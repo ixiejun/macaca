@@ -8,12 +8,12 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use macaca_app::{AppRegistry, AppRuntime};
-use macaca_kernel::{Kernel, ApplicationExecutorRegistry, AgentRunner};
+use macaca_kernel::{Kernel, ApplicationExecutorRegistry};
 use macaca_llm::LlmProvider;
 use macaca_persist::RedbStore;
 use macaca_proto::{ApplicationId, LlmMessage};
 use macaca_skill::SkillCatalog;
-use macaca_tools::{ToolSet, OrchestrationState};
+use macaca_tools::ToolSet;
 
 /// Shared state passed to all route handlers via axum's State extractor.
 pub struct AppState {
@@ -37,8 +37,6 @@ pub struct AppState {
     pub cancel_flags: RwLock<HashMap<String, Arc<AtomicBool>>>,
     /// Persistent session store (redb-backed).
     pub session_store: Arc<RedbStore>,
-    /// Orchestration state for multi-agent coordination.
-    pub orchestration: Arc<RwLock<OrchestrationState>>,
     /// Application executor registry for isolated multi-agent execution.
     pub executor_registry: Arc<ApplicationExecutorRegistry>,
 }

@@ -152,12 +152,9 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
     info!(count = cc_tools.len(), "Claude Code driver tools loaded");
     all_tools.extend(cc_tools);
 
-    // 8. Initialize orchestration state and add orchestration tools.
-    let orchestration: Arc<tokio::sync::RwLock<OrchestrationState>> = Arc::new(tokio::sync::RwLock::new(OrchestrationState::new()));
-
-    all_tools.push(Box::new(DelegateTaskTool::new(Arc::clone(&orchestration))));
-    all_tools.push(Box::new(GetTaskResultTool::new(Arc::clone(&orchestration))));
-    all_tools.push(Box::new(ReportResultTool::new(Arc::clone(&orchestration))));
+    // 8. Initialize orchestration tools placeholder.
+    // We'll create the actual tools after we have the executor_registry.
+    // For now, we'll add the list_agents tool which doesn't need the registry.
 
     // Create dynamic ListAgentsTool that fetches from kernel
     let kernel_for_callback = Arc::clone(&kernel);
@@ -184,7 +181,7 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
             .boxed()
         });
     all_tools.push(Box::new(list_agents_tool));
-    info!("Orchestration tools added: delegate_task, get_task_result, report_result, list_agents");
+    info!("ListAgents tool added");
 
     let tool_names: Vec<&str> = all_tools.iter().map(|t| t.name()).collect();
     info!(tools = ?tool_names, "Composite toolset ready");
@@ -219,7 +216,6 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
             sessions: tokio::sync::RwLock::new(HashMap::new()),
             cancel_flags: tokio::sync::RwLock::new(HashMap::new()),
             session_store,
-            orchestration,
             executor_registry,
         }
     });

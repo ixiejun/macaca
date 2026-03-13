@@ -98,8 +98,8 @@
   "hotPaths": [
     {
       "path": "crates/macaca-web/src/lib.rs",
-      "accessCount": 93,
-      "lastAccessed": 1773433883389,
+      "accessCount": 100,
+      "lastAccessed": 1773434836747,
       "type": "file"
     },
     {
@@ -110,8 +110,8 @@
     },
     {
       "path": "crates/macaca-tools/src/orchestration.rs",
-      "accessCount": 24,
-      "lastAccessed": 1773432397356,
+      "accessCount": 27,
+      "lastAccessed": 1773435008838,
       "type": "file"
     },
     {
@@ -121,15 +121,15 @@
       "type": "directory"
     },
     {
-      "path": "crates/macaca-proto/src/orchestration.rs",
-      "accessCount": 10,
-      "lastAccessed": 1773405785567,
+      "path": "crates/macaca-web/src/state.rs",
+      "accessCount": 11,
+      "lastAccessed": 1773434757796,
       "type": "file"
     },
     {
-      "path": "crates/macaca-web/src/state.rs",
+      "path": "crates/macaca-proto/src/orchestration.rs",
       "accessCount": 10,
-      "lastAccessed": 1773433603014,
+      "lastAccessed": 1773405785567,
       "type": "file"
     },
     {
@@ -145,9 +145,21 @@
       "type": "directory"
     },
     {
+      "path": "crates/macaca-tools/Cargo.toml",
+      "accessCount": 7,
+      "lastAccessed": 1773434937337,
+      "type": "directory"
+    },
+    {
       "path": "examples/apps/fullstack-autodev/personas/coordinator/IDENTITY.md",
       "accessCount": 6,
       "lastAccessed": 1773425090868,
+      "type": "file"
+    },
+    {
+      "path": "crates/macaca-tools/src/lib.rs",
+      "accessCount": 6,
+      "lastAccessed": 1773435297182,
       "type": "file"
     },
     {
@@ -169,12 +181,6 @@
       "type": "file"
     },
     {
-      "path": "crates/macaca-tools/Cargo.toml",
-      "accessCount": 4,
-      "lastAccessed": 1773419098389,
-      "type": "directory"
-    },
-    {
       "path": "crates/macaca-kernel/src/kernel.rs",
       "accessCount": 4,
       "lastAccessed": 1773429171285,
@@ -191,12 +197,6 @@
       "accessCount": 3,
       "lastAccessed": 1773404468292,
       "type": "directory"
-    },
-    {
-      "path": "crates/macaca-tools/src/lib.rs",
-      "accessCount": 3,
-      "lastAccessed": 1773406748360,
-      "type": "file"
     },
     {
       "path": "examples/apps/fullstack-autodev/app.yaml",
