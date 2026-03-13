@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use tokio::sync::{mpsc, RwLock};
 
-use super::{DelegatedTask, TaskId, TaskResult};
+use super::{DelegatedTask, TaskId, TaskResult, TaskStatus};
 
 /// Maximum number of tasks that can be queued.
 const DEFAULT_MAX_QUEUE_SIZE: usize = 100;
@@ -60,6 +60,8 @@ pub struct ExecutionQueue {
     pending: Arc<RwLock<Vec<PrioritizedTask>>>,
     /// Currently running tasks.
     running: Arc<RwLock<HashMap<TaskId, DelegatedTask>>>,
+    /// Completed task results.
+    results: Arc<RwLock<HashMap<TaskId, TaskResult>>>,
     /// Maximum concurrent tasks.
     max_parallel: usize,
     /// Maximum queue size.
@@ -74,6 +76,7 @@ impl ExecutionQueue {
         Self {
             pending: Arc::new(RwLock::new(Vec::new())),
             running: Arc::new(RwLock::new(HashMap::new())),
+            results: Arc::new(RwLock::new(HashMap::new())),
             max_parallel,
             max_queue_size,
             completion_tx: None,
@@ -232,6 +235,35 @@ impl ExecutionQueue {
             max_queue_size: self.max_queue_size,
         }
     }
+
+    /// Store a task result.
+    pub async fn store_result(&self, result: TaskResult) {
+        let task_id = result.task_id;
+        self.results.write().await.insert(task_id, result);
+        tracing::info!(task_id = %task_id, "Task result stored");
+    }
+
+    /// Get a task result by ID.
+    pub async fn get_result(&self, task_id: &TaskId) -> Option<TaskResult> {
+        self.results.read().await.get(task_id).cloned()
+    }
+
+    /// Get task status by ID.
+    pub async fn get_status(&self, task_id: &TaskId) -> Option<TaskStatus> {
+        // Check results first (completed)
+        if self.results.read().await.contains_key(task_id) {
+            return Some(TaskStatus::Completed);
+        }
+        // Check running
+        if self.running.read().await.contains_key(task_id) {
+            return Some(TaskStatus::Running);
+        }
+        // Check pending
+        if self.pending.read().await.iter().any(|p| p.task.id == *task_id) {
+            return Some(TaskStatus::Queued);
+        }
+        None
+    }
 }
 
 /// Queue status snapshot.
@@ -264,6 +296,7 @@ mod tests {
     fn create_test_task(priority: u8) -> DelegatedTask {
         DelegatedTask {
             id: TaskId::new(),
+            application_id: "test-app".into(),
             from_agent: "coordinator".into(),
             to_agent: "backend".into(),
             prompt: "Test task".into(),

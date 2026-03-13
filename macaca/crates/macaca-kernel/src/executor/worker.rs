@@ -49,6 +49,10 @@ pub enum ExecutorEvent {
         task_id: TaskId,
         error: String,
     },
+    /// Task cancelled.
+    TaskCancelled {
+        task_id: TaskId,
+    },
     /// Executor shutdown.
     Shutdown,
 }

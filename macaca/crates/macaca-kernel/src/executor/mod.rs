@@ -42,12 +42,14 @@ use tokio::sync::{broadcast, mpsc};
 use uuid::Uuid;
 
 
+pub mod app_executor;
 pub mod bus;
 pub mod callback;
 pub mod queue;
 pub mod router;
 pub mod worker;
 
+pub use app_executor::{ApplicationExecutor, ApplicationExecutorConfig, ApplicationExecutorRegistry};
 pub use bus::{EventBus, SystemEvent};
 pub use callback::CallbackDispatcher;
 pub use queue::ExecutionQueue;

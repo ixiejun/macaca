@@ -36,7 +36,8 @@ impl EventTimestamp {
 pub enum SystemEvent {
     /// A task was delegated from one agent to another.
     TaskDelegated {
-        task_id: String,
+        task_id: super::TaskId,
+        application_id: String,
         from_agent: String,
         to_agent: String,
         prompt: String,
@@ -120,14 +121,14 @@ impl SystemEvent {
     }
 
     /// Get the related task ID if applicable.
-    pub fn task_id(&self) -> Option<&str> {
+    pub fn task_id(&self) -> Option<String> {
         match self {
-            SystemEvent::TaskDelegated { task_id, .. } => Some(task_id),
-            SystemEvent::TaskStarted { task_id, .. } => Some(task_id),
-            SystemEvent::TaskProgress { task_id, .. } => Some(task_id),
-            SystemEvent::TaskCompleted { task_id, .. } => Some(task_id),
-            SystemEvent::TaskFailed { task_id, .. } => Some(task_id),
-            SystemEvent::TaskCancelled { task_id, .. } => Some(task_id),
+            SystemEvent::TaskDelegated { task_id, .. } => Some(task_id.to_string()),
+            SystemEvent::TaskStarted { task_id, .. } => Some(task_id.clone()),
+            SystemEvent::TaskProgress { task_id, .. } => Some(task_id.clone()),
+            SystemEvent::TaskCompleted { task_id, .. } => Some(task_id.clone()),
+            SystemEvent::TaskFailed { task_id, .. } => Some(task_id.clone()),
+            SystemEvent::TaskCancelled { task_id, .. } => Some(task_id.clone()),
             _ => None,
         }
     }
