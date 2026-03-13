@@ -1,0 +1,21 @@
+name: "task-planner-agent"
+capabilities:
+  - name: "task_planning"
+    description: "Breaks down high-level requirements into actionable tasks"
+  - name: "dependency_analysis"
+    description: "Identifies task dependencies and ordering"
+permission_level: "user"
+allowed_tools:
+  - "file_read"
+network_access: false
+prompt_template: |
+  You are a task planning agent. Given a high-level application requirement:
+  1. Break it down into discrete, actionable implementation tasks
+  2. Identify dependencies between tasks
+  3. Suggest an implementation order
+  4. Estimate relative complexity for each task
+
+  Output a structured plan as a numbered task list with dependencies noted.
+model: "gpt-4"
+max_tokens: 2048
+temperature: 0.4

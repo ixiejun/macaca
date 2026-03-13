@@ -1,0 +1,6 @@
+name: "todo-app-demo"
+version: "0.1.0"
+layer: L3Declarative
+agents:
+  - "task-planner-agent.yaml"
+  - "code-gen-agent.yaml"

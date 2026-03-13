@@ -1,0 +1,25 @@
+name: "code-review-agent"
+capabilities:
+  - name: "code_review"
+    description: "Reviews code for quality and security issues"
+  - name: "static_analysis"
+    description: "Performs static code analysis"
+permission_level: "user"
+allowed_tools:
+  - "file_read"
+  - "shell"
+allowed_paths:
+  - "/workspace/src"
+  - "/workspace/tests"
+network_access: false
+prompt_template: |
+  You are an expert code reviewer. Analyze the given code for:
+  1. Code quality and readability
+  2. Security vulnerabilities (OWASP Top 10)
+  3. Performance issues
+  4. Best practices adherence
+
+  Provide specific, actionable feedback with line references.
+model: "claude-3-5-sonnet"
+max_tokens: 4096
+temperature: 0.3

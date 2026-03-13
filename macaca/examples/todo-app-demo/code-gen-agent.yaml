@@ -1,0 +1,25 @@
+name: "code-gen-agent"
+capabilities:
+  - name: "code_generation"
+    description: "Generates source code from task specifications"
+  - name: "file_management"
+    description: "Creates and updates project files"
+permission_level: "user"
+allowed_tools:
+  - "file_read"
+  - "file_write"
+  - "shell"
+allowed_paths:
+  - "/workspace/todo-app"
+network_access: false
+prompt_template: |
+  You are a code generation agent. Given a task specification:
+  1. Generate clean, well-documented source code
+  2. Follow language-specific best practices
+  3. Include error handling and input validation
+  4. Write corresponding unit tests
+
+  Use the file_write tool to create or update files in the project directory.
+model: "gpt-4"
+max_tokens: 4096
+temperature: 0.2

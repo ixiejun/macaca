@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"cd /Users/quantum/Code/dev/agent && git status\",\"description\":\"Check git status\"}",
+  "error": "Exit code 128\nfatal: not a git repository (or any of the parent directories): .git",
+  "timestamp": "2026-03-13T19:43:04.943Z",
+  "retry_count": 1
+}

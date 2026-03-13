@@ -1,0 +1,7 @@
+{
+  "tool_name": "Read",
+  "tool_input_preview": "{\"file_path\":\"/Users/quantum/Code/dev/agent/agent-os\"}",
+  "error": "EISDIR: illegal operation on a directory, read '/Users/quantum/Code/dev/agent/agent-os'",
+  "timestamp": "2026-03-10T05:07:48.850Z",
+  "retry_count": 1
+}

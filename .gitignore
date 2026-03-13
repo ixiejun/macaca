@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+vendor/
+dist/
+build/
+
+# Build outputs
+target/
+*.exe
+*.dylib
+*.so
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.local
+
+# Frontend (has its own git)
+frontend/
+
+# Large binary files
+*.zip
+*.tar.gz
+*.7z
+
+# Lock files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml

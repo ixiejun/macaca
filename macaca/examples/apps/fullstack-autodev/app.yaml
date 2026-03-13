@@ -1,0 +1,132 @@
+name: fullstack-autodev
+version: "0.1.0"
+description: "Fullstack Auto Development - AI-powered fullstack development with intelligent task routing, OpenSpec specifications, and coordinated multi-agent workflows"
+layer: L3Declarative
+ui_type: chat
+
+llm_config:
+  provider: anthropic
+  model: claude-sonnet-4-20250514
+
+# Application entrypoint - uses SDD workflow for multi-agent collaboration
+entrypoint:
+  type: workflow
+  name: sdd
+
+# Workflow definitions
+workflows:
+  # Main intelligent routing workflow
+  smart-router:
+    description: Smart task routing - analyzes user intent and routes to appropriate workflow
+    steps:
+      - name: classify
+        agent: coordinator
+        prompt_template: workflows/classify-task.md
+
+  # SDD workflow for complex features
+  sdd:
+    description: Spec-Driven Development for complex features requiring planning
+    steps:
+      - name: analyze
+        agent: architect
+        prompt_template: workflows/sdd-analyze.md
+      - name: spec
+        agent: architect
+        prompt_template: workflows/sdd-spec.md
+        depends_on: [analyze]
+      - name: implement
+        agent: frontend
+        prompt_template: workflows/sdd-implement.md
+        depends_on: [spec]
+
+  # Direct coding workflow for simple tasks
+  direct-code:
+    description: Direct coding for bug fixes and simple tasks
+    steps:
+      - name: execute
+        agent: coordinator
+        prompt_template: workflows/direct-code.md
+
+  # Chat workflow for conversations
+  chat:
+    description: General conversation and assistance
+    steps:
+      - name: respond
+        agent: coordinator
+        prompt_template: workflows/chat.md
+
+# Resource paths
+resources:
+  personas: personas/
+  skills: skills/
+  prompts: prompts/
+  workflows: workflows/
+
+agents:
+  # Coordinator Agent — Intelligent task router and executor
+  # Acts as the main entry point, classifies tasks and routes appropriately
+  - name: coordinator
+    capabilities:
+      - name: task_classification
+        description: Classify user intent into chat, simple-code, or sdd-workflow
+      - name: direct_execution
+        description: Execute simple coding tasks directly without SDD overhead
+      - name: conversation
+        description: Engage in helpful technical conversations
+    prompt_template: ""
+    model: claude-sonnet-4-20250514
+    permission_level: system
+    allowed_tools:
+      - claude_code_execute
+      - claude_code_resume
+      - claude_code_status
+      - file_read
+      - file_write
+      - shell
+    persona_dir: "./personas/coordinator"
+
+  # Architect Agent — analyzes designs, generates OpenSpec specs
+  # Only invoked for complex features requiring SDD workflow
+  - name: architect
+    capabilities:
+      - name: design_analysis
+        description: Analyze Figma designs and generate OpenSpec specifications
+      - name: project_coordination
+        description: Decompose work into frontend/backend tasks with proper specs
+    prompt_template: ""
+    model: claude-sonnet-4-20250514
+    permission_level: system
+    allowed_tools:
+      - claude_code_execute
+      - claude_code_resume
+      - claude_code_status
+      - openspec
+    persona_dir: "./personas/architect"
+
+  # Frontend Agent — implements web UI
+  - name: frontend
+    capabilities:
+      - name: frontend_development
+        description: Implement web UI with Next.js, React, TypeScript, Tailwind CSS
+    prompt_template: ""
+    model: claude-sonnet-4-20250514
+    permission_level: user
+    allowed_tools:
+      - claude_code_execute
+      - claude_code_resume
+      - shadcn-ui
+    persona_dir: "./personas/frontend"
+
+  # Backend Agent — implements APIs
+  - name: backend
+    capabilities:
+      - name: backend_development
+        description: Implement Go REST API with PostgreSQL
+    prompt_template: ""
+    model: claude-sonnet-4-20250514
+    permission_level: user
+    allowed_tools:
+      - claude_code_execute
+      - claude_code_resume
+      - golang
+    persona_dir: "./personas/backend"

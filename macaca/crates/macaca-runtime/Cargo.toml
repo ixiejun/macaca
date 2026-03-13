@@ -1,0 +1,16 @@
+[package]
+name = "macaca-runtime"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+macaca-proto = { workspace = true }
+macaca-tools = { workspace = true }
+macaca-llm = { workspace = true }
+async-trait = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+[dev-dependencies]
+tokio = { workspace = true }

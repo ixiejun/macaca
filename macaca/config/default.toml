@@ -1,0 +1,81 @@
+[kernel]
+max_agents = 16
+heartbeat_interval_ms = 5000
+agent_timeout_ms = 30000
+
+[llm]
+default_provider = "dashscope"
+max_tokens_per_request = 8192
+rate_limit_rpm = 60
+
+[llm.providers.openai]
+api_key_env = "OPENAI_API_KEY"
+base_url = "https://api.openai.com/v1"
+
+[llm.providers.anthropic]
+api_key_env = "ANTHROPIC_API_KEY"
+base_url = "https://api.anthropic.com"
+
+[llm.providers.dashscope]
+api_key_env = "sk-7720115f25214ebaa4f83d5857224f9a"
+base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+
+# Example: OpenAI-compatible providers (uncomment to enable)
+# [llm.providers.deepseek]
+# api_key_env = "DEEPSEEK_API_KEY"
+# base_url = "https://api.deepseek.com/v1"
+#
+# [llm.providers.ollama]
+# api_key_env = ""
+# base_url = "http://localhost:11434/v1"
+
+[memory]
+session_ttl_seconds = 3600
+file_store_path = "./data/memory/files"
+auto_retrieve_on = "task_start"
+
+[memory.vector]
+backend = "milvus"
+milvus_url = "http://localhost:19530"
+collection_name = "agent_memory"
+
+[memory.embedding]
+provider = "dashscope"
+model = "text-embedding-v4"
+api_key_env = "sk-7720115f25214ebaa4f83d5857224f9a"
+dimensions = 1024
+base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+
+[memory.compression]
+enabled = true
+threshold_entries = 100
+strategy = "llm_summarize"
+
+[ipc]
+nats_url = "nats://localhost:4222"
+nats_auto_start = true
+reconnect_max_attempts = 10
+reconnect_delay_ms = 1000
+
+[persist]
+engine = "redb"
+data_dir = "./data/persist"
+snapshot_interval_seconds = 300
+
+[gateway]
+enabled = true
+
+[gateway.telegram]
+enabled = true
+bot_token_env = "TELEGRAM_BOT_TOKEN"
+allowed_user_ids = []
+
+[gateway.discord]
+enabled = true
+bot_token_env = "DISCORD_BOT_TOKEN"
+command_prefix = "!"
+
+[observability]
+log_level = "info"
+tracing_enabled = true
+otlp_endpoint = ""

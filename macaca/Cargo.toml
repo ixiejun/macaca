@@ -1,0 +1,84 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/macaca-proto",
+    "crates/macaca-llm",
+    "crates/macaca-memory",
+    "crates/macaca-ipc",
+    "crates/macaca-tools",
+    "crates/macaca-persist",
+    "crates/macaca-agent",
+    "crates/macaca-task",
+    "crates/macaca-app",
+    "crates/macaca-kernel",
+    "crates/macaca-sdk",
+    "crates/macaca-gateway",
+    "crates/macaca-cli",
+    "crates/macaca-driver",
+    "crates/macaca-runtime",
+    "crates/macaca-mcp",
+    "crates/macaca-skill",
+    "crates/macaca-driver-claude-code",
+    "crates/macaca-web",
+    "crates/macaca-integration-tests",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+rust-version = "1.75"
+
+[workspace.dependencies]
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+bincode = "1"
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+async-trait = "0.1"
+futures = "0.3"
+
+# Error handling
+thiserror = "2"
+anyhow = "1"
+
+# Logging & tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
+tracing-opentelemetry = "0.27"
+
+# Configuration
+config = "0.14"
+toml = "0.8"
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# UUID
+uuid = { version = "1", features = ["v4", "serde"] }
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Internal crates
+macaca-proto = { path = "crates/macaca-proto" }
+macaca-llm = { path = "crates/macaca-llm" }
+macaca-memory = { path = "crates/macaca-memory" }
+macaca-ipc = { path = "crates/macaca-ipc" }
+macaca-tools = { path = "crates/macaca-tools" }
+macaca-persist = { path = "crates/macaca-persist" }
+macaca-agent = { path = "crates/macaca-agent" }
+macaca-task = { path = "crates/macaca-task" }
+macaca-app = { path = "crates/macaca-app" }
+macaca-kernel = { path = "crates/macaca-kernel" }
+macaca-sdk = { path = "crates/macaca-sdk" }
+macaca-gateway = { path = "crates/macaca-gateway" }
+macaca-cli = { path = "crates/macaca-cli" }
+macaca-driver = { path = "crates/macaca-driver" }
+macaca-runtime = { path = "crates/macaca-runtime" }
+macaca-mcp = { path = "crates/macaca-mcp" }
+macaca-skill = { path = "crates/macaca-skill" }
+macaca-driver-claude-code = { path = "crates/macaca-driver-claude-code" }
+macaca-web = { path = "crates/macaca-web" }

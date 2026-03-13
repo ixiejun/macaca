@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"npm run dev 2>&1 &\\n_up the project目录结构， run dev server检查星座计算功能。验证响应式布局。验证应用可以正常运行。测试星座边界日期计算。检查加载状态和错误处理\\n检查并安装依赖\",\"timeout\":60000}",
+  "error": "Exit code 127\n(eval):2: command not found: _up\n(eval):3: command not found: 检查并安装依赖",
+  "timestamp": "2026-03-13T14:15:28.367Z",
+  "retry_count": 1
+}

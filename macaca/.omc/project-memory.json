@@ -1,0 +1,401 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1773376293054,
+  "projectRoot": "/Users/quantum/Code/dev/agent/macaca",
+  "techStack": {
+    "languages": [
+      {
+        "name": "Rust",
+        "version": "1.75",
+        "confidence": "high",
+        "markers": [
+          "Cargo.toml"
+        ]
+      }
+    ],
+    "frameworks": [],
+    "packageManager": "cargo",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "cargo build",
+    "testCommand": "cargo test",
+    "lintCommand": "cargo clippy",
+    "devCommand": "cargo run",
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "examples",
+      "tests"
+    ],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "config": {
+      "path": "config",
+      "purpose": "Configuration files",
+      "fileCount": 1,
+      "lastAccessed": 1773376293038,
+      "keyFiles": [
+        "default.toml"
+      ]
+    },
+    "crates": {
+      "path": "crates",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1773376293039,
+      "keyFiles": []
+    },
+    "examples": {
+      "path": "examples",
+      "purpose": "Example code",
+      "fileCount": 0,
+      "lastAccessed": 1773376293039,
+      "keyFiles": []
+    },
+    "infra": {
+      "path": "infra",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1773376293040,
+      "keyFiles": []
+    },
+    "target": {
+      "path": "target",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1773376293040,
+      "keyFiles": [
+        "CACHEDIR.TAG"
+      ]
+    },
+    "tests": {
+      "path": "tests",
+      "purpose": "Test files",
+      "fileCount": 0,
+      "lastAccessed": 1773376293040,
+      "keyFiles": []
+    },
+    "tests/fixtures": {
+      "path": "tests/fixtures",
+      "purpose": "Test fixtures",
+      "fileCount": 0,
+      "lastAccessed": 1773376293040,
+      "keyFiles": []
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "crates/macaca-web/src/routes.rs",
+      "accessCount": 91,
+      "lastAccessed": 1773426591524,
+      "type": "directory"
+    },
+    {
+      "path": "crates/macaca-web/src/lib.rs",
+      "accessCount": 85,
+      "lastAccessed": 1773426373259,
+      "type": "file"
+    },
+    {
+      "path": "crates/macaca-tools/src/orchestration.rs",
+      "accessCount": 23,
+      "lastAccessed": 1773426399863,
+      "type": "file"
+    },
+    {
+      "path": "crates/macaca-kernel/src/lib.rs",
+      "accessCount": 11,
+      "lastAccessed": 1773429031514,
+      "type": "directory"
+    },
+    {
+      "path": "crates/macaca-proto/src/orchestration.rs",
+      "accessCount": 10,
+      "lastAccessed": 1773405785567,
+      "type": "file"
+    },
+    {
+      "path": "crates/macaca-kernel/src/orchestrator.rs",
+      "accessCount": 9,
+      "lastAccessed": 1773426737768,
+      "type": "file"
+    },
+    {
+      "path": "",
+      "accessCount": 8,
+      "lastAccessed": 1773417463912,
+      "type": "directory"
+    },
+    {
+      "path": "crates/macaca-web/src/state.rs",
+      "accessCount": 8,
+      "lastAccessed": 1773425845427,
+      "type": "file"
+    },
+    {
+      "path": "examples/apps/fullstack-autodev/personas/coordinator/IDENTITY.md",
+      "accessCount": 6,
+      "lastAccessed": 1773425090868,
+      "type": "file"
+    },
+    {
+      "path": "crates/macaca-proto/src/types.rs",
+      "accessCount": 5,
+      "lastAccessed": 1773405728461,
+      "type": "file"
+    },
+    {
+      "path": "crates/macaca-llm/src/dashscope.rs",
+      "accessCount": 5,
+      "lastAccessed": 1773417687912,
+      "type": "directory"
+    },
+    {
+      "path": "examples/apps/fullstack-autodev/personas/coordinator/TOOLS.md",
+      "accessCount": 4,
+      "lastAccessed": 1773415302665,
+      "type": "file"
+    },
+    {
+      "path": "crates/macaca-tools/Cargo.toml",
+      "accessCount": 4,
+      "lastAccessed": 1773419098389,
+      "type": "directory"
+    },
+    {
+      "path": "crates/macaca-kernel/src/kernel.rs",
+      "accessCount": 4,
+      "lastAccessed": 1773429171285,
+      "type": "directory"
+    },
+    {
+      "path": "crates/macaca-kernel/src/status.rs",
+      "accessCount": 3,
+      "lastAccessed": 1773376564586,
+      "type": "file"
+    },
+    {
+      "path": "crates/macaca-proto/src/lib.rs",
+      "accessCount": 3,
+      "lastAccessed": 1773404468292,
+      "type": "directory"
+    },
+    {
+      "path": "crates/macaca-tools/src/lib.rs",
+      "accessCount": 3,
+      "lastAccessed": 1773406748360,
+      "type": "file"
+    },
+    {
+      "path": "examples/apps/fullstack-autodev/app.yaml",
+      "accessCount": 3,
+      "lastAccessed": 1773415579013,
+      "type": "file"
+    },
+    {
+      "path": "crates/macaca-kernel/src",
+      "accessCount": 3,
+      "lastAccessed": 1773419724399,
+      "type": "directory"
+    },
+    {
+      "path": "crates/macaca-web/src",
+      "accessCount": 2,
+      "lastAccessed": 1773400570395,
+      "type": "directory"
+    },
+    {
+      "path": "crates/macaca-app/src/registry.rs",
+      "accessCount": 2,
+      "lastAccessed": 1773400582539,
+      "type": "directory"
+    },
+    {
+      "path": "crates/macaca-tools/src/tool.rs",
+      "accessCount": 2,
+      "lastAccessed": 1773406691131,
+      "type": "directory"
+    },
+    {
+      "path": "crates/macaca-cli/src/main.rs",
+      "accessCount": 2,
+      "lastAccessed": 1773413947540,
+      "type": "file"
+    },
+    {
+      "path": "crates/macaca-tools/src",
+      "accessCount": 2,
+      "lastAccessed": 1773415715331,
+      "type": "directory"
+    },
+    {
+      "path": "crates/macaca-llm/src",
+      "accessCount": 2,
+      "lastAccessed": 1773417611597,
+      "type": "directory"
+    },
+    {
+      "path": "crates/macaca-proto/src",
+      "accessCount": 2,
+      "lastAccessed": 1773417754540,
+      "type": "directory"
+    },
+    {
+      "path": "uniswap-v2-contracts/openspec/AGENTS.md",
+      "accessCount": 1,
+      "lastAccessed": 1773387582983,
+      "type": "file"
+    },
+    {
+      "path": "uniswap-v2-contracts/openspec/project.md",
+      "accessCount": 1,
+      "lastAccessed": 1773387589295,
+      "type": "file"
+    },
+    {
+      "path": "hello.html",
+      "accessCount": 1,
+      "lastAccessed": 1773401667172,
+      "type": "file"
+    },
+    {
+      "path": "openspec/project.md",
+      "accessCount": 1,
+      "lastAccessed": 1773402032502,
+      "type": "file"
+    },
+    {
+      "path": "openspec/AGENTS.md",
+      "accessCount": 1,
+      "lastAccessed": 1773402032553,
+      "type": "file"
+    },
+    {
+      "path": "crates/macaca-web/Cargo.toml",
+      "accessCount": 1,
+      "lastAccessed": 1773402121058,
+      "type": "file"
+    },
+    {
+      "path": "openspec/changes/add-user-login-api/proposal.md",
+      "accessCount": 1,
+      "lastAccessed": 1773402258634,
+      "type": "file"
+    },
+    {
+      "path": "package.json",
+      "accessCount": 1,
+      "lastAccessed": 1773402303316,
+      "type": "file"
+    },
+    {
+      "path": "server.js",
+      "accessCount": 1,
+      "lastAccessed": 1773402303425,
+      "type": "file"
+    },
+    {
+      "path": "openspec/changes/add-user-login-api/design.md",
+      "accessCount": 1,
+      "lastAccessed": 1773402321511,
+      "type": "file"
+    },
+    {
+      "path": "openspec/changes/add-user-login-api/specs/auth/spec.md",
+      "accessCount": 1,
+      "lastAccessed": 1773402358565,
+      "type": "file"
+    },
+    {
+      "path": "openspec/changes/add-user-login-api/tasks.md",
+      "accessCount": 1,
+      "lastAccessed": 1773402387330,
+      "type": "file"
+    },
+    {
+      "path": "crates/macaca-tools/src/builtin.rs",
+      "accessCount": 1,
+      "lastAccessed": 1773406262757,
+      "type": "file"
+    },
+    {
+      "path": "examples/apps/fullstack-autodev",
+      "accessCount": 1,
+      "lastAccessed": 1773407688905,
+      "type": "directory"
+    },
+    {
+      "path": "examples/apps/zodiac-app/openspec/AGENTS.md",
+      "accessCount": 1,
+      "lastAccessed": 1773409934606,
+      "type": "file"
+    },
+    {
+      "path": "examples/apps/zodiac-app",
+      "accessCount": 1,
+      "lastAccessed": 1773409934659,
+      "type": "directory"
+    },
+    {
+      "path": "examples/apps/zodiac-app/openspec/project.md",
+      "accessCount": 1,
+      "lastAccessed": 1773410008757,
+      "type": "file"
+    },
+    {
+      "path": "examples/apps/zodiac-app/openspec/changes/create-zodiac-app/proposal.md",
+      "accessCount": 1,
+      "lastAccessed": 1773410117318,
+      "type": "file"
+    },
+    {
+      "path": "examples/apps/zodiac-app/openspec/changes/create-zodiac-app/tasks.md",
+      "accessCount": 1,
+      "lastAccessed": 1773410117440,
+      "type": "file"
+    },
+    {
+      "path": "examples/apps/zodiac-app/openspec/changes/create-zodiac-app/design.md",
+      "accessCount": 1,
+      "lastAccessed": 1773410117562,
+      "type": "file"
+    },
+    {
+      "path": "examples/apps/zodiac-app/openspec/changes/create-zodiac-app/specs/zodiac-query/spec.md",
+      "accessCount": 1,
+      "lastAccessed": 1773410117675,
+      "type": "file"
+    },
+    {
+      "path": "contracts/ERC20Token.sol",
+      "accessCount": 1,
+      "lastAccessed": 1773414857784,
+      "type": "file"
+    },
+    {
+      "path": "config",
+      "accessCount": 1,
+      "lastAccessed": 1773417245238,
+      "type": "directory"
+    },
+    {
+      "path": "MyToken.sol",
+      "accessCount": 1,
+      "lastAccessed": 1773419402064,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

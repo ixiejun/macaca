@@ -1,0 +1,6 @@
+name: figma-mcp
+description: Fetch design context from Figma files via MCP protocol
+entry_point:
+  type: mcp
+  command: npx
+  args: ["@anthropic/figma-mcp"]

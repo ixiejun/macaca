@@ -1,0 +1,31 @@
+[package]
+name = "macaca-integration-tests"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dev-dependencies]
+macaca-proto = { workspace = true }
+macaca-llm = { workspace = true }
+macaca-agent = { workspace = true }
+macaca-tools = { workspace = true }
+macaca-kernel = { workspace = true }
+macaca-task = { workspace = true }
+macaca-sdk = { workspace = true }
+macaca-app = { workspace = true }
+macaca-gateway = { workspace = true }
+macaca-persist = { workspace = true }
+macaca-memory = { workspace = true }
+macaca-ipc = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+chrono = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = "0.9"
+uuid = { workspace = true }
+reqwest = { version = "0.12", features = ["json"] }
+macaca-driver = { workspace = true }
+macaca-driver-claude-code = { workspace = true }
+macaca-skill = { workspace = true }
+tempfile = "3"

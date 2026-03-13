@@ -1,0 +1,33 @@
+name: openspec
+description: |
+  Spec-Driven Development (SDD) workflow management via OpenSpec CLI.
+  Use this tool to manage project specifications before writing code.
+  Actions:
+    - init: Initialize a .openspec directory in the project
+    - propose: Generate proposals (specs, design docs, tasks) from requirements
+    - apply: Implement approved proposals task by task
+    - verify: Verify implementation matches the specifications
+    - archive: Archive completed specs
+    - status: Show current spec status
+  IMPORTANT: Always set work_dir to the target project directory.
+version: "0.2.0"
+entry_point:
+  type: shell
+  command: openspec
+  args: []
+parameters:
+  type: object
+  required: [action, work_dir]
+  properties:
+    action:
+      type: string
+      enum: [init, propose, apply, verify, archive, status]
+      description: "SDD workflow action to execute"
+    work_dir:
+      type: string
+      description: "Project directory to run openspec in (REQUIRED)"
+    args:
+      type: array
+      items:
+        type: string
+      description: "Additional arguments passed to the openspec command"

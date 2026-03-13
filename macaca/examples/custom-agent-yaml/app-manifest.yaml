@@ -1,0 +1,5 @@
+name: "code-review-app"
+version: "0.1.0"
+layer: L3Declarative
+agents:
+  - "code-review-agent.yaml"
