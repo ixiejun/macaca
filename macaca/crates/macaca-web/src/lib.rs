@@ -3,6 +3,7 @@
 //! Provides an HTTP server with a single-page web interface for interacting
 //! with Macaca OS applications. Uses axum for the HTTP layer.
 
+pub mod agent_runner;
 pub mod routes;
 pub mod state;
 
@@ -17,7 +18,7 @@ use tracing::info;
 
 use macaca_app::{AppRegistry, AppRuntime};
 use macaca_driver_claude_code::{ClaudeCodeConfig, ClaudeCodeDriver};
-use macaca_kernel::Kernel;
+use macaca_kernel::{Kernel, ApplicationExecutorRegistry};
 use macaca_llm::{DashScopeProvider, LlmProvider};
 use macaca_persist::RedbStore;
 use macaca_proto::config::{KernelConfig, MacacaConfig};
@@ -25,10 +26,10 @@ use macaca_proto::{ApplicationId, LlmMessage, MacacaResult};
 use macaca_sdk::AgentPersona;
 use macaca_skill::{SkillCatalog, SkillRegistry};
 use macaca_tools::{DefaultToolSet, Tool, ToolSet, OrchestrationState, DelegateTaskTool, GetTaskResultTool, ReportResultTool, ListAgentsTool};
-use macaca_tools::orchestration::{AgentExecutor, AgentExecutionResult};
 use futures::FutureExt;
 
 use crate::state::AppState;
+use crate::agent_runner::WebAgentRunner;
 
 // ---------------------------------------------------------------------------
 // Composite ToolSet: built-in + skill tools
@@ -154,10 +155,6 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
     // 8. Initialize orchestration state and add orchestration tools.
     let orchestration: Arc<tokio::sync::RwLock<OrchestrationState>> = Arc::new(tokio::sync::RwLock::new(OrchestrationState::new()));
 
-    // NOTE: DelegateTaskTool is added WITHOUT executor for now.
-    // The delegated tasks will be stored in pending_tasks but not automatically executed.
-    // This is a limitation that can be addressed in a future iteration.
-    // For now, the coordinator can use claude_code_execute to run actual code.
     all_tools.push(Box::new(DelegateTaskTool::new(Arc::clone(&orchestration))));
     all_tools.push(Box::new(GetTaskResultTool::new(Arc::clone(&orchestration))));
     all_tools.push(Box::new(ReportResultTool::new(Arc::clone(&orchestration))));
@@ -204,18 +201,27 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
     info!(path = %session_db_path.display(), "Session store initialized");
 
     // 10. Build shared state.
-    let state = Arc::new(AppState {
-        kernel,
-        runtime,
-        registry: tokio::sync::RwLock::new(registry),
-        catalog: tokio::sync::RwLock::new(catalog),
-        llm,
-        app_dirs: tokio::sync::RwLock::new(app_dirs),
-        tools,
-        sessions: tokio::sync::RwLock::new(HashMap::new()),
-        cancel_flags: tokio::sync::RwLock::new(HashMap::new()),
-        session_store,
-        orchestration,
+    let state = Arc::new_cyclic(|weak_state| {
+        // Create the agent runner with the actual state
+        let runner = Arc::new(WebAgentRunner::new(weak_state.clone()));
+
+        // Create the executor registry with this runner
+        let executor_registry = Arc::new(ApplicationExecutorRegistry::new(Arc::clone(&runner) as Arc<dyn macaca_kernel::AgentRunner>));
+
+        AppState {
+            kernel,
+            runtime,
+            registry: tokio::sync::RwLock::new(registry),
+            catalog: tokio::sync::RwLock::new(catalog),
+            llm,
+            app_dirs: tokio::sync::RwLock::new(app_dirs),
+            tools,
+            sessions: tokio::sync::RwLock::new(HashMap::new()),
+            cancel_flags: tokio::sync::RwLock::new(HashMap::new()),
+            session_store,
+            orchestration,
+            executor_registry,
+        }
     });
 
     // 11. Build axum router.
@@ -239,7 +245,6 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
         .route("/api/sessions/detail/{session_id}", axum::routing::delete(routes::delete_session))
         .route("/api/skills", get(routes::get_skills))
         .route("/api/chat", post(routes::post_chat))
-        .route("/api/chat/stop", post(routes::post_stop))
         .layer(cors)
         .with_state(state);
 

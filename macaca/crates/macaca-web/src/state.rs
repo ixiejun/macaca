@@ -8,7 +8,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use macaca_app::{AppRegistry, AppRuntime};
-use macaca_kernel::Kernel;
+use macaca_kernel::{Kernel, ApplicationExecutorRegistry, AgentRunner};
 use macaca_llm::LlmProvider;
 use macaca_persist::RedbStore;
 use macaca_proto::{ApplicationId, LlmMessage};
@@ -39,4 +39,6 @@ pub struct AppState {
     pub session_store: Arc<RedbStore>,
     /// Orchestration state for multi-agent coordination.
     pub orchestration: Arc<RwLock<OrchestrationState>>,
+    /// Application executor registry for isolated multi-agent execution.
+    pub executor_registry: Arc<ApplicationExecutorRegistry>,
 }

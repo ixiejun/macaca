@@ -97,16 +97,16 @@
   },
   "hotPaths": [
     {
+      "path": "crates/macaca-web/src/lib.rs",
+      "accessCount": 93,
+      "lastAccessed": 1773433883389,
+      "type": "file"
+    },
+    {
       "path": "crates/macaca-web/src/routes.rs",
       "accessCount": 91,
       "lastAccessed": 1773426591524,
       "type": "directory"
-    },
-    {
-      "path": "crates/macaca-web/src/lib.rs",
-      "accessCount": 85,
-      "lastAccessed": 1773426373259,
-      "type": "file"
     },
     {
       "path": "crates/macaca-tools/src/orchestration.rs",
@@ -127,6 +127,12 @@
       "type": "file"
     },
     {
+      "path": "crates/macaca-web/src/state.rs",
+      "accessCount": 10,
+      "lastAccessed": 1773433603014,
+      "type": "file"
+    },
+    {
       "path": "crates/macaca-kernel/src/orchestrator.rs",
       "accessCount": 9,
       "lastAccessed": 1773426737768,
@@ -137,12 +143,6 @@
       "accessCount": 8,
       "lastAccessed": 1773417463912,
       "type": "directory"
-    },
-    {
-      "path": "crates/macaca-web/src/state.rs",
-      "accessCount": 8,
-      "lastAccessed": 1773425845427,
-      "type": "file"
     },
     {
       "path": "examples/apps/fullstack-autodev/personas/coordinator/IDENTITY.md",
@@ -211,6 +211,12 @@
       "type": "directory"
     },
     {
+      "path": "crates/macaca-proto/src",
+      "accessCount": 3,
+      "lastAccessed": 1773433461059,
+      "type": "directory"
+    },
+    {
       "path": "crates/macaca-web/src",
       "accessCount": 2,
       "lastAccessed": 1773400570395,
@@ -244,12 +250,6 @@
       "path": "crates/macaca-llm/src",
       "accessCount": 2,
       "lastAccessed": 1773417611597,
-      "type": "directory"
-    },
-    {
-      "path": "crates/macaca-proto/src",
-      "accessCount": 2,
-      "lastAccessed": 1773417754540,
       "type": "directory"
     },
     {
