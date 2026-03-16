@@ -37,7 +37,7 @@ pub enum SystemEvent {
     /// A task was delegated from one agent to another.
     TaskDelegated {
         task_id: super::TaskId,
-        application_id: String,
+        application_id: super::ApplicationId,
         from_agent: String,
         to_agent: String,
         prompt: String,
@@ -101,6 +101,29 @@ pub enum SystemEvent {
         agent_id: String,
         name: String,
     },
+
+    /// A fork (child agent) was created.
+    ForkCreated {
+        fork_id: String,
+        application_id: String,
+        agent_name: String,
+    },
+
+    /// A fork is waiting for delegate task to complete.
+    ForkWaiting {
+        fork_id: String,
+        delegate_task_id: String,
+    },
+
+    /// A fork resumed after delegate task completed.
+    ForkResumed {
+        fork_id: String,
+    },
+
+    /// A fork completed and validated.
+    ForkMerged {
+        fork_id: String,
+    },
 }
 
 impl SystemEvent {
@@ -117,6 +140,10 @@ impl SystemEvent {
             SystemEvent::AgentIdle { .. } => "agent_idle",
             SystemEvent::AgentBusy { .. } => "agent_busy",
             SystemEvent::AgentAvailable { .. } => "agent_available",
+            SystemEvent::ForkCreated { .. } => "fork_created",
+            SystemEvent::ForkWaiting { .. } => "fork_waiting",
+            SystemEvent::ForkResumed { .. } => "fork_resumed",
+            SystemEvent::ForkMerged { .. } => "fork_merged",
         }
     }
 
@@ -129,6 +156,7 @@ impl SystemEvent {
             SystemEvent::TaskCompleted { task_id, .. } => Some(task_id.clone()),
             SystemEvent::TaskFailed { task_id, .. } => Some(task_id.clone()),
             SystemEvent::TaskCancelled { task_id, .. } => Some(task_id.clone()),
+            SystemEvent::ForkWaiting { delegate_task_id, .. } => Some(delegate_task_id.clone()),
             _ => None,
         }
     }
@@ -388,6 +416,13 @@ mod tests {
 
         fn is_interested_in(&self, _event_type: &str) -> bool {
             true
+        }
+
+        fn clone_box(&self) -> Box<dyn EventSubscriber> {
+            Box::new(TestSubscriber {
+                name: self.name.clone(),
+                received: self.received.clone(),
+            })
         }
     }
 }

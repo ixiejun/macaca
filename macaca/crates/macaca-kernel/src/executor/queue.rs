@@ -118,7 +118,7 @@ impl ExecutionQueue {
         pending.sort_by(|a, b| b.cmp(a)); // Reverse for max-heap behavior
         drop(pending);
 
-        tracing::info!(task_id = %task_id, queue_size = self.pending.read().await.len(), "Task enqueued");
+        tracing::info!("Task enqueued: task_id={}, queue_size={}", task_id, self.pending.read().await.len());
 
         Ok(task_id)
     }
@@ -292,11 +292,12 @@ pub enum QueueError {
 mod tests {
     use super::*;
     use chrono::Utc;
+    use macaca_proto::ApplicationId;
 
     fn create_test_task(priority: u8) -> DelegatedTask {
         DelegatedTask {
             id: TaskId::new(),
-            application_id: "test-app".into(),
+            application_id: ApplicationId::new(),
             from_agent: "coordinator".into(),
             to_agent: "backend".into(),
             prompt: "Test task".into(),

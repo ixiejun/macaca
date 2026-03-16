@@ -10,7 +10,9 @@ use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::Json;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use tokio::sync::RwLock;
 
+use macaca_kernel::executor::ExecutorEvent;
 use macaca_persist::PersistStore;
 use macaca_proto::{ApplicationId, LlmMessage, LlmOptions, AgentId};
 use macaca_sdk::AgentPersona;
@@ -487,6 +489,183 @@ pub struct StoredTraceStep {
     pub content: Option<String>,
 }
 
+/// Individual step in a delegated agent's trace.
+/// Generic structure that works for any agent, not hardcoded to specific names.
+#[derive(Serialize, Deserialize, Clone, Default)]
+pub struct AgentTraceStep {
+    #[serde(rename = "type")]
+    pub step_type: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub iteration: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_input: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_error: Option<bool>,
+    // For cc_trace type
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thinking: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_result: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub call_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub success: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+/// Trace for a single delegated agent execution.
+/// task_id uniquely identifies this specific task execution.
+#[derive(Serialize, Deserialize, Clone)]
+pub struct AgentTrace {
+    pub task_id: String,
+    pub agent: String,
+    pub status: String, // "running" | "completed" | "error"
+    #[serde(default)]
+    pub steps: Vec<AgentTraceStep>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+// ---------------------------------------------------------------------------
+// Agent Trace Collector for SSE Stream
+// ---------------------------------------------------------------------------
+
+/// Collects agent traces during SSE stream processing.
+/// Shared between SSE stream and session saving.
+struct AgentTraceCollector {
+    traces: RwLock<std::collections::HashMap<String, Vec<AgentTrace>>>,
+    /// Maps task_id to agent name for looking up agent when TaskCompleted/TaskFailed is received
+    task_to_agent: RwLock<std::collections::HashMap<String, String>>,
+}
+
+impl AgentTraceCollector {
+    fn new() -> Arc<Self> {
+        Arc::new(Self {
+            traces: RwLock::new(std::collections::HashMap::new()),
+            task_to_agent: RwLock::new(std::collections::HashMap::new()),
+        })
+    }
+
+    /// Called when executor emits TaskStarted - creates new trace
+    async fn on_task_started(&self, task_id: &str, agent: &str) {
+        let mut traces = self.traces.write().await;
+        let mut task_to_agent = self.task_to_agent.write().await;
+
+        // Store task_id -> agent mapping
+        task_to_agent.insert(task_id.to_string(), agent.to_string());
+
+        let agent_traces = traces.entry(agent.to_string()).or_insert_with(Vec::new);
+        agent_traces.push(AgentTrace {
+            task_id: task_id.to_string(),
+            agent: agent.to_string(),
+            status: "running".to_string(),
+            steps: Vec::new(),
+            output: None,
+            error: None,
+        });
+    }
+
+    /// Called when executor emits AgentEvent - adds step to trace
+    async fn on_agent_event(&self, task_id: &str, agent: &str, event: &macaca_proto::AgentExecutionEvent) {
+        let mut traces = self.traces.write().await;
+        if let Some(agent_traces) = traces.get_mut(agent) {
+            if let Some(trace) = agent_traces.iter_mut().find(|t| t.task_id == task_id) {
+                let step = match event {
+                    macaca_proto::AgentExecutionEvent::Thinking { iteration, content } => {
+                        AgentTraceStep {
+                            step_type: "thinking".to_string(),
+                            iteration: Some(*iteration),
+                            content: content.clone(),
+                            ..Default::default()
+                        }
+                    }
+                    macaca_proto::AgentExecutionEvent::ToolCall { tool_name, tool_input, .. } => {
+                        AgentTraceStep {
+                            step_type: "tool_call".to_string(),
+                            tool_name: Some(tool_name.clone()),
+                            tool_input: Some(tool_input.clone()),
+                            ..Default::default()
+                        }
+                    }
+                    macaca_proto::AgentExecutionEvent::ToolResult { tool_name, output, is_error } => {
+                        AgentTraceStep {
+                            step_type: "tool_result".to_string(),
+                            tool_name: Some(tool_name.clone()),
+                            output: Some(output.clone()),
+                            is_error: is_error.clone(),
+                            ..Default::default()
+                        }
+                    }
+                    macaca_proto::AgentExecutionEvent::Assistant { content } => {
+                        AgentTraceStep {
+                            step_type: "assistant".to_string(),
+                            content: Some(content.clone()),
+                            ..Default::default()
+                        }
+                    }
+                    macaca_proto::AgentExecutionEvent::CcTrace { thinking, text, tool_name, tool_input, tool_result, is_error } => {
+                        AgentTraceStep {
+                            step_type: "cc_trace".to_string(),
+                            thinking: thinking.clone(),
+                            text: text.clone(),
+                            tool_name: tool_name.clone(),
+                            tool_input: tool_input.clone(),
+                            tool_result: tool_result.clone(),
+                            is_error: is_error.clone(),
+                            ..Default::default()
+                        }
+                    }
+                    macaca_proto::AgentExecutionEvent::Completed { success, error } => {
+                        AgentTraceStep {
+                            step_type: "completed".to_string(),
+                            success: Some(*success),
+                            error: error.clone(),
+                            ..Default::default()
+                        }
+                    }
+                };
+                trace.steps.push(step);
+            }
+        }
+    }
+
+    /// Called when executor emits TaskCompleted/TaskFailed - update trace status
+    /// Note: TaskCompleted/TaskFailed don't have agent field, so we look it up from task_to_agent mapping
+    async fn on_task_completed(&self, task_id: &str, success: bool, output: Option<String>, error: Option<String>) {
+        let agent = {
+            let task_to_agent = self.task_to_agent.read().await;
+            task_to_agent.get(task_id).cloned()
+        };
+
+        if let Some(agent) = agent {
+            let mut traces = self.traces.write().await;
+            if let Some(agent_traces) = traces.get_mut(&agent) {
+                if let Some(trace) = agent_traces.iter_mut().find(|t| t.task_id == task_id) {
+                    trace.status = if success { "completed".to_string() } else { "error".to_string() };
+                    trace.output = output;
+                    trace.error = error;
+                }
+            }
+        }
+    }
+
+    /// Get all collected traces for session storage
+    async fn get_all(&self) -> std::collections::HashMap<String, Vec<AgentTrace>> {
+        self.traces.read().await.clone()
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct StoredTurn {
     pub role: String,
@@ -499,6 +678,12 @@ pub struct StoredTurn {
     pub cc_trace_steps: Vec<TraceEvent>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<AssistantExecutionMeta>,
+    /// Delegated agent traces keyed by agent name.
+    /// This is a generic structure that works for any application with any number of agents.
+    /// Key: agent name (e.g., "backend", "frontend", "tester" - dynamic, not hardcoded)
+    /// Value: array of traces for that agent (supports multiple task executions per agent)
+    #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
+    pub agent_traces: std::collections::HashMap<String, Vec<AgentTrace>>,
 }
 
 #[derive(Serialize)]
@@ -547,6 +732,7 @@ fn build_turns_from_messages(messages: &[LlmMessage]) -> Vec<StoredTurn> {
                 trace_steps: Vec::new(),
                 cc_trace_steps: Vec::new(),
                 meta: None,
+                agent_traces: std::collections::HashMap::new(),
             }),
             macaca_proto::LlmRole::Assistant => Some(StoredTurn {
                 role: "assistant".into(),
@@ -555,6 +741,7 @@ fn build_turns_from_messages(messages: &[LlmMessage]) -> Vec<StoredTurn> {
                 trace_steps: Vec::new(),
                 cc_trace_steps: Vec::new(),
                 meta: None,
+                agent_traces: std::collections::HashMap::new(),
             }),
             _ => None,
         })
@@ -577,6 +764,10 @@ struct AssistantRunResult {
     status: String,
     trace_steps: Vec<StoredTraceStep>,
     cc_trace_steps: Vec<TraceEvent>,
+    /// Delegated agent traces collected during execution.
+    /// Key: agent name (dynamic, not hardcoded)
+    /// Value: array of traces for that agent
+    agent_traces: std::collections::HashMap<String, Vec<AgentTrace>>,
 }
 
 // ---------------------------------------------------------------------------
@@ -854,6 +1045,153 @@ fn err(status: StatusCode, msg: String) -> (StatusCode, Json<ErrorResponse>) {
     (status, Json(ErrorResponse { error: msg }))
 }
 
+/// Convert ExecutorEvent to SSE Event for frontend display.
+/// Each event includes an `agent_tab` field for frontend to group events by agent.
+fn convert_executor_event_to_sse(event: ExecutorEvent) -> Result<Event, Infallible> {
+    match event {
+        ExecutorEvent::TaskStarted { task_id, agent } => {
+            Ok(Event::default()
+                .event("delegated_task_start")
+                .data(serde_json::json!({
+                    "task_id": task_id.to_string(),
+                    "agent": agent,
+                    "agent_tab": agent,
+                }).to_string()))
+        }
+        ExecutorEvent::AgentEvent { task_id, agent, event: agent_event } => {
+            // Forward the internal agent execution event
+            let event_type = match &agent_event {
+                macaca_proto::AgentExecutionEvent::Thinking { .. } => "delegated_thinking",
+                macaca_proto::AgentExecutionEvent::ToolCall { .. } => "delegated_tool_call",
+                macaca_proto::AgentExecutionEvent::ToolResult { .. } => "delegated_tool_result",
+                macaca_proto::AgentExecutionEvent::Assistant { .. } => "delegated_assistant",
+                macaca_proto::AgentExecutionEvent::CcTrace { .. } => "delegated_cc_trace",
+                macaca_proto::AgentExecutionEvent::Completed { .. } => "delegated_completed",
+            };
+            Ok(Event::default()
+                .event(event_type)
+                .data(serde_json::json!({
+                    "task_id": task_id.to_string(),
+                    "agent": agent,
+                    "agent_tab": agent,
+                    "event": agent_event,
+                }).to_string()))
+        }
+        ExecutorEvent::TaskCompleted { task_id, result } => {
+            Ok(Event::default()
+                .event("delegated_task_complete")
+                .data(serde_json::json!({
+                    "task_id": task_id.to_string(),
+                    "success": result.success,
+                    "output": result.output,
+                    "agent_tab": "result",
+                }).to_string()))
+        }
+        ExecutorEvent::TaskFailed { task_id, error } => {
+            Ok(Event::default()
+                .event("delegated_task_error")
+                .data(serde_json::json!({
+                    "task_id": task_id.to_string(),
+                    "error": error,
+                    "agent_tab": "error",
+                }).to_string()))
+        }
+        ExecutorEvent::TaskCancelled { task_id } => {
+            Ok(Event::default()
+                .event("delegated_task_cancelled")
+                .data(serde_json::json!({
+                    "task_id": task_id.to_string(),
+                }).to_string()))
+        }
+        ExecutorEvent::TaskProgress { task_id, step, output } => {
+            Ok(Event::default()
+                .event("delegated_task_progress")
+                .data(serde_json::json!({
+                    "task_id": task_id.to_string(),
+                    "step": step,
+                    "output": output,
+                }).to_string()))
+        }
+        ExecutorEvent::Shutdown => {
+            Ok(Event::default()
+                .event("executor_shutdown")
+                .data("{}".to_string()))
+        }
+        ExecutorEvent::HookEvent { event: hook_event } => {
+            // Convert HookEvent to SSE for coordinator notification
+            match hook_event {
+                macaca_kernel::executor::fork_manager::HookEvent::DelegateCompleted { fork_id, task_id, success, output } => {
+                    Ok(Event::default()
+                        .event("hook_delegate_completed")
+                        .data(serde_json::json!({
+                            "fork_id": fork_id.to_string(),
+                            "task_id": task_id.to_string(),
+                            "success": success,
+                            "output": output,
+                            "agent_tab": "hook",
+                        }).to_string()))
+                }
+                macaca_kernel::executor::fork_manager::HookEvent::DelegateFailed { fork_id, task_id, error } => {
+                    Ok(Event::default()
+                        .event("hook_delegate_failed")
+                        .data(serde_json::json!({
+                            "fork_id": fork_id.to_string(),
+                            "task_id": task_id.to_string(),
+                            "error": error,
+                            "agent_tab": "hook",
+                        }).to_string()))
+                }
+                macaca_kernel::executor::fork_manager::HookEvent::ForkValidated { fork_id, result } => {
+                    Ok(Event::default()
+                        .event("hook_fork_validated")
+                        .data(serde_json::json!({
+                            "fork_id": fork_id.to_string(),
+                            "result": format!("{:?}", result),
+                            "agent_tab": "hook",
+                        }).to_string()))
+                }
+                macaca_kernel::executor::fork_manager::HookEvent::ForkMerged { fork_id } => {
+                    Ok(Event::default()
+                        .event("hook_fork_merged")
+                        .data(serde_json::json!({
+                            "fork_id": fork_id.to_string(),
+                            "agent_tab": "hook",
+                        }).to_string()))
+                }
+                macaca_kernel::executor::fork_manager::HookEvent::ForkCreated { fork_id, application_id, agent_name } => {
+                    Ok(Event::default()
+                        .event("hook_fork_created")
+                        .data(serde_json::json!({
+                            "fork_id": fork_id.to_string(),
+                            "application_id": application_id.to_string(),
+                            "agent_name": agent_name,
+                            "agent_tab": "hook",
+                        }).to_string()))
+                }
+                macaca_kernel::executor::fork_manager::HookEvent::ForkWaiting { fork_id, delegate_task_id } => {
+                    Ok(Event::default()
+                        .event("hook_fork_waiting")
+                        .data(serde_json::json!({
+                            "fork_id": fork_id.to_string(),
+                            "delegate_task_id": delegate_task_id.to_string(),
+                            "agent_tab": "hook",
+                        }).to_string()))
+                }
+                macaca_kernel::executor::fork_manager::HookEvent::ForkResumed { fork_id, delegate_result } => {
+                    Ok(Event::default()
+                        .event("hook_fork_resumed")
+                        .data(serde_json::json!({
+                            "fork_id": fork_id.to_string(),
+                            "task_id": delegate_result.task_id.to_string(),
+                            "success": delegate_result.success,
+                            "agent_tab": "hook",
+                        }).to_string()))
+                }
+            }
+        }
+    }
+}
+
 pub async fn root_not_found() -> (StatusCode, Json<ErrorResponse>) {
     err(
         StatusCode::NOT_FOUND,
@@ -986,7 +1324,7 @@ pub async fn post_chat(
     messages.push(LlmMessage::user(req.prompt.clone()));
 
     // 5. Create SSE channel, cancel flag, and spawn the agentic loop task.
-    let (tx, rx) = tokio::sync::mpsc::channel::<Result<Event, Infallible>>(64);
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<Result<Event, Infallible>>(64);
     let cancel_flag = Arc::new(AtomicBool::new(false));
 
     // Register the cancel flag so /api/chat/stop can set it.
@@ -995,7 +1333,24 @@ pub async fn post_chat(
         flags.insert(req.app_id.clone(), Arc::clone(&cancel_flag));
     }
 
-    let model = req.model.clone();
+    // Subscribe to executor events for delegated agent tracking
+    let executor_events_rx = {
+        if let Some(executor) = state.executor_registry.get(&app_id).await {
+            Some(executor.subscribe_to_events())
+        } else {
+            None
+        }
+    };
+
+    // Create agent trace collector for SSE stream and session persistence
+    let agent_trace_collector = AgentTraceCollector::new();
+
+    // Use default model from state if not specified
+    let model = if req.model.is_empty() {
+        state.default_model.clone()
+    } else {
+        req.model.clone()
+    };
     let prompt = req.prompt.clone();
     let tool_defs = state.tools.to_definitions();
     let state_clone = Arc::clone(&state);
@@ -1013,6 +1368,9 @@ pub async fn post_chat(
     let app_dir_clone = app_dir.clone();
     let discovered_app_clone = discovered_app.clone();
 
+    // Clone collector for session saving
+    let collector_for_save = Arc::clone(&agent_trace_collector);
+
     tokio::spawn(async move {
         let result = execute_workflow_steps(
             &state_clone,
@@ -1024,7 +1382,8 @@ pub async fn post_chat(
             &model,
             tool_defs,
             &tx,
-            &cancel
+            &cancel,
+            session_key.clone(),
         ).await;
 
         match result {
@@ -1080,6 +1439,7 @@ pub async fn post_chat(
                     trace_steps: Vec::new(),
                     cc_trace_steps: Vec::new(),
                     meta: None,
+                    agent_traces: std::collections::HashMap::new(),
                 });
                 turns.push(StoredTurn {
                     role: "assistant".into(),
@@ -1097,6 +1457,7 @@ pub async fn post_chat(
                         iterations: Some(run.iterations),
                         tools_used: run.tools_used.clone(),
                     }),
+                    agent_traces: collector_for_save.get_all().await,
                 });
                 let meta = SessionMeta {
                     session_id: session_id.clone(),
@@ -1158,6 +1519,7 @@ pub async fn post_chat(
                     trace_steps: Vec::new(),
                     cc_trace_steps: Vec::new(),
                     meta: None,
+                    agent_traces: std::collections::HashMap::new(),
                 });
                 turns.push(StoredTurn {
                     role: "assistant".into(),
@@ -1171,6 +1533,7 @@ pub async fn post_chat(
                         iterations: None,
                         tools_used: Vec::new(),
                     }),
+                    agent_traces: std::collections::HashMap::new(),
                 });
                 let now = Utc::now();
                 let title = prompt.chars().take(50).collect::<String>();
@@ -1202,10 +1565,108 @@ pub async fn post_chat(
         flags.remove(&app_id_for_cleanup);
     });
 
-    // Convert receiver into a Stream for SSE.
-    let stream = futures::stream::unfold(rx, |mut rx| async move {
-        rx.recv().await.map(|event| (event, rx))
-    });
+    // Convert receiver into a Stream for SSE, merging with executor events if available.
+    let collector_for_stream = Arc::clone(&agent_trace_collector);
+    let stream = async_stream::stream! {
+        // Fork: receive from both channels
+        use tokio::sync::broadcast;
+
+        if let Some(mut executor_rx) = executor_events_rx {
+            // Both channels available - merge them
+            // Track when main channel is closed and when we've seen final executor event
+            let mut rx_closed = false;
+            // Track pending delegated tasks - when empty and rx closed, we're done
+            let mut pending_delegated_tasks: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+            loop {
+                // If main channel closed and no pending tasks, exit
+                if rx_closed && pending_delegated_tasks.is_empty() {
+                    break;
+                }
+
+                // First, drain any available executor events (non-blocking)
+                loop {
+                    match executor_rx.try_recv() {
+                        Ok(event) => {
+                            // Collect agent traces (new)
+                            match &event {
+                                ExecutorEvent::TaskStarted { task_id, agent } => {
+                                    collector_for_stream.on_task_started(&task_id.to_string(), agent).await;
+                                }
+                                ExecutorEvent::AgentEvent { task_id, agent, event: agent_event } => {
+                                    collector_for_stream.on_agent_event(&task_id.to_string(), agent, agent_event).await;
+                                }
+                                ExecutorEvent::TaskCompleted { task_id, result } => {
+                                    collector_for_stream.on_task_completed(
+                                        &task_id.to_string(),
+                                        result.success,
+                                        Some(result.output.clone()),
+                                        None,
+                                    ).await;
+                                }
+                                ExecutorEvent::TaskFailed { task_id, error } => {
+                                    collector_for_stream.on_task_completed(
+                                        &task_id.to_string(),
+                                        false,
+                                        None,
+                                        Some(error.clone()),
+                                    ).await;
+                                }
+                                _ => {}
+                            }
+
+                            // Track task lifecycle
+                            match &event {
+                                ExecutorEvent::TaskStarted { task_id, .. } => {
+                                    pending_delegated_tasks.insert(task_id.to_string());
+                                }
+                                ExecutorEvent::TaskCompleted { task_id, .. } |
+                                ExecutorEvent::TaskFailed { task_id, .. } |
+                                ExecutorEvent::TaskCancelled { task_id } => {
+                                    pending_delegated_tasks.remove(&task_id.to_string());
+                                }
+                                _ => {}
+                            }
+                            // Convert ExecutorEvent to SSE Event
+                            let sse_event = convert_executor_event_to_sse(event);
+                            yield sse_event;
+                        }
+                        Err(broadcast::error::TryRecvError::Empty) => break, // No more events
+                        Err(broadcast::error::TryRecvError::Closed) => return,
+                        Err(broadcast::error::TryRecvError::Lagged(_)) => continue,
+                    }
+                }
+
+                // Check if we should exit after draining executor events
+                if rx_closed && pending_delegated_tasks.is_empty() {
+                    break;
+                }
+
+                // Now wait on main channel with a timeout to periodically check executor events
+                tokio::select! {
+                    // Regular SSE events from agent execution
+                    result = rx.recv(), if !rx_closed => {
+                        match result {
+                            Some(event) => yield event,
+                            None => {
+                                // Main channel closed, but keep receiving executor events
+                                rx_closed = true;
+                            }
+                        }
+                    }
+                    // Periodic check for executor events (every 100ms)
+                    _ = tokio::time::sleep(std::time::Duration::from_millis(100)) => {
+                        // Loop back to drain executor events
+                    }
+                }
+            }
+        } else {
+            // No executor events - just use regular channel
+            while let Some(event) = rx.recv().await {
+                yield event;
+            }
+        }
+    };
 
     Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
 }
@@ -1238,6 +1699,7 @@ async fn execute_workflow_steps(
     tool_defs: Vec<macaca_proto::ToolDefinition>,
     tx: &tokio::sync::mpsc::Sender<Result<Event, Infallible>>,
     cancel: &Arc<AtomicBool>,
+    session_id: String,
 ) -> Result<AssistantRunResult, String> {
 
     // Get workflow definition
@@ -1253,7 +1715,8 @@ async fn execute_workflow_steps(
             // Fallback to single-agent mode if no workflow defined
             return run_agentic_stream_with_agent(
                 state, app_id, app_dir, "coordinator",
-                initial_prompt, model, tool_defs, tx, cancel
+                initial_prompt, model, tool_defs, tx, cancel,
+                session_id,
             ).await;
         }
     };
@@ -1323,7 +1786,9 @@ async fn execute_workflow_steps(
         let result = run_agentic_stream_with_agent_for_step(
             state, app_dir, &step.agent,
             step_prompt, model, tool_defs.clone(),
-            agent_id, tx, cancel
+            agent_id, tx, cancel,
+            session_id.clone(),
+            app_id.clone(),
         ).await;
 
         match result {
@@ -1366,6 +1831,7 @@ async fn execute_workflow_steps(
         status: "completed".to_string(),
         trace_steps: Vec::new(),
         cc_trace_steps: Vec::new(),
+        agent_traces: std::collections::HashMap::new(),
     })
 }
 
@@ -1425,11 +1891,12 @@ async fn run_agentic_stream_with_agent(
     tool_defs: Vec<macaca_proto::ToolDefinition>,
     tx: &tokio::sync::mpsc::Sender<Result<Event, Infallible>>,
     cancel: &Arc<AtomicBool>,
+    session_id: String,
 ) -> Result<AssistantRunResult, String> {
     let agent_id = find_agent_by_name(state, app_id, agent_name).await;
     run_agentic_stream_with_agent_for_step(
         state, app_dir, agent_name, prompt, model, tool_defs,
-        agent_id, tx, cancel
+        agent_id, tx, cancel, session_id, app_id.clone()
     ).await
 }
 
@@ -1444,6 +1911,8 @@ pub(crate) async fn run_agentic_stream_with_agent_for_step(
     agent_id: Option<AgentId>,
     tx: &tokio::sync::mpsc::Sender<Result<Event, Infallible>>,
     cancel: &Arc<AtomicBool>,
+    session_id: String,
+    app_id: macaca_proto::ApplicationId,
 ) -> Result<AssistantRunResult, String> {
     // Get agent's persona
     let persona_dir = app_dir.join(format!("personas/{agent_name}"));
@@ -1470,11 +1939,12 @@ pub(crate) async fn run_agentic_stream_with_agent_for_step(
         LlmMessage::user(prompt),
     ];
 
-    run_agentic_stream(state, agent_id.clone(), messages, model, tool_defs, tx, cancel).await
+    run_agentic_stream(state, agent_id.clone(), messages, model, tool_defs, tx, cancel, session_id, app_id).await
 }
 
 /// Run the manual agentic loop, sending SSE events at each step.
 /// Updates agent status during execution.
+/// Supports pause/resume for Fork-Join workflow.
 ///
 async fn run_agentic_stream(
     state: &Arc<AppState>,
@@ -1484,7 +1954,12 @@ async fn run_agentic_stream(
     tool_defs: Vec<macaca_proto::ToolDefinition>,
     tx: &tokio::sync::mpsc::Sender<Result<Event, Infallible>>,
     cancel: &Arc<AtomicBool>,
+    session_id: String,
+    app_id: macaca_proto::ApplicationId,
 ) -> Result<AssistantRunResult, String> {
+    use macaca_runtime::agentic_loop::ResumeReason;
+    use macaca_proto::ForkId;
+
     let options = LlmOptions {
         model: model.to_string(),
         max_tokens: Some(4096),
@@ -1504,9 +1979,85 @@ async fn run_agentic_stream(
     let mut status = "completed".to_string();
     let mut trace_steps = Vec::new();
     let mut cc_trace_steps: Vec<TraceEvent> = Vec::new();
+    // Collect delegated agent traces during execution
+    // Key: agent name, Value: array of traces for that agent
+    let mut agent_traces: std::collections::HashMap<String, Vec<AgentTrace>> = std::collections::HashMap::new();
+
+    // Create pause/resume mechanism for Fork-Join workflow
+    let (resume_tx, mut resume_rx) = tokio::sync::mpsc::channel::<ResumeReason>(1);
+    let pause_signal = Arc::new(AtomicBool::new(false));
+
+    // Register active session for hook consumer to resume
+    {
+        let session_handle = crate::state::ActiveSession {
+            session_id: session_id.clone(),
+            app_id: app_id.clone(),
+            pause_signal: pause_signal.clone(),
+            resume_tx: resume_tx.clone(),
+        };
+        state.active_sessions.write().await.insert(session_id.clone(), session_handle);
+    }
 
     for i in 1..=max_iterations {
         iterations = i;
+
+        // ===== PAUSE/RESUME CHECK FOR FORK-JOIN WORKFLOW =====
+        while pause_signal.load(Ordering::SeqCst) {
+            // Send paused event to SSE
+            let _ = tx.send(Ok(Event::default()
+                .event("loop_paused")
+                .data(serde_json::json!({
+                    "session_id": session_id,
+                    "iteration": i,
+                    "reason": "waiting_for_delegate"
+                }).to_string())))
+                .await;
+
+            // Wait for resume signal
+            if let Some(reason) = resume_rx.recv().await {
+                match reason {
+                    ResumeReason::DelegateCompleted { task_id, success, output } => {
+                        // Inject result into messages
+                        let result_msg = format!(
+                            "[Delegate Task {} Completed]\nSuccess: {}\nOutput: {}",
+                            task_id, success, output
+                        );
+                        messages.push(LlmMessage::user(result_msg));
+
+                        // Send resumed event
+                        let _ = tx.send(Ok(Event::default()
+                            .event("loop_resumed")
+                            .data(serde_json::json!({
+                                "session_id": session_id,
+                                "task_id": task_id,
+                                "success": success
+                            }).to_string())))
+                            .await;
+                    }
+                    ResumeReason::DelegateFailed { task_id, error } => {
+                        let result_msg = format!(
+                            "[Delegate Task {} Failed]\nError: {}",
+                            task_id, error
+                        );
+                        messages.push(LlmMessage::user(result_msg));
+
+                        let _ = tx.send(Ok(Event::default()
+                            .event("loop_resumed")
+                            .data(serde_json::json!({
+                                "session_id": session_id,
+                                "task_id": task_id,
+                                "success": false,
+                                "error": error
+                            }).to_string())))
+                            .await;
+                    }
+                    _ => {}
+                }
+                pause_signal.store(false, Ordering::SeqCst);
+                break;
+            }
+        }
+        // ===== END PAUSE/RESUME CHECK =====
 
         // Check cancellation before each iteration.
         if cancel.load(Ordering::Relaxed) {
@@ -1778,6 +2329,59 @@ async fn run_agentic_stream(
                 // Append tool result to conversation for next LLM call.
                 messages.push(LlmMessage::tool_result(tc.id.clone(), result.clone()));
 
+                // ===== DETECT delegate_task FORK AND PAUSE LOOP =====
+                // When delegate_task returns a fork_id (format: "fork:uuid"),
+                // we need to register the fork_to_session mapping and pause the loop
+                // until the delegated task completes and ForkValidated is received.
+                if tc.name == "delegate_task" {
+                    // The result is a JSON object with task_id field containing fork info
+                    // Example: {"agent":"backend",...,"task_id":"fork:fork-uuid"}
+                    let fork_id_from_json = serde_json::from_str::<serde_json::Value>(&result)
+                        .ok()
+                        .and_then(|v| v.get("task_id").cloned())
+                        .and_then(|v| v.as_str().map(|s| s.to_string()));
+
+                    if let Some(task_id_str) = fork_id_from_json {
+                        if let Some(fork_id_str) = task_id_str.strip_prefix("fork:") {
+                            // Parse the fork_id
+                            let uuid_str = fork_id_str.strip_prefix("fork-").unwrap_or(fork_id_str);
+                            if let Ok(fork_uuid) = uuid::Uuid::parse_str(uuid_str) {
+                                let fork_id = ForkId(fork_uuid);
+
+                                // Register fork_to_session mapping for hook consumer
+                                let mapping = crate::state::ForkSessionMapping {
+                                    session_id: session_id.clone(),
+                                    app_id: app_id.clone(),
+                                    from_agent: agent_id
+                                        .as_ref()
+                                        .map(|id| id.0.to_string())
+                                        .unwrap_or_else(|| "unknown".to_string()),
+                                };
+                                state.fork_to_session.write().await.insert(fork_id, mapping);
+
+                                tracing::info!(
+                                    fork_id = %fork_id,
+                                    session_id = %session_id,
+                                    "Registered fork_to_session mapping, pausing loop"
+                                );
+
+                                // Send fork_created event to SSE
+                                let _ = tx.send(Ok(Event::default()
+                                    .event("fork_created")
+                                    .data(serde_json::json!({
+                                        "fork_id": fork_id_str,
+                                        "session_id": session_id,
+                                    }).to_string())))
+                                    .await;
+
+                                // Set pause signal - loop will pause at next iteration
+                                pause_signal.store(true, Ordering::SeqCst);
+                            }
+                        }
+                    }
+                }
+                // ===== END DETECT delegate_task =====
+
                 // Track claude_code_execute failures.
                 if tc.name == "claude_code_execute" {
                     if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&result) {
@@ -1823,6 +2427,10 @@ async fn run_agentic_stream(
             .await;
     }
 
+    // Clean up active session
+    state.active_sessions.write().await.remove(&session_id);
+    tracing::info!(session_id = %session_id, "Active session cleaned up");
+
     // Set agent status back to idle
     if let Some(ref id) = agent_id {
         state.kernel.update_agent_activity(
@@ -1839,5 +2447,6 @@ async fn run_agentic_stream(
         status,
         trace_steps,
         cc_trace_steps,
+        agent_traces,
     })
 }

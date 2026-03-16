@@ -39,6 +39,12 @@ pub enum ExecutorEvent {
         step: usize,
         output: String,
     },
+    /// Agent execution event (for delegated agent tracking).
+    AgentEvent {
+        task_id: TaskId,
+        agent: String,
+        event: macaca_proto::AgentExecutionEvent,
+    },
     /// Task completed.
     TaskCompleted {
         task_id: TaskId,
@@ -52,6 +58,10 @@ pub enum ExecutorEvent {
     /// Task cancelled.
     TaskCancelled {
         task_id: TaskId,
+    },
+    /// Hook event from Fork-Join workflow (validation, completion notification).
+    HookEvent {
+        event: super::fork_manager::HookEvent,
     },
     /// Executor shutdown.
     Shutdown,

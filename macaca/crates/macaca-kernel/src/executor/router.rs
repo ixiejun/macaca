@@ -236,6 +236,7 @@ mod tests {
 
         let task = DelegatedTask {
             id: TaskId::new(),
+            application_id: macaca_proto::ApplicationId::new(),
             from_agent: "coordinator".into(),
             to_agent: "backend".into(),
             prompt: "Write a Rust API".into(),
@@ -259,6 +260,7 @@ mod tests {
 
         let task = DelegatedTask {
             id: TaskId::new(),
+            application_id: macaca_proto::ApplicationId::new(),
             from_agent: "coordinator".into(),
             to_agent: "".into(), // Let router decide
             prompt: "Create a React component with TypeScript".into(),

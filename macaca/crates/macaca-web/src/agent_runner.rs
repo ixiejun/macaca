@@ -8,9 +8,11 @@ use std::path::PathBuf;
 
 use async_trait::async_trait;
 use macaca_kernel::{AgentInfo, AgentRunner, TaskContext, TaskId, TaskResult, TokenUsage};
-use macaca_proto::{LlmMessage, LlmOptions, ToolDefinition};
+use macaca_proto::{AgentId, ApplicationId, LlmMessage, LlmOptions, Permission, ToolDefinition};
+use macaca_runtime::{AgenticLoop, RuntimeConfig};
 use macaca_sdk::AgentPersona;
-use tracing::{info, warn};
+use macaca_tools::ToolSet;
+use tracing::{error, info, warn};
 
 use crate::state::AppState;
 
@@ -84,29 +86,34 @@ impl AgentRunner for WebAgentRunner {
     /// Execute an agent with the given prompt.
     ///
     /// This is the core method that actually runs an agent:
-    /// 1. Find the app directory for this agent
+    /// 1. Find the app directory for this agent (by application_id)
     /// 2. Load the agent's persona
     /// 3. Build messages with system prompt and user prompt
     /// 4. Call the LLM with available tools
     /// 5. Return the result
     async fn execute_agent(
         &self,
+        application_id: &ApplicationId,
         agent_name: &str,
         prompt: &str,
         context: Option<TaskContext>,
     ) -> Result<TaskResult, String> {
         let state = self.get_state()?;
 
-        info!(agent = agent_name, prompt_preview = %prompt.chars().take(50).collect::<String>(), "Executing agent");
+        info!(
+            application_id = %application_id.0,
+            agent = agent_name,
+            prompt_preview = %prompt.chars().take(50).collect::<String>(),
+            "Executing agent"
+        );
 
-        // Find the app directory for this agent
+        // Find the app directory for this application_id
         let app_dirs = state.app_dirs.read().await;
-        let (app_id, app_dir) = app_dirs
+        let app_dir = app_dirs
             .iter()
-            .next()
-            .ok_or_else(|| "No apps available".to_string())?;
-        let app_dir = app_dir.clone();
-        let _app_id = app_id.clone();
+            .find(|(id, _)| **id == *application_id)
+            .map(|(_, path)| path.clone())
+            .ok_or_else(|| format!("Application '{}' not found", application_id))?;
         drop(app_dirs);
 
         // Get agent's capabilities from kernel
@@ -122,8 +129,16 @@ impl AgentRunner for WebAgentRunner {
         // Load agent's persona
         let persona = Self::load_persona(&app_dir, agent_name).await;
 
+        // Debug: log persona status
+        if persona.is_some() {
+            info!(agent = agent_name, "Persona loaded successfully");
+        } else {
+            warn!(agent = agent_name, app_dir = %app_dir.display(), "No persona found");
+        }
+
         // Build system prompt
         let system_prompt = Self::build_system_prompt(agent_name, persona.as_ref(), &capabilities);
+        info!(agent = agent_name, system_prompt_len = system_prompt.len(), "System prompt built");
 
         // Build messages
         let mut messages = vec![LlmMessage::system(system_prompt)];
@@ -145,40 +160,99 @@ impl AgentRunner for WebAgentRunner {
         // Get tool definitions
         let tool_defs = state.tools.to_definitions();
 
-        // Build LLM options
+        // Model resolution priority:
+        // 1. Agent's preferred model (if non-empty)
+        // 2. Application's default model (from llm_config)
+        // 3. System default model
+        let model = if let Some(manifest) = state.kernel.get_agent_by_name(agent_name).await {
+            if !manifest.model.is_empty() {
+                // Agent has a specific model preference
+                manifest.model
+            } else {
+                // Check for application-level model configuration
+                // For now, use system default (application-level config can be added later)
+                state.default_model.clone()
+            }
+        } else {
+            state.default_model.clone()
+        };
+
+        // Build LLM options - use resolved model
         let options = LlmOptions {
-            model: String::new(), // Use default model
+            model,
             max_tokens: Some(4096),
             temperature: Some(0.7),
             stop_sequences: vec![],
             tools: Some(tool_defs),
         };
 
-        // Call the LLM
-        let response = state.llm
-            .chat(messages, &options)
+        // Use AgenticLoop for proper tool execution
+        let loop_config = RuntimeConfig {
+            max_iterations: 25,
+            tool_timeout: std::time::Duration::from_secs(300), // 5 minutes, matches Claude Code Driver default
+        };
+        let agentic_loop = AgenticLoop::new(loop_config);
+
+        // Create a dummy agent ID for permission checking
+        let agent_id = AgentId::new();
+        let permission = Permission {
+            level: macaca_proto::PermissionLevel::User,
+            allowed_tools: vec![],
+            allowed_paths: vec![],
+            network_access: true,
+        };
+
+        // Run the agentic loop
+        info!(
+            application_id = %application_id.0,
+            agent = agent_name,
+            "Starting agentic loop"
+        );
+
+        let loop_result = agentic_loop
+            .run(
+                &agent_id,
+                state.llm.as_ref(),
+                state.tools.as_ref(),
+                messages,
+                &options,
+                &permission,
+                None, // No permission checker - allow all tools
+            )
             .await
-            .map_err(|e| format!("LLM call failed: {}", e))?;
+            .map_err(|e| format!("Agentic loop failed: {}", e))?;
 
         info!(
+            application_id = %application_id.0,
             agent = agent_name,
-            success = !response.content.is_empty(),
-            output_len = response.content.len(),
+            success = !loop_result.content.is_empty(),
+            output_len = loop_result.content.len(),
+            iterations = loop_result.iterations,
+            total_tokens = loop_result.total_usage.total_tokens,
             "Agent execution completed"
         );
+
+        // Debug: if content is empty, log warning
+        if loop_result.content.is_empty() {
+            error!(
+                application_id = %application_id.0,
+                agent = agent_name,
+                "WARNING: Agent returned empty content!"
+            );
+        }
 
         // Build and return result
         Ok(TaskResult {
             task_id: TaskId::new(), // Will be overwritten by caller
-            success: !response.content.is_empty(),
-            output: response.content,
+            success: !loop_result.content.is_empty(),
+            output: loop_result.content,
             error: None,
             artifacts: vec![],
             completed_at: chrono::Utc::now(),
             tokens_used: Some(TokenUsage {
-                prompt_tokens: response.usage.prompt_tokens,
-                completion_tokens: response.usage.completion_tokens,
-                total_tokens: response.usage.total_tokens,
+                prompt_tokens: loop_result.total_usage.prompt_tokens,
+                completion_tokens: loop_result.total_usage.completion_tokens,
+                total_tokens: loop_result.total_usage.total_tokens,
             }),
         })
     }
@@ -213,6 +287,150 @@ impl AgentRunner for WebAgentRunner {
 
         let manifests = state.kernel.list_agents().await;
         manifests.iter().any(|m| m.name == agent_name)
+    }
+
+    /// Execute an agent with event callback for progress tracking.
+    async fn execute_agent_with_events(
+        &self,
+        application_id: &ApplicationId,
+        agent_name: &str,
+        prompt: &str,
+        context: Option<TaskContext>,
+        event_tx: Option<tokio::sync::mpsc::Sender<macaca_proto::AgentExecutionEvent>>,
+    ) -> Result<TaskResult, String> {
+        let state = self.get_state()?;
+
+        info!(
+            application_id = %application_id.0,
+            agent = agent_name,
+            prompt_preview = %prompt.chars().take(50).collect::<String>(),
+            has_event_tx = event_tx.is_some(),
+            "Executing agent with events"
+        );
+
+        // Find the app directory for this application_id
+        let app_dirs = state.app_dirs.read().await;
+        let app_dir = app_dirs
+            .iter()
+            .find(|(id, _)| **id == *application_id)
+            .map(|(_, path)| path.clone())
+            .ok_or_else(|| format!("Application '{}' not found", application_id))?;
+        drop(app_dirs);
+
+        // Load agent's persona
+        let persona = Self::load_persona(&app_dir, agent_name).await;
+
+        // Get agent's capabilities from kernel
+        let agent_manifests = state.kernel.list_agents().await;
+        let agent_info = agent_manifests
+            .iter()
+            .find(|m| m.name == agent_name);
+
+        let capabilities: Vec<String> = agent_info
+            .map(|a| a.capabilities.iter().map(|c| c.name.clone()).collect())
+            .unwrap_or_default();
+
+        // Build system prompt
+        let system_prompt = Self::build_system_prompt(agent_name, persona.as_ref(), &capabilities);
+
+        // Build messages
+        let mut messages = vec![LlmMessage::system(system_prompt)];
+
+        // Add context if provided
+        if let Some(ref ctx) = context {
+            if !ctx.artifacts.is_empty() {
+                let context_msg = format!(
+                    "Context artifacts available:\n{}",
+                    ctx.artifacts.join("\n")
+                );
+                messages.push(LlmMessage::user(context_msg));
+            }
+        }
+
+        // Add the main prompt
+        messages.push(LlmMessage::user(prompt.to_string()));
+
+        // Get tool definitions
+        let tool_defs = state.tools.to_definitions();
+
+        // Model resolution
+        let model = if let Some(manifest) = state.kernel.get_agent_by_name(agent_name).await {
+            if !manifest.model.is_empty() {
+                manifest.model
+            } else {
+                state.default_model.clone()
+            }
+        } else {
+            state.default_model.clone()
+        };
+
+        // Build LLM options
+        let options = LlmOptions {
+            model,
+            max_tokens: Some(4096),
+            temperature: Some(0.7),
+            stop_sequences: vec![],
+            tools: Some(tool_defs),
+        };
+
+        // Use AgenticLoop with events
+        let loop_config = RuntimeConfig {
+            max_iterations: 25,
+            tool_timeout: std::time::Duration::from_secs(300), // 5 minutes, matches Claude Code Driver default
+        };
+        let agentic_loop = AgenticLoop::new(loop_config);
+
+        let agent_id = AgentId::new();
+        let permission = Permission {
+            level: macaca_proto::PermissionLevel::User,
+            allowed_tools: vec![],
+            allowed_paths: vec![],
+            network_access: true,
+        };
+
+        info!(
+            application_id = %application_id.0,
+            agent = agent_name,
+            "Starting agentic loop with events"
+        );
+
+        let loop_result = agentic_loop
+            .run_with_events(
+                &agent_id,
+                state.llm.as_ref(),
+                state.tools.as_ref(),
+                messages,
+                &options,
+                &permission,
+                None,
+                event_tx,
+            )
+            .await
+            .map_err(|e| format!("Agentic loop failed: {}", e))?;
+
+        info!(
+            application_id = %application_id.0,
+            agent = agent_name,
+            success = !loop_result.content.is_empty(),
+            output_len = loop_result.content.len(),
+            iterations = loop_result.iterations,
+            total_tokens = loop_result.total_usage.total_tokens,
+            "Agent execution with events completed"
+        );
+
+        Ok(TaskResult {
+            task_id: TaskId::new(),
+            success: !loop_result.content.is_empty(),
+            output: loop_result.content,
+            error: None,
+            artifacts: vec![],
+            completed_at: chrono::Utc::now(),
+            tokens_used: Some(TokenUsage {
+                prompt_tokens: loop_result.total_usage.prompt_tokens,
+                completion_tokens: loop_result.total_usage.completion_tokens,
+                total_tokens: loop_result.total_usage.total_tokens,
+            }),
+        })
     }
 }
 

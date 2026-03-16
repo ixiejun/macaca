@@ -40,6 +40,34 @@ impl Default for TaskId {
     }
 }
 
+impl std::fmt::Display for TaskId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+/// Unique identifier for a forked (child) agent instance.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ForkId(pub Uuid);
+
+impl ForkId {
+    pub fn new() -> Self {
+        Self(Uuid::new_v4())
+    }
+}
+
+impl Default for ForkId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for ForkId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "fork-{}", self.0)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct MemoryId(pub Uuid);
 
@@ -152,6 +180,59 @@ impl Default for AgentActivity {
     }
 }
 
+/// Lifecycle state of a forked (child) agent.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ForkState {
+    /// Fork created, waiting to start execution.
+    Pending,
+    /// Fork is actively executing.
+    Running,
+    /// Fork delegated a task and is waiting for hook callback.
+    WaitingForHook,
+    /// Fork's delegated task completed successfully.
+    Completed,
+    /// Fork's delegated task failed.
+    Failed { error: String },
+    /// Fork completed and merged back to parent.
+    Merged,
+    /// Fork was cancelled.
+    Cancelled,
+}
+
+/// Criteria for accepting a fork's result.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AcceptanceCriteria {
+    /// Human-readable description of success criteria.
+    pub description: String,
+    /// Required artifacts (file paths, URLs, etc.).
+    pub required_artifacts: Vec<String>,
+    /// Whether to auto-accept on success without validation.
+    pub auto_accept: bool,
+}
+
+impl Default for AcceptanceCriteria {
+    fn default() -> Self {
+        Self {
+            description: "Task completed successfully".into(),
+            required_artifacts: vec![],
+            auto_accept: false,
+        }
+    }
+}
+
+/// Result of validating a fork's output against acceptance criteria.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ValidationResult {
+    /// Validation passed.
+    Accepted,
+    /// Validation failed.
+    Rejected { reason: String },
+    /// Unable to validate (e.g., timeout, missing artifacts).
+    Unavailable { reason: String },
+}
+
 /// Runtime status of an agent, combining lifecycle state and current activity.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentRuntimeStatus {
@@ -199,6 +280,10 @@ pub struct AgentManifest {
     pub permission: Permission,
     pub state: AgentState,
     pub created_at: DateTime<Utc>,
+    /// Preferred LLM model for this agent (e.g., "", "gpt-4o").
+    /// If empty, uses the application's default model.
+    #[serde(default)]
+    pub model: String,
 }
 
 // ── Task Types ──
@@ -494,6 +579,124 @@ pub struct TaskContext {
     pub description: String,
     pub agent_id: AgentId,
     pub history: Vec<String>,
+}
+
+// ── Agent Execution Events ──
+
+/// Events emitted during agent execution for progress tracking.
+/// These events are used to report detailed execution progress to the UI.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum AgentExecutionEvent {
+    /// Agent is thinking (internal reasoning)
+    Thinking {
+        iteration: usize,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        content: Option<String>,
+    },
+    /// Agent is making a tool call
+    ToolCall {
+        tool_name: String,
+        tool_input: serde_json::Value,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        call_id: Option<String>,
+    },
+    /// Tool execution result
+    ToolResult {
+        tool_name: String,
+        output: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        is_error: Option<bool>,
+    },
+    /// Agent produced assistant content
+    Assistant {
+        content: String,
+    },
+    /// Claude Code execution trace (for claude_code_execute tool)
+    CcTrace {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        thinking: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        text: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        tool_name: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        tool_input: Option<serde_json::Value>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        tool_result: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        is_error: Option<bool>,
+    },
+    /// Execution completed
+    Completed {
+        success: bool,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        error: Option<String>,
+    },
+}
+
+impl AgentExecutionEvent {
+    /// Create a thinking event
+    pub fn thinking(iteration: usize) -> Self {
+        Self::Thinking {
+            iteration,
+            content: None,
+        }
+    }
+
+    /// Create a thinking event with content
+    pub fn thinking_with_content(iteration: usize, content: String) -> Self {
+        Self::Thinking {
+            iteration,
+            content: Some(content),
+        }
+    }
+
+    /// Create a tool call event
+    pub fn tool_call(tool_name: String, tool_input: serde_json::Value) -> Self {
+        Self::ToolCall {
+            tool_name,
+            tool_input,
+            call_id: None,
+        }
+    }
+
+    /// Create a tool call event with call ID
+    pub fn tool_call_with_id(tool_name: String, tool_input: serde_json::Value, call_id: String) -> Self {
+        Self::ToolCall {
+            tool_name,
+            tool_input,
+            call_id: Some(call_id),
+        }
+    }
+
+    /// Create a tool result event
+    pub fn tool_result(tool_name: String, output: String) -> Self {
+        Self::ToolResult {
+            tool_name,
+            output,
+            is_error: None,
+        }
+    }
+
+    /// Create a tool result event with error flag
+    pub fn tool_result_with_error(tool_name: String, output: String, is_error: bool) -> Self {
+        Self::ToolResult {
+            tool_name,
+            output,
+            is_error: Some(is_error),
+        }
+    }
+
+    /// Create an assistant event
+    pub fn assistant(content: String) -> Self {
+        Self::Assistant { content }
+    }
+
+    /// Create a completed event
+    pub fn completed(success: bool, error: Option<String>) -> Self {
+        Self::Completed { success, error }
+    }
 }
 
 #[cfg(test)]

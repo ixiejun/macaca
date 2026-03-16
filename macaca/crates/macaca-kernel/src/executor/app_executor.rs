@@ -10,13 +10,11 @@ use tokio::sync::{mpsc, RwLock};
 use tracing::{info, error, warn};
 
 use super::{
-    AgentInfo, AgentRunner, DelegatedTask, EventBus, ExecutionQueue,
+    AgentInfo, AgentRunner, ApplicationId, DelegatedTask, EventBus, ExecutionQueue,
     RoutingDecision, TaskContext, TaskId, TaskResult, TaskRouter, TaskStatus,
-    CallbackDispatcher, ExecutorCommand, ExecutorEvent, SystemEvent,
+    CallbackDispatcher, ExecutorCommand, ExecutorEvent, SystemEvent, ForkManager,
 };
-
-/// Unique identifier for an application.
-pub type ApplicationId = String;
+use macaca_proto::TaskId as ProtoTaskId;
 
 /// Configuration for an ApplicationExecutor.
 #[derive(Debug, Clone)]
@@ -82,6 +80,12 @@ pub struct ApplicationExecutor {
     /// Channel for receiving events from the worker.
     event_rx: Option<mpsc::Receiver<ExecutorEvent>>,
 
+    /// Broadcast sender for executor events (for external subscribers like SSE).
+    event_broadcast: tokio::sync::broadcast::Sender<ExecutorEvent>,
+
+    /// Fork Manager for Fork-Join workflow.
+    fork_manager: Arc<ForkManager>,
+
     /// Shutdown signal.
     shutdown: Arc<RwLock<bool>>,
 }
@@ -105,20 +109,32 @@ impl ApplicationExecutor {
         let (command_tx, command_rx) = mpsc::channel(100);
         let (event_tx, event_rx) = mpsc::channel(100);
 
+        // Create broadcast channel for external subscribers
+        let (event_broadcast, _) = tokio::sync::broadcast::channel(256);
+
+        // Create Fork Manager for Fork-Join workflow
+        let fork_manager = Arc::new(ForkManager::new());
+
         let shutdown = Arc::new(RwLock::new(false));
 
         // Spawn the worker task
         let worker_runner = Arc::clone(&runner);
         let worker_shutdown = Arc::clone(&shutdown);
         let worker_queue = Arc::clone(&queue);
+        let worker_app_id = application_id.clone();
+        let worker_event_broadcast = event_broadcast.clone();
+        let worker_fork_manager = Arc::clone(&fork_manager);
 
         tokio::spawn(async move {
             Self::worker_loop(
                 worker_runner,
                 command_rx,
                 event_tx,
+                worker_event_broadcast,
                 worker_shutdown,
                 worker_queue,
+                worker_app_id,
+                worker_fork_manager,
             ).await;
         });
 
@@ -133,6 +149,8 @@ impl ApplicationExecutor {
             runner,
             command_tx,
             event_rx: Some(event_rx),
+            event_broadcast,
+            fork_manager,
             shutdown,
         }
     }
@@ -188,15 +206,16 @@ impl ApplicationExecutor {
         }).await;
 
         // Send execute command to worker
+        info!(
+            "Sending execute command to worker: app={}, task_id={}, from={}, to={}",
+            self.application_id, task_id, from_agent, to_agent
+        );
         self.command_tx.send(ExecutorCommand::Execute(task)).await
             .map_err(|e| format!("Failed to send execute command: {}", e))?;
 
         info!(
-            application_id = %self.application_id,
-            task_id = %task_id,
-            from = %from_agent,
-            to = %to_agent,
-            "Task delegated"
+            "Execute command sent successfully: app={}, task_id={}",
+            self.application_id, task_id
         );
 
         Ok(task_id)
@@ -278,6 +297,19 @@ impl ApplicationExecutor {
         self.event_bus.subscribe_to_broadcast()
     }
 
+    /// Subscribe to executor events (for external subscribers like SSE).
+    ///
+    /// This returns a broadcast receiver that will receive all executor events
+    /// including task lifecycle events and agent execution events.
+    pub fn subscribe_to_events(&self) -> tokio::sync::broadcast::Receiver<ExecutorEvent> {
+        self.event_broadcast.subscribe()
+    }
+
+    /// Get the Fork Manager for Fork-Join workflow.
+    pub fn fork_manager(&self) -> Arc<ForkManager> {
+        Arc::clone(&self.fork_manager)
+    }
+
     /// Shutdown the executor gracefully.
     pub async fn shutdown(&self) {
         *self.shutdown.write().await = true;
@@ -290,10 +322,49 @@ impl ApplicationExecutor {
         runner: Arc<dyn AgentRunner>,
         mut command_rx: mpsc::Receiver<ExecutorCommand>,
         event_tx: mpsc::Sender<ExecutorEvent>,
+        event_broadcast: tokio::sync::broadcast::Sender<ExecutorEvent>,
         shutdown: Arc<RwLock<bool>>,
         queue: Arc<ExecutionQueue>,
+        application_id: ApplicationId,
+        fork_manager: Arc<ForkManager>,
     ) {
         info!("Application executor worker started");
+
+        // Spawn a background task to forward hook events to executor events
+        let mut hook_rx = fork_manager.subscribe_to_hooks();
+        let hook_event_broadcast = event_broadcast.clone();
+        let hook_shutdown = Arc::clone(&shutdown);
+        tokio::spawn(async move {
+            loop {
+                if *hook_shutdown.read().await {
+                    break;
+                }
+                // Non-blocking check for hook events
+                match hook_rx.try_recv() {
+                    Ok(hook_event) => {
+                        info!("Forwarding hook event to SSE: {:?}", hook_event);
+                        // Convert HookEvent to ExecutorEvent for SSE streaming
+                        let executor_event = ExecutorEvent::HookEvent {
+                            event: hook_event,
+                        };
+                        let _ = hook_event_broadcast.send(executor_event);
+                    }
+                    Err(tokio::sync::broadcast::error::TryRecvError::Empty) => {
+                        // No events available, sleep briefly
+                        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+                    }
+                    Err(tokio::sync::broadcast::error::TryRecvError::Closed) => {
+                        info!("Hook event channel closed");
+                        break;
+                    }
+                    Err(tokio::sync::broadcast::error::TryRecvError::Lagged(_)) => {
+                        // Continue on lag
+                        continue;
+                    }
+                }
+            }
+            info!("Hook event forwarder stopped");
+        });
 
         loop {
             // Check for shutdown
@@ -303,8 +374,12 @@ impl ApplicationExecutor {
             }
 
             // Wait for commands
+            info!("Worker waiting for command...");
             let command = match command_rx.recv().await {
-                Some(cmd) => cmd,
+                Some(cmd) => {
+                    info!("Worker received command: {:?}", std::mem::discriminant(&cmd));
+                    cmd
+                },
                 None => {
                     warn!("Command channel closed, worker exiting");
                     break;
@@ -319,43 +394,102 @@ impl ApplicationExecutor {
                     let context = task.context.clone();
 
                     // Notify task started
-                    let _ = event_tx.send(ExecutorEvent::TaskStarted {
+                    let start_event = ExecutorEvent::TaskStarted {
                         task_id,
                         agent: agent_name.clone(),
-                    }).await;
+                    };
+                    let _ = event_tx.send(start_event.clone()).await;
+                    let _ = event_broadcast.send(start_event);
 
                     info!(
                         task_id = %task_id,
                         agent = %agent_name,
-                        "Executing task"
+                        prompt_preview = %prompt.chars().take(100).collect::<String>(),
+                        "Worker: executing task"
                     );
 
-                    // Execute the agent
-                    let result = runner.execute_agent(
+                    // Create a channel for agent execution events
+                    let (agent_event_tx, mut agent_event_rx) =
+                        mpsc::channel::<macaca_proto::AgentExecutionEvent>(64);
+
+                    // Clone event_tx and event_broadcast for the forwarding task
+                    let event_tx_clone = event_tx.clone();
+                    let event_broadcast_clone = event_broadcast.clone();
+                    let agent_name_clone = agent_name.clone();
+
+                    // Spawn a task to forward agent events to executor events
+                    let forward_handle = tokio::spawn(async move {
+                        while let Some(event) = agent_event_rx.recv().await {
+                            let executor_event = ExecutorEvent::AgentEvent {
+                                task_id,
+                                agent: agent_name_clone.clone(),
+                                event,
+                            };
+                            // Send to internal channel
+                            let _ = event_tx_clone.send(executor_event.clone()).await;
+                            // Broadcast to external subscribers (SSE, etc.)
+                            let _ = event_broadcast_clone.send(executor_event);
+                        }
+                    });
+
+                    // Execute the agent with events
+                    let result = runner.execute_agent_with_events(
+                        &application_id,
                         &agent_name,
                         &prompt,
                         context,
+                        Some(agent_event_tx),
                     ).await;
 
+                    // Wait for event forwarding to complete
+                    let _ = forward_handle.await;
+
                     match result {
-                        Ok(task_result) => {
+                        Ok(mut task_result) => {
+                            info!(
+                                task_id = %task_id,
+                                agent = %agent_name,
+                                success = task_result.success,
+                                output_len = task_result.output.len(),
+                                error = ?task_result.error,
+                                "Worker: task executed, storing result"
+                            );
+
+                            // Use the original task_id, not the one from the runner
+                            task_result.task_id = task_id;
+
                             // Store result in queue
                             queue.store_result(task_result.clone()).await;
 
+                            // Resume any fork waiting on this task
+                            let delegate_result = super::fork_manager::DelegateResult {
+                                task_id: macaca_proto::TaskId(task_id.0),
+                                success: task_result.success,
+                                output: task_result.output.clone(),
+                                error: task_result.error.clone(),
+                                artifacts: task_result.artifacts.clone(),
+                            };
+                            if let Err(e) = fork_manager.resume_fork_by_task(macaca_proto::TaskId(task_id.0), delegate_result).await {
+                                warn!(task_id = %task_id, error = %e, "Failed to resume fork waiting on task");
+                            }
+
                             // Notify task completed
-                            let _ = event_tx.send(ExecutorEvent::TaskCompleted {
+                            let completed_event = ExecutorEvent::TaskCompleted {
                                 task_id,
                                 result: task_result,
-                            }).await;
+                            };
+                            let _ = event_tx.send(completed_event.clone()).await;
+                            let _ = event_broadcast.send(completed_event);
                         }
                         Err(e) => {
                             error!(
                                 task_id = %task_id,
+                                agent = %agent_name,
                                 error = %e,
-                                "Task execution failed"
+                                "Worker: task execution failed"
                             );
 
-                            // Store error result
+                            // Store error result with original task_id
                             let error_result = TaskResult {
                                 task_id,
                                 success: false,
@@ -368,16 +502,20 @@ impl ApplicationExecutor {
                             queue.store_result(error_result).await;
 
                             // Notify task failed
-                            let _ = event_tx.send(ExecutorEvent::TaskFailed {
+                            let failed_event = ExecutorEvent::TaskFailed {
                                 task_id,
                                 error: e,
-                            }).await;
+                            };
+                            let _ = event_tx.send(failed_event.clone()).await;
+                            let _ = event_broadcast.send(failed_event);
                         }
                     }
                 }
                 ExecutorCommand::Cancel(task_id) => {
                     if queue.cancel(task_id).await {
-                        let _ = event_tx.send(ExecutorEvent::TaskCancelled { task_id }).await;
+                        let cancel_event = ExecutorEvent::TaskCancelled { task_id };
+                        let _ = event_tx.send(cancel_event.clone()).await;
+                        let _ = event_broadcast.send(cancel_event);
                     }
                 }
                 ExecutorCommand::Shutdown => {
@@ -445,12 +583,12 @@ impl ApplicationExecutorRegistry {
     }
 
     /// Get an executor by application ID.
-    pub async fn get(&self, application_id: &str) -> Option<Arc<ApplicationExecutor>> {
+    pub async fn get(&self, application_id: &ApplicationId) -> Option<Arc<ApplicationExecutor>> {
         self.executors.read().await.get(application_id).cloned()
     }
 
     /// Unregister an application.
-    pub async fn unregister(&self, application_id: &str) -> bool {
+    pub async fn unregister(&self, application_id: &ApplicationId) -> bool {
         if let Some(executor) = self.executors.write().await.remove(application_id) {
             executor.shutdown().await;
             true

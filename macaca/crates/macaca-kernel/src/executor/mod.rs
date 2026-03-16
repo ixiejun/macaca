@@ -41,20 +41,22 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc};
 use uuid::Uuid;
 
-
 pub mod app_executor;
 pub mod bus;
 pub mod callback;
+pub mod fork_manager;
 pub mod queue;
 pub mod router;
 pub mod worker;
 
 pub use app_executor::{ApplicationExecutor, ApplicationExecutorConfig, ApplicationExecutorRegistry};
+pub use macaca_proto::ApplicationId;
 pub use bus::{EventBus, SystemEvent};
 pub use callback::CallbackDispatcher;
 pub use queue::ExecutionQueue;
 pub use router::TaskRouter;
 pub use worker::{TaskExecutor, ExecutorCommand, ExecutorEvent};
+pub use fork_manager::{ForkManager, ForkContext, HookEvent, DelegateResult, MergeResult};
 
 /// Unique identifier for a delegated task.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -100,7 +102,7 @@ pub struct DelegatedTask {
     /// Unique task identifier
     pub id: TaskId,
     /// Application ID this task belongs to (for isolation)
-    pub application_id: String,
+    pub application_id: ApplicationId,
     /// Name of the agent that delegated this task
     pub from_agent: String,
     /// Name of the agent that should execute this task
@@ -206,6 +208,7 @@ pub trait AgentRunner: Send + Sync {
     /// Execute an agent and return the result.
     ///
     /// # Arguments
+    /// * `application_id` - ID of the application this agent belongs to
     /// * `agent_name` - Name of the agent to execute
     /// * `prompt` - The prompt/指令 to send to the agent
     /// * `context` - Optional execution context
@@ -215,10 +218,37 @@ pub trait AgentRunner: Send + Sync {
     /// * `Err(String)` - Error message if execution failed
     async fn execute_agent(
         &self,
+        application_id: &ApplicationId,
         agent_name: &str,
         prompt: &str,
         context: Option<TaskContext>,
     ) -> Result<TaskResult, String>;
+
+    /// Execute an agent with event callback for progress tracking.
+    ///
+    /// This method is similar to `execute_agent` but accepts an event callback
+    /// that will be called during execution to report progress (thinking, tool calls, etc.)
+    ///
+    /// # Arguments
+    /// * `application_id` - ID of the application this agent belongs to
+    /// * `agent_name` - Name of the agent to execute
+    /// * `prompt` - The prompt to send to the agent
+    /// * `context` - Optional execution context
+    /// * `event_tx` - Optional channel to send execution events
+    ///
+    /// Default implementation delegates to `execute_agent` without events.
+    async fn execute_agent_with_events(
+        &self,
+        application_id: &ApplicationId,
+        agent_name: &str,
+        prompt: &str,
+        context: Option<TaskContext>,
+        event_tx: Option<mpsc::Sender<macaca_proto::AgentExecutionEvent>>,
+    ) -> Result<TaskResult, String> {
+        // Default implementation ignores event_tx and calls execute_agent
+        let _ = event_tx; // suppress unused warning
+        self.execute_agent(application_id, agent_name, prompt, context).await
+    }
 
     /// Get information about all available agents.
     async fn list_agents(&self) -> Vec<AgentInfo>;
@@ -276,9 +306,10 @@ mod tests {
 
     #[test]
     fn test_delegated_task_defaults() {
+        let app_id = ApplicationId::new();
         let task = DelegatedTask {
             id: TaskId::new(),
-            application_id: "app-1".into(),
+            application_id: app_id.clone(),
             from_agent: "coordinator".into(),
             to_agent: "backend".into(),
             prompt: "Write a smart contract".into(),
@@ -291,7 +322,7 @@ mod tests {
         };
 
         assert_eq!(task.priority, 5);
-        assert_eq!(task.application_id, "app-1");
+        assert_eq!(task.application_id, app_id);
         assert!(!task.parallel);
     }
 }
