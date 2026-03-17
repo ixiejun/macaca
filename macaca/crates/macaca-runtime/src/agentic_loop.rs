@@ -14,7 +14,7 @@ use macaca_proto::{
 };
 use macaca_tools::{ToolSet, TraceEvent};
 use tokio::sync::mpsc;
-use tracing::{debug, info, instrument, warn};
+use tracing::{debug, error, info, instrument, warn};
 
 use crate::permission::PermissionChecker;
 
@@ -332,6 +332,18 @@ impl AgenticLoop {
         permission_checker: Option<&dyn PermissionChecker>,
         event_tx: Option<&mpsc::Sender<AgentExecutionEvent>>,
     ) -> MacacaResult<serde_json::Value> {
+        let tool_name = &tool_call.name;
+        let args_preview = serde_json::to_string(&tool_call.arguments)
+            .map(|s| s.chars().take(200).collect::<String>())
+            .unwrap_or_else(|_| "<serialize error>".to_string());
+
+        info!(
+            agent_id = %agent_id,
+            tool_name = %tool_name,
+            args_preview = %args_preview,
+            "[TOOL] Executing tool"
+        );
+
         // Permission check
         if let Some(checker) = permission_checker {
             checker.check_tool_permission(agent_id, permission, &tool_call.name)?;
@@ -339,6 +351,11 @@ impl AgenticLoop {
 
         // Find tool
         let tool = tools.get_tool(&tool_call.name).ok_or_else(|| {
+            error!(
+                agent_id = %agent_id,
+                tool_name = %tool_name,
+                "[TOOL] Tool not found"
+            );
             MacacaError::NotFound(format!("Tool '{}' not found", tool_call.name))
         })?;
 
@@ -382,6 +399,12 @@ impl AgenticLoop {
         )
         .await
         .map_err(|_| {
+            error!(
+                agent_id = %agent_id,
+                tool_name = %tool_name,
+                timeout_secs = timeout_duration.as_secs(),
+                "[TOOL] Tool execution timed out"
+            );
             MacacaError::Timeout(format!(
                 "Tool '{}' timed out after {}s",
                 tool_name,
@@ -395,6 +418,17 @@ impl AgenticLoop {
         if let Some(task) = forward_task {
             let _ = task.await;
         }
+
+        let result_preview = serde_json::to_string(&result)
+            .map(|s| s.chars().take(200).collect::<String>())
+            .unwrap_or_else(|_| "<serialize error>".to_string());
+
+        info!(
+            agent_id = %agent_id,
+            tool_name = %tool_name,
+            result_preview = %result_preview,
+            "[TOOL] Tool execution completed"
+        );
 
         Ok(result)
     }
@@ -549,23 +583,62 @@ impl PausableAgenticLoop {
 
         loop {
             // Check if paused and wait for resume
+            if self.pause_signal.load(Ordering::SeqCst) {
+                info!(
+                    agent_id = %agent_id,
+                    iteration = iterations,
+                    "[PAUSE] Loop paused, waiting for resume signal"
+                );
+            }
+            let mut pause_logged = false;
             while self.pause_signal.load(Ordering::SeqCst) {
+                if !pause_logged {
+                    pause_logged = true;
+                }
                 tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            }
+            if pause_logged {
+                info!(
+                    agent_id = %agent_id,
+                    iteration = iterations,
+                    "[PAUSE] Loop resumed"
+                );
             }
 
             // Check for resume reason and inject it
             if let Some(reason) = self.check_and_consume_resume().await {
                 let resume_msg = match reason {
                     ResumeReason::DelegateCompleted { task_id, success, output } => {
+                        info!(
+                            agent_id = %agent_id,
+                            task_id = %task_id,
+                            success = success,
+                            output_len = output.len(),
+                            "[RESUME] Delegate task completed"
+                        );
                         format!("[Delegate Task {} Completed]\nSuccess: {}\nOutput: {}", task_id, success, output)
                     }
                     ResumeReason::DelegateFailed { task_id, error } => {
+                        warn!(
+                            agent_id = %agent_id,
+                            task_id = %task_id,
+                            error = %error,
+                            "[RESUME] Delegate task failed"
+                        );
                         format!("[Delegate Task {} Failed]\nError: {}", task_id, error)
                     }
                     ResumeReason::Timeout => {
+                        warn!(
+                            agent_id = %agent_id,
+                            "[RESUME] Delegate task timed out"
+                        );
                         "[Delegate Task Timed Out]".to_string()
                     }
                     ResumeReason::Manual => {
+                        info!(
+                            agent_id = %agent_id,
+                            "[RESUME] Manual resume requested"
+                        );
                         "[Resume Requested]".to_string()
                     }
                 };
