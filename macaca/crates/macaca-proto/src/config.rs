@@ -25,6 +25,7 @@ pub struct KernelConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LlmConfig {
     pub default_provider: String,
+    pub default_model: Option<String>,
     pub max_tokens_per_request: u32,
     pub rate_limit_rpm: u32,
     pub providers: HashMap<String, LlmProviderConfig>,
@@ -35,6 +36,9 @@ pub struct LlmProviderConfig {
     /// API key — can be a raw key (e.g. `sk-xxx`) or an env var name (e.g. `OPENAI_API_KEY`).
     pub api_key_env: String,
     pub base_url: String,
+    /// Default model for this provider (e.g. "" for DashScope, "gpt-4o" for OpenAI)
+    #[serde(default)]
+    pub default_model: Option<String>,
 }
 
 impl LlmProviderConfig {
@@ -150,6 +154,52 @@ pub struct ObservabilityConfig {
     pub log_level: String,
     pub tracing_enabled: bool,
     pub otlp_endpoint: String,
+    /// File logging configuration
+    #[serde(default)]
+    pub log_file: LogFileConfig,
+}
+
+/// Configuration for file-based logging with rotation and compression.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LogFileConfig {
+    /// Enable file logging
+    #[serde(default = "default_log_file_enabled")]
+    pub enabled: bool,
+    /// Directory to store log files
+    #[serde(default = "default_log_dir")]
+    pub dir: String,
+    /// Log file name prefix
+    #[serde(default = "default_log_prefix")]
+    pub prefix: String,
+    /// Log format: "json" or "text"
+    #[serde(default = "default_log_format")]
+    pub format: String,
+    /// Maximum number of days to retain log files
+    #[serde(default = "default_log_retention_days")]
+    pub retention_days: u64,
+    /// Compress old log files
+    #[serde(default = "default_log_compress")]
+    pub compress: bool,
+}
+
+fn default_log_file_enabled() -> bool { true }
+fn default_log_dir() -> String { "./logs".into() }
+fn default_log_prefix() -> String { "macaca".into() }
+fn default_log_format() -> String { "json".into() }
+fn default_log_retention_days() -> u64 { 10 }
+fn default_log_compress() -> bool { true }
+
+impl Default for LogFileConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_log_file_enabled(),
+            dir: default_log_dir(),
+            prefix: default_log_prefix(),
+            format: default_log_format(),
+            retention_days: default_log_retention_days(),
+            compress: default_log_compress(),
+        }
+    }
 }
 
 impl Default for MacacaConfig {
@@ -162,6 +212,7 @@ impl Default for MacacaConfig {
             },
             llm: LlmConfig {
                 default_provider: "anthropic".into(),
+                default_model: None,
                 max_tokens_per_request: 8192,
                 rate_limit_rpm: 60,
                 providers: HashMap::new(),
@@ -216,6 +267,7 @@ impl Default for MacacaConfig {
                 log_level: "info".into(),
                 tracing_enabled: true,
                 otlp_endpoint: String::new(),
+                log_file: LogFileConfig::default(),
             },
         }
     }

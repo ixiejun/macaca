@@ -19,6 +19,7 @@ base_url = "https://api.anthropic.com"
 [llm.providers.dashscope]
 api_key_env = "sk-7720115f25214ebaa4f83d5857224f9a"
 base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+default_model = "qwen3-max"
 
 # Example: OpenAI-compatible providers (uncomment to enable)
 # [llm.providers.deepseek]
@@ -79,3 +80,12 @@ command_prefix = "!"
 log_level = "info"
 tracing_enabled = true
 otlp_endpoint = ""
+
+# File logging configuration
+[observability.log_file]
+enabled = true
+dir = "./logs"
+prefix = "macaca"
+format = "json"
+retention_days = 10
+compress = true

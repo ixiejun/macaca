@@ -1,11 +1,11 @@
 //! Agent OS CLI entry point.
 
 use clap::{Parser, Subcommand};
-use tracing_subscriber::EnvFilter;
+use macaca_proto::config::MacacaConfig;
 
 /// Agent OS — autonomous agent orchestration platform.
 #[derive(Parser)]
-#[command(name = "aos", version, about = "Agent OS CLI")]
+#[command(name = "macaca", version, about = "Macaca Agent OS CLI")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -32,11 +32,14 @@ enum Commands {
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
-        )
-        .init();
+    // Load configuration
+    let config = MacacaConfig::load_default();
+
+    // Initialize logging with file output
+    if let Err(e) = macaca_cli::logging::init_logging(&config.observability.log_file) {
+        eprintln!("Failed to initialize logging: {e}");
+        std::process::exit(1);
+    }
 
     let cli = Cli::parse();
 
@@ -45,14 +48,14 @@ async fn main() {
         Commands::Agents => macaca_cli::list_agents().await,
         Commands::Status => macaca_cli::show_status().await,
         Commands::Version => {
-            println!("Agent OS v{}", env!("CARGO_PKG_VERSION"));
+            println!("Macaca Agent OS v{}", env!("CARGO_PKG_VERSION"));
             Ok(())
         }
         Commands::Web { port } => macaca_web::start_server(port).await,
     };
 
     if let Err(e) = result {
-        eprintln!("Error: {e}");
+        tracing::error!(error = %e, "Command failed");
         std::process::exit(1);
     }
 }

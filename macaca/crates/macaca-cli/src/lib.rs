@@ -4,5 +4,6 @@
 //! command implementations for managing the kernel and agents.
 
 pub mod commands;
+pub mod logging;
 
 pub use commands::{create_kernel, list_agents, run_kernel, show_status};
