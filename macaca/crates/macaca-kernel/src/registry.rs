@@ -142,6 +142,7 @@ mod tests {
             },
             state,
             created_at: Utc::now(),
+            model: String::new(),
         }
     }
 

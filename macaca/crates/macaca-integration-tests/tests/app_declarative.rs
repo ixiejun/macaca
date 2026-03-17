@@ -79,10 +79,15 @@ fn inline_manifest(name: &str, agent_count: usize) -> AppManifest {
     AppManifest {
         id: ApplicationId::new(),
         name: name.into(),
+        description: None,
         version: "0.1.0".into(),
         layer: AppLayer::L3Declarative,
+        ui_type: None,
         agents,
         llm_config: None,
+        entrypoint: None,
+        workflows: None,
+        resources: None,
     }
 }
 

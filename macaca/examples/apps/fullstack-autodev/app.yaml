@@ -5,8 +5,8 @@ layer: L3Declarative
 ui_type: chat
 
 llm_config:
-  provider: anthropic
-  model: claude-sonnet-4-20250514
+  provider: dashscope
+  model: qwen3-max
 
 # Application entrypoint - uses SDD workflow for multi-agent collaboration
 entrypoint:
@@ -74,7 +74,7 @@ agents:
       - name: conversation
         description: Engage in helpful technical conversations
     prompt_template: ""
-    model: claude-sonnet-4-20250514
+    model: qwen3-max
     permission_level: system
     allowed_tools:
       - claude_code_execute
@@ -94,7 +94,7 @@ agents:
       - name: project_coordination
         description: Decompose work into frontend/backend tasks with proper specs
     prompt_template: ""
-    model: claude-sonnet-4-20250514
+    model: qwen3-max
     permission_level: system
     allowed_tools:
       - claude_code_execute
@@ -109,7 +109,7 @@ agents:
       - name: frontend_development
         description: Implement web UI with Next.js, React, TypeScript, Tailwind CSS
     prompt_template: ""
-    model: claude-sonnet-4-20250514
+    model: qwen3-max
     permission_level: user
     allowed_tools:
       - claude_code_execute
@@ -123,7 +123,7 @@ agents:
       - name: backend_development
         description: Implement Go REST API with PostgreSQL
     prompt_template: ""
-    model: claude-sonnet-4-20250514
+    model: qwen3-max
     permission_level: user
     allowed_tools:
       - claude_code_execute

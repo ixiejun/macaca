@@ -12,7 +12,14 @@ As the Coordinator, you can delegate tasks to specialized agents. Use these tool
 
 ### delegate_task
 
-Delegate a task to another agent. **Think intelligently about which agent to use!**
+**PRIMARY TOOL FOR TASK EXECUTION** - Always use this for implementation work!
+
+Delegate a task to a specialized agent. This is the **preferred way** to get work done.
+
+**Why delegate?**
+- Specialized agents have domain expertise (backend, frontend, architecture)
+- Parallel execution for faster completion
+- Better code quality through specialization
 
 **First, analyze the task:**
 - What specific skills are needed? (Solidity? React? API design? Architecture?)
@@ -36,9 +43,33 @@ Then match the task requirements to the best agent.
 
 **Key principle**: Analyze WHAT the task needs, then match to agent capabilities.
 
+**⚠️ IMPORTANT - Async Delegation Model:**
+
+After calling `delegate_task`, you will receive a `task_id`. The task is now being processed asynchronously by the delegated agent.
+
+**DO NOT poll for results!** The system uses a Hook-based notification model:
+1. You delegate the task and receive a `task_id`
+2. The delegated agent executes the task in the background
+3. When the task completes (success or failure), you will receive a notification via the system
+4. Continue with other work while waiting - do NOT call `get_task_result` repeatedly
+
+**Example workflow:**
+```json
+// Delegate the task
+{"agent": "backend", "prompt": "Create an ERC20 token contract"}
+// Response: {"task_id": "xxx", "status": "delegated"}
+
+// That's it! The system will notify you when the task completes.
+// Continue with other work or respond to the user that the task is in progress.
+```
+
 ### get_task_result
 
-Check the result of a delegated task.
+**⚠️ Use SPARINGLY - Only call ONCE after receiving a completion notification!**
+
+Check the result of a delegated task. This should only be called when:
+1. You receive a system notification that a task has completed
+2. You need the actual output of the task
 
 ```json
 {
@@ -47,8 +78,29 @@ Check the result of a delegated task.
 ```
 
 Returns:
-- `status: "completed"` with result
-- `status: "pending"` if still in progress
+- `status: "completed"` with result (if successful)
+- `status: "error"` if task failed (check error field)
+- `status: "waiting"` or `status: "running"` if still in progress (don't poll!)
+
+**❌ NEVER do this:**
+```json
+// WRONG - Polling loop!
+{"task_id": "xxx"} → {"status": "waiting"}
+{"task_id": "xxx"} → {"status": "waiting"}
+{"task_id": "xxx"} → {"status": "waiting"}
+// This is wasteful and will make the system slow!
+```
+
+**✅ DO this instead:**
+```json
+// Delegate task
+{"agent": "backend", "prompt": "Create the API"}
+// Response: {"task_id": "xxx", "status": "delegated"}
+
+// Tell user the task is in progress, then wait for notification
+// When notification arrives with result, call get_task_result ONCE:
+{"task_id": "xxx"} → {"status": "completed", "output": "..."}
+```
 
 ### list_agents
 
@@ -61,19 +113,28 @@ List all available agents and their capabilities:
 
 For tasks that can run in parallel (e.g., frontend + backend work):
 1. Call `delegate_task` with `"parallel": true` for each task
-2. Use `get_task_result` to check each task's status
-3. Aggregate results when all complete
+2. Wait for completion notifications (you'll receive one per task)
+3. Use `get_task_result` to fetch each result when notified
 
 ## claude_code_execute
 
-Primary tool for executing code changes. Use for ALL code implementation.
+⚠️ **DEPRECATED for multi-agent workflows**: Use `delegate_task` instead for most tasks.
+
+Use ONLY for:
+- Quick file reads or simple checks
+- Emergency fallback when all agents are busy
+- Coordinator's own analysis tasks (not implementation)
 
 ### When to Use
-- Simple bug fixes
-- Feature implementation
-- Running tests
-- Code refactoring
-- File operations
+- **Simple file operations** (reading configs, checking structure)
+- **Coordinator's own analysis** (not code implementation)
+- **Emergency fallback** when delegation fails
+
+### When NOT to Use (Use delegate_task instead)
+- ❌ **Backend development** → Use `delegate_task` to `backend` agent
+- ❌ **Frontend development** → Use `delegate_task` to `frontend` agent
+- ❌ **Architecture design** → Use `delegate_task` to `architect` agent
+- ❌ **Complex implementation** → Use `delegate_task` to appropriate agent
 
 ### Usage
 ```
@@ -82,32 +143,6 @@ Input: {
   "prompt": "[Clear, specific task description]",
   "work_dir": "/path/to/project",
   "timeout": 300  // optional, default 600
-}
-```
-
-### Examples
-
-**Bug fix:**
-```json
-{
-  "prompt": "Fix the authentication error in src/auth/login.ts where the token is not being refreshed. The error message shows 'token expired' but the refresh logic should handle this.",
-  "work_dir": "/Users/dev/my-project"
-}
-```
-
-**Simple feature:**
-```json
-{
-  "prompt": "Add a loading spinner to the submit button in components/Form.tsx. Use the existing Spinner component from ui/spinner.tsx.",
-  "work_dir": "/Users/dev/my-project"
-}
-```
-
-**Run tests:**
-```json
-{
-  "prompt": "Run the test suite and report any failures",
-  "work_dir": "/Users/dev/my-project"
 }
 ```
 
@@ -130,59 +165,9 @@ This flag skips interactive prompts and enables Claude Code integration.
 }
 ```
 
-**Validate changes:**
-```json
-{
-  "action": "validate",
-  "work_dir": "/path/to/project",
-  "args": ["<change-id>", "--strict"]
-}
-```
-
-**Archive changes:**
-```json
-{
-  "action": "archive",
-  "work_dir": "/path/to/project",
-  "args": ["<change-id>"]
-}
-```
-
-### ❌ NEVER do this:
-```bash
-# WRONG - interactive, will fail!
-openspec init
-
-# WRONG - interactive prompts!
-openspec propose
-
-# WRONG - shell command!
-cd /path && openspec init
-```
-
-### ✅ ALWAYS do this:
-```
-Tool: openspec
-Input: {
-  "action": "init",
-  "work_dir": "/path/to/project",
-  "args": ["--tools", "claude"]
-}
-```
-
 ## file_read / file_write
 
 Direct file operations. Use for quick tasks when claude_code_execute is overkill.
-
-### When to Use
-- Reading configuration files
-- Checking existing code structure
-- Quick file updates
-
-### When NOT to Use
-- Complex code changes → use claude_code_execute
-- Multiple file operations → use claude_code_execute
-- Any implementation task → use claude_code_execute
 
 ## shell
 
@@ -193,22 +178,13 @@ Execute shell commands. **Use sparingly!**
 - Finding files: `find . -name "*.ts"`
 - Git operations: `git status`
 
-### When NOT to Use
-- Code implementation → use claude_code_execute
-- OpenSpec operations → use openspec tool
-- Any interactive command → avoid entirely
-
 ## Error Handling Protocol
 
-### If claude_code_execute fails:
-1. **Report the error** to the user
-2. **Do NOT fallback** to file_write or shell
-3. **Ask for guidance** if stuck
-
-### If openspec tool fails:
-1. **Report the error**
-2. **Check if already initialized** (files exist)
-3. **Do NOT try shell command** as fallback
+### If a delegated task fails:
+1. Check the error message from the notification
+2. **Do NOT immediately fallback** to claude_code_execute
+3. Report the error to the user and ask for guidance
+4. Optionally, try delegating to a different agent if appropriate
 
 ### If any tool fails:
 ```
@@ -220,11 +196,11 @@ This appears to be [reason]. Would you like me to [alternative approach]?"
 
 ## Workflow Summary
 
-| Task Type | Primary Tool | Fallback |
-|-----------|-------------|----------|
-| Code changes | claude_code_execute | Report error, ask user |
+| Task Type | Primary Tool | Notes |
+|-----------|-------------|-------|
+| Code changes | delegate_task | Async, wait for notification |
 | OpenSpec init | openspec tool | Check if already done |
-| Tests | claude_code_execute | Report error |
-| File reading | file_read | - |
-| Quick file edit | file_write | - |
-| Shell ops | shell | - |
+| Tests | delegate_task | Delegate to appropriate agent |
+| File reading | file_read | Quick reads only |
+| Quick file edit | file_write | Simple changes only |
+| Shell ops | shell | Use sparingly |

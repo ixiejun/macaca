@@ -394,7 +394,14 @@ impl AgentRunner for WebAgentRunner {
             "Starting agentic loop with events"
         );
 
-        let loop_result = agentic_loop
+        // Update agent activity to "working" before execution
+        if let Some(agent_manifest) = state.kernel.get_agent_by_name(agent_name).await {
+            state.kernel.status_tracker()
+                .set_working(&agent_manifest.id, &format!("Executing: {}", prompt.chars().take(50).collect::<String>()))
+                .await;
+        }
+
+        let loop_result = match agentic_loop
             .run_with_events(
                 &agent_id,
                 state.llm.as_ref(),
@@ -406,7 +413,26 @@ impl AgentRunner for WebAgentRunner {
                 event_tx,
             )
             .await
-            .map_err(|e| format!("Agentic loop failed: {}", e))?;
+        {
+            Ok(result) => result,
+            Err(e) => {
+                // Update agent activity to "error" on failure
+                let error_msg = format!("{}", e);
+                if let Some(agent_manifest) = state.kernel.get_agent_by_name(agent_name).await {
+                    state.kernel.status_tracker()
+                        .set_error(&agent_manifest.id, &error_msg)
+                        .await;
+                }
+                return Err(format!("Agentic loop failed: {}", e));
+            }
+        };
+
+        // Update agent activity to "idle" after successful execution
+        if let Some(agent_manifest) = state.kernel.get_agent_by_name(agent_name).await {
+            state.kernel.status_tracker()
+                .set_idle(&agent_manifest.id)
+                .await;
+        }
 
         info!(
             application_id = %application_id.0,

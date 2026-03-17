@@ -131,6 +131,7 @@ impl DeclarativeAgent {
             permission: self.permission.clone(),
             state: self.state,
             created_at: Utc::now(),
+            model: self.llm_options.model.clone(),
         }
     }
 }

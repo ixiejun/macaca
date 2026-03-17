@@ -7,5 +7,6 @@ pub mod orchestration;
 pub use tool::{Tool, ToolSet, TraceEvent};
 pub use builtin::{DefaultToolSet, FileReadTool, FileWriteTool, ShellTool};
 pub use orchestration::{
-    OrchestrationState, DelegateTaskTool, GetTaskResultTool, ReportResultTool, ListAgentsTool,
+    OrchestrationState, DelegateTaskTool, GetTaskResultTool, GetTaskResultCallback,
+    TaskResultData, ReportResultTool, ListAgentsTool,
 };

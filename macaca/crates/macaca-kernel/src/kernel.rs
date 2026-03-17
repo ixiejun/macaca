@@ -88,6 +88,12 @@ impl Kernel {
         self.registry.list().await
     }
 
+    /// Get a specific agent's manifest by name.
+    pub async fn get_agent_by_name(&self, name: &str) -> Option<AgentManifest> {
+        let agents = self.registry.list().await;
+        agents.into_iter().find(|m| m.name == name)
+    }
+
     /// Number of registered agents.
     pub async fn agent_count(&self) -> usize {
         self.registry.count().await
@@ -215,6 +221,7 @@ mod tests {
             },
             state: AgentState::Running,
             created_at: Utc::now(),
+            model: String::new(),
         };
         (id, agent, manifest)
     }

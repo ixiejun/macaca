@@ -4,6 +4,7 @@
 //! with Macaca OS applications. Uses axum for the HTTP layer.
 
 pub mod agent_runner;
+pub mod hook_consumer;
 pub mod routes;
 pub mod state;
 
@@ -13,19 +14,20 @@ use std::sync::Arc;
 
 use axum::routing::{get, post};
 use axum::Router;
+use tokio::sync::RwLock;
 use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
 
 use macaca_app::{AppRegistry, AppRuntime};
 use macaca_driver_claude_code::{ClaudeCodeConfig, ClaudeCodeDriver};
-use macaca_kernel::{Kernel, ApplicationExecutorRegistry};
+use macaca_kernel::{Kernel, ApplicationExecutorRegistry, AgentInfo};
 use macaca_llm::{DashScopeProvider, LlmProvider};
 use macaca_persist::RedbStore;
 use macaca_proto::config::{KernelConfig, MacacaConfig};
 use macaca_proto::{ApplicationId, LlmMessage, MacacaResult};
 use macaca_sdk::AgentPersona;
 use macaca_skill::{SkillCatalog, SkillRegistry};
-use macaca_tools::{DefaultToolSet, Tool, ToolSet, OrchestrationState, DelegateTaskTool, GetTaskResultTool, ReportResultTool, ListAgentsTool};
+use macaca_tools::{DefaultToolSet, Tool, ToolSet, DelegateTaskTool, GetTaskResultTool, ListAgentsTool};
 use futures::FutureExt;
 
 use crate::state::AppState;
@@ -85,6 +87,7 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
     let runtime = AppRuntime::new();
     let mut app_dirs = HashMap::new();
     let mut skills_dirs = Vec::new();
+    let mut started_apps: Vec<(macaca_proto::ApplicationId, String)> = Vec::new();
 
     // Auto-start all discovered apps
     for app in &discovered {
@@ -95,6 +98,7 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
                     let agent_count = kernel.agent_count().await;
                     app_dirs.insert(app_id, app.path.clone());
                     skills_dirs.push(app.path.join("skills"));
+                    started_apps.push((app_id.clone(), app.name.clone()));
                     info!(
                         app_id = %app_id.0,
                         app_name = %app.name,
@@ -152,9 +156,11 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
     info!(count = cc_tools.len(), "Claude Code driver tools loaded");
     all_tools.extend(cc_tools);
 
-    // 8. Initialize orchestration tools placeholder.
-    // We'll create the actual tools after we have the executor_registry.
-    // For now, we'll add the list_agents tool which doesn't need the registry.
+    // 8. Initialize orchestration tools.
+    // We need to create a shared reference for the executor registry that can be
+    // populated after state creation. This allows delegate_task tool to access the registry.
+    let executor_registry_ref: Arc<RwLock<Option<Arc<ApplicationExecutorRegistry>>>> =
+        Arc::new(RwLock::new(None));
 
     // Create dynamic ListAgentsTool that fetches from kernel
     let kernel_for_callback = Arc::clone(&kernel);
@@ -183,6 +189,194 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
     all_tools.push(Box::new(list_agents_tool));
     info!("ListAgents tool added");
 
+    // Create DelegateTaskTool with callback to executor registry
+    // Uses Fork-Join workflow: creates a Fork that inherits parent context
+    let registry_for_delegate = Arc::clone(&executor_registry_ref);
+    let delegate_tool = DelegateTaskTool::empty()
+        .with_callback(move |app_id, to_agent, prompt, priority, parallel| {
+            let registry = Arc::clone(&registry_for_delegate);
+            async move {
+                // Get the registry reference
+                let registry_guard = registry.read().await;
+                let registry = registry_guard.as_ref()
+                    .ok_or_else(|| "Executor registry not initialized".to_string())?;
+
+                // If app_id is empty, use the first registered app
+                let app_id = if app_id.is_empty() {
+                    let apps = registry.list_applications().await;
+                    apps.first()
+                        .map(|(id, _)| id.clone())
+                        .ok_or_else(|| "No applications registered in executor".to_string())?
+                } else {
+                    // Parse string to ApplicationId
+                    uuid::Uuid::parse_str(&app_id)
+                        .map(macaca_proto::ApplicationId)
+                        .map_err(|e| format!("Invalid application ID: {}", e))?
+                };
+
+                // Get the executor for this app
+                let executor = registry.get(&app_id).await
+                    .ok_or_else(|| format!("App '{}' not found in registry", app_id))?;
+
+                // Get the ForkManager from the executor
+                let fork_manager = executor.fork_manager();
+
+                // Create acceptance criteria
+                let acceptance_criteria = macaca_proto::AcceptanceCriteria {
+                    description: format!("Task delegated to {}: {}", to_agent, prompt.chars().take(100).collect::<String>()),
+                    required_artifacts: vec![],
+                    auto_accept: false,
+                };
+
+                // Create a Fork for this delegation
+                let fork_id = fork_manager.create_fork(
+                    None,  // parent_fork_id - None for now, will be set by caller context
+                    app_id.clone(),
+                    to_agent.clone(),
+                    prompt.clone(),
+                    vec![],  // inherited_messages - will be populated by caller
+                    String::new(),  // system_prompt - will be set by caller
+                    acceptance_criteria,
+                ).await.map_err(|e| format!("Fork creation failed: {}", e))?;
+
+                // Start the fork (transition from Pending to Running)
+                fork_manager.start_fork(fork_id).await
+                    .map_err(|e| format!("Fork start failed: {}", e))?;
+
+                // Also delegate the actual task to the executor
+                let task_id = executor.delegate_task(
+                    "coordinator",  // from_agent
+                    &to_agent,
+                    prompt,
+                    priority,
+                    parallel,
+                    None,  // context
+                ).await.map_err(|e| format!("Delegation failed: {}", e))?;
+
+                // Suspend the fork waiting for the task to complete
+                fork_manager.suspend_fork(fork_id, macaca_proto::TaskId(task_id.0)).await
+                    .map_err(|e| format!("Fork suspend failed: {}", e))?;
+
+                // Return the fork_id - caller can use get_fork_result to check status
+                Ok(format!("fork:{}", fork_id))
+            }
+            .boxed()
+        });
+    all_tools.push(Box::new(delegate_tool));
+    info!("DelegateTask tool added");
+
+    // Create GetTaskResultTool with callback to executor registry
+    // Supports both fork_id (format: "fork:uuid") and task_id (format: "uuid")
+    let registry_for_result = Arc::clone(&executor_registry_ref);
+    let get_result_tool = GetTaskResultTool::empty()
+        .with_callback(move |app_id, task_or_fork_id| {
+            let registry = Arc::clone(&registry_for_result);
+            async move {
+                // Get the registry reference
+                let registry_guard = registry.read().await;
+                let registry = registry_guard.as_ref()
+                    .ok_or_else(|| "Executor registry not initialized".to_string())?;
+
+                // If app_id is empty, use the first registered app
+                let app_id = if app_id.is_empty() {
+                    let apps = registry.list_applications().await;
+                    apps.first()
+                        .map(|(id, _)| id.clone())
+                        .ok_or_else(|| "No applications registered in executor".to_string())?
+                } else {
+                    // Parse string to ApplicationId
+                    uuid::Uuid::parse_str(&app_id)
+                        .map(macaca_proto::ApplicationId)
+                        .map_err(|e| format!("Invalid application ID: {}", e))?
+                };
+
+                // Get the executor for this app
+                let executor = registry.get(&app_id).await
+                    .ok_or_else(|| format!("App '{}' not found in registry", app_id))?;
+
+                // Check if this is a fork_id (format: "fork:fork-{uuid}" or "fork:{uuid}")
+                if let Some(fork_id_str) = task_or_fork_id.strip_prefix("fork:") {
+                    // Handle both "fork-{uuid}" format (from Display) and plain UUID
+                    let uuid_str = if let Some(uuid_part) = fork_id_str.strip_prefix("fork-") {
+                        uuid_part
+                    } else {
+                        fork_id_str
+                    };
+                    let fork_id_uuid = uuid::Uuid::parse_str(uuid_str)
+                        .map_err(|e| format!("Invalid fork_id '{}': {}", uuid_str, e))?;
+                    let fork_id = macaca_proto::ForkId(fork_id_uuid);
+
+                    let fork_manager = executor.fork_manager();
+                    let fork = fork_manager.get_fork(fork_id).await
+                        .ok_or_else(|| format!("Fork '{}' not found", fork_id))?;
+
+                    let (status_str, output, error) = match fork.state {
+                        macaca_proto::ForkState::Pending => ("pending".to_string(), None, None),
+                        macaca_proto::ForkState::Running => ("running".to_string(), None, None),
+                        macaca_proto::ForkState::WaitingForHook => ("waiting".to_string(), None, None),
+                        macaca_proto::ForkState::Completed => {
+                            let output = fork.own_messages.iter()
+                                .filter_map(|m| if m.role == macaca_proto::LlmRole::Assistant {
+                                    Some(m.content.clone())
+                                } else { None })
+                                .collect::<Vec<_>>()
+                                .join("\n");
+                            ("completed".to_string(), Some(output), None)
+                        }
+                        macaca_proto::ForkState::Failed { ref error } => {
+                            ("failed".to_string(), None, Some(error.clone()))
+                        }
+                        macaca_proto::ForkState::Merged => ("merged".to_string(), None, None),
+                        macaca_proto::ForkState::Cancelled => ("cancelled".to_string(), None, None),
+                    };
+
+                    return Ok(macaca_tools::orchestration::TaskResultData {
+                        status: status_str,
+                        output,
+                        error,
+                    });
+                }
+
+                // Otherwise treat as task_id
+                let task_id_uuid = uuid::Uuid::parse_str(&task_or_fork_id)
+                    .map_err(|e| format!("Invalid task_id: {}", e))?;
+                let task_id = macaca_kernel::TaskId(task_id_uuid);
+
+                // Get task status and result
+                let status = executor.get_task_status(&task_id).await
+                    .ok_or_else(|| format!("Task '{}' not found", task_id))?;
+
+                let (status_str, output, error) = match status {
+                    macaca_kernel::TaskStatus::Queued => ("queued".to_string(), None, None),
+                    macaca_kernel::TaskStatus::Running => ("running".to_string(), None, None),
+                    macaca_kernel::TaskStatus::Completed => {
+                        if let Some(result) = executor.get_task_result(task_id).await {
+                            ("completed".to_string(), Some(result.output), result.error)
+                        } else {
+                            ("completed".to_string(), None, None)
+                        }
+                    }
+                    macaca_kernel::TaskStatus::Failed => {
+                        if let Some(result) = executor.get_task_result(task_id).await {
+                            ("failed".to_string(), Some(result.output), result.error)
+                        } else {
+                            ("failed".to_string(), None, Some("Task failed".to_string()))
+                        }
+                    }
+                    macaca_kernel::TaskStatus::Cancelled => ("cancelled".to_string(), None, None),
+                };
+
+                Ok(macaca_tools::TaskResultData {
+                    status: status_str,
+                    output,
+                    error,
+                })
+            }
+            .boxed()
+        });
+    all_tools.push(Box::new(get_result_tool));
+    info!("GetTaskResult tool added");
+
     let tool_names: Vec<&str> = all_tools.iter().map(|t| t.name()).collect();
     info!(tools = ?tool_names, "Composite toolset ready");
 
@@ -197,28 +391,93 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
     let session_store = Arc::new(RedbStore::open(&session_db_path)?);
     info!(path = %session_db_path.display(), "Session store initialized");
 
+    // Get default model from provider config
+    let provider_config = config.llm.providers.get(&config.llm.default_provider);
+    let default_model = provider_config
+        .and_then(|p| p.default_model.clone())
+        .unwrap_or_default();
+
     // 10. Build shared state.
     let state = Arc::new_cyclic(|weak_state| {
-        // Create the agent runner with the actual state
+        // Create the real agent runner with the actual weak state
         let runner = Arc::new(WebAgentRunner::new(weak_state.clone()));
-
-        // Create the executor registry with this runner
         let executor_registry = Arc::new(ApplicationExecutorRegistry::new(Arc::clone(&runner) as Arc<dyn macaca_kernel::AgentRunner>));
 
         AppState {
-            kernel,
-            runtime,
+            kernel: kernel.clone(),
+            runtime: runtime.clone(),
             registry: tokio::sync::RwLock::new(registry),
             catalog: tokio::sync::RwLock::new(catalog),
-            llm,
+            llm: llm.clone(),
+            default_model,
             app_dirs: tokio::sync::RwLock::new(app_dirs),
             tools,
             sessions: tokio::sync::RwLock::new(HashMap::new()),
             cancel_flags: tokio::sync::RwLock::new(HashMap::new()),
             session_store,
-            executor_registry,
+            executor_registry: executor_registry.clone(),
+            fork_to_session: tokio::sync::RwLock::new(HashMap::new()),
+            active_sessions: tokio::sync::RwLock::new(HashMap::new()),
         }
     });
+
+    // 10a. Set the executor registry reference for the delegate tool
+    {
+        let mut guard = executor_registry_ref.write().await;
+        *guard = Some(state.executor_registry.clone());
+    }
+
+    // 10b. Register all started apps to the executor registry
+    {
+        let kernel_ref = Arc::clone(&kernel);
+        let registry_ref = state.executor_registry.clone();
+        let apps_to_register = started_apps.clone();
+
+        tokio::spawn(async move {
+            // Get all agents from kernel
+            let all_agents = kernel_ref.list_agents().await;
+            let app_agents: Vec<AgentInfo> = all_agents
+                .iter()
+                .map(|m| AgentInfo {
+                    id: m.id.0.to_string(),
+                    name: m.name.clone(),
+                    capabilities: m.capabilities.iter().map(|c| c.name.clone()).collect(),
+                    current_load: 0,
+                    max_load: 4,
+                    available: true,
+                })
+                .collect();
+
+            // Register each app to executor registry
+            for (app_id, app_name) in apps_to_register {
+                // Register this app to executor registry
+                let _executor = registry_ref.register_application(
+                    app_id,
+                    app_name,
+                    app_agents.clone(),
+                ).await;
+                tracing::info!(app_id = %app_id.0, "App registered to executor");
+            }
+        });
+    }
+
+    // 10c. Note: executor_registry is available in state for task delegation
+    // The executor_registry allows agents to delegate tasks to other agents
+    // using capability-based routing or direct agent targeting.
+    // Route handlers can access it via state.executor_registry
+    {
+        let _registry = state.executor_registry.clone();
+        info!("ApplicationExecutorRegistry initialized and apps registered");
+    }
+
+    // 10d. Start hook event consumer for coordinator auto-continue
+    {
+        let consumer_state = Arc::clone(&state);
+        tokio::spawn(async move {
+            hook_consumer::start_hook_event_consumer(consumer_state).await;
+        });
+        info!("Hook event consumer started");
+    }
 
     // 11. Build axum router.
     let cors = CorsLayer::new()

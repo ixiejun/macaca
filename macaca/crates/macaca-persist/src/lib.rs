@@ -44,6 +44,7 @@ mod tests {
             },
             state: AgentState::Running,
             created_at: Utc::now(),
+            model: String::new(),
         }
     }
 

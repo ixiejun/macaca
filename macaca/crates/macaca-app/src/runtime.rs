@@ -13,6 +13,7 @@ use crate::loader::AppLoader;
 use crate::model::{AppLayer, AppManifest, AppStatus, LoadedApp};
 
 /// Manages the lifecycle of loaded applications and their agents.
+#[derive(Clone)]
 pub struct AppRuntime {
     apps: Arc<RwLock<HashMap<ApplicationId, LoadedApp>>>,
 }
