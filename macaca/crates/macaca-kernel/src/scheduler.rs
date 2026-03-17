@@ -2,6 +2,7 @@
 
 use async_trait::async_trait;
 use macaca_proto::{AgentId, AgentState, MacacaResult, Task};
+use tracing::{info, warn};
 
 use crate::registry::AgentRegistry;
 
@@ -47,9 +48,13 @@ impl Scheduler for SimpleScheduler {
                 .iter()
                 .any(|c| description_lower.contains(&c.name.to_lowercase()));
             if matches {
-                tracing::debug!(
+                info!(
+                    task_id = %task.id.0,
                     agent_id = %manifest.id.0,
-                    "scheduler: capability match"
+                    agent_name = %manifest.name,
+                    matched_capability = ?manifest.capabilities.iter().find(|c| description_lower.contains(&c.name.to_lowercase())).map(|c| &c.name),
+                    selection_type = "capability_match",
+                    "[SCHEDULE] Agent selected by capability match"
                 );
                 return Ok(Some(manifest.id));
             }
@@ -58,15 +63,23 @@ impl Scheduler for SimpleScheduler {
         // Fallback: first Running agent regardless of capability.
         for manifest in &manifests {
             if manifest.state == AgentState::Running {
-                tracing::debug!(
+                info!(
+                    task_id = %task.id.0,
                     agent_id = %manifest.id.0,
-                    "scheduler: fallback selection"
+                    agent_name = %manifest.name,
+                    selection_type = "fallback",
+                    "[SCHEDULE] Agent selected (fallback)"
                 );
                 return Ok(Some(manifest.id));
             }
         }
 
-        tracing::warn!("scheduler: no available agent for task {}", task.id.0);
+        warn!(
+            task_id = %task.id.0,
+            running_agents = manifests.iter().filter(|m| m.state == AgentState::Running).count(),
+            total_agents = manifests.len(),
+            "[SCHEDULE] No available agent for task"
+        );
         Ok(None)
     }
 }
@@ -128,6 +141,7 @@ mod tests {
             },
             state,
             created_at: Utc::now(),
+            model: String::new(),
         }
     }
 

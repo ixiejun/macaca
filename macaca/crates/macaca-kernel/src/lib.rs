@@ -7,6 +7,7 @@ pub mod kernel;
 pub mod services;
 pub mod status;
 pub mod orchestrator;
+pub mod logging;
 
 pub use registry::{AgentEntry, AgentRegistry};
 pub use scheduler::{Scheduler, SimpleScheduler};
@@ -21,5 +22,5 @@ pub use executor::{
     RoutingDecision, AgentInfo, EventBus, SystemEvent, CallbackDispatcher,
     ExecutionQueue, TaskRouter, TaskExecutor, ExecutorCommand, ExecutorEvent,
     ApplicationExecutor, ApplicationExecutorConfig, ApplicationExecutorRegistry,
-    AgentRunner,
+    AgentRunner, ForkManager, ForkContext, HookEvent, DelegateResult, MergeResult,
 };

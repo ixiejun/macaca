@@ -13,9 +13,10 @@ use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use tokio::sync::{mpsc, RwLock};
-use tracing::info;
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
+use crate::logging::{LogContext, log_hook_event, log_state_transition};
 use macaca_proto::{
     AcceptanceCriteria, ApplicationId, ForkId, ForkState, LlmMessage, TaskId, ValidationResult,
 };
@@ -216,6 +217,10 @@ impl ForkManager {
         system_prompt: String,
         acceptance_criteria: AcceptanceCriteria,
     ) -> Result<ForkId, String> {
+        // Create log context for this operation
+        let ctx = LogContext::new(&application_id.0.to_string())
+            .with_agent_name(&agent_name);
+
         // Check fork limit
         let forks = self.forks.read().await;
         let active_count = forks
@@ -225,6 +230,14 @@ impl ForkManager {
         drop(forks);
 
         if active_count >= self.max_parallel_forks {
+            error!(
+                trace_id = %ctx.trace_id,
+                app_id = %application_id.0,
+                agent_name = %agent_name,
+                active_count = active_count,
+                max_limit = self.max_parallel_forks,
+                "[FORK] Create failed: max parallel forks exceeded"
+            );
             return Err(format!(
                 "Maximum parallel forks ({}) exceeded",
                 self.max_parallel_forks
@@ -248,15 +261,41 @@ impl ForkManager {
         // Store fork
         self.forks.write().await.insert(fork_id, context);
 
+        // Create fork-specific context for logging (clone the base context)
+        let fork_ctx = LogContext::with_trace_id(&ctx.trace_id)
+            .with_agent_name(agent_name_for_event.clone())
+            .with_fork_id(&fork_id.0.to_string());
+
+        // Log state transition
+        log_state_transition(
+            &fork_ctx,
+            "ForkManager",
+            "None",
+            "Created",
+            Some([
+                ("parent_fork_id".to_string(), parent_fork_id.map(|f| f.0.to_string()).unwrap_or_default()),
+                ("fork_id".to_string(), fork_id.0.to_string()),
+            ].into_iter().filter(|(_, v)| !v.is_empty()).collect()),
+        );
+
         // Emit created event
         let _ = self
             .hook_tx
             .send(HookEvent::ForkCreated {
                 fork_id,
                 application_id,
-                agent_name: agent_name_for_event,
+                agent_name: agent_name_for_event.clone(),
             })
             .await;
+
+        info!(
+            trace_id = %ctx.trace_id,
+            app_id = %application_id.0,
+            fork_id = %fork_id.0,
+            agent_name = %agent_name_for_event,
+            parent_fork_id = ?parent_fork_id,
+            "[FORK] Created successfully"
+        );
 
         Ok(fork_id)
     }
@@ -266,14 +305,33 @@ impl ForkManager {
         let mut forks = self.forks.write().await;
         let fork = forks
             .get_mut(&fork_id)
-            .ok_or_else(|| format!("Fork {} not found", fork_id))?;
+            .ok_or_else(|| {
+                error!(fork_id = %fork_id.0, "[FORK] Suspend failed: fork not found");
+                format!("Fork {} not found", fork_id)
+            })?;
 
         if fork.state != ForkState::Running {
+            warn!(
+                fork_id = %fork_id.0,
+                current_state = ?fork.state,
+                "[FORK] Suspend failed: fork not running"
+            );
             return Err(format!("Fork {} is not running", fork_id));
         }
 
+        let agent_name = fork.agent_name.clone();
         fork.state = ForkState::WaitingForHook;
         fork.waiting_on_task = Some(delegate_task_id);
+
+        // Log state transition
+        info!(
+            fork_id = %fork_id.0,
+            task_id = %delegate_task_id.0,
+            agent_name = %agent_name,
+            from_state = "Running",
+            to_state = "WaitingForHook",
+            "[FORK] Suspended: waiting for delegate task"
+        );
 
         // Emit waiting event
         let _ = self
