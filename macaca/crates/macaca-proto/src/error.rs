@@ -35,6 +35,9 @@ pub enum MacacaError {
     #[error("Timeout: {0}")]
     Timeout(String),
 
+    #[error("Budget exceeded: {0}")]
+    BudgetExceeded(String),
+
     #[error("Serialization error: {0}")]
     Serialization(String),
 

@@ -35,6 +35,7 @@ pub mod openai_compatible;
 pub mod router;
 pub mod cost;
 pub mod rate_limit;
+pub mod resilient;
 
 pub use provider::LlmProvider;
 pub use openai::OpenAiProvider;
@@ -44,3 +45,4 @@ pub use openai_compatible::OpenAiCompatibleProvider;
 pub use router::LlmRouter;
 pub use cost::{CostTracker, ModelPricing, default_pricing};
 pub use rate_limit::RateLimiter;
+pub use resilient::{ResilientConfig, ResilientLlmWrapper};

@@ -20,8 +20,10 @@ impl AppLoader {
 
     /// Parse an app manifest from a YAML string.
     pub fn parse_manifest_yaml(yaml: &str) -> MacacaResult<AppManifest> {
-        let manifest: AppManifest =
+        let mut manifest: AppManifest =
             serde_yaml::from_str(yaml).map_err(|e| MacacaError::Config(e.to_string()))?;
+        // Ensure deterministic ID based on app name (survives restarts)
+        manifest.id = macaca_proto::ApplicationId::from_name(&manifest.name);
         Self::validate_manifest(&manifest)?;
         Ok(manifest)
     }

@@ -1,10 +1,12 @@
 //! aos-persist: redb-backed persistence layer for Agent OS.
 
 pub mod checkpoint;
+pub mod event_log;
 pub mod redb_store;
 pub mod store;
 
 pub use checkpoint::CheckpointManager;
+pub use event_log::EventLog;
 pub use redb_store::RedbStore;
 pub use store::PersistStore;
 
@@ -165,5 +167,116 @@ mod tests {
 
         let ids = mgr.list_snapshots().await.unwrap();
         assert!(ids.is_empty());
+    }
+
+    // ── Session Storage Tests ─────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn session_create_and_retrieve() {
+        let (store, _dir) = temp_store();
+        let session_id = "test-session-001";
+        let key = format!("session/{}", session_id);
+
+        let session_data = serde_json::json!({
+            "meta": {
+                "session_id": session_id,
+                "app_id": "app-001",
+                "created_at": "2026-03-18T00:00:00Z",
+                "updated_at": "2026-03-18T00:00:00Z",
+                "message_count": 1,
+                "title": "Test session",
+                "status": "running"
+            },
+            "messages": [{"role": "user", "content": "hello"}],
+            "turns": []
+        });
+
+        let data = serde_json::to_vec(&session_data).unwrap();
+        store.set(&key, &data).await.unwrap();
+
+        let retrieved = store.get(&key).await.unwrap().unwrap();
+        let parsed: serde_json::Value = serde_json::from_slice(&retrieved).unwrap();
+        assert_eq!(parsed["meta"]["status"], "running");
+        assert_eq!(parsed["meta"]["session_id"], session_id);
+    }
+
+    #[tokio::test]
+    async fn session_status_update() {
+        let (store, _dir) = temp_store();
+        let key = "session/test-002";
+
+        let session = serde_json::json!({
+            "meta": {
+                "session_id": "test-002",
+                "app_id": "app-001",
+                "created_at": "2026-03-18T00:00:00Z",
+                "updated_at": "2026-03-18T00:00:00Z",
+                "message_count": 0,
+                "title": "Test",
+                "status": "running"
+            },
+            "messages": [],
+            "turns": []
+        });
+        store.set(key, &serde_json::to_vec(&session).unwrap()).await.unwrap();
+
+        // Update status to completed
+        let mut updated: serde_json::Value = serde_json::from_slice(
+            &store.get(key).await.unwrap().unwrap()
+        ).unwrap();
+        updated["meta"]["status"] = serde_json::json!("completed");
+        store.set(key, &serde_json::to_vec(&updated).unwrap()).await.unwrap();
+
+        let final_data = store.get(key).await.unwrap().unwrap();
+        let parsed: serde_json::Value = serde_json::from_slice(&final_data).unwrap();
+        assert_eq!(parsed["meta"]["status"], "completed");
+    }
+
+    #[tokio::test]
+    async fn session_list_by_prefix() {
+        let (store, _dir) = temp_store();
+
+        store.set("session/s1", b"{}").await.unwrap();
+        store.set("session/s2", b"{}").await.unwrap();
+        store.set("app_sessions/app1/s1", b"s1").await.unwrap();
+        store.set("other/key", b"x").await.unwrap();
+
+        let session_keys = store.list_keys("session/").await.unwrap();
+        assert_eq!(session_keys.len(), 2);
+
+        let app_keys = store.list_keys("app_sessions/app1/").await.unwrap();
+        assert_eq!(app_keys.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn session_immediate_visibility() {
+        let (store, _dir) = temp_store();
+        let key = "session/immediate-test";
+
+        // Simulate: user sends message -> session created immediately with running status
+        let session = serde_json::json!({
+            "meta": {
+                "session_id": "immediate-test",
+                "app_id": "app-001",
+                "created_at": "2026-03-18T00:00:00Z",
+                "updated_at": "2026-03-18T00:00:00Z",
+                "message_count": 0,
+                "title": "User prompt",
+                "status": "running"
+            },
+            "messages": [{"role": "user", "content": "test prompt"}],
+            "turns": []
+        });
+        store.set(key, &serde_json::to_vec(&session).unwrap()).await.unwrap();
+
+        // Verify: session is immediately visible in list
+        let keys = store.list_keys("session/").await.unwrap();
+        assert!(keys.contains(&key.to_string()));
+
+        // Verify: session has running status
+        let data = store.get(key).await.unwrap().unwrap();
+        let parsed: serde_json::Value = serde_json::from_slice(&data).unwrap();
+        assert_eq!(parsed["meta"]["status"], "running");
+        assert_eq!(parsed["messages"][0]["content"], "test prompt");
     }
 }

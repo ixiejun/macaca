@@ -36,7 +36,7 @@ impl DashScopeProvider {
         Self {
             api_key: api_key.into(),
             base_url: DEFAULT_BASE_URL.to_owned(),
-            client: reqwest::Client::new(),
+            client: reqwest::Client::builder().no_proxy().build().unwrap_or_default(),
         }
     }
 

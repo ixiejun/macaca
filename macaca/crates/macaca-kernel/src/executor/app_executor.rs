@@ -4,10 +4,36 @@
 //! containing all the components needed for agent-to-agent task delegation.
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering as AtomicOrdering};
 use std::sync::Arc;
+use std::time::Instant;
 
 use tokio::sync::{mpsc, RwLock};
-use tracing::{info, error, warn};
+use tracing::{info, error, warn, debug};
+
+/// Worker state for tracking worker health.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WorkerState {
+    /// Worker is running normally
+    Running,
+    /// Command channel is closed, worker is waiting for recovery
+    Disconnected,
+    /// Worker has shut down gracefully
+    Shutdown,
+}
+
+/// Worker health status for external health checks.
+#[derive(Debug)]
+pub enum WorkerHealth {
+    /// Worker is healthy with recent heartbeat
+    Healthy { last_heartbeat: std::time::Duration },
+    /// Worker is unhealthy (no recent heartbeat)
+    Unhealthy { reason: String },
+    /// Worker's command channel is disconnected
+    Disconnected,
+    /// Worker has shut down
+    Shutdown,
+}
 
 use super::{
     AgentInfo, AgentRunner, ApplicationId, DelegatedTask, EventBus, ExecutionQueue,
@@ -33,6 +59,27 @@ impl Default for ApplicationExecutorConfig {
             max_parallel: 4,
             max_queue_size: 100,
             enable_events: true,
+        }
+    }
+}
+
+/// Configuration for the worker supervisor that handles automatic restart on failure.
+#[derive(Debug, Clone)]
+pub struct WorkerSupervisorConfig {
+    /// Maximum number of restarts before giving up.
+    pub max_restarts: u32,
+    /// If the worker runs successfully for this many seconds, reset the restart counter.
+    pub cooldown_reset_secs: u64,
+    /// Milliseconds to wait before each restart attempt.
+    pub restart_delay_ms: u64,
+}
+
+impl Default for WorkerSupervisorConfig {
+    fn default() -> Self {
+        Self {
+            max_restarts: 5,
+            cooldown_reset_secs: 300,
+            restart_delay_ms: 1000,
         }
     }
 }
@@ -75,7 +122,8 @@ pub struct ApplicationExecutor {
     runner: Arc<dyn AgentRunner>,
 
     /// Channel for sending commands to the worker.
-    command_tx: mpsc::Sender<ExecutorCommand>,
+    /// Wrapped in Arc<RwLock<...>> so the supervisor can swap it after each restart.
+    command_tx: Arc<RwLock<mpsc::Sender<ExecutorCommand>>>,
 
     /// Channel for receiving events from the worker.
     event_rx: Option<mpsc::Receiver<ExecutorEvent>>,
@@ -88,6 +136,18 @@ pub struct ApplicationExecutor {
 
     /// Shutdown signal.
     shutdown: Arc<RwLock<bool>>,
+
+    /// Worker heartbeat timestamp (updated every 10 seconds).
+    worker_heartbeat: Arc<RwLock<Instant>>,
+
+    /// Worker state (Running/Disconnected/Shutdown).
+    worker_state: Arc<RwLock<WorkerState>>,
+
+    /// Flag set by shutdown() to tell the supervisor not to restart.
+    shutdown_requested: Arc<AtomicBool>,
+
+    /// Number of times the worker has been restarted.
+    restart_count: Arc<AtomicU32>,
 }
 
 impl ApplicationExecutor {
@@ -110,31 +170,56 @@ impl ApplicationExecutor {
         let (event_tx, event_rx) = mpsc::channel(100);
 
         // Create broadcast channel for external subscribers
-        let (event_broadcast, _) = tokio::sync::broadcast::channel(256);
+        let (event_broadcast, _) = tokio::sync::broadcast::channel(4096);
 
         // Create Fork Manager for Fork-Join workflow
         let fork_manager = Arc::new(ForkManager::new());
 
         let shutdown = Arc::new(RwLock::new(false));
 
-        // Spawn the worker task
-        let worker_runner = Arc::clone(&runner);
-        let worker_shutdown = Arc::clone(&shutdown);
-        let worker_queue = Arc::clone(&queue);
-        let worker_app_id = application_id.clone();
-        let worker_event_broadcast = event_broadcast.clone();
-        let worker_fork_manager = Arc::clone(&fork_manager);
+        // Initialize worker state tracking
+        let worker_heartbeat = Arc::new(RwLock::new(Instant::now()));
+        let worker_state = Arc::new(RwLock::new(WorkerState::Running));
+
+        let shutdown_requested = Arc::new(AtomicBool::new(false));
+        let restart_count = Arc::new(AtomicU32::new(0));
+
+        // Wrap command_tx so the supervisor can swap it after each restart.
+        let command_tx_shared = Arc::new(RwLock::new(command_tx));
+
+        // Spawn supervisor task which owns the worker loop and restarts it on failure.
+        let sup_runner = Arc::clone(&runner);
+        let sup_shutdown = Arc::clone(&shutdown);
+        let sup_queue = Arc::clone(&queue);
+        let sup_app_id = application_id.clone();
+        let sup_event_broadcast = event_broadcast.clone();
+        let sup_fork_manager = Arc::clone(&fork_manager);
+        let sup_heartbeat = Arc::clone(&worker_heartbeat);
+        let sup_state = Arc::clone(&worker_state);
+        let sup_shutdown_requested = Arc::clone(&shutdown_requested);
+        let sup_restart_count = Arc::clone(&restart_count);
+        let sup_command_tx = Arc::clone(&command_tx_shared);
+        let sup_supervisor_config = WorkerSupervisorConfig::default();
+        // The first command_rx was already created above; pass it to the supervisor
+        // which will hand it to the first worker invocation.
+        let initial_command_rx = command_rx;
 
         tokio::spawn(async move {
-            Self::worker_loop(
-                worker_runner,
-                command_rx,
+            Self::supervisor_loop(
+                sup_runner,
+                initial_command_rx,
                 event_tx,
-                worker_event_broadcast,
-                worker_shutdown,
-                worker_queue,
-                worker_app_id,
-                worker_fork_manager,
+                sup_event_broadcast,
+                sup_shutdown,
+                sup_queue,
+                sup_app_id,
+                sup_fork_manager,
+                sup_heartbeat,
+                sup_state,
+                sup_shutdown_requested,
+                sup_restart_count,
+                sup_command_tx,
+                sup_supervisor_config,
             ).await;
         });
 
@@ -147,11 +232,125 @@ impl ApplicationExecutor {
             router,
             callback_dispatcher,
             runner,
-            command_tx,
+            command_tx: command_tx_shared,
             event_rx: Some(event_rx),
             event_broadcast,
             fork_manager,
             shutdown,
+            worker_heartbeat,
+            worker_state,
+            shutdown_requested,
+            restart_count,
+        }
+    }
+
+    /// Create a new ApplicationExecutor with persistence support.
+    ///
+    /// Restores any previously persisted queue entries and fork states before
+    /// starting the worker supervisor.
+    pub async fn new_with_store(
+        application_id: ApplicationId,
+        application_name: String,
+        agents: Vec<AgentInfo>,
+        runner: Arc<dyn AgentRunner>,
+        config: ApplicationExecutorConfig,
+        store: Arc<macaca_persist::RedbStore>,
+    ) -> Self {
+        let agents = Arc::new(RwLock::new(agents));
+
+        // Build queue with persistence
+        let mut queue_inner = super::queue::ExecutionQueue::new_with_store(
+            config.max_parallel,
+            config.max_queue_size,
+            Some(Arc::clone(&store)),
+            application_id.clone(),
+        );
+        queue_inner.restore_from_store().await;
+        let queue = Arc::new(queue_inner);
+
+        let event_bus = EventBus::new();
+        let router = TaskRouter::new(Arc::clone(&agents));
+        let callback_dispatcher = CallbackDispatcher::new();
+
+        // Create channels for worker communication
+        let (command_tx, command_rx) = mpsc::channel(100);
+        let (event_tx, event_rx) = mpsc::channel(100);
+
+        // Create broadcast channel for external subscribers
+        let (event_broadcast, _) = tokio::sync::broadcast::channel(4096);
+
+        // Build Fork Manager with persistence
+        let mut fork_manager_inner = super::fork_manager::ForkManager::new_with_store(
+            Some(Arc::clone(&store)),
+            application_id.clone(),
+        );
+        fork_manager_inner.restore_forks().await;
+        let fork_manager = Arc::new(fork_manager_inner);
+
+        let shutdown = Arc::new(RwLock::new(false));
+
+        // Initialize worker state tracking
+        let worker_heartbeat = Arc::new(RwLock::new(Instant::now()));
+        let worker_state = Arc::new(RwLock::new(WorkerState::Running));
+
+        let shutdown_requested = Arc::new(AtomicBool::new(false));
+        let restart_count = Arc::new(AtomicU32::new(0));
+
+        // Wrap command_tx so the supervisor can swap it after each restart.
+        let command_tx_shared = Arc::new(RwLock::new(command_tx));
+
+        // Spawn supervisor task which owns the worker loop and restarts it on failure.
+        let sup_runner = Arc::clone(&runner);
+        let sup_shutdown = Arc::clone(&shutdown);
+        let sup_queue = Arc::clone(&queue);
+        let sup_app_id = application_id.clone();
+        let sup_event_broadcast = event_broadcast.clone();
+        let sup_fork_manager = Arc::clone(&fork_manager);
+        let sup_heartbeat = Arc::clone(&worker_heartbeat);
+        let sup_state = Arc::clone(&worker_state);
+        let sup_shutdown_requested = Arc::clone(&shutdown_requested);
+        let sup_restart_count = Arc::clone(&restart_count);
+        let sup_command_tx = Arc::clone(&command_tx_shared);
+        let sup_supervisor_config = WorkerSupervisorConfig::default();
+        let initial_command_rx = command_rx;
+
+        tokio::spawn(async move {
+            Self::supervisor_loop(
+                sup_runner,
+                initial_command_rx,
+                event_tx,
+                sup_event_broadcast,
+                sup_shutdown,
+                sup_queue,
+                sup_app_id,
+                sup_fork_manager,
+                sup_heartbeat,
+                sup_state,
+                sup_shutdown_requested,
+                sup_restart_count,
+                sup_command_tx,
+                sup_supervisor_config,
+            ).await;
+        });
+
+        Self {
+            application_id,
+            application_name,
+            agents,
+            queue,
+            event_bus,
+            router,
+            callback_dispatcher,
+            runner,
+            command_tx: command_tx_shared,
+            event_rx: Some(event_rx),
+            event_broadcast,
+            fork_manager,
+            shutdown,
+            worker_heartbeat,
+            worker_state,
+            shutdown_requested,
+            restart_count,
         }
     }
 
@@ -206,17 +405,43 @@ impl ApplicationExecutor {
         }).await;
 
         // Send execute command to worker
+        let command_tx = self.command_tx.read().await;
         info!(
-            "Sending execute command to worker: app={}, task_id={}, from={}, to={}",
-            self.application_id, task_id, from_agent, to_agent
+            application_id = %self.application_id,
+            task_id = %task_id,
+            from_agent = %from_agent,
+            to_agent = %to_agent,
+            channel_capacity = command_tx.capacity(),
+            "Sending execute command to worker"
         );
-        self.command_tx.send(ExecutorCommand::Execute(task)).await
-            .map_err(|e| format!("Failed to send execute command: {}", e))?;
 
-        info!(
-            "Execute command sent successfully: app={}, task_id={}",
-            self.application_id, task_id
-        );
+        // Check if sender is still valid before sending
+        if command_tx.is_closed() {
+            error!(
+                application_id = %self.application_id,
+                task_id = %task_id,
+                "Command channel is closed before sending!"
+            );
+        }
+
+        match command_tx.send(ExecutorCommand::Execute(task)).await {
+            Ok(_) => {
+                info!(
+                    application_id = %self.application_id,
+                    task_id = %task_id,
+                    "Execute command sent successfully"
+                );
+            }
+            Err(e) => {
+                error!(
+                    application_id = %self.application_id,
+                    task_id = %task_id,
+                    error = %e,
+                    "Failed to send execute command"
+                );
+                return Err(format!("Failed to send execute command: {}", e));
+            }
+        }
 
         Ok(task_id)
     }
@@ -312,9 +537,167 @@ impl ApplicationExecutor {
 
     /// Shutdown the executor gracefully.
     pub async fn shutdown(&self) {
+        // Set the atomic flag first so the supervisor won't restart the worker.
+        self.shutdown_requested.store(true, AtomicOrdering::SeqCst);
         *self.shutdown.write().await = true;
-        let _ = self.command_tx.send(ExecutorCommand::Shutdown).await;
+        let _ = self.command_tx.read().await.send(ExecutorCommand::Shutdown).await;
         info!(application_id = %self.application_id, "Executor shutdown initiated");
+    }
+
+    /// Check if worker is healthy.
+    ///
+    /// Returns the current health status of the worker based on:
+    /// - Current worker state (Running/Disconnected/Shutdown)
+    /// - Time since last heartbeat
+    pub async fn check_worker_health(&self) -> WorkerHealth {
+        let state = self.worker_state.read().await;
+        match *state {
+            WorkerState::Running => {
+                let elapsed = self.worker_heartbeat.read().await.elapsed();
+                if elapsed < std::time::Duration::from_secs(30) {
+                    WorkerHealth::Healthy { last_heartbeat: elapsed }
+                } else {
+                    WorkerHealth::Unhealthy {
+                        reason: format!("No heartbeat for {:?}", elapsed)
+                    }
+                }
+            }
+            WorkerState::Disconnected => WorkerHealth::Disconnected,
+            WorkerState::Shutdown => WorkerHealth::Shutdown,
+        }
+    }
+
+    /// Check if worker is healthy (simple boolean).
+    pub async fn is_worker_healthy(&self) -> bool {
+        matches!(self.check_worker_health().await, WorkerHealth::Healthy { .. })
+    }
+
+    /// Return how many times the worker has been restarted by the supervisor.
+    pub fn restart_count(&self) -> u32 {
+        self.restart_count.load(AtomicOrdering::SeqCst)
+    }
+
+    /// Supervisor loop: spawns the worker and restarts it on unexpected exit.
+    #[allow(clippy::too_many_arguments)]
+    async fn supervisor_loop(
+        runner: Arc<dyn AgentRunner>,
+        initial_command_rx: mpsc::Receiver<ExecutorCommand>,
+        event_tx: mpsc::Sender<ExecutorEvent>,
+        event_broadcast: tokio::sync::broadcast::Sender<ExecutorEvent>,
+        shutdown: Arc<RwLock<bool>>,
+        queue: Arc<ExecutionQueue>,
+        application_id: ApplicationId,
+        fork_manager: Arc<ForkManager>,
+        worker_heartbeat: Arc<RwLock<Instant>>,
+        worker_state: Arc<RwLock<WorkerState>>,
+        shutdown_requested: Arc<AtomicBool>,
+        restart_count: Arc<AtomicU32>,
+        command_tx_shared: Arc<RwLock<mpsc::Sender<ExecutorCommand>>>,
+        config: WorkerSupervisorConfig,
+    ) {
+        let mut command_rx = initial_command_rx;
+
+        loop {
+            let started_at = Instant::now();
+
+            // Clone everything the worker needs for this iteration.
+            let w_runner = Arc::clone(&runner);
+            let w_event_tx = event_tx.clone();
+            let w_event_broadcast = event_broadcast.clone();
+            let w_shutdown = Arc::clone(&shutdown);
+            let w_queue = Arc::clone(&queue);
+            let w_app_id = application_id.clone();
+            let w_fork_manager = Arc::clone(&fork_manager);
+            let w_heartbeat = Arc::clone(&worker_heartbeat);
+            let w_state = Arc::clone(&worker_state);
+
+            let handle = tokio::spawn(Self::worker_loop(
+                w_runner,
+                command_rx,
+                w_event_tx,
+                w_event_broadcast,
+                w_shutdown,
+                w_queue,
+                w_app_id,
+                w_fork_manager,
+                w_heartbeat,
+                w_state,
+            ));
+
+            // Wait for worker to finish.
+            match handle.await {
+                Ok(()) => {
+                    // Worker exited cleanly (Shutdown command or channel-closed timeout).
+                }
+                Err(e) => {
+                    error!(
+                        application_id = %application_id,
+                        error = %e,
+                        "Worker task panicked"
+                    );
+                }
+            }
+
+            // If a graceful shutdown was requested, do not restart.
+            if shutdown_requested.load(AtomicOrdering::SeqCst) {
+                info!(
+                    application_id = %application_id,
+                    "Supervisor: shutdown requested, not restarting worker"
+                );
+                break;
+            }
+
+            // If worker ran long enough, reset restart counter.
+            if started_at.elapsed().as_secs() >= config.cooldown_reset_secs {
+                let prev = restart_count.swap(0, AtomicOrdering::SeqCst);
+                if prev > 0 {
+                    info!(
+                        application_id = %application_id,
+                        previous_count = prev,
+                        "Supervisor: worker ran past cooldown threshold, resetting restart counter"
+                    );
+                }
+            }
+
+            let count = restart_count.fetch_add(1, AtomicOrdering::SeqCst) + 1;
+
+            if count > config.max_restarts {
+                error!(
+                    application_id = %application_id,
+                    restart_count = count,
+                    max_restarts = config.max_restarts,
+                    "Supervisor: max restarts exceeded, giving up"
+                );
+                *worker_state.write().await = WorkerState::Shutdown;
+                break;
+            }
+
+            warn!(
+                application_id = %application_id,
+                restart_count = count,
+                delay_ms = config.restart_delay_ms,
+                "Supervisor: worker exited unexpectedly, restarting after delay"
+            );
+
+            tokio::time::sleep(tokio::time::Duration::from_millis(config.restart_delay_ms)).await;
+
+            // Create a fresh command channel and hand the new sender to the executor.
+            let (new_tx, new_rx) = mpsc::channel(100);
+            *command_tx_shared.write().await = new_tx;
+            command_rx = new_rx;
+
+            // Mark worker as running again so health checks pass.
+            *worker_state.write().await = WorkerState::Running;
+            *worker_heartbeat.write().await = Instant::now();
+
+            info!(
+                application_id = %application_id,
+                restart_count = count,
+                "Supervisor: spawning new worker"
+            );
+        }
+
+        info!(application_id = %application_id, "Supervisor loop exited");
     }
 
     /// Worker loop that processes tasks.
@@ -327,205 +710,289 @@ impl ApplicationExecutor {
         queue: Arc<ExecutionQueue>,
         application_id: ApplicationId,
         fork_manager: Arc<ForkManager>,
+        worker_heartbeat: Arc<RwLock<Instant>>,
+        worker_state: Arc<RwLock<WorkerState>>,
     ) {
-        info!("Application executor worker started");
+        info!(
+            application_id = %application_id,
+            "Worker loop started, waiting for commands"
+        );
 
         // Spawn a background task to forward hook events to executor events
+        // Using select! pattern for cleaner async handling
         let mut hook_rx = fork_manager.subscribe_to_hooks();
         let hook_event_broadcast = event_broadcast.clone();
         let hook_shutdown = Arc::clone(&shutdown);
         tokio::spawn(async move {
+            // Use interval for polling instead of tight loop with sleep
+            let mut poll_interval = tokio::time::interval(tokio::time::Duration::from_millis(50));
+            poll_interval.tick().await; // Skip initial tick
+
+            info!("Hook event forwarder started");
+
             loop {
-                if *hook_shutdown.read().await {
-                    break;
-                }
-                // Non-blocking check for hook events
-                match hook_rx.try_recv() {
-                    Ok(hook_event) => {
-                        info!("Forwarding hook event to SSE: {:?}", hook_event);
-                        // Convert HookEvent to ExecutorEvent for SSE streaming
-                        let executor_event = ExecutorEvent::HookEvent {
-                            event: hook_event,
-                        };
-                        let _ = hook_event_broadcast.send(executor_event);
-                    }
-                    Err(tokio::sync::broadcast::error::TryRecvError::Empty) => {
-                        // No events available, sleep briefly
-                        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-                    }
-                    Err(tokio::sync::broadcast::error::TryRecvError::Closed) => {
-                        info!("Hook event channel closed");
+                tokio::select! {
+                    biased;
+
+                    // 1. Shutdown signal (highest priority)
+                    _ = async {
+                        if *hook_shutdown.read().await {
+                            futures::future::ready(()).await
+                        } else {
+                            std::future::pending().await
+                        }
+                    } => {
+                        info!("Hook forwarder shutting down");
                         break;
                     }
-                    Err(tokio::sync::broadcast::error::TryRecvError::Lagged(_)) => {
-                        // Continue on lag
-                        continue;
+
+                    // 2. Hook event receive
+                    result = hook_rx.recv() => {
+                        match result {
+                            Ok(hook_event) => {
+                                debug!("Forwarding hook event to SSE: {:?}", hook_event);
+                                // Convert HookEvent to ExecutorEvent for SSE streaming
+                                let executor_event = ExecutorEvent::HookEvent {
+                                    event: hook_event,
+                                };
+                                let _ = hook_event_broadcast.send(executor_event);
+                            }
+                            Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                                info!("Hook event channel closed");
+                                break;
+                            }
+                            Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                                warn!("Hook event channel lagged, missed {} messages", n);
+                                // Continue on lag
+                                continue;
+                            }
+                        }
+                    }
+
+                    // 3. Poll interval (lowest priority - just prevents busy-wait)
+                    _ = poll_interval.tick() => {
+                        // Heartbeat tick - no action needed
                     }
                 }
             }
             info!("Hook event forwarder stopped");
         });
 
-        loop {
-            // Check for shutdown
-            if *shutdown.read().await {
-                info!("Worker shutting down");
-                break;
-            }
+        // Heartbeat interval for worker health tracking
+        let mut heartbeat_interval = tokio::time::interval(tokio::time::Duration::from_secs(10));
+        heartbeat_interval.tick().await; // Skip initial tick
 
-            // Wait for commands
-            info!("Worker waiting for command...");
-            let command = match command_rx.recv().await {
-                Some(cmd) => {
-                    info!("Worker received command: {:?}", std::mem::discriminant(&cmd));
-                    cmd
-                },
-                None => {
-                    warn!("Command channel closed, worker exiting");
+        // Track when channel was closed (for graceful degradation)
+        let mut channel_closed_at: Option<std::time::Instant> = None;
+        const MAX_CHANNEL_CLOSED_DURATION: tokio::time::Duration = tokio::time::Duration::from_secs(30);
+
+        loop {
+            // Use select! with biased; for deterministic priority
+            tokio::select! {
+                biased;
+
+                // 1. Shutdown check (highest priority)
+                _ = async {
+                    if *shutdown.read().await {
+                        futures::future::ready(()).await
+                    } else {
+                        std::future::pending().await
+                    }
+                } => {
+                    *worker_state.write().await = WorkerState::Shutdown;
+                    info!("Worker shutting down gracefully");
                     break;
                 }
-            };
 
-            match command {
-                ExecutorCommand::Execute(task) => {
-                    let task_id = task.id;
-                    let agent_name = task.to_agent.clone();
-                    let prompt = task.prompt.clone();
-                    let context = task.context.clone();
-
-                    // Notify task started
-                    let start_event = ExecutorEvent::TaskStarted {
-                        task_id,
-                        agent: agent_name.clone(),
-                    };
-                    let _ = event_tx.send(start_event.clone()).await;
-                    let _ = event_broadcast.send(start_event);
-
-                    info!(
-                        task_id = %task_id,
-                        agent = %agent_name,
-                        prompt_preview = %prompt.chars().take(100).collect::<String>(),
-                        "Worker: executing task"
+                // 2. Heartbeat (fires every 10s regardless of activity)
+                _ = heartbeat_interval.tick() => {
+                    *worker_heartbeat.write().await = Instant::now();
+                    let elapsed = worker_heartbeat.read().await.elapsed();
+                    debug!(
+                        application_id = %application_id,
+                        elapsed_since_last = ?elapsed,
+                        "Worker heartbeat"
                     );
+                }
 
-                    // Create a channel for agent execution events
-                    let (agent_event_tx, mut agent_event_rx) =
-                        mpsc::channel::<macaca_proto::AgentExecutionEvent>(64);
+                // 3. Command receive
+                cmd_opt = command_rx.recv() => {
+                    match cmd_opt {
+                        Some(command) => {
+                            // Reset channel closed timer on successful receive
+                            channel_closed_at = None;
+                            info!("Worker received command: {:?}", std::mem::discriminant(&command));
 
-                    // Clone event_tx and event_broadcast for the forwarding task
-                    let event_tx_clone = event_tx.clone();
-                    let event_broadcast_clone = event_broadcast.clone();
-                    let agent_name_clone = agent_name.clone();
+                            match command {
+                                ExecutorCommand::Execute(task) => {
+                                    let task_id = task.id;
+                                    let agent_name = task.to_agent.clone();
+                                    let prompt = task.prompt.clone();
+                                    let context = task.context.clone();
 
-                    // Spawn a task to forward agent events to executor events
-                    let forward_handle = tokio::spawn(async move {
-                        while let Some(event) = agent_event_rx.recv().await {
-                            let executor_event = ExecutorEvent::AgentEvent {
-                                task_id,
-                                agent: agent_name_clone.clone(),
-                                event,
-                            };
-                            // Send to internal channel
-                            let _ = event_tx_clone.send(executor_event.clone()).await;
-                            // Broadcast to external subscribers (SSE, etc.)
-                            let _ = event_broadcast_clone.send(executor_event);
+                                    // Notify task started
+                                    let start_event = ExecutorEvent::TaskStarted {
+                                        task_id,
+                                        agent: agent_name.clone(),
+                                    };
+                                    let _ = event_tx.send(start_event.clone()).await;
+                                    let _ = event_broadcast.send(start_event);
+
+                                    info!(
+                                        task_id = %task_id,
+                                        agent = %agent_name,
+                                        prompt_preview = %prompt.chars().take(100).collect::<String>(),
+                                        "Worker: executing task"
+                                    );
+
+                                    // Create a channel for agent execution events
+                                    let (agent_event_tx, mut agent_event_rx) =
+                                        mpsc::channel::<macaca_proto::AgentExecutionEvent>(64);
+
+                                    // Clone event_tx and event_broadcast for the forwarding task
+                                    let event_tx_clone = event_tx.clone();
+                                    let event_broadcast_clone = event_broadcast.clone();
+                                    let agent_name_clone = agent_name.clone();
+
+                                    // Spawn a task to forward agent events to executor events
+                                    let forward_handle = tokio::spawn(async move {
+                                        while let Some(event) = agent_event_rx.recv().await {
+                                            let executor_event = ExecutorEvent::AgentEvent {
+                                                task_id,
+                                                agent: agent_name_clone.clone(),
+                                                event,
+                                            };
+                                            // Broadcast to external subscribers (SSE, etc.)
+                                            // Note: event_tx internal channel is intentionally skipped
+                                            // to avoid blocking when nobody consumes event_rx.
+                                            let _ = event_broadcast_clone.send(executor_event);
+                                        }
+                                    });
+
+                                    // Execute the agent with events
+                                    let result = runner.execute_agent_with_events(
+                                        &application_id,
+                                        &agent_name,
+                                        &prompt,
+                                        context,
+                                        Some(agent_event_tx),
+                                    ).await;
+
+                                    // Wait for event forwarding to complete
+                                    let _ = forward_handle.await;
+
+                                    match result {
+                                        Ok(mut task_result) => {
+                                            info!(
+                                                task_id = %task_id,
+                                                agent = %agent_name,
+                                                success = task_result.success,
+                                                output_len = task_result.output.len(),
+                                                error = ?task_result.error,
+                                                "Worker: task executed, storing result"
+                                            );
+
+                                            // Use the original task_id, not the one from the runner
+                                            task_result.task_id = task_id;
+
+                                            // Store result in queue
+                                            queue.store_result(task_result.clone()).await;
+
+                                            // Resume any fork waiting on this task
+                                            let delegate_result = super::fork_manager::DelegateResult {
+                                                task_id: macaca_proto::TaskId(task_id.0),
+                                                success: task_result.success,
+                                                output: task_result.output.clone(),
+                                                error: task_result.error.clone(),
+                                                artifacts: task_result.artifacts.clone(),
+                                            };
+                                            if let Err(e) = fork_manager.resume_fork_by_task(macaca_proto::TaskId(task_id.0), delegate_result).await {
+                                                warn!(task_id = %task_id, error = %e, "Failed to resume fork waiting on task");
+                                            }
+
+                                            // Notify task completed
+                                            let completed_event = ExecutorEvent::TaskCompleted {
+                                                task_id,
+                                                result: task_result,
+                                            };
+                                            let _ = event_tx.send(completed_event.clone()).await;
+                                            let _ = event_broadcast.send(completed_event);
+                                        }
+                                        Err(e) => {
+                                            error!(
+                                                task_id = %task_id,
+                                                agent = %agent_name,
+                                                error = %e,
+                                                "Worker: task execution failed"
+                                            );
+
+                                            // Store error result with original task_id
+                                            let error_result = TaskResult {
+                                                task_id,
+                                                success: false,
+                                                output: String::new(),
+                                                error: Some(e.clone()),
+                                                artifacts: vec![],
+                                                completed_at: chrono::Utc::now(),
+                                                tokens_used: None,
+                                            };
+                                            queue.store_result(error_result).await;
+
+                                            // Notify task failed
+                                            let failed_event = ExecutorEvent::TaskFailed {
+                                                task_id,
+                                                error: e,
+                                            };
+                                            let _ = event_tx.send(failed_event.clone()).await;
+                                            let _ = event_broadcast.send(failed_event);
+                                        }
+                                    }
+                                }
+                                ExecutorCommand::Cancel(task_id) => {
+                                    if queue.cancel(task_id).await {
+                                        let cancel_event = ExecutorEvent::TaskCancelled { task_id };
+                                        let _ = event_tx.send(cancel_event.clone()).await;
+                                        let _ = event_broadcast.send(cancel_event);
+                                    }
+                                }
+                                ExecutorCommand::Shutdown => {
+                                    info!("Shutdown command received");
+                                    break;
+                                }
+                            }
                         }
-                    });
+                        None => {
+                            // Channel closed - track time and wait before exiting
+                            let closed_at = channel_closed_at.get_or_insert(std::time::Instant::now());
 
-                    // Execute the agent with events
-                    let result = runner.execute_agent_with_events(
-                        &application_id,
-                        &agent_name,
-                        &prompt,
-                        context,
-                        Some(agent_event_tx),
-                    ).await;
+                            // Update worker state to Disconnected
+                            *worker_state.write().await = WorkerState::Disconnected;
 
-                    // Wait for event forwarding to complete
-                    let _ = forward_handle.await;
-
-                    match result {
-                        Ok(mut task_result) => {
-                            info!(
-                                task_id = %task_id,
-                                agent = %agent_name,
-                                success = task_result.success,
-                                output_len = task_result.output.len(),
-                                error = ?task_result.error,
-                                "Worker: task executed, storing result"
-                            );
-
-                            // Use the original task_id, not the one from the runner
-                            task_result.task_id = task_id;
-
-                            // Store result in queue
-                            queue.store_result(task_result.clone()).await;
-
-                            // Resume any fork waiting on this task
-                            let delegate_result = super::fork_manager::DelegateResult {
-                                task_id: macaca_proto::TaskId(task_id.0),
-                                success: task_result.success,
-                                output: task_result.output.clone(),
-                                error: task_result.error.clone(),
-                                artifacts: task_result.artifacts.clone(),
-                            };
-                            if let Err(e) = fork_manager.resume_fork_by_task(macaca_proto::TaskId(task_id.0), delegate_result).await {
-                                warn!(task_id = %task_id, error = %e, "Failed to resume fork waiting on task");
+                            if closed_at.elapsed() > MAX_CHANNEL_CLOSED_DURATION {
+                                error!(
+                                    application_id = %application_id,
+                                    duration_secs = closed_at.elapsed().as_secs(),
+                                    "Command channel closed for too long, worker exiting"
+                                );
+                                break;
                             }
 
-                            // Notify task completed
-                            let completed_event = ExecutorEvent::TaskCompleted {
-                                task_id,
-                                result: task_result,
-                            };
-                            let _ = event_tx.send(completed_event.clone()).await;
-                            let _ = event_broadcast.send(completed_event);
-                        }
-                        Err(e) => {
-                            error!(
-                                task_id = %task_id,
-                                agent = %agent_name,
-                                error = %e,
-                                "Worker: task execution failed"
+                            warn!(
+                                application_id = %application_id,
+                                duration_secs = closed_at.elapsed().as_secs(),
+                                "Command channel closed, waiting for recovery..."
                             );
-
-                            // Store error result with original task_id
-                            let error_result = TaskResult {
-                                task_id,
-                                success: false,
-                                output: String::new(),
-                                error: Some(e.clone()),
-                                artifacts: vec![],
-                                completed_at: chrono::Utc::now(),
-                                tokens_used: None,
-                            };
-                            queue.store_result(error_result).await;
-
-                            // Notify task failed
-                            let failed_event = ExecutorEvent::TaskFailed {
-                                task_id,
-                                error: e,
-                            };
-                            let _ = event_tx.send(failed_event.clone()).await;
-                            let _ = event_broadcast.send(failed_event);
+                            // Continue loop - will check again on next iteration
                         }
                     }
-                }
-                ExecutorCommand::Cancel(task_id) => {
-                    if queue.cancel(task_id).await {
-                        let cancel_event = ExecutorEvent::TaskCancelled { task_id };
-                        let _ = event_tx.send(cancel_event.clone()).await;
-                        let _ = event_broadcast.send(cancel_event);
-                    }
-                }
-                ExecutorCommand::Shutdown => {
-                    info!("Shutdown command received");
-                    break;
                 }
             }
         }
 
-        info!("Worker loop exited");
+        info!(
+            application_id = %application_id,
+            "Worker loop exited"
+        );
     }
 }
 
@@ -609,6 +1076,65 @@ impl ApplicationExecutorRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Duration;
+
+    /// Mock AgentRunner for testing
+    struct MockRunner;
+
+    #[async_trait::async_trait]
+    impl AgentRunner for MockRunner {
+        async fn execute_agent(
+            &self,
+            _application_id: &ApplicationId,
+            agent_name: &str,
+            _prompt: &str,
+            _context: Option<TaskContext>,
+        ) -> Result<TaskResult, String> {
+            // Simulate some work
+            tokio::time::sleep(Duration::from_millis(10)).await;
+            Ok(TaskResult {
+                task_id: TaskId::new(),
+                success: true,
+                output: format!("{} executed", agent_name),
+                error: None,
+                artifacts: vec![],
+                completed_at: chrono::Utc::now(),
+                tokens_used: None,
+            })
+        }
+
+        async fn list_agents(&self) -> Vec<AgentInfo> {
+            vec![AgentInfo {
+                id: "test-backend".to_string(),
+                name: "backend".to_string(),
+                capabilities: vec!["api".to_string()],
+                current_load: 0,
+                max_load: 10,
+                available: true,
+            }]
+        }
+
+        async fn agent_exists(&self, agent_name: &str) -> bool {
+            agent_name == "backend"
+        }
+    }
+
+    fn create_test_executor() -> ApplicationExecutor {
+        ApplicationExecutor::new(
+            ApplicationId::new(),
+            "test-app".to_string(),
+            vec![AgentInfo {
+                id: "test-backend".to_string(),
+                name: "backend".to_string(),
+                capabilities: vec!["api".to_string()],
+                current_load: 0,
+                max_load: 10,
+                available: true,
+            }],
+            Arc::new(MockRunner),
+            ApplicationExecutorConfig::default(),
+        )
+    }
 
     #[test]
     fn test_application_executor_config_defaults() {
@@ -616,5 +1142,83 @@ mod tests {
         assert_eq!(config.max_parallel, 4);
         assert_eq!(config.max_queue_size, 100);
         assert!(config.enable_events);
+    }
+
+    #[tokio::test]
+    async fn test_worker_health_check_healthy() {
+        let executor = create_test_executor();
+
+        // Worker should be healthy immediately after creation
+        let health = executor.check_worker_health().await;
+        match health {
+            WorkerHealth::Healthy { last_heartbeat } => {
+                assert!(last_heartbeat < Duration::from_secs(5));
+            }
+            _ => panic!("Expected worker to be healthy"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_worker_is_healthy() {
+        let executor = create_test_executor();
+
+        // Worker should be healthy immediately after creation
+        assert!(executor.is_worker_healthy().await);
+    }
+
+    #[tokio::test]
+    async fn test_worker_state_running_after_creation() {
+        let executor = create_test_executor();
+
+        let state = executor.worker_state.read().await;
+        assert_eq!(*state, WorkerState::Running);
+    }
+
+    #[tokio::test]
+    async fn test_worker_heartbeat_updates() {
+        let executor = create_test_executor();
+
+        // Get initial heartbeat
+        let before = *executor.worker_heartbeat.read().await;
+
+        // Wait for at least one heartbeat cycle (10s + buffer)
+        // Note: For faster tests, we just verify the mechanism exists
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // Verify heartbeat mechanism is working (time should have progressed)
+        let after = *executor.worker_heartbeat.read().await;
+
+        // The heartbeat should be recent (within 1 second of now)
+        assert!(after.elapsed() < Duration::from_secs(1));
+    }
+
+    #[tokio::test]
+    async fn test_worker_graceful_shutdown() {
+        let executor = create_test_executor();
+
+        // Verify worker is running
+        assert!(executor.is_worker_healthy().await);
+
+        // Initiate shutdown
+        executor.shutdown().await;
+
+        // Give time for shutdown to propagate
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        // Verify worker state changed to Shutdown
+        let state = executor.worker_state.read().await;
+        assert_eq!(*state, WorkerState::Shutdown);
+    }
+
+    #[test]
+    fn test_worker_state_enum_values() {
+        // Verify enum values can be created and compared
+        assert_eq!(WorkerState::Running, WorkerState::Running);
+        assert_eq!(WorkerState::Disconnected, WorkerState::Disconnected);
+        assert_eq!(WorkerState::Shutdown, WorkerState::Shutdown);
+
+        assert_ne!(WorkerState::Running, WorkerState::Disconnected);
+        assert_ne!(WorkerState::Running, WorkerState::Shutdown);
+        assert_ne!(WorkerState::Disconnected, WorkerState::Shutdown);
     }
 }

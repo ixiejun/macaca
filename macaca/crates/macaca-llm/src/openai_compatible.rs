@@ -31,7 +31,7 @@ impl OpenAiCompatibleProvider {
             provider_name: name.into(),
             api_key: api_key.into(),
             base_url: base_url.into(),
-            client: reqwest::Client::new(),
+            client: reqwest::Client::builder().no_proxy().build().unwrap_or_default(),
         }
     }
 
@@ -220,6 +220,7 @@ impl LlmProvider for OpenAiCompatibleProvider {
         };
 
         let url = format!("{}/chat/completions", self.base_url);
+        tracing::info!(provider = %self.provider_name, model = %options.model, url = %url, "OpenAI-compatible chat request");
 
         let mut req = self.client.post(&url).json(&body);
         if !self.api_key.is_empty() {
@@ -240,12 +241,13 @@ impl LlmProvider for OpenAiCompatibleProvider {
             )));
         }
 
-        let resp: ChatResponse = raw
-            .json()
-            .await
-            .map_err(|e| {
-                MacacaError::Llm(format!("{} response parse failed: {e}", self.provider_name))
-            })?;
+        let raw_text = raw.text().await.map_err(|e| {
+            MacacaError::Llm(format!("{} response read failed: {e}", self.provider_name))
+        })?;
+        let resp: ChatResponse = serde_json::from_str(&raw_text).map_err(|e| {
+            tracing::error!(provider = %self.provider_name, body = %&raw_text[..raw_text.len().min(500)], "Failed to parse LLM response");
+            MacacaError::Llm(format!("{} response parse failed: {e}", self.provider_name))
+        })?;
 
         let choice = resp
             .choices

@@ -36,7 +36,7 @@ async fn main() {
     let config = MacacaConfig::load_default();
 
     // Initialize logging with file output
-    if let Err(e) = macaca_cli::logging::init_logging(&config.observability.log_file) {
+    if let Err(e) = macaca_cli::logging::init_logging(&config.observability.log_file, &config.observability.log_level) {
         eprintln!("Failed to initialize logging: {e}");
         std::process::exit(1);
     }
@@ -51,7 +51,24 @@ async fn main() {
             println!("Macaca Agent OS v{}", env!("CARGO_PKG_VERSION"));
             Ok(())
         }
-        Commands::Web { port } => macaca_web::start_server(port).await,
+        Commands::Web { port } => {
+            #[cfg(feature = "systemd")]
+            {
+                // Notify systemd we're ready
+                let _ = sd_notify::notify(true, &[sd_notify::NotifyState::Ready]);
+
+                // Spawn watchdog heartbeat task
+                tokio::spawn(async {
+                    let mut interval =
+                        tokio::time::interval(std::time::Duration::from_secs(10));
+                    loop {
+                        interval.tick().await;
+                        let _ = sd_notify::notify(false, &[sd_notify::NotifyState::Watchdog]);
+                    }
+                });
+            }
+            macaca_web::start_server(port).await
+        }
     };
 
     if let Err(e) = result {

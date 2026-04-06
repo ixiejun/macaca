@@ -4,9 +4,12 @@
 //! with Macaca OS applications. Uses axum for the HTTP layer.
 
 pub mod agent_runner;
+pub mod event_persistence;
 pub mod hook_consumer;
+pub mod metrics;
 pub mod routes;
 pub mod state;
+pub mod workspace;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -21,7 +24,7 @@ use tracing::info;
 use macaca_app::{AppRegistry, AppRuntime};
 use macaca_driver_claude_code::{ClaudeCodeConfig, ClaudeCodeDriver};
 use macaca_kernel::{Kernel, ApplicationExecutorRegistry, AgentInfo};
-use macaca_llm::{DashScopeProvider, LlmProvider};
+use macaca_llm::{CostTracker, DashScopeProvider, OpenAiProvider, AnthropicProvider, OpenAiCompatibleProvider, LlmProvider, RateLimiter, ResilientConfig, ResilientLlmWrapper};
 use macaca_persist::RedbStore;
 use macaca_proto::config::{KernelConfig, MacacaConfig};
 use macaca_proto::{ApplicationId, LlmMessage, MacacaResult};
@@ -62,10 +65,39 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
         let api_key = provider_config.resolve_api_key()?;
         let base_url = &provider_config.base_url;
 
-        match provider_name.as_str() {
+        let base_provider: Arc<dyn LlmProvider> = match provider_name.as_str() {
             "dashscope" => Arc::new(DashScopeProvider::new(api_key).with_base_url(base_url.clone())),
-            _ => panic!("Unsupported LLM provider: {}", provider_name),
-        }
+            "openai" => Arc::new(OpenAiProvider::new(api_key).with_base_url(base_url.clone())),
+            "anthropic" => Arc::new(AnthropicProvider::new(api_key).with_base_url(base_url.clone())),
+            // Any other provider name → treat as OpenAI-compatible (DeepSeek, Ollama, vLLM, etc.)
+            other => {
+                info!(provider = other, base_url = %base_url, "Using OpenAI-compatible provider");
+                Arc::new(OpenAiCompatibleProvider::new(other, base_url.clone(), api_key))
+            }
+        };
+
+        let cost_tracker = CostTracker::new();
+        let rate_limiter = RateLimiter::per_minute(60);
+        // Get default_model for fallback
+        let default_model_name = config.llm.providers.get(&config.llm.default_provider)
+            .and_then(|p| p.default_model.clone())
+            .unwrap_or_default();
+        let resilient_config = ResilientConfig {
+            max_retries: 3,
+            backoff_base_ms: 60_000,   // 1 minute between retries
+            backoff_max_ms: 60_000,    // Cap at 1 minute
+            retry_on_status: vec![429, 500, 502, 503],
+            max_budget_usd: None,
+            // Fallback models: try the provider's default_model as a last resort.
+            // In production, configure multiple fallback models in config.
+            fallback_models: if default_model_name.is_empty() { Vec::new() } else { vec![default_model_name] },
+        };
+        Arc::new(
+            ResilientLlmWrapper::new(base_provider)
+                .with_config(resilient_config)
+                .with_rate_limiter(rate_limiter)
+                .with_cost_tracker(cost_tracker),
+        )
     };
 
     info!(provider = llm.name(), "LLM provider initialized");
@@ -191,9 +223,11 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
 
     // Create DelegateTaskTool with callback to executor registry
     // Uses Fork-Join workflow: creates a Fork that inherits parent context
+    let delegate_session_id: Arc<tokio::sync::RwLock<Option<String>>> =
+        Arc::new(tokio::sync::RwLock::new(None));
     let registry_for_delegate = Arc::clone(&executor_registry_ref);
-    let delegate_tool = DelegateTaskTool::empty()
-        .with_callback(move |app_id, to_agent, prompt, priority, parallel| {
+    let delegate_tool = DelegateTaskTool::empty_with_session_id(Arc::clone(&delegate_session_id))
+        .with_callback(move |app_id, to_agent, prompt, priority, parallel, session_id| {
             let registry = Arc::clone(&registry_for_delegate);
             async move {
                 // Get the registry reference
@@ -244,13 +278,18 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
                     .map_err(|e| format!("Fork start failed: {}", e))?;
 
                 // Also delegate the actual task to the executor
+                let task_context = session_id.map(|sid| macaca_kernel::TaskContext {
+                    session_id: Some(sid),
+                    artifacts: vec![],
+                    env: std::collections::HashMap::new(),
+                });
                 let task_id = executor.delegate_task(
                     "coordinator",  // from_agent
                     &to_agent,
                     prompt,
                     priority,
                     parallel,
-                    None,  // context
+                    task_context,
                 ).await.map_err(|e| format!("Delegation failed: {}", e))?;
 
                 // Suspend the fork waiting for the task to complete
@@ -389,7 +428,15 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
     std::fs::create_dir_all(&data_dir).ok();
     let session_db_path = data_dir.join("sessions.db");
     let session_store = Arc::new(RedbStore::open(&session_db_path)?);
+    let todo_store = Arc::new(macaca_task::TodoStore::new(Arc::clone(&session_store)));
+    let event_log = Arc::new(macaca_persist::EventLog::new(Arc::clone(&session_store)));
     info!(path = %session_db_path.display(), "Session store initialized");
+
+    // 9a. Initialize audit logger and alert manager.
+    let audit_logger = Arc::new(macaca_kernel::audit::AuditLogger::new(Arc::clone(&session_store)));
+    let alert_config = macaca_kernel::alert::AlertConfig::default();
+    let alert_manager = Arc::new(macaca_kernel::alert::AlertManager::new(alert_config));
+    info!("AuditLogger and AlertManager initialized");
 
     // Get default model from provider config
     let provider_config = config.llm.providers.get(&config.llm.default_provider);
@@ -417,7 +464,19 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
             session_store,
             executor_registry: executor_registry.clone(),
             fork_to_session: tokio::sync::RwLock::new(HashMap::new()),
+            goal_to_session: tokio::sync::RwLock::new(HashMap::new()),
             active_sessions: tokio::sync::RwLock::new(HashMap::new()),
+            todo_store,
+            plan_loop_handles: tokio::sync::RwLock::new(HashMap::new()),
+            scheduler_handles: tokio::sync::RwLock::new(HashMap::new()),
+            worker_loop_handles: tokio::sync::RwLock::new(HashMap::new()),
+            plan_loop_wakers: tokio::sync::RwLock::new(HashMap::new()),
+            worker_loop_wakers: tokio::sync::RwLock::new(HashMap::new()),
+            audit_logger: audit_logger.clone(),
+            alert_manager: alert_manager.clone(),
+            app_workspaces: tokio::sync::RwLock::new(HashMap::new()),
+            event_log: event_log.clone(),
+            delegate_session_id: Arc::clone(&delegate_session_id),
         }
     });
 
@@ -427,11 +486,13 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
         *guard = Some(state.executor_registry.clone());
     }
 
-    // 10b. Register all started apps to the executor registry
+    // 10b. Register all started apps to the executor registry and create workspaces
     {
         let kernel_ref = Arc::clone(&kernel);
         let registry_ref = state.executor_registry.clone();
         let apps_to_register = started_apps.clone();
+        let todo_store_for_recovery = Arc::clone(&state.todo_store);
+        let state_ref = Arc::clone(&state);
 
         tokio::spawn(async move {
             // Get all agents from kernel
@@ -457,6 +518,26 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
                     app_agents.clone(),
                 ).await;
                 tracing::info!(app_id = %app_id.0, "App registered to executor");
+
+                // Recover crashed tasks: rollback InProgress/Assigned → Pending
+                todo_store_for_recovery.rollback_in_progress(&app_id).await;
+
+                // Create workspace directories for this app
+                let agent_names: Vec<String> = all_agents.iter().map(|a| a.name.clone()).collect();
+                let workspace = crate::workspace::AppWorkspace::new(&config.workspace.root_dir, &app_id);
+                match workspace.ensure_dirs(&agent_names) {
+                    Ok(()) => {
+                        tracing::info!(
+                            app_id = %app_id.0,
+                            workspace = %workspace.root.display(),
+                            "Workspace directories created"
+                        );
+                    }
+                    Err(e) => {
+                        tracing::error!(app_id = %app_id.0, error = %e, "Failed to create workspace directories");
+                    }
+                }
+                state_ref.app_workspaces.write().await.insert(app_id, workspace);
             }
         });
     }
@@ -486,6 +567,7 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
         .allow_headers(Any);
 
     let app = Router::new()
+        .route("/metrics", get(metrics::metrics_handler))
         .route("/", get(routes::root_not_found))
         .route("/api/status", get(routes::get_status))
         .route("/api/apps", get(routes::get_apps))
@@ -497,9 +579,18 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
         .route("/api/sessions", get(routes::list_sessions))
         .route("/api/sessions/{app_id}", get(routes::get_session))
         .route("/api/sessions/detail/{session_id}", get(routes::get_session_by_id))
-        .route("/api/sessions/detail/{session_id}", axum::routing::delete(routes::delete_session))
+        .route("/api/sessions/stream/{session_id}", get(routes::stream_session_events))
         .route("/api/skills", get(routes::get_skills))
         .route("/api/chat", post(routes::post_chat))
+        .route("/api/chat/stop", post(routes::post_chat_stop))
+        .route("/api/apps/{app_id}/todos", get(routes::list_todos))
+        .route("/api/apps/{app_id}/todos/progress", get(routes::get_todo_progress))
+        .route("/api/apps/{app_id}/todos/{agent_name}", get(routes::list_agent_todos))
+        .route("/api/apps/{app_id}/goals", get(routes::list_goals).post(routes::create_goal))
+        .route("/api/apps/{app_id}/schedules", get(routes::list_schedules).post(routes::create_schedule))
+        .route("/api/apps/{app_id}/schedules/{id}", get(routes::get_schedule).delete(routes::delete_schedule))
+        .route("/api/apps/{app_id}/schedules/{id}/toggle", axum::routing::put(routes::toggle_schedule))
+        .route("/api/sessions/{id}/events", get(routes::get_session_events))
         .layer(cors)
         .with_state(state);
 

@@ -16,6 +16,8 @@ use macaca_tools::{ToolSet, TraceEvent};
 use tokio::sync::mpsc;
 use tracing::{debug, error, info, instrument, warn};
 
+use crate::context_window::{ContextWindowConfig, ContextWindowManager};
+use crate::loop_detector::{LoopDetector, LoopDetectorAction, LoopDetectorConfig};
 use crate::permission::PermissionChecker;
 
 /// Configuration for the agentic runtime loop.
@@ -90,6 +92,8 @@ impl AgenticLoop {
             total_tokens: 0,
         };
         let mut iterations = 0;
+        let mut loop_detector = LoopDetector::new(LoopDetectorConfig::default());
+        let ctx_manager = ContextWindowManager::new(ContextWindowConfig::default());
 
         // Build LlmOptions with tool definitions injected.
         let options_with_tools = {
@@ -128,8 +132,9 @@ impl AgenticLoop {
 
             debug!(iteration = iterations, "Sending request to LLM");
 
-            // 1. Call LLM
-            let response = llm.chat(messages.clone(), &options_with_tools).await?;
+            // 1. Call LLM (trim context window if needed; internal history stays intact)
+            let trimmed = ctx_manager.trim_if_needed(messages.clone());
+            let response = llm.chat(trimmed, &options_with_tools).await?;
             accumulate_usage(&mut total_usage, &response.usage);
 
             // 2. Check for tool calls
@@ -164,6 +169,32 @@ impl AgenticLoop {
             );
 
             for tc in &tool_calls {
+                let args_str = serde_json::to_string(&tc.arguments)
+                    .unwrap_or_else(|_| tc.arguments.to_string());
+
+                match loop_detector.record_tool_call(&tc.name, &args_str) {
+                    LoopDetectorAction::Continue => {}
+                    LoopDetectorAction::Warn(msg) => {
+                        warn!(msg = %msg, "Loop detector warning");
+                        messages.push(LlmMessage::system(&msg));
+                    }
+                    LoopDetectorAction::Terminate(msg) => {
+                        error!(msg = %msg, "Loop detector terminated loop");
+                        let last_content = messages
+                            .iter()
+                            .rev()
+                            .find(|m| m.role == macaca_proto::LlmRole::Assistant)
+                            .map(|m| m.content.clone())
+                            .unwrap_or_default();
+                        return Ok(LoopResult {
+                            content: last_content,
+                            total_usage,
+                            iterations,
+                            messages,
+                        });
+                    }
+                }
+
                 let tool_result = self
                     .execute_tool_call(agent_id, tools, tc, permission, permission_checker)
                     .await;
@@ -198,6 +229,8 @@ impl AgenticLoop {
         let mut messages = initial_messages;
         let mut iterations = 0;
         let mut total_usage = TokenUsage::default();
+        let mut loop_detector = LoopDetector::new(LoopDetectorConfig::default());
+        let ctx_manager = ContextWindowManager::new(ContextWindowConfig::default());
         let options_with_tools = LlmOptions {
             tools: Some(tools.to_definitions()),
             ..options.clone()
@@ -219,8 +252,9 @@ impl AgenticLoop {
 
             debug!(iteration = iterations, "Sending request to LLM");
 
-            // Call LLM
-            let response = llm.chat(messages.clone(), &options_with_tools).await?;
+            // Call LLM (trim context window if needed; internal history stays intact)
+            let trimmed = ctx_manager.trim_if_needed(messages.clone());
+            let response = llm.chat(trimmed, &options_with_tools).await?;
             accumulate_usage(&mut total_usage, &response.usage);
 
             // Send assistant event if there's content
@@ -264,6 +298,35 @@ impl AgenticLoop {
             debug!(iteration = iterations, count = tool_calls.len(), "Executing tool calls");
 
             for tc in &tool_calls {
+                let args_str = serde_json::to_string(&tc.arguments)
+                    .unwrap_or_else(|_| tc.arguments.to_string());
+
+                match loop_detector.record_tool_call(&tc.name, &args_str) {
+                    LoopDetectorAction::Continue => {}
+                    LoopDetectorAction::Warn(msg) => {
+                        warn!(msg = %msg, "Loop detector warning");
+                        messages.push(LlmMessage::system(&msg));
+                    }
+                    LoopDetectorAction::Terminate(msg) => {
+                        error!(msg = %msg, "Loop detector terminated loop");
+                        let last_content = messages
+                            .iter()
+                            .rev()
+                            .find(|m| m.role == macaca_proto::LlmRole::Assistant)
+                            .map(|m| m.content.clone())
+                            .unwrap_or_default();
+                        if let Some(ref tx) = event_tx {
+                            let _ = tx.send(AgentExecutionEvent::completed(false, Some(msg))).await;
+                        }
+                        return Ok(LoopResult {
+                            content: last_content,
+                            total_usage,
+                            iterations,
+                            messages,
+                        });
+                    }
+                }
+
                 // Send tool call event
                 if let Some(ref tx) = event_tx {
                     let _ = tx.send(AgentExecutionEvent::tool_call_with_id(
@@ -344,9 +407,9 @@ impl AgenticLoop {
             "[TOOL] Executing tool"
         );
 
-        // Permission check
+        // Permission check (includes path and network access enforcement)
         if let Some(checker) = permission_checker {
-            checker.check_tool_permission(agent_id, permission, &tool_call.name)?;
+            checker.check_tool_with_args(agent_id, permission, &tool_call.name, &tool_call.arguments)?;
         }
 
         // Find tool
@@ -442,9 +505,9 @@ impl AgenticLoop {
         permission: &Permission,
         permission_checker: Option<&dyn PermissionChecker>,
     ) -> MacacaResult<serde_json::Value> {
-        // Permission check
+        // Permission check (includes path and network access enforcement)
         if let Some(checker) = permission_checker {
-            checker.check_tool_permission(agent_id, permission, &tool_call.name)?;
+            checker.check_tool_with_args(agent_id, permission, &tool_call.name, &tool_call.arguments)?;
         }
 
         // Find tool
@@ -580,6 +643,8 @@ impl PausableAgenticLoop {
 
         let mut total_usage = TokenUsage::default();
         let mut iterations = 0;
+        let mut loop_detector = LoopDetector::new(LoopDetectorConfig::default());
+        let ctx_manager = ContextWindowManager::new(ContextWindowConfig::default());
 
         loop {
             // Check if paused and wait for resume
@@ -657,8 +722,9 @@ impl PausableAgenticLoop {
                 let _ = tx.send(AgentExecutionEvent::thinking(iterations)).await;
             }
 
-            // Call LLM
-            let response = llm.chat(messages.clone(), &options_with_tools).await?;
+            // Call LLM (trim context window if needed; internal history stays intact)
+            let trimmed = ctx_manager.trim_if_needed(messages.clone());
+            let response = llm.chat(trimmed, &options_with_tools).await?;
             accumulate_usage(&mut total_usage, &response.usage);
 
             // Send assistant event
@@ -697,6 +763,35 @@ impl PausableAgenticLoop {
 
             // Execute tool calls
             for tc in &tool_calls {
+                let args_str = serde_json::to_string(&tc.arguments)
+                    .unwrap_or_else(|_| tc.arguments.to_string());
+
+                match loop_detector.record_tool_call(&tc.name, &args_str) {
+                    LoopDetectorAction::Continue => {}
+                    LoopDetectorAction::Warn(msg) => {
+                        warn!(msg = %msg, "Loop detector warning");
+                        messages.push(LlmMessage::system(&msg));
+                    }
+                    LoopDetectorAction::Terminate(msg) => {
+                        error!(msg = %msg, "Loop detector terminated loop");
+                        let last_content = messages
+                            .iter()
+                            .rev()
+                            .find(|m| m.role == macaca_proto::LlmRole::Assistant)
+                            .map(|m| m.content.clone())
+                            .unwrap_or_default();
+                        if let Some(ref tx) = event_tx {
+                            let _ = tx.send(AgentExecutionEvent::completed(false, Some(msg))).await;
+                        }
+                        return Ok(LoopResult {
+                            content: last_content,
+                            total_usage,
+                            iterations,
+                            messages,
+                        });
+                    }
+                }
+
                 if let Some(ref tx) = event_tx {
                     let _ = tx.send(AgentExecutionEvent::tool_call_with_id(
                         tc.name.clone(),

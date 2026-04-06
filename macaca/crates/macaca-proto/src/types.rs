@@ -105,6 +105,17 @@ impl ApplicationId {
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
+
+    /// Create a deterministic ApplicationId from an app name.
+    /// Same name always produces the same ID across restarts.
+    pub fn from_name(name: &str) -> Self {
+        // UUID v5 with a fixed namespace ensures deterministic IDs
+        const MACACA_NS: Uuid = Uuid::from_bytes([
+            0x6d, 0x61, 0x63, 0x61, 0x63, 0x61, 0x2d, 0x6f,
+            0x73, 0x2d, 0x61, 0x70, 0x70, 0x2d, 0x6e, 0x73,
+        ]);
+        Self(Uuid::new_v5(&MACACA_NS, name.as_bytes()))
+    }
 }
 
 impl Default for ApplicationId {
@@ -344,6 +355,171 @@ pub struct TaskResult {
     pub completed_at: DateTime<Utc>,
 }
 
+// ── Todo System Types ──
+
+/// Status of a todo item in the Task Board system.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TodoStatus {
+    /// Waiting to be claimed by an agent
+    Pending,
+    /// Agent has acknowledged the task
+    Assigned,
+    /// Agent is actively working on it
+    InProgress,
+    /// Agent finished, awaiting Plan Agent verification
+    PendingReview,
+    /// Verification failed, agent should retry with suggestions
+    NeedsOptimization,
+    /// Plan Agent verified – done
+    Completed,
+    /// Blocked by dependency tasks
+    Blocked,
+    /// Cancelled by Plan Agent
+    Cancelled,
+    /// Exceeded max attempts, needs human intervention
+    Failed,
+}
+
+/// A single work item on an agent's task board.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TodoItem {
+    pub id: TaskId,
+    pub application_id: ApplicationId,
+    /// Session this task belongs to (None = global / cross-session)
+    #[serde(default)]
+    pub session_id: Option<String>,
+    /// Which agent this task is assigned to
+    pub assigned_agent: String,
+    /// Who created it (usually the plan agent / coordinator)
+    pub created_by: String,
+
+    // ── content ──
+    pub title: String,
+    pub description: String,
+    pub acceptance_criteria: Vec<String>,
+    /// Extra context from parent goal or prior tasks
+    pub context: Option<String>,
+
+    // ── lifecycle ──
+    pub status: TodoStatus,
+    pub priority: u8,
+    /// Execution order within this agent+session scope (1-based, ascending).
+    /// Lower numbers execute first. 0 means unassigned (legacy data).
+    #[serde(default)]
+    pub sequence_number: u32,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub deadline: Option<DateTime<Utc>>,
+
+    // ── dependencies ──
+    pub depends_on: Vec<TaskId>,
+    pub parent_task: Option<TaskId>,
+
+    // ── execution records ──
+    /// Progress notes recorded during task execution
+    #[serde(default)]
+    pub progress_notes: Vec<String>,
+    /// Agent's summary when submitting for review
+    pub completion_summary: Option<String>,
+    /// Plan Agent's feedback after review
+    pub review_feedback: Option<String>,
+    /// Suggestions when status = NeedsOptimization
+    pub optimization_suggestions: Option<String>,
+    pub attempt_count: u32,
+    pub max_attempts: u32,
+}
+
+impl TodoItem {
+    pub fn new(
+        application_id: ApplicationId,
+        session_id: Option<String>,
+        assigned_agent: impl Into<String>,
+        created_by: impl Into<String>,
+        title: impl Into<String>,
+        description: impl Into<String>,
+        priority: u8,
+    ) -> Self {
+        let now = Utc::now();
+        Self {
+            id: TaskId::new(),
+            application_id,
+            session_id,
+            assigned_agent: assigned_agent.into(),
+            created_by: created_by.into(),
+            title: title.into(),
+            description: description.into(),
+            acceptance_criteria: Vec::new(),
+            context: None,
+            status: TodoStatus::Pending,
+            priority,
+            sequence_number: 0,
+            created_at: now,
+            updated_at: now,
+            deadline: None,
+            depends_on: Vec::new(),
+            parent_task: None,
+            progress_notes: Vec::new(),
+            completion_summary: None,
+            review_feedback: None,
+            optimization_suggestions: None,
+            attempt_count: 0,
+            max_attempts: 3,
+        }
+    }
+}
+
+/// Result of a Plan Agent reviewing a completed task.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TodoReviewResult {
+    pub passed: bool,
+    pub feedback: String,
+    /// Per-criterion verification: (criterion text, passed?)
+    pub verified_criteria: Vec<(String, bool)>,
+}
+
+/// High-level goal submitted to an application's task space.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TodoGoal {
+    pub id: TaskId,
+    pub application_id: ApplicationId,
+    /// Session this goal belongs to (None = global / cross-session)
+    #[serde(default)]
+    pub session_id: Option<String>,
+    pub description: String,
+    pub created_at: DateTime<Utc>,
+    pub status: TodoGoalStatus,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TodoGoalStatus {
+    Pending,
+    InProgress,
+    Completed,
+}
+
+/// Reference to tasks owned by another agent, used for cross-agent dependency declarations.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum AgentTaskRef {
+    /// Depend on ALL tasks assigned to the named agent.
+    AllTasks { agent: String },
+    /// Depend on a specific task (matched by title) assigned to the named agent.
+    SpecificTask { agent: String, title: String },
+}
+
+impl TodoGoal {
+    pub fn new(application_id: ApplicationId, session_id: Option<String>, description: impl Into<String>) -> Self {
+        Self {
+            id: TaskId::new(),
+            application_id,
+            session_id,
+            description: description.into(),
+            created_at: Utc::now(),
+            status: TodoGoalStatus::Pending,
+        }
+    }
+}
+
 // ── Memory Types ──
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -579,6 +755,29 @@ pub struct TaskContext {
     pub description: String,
     pub agent_id: AgentId,
     pub history: Vec<String>,
+}
+
+// ── Event Log Types ──
+
+/// A persisted event entry in the EventLog.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EventEntry {
+    /// Monotonically increasing sequence number (per-session).
+    pub seq: u64,
+    /// When the event occurred.
+    pub timestamp: chrono::DateTime<chrono::Utc>,
+    /// Which session this event belongs to.
+    pub session_id: String,
+    /// Event type: "thinking", "tool_call", "tool_result", "assistant", "content", "done",
+    /// "error", "delegated_task_start", "delegated_thinking", "delegated_tool_call",
+    /// "delegated_tool_result", "delegated_assistant", "delegated_cc_trace",
+    /// "delegated_completed", "delegated_task_complete", "delegated_task_error",
+    /// "plan_decision", "loop_paused", "loop_resumed", "fork_created", etc.
+    pub event_type: String,
+    /// Source of the event: "coordinator", "executor:backend", "plan_loop", "worker_loop", etc.
+    pub source: String,
+    /// Event payload (varies by event_type).
+    pub payload: serde_json::Value,
 }
 
 // ── Agent Execution Events ──
@@ -881,6 +1080,75 @@ mod tests {
         let resp: LlmResponse = serde_json::from_str(json).unwrap();
         assert_eq!(resp.content, "hi");
         assert!(resp.tool_calls.is_none());
+    }
+
+    #[test]
+    fn todo_item_sequence_number_default() {
+        let item = TodoItem::new(
+            ApplicationId::new(), None, "agent1", "plan", "Test task", "desc", 5,
+        );
+        assert_eq!(item.sequence_number, 0);
+    }
+
+    #[test]
+    fn todo_item_serialize_with_sequence_number() {
+        let mut item = TodoItem::new(
+            ApplicationId::new(), None, "agent1", "plan", "Test", "desc", 5,
+        );
+        item.sequence_number = 3;
+        let json = serde_json::to_string(&item).unwrap();
+        assert!(json.contains("\"sequence_number\":3"));
+        let parsed: TodoItem = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.sequence_number, 3);
+    }
+
+    #[test]
+    fn todo_item_deserialize_without_sequence_number() {
+        // Simulate legacy data without sequence_number field
+        let json = serde_json::json!({
+            "id": TaskId::new(),
+            "application_id": ApplicationId::new(),
+            "assigned_agent": "agent1",
+            "created_by": "plan",
+            "title": "Legacy task",
+            "description": "desc",
+            "acceptance_criteria": [],
+            "status": "Pending",
+            "priority": 5,
+            "created_at": "2025-01-01T00:00:00Z",
+            "updated_at": "2025-01-01T00:00:00Z",
+            "depends_on": [],
+            "progress_notes": [],
+            "attempt_count": 0,
+            "max_attempts": 3
+        });
+        let item: TodoItem = serde_json::from_value(json).unwrap();
+        assert_eq!(item.sequence_number, 0); // default
+    }
+
+    #[test]
+    fn agent_task_ref_serialize_roundtrip() {
+        let all = AgentTaskRef::AllTasks { agent: "architect".into() };
+        let json = serde_json::to_string(&all).unwrap();
+        let parsed: AgentTaskRef = serde_json::from_str(&json).unwrap();
+        match parsed {
+            AgentTaskRef::AllTasks { agent } => assert_eq!(agent, "architect"),
+            _ => panic!("Expected AllTasks"),
+        }
+
+        let specific = AgentTaskRef::SpecificTask {
+            agent: "backend".into(),
+            title: "Design API".into(),
+        };
+        let json = serde_json::to_string(&specific).unwrap();
+        let parsed: AgentTaskRef = serde_json::from_str(&json).unwrap();
+        match parsed {
+            AgentTaskRef::SpecificTask { agent, title } => {
+                assert_eq!(agent, "backend");
+                assert_eq!(title, "Design API");
+            }
+            _ => panic!("Expected SpecificTask"),
+        }
     }
 
     #[test]

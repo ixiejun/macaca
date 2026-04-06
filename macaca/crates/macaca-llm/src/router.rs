@@ -83,7 +83,13 @@ impl LlmRouter {
     /// - `deepseek-*` → `"deepseek"`
     /// - anything else → uses the model string as the provider key
     fn resolve_provider_name(model: &str) -> &str {
-        if model.starts_with("gpt-") || model.starts_with("o1") || model.starts_with("o3") {
+        // Models with "/" separator are from aggregator platforms (e.g. OpenRouter).
+        // Format: "provider/model-name" or "provider/model:variant"
+        // Examples: "qwen/qwen3.6-plus:free", "openai/gpt-4o", "anthropic/claude-3.5-sonnet"
+        // Must check BEFORE bare-prefix rules so "qwen/..." goes to openrouter, not dashscope.
+        if model.contains('/') {
+            "openrouter"
+        } else if model.starts_with("gpt-") || model.starts_with("o1") || model.starts_with("o3") {
             "openai"
         } else if model.starts_with("claude-") {
             "anthropic"
@@ -185,6 +191,15 @@ mod tests {
     fn resolve_provider_name_deepseek() {
         assert_eq!(LlmRouter::resolve_provider_name("deepseek-chat"), "deepseek");
         assert_eq!(LlmRouter::resolve_provider_name("deepseek-coder"), "deepseek");
+    }
+
+    #[test]
+    fn resolve_provider_name_openrouter() {
+        // Models with "/" are routed to openrouter (aggregator platform)
+        assert_eq!(LlmRouter::resolve_provider_name("qwen/qwen3.6-plus:free"), "openrouter");
+        assert_eq!(LlmRouter::resolve_provider_name("openai/gpt-4o"), "openrouter");
+        assert_eq!(LlmRouter::resolve_provider_name("anthropic/claude-3.5-sonnet"), "openrouter");
+        assert_eq!(LlmRouter::resolve_provider_name("meta-llama/llama-3-70b"), "openrouter");
     }
 
     #[test]

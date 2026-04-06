@@ -36,8 +36,9 @@ impl OrchestrationState {
 }
 
 /// Type alias for the delegate callback function.
+/// Arguments: (app_id, to_agent, prompt, priority, parallel, session_id) -> Result<task_id, error>
 pub type DelegateCallback = Box<
-    dyn Fn(String, String, String, u8, bool) -> futures::future::BoxFuture<'static, Result<String, String>>
+    dyn Fn(String, String, String, u8, bool, Option<String>) -> futures::future::BoxFuture<'static, Result<String, String>>
         + Send
         + Sync,
 >;
@@ -51,8 +52,10 @@ pub struct DelegateTaskTool {
     /// Legacy state storage (optional).
     state: Option<Arc<RwLock<OrchestrationState>>>,
     /// Callback for real task execution.
-    /// Arguments: (app_id, to_agent, prompt, priority, parallel) -> Result<task_id, error>
+    /// Arguments: (app_id, to_agent, prompt, priority, parallel, session_id) -> Result<task_id, error>
     delegate_callback: Option<DelegateCallback>,
+    /// Current session ID, shared with AppState so routes can set it before execution.
+    pub session_id: Arc<RwLock<Option<String>>>,
 }
 
 impl DelegateTaskTool {
@@ -61,14 +64,15 @@ impl DelegateTaskTool {
         Self {
             state: Some(state),
             delegate_callback: None,
+            session_id: Arc::new(RwLock::new(None)),
         }
     }
 
     /// Create a tool with a real execution callback.
-    /// The callback receives (app_id, to_agent, prompt, priority, parallel) and returns task_id.
+    /// The callback receives (app_id, to_agent, prompt, priority, parallel, session_id) and returns task_id.
     pub fn with_callback<F>(mut self, callback: F) -> Self
     where
-        F: Fn(String, String, String, u8, bool) -> futures::future::BoxFuture<'static, Result<String, String>>
+        F: Fn(String, String, String, u8, bool, Option<String>) -> futures::future::BoxFuture<'static, Result<String, String>>
             + Send
             + Sync
             + 'static,
@@ -82,6 +86,16 @@ impl DelegateTaskTool {
         Self {
             state: None,
             delegate_callback: None,
+            session_id: Arc::new(RwLock::new(None)),
+        }
+    }
+
+    /// Create an empty tool with a pre-shared session_id Arc.
+    pub fn empty_with_session_id(session_id: Arc<RwLock<Option<String>>>) -> Self {
+        Self {
+            state: None,
+            delegate_callback: None,
+            session_id,
         }
     }
 }
@@ -144,7 +158,8 @@ impl Tool for DelegateTaskTool {
 
         // If we have a real callback, use it for actual execution
         if let Some(ref callback) = self.delegate_callback {
-            match callback(app_id, agent.to_string(), prompt.to_string(), priority, parallel).await {
+            let session_id = self.session_id.read().await.clone();
+            match callback(app_id, agent.to_string(), prompt.to_string(), priority, parallel, session_id).await {
                 Ok(task_id) => {
                     return Ok(serde_json::json!({
                         "task_id": task_id,

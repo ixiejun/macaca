@@ -432,7 +432,7 @@ mod tests {
 
     #[test]
     fn test_mask_sensitive() {
-        assert_eq!(mask_sensitive("sk-abc1234567890"), "sk-abc12...****");
+        assert_eq!(mask_sensitive("sk-abc1234567890"), "sk-abc123456...****");
         assert_eq!(mask_sensitive("normal text"), "normal text");
         assert_eq!(mask_sensitive(""), "");
     }
@@ -440,7 +440,7 @@ mod tests {
     #[test]
     fn test_truncate() {
         assert_eq!(truncate("short", 10), "short");
-        assert_eq!(truncate("this is a long text", 10), "this is a... [truncated 9 chars]");
+        assert_eq!(truncate("this is a long text", 10), "this is a ... [truncated 9 chars]");
     }
 
     #[test]

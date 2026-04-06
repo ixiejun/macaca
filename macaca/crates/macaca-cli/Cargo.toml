@@ -3,6 +3,10 @@ name = "macaca-cli"
 version.workspace = true
 edition.workspace = true
 
+[features]
+default = []
+systemd = ["sd-notify"]
+
 [dependencies]
 macaca-proto = { workspace = true }
 macaca-kernel = { workspace = true }
@@ -22,6 +26,7 @@ serde_json = { workspace = true }
 async-trait = { workspace = true }
 uuid = { workspace = true }
 macaca-web = { workspace = true }
+sd-notify = { version = "0.4", optional = true }
 
 [[bin]]
 name = "macaca"

@@ -2,12 +2,14 @@
 //!
 //! This module provides a production-grade logging system that:
 //! - Writes logs to both console and file
-//! - Rotates log files daily
+//! - Rotates log files daily (using LOCAL timezone)
 //! - Compresses old log files (previous days)
 //! - Cleans up logs older than retention period
 
-use std::fs;
-use std::path::Path;
+use std::fs::{self, File};
+use std::io::{self, Write};
+use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use std::time::Duration;
 
 use chrono::{Local, NaiveDate};
@@ -25,6 +27,79 @@ use macaca_proto::config::LogFileConfig;
 /// Must be kept alive for the duration of the application.
 static mut FILE_APPENDER_GUARD: Option<tracing_appender::non_blocking::WorkerGuard> = None;
 
+/// A daily rolling file appender that uses LOCAL timezone for date rotation.
+pub struct LocalDailyRollingAppender {
+    dir: PathBuf,
+    prefix: String,
+    current_file: Option<(File, NaiveDate)>,
+}
+
+impl LocalDailyRollingAppender {
+    pub fn new(dir: impl Into<PathBuf>, prefix: impl Into<String>) -> Self {
+        Self {
+            dir: dir.into(),
+            prefix: prefix.into(),
+            current_file: None,
+        }
+    }
+
+    fn get_current_date() -> NaiveDate {
+        Local::now().date_naive()
+    }
+
+    fn get_file_path(&self, date: NaiveDate) -> PathBuf {
+        self.dir.join(format!("{}.{}", self.prefix, date.format("%Y-%m-%d")))
+    }
+
+    fn ensure_file(&mut self) -> io::Result<&File> {
+        let today = Self::get_current_date();
+
+        // Check if we need to create or rotate the file
+        match &self.current_file {
+            Some((_, file_date)) if *file_date == today => {
+                // Same day, file is still valid
+            }
+            _ => {
+                // Need to create new file for today
+                let path = self.get_file_path(today);
+                let file = File::options()
+                    .create(true)
+                    .append(true)
+                    .open(&path)?;
+                self.current_file = Some((file, today));
+            }
+        }
+
+        Ok(&self.current_file.as_ref().unwrap().0)
+    }
+}
+
+impl io::Write for LocalDailyRollingAppender {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.ensure_file()?.write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        if let Some((file, _)) = &mut self.current_file {
+            file.flush()?;
+        }
+        Ok(())
+    }
+}
+
+/// Wrapper to make a Mutex<Write> implement io::Write for tracing_appender.
+struct MutexWriter<W>(Mutex<W>);
+
+impl<W: io::Write> io::Write for MutexWriter<W> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.0.lock().unwrap().write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.0.lock().unwrap().flush()
+    }
+}
+
 /// Initialize the logging system with both console and file output.
 ///
 /// # Arguments
@@ -33,22 +108,25 @@ static mut FILE_APPENDER_GUARD: Option<tracing_appender::non_blocking::WorkerGua
 /// # Returns
 /// * `Ok(())` on success
 /// * `Err(...)` on failure
-pub fn init_logging(config: &LogFileConfig) -> Result<(), Box<dyn std::error::Error>> {
+pub fn init_logging(config: &LogFileConfig, log_level: &str) -> Result<(), Box<dyn std::error::Error>> {
     // Create log directory if it doesn't exist
     if config.enabled {
         fs::create_dir_all(&config.dir)?;
     }
 
-    // Build the env filter from config or environment
+    // Build the env filter: RUST_LOG env var takes priority, then config log_level
     let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("info"));
+        .unwrap_or_else(|_| EnvFilter::new(log_level));
 
     if config.enabled {
-        // Create daily rolling file appender
-        let file_appender = tracing_appender::rolling::daily(&config.dir, &config.prefix);
+        // Create local timezone daily rolling file appender
+        let file_appender = LocalDailyRollingAppender::new(&config.dir, &config.prefix);
+
+        // Wrap in Mutex for thread safety
+        let file_appender = Mutex::new(file_appender);
 
         // Create non-blocking writer for performance
-        let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
+        let (non_blocking, guard) = tracing_appender::non_blocking(MutexWriter(file_appender));
 
         // Store guard globally to keep it alive
         // SAFETY: This is called once during initialization

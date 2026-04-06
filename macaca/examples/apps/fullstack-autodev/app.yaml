@@ -8,10 +8,10 @@ llm_config:
   provider: dashscope
   model: qwen3-max
 
-# Application entrypoint - uses SDD workflow for multi-agent collaboration
+# Application entrypoint - coordinator receives all user messages
 entrypoint:
   type: workflow
-  name: sdd
+  name: smart-router
 
 # Workflow definitions
 workflows:
@@ -116,6 +116,19 @@ agents:
       - claude_code_resume
       - shadcn-ui
     persona_dir: "./personas/frontend"
+
+  # Planner Agent — decomposes goals, assigns tasks, reviews quality
+  - name: planner
+    capabilities:
+      - name: task_planning
+        description: Decompose goals into tasks, assign to agents, review quality
+    prompt_template: ""
+    model: qwen3-max
+    permission_level: system
+    allowed_tools:
+      - claude_code_execute
+      - claude_code_resume
+    persona_dir: "./personas/planner"
 
   # Backend Agent — implements APIs
   - name: backend

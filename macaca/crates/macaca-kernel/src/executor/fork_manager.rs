@@ -12,9 +12,12 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, RwLock};
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
+
+use macaca_persist::PersistStore;
 
 use crate::logging::{LogContext, log_hook_event, log_state_transition};
 use macaca_proto::{
@@ -81,7 +84,7 @@ pub enum HookEvent {
 }
 
 /// Result from a delegated task.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DelegateResult {
     pub task_id: TaskId,
     pub success: bool,
@@ -91,7 +94,7 @@ pub struct DelegateResult {
 }
 
 /// Context for a forked agent.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ForkContext {
     /// Unique fork identifier.
     pub id: ForkId,
@@ -121,7 +124,8 @@ pub struct ForkContext {
     pub created_at: DateTime<Utc>,
     /// Completion timestamp (if completed).
     pub completed_at: Option<DateTime<Utc>>,
-    /// Timeout for delegate tasks.
+    /// Timeout for delegate tasks (stored as seconds for serialization).
+    #[serde(with = "duration_secs")]
     pub delegate_timeout: Duration,
 }
 
@@ -191,6 +195,10 @@ pub struct ForkManager {
     hook_tx: mpsc::Sender<HookEvent>,
     /// Broadcast sender for hook events (multiple subscribers).
     hook_broadcast: tokio::sync::broadcast::Sender<HookEvent>,
+    /// Optional persistence store for durability across restarts.
+    store: Option<Arc<macaca_persist::RedbStore>>,
+    /// Application ID used for key namespacing in the store.
+    app_id: macaca_proto::ApplicationId,
 }
 
 impl ForkManager {
@@ -203,6 +211,25 @@ impl ForkManager {
             max_parallel_forks: MAX_PARALLEL_FORKS,
             hook_tx,
             hook_broadcast,
+            store: None,
+            app_id: macaca_proto::ApplicationId::new(),
+        }
+    }
+
+    /// Create a new ForkManager with optional persistence.
+    pub fn new_with_store(
+        store: Option<Arc<macaca_persist::RedbStore>>,
+        app_id: macaca_proto::ApplicationId,
+    ) -> Self {
+        let (hook_tx, _hook_rx) = mpsc::channel(100);
+        let (hook_broadcast, _) = tokio::sync::broadcast::channel(256);
+        Self {
+            forks: Arc::new(RwLock::new(HashMap::new())),
+            max_parallel_forks: MAX_PARALLEL_FORKS,
+            hook_tx,
+            hook_broadcast,
+            store,
+            app_id,
         }
     }
 
@@ -258,8 +285,23 @@ impl ForkManager {
 
         let fork_id = context.id;
 
-        // Store fork
-        self.forks.write().await.insert(fork_id, context);
+        // Store fork in memory
+        self.forks.write().await.insert(fork_id, context.clone());
+
+        // Persist fork to store
+        if let Some(ref store) = self.store {
+            let key = format!("fork/{}/{}", self.app_id.0, fork_id.0);
+            match serde_json::to_vec(&context) {
+                Ok(bytes) => {
+                    if let Err(e) = store.set(&key, &bytes).await {
+                        warn!(fork_id = %fork_id.0, error = %e, "[FORK] Failed to persist fork");
+                    }
+                }
+                Err(e) => {
+                    warn!(fork_id = %fork_id.0, error = %e, "[FORK] Failed to serialize fork for persistence");
+                }
+            }
+        }
 
         // Create fork-specific context for logging (clone the base context)
         let fork_ctx = LogContext::with_trace_id(&ctx.trace_id)
@@ -465,6 +507,14 @@ impl ForkManager {
             info!(fork_id = %fork_id, task_id = %task_id, success = result.success, "Fork resumed and completed by task");
         }
 
+        // Delete from store — terminal state
+        if let Some(ref store) = self.store {
+            let key = format!("fork/{}/{}", self.app_id.0, fork_id.0);
+            if let Err(e) = store.delete(&key).await {
+                warn!(fork_id = %fork_id.0, error = %e, "[FORK] Failed to delete completed fork from store");
+            }
+        }
+
         // Emit hook events (after releasing the lock)
         if result.success {
             // Emit DelegateCompleted event for coordinator notification
@@ -507,6 +557,14 @@ impl ForkManager {
         fork.state = ForkState::Completed;
         fork.completed_at = Some(Utc::now());
 
+        // Delete from store — terminal state, no need to restore
+        if let Some(ref store) = self.store {
+            let key = format!("fork/{}/{}", self.app_id.0, fork_id.0);
+            if let Err(e) = store.delete(&key).await {
+                warn!(fork_id = %fork_id.0, error = %e, "[FORK] Failed to delete completed fork from store");
+            }
+        }
+
         Ok(())
     }
 
@@ -519,6 +577,14 @@ impl ForkManager {
 
         fork.state = ForkState::Failed { error };
         fork.completed_at = Some(Utc::now());
+
+        // Delete from store — terminal state, no need to restore
+        if let Some(ref store) = self.store {
+            let key = format!("fork/{}/{}", self.app_id.0, fork_id.0);
+            if let Err(e) = store.delete(&key).await {
+                warn!(fork_id = %fork_id.0, error = %e, "[FORK] Failed to delete failed fork from store");
+            }
+        }
 
         Ok(())
     }
@@ -580,6 +646,14 @@ impl ForkManager {
         // Mark as merged
         fork.state = ForkState::Merged;
         fork.completed_at = Some(Utc::now());
+
+        // Delete from store — terminal state
+        if let Some(ref store) = self.store {
+            let key = format!("fork/{}/{}", self.app_id.0, fork_id.0);
+            if let Err(e) = store.delete(&key).await {
+                warn!(fork_id = %fork_id.0, error = %e, "[FORK] Failed to delete merged fork from store");
+            }
+        }
 
         // Emit merged event
         let _ = self.hook_tx.send(HookEvent::ForkMerged { fork_id }).await;
@@ -653,6 +727,59 @@ impl ForkManager {
         let _ = self.hook_broadcast.send(event.clone());
     }
 
+    /// Restore non-terminal forks from the persistence store after a restart.
+    pub async fn restore_forks(&mut self) {
+        let store = match &self.store {
+            Some(s) => Arc::clone(s),
+            None => return,
+        };
+
+        let prefix = format!("fork/{}/", self.app_id.0);
+        let keys = match store.list_keys(&prefix).await {
+            Ok(k) => k,
+            Err(e) => {
+                error!(error = %e, "[FORK] Failed to list fork keys during restore");
+                return;
+            }
+        };
+
+        let mut forks = self.forks.write().await;
+        let mut restored = 0usize;
+
+        for key in &keys {
+            let bytes = match store.get(key).await {
+                Ok(Some(b)) => b,
+                Ok(None) => continue,
+                Err(e) => {
+                    warn!(key = %key, error = %e, "[FORK] Failed to read fork during restore");
+                    continue;
+                }
+            };
+
+            match serde_json::from_slice::<ForkContext>(&bytes) {
+                Ok(fork) => {
+                    // Skip terminal forks — they don't need restoring
+                    if fork.is_terminal() {
+                        // Clean up stale terminal entries from store
+                        if let Err(e) = store.delete(key).await {
+                            warn!(key = %key, error = %e, "[FORK] Failed to clean up terminal fork from store");
+                        }
+                        continue;
+                    }
+                    forks.insert(fork.id, fork);
+                    restored += 1;
+                }
+                Err(e) => {
+                    warn!(key = %key, error = %e, "[FORK] Failed to deserialize fork during restore");
+                }
+            }
+        }
+
+        if restored > 0 {
+            info!(restored = restored, app_id = %self.app_id.0, "[FORK] Restored forks from store");
+        }
+    }
+
     /// Clean up old merged forks.
     pub async fn cleanup(&self, older_than: Duration) -> usize {
         use chrono::TimeDelta;
@@ -686,6 +813,23 @@ impl Default for ForkManager {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Serde helper for serializing `Duration` as seconds (u64).
+mod duration_secs {
+    use std::time::Duration;
+    use serde::{Deserializer, Serializer};
+
+    pub fn serialize<S: Serializer>(d: &Duration, s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_u64(d.as_secs())
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Duration, D::Error> {
+        let secs = u64::deserialize(d)?;
+        Ok(Duration::from_secs(secs))
+    }
+
+    use serde::Deserialize;
 }
 
 #[cfg(test)]

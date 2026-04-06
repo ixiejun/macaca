@@ -1,5 +1,7 @@
 //! `aos-kernel` — agent runtime, scheduler, and orchestrator.
 
+pub mod alert;
+pub mod audit;
 pub mod executor;
 pub mod registry;
 pub mod scheduler;

@@ -4,8 +4,11 @@ use std::collections::HashMap;
 use std::cmp::Ordering;
 use std::sync::Arc;
 
+use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, RwLock};
 
+use macaca_persist::PersistStore;
+use macaca_proto::ApplicationId;
 use super::{DelegatedTask, TaskId, TaskResult, TaskStatus};
 
 /// Maximum number of tasks that can be queued.
@@ -14,7 +17,7 @@ const DEFAULT_MAX_QUEUE_SIZE: usize = 100;
 const DEFAULT_MAX_PARALLEL: usize = 4;
 
 /// A task with priority for the priority queue.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrioritizedTask {
     /// The task to execute.
     pub task: DelegatedTask,
@@ -68,6 +71,10 @@ pub struct ExecutionQueue {
     max_queue_size: usize,
     /// Sender for task completion events.
     completion_tx: Option<mpsc::Sender<TaskResult>>,
+    /// Optional persistence store for durability across restarts.
+    store: Option<Arc<macaca_persist::RedbStore>>,
+    /// Application ID used for key namespacing in the store.
+    app_id: ApplicationId,
 }
 
 impl ExecutionQueue {
@@ -80,6 +87,27 @@ impl ExecutionQueue {
             max_parallel,
             max_queue_size,
             completion_tx: None,
+            store: None,
+            app_id: ApplicationId::new(),
+        }
+    }
+
+    /// Create a new execution queue with optional persistence.
+    pub fn new_with_store(
+        max_parallel: usize,
+        max_queue_size: usize,
+        store: Option<Arc<macaca_persist::RedbStore>>,
+        app_id: ApplicationId,
+    ) -> Self {
+        Self {
+            pending: Arc::new(RwLock::new(Vec::new())),
+            running: Arc::new(RwLock::new(HashMap::new())),
+            results: Arc::new(RwLock::new(HashMap::new())),
+            max_parallel,
+            max_queue_size,
+            completion_tx: None,
+            store,
+            app_id,
         }
     }
 
@@ -112,6 +140,21 @@ impl ExecutionQueue {
 
         let prioritized = PrioritizedTask::new(task);
 
+        // Persist before inserting into memory
+        if let Some(ref store) = self.store {
+            let key = format!("exec_queue/{}/{}", self.app_id.0, task_id.0);
+            match serde_json::to_vec(&prioritized) {
+                Ok(bytes) => {
+                    if let Err(e) = store.set(&key, &bytes).await {
+                        tracing::warn!(task_id = %task_id, error = %e, "Failed to persist queued task");
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(task_id = %task_id, error = %e, "Failed to serialize queued task");
+                }
+            }
+        }
+
         let mut pending = self.pending.write().await;
         pending.push(prioritized);
         // Re-sort by priority (highest first)
@@ -143,6 +186,14 @@ impl ExecutionQueue {
         let task = pending.pop().map(|p| p.task).take()?;
         let task_id = task.id;
 
+        // Remove from persistent store (task is now running, tracked in memory)
+        if let Some(ref store) = self.store {
+            let key = format!("exec_queue/{}/{}", self.app_id.0, task_id.0);
+            if let Err(e) = store.delete(&key).await {
+                tracing::warn!(task_id = %task_id, error = %e, "Failed to delete dequeued task from store");
+            }
+        }
+
         // Add to running
         self.running.write().await.insert(task_id, task.clone());
         drop(pending);
@@ -150,6 +201,57 @@ impl ExecutionQueue {
         tracing::info!(task_id = %task_id, running = running_count + 1, "Task dequeued for execution");
 
         Some(task)
+    }
+
+    /// Restore pending tasks from the persistence store after a restart.
+    ///
+    /// Tasks that were previously in `Running` state are rolled back to `Queued`
+    /// (since the executor that was running them is gone).
+    pub async fn restore_from_store(&mut self) {
+        let store = match &self.store {
+            Some(s) => Arc::clone(s),
+            None => return,
+        };
+
+        let prefix = format!("exec_queue/{}/", self.app_id.0);
+        let keys = match store.list_keys(&prefix).await {
+            Ok(k) => k,
+            Err(e) => {
+                tracing::error!(error = %e, "Failed to list exec_queue keys during restore");
+                return;
+            }
+        };
+
+        let mut pending = self.pending.write().await;
+        let mut restored = 0usize;
+
+        for key in &keys {
+            let bytes = match store.get(key).await {
+                Ok(Some(b)) => b,
+                Ok(None) => continue,
+                Err(e) => {
+                    tracing::warn!(key = %key, error = %e, "Failed to read queued task during restore");
+                    continue;
+                }
+            };
+
+            match serde_json::from_slice::<PrioritizedTask>(&bytes) {
+                Ok(prioritized) => {
+                    pending.push(prioritized);
+                    restored += 1;
+                }
+                Err(e) => {
+                    tracing::warn!(key = %key, error = %e, "Failed to deserialize queued task during restore");
+                }
+            }
+        }
+
+        // Re-sort by priority after bulk insert
+        pending.sort_by(|a, b| b.cmp(a));
+
+        if restored > 0 {
+            tracing::info!(restored = restored, app_id = %self.app_id.0, "Restored queued tasks from store");
+        }
     }
 
     /// Mark a task as completed and remove it from running.
@@ -196,6 +298,16 @@ impl ExecutionQueue {
 
         if let Some(idx) = idx {
             pending.remove(idx);
+            drop(pending);
+
+            // Remove from persistent store
+            if let Some(ref store) = self.store {
+                let key = format!("exec_queue/{}/{}", self.app_id.0, task_id.0);
+                if let Err(e) = store.delete(&key).await {
+                    tracing::warn!(task_id = %task_id, error = %e, "Failed to delete cancelled task from store");
+                }
+            }
+
             tracing::info!(task_id = %task_id, "Task cancelled (was pending)");
             return true;
         }

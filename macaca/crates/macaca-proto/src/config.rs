@@ -13,6 +13,19 @@ pub struct MacacaConfig {
     pub persist: PersistConfig,
     pub gateway: GatewayConfig,
     pub observability: ObservabilityConfig,
+    #[serde(default)]
+    pub workspace: WorkspaceConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkspaceConfig {
+    pub root_dir: String,
+}
+
+impl Default for WorkspaceConfig {
+    fn default() -> Self {
+        Self { root_dir: "./data/workspaces".into() }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -269,6 +282,7 @@ impl Default for MacacaConfig {
                 otlp_endpoint: String::new(),
                 log_file: LogFileConfig::default(),
             },
+            workspace: WorkspaceConfig::default(),
         }
     }
 }

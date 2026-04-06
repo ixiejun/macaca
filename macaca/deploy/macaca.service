@@ -1,0 +1,37 @@
+[Unit]
+Description=Macaca Agent OS
+Documentation=https://github.com/macaca-agent/macaca
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+ExecStart=/usr/local/bin/macaca web
+WorkingDirectory=/var/lib/macaca
+Restart=always
+RestartSec=5
+RestartMaxDelaySec=60
+
+# Watchdog: if no heartbeat in 30s, systemd kills and restarts
+WatchdogSec=30
+
+# Environment
+EnvironmentFile=-/etc/macaca/env
+Environment=RUST_LOG=info
+
+# Resource limits
+LimitNOFILE=65536
+MemoryMax=4G
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/macaca /tmp
+
+# User
+User=macaca
+Group=macaca
+
+[Install]
+WantedBy=multi-user.target

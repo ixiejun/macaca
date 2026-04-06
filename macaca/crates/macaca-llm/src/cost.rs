@@ -90,6 +90,16 @@ impl CostTracker {
         self.inner.lock().expect("CostTracker mutex poisoned").request_count
     }
 
+    /// Returns `true` if the accumulated cost exceeds `max_usd`.
+    pub fn is_over_budget(&self, max_usd: f64) -> bool {
+        self.total_cost_usd() > max_usd
+    }
+
+    /// Returns how much budget remains (can be negative if over budget).
+    pub fn remaining_budget(&self, max_usd: f64) -> f64 {
+        max_usd - self.total_cost_usd()
+    }
+
     /// Reset all counters.
     pub fn reset(&self) {
         let mut g = self.inner.lock().expect("CostTracker mutex poisoned");

@@ -49,7 +49,7 @@ pub mod queue;
 pub mod router;
 pub mod worker;
 
-pub use app_executor::{ApplicationExecutor, ApplicationExecutorConfig, ApplicationExecutorRegistry};
+pub use app_executor::{ApplicationExecutor, ApplicationExecutorConfig, ApplicationExecutorRegistry, WorkerState, WorkerHealth, WorkerSupervisorConfig};
 pub use macaca_proto::ApplicationId;
 pub use bus::{EventBus, SystemEvent};
 pub use callback::CallbackDispatcher;
