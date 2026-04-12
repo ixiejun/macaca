@@ -31,6 +31,31 @@ fn planner_scope_session_id(app_id: &ApplicationId, session_id: Option<&str>) ->
         .unwrap_or_else(|| format!("_macaca_app_{}", app_id.0))
 }
 
+async fn persist_planner_notebook_update(
+    state: &Arc<AppState>,
+    app_id: &ApplicationId,
+    session_id: Option<&str>,
+    update: impl FnOnce(&mut PlanNotebook),
+) {
+    let sid = planner_scope_session_id(app_id, session_id);
+    let mut notebook = PlanNotebook::new();
+    let _ = load_module_state(
+        state.sessions.framework_session_store.as_ref(),
+        &sid,
+        &mut notebook,
+    )
+    .await;
+
+    update(&mut notebook);
+
+    let _ = save_module_state(
+        state.sessions.framework_session_store.as_ref(),
+        &sid,
+        &notebook,
+    )
+    .await;
+}
+
 fn select_entry_and_plan_agents(
     agents: &[AgentInfo],
     manifest_entry: Option<&str>,
@@ -47,22 +72,11 @@ fn select_entry_and_plan_agents(
     (entry, planner)
 }
 
-async fn planner_notebook_mark_decomposition(
-    state: &Arc<AppState>,
-    app_id: &ApplicationId,
-    session_id: Option<&str>,
+fn mark_decomposition_in_notebook(
+    notebook: &mut PlanNotebook,
     goal_id: macaca_proto::TaskId,
     description: &str,
 ) {
-    let sid = planner_scope_session_id(app_id, session_id);
-    let mut notebook = PlanNotebook::new();
-    let _ = load_module_state(
-        state.sessions.framework_session_store.as_ref(),
-        &sid,
-        &mut notebook,
-    )
-    .await;
-
     notebook.create_plan(
         format!("goal:{}", goal_id),
         description.to_string(),
@@ -78,29 +92,26 @@ async fn planner_notebook_mark_decomposition(
         let _ = plan_mut.finish_subtask(0, "decomposition delegated to planner");
     }
     let _ = notebook.finish_plan(format!("goal {} decomposition recorded", goal_id));
-    let _ = save_module_state(
-        state.sessions.framework_session_store.as_ref(),
-        &sid,
-        &notebook,
-    )
-    .await;
 }
 
-async fn planner_notebook_mark_review(
+async fn planner_notebook_mark_decomposition(
     state: &Arc<AppState>,
     app_id: &ApplicationId,
     session_id: Option<&str>,
+    goal_id: macaca_proto::TaskId,
+    description: &str,
+) {
+    persist_planner_notebook_update(state, app_id, session_id, |notebook| {
+        mark_decomposition_in_notebook(notebook, goal_id, description);
+    })
+    .await;
+}
+
+fn mark_review_in_notebook(
+    notebook: &mut PlanNotebook,
     task_id: macaca_proto::TaskId,
     task_title: &str,
 ) {
-    let sid = planner_scope_session_id(app_id, session_id);
-    let mut notebook = PlanNotebook::new();
-    let _ = load_module_state(
-        state.sessions.framework_session_store.as_ref(),
-        &sid,
-        &mut notebook,
-    )
-    .await;
     notebook.create_plan(
         format!("review:{}", task_id),
         format!("Review task '{}'", task_title),
@@ -116,11 +127,18 @@ async fn planner_notebook_mark_review(
         let _ = plan_mut.finish_subtask(0, "review delegated to planner");
     }
     let _ = notebook.finish_plan(format!("task {} review recorded", task_id));
-    let _ = save_module_state(
-        state.sessions.framework_session_store.as_ref(),
-        &sid,
-        &notebook,
-    )
+}
+
+async fn planner_notebook_mark_review(
+    state: &Arc<AppState>,
+    app_id: &ApplicationId,
+    session_id: Option<&str>,
+    task_id: macaca_proto::TaskId,
+    task_title: &str,
+) {
+    persist_planner_notebook_update(state, app_id, session_id, |notebook| {
+        mark_review_in_notebook(notebook, task_id, task_title);
+    })
     .await;
 }
 
@@ -1709,9 +1727,11 @@ pub(crate) async fn create_goal(
 mod tests {
     use super::{
         executor_task_completed, executor_task_failed, executor_task_started,
+        mark_decomposition_in_notebook, mark_review_in_notebook, planner_scope_session_id,
         select_entry_and_plan_agents, worker_success_summary, PlannerFrameworkBuilder,
         PlannerFrameworkCallKind, WorkerExecutionMode,
     };
+    use macaca_framework::plan::{PlanNotebook, PlanState, SubTaskState};
     use macaca_kernel::executor::ExecutorEvent;
     use macaca_kernel::AgentInfo;
 
@@ -1747,6 +1767,94 @@ mod tests {
         let (entry, planner) = select_entry_and_plan_agents(&agents, Some("entry_custom"));
         assert_eq!(entry, "entry_custom");
         assert_eq!(planner, "entry_custom");
+    }
+
+    #[test]
+    fn planner_scope_session_id_preserves_session_and_app_fallback() {
+        let app_id = macaca_proto::ApplicationId::from_name("demo-app");
+
+        assert_eq!(
+            planner_scope_session_id(&app_id, Some("session-123")),
+            "session-123"
+        );
+        assert_eq!(
+            planner_scope_session_id(&app_id, None),
+            format!("_macaca_app_{}", app_id.0)
+        );
+    }
+
+    #[test]
+    fn planner_notebook_decomposition_content_is_preserved() {
+        let goal_id = macaca_proto::TaskId::new();
+        let description = "Build a small app";
+        let mut notebook = PlanNotebook::new();
+
+        mark_decomposition_in_notebook(&mut notebook, goal_id, description);
+
+        assert!(notebook.current_plan().is_none());
+        assert_eq!(notebook.historical_plans().len(), 1);
+        let plan = &notebook.historical_plans()[0];
+        assert_eq!(plan.name, format!("goal:{}", goal_id));
+        assert_eq!(plan.description, description);
+        assert_eq!(
+            plan.expected_outcome,
+            "Decompose goal into executable todos"
+        );
+        assert_eq!(plan.state, PlanState::Done);
+        assert_eq!(
+            plan.outcome.as_deref(),
+            Some(format!("goal {} decomposition recorded", goal_id).as_str())
+        );
+        assert_eq!(plan.subtasks.len(), 1);
+        let subtask = &plan.subtasks[0];
+        assert_eq!(subtask.name, "decompose_goal");
+        assert_eq!(subtask.description, format!("Decompose goal {}", goal_id));
+        assert_eq!(
+            subtask.expected_outcome,
+            "Todos created and persisted to TodoBoard"
+        );
+        assert_eq!(subtask.state, SubTaskState::Done);
+        assert_eq!(
+            subtask.outcome.as_deref(),
+            Some("decomposition delegated to planner")
+        );
+    }
+
+    #[test]
+    fn planner_notebook_review_content_is_preserved() {
+        let task_id = macaca_proto::TaskId::new();
+        let task_title = "Implement API";
+        let mut notebook = PlanNotebook::new();
+
+        mark_review_in_notebook(&mut notebook, task_id, task_title);
+
+        assert!(notebook.current_plan().is_none());
+        assert_eq!(notebook.historical_plans().len(), 1);
+        let plan = &notebook.historical_plans()[0];
+        assert_eq!(plan.name, format!("review:{}", task_id));
+        assert_eq!(plan.description, format!("Review task '{}'", task_title));
+        assert_eq!(
+            plan.expected_outcome,
+            "Task review decision persisted via review_todo"
+        );
+        assert_eq!(plan.state, PlanState::Done);
+        assert_eq!(
+            plan.outcome.as_deref(),
+            Some(format!("task {} review recorded", task_id).as_str())
+        );
+        assert_eq!(plan.subtasks.len(), 1);
+        let subtask = &plan.subtasks[0];
+        assert_eq!(subtask.name, "review_todo");
+        assert_eq!(subtask.description, format!("Review todo {}", task_id));
+        assert_eq!(
+            subtask.expected_outcome,
+            "Todo status updated to completed/needs_optimization/failed"
+        );
+        assert_eq!(subtask.state, SubTaskState::Done);
+        assert_eq!(
+            subtask.outcome.as_deref(),
+            Some("review delegated to planner")
+        );
     }
 
     #[test]
