@@ -177,6 +177,156 @@ fn executor_task_failed(
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PlannerFrameworkBuilder {
+    TracedWithGoal,
+    Worker,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PlannerFrameworkCallKind {
+    DecomposeGoal,
+    Review,
+    FollowUp,
+}
+
+impl PlannerFrameworkCallKind {
+    fn builder(self) -> PlannerFrameworkBuilder {
+        match self {
+            Self::DecomposeGoal | Self::FollowUp => PlannerFrameworkBuilder::TracedWithGoal,
+            Self::Review => PlannerFrameworkBuilder::Worker,
+        }
+    }
+
+    fn goal_context(self, task_id: macaca_proto::TaskId) -> Option<macaca_proto::TaskId> {
+        match self {
+            Self::DecomposeGoal | Self::FollowUp => Some(task_id),
+            Self::Review => None,
+        }
+    }
+
+    fn success_log_prefix(self) -> &'static str {
+        match self {
+            Self::DecomposeGoal => "Planner decomposition completed",
+            Self::Review => "Review completed",
+            Self::FollowUp => "Follow-up tasks created",
+        }
+    }
+
+    fn reply_error_log_prefix(self) -> &'static str {
+        match self {
+            Self::DecomposeGoal => "Planner decomposition failed",
+            Self::Review => "Review failed",
+            Self::FollowUp => "Follow-up task creation failed",
+        }
+    }
+
+    fn build_error_log_prefix(self) -> &'static str {
+        match self {
+            Self::DecomposeGoal => "Failed to build planner agent",
+            Self::Review => "Failed to build planner agent for review",
+            Self::FollowUp => "Failed to build planner agent for follow-up",
+        }
+    }
+
+    fn missing_executor_log(self) -> &'static str {
+        match self {
+            Self::DecomposeGoal => "No executor found for planner decomposition",
+            Self::Review => "No executor found for planner review",
+            Self::FollowUp => "No executor found for planner follow-up",
+        }
+    }
+}
+
+async fn run_planner_framework_call(
+    state: &Arc<AppState>,
+    app_id: &ApplicationId,
+    plan_agent_name: &str,
+    session_id: Option<String>,
+    task_id: macaca_proto::TaskId,
+    prompt: String,
+    activity_context: String,
+    kind: PlannerFrameworkCallKind,
+) {
+    let Some(executor) = state.executor_registry.get(app_id).await else {
+        tracing::error!("{}", kind.missing_executor_log());
+        return;
+    };
+
+    update_agent_activity_by_name(
+        state,
+        plan_agent_name,
+        macaca_proto::AgentActivity::Working {
+            context: activity_context,
+        },
+    )
+    .await;
+    executor.broadcast_event(executor_task_started(task_id, plan_agent_name));
+
+    let build_result = match kind.builder() {
+        PlannerFrameworkBuilder::TracedWithGoal => {
+            crate::framework_runner::FrameworkRunner::build_traced_agent_with_goal(
+                state,
+                app_id,
+                plan_agent_name,
+                session_id,
+                task_id,
+                Arc::clone(&executor),
+                kind.goal_context(task_id),
+            )
+            .await
+        }
+        PlannerFrameworkBuilder::Worker => {
+            crate::framework_runner::FrameworkRunner::build_worker_agent(
+                state,
+                app_id,
+                plan_agent_name,
+                session_id,
+                task_id,
+                Arc::clone(&executor),
+            )
+            .await
+        }
+    };
+
+    match build_result {
+        Ok(agent) => {
+            use macaca_framework::agent::Agent;
+
+            let msg = macaca_framework::message::Msg::user("plan_loop", prompt.as_str());
+            match agent.reply(msg).await {
+                Ok(reply) => {
+                    let output = reply.get_text();
+                    executor.broadcast_event(executor_task_completed(
+                        task_id,
+                        plan_agent_name,
+                        output.clone(),
+                    ));
+                    tracing::info!(
+                        "{}: {}",
+                        kind.success_log_prefix(),
+                        output.chars().take(100).collect::<String>()
+                    );
+                }
+                Err(e) => {
+                    executor.broadcast_event(executor_task_failed(
+                        task_id,
+                        plan_agent_name,
+                        e.to_string(),
+                    ));
+                    tracing::error!("{}: {}", kind.reply_error_log_prefix(), e);
+                }
+            }
+        }
+        Err(e) => {
+            executor.broadcast_event(executor_task_failed(task_id, plan_agent_name, e.clone()));
+            tracing::error!("{}: {}", kind.build_error_log_prefix(), e);
+        }
+    }
+
+    update_agent_activity_by_name(state, plan_agent_name, macaca_proto::AgentActivity::Idle).await;
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum WorkerExecutionMode {
     TaskClaimed,
     Retry,
@@ -508,85 +658,20 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                          Start by creating the first task now.",
                                         description, agents_list, agents_profile_text
                                     );
-                                    if let Some(executor) = state_for_consumer
-                                        .executor_registry
-                                        .get(&app_id_for_consumer)
-                                        .await
-                                    {
-                                        update_agent_activity_by_name(
-                                            &state_for_consumer,
-                                            &plan_agent_name_for_loop,
-                                            macaca_proto::AgentActivity::Working {
-                                                context: format!(
-                                                    "Decomposing goal: {}",
-                                                    description
-                                                        .chars()
-                                                        .take(80)
-                                                        .collect::<String>()
-                                                ),
-                                            },
-                                        )
-                                        .await;
-                                        executor.broadcast_event(executor_task_started(
-                                            goal_id,
-                                            &plan_agent_name_for_loop,
-                                        ));
-                                        match crate::framework_runner::FrameworkRunner::build_traced_agent_with_goal(
-                                            &state_for_consumer,
-                                            &app_id_for_consumer,
-                                            &plan_agent_name_for_loop,
-                                            session_id.clone(),
-                                            goal_id,
-                                            Arc::clone(&executor),
-                                            Some(goal_id),
-                                        ).await {
-                                            Ok(agent) => {
-                                                use macaca_framework::agent::Agent;
-                                                let msg = macaca_framework::message::Msg::user("plan_loop", prompt.as_str());
-                                                match agent.reply(msg).await {
-                                                    Ok(reply) => {
-                                                        let output = reply.get_text();
-                                                        executor.broadcast_event(
-                                                            executor_task_completed(
-                                                                goal_id,
-                                                                &plan_agent_name_for_loop,
-                                                                output.clone(),
-                                                            ),
-                                                        );
-                                                        tracing::info!("Planner decomposition completed: {}", output.chars().take(100).collect::<String>());
-                                                    }
-                                                    Err(e) => {
-                                                        executor.broadcast_event(
-                                                            executor_task_failed(
-                                                                goal_id,
-                                                                &plan_agent_name_for_loop,
-                                                                e.to_string(),
-                                                            ),
-                                                        );
-                                                        tracing::error!("Planner decomposition failed: {}", e);
-                                                    }
-                                                }
-                                            }
-                                            Err(e) => {
-                                                executor.broadcast_event(executor_task_failed(
-                                                    goal_id,
-                                                    &plan_agent_name_for_loop,
-                                                    e.clone(),
-                                                ));
-                                                tracing::error!("Failed to build planner agent: {}", e);
-                                            }
-                                        }
-                                        update_agent_activity_by_name(
-                                            &state_for_consumer,
-                                            &plan_agent_name_for_loop,
-                                            macaca_proto::AgentActivity::Idle,
-                                        )
-                                        .await;
-                                    } else {
-                                        tracing::error!(
-                                            "No executor found for planner decomposition"
-                                        );
-                                    }
+                                    run_planner_framework_call(
+                                        &state_for_consumer,
+                                        &app_id_for_consumer,
+                                        &plan_agent_name_for_loop,
+                                        session_id.clone(),
+                                        goal_id,
+                                        prompt,
+                                        format!(
+                                            "Decomposing goal: {}",
+                                            description.chars().take(80).collect::<String>()
+                                        ),
+                                        PlannerFrameworkCallKind::DecomposeGoal,
+                                    )
+                                    .await;
                                     crate::run_trace::emit_for_scope(
                                         &state_for_consumer.persist.run_tracer,
                                         session_id.as_deref(),
@@ -669,79 +754,17 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                          Verify the work meets the criteria. Use review_todo with passed=true/false and feedback.",
                                         task_id, agent, title, summary, criteria
                                     );
-                                    if let Some(executor) = state_for_consumer
-                                        .executor_registry
-                                        .get(&app_id_for_consumer)
-                                        .await
-                                    {
-                                        update_agent_activity_by_name(
-                                            &state_for_consumer,
-                                            &plan_agent_name_for_loop,
-                                            macaca_proto::AgentActivity::Working {
-                                                context: format!(
-                                                    "Reviewing {} task: {}",
-                                                    agent, title
-                                                ),
-                                            },
-                                        )
-                                        .await;
-                                        executor.broadcast_event(executor_task_started(
-                                            task_id,
-                                            &plan_agent_name_for_loop,
-                                        ));
-                                        match crate::framework_runner::FrameworkRunner::build_worker_agent(
-                                            &state_for_consumer,
-                                            &app_id_for_consumer,
-                                            &plan_agent_name_for_loop,
-                                            session_id.clone(),
-                                            task_id,
-                                            Arc::clone(&executor),
-                                        ).await {
-                                            Ok(agent) => {
-                                                use macaca_framework::agent::Agent;
-                                                let msg = macaca_framework::message::Msg::user("plan_loop", prompt.as_str());
-                                                match agent.reply(msg).await {
-                                                    Ok(reply) => {
-                                                        let output = reply.get_text();
-                                                        executor.broadcast_event(
-                                                            executor_task_completed(
-                                                                task_id,
-                                                                &plan_agent_name_for_loop,
-                                                                output.clone(),
-                                                            ),
-                                                        );
-                                                        tracing::info!("Review completed: {}", output.chars().take(100).collect::<String>());
-                                                    }
-                                                    Err(e) => {
-                                                        executor.broadcast_event(
-                                                            executor_task_failed(
-                                                                task_id,
-                                                                &plan_agent_name_for_loop,
-                                                                e.to_string(),
-                                                            ),
-                                                        );
-                                                        tracing::error!("Review failed: {}", e);
-                                                    }
-                                                }
-                                            }
-                                            Err(e) => {
-                                                executor.broadcast_event(executor_task_failed(
-                                                    task_id,
-                                                    &plan_agent_name_for_loop,
-                                                    e.clone(),
-                                                ));
-                                                tracing::error!("Failed to build planner agent for review: {}", e);
-                                            }
-                                        }
-                                        update_agent_activity_by_name(
-                                            &state_for_consumer,
-                                            &plan_agent_name_for_loop,
-                                            macaca_proto::AgentActivity::Idle,
-                                        )
-                                        .await;
-                                    } else {
-                                        tracing::error!("No executor found for planner review");
-                                    }
+                                    run_planner_framework_call(
+                                        &state_for_consumer,
+                                        &app_id_for_consumer,
+                                        &plan_agent_name_for_loop,
+                                        session_id.clone(),
+                                        task_id,
+                                        prompt,
+                                        format!("Reviewing {} task: {}", agent, title),
+                                        PlannerFrameworkCallKind::Review,
+                                    )
+                                    .await;
                                     crate::run_trace::emit_for_scope(
                                         &state_for_consumer.persist.run_tracer,
                                         session_id.as_deref(),
@@ -985,87 +1008,20 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                                 goal_description, reason,
                                                 suggestions.iter().map(|s| format!("- {}", s)).collect::<Vec<_>>().join("\n")
                                             );
-                                            if let Some(executor) = state_for_consumer
-                                                .executor_registry
-                                                .get(&app_id_for_consumer)
-                                                .await
-                                            {
-                                                update_agent_activity_by_name(
-                                                    &state_for_consumer,
-                                                    &plan_agent_name_for_loop,
-                                                    macaca_proto::AgentActivity::Working {
-                                                        context: format!(
-                                                            "Planning follow-up work: {}",
-                                                            reason
-                                                                .chars()
-                                                                .take(80)
-                                                                .collect::<String>()
-                                                        ),
-                                                    },
-                                                )
-                                                .await;
-                                                executor.broadcast_event(executor_task_started(
-                                                    goal_id,
-                                                    &plan_agent_name_for_loop,
-                                                ));
-                                                match crate::framework_runner::FrameworkRunner::build_traced_agent_with_goal(
-                                                    &state_for_consumer,
-                                                    &app_id_for_consumer,
-                                                    &plan_agent_name_for_loop,
-                                                    session_id.clone(),
-                                                    goal_id,
-                                                    Arc::clone(&executor),
-                                                    Some(goal_id),
-                                                ).await {
-                                                    Ok(agent) => {
-                                                        use macaca_framework::agent::Agent;
-                                                        let msg = macaca_framework::message::Msg::user("plan_loop", prompt.as_str());
-                                                        match agent.reply(msg).await {
-                                                            Ok(reply) => {
-                                                                let output = reply.get_text();
-                                                                executor.broadcast_event(
-                                                                    executor_task_completed(
-                                                                        goal_id,
-                                                                        &plan_agent_name_for_loop,
-                                                                        output.clone(),
-                                                                    ),
-                                                                );
-                                                                tracing::info!("Follow-up tasks created: {}", output.chars().take(100).collect::<String>());
-                                                            }
-                                                            Err(e) => {
-                                                                executor.broadcast_event(
-                                                                    executor_task_failed(
-                                                                        goal_id,
-                                                                        &plan_agent_name_for_loop,
-                                                                        e.to_string(),
-                                                                    ),
-                                                                );
-                                                                tracing::error!("Follow-up task creation failed: {}", e);
-                                                            }
-                                                        }
-                                                    }
-                                                    Err(e) => {
-                                                        executor.broadcast_event(
-                                                            executor_task_failed(
-                                                                goal_id,
-                                                                &plan_agent_name_for_loop,
-                                                                e.clone(),
-                                                            ),
-                                                        );
-                                                        tracing::error!("Failed to build planner agent for follow-up: {}", e);
-                                                    }
-                                                }
-                                                update_agent_activity_by_name(
-                                                    &state_for_consumer,
-                                                    &plan_agent_name_for_loop,
-                                                    macaca_proto::AgentActivity::Idle,
-                                                )
-                                                .await;
-                                            } else {
-                                                tracing::error!(
-                                                    "No executor found for planner follow-up"
-                                                );
-                                            }
+                                            run_planner_framework_call(
+                                                &state_for_consumer,
+                                                &app_id_for_consumer,
+                                                &plan_agent_name_for_loop,
+                                                session_id.clone(),
+                                                goal_id,
+                                                prompt,
+                                                format!(
+                                                    "Planning follow-up work: {}",
+                                                    reason.chars().take(80).collect::<String>()
+                                                ),
+                                                PlannerFrameworkCallKind::FollowUp,
+                                            )
+                                            .await;
                                         }
                                         // Emit SSE decision event
                                         let msg = format!("Goal needs more work: {}", reason);
@@ -1753,7 +1709,8 @@ pub(crate) async fn create_goal(
 mod tests {
     use super::{
         executor_task_completed, executor_task_failed, executor_task_started,
-        select_entry_and_plan_agents, worker_success_summary, WorkerExecutionMode,
+        select_entry_and_plan_agents, worker_success_summary, PlannerFrameworkBuilder,
+        PlannerFrameworkCallKind, WorkerExecutionMode,
     };
     use macaca_kernel::executor::ExecutorEvent;
     use macaca_kernel::AgentInfo;
@@ -1854,6 +1811,91 @@ mod tests {
             }
             other => panic!("expected TaskFailed, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn planner_framework_call_uses_goal_builder_for_goal_scoped_calls() {
+        let goal_id = macaca_proto::TaskId::new();
+
+        assert_eq!(
+            PlannerFrameworkCallKind::DecomposeGoal.builder(),
+            PlannerFrameworkBuilder::TracedWithGoal
+        );
+        assert_eq!(
+            PlannerFrameworkCallKind::DecomposeGoal.goal_context(goal_id),
+            Some(goal_id)
+        );
+        assert_eq!(
+            PlannerFrameworkCallKind::FollowUp.builder(),
+            PlannerFrameworkBuilder::TracedWithGoal
+        );
+        assert_eq!(
+            PlannerFrameworkCallKind::FollowUp.goal_context(goal_id),
+            Some(goal_id)
+        );
+    }
+
+    #[test]
+    fn planner_framework_call_uses_worker_builder_for_review() {
+        let task_id = macaca_proto::TaskId::new();
+
+        assert_eq!(
+            PlannerFrameworkCallKind::Review.builder(),
+            PlannerFrameworkBuilder::Worker
+        );
+        assert_eq!(PlannerFrameworkCallKind::Review.goal_context(task_id), None);
+    }
+
+    #[test]
+    fn planner_framework_call_messages_preserve_existing_log_text() {
+        assert_eq!(
+            PlannerFrameworkCallKind::DecomposeGoal.success_log_prefix(),
+            "Planner decomposition completed"
+        );
+        assert_eq!(
+            PlannerFrameworkCallKind::DecomposeGoal.reply_error_log_prefix(),
+            "Planner decomposition failed"
+        );
+        assert_eq!(
+            PlannerFrameworkCallKind::DecomposeGoal.build_error_log_prefix(),
+            "Failed to build planner agent"
+        );
+        assert_eq!(
+            PlannerFrameworkCallKind::DecomposeGoal.missing_executor_log(),
+            "No executor found for planner decomposition"
+        );
+        assert_eq!(
+            PlannerFrameworkCallKind::Review.success_log_prefix(),
+            "Review completed"
+        );
+        assert_eq!(
+            PlannerFrameworkCallKind::Review.reply_error_log_prefix(),
+            "Review failed"
+        );
+        assert_eq!(
+            PlannerFrameworkCallKind::Review.build_error_log_prefix(),
+            "Failed to build planner agent for review"
+        );
+        assert_eq!(
+            PlannerFrameworkCallKind::Review.missing_executor_log(),
+            "No executor found for planner review"
+        );
+        assert_eq!(
+            PlannerFrameworkCallKind::FollowUp.success_log_prefix(),
+            "Follow-up tasks created"
+        );
+        assert_eq!(
+            PlannerFrameworkCallKind::FollowUp.reply_error_log_prefix(),
+            "Follow-up task creation failed"
+        );
+        assert_eq!(
+            PlannerFrameworkCallKind::FollowUp.build_error_log_prefix(),
+            "Failed to build planner agent for follow-up"
+        );
+        assert_eq!(
+            PlannerFrameworkCallKind::FollowUp.missing_executor_log(),
+            "No executor found for planner follow-up"
+        );
     }
 
     #[test]
