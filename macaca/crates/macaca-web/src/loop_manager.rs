@@ -17,7 +17,7 @@ use futures::FutureExt;
 use macaca_framework::execution::ExecutionContext;
 use macaca_framework::plan::PlanNotebook;
 use macaca_framework::session::{load_module_state, save_module_state};
-use macaca_kernel::executor::{ExecutorEvent, TaskResult};
+use macaca_kernel::executor::{ApplicationExecutor, ExecutorEvent, TaskResult};
 use macaca_kernel::AgentInfo;
 use macaca_proto::ApplicationId;
 
@@ -174,6 +174,148 @@ fn executor_task_failed(
         agent: agent.to_string(),
         error: error.into(),
     }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum WorkerExecutionMode {
+    TaskClaimed,
+    Retry,
+}
+
+impl WorkerExecutionMode {
+    fn empty_success_summary(self, title: &str) -> String {
+        match self {
+            Self::TaskClaimed => format!("Task '{}' completed", title),
+            Self::Retry => format!("Task '{}' completed on retry", title),
+        }
+    }
+
+    fn success_submit_review_detail(self, summary: &str) -> String {
+        match self {
+            Self::TaskClaimed => summary.chars().take(120).collect::<String>(),
+            Self::Retry => "retry_success".to_string(),
+        }
+    }
+
+    fn panic_error(self) -> &'static str {
+        match self {
+            Self::TaskClaimed => "Task execution panicked",
+            Self::Retry => "Retry task execution panicked",
+        }
+    }
+
+    fn timeout_error(self) -> &'static str {
+        match self {
+            Self::TaskClaimed => "Execution timeout (30 min)",
+            Self::Retry => "Retry execution timeout (30 min)",
+        }
+    }
+}
+
+fn worker_success_summary(mode: WorkerExecutionMode, title: &str, output: String) -> String {
+    if output.is_empty() {
+        mode.empty_success_summary(title)
+    } else {
+        output
+    }
+}
+
+async fn handle_worker_execution_success(
+    state: &Arc<AppState>,
+    board: &macaca_task::TaskBoard,
+    executor: &ApplicationExecutor,
+    app_id: &ApplicationId,
+    task_session: Option<&str>,
+    task_id: macaca_proto::TaskId,
+    agent_name: &str,
+    title: &str,
+    output: String,
+    mode: WorkerExecutionMode,
+) {
+    let summary = worker_success_summary(mode, title, output);
+    board.submit_for_review(&task_id, summary.clone()).await;
+    executor.broadcast_event(executor_task_completed(
+        task_id,
+        agent_name,
+        summary.clone(),
+    ));
+
+    if mode == WorkerExecutionMode::TaskClaimed {
+        crate::run_trace::emit_for_scope(
+            &state.persist.run_tracer,
+            task_session,
+            app_id,
+            crate::run_trace::phase::WORKER_TASK_SUCCESS,
+            "worker_loop",
+            crate::run_trace::status::OK,
+            None,
+            Some(task_id.to_string()),
+            None,
+            None,
+        )
+        .await;
+    }
+
+    crate::run_trace::emit_for_scope(
+        &state.persist.run_tracer,
+        task_session,
+        app_id,
+        crate::run_trace::phase::WORKER_SUBMIT_REVIEW,
+        "worker_loop",
+        crate::run_trace::status::INFO,
+        Some(mode.success_submit_review_detail(&summary)),
+        Some(task_id.to_string()),
+        None,
+        None,
+    )
+    .await;
+
+    if let Some(waker) = state.loops.plan_loop_wakers.read().await.get(app_id) {
+        waker.wake();
+    }
+
+    if mode == WorkerExecutionMode::TaskClaimed {
+        tracing::info!(agent = %agent_name, "Task completed, submitted for review");
+    }
+}
+
+async fn handle_worker_execution_failure(
+    state: &Arc<AppState>,
+    board: &macaca_task::TaskBoard,
+    executor: &ApplicationExecutor,
+    app_id: &ApplicationId,
+    task_session: Option<&str>,
+    task_id: macaca_proto::TaskId,
+    agent_name: &str,
+    error: String,
+) {
+    board.mark_failed(&task_id, error.clone()).await;
+    executor.broadcast_event(executor_task_failed(task_id, agent_name, error.clone()));
+    crate::run_trace::emit_for_scope(
+        &state.persist.run_tracer,
+        task_session,
+        app_id,
+        crate::run_trace::phase::WORKER_TASK_FAILED,
+        "worker_loop",
+        crate::run_trace::status::ERROR,
+        Some(error.chars().take(200).collect()),
+        Some(task_id.to_string()),
+        None,
+        None,
+    )
+    .await;
+}
+
+async fn handle_worker_execution_timeout(
+    board: &macaca_task::TaskBoard,
+    executor: &ApplicationExecutor,
+    task_id: macaca_proto::TaskId,
+    agent_name: &str,
+    mode: WorkerExecutionMode,
+) {
+    let error = mode.timeout_error();
+    board.mark_failed(&task_id, error.into()).await;
+    executor.broadcast_event(executor_task_failed(task_id, agent_name, error));
 }
 
 /// Ensure PlanLoop and WorkerLoops are running for an application.
@@ -1307,105 +1449,62 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                             ).await {
                                                 Ok(Ok(Ok(reply))) => {
                                                     let output = reply.get_text();
-                                                    let summary = if output.is_empty() { format!("Task '{}' completed", title) } else { output };
-                                                    board_clone.submit_for_review(&task_id, summary.clone()).await;
-                                                    // Emit TaskCompleted event for SSE/EventLog
-                                                    executor_clone.broadcast_event(
-                                                        executor_task_completed(
-                                                            task_id,
-                                                            &agent_name_clone,
-                                                            summary.clone(),
-                                                        ),
-                                                    );
-                                                    crate::run_trace::emit_for_scope(
-                                                        &state_for_worker.persist.run_tracer,
-                                                        task_session.as_deref(),
+                                                    handle_worker_execution_success(
+                                                        &state_for_worker,
+                                                        &board_clone,
+                                                        &executor_clone,
                                                         &app_id_for_worker,
-                                                        crate::run_trace::phase::WORKER_TASK_SUCCESS,
-                                                        "worker_loop",
-                                                        crate::run_trace::status::OK,
-                                                        None,
-                                                        Some(task_id.to_string()),
-                                                        None,
-                                                        None,
-                                                    ).await;
-                                                    crate::run_trace::emit_for_scope(
-                                                        &state_for_worker.persist.run_tracer,
                                                         task_session.as_deref(),
-                                                        &app_id_for_worker,
-                                                        crate::run_trace::phase::WORKER_SUBMIT_REVIEW,
-                                                        "worker_loop",
-                                                        crate::run_trace::status::INFO,
-                                                        Some(summary.chars().take(120).collect::<String>()),
-                                                        Some(task_id.to_string()),
-                                                        None,
-                                                        None,
-                                                    ).await;
-                                                    if let Some(waker) = state_for_worker.loops.plan_loop_wakers.read().await.get(&app_id_for_worker) {
-                                                        waker.wake();
-                                                    }
-                                                    tracing::info!(agent = %agent_name_clone, "Task completed, submitted for review");
+                                                        task_id,
+                                                        &agent_name_clone,
+                                                        &title,
+                                                        output,
+                                                        WorkerExecutionMode::TaskClaimed,
+                                                    )
+                                                    .await;
                                                 }
                                                 Ok(Ok(Err(e))) => {
                                                     let error = e.to_string();
-                                                    board_clone.mark_failed(&task_id, error.clone()).await;
-                                                    // Emit TaskFailed event for SSE/EventLog
-                                                    executor_clone.broadcast_event(
-                                                        executor_task_failed(
-                                                            task_id,
-                                                            &agent_name_clone,
-                                                            error.clone(),
-                                                        ),
-                                                    );
-                                                    crate::run_trace::emit_for_scope(
-                                                        &state_for_worker.persist.run_tracer,
-                                                        task_session.as_deref(),
+                                                    handle_worker_execution_failure(
+                                                        &state_for_worker,
+                                                        &board_clone,
+                                                        &executor_clone,
                                                         &app_id_for_worker,
-                                                        crate::run_trace::phase::WORKER_TASK_FAILED,
-                                                        "worker_loop",
-                                                        crate::run_trace::status::ERROR,
-                                                        Some(error.chars().take(200).collect()),
-                                                        Some(task_id.to_string()),
-                                                        None,
-                                                        None,
-                                                    ).await;
+                                                        task_session.as_deref(),
+                                                        task_id,
+                                                        &agent_name_clone,
+                                                        error,
+                                                    )
+                                                    .await;
                                                     tracing::error!(agent = %agent_name_clone, "Task execution failed: {}", e);
                                                 }
                                                 Ok(Err(_panic)) => {
-                                                    let error = "Task execution panicked".to_string();
-                                                    board_clone.mark_failed(&task_id, error.clone()).await;
-                                                    executor_clone.broadcast_event(
-                                                        executor_task_failed(
-                                                            task_id,
-                                                            &agent_name_clone,
-                                                            error.clone(),
-                                                        ),
-                                                    );
-                                                    crate::run_trace::emit_for_scope(
-                                                        &state_for_worker.persist.run_tracer,
-                                                        task_session.as_deref(),
+                                                    let error = WorkerExecutionMode::TaskClaimed
+                                                        .panic_error()
+                                                        .to_string();
+                                                    handle_worker_execution_failure(
+                                                        &state_for_worker,
+                                                        &board_clone,
+                                                        &executor_clone,
                                                         &app_id_for_worker,
-                                                        crate::run_trace::phase::WORKER_TASK_FAILED,
-                                                        "worker_loop",
-                                                        crate::run_trace::status::ERROR,
-                                                        Some(error),
-                                                        Some(task_id.to_string()),
-                                                        None,
-                                                        None,
-                                                    ).await;
+                                                        task_session.as_deref(),
+                                                        task_id,
+                                                        &agent_name_clone,
+                                                        error,
+                                                    )
+                                                    .await;
                                                     tracing::error!(agent = %agent_name_clone, task_id = %task_id, "Task execution panicked");
                                                 }
                                                 Err(_) => {
                                                     tracing::error!(agent = %agent_name_clone, "Task execution timeout after 30min");
-                                                    board_clone.mark_failed(&task_id, "Execution timeout (30 min)".into()).await;
-                                                    // Emit TaskFailed event for timeout
-                                                    executor_clone.broadcast_event(
-                                                        executor_task_failed(
-                                                            task_id,
-                                                            &agent_name_clone,
-                                                            "Execution timeout (30 min)",
-                                                        ),
-                                                    );
+                                                    handle_worker_execution_timeout(
+                                                        &board_clone,
+                                                        &executor_clone,
+                                                        task_id,
+                                                        &agent_name_clone,
+                                                        WorkerExecutionMode::TaskClaimed,
+                                                    )
+                                                    .await;
                                                 }
                                             }
                                             // Reset agent status to Idle
@@ -1504,87 +1603,59 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                             ).await {
                                                 Ok(Ok(Ok(reply))) => {
                                                     let output = reply.get_text();
-                                                    let summary = if output.is_empty() { format!("Task '{}' completed on retry", title) } else { output };
-                                                    board_clone.submit_for_review(&task_id, summary.clone()).await;
-                                                    // Emit TaskCompleted event for SSE/EventLog (retry)
-                                                    executor_clone.broadcast_event(
-                                                        executor_task_completed(
-                                                            task_id,
-                                                            &agent_name_clone,
-                                                            summary.clone(),
-                                                        ),
-                                                    );
-                                                    crate::run_trace::emit_for_scope(
-                                                        &state_for_worker.persist.run_tracer,
-                                                        task_session.as_deref(),
+                                                    handle_worker_execution_success(
+                                                        &state_for_worker,
+                                                        &board_clone,
+                                                        &executor_clone,
                                                         &app_id_for_worker,
-                                                        crate::run_trace::phase::WORKER_SUBMIT_REVIEW,
-                                                        "worker_loop",
-                                                        crate::run_trace::status::INFO,
-                                                        Some("retry_success".into()),
-                                                        Some(task_id.to_string()),
-                                                        None,
-                                                        None,
-                                                    ).await;
-                                                    if let Some(waker) = state_for_worker.loops.plan_loop_wakers.read().await.get(&app_id_for_worker) {
-                                                        waker.wake();
-                                                    }
+                                                        task_session.as_deref(),
+                                                        task_id,
+                                                        &agent_name_clone,
+                                                        &title,
+                                                        output,
+                                                        WorkerExecutionMode::Retry,
+                                                    )
+                                                    .await;
                                                 }
                                                 Ok(Ok(Err(e))) => {
                                                     let error = e.to_string();
-                                                    board_clone.mark_failed(&task_id, error.clone()).await;
-                                                    executor_clone.broadcast_event(
-                                                        executor_task_failed(
-                                                            task_id,
-                                                            &agent_name_clone,
-                                                            error.clone(),
-                                                        ),
-                                                    );
-                                                    crate::run_trace::emit_for_scope(
-                                                        &state_for_worker.persist.run_tracer,
-                                                        task_session.as_deref(),
+                                                    handle_worker_execution_failure(
+                                                        &state_for_worker,
+                                                        &board_clone,
+                                                        &executor_clone,
                                                         &app_id_for_worker,
-                                                        crate::run_trace::phase::WORKER_TASK_FAILED,
-                                                        "worker_loop",
-                                                        crate::run_trace::status::ERROR,
-                                                        Some(error.chars().take(200).collect()),
-                                                        Some(task_id.to_string()),
-                                                        None,
-                                                        None,
-                                                    ).await;
+                                                        task_session.as_deref(),
+                                                        task_id,
+                                                        &agent_name_clone,
+                                                        error,
+                                                    )
+                                                    .await;
                                                 }
                                                 Ok(Err(_panic)) => {
-                                                    let error = "Retry task execution panicked".to_string();
-                                                    board_clone.mark_failed(&task_id, error.clone()).await;
-                                                    executor_clone.broadcast_event(
-                                                        executor_task_failed(
-                                                            task_id,
-                                                            &agent_name_clone,
-                                                            error.clone(),
-                                                        ),
-                                                    );
-                                                    crate::run_trace::emit_for_scope(
-                                                        &state_for_worker.persist.run_tracer,
-                                                        task_session.as_deref(),
+                                                    let error = WorkerExecutionMode::Retry
+                                                        .panic_error()
+                                                        .to_string();
+                                                    handle_worker_execution_failure(
+                                                        &state_for_worker,
+                                                        &board_clone,
+                                                        &executor_clone,
                                                         &app_id_for_worker,
-                                                        crate::run_trace::phase::WORKER_TASK_FAILED,
-                                                        "worker_loop",
-                                                        crate::run_trace::status::ERROR,
-                                                        Some(error),
-                                                        Some(task_id.to_string()),
-                                                        None,
-                                                        None,
-                                                    ).await;
+                                                        task_session.as_deref(),
+                                                        task_id,
+                                                        &agent_name_clone,
+                                                        error,
+                                                    )
+                                                    .await;
                                                 }
                                                 Err(_) => {
-                                                    board_clone.mark_failed(&task_id, "Retry execution timeout (30 min)".into()).await;
-                                                    executor_clone.broadcast_event(
-                                                        executor_task_failed(
-                                                            task_id,
-                                                            &agent_name_clone,
-                                                            "Retry execution timeout (30 min)",
-                                                        ),
-                                                    );
+                                                    handle_worker_execution_timeout(
+                                                        &board_clone,
+                                                        &executor_clone,
+                                                        task_id,
+                                                        &agent_name_clone,
+                                                        WorkerExecutionMode::Retry,
+                                                    )
+                                                    .await;
                                                 }
                                             }
                                         }
@@ -1682,7 +1753,7 @@ pub(crate) async fn create_goal(
 mod tests {
     use super::{
         executor_task_completed, executor_task_failed, executor_task_started,
-        select_entry_and_plan_agents,
+        select_entry_and_plan_agents, worker_success_summary, WorkerExecutionMode,
     };
     use macaca_kernel::executor::ExecutorEvent;
     use macaca_kernel::AgentInfo;
@@ -1783,5 +1854,63 @@ mod tests {
             }
             other => panic!("expected TaskFailed, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn worker_success_summary_preserves_normal_empty_output_fallback() {
+        let summary = worker_success_summary(
+            WorkerExecutionMode::TaskClaimed,
+            "Implement API",
+            String::new(),
+        );
+
+        assert_eq!(summary, "Task 'Implement API' completed");
+    }
+
+    #[test]
+    fn worker_success_summary_preserves_retry_empty_output_fallback() {
+        let summary =
+            worker_success_summary(WorkerExecutionMode::Retry, "Implement API", String::new());
+
+        assert_eq!(summary, "Task 'Implement API' completed on retry");
+    }
+
+    #[test]
+    fn worker_success_summary_preserves_non_empty_output() {
+        let summary = worker_success_summary(
+            WorkerExecutionMode::TaskClaimed,
+            "Implement API",
+            "custom summary".to_string(),
+        );
+
+        assert_eq!(summary, "custom summary");
+    }
+
+    #[test]
+    fn worker_execution_mode_preserves_trace_detail_and_error_messages() {
+        assert_eq!(
+            WorkerExecutionMode::TaskClaimed.success_submit_review_detail("abcdef"),
+            "abcdef"
+        );
+        assert_eq!(
+            WorkerExecutionMode::Retry.success_submit_review_detail("abcdef"),
+            "retry_success"
+        );
+        assert_eq!(
+            WorkerExecutionMode::TaskClaimed.panic_error(),
+            "Task execution panicked"
+        );
+        assert_eq!(
+            WorkerExecutionMode::Retry.panic_error(),
+            "Retry task execution panicked"
+        );
+        assert_eq!(
+            WorkerExecutionMode::TaskClaimed.timeout_error(),
+            "Execution timeout (30 min)"
+        );
+        assert_eq!(
+            WorkerExecutionMode::Retry.timeout_error(),
+            "Retry execution timeout (30 min)"
+        );
     }
 }
