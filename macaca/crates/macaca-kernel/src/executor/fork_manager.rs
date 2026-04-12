@@ -19,7 +19,7 @@ use uuid::Uuid;
 
 use macaca_persist::PersistStore;
 
-use crate::logging::{LogContext, log_hook_event, log_state_transition};
+use crate::logging::{log_hook_event, log_state_transition, LogContext};
 use macaca_proto::{
     AcceptanceCriteria, ApplicationId, ForkId, ForkState, LlmMessage, TaskId, ValidationResult,
 };
@@ -34,11 +34,8 @@ const DEFAULT_DELEGATE_TIMEOUT_SECS: u64 = 300;
 const MAX_INHERITED_MESSAGES: usize = 10;
 
 /// Callback for hook events.
-pub type HookCallback = Box<
-    dyn Fn(HookEvent) -> futures::future::BoxFuture<'static, ()>
-        + Send
-        + Sync,
->;
+pub type HookCallback =
+    Box<dyn Fn(HookEvent) -> futures::future::BoxFuture<'static, ()> + Send + Sync>;
 
 /// Event emitted when a fork's state changes.
 #[derive(Debug, Clone)]
@@ -78,9 +75,7 @@ pub enum HookEvent {
         result: ValidationResult,
     },
     /// Fork merged to parent.
-    ForkMerged {
-        fork_id: ForkId,
-    },
+    ForkMerged { fork_id: ForkId },
 }
 
 /// Result from a delegated task.
@@ -171,7 +166,10 @@ impl ForkContext {
     pub fn is_terminal(&self) -> bool {
         matches!(
             self.state,
-            ForkState::Completed | ForkState::Failed { .. } | ForkState::Merged | ForkState::Cancelled
+            ForkState::Completed
+                | ForkState::Failed { .. }
+                | ForkState::Merged
+                | ForkState::Cancelled
         )
     }
 }
@@ -245,15 +243,11 @@ impl ForkManager {
         acceptance_criteria: AcceptanceCriteria,
     ) -> Result<ForkId, String> {
         // Create log context for this operation
-        let ctx = LogContext::new(&application_id.0.to_string())
-            .with_agent_name(&agent_name);
+        let ctx = LogContext::new(&application_id.0.to_string()).with_agent_name(&agent_name);
 
         // Check fork limit
         let forks = self.forks.read().await;
-        let active_count = forks
-            .values()
-            .filter(|f| !f.is_terminal())
-            .count();
+        let active_count = forks.values().filter(|f| !f.is_terminal()).count();
         drop(forks);
 
         if active_count >= self.max_parallel_forks {
@@ -314,10 +308,18 @@ impl ForkManager {
             "ForkManager",
             "None",
             "Created",
-            Some([
-                ("parent_fork_id".to_string(), parent_fork_id.map(|f| f.0.to_string()).unwrap_or_default()),
-                ("fork_id".to_string(), fork_id.0.to_string()),
-            ].into_iter().filter(|(_, v)| !v.is_empty()).collect()),
+            Some(
+                [
+                    (
+                        "parent_fork_id".to_string(),
+                        parent_fork_id.map(|f| f.0.to_string()).unwrap_or_default(),
+                    ),
+                    ("fork_id".to_string(), fork_id.0.to_string()),
+                ]
+                .into_iter()
+                .filter(|(_, v)| !v.is_empty())
+                .collect(),
+            ),
         );
 
         // Emit created event
@@ -343,14 +345,16 @@ impl ForkManager {
     }
 
     /// Suspend a fork (waiting for delegate task to complete).
-    pub async fn suspend_fork(&self, fork_id: ForkId, delegate_task_id: TaskId) -> Result<(), String> {
+    pub async fn suspend_fork(
+        &self,
+        fork_id: ForkId,
+        delegate_task_id: TaskId,
+    ) -> Result<(), String> {
         let mut forks = self.forks.write().await;
-        let fork = forks
-            .get_mut(&fork_id)
-            .ok_or_else(|| {
-                error!(fork_id = %fork_id.0, "[FORK] Suspend failed: fork not found");
-                format!("Fork {} not found", fork_id)
-            })?;
+        let fork = forks.get_mut(&fork_id).ok_or_else(|| {
+            error!(fork_id = %fork_id.0, "[FORK] Suspend failed: fork not found");
+            format!("Fork {} not found", fork_id)
+        })?;
 
         if fork.state != ForkState::Running {
             warn!(
@@ -442,7 +446,10 @@ impl ForkManager {
             .ok_or_else(|| format!("Fork {} not found", fork_id))?;
 
         if fork.state != ForkState::Pending {
-            return Err(format!("Fork {} is not pending (current state: {:?})", fork_id, fork.state));
+            return Err(format!(
+                "Fork {} is not pending (current state: {:?})",
+                fork_id, fork.state
+            ));
         }
 
         fork.state = ForkState::Running;
@@ -457,7 +464,11 @@ impl ForkManager {
     /// 2. Validates the result against acceptance criteria
     /// 3. Emits DelegateCompleted/DelegateFailed hook events
     /// 4. Marks the fork as completed
-    pub async fn resume_fork_by_task(&self, task_id: TaskId, result: DelegateResult) -> Result<ForkId, String> {
+    pub async fn resume_fork_by_task(
+        &self,
+        task_id: TaskId,
+        result: DelegateResult,
+    ) -> Result<ForkId, String> {
         let fork_id: ForkId;
         let validation_result: ValidationResult;
 
@@ -465,14 +476,13 @@ impl ForkManager {
             let mut forks = self.forks.write().await;
 
             // Find the fork waiting on this task
-            let fork_entry = forks
-                .iter_mut()
-                .find(|(_, fork)| {
-                    matches!(fork.state, ForkState::WaitingForHook) && fork.waiting_on_task == Some(task_id)
-                });
+            let fork_entry = forks.iter_mut().find(|(_, fork)| {
+                matches!(fork.state, ForkState::WaitingForHook)
+                    && fork.waiting_on_task == Some(task_id)
+            });
 
-            let (fid, fork) = fork_entry
-                .ok_or_else(|| format!("No fork waiting on task {}", task_id))?;
+            let (fid, fork) =
+                fork_entry.ok_or_else(|| format!("No fork waiting on task {}", task_id))?;
 
             fork_id = *fid;
 
@@ -490,7 +500,8 @@ impl ForkManager {
             fork.own_messages.push(LlmMessage::user(result_message));
             // Also store the output as an assistant message so it can be retrieved
             if result.success {
-                fork.own_messages.push(LlmMessage::assistant(result.output.clone()));
+                fork.own_messages
+                    .push(LlmMessage::assistant(result.output.clone()));
             }
 
             // Collect artifacts (clone to avoid moving)
@@ -540,7 +551,10 @@ impl ForkManager {
             self.emit_hook_event(HookEvent::DelegateFailed {
                 fork_id,
                 task_id,
-                error: result.error.clone().unwrap_or_else(|| "Unknown error".to_string()),
+                error: result
+                    .error
+                    .clone()
+                    .unwrap_or_else(|| "Unknown error".to_string()),
             });
         }
 
@@ -608,10 +622,7 @@ impl ForkManager {
         }
 
         // Check if there's any output
-        let has_output = fork
-            .own_messages
-            .iter()
-            .any(|m| !m.content.is_empty());
+        let has_output = fork.own_messages.iter().any(|m| !m.content.is_empty());
 
         if !has_output {
             return ValidationResult::Rejected {
@@ -817,8 +828,8 @@ impl Default for ForkManager {
 
 /// Serde helper for serializing `Duration` as seconds (u64).
 mod duration_secs {
-    use std::time::Duration;
     use serde::{Deserializer, Serializer};
+    use std::time::Duration;
 
     pub fn serialize<S: Serializer>(d: &Duration, s: S) -> Result<S::Ok, S::Error> {
         s.serialize_u64(d.as_secs())

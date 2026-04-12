@@ -118,7 +118,11 @@ mod tests {
 
         mgr.save_snapshot(&id, &manifest).await.unwrap();
 
-        let loaded = mgr.load_snapshot(&id).await.unwrap().expect("snapshot present");
+        let loaded = mgr
+            .load_snapshot(&id)
+            .await
+            .unwrap()
+            .expect("snapshot present");
         assert_eq!(loaded.id, id);
         assert_eq!(loaded.name, "test-agent");
         assert_eq!(loaded.state, AgentState::Running);
@@ -142,8 +146,12 @@ mod tests {
 
         let id1 = AgentId::new();
         let id2 = AgentId::new();
-        mgr.save_snapshot(&id1, &sample_manifest(id1)).await.unwrap();
-        mgr.save_snapshot(&id2, &sample_manifest(id2)).await.unwrap();
+        mgr.save_snapshot(&id1, &sample_manifest(id1))
+            .await
+            .unwrap();
+        mgr.save_snapshot(&id2, &sample_manifest(id2))
+            .await
+            .unwrap();
 
         let mut ids = mgr.list_snapshots().await.unwrap();
         ids.sort_by_key(|a| a.0);
@@ -218,14 +226,19 @@ mod tests {
             "messages": [],
             "turns": []
         });
-        store.set(key, &serde_json::to_vec(&session).unwrap()).await.unwrap();
+        store
+            .set(key, &serde_json::to_vec(&session).unwrap())
+            .await
+            .unwrap();
 
         // Update status to completed
-        let mut updated: serde_json::Value = serde_json::from_slice(
-            &store.get(key).await.unwrap().unwrap()
-        ).unwrap();
+        let mut updated: serde_json::Value =
+            serde_json::from_slice(&store.get(key).await.unwrap().unwrap()).unwrap();
         updated["meta"]["status"] = serde_json::json!("completed");
-        store.set(key, &serde_json::to_vec(&updated).unwrap()).await.unwrap();
+        store
+            .set(key, &serde_json::to_vec(&updated).unwrap())
+            .await
+            .unwrap();
 
         let final_data = store.get(key).await.unwrap().unwrap();
         let parsed: serde_json::Value = serde_json::from_slice(&final_data).unwrap();
@@ -267,7 +280,10 @@ mod tests {
             "messages": [{"role": "user", "content": "test prompt"}],
             "turns": []
         });
-        store.set(key, &serde_json::to_vec(&session).unwrap()).await.unwrap();
+        store
+            .set(key, &serde_json::to_vec(&session).unwrap())
+            .await
+            .unwrap();
 
         // Verify: session is immediately visible in list
         let keys = store.list_keys("session/").await.unwrap();

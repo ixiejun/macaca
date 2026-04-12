@@ -1,0 +1,54 @@
+[package]
+name = "macaca-framework"
+version = "0.1.0"
+edition = "2021"
+description = "Agent framework for Macaca OS — Rust implementation inspired by AgentScope"
+
+[dependencies]
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+async-trait = "0.1"
+futures = "0.3"
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Unique IDs
+uuid = { version = "1", features = ["v4", "serde"] }
+
+# Error handling
+thiserror = "1"
+
+# Logging / Tracing
+tracing = "0.1"
+
+# HTTP client (for A2A)
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"], optional = true }
+
+# HTTP server (for A2A server)
+axum = { version = "0.8", optional = true }
+
+# Macaca ecosystem
+macaca-proto = { path = "../macaca-proto" }
+macaca-persist = { path = "../macaca-persist", optional = true }
+macaca-llm = { path = "../macaca-llm", optional = true }
+macaca-tools = { path = "../macaca-tools", optional = true }
+
+[features]
+default = []
+a2a-client = ["dep:reqwest"]
+a2a-server = ["dep:axum"]
+persist = ["dep:macaca-persist"]
+openai = ["dep:reqwest"]
+anthropic = ["dep:reqwest"]
+macaca-compat = ["dep:macaca-llm", "dep:macaca-tools"]
+full = ["a2a-client", "a2a-server", "persist", "openai", "anthropic", "macaca-compat"]
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full", "test-util"] }
+tempfile = "3"

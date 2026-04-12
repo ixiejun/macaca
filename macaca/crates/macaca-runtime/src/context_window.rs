@@ -56,8 +56,7 @@ impl ContextWindowManager {
                 let total_chars = text.chars().count();
                 let ascii_chars = total_chars.saturating_sub(cjk_chars);
 
-                let token_estimate =
-                    (cjk_chars as f64 / 1.5 + ascii_chars as f64 / 4.0) as usize;
+                let token_estimate = (cjk_chars as f64 / 1.5 + ascii_chars as f64 / 4.0) as usize;
 
                 // Add overhead for role metadata and formatting
                 token_estimate + 4
@@ -75,8 +74,7 @@ impl ContextWindowManager {
     /// Returns the (possibly trimmed) message list.
     pub fn trim_if_needed(&self, messages: Vec<LlmMessage>) -> Vec<LlmMessage> {
         let estimated = Self::estimate_tokens(&messages);
-        let threshold =
-            (self.config.max_tokens as f64 * self.config.trim_threshold) as usize;
+        let threshold = (self.config.max_tokens as f64 * self.config.trim_threshold) as usize;
 
         if estimated <= threshold {
             return messages;
@@ -89,17 +87,19 @@ impl ContextWindowManager {
         let mut result = Vec::new();
 
         // 1. Preserve system message if the first message has System role.
-        let start_idx =
-            if messages.first().map(|m| m.role == LlmRole::System).unwrap_or(false) {
-                result.push(messages[0].clone());
-                1
-            } else {
-                0
-            };
+        let start_idx = if messages
+            .first()
+            .map(|m| m.role == LlmRole::System)
+            .unwrap_or(false)
+        {
+            result.push(messages[0].clone());
+            1
+        } else {
+            0
+        };
 
         // 2. Calculate how many recent messages to keep.
-        let recent_count =
-            (self.config.preserve_recent * 2).min(messages.len() - start_idx);
+        let recent_count = (self.config.preserve_recent * 2).min(messages.len() - start_idx);
         let recent_start = messages.len() - recent_count;
 
         // 3. Replace middle portion with a summary placeholder.
@@ -171,7 +171,11 @@ mod tests {
         let msgs = small_messages();
         let original_len = msgs.len();
         let result = mgr.trim_if_needed(msgs);
-        assert_eq!(result.len(), original_len, "Messages under threshold must not be trimmed");
+        assert_eq!(
+            result.len(),
+            original_len,
+            "Messages under threshold must not be trimmed"
+        );
     }
 
     #[test]
@@ -180,7 +184,11 @@ mod tests {
         let msgs = large_messages(800);
         assert!(msgs[0].role == LlmRole::System);
         let result = mgr.trim_if_needed(msgs);
-        assert_eq!(result[0].role, LlmRole::System, "First message must remain a system message");
+        assert_eq!(
+            result[0].role,
+            LlmRole::System,
+            "First message must remain a system message"
+        );
         assert_eq!(result[0].content, "System prompt.");
     }
 
@@ -195,7 +203,10 @@ mod tests {
         let msgs = large_messages(800);
         let total = msgs.len();
         // The last 10 messages (5 pairs) should always be present.
-        let last_10: Vec<_> = msgs[total - 10..].iter().map(|m| m.content.clone()).collect();
+        let last_10: Vec<_> = msgs[total - 10..]
+            .iter()
+            .map(|m| m.content.clone())
+            .collect();
 
         let result = mgr.trim_if_needed(msgs);
 

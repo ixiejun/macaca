@@ -48,7 +48,8 @@ impl LocalDailyRollingAppender {
     }
 
     fn get_file_path(&self, date: NaiveDate) -> PathBuf {
-        self.dir.join(format!("{}.{}", self.prefix, date.format("%Y-%m-%d")))
+        self.dir
+            .join(format!("{}.{}", self.prefix, date.format("%Y-%m-%d")))
     }
 
     fn ensure_file(&mut self) -> io::Result<&File> {
@@ -62,10 +63,7 @@ impl LocalDailyRollingAppender {
             _ => {
                 // Need to create new file for today
                 let path = self.get_file_path(today);
-                let file = File::options()
-                    .create(true)
-                    .append(true)
-                    .open(&path)?;
+                let file = File::options().create(true).append(true).open(&path)?;
                 self.current_file = Some((file, today));
             }
         }
@@ -108,15 +106,17 @@ impl<W: io::Write> io::Write for MutexWriter<W> {
 /// # Returns
 /// * `Ok(())` on success
 /// * `Err(...)` on failure
-pub fn init_logging(config: &LogFileConfig, log_level: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn init_logging(
+    config: &LogFileConfig,
+    log_level: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
     // Create log directory if it doesn't exist
     if config.enabled {
         fs::create_dir_all(&config.dir)?;
     }
 
     // Build the env filter: RUST_LOG env var takes priority, then config log_level
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new(log_level));
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(log_level));
 
     if config.enabled {
         // Create local timezone daily rolling file appender
@@ -212,7 +212,9 @@ fn spawn_log_cleanup_task(config: LogFileConfig) {
 }
 
 /// Clean up old log files: compress previous days and delete files past retention.
-async fn cleanup_old_logs(config: &LogFileConfig) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+async fn cleanup_old_logs(
+    config: &LogFileConfig,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let log_dir = Path::new(&config.dir);
 
     if !log_dir.exists() {
@@ -222,9 +224,7 @@ async fn cleanup_old_logs(config: &LogFileConfig) -> Result<(), Box<dyn std::err
     let today = Local::now().date_naive();
     let retention_threshold = today - chrono::Duration::days(config.retention_days as i64);
 
-    let entries: Vec<_> = fs::read_dir(log_dir)?
-        .filter_map(|e| e.ok())
-        .collect();
+    let entries: Vec<_> = fs::read_dir(log_dir)?.filter_map(|e| e.ok()).collect();
 
     for entry in entries {
         let path = entry.path();

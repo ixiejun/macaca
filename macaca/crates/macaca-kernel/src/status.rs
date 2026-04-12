@@ -1,9 +1,9 @@
 //! Agent status tracker — tracks runtime activity of all agents.
 
+use chrono::Utc;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use chrono::Utc;
 
 use macaca_proto::{AgentActivity, AgentId, AgentRuntimeStatus, AgentState};
 
@@ -69,23 +69,35 @@ impl AgentStatusTracker {
 
     /// Convenience method: mark agent as thinking.
     pub async fn set_thinking(&self, agent_id: &AgentId, context: impl Into<String>) {
-        self.update_activity(agent_id, AgentActivity::Thinking {
-            context: context.into(),
-        }).await;
+        self.update_activity(
+            agent_id,
+            AgentActivity::Thinking {
+                context: context.into(),
+            },
+        )
+        .await;
     }
 
     /// Convenience method: mark agent as working.
     pub async fn set_working(&self, agent_id: &AgentId, context: impl Into<String>) {
-        self.update_activity(agent_id, AgentActivity::Working {
-            context: context.into(),
-        }).await;
+        self.update_activity(
+            agent_id,
+            AgentActivity::Working {
+                context: context.into(),
+            },
+        )
+        .await;
     }
 
     /// Convenience method: mark agent as having an error.
     pub async fn set_error(&self, agent_id: &AgentId, message: impl Into<String>) {
-        self.update_activity(agent_id, AgentActivity::Error {
-            message: message.into(),
-        }).await;
+        self.update_activity(
+            agent_id,
+            AgentActivity::Error {
+                message: message.into(),
+            },
+        )
+        .await;
     }
 
     /// Convenience method: mark agent as idle.

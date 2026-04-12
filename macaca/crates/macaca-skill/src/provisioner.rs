@@ -190,11 +190,7 @@ impl SkillProvisioner {
     }
 
     /// Provision a specific skill to a specific client.
-    pub async fn provision_skill(
-        &self,
-        skill_name: &str,
-        client_name: &str,
-    ) -> MacacaResult<()> {
+    pub async fn provision_skill(&self, skill_name: &str, client_name: &str) -> MacacaResult<()> {
         let client = self
             .clients
             .get(client_name)
@@ -283,9 +279,7 @@ async fn copy_skill_dir(src: &Path, dst: &Path) -> MacacaResult<()> {
 }
 
 fn home_dir() -> Option<PathBuf> {
-    std::env::var("HOME")
-        .ok()
-        .map(PathBuf::from)
+    std::env::var("HOME").ok().map(PathBuf::from)
 }
 
 #[cfg(test)]
@@ -328,7 +322,10 @@ mod tests {
             skills_dir: target.path().join("skills"),
         });
 
-        let count = provisioner.provision_all_for_client("test-client").await.unwrap();
+        let count = provisioner
+            .provision_all_for_client("test-client")
+            .await
+            .unwrap();
         assert_eq!(count, 2);
 
         // Verify files were copied.

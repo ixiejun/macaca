@@ -71,6 +71,14 @@ pub static TOOL_EXECUTIONS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     counter
 });
 
+/// Run trace checkpoints — labels: `phase`, `status` (`ok` | `error` | `waiting` | `info`).
+pub static RUN_TRACE_EVENTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    let opts = Opts::new("run_trace_events_total", "Structured run_trace checkpoints");
+    let counter = IntCounterVec::new(opts, &["phase", "status"]).unwrap();
+    REGISTRY.register(Box::new(counter.clone())).unwrap();
+    counter
+});
+
 // ---------------------------------------------------------------------------
 // Convenience recording functions
 // ---------------------------------------------------------------------------
@@ -106,6 +114,13 @@ pub fn record_tool_execution(tool_name: &str, success: bool) {
     let status = if success { "success" } else { "error" };
     TOOL_EXECUTIONS_TOTAL
         .with_label_values(&[tool_name, status])
+        .inc();
+}
+
+/// Record a [`crate::run_trace::RunTracer`] checkpoint.
+pub fn record_run_trace(phase: &str, status: &str) {
+    RUN_TRACE_EVENTS_TOTAL
+        .with_label_values(&[phase, status])
         .inc();
 }
 

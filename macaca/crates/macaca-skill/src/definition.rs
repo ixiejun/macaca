@@ -63,7 +63,6 @@ fn default_schema() -> Value {
     serde_json::json!({"type": "object", "properties": {}})
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -136,5 +135,4 @@ entry_point:
             _ => panic!("Expected Script"),
         }
     }
-
 }

@@ -6,8 +6,8 @@ use chrono::Utc;
 use macaca_agent::{Agent, AgentServices};
 use macaca_llm::LlmProvider;
 use macaca_proto::{
-    AgentId, AgentManifest, AgentOutput, AgentState, MacacaError, MacacaResult, Capability,
-    LlmMessage, LlmOptions, Permission,
+    AgentId, AgentManifest, AgentOutput, AgentState, Capability, LlmMessage, LlmOptions,
+    MacacaError, MacacaResult, Permission,
 };
 use macaca_tools::ToolSet;
 
@@ -229,9 +229,7 @@ model: mock-model
 
     #[test]
     fn builder_builds_agent() {
-        let agent = AgentBuilder::from_config(sample_config())
-            .build()
-            .unwrap();
+        let agent = AgentBuilder::from_config(sample_config()).build().unwrap();
         assert_eq!(agent.name(), "test-agent");
         assert_eq!(agent.capabilities().len(), 1);
         assert_eq!(agent.state(), AgentState::Created);
@@ -287,9 +285,7 @@ model: mock-model
 
     #[tokio::test]
     async fn declarative_agent_run_calls_llm() {
-        let agent = AgentBuilder::from_config(sample_config())
-            .build()
-            .unwrap();
+        let agent = AgentBuilder::from_config(sample_config()).build().unwrap();
         let llm = MockLlm;
         let tools = DefaultToolSet::new();
         let services = AgentServices::empty();

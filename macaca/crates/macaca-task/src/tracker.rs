@@ -46,9 +46,9 @@ impl TaskTracker {
 
     pub async fn assign(&self, task_id: &TaskId, agent_id: AgentId) -> MacacaResult<()> {
         let mut tasks = self.tasks.write().await;
-        let task = tasks.get_mut(task_id).ok_or_else(|| {
-            MacacaError::NotFound(format!("task {:?}", task_id))
-        })?;
+        let task = tasks
+            .get_mut(task_id)
+            .ok_or_else(|| MacacaError::NotFound(format!("task {:?}", task_id)))?;
 
         match task.status {
             TaskStatus::Pending => {
@@ -70,9 +70,9 @@ impl TaskTracker {
 
     pub async fn start(&self, task_id: &TaskId) -> MacacaResult<()> {
         let mut tasks = self.tasks.write().await;
-        let task = tasks.get_mut(task_id).ok_or_else(|| {
-            MacacaError::NotFound(format!("task {:?}", task_id))
-        })?;
+        let task = tasks
+            .get_mut(task_id)
+            .ok_or_else(|| MacacaError::NotFound(format!("task {:?}", task_id)))?;
 
         match task.status {
             TaskStatus::Assigned => {
@@ -93,9 +93,9 @@ impl TaskTracker {
 
     pub async fn complete(&self, task_id: &TaskId, result: TaskResult) -> MacacaResult<()> {
         let mut tasks = self.tasks.write().await;
-        let task = tasks.get_mut(task_id).ok_or_else(|| {
-            MacacaError::NotFound(format!("task {:?}", task_id))
-        })?;
+        let task = tasks
+            .get_mut(task_id)
+            .ok_or_else(|| MacacaError::NotFound(format!("task {:?}", task_id)))?;
 
         match task.status {
             TaskStatus::Running => {
@@ -118,9 +118,9 @@ impl TaskTracker {
 
     pub async fn fail(&self, task_id: &TaskId, error: String) -> MacacaResult<()> {
         let mut tasks = self.tasks.write().await;
-        let task = tasks.get_mut(task_id).ok_or_else(|| {
-            MacacaError::NotFound(format!("task {:?}", task_id))
-        })?;
+        let task = tasks
+            .get_mut(task_id)
+            .ok_or_else(|| MacacaError::NotFound(format!("task {:?}", task_id)))?;
 
         match task.status {
             TaskStatus::Running | TaskStatus::Pending => {
@@ -129,12 +129,10 @@ impl TaskTracker {
                 warn!("Task {:?} failed: {}", task_id, error);
                 Ok(())
             }
-            other => {
-                Err(MacacaError::Task(format!(
-                    "cannot fail task in status {:?}: expected Running or Pending",
-                    other
-                )))
-            }
+            other => Err(MacacaError::Task(format!(
+                "cannot fail task in status {:?}: expected Running or Pending",
+                other
+            ))),
         }
     }
 
@@ -153,7 +151,11 @@ impl TaskTracker {
 
     pub async fn list_by_status(&self, status: TaskStatus) -> MacacaResult<Vec<Task>> {
         let tasks = self.tasks.read().await;
-        Ok(tasks.values().filter(|t| t.status == status).cloned().collect())
+        Ok(tasks
+            .values()
+            .filter(|t| t.status == status)
+            .cloned()
+            .collect())
     }
 
     pub async fn list_by_agent(&self, agent_id: &AgentId) -> MacacaResult<Vec<Task>> {
@@ -219,14 +221,20 @@ mod tests {
         let agent = AgentId::new();
 
         tracker.assign(&task.id, agent).await.unwrap();
-        assert_eq!(tracker.status(&task.id).await.unwrap(), TaskStatus::Assigned);
+        assert_eq!(
+            tracker.status(&task.id).await.unwrap(),
+            TaskStatus::Assigned
+        );
 
         tracker.start(&task.id).await.unwrap();
         assert_eq!(tracker.status(&task.id).await.unwrap(), TaskStatus::Running);
 
         let result = make_result(task.id);
         tracker.complete(&task.id, result).await.unwrap();
-        assert_eq!(tracker.status(&task.id).await.unwrap(), TaskStatus::Completed);
+        assert_eq!(
+            tracker.status(&task.id).await.unwrap(),
+            TaskStatus::Completed
+        );
 
         let stored = tracker.get_result(&task.id).await.unwrap().unwrap();
         assert!(stored.success);

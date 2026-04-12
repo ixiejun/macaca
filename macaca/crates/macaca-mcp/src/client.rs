@@ -21,9 +21,7 @@ pub enum McpTransport {
         env: Vec<(String, String)>,
     },
     /// Connect to the MCP server via HTTP Server-Sent Events.
-    Sse {
-        url: String,
-    },
+    Sse { url: String },
 }
 
 /// Information about a tool exposed by an MCP server.
@@ -233,7 +231,10 @@ mod tests {
         assert!(!result.is_error);
 
         // Unknown tool
-        assert!(client.call_tool("unknown", serde_json::json!({})).await.is_err());
+        assert!(client
+            .call_tool("unknown", serde_json::json!({}))
+            .await
+            .is_err());
 
         client.disconnect().await.unwrap();
         assert!(!client.is_connected());

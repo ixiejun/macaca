@@ -25,9 +25,13 @@ impl AppWorkspace {
     /// Root is: `{data_dir}/workspaces/{app_id}/`
     /// Directories are NOT created here — call [`ensure_dirs`] to create them.
     pub fn new(data_dir: impl AsRef<Path>, app_id: &ApplicationId) -> Self {
-        let root = data_dir
-            .as_ref()
-            .join(app_id.0.to_string());
+        let base = data_dir.as_ref();
+        let workspace_root = if base.file_name().is_some_and(|name| name == "workspaces") {
+            base.to_path_buf()
+        } else {
+            base.join("workspaces")
+        };
+        let root = workspace_root.join(app_id.0.to_string());
         Self {
             shared: root.join("shared"),
             agents_root: root.join("agents"),
@@ -93,9 +97,7 @@ mod tests {
         );
         assert_eq!(
             ws.agent_workspace("backend"),
-            PathBuf::from(
-                "/data/workspaces/00000000-0000-0000-0000-000000000001/agents/backend"
-            )
+            PathBuf::from("/data/workspaces/00000000-0000-0000-0000-000000000001/agents/backend")
         );
     }
 
@@ -129,5 +131,18 @@ mod tests {
         assert!(ws.agent_workspace("frontend").exists());
         // Cleanup
         let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn new_does_not_duplicate_workspaces_segment() {
+        let ws = AppWorkspace::new("/data/workspaces", &test_app_id());
+        assert_eq!(
+            ws.root,
+            PathBuf::from("/data/workspaces/00000000-0000-0000-0000-000000000001")
+        );
+        assert_eq!(
+            ws.shared,
+            PathBuf::from("/data/workspaces/00000000-0000-0000-0000-000000000001/shared")
+        );
     }
 }

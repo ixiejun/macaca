@@ -4,22 +4,48 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 use macaca_persist::{PersistStore, RedbStore};
 use macaca_proto::ApplicationId;
+use serde::{Deserialize, Serialize};
 
 /// Types of auditable events.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AuditAction {
-    ToolExecuted { tool_name: String, success: bool },
-    TaskDelegated { agent: String, task_id: String },
-    PermissionDenied { tool_name: String, reason: String },
-    BudgetExceeded { spent_usd: f64, limit_usd: f64 },
-    ForkCreated { fork_id: String, target_agent: String },
-    ScheduleTriggered { schedule_id: String, schedule_name: String },
-    WorkerRestarted { agent: String, restart_count: u32 },
-    AgentStarted { agent: String },
-    AgentStopped { agent: String, reason: String },
+    ToolExecuted {
+        tool_name: String,
+        success: bool,
+    },
+    TaskDelegated {
+        agent: String,
+        task_id: String,
+    },
+    PermissionDenied {
+        tool_name: String,
+        reason: String,
+    },
+    BudgetExceeded {
+        spent_usd: f64,
+        limit_usd: f64,
+    },
+    ForkCreated {
+        fork_id: String,
+        target_agent: String,
+    },
+    ScheduleTriggered {
+        schedule_id: String,
+        schedule_name: String,
+    },
+    WorkerRestarted {
+        agent: String,
+        restart_count: u32,
+    },
+    AgentStarted {
+        agent: String,
+    },
+    AgentStopped {
+        agent: String,
+        reason: String,
+    },
 }
 
 /// A single audit event.
@@ -150,7 +176,11 @@ impl AuditLogger {
     /// Count total audit events for an application.
     pub async fn count(&self, app_id: &ApplicationId) -> usize {
         let prefix = Self::app_prefix(app_id);
-        self.store.list_keys(&prefix).await.unwrap_or_default().len()
+        self.store
+            .list_keys(&prefix)
+            .await
+            .unwrap_or_default()
+            .len()
     }
 }
 
@@ -179,21 +209,29 @@ mod tests {
             .record(AuditEvent::new(
                 app_id,
                 "agent-a",
-                AuditAction::AgentStarted { agent: "agent-a".into() },
+                AuditAction::AgentStarted {
+                    agent: "agent-a".into(),
+                },
             ))
             .await;
         logger
             .record(AuditEvent::new(
                 app_id,
                 "agent-b",
-                AuditAction::ToolExecuted { tool_name: "shell".into(), success: true },
+                AuditAction::ToolExecuted {
+                    tool_name: "shell".into(),
+                    success: true,
+                },
             ))
             .await;
         logger
             .record(AuditEvent::new(
                 app_id,
                 "agent-c",
-                AuditAction::AgentStopped { agent: "agent-c".into(), reason: "done".into() },
+                AuditAction::AgentStopped {
+                    agent: "agent-c".into(),
+                    reason: "done".into(),
+                },
             ))
             .await;
 
@@ -214,7 +252,10 @@ mod tests {
                 .record(AuditEvent::new(
                     app_id,
                     "agent-x",
-                    AuditAction::ToolExecuted { tool_name: "read".into(), success: true },
+                    AuditAction::ToolExecuted {
+                        tool_name: "read".into(),
+                        success: true,
+                    },
                 ))
                 .await;
         }
@@ -222,7 +263,10 @@ mod tests {
             .record(AuditEvent::new(
                 app_id,
                 "agent-y",
-                AuditAction::ToolExecuted { tool_name: "write".into(), success: false },
+                AuditAction::ToolExecuted {
+                    tool_name: "write".into(),
+                    success: false,
+                },
             ))
             .await;
 
@@ -253,7 +297,9 @@ mod tests {
         let mut old_event = AuditEvent::new(
             app_id,
             "agent-a",
-            AuditAction::AgentStarted { agent: "agent-a".into() },
+            AuditAction::AgentStarted {
+                agent: "agent-a".into(),
+            },
         );
         old_event.timestamp = now - Duration::hours(2);
         logger.record(old_event).await;
@@ -263,7 +309,9 @@ mod tests {
             .record(AuditEvent::new(
                 app_id,
                 "agent-a",
-                AuditAction::AgentStarted { agent: "agent-a".into() },
+                AuditAction::AgentStarted {
+                    agent: "agent-a".into(),
+                },
             ))
             .await;
 
@@ -294,7 +342,10 @@ mod tests {
                 .record(AuditEvent::new(
                     app_id,
                     "agent-a",
-                    AuditAction::WorkerRestarted { agent: "agent-a".into(), restart_count: i },
+                    AuditAction::WorkerRestarted {
+                        agent: "agent-a".into(),
+                        restart_count: i,
+                    },
                 ))
                 .await;
         }
@@ -326,10 +377,22 @@ mod tests {
         let app2 = ApplicationId::new();
 
         logger
-            .record(AuditEvent::new(app1, "agent-a", AuditAction::AgentStarted { agent: "agent-a".into() }))
+            .record(AuditEvent::new(
+                app1,
+                "agent-a",
+                AuditAction::AgentStarted {
+                    agent: "agent-a".into(),
+                },
+            ))
             .await;
         logger
-            .record(AuditEvent::new(app2, "agent-b", AuditAction::AgentStarted { agent: "agent-b".into() }))
+            .record(AuditEvent::new(
+                app2,
+                "agent-b",
+                AuditAction::AgentStarted {
+                    agent: "agent-b".into(),
+                },
+            ))
             .await;
 
         assert_eq!(logger.count(&app1).await, 1);

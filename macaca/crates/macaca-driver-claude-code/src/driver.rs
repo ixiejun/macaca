@@ -9,11 +9,13 @@ use async_trait::async_trait;
 use tokio::sync::RwLock;
 
 use macaca_driver::driver::{DriverManifest, DriverType, SoftwareDriver};
-use macaca_proto::{MacacaResult, DriverId};
+use macaca_proto::{DriverId, MacacaResult};
 use macaca_tools::Tool;
 
 use crate::config::ClaudeCodeConfig;
-use crate::tools::{ClaudeCodeExecuteTool, ClaudeCodeResumeTool, ClaudeCodeStatusTool, SharedConfig};
+use crate::tools::{
+    ClaudeCodeExecuteTool, ClaudeCodeResumeTool, ClaudeCodeStatusTool, SharedConfig,
+};
 
 /// A software driver that controls Claude Code CLI for autonomous programming.
 ///

@@ -3,8 +3,8 @@
 use std::path::Path;
 
 use macaca_proto::{MacacaError, MacacaResult};
-use macaca_sdk::AgentConfig;
 use macaca_sdk::config::CapabilityDef;
+use macaca_sdk::AgentConfig;
 
 use crate::model::{AgentSource, AppLayer, AppManifest, InlineAgentConfig};
 
@@ -157,6 +157,7 @@ layer: L2Wasm
             ui_type: None,
             agents: vec![],
             llm_config: None,
+            entry_agent: None,
             entrypoint: None,
             workflows: None,
             resources: None,
@@ -176,6 +177,7 @@ layer: L2Wasm
             ui_type: None,
             agents: vec![],
             llm_config: None,
+            entry_agent: None,
             entrypoint: None,
             workflows: None,
             resources: None,
@@ -207,6 +209,7 @@ layer: L2Wasm
                 temperature: None,
             })],
             llm_config: None,
+            entry_agent: None,
             entrypoint: None,
             workflows: None,
             resources: None,
@@ -241,6 +244,7 @@ capabilities:
             ui_type: None,
             agents: vec![AgentSource::FilePath("agent.yaml".into())],
             llm_config: None,
+            entry_agent: None,
             entrypoint: None,
             workflows: None,
             resources: None,

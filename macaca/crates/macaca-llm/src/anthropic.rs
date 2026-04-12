@@ -1,10 +1,10 @@
+use crate::provider::LlmProvider;
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
 use macaca_proto::{
     error::{MacacaError, MacacaResult},
     types::{LlmMessage, LlmOptions, LlmResponse, LlmRole, TokenUsage, ToolCall},
 };
-use crate::provider::LlmProvider;
+use serde::{Deserialize, Serialize};
 
 const DEFAULT_BASE_URL: &str = "https://api.anthropic.com/v1";
 const ANTHROPIC_VERSION: &str = "2023-06-01";
@@ -26,7 +26,10 @@ impl AnthropicProvider {
         Self {
             api_key: api_key.into(),
             base_url: DEFAULT_BASE_URL.to_owned(),
-            client: reqwest::Client::builder().no_proxy().build().unwrap_or_default(),
+            client: reqwest::Client::builder()
+                .no_proxy()
+                .build()
+                .unwrap_or_default(),
         }
     }
 
@@ -73,9 +76,16 @@ enum AnthropicContentBlock {
     #[serde(rename = "text")]
     Text { text: String },
     #[serde(rename = "tool_use")]
-    ToolUse { id: String, name: String, input: serde_json::Value },
+    ToolUse {
+        id: String,
+        name: String,
+        input: serde_json::Value,
+    },
     #[serde(rename = "tool_result")]
-    ToolResult { tool_use_id: String, content: String },
+    ToolResult {
+        tool_use_id: String,
+        content: String,
+    },
 }
 
 #[derive(Serialize)]
@@ -99,7 +109,11 @@ enum ResponseContentBlock {
     #[serde(rename = "text")]
     Text { text: String },
     #[serde(rename = "tool_use")]
-    ToolUse { id: String, name: String, input: serde_json::Value },
+    ToolUse {
+        id: String,
+        name: String,
+        input: serde_json::Value,
+    },
 }
 
 #[derive(Deserialize)]
@@ -129,7 +143,9 @@ fn convert_messages(messages: &[LlmMessage]) -> (Option<String>, Vec<AnthropicMe
                 if let Some(ref calls) = m.tool_calls {
                     let mut blocks: Vec<AnthropicContentBlock> = Vec::new();
                     if !m.content.is_empty() {
-                        blocks.push(AnthropicContentBlock::Text { text: m.content.clone() });
+                        blocks.push(AnthropicContentBlock::Text {
+                            text: m.content.clone(),
+                        });
                     }
                     for tc in calls {
                         blocks.push(AnthropicContentBlock::ToolUse {
@@ -153,12 +169,10 @@ fn convert_messages(messages: &[LlmMessage]) -> (Option<String>, Vec<AnthropicMe
                 let tool_use_id = m.tool_call_id.clone().unwrap_or_default();
                 result.push(AnthropicMessage {
                     role: "user".into(),
-                    content: AnthropicContent::Blocks(vec![
-                        AnthropicContentBlock::ToolResult {
-                            tool_use_id,
-                            content: m.content.clone(),
-                        },
-                    ]),
+                    content: AnthropicContent::Blocks(vec![AnthropicContentBlock::ToolResult {
+                        tool_use_id,
+                        content: m.content.clone(),
+                    }]),
                 });
             }
         }
@@ -234,7 +248,11 @@ impl LlmProvider for AnthropicProvider {
             match block {
                 ResponseContentBlock::Text { text } => text_parts.push(text),
                 ResponseContentBlock::ToolUse { id, name, input } => {
-                    tool_calls.push(ToolCall { id, name, arguments: input });
+                    tool_calls.push(ToolCall {
+                        id,
+                        name,
+                        arguments: input,
+                    });
                 }
             }
         }
@@ -242,7 +260,11 @@ impl LlmProvider for AnthropicProvider {
         let content = text_parts.join("");
         let finish_reason = resp.stop_reason.unwrap_or_else(|| "end_turn".into());
         let total = resp.usage.input_tokens + resp.usage.output_tokens;
-        let tool_calls_opt = if tool_calls.is_empty() { None } else { Some(tool_calls) };
+        let tool_calls_opt = if tool_calls.is_empty() {
+            None
+        } else {
+            Some(tool_calls)
+        };
 
         Ok(LlmResponse {
             content,

@@ -1,5 +1,5 @@
-use std::sync::{Arc, Mutex};
 use macaca_proto::types::TokenUsage;
+use std::sync::{Arc, Mutex};
 
 /// Per-model pricing in USD per 1 000 tokens.
 #[derive(Debug, Clone, Copy)]
@@ -20,20 +20,41 @@ impl ModelPricing {
 pub fn default_pricing(model: &str) -> ModelPricing {
     // Strip version suffixes like "-20241022" for lookup simplicity.
     if model.starts_with("gpt-4o") {
-        ModelPricing { prompt_per_1k: 0.005, completion_per_1k: 0.015 }
+        ModelPricing {
+            prompt_per_1k: 0.005,
+            completion_per_1k: 0.015,
+        }
     } else if model.starts_with("gpt-4-turbo") || model.starts_with("gpt-4") {
-        ModelPricing { prompt_per_1k: 0.01, completion_per_1k: 0.03 }
+        ModelPricing {
+            prompt_per_1k: 0.01,
+            completion_per_1k: 0.03,
+        }
     } else if model.starts_with("gpt-3.5") {
-        ModelPricing { prompt_per_1k: 0.0005, completion_per_1k: 0.0015 }
+        ModelPricing {
+            prompt_per_1k: 0.0005,
+            completion_per_1k: 0.0015,
+        }
     } else if model.contains("claude-3-5-sonnet") {
-        ModelPricing { prompt_per_1k: 0.003, completion_per_1k: 0.015 }
+        ModelPricing {
+            prompt_per_1k: 0.003,
+            completion_per_1k: 0.015,
+        }
     } else if model.contains("claude-3-opus") {
-        ModelPricing { prompt_per_1k: 0.015, completion_per_1k: 0.075 }
+        ModelPricing {
+            prompt_per_1k: 0.015,
+            completion_per_1k: 0.075,
+        }
     } else if model.contains("claude-3") {
-        ModelPricing { prompt_per_1k: 0.00025, completion_per_1k: 0.00125 }
+        ModelPricing {
+            prompt_per_1k: 0.00025,
+            completion_per_1k: 0.00125,
+        }
     } else {
         // Unknown model — assume zero cost rather than panicking.
-        ModelPricing { prompt_per_1k: 0.0, completion_per_1k: 0.0 }
+        ModelPricing {
+            prompt_per_1k: 0.0,
+            completion_per_1k: 0.0,
+        }
     }
 }
 
@@ -71,23 +92,38 @@ impl CostTracker {
     }
 
     pub fn total_prompt_tokens(&self) -> u64 {
-        self.inner.lock().expect("CostTracker mutex poisoned").total_prompt_tokens
+        self.inner
+            .lock()
+            .expect("CostTracker mutex poisoned")
+            .total_prompt_tokens
     }
 
     pub fn total_completion_tokens(&self) -> u64 {
-        self.inner.lock().expect("CostTracker mutex poisoned").total_completion_tokens
+        self.inner
+            .lock()
+            .expect("CostTracker mutex poisoned")
+            .total_completion_tokens
     }
 
     pub fn total_tokens(&self) -> u64 {
-        self.inner.lock().expect("CostTracker mutex poisoned").total_tokens
+        self.inner
+            .lock()
+            .expect("CostTracker mutex poisoned")
+            .total_tokens
     }
 
     pub fn total_cost_usd(&self) -> f64 {
-        self.inner.lock().expect("CostTracker mutex poisoned").total_cost_usd
+        self.inner
+            .lock()
+            .expect("CostTracker mutex poisoned")
+            .total_cost_usd
     }
 
     pub fn request_count(&self) -> u64 {
-        self.inner.lock().expect("CostTracker mutex poisoned").request_count
+        self.inner
+            .lock()
+            .expect("CostTracker mutex poisoned")
+            .request_count
     }
 
     /// Returns `true` if the accumulated cost exceeds `max_usd`.
@@ -112,7 +148,11 @@ mod tests {
     use super::*;
 
     fn usage(p: u32, c: u32) -> TokenUsage {
-        TokenUsage { prompt_tokens: p, completion_tokens: c, total_tokens: p + c }
+        TokenUsage {
+            prompt_tokens: p,
+            completion_tokens: c,
+            total_tokens: p + c,
+        }
     }
 
     #[test]

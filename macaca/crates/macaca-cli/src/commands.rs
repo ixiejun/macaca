@@ -5,13 +5,13 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use tracing::info;
 
+use macaca_gateway::{DefaultEventHandler, DiscordAdapter, Gateway, TelegramAdapter};
 use macaca_kernel::Kernel;
 use macaca_llm::LlmProvider;
-use macaca_proto::config::{MacacaConfig, KernelConfig};
+use macaca_proto::config::{KernelConfig, MacacaConfig};
 use macaca_proto::error::MacacaResult;
 use macaca_proto::types::{LlmMessage, LlmOptions, LlmResponse, TokenUsage};
 use macaca_tools::DefaultToolSet;
-use macaca_gateway::{DefaultEventHandler, DiscordAdapter, Gateway, TelegramAdapter};
 
 /// A no-op LLM provider used when no real provider is configured.
 ///
@@ -144,10 +144,16 @@ pub async fn show_status() -> MacacaResult<()> {
 
     if config.gateway.enabled {
         if let Some(ref tg) = config.gateway.telegram {
-            println!("  Telegram:      {}", if tg.enabled { "enabled" } else { "disabled" });
+            println!(
+                "  Telegram:      {}",
+                if tg.enabled { "enabled" } else { "disabled" }
+            );
         }
         if let Some(ref dc) = config.gateway.discord {
-            println!("  Discord:       {}", if dc.enabled { "enabled" } else { "disabled" });
+            println!(
+                "  Discord:       {}",
+                if dc.enabled { "enabled" } else { "disabled" }
+            );
         }
     }
 

@@ -4,12 +4,11 @@
 //! executes the requested tools, feeds results back to the LLM, and repeats
 //! until the LLM produces a final (non-tool-call) response or a safety limit is hit.
 
-use std::sync::Arc;
 use std::time::Duration;
 
 use macaca_llm::LlmProvider;
 use macaca_proto::{
-    AgentExecutionEvent, AgentId, MacacaError, MacacaResult, LlmMessage, LlmOptions, Permission,
+    AgentExecutionEvent, AgentId, LlmMessage, LlmOptions, MacacaError, MacacaResult, Permission,
     TokenUsage, ToolCall,
 };
 use macaca_tools::{ToolSet, TraceEvent};
@@ -51,6 +50,14 @@ pub struct LoopResult {
     pub messages: Vec<LlmMessage>,
 }
 
+/// Result of a single iteration of the agentic loop.
+enum IterationResult {
+    /// Tools were executed; caller should continue the loop.
+    ToolsExecuted,
+    /// LLM produced a final response (no tool calls).
+    FinalResponse { content: String },
+}
+
 /// The agentic execution loop.
 ///
 /// Drives the LLM → tool → LLM cycle until the model produces a final
@@ -62,6 +69,154 @@ pub struct AgenticLoop {
 impl AgenticLoop {
     pub fn new(config: RuntimeConfig) -> Self {
         Self { config }
+    }
+
+    /// Core single-iteration logic shared by all loop variants.
+    ///
+    /// Handles LLM call, tool execution, event emission, and loop detection.
+    /// Returns `IterationResult` so callers can decide whether to continue.
+    #[allow(clippy::too_many_arguments)]
+    async fn run_iteration(
+        &self,
+        agent_id: &AgentId,
+        llm: &dyn LlmProvider,
+        tools: &dyn ToolSet,
+        messages: &mut Vec<LlmMessage>,
+        options_with_tools: &LlmOptions,
+        total_usage: &mut TokenUsage,
+        iteration: usize,
+        loop_detector: &mut LoopDetector,
+        ctx_manager: &ContextWindowManager,
+        permission: &Permission,
+        permission_checker: Option<&dyn PermissionChecker>,
+        event_tx: Option<&mpsc::Sender<AgentExecutionEvent>>,
+    ) -> MacacaResult<IterationResult> {
+        // Emit thinking event
+        if let Some(tx) = event_tx {
+            let _ = tx.send(AgentExecutionEvent::thinking(iteration)).await;
+        }
+
+        debug!(iteration, "Sending request to LLM");
+
+        // Call LLM (trim context window if needed; internal history stays intact)
+        let trimmed = ctx_manager.trim_if_needed(messages.clone());
+        let response = llm.chat(trimmed, options_with_tools).await?;
+        accumulate_usage(total_usage, &response.usage);
+
+        // Emit assistant event if there's content
+        if !response.content.is_empty() {
+            if let Some(tx) = event_tx {
+                let _ = tx
+                    .send(AgentExecutionEvent::assistant(response.content.clone()))
+                    .await;
+            }
+        }
+
+        // Check for tool calls
+        let tool_calls = response.tool_calls.clone().unwrap_or_default();
+
+        // Append assistant message (with or without tool_calls)
+        if tool_calls.is_empty() {
+            messages.push(LlmMessage::assistant(response.content.clone()));
+        } else {
+            messages.push(LlmMessage::assistant_with_tool_calls(
+                response.content.clone(),
+                tool_calls.clone(),
+            ));
+        }
+
+        if tool_calls.is_empty() {
+            // No tool calls — the model produced a final response.
+            debug!(iteration, "LLM returned final response");
+            return Ok(IterationResult::FinalResponse {
+                content: response.content,
+            });
+        }
+
+        // Execute each tool call
+        debug!(iteration, count = tool_calls.len(), "Executing tool calls");
+
+        for tc in &tool_calls {
+            let args_str =
+                serde_json::to_string(&tc.arguments).unwrap_or_else(|_| tc.arguments.to_string());
+
+            match loop_detector.record_tool_call(&tc.name, &args_str) {
+                LoopDetectorAction::Continue => {}
+                LoopDetectorAction::Warn(msg) => {
+                    warn!(msg = %msg, "Loop detector warning");
+                    messages.push(LlmMessage::system(&msg));
+                }
+                LoopDetectorAction::Terminate(msg) => {
+                    error!(msg = %msg, "Loop detector terminated loop");
+                    // Emit completed(false) event on termination
+                    if let Some(tx) = event_tx {
+                        let _ = tx
+                            .send(AgentExecutionEvent::completed(false, Some(msg)))
+                            .await;
+                    }
+                    let last_content = messages
+                        .iter()
+                        .rev()
+                        .find(|m| m.role == macaca_proto::LlmRole::Assistant)
+                        .map(|m| m.content.clone())
+                        .unwrap_or_default();
+                    // Signal callers to stop by returning a FinalResponse with the last content
+                    return Ok(IterationResult::FinalResponse {
+                        content: last_content,
+                    });
+                }
+            }
+
+            // Emit tool_call event
+            if let Some(tx) = event_tx {
+                let _ = tx
+                    .send(AgentExecutionEvent::tool_call_with_id(
+                        tc.name.clone(),
+                        tc.arguments.clone(),
+                        tc.id.clone(),
+                    ))
+                    .await;
+            }
+
+            // Execute tool — use events variant when event_tx is present
+            let tool_result = if event_tx.is_some() {
+                self.execute_tool_call_with_events(
+                    agent_id,
+                    tools,
+                    tc,
+                    permission,
+                    permission_checker,
+                    event_tx,
+                )
+                .await
+            } else {
+                self.execute_tool_call(agent_id, tools, tc, permission, permission_checker)
+                    .await
+            };
+
+            let (result_value, is_error) = match tool_result {
+                Ok(value) => {
+                    let s = serde_json::to_string(&value).unwrap_or_else(|_| value.to_string());
+                    (s, false)
+                }
+                Err(e) => (format!("Error: {e}"), true),
+            };
+
+            // Emit tool_result event
+            if let Some(tx) = event_tx {
+                let _ = tx
+                    .send(AgentExecutionEvent::tool_result_with_error(
+                        tc.name.clone(),
+                        result_value.clone(),
+                        is_error,
+                    ))
+                    .await;
+            }
+
+            messages.push(LlmMessage::tool_result(&tc.id, result_value));
+        }
+
+        Ok(IterationResult::ToolsExecuted)
     }
 
     /// Run the agentic loop.
@@ -91,7 +246,6 @@ impl AgenticLoop {
             completion_tokens: 0,
             total_tokens: 0,
         };
-        let mut iterations = 0;
         let mut loop_detector = LoopDetector::new(LoopDetectorConfig::default());
         let ctx_manager = ContextWindowManager::new(ContextWindowConfig::default());
 
@@ -105,6 +259,7 @@ impl AgenticLoop {
             opts
         };
 
+        let mut iterations = 0;
         loop {
             iterations += 1;
 
@@ -114,14 +269,12 @@ impl AgenticLoop {
                     max = self.config.max_iterations,
                     "Agentic loop hit max iterations — forcing stop"
                 );
-                // Return accumulated content from the last assistant message.
                 let last_content = messages
                     .iter()
                     .rev()
                     .find(|m| m.role == macaca_proto::LlmRole::Assistant)
                     .map(|m| m.content.clone())
                     .unwrap_or_default();
-
                 return Ok(LoopResult {
                     content: last_content,
                     total_usage,
@@ -130,83 +283,32 @@ impl AgenticLoop {
                 });
             }
 
-            debug!(iteration = iterations, "Sending request to LLM");
-
-            // 1. Call LLM (trim context window if needed; internal history stays intact)
-            let trimmed = ctx_manager.trim_if_needed(messages.clone());
-            let response = llm.chat(trimmed, &options_with_tools).await?;
-            accumulate_usage(&mut total_usage, &response.usage);
-
-            // 2. Check for tool calls
-            let tool_calls = response.tool_calls.clone().unwrap_or_default();
-
-            // Append the assistant message (with or without tool_calls)
-            if tool_calls.is_empty() {
-                messages.push(LlmMessage::assistant(response.content.clone()));
-            } else {
-                messages.push(LlmMessage::assistant_with_tool_calls(
-                    response.content.clone(),
-                    tool_calls.clone(),
-                ));
-            }
-
-            if tool_calls.is_empty() {
-                // No tool calls — the model produced a final response.
-                debug!(iteration = iterations, "LLM returned final response");
-                return Ok(LoopResult {
-                    content: response.content,
-                    total_usage,
+            match self
+                .run_iteration(
+                    agent_id,
+                    llm,
+                    tools,
+                    &mut messages,
+                    &options_with_tools,
+                    &mut total_usage,
                     iterations,
-                    messages,
-                });
-            }
-
-            // 3. Execute each tool call
-            debug!(
-                iteration = iterations,
-                count = tool_calls.len(),
-                "Executing tool calls"
-            );
-
-            for tc in &tool_calls {
-                let args_str = serde_json::to_string(&tc.arguments)
-                    .unwrap_or_else(|_| tc.arguments.to_string());
-
-                match loop_detector.record_tool_call(&tc.name, &args_str) {
-                    LoopDetectorAction::Continue => {}
-                    LoopDetectorAction::Warn(msg) => {
-                        warn!(msg = %msg, "Loop detector warning");
-                        messages.push(LlmMessage::system(&msg));
-                    }
-                    LoopDetectorAction::Terminate(msg) => {
-                        error!(msg = %msg, "Loop detector terminated loop");
-                        let last_content = messages
-                            .iter()
-                            .rev()
-                            .find(|m| m.role == macaca_proto::LlmRole::Assistant)
-                            .map(|m| m.content.clone())
-                            .unwrap_or_default();
-                        return Ok(LoopResult {
-                            content: last_content,
-                            total_usage,
-                            iterations,
-                            messages,
-                        });
-                    }
+                    &mut loop_detector,
+                    &ctx_manager,
+                    permission,
+                    permission_checker,
+                    None,
+                )
+                .await?
+            {
+                IterationResult::FinalResponse { content } => {
+                    return Ok(LoopResult {
+                        content,
+                        total_usage,
+                        iterations,
+                        messages,
+                    });
                 }
-
-                let tool_result = self
-                    .execute_tool_call(agent_id, tools, tc, permission, permission_checker)
-                    .await;
-
-                let result_value = match tool_result {
-                    Ok(value) => serde_json::to_string(&value)
-                        .unwrap_or_else(|_| value.to_string()),
-                    Err(e) => format!("Error: {e}"),
-                };
-
-                // Append tool result message
-                messages.push(LlmMessage::tool_result(&tc.id, result_value));
+                IterationResult::ToolsExecuted => continue,
             }
         }
     }
@@ -227,7 +329,6 @@ impl AgenticLoop {
         event_tx: Option<mpsc::Sender<AgentExecutionEvent>>,
     ) -> MacacaResult<LoopResult> {
         let mut messages = initial_messages;
-        let mut iterations = 0;
         let mut total_usage = TokenUsage::default();
         let mut loop_detector = LoopDetector::new(LoopDetectorConfig::default());
         let ctx_manager = ContextWindowManager::new(ContextWindowConfig::default());
@@ -236,8 +337,12 @@ impl AgenticLoop {
             ..options.clone()
         };
 
-        info!(max_iterations = self.config.max_iterations, "Starting agentic loop with events");
+        info!(
+            max_iterations = self.config.max_iterations,
+            "Starting agentic loop with events"
+        );
 
+        let mut iterations = 0;
         loop {
             iterations += 1;
             if iterations > self.config.max_iterations {
@@ -245,124 +350,40 @@ impl AgenticLoop {
                 break;
             }
 
-            // Send thinking event
-            if let Some(ref tx) = event_tx {
-                let _ = tx.send(AgentExecutionEvent::thinking(iterations)).await;
-            }
-
-            debug!(iteration = iterations, "Sending request to LLM");
-
-            // Call LLM (trim context window if needed; internal history stays intact)
-            let trimmed = ctx_manager.trim_if_needed(messages.clone());
-            let response = llm.chat(trimmed, &options_with_tools).await?;
-            accumulate_usage(&mut total_usage, &response.usage);
-
-            // Send assistant event if there's content
-            if !response.content.is_empty() {
-                if let Some(ref tx) = event_tx {
-                    let _ = tx.send(AgentExecutionEvent::assistant(response.content.clone())).await;
-                }
-            }
-
-            // Check for tool calls
-            let tool_calls = response.tool_calls.clone().unwrap_or_default();
-
-            // Append the assistant message
-            if tool_calls.is_empty() {
-                messages.push(LlmMessage::assistant(response.content.clone()));
-            } else {
-                messages.push(LlmMessage::assistant_with_tool_calls(
-                    response.content.clone(),
-                    tool_calls.clone(),
-                ));
-            }
-
-            if tool_calls.is_empty() {
-                // No tool calls — final response
-                debug!(iteration = iterations, "LLM returned final response");
-
-                // Send completed event
-                if let Some(ref tx) = event_tx {
-                    let _ = tx.send(AgentExecutionEvent::completed(true, None)).await;
-                }
-
-                return Ok(LoopResult {
-                    content: response.content,
-                    total_usage,
+            match self
+                .run_iteration(
+                    agent_id,
+                    llm,
+                    tools,
+                    &mut messages,
+                    &options_with_tools,
+                    &mut total_usage,
                     iterations,
-                    messages,
-                });
-            }
-
-            // Execute each tool call
-            debug!(iteration = iterations, count = tool_calls.len(), "Executing tool calls");
-
-            for tc in &tool_calls {
-                let args_str = serde_json::to_string(&tc.arguments)
-                    .unwrap_or_else(|_| tc.arguments.to_string());
-
-                match loop_detector.record_tool_call(&tc.name, &args_str) {
-                    LoopDetectorAction::Continue => {}
-                    LoopDetectorAction::Warn(msg) => {
-                        warn!(msg = %msg, "Loop detector warning");
-                        messages.push(LlmMessage::system(&msg));
+                    &mut loop_detector,
+                    &ctx_manager,
+                    permission,
+                    permission_checker,
+                    event_tx.as_ref(),
+                )
+                .await?
+            {
+                IterationResult::FinalResponse { content } => {
+                    // Emit completed(true) on normal finish
+                    if let Some(ref tx) = event_tx {
+                        let _ = tx.send(AgentExecutionEvent::completed(true, None)).await;
                     }
-                    LoopDetectorAction::Terminate(msg) => {
-                        error!(msg = %msg, "Loop detector terminated loop");
-                        let last_content = messages
-                            .iter()
-                            .rev()
-                            .find(|m| m.role == macaca_proto::LlmRole::Assistant)
-                            .map(|m| m.content.clone())
-                            .unwrap_or_default();
-                        if let Some(ref tx) = event_tx {
-                            let _ = tx.send(AgentExecutionEvent::completed(false, Some(msg))).await;
-                        }
-                        return Ok(LoopResult {
-                            content: last_content,
-                            total_usage,
-                            iterations,
-                            messages,
-                        });
-                    }
+                    return Ok(LoopResult {
+                        content,
+                        total_usage,
+                        iterations,
+                        messages,
+                    });
                 }
-
-                // Send tool call event
-                if let Some(ref tx) = event_tx {
-                    let _ = tx.send(AgentExecutionEvent::tool_call_with_id(
-                        tc.name.clone(),
-                        tc.arguments.clone(),
-                        tc.id.clone(),
-                    )).await;
-                }
-
-                let tool_result = self
-                    .execute_tool_call_with_events(agent_id, tools, tc, permission, permission_checker, event_tx.as_ref())
-                    .await;
-
-                let (result_value, is_error) = match tool_result {
-                    Ok(value) => {
-                        let s = serde_json::to_string(&value).unwrap_or_else(|_| value.to_string());
-                        (s, false)
-                    }
-                    Err(e) => (format!("Error: {e}"), true),
-                };
-
-                // Send tool result event
-                if let Some(ref tx) = event_tx {
-                    let _ = tx.send(AgentExecutionEvent::tool_result_with_error(
-                        tc.name.clone(),
-                        result_value.clone(),
-                        is_error,
-                    )).await;
-                }
-
-                // Append tool result message
-                messages.push(LlmMessage::tool_result(&tc.id, result_value));
+                IterationResult::ToolsExecuted => continue,
             }
         }
 
-        // Iteration limit reached - extract last assistant content
+        // Iteration limit reached — extract last assistant content
         let last_content = messages
             .iter()
             .rev()
@@ -370,7 +391,6 @@ impl AgenticLoop {
             .map(|m| m.content.clone())
             .unwrap_or_default();
 
-        // Send completed event
         if let Some(ref tx) = event_tx {
             let _ = tx.send(AgentExecutionEvent::completed(true, None)).await;
         }
@@ -409,7 +429,12 @@ impl AgenticLoop {
 
         // Permission check (includes path and network access enforcement)
         if let Some(checker) = permission_checker {
-            checker.check_tool_with_args(agent_id, permission, &tool_call.name, &tool_call.arguments)?;
+            checker.check_tool_with_args(
+                agent_id,
+                permission,
+                &tool_call.name,
+                &tool_call.arguments,
+            )?;
         }
 
         // Find tool
@@ -507,13 +532,18 @@ impl AgenticLoop {
     ) -> MacacaResult<serde_json::Value> {
         // Permission check (includes path and network access enforcement)
         if let Some(checker) = permission_checker {
-            checker.check_tool_with_args(agent_id, permission, &tool_call.name, &tool_call.arguments)?;
+            checker.check_tool_with_args(
+                agent_id,
+                permission,
+                &tool_call.name,
+                &tool_call.arguments,
+            )?;
         }
 
         // Find tool
-        let tool = tools.get_tool(&tool_call.name).ok_or_else(|| {
-            MacacaError::NotFound(format!("Tool '{}' not found", tool_call.name))
-        })?;
+        let tool = tools
+            .get_tool(&tool_call.name)
+            .ok_or_else(|| MacacaError::NotFound(format!("Tool '{}' not found", tool_call.name)))?;
 
         // Execute with timeout
         let result = tokio::time::timeout(
@@ -561,6 +591,8 @@ pub struct PausableAgenticLoop {
     inner: AgenticLoop,
     /// Signal to pause execution.
     pause_signal: StdArc<AtomicBool>,
+    /// Notifier to wake the loop when resumed (replaces 100ms polling).
+    resume_notify: StdArc<tokio::sync::Notify>,
     /// Resume reason received from hook callback.
     resume_reason: StdArc<tokio::sync::RwLock<Option<ResumeReason>>>,
 }
@@ -577,10 +609,7 @@ pub enum ResumeReason {
         output: String,
     },
     /// Resume due to delegate task failure.
-    DelegateFailed {
-        task_id: String,
-        error: String,
-    },
+    DelegateFailed { task_id: String, error: String },
     /// Resume due to timeout.
     Timeout,
 }
@@ -591,6 +620,7 @@ impl PausableAgenticLoop {
         Self {
             inner: AgenticLoop::new(config),
             pause_signal: StdArc::new(AtomicBool::new(false)),
+            resume_notify: StdArc::new(tokio::sync::Notify::new()),
             resume_reason: StdArc::new(tokio::sync::RwLock::new(None)),
         }
     }
@@ -610,6 +640,8 @@ impl PausableAgenticLoop {
         self.pause_signal.store(false, Ordering::SeqCst);
         let mut r = self.resume_reason.write().await;
         *r = Some(reason);
+        // Wake the waiting loop instead of relying on 100ms polling.
+        self.resume_notify.notify_one();
     }
 
     /// Check if paused and consume the resume reason if any.
@@ -647,22 +679,14 @@ impl PausableAgenticLoop {
         let ctx_manager = ContextWindowManager::new(ContextWindowConfig::default());
 
         loop {
-            // Check if paused and wait for resume
+            // Check for pause and wait for resume using Notify (no polling).
             if self.pause_signal.load(Ordering::SeqCst) {
                 info!(
                     agent_id = %agent_id,
                     iteration = iterations,
                     "[PAUSE] Loop paused, waiting for resume signal"
                 );
-            }
-            let mut pause_logged = false;
-            while self.pause_signal.load(Ordering::SeqCst) {
-                if !pause_logged {
-                    pause_logged = true;
-                }
-                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-            }
-            if pause_logged {
+                self.resume_notify.notified().await;
                 info!(
                     agent_id = %agent_id,
                     iteration = iterations,
@@ -670,10 +694,14 @@ impl PausableAgenticLoop {
                 );
             }
 
-            // Check for resume reason and inject it
+            // Inject resume reason as a user message if present.
             if let Some(reason) = self.check_and_consume_resume().await {
                 let resume_msg = match reason {
-                    ResumeReason::DelegateCompleted { task_id, success, output } => {
+                    ResumeReason::DelegateCompleted {
+                        task_id,
+                        success,
+                        output,
+                    } => {
                         info!(
                             agent_id = %agent_id,
                             task_id = %task_id,
@@ -681,7 +709,10 @@ impl PausableAgenticLoop {
                             output_len = output.len(),
                             "[RESUME] Delegate task completed"
                         );
-                        format!("[Delegate Task {} Completed]\nSuccess: {}\nOutput: {}", task_id, success, output)
+                        format!(
+                            "[Delegate Task {} Completed]\nSuccess: {}\nOutput: {}",
+                            task_id, success, output
+                        )
                     }
                     ResumeReason::DelegateFailed { task_id, error } => {
                         warn!(
@@ -717,113 +748,40 @@ impl PausableAgenticLoop {
                 break;
             }
 
-            // Send thinking event
-            if let Some(ref tx) = event_tx {
-                let _ = tx.send(AgentExecutionEvent::thinking(iterations)).await;
-            }
-
-            // Call LLM (trim context window if needed; internal history stays intact)
-            let trimmed = ctx_manager.trim_if_needed(messages.clone());
-            let response = llm.chat(trimmed, &options_with_tools).await?;
-            accumulate_usage(&mut total_usage, &response.usage);
-
-            // Send assistant event
-            if !response.content.is_empty() {
-                if let Some(ref tx) = event_tx {
-                    let _ = tx.send(AgentExecutionEvent::assistant(response.content.clone())).await;
-                }
-            }
-
-            // Check for tool calls
-            let tool_calls = response.tool_calls.clone().unwrap_or_default();
-
-            // Append the assistant message
-            if tool_calls.is_empty() {
-                messages.push(LlmMessage::assistant(response.content.clone()));
-            } else {
-                messages.push(LlmMessage::assistant_with_tool_calls(
-                    response.content.clone(),
-                    tool_calls.clone(),
-                ));
-            }
-
-            if tool_calls.is_empty() {
-                // No tool calls - final response
-                if let Some(ref tx) = event_tx {
-                    let _ = tx.send(AgentExecutionEvent::completed(true, None)).await;
-                }
-
-                return Ok(LoopResult {
-                    content: response.content,
-                    total_usage,
+            match self
+                .inner
+                .run_iteration(
+                    agent_id,
+                    llm,
+                    tools,
+                    &mut messages,
+                    &options_with_tools,
+                    &mut total_usage,
                     iterations,
-                    messages,
-                });
-            }
-
-            // Execute tool calls
-            for tc in &tool_calls {
-                let args_str = serde_json::to_string(&tc.arguments)
-                    .unwrap_or_else(|_| tc.arguments.to_string());
-
-                match loop_detector.record_tool_call(&tc.name, &args_str) {
-                    LoopDetectorAction::Continue => {}
-                    LoopDetectorAction::Warn(msg) => {
-                        warn!(msg = %msg, "Loop detector warning");
-                        messages.push(LlmMessage::system(&msg));
+                    &mut loop_detector,
+                    &ctx_manager,
+                    permission,
+                    permission_checker,
+                    event_tx.as_ref(),
+                )
+                .await?
+            {
+                IterationResult::FinalResponse { content } => {
+                    if let Some(ref tx) = event_tx {
+                        let _ = tx.send(AgentExecutionEvent::completed(true, None)).await;
                     }
-                    LoopDetectorAction::Terminate(msg) => {
-                        error!(msg = %msg, "Loop detector terminated loop");
-                        let last_content = messages
-                            .iter()
-                            .rev()
-                            .find(|m| m.role == macaca_proto::LlmRole::Assistant)
-                            .map(|m| m.content.clone())
-                            .unwrap_or_default();
-                        if let Some(ref tx) = event_tx {
-                            let _ = tx.send(AgentExecutionEvent::completed(false, Some(msg))).await;
-                        }
-                        return Ok(LoopResult {
-                            content: last_content,
-                            total_usage,
-                            iterations,
-                            messages,
-                        });
-                    }
+                    return Ok(LoopResult {
+                        content,
+                        total_usage,
+                        iterations,
+                        messages,
+                    });
                 }
-
-                if let Some(ref tx) = event_tx {
-                    let _ = tx.send(AgentExecutionEvent::tool_call_with_id(
-                        tc.name.clone(),
-                        tc.arguments.clone(),
-                        tc.id.clone(),
-                    )).await;
-                }
-
-                let tool_result = self.inner.execute_tool_call(
-                    agent_id, tools, tc, permission, permission_checker,
-                ).await;
-
-                let result_value = match tool_result {
-                    Ok(value) => serde_json::to_string(&value)
-                        .unwrap_or_else(|_| value.to_string()),
-                    Err(e) => format!("Error: {e}"),
-                };
-
-                if let Some(ref tx) = event_tx {
-                    let is_error = result_value.contains("error") || result_value.contains("Error") || result_value.contains("failed");
-                    let _ = tx.send(AgentExecutionEvent::tool_result_with_error(
-                        tc.name.clone(),
-                        result_value.clone(),
-                        is_error,
-                    )).await;
-                }
-
-                messages.push(LlmMessage::tool_result(&tc.id, result_value));
+                IterationResult::ToolsExecuted => continue,
             }
         }
 
-        // Return last assistant content
+        // Iteration limit reached — return last assistant content.
         let last_content = messages
             .iter()
             .rev()
@@ -849,8 +807,8 @@ impl PausableAgenticLoop {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use macaca_proto::LlmResponse;
     use async_trait::async_trait;
+    use macaca_proto::LlmResponse;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
 
@@ -1045,7 +1003,7 @@ mod tests {
         assert_eq!(result.content, "Done! The command output was: hello");
         assert_eq!(result.iterations, 2);
         assert_eq!(result.total_usage.total_tokens, 45); // 15 + 30
-        // Messages should contain: system, user, assistant(tool_call), tool_result, assistant(final)
+                                                         // Messages should contain: system, user, assistant(tool_call), tool_result, assistant(final)
         assert_eq!(result.messages.len(), 5);
     }
 

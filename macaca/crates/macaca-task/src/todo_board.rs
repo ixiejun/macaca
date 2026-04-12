@@ -7,7 +7,9 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use chrono::Utc;
-use macaca_proto::{ApplicationId, TaskId, TodoGoal, TodoGoalStatus, TodoItem, TodoReviewResult, TodoStatus};
+use macaca_proto::{
+    ApplicationId, TaskId, TodoGoal, TodoGoalStatus, TodoItem, TodoReviewResult, TodoStatus,
+};
 
 use crate::todo_store::TodoStore;
 
@@ -42,9 +44,12 @@ pub fn detect_cycles(tasks: &[TodoItem]) -> Result<(), String> {
     }
 
     // Build adjacency: task -> its dependencies (only within this batch)
-    let deps_map: HashMap<TaskId, Vec<TaskId>> = tasks.iter()
+    let deps_map: HashMap<TaskId, Vec<TaskId>> = tasks
+        .iter()
         .map(|t| {
-            let relevant_deps: Vec<TaskId> = t.depends_on.iter()
+            let relevant_deps: Vec<TaskId> = t
+                .depends_on
+                .iter()
                 .filter(|d| id_set.contains(d))
                 .copied()
                 .collect();
@@ -93,34 +98,58 @@ impl TaskBoard {
 
     /// Claim the next task in sequence order. Returns None if no tasks available
     /// or if the lowest-sequence task is not yet claimable (Blocked/InProgress/Assigned).
+    /// Sequential ordering is enforced PER SESSION — different sessions are independent.
     /// Atomically transitions Pending → Assigned.
     pub async fn claim_next(&self) -> Option<TodoItem> {
-        let mut all = self
+        let all = self
             .store
             .list_agent_todos(&self.app_id, &self.session_id, &self.agent_name)
             .await;
 
-        // Sort by sequence_number ascending (lowest first)
-        all.sort_by_key(|t| t.sequence_number);
+        // Group tasks by session_id, then apply sequential logic per session
+        let mut by_session: std::collections::BTreeMap<String, Vec<TodoItem>> =
+            std::collections::BTreeMap::new();
+        for task in all {
+            let key = task
+                .session_id
+                .clone()
+                .unwrap_or_else(|| "_global_".to_string());
+            by_session.entry(key).or_default().push(task);
+        }
 
-        // Find the first non-terminal task (strict sequential: must respect order)
-        for task in &all {
-            match task.status {
-                // Terminal states — skip, look at next in sequence
-                TodoStatus::Completed | TodoStatus::Cancelled | TodoStatus::Failed => continue,
-                // Claimable — take it
-                TodoStatus::Pending => {
-                    let mut claimed = task.clone();
-                    claimed.status = TodoStatus::Assigned;
-                    claimed.updated_at = Utc::now();
-                    self.store.save_todo(&claimed).await;
-                    return Some(claimed);
-                }
-                // Blocked or already in progress — stop, can't skip ahead
-                TodoStatus::Blocked | TodoStatus::Assigned
-                | TodoStatus::InProgress | TodoStatus::PendingReview
-                | TodoStatus::NeedsOptimization => {
-                    return None;
+        // Sort sessions by most recent task created_at (newest first)
+        let mut session_order: Vec<(String, Vec<TodoItem>)> = by_session.into_iter().collect();
+        session_order.sort_by(|a, b| {
+            let a_latest = a.1.iter().map(|t| t.created_at).max();
+            let b_latest = b.1.iter().map(|t| t.created_at).max();
+            b_latest.cmp(&a_latest) // newest session first
+        });
+
+        // Try each session (newest first): find the first one with a claimable task
+        for (_session, mut tasks) in session_order {
+            // Sort by sequence_number ascending within this session
+            tasks.sort_by_key(|t| t.sequence_number);
+
+            for task in &tasks {
+                match task.status {
+                    // Terminal states — skip, look at next in sequence
+                    TodoStatus::Completed | TodoStatus::Cancelled | TodoStatus::Failed => continue,
+                    // Claimable — take it
+                    TodoStatus::Pending => {
+                        let mut claimed = task.clone();
+                        claimed.status = TodoStatus::Assigned;
+                        claimed.updated_at = Utc::now();
+                        self.store.save_todo(&claimed).await;
+                        return Some(claimed);
+                    }
+                    // Blocked or already in progress — stop FOR THIS SESSION, try next session
+                    TodoStatus::Blocked
+                    | TodoStatus::Assigned
+                    | TodoStatus::InProgress
+                    | TodoStatus::PendingReview
+                    | TodoStatus::NeedsOptimization => {
+                        break; // Try next session
+                    }
                 }
             }
         }
@@ -129,7 +158,11 @@ impl TaskBoard {
 
     /// Mark a task as in-progress. Called by the agent after claiming.
     pub async fn start_task(&self, task_id: &TaskId) -> bool {
-        if let Some(mut task) = self.store.get_todo(&self.app_id, &self.session_id, &self.agent_name, task_id).await {
+        if let Some(mut task) = self
+            .store
+            .get_todo(&self.app_id, &self.session_id, &self.agent_name, task_id)
+            .await
+        {
             if task.status == TodoStatus::Assigned || task.status == TodoStatus::NeedsOptimization {
                 task.status = TodoStatus::InProgress;
                 task.attempt_count += 1;
@@ -143,7 +176,11 @@ impl TaskBoard {
 
     /// Submit a completed task for Plan Agent review.
     pub async fn submit_for_review(&self, task_id: &TaskId, summary: String) -> bool {
-        if let Some(mut task) = self.store.get_todo(&self.app_id, &self.session_id, &self.agent_name, task_id).await {
+        if let Some(mut task) = self
+            .store
+            .get_todo(&self.app_id, &self.session_id, &self.agent_name, task_id)
+            .await
+        {
             if task.status == TodoStatus::InProgress {
                 task.status = TodoStatus::PendingReview;
                 task.completion_summary = Some(summary);
@@ -157,7 +194,11 @@ impl TaskBoard {
 
     /// Update progress on the current task.
     pub async fn update_progress(&self, task_id: &TaskId, message: String) -> bool {
-        if let Some(mut task) = self.store.get_todo(&self.app_id, &self.session_id, &self.agent_name, task_id).await {
+        if let Some(mut task) = self
+            .store
+            .get_todo(&self.app_id, &self.session_id, &self.agent_name, task_id)
+            .await
+        {
             if task.status == TodoStatus::InProgress {
                 task.progress_notes.push(message);
                 task.updated_at = Utc::now();
@@ -170,7 +211,11 @@ impl TaskBoard {
 
     /// Mark a task as failed (exceeded max attempts).
     pub async fn mark_failed(&self, task_id: &TaskId, error: String) -> bool {
-        if let Some(mut task) = self.store.get_todo(&self.app_id, &self.session_id, &self.agent_name, task_id).await {
+        if let Some(mut task) = self
+            .store
+            .get_todo(&self.app_id, &self.session_id, &self.agent_name, task_id)
+            .await
+        {
             task.status = TodoStatus::Failed;
             task.review_feedback = Some(error);
             task.updated_at = Utc::now();
@@ -183,7 +228,12 @@ impl TaskBoard {
     /// Get the current in-progress task (if any).
     pub async fn current_task(&self) -> Option<TodoItem> {
         self.store
-            .list_agent_todos_by_status(&self.app_id, &self.session_id, &self.agent_name, TodoStatus::InProgress)
+            .list_agent_todos_by_status(
+                &self.app_id,
+                &self.session_id,
+                &self.agent_name,
+                TodoStatus::InProgress,
+            )
             .await
             .into_iter()
             .next()
@@ -193,7 +243,12 @@ impl TaskBoard {
     pub async fn has_pending_tasks(&self) -> bool {
         !self
             .store
-            .list_agent_todos_by_status(&self.app_id, &self.session_id, &self.agent_name, TodoStatus::Pending)
+            .list_agent_todos_by_status(
+                &self.app_id,
+                &self.session_id,
+                &self.agent_name,
+                TodoStatus::Pending,
+            )
             .await
             .is_empty()
     }
@@ -201,13 +256,20 @@ impl TaskBoard {
     /// Get tasks that need optimization (for retry).
     pub async fn needs_optimization_tasks(&self) -> Vec<TodoItem> {
         self.store
-            .list_agent_todos_by_status(&self.app_id, &self.session_id, &self.agent_name, TodoStatus::NeedsOptimization)
+            .list_agent_todos_by_status(
+                &self.app_id,
+                &self.session_id,
+                &self.agent_name,
+                TodoStatus::NeedsOptimization,
+            )
             .await
     }
 
     /// List all tasks on this board.
     pub async fn list_all(&self) -> Vec<TodoItem> {
-        self.store.list_agent_todos(&self.app_id, &self.session_id, &self.agent_name).await
+        self.store
+            .list_agent_todos(&self.app_id, &self.session_id, &self.agent_name)
+            .await
     }
 }
 
@@ -239,7 +301,16 @@ pub struct TaskSpace {
 
 impl TaskSpace {
     pub fn new(app_id: ApplicationId, session_id: Option<String>, store: Arc<TodoStore>) -> Self {
-        Self { app_id, session_id, store }
+        Self {
+            app_id,
+            session_id,
+            store,
+        }
+    }
+
+    /// Access the underlying TodoStore.
+    pub fn store(&self) -> &Arc<TodoStore> {
+        &self.store
     }
 
     /// Create a new task and assign it to an agent's board.
@@ -255,9 +326,10 @@ impl TaskSpace {
         parent_task: Option<TaskId>,
     ) -> TodoItem {
         // Auto-assign sequence_number: next after current max for this agent+session
-        let max_seq = self.store.get_max_sequence_number(
-            &self.app_id, &self.session_id, agent,
-        ).await;
+        let max_seq = self
+            .store
+            .get_max_sequence_number(&self.app_id, &self.session_id, agent)
+            .await;
         let seq = max_seq + 1;
 
         let mut item = TodoItem::new(
@@ -295,12 +367,18 @@ impl TaskSpace {
 
     /// Review a task submitted by an agent.
     /// Searches across sessions (reviewer may not know the originating session).
-    pub async fn review_task(&self, task_id: &TaskId, agent: &str, result: TodoReviewResult) -> bool {
-        // Try session-scoped lookup first, then fall back to None (global)
+    pub async fn review_task(
+        &self,
+        task_id: &TaskId,
+        agent: &str,
+        result: TodoReviewResult,
+    ) -> bool {
+        // Session-scoped lookup when this TaskSpace has a session; otherwise scan the whole app.
         let task_opt = if self.session_id.is_some() {
-            self.store.get_todo(&self.app_id, &self.session_id, agent, task_id).await
+            self.store
+                .get_todo(&self.app_id, &self.session_id, agent, task_id)
+                .await
         } else {
-            // Cross-session: scan all sessions by trying app-wide list
             self.store
                 .list_all_todos(&self.app_id)
                 .await
@@ -356,6 +434,7 @@ impl TaskSpace {
     /// Unblock tasks that depended on a now-completed task.
     /// Only unblocks if ALL dependencies are Completed.
     async fn unblock_dependents(&self, completed_id: &TaskId) {
+        // Same scope as this TaskSpace: one chat/session only when session_id is set.
         let all = self.list_all_internal().await;
         let completed_ids: Vec<TaskId> = all
             .iter()
@@ -365,7 +444,10 @@ impl TaskSpace {
 
         for mut item in all {
             if item.status == TodoStatus::Blocked && item.depends_on.contains(completed_id) {
-                let all_met = item.depends_on.iter().all(|dep| completed_ids.contains(dep));
+                let all_met = item
+                    .depends_on
+                    .iter()
+                    .all(|dep| completed_ids.contains(dep));
                 if all_met {
                     item.status = TodoStatus::Pending;
                     item.updated_at = Utc::now();
@@ -393,16 +475,21 @@ impl TaskSpace {
         if all.is_empty() {
             return true;
         }
-        all.iter().all(|t| matches!(
-            t.status,
-            TodoStatus::Completed | TodoStatus::Cancelled | TodoStatus::Failed
-        ))
+        all.iter().all(|t| {
+            matches!(
+                t.status,
+                TodoStatus::Completed | TodoStatus::Cancelled | TodoStatus::Failed
+            )
+        })
     }
 
     /// Compute progress summary.
     pub async fn overall_progress(&self) -> ProgressSummary {
         let all = self.list_all_internal().await;
-        let mut s = ProgressSummary { total: all.len(), ..Default::default() };
+        let mut s = ProgressSummary {
+            total: all.len(),
+            ..Default::default()
+        };
         for item in &all {
             match item.status {
                 TodoStatus::Pending => s.pending += 1,
@@ -457,9 +544,15 @@ impl TaskSpace {
     /// Deletes from old agent's key, updates `assigned_agent`, resets status
     /// to `Pending`, and saves under the new agent's key.
     pub async fn reassign_task(&self, task_id: &TaskId, old_agent: &str, new_agent: &str) -> bool {
-        if let Some(mut task) = self.store.get_todo(&self.app_id, &self.session_id, old_agent, task_id).await {
+        if let Some(mut task) = self
+            .store
+            .get_todo(&self.app_id, &self.session_id, old_agent, task_id)
+            .await
+        {
             // Delete from old agent's key
-            self.store.delete_todo(&self.app_id, &self.session_id, old_agent, task_id).await;
+            self.store
+                .delete_todo(&self.app_id, &self.session_id, old_agent, task_id)
+                .await;
 
             // Update agent and reset status
             task.assigned_agent = new_agent.to_string();
@@ -479,7 +572,11 @@ impl TaskSpace {
     /// Returns session-scoped todos when session_id is set, cross-session otherwise.
     async fn list_all_internal(&self) -> Vec<TodoItem> {
         match &self.session_id {
-            Some(sid) => self.store.list_all_todos_for_session(&self.app_id, sid).await,
+            Some(sid) => {
+                self.store
+                    .list_all_todos_for_session(&self.app_id, sid)
+                    .await
+            }
             None => self.store.list_all_todos(&self.app_id).await,
         }
     }
@@ -508,9 +605,42 @@ mod tests {
         let space = TaskSpace::new(app_id.clone(), None, Arc::clone(&store));
 
         // Created in order: seq 1, 2, 3 (auto-assigned)
-        space.create_and_assign("backend", "coord", "First task", "desc", vec![], 3, vec![], None).await;
-        space.create_and_assign("backend", "coord", "Second task", "desc", vec![], 9, vec![], None).await;
-        space.create_and_assign("backend", "coord", "Third task", "desc", vec![], 5, vec![], None).await;
+        space
+            .create_and_assign(
+                "backend",
+                "coord",
+                "First task",
+                "desc",
+                vec![],
+                3,
+                vec![],
+                None,
+            )
+            .await;
+        space
+            .create_and_assign(
+                "backend",
+                "coord",
+                "Second task",
+                "desc",
+                vec![],
+                9,
+                vec![],
+                None,
+            )
+            .await;
+        space
+            .create_and_assign(
+                "backend",
+                "coord",
+                "Third task",
+                "desc",
+                vec![],
+                5,
+                vec![],
+                None,
+            )
+            .await;
 
         // Should claim by sequence order, not priority
         let claimed = board.claim_next().await.unwrap();
@@ -529,14 +659,27 @@ mod tests {
         let board = TaskBoard::new(app_id.clone(), "backend", None, Arc::clone(&store));
         let space = TaskSpace::new(app_id.clone(), None, Arc::clone(&store));
 
-        let task = space.create_and_assign("backend", "coord", "Write API", "Create REST", vec!["returns 200".into()], 7, vec![], None).await;
+        let task = space
+            .create_and_assign(
+                "backend",
+                "coord",
+                "Write API",
+                "Create REST",
+                vec!["returns 200".into()],
+                7,
+                vec![],
+                None,
+            )
+            .await;
 
         // Agent claims and starts
         board.claim_next().await;
         board.start_task(&task.id).await;
 
         // Agent submits for review
-        board.submit_for_review(&task.id, "Done, all tests pass".into()).await;
+        board
+            .submit_for_review(&task.id, "Done, all tests pass".into())
+            .await;
 
         // Plan Agent reviews — pass
         let result = TodoReviewResult {
@@ -546,7 +689,10 @@ mod tests {
         };
         space.review_task(&task.id, "backend", result).await;
 
-        let updated = store.get_todo(&app_id, &None, "backend", &task.id).await.unwrap();
+        let updated = store
+            .get_todo(&app_id, &None, "backend", &task.id)
+            .await
+            .unwrap();
         assert_eq!(updated.status, TodoStatus::Completed);
     }
 
@@ -556,10 +702,23 @@ mod tests {
         let board = TaskBoard::new(app_id.clone(), "backend", None, Arc::clone(&store));
         let space = TaskSpace::new(app_id.clone(), None, Arc::clone(&store));
 
-        let task = space.create_and_assign("backend", "coord", "Fix bug", "Fix it", vec![], 5, vec![], None).await;
+        let task = space
+            .create_and_assign(
+                "backend",
+                "coord",
+                "Fix bug",
+                "Fix it",
+                vec![],
+                5,
+                vec![],
+                None,
+            )
+            .await;
         board.claim_next().await;
         board.start_task(&task.id).await;
-        board.submit_for_review(&task.id, "I think it's fixed".into()).await;
+        board
+            .submit_for_review(&task.id, "I think it's fixed".into())
+            .await;
 
         let result = TodoReviewResult {
             passed: false,
@@ -568,7 +727,10 @@ mod tests {
         };
         space.review_task(&task.id, "backend", result).await;
 
-        let updated = store.get_todo(&app_id, &None, "backend", &task.id).await.unwrap();
+        let updated = store
+            .get_todo(&app_id, &None, "backend", &task.id)
+            .await
+            .unwrap();
         assert_eq!(updated.status, TodoStatus::NeedsOptimization);
         assert!(updated.optimization_suggestions.is_some());
     }
@@ -580,22 +742,60 @@ mod tests {
         let space = TaskSpace::new(app_id.clone(), None, Arc::clone(&store));
 
         // Task A (no deps)
-        let task_a = space.create_and_assign("backend", "coord", "Task A", "First", vec![], 9, vec![], None).await;
+        let task_a = space
+            .create_and_assign(
+                "backend",
+                "coord",
+                "Task A",
+                "First",
+                vec![],
+                9,
+                vec![],
+                None,
+            )
+            .await;
         // Task B depends on A
-        let task_b = space.create_and_assign("backend", "coord", "Task B", "Second", vec![], 7, vec![task_a.id], None).await;
+        let task_b = space
+            .create_and_assign(
+                "backend",
+                "coord",
+                "Task B",
+                "Second",
+                vec![],
+                7,
+                vec![task_a.id],
+                None,
+            )
+            .await;
 
         // B should be blocked
-        let b = store.get_todo(&app_id, &None, "backend", &task_b.id).await.unwrap();
+        let b = store
+            .get_todo(&app_id, &None, "backend", &task_b.id)
+            .await
+            .unwrap();
         assert_eq!(b.status, TodoStatus::Blocked);
 
         // Complete A
         board.claim_next().await;
         board.start_task(&task_a.id).await;
         board.submit_for_review(&task_a.id, "Done".into()).await;
-        space.review_task(&task_a.id, "backend", TodoReviewResult { passed: true, feedback: "OK".into(), verified_criteria: vec![] }).await;
+        space
+            .review_task(
+                &task_a.id,
+                "backend",
+                TodoReviewResult {
+                    passed: true,
+                    feedback: "OK".into(),
+                    verified_criteria: vec![],
+                },
+            )
+            .await;
 
         // B should now be Pending
-        let b = store.get_todo(&app_id, &None, "backend", &task_b.id).await.unwrap();
+        let b = store
+            .get_todo(&app_id, &None, "backend", &task_b.id)
+            .await
+            .unwrap();
         assert_eq!(b.status, TodoStatus::Pending);
     }
 
@@ -604,9 +804,15 @@ mod tests {
         let (app_id, store) = setup().await;
         let space = TaskSpace::new(app_id.clone(), None, Arc::clone(&store));
 
-        space.create_and_assign("backend", "coord", "T1", "d", vec![], 5, vec![], None).await;
-        space.create_and_assign("backend", "coord", "T2", "d", vec![], 5, vec![], None).await;
-        space.create_and_assign("frontend", "coord", "T3", "d", vec![], 5, vec![], None).await;
+        space
+            .create_and_assign("backend", "coord", "T1", "d", vec![], 5, vec![], None)
+            .await;
+        space
+            .create_and_assign("backend", "coord", "T2", "d", vec![], 5, vec![], None)
+            .await;
+        space
+            .create_and_assign("frontend", "coord", "T3", "d", vec![], 5, vec![], None)
+            .await;
 
         let progress = space.overall_progress().await;
         assert_eq!(progress.total, 3);
@@ -639,8 +845,30 @@ mod tests {
         let space_a = TaskSpace::new(app_id.clone(), sess_a, Arc::clone(&store));
         let space_b = TaskSpace::new(app_id.clone(), sess_b, Arc::clone(&store));
 
-        space_a.create_and_assign("backend", "coord", "Task A", "desc", vec![], 5, vec![], None).await;
-        space_b.create_and_assign("backend", "coord", "Task B", "desc", vec![], 5, vec![], None).await;
+        space_a
+            .create_and_assign(
+                "backend",
+                "coord",
+                "Task A",
+                "desc",
+                vec![],
+                5,
+                vec![],
+                None,
+            )
+            .await;
+        space_b
+            .create_and_assign(
+                "backend",
+                "coord",
+                "Task B",
+                "desc",
+                vec![],
+                5,
+                vec![],
+                None,
+            )
+            .await;
 
         // Each space only sees its own session's tasks
         let a_tasks = space_a.list_all().await;

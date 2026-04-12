@@ -3,8 +3,8 @@
 //! Detects when an agent repeatedly makes identical tool calls and either warns
 //! the agent or terminates the loop to prevent infinite loops.
 
-use std::collections::VecDeque;
 use sha2::{Digest, Sha256};
+use std::collections::VecDeque;
 
 /// Configuration for the loop detector.
 #[derive(Debug, Clone)]
@@ -123,9 +123,18 @@ mod tests {
     #[test]
     fn no_loop_on_varied_calls() {
         let mut d = make_detector();
-        assert!(matches!(d.record_tool_call("read", "a"), LoopDetectorAction::Continue));
-        assert!(matches!(d.record_tool_call("write", "b"), LoopDetectorAction::Continue));
-        assert!(matches!(d.record_tool_call("read", "c"), LoopDetectorAction::Continue));
+        assert!(matches!(
+            d.record_tool_call("read", "a"),
+            LoopDetectorAction::Continue
+        ));
+        assert!(matches!(
+            d.record_tool_call("write", "b"),
+            LoopDetectorAction::Continue
+        ));
+        assert!(matches!(
+            d.record_tool_call("read", "c"),
+            LoopDetectorAction::Continue
+        ));
     }
 
     #[test]

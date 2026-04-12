@@ -49,7 +49,10 @@ impl LlmProvider for ScriptedLlm {
         _messages: Vec<LlmMessage>,
         _options: &LlmOptions,
     ) -> MacacaResult<LlmResponse> {
-        let mut q = self.queue.lock().map_err(|e| MacacaError::Llm(e.to_string()))?;
+        let mut q = self
+            .queue
+            .lock()
+            .map_err(|e| MacacaError::Llm(e.to_string()))?;
         q.pop_front()
             .ok_or_else(|| MacacaError::Llm("scripted LLM queue exhausted".into()))
     }

@@ -9,7 +9,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use tokio::sync::RwLock;
 
-use macaca_proto::{MacacaResult, DriverId};
+use macaca_proto::{DriverId, MacacaResult};
 use macaca_tools::Tool;
 
 use macaca_driver::driver::{DriverManifest, DriverType, SoftwareDriver};
@@ -62,11 +62,7 @@ impl SoftwareDriver for McpDriver {
         self.tools = tools_from_client(Arc::clone(&self.client)).await?;
 
         // Update manifest capabilities from discovered tools.
-        self.manifest.capabilities = self
-            .tools
-            .iter()
-            .map(|t| t.name().to_string())
-            .collect();
+        self.manifest.capabilities = self.tools.iter().map(|t| t.name().to_string()).collect();
 
         tracing::info!(
             driver = %self.manifest.name,
@@ -140,25 +136,25 @@ mod tests {
         {
             let mut client = driver.client.write().await;
             client.connect().await.unwrap();
-            client.register_tools(vec![
-                McpToolInfo {
-                    name: "search".into(),
-                    description: "Search the web".into(),
-                    input_schema: serde_json::json!({"type": "object"}),
-                },
-            ]);
+            client.register_tools(vec![McpToolInfo {
+                name: "search".into(),
+                description: "Search the web".into(),
+                input_schema: serde_json::json!({"type": "object"}),
+            }]);
         }
 
         // Re-initialize to pick up tools.
         // First disconnect so initialize can reconnect.
         driver.client.write().await.disconnect().await.unwrap();
-        driver.client.write().await.register_tools(vec![
-            McpToolInfo {
+        driver
+            .client
+            .write()
+            .await
+            .register_tools(vec![McpToolInfo {
                 name: "search".into(),
                 description: "Search the web".into(),
                 input_schema: serde_json::json!({"type": "object"}),
-            },
-        ]);
+            }]);
         driver.initialize().await.unwrap();
 
         assert!(driver.health_check().await.unwrap());

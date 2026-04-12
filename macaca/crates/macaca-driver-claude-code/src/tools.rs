@@ -320,16 +320,11 @@ async fn run_claude_cli(
     // Prevent "nested session" error when Agent OS itself runs inside Claude Code.
     cmd.env_remove("CLAUDECODE");
 
-    tracing::debug!(
-        claude_bin,
-        ?work_dir,
-        ?session_id,
-        "executing claude code"
-    );
+    tracing::debug!(claude_bin, ?work_dir, ?session_id, "executing claude code");
 
     let child_result = cmd.spawn();
-    let child = child_result
-        .map_err(|e| MacacaError::Agent(format!("Failed to spawn claude: {e}")))?;
+    let child =
+        child_result.map_err(|e| MacacaError::Agent(format!("Failed to spawn claude: {e}")))?;
 
     let output = tokio::time::timeout(timeout, child.wait_with_output())
         .await
@@ -410,9 +405,10 @@ async fn run_claude_cli_streaming(
         .spawn()
         .map_err(|e| MacacaError::Agent(format!("Failed to spawn claude: {e}")))?;
 
-    let stdout = child.stdout.take().ok_or_else(|| {
-        MacacaError::Agent("Failed to capture stdout from claude process".into())
-    })?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| MacacaError::Agent("Failed to capture stdout from claude process".into()))?;
 
     let mut stderr_buf = String::new();
     let mut all_stdout = String::new();
@@ -421,9 +417,11 @@ async fn run_claude_cli_streaming(
 
     // Read lines in a timeout wrapper
     let read_result = tokio::time::timeout(timeout, async {
-        while let Some(line) = lines.next_line().await.map_err(|e| {
-            MacacaError::Agent(format!("Error reading claude stdout: {e}"))
-        })? {
+        while let Some(line) = lines
+            .next_line()
+            .await
+            .map_err(|e| MacacaError::Agent(format!("Error reading claude stdout: {e}")))?
+        {
             all_stdout.push_str(&line);
             all_stdout.push('\n');
 
@@ -443,14 +441,17 @@ async fn run_claude_cli_streaming(
         Ok(Err(e)) => return Err(e),
         Err(_) => {
             let _ = child.kill().await;
-            return Err(MacacaError::Timeout("Claude Code execution timed out".into()));
+            return Err(MacacaError::Timeout(
+                "Claude Code execution timed out".into(),
+            ));
         }
     }
 
     // Wait for process to complete
-    let status = child.wait().await.map_err(|e| {
-        MacacaError::Agent(format!("Claude Code process wait error: {e}"))
-    })?;
+    let status = child
+        .wait()
+        .await
+        .map_err(|e| MacacaError::Agent(format!("Claude Code process wait error: {e}")))?;
 
     let exit_code = status.code().unwrap_or(-1);
     tracing::debug!(exit_code, "claude code finished (streaming)");
@@ -478,7 +479,9 @@ fn emit_trace_events(json: &Value, event_tx: &UnboundedSender<TraceEvent>) {
 
                         match block_type {
                             "thinking" => {
-                                if let Some(thinking) = block.get("thinking").and_then(|v| v.as_str()) {
+                                if let Some(thinking) =
+                                    block.get("thinking").and_then(|v| v.as_str())
+                                {
                                     if !thinking.is_empty() {
                                         let _ = event_tx.send(TraceEvent {
                                             event_type: "thinking".into(),
@@ -493,7 +496,8 @@ fn emit_trace_events(json: &Value, event_tx: &UnboundedSender<TraceEvent>) {
                                 }
                             }
                             "tool_use" => {
-                                let tool_name = block.get("name").and_then(|v| v.as_str()).unwrap_or("tool");
+                                let tool_name =
+                                    block.get("name").and_then(|v| v.as_str()).unwrap_or("tool");
                                 let tool_input = block.get("input").cloned();
                                 let _ = event_tx.send(TraceEvent {
                                     event_type: "tool_use".into(),
@@ -551,7 +555,10 @@ fn emit_trace_events(json: &Value, event_tx: &UnboundedSender<TraceEvent>) {
                                 })
                                 .unwrap_or("");
 
-                            let is_err = block.get("is_error").and_then(|v| v.as_bool()).unwrap_or(false);
+                            let is_err = block
+                                .get("is_error")
+                                .and_then(|v| v.as_bool())
+                                .unwrap_or(false);
 
                             let _ = event_tx.send(TraceEvent {
                                 event_type: "tool_result".into(),

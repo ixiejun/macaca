@@ -3,7 +3,8 @@ use std::collections::HashMap;
 use async_trait::async_trait;
 use tracing::debug;
 
-use macaca_proto::{AgentId, MacacaResult, MemoryEntry, MemoryId, TaskContext};
+use crate::store::MemoryQueryContext;
+use macaca_proto::{AgentId, MacacaResult, MemoryEntry, MemoryId, TaskId};
 
 use crate::embedding::MockEmbedding;
 use crate::file::FileMemory;
@@ -90,7 +91,9 @@ impl<V: VectorStore, E: EmbeddingProvider> MemoryManager<V, E> {
                     match vec_store.search(qvec, limit).await {
                         Ok(hits) => {
                             for hit in hits {
-                                if let Some(mid_str) = hit.payload.get("memory_id").and_then(|v| v.as_str()) {
+                                if let Some(mid_str) =
+                                    hit.payload.get("memory_id").and_then(|v| v.as_str())
+                                {
                                     if let Ok(uuid) = uuid::Uuid::parse_str(mid_str) {
                                         let mid = MemoryId(uuid);
                                         if !seen.contains_key(&mid) {
@@ -118,16 +121,27 @@ impl<V: VectorStore, E: EmbeddingProvider> MemoryManager<V, E> {
     }
 
     /// List entries from the file layer (persistent).
-    pub async fn list(&self, agent_id: Option<&AgentId>, limit: usize) -> MacacaResult<Vec<MemoryEntry>> {
+    pub async fn list(
+        &self,
+        agent_id: Option<&AgentId>,
+        limit: usize,
+    ) -> MacacaResult<Vec<MemoryEntry>> {
         self.file.list(agent_id, limit).await
     }
 }
 
 #[async_trait]
 impl<V: VectorStore, E: EmbeddingProvider> MemoryRetriever for MemoryManager<V, E> {
-    async fn auto_retrieve(&self, context: &TaskContext) -> MacacaResult<Vec<MemoryEntry>> {
+    async fn auto_retrieve(&self, context: &MemoryQueryContext) -> MacacaResult<Vec<MemoryEntry>> {
         // Build a composite query from description and recent history items.
-        let history_snippet = context.history.iter().rev().take(3).cloned().collect::<Vec<_>>().join(" ");
+        let history_snippet = context
+            .history
+            .iter()
+            .rev()
+            .take(3)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join(" ");
         let query = format!("{} {}", context.description, history_snippet);
         self.retrieve(query.trim(), 10).await
     }
@@ -140,8 +154,8 @@ pub type TestMemoryManager = MemoryManager<InMemoryVectorStore, MockEmbedding>;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use macaca_proto::{AgentId, MemoryLayer, MemoryId, TaskId};
     use chrono::Utc;
+    use macaca_proto::{AgentId, MemoryId, MemoryLayer, TaskId};
     use std::time::Duration;
     use tempfile::TempDir;
 
@@ -190,10 +204,12 @@ mod tests {
     async fn auto_retrieve_uses_description() {
         let dir = TempDir::new().unwrap();
         let mgr = make_manager(&dir);
-        mgr.store(make_entry("rust async programming")).await.unwrap();
+        mgr.store(make_entry("rust async programming"))
+            .await
+            .unwrap();
         mgr.store(make_entry("unrelated topic")).await.unwrap();
 
-        let ctx = TaskContext {
+        let ctx = MemoryQueryContext {
             task_id: TaskId::new(),
             description: "rust async".to_string(),
             agent_id: AgentId::new(),

@@ -10,7 +10,7 @@ use macaca_gateway::{
     DefaultEventHandler, DiscordAdapter, EventHandler, Gateway, ImAdapter, TelegramAdapter,
 };
 use macaca_proto::config::{DiscordConfig, TelegramConfig};
-use macaca_proto::{MacacaResult, GatewayEvent};
+use macaca_proto::{GatewayEvent, MacacaResult};
 
 // ---------------------------------------------------------------------------
 // Counting event handler

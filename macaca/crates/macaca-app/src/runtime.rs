@@ -35,9 +35,7 @@ impl AppRuntime {
         let path = manifest_path.as_ref();
         let manifest = AppLoader::load_manifest(path)?;
 
-        let base_dir = path
-            .parent()
-            .unwrap_or_else(|| Path::new("."));
+        let base_dir = path.parent().unwrap_or_else(|| Path::new("."));
 
         self.start_app(manifest, base_dir, kernel).await
     }
@@ -180,13 +178,11 @@ mod tests {
 
     use async_trait::async_trait;
     use macaca_llm::LlmProvider;
-    use macaca_proto::{
-        MacacaResult as Res, LlmMessage, LlmOptions, LlmResponse, TokenUsage,
-    };
     use macaca_proto::config::KernelConfig;
+    use macaca_proto::{LlmMessage, LlmOptions, LlmResponse, MacacaResult as Res, TokenUsage};
     use macaca_tools::DefaultToolSet;
 
-    use crate::model::{AgentSource, InlineAgentConfig, CapabilityRef};
+    use crate::model::{AgentSource, CapabilityRef, InlineAgentConfig};
 
     struct MockLlm;
 
@@ -246,6 +242,7 @@ mod tests {
                 temperature: None,
             })],
             llm_config: None,
+            entry_agent: None,
             entrypoint: None,
             workflows: None,
             resources: None,
@@ -289,10 +286,7 @@ mod tests {
         let kernel = make_kernel();
         let manifest = inline_manifest("stop-test");
 
-        let app_id = runtime
-            .start_app(manifest, ".", &kernel)
-            .await
-            .unwrap();
+        let app_id = runtime.start_app(manifest, ".", &kernel).await.unwrap();
         runtime.stop_app(&app_id, &kernel).await.unwrap();
 
         let status = runtime.app_status(&app_id).await.unwrap();
@@ -329,10 +323,7 @@ mod tests {
         let kernel = make_kernel();
         let manifest = inline_manifest("rm-running");
 
-        let app_id = runtime
-            .start_app(manifest, ".", &kernel)
-            .await
-            .unwrap();
+        let app_id = runtime.start_app(manifest, ".", &kernel).await.unwrap();
         let err = runtime.remove_app(&app_id).await.unwrap_err();
         assert!(err.to_string().contains("still running"));
     }
@@ -343,10 +334,7 @@ mod tests {
         let kernel = make_kernel();
         let manifest = inline_manifest("agents-test");
 
-        let app_id = runtime
-            .start_app(manifest, ".", &kernel)
-            .await
-            .unwrap();
+        let app_id = runtime.start_app(manifest, ".", &kernel).await.unwrap();
         let agents = runtime.app_agents(&app_id).await.unwrap();
         assert_eq!(agents.len(), 1);
 
@@ -376,6 +364,7 @@ mod tests {
             ui_type: None,
             agents: vec![],
             llm_config: None,
+            entry_agent: None,
             entrypoint: None,
             workflows: None,
             resources: None,
@@ -397,6 +386,7 @@ mod tests {
             ui_type: None,
             agents: vec![],
             llm_config: None,
+            entry_agent: None,
             entrypoint: None,
             workflows: None,
             resources: None,

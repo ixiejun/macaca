@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use macaca_proto::{MacacaError, MacacaResult, DriverId};
+use macaca_proto::{DriverId, MacacaError, MacacaResult};
 use macaca_tools::Tool;
 
 use crate::driver::{DriverManifest, SoftwareDriver};

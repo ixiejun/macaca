@@ -151,7 +151,10 @@ mod tests {
         let tool = SkillTool::new(echo_skill());
         let result = tool.execute(serde_json::json!({})).await.unwrap();
         assert_eq!(result["exit_code"], 0);
-        assert!(result["stdout"].as_str().unwrap().contains("hello from skill"));
+        assert!(result["stdout"]
+            .as_str()
+            .unwrap()
+            .contains("hello from skill"));
         assert!(result["command"].as_str().unwrap().contains("echo"));
     }
 

@@ -5,12 +5,12 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use macaca_app::{AppLayer, AppManifest, AppRuntime, AppStatus};
 use macaca_app::model::{AgentSource, CapabilityRef, InlineAgentConfig};
+use macaca_app::{AppLayer, AppManifest, AppRuntime, AppStatus};
 use macaca_kernel::Kernel;
 use macaca_llm::LlmProvider;
 use macaca_proto::config::KernelConfig;
-use macaca_proto::{ApplicationId, MacacaResult, LlmMessage, LlmOptions, LlmResponse, TokenUsage};
+use macaca_proto::{ApplicationId, LlmMessage, LlmOptions, LlmResponse, MacacaResult, TokenUsage};
 use macaca_tools::DefaultToolSet;
 
 // ---------------------------------------------------------------------------
@@ -85,6 +85,7 @@ fn inline_manifest(name: &str, agent_count: usize) -> AppManifest {
         ui_type: None,
         agents,
         llm_config: None,
+        entry_agent: None,
         entrypoint: None,
         workflows: None,
         resources: None,
@@ -192,10 +193,7 @@ async fn duplicate_app_rejected() {
         .start_app(manifest.clone(), ".", &kernel)
         .await
         .unwrap();
-    let err = runtime
-        .start_app(manifest, ".", &kernel)
-        .await
-        .unwrap_err();
+    let err = runtime.start_app(manifest, ".", &kernel).await.unwrap_err();
     assert!(err.to_string().contains("already loaded"));
 }
 

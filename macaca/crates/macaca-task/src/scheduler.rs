@@ -285,12 +285,7 @@ impl TaskScheduler {
 
     /// Toggle a schedule's enabled state.  Re-computes `next_run_at` when
     /// re-enabling.  Returns `false` if the entry was not found.
-    pub async fn set_enabled(
-        &self,
-        app_id: &ApplicationId,
-        id: &TaskId,
-        enabled: bool,
-    ) -> bool {
+    pub async fn set_enabled(&self, app_id: &ApplicationId, id: &TaskId, enabled: bool) -> bool {
         if let Some(mut entry) = self.get(app_id, id).await {
             entry.enabled = enabled;
             if enabled {
@@ -382,7 +377,12 @@ mod tests {
     }
 
     fn make_scheduler(store: Arc<RedbStore>) -> TaskScheduler {
-        TaskScheduler::new(store, SchedulerConfig { check_interval_secs: 60 })
+        TaskScheduler::new(
+            store,
+            SchedulerConfig {
+                check_interval_secs: 60,
+            },
+        )
     }
 
     // ── is_due for interval schedules ────────────────────────────────────────
@@ -390,11 +390,16 @@ mod tests {
     #[test]
     fn test_interval_schedule_is_due() {
         let app_id = ApplicationId::new();
-        let action = ScheduleAction::CreateGoal { description: "daily sync".into() };
+        let action = ScheduleAction::CreateGoal {
+            description: "daily sync".into(),
+        };
         let mut entry = ScheduleEntry::new_interval(app_id, "test", 3600, action);
 
         // Freshly created: next_run_at is now + 3600 s → not due yet.
-        assert!(!entry.is_due(), "should not be due immediately after creation");
+        assert!(
+            !entry.is_due(),
+            "should not be due immediately after creation"
+        );
 
         // Simulate that the last run happened more than 3600 s ago.
         entry.last_run_at = Some(Utc::now() - chrono::Duration::seconds(7200));
@@ -408,7 +413,9 @@ mod tests {
     #[test]
     fn test_disabled_schedule_not_due() {
         let app_id = ApplicationId::new();
-        let action = ScheduleAction::CreateGoal { description: "disabled".into() };
+        let action = ScheduleAction::CreateGoal {
+            description: "disabled".into(),
+        };
         let mut entry = ScheduleEntry::new_interval(app_id, "test", 1, action);
 
         // Force next_run_at into the past.
@@ -451,7 +458,9 @@ mod tests {
         let scheduler = make_scheduler(Arc::clone(&store));
         let app_id = ApplicationId::new();
 
-        let action = ScheduleAction::CreateGoal { description: "cleanup".into() };
+        let action = ScheduleAction::CreateGoal {
+            description: "cleanup".into(),
+        };
         let entry = ScheduleEntry::new_interval(app_id.clone(), "cleanup", 300, action);
         let id = entry.id;
 
@@ -483,7 +492,9 @@ mod tests {
         let scheduler = make_scheduler(Arc::clone(&store));
         let app_id = ApplicationId::new();
 
-        let action = ScheduleAction::CreateGoal { description: "ping".into() };
+        let action = ScheduleAction::CreateGoal {
+            description: "ping".into(),
+        };
         let entry = ScheduleEntry::new_interval(app_id.clone(), "ping", 60, action);
         let id = entry.id;
         scheduler.create(entry).await;

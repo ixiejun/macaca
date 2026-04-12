@@ -53,7 +53,11 @@ pub struct ClaudeOutput {
 /// - `{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash","input":{...}]}}`
 /// - `{"type":"user","message":{"content":[{"type":"tool_result","content":"..."}]}}`
 /// - `{"type":"result","result":"...","session_id":"...","total_cost_usd":...}`
-pub fn parse_claude_stream(stdout: &str, stderr: &str, exit_code: i32) -> Result<ClaudeOutput, MacacaError> {
+pub fn parse_claude_stream(
+    stdout: &str,
+    stderr: &str,
+    exit_code: i32,
+) -> Result<ClaudeOutput, MacacaError> {
     // Handle error case with no stdout
     if exit_code != 0 && stdout.trim().is_empty() {
         return Ok(ClaudeOutput {
@@ -111,7 +115,10 @@ pub fn parse_claude_stream(stdout: &str, stderr: &str, exit_code: i32) -> Result
                     .or_else(|| json.get("cost_usd"))
                     .and_then(|v| v.as_f64());
                 duration_ms = json.get("duration_ms").and_then(|v| v.as_u64());
-                is_error = json.get("is_error").and_then(|v| v.as_bool()).unwrap_or(false);
+                is_error = json
+                    .get("is_error")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
             }
 
             // Assistant message with content blocks
@@ -119,14 +126,19 @@ pub fn parse_claude_stream(stdout: &str, stderr: &str, exit_code: i32) -> Result
                 if let Some(message) = json.get("message") {
                     if let Some(content) = message.get("content") {
                         if let Some(content_arr) = content.as_array() {
-                            tracing::debug!("Processing assistant message with {} content blocks", content_arr.len());
+                            tracing::debug!(
+                                "Processing assistant message with {} content blocks",
+                                content_arr.len()
+                            );
                             for block in content_arr {
-                                let block_type = block.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                                let block_type =
+                                    block.get("type").and_then(|v| v.as_str()).unwrap_or("");
                                 tracing::debug!("Content block type: {}", block_type);
 
                                 match block_type {
                                     "thinking" => {
-                                        let thinking = extract_string(block, "thinking").unwrap_or_default();
+                                        let thinking =
+                                            extract_string(block, "thinking").unwrap_or_default();
                                         if !thinking.is_empty() {
                                             trace.push(TraceEvent {
                                                 event_type: "thinking".into(),
@@ -140,7 +152,8 @@ pub fn parse_claude_stream(stdout: &str, stderr: &str, exit_code: i32) -> Result
                                         }
                                     }
                                     "tool_use" => {
-                                        let tool_name = extract_string(block, "name").unwrap_or_default();
+                                        let tool_name =
+                                            extract_string(block, "name").unwrap_or_default();
                                         let tool_input = block.get("input").cloned();
                                         trace.push(TraceEvent {
                                             event_type: "tool_use".into(),
@@ -153,7 +166,8 @@ pub fn parse_claude_stream(stdout: &str, stderr: &str, exit_code: i32) -> Result
                                         });
                                     }
                                     "text" => {
-                                        let text = extract_string(block, "text").unwrap_or_default();
+                                        let text =
+                                            extract_string(block, "text").unwrap_or_default();
                                         if !text.is_empty() {
                                             trace.push(TraceEvent {
                                                 event_type: "text".into(),
@@ -180,7 +194,8 @@ pub fn parse_claude_stream(stdout: &str, stderr: &str, exit_code: i32) -> Result
                     if let Some(content) = message.get("content") {
                         if let Some(content_arr) = content.as_array() {
                             for block in content_arr {
-                                let block_type = block.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                                let block_type =
+                                    block.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
                                 if block_type == "tool_result" {
                                     // Get tool name from tool_use_result if available
@@ -202,7 +217,10 @@ pub fn parse_claude_stream(stdout: &str, stderr: &str, exit_code: i32) -> Result
                                         })
                                         .unwrap_or_default();
 
-                                    let is_err = block.get("is_error").and_then(|v| v.as_bool()).unwrap_or(false);
+                                    let is_err = block
+                                        .get("is_error")
+                                        .and_then(|v| v.as_bool())
+                                        .unwrap_or(false);
 
                                     trace.push(TraceEvent {
                                         event_type: "tool_result".into(),
@@ -237,7 +255,11 @@ pub fn parse_claude_stream(stdout: &str, stderr: &str, exit_code: i32) -> Result
             .unwrap_or_default();
     }
 
-    tracing::debug!("Parsed Claude output: {} trace events, result length {}", trace.len(), result.len());
+    tracing::debug!(
+        "Parsed Claude output: {} trace events, result length {}",
+        trace.len(),
+        result.len()
+    );
 
     Ok(ClaudeOutput {
         result,
@@ -250,7 +272,10 @@ pub fn parse_claude_stream(stdout: &str, stderr: &str, exit_code: i32) -> Result
 }
 
 fn extract_string(value: &Value, key: &str) -> Option<String> {
-    value.get(key).and_then(|v| v.as_str()).map(|s| s.to_string())
+    value
+        .get(key)
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
 }
 
 fn truncate(s: &str, max_len: usize) -> String {
@@ -274,7 +299,11 @@ pub fn output_to_json(output: &ClaudeOutput) -> Value {
 }
 
 // Legacy function for backward compatibility
-pub fn parse_claude_json(stdout: &str, stderr: &str, exit_code: i32) -> Result<ClaudeOutput, MacacaError> {
+pub fn parse_claude_json(
+    stdout: &str,
+    stderr: &str,
+    exit_code: i32,
+) -> Result<ClaudeOutput, MacacaError> {
     parse_claude_stream(stdout, stderr, exit_code)
 }
 
@@ -354,14 +383,17 @@ fn parse_real_stream_output() {
 {"type":"assistant","message":{"id":"msg3","type":"message","role":"assistant","content":[{"type":"text","text":"Done listing files"}]}}
 {"type":"result","result":"Done listing files","session_id":"sess-123","total_cost_usd":0.05,"duration_ms":1234}"#;
     let output = parse_claude_stream(stdout, "", 0).unwrap();
-    
+
     println!("Result: {}", output.result);
     println!("Session: {:?}", output.session_id);
     println!("Trace count: {}", output.trace.len());
     for (i, t) in output.trace.iter().enumerate() {
-        println!("  [{}] type={}, tool_name={:?}", i, t.event_type, t.tool_name);
+        println!(
+            "  [{}] type={}, tool_name={:?}",
+            i, t.event_type, t.tool_name
+        );
     }
-    
+
     assert_eq!(output.result, "Done listing files");
     assert_eq!(output.session_id, Some("sess-123".to_string()));
     assert_eq!(output.trace.len(), 4, "Should have 4 trace events");

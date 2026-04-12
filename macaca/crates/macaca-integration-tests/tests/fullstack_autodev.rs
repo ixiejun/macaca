@@ -7,14 +7,14 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use macaca_app::{AppLayer, AppRuntime, AppStatus};
 use macaca_app::loader::AppLoader;
+use macaca_app::{AppLayer, AppRuntime, AppStatus};
 use macaca_driver::driver::{DriverType, SoftwareDriver};
 use macaca_driver_claude_code::{ClaudeCodeConfig, ClaudeCodeDriver};
 use macaca_kernel::Kernel;
 use macaca_llm::LlmProvider;
 use macaca_proto::config::KernelConfig;
-use macaca_proto::{MacacaResult, LlmMessage, LlmOptions, LlmResponse, TokenUsage};
+use macaca_proto::{LlmMessage, LlmOptions, LlmResponse, MacacaResult, TokenUsage};
 use macaca_sdk::AgentPersona;
 use macaca_skill::{SkillCatalog, SkillRegistry};
 use macaca_tools::{DefaultToolSet, Tool};
@@ -77,22 +77,26 @@ fn app_dir() -> std::path::PathBuf {
 #[tokio::test]
 async fn app_manifest_loads() {
     let manifest_path = app_dir().join("app.yaml");
-    assert!(manifest_path.exists(), "app.yaml not found at {:?}", manifest_path);
+    assert!(
+        manifest_path.exists(),
+        "app.yaml not found at {:?}",
+        manifest_path
+    );
 
     let manifest = AppLoader::load_manifest(&manifest_path).unwrap();
 
     assert_eq!(manifest.name, "fullstack-autodev");
     assert_eq!(manifest.version, "0.1.0");
     assert_eq!(manifest.layer, AppLayer::L3Declarative);
-    assert_eq!(manifest.agents.len(), 3);
+    assert_eq!(manifest.agents.len(), 5);
 
     // LLM config present
     let llm_config = manifest.llm_config.as_ref().unwrap();
-    assert_eq!(llm_config.provider, "anthropic");
-    assert!(llm_config.model.contains("claude"));
+    assert_eq!(llm_config.provider, "volces");
+    assert_eq!(llm_config.model, "glm-4.7");
 }
 
-/// Start the fullstack-autodev app and verify 3 agents are registered.
+/// Start the fullstack-autodev app and verify 5 agents are registered.
 #[tokio::test]
 async fn app_starts_with_three_agents() {
     let runtime = AppRuntime::new();
@@ -107,16 +111,18 @@ async fn app_starts_with_three_agents() {
     let status = runtime.app_status(&app_id).await.unwrap();
     assert_eq!(status, AppStatus::Running);
 
-    // 3 agents: architect, frontend, backend
+    // 5 agents: coordinator, architect, frontend, planner, backend
     let agent_ids = runtime.app_agents(&app_id).await.unwrap();
-    assert_eq!(agent_ids.len(), 3);
-    assert_eq!(kernel.agent_count().await, 3);
+    assert_eq!(agent_ids.len(), 5);
+    assert_eq!(kernel.agent_count().await, 5);
 
     // Verify agent names
     let manifests = kernel.list_agents().await;
     let names: Vec<&str> = manifests.iter().map(|m| m.name.as_str()).collect();
+    assert!(names.contains(&"coordinator"));
     assert!(names.contains(&"architect"));
     assert!(names.contains(&"frontend"));
+    assert!(names.contains(&"planner"));
     assert!(names.contains(&"backend"));
 
     // Cleanup
@@ -141,11 +147,20 @@ async fn yaml_skills_load_from_registry() {
     // SKILL.md subdirectories (golang, shadcn-ui) are NOT loaded by SkillRegistry.
     assert_eq!(loaded, 2, "Expected 2 YAML skills, got {loaded}");
     assert!(registry.get("openspec").is_some(), "openspec skill missing");
-    assert!(registry.get("figma-mcp").is_some(), "figma-mcp skill missing");
+    assert!(
+        registry.get("figma-mcp").is_some(),
+        "figma-mcp skill missing"
+    );
 
     // SKILL.md skills should NOT be in the registry.
-    assert!(registry.get("golang").is_none(), "golang should not be in SkillRegistry");
-    assert!(registry.get("shadcn-ui").is_none(), "shadcn-ui should not be in SkillRegistry");
+    assert!(
+        registry.get("golang").is_none(),
+        "golang should not be in SkillRegistry"
+    );
+    assert!(
+        registry.get("shadcn-ui").is_none(),
+        "shadcn-ui should not be in SkillRegistry"
+    );
 }
 
 /// Verify YAML skills can be instantiated as tools.
@@ -172,14 +187,23 @@ async fn agent_skills_load_via_catalog() {
     let mut catalog = SkillCatalog::new();
     let loaded = catalog.load_from_directory(&skills_dir).await.unwrap();
 
-    // Should load SKILL.md subdirectories: golang, shadcn-ui (2 skills).
-    assert_eq!(loaded, 2, "Expected 2 agent skills, got {loaded}");
+    // Should load SKILL.md subdirectories: golang, openspec, shadcn-ui (3 skills).
+    assert_eq!(loaded, 3, "Expected 3 agent skills, got {loaded}");
 
     // Verify catalog entries (tier 1 — name + description only).
-    let golang = catalog.get("golang").expect("golang skill missing from catalog");
+    let golang = catalog
+        .get("golang")
+        .expect("golang skill missing from catalog");
     assert!(golang.description.contains("Go"));
 
-    let shadcn = catalog.get("shadcn-ui").expect("shadcn-ui skill missing from catalog");
+    let openspec = catalog
+        .get("openspec")
+        .expect("openspec skill missing from catalog");
+    assert!(openspec.description.len() > 0);
+
+    let shadcn = catalog
+        .get("shadcn-ui")
+        .expect("shadcn-ui skill missing from catalog");
     assert!(shadcn.description.contains("shadcn"));
 }
 
@@ -194,12 +218,18 @@ async fn agent_skills_activate() {
     // Activate golang skill (tier 2).
     let golang = catalog.activate("golang").await.unwrap();
     assert_eq!(golang.name, "golang");
-    assert!(golang.content.contains("chi router"), "golang skill should mention chi router");
+    assert!(
+        golang.content.contains("chi router"),
+        "golang skill should mention chi router"
+    );
 
     // Activate shadcn-ui skill (tier 2).
     let shadcn = catalog.activate("shadcn-ui").await.unwrap();
     assert_eq!(shadcn.name, "shadcn-ui");
-    assert!(shadcn.content.contains("Radix UI"), "shadcn-ui skill should mention Radix UI");
+    assert!(
+        shadcn.content.contains("Radix UI"),
+        "shadcn-ui skill should mention Radix UI"
+    );
 
     // Both should be marked as activated.
     assert!(catalog.is_activated("golang"));
@@ -232,7 +262,9 @@ async fn architect_persona_loads() {
     let persona_dir = app_dir().join("personas/architect");
     assert!(persona_dir.exists(), "architect persona dir not found");
 
-    let persona = AgentPersona::load_from_directory(&persona_dir).await.unwrap();
+    let persona = AgentPersona::load_from_directory(&persona_dir)
+        .await
+        .unwrap();
     assert!(!persona.is_empty());
     assert!(persona.identity.is_some());
     assert!(persona.tools.is_some());
@@ -247,7 +279,9 @@ async fn architect_persona_loads() {
 #[tokio::test]
 async fn frontend_persona_loads() {
     let persona_dir = app_dir().join("personas/frontend");
-    let persona = AgentPersona::load_from_directory(&persona_dir).await.unwrap();
+    let persona = AgentPersona::load_from_directory(&persona_dir)
+        .await
+        .unwrap();
     assert!(persona.identity.is_some());
     assert!(persona.tools.is_some());
 
@@ -260,7 +294,9 @@ async fn frontend_persona_loads() {
 #[tokio::test]
 async fn backend_persona_loads() {
     let persona_dir = app_dir().join("personas/backend");
-    let persona = AgentPersona::load_from_directory(&persona_dir).await.unwrap();
+    let persona = AgentPersona::load_from_directory(&persona_dir)
+        .await
+        .unwrap();
     assert!(persona.identity.is_some());
     assert!(persona.tools.is_some());
 
@@ -309,7 +345,10 @@ async fn claude_code_execute_validates_params() {
     let driver = ClaudeCodeDriver::new(config);
     let tools = driver.tools();
 
-    let execute_tool = tools.iter().find(|t| t.name() == "claude_code_execute").unwrap();
+    let execute_tool = tools
+        .iter()
+        .find(|t| t.name() == "claude_code_execute")
+        .unwrap();
 
     // Missing prompt should error
     let result = execute_tool.execute(serde_json::json!({})).await;
@@ -324,7 +363,10 @@ async fn claude_code_status_graceful() {
     let driver = ClaudeCodeDriver::new(config);
     let tools = driver.tools();
 
-    let status_tool = tools.iter().find(|t| t.name() == "claude_code_status").unwrap();
+    let status_tool = tools
+        .iter()
+        .find(|t| t.name() == "claude_code_status")
+        .unwrap();
     let result = status_tool.execute(serde_json::json!({})).await.unwrap();
 
     // Should return JSON with available field regardless of claude installation

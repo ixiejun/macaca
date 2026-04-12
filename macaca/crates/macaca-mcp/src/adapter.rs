@@ -78,9 +78,7 @@ impl Tool for McpToolAdapter {
 }
 
 /// Create Tool adapters for all tools from a connected MCP client.
-pub async fn tools_from_client(
-    client: Arc<RwLock<McpClient>>,
-) -> MacacaResult<Vec<Box<dyn Tool>>> {
+pub async fn tools_from_client(client: Arc<RwLock<McpClient>>) -> MacacaResult<Vec<Box<dyn Tool>>> {
     let tools_info = client.read().await.list_tools().await?;
     let mut tools: Vec<Box<dyn Tool>> = Vec::new();
     for info in tools_info {
@@ -142,7 +140,10 @@ mod tests {
             input_schema: serde_json::json!({"type": "object"}),
         };
         let adapter = McpToolAdapter::new(client, info);
-        let result = adapter.execute(serde_json::json!({"path": "/tmp"})).await.unwrap();
+        let result = adapter
+            .execute(serde_json::json!({"path": "/tmp"}))
+            .await
+            .unwrap();
         assert!(result["result"].as_str().unwrap().contains("read"));
     }
 

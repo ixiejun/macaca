@@ -56,7 +56,11 @@ impl TaskRouter {
                         agent_name: task.to_agent.clone(),
                         confidence: 0.0,
                         reasoning: format!("Agent {} is not available", task.to_agent),
-                        fallback_agents: agents.iter().filter(|a| a.available).map(|a| a.name.clone()).collect(),
+                        fallback_agents: agents
+                            .iter()
+                            .filter(|a| a.available)
+                            .map(|a| a.name.clone())
+                            .collect(),
                     };
                 }
             } else {
@@ -101,11 +105,15 @@ impl TaskRouter {
                 fallback_agents: scored.iter().skip(1).map(|(_, a)| a.name.clone()).collect(),
             }
         } else {
-            // No match found, use coordinator as fallback
+            // No match found — fall back to the first registered agent.
+            let fallback_name = agents
+                .first()
+                .map(|a| a.name.clone())
+                .unwrap_or_else(|| "default".to_string());
             RoutingDecision {
-                agent_name: "coordinator".to_string(),
+                agent_name: fallback_name.clone(),
                 confidence: 0.0,
-                reasoning: "No matching agent found, routing to coordinator".to_string(),
+                reasoning: format!("No matching agent found, routing to {fallback_name}"),
                 fallback_agents: agents.iter().map(|a| a.name.clone()).collect(),
             }
         }
@@ -127,7 +135,10 @@ impl TaskRouter {
             // Partial matches
             for word in prompt.split_whitespace() {
                 let word_lower = word.to_lowercase();
-                if cap_lower.contains(&word_lower) || word_lower.len() > 3 && cap_lower.contains(&word_lower[..word_lower.len()-1]) {
+                if cap_lower.contains(&word_lower)
+                    || word_lower.len() > 3
+                        && cap_lower.contains(&word_lower[..word_lower.len() - 1])
+                {
                     score += 0.2;
                 }
             }
@@ -205,7 +216,11 @@ mod tests {
             AgentInfo {
                 id: "1".into(),
                 name: "backend".into(),
-                capabilities: vec!["backend_development".into(), "api_design".into(), "database".into()],
+                capabilities: vec![
+                    "backend_development".into(),
+                    "api_design".into(),
+                    "database".into(),
+                ],
                 current_load: 0,
                 max_load: 3,
                 available: true,
@@ -213,7 +228,11 @@ mod tests {
             AgentInfo {
                 id: "2".into(),
                 name: "frontend".into(),
-                capabilities: vec!["frontend_development".into(), "ui_design".into(), "react".into()],
+                capabilities: vec![
+                    "frontend_development".into(),
+                    "ui_design".into(),
+                    "react".into(),
+                ],
                 current_load: 0,
                 max_load: 3,
                 available: true,
@@ -282,14 +301,16 @@ mod tests {
         let agents = Arc::new(RwLock::new(vec![]));
         let router = TaskRouter::new(agents.clone());
 
-        router.register_agent(AgentInfo {
-            id: "new".into(),
-            name: "new_agent".into(),
-            capabilities: vec!["new_capability".into()],
-            current_load: 0,
-            max_load: 1,
-            available: true,
-        }).await;
+        router
+            .register_agent(AgentInfo {
+                id: "new".into(),
+                name: "new_agent".into(),
+                capabilities: vec!["new_capability".into()],
+                current_load: 0,
+                max_load: 1,
+                available: true,
+            })
+            .await;
 
         let list = router.list_agents().await;
         assert_eq!(list.len(), 1);

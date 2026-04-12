@@ -93,11 +93,11 @@ mod tests {
     use chrono::Utc;
     use macaca_agent::AgentServices;
     use macaca_llm::LlmProvider;
-    use macaca_tools::ToolSet;
     use macaca_proto::{
-        AgentManifest, AgentOutput, Capability, Permission, PermissionLevel,
-        TaskId, TaskPriority, TaskStatus, TokenUsage,
+        AgentManifest, AgentOutput, Capability, Permission, PermissionLevel, TaskId, TaskPriority,
+        TaskStatus, TokenUsage,
     };
+    use macaca_tools::ToolSet;
 
     struct MockAgent {
         id: AgentId,
@@ -107,9 +107,15 @@ mod tests {
 
     #[at]
     impl macaca_agent::Agent for MockAgent {
-        fn id(&self) -> AgentId { self.id }
-        fn capabilities(&self) -> &[Capability] { &self.caps }
-        fn state(&self) -> AgentState { self.state }
+        fn id(&self) -> AgentId {
+            self.id
+        }
+        fn capabilities(&self) -> &[Capability] {
+            &self.caps
+        }
+        fn state(&self) -> AgentState {
+            self.state
+        }
         async fn run(
             &self,
             _llm: &dyn LlmProvider,
@@ -163,8 +169,15 @@ mod tests {
     async fn selects_running_agent_by_capability() {
         let reg = AgentRegistry::new(10);
         let id = AgentId::new();
-        let caps = vec![Capability { name: "search".into(), description: "web search".into() }];
-        let agent = Box::new(MockAgent { id, state: AgentState::Running, caps: caps.clone() });
+        let caps = vec![Capability {
+            name: "search".into(),
+            description: "web search".into(),
+        }];
+        let agent = Box::new(MockAgent {
+            id,
+            state: AgentState::Running,
+            caps: caps.clone(),
+        });
         let manifest = make_manifest(id, AgentState::Running, caps);
         reg.register(agent, manifest).await.unwrap();
 
@@ -177,8 +190,15 @@ mod tests {
     async fn skips_non_running_agent() {
         let reg = AgentRegistry::new(10);
         let id = AgentId::new();
-        let caps = vec![Capability { name: "search".into(), description: "".into() }];
-        let agent = Box::new(MockAgent { id, state: AgentState::Suspended, caps: caps.clone() });
+        let caps = vec![Capability {
+            name: "search".into(),
+            description: "".into(),
+        }];
+        let agent = Box::new(MockAgent {
+            id,
+            state: AgentState::Suspended,
+            caps: caps.clone(),
+        });
         let manifest = make_manifest(id, AgentState::Suspended, caps);
         reg.register(agent, manifest).await.unwrap();
 
@@ -191,8 +211,15 @@ mod tests {
     async fn falls_back_to_first_running_when_no_cap_match() {
         let reg = AgentRegistry::new(10);
         let id = AgentId::new();
-        let caps = vec![Capability { name: "write".into(), description: "".into() }];
-        let agent = Box::new(MockAgent { id, state: AgentState::Running, caps: caps.clone() });
+        let caps = vec![Capability {
+            name: "write".into(),
+            description: "".into(),
+        }];
+        let agent = Box::new(MockAgent {
+            id,
+            state: AgentState::Running,
+            caps: caps.clone(),
+        });
         let manifest = make_manifest(id, AgentState::Running, caps);
         reg.register(agent, manifest).await.unwrap();
 

@@ -188,7 +188,9 @@ mod tests {
         let checker = DefaultPermissionChecker;
         let agent_id = AgentId::new();
         let perm = open_permission();
-        assert!(checker.check_tool_permission(&agent_id, &perm, "anything").is_ok());
+        assert!(checker
+            .check_tool_permission(&agent_id, &perm, "anything")
+            .is_ok());
     }
 
     #[test]
@@ -196,8 +198,12 @@ mod tests {
         let checker = DefaultPermissionChecker;
         let agent_id = AgentId::new();
         let perm = restricted_permission();
-        assert!(checker.check_tool_permission(&agent_id, &perm, "file_read").is_ok());
-        assert!(checker.check_tool_permission(&agent_id, &perm, "shell").is_ok());
+        assert!(checker
+            .check_tool_permission(&agent_id, &perm, "file_read")
+            .is_ok());
+        assert!(checker
+            .check_tool_permission(&agent_id, &perm, "shell")
+            .is_ok());
     }
 
     #[test]
@@ -225,7 +231,9 @@ mod tests {
             network_access: false,
         };
         let args = serde_json::json!({"path": "/home/agent/data.txt"});
-        assert!(checker.check_tool_with_args(&agent_id, &perm, "file_read", &args).is_ok());
+        assert!(checker
+            .check_tool_with_args(&agent_id, &perm, "file_read", &args)
+            .is_ok());
     }
 
     #[test]
@@ -258,7 +266,9 @@ mod tests {
         };
         let args = serde_json::json!({"path": "/etc/passwd"});
         // Empty allowed_paths = no path restriction
-        assert!(checker.check_tool_with_args(&agent_id, &perm, "file_read", &args).is_ok());
+        assert!(checker
+            .check_tool_with_args(&agent_id, &perm, "file_read", &args)
+            .is_ok());
     }
 
     // ── check_tool_with_args: network permission tests ──
@@ -291,7 +301,9 @@ mod tests {
             network_access: true,
         };
         let args = serde_json::json!({"command": "curl https://example.com"});
-        assert!(checker.check_tool_with_args(&agent_id, &perm, "shell", &args).is_ok());
+        assert!(checker
+            .check_tool_with_args(&agent_id, &perm, "shell", &args)
+            .is_ok());
     }
 
     #[test]
@@ -306,6 +318,8 @@ mod tests {
         };
         // Plain `ls` has no network activity — should pass even with network_access=false
         let args = serde_json::json!({"command": "ls /tmp"});
-        assert!(checker.check_tool_with_args(&agent_id, &perm, "shell", &args).is_ok());
+        assert!(checker
+            .check_tool_with_args(&agent_id, &perm, "shell", &args)
+            .is_ok());
     }
 }

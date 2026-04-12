@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use tokio::sync::{mpsc, RwLock};
-use tracing::{info, error, warn, debug};
+use tracing::{debug, error, info, warn};
 
 /// Worker state for tracking worker health.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -36,9 +36,9 @@ pub enum WorkerHealth {
 }
 
 use super::{
-    AgentInfo, AgentRunner, ApplicationId, DelegatedTask, EventBus, ExecutionQueue,
-    RoutingDecision, TaskContext, TaskId, TaskResult, TaskRouter, TaskStatus,
-    CallbackDispatcher, ExecutorCommand, ExecutorEvent, SystemEvent, ForkManager,
+    AgentInfo, AgentRunner, ApplicationId, CallbackDispatcher, DelegatedTask, EventBus,
+    ExecutionQueue, ExecutorCommand, ExecutorEvent, ForkManager, RoutingDecision, SystemEvent,
+    TaskContext, TaskId, TaskResult, TaskRouter, TaskStatus,
 };
 use macaca_proto::TaskId as ProtoTaskId;
 
@@ -160,7 +160,10 @@ impl ApplicationExecutor {
         config: ApplicationExecutorConfig,
     ) -> Self {
         let agents = Arc::new(RwLock::new(agents));
-        let queue = Arc::new(ExecutionQueue::new(config.max_parallel, config.max_queue_size));
+        let queue = Arc::new(ExecutionQueue::new(
+            config.max_parallel,
+            config.max_queue_size,
+        ));
         let event_bus = EventBus::new();
         let router = TaskRouter::new(Arc::clone(&agents));
         let callback_dispatcher = CallbackDispatcher::new();
@@ -220,7 +223,8 @@ impl ApplicationExecutor {
                 sup_restart_count,
                 sup_command_tx,
                 sup_supervisor_config,
-            ).await;
+            )
+            .await;
         });
 
         Self {
@@ -330,7 +334,8 @@ impl ApplicationExecutor {
                 sup_restart_count,
                 sup_command_tx,
                 sup_supervisor_config,
-            ).await;
+            )
+            .await;
         });
 
         Self {
@@ -371,7 +376,10 @@ impl ApplicationExecutor {
         let agents = self.agents.read().await;
         let target_exists = agents.iter().any(|a| a.name == to_agent);
         if !target_exists {
-            return Err(format!("Agent '{}' not found in application '{}'", to_agent, self.application_id));
+            return Err(format!(
+                "Agent '{}' not found in application '{}'",
+                to_agent, self.application_id
+            ));
         }
         drop(agents);
 
@@ -392,17 +400,21 @@ impl ApplicationExecutor {
         let task_id = task.id;
 
         // Enqueue the task
-        self.queue.enqueue(task.clone()).await
+        self.queue
+            .enqueue(task.clone())
+            .await
             .map_err(|e| format!("Failed to enqueue task: {}", e))?;
 
         // Publish task delegated event
-        self.event_bus.emit(SystemEvent::TaskDelegated {
-            task_id: task.id,
-            application_id: self.application_id.clone(),
-            from_agent: from_agent.to_string(),
-            to_agent: to_agent.to_string(),
-            prompt: task.prompt.clone(),
-        }).await;
+        self.event_bus
+            .emit(SystemEvent::TaskDelegated {
+                task_id: task.id,
+                application_id: self.application_id.clone(),
+                from_agent: from_agent.to_string(),
+                to_agent: to_agent.to_string(),
+                prompt: task.prompt.clone(),
+            })
+            .await;
 
         // Send execute command to worker
         let command_tx = self.command_tx.read().await;
@@ -478,18 +490,23 @@ impl ApplicationExecutor {
 
         // Check if routing was successful
         if decision.confidence <= 0.0 {
-            return Err(format!("No suitable agent found for prompt: {}", decision.reasoning));
+            return Err(format!(
+                "No suitable agent found for prompt: {}",
+                decision.reasoning
+            ));
         }
 
         // Delegate to the selected agent
-        let task_id = self.delegate_task(
-            from_agent,
-            &decision.agent_name,
-            prompt,
-            priority,
-            parallel,
-            context,
-        ).await?;
+        let task_id = self
+            .delegate_task(
+                from_agent,
+                &decision.agent_name,
+                prompt,
+                priority,
+                parallel,
+                context,
+            )
+            .await?;
 
         Ok((task_id, decision))
     }
@@ -530,6 +547,14 @@ impl ApplicationExecutor {
         self.event_broadcast.subscribe()
     }
 
+    /// Broadcast an executor event to all subscribers.
+    ///
+    /// Used by external execution paths (e.g. WorkerLoop via FrameworkRunner)
+    /// to emit events into the same broadcast channel that AppExecutor uses.
+    pub fn broadcast_event(&self, event: ExecutorEvent) {
+        let _ = self.event_broadcast.send(event);
+    }
+
     /// Get the Fork Manager for Fork-Join workflow.
     pub fn fork_manager(&self) -> Arc<ForkManager> {
         Arc::clone(&self.fork_manager)
@@ -540,7 +565,12 @@ impl ApplicationExecutor {
         // Set the atomic flag first so the supervisor won't restart the worker.
         self.shutdown_requested.store(true, AtomicOrdering::SeqCst);
         *self.shutdown.write().await = true;
-        let _ = self.command_tx.read().await.send(ExecutorCommand::Shutdown).await;
+        let _ = self
+            .command_tx
+            .read()
+            .await
+            .send(ExecutorCommand::Shutdown)
+            .await;
         info!(application_id = %self.application_id, "Executor shutdown initiated");
     }
 
@@ -555,10 +585,12 @@ impl ApplicationExecutor {
             WorkerState::Running => {
                 let elapsed = self.worker_heartbeat.read().await.elapsed();
                 if elapsed < std::time::Duration::from_secs(30) {
-                    WorkerHealth::Healthy { last_heartbeat: elapsed }
+                    WorkerHealth::Healthy {
+                        last_heartbeat: elapsed,
+                    }
                 } else {
                     WorkerHealth::Unhealthy {
-                        reason: format!("No heartbeat for {:?}", elapsed)
+                        reason: format!("No heartbeat for {:?}", elapsed),
                     }
                 }
             }
@@ -569,7 +601,10 @@ impl ApplicationExecutor {
 
     /// Check if worker is healthy (simple boolean).
     pub async fn is_worker_healthy(&self) -> bool {
-        matches!(self.check_worker_health().await, WorkerHealth::Healthy { .. })
+        matches!(
+            self.check_worker_health().await,
+            WorkerHealth::Healthy { .. }
+        )
     }
 
     /// Return how many times the worker has been restarted by the supervisor.
@@ -784,7 +819,8 @@ impl ApplicationExecutor {
 
         // Track when channel was closed (for graceful degradation)
         let mut channel_closed_at: Option<std::time::Instant> = None;
-        const MAX_CHANNEL_CLOSED_DURATION: tokio::time::Duration = tokio::time::Duration::from_secs(30);
+        const MAX_CHANNEL_CLOSED_DURATION: tokio::time::Duration =
+            tokio::time::Duration::from_secs(30);
 
         loop {
             // Use select! with biased; for deterministic priority
@@ -913,6 +949,7 @@ impl ApplicationExecutor {
                                             // Notify task completed
                                             let completed_event = ExecutorEvent::TaskCompleted {
                                                 task_id,
+                                                agent: agent_name.clone(),
                                                 result: task_result,
                                             };
                                             let _ = event_tx.send(completed_event.clone()).await;
@@ -941,6 +978,7 @@ impl ApplicationExecutor {
                                             // Notify task failed
                                             let failed_event = ExecutorEvent::TaskFailed {
                                                 task_id,
+                                                agent: agent_name.clone(),
                                                 error: e,
                                             };
                                             let _ = event_tx.send(failed_event.clone()).await;
@@ -1026,7 +1064,8 @@ impl ApplicationExecutorRegistry {
             application_name,
             agents,
             ApplicationExecutorConfig::default(),
-        ).await
+        )
+        .await
     }
 
     /// Register a new application with custom configuration.
@@ -1045,7 +1084,10 @@ impl ApplicationExecutorRegistry {
             config,
         ));
 
-        self.executors.write().await.insert(application_id, Arc::clone(&executor));
+        self.executors
+            .write()
+            .await
+            .insert(application_id, Arc::clone(&executor));
         executor
     }
 
@@ -1066,7 +1108,9 @@ impl ApplicationExecutorRegistry {
 
     /// List all registered applications.
     pub async fn list_applications(&self) -> Vec<(ApplicationId, String)> {
-        self.executors.read().await
+        self.executors
+            .read()
+            .await
             .iter()
             .map(|(id, exec)| (id.clone(), exec.application_name.clone()))
             .collect()

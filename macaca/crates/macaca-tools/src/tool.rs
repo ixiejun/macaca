@@ -48,7 +48,10 @@ pub trait ToolSet: Send + Sync {
     fn tools(&self) -> &[Box<dyn Tool>];
 
     fn get_tool(&self, name: &str) -> Option<&dyn Tool> {
-        self.tools().iter().find(|t| t.name() == name).map(|t| t.as_ref())
+        self.tools()
+            .iter()
+            .find(|t| t.name() == name)
+            .map(|t| t.as_ref())
     }
 
     /// Convert all tools to LLM-compatible tool definitions.

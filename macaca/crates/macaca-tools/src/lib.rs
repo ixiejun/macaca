@@ -1,19 +1,18 @@
 //! Tool abstractions and built-in tool implementations for Agent OS.
 
 pub mod builtin;
-pub mod tool;
 pub mod orchestration;
 pub mod todo;
+pub mod tool;
 
-pub use tool::{Tool, ToolSet, TraceEvent};
 pub use builtin::{DefaultToolSet, FileReadTool, FileWriteTool, ShellTool};
 pub use orchestration::{
-    OrchestrationState, DelegateTaskTool, GetTaskResultTool, GetTaskResultCallback,
-    TaskResultData, ReportResultTool, ListAgentsTool,
+    DelegateTaskTool, GetTaskResultCallback, GetTaskResultTool, ListAgentsTool, OrchestrationState,
+    ReportResultTool, TaskResultData,
 };
 pub use todo::{
-    ClaimTaskTool, StartTaskTool, UpdateTaskProgressTool,
-    SubmitTaskForReviewTool, ListMyTasksTool,
-    CreateTodoTool, ReviewTodoTool, CheckTodoProgressTool, CreateGoalTool, ReassignTaskTool,
-    OnGoalCreated,
+    CheckTodoProgressTool, ClaimTaskTool, CreateGoalTool, CreateTodoTool, ListMyTasksTool,
+    OnGoalCreated, OnGoalRecorded, OnTodoReviewed, ReassignTaskTool, ReviewTodoTool, StartTaskTool,
+    SubmitTaskForReviewTool, UpdateTaskProgressTool,
 };
+pub use tool::{Tool, ToolSet, TraceEvent};

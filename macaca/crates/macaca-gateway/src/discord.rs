@@ -102,6 +102,9 @@ mod tests {
     #[tokio::test]
     async fn discord_adapter_send_message() {
         let adapter = DiscordAdapter::new(test_config());
-        adapter.send_message("channel_456", "Hello from Discord test").await.unwrap();
+        adapter
+            .send_message("channel_456", "Hello from Discord test")
+            .await
+            .unwrap();
     }
 }

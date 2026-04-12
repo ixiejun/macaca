@@ -1,12 +1,12 @@
 name: fullstack-autodev
 version: "0.1.0"
-description: "Fullstack Auto Development - AI-powered fullstack development with intelligent task routing, OpenSpec specifications, and coordinated multi-agent workflows"
+description: "Fullstack Auto Development - AI-powered fullstack development with intelligent task routing, architecture-first planning, and coordinated multi-agent workflows"
 layer: L3Declarative
 ui_type: chat
 
 llm_config:
-  provider: dashscope
-  model: qwen3-max
+  provider: volces
+  model: glm-4.7
 
 # Application entrypoint - coordinator receives all user messages
 entrypoint:
@@ -67,6 +67,8 @@ agents:
   # Acts as the main entry point, classifies tasks and routes appropriately
   - name: coordinator
     capabilities:
+      - name: todo_goal_management
+        description: Create and track project goals at the orchestration boundary
       - name: task_classification
         description: Classify user intent into chat, simple-code, or sdd-workflow
       - name: direct_execution
@@ -74,7 +76,7 @@ agents:
       - name: conversation
         description: Engage in helpful technical conversations
     prompt_template: ""
-    model: qwen3-max
+    model: glm-4.7
     permission_level: system
     allowed_tools:
       - claude_code_execute
@@ -85,31 +87,36 @@ agents:
       - shell
     persona_dir: "./personas/coordinator"
 
-  # Architect Agent — analyzes designs, generates OpenSpec specs
-  # Only invoked for complex features requiring SDD workflow
+  # Architect Agent — architecture and interface design handoff
+  # Invoked when workers need clear technical boundaries before coding
   - name: architect
     capabilities:
-      - name: design_analysis
-        description: Analyze Figma designs and generate OpenSpec specifications
-      - name: project_coordination
-        description: Decompose work into frontend/backend tasks with proper specs
+      - name: todo_execution
+        description: Execute assigned architecture tasks and submit review summaries
+      - name: architecture_design
+        description: Define system boundaries, module responsibilities, and technical constraints
+      - name: interface_contract_design
+        description: Define frontend/backend API and data contracts
+      - name: technical_risk_analysis
+        description: Identify integration risks, edge cases, and rollout constraints
     prompt_template: ""
-    model: qwen3-max
+    model: glm-4.7
     permission_level: system
     allowed_tools:
-      - claude_code_execute
-      - claude_code_resume
-      - claude_code_status
-      - openspec
+      - file_read
+      - file_write
+      - figma-mcp
     persona_dir: "./personas/architect"
 
   # Frontend Agent — implements web UI
   - name: frontend
     capabilities:
+      - name: todo_execution
+        description: Execute assigned TaskBoard todos and submit review summaries
       - name: frontend_development
         description: Implement web UI with Next.js, React, TypeScript, Tailwind CSS
     prompt_template: ""
-    model: qwen3-max
+    model: glm-4.7
     permission_level: user
     allowed_tools:
       - claude_code_execute
@@ -120,10 +127,12 @@ agents:
   # Planner Agent — decomposes goals, assigns tasks, reviews quality
   - name: planner
     capabilities:
+      - name: todo_planning
+        description: Manage todo decomposition and review via planning tools
       - name: task_planning
         description: Decompose goals into tasks, assign to agents, review quality
     prompt_template: ""
-    model: qwen3-max
+    model: glm-4.7
     permission_level: system
     allowed_tools:
       - claude_code_execute
@@ -133,10 +142,12 @@ agents:
   # Backend Agent — implements APIs
   - name: backend
     capabilities:
+      - name: todo_execution
+        description: Execute assigned TaskBoard todos and submit review summaries
       - name: backend_development
         description: Implement Go REST API with PostgreSQL
     prompt_template: ""
-    model: qwen3-max
+    model: glm-4.7
     permission_level: user
     allowed_tools:
       - claude_code_execute

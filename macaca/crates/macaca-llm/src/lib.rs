@@ -27,22 +27,25 @@
 //! }
 //! ```
 
-pub mod provider;
-pub mod openai;
 pub mod anthropic;
-pub mod dashscope;
-pub mod openai_compatible;
-pub mod router;
+pub mod coding_plans;
 pub mod cost;
+pub mod dashscope;
+pub mod openai;
+pub mod openai_compatible;
+pub mod provider;
 pub mod rate_limit;
 pub mod resilient;
+pub mod router;
+pub mod tool_wire;
 
-pub use provider::LlmProvider;
-pub use openai::OpenAiProvider;
 pub use anthropic::AnthropicProvider;
+pub use coding_plans::normalize_openai_compatible_base;
+pub use cost::{default_pricing, CostTracker, ModelPricing};
 pub use dashscope::DashScopeProvider;
+pub use openai::OpenAiProvider;
 pub use openai_compatible::OpenAiCompatibleProvider;
-pub use router::LlmRouter;
-pub use cost::{CostTracker, ModelPricing, default_pricing};
+pub use provider::LlmProvider;
 pub use rate_limit::RateLimiter;
 pub use resilient::{ResilientConfig, ResilientLlmWrapper};
+pub use router::{LlmRouter, ModelSelection, ModelSelectionRequest, ModelTarget};

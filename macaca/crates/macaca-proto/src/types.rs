@@ -111,8 +111,8 @@ impl ApplicationId {
     pub fn from_name(name: &str) -> Self {
         // UUID v5 with a fixed namespace ensures deterministic IDs
         const MACACA_NS: Uuid = Uuid::from_bytes([
-            0x6d, 0x61, 0x63, 0x61, 0x63, 0x61, 0x2d, 0x6f,
-            0x73, 0x2d, 0x61, 0x70, 0x70, 0x2d, 0x6e, 0x73,
+            0x6d, 0x61, 0x63, 0x61, 0x63, 0x61, 0x2d, 0x6f, 0x73, 0x2d, 0x61, 0x70, 0x70, 0x2d,
+            0x6e, 0x73,
         ]);
         Self(Uuid::new_v5(&MACACA_NS, name.as_bytes()))
     }
@@ -493,8 +493,16 @@ pub struct TodoGoal {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TodoGoalStatus {
     Pending,
+    /// Planner is decomposing the goal into subtasks.
+    Decomposing,
     InProgress,
+    /// GoalEvaluator is assessing whether the goal is satisfied.
+    Evaluating,
     Completed,
+    /// Goal was cancelled (e.g. session cleanup).
+    Cancelled,
+    /// Goal decomposition or evaluation failed.
+    Failed,
 }
 
 /// Reference to tasks owned by another agent, used for cross-agent dependency declarations.
@@ -508,7 +516,11 @@ pub enum AgentTaskRef {
 }
 
 impl TodoGoal {
-    pub fn new(application_id: ApplicationId, session_id: Option<String>, description: impl Into<String>) -> Self {
+    pub fn new(
+        application_id: ApplicationId,
+        session_id: Option<String>,
+        description: impl Into<String>,
+    ) -> Self {
         Self {
             id: TaskId::new(),
             application_id,
@@ -677,7 +689,10 @@ impl LlmMessage {
     }
 
     /// Create an assistant message that requests tool calls.
-    pub fn assistant_with_tool_calls(content: impl Into<String>, tool_calls: Vec<ToolCall>) -> Self {
+    pub fn assistant_with_tool_calls(
+        content: impl Into<String>,
+        tool_calls: Vec<ToolCall>,
+    ) -> Self {
         Self {
             role: LlmRole::Assistant,
             content: content.into(),
@@ -747,14 +762,27 @@ pub struct AgentOutput {
     pub tokens_used: TokenUsage,
 }
 
-// ── Task Context (for memory retrieval) ──
+// ── Task Context (execution context passed with delegated tasks) ──
 
+/// Additional context for task execution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TaskContext {
-    pub task_id: TaskId,
-    pub description: String,
-    pub agent_id: AgentId,
-    pub history: Vec<String>,
+    /// Session ID for conversation continuity.
+    pub session_id: Option<String>,
+    /// Files or artifacts relevant to the task.
+    pub artifacts: Vec<String>,
+    /// Environment variables or configuration.
+    pub env: std::collections::HashMap<String, String>,
+}
+
+impl Default for TaskContext {
+    fn default() -> Self {
+        Self {
+            session_id: None,
+            artifacts: vec![],
+            env: std::collections::HashMap::new(),
+        }
+    }
 }
 
 // ── Event Log Types ──
@@ -772,12 +800,32 @@ pub struct EventEntry {
     /// "error", "delegated_task_start", "delegated_thinking", "delegated_tool_call",
     /// "delegated_tool_result", "delegated_assistant", "delegated_cc_trace",
     /// "delegated_completed", "delegated_task_complete", "delegated_task_error",
-    /// "plan_decision", "loop_paused", "loop_resumed", "fork_created", etc.
+    /// "plan_decision", "loop_paused", "loop_resumed", "fork_created",
+    /// "run_trace" (structured pipeline phases), etc.
     pub event_type: String,
     /// Source of the event: "coordinator", "executor:backend", "plan_loop", "worker_loop", etc.
     pub source: String,
     /// Event payload (varies by event_type).
     pub payload: serde_json::Value,
+}
+
+/// Structured payload for `event_type == "run_trace"` — pipeline / health checkpoints.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RunTracePayload {
+    /// Logical phase, e.g. `chat.request`, `delegate.task_start`, `coordinator.llm_error`.
+    pub phase: String,
+    /// Subsystem emitting the checkpoint: `coordinator`, `executor`, `plan_loop`, ...
+    pub component: String,
+    /// `ok` | `error` | `waiting` | `info`
+    pub status: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub task_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub goal_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extra: Option<serde_json::Value>,
 }
 
 // ── Agent Execution Events ──
@@ -808,9 +856,7 @@ pub enum AgentExecutionEvent {
         is_error: Option<bool>,
     },
     /// Agent produced assistant content
-    Assistant {
-        content: String,
-    },
+    Assistant { content: String },
     /// Claude Code execution trace (for claude_code_execute tool)
     CcTrace {
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -861,7 +907,11 @@ impl AgentExecutionEvent {
     }
 
     /// Create a tool call event with call ID
-    pub fn tool_call_with_id(tool_name: String, tool_input: serde_json::Value, call_id: String) -> Self {
+    pub fn tool_call_with_id(
+        tool_name: String,
+        tool_input: serde_json::Value,
+        call_id: String,
+    ) -> Self {
         Self::ToolCall {
             tool_name,
             tool_input,
@@ -1059,7 +1109,11 @@ mod tests {
         let resp = LlmResponse {
             content: String::new(),
             model: "gpt-4".into(),
-            usage: TokenUsage { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+            usage: TokenUsage {
+                prompt_tokens: 10,
+                completion_tokens: 5,
+                total_tokens: 15,
+            },
             finish_reason: "tool_calls".into(),
             tool_calls: Some(vec![ToolCall {
                 id: "call_1".into(),
@@ -1085,7 +1139,13 @@ mod tests {
     #[test]
     fn todo_item_sequence_number_default() {
         let item = TodoItem::new(
-            ApplicationId::new(), None, "agent1", "plan", "Test task", "desc", 5,
+            ApplicationId::new(),
+            None,
+            "agent1",
+            "plan",
+            "Test task",
+            "desc",
+            5,
         );
         assert_eq!(item.sequence_number, 0);
     }
@@ -1093,7 +1153,13 @@ mod tests {
     #[test]
     fn todo_item_serialize_with_sequence_number() {
         let mut item = TodoItem::new(
-            ApplicationId::new(), None, "agent1", "plan", "Test", "desc", 5,
+            ApplicationId::new(),
+            None,
+            "agent1",
+            "plan",
+            "Test",
+            "desc",
+            5,
         );
         item.sequence_number = 3;
         let json = serde_json::to_string(&item).unwrap();
@@ -1128,7 +1194,9 @@ mod tests {
 
     #[test]
     fn agent_task_ref_serialize_roundtrip() {
-        let all = AgentTaskRef::AllTasks { agent: "architect".into() };
+        let all = AgentTaskRef::AllTasks {
+            agent: "architect".into(),
+        };
         let json = serde_json::to_string(&all).unwrap();
         let parsed: AgentTaskRef = serde_json::from_str(&json).unwrap();
         match parsed {

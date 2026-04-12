@@ -4,7 +4,6 @@
 //! routes.rs calls `spawn_session_event_collector()` with the session_id;
 //! this module handles the rest.
 
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use tokio::task::JoinHandle;
@@ -12,6 +11,8 @@ use tokio::task::JoinHandle;
 use macaca_kernel::executor::app_executor::ApplicationExecutor;
 use macaca_kernel::executor::ExecutorEvent;
 use macaca_persist::EventLog;
+
+use crate::run_trace::{phase, status, RunTracer};
 
 /// Spawn a per-session event collector that subscribes to executor events
 /// and writes them to the EventLog keyed by `session_id`.
@@ -23,35 +24,50 @@ use macaca_persist::EventLog;
 pub fn spawn_session_event_collector(
     executor: Arc<ApplicationExecutor>,
     event_log: Arc<EventLog>,
+    run_tracer: Arc<RunTracer>,
     session_id: String,
-    collector: Arc<crate::routes::AgentTraceCollector>,
+    collector: Arc<crate::session::AgentTraceCollector>,
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
         let mut evt_rx = executor.subscribe_to_events();
-        let mut task_to_agent: HashMap<String, String> = HashMap::new();
-
         loop {
             match evt_rx.recv().await {
                 Ok(event) => {
                     // 1. Feed the AgentTraceCollector (for session save compatibility).
                     match &event {
                         ExecutorEvent::TaskStarted { task_id, agent } => {
-                            task_to_agent.insert(task_id.to_string(), agent.clone());
                             collector.on_task_started(&task_id.to_string(), agent).await;
                         }
-                        ExecutorEvent::AgentEvent { task_id, agent, event: agent_event } => {
-                            collector.on_agent_event(&task_id.to_string(), agent, agent_event).await;
+                        ExecutorEvent::AgentEvent {
+                            task_id,
+                            agent,
+                            event: agent_event,
+                        } => {
+                            collector
+                                .on_agent_event(&task_id.to_string(), agent, agent_event)
+                                .await;
                         }
-                        ExecutorEvent::TaskCompleted { task_id, result } => {
-                            collector.on_task_completed(
-                                &task_id.to_string(), result.success,
-                                Some(result.output.clone()), None,
-                            ).await;
+                        ExecutorEvent::TaskCompleted {
+                            task_id, result, ..
+                        } => {
+                            collector
+                                .on_task_completed(
+                                    &task_id.to_string(),
+                                    result.success,
+                                    Some(result.output.clone()),
+                                    None,
+                                )
+                                .await;
                         }
-                        ExecutorEvent::TaskFailed { task_id, error } => {
-                            collector.on_task_completed(
-                                &task_id.to_string(), false, None, Some(error.clone()),
-                            ).await;
+                        ExecutorEvent::TaskFailed { task_id, error, .. } => {
+                            collector
+                                .on_task_completed(
+                                    &task_id.to_string(),
+                                    false,
+                                    None,
+                                    Some(error.clone()),
+                                )
+                                .await;
                         }
                         _ => {}
                     }
@@ -65,38 +81,65 @@ pub fn spawn_session_event_collector(
                                 "agent": agent,
                             }),
                         ),
-                        ExecutorEvent::AgentEvent { task_id, agent, event: ref agent_evt } => {
+                        ExecutorEvent::AgentEvent {
+                            task_id,
+                            agent,
+                            event: ref agent_evt,
+                        } => {
                             let sub = match agent_evt {
-                                macaca_proto::AgentExecutionEvent::Thinking { .. } => "delegated_thinking",
-                                macaca_proto::AgentExecutionEvent::ToolCall { .. } => "delegated_tool_call",
-                                macaca_proto::AgentExecutionEvent::ToolResult { .. } => "delegated_tool_result",
-                                macaca_proto::AgentExecutionEvent::Assistant { .. } => "delegated_assistant",
-                                macaca_proto::AgentExecutionEvent::CcTrace { .. } => "delegated_cc_trace",
-                                macaca_proto::AgentExecutionEvent::Completed { .. } => "delegated_done",
+                                macaca_proto::AgentExecutionEvent::Thinking { .. } => {
+                                    "delegated_thinking"
+                                }
+                                macaca_proto::AgentExecutionEvent::ToolCall { .. } => {
+                                    "delegated_tool_call"
+                                }
+                                macaca_proto::AgentExecutionEvent::ToolResult { .. } => {
+                                    "delegated_tool_result"
+                                }
+                                macaca_proto::AgentExecutionEvent::Assistant { .. } => {
+                                    "delegated_assistant"
+                                }
+                                macaca_proto::AgentExecutionEvent::CcTrace { .. } => {
+                                    "delegated_cc_trace"
+                                }
+                                macaca_proto::AgentExecutionEvent::Completed { .. } => {
+                                    "delegated_done"
+                                }
                             };
-                            (sub, serde_json::json!({
-                                "task_id": task_id.to_string(),
-                                "agent": agent,
-                                "event": agent_evt,
-                            }))
-                        },
-                        ExecutorEvent::TaskCompleted { task_id, result } => {
-                            let agent = task_to_agent.get(&task_id.to_string()).cloned().unwrap_or_default();
-                            ("delegated_task_complete", serde_json::json!({
+                            (
+                                sub,
+                                serde_json::json!({
+                                    "task_id": task_id.to_string(),
+                                    "agent": agent,
+                                    "event": agent_evt,
+                                }),
+                            )
+                        }
+                        ExecutorEvent::TaskCompleted {
+                            task_id,
+                            agent,
+                            result,
+                        } => (
+                            "delegated_task_complete",
+                            serde_json::json!({
                                 "task_id": task_id.to_string(),
                                 "agent": agent,
                                 "output": result.output,
                                 "success": result.success,
-                            }))
-                        },
-                        ExecutorEvent::TaskFailed { task_id, error } => {
-                            let agent = task_to_agent.get(&task_id.to_string()).cloned().unwrap_or_default();
-                            ("delegated_task_error", serde_json::json!({
+                            }),
+                        ),
+                        ExecutorEvent::TaskFailed {
+                            task_id,
+                            agent,
+                            error,
+                        } => (
+                            "delegated_task_error",
+                            serde_json::json!({
                                 "task_id": task_id.to_string(),
                                 "agent": agent,
                                 "error": error,
-                            }))
-                        },
+                            }),
+                        ),
                         ExecutorEvent::TaskCancelled { task_id } => (
                             "delegated_task_cancelled",
                             serde_json::json!({"task_id": task_id.to_string()}),
@@ -108,14 +151,58 @@ pub fn spawn_session_event_collector(
                         ExecutorEvent::HookEvent { .. } | ExecutorEvent::Shutdown => continue,
                     };
 
-                    event_log.append(&session_id, evt_type, "executor", evt_payload).await;
+                    event_log
+                        .append(&session_id, evt_type, "executor", evt_payload)
+                        .await;
 
-                    // Clean up local state on terminal events.
                     match &event {
-                        ExecutorEvent::TaskCompleted { task_id, .. }
-                        | ExecutorEvent::TaskFailed { task_id, .. }
-                        | ExecutorEvent::TaskCancelled { task_id } => {
-                            task_to_agent.remove(&task_id.to_string());
+                        ExecutorEvent::TaskStarted { task_id, agent } => {
+                            run_tracer
+                                .emit(
+                                    &session_id,
+                                    phase::DELEGATE_TASK_START,
+                                    "executor",
+                                    status::INFO,
+                                    Some(format!("agent={agent}")),
+                                    Some(task_id.to_string()),
+                                    None,
+                                    None,
+                                )
+                                .await;
+                        }
+                        ExecutorEvent::TaskCompleted {
+                            task_id, result, ..
+                        } => {
+                            run_tracer
+                                .emit(
+                                    &session_id,
+                                    phase::DELEGATE_TASK_COMPLETE,
+                                    "executor",
+                                    if result.success {
+                                        status::OK
+                                    } else {
+                                        status::ERROR
+                                    },
+                                    None,
+                                    Some(task_id.to_string()),
+                                    None,
+                                    Some(serde_json::json!({"success": result.success})),
+                                )
+                                .await;
+                        }
+                        ExecutorEvent::TaskFailed { task_id, error, .. } => {
+                            run_tracer
+                                .emit(
+                                    &session_id,
+                                    phase::DELEGATE_TASK_FAILED,
+                                    "executor",
+                                    status::ERROR,
+                                    Some(error.clone()),
+                                    Some(task_id.to_string()),
+                                    None,
+                                    None,
+                                )
+                                .await;
                         }
                         _ => {}
                     }

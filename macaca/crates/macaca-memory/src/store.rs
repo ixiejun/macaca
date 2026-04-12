@@ -1,6 +1,15 @@
 use async_trait::async_trait;
-use macaca_proto::{AgentId, MacacaResult, MemoryEntry, MemoryId, TaskContext};
+use macaca_proto::{AgentId, MacacaResult, MemoryEntry, MemoryId, TaskId};
 use serde_json::Value;
+
+/// Context for memory retrieval queries (distinct from execution `TaskContext`).
+#[derive(Debug, Clone)]
+pub struct MemoryQueryContext {
+    pub task_id: TaskId,
+    pub description: String,
+    pub agent_id: AgentId,
+    pub history: Vec<String>,
+}
 
 /// Search result from a vector store.
 #[derive(Debug, Clone)]
@@ -17,13 +26,17 @@ pub trait MemoryStore: Send + Sync {
     async fn retrieve(&self, query: &str, limit: usize) -> MacacaResult<Vec<MemoryEntry>>;
     async fn get(&self, id: &MemoryId) -> MacacaResult<Option<MemoryEntry>>;
     async fn delete(&self, id: &MemoryId) -> MacacaResult<()>;
-    async fn list(&self, agent_id: Option<&AgentId>, limit: usize) -> MacacaResult<Vec<MemoryEntry>>;
+    async fn list(
+        &self,
+        agent_id: Option<&AgentId>,
+        limit: usize,
+    ) -> MacacaResult<Vec<MemoryEntry>>;
 }
 
 /// Automatically retrieves memory relevant to a task context.
 #[async_trait]
 pub trait MemoryRetriever: Send + Sync {
-    async fn auto_retrieve(&self, context: &TaskContext) -> MacacaResult<Vec<MemoryEntry>>;
+    async fn auto_retrieve(&self, context: &MemoryQueryContext) -> MacacaResult<Vec<MemoryEntry>>;
 }
 
 /// Converts text into embedding vectors.
@@ -37,6 +50,7 @@ pub trait EmbeddingProvider: Send + Sync {
 #[async_trait]
 pub trait VectorStore: Send + Sync {
     async fn upsert(&self, id: &str, vector: Vec<f32>, payload: Value) -> MacacaResult<()>;
-    async fn search(&self, vector: Vec<f32>, limit: usize) -> MacacaResult<Vec<VectorSearchResult>>;
+    async fn search(&self, vector: Vec<f32>, limit: usize)
+        -> MacacaResult<Vec<VectorSearchResult>>;
     async fn delete(&self, id: &str) -> MacacaResult<()>;
 }

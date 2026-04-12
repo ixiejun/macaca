@@ -105,7 +105,11 @@ pub fn mask_sensitive(text: &str) -> String {
 /// 截断长文本
 pub fn truncate(text: &str, max_len: usize) -> String {
     if text.len() > max_len {
-        format!("{}... [truncated {} chars]", &text[..max_len], text.len() - max_len)
+        format!(
+            "{}... [truncated {} chars]",
+            &text[..max_len],
+            text.len() - max_len
+        )
     } else {
         text.to_string()
     }
@@ -212,12 +216,7 @@ pub fn log_operation_start(ctx: &LogContext, operation: &str, description: Optio
 }
 
 /// 记录操作完成
-pub fn log_operation_complete(
-    ctx: &LogContext,
-    operation: &str,
-    elapsed: Duration,
-    result: &str,
-) {
+pub fn log_operation_complete(ctx: &LogContext, operation: &str, elapsed: Duration, result: &str) {
     info!(
         trace_id = %ctx.trace_id,
         task_id = ?ctx.task_id,
@@ -233,12 +232,7 @@ pub fn log_operation_complete(
 }
 
 /// 记录操作错误
-pub fn log_operation_error(
-    ctx: &LogContext,
-    operation: &str,
-    error: &str,
-    recoverable: bool,
-) {
+pub fn log_operation_error(ctx: &LogContext, operation: &str, error: &str, recoverable: bool) {
     if recoverable {
         warn!(
             trace_id = %ctx.trace_id,
@@ -323,12 +317,7 @@ pub fn log_hook_event(
 }
 
 /// 记录工具调用
-pub fn log_tool_call(
-    ctx: &LogContext,
-    tool_name: &str,
-    tool_input: &str,
-    is_error: bool,
-) {
+pub fn log_tool_call(ctx: &LogContext, tool_name: &str, tool_input: &str, is_error: bool) {
     let masked_input = mask_json_params(tool_input);
     let truncated_input = truncate(&masked_input, 500);
 
@@ -354,12 +343,7 @@ pub fn log_tool_call(
 }
 
 /// 记录调度决策
-pub fn log_scheduling_decision(
-    ctx: &LogContext,
-    from_agent: &str,
-    to_agent: &str,
-    reason: &str,
-) {
+pub fn log_scheduling_decision(ctx: &LogContext, from_agent: &str, to_agent: &str, reason: &str) {
     info!(
         trace_id = %ctx.trace_id,
         task_id = ?ctx.task_id,
@@ -400,7 +384,12 @@ impl LogTimer {
 }
 
 /// 调试级别的详细日志
-pub fn log_debug(ctx: &LogContext, component: &str, message: &str, details: Option<HashMap<String, String>>) {
+pub fn log_debug(
+    ctx: &LogContext,
+    component: &str,
+    message: &str,
+    details: Option<HashMap<String, String>>,
+) {
     match details {
         Some(d) => {
             debug!(
@@ -440,7 +429,10 @@ mod tests {
     #[test]
     fn test_truncate() {
         assert_eq!(truncate("short", 10), "short");
-        assert_eq!(truncate("this is a long text", 10), "this is a ... [truncated 9 chars]");
+        assert_eq!(
+            truncate("this is a long text", 10),
+            "this is a ... [truncated 9 chars]"
+        );
     }
 
     #[test]

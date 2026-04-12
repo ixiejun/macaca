@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use macaca_proto::{MacacaResult, IpcMessage};
+use macaca_proto::{IpcMessage, MacacaResult};
 
 /// Sends messages to agents or topics.
 #[async_trait]

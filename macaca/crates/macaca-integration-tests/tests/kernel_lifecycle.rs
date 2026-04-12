@@ -9,7 +9,7 @@ use macaca_kernel::Kernel;
 use macaca_llm::LlmProvider;
 use macaca_proto::config::KernelConfig;
 use macaca_proto::{
-    AgentId, MacacaError, MacacaResult, LlmMessage, LlmOptions, LlmResponse, TokenUsage,
+    AgentId, LlmMessage, LlmOptions, LlmResponse, MacacaError, MacacaResult, TokenUsage,
 };
 use macaca_sdk::{AgentBuilder, AgentConfig};
 use macaca_tools::DefaultToolSet;
@@ -167,7 +167,9 @@ async fn sdk_register_from_config_end_to_end() {
     let kernel = make_kernel();
     let config = sample_agent_config("sdk-agent");
 
-    let id = macaca_sdk::register_from_config(&kernel, config).await.unwrap();
+    let id = macaca_sdk::register_from_config(&kernel, config)
+        .await
+        .unwrap();
 
     assert_eq!(kernel.agent_count().await, 1);
     let agents = kernel.list_agents().await;

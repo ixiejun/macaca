@@ -12,6 +12,7 @@ use macaca_proto::{
 };
 
 use crate::provider::LlmProvider;
+use crate::tool_wire::tool_arguments_for_chat_api;
 
 /// A generic provider for any OpenAI-compatible API endpoint.
 pub struct OpenAiCompatibleProvider {
@@ -27,25 +28,28 @@ impl OpenAiCompatibleProvider {
         base_url: impl Into<String>,
         api_key: impl Into<String>,
     ) -> Self {
+        let base_url = base_url.into().trim().trim_end_matches('/').to_string();
         Self {
             provider_name: name.into(),
             api_key: api_key.into(),
-            base_url: base_url.into(),
-            client: reqwest::Client::builder().no_proxy().build().unwrap_or_default(),
+            base_url,
+            client: reqwest::Client::builder()
+                .no_proxy()
+                .build()
+                .unwrap_or_default(),
         }
     }
 
     pub fn from_env(
         name: impl Into<String>,
         base_url: impl Into<String>,
-        api_key_env: &str,
+        env_var_name: &str,
     ) -> MacacaResult<Self> {
-        let api_key = if api_key_env.is_empty() {
+        let api_key = if env_var_name.is_empty() {
             String::new()
         } else {
-            std::env::var(api_key_env).map_err(|_| {
-                MacacaError::Config(format!("{api_key_env} not set"))
-            })?
+            std::env::var(env_var_name)
+                .map_err(|_| MacacaError::Config(format!("{env_var_name} not set")))?
         };
         Ok(Self::new(name, base_url, api_key))
     }
@@ -149,7 +153,11 @@ fn role_str(role: LlmRole) -> &'static str {
 fn convert_message(m: &LlmMessage) -> ChatMessage {
     let mut msg = ChatMessage {
         role: role_str(m.role).to_owned(),
-        content: if m.content.is_empty() { None } else { Some(m.content.clone()) },
+        content: if m.content.is_empty() {
+            None
+        } else {
+            Some(m.content.clone())
+        },
         tool_calls: None,
         tool_call_id: m.tool_call_id.clone(),
     };
@@ -162,7 +170,7 @@ fn convert_message(m: &LlmMessage) -> ChatMessage {
                     call_type: "function".into(),
                     function: OaiFunctionCall {
                         name: tc.name.clone(),
-                        arguments: tc.arguments.to_string(),
+                        arguments: tool_arguments_for_chat_api(&tc.arguments),
                     },
                 })
                 .collect(),
@@ -249,13 +257,9 @@ impl LlmProvider for OpenAiCompatibleProvider {
             MacacaError::Llm(format!("{} response parse failed: {e}", self.provider_name))
         })?;
 
-        let choice = resp
-            .choices
-            .into_iter()
-            .next()
-            .ok_or_else(|| {
-                MacacaError::Llm(format!("{} returned no choices", self.provider_name))
-            })?;
+        let choice = resp.choices.into_iter().next().ok_or_else(|| {
+            MacacaError::Llm(format!("{} returned no choices", self.provider_name))
+        })?;
 
         let content = choice.message.content.unwrap_or_default();
         let finish_reason = choice.finish_reason.unwrap_or_else(|| "stop".into());

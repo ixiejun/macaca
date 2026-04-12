@@ -69,9 +69,7 @@ async fn live_dashscope_qwen3_max_chat() {
     println!("Content: {}", response.content);
     println!(
         "Tokens: {} prompt + {} completion = {} total",
-        response.usage.prompt_tokens,
-        response.usage.completion_tokens,
-        response.usage.total_tokens,
+        response.usage.prompt_tokens, response.usage.completion_tokens, response.usage.total_tokens,
     );
     println!("Finish reason: {}", response.finish_reason);
 
@@ -96,7 +94,9 @@ async fn live_fullstack_autodev_architect_qwen3() {
 
     // 2. Load the architect persona.
     let persona_dir = app_dir().join("personas/architect");
-    let persona = AgentPersona::load_from_directory(&persona_dir).await.unwrap();
+    let persona = AgentPersona::load_from_directory(&persona_dir)
+        .await
+        .unwrap();
     let system_prompt = persona.to_system_prompt(Some(
         "You are an agent in the Agent OS fullstack-autodev application. \
          Your task is to analyze project requirements and create a technical specification.",
@@ -147,9 +147,7 @@ async fn live_fullstack_autodev_architect_qwen3() {
     println!("Model: {}", response.model);
     println!(
         "Tokens: {} prompt + {} completion = {} total",
-        response.usage.prompt_tokens,
-        response.usage.completion_tokens,
-        response.usage.total_tokens,
+        response.usage.prompt_tokens, response.usage.completion_tokens, response.usage.total_tokens,
     );
     println!("Finish reason: {}", response.finish_reason);
     println!("\n{}", response.content);
@@ -177,7 +175,9 @@ async fn live_fullstack_autodev_kernel_execution() {
 
     // 1. Load persona for architect.
     let persona_dir = app_dir().join("personas/architect");
-    let persona = AgentPersona::load_from_directory(&persona_dir).await.unwrap();
+    let persona = AgentPersona::load_from_directory(&persona_dir)
+        .await
+        .unwrap();
     let system_prompt = persona.to_system_prompt(Some(
         "You are the Architect Agent in the Agent OS. \
          Analyze requirements and produce technical specifications.",

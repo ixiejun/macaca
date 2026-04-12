@@ -1,12 +1,9 @@
 //! Agent registry — stores and manages registered agents and their manifests.
 
-use std::{
-    collections::HashMap,
-    sync::Arc,
-};
-use tokio::sync::RwLock;
 use macaca_agent::Agent;
 use macaca_proto::{AgentId, AgentManifest, MacacaError, MacacaResult};
+use std::{collections::HashMap, sync::Arc};
+use tokio::sync::RwLock;
 
 // ── AgentEntry ────────────────────────────────────────────────────────────────
 
@@ -121,13 +118,13 @@ impl AgentRegistry {
 mod tests {
     use super::*;
     use async_trait::async_trait;
+    use chrono::Utc;
     use macaca_agent::AgentServices;
     use macaca_llm::LlmProvider;
-    use macaca_tools::ToolSet;
     use macaca_proto::{
         AgentOutput, AgentState, Capability, Permission, PermissionLevel, TokenUsage,
     };
-    use chrono::Utc;
+    use macaca_tools::ToolSet;
 
     fn make_manifest(id: AgentId, state: AgentState) -> AgentManifest {
         AgentManifest {
@@ -153,9 +150,15 @@ mod tests {
 
     #[async_trait]
     impl Agent for MockAgent {
-        fn id(&self) -> AgentId { self.id }
-        fn capabilities(&self) -> &[Capability] { &[] }
-        fn state(&self) -> AgentState { self.state }
+        fn id(&self) -> AgentId {
+            self.id
+        }
+        fn capabilities(&self) -> &[Capability] {
+            &[]
+        }
+        fn state(&self) -> AgentState {
+            self.state
+        }
         async fn run(
             &self,
             _llm: &dyn LlmProvider,
@@ -232,8 +235,14 @@ mod tests {
         let reg = AgentRegistry::new(10);
         let id = AgentId::new();
         let manifest = make_manifest(id, AgentState::Running);
-        let agent1 = Box::new(MockAgent { id, state: AgentState::Running });
-        let agent2 = Box::new(MockAgent { id, state: AgentState::Running });
+        let agent1 = Box::new(MockAgent {
+            id,
+            state: AgentState::Running,
+        });
+        let agent2 = Box::new(MockAgent {
+            id,
+            state: AgentState::Running,
+        });
         reg.register(agent1, manifest.clone()).await.unwrap();
         let err = reg.register(agent2, manifest).await.unwrap_err();
         assert!(matches!(err, MacacaError::Agent(_)));

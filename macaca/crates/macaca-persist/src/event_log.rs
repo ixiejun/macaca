@@ -4,14 +4,14 @@
 //! Events are never modified or deleted during normal operation.
 
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 
 use tokio::sync::RwLock;
 
-use macaca_proto::types::EventEntry;
 use crate::store::PersistStore;
 use crate::RedbStore;
+use macaca_proto::types::EventEntry;
 
 const EVENTS_PREFIX: &str = "events/";
 
@@ -123,12 +123,7 @@ impl EventLog {
 
     /// Query events for a session, starting from `since_seq` (exclusive).
     /// Returns events with seq > since_seq, up to `limit`.
-    pub async fn query(
-        &self,
-        session_id: &str,
-        since_seq: u64,
-        limit: usize,
-    ) -> Vec<EventEntry> {
+    pub async fn query(&self, session_id: &str, since_seq: u64, limit: usize) -> Vec<EventEntry> {
         let prefix = Self::session_prefix(session_id);
         let keys = self.store.list_keys(&prefix).await.unwrap_or_default();
 
@@ -204,10 +199,20 @@ mod tests {
     async fn append_and_query() {
         let log = test_log().await;
         let s1 = log
-            .append("sess1", "thinking", "coordinator", serde_json::json!({"iteration": 1}))
+            .append(
+                "sess1",
+                "thinking",
+                "coordinator",
+                serde_json::json!({"iteration": 1}),
+            )
             .await;
         let s2 = log
-            .append("sess1", "tool_call", "coordinator", serde_json::json!({"tool": "list_agents"}))
+            .append(
+                "sess1",
+                "tool_call",
+                "coordinator",
+                serde_json::json!({"tool": "list_agents"}),
+            )
             .await;
         assert_eq!(s1, 1);
         assert_eq!(s2, 2);

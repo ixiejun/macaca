@@ -176,8 +176,7 @@ impl LlmProvider for ResilientLlmWrapper {
         options: &LlmOptions,
     ) -> MacacaResult<LlmResponse> {
         // Check budget before attempting any call.
-        if let (Some(max_usd), Some(ref tracker)) =
-            (self.config.max_budget_usd, &self.cost_tracker)
+        if let (Some(max_usd), Some(ref tracker)) = (self.config.max_budget_usd, &self.cost_tracker)
         {
             if tracker.is_over_budget(max_usd) {
                 return Err(macaca_proto::error::MacacaError::BudgetExceeded(format!(
@@ -239,10 +238,7 @@ impl LlmProvider for ResilientLlmWrapper {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use macaca_proto::{
-        error::MacacaError,
-        types::TokenUsage,
-    };
+    use macaca_proto::{error::MacacaError, types::TokenUsage};
     use std::sync::{
         atomic::{AtomicU32, Ordering},
         Arc,
@@ -354,7 +350,10 @@ mod tests {
         }
     }
 
-    fn fast_config_with_fallbacks(max_retries: u32, fallback_models: Vec<String>) -> ResilientConfig {
+    fn fast_config_with_fallbacks(
+        max_retries: u32,
+        fallback_models: Vec<String>,
+    ) -> ResilientConfig {
         ResilientConfig {
             fallback_models,
             ..fast_config(max_retries)
@@ -467,11 +466,14 @@ mod tests {
         });
         let tracker = CostTracker::new();
         // Record enough cost to exceed a $0.01 budget
-        tracker.record("gpt-4o", TokenUsage {
-            prompt_tokens: 10_000,
-            completion_tokens: 5_000,
-            total_tokens: 15_000,
-        });
+        tracker.record(
+            "gpt-4o",
+            TokenUsage {
+                prompt_tokens: 10_000,
+                completion_tokens: 5_000,
+                total_tokens: 15_000,
+            },
+        );
         let config = ResilientConfig {
             max_budget_usd: Some(0.01),
             ..fast_config(3)
@@ -560,10 +562,7 @@ mod tests {
             calls: calls.clone(),
             error_msg: "status 500 Internal Server Error".into(),
         });
-        let config = fast_config_with_fallbacks(
-            1,
-            vec!["fallback-a".into(), "fallback-b".into()],
-        );
+        let config = fast_config_with_fallbacks(1, vec!["fallback-a".into(), "fallback-b".into()]);
         let wrapper = ResilientLlmWrapper::new(provider).with_config(config);
         let options = LlmOptions {
             model: "primary-model".into(),

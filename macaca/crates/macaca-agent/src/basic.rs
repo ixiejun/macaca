@@ -3,7 +3,7 @@
 use async_trait::async_trait;
 use macaca_llm::LlmProvider;
 use macaca_proto::{
-    AgentId, AgentOutput, AgentState, MacacaResult, Capability, LlmMessage, LlmOptions,
+    AgentId, AgentOutput, AgentState, Capability, LlmMessage, LlmOptions, MacacaResult,
 };
 use macaca_tools::ToolSet;
 use tracing::instrument;
@@ -89,8 +89,8 @@ impl Agent for BasicAgent {
 mod tests {
     use super::*;
     use async_trait::async_trait;
-    use macaca_proto::{MacacaResult, LlmMessage, LlmOptions, LlmResponse, TokenUsage};
     use macaca_llm::LlmProvider;
+    use macaca_proto::{LlmMessage, LlmOptions, LlmResponse, MacacaResult, TokenUsage};
     use macaca_tools::DefaultToolSet;
 
     struct MockLlm;

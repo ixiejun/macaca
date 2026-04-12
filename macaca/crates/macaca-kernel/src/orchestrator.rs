@@ -11,11 +11,11 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 
 use macaca_proto::{
-    AgentId, TaskId, ApplicationId,
     orchestration::{
-        DelegatedTask, DelegatedTaskResult, OrchestrationCommand,
-        OrchestrationEvent, RoutingDecision, AgentRouting, AgentCapability,
+        AgentCapability, AgentRouting, DelegatedTask, DelegatedTaskResult, OrchestrationCommand,
+        OrchestrationEvent, RoutingDecision,
     },
+    AgentId, ApplicationId, TaskId,
 };
 
 /// Maximum pending tasks in the queue.
@@ -48,7 +48,11 @@ impl AgentOrchestrator {
     }
 
     /// Register capabilities for an agent.
-    pub async fn register_agent_capabilities(&self, agent_name: &str, capabilities: Vec<AgentCapability>) {
+    pub async fn register_agent_capabilities(
+        &self,
+        agent_name: &str,
+        capabilities: Vec<AgentCapability>,
+    ) {
         let mut caps = self.agent_capabilities.write().await;
         caps.insert(agent_name.to_string(), capabilities);
     }
@@ -70,10 +74,12 @@ impl AgentOrchestrator {
         let task_id = TaskId::new();
         let task = DelegatedTask {
             id: task_id,
-            from_agent,
-            to_agent: AgentId::new(), // Will be resolved when executed
+            application_id: ApplicationId::new(),
+            from_agent: from_agent.0.to_string(),
+            to_agent: to_agent_name.to_string(),
             prompt: prompt.clone(),
             priority,
+            parallel,
             created_at: chrono::Utc::now(),
             deadline: None,
             parent_task: None,
@@ -87,12 +93,15 @@ impl AgentOrchestrator {
         }
 
         // Emit event
-        let _ = self.event_tx.send(OrchestrationEvent::TaskDelegated {
-            task_id,
-            from_agent: format!("{}", from_agent.0),
-            to_agent: to_agent_name.to_string(),
-            prompt: prompt.clone(),
-        }).await;
+        let _ = self
+            .event_tx
+            .send(OrchestrationEvent::TaskDelegated {
+                task_id,
+                from_agent: format!("{}", from_agent.0),
+                to_agent: to_agent_name.to_string(),
+                prompt: prompt.clone(),
+            })
+            .await;
 
         task_id
     }
@@ -101,9 +110,7 @@ impl AgentOrchestrator {
     pub async fn get_next_task(&self) -> Option<DelegatedTask> {
         let pending = self.pending_tasks.read().await;
         // Find highest priority task
-        pending.values()
-            .max_by_key(|t| t.priority)
-            .cloned()
+        pending.values().max_by_key(|t| t.priority).cloned()
     }
 
     /// Report task completion.
@@ -123,18 +130,22 @@ impl AgentOrchestrator {
         }
 
         // Emit event
-        let _ = self.event_tx.send(OrchestrationEvent::TaskCompleted {
-            task_id,
-            agent: format!("{}", result.agent_id.0),
-            success: result.success,
-            output_preview: result.output.chars().take(100).collect(),
-        }).await;
+        let _ = self
+            .event_tx
+            .send(OrchestrationEvent::TaskCompleted {
+                task_id,
+                agent: format!("{}", result.agent_id.0),
+                success: result.success,
+                output_preview: result.output.chars().take(100).collect(),
+            })
+            .await;
     }
 
     /// Get results for specific tasks.
     pub async fn get_results(&self, task_ids: &[TaskId]) -> Vec<DelegatedTaskResult> {
         let completed = self.completed_tasks.read().await;
-        task_ids.iter()
+        task_ids
+            .iter()
             .filter_map(|id| completed.get(id).cloned())
             .collect()
     }
@@ -177,17 +188,25 @@ impl AgentOrchestrator {
             }
         }
 
-        // Default to coordinator if no match
-        best_agent.or_else(|| Some("coordinator".to_string()))
+        // Default to the first available agent if no match.
+        // Callers should configure an entry_agent in the app manifest
+        // to avoid relying on this positional fallback.
+        best_agent.or_else(|| capabilities.keys().next().cloned())
     }
 
     /// Parse orchestration command from LLM tool call.
-    pub fn parse_command(tool_name: &str, tool_input: &serde_json::Value) -> Option<OrchestrationCommand> {
+    pub fn parse_command(
+        tool_name: &str,
+        tool_input: &serde_json::Value,
+    ) -> Option<OrchestrationCommand> {
         match tool_name {
             "delegate_task" => {
                 let agent = tool_input.get("agent")?.as_str()?.to_string();
                 let prompt = tool_input.get("prompt")?.as_str()?.to_string();
-                let priority = tool_input.get("priority").and_then(|v| v.as_u64()).map(|v| v as u8);
+                let priority = tool_input
+                    .get("priority")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as u8);
                 let parallel = tool_input.get("parallel").and_then(|v| v.as_bool());
 
                 Some(OrchestrationCommand::Delegate {
@@ -215,7 +234,10 @@ impl AgentOrchestrator {
             "report_to_coordinator" => {
                 let success = tool_input.get("success")?.as_bool()?;
                 let output = tool_input.get("output")?.as_str()?.to_string();
-                let error = tool_input.get("error").and_then(|v| v.as_str()).map(|s| s.to_string());
+                let error = tool_input
+                    .get("error")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
 
                 Some(OrchestrationCommand::Report {
                     success,
@@ -249,10 +271,7 @@ impl OrchestratorBuilder {
 
     pub fn build(self) -> AgentOrchestrator {
         let (tx, _) = mpsc::channel(64);
-        AgentOrchestrator::new(
-            self.app_id,
-            self.event_tx.unwrap_or(tx),
-        )
+        AgentOrchestrator::new(self.app_id, self.event_tx.unwrap_or(tx))
     }
 }
 
@@ -267,24 +286,23 @@ mod tests {
         let orchestrator = AgentOrchestrator::new(app_id, tx);
 
         // Register an agent
-        orchestrator.register_agent_capabilities("frontend", vec![
-            AgentCapability {
-                name: "frontend_development".into(),
-                description: "Build UI components".into(),
-                keywords: vec!["ui".into(), "component".into(), "react".into()],
-                examples: vec!["create button".into(), "build form".into()],
-            }
-        ]).await;
+        orchestrator
+            .register_agent_capabilities(
+                "frontend",
+                vec![AgentCapability {
+                    name: "frontend_development".into(),
+                    description: "Build UI components".into(),
+                    keywords: vec!["ui".into(), "component".into(), "react".into()],
+                    examples: vec!["create button".into(), "build form".into()],
+                }],
+            )
+            .await;
 
         // Delegate a task
         let from = AgentId::new();
-        let task_id = orchestrator.delegate_task(
-            from,
-            "frontend",
-            "Create a login form".into(),
-            5,
-            false,
-        ).await;
+        let task_id = orchestrator
+            .delegate_task(from, "frontend", "Create a login form".into(), 5, false)
+            .await;
 
         // Get pending task
         let task = orchestrator.get_next_task().await;
@@ -315,29 +333,39 @@ mod tests {
         let orchestrator = AgentOrchestrator::new(app_id, tx);
 
         // Register agents
-        orchestrator.register_agent_capabilities("frontend", vec![
-            AgentCapability {
-                name: "frontend_dev".into(),
-                description: "Frontend development".into(),
-                keywords: vec!["ui".into(), "react".into(), "css".into()],
-                examples: vec![],
-            }
-        ]).await;
+        orchestrator
+            .register_agent_capabilities(
+                "frontend",
+                vec![AgentCapability {
+                    name: "frontend_dev".into(),
+                    description: "Frontend development".into(),
+                    keywords: vec!["ui".into(), "react".into(), "css".into()],
+                    examples: vec![],
+                }],
+            )
+            .await;
 
-        orchestrator.register_agent_capabilities("backend", vec![
-            AgentCapability {
-                name: "backend_dev".into(),
-                description: "Backend development".into(),
-                keywords: vec!["api".into(), "database".into(), "server".into()],
-                examples: vec![],
-            }
-        ]).await;
+        orchestrator
+            .register_agent_capabilities(
+                "backend",
+                vec![AgentCapability {
+                    name: "backend_dev".into(),
+                    description: "Backend development".into(),
+                    keywords: vec!["api".into(), "database".into(), "server".into()],
+                    examples: vec![],
+                }],
+            )
+            .await;
 
         // Test matching
-        let best = orchestrator.find_best_agent("Create a new REST API endpoint").await;
+        let best = orchestrator
+            .find_best_agent("Create a new REST API endpoint")
+            .await;
         assert_eq!(best, Some("backend".to_string()));
 
-        let best = orchestrator.find_best_agent("Build a beautiful UI component").await;
+        let best = orchestrator
+            .find_best_agent("Build a beautiful UI component")
+            .await;
         assert_eq!(best, Some("frontend".to_string()));
     }
 }

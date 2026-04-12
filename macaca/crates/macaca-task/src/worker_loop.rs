@@ -40,6 +40,8 @@ pub enum WorkerEvent {
         context: Option<String>,
         optimization_suggestions: Option<String>,
         attempt: u32,
+        /// Session scope for tracing / UI (mirrors `TodoItem.session_id`).
+        session_id: Option<String>,
     },
     /// A task needing optimization was found.
     RetryTask {
@@ -48,6 +50,7 @@ pub enum WorkerEvent {
         description: String,
         optimization_suggestions: String,
         attempt: u32,
+        session_id: Option<String>,
     },
     /// No tasks available — agent is idle.
     Idle,
@@ -93,7 +96,9 @@ impl WorkerLoop {
 
     /// Get a waker handle for this worker loop.
     pub fn waker(&self) -> WorkerLoopWaker {
-        WorkerLoopWaker { notify: Arc::clone(&self.notify) }
+        WorkerLoopWaker {
+            notify: Arc::clone(&self.notify),
+        }
     }
 
     /// Run the worker loop until shutdown is signaled.
@@ -126,21 +131,26 @@ impl WorkerLoop {
                 self.board.start_task(&task.id).await;
 
                 let claimed_id = task.id;
-                let _ = event_tx.send(WorkerEvent::TaskClaimed {
-                    task_id: task.id,
-                    title: task.title,
-                    description: task.description,
-                    acceptance_criteria: task.acceptance_criteria,
-                    context: task.context,
-                    optimization_suggestions: task.optimization_suggestions,
-                    attempt: task.attempt_count,
-                }).await;
+                let _ = event_tx
+                    .send(WorkerEvent::TaskClaimed {
+                        task_id: task.id,
+                        title: task.title,
+                        description: task.description,
+                        acceptance_criteria: task.acceptance_criteria,
+                        context: task.context,
+                        optimization_suggestions: task.optimization_suggestions,
+                        attempt: task.attempt_count,
+                        session_id: task.session_id.clone(),
+                    })
+                    .await;
 
                 // Wait for the task to leave InProgress before claiming the next one.
                 // Poll the board until the task status changes (completed, review, failed, etc.)
                 loop {
                     tokio::time::sleep(Duration::from_secs(5)).await;
-                    if shutdown.load(Ordering::SeqCst) { break; }
+                    if shutdown.load(Ordering::SeqCst) {
+                        break;
+                    }
                     match self.board.current_task().await {
                         Some(t) if t.id == claimed_id => {
                             // Still in progress — keep waiting
@@ -168,18 +178,23 @@ impl WorkerLoop {
                 self.board.start_task(&task.id).await;
 
                 let retry_id = task.id;
-                let _ = event_tx.send(WorkerEvent::RetryTask {
-                    task_id: task.id,
-                    title: task.title,
-                    description: task.description,
-                    optimization_suggestions: task.optimization_suggestions.unwrap_or_default(),
-                    attempt: task.attempt_count,
-                }).await;
+                let _ = event_tx
+                    .send(WorkerEvent::RetryTask {
+                        task_id: task.id,
+                        title: task.title,
+                        description: task.description,
+                        optimization_suggestions: task.optimization_suggestions.unwrap_or_default(),
+                        attempt: task.attempt_count,
+                        session_id: task.session_id.clone(),
+                    })
+                    .await;
 
                 // Wait for retry to complete before claiming next
                 loop {
                     tokio::time::sleep(Duration::from_secs(5)).await;
-                    if shutdown.load(Ordering::SeqCst) { break; }
+                    if shutdown.load(Ordering::SeqCst) {
+                        break;
+                    }
                     match self.board.current_task().await {
                         Some(t) if t.id == retry_id => continue,
                         _ => break,

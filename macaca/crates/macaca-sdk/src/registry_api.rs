@@ -18,10 +18,7 @@ pub async fn register_from_config(kernel: &Kernel, config: AgentConfig) -> Macac
 /// Load an agent config from a file and register the resulting agent with the kernel.
 ///
 /// File format is detected by extension (`.yaml`/`.yml` or `.toml`).
-pub async fn register_from_file(
-    kernel: &Kernel,
-    path: impl AsRef<Path>,
-) -> MacacaResult<AgentId> {
+pub async fn register_from_file(kernel: &Kernel, path: impl AsRef<Path>) -> MacacaResult<AgentId> {
     let config = AgentConfig::from_file(path)?;
     register_from_config(kernel, config).await
 }
@@ -33,10 +30,8 @@ mod tests {
 
     use async_trait::async_trait;
     use macaca_llm::LlmProvider;
-    use macaca_proto::{
-        MacacaResult as Res, LlmMessage, LlmOptions, LlmResponse, TokenUsage,
-    };
     use macaca_proto::config::KernelConfig;
+    use macaca_proto::{LlmMessage, LlmOptions, LlmResponse, MacacaResult as Res, TokenUsage};
     use macaca_tools::DefaultToolSet;
 
     struct MockLlm;

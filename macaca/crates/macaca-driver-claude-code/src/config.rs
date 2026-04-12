@@ -94,6 +94,12 @@ impl ClaudeCodeConfig {
         self.timeout_secs = secs;
         self
     }
+
+    /// Path to the Claude Code CLI binary (overrides default `"claude"` on `PATH`).
+    pub fn with_claude_bin(mut self, bin: impl Into<String>) -> Self {
+        self.claude_bin = bin.into();
+        self
+    }
 }
 
 #[cfg(test)]
@@ -115,7 +121,8 @@ mod tests {
         let config = ClaudeCodeConfig::new("/tmp/test")
             .with_model("claude-sonnet-4-20250514")
             .dangerously_skip_permissions()
-            .with_timeout(600);
+            .with_timeout(600)
+            .with_claude_bin("/opt/claude");
 
         assert_eq!(config.model.as_deref(), Some("claude-sonnet-4-20250514"));
         assert_eq!(
@@ -123,12 +130,12 @@ mod tests {
             PermissionMode::DangerouslySkipPermissions
         );
         assert_eq!(config.timeout_secs, 600);
+        assert_eq!(config.claude_bin, "/opt/claude");
     }
 
     #[test]
     fn serialize_roundtrip() {
-        let config = ClaudeCodeConfig::new("/tmp/work")
-            .with_model("test-model");
+        let config = ClaudeCodeConfig::new("/tmp/work").with_model("test-model");
         let json = serde_json::to_string(&config).unwrap();
         let parsed: ClaudeCodeConfig = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.model.as_deref(), Some("test-model"));

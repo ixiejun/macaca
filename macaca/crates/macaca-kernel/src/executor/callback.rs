@@ -17,10 +17,7 @@ pub enum CallbackType {
         artifacts: Vec<String>,
     },
     /// Task failed.
-    TaskFailed {
-        task_id: String,
-        error: String,
-    },
+    TaskFailed { task_id: String, error: String },
     /// Task progress update.
     TaskProgress {
         task_id: String,
@@ -192,10 +189,7 @@ impl CallbackDispatcher {
         task_id: String,
         error: String,
     ) -> Result<(), DispatchError> {
-        let callback = Callback::new(
-            target_agent,
-            CallbackType::TaskFailed { task_id, error },
-        );
+        let callback = Callback::new(target_agent, CallbackType::TaskFailed { task_id, error });
         self.queue(callback).await
     }
 
@@ -238,15 +232,17 @@ impl CallbackDispatcher {
                 let target_agent = callback.target_agent.clone();
 
                 let msg = match callback.callback {
-                    CallbackType::TaskCompleted { task_id, output, .. } => {
-                        CoordinatorMessage::task_completed(task_id, output)
-                    }
+                    CallbackType::TaskCompleted {
+                        task_id, output, ..
+                    } => CoordinatorMessage::task_completed(task_id, output),
                     CallbackType::TaskFailed { task_id, error } => {
                         CoordinatorMessage::task_failed(task_id, error)
                     }
-                    CallbackType::TaskProgress { task_id, step, output } => {
-                        CoordinatorMessage::task_progress(task_id, step, output)
-                    }
+                    CallbackType::TaskProgress {
+                        task_id,
+                        step,
+                        output,
+                    } => CoordinatorMessage::task_progress(task_id, step, output),
                 };
 
                 if tx.try_send(msg).is_ok() {

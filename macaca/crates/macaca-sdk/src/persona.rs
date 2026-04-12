@@ -198,7 +198,10 @@ mod tests {
         let prompt = persona.to_system_prompt(None);
         let boot_pos = prompt.find("## Bootstrap").unwrap();
         let heart_pos = prompt.find("## Heartbeat").unwrap();
-        assert!(boot_pos < heart_pos, "Bootstrap should come before Heartbeat");
+        assert!(
+            boot_pos < heart_pos,
+            "Bootstrap should come before Heartbeat"
+        );
     }
 
     #[tokio::test]

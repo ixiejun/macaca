@@ -2,7 +2,9 @@
 
 use async_trait::async_trait;
 use macaca_llm::LlmProvider;
-use macaca_proto::{AgentId, AgentOutput, AgentState, MacacaResult, Capability, MemoryEntry, MemoryId, IpcMessage};
+use macaca_proto::{
+    AgentId, AgentOutput, AgentState, Capability, IpcMessage, MacacaResult, MemoryEntry, MemoryId,
+};
 use macaca_tools::ToolSet;
 
 // ── Service injection traits ──────────────────────────────────────────────────

@@ -4,8 +4,10 @@ use std::sync::Arc;
 
 use macaca_agent::AgentServices;
 use macaca_llm::LlmProvider;
-use macaca_proto::{AgentActivity, AgentId, AgentManifest, AgentOutput, AgentState, MacacaError, MacacaResult};
 use macaca_proto::config::KernelConfig;
+use macaca_proto::{
+    AgentActivity, AgentId, AgentManifest, AgentOutput, AgentState, MacacaError, MacacaResult,
+};
 use macaca_tools::ToolSet;
 
 use crate::registry::AgentRegistry;
@@ -23,11 +25,7 @@ pub struct Kernel {
 
 impl Kernel {
     /// Create a new kernel with the given configuration.
-    pub fn new(
-        config: &KernelConfig,
-        llm: Arc<dyn LlmProvider>,
-        tools: Box<dyn ToolSet>,
-    ) -> Self {
+    pub fn new(config: &KernelConfig, llm: Arc<dyn LlmProvider>, tools: Box<dyn ToolSet>) -> Self {
         Self {
             registry: AgentRegistry::new(config.max_agents),
             scheduler: Box::new(SimpleScheduler),
@@ -48,7 +46,9 @@ impl Kernel {
         self.registry.register(agent, manifest).await?;
         // Register status tracking
         self.status_tracker.register(id, name).await;
-        self.status_tracker.update_state(&id, AgentState::Running).await;
+        self.status_tracker
+            .update_state(&id, AgentState::Running)
+            .await;
         Ok(id)
     }
 
@@ -69,13 +69,18 @@ impl Kernel {
         let tools = Arc::clone(&self.tools);
 
         // Mark as thinking
-        self.status_tracker.set_thinking(agent_id, "executing agent").await;
+        self.status_tracker
+            .set_thinking(agent_id, "executing agent")
+            .await;
 
         let map = self.registry.agents_read().await;
-        let entry = map.get(agent_id).ok_or_else(|| {
-            MacacaError::NotFound(format!("Agent {} not found", agent_id.0))
-        })?;
-        let output = entry.agent.run(llm.as_ref(), tools.as_ref(), &services).await;
+        let entry = map
+            .get(agent_id)
+            .ok_or_else(|| MacacaError::NotFound(format!("Agent {} not found", agent_id.0)))?;
+        let output = entry
+            .agent
+            .run(llm.as_ref(), tools.as_ref(), &services)
+            .await;
 
         // Mark as idle after execution
         self.status_tracker.set_idle(agent_id).await;
@@ -116,11 +121,16 @@ impl Kernel {
 
     /// Update agent activity status.
     pub async fn update_agent_activity(&self, agent_id: &AgentId, activity: AgentActivity) {
-        self.status_tracker.update_activity(agent_id, activity).await;
+        self.status_tracker
+            .update_activity(agent_id, activity)
+            .await;
     }
 
     /// Get agent runtime status.
-    pub async fn get_agent_status(&self, agent_id: &AgentId) -> Option<macaca_proto::AgentRuntimeStatus> {
+    pub async fn get_agent_status(
+        &self,
+        agent_id: &AgentId,
+    ) -> Option<macaca_proto::AgentRuntimeStatus> {
         self.status_tracker.get(agent_id).await
     }
 
@@ -130,7 +140,10 @@ impl Kernel {
     }
 
     /// Get statuses for specific agents (e.g., agents of an app).
-    pub async fn list_agent_statuses_for(&self, agent_ids: &[AgentId]) -> Vec<macaca_proto::AgentRuntimeStatus> {
+    pub async fn list_agent_statuses_for(
+        &self,
+        agent_ids: &[AgentId],
+    ) -> Vec<macaca_proto::AgentRuntimeStatus> {
         self.status_tracker.list_for_agents(agent_ids).await
     }
 }
@@ -139,19 +152,21 @@ impl Kernel {
 mod tests {
     use super::*;
     use async_trait::async_trait;
+    use chrono::Utc;
     use macaca_agent::Agent;
     use macaca_proto::{
-        AgentState, Capability, LlmMessage, LlmOptions, LlmResponse, Permission,
-        PermissionLevel, TokenUsage,
+        AgentState, Capability, LlmMessage, LlmOptions, LlmResponse, Permission, PermissionLevel,
+        TokenUsage,
     };
     use macaca_tools::DefaultToolSet;
-    use chrono::Utc;
 
     struct MockLlm;
 
     #[async_trait]
     impl LlmProvider for MockLlm {
-        fn name(&self) -> &str { "mock" }
+        fn name(&self) -> &str {
+            "mock"
+        }
         async fn chat(
             &self,
             _messages: Vec<LlmMessage>,
@@ -177,9 +192,15 @@ mod tests {
 
     #[async_trait]
     impl Agent for TestAgent {
-        fn id(&self) -> AgentId { self.id }
-        fn capabilities(&self) -> &[Capability] { &[] }
-        fn state(&self) -> AgentState { AgentState::Running }
+        fn id(&self) -> AgentId {
+            self.id
+        }
+        fn capabilities(&self) -> &[Capability] {
+            &[]
+        }
+        fn state(&self) -> AgentState {
+            AgentState::Running
+        }
         async fn run(
             &self,
             llm: &dyn LlmProvider,

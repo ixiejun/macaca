@@ -4,30 +4,60 @@ heartbeat_interval_ms = 5000
 agent_timeout_ms = 30000
 
 [llm]
-default_provider = "dashscope"
+default_provider = "volces"
 max_tokens_per_request = 8192
-rate_limit_rpm = 60
+rate_limit_rpm = 600
 
 [llm.providers.openai]
-api_key_env = "OPENAI_API_KEY"
+api_key = "OPENAI_API_KEY"
 base_url = "https://api.openai.com/v1"
 
 [llm.providers.anthropic]
-api_key_env = "ANTHROPIC_API_KEY"
+api_key = "ANTHROPIC_API_KEY"
 base_url = "https://api.anthropic.com"
 
 [llm.providers.dashscope]
-api_key_env = "sk-7720115f25214ebaa4f83d5857224f9a"
+api_key = "DASHSCOPE_API_KEY"
 base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 default_model = "qwen3-max"
 
 # Example: OpenAI-compatible providers (uncomment to enable)
-# [llm.providers.deepseek]
-# api_key_env = "DEEPSEEK_API_KEY"
-# base_url = "https://api.deepseek.com/v1"
-#
+[llm.providers.deepseek]
+api_key = "DEEPSEEK_API_KEY"
+base_url = "https://api.deepseek.com/v1"
+default_model = "deepseek-chat"
+
+[llm.providers.zai]
+api_key = "ZHIPU_API_KEY"
+base_url = "https://open.bigmodel.cn/api/paas/v4"
+default_model = "glm-5"
+
+# MiniMax：OpenAI 兼容端点 https://api.minimaxi.com/v1
+# api_key_plan = Token Plan / 订阅（Coding Plan）密钥，优先使用
+# api_key = 按量计费密钥；全大写则为环境变量名。仅当 api_key_plan 为空时才用 api_key
+[llm.providers.minimax]
+api_key_plan = "sk-cp-CS_HBIo2UdWWEfOh737IoTGaudHBSiln1xFirTmCH4AodCN9SLU0iA9I8TKJ8Lv16536v3m0d0GTAhnTcRzxfj5ldU9CUE8wMgaF9QwPLMQ3LgL-_zW52o8"
+api_key = ""
+base_url = "https://api.minimaxi.com/v1"
+default_model = "MiniMax-M2.7"
+
+[llm.providers.volces]
+api_key_plan = "c91590fd-77bc-4c06-bca2-4ce9f1f2ae0b"
+api_key = ""
+base_url = "https://ark.cn-beijing.volces.com/api/coding/v3"
+default_model = "glm-4.7"
+
+# OpenRouter: AI model aggregation platform
+# Supports 100+ models from various providers via OpenAI-compatible API.
+# Model format: "provider/model-name" (e.g. "qwen/qwen3.6-plus:free")
+# Get API key at https://openrouter.ai/keys
+[llm.providers.openrouter]
+api_key = "OPENROUTER_API_KEY"
+base_url = "https://openrouter.ai/api/v1"
+default_model = "qwen/qwen3.6-plus:free"
+
 # [llm.providers.ollama]
-# api_key_env = ""
+# api_key = ""
 # base_url = "http://localhost:11434/v1"
 
 [memory]
@@ -43,7 +73,7 @@ collection_name = "agent_memory"
 [memory.embedding]
 provider = "dashscope"
 model = "text-embedding-v4"
-api_key_env = "sk-7720115f25214ebaa4f83d5857224f9a"
+api_key = "DASHSCOPE_API_KEY"
 dimensions = 1024
 base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 
@@ -57,6 +87,9 @@ nats_url = "nats://localhost:4222"
 nats_auto_start = true
 reconnect_max_attempts = 10
 reconnect_delay_ms = 1000
+
+[workspace]
+root_dir = "/Users/quantum/.macaca/workspaces"
 
 [persist]
 engine = "redb"
@@ -77,7 +110,7 @@ bot_token_env = "DISCORD_BOT_TOKEN"
 command_prefix = "!"
 
 [observability]
-log_level = "info"
+log_level = "debug"
 tracing_enabled = true
 otlp_endpoint = ""
 

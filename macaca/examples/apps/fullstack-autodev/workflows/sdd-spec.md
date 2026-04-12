@@ -4,119 +4,73 @@ You are in the **Spec** phase of Spec-Driven Development (SDD).
 
 ## Prerequisites
 
-Analysis phase should be complete with:
-- Clear requirements documented
-- Technical context understood
-- Architecture decisions made
+Analysis phase should already provide:
+- Clear requirements
+- Affected module scope
+- Key architecture constraints
 
 ## Your Task
 
-Create detailed specifications using OpenSpec that will guide implementation.
+Produce an implementation-ready architecture handoff without writing feature code.
 
-### ⚠️ IMPORTANT: Non-Interactive Usage
+### 1. Consolidate Design Decisions
 
-**NEVER run `openspec init` directly in shell** - it requires interactive input!
+- Confirm system boundaries and ownership
+- Define frontend/backend responsibilities
+- Identify risk points and fallback strategy
 
-**Always use the openspec tool with these exact parameters:**
+### 2. Define Contracts
 
-```
-Tool: openspec
-Input: {
-  "action": "init",
-  "work_dir": "/path/to/project",
-  "args": ["--tools", "claude"]
-}
-```
+- API routes, request/response schema, and error model
+- Data model changes and migration constraints
+- Integration points with external services
 
-The `--tools claude` flag is **required** to skip interactive prompts.
+### 3. Publish Handoff Docs
 
-### 1. Initialize OpenSpec (if not already initialized)
+Use `file_write` to publish concise artifacts in `shared/`:
 
-Check if `.claude/commands/openspec/` exists. If not:
+- `shared/architecture.md`
+- `shared/api-contract.md`
+- `shared/task-handoff.md`
 
-```
-openspec(action="init", work_dir="<project_dir>", args=["--tools", "claude"])
-```
+Each file should be short, concrete, and directly actionable by implementation agents.
 
-This creates:
-- `.claude/commands/openspec/` - Slash commands for Claude Code
-- `openspec/` - Specs and changes directories
+### 4. Dependency Graph
 
-### 2. Create Change Proposal
+For each implementation task, define dependencies explicitly:
 
-**Use claude_code_execute, NOT direct file writes:**
+- Which tasks must be completed first
+- Which contracts are blocking
+- Which risks require validation before coding
 
-```
-Tool: claude_code_execute
-Input: {
-  "prompt": "Create an OpenSpec change proposal for [FEATURE]. Use /openspec:proposal slash command.",
-  "work_dir": "/path/to/project"
-}
-```
+## Guardrails
 
-Claude Code will:
-1. Use the `/openspec:proposal` slash command
-2. Create `openspec/changes/<change-id>/proposal.md`
-3. Create `openspec/changes/<change-id>/tasks.md`
-4. Create `openspec/changes/<change-id>/specs/`
-
-### 3. Review Generated Artifacts
-
-After proposal creation, verify:
-- `openspec/changes/<change-id>/proposal.md` - Feature description
-- `openspec/changes/<change-id>/tasks.md` - Ordered task breakdown
-- `openspec/changes/<change-id>/specs/` - Spec deltas
-
-### 4. Validate Proposal
-
-```
-Tool: openspec
-Input: {
-  "action": "validate",
-  "work_dir": "/path/to/project",
-  "args": ["<change-id>", "--strict"]
-}
-```
-
-## Quick Reference
-
-| Action | Tool | Parameters |
-|--------|------|------------|
-| Init | `openspec` | `action="init", args=["--tools", "claude"]` |
-| Propose | `claude_code_execute` | `prompt="use /openspec:proposal for..."` |
-| Validate | `openspec` | `action="validate", args=["<id>", "--strict"]` |
-| Apply | `claude_code_execute` | `prompt="use /openspec:apply for..."` |
-| Archive | `openspec` | `action="archive", args=["<id>"]` |
-
-## Common Mistakes to Avoid
-
-❌ **WRONG:**
-```bash
-openspec init  # This requires interactive input!
-```
-
-✅ **CORRECT:**
-```
-openspec(action="init", work_dir="/project", args=["--tools", "claude"])
-```
+- Do not use `claude_code_execute` / `claude_code_resume` / `claude_code_status`
+- Do not write production implementation code in this phase
+- Keep output architecture-focused and execution-oriented
 
 ## Output Format
 
 ```markdown
-## Specification Complete
+## Spec Ready
 
-### Artifacts Created
-- `openspec/changes/<change-id>/proposal.md` - [brief description]
-- `openspec/changes/<change-id>/tasks.md` - [task count]
-- `openspec/changes/<change-id>/specs/` - [spec files]
+### Architecture Summary
+[1 paragraph]
 
-### Summary
-[One-paragraph summary of the specification]
+### Interfaces
+- [API/contract decision 1]
+- [API/contract decision 2]
 
-### Task Breakdown
-1. **[Task 1]** - [Agent assignment]
-2. **[Task 2]** - [Agent assignment]
+### Implementation Handoff
+| Task | Assignee | Dependencies |
+|------|----------|--------------|
+| Task 1 | [worker] | - |
+| Task 2 | [worker] | Task 1 |
+
+### Risks And Constraints
+- [risk 1 + mitigation]
+- [constraint 1]
 
 ### Ready for Implementation
-✓ Specifications created and validated
+✓ Workers can start with clear contracts and dependencies
 ```

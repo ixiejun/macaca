@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use tracing::{debug, warn};
 
-use macaca_proto::{MacacaError, MacacaResult, IpcMessage};
+use macaca_proto::{IpcMessage, MacacaError, MacacaResult};
 
 use crate::bus::{MessageReceiver, MessageSender};
 
@@ -63,15 +63,13 @@ impl MessageReceiver for NatsReceiver {
 
         loop {
             match sub.next().await {
-                Some(nats_msg) => {
-                    match serde_json::from_slice::<IpcMessage>(&nats_msg.payload) {
-                        Ok(msg) => return Ok(msg),
-                        Err(e) => {
-                            warn!("failed to deserialize nats message: {e}");
-                            continue;
-                        }
+                Some(nats_msg) => match serde_json::from_slice::<IpcMessage>(&nats_msg.payload) {
+                    Ok(msg) => return Ok(msg),
+                    Err(e) => {
+                        warn!("failed to deserialize nats message: {e}");
+                        continue;
                     }
-                }
+                },
                 None => {
                     return Err(MacacaError::Ipc("nats subscription closed".to_owned()));
                 }
@@ -147,8 +145,8 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn nats_publish_and_receive() {
-        use macaca_proto::{AgentId, IpcMessage, MessageId};
         use chrono::Utc;
+        use macaca_proto::{AgentId, IpcMessage, MessageId};
 
         let bus = NatsBus::connect("nats://127.0.0.1:4222").await.unwrap();
         let sender = bus.sender();

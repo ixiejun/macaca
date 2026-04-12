@@ -10,7 +10,8 @@ use std::time::Duration;
 use async_trait::async_trait;
 use tracing::debug;
 
-use macaca_proto::{AgentId, ApplicationId, MacacaResult, MemoryEntry, MemoryId, TaskContext};
+use crate::store::MemoryQueryContext;
+use macaca_proto::{AgentId, ApplicationId, MacacaResult, MemoryEntry, MemoryId};
 
 use crate::file::FileMemory;
 use crate::session::SessionMemory;
@@ -205,7 +206,7 @@ impl<V: VectorStore, E: EmbeddingProvider> IsolatedMemoryManager<V, E> {
 
 #[async_trait]
 impl<V: VectorStore, E: EmbeddingProvider> MemoryRetriever for IsolatedMemoryManager<V, E> {
-    async fn auto_retrieve(&self, context: &TaskContext) -> MacacaResult<Vec<MemoryEntry>> {
+    async fn auto_retrieve(&self, context: &MemoryQueryContext) -> MacacaResult<Vec<MemoryEntry>> {
         let history_snippet = context
             .history
             .iter()
@@ -251,13 +252,11 @@ mod tests {
     use super::*;
     use crate::embedding::MockEmbedding;
     use crate::vector::InMemoryVectorStore;
-    use macaca_proto::{MemoryLayer, MemoryId};
     use chrono::Utc;
+    use macaca_proto::{MemoryId, MemoryLayer};
     use tempfile::TempDir;
 
-    fn make_isolated(
-        dir: &TempDir,
-    ) -> IsolatedMemoryManager<InMemoryVectorStore, MockEmbedding> {
+    fn make_isolated(dir: &TempDir) -> IsolatedMemoryManager<InMemoryVectorStore, MockEmbedding> {
         let app_id = ApplicationId::new();
         let agent_id = AgentId::new();
         IsolatedMemoryManager::new(

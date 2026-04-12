@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use std::sync::Arc;
 
 use macaca_llm::LlmProvider;
-use macaca_proto::{MacacaResult, LlmMessage, LlmOptions, LlmResponse};
+use macaca_proto::{LlmMessage, LlmOptions, LlmResponse, MacacaResult};
 
 use crate::model::AppLlmConfig;
 

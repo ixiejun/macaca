@@ -54,10 +54,8 @@ impl ShutdownHandle {
 async fn wait_for_signal() {
     use tokio::signal::unix::{signal, SignalKind};
 
-    let mut sigterm = signal(SignalKind::terminate())
-        .expect("failed to register SIGTERM handler");
-    let mut sigint = signal(SignalKind::interrupt())
-        .expect("failed to register SIGINT handler");
+    let mut sigterm = signal(SignalKind::terminate()).expect("failed to register SIGTERM handler");
+    let mut sigint = signal(SignalKind::interrupt()).expect("failed to register SIGINT handler");
 
     tokio::select! {
         _ = sigterm.recv() => info!("SIGTERM received"),
@@ -78,7 +76,10 @@ async fn wait_for_signal() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+    use std::sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    };
 
     /// Verify the callback fires when the sender is triggered directly.
     #[tokio::test]

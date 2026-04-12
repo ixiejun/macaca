@@ -38,7 +38,14 @@ impl OrchestrationState {
 /// Type alias for the delegate callback function.
 /// Arguments: (app_id, to_agent, prompt, priority, parallel, session_id) -> Result<task_id, error>
 pub type DelegateCallback = Box<
-    dyn Fn(String, String, String, u8, bool, Option<String>) -> futures::future::BoxFuture<'static, Result<String, String>>
+    dyn Fn(
+            String,
+            String,
+            String,
+            u8,
+            bool,
+            Option<String>,
+        ) -> futures::future::BoxFuture<'static, Result<String, String>>
         + Send
         + Sync,
 >;
@@ -72,7 +79,14 @@ impl DelegateTaskTool {
     /// The callback receives (app_id, to_agent, prompt, priority, parallel, session_id) and returns task_id.
     pub fn with_callback<F>(mut self, callback: F) -> Self
     where
-        F: Fn(String, String, String, u8, bool, Option<String>) -> futures::future::BoxFuture<'static, Result<String, String>>
+        F: Fn(
+                String,
+                String,
+                String,
+                u8,
+                bool,
+                Option<String>,
+            ) -> futures::future::BoxFuture<'static, Result<String, String>>
             + Send
             + Sync
             + 'static,
@@ -145,21 +159,23 @@ impl Tool for DelegateTaskTool {
         let prompt = input["prompt"]
             .as_str()
             .ok_or_else(|| MacacaError::Agent("delegate_task requires 'prompt' field".into()))?;
-        let priority = input["priority"]
-            .as_u64()
-            .unwrap_or(5) as u8;
-        let parallel = input["parallel"]
-            .as_bool()
-            .unwrap_or(false);
-        let app_id = input["app_id"]
-            .as_str()
-            .unwrap_or("")
-            .to_string();
+        let priority = input["priority"].as_u64().unwrap_or(5) as u8;
+        let parallel = input["parallel"].as_bool().unwrap_or(false);
+        let app_id = input["app_id"].as_str().unwrap_or("").to_string();
 
         // If we have a real callback, use it for actual execution
         if let Some(ref callback) = self.delegate_callback {
             let session_id = self.session_id.read().await.clone();
-            match callback(app_id, agent.to_string(), prompt.to_string(), priority, parallel, session_id).await {
+            match callback(
+                app_id,
+                agent.to_string(),
+                prompt.to_string(),
+                priority,
+                parallel,
+                session_id,
+            )
+            .await
+            {
                 Ok(task_id) => {
                     return Ok(serde_json::json!({
                         "task_id": task_id,
@@ -180,7 +196,9 @@ impl Tool for DelegateTaskTool {
 
         if let Some(ref state) = self.state {
             let mut state = state.write().await;
-            state.pending_tasks.insert(task_id.clone(), (agent.to_string(), prompt.to_string()));
+            state
+                .pending_tasks
+                .insert(task_id.clone(), (agent.to_string(), prompt.to_string()));
         }
 
         Ok(serde_json::json!({
@@ -233,7 +251,10 @@ impl GetTaskResultTool {
     /// Create a tool with a real result retrieval callback.
     pub fn with_callback<F>(mut self, callback: F) -> Self
     where
-        F: Fn(String, String) -> futures::future::BoxFuture<'static, Result<TaskResultData, String>>
+        F: Fn(
+                String,
+                String,
+            ) -> futures::future::BoxFuture<'static, Result<TaskResultData, String>>
             + Send
             + Sync
             + 'static,
@@ -279,10 +300,7 @@ impl Tool for GetTaskResultTool {
         let task_id = input["task_id"]
             .as_str()
             .ok_or_else(|| MacacaError::Agent("get_task_result requires 'task_id' field".into()))?;
-        let app_id = input["app_id"]
-            .as_str()
-            .unwrap_or("")
-            .to_string();
+        let app_id = input["app_id"].as_str().unwrap_or("").to_string();
 
         // If we have a real callback, use it
         if let Some(ref callback) = self.result_callback {
@@ -296,7 +314,10 @@ impl Tool for GetTaskResultTool {
                     }));
                 }
                 Err(e) => {
-                    return Err(MacacaError::Agent(format!("Failed to get task result: {}", e)));
+                    return Err(MacacaError::Agent(format!(
+                        "Failed to get task result: {}",
+                        e
+                    )));
                 }
             }
         }
@@ -369,7 +390,9 @@ impl Tool for ReportResultTool {
 
         let mut state = self.state.write().await;
         state.pending_tasks.remove(task_id);
-        state.completed_results.insert(task_id.to_string(), output.to_string());
+        state
+            .completed_results
+            .insert(task_id.to_string(), output.to_string());
 
         Ok(serde_json::json!({
             "task_id": task_id,
@@ -380,12 +403,15 @@ impl Tool for ReportResultTool {
 
 /// Tool for listing available agents.
 pub struct ListAgentsTool {
-    agents_callback: Option<Box<dyn Fn() -> futures::future::BoxFuture<'static, Vec<Value>> + Send + Sync>>,
+    agents_callback:
+        Option<Box<dyn Fn() -> futures::future::BoxFuture<'static, Vec<Value>> + Send + Sync>>,
 }
 
 impl ListAgentsTool {
     pub fn new() -> Self {
-        Self { agents_callback: None }
+        Self {
+            agents_callback: None,
+        }
     }
 
     pub fn with_agents_callback<F>(mut self, callback: F) -> Self

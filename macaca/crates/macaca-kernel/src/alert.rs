@@ -1,8 +1,8 @@
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
-use serde::{Deserialize, Serialize};
 
 /// Alert severity levels.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -233,7 +233,10 @@ impl AlertManager {
     pub async fn budget_warning(&self, spent: f64, limit: f64) {
         self.fire(Alert::warning(
             "Budget Warning",
-            format!("Cost ${:.4} has exceeded 80% of budget ${:.4}", spent, limit),
+            format!(
+                "Cost ${:.4} has exceeded 80% of budget ${:.4}",
+                spent, limit
+            ),
             "cost_tracker",
         ))
         .await;
@@ -260,10 +263,7 @@ impl AlertManager {
     pub async fn all_llm_degraded(&self, model: &str) {
         self.fire(Alert::critical(
             "All LLM Models Failed",
-            format!(
-                "Primary model '{}' and all fallbacks have failed",
-                model
-            ),
+            format!("Primary model '{}' and all fallbacks have failed", model),
             "llm_router",
         ))
         .await;
@@ -319,7 +319,11 @@ mod tests {
             .fire(Alert::warning("Test", "test message", "test_source"))
             .await;
         assert!(sent, "Alert should be sent");
-        assert_eq!(counter.load(Ordering::SeqCst), 1, "Channel should receive one call");
+        assert_eq!(
+            counter.load(Ordering::SeqCst),
+            1,
+            "Channel should receive one call"
+        );
     }
 
     #[tokio::test]
@@ -332,7 +336,11 @@ mod tests {
 
         assert!(sent1, "First alert should be sent");
         assert!(!sent2, "Second alert within window should be deduplicated");
-        assert_eq!(counter.load(Ordering::SeqCst), 1, "Channel should only see one call");
+        assert_eq!(
+            counter.load(Ordering::SeqCst),
+            1,
+            "Channel should only see one call"
+        );
     }
 
     #[tokio::test]
@@ -355,12 +363,8 @@ mod tests {
     async fn test_dedup_different_titles_not_blocked() {
         let (manager, counter) = make_manager_with_counter(true);
 
-        let sent1 = manager
-            .fire(Alert::warning("Title A", "msg", "src"))
-            .await;
-        let sent2 = manager
-            .fire(Alert::warning("Title B", "msg", "src"))
-            .await;
+        let sent1 = manager.fire(Alert::warning("Title A", "msg", "src")).await;
+        let sent2 = manager.fire(Alert::warning("Title B", "msg", "src")).await;
 
         assert!(sent1);
         assert!(sent2, "Different title should not be deduped");

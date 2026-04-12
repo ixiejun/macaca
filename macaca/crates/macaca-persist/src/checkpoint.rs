@@ -22,7 +22,11 @@ impl CheckpointManager {
     }
 
     /// Serialize and persist an agent state snapshot.
-    pub async fn save_snapshot(&self, agent_id: &AgentId, state: &AgentManifest) -> MacacaResult<()> {
+    pub async fn save_snapshot(
+        &self,
+        agent_id: &AgentId,
+        state: &AgentManifest,
+    ) -> MacacaResult<()> {
         let bytes = serde_json::to_vec(state)?;
         self.store.set(&Self::key(agent_id), &bytes).await
     }

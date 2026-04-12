@@ -2,8 +2,8 @@ use std::path::Path;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use redb::{Database, ReadableTable, TableDefinition};
 use macaca_proto::error::{MacacaError, MacacaResult};
+use redb::{Database, ReadableTable, TableDefinition};
 
 use crate::store::PersistStore;
 
@@ -17,17 +17,20 @@ pub struct RedbStore {
 impl RedbStore {
     /// Open (or create) a redb database at `path`.
     pub fn open(path: impl AsRef<Path>) -> MacacaResult<Self> {
-        let db = Database::create(path.as_ref())
-            .map_err(|e| MacacaError::Persist(e.to_string()))?;
+        let db =
+            Database::create(path.as_ref()).map_err(|e| MacacaError::Persist(e.to_string()))?;
 
         // Ensure the table exists.
-        let write_txn = db.begin_write()
+        let write_txn = db
+            .begin_write()
             .map_err(|e| MacacaError::Persist(e.to_string()))?;
         {
-            write_txn.open_table(TABLE)
+            write_txn
+                .open_table(TABLE)
                 .map_err(|e| MacacaError::Persist(e.to_string()))?;
         }
-        write_txn.commit()
+        write_txn
+            .commit()
             .map_err(|e| MacacaError::Persist(e.to_string()))?;
 
         Ok(Self { db: Arc::new(db) })
@@ -40,11 +43,14 @@ impl PersistStore for RedbStore {
         let db = Arc::clone(&self.db);
         let key = key.to_owned();
         tokio::task::spawn_blocking(move || {
-            let read_txn = db.begin_read()
+            let read_txn = db
+                .begin_read()
                 .map_err(|e| MacacaError::Persist(e.to_string()))?;
-            let table = read_txn.open_table(TABLE)
+            let table = read_txn
+                .open_table(TABLE)
                 .map_err(|e| MacacaError::Persist(e.to_string()))?;
-            let result = table.get(key.as_str())
+            let result = table
+                .get(key.as_str())
                 .map_err(|e| MacacaError::Persist(e.to_string()))?;
             Ok(result.map(|v| v.value().to_vec()))
         })
@@ -57,15 +63,19 @@ impl PersistStore for RedbStore {
         let key = key.to_owned();
         let value = value.to_vec();
         tokio::task::spawn_blocking(move || {
-            let write_txn = db.begin_write()
+            let write_txn = db
+                .begin_write()
                 .map_err(|e| MacacaError::Persist(e.to_string()))?;
             {
-                let mut table = write_txn.open_table(TABLE)
+                let mut table = write_txn
+                    .open_table(TABLE)
                     .map_err(|e| MacacaError::Persist(e.to_string()))?;
-                table.insert(key.as_str(), value.as_slice())
+                table
+                    .insert(key.as_str(), value.as_slice())
                     .map_err(|e| MacacaError::Persist(e.to_string()))?;
             }
-            write_txn.commit()
+            write_txn
+                .commit()
                 .map_err(|e| MacacaError::Persist(e.to_string()))
         })
         .await
@@ -76,15 +86,19 @@ impl PersistStore for RedbStore {
         let db = Arc::clone(&self.db);
         let key = key.to_owned();
         tokio::task::spawn_blocking(move || {
-            let write_txn = db.begin_write()
+            let write_txn = db
+                .begin_write()
                 .map_err(|e| MacacaError::Persist(e.to_string()))?;
             {
-                let mut table = write_txn.open_table(TABLE)
+                let mut table = write_txn
+                    .open_table(TABLE)
                     .map_err(|e| MacacaError::Persist(e.to_string()))?;
-                table.remove(key.as_str())
+                table
+                    .remove(key.as_str())
                     .map_err(|e| MacacaError::Persist(e.to_string()))?;
             }
-            write_txn.commit()
+            write_txn
+                .commit()
                 .map_err(|e| MacacaError::Persist(e.to_string()))
         })
         .await
@@ -95,12 +109,17 @@ impl PersistStore for RedbStore {
         let db = Arc::clone(&self.db);
         let prefix = prefix.to_owned();
         tokio::task::spawn_blocking(move || {
-            let read_txn = db.begin_read()
+            let read_txn = db
+                .begin_read()
                 .map_err(|e| MacacaError::Persist(e.to_string()))?;
-            let table = read_txn.open_table(TABLE)
+            let table = read_txn
+                .open_table(TABLE)
                 .map_err(|e| MacacaError::Persist(e.to_string()))?;
             let mut keys = Vec::new();
-            for entry in table.iter().map_err(|e| MacacaError::Persist(e.to_string()))? {
+            for entry in table
+                .iter()
+                .map_err(|e| MacacaError::Persist(e.to_string()))?
+            {
                 let (k, _) = entry.map_err(|e| MacacaError::Persist(e.to_string()))?;
                 let k_str = k.value().to_owned();
                 if k_str.starts_with(&prefix) {

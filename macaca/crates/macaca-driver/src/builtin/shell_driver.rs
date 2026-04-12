@@ -5,7 +5,7 @@
 use async_trait::async_trait;
 use std::time::Duration;
 
-use macaca_proto::{MacacaResult, DriverId};
+use macaca_proto::{DriverId, MacacaResult};
 use macaca_tools::builtin::ShellTool;
 use macaca_tools::Tool;
 

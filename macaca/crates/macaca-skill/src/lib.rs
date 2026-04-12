@@ -28,7 +28,7 @@ pub use registry::SkillRegistry;
 pub use tool::SkillTool;
 
 // Agent Skills (SKILL.md / agentskills.io).
-pub use agent_skill::{AgentSkill, ActivatedSkill};
+pub use agent_skill::{ActivatedSkill, AgentSkill};
 pub use catalog::{CatalogEntry, SkillCatalog};
 pub use discovery::{DiscoveredSkill, SkillScope};
 pub use provisioner::{ClientConfig, SkillProvisioner};

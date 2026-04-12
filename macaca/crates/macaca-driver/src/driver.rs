@@ -1,7 +1,7 @@
 //! Core `SoftwareDriver` trait and supporting types.
 
 use async_trait::async_trait;
-use macaca_proto::{MacacaResult, DriverId};
+use macaca_proto::{DriverId, MacacaResult};
 use macaca_tools::Tool;
 use serde::{Deserialize, Serialize};
 

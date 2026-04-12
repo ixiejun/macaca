@@ -4,7 +4,7 @@
 
 use async_trait::async_trait;
 
-use macaca_proto::{MacacaResult, DriverId};
+use macaca_proto::{DriverId, MacacaResult};
 use macaca_tools::builtin::{FileReadTool, FileWriteTool};
 use macaca_tools::Tool;
 

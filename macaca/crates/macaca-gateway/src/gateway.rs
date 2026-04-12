@@ -71,7 +71,11 @@ pub struct DefaultEventHandler;
 impl EventHandler for DefaultEventHandler {
     async fn handle(&self, event: GatewayEvent) -> MacacaResult<()> {
         match &event {
-            GatewayEvent::TaskRequest { user_id, channel_id, content } => {
+            GatewayEvent::TaskRequest {
+                user_id,
+                channel_id,
+                content,
+            } => {
                 info!(
                     user_id = %user_id,
                     channel_id = %channel_id,
@@ -79,7 +83,11 @@ impl EventHandler for DefaultEventHandler {
                     "Received task request"
                 );
             }
-            GatewayEvent::StatusQuery { user_id, channel_id, task_id } => {
+            GatewayEvent::StatusQuery {
+                user_id,
+                channel_id,
+                task_id,
+            } => {
                 info!(
                     user_id = %user_id,
                     channel_id = %channel_id,
@@ -87,7 +95,12 @@ impl EventHandler for DefaultEventHandler {
                     "Received status query"
                 );
             }
-            GatewayEvent::UserReply { user_id, channel_id, content, context_id } => {
+            GatewayEvent::UserReply {
+                user_id,
+                channel_id,
+                content,
+                context_id,
+            } => {
                 info!(
                     user_id = %user_id,
                     channel_id = %channel_id,
@@ -96,7 +109,12 @@ impl EventHandler for DefaultEventHandler {
                     "Received user reply"
                 );
             }
-            GatewayEvent::Command { user_id, channel_id, command, args } => {
+            GatewayEvent::Command {
+                user_id,
+                channel_id,
+                command,
+                args,
+            } => {
                 info!(
                     user_id = %user_id,
                     channel_id = %channel_id,

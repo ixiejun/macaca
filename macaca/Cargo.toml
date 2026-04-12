@@ -20,6 +20,7 @@ members = [
     "crates/macaca-skill",
     "crates/macaca-driver-claude-code",
     "crates/macaca-web",
+    "crates/macaca-framework",
     "crates/macaca-integration-tests",
 ]
 

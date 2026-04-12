@@ -10,7 +10,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::{AgentId, TaskId};
+use super::{AgentId, ApplicationId, TaskContext, TaskId};
 
 // ── Task Delegation ──
 
@@ -19,22 +19,26 @@ use super::{AgentId, TaskId};
 pub struct DelegatedTask {
     /// Unique task identifier.
     pub id: TaskId,
-    /// Agent that delegated this task.
-    pub from_agent: AgentId,
-    /// Agent assigned to handle this task.
-    pub to_agent: AgentId,
+    /// Application ID this task belongs to (for isolation).
+    pub application_id: ApplicationId,
+    /// Name of the agent that delegated this task.
+    pub from_agent: String,
+    /// Name of the agent that should execute this task.
+    pub to_agent: String,
     /// Task description/prompt.
     pub prompt: String,
-    /// Task priority (higher = more important).
+    /// Priority level (0-10, higher = more urgent).
     pub priority: u8,
+    /// Whether this task can run in parallel with others.
+    pub parallel: bool,
     /// When this task was created.
     pub created_at: DateTime<Utc>,
     /// When this task should complete by (optional).
     pub deadline: Option<DateTime<Utc>>,
     /// Parent task ID if this is a subtask.
     pub parent_task: Option<TaskId>,
-    /// Additional context to pass to the agent.
-    pub context: Option<DelegatedTaskContext>,
+    /// Additional context for execution.
+    pub context: Option<TaskContext>,
 }
 
 /// Context passed along with a delegated task.
@@ -197,10 +201,7 @@ pub enum OrchestrationEvent {
         prompt: String,
     },
     /// An agent started working on a task.
-    TaskStarted {
-        task_id: TaskId,
-        agent: String,
-    },
+    TaskStarted { task_id: TaskId, agent: String },
     /// An agent completed a task.
     TaskCompleted {
         task_id: TaskId,
@@ -209,9 +210,7 @@ pub enum OrchestrationEvent {
         output_preview: String,
     },
     /// Multiple agents started working in parallel.
-    ParallelExecution {
-        tasks: Vec<ParallelTaskInfo>,
-    },
+    ParallelExecution { tasks: Vec<ParallelTaskInfo> },
     /// Results were aggregated.
     ResultsAggregated {
         task_count: usize,
@@ -239,8 +238,7 @@ pub fn delegate_task_tool_definition() -> serde_json::Value {
             "properties": {
                 "agent": {
                     "type": "string",
-                    "description": "Name of the target agent (frontend, backend, architect, etc.)",
-                    "enum": ["frontend", "backend", "architect", "coordinator"]
+                    "description": "Name of the target agent to delegate to (application-specific)"
                 },
                 "prompt": {
                     "type": "string",

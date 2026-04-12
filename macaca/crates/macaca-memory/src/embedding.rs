@@ -168,7 +168,10 @@ mod tests {
     #[tokio::test]
     async fn mock_embedding_dimensions() {
         let mock = MockEmbedding::new(128);
-        let result = mock.embed(vec!["hello".into(), "world".into()]).await.unwrap();
+        let result = mock
+            .embed(vec!["hello".into(), "world".into()])
+            .await
+            .unwrap();
         assert_eq!(result.len(), 2);
         assert_eq!(result[0].len(), 128);
         assert_eq!(result[1].len(), 128);
@@ -186,10 +189,7 @@ mod tests {
     #[ignore]
     async fn dashscope_embed_live() {
         let provider = DashScopeEmbedding::from_env().unwrap();
-        let result = provider
-            .embed(vec!["hello world".into()])
-            .await
-            .unwrap();
+        let result = provider.embed(vec!["hello world".into()]).await.unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].len(), DIMENSIONS);
     }

@@ -8,10 +8,10 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use macaca_agent::{IpcService, MemoryService, PersistService};
-use macaca_proto::{MacacaResult, IpcMessage, MemoryEntry, MemoryId};
+use macaca_proto::{IpcMessage, MacacaResult, MemoryEntry, MemoryId};
 
-use macaca_memory::store::MemoryStore;
 use macaca_ipc::bus;
+use macaca_memory::store::MemoryStore;
 use macaca_persist::store::PersistStore;
 
 // ── MemoryServiceAdapter ─────────────────────────────────────────────────────
@@ -96,8 +96,8 @@ impl PersistService for PersistServiceAdapter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use macaca_proto::{AgentId, MemoryId, MemoryLayer};
     use chrono::Utc;
+    use macaca_proto::{AgentId, MemoryId, MemoryLayer};
     use std::time::Duration;
 
     #[tokio::test]
@@ -176,7 +176,13 @@ mod tests {
         adapter_b.save("key", b"data B").await.unwrap();
 
         // Each agent sees only its own data.
-        assert_eq!(adapter_a.load("key").await.unwrap(), Some(b"data A".to_vec()));
-        assert_eq!(adapter_b.load("key").await.unwrap(), Some(b"data B".to_vec()));
+        assert_eq!(
+            adapter_a.load("key").await.unwrap(),
+            Some(b"data A".to_vec())
+        );
+        assert_eq!(
+            adapter_b.load("key").await.unwrap(),
+            Some(b"data B".to_vec())
+        );
     }
 }

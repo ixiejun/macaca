@@ -45,9 +45,7 @@ async fn tracker_and_queue_full_lifecycle() {
     assert_eq!(task.status, TaskStatus::Pending);
 
     // Push to queue
-    queue
-        .push(task.id, task.priority, task.created_at)
-        .await;
+    queue.push(task.id, task.priority, task.created_at).await;
 
     // Pop from queue
     let popped_id = queue.try_pop().unwrap();
@@ -63,10 +61,7 @@ async fn tracker_and_queue_full_lifecycle() {
 
     // Start
     tracker.start(&task.id).await.unwrap();
-    assert_eq!(
-        tracker.status(&task.id).await.unwrap(),
-        TaskStatus::Running
-    );
+    assert_eq!(tracker.status(&task.id).await.unwrap(), TaskStatus::Running);
 
     // Complete
     let result = make_result(task.id);

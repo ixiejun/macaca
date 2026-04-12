@@ -9,6 +9,41 @@ use tracing::instrument;
 
 use crate::tool::{Tool, ToolSet};
 
+/// Resolve file path from tool args. LLMs often use `file_path` / `filepath` instead of `path`.
+/// Also handles the case where arguments is a JSON string that needs re-parsing.
+fn pick_path_str(input: &Value) -> Option<&str> {
+    for key in ["path", "file_path", "filepath", "file", "filename"] {
+        if let Some(s) = input.get(key).and_then(|v| v.as_str()) {
+            if !s.trim().is_empty() {
+                return Some(s);
+            }
+        }
+    }
+    None
+}
+
+/// If input is a string containing JSON, parse it into an object.
+fn normalize_tool_input(input: &Value) -> std::borrow::Cow<'_, Value> {
+    if let Some(s) = input.as_str() {
+        if let Ok(parsed) = serde_json::from_str::<Value>(s) {
+            if parsed.is_object() {
+                return std::borrow::Cow::Owned(parsed);
+            }
+        }
+    }
+    std::borrow::Cow::Borrowed(input)
+}
+
+/// Resolve write body from tool args (`content`, `text`, `body`).
+fn pick_content_str(input: &Value) -> Option<&str> {
+    for key in ["content", "text", "body"] {
+        if let Some(s) = input.get(key).and_then(|v| v.as_str()) {
+            return Some(s);
+        }
+    }
+    None
+}
+
 // ── FileReadTool ──────────────────────────────────────────────────────────────
 
 /// Reads a file from the filesystem.
@@ -24,30 +59,35 @@ impl Tool for FileReadTool {
     }
 
     fn description(&self) -> &str {
-        "Read the contents of a file. Input: { \"path\": \"<path>\" }"
+        "Read the contents of a file. Use JSON key \"path\", or alias \"file_path\" / \"filepath\"."
     }
 
     fn parameters_schema(&self) -> serde_json::Value {
         serde_json::json!({
             "type": "object",
             "properties": {
-                "path": { "type": "string", "description": "File path to read" }
+                "path": { "type": "string", "description": "Absolute or workspace file path to read" },
+                "file_path": { "type": "string", "description": "Alias for path (same meaning)" },
+                "filepath": { "type": "string", "description": "Alias for path (same meaning)" }
             },
-            "required": ["path"]
+            "required": []
         })
     }
 
     #[instrument(name = "file_read", skip(self), fields(path))]
     async fn execute(&self, input: Value) -> MacacaResult<Value> {
-        let path = input["path"]
-            .as_str()
-            .ok_or_else(|| MacacaError::Agent("file_read requires 'path' field".into()))?;
+        let input = normalize_tool_input(&input);
+        let path = pick_path_str(&input).ok_or_else(|| {
+            MacacaError::Agent(
+                "file_read requires non-empty 'path' (or alias 'file_path' / 'filepath')".into(),
+            )
+        })?;
 
         tracing::Span::current().record("path", path);
 
-        let content = fs::read_to_string(path).await.map_err(|e| {
-            MacacaError::Agent(format!("file_read failed for '{}': {}", path, e))
-        })?;
+        let content = fs::read_to_string(path)
+            .await
+            .map_err(|e| MacacaError::Agent(format!("file_read failed for '{}': {}", path, e)))?;
 
         Ok(serde_json::json!({ "content": content }))
     }
@@ -68,7 +108,7 @@ impl Tool for FileWriteTool {
     }
 
     fn description(&self) -> &str {
-        "Write content to a file. Input: { \"path\": \"<path>\", \"content\": \"<text>\" }"
+        "Write content to a file. Keys: path (or file_path/filepath), content (or text/body)."
     }
 
     fn parameters_schema(&self) -> serde_json::Value {
@@ -76,33 +116,50 @@ impl Tool for FileWriteTool {
             "type": "object",
             "properties": {
                 "path": { "type": "string", "description": "File path to write" },
-                "content": { "type": "string", "description": "Content to write" }
+                "file_path": { "type": "string", "description": "Alias for path" },
+                "filepath": { "type": "string", "description": "Alias for path" },
+                "content": { "type": "string", "description": "Full file content as a string" },
+                "text": { "type": "string", "description": "Alias for content" },
+                "body": { "type": "string", "description": "Alias for content" }
             },
-            "required": ["path", "content"]
+            "required": []
         })
     }
 
     #[instrument(name = "file_write", skip(self), fields(path))]
     async fn execute(&self, input: Value) -> MacacaResult<Value> {
-        let path = input["path"]
-            .as_str()
-            .ok_or_else(|| MacacaError::Agent("file_write requires 'path' field".into()))?;
-        let content = input["content"]
-            .as_str()
-            .ok_or_else(|| MacacaError::Agent("file_write requires 'content' field".into()))?;
+        let input = normalize_tool_input(&input);
+        let path = pick_path_str(&input).ok_or_else(|| {
+            tracing::error!(raw_input = %input, "file_write: path not found in input");
+            MacacaError::Agent(format!(
+                "file_write requires non-empty 'path'. Received keys: {:?}",
+                input
+                    .as_object()
+                    .map(|o| o.keys().collect::<Vec<_>>())
+                    .unwrap_or_default()
+            ))
+        })?;
+        let content = pick_content_str(&input).ok_or_else(|| {
+            MacacaError::Agent(
+                "file_write requires 'content' as a string (or alias 'text' / 'body')".into(),
+            )
+        })?;
 
         tracing::Span::current().record("path", path);
 
         if let Some(parent) = std::path::Path::new(path).parent() {
             fs::create_dir_all(parent).await.map_err(|e| {
-                MacacaError::Agent(format!("file_write: failed to create dirs for '{}': {}", path, e))
+                MacacaError::Agent(format!(
+                    "file_write: failed to create dirs for '{}': {}",
+                    path, e
+                ))
             })?;
         }
 
         let bytes = content.len();
-        fs::write(path, content).await.map_err(|e| {
-            MacacaError::Agent(format!("file_write failed for '{}': {}", path, e))
-        })?;
+        fs::write(path, content)
+            .await
+            .map_err(|e| MacacaError::Agent(format!("file_write failed for '{}': {}", path, e)))?;
 
         Ok(serde_json::json!({ "bytes_written": bytes }))
     }
@@ -150,6 +207,7 @@ impl Tool for ShellTool {
 
     #[instrument(name = "shell", skip(self), fields(command))]
     async fn execute(&self, input: Value) -> MacacaResult<Value> {
+        let input = normalize_tool_input(&input);
         let command = input["command"]
             .as_str()
             .ok_or_else(|| MacacaError::Agent("shell requires 'command' field".into()))?;
@@ -161,16 +219,18 @@ impl Tool for ShellTool {
             .map(Duration::from_secs)
             .unwrap_or(self.default_timeout);
 
-        let fut = Command::new("sh")
-            .arg("-c")
-            .arg(command)
-            .output();
+        let fut = Command::new("sh").arg("-c").arg(command).output();
 
-        let output = timeout(timeout_secs, fut).await.map_err(|_| {
-            MacacaError::Timeout(format!("shell command timed out after {}s: {}", timeout_secs.as_secs(), command))
-        })?.map_err(|e| {
-            MacacaError::Agent(format!("shell command failed to spawn: {}", e))
-        })?;
+        let output = timeout(timeout_secs, fut)
+            .await
+            .map_err(|_| {
+                MacacaError::Timeout(format!(
+                    "shell command timed out after {}s: {}",
+                    timeout_secs.as_secs(),
+                    command
+                ))
+            })?
+            .map_err(|e| MacacaError::Agent(format!("shell command failed to spawn: {}", e)))?;
 
         let exit_code = output.status.code().unwrap_or(-1);
         let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
@@ -254,6 +314,21 @@ mod tests {
             .execute(serde_json::json!({ "path": "/tmp/x" }))
             .await;
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn file_write_accepts_path_aliases() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("alias.txt");
+        let path_str = path.to_str().unwrap();
+        let result = FileWriteTool
+            .execute(serde_json::json!({
+                "file_path": path_str,
+                "text": "via aliases"
+            }))
+            .await
+            .unwrap();
+        assert_eq!(result["bytes_written"], 11);
     }
 
     #[tokio::test]

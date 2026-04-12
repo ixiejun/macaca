@@ -76,10 +76,7 @@ pub async fn discover_skills(
             let client_dir = proj.join(format!(".{client}/skills"));
             scan_targets.push((client_dir, SkillScope::ProjectClient));
         }
-        scan_targets.push((
-            proj.join(".agents/skills"),
-            SkillScope::ProjectCrossClient,
-        ));
+        scan_targets.push((proj.join(".agents/skills"), SkillScope::ProjectCrossClient));
     }
 
     // User-level scopes.
@@ -88,15 +85,9 @@ pub async fn discover_skills(
             let client_dir = home.join(format!(".{client}/skills"));
             scan_targets.push((client_dir, SkillScope::UserClient));
         }
-        scan_targets.push((
-            home.join(".agents/skills"),
-            SkillScope::UserCrossClient,
-        ));
+        scan_targets.push((home.join(".agents/skills"), SkillScope::UserCrossClient));
         // Agent OS central store.
-        scan_targets.push((
-            home.join(".macaca/skills"),
-            SkillScope::AgentOsCentral,
-        ));
+        scan_targets.push((home.join(".macaca/skills"), SkillScope::AgentOsCentral));
     }
 
     // Extra directories.
@@ -226,9 +217,7 @@ pub async fn scan_skills_directory(dir: &Path) -> MacacaResult<Vec<AgentSkill>> 
 }
 
 fn home_dir() -> Option<PathBuf> {
-    std::env::var("HOME")
-        .ok()
-        .map(PathBuf::from)
+    std::env::var("HOME").ok().map(PathBuf::from)
 }
 
 #[cfg(test)]

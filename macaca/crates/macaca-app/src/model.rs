@@ -121,6 +121,11 @@ pub struct AppManifest {
     /// Apps declare preferences; the kernel resolves actual API keys.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub llm_config: Option<AppLlmConfig>,
+    /// Name of the agent that receives user messages (the "entry" agent).
+    /// If not set, falls back to the first agent in the workflow, or the
+    /// first agent with `delegate_task` capability, or the first registered agent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entry_agent: Option<String>,
     /// Application entry point configuration.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub entrypoint: Option<EntrypointConfig>,
@@ -308,6 +313,7 @@ agents:
                 ui_type: None,
                 agents: vec![],
                 llm_config: None,
+                entry_agent: None,
                 entrypoint: None,
                 workflows: None,
                 resources: None,

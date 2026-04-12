@@ -1,15 +1,15 @@
 //! Execution Queue - Priority-based task queue for agent execution.
 
-use std::collections::HashMap;
 use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, RwLock};
 
+use super::{DelegatedTask, TaskId, TaskResult, TaskStatus};
 use macaca_persist::PersistStore;
 use macaca_proto::ApplicationId;
-use super::{DelegatedTask, TaskId, TaskResult, TaskStatus};
 
 /// Maximum number of tasks that can be queued.
 const DEFAULT_MAX_QUEUE_SIZE: usize = 100;
@@ -32,7 +32,10 @@ impl PrioritizedTask {
         let bonus = if task.parallel { 1 } else { 0 };
         let priority_score = (task.priority as i32) * 10 + bonus;
 
-        Self { task, priority_score }
+        Self {
+            task,
+            priority_score,
+        }
     }
 }
 
@@ -161,7 +164,11 @@ impl ExecutionQueue {
         pending.sort_by(|a, b| b.cmp(a)); // Reverse for max-heap behavior
         drop(pending);
 
-        tracing::info!("Task enqueued: task_id={}, queue_size={}", task_id, self.pending.read().await.len());
+        tracing::info!(
+            "Task enqueued: task_id={}, queue_size={}",
+            task_id,
+            self.pending.read().await.len()
+        );
 
         Ok(task_id)
     }
@@ -371,7 +378,13 @@ impl ExecutionQueue {
             return Some(TaskStatus::Running);
         }
         // Check pending
-        if self.pending.read().await.iter().any(|p| p.task.id == *task_id) {
+        if self
+            .pending
+            .read()
+            .await
+            .iter()
+            .any(|p| p.task.id == *task_id)
+        {
             return Some(TaskStatus::Queued);
         }
         None

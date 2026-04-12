@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1773655855873,
+  "lastScanned": 1775926865238,
   "projectRoot": "/Users/quantum/Code/dev/agent/macaca",
   "techStack": {
     "languages": [
@@ -28,13 +28,16 @@
     "namingStyle": null,
     "importStyle": null,
     "testPattern": null,
-    "fileOrganization": null
+    "fileOrganization": "type-based"
   },
   "structure": {
     "isMonorepo": false,
     "workspaces": [],
     "mainDirectories": [
+      "docs",
       "examples",
+      "scripts",
+      "src",
       "tests"
     ],
     "gitBranches": null
@@ -45,14 +48,14 @@
       "path": "Library",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1773655855861,
+      "lastAccessed": 1775926865225,
       "keyFiles": []
     },
     "config": {
       "path": "config",
       "purpose": "Configuration files",
       "fileCount": 1,
-      "lastAccessed": 1773655855862,
+      "lastAccessed": 1775926865226,
       "keyFiles": [
         "default.toml"
       ]
@@ -61,28 +64,106 @@
       "path": "crates",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1773655855862,
+      "lastAccessed": 1775926865226,
       "keyFiles": []
+    },
+    "deploy": {
+      "path": "deploy",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1775926865226,
+      "keyFiles": [
+        "install-systemd.sh",
+        "macaca.service"
+      ]
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 12,
+      "lastAccessed": 1775926865226,
+      "keyFiles": [
+        "SYSTEM_AUDIT.md",
+        "SYSTEM_OVERVIEW.md",
+        "autonomous-agent-os-analysis.md",
+        "event-log-redesign.md",
+        "full-chain-logging-plan.md"
+      ]
     },
     "examples": {
       "path": "examples",
       "purpose": "Example code",
-      "fileCount": 0,
-      "lastAccessed": 1773655855862,
+      "fileCount": 1,
+      "lastAccessed": 1775926865226,
       "keyFiles": []
+    },
+    "hello-world": {
+      "path": "hello-world",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1775926865226,
+      "keyFiles": [
+        "README.md",
+        "index.html"
+      ]
     },
     "infra": {
       "path": "infra",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1773655855862,
+      "lastAccessed": 1775926865226,
+      "keyFiles": []
+    },
+    "logs": {
+      "path": "logs",
+      "purpose": null,
+      "fileCount": 11,
+      "lastAccessed": 1775926865227,
+      "keyFiles": [
+        "macaca.2026-04-02.gz",
+        "macaca.2026-04-03.gz",
+        "macaca.2026-04-04.gz",
+        "macaca.2026-04-05.gz",
+        "macaca.2026-04-06.gz"
+      ]
+    },
+    "openspec": {
+      "path": "openspec",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1775926865227,
+      "keyFiles": []
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 3,
+      "lastAccessed": 1775926865227,
+      "keyFiles": [
+        "benchmark.py",
+        "trace_watch.py",
+        "verify_logs.py"
+      ]
+    },
+    "specs": {
+      "path": "specs",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1775926865227,
+      "keyFiles": []
+    },
+    "src": {
+      "path": "src",
+      "purpose": "Source code",
+      "fileCount": 0,
+      "lastAccessed": 1775926865227,
       "keyFiles": []
     },
     "target": {
       "path": "target",
       "purpose": null,
-      "fileCount": 2,
-      "lastAccessed": 1773655855862,
+      "fileCount": 3,
+      "lastAccessed": 1775926865227,
       "keyFiles": [
         "CACHEDIR.TAG"
       ]
@@ -90,317 +171,161 @@
     "tests": {
       "path": "tests",
       "purpose": "Test files",
+      "fileCount": 1,
+      "lastAccessed": 1775926865227,
+      "keyFiles": [
+        "e2e_project_task.sh"
+      ]
+    },
+    "src/app": {
+      "path": "src/app",
+      "purpose": "Application code",
+      "fileCount": 1,
+      "lastAccessed": 1775926865228,
+      "keyFiles": [
+        "page.tsx"
+      ]
+    },
+    "src/components": {
+      "path": "src/components",
+      "purpose": "UI components",
       "fileCount": 0,
-      "lastAccessed": 1773655855863,
+      "lastAccessed": 1775926865228,
       "keyFiles": []
     },
     "tests/fixtures": {
       "path": "tests/fixtures",
       "purpose": "Test fixtures",
       "fileCount": 0,
-      "lastAccessed": 1773655855863,
+      "lastAccessed": 1775926865228,
       "keyFiles": []
     }
   },
   "hotPaths": [
     {
-      "path": "crates/macaca-runtime/src/agentic_loop.rs",
-      "accessCount": 59,
-      "lastAccessed": 1773731904468,
+      "path": "",
+      "accessCount": 10,
+      "lastAccessed": 1775928595599,
+      "type": "directory"
+    },
+    {
+      "path": "beijing-weather/backend/internal/qweather/client_test.go",
+      "accessCount": 5,
+      "lastAccessed": 1775927492775,
       "type": "file"
     },
     {
-      "path": "crates/macaca-web/src/routes.rs",
-      "accessCount": 32,
-      "lastAccessed": 1773731942636,
+      "path": "beijing-weather/backend/go.mod",
+      "accessCount": 5,
+      "lastAccessed": 1775928600045,
       "type": "file"
     },
     {
-      "path": "crates/macaca-proto/src/config.rs",
-      "accessCount": 23,
-      "lastAccessed": 1773729644170,
+      "path": "beijing-weather/backend/internal/qweather/client.go",
+      "accessCount": 5,
+      "lastAccessed": 1775928602806,
       "type": "file"
     },
     {
-      "path": "crates/macaca-driver-claude-code/src/tools.rs",
-      "accessCount": 21,
-      "lastAccessed": 1773672901738,
+      "path": "beijing-weather/backend/internal/qweather/types.go",
+      "accessCount": 4,
+      "lastAccessed": 1775927518143,
       "type": "file"
     },
     {
-      "path": "crates/macaca-kernel/src/executor/fork_manager.rs",
-      "accessCount": 20,
-      "lastAccessed": 1773734318666,
+      "path": "beijing-weather/backend/internal/config/config.go",
+      "accessCount": 4,
+      "lastAccessed": 1775928592058,
       "type": "file"
     },
     {
-      "path": "crates/macaca-web/src/agent_runner.rs",
-      "accessCount": 15,
-      "lastAccessed": 1773724037479,
+      "path": "beijing-weather/backend/cmd/server/main.go",
+      "accessCount": 3,
+      "lastAccessed": 1775928592040,
       "type": "file"
     },
     {
-      "path": "crates/macaca-proto/src/types.rs",
-      "accessCount": 13,
-      "lastAccessed": 1773673507668,
+      "path": "beijing-weather/backend/internal/handler/weather.go",
+      "accessCount": 3,
+      "lastAccessed": 1775928592856,
       "type": "file"
     },
     {
-      "path": "crates/macaca-cli/src/logging.rs",
-      "accessCount": 12,
-      "lastAccessed": 1773730783148,
+      "path": "beijing-weather/backend/internal/model/weather.go",
+      "accessCount": 3,
+      "lastAccessed": 1775928601450,
       "type": "file"
     },
     {
-      "path": "crates/macaca-cli/Cargo.toml",
-      "accessCount": 11,
-      "lastAccessed": 1773730090653,
+      "path": "beijing-weather/backend/internal/service/weather.go",
+      "accessCount": 3,
+      "lastAccessed": 1775928602335,
+      "type": "file"
+    },
+    {
+      "path": "beijing-weather/backend/internal/service/cache.go",
+      "accessCount": 3,
+      "lastAccessed": 1775928603267,
+      "type": "file"
+    },
+    {
+      "path": "beijing-weather/backend/internal/middleware/cors.go",
+      "accessCount": 2,
+      "lastAccessed": 1775928592996,
+      "type": "file"
+    },
+    {
+      "path": "beijing-weather/backend/internal/handler/health.go",
+      "accessCount": 2,
+      "lastAccessed": 1775928600804,
+      "type": "file"
+    },
+    {
+      "path": "beijing-weather/backend/internal/handler/airquality.go",
+      "accessCount": 2,
+      "lastAccessed": 1775928601397,
+      "type": "file"
+    },
+    {
+      "path": "beijing-weather/backend/internal/model/response.go",
+      "accessCount": 2,
+      "lastAccessed": 1775928601835,
+      "type": "file"
+    },
+    {
+      "path": "beijing-weather/backend/internal/middleware/ratelimit.go",
+      "accessCount": 2,
+      "lastAccessed": 1775928603700,
+      "type": "file"
+    },
+    {
+      "path": "beijing-weather/backend/internal/middleware/requestid.go",
+      "accessCount": 2,
+      "lastAccessed": 1775928604171,
+      "type": "file"
+    },
+    {
+      "path": "beijing-weather/backend/config.toml",
+      "accessCount": 1,
+      "lastAccessed": 1775927150832,
+      "type": "file"
+    },
+    {
+      "path": "beijing-weather/backend/cmd/example/main.go",
+      "accessCount": 1,
+      "lastAccessed": 1775927541606,
       "type": "file"
     },
     {
       "path": "Cargo.toml",
-      "accessCount": 10,
-      "lastAccessed": 1773729869203,
-      "type": "file"
-    },
-    {
-      "path": "crates/macaca-web/src/lib.rs",
-      "accessCount": 10,
-      "lastAccessed": 1773730008234,
-      "type": "directory"
-    },
-    {
-      "path": "crates",
-      "accessCount": 10,
-      "lastAccessed": 1773731854199,
-      "type": "directory"
-    },
-    {
-      "path": "crates/macaca-tools/src/tool.rs",
-      "accessCount": 9,
-      "lastAccessed": 1773668718394,
-      "type": "file"
-    },
-    {
-      "path": "crates/macaca-kernel/src/executor/app_executor.rs",
-      "accessCount": 9,
-      "lastAccessed": 1773734665574,
-      "type": "file"
-    },
-    {
-      "path": "crates/macaca-tools/src/orchestration.rs",
-      "accessCount": 8,
-      "lastAccessed": 1773731876497,
+      "accessCount": 1,
+      "lastAccessed": 1775928543277,
       "type": "file"
     },
     {
       "path": "crates/macaca-cli/src/main.rs",
-      "accessCount": 7,
-      "lastAccessed": 1773729974957,
-      "type": "file"
-    },
-    {
-      "path": "config/default.toml",
-      "accessCount": 6,
-      "lastAccessed": 1773729664362,
-      "type": "file"
-    },
-    {
-      "path": "crates/macaca-kernel/src/executor/worker.rs",
-      "accessCount": 5,
-      "lastAccessed": 1773731902358,
-      "type": "file"
-    },
-    {
-      "path": "crates/macaca-web/src/hook_consumer.rs",
-      "accessCount": 5,
-      "lastAccessed": 1773734604348,
-      "type": "file"
-    },
-    {
-      "path": "crates/macaca-web/src",
-      "accessCount": 4,
-      "lastAccessed": 1773668698319,
-      "type": "directory"
-    },
-    {
-      "path": "examples/go/multiply/main.go",
-      "accessCount": 3,
-      "lastAccessed": 1773672049755,
-      "type": "file"
-    },
-    {
-      "path": "crates/macaca-driver-claude-code/src",
-      "accessCount": 3,
-      "lastAccessed": 1773672406972,
-      "type": "directory"
-    },
-    {
-      "path": "crates/macaca-driver-claude-code/src/output.rs",
-      "accessCount": 3,
-      "lastAccessed": 1773672429787,
-      "type": "file"
-    },
-    {
-      "path": "hello-world-api/main.go",
-      "accessCount": 3,
-      "lastAccessed": 1773674815938,
-      "type": "file"
-    },
-    {
-      "path": "crates/macaca-kernel/src/executor",
-      "accessCount": 3,
-      "lastAccessed": 1773724196205,
-      "type": "directory"
-    },
-    {
-      "path": "",
-      "accessCount": 3,
-      "lastAccessed": 1773725041748,
-      "type": "directory"
-    },
-    {
-      "path": "docs/log-system-plan.md",
-      "accessCount": 3,
-      "lastAccessed": 1773727254392,
-      "type": "file"
-    },
-    {
-      "path": "crates/macaca-tools/src",
-      "accessCount": 2,
-      "lastAccessed": 1773659729117,
-      "type": "directory"
-    },
-    {
-      "path": "crates/macaca-tools",
-      "accessCount": 2,
-      "lastAccessed": 1773668621372,
-      "type": "directory"
-    },
-    {
-      "path": "crates/macaca-kernel/src/executor/queue.rs",
-      "accessCount": 2,
-      "lastAccessed": 1773731902305,
-      "type": "file"
-    },
-    {
-      "path": "crates/macaca-driver-claude-code/src/driver.rs",
       "accessCount": 1,
-      "lastAccessed": 1773658761023,
-      "type": "file"
-    },
-    {
-      "path": "crates/macaca-tools/src/lib.rs",
-      "accessCount": 1,
-      "lastAccessed": 1773658815150,
-      "type": "file"
-    },
-    {
-      "path": "crates/macaca-proto/src",
-      "accessCount": 1,
-      "lastAccessed": 1773659762372,
-      "type": "directory"
-    },
-    {
-      "path": "examples/go/hello-api/main.go",
-      "accessCount": 1,
-      "lastAccessed": 1773667803238,
-      "type": "file"
-    },
-    {
-      "path": "hello-world-api/pkg/logger/logger.go",
-      "accessCount": 1,
-      "lastAccessed": 1773669471338,
-      "type": "file"
-    },
-    {
-      "path": "hello-world-api/handlers/health.go",
-      "accessCount": 1,
-      "lastAccessed": 1773669471448,
-      "type": "file"
-    },
-    {
-      "path": "crates/macaca-persist",
-      "accessCount": 1,
-      "lastAccessed": 1773669562443,
-      "type": "directory"
-    },
-    {
-      "path": "crates/macaca-persist/src/lib.rs",
-      "accessCount": 1,
-      "lastAccessed": 1773669572019,
-      "type": "file"
-    },
-    {
-      "path": "crates/macaca-persist/src/redb_store.rs",
-      "accessCount": 1,
-      "lastAccessed": 1773669582770,
-      "type": "file"
-    },
-    {
-      "path": "examples/go/remainder/main.go",
-      "accessCount": 1,
-      "lastAccessed": 1773672057307,
-      "type": "file"
-    },
-    {
-      "path": "examples/go/remainder/main_test.go",
-      "accessCount": 1,
-      "lastAccessed": 1773672089770,
-      "type": "file"
-    },
-    {
-      "path": "examples/go/remainder/go.mod",
-      "accessCount": 1,
-      "lastAccessed": 1773672101049,
-      "type": "file"
-    },
-    {
-      "path": "examples/go/bubblesort/bubblesort.go",
-      "accessCount": 1,
-      "lastAccessed": 1773673956117,
-      "type": "file"
-    },
-    {
-      "path": "examples/go/bubblesort/main.go",
-      "accessCount": 1,
-      "lastAccessed": 1773673972912,
-      "type": "file"
-    },
-    {
-      "path": "examples/go/bubblesort/bubblesort_test.go",
-      "accessCount": 1,
-      "lastAccessed": 1773673994055,
-      "type": "file"
-    },
-    {
-      "path": "hello-api/main.go",
-      "accessCount": 1,
-      "lastAccessed": 1773680171713,
-      "type": "file"
-    },
-    {
-      "path": "crates/macaca-kernel/src/executor/callback.rs",
-      "accessCount": 1,
-      "lastAccessed": 1773724071824,
-      "type": "file"
-    },
-    {
-      "path": "crates/macaca-runtime/src",
-      "accessCount": 1,
-      "lastAccessed": 1773724667265,
-      "type": "directory"
-    },
-    {
-      "path": "crates/macaca-web/Cargo.toml",
-      "accessCount": 1,
-      "lastAccessed": 1773725674549,
-      "type": "file"
-    },
-    {
-      "path": "crates/macaca-gateway/src/gateway.rs",
-      "accessCount": 1,
-      "lastAccessed": 1773725742580,
+      "lastAccessed": 1775928543404,
       "type": "file"
     }
   ],

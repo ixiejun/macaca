@@ -24,7 +24,9 @@ pub struct WorkspaceConfig {
 
 impl Default for WorkspaceConfig {
     fn default() -> Self {
-        Self { root_dir: "./data/workspaces".into() }
+        Self {
+            root_dir: "./data/workspaces".into(),
+        }
     }
 }
 
@@ -46,31 +48,79 @@ pub struct LlmConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LlmProviderConfig {
-    /// API key — can be a raw key (e.g. `sk-xxx`) or an env var name (e.g. `OPENAI_API_KEY`).
-    pub api_key_env: String,
+    /// Coding-plan / subscription key (e.g. MiniMax [Token Plan](https://platform.minimaxi.com/docs/token-plan/intro)).
+    /// When non-empty after resolution, **takes precedence** over [`Self::api_key`] (pay-as-you-go).
+    /// Value: raw key, or `ALL_CAPS` env var name (same rules as `api_key`).
+    #[serde(default)]
+    pub api_key_plan: Option<String>,
+    /// Pay-as-you-go API key: raw `sk-…` string, or env var name if `ALL_CAPS_WITH_UNDERSCORES`
+    /// (e.g. `OPENAI_API_KEY`). Used when `api_key_plan` is unset or empty.
+    #[serde(default)]
+    pub api_key: String,
     pub base_url: String,
     /// Default model for this provider (e.g. "" for DashScope, "gpt-4o" for OpenAI)
     #[serde(default)]
     pub default_model: Option<String>,
 }
 
+/// Resolve one key field: empty → `Ok("")`; `ALL_CAPS` → `std::env::var`; else literal.
+fn resolve_llm_key_field(raw: &str) -> MacacaResult<String> {
+    let v = raw.trim();
+    if v.is_empty() {
+        return Ok(String::new());
+    }
+    let is_env_var_name = v
+        .chars()
+        .all(|c| c.is_ascii_uppercase() || c == '_' || c.is_ascii_digit());
+    if is_env_var_name {
+        std::env::var(v).map_err(|_| MacacaError::Config(format!("{v} not set")))
+    } else {
+        Ok(v.to_string())
+    }
+}
+
+fn resolve_llm_optional_key(opt: &Option<String>) -> MacacaResult<String> {
+    match opt {
+        None => Ok(String::new()),
+        Some(s) => resolve_llm_key_field(s),
+    }
+}
+
 impl LlmProviderConfig {
-    /// Resolve the API key: if the value looks like a raw key (contains `-` or
-    /// starts with `sk`), use it directly; otherwise treat as an env var name.
+    /// Effective API key: **`api_key_plan` (coding plan) first**, then **`api_key` (按量)**.
     pub fn resolve_api_key(&self) -> MacacaResult<String> {
-        let v = &self.api_key_env;
-        if v.is_empty() {
-            return Ok(String::new());
+        let plan = resolve_llm_optional_key(&self.api_key_plan)?;
+        if !plan.is_empty() {
+            return Ok(plan);
         }
-        // Heuristic: raw keys typically contain lowercase, dashes, or start with sk/key prefix.
-        // Env var names are ALL_UPPER_WITH_UNDERSCORES.
-        let is_env_var_name = !v.is_empty()
-            && v.chars().all(|c| c.is_ascii_uppercase() || c == '_' || c.is_ascii_digit());
-        if is_env_var_name {
-            std::env::var(v).map_err(|_| MacacaError::Config(format!("{v} not set")))
-        } else {
-            Ok(v.clone())
-        }
+        resolve_llm_key_field(&self.api_key)
+    }
+}
+
+#[cfg(test)]
+mod llm_provider_config_tests {
+    use super::*;
+
+    #[test]
+    fn resolve_api_key_prefers_api_key_plan() {
+        let c = LlmProviderConfig {
+            api_key_plan: Some("  sk-plan  ".into()),
+            api_key: "SHOULD_NOT_READ".into(),
+            base_url: "https://example.com/v1".into(),
+            default_model: None,
+        };
+        assert_eq!(c.resolve_api_key().unwrap(), "sk-plan");
+    }
+
+    #[test]
+    fn resolve_api_key_falls_back_to_api_key_paygo() {
+        let c = LlmProviderConfig {
+            api_key_plan: None,
+            api_key: "sk-paygo-inline".into(),
+            base_url: "https://example.com/v1".into(),
+            default_model: None,
+        };
+        assert_eq!(c.resolve_api_key().unwrap(), "sk-paygo-inline");
     }
 }
 
@@ -95,7 +145,8 @@ pub struct VectorConfig {
 pub struct EmbeddingConfig {
     pub provider: String,
     pub model: String,
-    pub api_key_env: String,
+    /// Raw API key or `ALL_CAPS` env var name (same rules as [`LlmProviderConfig::api_key`]).
+    pub api_key: String,
     pub dimensions: usize,
     /// Base URL for the embedding API endpoint.
     #[serde(default)]
@@ -103,19 +154,8 @@ pub struct EmbeddingConfig {
 }
 
 impl EmbeddingConfig {
-    /// Resolve the API key (same heuristic as LlmProviderConfig).
     pub fn resolve_api_key(&self) -> MacacaResult<String> {
-        let v = &self.api_key_env;
-        if v.is_empty() {
-            return Ok(String::new());
-        }
-        let is_env_var_name = !v.is_empty()
-            && v.chars().all(|c| c.is_ascii_uppercase() || c == '_' || c.is_ascii_digit());
-        if is_env_var_name {
-            std::env::var(v).map_err(|_| MacacaError::Config(format!("{v} not set")))
-        } else {
-            Ok(v.clone())
-        }
+        resolve_llm_key_field(&self.api_key)
     }
 }
 
@@ -195,12 +235,24 @@ pub struct LogFileConfig {
     pub compress: bool,
 }
 
-fn default_log_file_enabled() -> bool { true }
-fn default_log_dir() -> String { "./logs".into() }
-fn default_log_prefix() -> String { "macaca".into() }
-fn default_log_format() -> String { "json".into() }
-fn default_log_retention_days() -> u64 { 10 }
-fn default_log_compress() -> bool { true }
+fn default_log_file_enabled() -> bool {
+    true
+}
+fn default_log_dir() -> String {
+    "./logs".into()
+}
+fn default_log_prefix() -> String {
+    "macaca".into()
+}
+fn default_log_format() -> String {
+    "json".into()
+}
+fn default_log_retention_days() -> u64 {
+    10
+}
+fn default_log_compress() -> bool {
+    true
+}
 
 impl Default for LogFileConfig {
     fn default() -> Self {
@@ -242,7 +294,7 @@ impl Default for MacacaConfig {
                 embedding: EmbeddingConfig {
                     provider: "dashscope".into(),
                     model: "text-embedding-v4".into(),
-                    api_key_env: "DASHSCOPE_API_KEY".into(),
+                    api_key: "DASHSCOPE_API_KEY".into(),
                     dimensions: 1024,
                     base_url: "https://dashscope.aliyuncs.com/api/v1/services/embeddings/text-embedding/text-embedding".into(),
                 },

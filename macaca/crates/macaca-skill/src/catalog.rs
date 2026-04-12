@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 
 use macaca_proto::{MacacaError, MacacaResult};
 
-use crate::agent_skill::{AgentSkill, ActivatedSkill};
+use crate::agent_skill::{ActivatedSkill, AgentSkill};
 use crate::discovery;
 
 /// Entry in the skill catalog (tier 1 — lightweight metadata).
@@ -118,8 +118,14 @@ impl SkillCatalog {
         for entry in &entries {
             out.push_str("  <skill>\n");
             out.push_str(&format!("    <name>{}</name>\n", entry.name));
-            out.push_str(&format!("    <description>{}</description>\n", entry.description));
-            out.push_str(&format!("    <location>{}</location>\n", entry.location.display()));
+            out.push_str(&format!(
+                "    <description>{}</description>\n",
+                entry.description
+            ));
+            out.push_str(&format!(
+                "    <location>{}</location>\n",
+                entry.location.display()
+            ));
             out.push_str("  </skill>\n");
         }
         out.push_str("</available_skills>");
@@ -199,7 +205,9 @@ mod tests {
         tokio::fs::create_dir(&skill_dir).await.unwrap();
         tokio::fs::write(
             skill_dir.join("SKILL.md"),
-            format!("---\nname: {name}\ndescription: {desc}\n---\n# {name}\n\nInstructions for {name}."),
+            format!(
+                "---\nname: {name}\ndescription: {desc}\n---\n# {name}\n\nInstructions for {name}."
+            ),
         )
         .await
         .unwrap();

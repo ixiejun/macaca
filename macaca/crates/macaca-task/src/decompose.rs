@@ -4,8 +4,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
-use macaca_proto::{MacacaResult, Task, TaskId, TaskRequest};
 use macaca_proto::types::{LlmMessage, LlmOptions};
+use macaca_proto::{MacacaResult, Task, TaskId, TaskRequest};
 
 /// Trait for breaking a high-level task into sub-task requests.
 /// Implementations may call an LLM or apply heuristic rules.
@@ -55,14 +55,21 @@ pub struct LlmDecomposer {
 
 impl LlmDecomposer {
     pub fn new(llm: Arc<dyn macaca_llm::LlmProvider>, model: impl Into<String>) -> Self {
-        Self { llm, model: model.into() }
+        Self {
+            llm,
+            model: model.into(),
+        }
     }
 
     /// Decompose a goal description into structured sub-tasks.
-    pub async fn decompose(&self, goal: &str, available_agents: &[String]) -> Result<Vec<DecomposedTask>, String> {
+    pub async fn decompose(
+        &self,
+        goal: &str,
+        available_agents: &[String],
+    ) -> Result<Vec<DecomposedTask>, String> {
         let agents_list = available_agents.join(", ");
         let prompt = format!(
-r#"You are a project planning agent. Decompose the following goal into 3-7 executable sub-tasks.
+            r#"You are a project planning agent. Decompose the following goal into 3-7 executable sub-tasks.
 
 Goal: {goal}
 
@@ -101,7 +108,10 @@ Respond with ONLY a JSON array, no other text."#
             ..Default::default()
         };
 
-        let response = self.llm.chat(messages, &options).await
+        let response = self
+            .llm
+            .chat(messages, &options)
+            .await
             .map_err(|e| format!("LLM decomposition failed: {}", e))?;
 
         let tasks = Self::parse_llm_output(&response.content)?;
@@ -168,7 +178,9 @@ Respond with ONLY a JSON array, no other text."#
 
         for task in &decomposed {
             // Resolve depends_on from titles to TaskIds
-            let mut depends_on: Vec<TaskId> = task.depends_on_titles.iter()
+            let mut depends_on: Vec<TaskId> = task
+                .depends_on_titles
+                .iter()
                 .filter_map(|title| title_to_id.get(title).copied())
                 .collect();
 
@@ -197,22 +209,30 @@ Respond with ONLY a JSON array, no other text."#
             let agent = if available_agents.contains(&task.assigned_agent) {
                 task.assigned_agent.as_str()
             } else {
-                available_agents.first().map(|s| s.as_str()).unwrap_or("coordinator")
+                available_agents
+                    .first()
+                    .map(|s| s.as_str())
+                    .unwrap_or("default")
             };
 
-            let item = space.create_and_assign(
-                agent,
-                "plan_agent",
-                &task.title,
-                &task.description,
-                task.acceptance_criteria.clone(),
-                task.priority,
-                depends_on,
-                Some(*goal_id),
-            ).await;
+            let item = space
+                .create_and_assign(
+                    agent,
+                    "plan_agent",
+                    &task.title,
+                    &task.description,
+                    task.acceptance_criteria.clone(),
+                    task.priority,
+                    depends_on,
+                    Some(*goal_id),
+                )
+                .await;
 
             title_to_id.insert(task.title.clone(), item.id);
-            agent_to_ids.entry(agent.to_string()).or_default().push(item.id);
+            agent_to_ids
+                .entry(agent.to_string())
+                .or_default()
+                .push(item.id);
             created_items.push(item);
         }
 
@@ -229,8 +249,8 @@ Respond with ONLY a JSON array, no other text."#
 #[cfg(test)]
 mod tests {
     use super::*;
-    use macaca_proto::{Task, TaskId, TaskPriority, TaskStatus};
     use chrono::Utc;
+    use macaca_proto::{Task, TaskId, TaskPriority, TaskStatus};
 
     fn sample_task() -> Task {
         let now = Utc::now();

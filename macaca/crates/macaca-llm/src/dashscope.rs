@@ -11,6 +11,7 @@ use macaca_proto::{
 };
 
 use crate::provider::LlmProvider;
+use crate::tool_wire::tool_arguments_for_chat_api;
 
 const DEFAULT_BASE_URL: &str = "https://dashscope.aliyuncs.com/compatible-mode/v1";
 
@@ -36,7 +37,10 @@ impl DashScopeProvider {
         Self {
             api_key: api_key.into(),
             base_url: DEFAULT_BASE_URL.to_owned(),
-            client: reqwest::Client::builder().no_proxy().build().unwrap_or_default(),
+            client: reqwest::Client::builder()
+                .no_proxy()
+                .build()
+                .unwrap_or_default(),
         }
     }
 
@@ -141,7 +145,11 @@ fn role_str(role: LlmRole) -> &'static str {
 fn convert_message(m: &LlmMessage) -> ChatMessage {
     let mut msg = ChatMessage {
         role: role_str(m.role).to_owned(),
-        content: if m.content.is_empty() { None } else { Some(m.content.clone()) },
+        content: if m.content.is_empty() {
+            None
+        } else {
+            Some(m.content.clone())
+        },
         tool_calls: None,
         tool_call_id: m.tool_call_id.clone(),
     };
@@ -154,7 +162,7 @@ fn convert_message(m: &LlmMessage) -> ChatMessage {
                     call_type: "function".into(),
                     function: OaiFunctionCall {
                         name: tc.name.clone(),
-                        arguments: tc.arguments.to_string(),
+                        arguments: tool_arguments_for_chat_api(&tc.arguments),
                     },
                 })
                 .collect(),
@@ -277,8 +285,7 @@ mod tests {
 
     #[test]
     fn custom_base_url() {
-        let p = DashScopeProvider::new("key")
-            .with_base_url("http://localhost:8000");
+        let p = DashScopeProvider::new("key").with_base_url("http://localhost:8000");
         assert_eq!(p.base_url, "http://localhost:8000");
     }
 

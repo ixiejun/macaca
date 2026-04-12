@@ -13,20 +13,20 @@ use std::path::PathBuf;
 fn config_path() -> PathBuf {
     let manifest = std::env::var("CARGO_MANIFEST_DIR").unwrap();
     PathBuf::from(manifest)
-        .parent().unwrap() // crates/
-        .parent().unwrap() // workspace root
+        .parent()
+        .unwrap() // crates/
+        .parent()
+        .unwrap() // workspace root
         .join("config/default.toml")
 }
 
 fn load_config() -> MacacaConfig {
-    MacacaConfig::load(config_path())
-        .expect("Failed to load config/default.toml")
+    MacacaConfig::load(config_path()).expect("Failed to load config/default.toml")
 }
 
 fn load_router() -> LlmRouter {
     let config = load_config();
-    LlmRouter::from_config(&config.llm)
-        .expect("Failed to create router from config")
+    LlmRouter::from_config(&config.llm).expect("Failed to create router from config")
 }
 
 #[tokio::test]
@@ -57,7 +57,9 @@ async fn live_dashscope_qwen_max_chat() {
 
     let messages = vec![
         LlmMessage::system("You are a helpful coding assistant. Reply concisely."),
-        LlmMessage::user("Write a Rust function that adds two numbers. Just the code, no explanation."),
+        LlmMessage::user(
+            "Write a Rust function that adds two numbers. Just the code, no explanation.",
+        ),
     ];
     let options = LlmOptions {
         model: "qwen-max".into(),
@@ -82,7 +84,10 @@ async fn live_dashscope_qwen_max_chat() {
 async fn live_dashscope_embedding() {
     let config = load_config();
 
-    let api_key = config.memory.embedding.resolve_api_key()
+    let api_key = config
+        .memory
+        .embedding
+        .resolve_api_key()
         .expect("Failed to resolve embedding API key");
     let base_url = &config.memory.embedding.base_url;
 
@@ -117,10 +122,38 @@ async fn live_dashscope_embedding() {
 
 #[tokio::test]
 #[ignore]
+async fn live_minimax_m27_token_plan_chat() {
+    let router = load_router();
+    let messages = vec![LlmMessage::user(
+        "Reply with exactly the two characters OK and nothing else.",
+    )];
+    let options = LlmOptions {
+        model: "MiniMax-M2.7".into(),
+        max_tokens: Some(32),
+        // MiniMax OpenAI 兼容：temperature 须在 (0, 1.0]
+        temperature: Some(1.0),
+        ..Default::default()
+    };
+
+    let resp = router
+        .chat(messages, &options)
+        .await
+        .expect("MiniMax chat failed — check api_key_plan / base_url in config/default.toml");
+
+    println!("[MiniMax M2.7] content: {:?}", resp.content);
+    println!(
+        "[MiniMax M2.7] model: {} usage: {:?}",
+        resp.model, resp.usage
+    );
+    assert!(!resp.content.is_empty(), "empty completion");
+    assert!(resp.usage.total_tokens > 0, "expected token usage");
+}
+
+#[tokio::test]
+#[ignore]
 async fn live_router_from_config_builds_all_providers() {
     let config = load_config();
-    let router = LlmRouter::from_config(&config.llm)
-        .expect("Failed to build router");
+    let router = LlmRouter::from_config(&config.llm).expect("Failed to build router");
 
     // Verify dashscope provider is registered by making a request
     let messages = vec![LlmMessage::user("Reply with just the number 42")];

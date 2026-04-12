@@ -47,7 +47,8 @@ pub async fn start_hook_event_consumer(state: Arc<AppState>) {
         }
 
         // Remove receivers for apps that no longer exist
-        let current_app_ids: std::collections::HashSet<_> = executors.iter().map(|(id, _)| id.clone()).collect();
+        let current_app_ids: std::collections::HashSet<_> =
+            executors.iter().map(|(id, _)| id.clone()).collect();
         app_receivers.retain(|app_id, _| {
             let keep = current_app_ids.contains(app_id);
             if !keep {
@@ -65,17 +66,27 @@ pub async fn start_hook_event_consumer(state: Arc<AppState>) {
                         info!(fork_id = %fork_id, app_id = %app_id, "ForkValidated received");
 
                         // Look up the session mapping
-                        let mapping = state.fork_to_session.read().await.get(&fork_id).cloned();
+                        let mapping = state
+                            .sessions
+                            .fork_to_session
+                            .read()
+                            .await
+                            .get(&fork_id)
+                            .cloned();
 
                         if let Some(mapping) = mapping {
                             // Get the executor and fork manager for this app
-                            if let Some(executor) = state.executor_registry.get(&mapping.app_id).await {
+                            if let Some(executor) =
+                                state.executor_registry.get(&mapping.app_id).await
+                            {
                                 let fork_manager = executor.fork_manager();
 
                                 // Get the fork result
                                 if let Some(fork) = fork_manager.get_fork(fork_id).await {
                                     // Extract assistant output from fork messages
-                                    let output = fork.own_messages.iter()
+                                    let output = fork
+                                        .own_messages
+                                        .iter()
                                         .filter_map(|m| {
                                             if matches!(m.role, LlmRole::Assistant) {
                                                 Some(m.content.clone())
@@ -86,12 +97,13 @@ pub async fn start_hook_event_consumer(state: Arc<AppState>) {
                                         .collect::<Vec<_>>()
                                         .join("\n");
 
-                                    let task_id = fork.waiting_on_task
+                                    let task_id = fork
+                                        .waiting_on_task
                                         .map(|t| t.0.to_string())
                                         .unwrap_or_else(|| fork_id.to_string());
 
                                     // Find the active session
-                                    let sessions = state.active_sessions.read().await;
+                                    let sessions = state.sessions.active_sessions.read().await;
                                     if let Some(session) = sessions.get(&mapping.session_id) {
                                         info!(
                                             session_id = %mapping.session_id,
@@ -109,7 +121,8 @@ pub async fn start_hook_event_consumer(state: Arc<AppState>) {
                                             output,
                                         };
 
-                                        if let Err(e) = session.resume_tx.send(resume_reason).await {
+                                        if let Err(e) = session.resume_tx.send(resume_reason).await
+                                        {
                                             warn!(error = %e, "Failed to send resume signal");
                                         }
                                     } else {
@@ -127,14 +140,24 @@ pub async fn start_hook_event_consumer(state: Arc<AppState>) {
                         }
                     }
 
-                    Ok(HookEvent::DelegateFailed { fork_id, task_id, error }) => {
+                    Ok(HookEvent::DelegateFailed {
+                        fork_id,
+                        task_id,
+                        error,
+                    }) => {
                         info!(fork_id = %fork_id, task_id = %task_id, "DelegateFailed received");
 
                         // Look up the session mapping
-                        let mapping = state.fork_to_session.read().await.get(&fork_id).cloned();
+                        let mapping = state
+                            .sessions
+                            .fork_to_session
+                            .read()
+                            .await
+                            .get(&fork_id)
+                            .cloned();
 
                         if let Some(mapping) = mapping {
-                            let sessions = state.active_sessions.read().await;
+                            let sessions = state.sessions.active_sessions.read().await;
                             if let Some(session) = sessions.get(&mapping.session_id) {
                                 info!(
                                     session_id = %mapping.session_id,
@@ -156,7 +179,12 @@ pub async fn start_hook_event_consumer(state: Arc<AppState>) {
                         }
                     }
 
-                    Ok(HookEvent::DelegateCompleted { fork_id, task_id, success, output }) => {
+                    Ok(HookEvent::DelegateCompleted {
+                        fork_id,
+                        task_id,
+                        success,
+                        output,
+                    }) => {
                         // Log but don't resume yet - wait for ForkValidated
                         info!(
                             fork_id = %fork_id,
@@ -171,7 +199,12 @@ pub async fn start_hook_event_consumer(state: Arc<AppState>) {
                         info!(fork_id = %fork_id, "ForkMerged - cleaning up mapping");
 
                         // Clean up the mapping
-                        state.fork_to_session.write().await.remove(&fork_id);
+                        state
+                            .sessions
+                            .fork_to_session
+                            .write()
+                            .await
+                            .remove(&fork_id);
                     }
 
                     Ok(other_event) => {

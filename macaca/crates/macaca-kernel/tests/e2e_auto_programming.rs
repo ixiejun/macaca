@@ -14,9 +14,7 @@ use async_trait::async_trait;
 use macaca_kernel::Kernel;
 use macaca_llm::LlmProvider;
 use macaca_proto::config::KernelConfig;
-use macaca_proto::{
-    MacacaResult, LlmMessage, LlmOptions, LlmResponse, LlmRole, TokenUsage,
-};
+use macaca_proto::{LlmMessage, LlmOptions, LlmResponse, LlmRole, MacacaResult, TokenUsage};
 use macaca_sdk::{AgentBuilder, AgentConfig};
 use macaca_tools::DefaultToolSet;
 

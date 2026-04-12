@@ -61,10 +61,7 @@ impl TelegramAdapter {
                 .map(|(c, _)| c)
                 .unwrap_or(cmd_raw)
                 .to_string();
-            let args: Vec<String> = arg_str
-                .split_whitespace()
-                .map(|s| s.to_string())
-                .collect();
+            let args: Vec<String> = arg_str.split_whitespace().map(|s| s.to_string()).collect();
 
             if command == "status" {
                 return GatewayEvent::StatusQuery {
@@ -131,10 +128,7 @@ impl ImAdapter for TelegramAdapter {
         tokio::spawn(async move {
             let mut offset: i64 = 0;
             loop {
-                let url = format!(
-                    "{}/getUpdates?offset={}&timeout=30",
-                    api_base, offset
-                );
+                let url = format!("{}/getUpdates?offset={}&timeout=30", api_base, offset);
                 let resp = match client.get(&url).send().await {
                     Ok(r) => r,
                     Err(e) => {
@@ -234,9 +228,10 @@ impl ImAdapter for TelegramAdapter {
             });
             if let Err(e) = client.post(&url).json(&payload).send().await {
                 error!(error = %e, "Telegram sendMessage failed");
-                return Err(macaca_proto::error::MacacaError::Gateway(
-                    format!("Telegram send error: {}", e),
-                ));
+                return Err(macaca_proto::error::MacacaError::Gateway(format!(
+                    "Telegram send error: {}",
+                    e
+                )));
             }
         }
 
@@ -328,7 +323,11 @@ mod tests {
     fn test_parse_task_request() {
         let event = TelegramAdapter::parse_message("build me a web app", "42", "100");
         match event {
-            GatewayEvent::TaskRequest { user_id, channel_id, content } => {
+            GatewayEvent::TaskRequest {
+                user_id,
+                channel_id,
+                content,
+            } => {
                 assert_eq!(user_id, "42");
                 assert_eq!(channel_id, "100");
                 assert_eq!(content, "build me a web app");
@@ -341,7 +340,11 @@ mod tests {
     fn test_parse_status_command_no_id() {
         let event = TelegramAdapter::parse_message("/status", "1", "2");
         match event {
-            GatewayEvent::StatusQuery { user_id, channel_id, task_id } => {
+            GatewayEvent::StatusQuery {
+                user_id,
+                channel_id,
+                task_id,
+            } => {
                 assert_eq!(user_id, "1");
                 assert_eq!(channel_id, "2");
                 assert!(task_id.is_none());
@@ -379,7 +382,12 @@ mod tests {
     fn test_parse_generic_command() {
         let event = TelegramAdapter::parse_message("/agents list all", "7", "9");
         match event {
-            GatewayEvent::Command { user_id, channel_id, command, args } => {
+            GatewayEvent::Command {
+                user_id,
+                channel_id,
+                command,
+                args,
+            } => {
                 assert_eq!(user_id, "7");
                 assert_eq!(channel_id, "9");
                 assert_eq!(command, "agents");
@@ -488,6 +496,9 @@ mod tests {
     async fn telegram_adapter_send_without_token_is_ok() {
         std::env::remove_var("TEST_TELEGRAM_TOKEN");
         let adapter = TelegramAdapter::new(test_config());
-        adapter.send_message("chat_123", "Hello from test").await.unwrap();
+        adapter
+            .send_message("chat_123", "Hello from test")
+            .await
+            .unwrap();
     }
 }

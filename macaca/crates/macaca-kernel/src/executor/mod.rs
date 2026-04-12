@@ -49,36 +49,20 @@ pub mod queue;
 pub mod router;
 pub mod worker;
 
-pub use app_executor::{ApplicationExecutor, ApplicationExecutorConfig, ApplicationExecutorRegistry, WorkerState, WorkerHealth, WorkerSupervisorConfig};
-pub use macaca_proto::ApplicationId;
+pub use app_executor::{
+    ApplicationExecutor, ApplicationExecutorConfig, ApplicationExecutorRegistry, WorkerHealth,
+    WorkerState, WorkerSupervisorConfig,
+};
 pub use bus::{EventBus, SystemEvent};
 pub use callback::CallbackDispatcher;
+pub use fork_manager::{DelegateResult, ForkContext, ForkManager, HookEvent, MergeResult};
+pub use macaca_proto::ApplicationId;
 pub use queue::ExecutionQueue;
 pub use router::TaskRouter;
-pub use worker::{TaskExecutor, ExecutorCommand, ExecutorEvent};
-pub use fork_manager::{ForkManager, ForkContext, HookEvent, DelegateResult, MergeResult};
+pub use worker::{ExecutorCommand, ExecutorEvent, TaskExecutor};
 
-/// Unique identifier for a delegated task.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct TaskId(pub Uuid);
-
-impl TaskId {
-    pub fn new() -> Self {
-        Self(Uuid::new_v4())
-    }
-}
-
-impl Default for TaskId {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl std::fmt::Display for TaskId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
+/// Re-export TaskId from the shared protocol crate (single source of truth).
+pub use macaca_proto::TaskId;
 
 /// Status of a delegated task.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -96,53 +80,9 @@ pub enum TaskStatus {
     Cancelled,
 }
 
-/// A delegated task waiting to be executed.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DelegatedTask {
-    /// Unique task identifier
-    pub id: TaskId,
-    /// Application ID this task belongs to (for isolation)
-    pub application_id: ApplicationId,
-    /// Name of the agent that delegated this task
-    pub from_agent: String,
-    /// Name of the agent that should execute this task
-    pub to_agent: String,
-    /// The actual prompt/指令 to execute
-    pub prompt: String,
-    /// Priority level (0-10, higher = more urgent)
-    pub priority: u8,
-    /// Whether this task can run in parallel with others
-    pub parallel: bool,
-    /// When the task was created
-    pub created_at: DateTime<Utc>,
-    /// Optional deadline for task completion
-    pub deadline: Option<DateTime<Utc>>,
-    /// Parent task ID (if this is a subtask)
-    pub parent_task: Option<TaskId>,
-    /// Additional context for execution
-    pub context: Option<TaskContext>,
-}
-
-/// Additional context for task execution.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TaskContext {
-    /// Session ID for conversation continuity
-    pub session_id: Option<String>,
-    /// Files or artifacts relevant to the task
-    pub artifacts: Vec<String>,
-    /// Environment variables or configuration
-    pub env: std::collections::HashMap<String, String>,
-}
-
-impl Default for TaskContext {
-    fn default() -> Self {
-        Self {
-            session_id: None,
-            artifacts: vec![],
-            env: std::collections::HashMap::new(),
-        }
-    }
-}
+/// Re-export DelegatedTask and TaskContext from the shared protocol crate.
+pub use macaca_proto::orchestration::DelegatedTask;
+pub use macaca_proto::TaskContext;
 
 /// Result of a completed task execution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -247,7 +187,8 @@ pub trait AgentRunner: Send + Sync {
     ) -> Result<TaskResult, String> {
         // Default implementation ignores event_tx and calls execute_agent
         let _ = event_tx; // suppress unused warning
-        self.execute_agent(application_id, agent_name, prompt, context).await
+        self.execute_agent(application_id, agent_name, prompt, context)
+            .await
     }
 
     /// Get information about all available agents.

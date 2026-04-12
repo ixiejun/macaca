@@ -44,10 +44,7 @@ pub enum SystemEvent {
     },
 
     /// A task started execution.
-    TaskStarted {
-        task_id: String,
-        agent: String,
-    },
+    TaskStarted { task_id: String, agent: String },
 
     /// A task made progress.
     TaskProgress {
@@ -72,9 +69,7 @@ pub enum SystemEvent {
     },
 
     /// A task was cancelled.
-    TaskCancelled {
-        task_id: String,
-    },
+    TaskCancelled { task_id: String },
 
     /// An agent was spawned/registered.
     AgentSpawned {
@@ -84,10 +79,7 @@ pub enum SystemEvent {
     },
 
     /// An agent became idle (finished all tasks).
-    AgentIdle {
-        agent_id: String,
-        name: String,
-    },
+    AgentIdle { agent_id: String, name: String },
 
     /// An agent started working on a task.
     AgentBusy {
@@ -97,10 +89,7 @@ pub enum SystemEvent {
     },
 
     /// An agent is now available (was busy, now idle).
-    AgentAvailable {
-        agent_id: String,
-        name: String,
-    },
+    AgentAvailable { agent_id: String, name: String },
 
     /// A fork (child agent) was created.
     ForkCreated {
@@ -116,14 +105,10 @@ pub enum SystemEvent {
     },
 
     /// A fork resumed after delegate task completed.
-    ForkResumed {
-        fork_id: String,
-    },
+    ForkResumed { fork_id: String },
 
     /// A fork completed and validated.
-    ForkMerged {
-        fork_id: String,
-    },
+    ForkMerged { fork_id: String },
 }
 
 impl SystemEvent {
@@ -156,7 +141,9 @@ impl SystemEvent {
             SystemEvent::TaskCompleted { task_id, .. } => Some(task_id.clone()),
             SystemEvent::TaskFailed { task_id, .. } => Some(task_id.clone()),
             SystemEvent::TaskCancelled { task_id, .. } => Some(task_id.clone()),
-            SystemEvent::ForkWaiting { delegate_task_id, .. } => Some(delegate_task_id.clone()),
+            SystemEvent::ForkWaiting {
+                delegate_task_id, ..
+            } => Some(delegate_task_id.clone()),
             _ => None,
         }
     }
@@ -344,7 +331,10 @@ macro_rules! subscriber {
         #[async_trait::async_trait]
         impl<F> $crate::executor::EventSubscriber for Subscriber<F>
         where
-            F: Fn($crate::executor::Event) -> futures::future::BoxFuture<'static, ()> + Send + Sync + 'static,
+            F: Fn($crate::executor::Event) -> futures::future::BoxFuture<'static, ()>
+                + Send
+                + Sync
+                + 'static,
         {
             fn name(&self) -> &str {
                 &self.name
@@ -361,9 +351,7 @@ macro_rules! subscriber {
 
         Subscriber {
             name: $name.to_string(),
-            handler: std::sync::Arc::new(|event| {
-                async move { $body }.boxed()
-            }),
+            handler: std::sync::Arc::new(|event| async move { $body }.boxed()),
         }
     };
 }
@@ -391,7 +379,8 @@ mod tests {
         bus.emit(SystemEvent::TaskStarted {
             task_id: "test-1".to_string(),
             agent: "backend".to_string(),
-        }).await;
+        })
+        .await;
 
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
 

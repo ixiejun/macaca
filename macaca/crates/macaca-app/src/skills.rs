@@ -177,8 +177,8 @@ mod tests {
         std::fs::create_dir_all(&temp_global).ok();
         std::fs::create_dir_all(&temp_app).ok();
 
-        let loader = SkillLoader::with_global_dir(temp_global.clone())
-            .with_app_dir(temp_app.clone());
+        let loader =
+            SkillLoader::with_global_dir(temp_global.clone()).with_app_dir(temp_app.clone());
 
         let names = loader.list_skill_names();
         assert!(names.is_empty());
@@ -202,8 +202,8 @@ mod tests {
         std::fs::create_dir_all(&app_skill).ok();
         std::fs::write(app_skill.join("SKILL.md"), "# App Skill").ok();
 
-        let loader = SkillLoader::with_global_dir(temp_global.clone())
-            .with_app_dir(temp_app.clone());
+        let loader =
+            SkillLoader::with_global_dir(temp_global.clone()).with_app_dir(temp_app.clone());
 
         let names = loader.list_skill_names();
         assert_eq!(names.len(), 2);
@@ -228,8 +228,8 @@ mod tests {
         std::fs::create_dir_all(&app_skill).ok();
         std::fs::write(app_skill.join("SKILL.md"), "# App Common").ok();
 
-        let loader = SkillLoader::with_global_dir(temp_global.clone())
-            .with_app_dir(temp_app.clone());
+        let loader =
+            SkillLoader::with_global_dir(temp_global.clone()).with_app_dir(temp_app.clone());
 
         let skill_path = loader.get_skill_path("common-skill").unwrap();
         // App skill should take priority

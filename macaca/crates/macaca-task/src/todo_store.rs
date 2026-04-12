@@ -39,7 +39,12 @@ impl TodoStore {
         session_id.as_deref().unwrap_or(GLOBAL_SESSION)
     }
 
-    fn todo_key(app_id: &ApplicationId, session_id: &Option<String>, agent: &str, task_id: &TaskId) -> String {
+    fn todo_key(
+        app_id: &ApplicationId,
+        session_id: &Option<String>,
+        agent: &str,
+        task_id: &TaskId,
+    ) -> String {
         let sess = Self::session_seg(session_id);
         format!("{}{}/{}/{}/{}", TODO_PREFIX, app_id, sess, agent, task_id)
     }
@@ -74,7 +79,12 @@ impl TodoStore {
 
     /// Save (create or update) a todo item. Called on every status change.
     pub async fn save_todo(&self, item: &TodoItem) {
-        let key = Self::todo_key(&item.application_id, &item.session_id, &item.assigned_agent, &item.id);
+        let key = Self::todo_key(
+            &item.application_id,
+            &item.session_id,
+            &item.assigned_agent,
+            &item.id,
+        );
         if let Ok(data) = serde_json::to_vec(item) {
             let _ = self.store.set(&key, &data).await;
         }
@@ -91,7 +101,8 @@ impl TodoStore {
     ) -> Option<TodoItem> {
         if session_id.is_some() {
             let key = Self::todo_key(app_id, session_id, agent, task_id);
-            return self.store
+            return self
+                .store
                 .get(&key)
                 .await
                 .ok()
@@ -107,7 +118,13 @@ impl TodoStore {
 
     /// Delete a todo item.
     /// When session_id is None, looks up the item first to find its actual session_id.
-    pub async fn delete_todo(&self, app_id: &ApplicationId, session_id: &Option<String>, agent: &str, task_id: &TaskId) {
+    pub async fn delete_todo(
+        &self,
+        app_id: &ApplicationId,
+        session_id: &Option<String>,
+        agent: &str,
+        task_id: &TaskId,
+    ) {
         if session_id.is_some() {
             let key = Self::todo_key(app_id, session_id, agent, task_id);
             let _ = self.store.delete(&key).await;
@@ -164,7 +181,11 @@ impl TodoStore {
     }
 
     /// List all todos for a specific session (cross-agent, single session).
-    pub async fn list_all_todos_for_session(&self, app_id: &ApplicationId, session_id: &str) -> Vec<TodoItem> {
+    pub async fn list_all_todos_for_session(
+        &self,
+        app_id: &ApplicationId,
+        session_id: &str,
+    ) -> Vec<TodoItem> {
         let prefix = Self::session_prefix(app_id, session_id);
         self.load_items_by_prefix(&prefix).await
     }
@@ -216,9 +237,8 @@ impl TodoStore {
         }
 
         let all = self.list_all_todos(app_id).await;
-        let needs_migration: Vec<&TodoItem> = all.iter()
-            .filter(|t| t.sequence_number == 0)
-            .collect();
+        let needs_migration: Vec<&TodoItem> =
+            all.iter().filter(|t| t.sequence_number == 0).collect();
 
         if needs_migration.is_empty() {
             // Mark as migrated even if nothing to do
@@ -259,6 +279,20 @@ impl TodoStore {
         }
     }
 
+    /// Update a goal's status by ID.
+    pub async fn update_goal_status(
+        &self,
+        app_id: &ApplicationId,
+        goal_id: &macaca_proto::TaskId,
+        status: TodoGoalStatus,
+    ) {
+        let goals = self.list_goals(app_id).await;
+        if let Some(mut goal) = goals.into_iter().find(|g| g.id == *goal_id) {
+            goal.status = status;
+            self.save_goal(&goal).await;
+        }
+    }
+
     /// Pop the next pending goal (FIFO by created_at). Cross-session, for PlanLoop.
     pub async fn pop_pending_goal(&self, app_id: &ApplicationId) -> Option<TodoGoal> {
         let goals = self.list_goals(app_id).await;
@@ -268,7 +302,7 @@ impl TodoStore {
             .collect();
         pending.sort_by_key(|g| g.created_at);
         if let Some(mut goal) = pending.into_iter().next() {
-            goal.status = TodoGoalStatus::InProgress;
+            goal.status = TodoGoalStatus::Decomposing;
             self.save_goal(&goal).await;
             Some(goal)
         } else {
@@ -292,7 +326,11 @@ impl TodoStore {
     }
 
     /// List all goals for a specific session.
-    pub async fn list_goals_for_session(&self, app_id: &ApplicationId, session_id: &str) -> Vec<TodoGoal> {
+    pub async fn list_goals_for_session(
+        &self,
+        app_id: &ApplicationId,
+        session_id: &str,
+    ) -> Vec<TodoGoal> {
         let prefix = Self::goal_prefix_for_session(app_id, session_id);
         let keys = self.store.list_keys(&prefix).await.unwrap_or_default();
         let mut goals = Vec::new();
@@ -341,7 +379,15 @@ mod tests {
     async fn save_and_load_todo() {
         let store = test_store().await;
         let app_id = ApplicationId::new();
-        let item = TodoItem::new(app_id.clone(), None, "backend", "coordinator", "Write API", "Create REST API", 8);
+        let item = TodoItem::new(
+            app_id.clone(),
+            None,
+            "backend",
+            "coordinator",
+            "Write API",
+            "Create REST API",
+            8,
+        );
         let task_id = item.id;
 
         store.save_todo(&item).await;
@@ -358,10 +404,34 @@ mod tests {
         let store = test_store().await;
         let app_id = ApplicationId::new();
 
-        let item1 = TodoItem::new(app_id.clone(), None, "backend", "coord", "Task 1", "Desc 1", 5);
-        let mut item2 = TodoItem::new(app_id.clone(), None, "backend", "coord", "Task 2", "Desc 2", 9);
+        let item1 = TodoItem::new(
+            app_id.clone(),
+            None,
+            "backend",
+            "coord",
+            "Task 1",
+            "Desc 1",
+            5,
+        );
+        let mut item2 = TodoItem::new(
+            app_id.clone(),
+            None,
+            "backend",
+            "coord",
+            "Task 2",
+            "Desc 2",
+            9,
+        );
         item2.status = TodoStatus::InProgress;
-        let item3 = TodoItem::new(app_id.clone(), None, "frontend", "coord", "Task 3", "Desc 3", 7);
+        let item3 = TodoItem::new(
+            app_id.clone(),
+            None,
+            "frontend",
+            "coord",
+            "Task 3",
+            "Desc 3",
+            7,
+        );
 
         store.save_todo(&item1).await;
         store.save_todo(&item2).await;
@@ -373,7 +443,9 @@ mod tests {
         let frontend_todos = store.list_agent_todos(&app_id, &None, "frontend").await;
         assert_eq!(frontend_todos.len(), 1);
 
-        let pending = store.list_agent_todos_by_status(&app_id, &None, "backend", TodoStatus::Pending).await;
+        let pending = store
+            .list_agent_todos_by_status(&app_id, &None, "backend", TodoStatus::Pending)
+            .await;
         assert_eq!(pending.len(), 1);
         assert_eq!(pending[0].title, "Task 1");
     }
@@ -383,13 +455,24 @@ mod tests {
         let store = test_store().await;
         let app_id = ApplicationId::new();
 
-        let mut item = TodoItem::new(app_id.clone(), None, "backend", "coord", "Running task", "Desc", 5);
+        let mut item = TodoItem::new(
+            app_id.clone(),
+            None,
+            "backend",
+            "coord",
+            "Running task",
+            "Desc",
+            5,
+        );
         item.status = TodoStatus::InProgress;
         store.save_todo(&item).await;
 
         store.rollback_in_progress(&app_id).await;
 
-        let loaded = store.get_todo(&app_id, &None, "backend", &item.id).await.unwrap();
+        let loaded = store
+            .get_todo(&app_id, &None, "backend", &item.id)
+            .await
+            .unwrap();
         assert_eq!(loaded.status, TodoStatus::Pending);
     }
 
@@ -406,7 +489,7 @@ mod tests {
 
         let popped = store.pop_pending_goal(&app_id).await;
         assert!(popped.is_some());
-        assert_eq!(popped.unwrap().status, TodoGoalStatus::InProgress);
+        assert_eq!(popped.unwrap().status, TodoGoalStatus::Decomposing);
 
         // No more pending
         let popped2 = store.pop_pending_goal(&app_id).await;
@@ -420,8 +503,24 @@ mod tests {
         let sess_a = Some("session-a".to_string());
         let sess_b = Some("session-b".to_string());
 
-        let item_a = TodoItem::new(app_id.clone(), sess_a.clone(), "backend", "coord", "Task A", "Desc", 5);
-        let item_b = TodoItem::new(app_id.clone(), sess_b.clone(), "backend", "coord", "Task B", "Desc", 5);
+        let item_a = TodoItem::new(
+            app_id.clone(),
+            sess_a.clone(),
+            "backend",
+            "coord",
+            "Task A",
+            "Desc",
+            5,
+        );
+        let item_b = TodoItem::new(
+            app_id.clone(),
+            sess_b.clone(),
+            "backend",
+            "coord",
+            "Task B",
+            "Desc",
+            5,
+        );
 
         store.save_todo(&item_a).await;
         store.save_todo(&item_b).await;

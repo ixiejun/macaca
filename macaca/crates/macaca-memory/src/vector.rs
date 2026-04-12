@@ -66,7 +66,11 @@ pub struct MilvusStore {
 }
 
 impl MilvusStore {
-    pub fn new(base_url: impl Into<String>, collection: impl Into<String>, dimension: usize) -> Self {
+    pub fn new(
+        base_url: impl Into<String>,
+        collection: impl Into<String>,
+        dimension: usize,
+    ) -> Self {
         Self {
             client: reqwest::Client::new(),
             base_url: base_url.into(),
@@ -130,12 +134,18 @@ impl VectorStore for MilvusStore {
         if !resp.status().is_success() {
             let status = resp.status();
             let text = resp.text().await.unwrap_or_default();
-            return Err(MacacaError::Memory(format!("milvus upsert {status}: {text}")));
+            return Err(MacacaError::Memory(format!(
+                "milvus upsert {status}: {text}"
+            )));
         }
         Ok(())
     }
 
-    async fn search(&self, vector: Vec<f32>, limit: usize) -> MacacaResult<Vec<VectorSearchResult>> {
+    async fn search(
+        &self,
+        vector: Vec<f32>,
+        limit: usize,
+    ) -> MacacaResult<Vec<VectorSearchResult>> {
         let url = format!("{}/v2/vectordb/entities/search", self.base_url);
         let body = MilvusSearchRequest {
             collection_name: self.collection.clone(),
@@ -155,7 +165,9 @@ impl VectorStore for MilvusStore {
         if !resp.status().is_success() {
             let status = resp.status();
             let text = resp.text().await.unwrap_or_default();
-            return Err(MacacaError::Memory(format!("milvus search {status}: {text}")));
+            return Err(MacacaError::Memory(format!(
+                "milvus search {status}: {text}"
+            )));
         }
 
         let parsed: MilvusSearchResponse = resp
@@ -198,7 +210,9 @@ impl VectorStore for MilvusStore {
         if !resp.status().is_success() {
             let status = resp.status();
             let text = resp.text().await.unwrap_or_default();
-            return Err(MacacaError::Memory(format!("milvus delete {status}: {text}")));
+            return Err(MacacaError::Memory(format!(
+                "milvus delete {status}: {text}"
+            )));
         }
         Ok(())
     }
@@ -249,7 +263,11 @@ impl VectorStore for InMemoryVectorStore {
         Ok(())
     }
 
-    async fn search(&self, vector: Vec<f32>, limit: usize) -> MacacaResult<Vec<VectorSearchResult>> {
+    async fn search(
+        &self,
+        vector: Vec<f32>,
+        limit: usize,
+    ) -> MacacaResult<Vec<VectorSearchResult>> {
         let guard = self.entries.read().await;
         let mut scored: Vec<(String, f32, Value)> = guard
             .iter()
@@ -327,7 +345,11 @@ mod tests {
         let store = MilvusStore::new("http://localhost:19530", "test_collection", 4);
         store.ensure_collection().await.unwrap();
         store
-            .upsert("m1", vec![1.0, 0.0, 0.0, 0.0], serde_json::json!({"text": "hello"}))
+            .upsert(
+                "m1",
+                vec![1.0, 0.0, 0.0, 0.0],
+                serde_json::json!({"text": "hello"}),
+            )
             .await
             .unwrap();
         let results = store.search(vec![1.0, 0.0, 0.0, 0.0], 1).await.unwrap();

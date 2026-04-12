@@ -1,5 +1,7 @@
 # Macaca OS 完整技术架构文档
 
+> **Status:** This file is a non-canonical deep reference / source draft. For the canonical system-definition document, read [`docs/SYSTEM_OVERVIEW.md`](docs/SYSTEM_OVERVIEW.md). This file still mixes current / intended / planned material and should not be treated as the primary architecture contract.
+
 ## 1. 系统定位
 
 Macaca OS 是一个 **Agent 操作系统**，类比关系：

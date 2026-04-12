@@ -99,7 +99,11 @@ impl MemoryStore for FileMemory {
         }
     }
 
-    async fn list(&self, agent_id: Option<&AgentId>, limit: usize) -> MacacaResult<Vec<MemoryEntry>> {
+    async fn list(
+        &self,
+        agent_id: Option<&AgentId>,
+        limit: usize,
+    ) -> MacacaResult<Vec<MemoryEntry>> {
         let mut entries: Vec<MemoryEntry> = self
             .load_all()
             .await?
@@ -115,8 +119,8 @@ impl MemoryStore for FileMemory {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use macaca_proto::{MemoryLayer, MemoryId};
     use chrono::Utc;
+    use macaca_proto::{MemoryId, MemoryLayer};
     use tempfile::TempDir;
 
     fn make_entry(content: &str) -> MemoryEntry {

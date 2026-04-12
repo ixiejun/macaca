@@ -29,10 +29,7 @@ pub enum ExecutorCommand {
 #[derive(Debug, Clone)]
 pub enum ExecutorEvent {
     /// Task started execution.
-    TaskStarted {
-        task_id: TaskId,
-        agent: String,
-    },
+    TaskStarted { task_id: TaskId, agent: String },
     /// Task progress update.
     TaskProgress {
         task_id: TaskId,
@@ -48,17 +45,17 @@ pub enum ExecutorEvent {
     /// Task completed.
     TaskCompleted {
         task_id: TaskId,
+        agent: String,
         result: TaskResult,
     },
     /// Task failed.
     TaskFailed {
         task_id: TaskId,
+        agent: String,
         error: String,
     },
     /// Task cancelled.
-    TaskCancelled {
-        task_id: TaskId,
-    },
+    TaskCancelled { task_id: TaskId },
     /// Hook event from Fork-Join workflow (validation, completion notification).
     HookEvent {
         event: super::fork_manager::HookEvent,
@@ -140,16 +137,22 @@ impl TaskExecutor {
         tracing::info!(task_id = %task_id, agent = %to_agent, "Executing task");
 
         // Publish TaskStarted event
-        let _ = self.event_bus.emit(SystemEvent::TaskStarted {
-            task_id: task_id.to_string(),
-            agent: to_agent.clone(),
-        }).await;
+        let _ = self
+            .event_bus
+            .emit(SystemEvent::TaskStarted {
+                task_id: task_id.to_string(),
+                agent: to_agent.clone(),
+            })
+            .await;
 
         // Send TaskStarted to event channel
-        let _ = self.event_tx.send(ExecutorEvent::TaskStarted {
-            task_id,
-            agent: to_agent.clone(),
-        }).await;
+        let _ = self
+            .event_tx
+            .send(ExecutorEvent::TaskStarted {
+                task_id,
+                agent: to_agent.clone(),
+            })
+            .await;
 
         // Execute the agent
         let result = self.run_agent(&task).await;
@@ -159,15 +162,20 @@ impl TaskExecutor {
                 tracing::info!(task_id = %task_id, success = task_result.success, "Task completed");
 
                 // Publish TaskCompleted event
-                let _ = self.event_bus.emit(SystemEvent::TaskCompleted {
-                    task_id: task_id.to_string(),
-                    agent: to_agent,
-                    success: task_result.success,
-                    output_preview: task_result.output.chars().take(100).collect(),
-                }).await;
+                let agent_name = to_agent.clone();
+                let _ = self
+                    .event_bus
+                    .emit(SystemEvent::TaskCompleted {
+                        task_id: task_id.to_string(),
+                        agent: to_agent,
+                        success: task_result.success,
+                        output_preview: task_result.output.chars().take(100).collect(),
+                    })
+                    .await;
 
                 let _ = self.event_tx.send(ExecutorEvent::TaskCompleted {
                     task_id,
+                    agent: agent_name,
                     result: task_result,
                 });
             }
@@ -175,14 +183,19 @@ impl TaskExecutor {
                 tracing::error!(task_id = %task_id, error = %error, "Task failed");
 
                 // Publish TaskFailed event
-                let _ = self.event_bus.emit(SystemEvent::TaskFailed {
-                    task_id: task_id.to_string(),
-                    agent: to_agent,
-                    error: error.clone(),
-                }).await;
+                let agent_name = to_agent.clone();
+                let _ = self
+                    .event_bus
+                    .emit(SystemEvent::TaskFailed {
+                        task_id: task_id.to_string(),
+                        agent: to_agent,
+                        error: error.clone(),
+                    })
+                    .await;
 
                 let _ = self.event_tx.send(ExecutorEvent::TaskFailed {
                     task_id,
+                    agent: agent_name,
                     error,
                 });
             }
@@ -195,10 +208,7 @@ impl TaskExecutor {
         let decision = self.router.route(task).await;
 
         if decision.confidence <= 0.0 {
-            return Err(format!(
-                "No suitable agent found: {}",
-                decision.reasoning
-            ));
+            return Err(format!("No suitable agent found: {}", decision.reasoning));
         }
 
         tracing::debug!(
@@ -238,7 +248,11 @@ impl TaskExecutor {
         Ok(TaskResult {
             task_id: TaskId::new(),
             success: true,
-            output: format!("Agent '{}' executed prompt: {}", agent_name, prompt.chars().take(100).collect::<String>()),
+            output: format!(
+                "Agent '{}' executed prompt: {}",
+                agent_name,
+                prompt.chars().take(100).collect::<String>()
+            ),
             error: None,
             artifacts: vec![],
             completed_at: Utc::now(),
@@ -250,9 +264,12 @@ impl TaskExecutor {
     async fn cancel_task(&self, task_id: TaskId) {
         tracing::info!(task_id = %task_id, "Cancelling task");
 
-        let _ = self.event_bus.emit(SystemEvent::TaskCancelled {
-            task_id: task_id.to_string(),
-        }).await;
+        let _ = self
+            .event_bus
+            .emit(SystemEvent::TaskCancelled {
+                task_id: task_id.to_string(),
+            })
+            .await;
     }
 
     /// Check if the executor is running.
@@ -309,7 +326,8 @@ impl TaskExecutorBuilder {
     pub fn build(self) -> TaskExecutor {
         TaskExecutor::new(
             self.application_id.unwrap_or_default(),
-            self.router.unwrap_or_else(|| Arc::new(TaskRouter::new(Arc::new(RwLock::new(vec![]))))),
+            self.router
+                .unwrap_or_else(|| Arc::new(TaskRouter::new(Arc::new(RwLock::new(vec![]))))),
             self.event_bus.unwrap_or_else(|| Arc::new(EventBus::new())),
             self.command_rx.expect("command_rx is required"),
         )

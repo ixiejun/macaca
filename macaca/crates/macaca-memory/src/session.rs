@@ -115,7 +115,11 @@ impl MemoryStore for SessionMemory {
         Ok(())
     }
 
-    async fn list(&self, agent_id: Option<&AgentId>, limit: usize) -> MacacaResult<Vec<MemoryEntry>> {
+    async fn list(
+        &self,
+        agent_id: Option<&AgentId>,
+        limit: usize,
+    ) -> MacacaResult<Vec<MemoryEntry>> {
         let now = Utc::now();
         let guard = self.inner.read().await;
         let mut results: Vec<MemoryEntry> = guard
@@ -137,8 +141,8 @@ impl MemoryStore for SessionMemory {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use macaca_proto::{MemoryLayer, MemoryId};
     use chrono::Utc;
+    use macaca_proto::{MemoryId, MemoryLayer};
 
     fn make_entry(content: &str) -> MemoryEntry {
         MemoryEntry {

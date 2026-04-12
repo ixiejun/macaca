@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use tokio::sync::broadcast;
 use tracing::{debug, warn};
 
-use macaca_proto::{MacacaError, MacacaResult, IpcMessage};
+use macaca_proto::{IpcMessage, MacacaError, MacacaResult};
 
 use crate::bus::{MessageReceiver, MessageSender};
 
@@ -149,8 +149,8 @@ impl MessageReceiver for LocalReceiver {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use macaca_proto::{AgentId, MessageId, IpcMessage};
     use chrono::Utc;
+    use macaca_proto::{AgentId, IpcMessage, MessageId};
 
     fn make_msg(topic: &str) -> IpcMessage {
         IpcMessage {

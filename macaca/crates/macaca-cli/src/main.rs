@@ -36,7 +36,10 @@ async fn main() {
     let config = MacacaConfig::load_default();
 
     // Initialize logging with file output
-    if let Err(e) = macaca_cli::logging::init_logging(&config.observability.log_file, &config.observability.log_level) {
+    if let Err(e) = macaca_cli::logging::init_logging(
+        &config.observability.log_file,
+        &config.observability.log_level,
+    ) {
         eprintln!("Failed to initialize logging: {e}");
         std::process::exit(1);
     }
@@ -59,8 +62,7 @@ async fn main() {
 
                 // Spawn watchdog heartbeat task
                 tokio::spawn(async {
-                    let mut interval =
-                        tokio::time::interval(std::time::Duration::from_secs(10));
+                    let mut interval = tokio::time::interval(std::time::Duration::from_secs(10));
                     loop {
                         interval.tick().await;
                         let _ = sd_notify::notify(false, &[sd_notify::NotifyState::Watchdog]);

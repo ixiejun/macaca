@@ -1,10 +1,11 @@
+use crate::provider::LlmProvider;
+use crate::tool_wire::tool_arguments_for_chat_api;
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
 use macaca_proto::{
     error::{MacacaError, MacacaResult},
     types::{LlmMessage, LlmOptions, LlmResponse, LlmRole, TokenUsage, ToolCall},
 };
-use crate::provider::LlmProvider;
+use serde::{Deserialize, Serialize};
 
 const DEFAULT_BASE_URL: &str = "https://api.openai.com/v1";
 
@@ -26,7 +27,10 @@ impl OpenAiProvider {
         Self {
             api_key: api_key.into(),
             base_url: DEFAULT_BASE_URL.to_owned(),
-            client: reqwest::Client::builder().no_proxy().build().unwrap_or_default(),
+            client: reqwest::Client::builder()
+                .no_proxy()
+                .build()
+                .unwrap_or_default(),
         }
     }
 
@@ -131,7 +135,11 @@ fn role_str(role: LlmRole) -> &'static str {
 fn convert_message(m: &LlmMessage) -> OpenAiMessage {
     let mut msg = OpenAiMessage {
         role: role_str(m.role).to_owned(),
-        content: if m.content.is_empty() { None } else { Some(m.content.clone()) },
+        content: if m.content.is_empty() {
+            None
+        } else {
+            Some(m.content.clone())
+        },
         tool_calls: None,
         tool_call_id: m.tool_call_id.clone(),
     };
@@ -144,7 +152,7 @@ fn convert_message(m: &LlmMessage) -> OpenAiMessage {
                     call_type: "function".into(),
                     function: OpenAiFunctionCall {
                         name: tc.name.clone(),
-                        arguments: tc.arguments.to_string(),
+                        arguments: tool_arguments_for_chat_api(&tc.arguments),
                     },
                 })
                 .collect(),

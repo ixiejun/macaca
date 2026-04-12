@@ -8,7 +8,7 @@ use macaca_kernel::Kernel;
 use macaca_llm::LlmProvider;
 use macaca_proto::{AgentId, MacacaError, MacacaResult};
 
-use crate::model::{AppManifest, WorkflowDefinition, WorkflowStep, EntrypointType};
+use crate::model::{AppManifest, EntrypointType, WorkflowDefinition, WorkflowStep};
 
 /// Default workflow name if not specified.
 pub const DEFAULT_WORKFLOW: &str = "default";
@@ -69,7 +69,8 @@ impl WorkflowEngine {
         additional_context: Option<&str>,
     ) -> MacacaResult<String> {
         // Get workflow definition
-        let workflow = manifest.workflows
+        let workflow = manifest
+            .workflows
             .as_ref()
             .and_then(|w| w.get(workflow_name));
 
@@ -105,7 +106,8 @@ impl WorkflowEngine {
         app_dir: &PathBuf,
         workflow_name: &str,
     ) -> Option<PathBuf> {
-        let workflow = manifest.workflows
+        let workflow = manifest
+            .workflows
             .as_ref()
             .and_then(|w| w.get(workflow_name))?;
 
@@ -145,7 +147,8 @@ impl WorkflowEngine {
          \n\
          ## Important Rules\n\
          - Complete the ENTIRE task — do not stop halfway\n\
-         - Be thorough and precise".into()
+         - Be thorough and precise"
+            .into()
     }
 
     /// Default assistant prompt when no persona is available.
@@ -154,7 +157,8 @@ impl WorkflowEngine {
          Use `claude_code_execute` for ALL coding tasks.\n\
          NEVER use file_write to write source code.\n\
          If claude_code_execute fails, report the error and stop.\n\
-         Respond helpfully and concisely.".into()
+         Respond helpfully and concisely."
+            .into()
     }
 
     /// Validate workflow steps (check for circular dependencies, etc.).
@@ -182,7 +186,8 @@ impl WorkflowEngine {
 
         visited.insert(step_name.into(), true);
 
-        let step = steps.iter()
+        let step = steps
+            .iter()
             .find(|s| s.name == step_name)
             .ok_or_else(|| MacacaError::Config(format!("Step not found: {step_name}")))?;
 
@@ -196,7 +201,8 @@ impl WorkflowEngine {
 
     /// Get the entry point workflow name for an app.
     pub fn get_entrypoint_workflow(manifest: &AppManifest) -> String {
-        manifest.entrypoint
+        manifest
+            .entrypoint
             .as_ref()
             .filter(|e| e.type_ == EntrypointType::Workflow)
             .map(|e| e.name.clone())

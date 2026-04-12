@@ -3,10 +3,10 @@
 //! Continuously: process goals → review completed tasks → schedule new work.
 //! Runs as a background tokio task, tied to the application's lifetime.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use tracing::{info, warn};
 
@@ -83,7 +83,9 @@ impl PlanLoop {
 
     /// Get a waker handle that can be used to wake this loop immediately.
     pub fn waker(&self) -> PlanLoopWaker {
-        PlanLoopWaker { notify: Arc::clone(&self.notify) }
+        PlanLoopWaker {
+            notify: Arc::clone(&self.notify),
+        }
     }
 
     /// Run the plan loop until shutdown is signaled.
@@ -98,6 +100,9 @@ impl PlanLoop {
         info!("Plan loop started");
         let mut last_failed_count: usize = 0;
         let mut review_emitted: HashSet<macaca_proto::TaskId> = HashSet::new();
+        let mut goal_retry_emitted: HashSet<macaca_proto::TaskId> = HashSet::new();
+        let mut goal_eval_emitted: HashSet<macaca_proto::TaskId> = HashSet::new();
+        let mut goal_decomposing_since: HashMap<macaca_proto::TaskId, Instant> = HashMap::new();
 
         loop {
             // Wait for either: heartbeat timeout OR immediate wakeup notification
@@ -115,20 +120,83 @@ impl PlanLoop {
             // 1. Check for new goals
             if let Some(goal) = self.space.pop_goal().await {
                 info!(goal_id = %goal.id, "New goal found, requesting decomposition");
-                let _ = event_tx.send(PlanEvent::GoalReady {
-                    goal_id: goal.id,
-                    description: goal.description,
-                    session_id: goal.session_id,
-                }).await;
+                goal_decomposing_since.insert(goal.id, Instant::now());
+                let _ = event_tx
+                    .send(PlanEvent::GoalReady {
+                        goal_id: goal.id,
+                        description: goal.description,
+                        session_id: goal.session_id,
+                    })
+                    .await;
+            }
+
+            // 1b. Decomposing goals: transition to InProgress when tasks appear, or retry if still empty
+            {
+                let goals = self.space.list_goals().await;
+                let all_todos = self.space.list_all().await;
+                // Clean up: remove goals that now have tasks or left Decomposing state
+                goal_retry_emitted.retain(|id| {
+                    goals.iter().any(|g| {
+                        g.id == *id
+                            && g.status == TodoGoalStatus::Decomposing
+                            && !all_todos.iter().any(|t| t.parent_task == Some(*id))
+                    })
+                });
+                goal_decomposing_since.retain(|id, _| {
+                    goals
+                        .iter()
+                        .any(|g| g.id == *id && g.status == TodoGoalStatus::Decomposing)
+                });
+                for goal in &goals {
+                    if goal.status == TodoGoalStatus::Decomposing {
+                        let has_tasks = all_todos.iter().any(|t| t.parent_task == Some(goal.id));
+                        if has_tasks {
+                            // Decomposition succeeded — transition to InProgress
+                            info!(
+                                goal_id = %goal.id,
+                                "Goal decomposition complete, transitioning Decomposing → InProgress"
+                            );
+                            self.space
+                                .store()
+                                .update_goal_status(
+                                    &goal.application_id,
+                                    &goal.id,
+                                    TodoGoalStatus::InProgress,
+                                )
+                                .await;
+                            goal_decomposing_since.remove(&goal.id);
+                        } else if !goal_retry_emitted.contains(&goal.id) {
+                            let started_at = goal_decomposing_since
+                                .entry(goal.id)
+                                .or_insert_with(Instant::now);
+                            if started_at.elapsed() < Duration::from_secs(60) {
+                                continue;
+                            }
+                            // Decomposition failed (no tasks created) — retry once
+                            warn!(goal_id = %goal.id, "Decomposing goal has no tasks, re-emitting GoalReady for retry");
+                            goal_retry_emitted.insert(goal.id);
+                            goal_decomposing_since.insert(goal.id, Instant::now());
+                            let _ = event_tx
+                                .send(PlanEvent::GoalReady {
+                                    goal_id: goal.id,
+                                    description: goal.description.clone(),
+                                    session_id: goal.session_id.clone(),
+                                })
+                                .await;
+                        }
+                    }
+                }
             }
 
             // 2. Check for tasks needing review (with deduplication)
             let reviews = self.space.pending_reviews().await;
             // Clean up: remove task IDs that are no longer PendingReview
-            let current_review_ids: HashSet<macaca_proto::TaskId> = reviews.iter().map(|t| t.id).collect();
+            let current_review_ids: HashSet<macaca_proto::TaskId> =
+                reviews.iter().map(|t| t.id).collect();
             review_emitted.retain(|id| current_review_ids.contains(id));
             // Only emit ReviewNeeded for NEW tasks not yet emitted
-            let new_reviews: Vec<_> = reviews.into_iter()
+            let new_reviews: Vec<_> = reviews
+                .into_iter()
                 .filter(|t| !review_emitted.contains(&t.id))
                 .take(self.config.max_reviews_per_cycle)
                 .collect();
@@ -136,73 +204,117 @@ impl PlanLoop {
                 info!(count = new_reviews.len(), "New tasks pending review");
                 for task in new_reviews {
                     review_emitted.insert(task.id);
-                    let _ = event_tx.send(PlanEvent::ReviewNeeded {
-                        task_id: task.id,
-                        agent: task.assigned_agent.clone(),
-                        title: task.title.clone(),
-                        summary: task.completion_summary.clone().unwrap_or_default(),
-                        criteria: task.acceptance_criteria.clone(),
-                        session_id: task.session_id.clone(),
-                    }).await;
+                    let _ = event_tx
+                        .send(PlanEvent::ReviewNeeded {
+                            task_id: task.id,
+                            agent: task.assigned_agent.clone(),
+                            title: task.title.clone(),
+                            summary: task.completion_summary.clone().unwrap_or_default(),
+                            criteria: task.acceptance_criteria.clone(),
+                            session_id: task.session_id.clone(),
+                        })
+                        .await;
                 }
             }
 
             // 3. Check overall progress — only emit anomaly when failed count INCREASES
             let progress = self.space.overall_progress().await;
             if progress.total > 0 && progress.failed > 0 && progress.failed != last_failed_count {
-                warn!(failed = progress.failed, "Tasks have failed, may need human intervention");
-                let _ = event_tx.send(PlanEvent::AnomalyDetected {
-                    message: format!("{} tasks failed (exceeded max attempts)", progress.failed),
-                }).await;
+                warn!(
+                    failed = progress.failed,
+                    "Tasks have failed, may need human intervention"
+                );
+                let _ = event_tx
+                    .send(PlanEvent::AnomalyDetected {
+                        message: format!(
+                            "{} tasks failed (exceeded max attempts)",
+                            progress.failed
+                        ),
+                    })
+                    .await;
                 last_failed_count = progress.failed;
             }
 
             // 4. Check goals with all tasks completed (goal-aware completion detection)
             let goals = self.space.list_goals().await;
-            for goal in goals {
-                if goal.status == TodoGoalStatus::InProgress {
-                    let all_todos = self.space.list_all().await;
-                    let goal_tasks: Vec<_> = all_todos.iter()
-                        .filter(|t| t.parent_task == Some(goal.id))
-                        .collect();
+            // Clean up eval dedup: remove goals that are no longer InProgress
+            goal_eval_emitted.retain(|id| {
+                goals
+                    .iter()
+                    .any(|g| g.id == *id && g.status == TodoGoalStatus::InProgress)
+            });
+            for goal in &goals {
+                // Only evaluate InProgress goals; skip Decomposing/Evaluating/Completed/Failed
+                if goal.status != TodoGoalStatus::InProgress {
+                    continue;
+                }
+                // Dedup: skip if already emitted EvaluateGoalCompletion for this goal
+                if goal_eval_emitted.contains(&goal.id) {
+                    continue;
+                }
 
-                    if !goal_tasks.is_empty() {
-                        let all_done = goal_tasks.iter().all(|t| matches!(
+                let all_todos = self.space.list_all().await;
+                let goal_tasks: Vec<_> = all_todos
+                    .iter()
+                    .filter(|t| t.parent_task == Some(goal.id))
+                    .collect();
+
+                if !goal_tasks.is_empty() {
+                    let all_done = goal_tasks.iter().all(|t| {
+                        matches!(
                             t.status,
                             TodoStatus::Completed | TodoStatus::Failed | TodoStatus::Cancelled
-                        ));
+                        )
+                    });
 
-                        if all_done {
-                            let summaries: Vec<TaskSummary> = goal_tasks.iter().map(|t| TaskSummary {
+                    if all_done {
+                        let summaries: Vec<TaskSummary> = goal_tasks
+                            .iter()
+                            .map(|t| TaskSummary {
                                 title: t.title.clone(),
                                 agent: t.assigned_agent.clone(),
                                 status: format!("{:?}", t.status),
                                 completion_summary: t.completion_summary.clone(),
-                            }).collect();
+                            })
+                            .collect();
 
-                            let completed = goal_tasks.iter()
-                                .filter(|t| t.status == TodoStatus::Completed)
-                                .count();
-                            let failed = goal_tasks.iter()
-                                .filter(|t| t.status == TodoStatus::Failed)
-                                .count();
+                        let completed = goal_tasks
+                            .iter()
+                            .filter(|t| t.status == TodoStatus::Completed)
+                            .count();
+                        let failed = goal_tasks
+                            .iter()
+                            .filter(|t| t.status == TodoStatus::Failed)
+                            .count();
 
-                            info!(
-                                goal_id = %goal.id,
-                                completed,
-                                failed,
-                                "All tasks for goal done, requesting evaluation"
-                            );
+                        info!(
+                            goal_id = %goal.id,
+                            completed,
+                            failed,
+                            "All tasks for goal done, requesting evaluation"
+                        );
 
-                            let _ = event_tx.send(PlanEvent::EvaluateGoalCompletion {
+                        // Mark as Evaluating to prevent duplicate evaluation
+                        self.space
+                            .store()
+                            .update_goal_status(
+                                &goal.application_id,
+                                &goal.id,
+                                TodoGoalStatus::Evaluating,
+                            )
+                            .await;
+                        goal_eval_emitted.insert(goal.id);
+
+                        let _ = event_tx
+                            .send(PlanEvent::EvaluateGoalCompletion {
                                 goal_id: goal.id,
                                 goal_description: goal.description.clone(),
                                 completed_count: completed,
                                 failed_count: failed,
                                 task_summaries: summaries,
                                 session_id: goal.session_id.clone(),
-                            }).await;
-                        }
+                            })
+                            .await;
                     }
                 }
             }
@@ -210,10 +322,12 @@ impl PlanLoop {
             // 5. Fallback: check if ALL tasks across all goals are done
             if progress.total > 0 && self.space.all_tasks_done().await {
                 info!("All tasks completed, checking if more work needed");
-                let _ = event_tx.send(PlanEvent::AllTasksDone {
-                    completed: progress.completed,
-                    failed: progress.failed,
-                }).await;
+                let _ = event_tx
+                    .send(PlanEvent::AllTasksDone {
+                        completed: progress.completed,
+                        failed: progress.failed,
+                    })
+                    .await;
             }
         }
     }
@@ -238,14 +352,9 @@ pub enum PlanEvent {
         session_id: Option<String>,
     },
     /// All tasks are done — decide whether to generate new work.
-    AllTasksDone {
-        completed: usize,
-        failed: usize,
-    },
+    AllTasksDone { completed: usize, failed: usize },
     /// An anomaly was detected (failed tasks, timeouts, etc.).
-    AnomalyDetected {
-        message: String,
-    },
+    AnomalyDetected { message: String },
     /// All tasks for a specific goal are done — request quality evaluation.
     EvaluateGoalCompletion {
         goal_id: macaca_proto::TaskId,
@@ -270,7 +379,10 @@ pub enum GoalEvaluation {
     /// Goal is complete and satisfactory.
     Satisfied { summary: String },
     /// Goal needs additional work — new tasks suggested.
-    NeedsMoreWork { reason: String, suggestions: Vec<String> },
+    NeedsMoreWork {
+        reason: String,
+        suggestions: Vec<String>,
+    },
 }
 
 /// Evaluates whether a completed goal meets quality standards using an LLM.
@@ -283,7 +395,10 @@ pub struct GoalEvaluator {
 
 impl GoalEvaluator {
     pub fn new(llm: Arc<dyn macaca_llm::LlmProvider>, model: impl Into<String>) -> Self {
-        Self { llm, model: model.into() }
+        Self {
+            llm,
+            model: model.into(),
+        }
     }
 
     /// Evaluate whether a goal's tasks collectively satisfy the goal.
@@ -297,19 +412,22 @@ impl GoalEvaluator {
         completed: usize,
         failed: usize,
     ) -> Result<GoalEvaluation, String> {
-        let summaries_text = task_summaries.iter()
-            .map(|s| format!(
-                "- [{}] {} (agent: {}): {}",
-                s.status,
-                s.title,
-                s.agent,
-                s.completion_summary.as_deref().unwrap_or("no summary"),
-            ))
+        let summaries_text = task_summaries
+            .iter()
+            .map(|s| {
+                format!(
+                    "- [{}] {} (agent: {}): {}",
+                    s.status,
+                    s.title,
+                    s.agent,
+                    s.completion_summary.as_deref().unwrap_or("no summary"),
+                )
+            })
             .collect::<Vec<_>>()
             .join("\n");
 
         let prompt = format!(
-r#"You are a quality evaluation agent. Evaluate whether the following goal has been satisfactorily completed.
+            r#"You are a quality evaluation agent. Evaluate whether the following goal has been satisfactorily completed.
 
 Goal: {goal_description}
 
@@ -334,7 +452,10 @@ If there are gaps or quality issues, set satisfied=false and provide suggestions
             ..Default::default()
         };
 
-        let response = self.llm.chat(messages, &options).await
+        let response = self
+            .llm
+            .chat(messages, &options)
+            .await
             .map_err(|e| format!("Goal evaluation LLM call failed: {}", e))?;
 
         Ok(Self::parse_eval_response(&response.content))
@@ -366,7 +487,9 @@ If there are gaps or quality issues, set satisfied=false and provide suggestions
         match serde_json::from_str::<EvalResponse>(json_str) {
             Ok(eval) => {
                 if eval.satisfied {
-                    GoalEvaluation::Satisfied { summary: eval.summary }
+                    GoalEvaluation::Satisfied {
+                        summary: eval.summary,
+                    }
                 } else {
                     GoalEvaluation::NeedsMoreWork {
                         reason: eval.summary,
@@ -421,7 +544,8 @@ mod tests {
 
     #[test]
     fn test_goal_evaluation_satisfied_json() {
-        let json = r#"{"satisfied": true, "summary": "All tasks passed, goal met.", "suggestions": []}"#;
+        let json =
+            r#"{"satisfied": true, "summary": "All tasks passed, goal met.", "suggestions": []}"#;
         let result = GoalEvaluator::parse_eval_response(json);
         match result {
             GoalEvaluation::Satisfied { summary } => {
@@ -440,7 +564,10 @@ mod tests {
         }"#;
         let result = GoalEvaluator::parse_eval_response(json);
         match result {
-            GoalEvaluation::NeedsMoreWork { reason, suggestions } => {
+            GoalEvaluation::NeedsMoreWork {
+                reason,
+                suggestions,
+            } => {
                 assert_eq!(reason, "Missing error handling in API endpoints.");
                 assert_eq!(suggestions.len(), 2);
                 assert_eq!(suggestions[0], "Add 400/500 error responses");
@@ -483,7 +610,8 @@ mod tests {
 
     #[test]
     fn test_goal_evaluation_parses_markdown_code_block() {
-        let json = "```json\n{\"satisfied\": true, \"summary\": \"Done\", \"suggestions\": []}\n```";
+        let json =
+            "```json\n{\"satisfied\": true, \"summary\": \"Done\", \"suggestions\": []}\n```";
         let result = GoalEvaluator::parse_eval_response(json);
         match result {
             GoalEvaluation::Satisfied { summary } => assert_eq!(summary, "Done"),
@@ -496,7 +624,10 @@ mod tests {
         let json = "```\n{\"satisfied\": false, \"summary\": \"Needs work\", \"suggestions\": [\"fix tests\"]}\n```";
         let result = GoalEvaluator::parse_eval_response(json);
         match result {
-            GoalEvaluation::NeedsMoreWork { reason, suggestions } => {
+            GoalEvaluation::NeedsMoreWork {
+                reason,
+                suggestions,
+            } => {
                 assert_eq!(reason, "Needs work");
                 assert_eq!(suggestions[0], "fix tests");
             }

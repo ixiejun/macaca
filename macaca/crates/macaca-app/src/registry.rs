@@ -10,9 +10,9 @@ use crate::model::AppManifest;
 
 /// Standard directories where applications are discovered.
 pub const STANDARD_APP_DIRS: &[&str] = &[
-    "examples/apps",       // Development: examples/apps/<app-name>/
-    "apps",                // Project-local: apps/<app-name>/
-    "../apps",             // Relative to build directory
+    "examples/apps", // Development: examples/apps/<app-name>/
+    "apps",          // Project-local: apps/<app-name>/
+    "../apps",       // Relative to build directory
 ];
 
 /// Default application to auto-start if no app is specified.
@@ -155,7 +155,9 @@ impl AppRegistry {
 
     /// Get a discovered app by name.
     pub fn get_app_by_name(&self, name: &str) -> Option<&DiscoveredApp> {
-        self.name_to_id.get(name).and_then(|id| self.discovered.get(id))
+        self.name_to_id
+            .get(name)
+            .and_then(|id| self.discovered.get(id))
     }
 
     /// List all discovered apps.
