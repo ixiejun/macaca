@@ -17,6 +17,7 @@ use futures::FutureExt;
 use macaca_framework::execution::ExecutionContext;
 use macaca_framework::plan::PlanNotebook;
 use macaca_framework::session::{load_module_state, save_module_state};
+use macaca_kernel::executor::{ExecutorEvent, TaskResult};
 use macaca_kernel::AgentInfo;
 use macaca_proto::ApplicationId;
 
@@ -133,6 +134,45 @@ async fn update_agent_activity_by_name(
             .kernel
             .update_agent_activity(&manifest.id, activity)
             .await;
+    }
+}
+
+fn executor_task_started(task_id: macaca_proto::TaskId, agent: &str) -> ExecutorEvent {
+    ExecutorEvent::TaskStarted {
+        task_id,
+        agent: agent.to_string(),
+    }
+}
+
+fn executor_task_completed(
+    task_id: macaca_proto::TaskId,
+    agent: &str,
+    output: impl Into<String>,
+) -> ExecutorEvent {
+    ExecutorEvent::TaskCompleted {
+        task_id,
+        agent: agent.to_string(),
+        result: TaskResult {
+            task_id,
+            success: true,
+            output: output.into(),
+            error: None,
+            artifacts: vec![],
+            completed_at: chrono::Utc::now(),
+            tokens_used: None,
+        },
+    }
+}
+
+fn executor_task_failed(
+    task_id: macaca_proto::TaskId,
+    agent: &str,
+    error: impl Into<String>,
+) -> ExecutorEvent {
+    ExecutorEvent::TaskFailed {
+        task_id,
+        agent: agent.to_string(),
+        error: error.into(),
     }
 }
 
@@ -345,12 +385,10 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                             },
                                         )
                                         .await;
-                                        executor.broadcast_event(
-                                            macaca_kernel::executor::ExecutorEvent::TaskStarted {
-                                                task_id: goal_id,
-                                                agent: plan_agent_name_for_loop.clone(),
-                                            },
-                                        );
+                                        executor.broadcast_event(executor_task_started(
+                                            goal_id,
+                                            &plan_agent_name_for_loop,
+                                        ));
                                         match crate::framework_runner::FrameworkRunner::build_traced_agent_with_goal(
                                             &state_for_consumer,
                                             &app_id_for_consumer,
@@ -367,42 +405,32 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                                     Ok(reply) => {
                                                         let output = reply.get_text();
                                                         executor.broadcast_event(
-                                                            macaca_kernel::executor::ExecutorEvent::TaskCompleted {
-                                                                task_id: goal_id,
-                                                                agent: plan_agent_name_for_loop.clone(),
-                                                                result: macaca_kernel::executor::TaskResult {
-                                                                    task_id: goal_id,
-                                                                    success: true,
-                                                                    output: output.clone(),
-                                                                    error: None,
-                                                                    artifacts: vec![],
-                                                                    completed_at: chrono::Utc::now(),
-                                                                    tokens_used: None,
-                                                                },
-                                                            },
+                                                            executor_task_completed(
+                                                                goal_id,
+                                                                &plan_agent_name_for_loop,
+                                                                output.clone(),
+                                                            ),
                                                         );
                                                         tracing::info!("Planner decomposition completed: {}", output.chars().take(100).collect::<String>());
                                                     }
                                                     Err(e) => {
                                                         executor.broadcast_event(
-                                                            macaca_kernel::executor::ExecutorEvent::TaskFailed {
-                                                                task_id: goal_id,
-                                                                agent: plan_agent_name_for_loop.clone(),
-                                                                error: e.to_string(),
-                                                            },
+                                                            executor_task_failed(
+                                                                goal_id,
+                                                                &plan_agent_name_for_loop,
+                                                                e.to_string(),
+                                                            ),
                                                         );
                                                         tracing::error!("Planner decomposition failed: {}", e);
                                                     }
                                                 }
                                             }
                                             Err(e) => {
-                                                executor.broadcast_event(
-                                                    macaca_kernel::executor::ExecutorEvent::TaskFailed {
-                                                        task_id: goal_id,
-                                                        agent: plan_agent_name_for_loop.clone(),
-                                                        error: e.clone(),
-                                                    },
-                                                );
+                                                executor.broadcast_event(executor_task_failed(
+                                                    goal_id,
+                                                    &plan_agent_name_for_loop,
+                                                    e.clone(),
+                                                ));
                                                 tracing::error!("Failed to build planner agent: {}", e);
                                             }
                                         }
@@ -515,12 +543,10 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                             },
                                         )
                                         .await;
-                                        executor.broadcast_event(
-                                            macaca_kernel::executor::ExecutorEvent::TaskStarted {
-                                                task_id,
-                                                agent: plan_agent_name_for_loop.clone(),
-                                            },
-                                        );
+                                        executor.broadcast_event(executor_task_started(
+                                            task_id,
+                                            &plan_agent_name_for_loop,
+                                        ));
                                         match crate::framework_runner::FrameworkRunner::build_worker_agent(
                                             &state_for_consumer,
                                             &app_id_for_consumer,
@@ -536,42 +562,32 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                                     Ok(reply) => {
                                                         let output = reply.get_text();
                                                         executor.broadcast_event(
-                                                            macaca_kernel::executor::ExecutorEvent::TaskCompleted {
+                                                            executor_task_completed(
                                                                 task_id,
-                                                                agent: plan_agent_name_for_loop.clone(),
-                                                                result: macaca_kernel::executor::TaskResult {
-                                                                    task_id,
-                                                                    success: true,
-                                                                    output: output.clone(),
-                                                                    error: None,
-                                                                    artifacts: vec![],
-                                                                    completed_at: chrono::Utc::now(),
-                                                                    tokens_used: None,
-                                                                },
-                                                            },
+                                                                &plan_agent_name_for_loop,
+                                                                output.clone(),
+                                                            ),
                                                         );
                                                         tracing::info!("Review completed: {}", output.chars().take(100).collect::<String>());
                                                     }
                                                     Err(e) => {
                                                         executor.broadcast_event(
-                                                            macaca_kernel::executor::ExecutorEvent::TaskFailed {
+                                                            executor_task_failed(
                                                                 task_id,
-                                                                agent: plan_agent_name_for_loop.clone(),
-                                                                error: e.to_string(),
-                                                            },
+                                                                &plan_agent_name_for_loop,
+                                                                e.to_string(),
+                                                            ),
                                                         );
                                                         tracing::error!("Review failed: {}", e);
                                                     }
                                                 }
                                             }
                                             Err(e) => {
-                                                executor.broadcast_event(
-                                                    macaca_kernel::executor::ExecutorEvent::TaskFailed {
-                                                        task_id,
-                                                        agent: plan_agent_name_for_loop.clone(),
-                                                        error: e.clone(),
-                                                    },
-                                                );
+                                                executor.broadcast_event(executor_task_failed(
+                                                    task_id,
+                                                    &plan_agent_name_for_loop,
+                                                    e.clone(),
+                                                ));
                                                 tracing::error!("Failed to build planner agent for review: {}", e);
                                             }
                                         }
@@ -846,12 +862,10 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                                     },
                                                 )
                                                 .await;
-                                                executor.broadcast_event(
-                                                    macaca_kernel::executor::ExecutorEvent::TaskStarted {
-                                                        task_id: goal_id,
-                                                        agent: plan_agent_name_for_loop.clone(),
-                                                    },
-                                                );
+                                                executor.broadcast_event(executor_task_started(
+                                                    goal_id,
+                                                    &plan_agent_name_for_loop,
+                                                ));
                                                 match crate::framework_runner::FrameworkRunner::build_traced_agent_with_goal(
                                                     &state_for_consumer,
                                                     &app_id_for_consumer,
@@ -868,29 +882,21 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                                             Ok(reply) => {
                                                                 let output = reply.get_text();
                                                                 executor.broadcast_event(
-                                                                    macaca_kernel::executor::ExecutorEvent::TaskCompleted {
-                                                                        task_id: goal_id,
-                                                                        agent: plan_agent_name_for_loop.clone(),
-                                                                        result: macaca_kernel::executor::TaskResult {
-                                                                            task_id: goal_id,
-                                                                            success: true,
-                                                                            output: output.clone(),
-                                                                            error: None,
-                                                                            artifacts: vec![],
-                                                                            completed_at: chrono::Utc::now(),
-                                                                            tokens_used: None,
-                                                                        },
-                                                                    },
+                                                                    executor_task_completed(
+                                                                        goal_id,
+                                                                        &plan_agent_name_for_loop,
+                                                                        output.clone(),
+                                                                    ),
                                                                 );
                                                                 tracing::info!("Follow-up tasks created: {}", output.chars().take(100).collect::<String>());
                                                             }
                                                             Err(e) => {
                                                                 executor.broadcast_event(
-                                                                    macaca_kernel::executor::ExecutorEvent::TaskFailed {
-                                                                        task_id: goal_id,
-                                                                        agent: plan_agent_name_for_loop.clone(),
-                                                                        error: e.to_string(),
-                                                                    },
+                                                                    executor_task_failed(
+                                                                        goal_id,
+                                                                        &plan_agent_name_for_loop,
+                                                                        e.to_string(),
+                                                                    ),
                                                                 );
                                                                 tracing::error!("Follow-up task creation failed: {}", e);
                                                             }
@@ -898,11 +904,11 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                                     }
                                                     Err(e) => {
                                                         executor.broadcast_event(
-                                                            macaca_kernel::executor::ExecutorEvent::TaskFailed {
-                                                                task_id: goal_id,
-                                                                agent: plan_agent_name_for_loop.clone(),
-                                                                error: e.clone(),
-                                                            },
+                                                            executor_task_failed(
+                                                                goal_id,
+                                                                &plan_agent_name_for_loop,
+                                                                e.clone(),
+                                                            ),
                                                         );
                                                         tracing::error!("Failed to build planner agent for follow-up: {}", e);
                                                     }
@@ -1284,12 +1290,10 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                     }
                                     // Use ReActAgent with executor hooks for trace events
                                     // Emit TaskStarted event for SSE/EventLog
-                                    executor_clone.broadcast_event(
-                                        macaca_kernel::executor::ExecutorEvent::TaskStarted {
-                                            task_id,
-                                            agent: agent_name_clone.clone(),
-                                        },
-                                    );
+                                    executor_clone.broadcast_event(executor_task_started(
+                                        task_id,
+                                        &agent_name_clone,
+                                    ));
                                     match crate::framework_runner::FrameworkRunner::build_worker_agent(
                                         &state_for_worker, &app_id_for_worker, &agent_name_clone, task_session.clone(),
                                         task_id, Arc::clone(&executor_clone),
@@ -1307,19 +1311,11 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                                     board_clone.submit_for_review(&task_id, summary.clone()).await;
                                                     // Emit TaskCompleted event for SSE/EventLog
                                                     executor_clone.broadcast_event(
-                                                        macaca_kernel::executor::ExecutorEvent::TaskCompleted {
+                                                        executor_task_completed(
                                                             task_id,
-                                                            agent: agent_name_clone.clone(),
-                                                            result: macaca_kernel::executor::TaskResult {
-                                                                task_id,
-                                                                success: true,
-                                                                output: summary.clone(),
-                                                                error: None,
-                                                                artifacts: vec![],
-                                                                completed_at: chrono::Utc::now(),
-                                                                tokens_used: None,
-                                                            },
-                                                        },
+                                                            &agent_name_clone,
+                                                            summary.clone(),
+                                                        ),
                                                     );
                                                     crate::run_trace::emit_for_scope(
                                                         &state_for_worker.persist.run_tracer,
@@ -1355,11 +1351,11 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                                     board_clone.mark_failed(&task_id, error.clone()).await;
                                                     // Emit TaskFailed event for SSE/EventLog
                                                     executor_clone.broadcast_event(
-                                                        macaca_kernel::executor::ExecutorEvent::TaskFailed {
+                                                        executor_task_failed(
                                                             task_id,
-                                                            agent: agent_name_clone.clone(),
-                                                            error: error.clone(),
-                                                        },
+                                                            &agent_name_clone,
+                                                            error.clone(),
+                                                        ),
                                                     );
                                                     crate::run_trace::emit_for_scope(
                                                         &state_for_worker.persist.run_tracer,
@@ -1379,11 +1375,11 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                                     let error = "Task execution panicked".to_string();
                                                     board_clone.mark_failed(&task_id, error.clone()).await;
                                                     executor_clone.broadcast_event(
-                                                        macaca_kernel::executor::ExecutorEvent::TaskFailed {
+                                                        executor_task_failed(
                                                             task_id,
-                                                            agent: agent_name_clone.clone(),
-                                                            error: error.clone(),
-                                                        },
+                                                            &agent_name_clone,
+                                                            error.clone(),
+                                                        ),
                                                     );
                                                     crate::run_trace::emit_for_scope(
                                                         &state_for_worker.persist.run_tracer,
@@ -1404,11 +1400,11 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                                     board_clone.mark_failed(&task_id, "Execution timeout (30 min)".into()).await;
                                                     // Emit TaskFailed event for timeout
                                                     executor_clone.broadcast_event(
-                                                        macaca_kernel::executor::ExecutorEvent::TaskFailed {
+                                                        executor_task_failed(
                                                             task_id,
-                                                            agent: agent_name_clone.clone(),
-                                                            error: "Execution timeout (30 min)".into(),
-                                                        },
+                                                            &agent_name_clone,
+                                                            "Execution timeout (30 min)",
+                                                        ),
                                                     );
                                                 }
                                             }
@@ -1423,13 +1419,11 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                         Err(e) => {
                                             tracing::error!(agent = %agent_name_clone, error = %e, "Failed to build agent");
                                             // Emit TaskFailed since TaskStarted was already sent
-                                            executor_clone.broadcast_event(
-                                                macaca_kernel::executor::ExecutorEvent::TaskFailed {
-                                                    task_id,
-                                                    agent: agent_name_clone.clone(),
-                                                    error: e.clone(),
-                                                },
-                                            );
+                                            executor_clone.broadcast_event(executor_task_failed(
+                                                task_id,
+                                                &agent_name_clone,
+                                                e.clone(),
+                                            ));
                                             crate::run_trace::emit_for_scope(
                                                 &state_for_worker.persist.run_tracer,
                                                 task_session.as_deref(),
@@ -1493,12 +1487,10 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                     .await;
                                     // Use ReActAgent with executor hooks for trace events (retry)
                                     // Emit TaskStarted event for SSE/EventLog (retry)
-                                    executor_clone.broadcast_event(
-                                        macaca_kernel::executor::ExecutorEvent::TaskStarted {
-                                            task_id,
-                                            agent: agent_name_clone.clone(),
-                                        },
-                                    );
+                                    executor_clone.broadcast_event(executor_task_started(
+                                        task_id,
+                                        &agent_name_clone,
+                                    ));
                                     match crate::framework_runner::FrameworkRunner::build_worker_agent(
                                         &state_for_worker, &app_id_for_worker, &agent_name_clone, task_session.clone(),
                                         task_id, Arc::clone(&executor_clone),
@@ -1516,19 +1508,11 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                                     board_clone.submit_for_review(&task_id, summary.clone()).await;
                                                     // Emit TaskCompleted event for SSE/EventLog (retry)
                                                     executor_clone.broadcast_event(
-                                                        macaca_kernel::executor::ExecutorEvent::TaskCompleted {
+                                                        executor_task_completed(
                                                             task_id,
-                                                            agent: agent_name_clone.clone(),
-                                                            result: macaca_kernel::executor::TaskResult {
-                                                                task_id,
-                                                                success: true,
-                                                                output: summary.clone(),
-                                                                error: None,
-                                                                artifacts: vec![],
-                                                                completed_at: chrono::Utc::now(),
-                                                                tokens_used: None,
-                                                            },
-                                                        },
+                                                            &agent_name_clone,
+                                                            summary.clone(),
+                                                        ),
                                                     );
                                                     crate::run_trace::emit_for_scope(
                                                         &state_for_worker.persist.run_tracer,
@@ -1550,11 +1534,11 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                                     let error = e.to_string();
                                                     board_clone.mark_failed(&task_id, error.clone()).await;
                                                     executor_clone.broadcast_event(
-                                                        macaca_kernel::executor::ExecutorEvent::TaskFailed {
+                                                        executor_task_failed(
                                                             task_id,
-                                                            agent: agent_name_clone.clone(),
-                                                            error: error.clone(),
-                                                        },
+                                                            &agent_name_clone,
+                                                            error.clone(),
+                                                        ),
                                                     );
                                                     crate::run_trace::emit_for_scope(
                                                         &state_for_worker.persist.run_tracer,
@@ -1573,11 +1557,11 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                                     let error = "Retry task execution panicked".to_string();
                                                     board_clone.mark_failed(&task_id, error.clone()).await;
                                                     executor_clone.broadcast_event(
-                                                        macaca_kernel::executor::ExecutorEvent::TaskFailed {
+                                                        executor_task_failed(
                                                             task_id,
-                                                            agent: agent_name_clone.clone(),
-                                                            error: error.clone(),
-                                                        },
+                                                            &agent_name_clone,
+                                                            error.clone(),
+                                                        ),
                                                     );
                                                     crate::run_trace::emit_for_scope(
                                                         &state_for_worker.persist.run_tracer,
@@ -1595,11 +1579,11 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                                 Err(_) => {
                                                     board_clone.mark_failed(&task_id, "Retry execution timeout (30 min)".into()).await;
                                                     executor_clone.broadcast_event(
-                                                        macaca_kernel::executor::ExecutorEvent::TaskFailed {
+                                                        executor_task_failed(
                                                             task_id,
-                                                            agent: agent_name_clone.clone(),
-                                                            error: "Retry execution timeout (30 min)".into(),
-                                                        },
+                                                            &agent_name_clone,
+                                                            "Retry execution timeout (30 min)",
+                                                        ),
                                                     );
                                                 }
                                             }
@@ -1696,7 +1680,11 @@ pub(crate) async fn create_goal(
 
 #[cfg(test)]
 mod tests {
-    use super::select_entry_and_plan_agents;
+    use super::{
+        executor_task_completed, executor_task_failed, executor_task_started,
+        select_entry_and_plan_agents,
+    };
+    use macaca_kernel::executor::ExecutorEvent;
     use macaca_kernel::AgentInfo;
 
     fn agent(name: &str, capabilities: &[&str]) -> AgentInfo {
@@ -1731,5 +1719,69 @@ mod tests {
         let (entry, planner) = select_entry_and_plan_agents(&agents, Some("entry_custom"));
         assert_eq!(entry, "entry_custom");
         assert_eq!(planner, "entry_custom");
+    }
+
+    #[test]
+    fn executor_task_started_helper_preserves_fields() {
+        let task_id = macaca_proto::TaskId::new();
+
+        let event = executor_task_started(task_id, "planner");
+
+        match event {
+            ExecutorEvent::TaskStarted {
+                task_id: got,
+                agent,
+            } => {
+                assert_eq!(got, task_id);
+                assert_eq!(agent, "planner");
+            }
+            other => panic!("expected TaskStarted, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn executor_task_completed_helper_preserves_result_fields() {
+        let task_id = macaca_proto::TaskId::new();
+
+        let event = executor_task_completed(task_id, "backend", "done");
+
+        match event {
+            ExecutorEvent::TaskCompleted {
+                task_id: got,
+                agent,
+                result,
+            } => {
+                assert_eq!(got, task_id);
+                assert_eq!(agent, "backend");
+                assert_eq!(result.task_id, task_id);
+                assert!(result.success);
+                assert_eq!(result.output, "done");
+                assert_eq!(result.error, None);
+                assert!(result.artifacts.is_empty());
+                assert!(result.tokens_used.is_none());
+                assert!(result.completed_at <= chrono::Utc::now());
+            }
+            other => panic!("expected TaskCompleted, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn executor_task_failed_helper_preserves_fields() {
+        let task_id = macaca_proto::TaskId::new();
+
+        let event = executor_task_failed(task_id, "frontend", "boom");
+
+        match event {
+            ExecutorEvent::TaskFailed {
+                task_id: got,
+                agent,
+                error,
+            } => {
+                assert_eq!(got, task_id);
+                assert_eq!(agent, "frontend");
+                assert_eq!(error, "boom");
+            }
+            other => panic!("expected TaskFailed, got {other:?}"),
+        }
     }
 }
