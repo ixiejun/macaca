@@ -970,6 +970,7 @@ pub(crate) async fn get_session_by_id(
         // Coordinator events: thinking, tool_call, tool_result, content
         let mut coordinator_traces: Vec<StoredTraceStep> = Vec::new();
         let mut latest_coordinator_content: Option<String> = None;
+        let mut coordinator_done = false;
         for event in &events {
             if event.source != "coordinator" {
                 continue;
@@ -1022,10 +1023,32 @@ pub(crate) async fn get_session_by_id(
                     });
                 }
                 "content" => {
-                    latest_coordinator_content = payload
+                    if let Some(content) = payload
                         .get("content")
                         .and_then(|v| v.as_str())
-                        .map(|s| s.to_string());
+                        .map(|s| s.to_string())
+                    {
+                        latest_coordinator_content = Some(content.clone());
+                        coordinator_traces.push(StoredTraceStep {
+                            step_type: "assistant".into(),
+                            iteration: None,
+                            tool_name: None,
+                            tool_input: None,
+                            output: None,
+                            content: Some(content),
+                        });
+                    }
+                }
+                "done" => {
+                    coordinator_done = true;
+                    coordinator_traces.push(StoredTraceStep {
+                        step_type: "done".into(),
+                        iteration: None,
+                        tool_name: None,
+                        tool_input: None,
+                        output: Some(payload.to_string()),
+                        content: None,
+                    });
                 }
                 _ => {}
             }
@@ -1052,6 +1075,9 @@ pub(crate) async fn get_session_by_id(
             }
             if let Some(content) = latest_coordinator_content {
                 assistant_turn.content = content;
+            }
+            if coordinator_done {
+                assistant_turn.status = Some("completed".to_string());
             }
         }
     }
