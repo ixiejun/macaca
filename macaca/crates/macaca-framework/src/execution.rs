@@ -155,7 +155,9 @@ mod tests {
         let state = ctx.state_dict();
 
         let mut restored = ExecutionContext::new("", "", "");
-        restored.load_state_dict(state).expect("load execution context");
+        restored
+            .load_state_dict(state)
+            .expect("load execution context");
         assert_eq!(restored.session_id, "s1");
         assert_eq!(restored.app_id, "app1");
         assert_eq!(restored.owner_agent, "entry");
@@ -163,4 +165,3 @@ mod tests {
         assert_eq!(restored.reason.as_deref(), Some("waiting goal"));
     }
 }
-

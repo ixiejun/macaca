@@ -161,6 +161,7 @@ fn err_msg(msg: &str) -> Result<(), String> {
 pub fn response_text(content: impl Into<String>) -> LlmResponse {
     LlmResponse {
         content: content.into(),
+        reasoning_content: None,
         model: "scripted".into(),
         usage: TokenUsage::default(),
         finish_reason: "stop".into(),
@@ -171,6 +172,7 @@ pub fn response_text(content: impl Into<String>) -> LlmResponse {
 pub fn response_with_tools(tool_calls: Vec<ToolCall>) -> LlmResponse {
     LlmResponse {
         content: String::new(),
+        reasoning_content: None,
         model: "scripted".into(),
         usage: TokenUsage::default(),
         finish_reason: "tool_calls".into(),

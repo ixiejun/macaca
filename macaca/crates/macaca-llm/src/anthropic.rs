@@ -268,6 +268,7 @@ impl LlmProvider for AnthropicProvider {
 
         Ok(LlmResponse {
             content,
+            reasoning_content: None,
             model: resp.model,
             usage: TokenUsage {
                 prompt_tokens: resp.usage.input_tokens,

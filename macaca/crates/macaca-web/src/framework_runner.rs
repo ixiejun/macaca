@@ -8,6 +8,7 @@
 //! - Hook system for SSE event bridging
 //! - Pause/resume via `ToolMiddleware` for `create_goal` coordination
 
+use std::collections::HashSet;
 use std::convert::Infallible;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -82,8 +83,8 @@ impl FrameworkRunner {
         task_id: macaca_proto::TaskId,
         executor: Arc<macaca_kernel::executor::ApplicationExecutor>,
     ) -> Result<HookedAgent<ReActAgent>, String> {
-        Self::build_traced_agent_with_goal(
-            state, app_id, agent_name, session_id, task_id, executor, None,
+        Self::build_traced_agent_internal(
+            state, app_id, agent_name, session_id, task_id, executor, None, false, None,
         )
         .await
     }
@@ -99,7 +100,10 @@ impl FrameworkRunner {
         task_id: macaca_proto::TaskId,
         executor: Arc<macaca_kernel::executor::ApplicationExecutor>,
     ) -> Result<HookedAgent<ReActAgent>, String> {
-        Self::build_traced_agent(state, app_id, agent_name, session_id, task_id, executor).await
+        Self::build_traced_agent_internal(
+            state, app_id, agent_name, session_id, task_id, executor, None, true, None,
+        )
+        .await
     }
 
     /// Build a traced `ReActAgent` that emits execution events through the
@@ -113,6 +117,51 @@ impl FrameworkRunner {
         task_id: macaca_proto::TaskId,
         executor: Arc<macaca_kernel::executor::ApplicationExecutor>,
         goal_id: Option<macaca_proto::TaskId>,
+    ) -> Result<HookedAgent<ReActAgent>, String> {
+        Self::build_traced_agent_internal(
+            state, app_id, agent_name, session_id, task_id, executor, goal_id, false, None,
+        )
+        .await
+    }
+
+    /// Build a traced planner agent for goal decomposition only.
+    ///
+    /// This keeps decomposition visible while limiting the available action
+    /// surface to todo creation, so the planner cannot drift into review,
+    /// reassignment, or goal management during initial planning.
+    pub async fn build_planner_decomposition_agent(
+        state: &Arc<AppState>,
+        app_id: &ApplicationId,
+        agent_name: &str,
+        session_id: Option<String>,
+        task_id: macaca_proto::TaskId,
+        executor: Arc<macaca_kernel::executor::ApplicationExecutor>,
+        goal_id: Option<macaca_proto::TaskId>,
+    ) -> Result<HookedAgent<ReActAgent>, String> {
+        Self::build_traced_agent_internal(
+            state,
+            app_id,
+            agent_name,
+            session_id,
+            task_id,
+            executor,
+            goal_id,
+            false,
+            Some(&["create_todo", "create_todos"]),
+        )
+        .await
+    }
+
+    async fn build_traced_agent_internal(
+        state: &Arc<AppState>,
+        app_id: &ApplicationId,
+        agent_name: &str,
+        session_id: Option<String>,
+        task_id: macaca_proto::TaskId,
+        executor: Arc<macaca_kernel::executor::ApplicationExecutor>,
+        goal_id: Option<macaca_proto::TaskId>,
+        suppress_worker_lifecycle_tools: bool,
+        allowed_tool_names: Option<&[&str]>,
     ) -> Result<HookedAgent<ReActAgent>, String> {
         let system_prompt = Self::build_system_prompt(state, app_id, agent_name).await;
         let selection = Self::resolve_model_selection(state, app_id, agent_name).await?;
@@ -129,6 +178,28 @@ impl FrameworkRunner {
             goal_id,
         )
         .await;
+
+        if suppress_worker_lifecycle_tools {
+            for tool_name in [
+                "claim_task",
+                "start_task",
+                "update_task_progress",
+                "submit_task_for_review",
+                "list_my_tasks",
+            ] {
+                toolkit.unregister(tool_name);
+            }
+        }
+        if let Some(allowed_tool_names) = allowed_tool_names {
+            let allowed: HashSet<&str> = allowed_tool_names.iter().copied().collect();
+            for tool in toolkit.get_definitions() {
+                if let Some(name) = tool.get("name").and_then(|v| v.as_str()) {
+                    if !allowed.contains(name) {
+                        toolkit.unregister(name);
+                    }
+                }
+            }
+        }
 
         // Executor tool middleware — emits tool_call / tool_result via broadcast
         toolkit.add_middleware(Box::new(ExecutorToolMiddleware {

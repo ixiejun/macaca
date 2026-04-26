@@ -194,8 +194,16 @@ fn executor_task_failed(
     }
 }
 
+fn goal_has_decomposed_tasks(
+    tasks: &[macaca_proto::TodoItem],
+    goal_id: macaca_proto::TaskId,
+) -> bool {
+    tasks.iter().any(|task| task.parent_task == Some(goal_id))
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum PlannerFrameworkBuilder {
+    Decomposition,
     TracedWithGoal,
     Worker,
 }
@@ -205,19 +213,29 @@ enum PlannerFrameworkCallKind {
     DecomposeGoal,
     Review,
     FollowUp,
+    GoalEvaluation,
 }
 
 impl PlannerFrameworkCallKind {
+    fn timeout(self) -> std::time::Duration {
+        match self {
+            Self::DecomposeGoal => std::time::Duration::from_secs(90),
+            Self::Review | Self::FollowUp => std::time::Duration::from_secs(5 * 60),
+            Self::GoalEvaluation => std::time::Duration::from_secs(10 * 60),
+        }
+    }
+
     fn builder(self) -> PlannerFrameworkBuilder {
         match self {
-            Self::DecomposeGoal | Self::FollowUp => PlannerFrameworkBuilder::TracedWithGoal,
+            Self::DecomposeGoal => PlannerFrameworkBuilder::Decomposition,
+            Self::FollowUp | Self::GoalEvaluation => PlannerFrameworkBuilder::TracedWithGoal,
             Self::Review => PlannerFrameworkBuilder::Worker,
         }
     }
 
     fn goal_context(self, task_id: macaca_proto::TaskId) -> Option<macaca_proto::TaskId> {
         match self {
-            Self::DecomposeGoal | Self::FollowUp => Some(task_id),
+            Self::DecomposeGoal | Self::FollowUp | Self::GoalEvaluation => Some(task_id),
             Self::Review => None,
         }
     }
@@ -227,6 +245,7 @@ impl PlannerFrameworkCallKind {
             Self::DecomposeGoal => "Planner decomposition completed",
             Self::Review => "Review completed",
             Self::FollowUp => "Follow-up tasks created",
+            Self::GoalEvaluation => "Goal evaluation completed",
         }
     }
 
@@ -235,6 +254,7 @@ impl PlannerFrameworkCallKind {
             Self::DecomposeGoal => "Planner decomposition failed",
             Self::Review => "Review failed",
             Self::FollowUp => "Follow-up task creation failed",
+            Self::GoalEvaluation => "Goal evaluation failed",
         }
     }
 
@@ -243,6 +263,7 @@ impl PlannerFrameworkCallKind {
             Self::DecomposeGoal => "Failed to build planner agent",
             Self::Review => "Failed to build planner agent for review",
             Self::FollowUp => "Failed to build planner agent for follow-up",
+            Self::GoalEvaluation => "Failed to build planner agent for goal evaluation",
         }
     }
 
@@ -251,6 +272,7 @@ impl PlannerFrameworkCallKind {
             Self::DecomposeGoal => "No executor found for planner decomposition",
             Self::Review => "No executor found for planner review",
             Self::FollowUp => "No executor found for planner follow-up",
+            Self::GoalEvaluation => "No executor found for planner goal evaluation",
         }
     }
 }
@@ -264,10 +286,11 @@ async fn run_planner_framework_call(
     prompt: String,
     activity_context: String,
     kind: PlannerFrameworkCallKind,
-) {
+) -> Result<String, String> {
     let Some(executor) = state.executor_registry.get(app_id).await else {
-        tracing::error!("{}", kind.missing_executor_log());
-        return;
+        let error = kind.missing_executor_log().to_string();
+        tracing::error!("{}", error);
+        return Err(error);
     };
 
     update_agent_activity_by_name(
@@ -281,6 +304,18 @@ async fn run_planner_framework_call(
     executor.broadcast_event(executor_task_started(task_id, plan_agent_name));
 
     let build_result = match kind.builder() {
+        PlannerFrameworkBuilder::Decomposition => {
+            crate::framework_runner::FrameworkRunner::build_planner_decomposition_agent(
+                state,
+                app_id,
+                plan_agent_name,
+                session_id,
+                task_id,
+                Arc::clone(&executor),
+                kind.goal_context(task_id),
+            )
+            .await
+        }
         PlannerFrameworkBuilder::TracedWithGoal => {
             crate::framework_runner::FrameworkRunner::build_traced_agent_with_goal(
                 state,
@@ -306,13 +341,14 @@ async fn run_planner_framework_call(
         }
     };
 
-    match build_result {
+    let result = match build_result {
         Ok(agent) => {
             use macaca_framework::agent::Agent;
 
             let msg = macaca_framework::message::Msg::user("plan_loop", prompt.as_str());
-            match agent.reply(msg).await {
-                Ok(reply) => {
+            let timeout = kind.timeout();
+            match tokio::time::timeout(timeout, agent.reply(msg)).await {
+                Ok(Ok(reply)) => {
                     let output = reply.get_text();
                     executor.broadcast_event(executor_task_completed(
                         task_id,
@@ -324,24 +360,360 @@ async fn run_planner_framework_call(
                         kind.success_log_prefix(),
                         output.chars().take(100).collect::<String>()
                     );
+                    Ok(output)
                 }
-                Err(e) => {
+                Ok(Err(e)) => {
+                    let error = e.to_string();
                     executor.broadcast_event(executor_task_failed(
                         task_id,
                         plan_agent_name,
-                        e.to_string(),
+                        error.clone(),
                     ));
-                    tracing::error!("{}: {}", kind.reply_error_log_prefix(), e);
+                    tracing::error!("{}: {}", kind.reply_error_log_prefix(), error);
+                    Err(error)
+                }
+                Err(_) => {
+                    let error = format!(
+                        "{} timed out after {}s",
+                        kind.reply_error_log_prefix(),
+                        timeout.as_secs()
+                    );
+                    executor.broadcast_event(executor_task_failed(
+                        task_id,
+                        plan_agent_name,
+                        error.clone(),
+                    ));
+                    tracing::error!("{}", error);
+                    Err(error)
                 }
             }
         }
         Err(e) => {
             executor.broadcast_event(executor_task_failed(task_id, plan_agent_name, e.clone()));
             tracing::error!("{}: {}", kind.build_error_log_prefix(), e);
+            Err(e)
         }
-    }
+    };
 
     update_agent_activity_by_name(state, plan_agent_name, macaca_proto::AgentActivity::Idle).await;
+    result
+}
+
+async fn list_goal_todos_for_scope(
+    state: &Arc<AppState>,
+    app_id: &ApplicationId,
+    session_id: Option<&str>,
+    goal_id: macaca_proto::TaskId,
+) -> Vec<macaca_proto::TodoItem> {
+    let todos = match session_id {
+        Some(sid) => {
+            state
+                .persist
+                .todo_store
+                .list_all_todos_for_session(app_id, sid)
+                .await
+        }
+        None => state.persist.todo_store.list_all_todos(app_id).await,
+    };
+    todos
+        .into_iter()
+        .filter(|task| task.parent_task == Some(goal_id))
+        .collect()
+}
+
+async fn wake_worker_loops(state: &Arc<AppState>, app_id: &ApplicationId) {
+    if let Some(wakers) = state.loops.worker_loop_wakers.read().await.get(app_id) {
+        for waker in wakers {
+            waker.wake();
+        }
+    }
+}
+
+async fn mark_goal_decomposition_ready(
+    state: &Arc<AppState>,
+    app_id: &ApplicationId,
+    session_id: Option<&str>,
+    goal_id: macaca_proto::TaskId,
+    task_count: usize,
+) {
+    state
+        .persist
+        .todo_store
+        .update_goal_status(app_id, &goal_id, macaca_proto::TodoGoalStatus::InProgress)
+        .await;
+    crate::run_trace::emit_for_scope(
+        &state.persist.run_tracer,
+        session_id,
+        app_id,
+        "plan.goal_decomposition_ready",
+        "plan_loop",
+        crate::run_trace::status::OK,
+        Some(format!("tasks={task_count}")),
+        None,
+        Some(goal_id.to_string()),
+        None,
+    )
+    .await;
+    wake_worker_loops(state, app_id).await;
+}
+
+async fn mark_goal_decomposition_failed(
+    state: &Arc<AppState>,
+    app_id: &ApplicationId,
+    session_id: Option<&str>,
+    goal_id: macaca_proto::TaskId,
+    error: &str,
+) {
+    let mut cancelled = 0usize;
+    let mut tasks = list_goal_todos_for_scope(state, app_id, session_id, goal_id).await;
+    for task in &mut tasks {
+        if matches!(
+            task.status,
+            macaca_proto::TodoStatus::Pending
+                | macaca_proto::TodoStatus::Blocked
+                | macaca_proto::TodoStatus::Assigned
+        ) {
+            task.status = macaca_proto::TodoStatus::Cancelled;
+            task.updated_at = chrono::Utc::now();
+            state.persist.todo_store.save_todo(task).await;
+            cancelled += 1;
+        }
+    }
+    state
+        .persist
+        .todo_store
+        .update_goal_status(app_id, &goal_id, macaca_proto::TodoGoalStatus::Failed)
+        .await;
+    crate::run_trace::emit_for_scope(
+        &state.persist.run_tracer,
+        session_id,
+        app_id,
+        "plan.goal_decomposition_failed",
+        "plan_loop",
+        crate::run_trace::status::ERROR,
+        Some(error.chars().take(200).collect::<String>()),
+        None,
+        Some(goal_id.to_string()),
+        Some(serde_json::json!({ "cancelled_partial_todos": cancelled })),
+    )
+    .await;
+}
+
+#[derive(Clone, Debug)]
+struct PlannerWorkerDossier {
+    name: String,
+    capabilities: Vec<String>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum FallbackTaskPhase {
+    Research = 0,
+    Validate = 1,
+    Analyze = 2,
+    Produce = 3,
+    Finalize = 4,
+    Execute = 5,
+}
+
+fn fallback_phase_for(capabilities: &[String]) -> FallbackTaskPhase {
+    let text = capabilities.join(" ").to_lowercase();
+    if text.contains("research")
+        || text.contains("source")
+        || text.contains("web")
+        || text.contains("discovery")
+    {
+        FallbackTaskPhase::Research
+    } else if text.contains("fact")
+        || text.contains("verify")
+        || text.contains("validation")
+        || text.contains("quality")
+    {
+        FallbackTaskPhase::Validate
+    } else if text.contains("analysis")
+        || text.contains("analyze")
+        || text.contains("architecture")
+        || text.contains("design")
+        || text.contains("spec")
+        || text.contains("planning")
+        || text.contains("interface")
+    {
+        FallbackTaskPhase::Analyze
+    } else if text.contains("write")
+        || text.contains("draft")
+        || text.contains("implement")
+        || text.contains("build")
+        || text.contains("code")
+        || text.contains("frontend")
+        || text.contains("backend")
+    {
+        FallbackTaskPhase::Produce
+    } else if text.contains("edit")
+        || text.contains("review")
+        || text.contains("package")
+        || text.contains("polish")
+        || text.contains("test")
+        || text.contains("qa")
+    {
+        FallbackTaskPhase::Finalize
+    } else {
+        FallbackTaskPhase::Execute
+    }
+}
+
+fn fallback_task_template(
+    phase: FallbackTaskPhase,
+    agent_name: &str,
+    goal_description: &str,
+) -> (String, String, Vec<String>) {
+    let clipped_goal = goal_description.chars().take(500).collect::<String>();
+    let title = match phase {
+        FallbackTaskPhase::Research => "Collect source material and context",
+        FallbackTaskPhase::Validate => "Validate facts, assumptions, and constraints",
+        FallbackTaskPhase::Analyze => "Produce specialist analysis and handoff brief",
+        FallbackTaskPhase::Produce => "Create the primary specialist deliverable",
+        FallbackTaskPhase::Finalize => "Review, polish, and package final deliverables",
+        FallbackTaskPhase::Execute => "Complete specialist contribution",
+    };
+    let description = format!(
+        "Planner LLM timed out before creating todos. Fallback task for `{agent_name}`.\n\n\
+         Goal:\n{clipped_goal}\n\n\
+         Use your declared capabilities and allowed tools to produce the durable deliverable \
+         expected for this stage. Save outputs under the shared workspace when files are needed, \
+         then submit a concise review summary with exact paths."
+    );
+    let criteria = match phase {
+        FallbackTaskPhase::Research => vec![
+            "Collect reliable source material or project context relevant to the goal".to_string(),
+            "Separate confirmed facts from assumptions or unresolved questions".to_string(),
+            "Save a durable handoff artifact in the shared workspace when applicable".to_string(),
+        ],
+        FallbackTaskPhase::Validate => vec![
+            "Validate important claims, assumptions, dependencies, or constraints".to_string(),
+            "Flag unsupported, risky, contradictory, or incomplete information".to_string(),
+            "Save findings and safe wording or implementation guidance when applicable".to_string(),
+        ],
+        FallbackTaskPhase::Analyze => vec![
+            "Create a clear specialist brief, plan, architecture, or analysis for downstream work"
+                .to_string(),
+            "Identify dependencies, risks, and handoff requirements".to_string(),
+            "Save the brief in the shared workspace when applicable".to_string(),
+        ],
+        FallbackTaskPhase::Produce => vec![
+            "Produce the primary deliverable requested by the goal for this specialist area"
+                .to_string(),
+            "Use upstream handoff artifacts if they exist".to_string(),
+            "Save durable output files or a detailed completion summary".to_string(),
+        ],
+        FallbackTaskPhase::Finalize => vec![
+            "Review upstream deliverables for completeness, correctness, and user fit".to_string(),
+            "Polish or package final outputs without hiding uncertainty".to_string(),
+            "Submit exact output paths and remaining caveats".to_string(),
+        ],
+        FallbackTaskPhase::Execute => vec![
+            "Complete a useful specialist contribution toward the goal".to_string(),
+            "Create durable output or a clear handoff summary".to_string(),
+            "Submit exact paths, decisions, and unresolved blockers".to_string(),
+        ],
+    };
+    (title.to_string(), description, criteria)
+}
+
+async fn create_fallback_decomposition_tasks(
+    state: &Arc<AppState>,
+    app_id: &ApplicationId,
+    session_id: Option<&str>,
+    goal_id: macaca_proto::TaskId,
+    plan_agent_name: &str,
+    goal_description: &str,
+    workers: &[PlannerWorkerDossier],
+    initial_dependency: Option<macaca_proto::TaskId>,
+    planner_error: &str,
+) -> Vec<macaca_proto::TodoItem> {
+    let mut ordered = workers.to_vec();
+    ordered.sort_by_key(|worker| {
+        (
+            fallback_phase_for(&worker.capabilities),
+            worker.name.clone(),
+        )
+    });
+    ordered.truncate(5);
+
+    if ordered.is_empty() {
+        return Vec::new();
+    }
+
+    tracing::warn!(
+        goal_id = %goal_id,
+        planner_error = %planner_error,
+        fallback_tasks = ordered.len(),
+        "Planner produced no todos; creating capability-based fallback task chain"
+    );
+
+    let space = macaca_task::TaskSpace::new(
+        app_id.clone(),
+        session_id.map(str::to_string),
+        Arc::clone(&state.persist.todo_store),
+    );
+    let mut created = Vec::new();
+    let mut previous: Option<macaca_proto::TaskId> = initial_dependency;
+
+    for (index, worker) in ordered.iter().enumerate() {
+        let phase = fallback_phase_for(&worker.capabilities);
+        let (title, description, acceptance_criteria) =
+            fallback_task_template(phase, &worker.name, goal_description);
+        let depends_on = previous.into_iter().collect::<Vec<_>>();
+        let item = space
+            .create_and_assign(
+                &worker.name,
+                plan_agent_name,
+                title,
+                description,
+                acceptance_criteria,
+                8u8.saturating_sub(index.min(3) as u8),
+                depends_on,
+                Some(goal_id),
+            )
+            .await;
+        previous = Some(item.id);
+        created.push(item);
+    }
+
+    crate::run_trace::emit_for_scope(
+        &state.persist.run_tracer,
+        session_id,
+        app_id,
+        "plan.goal_decomposition_fallback_ready",
+        "plan_loop",
+        crate::run_trace::status::INFO,
+        Some(format!(
+            "planner_error={}; fallback_tasks={}",
+            planner_error.chars().take(160).collect::<String>(),
+            created.len()
+        )),
+        None,
+        Some(goal_id.to_string()),
+        Some(serde_json::json!({
+            "task_count": created.len(),
+            "planner_error": planner_error,
+            "agents": created.iter().map(|task| task.assigned_agent.clone()).collect::<Vec<_>>(),
+        })),
+    )
+    .await;
+
+    created
+}
+
+fn terminal_goal_task(tasks: &[macaca_proto::TodoItem]) -> Option<macaca_proto::TaskId> {
+    let dependency_ids = tasks
+        .iter()
+        .flat_map(|task| task.depends_on.iter().copied())
+        .collect::<std::collections::HashSet<_>>();
+    tasks
+        .iter()
+        .rev()
+        .find(|task| !dependency_ids.contains(&task.id))
+        .map(|task| task.id)
+        .or_else(|| tasks.last().map(|task| task.id))
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -590,6 +962,31 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                 description,
                                 session_id,
                             } => {
+                                let existing_goal_tasks = match session_id.as_deref() {
+                                    Some(sid) => {
+                                        state_for_consumer
+                                            .persist
+                                            .todo_store
+                                            .list_all_todos_for_session(&app_id_for_consumer, sid)
+                                            .await
+                                    }
+                                    None => {
+                                        state_for_consumer
+                                            .persist
+                                            .todo_store
+                                            .list_all_todos(&app_id_for_consumer)
+                                            .await
+                                    }
+                                };
+                                if goal_has_decomposed_tasks(&existing_goal_tasks, goal_id) {
+                                    tracing::info!(
+                                        goal_id = %goal_id,
+                                        session_id = ?session_id,
+                                        "Skipping stale GoalReady event because goal already has tasks"
+                                    );
+                                    continue;
+                                }
+
                                 crate::run_trace::emit_for_scope(
                                     &state_for_consumer.persist.run_tracer,
                                     session_id.as_deref(),
@@ -615,37 +1012,126 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                 .await;
                                 {
                                     // Dynamically get available worker agents + capabilities (no hardcoding)
-                                    let (agent_names, agent_profiles): (Vec<String>, Vec<String>) =
-                                        if let Some(executor) = state_for_consumer
-                                            .executor_registry
-                                            .get(&app_id_for_consumer)
-                                            .await
-                                        {
-                                            let agents = executor.list_agents().await;
-                                            let workers: Vec<_> = agents
-                                                .iter()
-                                                .filter(|a| {
-                                                    a.name != entry_agent_for_loop
-                                                        && a.name != plan_agent_name_for_loop
-                                                })
+                                    let (agent_names, agent_profiles, worker_dossiers): (
+                                        Vec<String>,
+                                        Vec<String>,
+                                        Vec<PlannerWorkerDossier>,
+                                    ) = if let Some(executor) = state_for_consumer
+                                        .executor_registry
+                                        .get(&app_id_for_consumer)
+                                        .await
+                                    {
+                                        let agents = executor.list_agents().await;
+                                        let manifest_by_name: std::collections::HashMap<_, _> =
+                                            state_for_consumer
+                                                .kernel
+                                                .list_agents()
+                                                .await
+                                                .into_iter()
+                                                .map(|m| (m.name.clone(), m))
                                                 .collect();
-                                            let names =
-                                                workers.iter().map(|a| a.name.clone()).collect();
-                                            let profiles = workers
+                                        let workers: Vec<_> = agents
+                                            .iter()
+                                            .filter(|a| {
+                                                a.name != entry_agent_for_loop
+                                                    && a.name != plan_agent_name_for_loop
+                                            })
+                                            .collect();
+                                        let names =
+                                            workers.iter().map(|a| a.name.clone()).collect();
+                                        let dossiers = workers
+                                            .iter()
+                                            .map(|a| {
+                                                let capabilities = manifest_by_name
+                                                    .get(&a.name)
+                                                    .map(|m| {
+                                                        m.capabilities
+                                                            .iter()
+                                                            .map(|c| {
+                                                                format!(
+                                                                    "{}: {}",
+                                                                    c.name, c.description
+                                                                )
+                                                            })
+                                                            .collect::<Vec<_>>()
+                                                    })
+                                                    .filter(|caps| !caps.is_empty())
+                                                    .unwrap_or_else(|| a.capabilities.clone());
+                                                PlannerWorkerDossier {
+                                                    name: a.name.clone(),
+                                                    capabilities,
+                                                }
+                                            })
+                                            .collect();
+                                        let profiles = workers
                                                 .iter()
                                                 .map(|a| {
-                                                    let caps = if a.capabilities.is_empty() {
-                                                        "no capability metadata".to_string()
+                                                    let manifest = manifest_by_name.get(&a.name);
+                                                    let caps = manifest
+                                                        .map(|m| {
+                                                            m.capabilities
+                                                                .iter()
+                                                                .map(|c| {
+                                                                    format!(
+                                                                        "    - {}: {}",
+                                                                        c.name, c.description
+                                                                    )
+                                                                })
+                                                                .collect::<Vec<_>>()
+                                                        })
+                                                        .unwrap_or_else(|| {
+                                                            a.capabilities
+                                                                .iter()
+                                                                .map(|c| format!("    - {c}"))
+                                                                .collect()
+                                                        });
+                                                    let caps = if caps.is_empty() {
+                                                        "    - no capability metadata".to_string()
                                                     } else {
-                                                        a.capabilities.join(", ")
+                                                        caps.join("\n")
                                                     };
-                                                    format!("- {}: {}", a.name, caps)
+                                                    let tools = manifest
+                                                        .map(|m| {
+                                                            if m.permission.allowed_tools.is_empty()
+                                                            {
+                                                                "all registered tools (open policy)"
+                                                                    .to_string()
+                                                            } else {
+                                                                m.permission.allowed_tools.join(", ")
+                                                            }
+                                                        })
+                                                        .unwrap_or_else(|| "unknown".to_string());
+                                                    let permission = manifest
+                                                        .map(|m| match m.permission.level {
+                                                            macaca_proto::PermissionLevel::System => {
+                                                                "system"
+                                                            }
+                                                            macaca_proto::PermissionLevel::User => {
+                                                                "user"
+                                                            }
+                                                        })
+                                                        .unwrap_or("unknown");
+                                                    let model = manifest
+                                                        .map(|m| m.model.as_str())
+                                                        .filter(|m| !m.is_empty())
+                                                        .unwrap_or("app default");
+                                                    format!(
+                                                        "- Agent `{}`\n  available: {}\n  load: {}/{}\n  permission: {}\n  model: {}\n  tools: {}\n  capabilities:\n{}",
+                                                        a.name,
+                                                        a.available,
+                                                        a.current_load,
+                                                        a.max_load,
+                                                        permission,
+                                                        model,
+                                                        tools,
+                                                        caps
+                                                    )
                                                 })
                                                 .collect();
-                                            (names, profiles)
-                                        } else {
-                                            (vec![], vec![])
-                                        };
+                                        (names, profiles, dossiers)
+                                    } else {
+                                        (vec![], vec![], vec![])
+                                    };
                                     let agents_list = if agent_names.is_empty() {
                                         "no worker agents registered".to_string()
                                     } else {
@@ -658,25 +1144,36 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                     };
                                     let prompt = format!(
                                         "A new project goal has been submitted. You MUST decompose it into \
-                                         concrete tasks by calling the `create_todo` tool for EACH task.\n\n\
+                                         concrete tasks. Prefer one `create_todos` tool call with the full task graph; \
+                                         use `create_todo` only as a fallback for a single additional task.\n\n\
                                          Goal: {}\n\n\
                                          Available agents: {}.\n\
-                                         Agent capability profiles:\n{}\n\n\
+                                         Agent dossiers:\n{}\n\n\
+                                         IMPORTANT ASSIGNMENT CONTRACT:\n\
+                                         - The `agent` you pass to `create_todo` is authoritative; the system will NOT automatically reroute it.\n\
+                                         - You must choose the correct worker agent from the dossiers above.\n\
+                                         - If the acceptance criteria require working code, files, APIs, UI, tests, or runnable behavior, assign to an implementation-capable agent rather than a design/spec-only agent.\n\
+                                         - Use design/spec agents for architecture, interfaces, data contracts, risk analysis, and handoff documents only.\n\
+                                         - If a task has both design and implementation work, split it into separate dependent tasks.\n\n\
                                          INSTRUCTIONS:\n\
                                          1. Briefly analyze the goal (1-2 sentences).\n\
-                                         2. Call `create_todo` for EACH task — you MUST create at least one task.\n\
+                                         2. Call `create_todos` once with ALL tasks whenever possible — you MUST create at least one task.\n\
                                          3. Set priorities (0-10) and acceptance_criteria for each task.\n\
-                                         4. Assign each task to the MOST CAPABLE agent based on the capability profiles above.\n\
+                                         4. Assign each task to the MOST CAPABLE agent based on the dossiers above; use the exact agent name.\n\
                                          5. Create foundational design/spec tasks first, then implementation tasks.\n\
-                                         6. Use dependencies explicitly:\n\
+                                         6. If a foundational design/spec task is needed, assign it to an agent whose capability profile includes architecture/design/spec/interface/analysis when such a profile exists.\n\
+                                         7. Do not assign design/spec work to implementation agents solely because the task mentions API, backend, or frontend; choose the strongest capability profile.\n\
+                                         8. Use dependencies explicitly:\n\
                                             - depends_on: known task IDs\n\
                                             - depends_on_titles: task titles already created in this decomposition\n\
                                             - depends_on_agents: symbolic cross-agent dependencies (all_tasks/specific_task)\n\
-                                         7. Do NOT just describe tasks in text — you MUST invoke the `create_todo` tool.\n\n\
-                                         Start by creating the first task now.",
+                                         9. Do NOT create duplicate tasks with the same title and agent.\n\
+                                         10. Do NOT just describe tasks in text — you MUST invoke `create_todos` or `create_todo`.\n\
+                                         11. After creating the complete task chain, stop calling tools and reply exactly with: DECOMPOSITION_COMPLETE.\n\n\
+                                         Start by creating the complete task graph now.",
                                         description, agents_list, agents_profile_text
                                     );
-                                    run_planner_framework_call(
+                                    let decomposition_result = run_planner_framework_call(
                                         &state_for_consumer,
                                         &app_id_for_consumer,
                                         &plan_agent_name_for_loop,
@@ -690,6 +1187,156 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                         PlannerFrameworkCallKind::DecomposeGoal,
                                     )
                                     .await;
+                                    let goal_tasks = list_goal_todos_for_scope(
+                                        &state_for_consumer,
+                                        &app_id_for_consumer,
+                                        session_id.as_deref(),
+                                        goal_id,
+                                    )
+                                    .await;
+                                    match decomposition_result {
+                                        Ok(_) if !goal_tasks.is_empty() => {
+                                            mark_goal_decomposition_ready(
+                                                &state_for_consumer,
+                                                &app_id_for_consumer,
+                                                session_id.as_deref(),
+                                                goal_id,
+                                                goal_tasks.len(),
+                                            )
+                                            .await;
+                                        }
+                                        Ok(_) => {
+                                            let fallback_tasks = create_fallback_decomposition_tasks(
+                                                &state_for_consumer,
+                                                &app_id_for_consumer,
+                                                session_id.as_deref(),
+                                                goal_id,
+                                                &plan_agent_name_for_loop,
+                                                &description,
+                                                &worker_dossiers,
+                                                None,
+                                                "Planner decomposition returned without creating todos",
+                                            )
+                                            .await;
+                                            if fallback_tasks.is_empty() {
+                                                mark_goal_decomposition_failed(
+                                                    &state_for_consumer,
+                                                    &app_id_for_consumer,
+                                                    session_id.as_deref(),
+                                                    goal_id,
+                                                    "Planner decomposition returned without creating todos",
+                                                )
+                                                .await;
+                                            } else {
+                                                mark_goal_decomposition_ready(
+                                                    &state_for_consumer,
+                                                    &app_id_for_consumer,
+                                                    session_id.as_deref(),
+                                                    goal_id,
+                                                    fallback_tasks.len(),
+                                                )
+                                                .await;
+                                            }
+                                        }
+                                        Err(error) if !goal_tasks.is_empty() => {
+                                            let existing_agents = goal_tasks
+                                                .iter()
+                                                .map(|task| task.assigned_agent.clone())
+                                                .collect::<std::collections::HashSet<_>>();
+                                            let remaining_workers = worker_dossiers
+                                                .iter()
+                                                .filter(|worker| {
+                                                    !existing_agents.contains(&worker.name)
+                                                })
+                                                .cloned()
+                                                .collect::<Vec<_>>();
+                                            let fallback_tasks =
+                                                create_fallback_decomposition_tasks(
+                                                    &state_for_consumer,
+                                                    &app_id_for_consumer,
+                                                    session_id.as_deref(),
+                                                    goal_id,
+                                                    &plan_agent_name_for_loop,
+                                                    &description,
+                                                    &remaining_workers,
+                                                    terminal_goal_task(&goal_tasks),
+                                                    &error,
+                                                )
+                                                .await;
+                                            let total_tasks =
+                                                goal_tasks.len() + fallback_tasks.len();
+                                            tracing::warn!(
+                                                goal_id = %goal_id,
+                                                task_count = total_tasks,
+                                                error = %error,
+                                                "Planner decomposition failed after creating todos; allowing partial decomposition to proceed"
+                                            );
+                                            crate::run_trace::emit_for_scope(
+                                                &state_for_consumer.persist.run_tracer,
+                                                session_id.as_deref(),
+                                                &app_id_for_consumer,
+                                                "plan.goal_decomposition_partial_ready",
+                                                "plan_loop",
+                                                crate::run_trace::status::INFO,
+                                                Some(format!(
+                                                    "planner_error={}; tasks={}",
+                                                    error.chars().take(160).collect::<String>(),
+                                                    total_tasks
+                                                )),
+                                                None,
+                                                Some(goal_id.to_string()),
+                                                Some(serde_json::json!({
+                                                    "task_count": total_tasks,
+                                                    "planner_created_tasks": goal_tasks.len(),
+                                                    "fallback_added_tasks": fallback_tasks.len(),
+                                                    "planner_error": error,
+                                                })),
+                                            )
+                                            .await;
+                                            mark_goal_decomposition_ready(
+                                                &state_for_consumer,
+                                                &app_id_for_consumer,
+                                                session_id.as_deref(),
+                                                goal_id,
+                                                total_tasks,
+                                            )
+                                            .await;
+                                        }
+                                        Err(error) => {
+                                            let fallback_tasks =
+                                                create_fallback_decomposition_tasks(
+                                                    &state_for_consumer,
+                                                    &app_id_for_consumer,
+                                                    session_id.as_deref(),
+                                                    goal_id,
+                                                    &plan_agent_name_for_loop,
+                                                    &description,
+                                                    &worker_dossiers,
+                                                    None,
+                                                    &error,
+                                                )
+                                                .await;
+                                            if fallback_tasks.is_empty() {
+                                                mark_goal_decomposition_failed(
+                                                    &state_for_consumer,
+                                                    &app_id_for_consumer,
+                                                    session_id.as_deref(),
+                                                    goal_id,
+                                                    &error,
+                                                )
+                                                .await;
+                                            } else {
+                                                mark_goal_decomposition_ready(
+                                                    &state_for_consumer,
+                                                    &app_id_for_consumer,
+                                                    session_id.as_deref(),
+                                                    goal_id,
+                                                    fallback_tasks.len(),
+                                                )
+                                                .await;
+                                            }
+                                        }
+                                    }
                                     crate::run_trace::emit_for_scope(
                                         &state_for_consumer.persist.run_tracer,
                                         session_id.as_deref(),
@@ -703,8 +1350,6 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                         None,
                                     )
                                     .await;
-                                    // Note: don't wake workers here — planner hasn't created tasks yet.
-                                    // Workers will be woken when tasks actually appear on their boards.
                                 }
                                 // Emit SSE decision event
                                 let msg = format!(
@@ -772,7 +1417,7 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                          Verify the work meets the criteria. Use review_todo with passed=true/false and feedback.",
                                         task_id, agent, title, summary, criteria
                                     );
-                                    run_planner_framework_call(
+                                    let _ = run_planner_framework_call(
                                         &state_for_consumer,
                                         &app_id_for_consumer,
                                         &plan_agent_name_for_loop,
@@ -948,19 +1593,30 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                     })),
                                 )
                                 .await;
-                                let evaluator = macaca_task::GoalEvaluator::new(
-                                    Arc::clone(&state_for_consumer.llm),
-                                    state_for_consumer.config.default_model.clone(),
+                                let evaluation_prompt = macaca_task::GoalEvaluator::build_prompt(
+                                    &goal_description,
+                                    &task_summaries,
+                                    completed_count,
+                                    failed_count,
                                 );
-                                match evaluator
-                                    .evaluate(
-                                        &goal_description,
-                                        &task_summaries,
-                                        completed_count,
-                                        failed_count,
-                                    )
-                                    .await
-                                {
+                                let evaluation_result = run_planner_framework_call(
+                                    &state_for_consumer,
+                                    &app_id_for_consumer,
+                                    &plan_agent_name_for_loop,
+                                    session_id.clone(),
+                                    goal_id,
+                                    evaluation_prompt,
+                                    format!(
+                                        "Evaluating goal completion: {}",
+                                        goal_description.chars().take(80).collect::<String>()
+                                    ),
+                                    PlannerFrameworkCallKind::GoalEvaluation,
+                                )
+                                .await
+                                .map(|reply| {
+                                    macaca_task::GoalEvaluator::parse_eval_response(&reply)
+                                });
+                                match evaluation_result {
                                     Ok(macaca_task::GoalEvaluation::Satisfied { summary }) => {
                                         tracing::info!(goal_id = %goal_id, summary = %summary, "Goal satisfied");
                                         let space = macaca_task::TaskSpace::new(
@@ -1026,7 +1682,7 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                                 goal_description, reason,
                                                 suggestions.iter().map(|s| format!("- {}", s)).collect::<Vec<_>>().join("\n")
                                             );
-                                            run_planner_framework_call(
+                                            let _ = run_planner_framework_call(
                                                 &state_for_consumer,
                                                 &app_id_for_consumer,
                                                 &plan_agent_name_for_loop,
@@ -1727,9 +2383,9 @@ pub(crate) async fn create_goal(
 mod tests {
     use super::{
         executor_task_completed, executor_task_failed, executor_task_started,
-        mark_decomposition_in_notebook, mark_review_in_notebook, planner_scope_session_id,
-        select_entry_and_plan_agents, worker_success_summary, PlannerFrameworkBuilder,
-        PlannerFrameworkCallKind, WorkerExecutionMode,
+        goal_has_decomposed_tasks, mark_decomposition_in_notebook, mark_review_in_notebook,
+        planner_scope_session_id, select_entry_and_plan_agents, worker_success_summary,
+        PlannerFrameworkBuilder, PlannerFrameworkCallKind, WorkerExecutionMode,
     };
     use macaca_framework::plan::{PlanNotebook, PlanState, SubTaskState};
     use macaca_kernel::executor::ExecutorEvent;
@@ -1781,6 +2437,27 @@ mod tests {
             planner_scope_session_id(&app_id, None),
             format!("_macaca_app_{}", app_id.0)
         );
+    }
+
+    #[test]
+    fn goal_has_decomposed_tasks_detects_existing_parent_task() {
+        let app_id = macaca_proto::ApplicationId::from_name("demo-app");
+        let goal_id = macaca_proto::TaskId::new();
+        let other_goal_id = macaca_proto::TaskId::new();
+        let mut task = macaca_proto::TodoItem::new(
+            app_id,
+            Some("session-123".into()),
+            "architect",
+            "planner",
+            "Design architecture",
+            "Define architecture and API contracts",
+            9,
+        );
+        task.parent_task = Some(goal_id);
+
+        assert!(goal_has_decomposed_tasks(&[task.clone()], goal_id));
+        assert!(!goal_has_decomposed_tasks(&[task], other_goal_id));
+        assert!(!goal_has_decomposed_tasks(&[], goal_id));
     }
 
     #[test]
@@ -1927,7 +2604,7 @@ mod tests {
 
         assert_eq!(
             PlannerFrameworkCallKind::DecomposeGoal.builder(),
-            PlannerFrameworkBuilder::TracedWithGoal
+            PlannerFrameworkBuilder::Decomposition
         );
         assert_eq!(
             PlannerFrameworkCallKind::DecomposeGoal.goal_context(goal_id),
@@ -1939,6 +2616,14 @@ mod tests {
         );
         assert_eq!(
             PlannerFrameworkCallKind::FollowUp.goal_context(goal_id),
+            Some(goal_id)
+        );
+        assert_eq!(
+            PlannerFrameworkCallKind::GoalEvaluation.builder(),
+            PlannerFrameworkBuilder::TracedWithGoal
+        );
+        assert_eq!(
+            PlannerFrameworkCallKind::GoalEvaluation.goal_context(goal_id),
             Some(goal_id)
         );
     }
@@ -2003,6 +2688,22 @@ mod tests {
         assert_eq!(
             PlannerFrameworkCallKind::FollowUp.missing_executor_log(),
             "No executor found for planner follow-up"
+        );
+        assert_eq!(
+            PlannerFrameworkCallKind::GoalEvaluation.success_log_prefix(),
+            "Goal evaluation completed"
+        );
+        assert_eq!(
+            PlannerFrameworkCallKind::GoalEvaluation.reply_error_log_prefix(),
+            "Goal evaluation failed"
+        );
+        assert_eq!(
+            PlannerFrameworkCallKind::GoalEvaluation.build_error_log_prefix(),
+            "Failed to build planner agent for goal evaluation"
+        );
+        assert_eq!(
+            PlannerFrameworkCallKind::GoalEvaluation.missing_executor_log(),
+            "No executor found for planner goal evaluation"
         );
     }
 

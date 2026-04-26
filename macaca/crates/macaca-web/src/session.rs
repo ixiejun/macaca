@@ -865,11 +865,16 @@ pub(crate) async fn get_session_by_id(
                 | "delegated_assistant"
                 | "delegated_cc_trace"
                 | "delegated_done" => {
-                    if agent.is_empty() {
+                    let resolved_agent = if !agent.is_empty() {
+                        agent.clone()
+                    } else {
+                        task_to_agent.get(&task_id).cloned().unwrap_or_default()
+                    };
+                    if resolved_agent.is_empty() || task_id.is_empty() {
                         continue;
                     }
-                    if let Some(traces) = agent_traces.get_mut(&agent) {
-                        if let Some(trace) = traces.last_mut() {
+                    if let Some(traces) = agent_traces.get_mut(&resolved_agent) {
+                        if let Some(trace) = traces.iter_mut().rfind(|t| t.task_id == task_id) {
                             let step_type = event
                                 .event_type
                                 .strip_prefix("delegated_")

@@ -11,7 +11,7 @@
 use std::convert::Infallible;
 use std::sync::Arc;
 
-use axum::extract::State;
+use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::Json;
@@ -40,14 +40,24 @@ pub(crate) fn default_model() -> String {
     String::new()
 }
 
-async fn app_has_active_session(state: &Arc<AppState>, app_id: &ApplicationId) -> bool {
-    state
-        .sessions
-        .active_sessions
-        .read()
-        .await
-        .values()
-        .any(|session| session.app_id == *app_id)
+#[derive(Debug, Deserialize, Default)]
+pub struct AgentStatusQuery {
+    pub session_id: Option<String>,
+}
+
+async fn app_has_active_session(
+    state: &Arc<AppState>,
+    app_id: &ApplicationId,
+    session_id: Option<&str>,
+) -> bool {
+    let sessions = state.sessions.active_sessions.read().await;
+    if let Some(session_id) = session_id.filter(|id| !id.is_empty()) {
+        return sessions
+            .get(session_id)
+            .is_some_and(|session| session.app_id == *app_id);
+    }
+
+    sessions.values().any(|session| session.app_id == *app_id)
 }
 
 async fn app_entry_agent_name(state: &Arc<AppState>, app_id: &ApplicationId) -> Option<String> {
@@ -260,6 +270,7 @@ impl From<macaca_proto::AgentActivity> for AgentActivityInfo {
 pub async fn get_app_agents(
     State(state): State<Arc<AppState>>,
     axum::extract::Path(app_id): axum::extract::Path<String>,
+    Query(query): Query<AgentStatusQuery>,
 ) -> Result<Json<Vec<AgentInfo>>, (StatusCode, Json<ErrorResponse>)> {
     let app_uuid: uuid::Uuid = app_id.parse().map_err(|_| {
         (
@@ -290,7 +301,8 @@ pub async fn get_app_agents(
         .into_iter()
         .map(|s| (s.agent_id.0.to_string(), s))
         .collect();
-    let has_active_session = app_has_active_session(&state, &app_id).await;
+    let has_active_session =
+        app_has_active_session(&state, &app_id, query.session_id.as_deref()).await;
     let entry_agent_name = app_entry_agent_name(&state, &app_id).await;
 
     let agents: Vec<AgentInfo> = manifests
@@ -341,9 +353,11 @@ pub struct SimpleAgentStatus {
 pub async fn stream_agent_status(
     State(state): State<Arc<AppState>>,
     axum::extract::Path(app_id): axum::extract::Path<String>,
+    Query(query): Query<AgentStatusQuery>,
 ) -> Sse<impl futures::stream::Stream<Item = Result<Event, Infallible>>> {
     let app_uuid_result: Result<uuid::Uuid, _> = app_id.parse();
     let state_clone = Arc::clone(&state);
+    let scoped_session_id = query.session_id.filter(|id| !id.is_empty());
 
     let stream = async_stream::stream! {
         // Handle parse error inside the stream
@@ -375,7 +389,8 @@ pub async fn stream_agent_status(
                 .into_iter()
                 .map(|s| (s.agent_id.0.to_string(), s))
                 .collect();
-            let has_active_session = app_has_active_session(&state_clone, &app_id).await;
+            let has_active_session =
+                app_has_active_session(&state_clone, &app_id, scoped_session_id.as_deref()).await;
             let entry_agent_name = app_entry_agent_name(&state_clone, &app_id).await;
 
             // Build simplified status

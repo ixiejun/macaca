@@ -1,0 +1,151 @@
+name: newsroom-autowriter
+version: "0.1.0"
+description: "Newsroom AutoWriter - multi-agent research, fact-checking, analysis, drafting, editing, and packaging for long-form news analysis"
+layer: L3Declarative
+ui_type: chat
+
+llm_config:
+  provider: deepseek
+  model: deepseek-v4-flash
+
+entry_agent: news_coordinator
+entrypoint:
+  type: workflow
+  name: editorial-router
+
+workflows:
+  editorial-router:
+    description: Intake user editorial requests and submit substantial writing assignments as goals.
+    steps:
+      - name: intake
+        agent: news_coordinator
+        prompt_template: workflows/intake.md
+
+  chat:
+    description: General editorial conversation.
+    steps:
+      - name: respond
+        agent: news_coordinator
+        prompt_template: workflows/chat.md
+
+resources:
+  personas: personas/
+  skills: skills/
+  prompts: prompts/
+  workflows: workflows/
+
+agents:
+  - name: news_coordinator
+    capabilities:
+      - name: todo_goal_management
+        description: Convert user editorial requests into durable newsroom goals and report final progress.
+      - name: editorial_intake
+        description: Clarify audience, angle, length, language, and deadline before work begins.
+      - name: conversation
+        description: Explain newsroom progress and summarize results for the user.
+    prompt_template: ""
+    model: deepseek-v4-flash
+    permission_level: system
+    allowed_tools:
+      - file_read
+      - file_write
+    persona_dir: "./personas/news_coordinator"
+
+  - name: news_planner
+    capabilities:
+      - name: todo_planning
+        description: Decompose editorial goals into ordered newsroom tasks and review submissions.
+      - name: task_planning
+        description: Assign work by agent capability, set dependencies, and prevent premature drafting.
+      - name: editorial_workflow_design
+        description: Create research-first plans for news analysis, explainers, and long-form articles.
+    prompt_template: ""
+    model: deepseek-v4-flash
+    permission_level: system
+    allowed_tools:
+      - file_read
+      - file_write
+    persona_dir: "./personas/news_planner"
+
+  - name: news_researcher
+    capabilities:
+      - name: todo_execution
+        description: Execute assigned TaskBoard todos and submit review summaries.
+      - name: web_research
+        description: Search the web, inspect pages, collect sources, and produce source notes.
+      - name: source_triage
+        description: Separate primary sources, reputable reporting, analysis, and weak claims.
+    prompt_template: ""
+    model: deepseek-v4-flash
+    permission_level: user
+    allowed_tools:
+      - playwright_search
+      - file_read
+      - file_write
+    persona_dir: "./personas/news_researcher"
+
+  - name: news_fact_checker
+    capabilities:
+      - name: todo_execution
+        description: Execute assigned TaskBoard todos and submit review summaries.
+      - name: fact_checking
+        description: Verify claims, dates, names, quotes, causal language, and uncertainty.
+      - name: source_validation
+        description: Cross-check source quality and flag unsupported or speculative claims.
+    prompt_template: ""
+    model: deepseek-v4-flash
+    permission_level: user
+    allowed_tools:
+      - playwright_search
+      - file_read
+      - file_write
+    persona_dir: "./personas/news_fact_checker"
+
+  - name: news_analyst
+    capabilities:
+      - name: todo_execution
+        description: Execute assigned TaskBoard todos and submit review summaries.
+      - name: news_analysis
+        description: Build the thesis, implications, counterarguments, and narrative structure.
+      - name: technology_policy_analysis
+        description: Analyze AI products, companies, strategy, market impact, and policy risks.
+    prompt_template: ""
+    model: deepseek-v4-flash
+    permission_level: user
+    allowed_tools:
+      - file_read
+      - file_write
+      - playwright_search
+    persona_dir: "./personas/news_analyst"
+
+  - name: news_writer
+    capabilities:
+      - name: todo_execution
+        description: Execute assigned TaskBoard todos and submit review summaries.
+      - name: longform_writing
+        description: Draft clear, structured, source-aware long-form analysis articles.
+      - name: markdown_drafting
+        description: Produce clean Markdown with headings, bullets, callouts, and citations.
+    prompt_template: ""
+    model: deepseek-v4-flash
+    permission_level: user
+    allowed_tools:
+      - file_read
+      - file_write
+    persona_dir: "./personas/news_writer"
+
+  - name: news_editor
+    capabilities:
+      - name: todo_execution
+        description: Execute assigned TaskBoard todos and submit review summaries.
+      - name: editorial_review
+        description: Edit for clarity, accuracy, tone, structure, and reader value.
+      - name: publication_packaging
+        description: Produce headline options, deck, SEO summary, social posts, and final checklist.
+    prompt_template: ""
+    model: deepseek-v4-flash
+    permission_level: user
+    allowed_tools:
+      - file_read
+      - file_write
+    persona_dir: "./personas/news_editor"

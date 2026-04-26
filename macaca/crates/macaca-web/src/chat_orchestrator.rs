@@ -14,6 +14,7 @@ use chrono::Utc;
 use serde::Deserialize;
 use tokio::sync::RwLock;
 
+use macaca_app::AppLoader;
 use macaca_framework::execution::ExecutionContext;
 use macaca_framework::session::{load_module_state, save_module_state};
 use macaca_kernel::AgentInfo;
@@ -148,19 +149,29 @@ async fn ensure_app_executor(state: &Arc<AppState>, app_id: &ApplicationId) {
         return;
     }
 
-    let app_name = {
+    let (app_name, app_agent_names) = {
         let registry = state.registry.read().await;
-        registry
-            .get_app(app_id)
-            .map(|app| app.name.clone())
-            .unwrap_or_else(|| app_id.0.to_string())
+        if let Some(app) = registry.get_app(app_id).cloned() {
+            let names = AppLoader::resolve_agent_configs(&app.manifest, &app.path)
+                .map(|configs| configs.into_iter().map(|config| config.name).collect())
+                .unwrap_or_else(|error| {
+                    tracing::warn!(
+                        app_id = %app_id,
+                        error = %error,
+                        "Failed to resolve app agent names while ensuring executor"
+                    );
+                    Vec::new()
+                });
+            (app.name, names)
+        } else {
+            (app_id.0.to_string(), Vec::new())
+        }
     };
 
-    let app_agents: Vec<AgentInfo> = state
-        .kernel
-        .list_agents()
-        .await
+    let all_agents = state.kernel.list_agents().await;
+    let app_agents: Vec<AgentInfo> = all_agents
         .into_iter()
+        .filter(|agent| app_agent_names.is_empty() || app_agent_names.contains(&agent.name))
         .map(|agent| AgentInfo {
             id: agent.id.0.to_string(),
             name: agent.name,
@@ -170,6 +181,12 @@ async fn ensure_app_executor(state: &Arc<AppState>, app_id: &ApplicationId) {
             available: true,
         })
         .collect();
+    if app_agents.is_empty() {
+        tracing::warn!(
+            app_id = %app_id,
+            "No app-scoped agents resolved while ensuring executor"
+        );
+    }
 
     let _ = state
         .executor_registry

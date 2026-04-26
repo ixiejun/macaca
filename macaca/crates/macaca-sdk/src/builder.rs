@@ -201,6 +201,7 @@ mod tests {
         ) -> MacacaResult<LlmResponse> {
             Ok(LlmResponse {
                 content: format!("response for: {}", messages[0].content),
+                reasoning_content: None,
                 model: "mock".into(),
                 usage: TokenUsage {
                     prompt_tokens: 10,

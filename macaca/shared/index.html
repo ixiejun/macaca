@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Weather Dashboard</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #f0f4f8;
+      color: #334155;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      max-width: 640px;
+      width: 100%;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.5rem;
+    }
+
+    header h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #1e293b;
+    }
+
+    #refresh-button {
+      padding: 0.5rem 1rem;
+      border: 1px solid #cbd5e1;
+      border-radius: 0.375rem;
+      background: #fff;
+      color: #334155;
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    #refresh-button:hover {
+      background: #f8fafc;
+      border-color: #94a3b8;
+    }
+
+    /* Loading indicator */
+    #loading-indicator {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      color: #64748b;
+      font-size: 0.95rem;
+    }
+
+    /* Error message */
+    #error-message {
+      display: none;
+      padding: 0.875rem 1rem;
+      background: #fef2f2;
+      color: #991b1b;
+      border: 1px solid #fecaca;
+      border-radius: 0.375rem;
+      font-size: 0.875rem;
+      margin-bottom: 1.5rem;
+    }
+
+    /* Current weather (populated by weather.js) */
+    #current-weather-section {
+      margin-bottom: 1.5rem;
+    }
+
+    .weather-current {
+      background: #fff;
+      border-radius: 0.5rem;
+      padding: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+      text-align: center;
+    }
+
+    .weather-current h2 {
+      font-size: 1.125rem;
+      color: #475569;
+      margin-bottom: 0.5rem;
+    }
+
+    .weather-temp {
+      font-size: 3rem;
+      font-weight: 700;
+      color: #0f172a;
+      line-height: 1.2;
+    }
+
+    .weather-desc {
+      font-size: 1rem;
+      color: #64748b;
+      margin: 0.5rem 0;
+      text-transform: capitalize;
+    }
+
+    .weather-details {
+      display: flex;
+      justify-content: center;
+      gap: 1.5rem;
+      margin-top: 0.75rem;
+      font-size: 0.875rem;
+      color: #64748b;
+    }
+
+    /* Forecast section (populated by weather.js) */
+    #forecast-section {
+      margin-bottom: 1.5rem;
+    }
+
+    .forecast-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 0.75rem;
+    }
+
+    .forecast-card {
+      background: #fff;
+      border-radius: 0.5rem;
+      padding: 1rem;
+      text-align: center;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    }
+
+    .forecast-date {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #475569;
+      margin-bottom: 0.5rem;
+    }
+
+    .forecast-temps {
+      display: flex;
+      justify-content: center;
+      gap: 0.5rem;
+      font-size: 0.95rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .temp-high {
+      font-weight: 600;
+      color: #0f172a;
+    }
+
+    .temp-low {
+      color: #94a3b8;
+    }
+
+    .forecast-desc {
+      font-size: 0.75rem;
+      color: #64748b;
+      text-transform: capitalize;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Weather Dashboard</h1>
+      <button id="refresh-button">Refresh</button>
+    </header>
+
+    <!--
+      IMPORTANT: This page must be served from the same origin as the API.
+      weather.js fetches from /api/weather/current and /api/weather/forecast,
+      so the HTML must be served by the same server that handles those routes.
+      Opening this file directly via file:// will not work.
+    -->
+
+    <div id="loading-indicator">Loading weather data...</div>
+    <div id="error-message"></div>
+    <div id="current-weather-section"></div>
+    <div id="forecast-section"></div>
+  </div>
+
+  <!-- weather.js expects the five elements above: loading-indicator,
+       error-message, current-weather-section, forecast-section, refresh-button -->
+  <script src="weather.js"></script>
+</body>
+</html>

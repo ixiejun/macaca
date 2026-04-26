@@ -843,6 +843,7 @@ mod tests {
                 // First call: request a tool call
                 Ok(LlmResponse {
                     content: String::new(),
+                    reasoning_content: None,
                     model: "mock".into(),
                     usage: TokenUsage {
                         prompt_tokens: 10,
@@ -860,6 +861,7 @@ mod tests {
                 // Second call: final response
                 Ok(LlmResponse {
                     content: "Done! The command output was: hello".into(),
+                    reasoning_content: None,
                     model: "mock".into(),
                     usage: TokenUsage {
                         prompt_tokens: 20,
@@ -890,6 +892,7 @@ mod tests {
         ) -> MacacaResult<LlmResponse> {
             Ok(LlmResponse {
                 content: "thinking...".into(),
+                reasoning_content: None,
                 model: "mock".into(),
                 usage: TokenUsage {
                     prompt_tokens: 5,
@@ -923,6 +926,7 @@ mod tests {
         ) -> MacacaResult<LlmResponse> {
             Ok(LlmResponse {
                 content: "Direct answer: 42".into(),
+                reasoning_content: None,
                 model: "mock".into(),
                 usage: TokenUsage {
                     prompt_tokens: 10,
@@ -1107,6 +1111,7 @@ mod tests {
                 if !has_tool_result {
                     Ok(LlmResponse {
                         content: String::new(),
+                        reasoning_content: None,
                         model: "mock".into(),
                         usage: TokenUsage::default(),
                         finish_reason: "tool_calls".into(),
@@ -1119,6 +1124,7 @@ mod tests {
                 } else {
                     Ok(LlmResponse {
                         content: "Tool not found, giving up.".into(),
+                        reasoning_content: None,
                         model: "mock".into(),
                         usage: TokenUsage::default(),
                         finish_reason: "stop".into(),

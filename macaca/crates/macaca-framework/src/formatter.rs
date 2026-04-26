@@ -13,7 +13,8 @@ use serde_json::{json, Value};
 use tracing::warn;
 
 use crate::message::{
-    ContentBlock, ImageBlock, Msg, MsgContent, Role, TextBlock, ToolResultBlock, ToolUseBlock,
+    ContentBlock, ImageBlock, Msg, MsgContent, Role, TextBlock, ThinkingBlock, ToolResultBlock,
+    ToolUseBlock,
 };
 use crate::model::{ChatResponse, ChatUsage};
 
@@ -167,6 +168,16 @@ fn parse_openai_response(raw: Value) -> Result<ChatResponse, FormatterError> {
     let mut content_blocks: Vec<ContentBlock> = Vec::new();
 
     // Text content
+    if let Some(reasoning_content) = choice_msg
+        .get("reasoning_content")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+    {
+        content_blocks.push(ContentBlock::Thinking(ThinkingBlock {
+            thinking: reasoning_content.to_string(),
+        }));
+    }
+
     if let Some(text) = choice_msg.get("content").and_then(|v| v.as_str()) {
         if !text.is_empty() {
             content_blocks.push(ContentBlock::Text(TextBlock {
@@ -250,6 +261,19 @@ fn format_openai_msg(msg: &Msg) -> Value {
             json!({"role": role_str, "content": text})
         }
         MsgContent::Blocks(blocks) => {
+            let reasoning_content = if msg.role == Role::Assistant {
+                blocks
+                    .iter()
+                    .filter_map(|b| match b {
+                        ContentBlock::Thinking(t) => Some(t.thinking.as_str()),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+                    .join("")
+            } else {
+                String::new()
+            };
+
             // Tool results → OpenAI tool messages
             let tool_results = extract_tool_result_blocks(blocks);
             if !tool_results.is_empty() {
@@ -290,16 +314,24 @@ fn format_openai_msg(msg: &Msg) -> Value {
                     .collect::<Vec<_>>()
                     .join("");
 
-                return json!({
+                let mut message = json!({
                     "role": "assistant",
                     "content": if text_content.is_empty() { Value::Null } else { Value::String(text_content) },
                     "tool_calls": tool_calls,
                 });
+                if !reasoning_content.is_empty() {
+                    message["reasoning_content"] = Value::String(reasoning_content);
+                }
+                return message;
             }
 
             // Regular content (text + images)
             let content = blocks_to_openai_content(blocks);
-            json!({"role": role_str, "content": content})
+            let mut message = json!({"role": role_str, "content": content});
+            if !reasoning_content.is_empty() {
+                message["reasoning_content"] = Value::String(reasoning_content);
+            }
+            message
         }
     }
 }
@@ -705,6 +737,39 @@ mod tests {
         let result = fmt.format(&[msg]);
         // content should only contain "visible"
         assert_eq!(result[0]["content"], "visible");
+    }
+
+    #[test]
+    fn test_openai_assistant_reasoning_content_roundtrip() {
+        let blocks = vec![
+            ContentBlock::Thinking(ThinkingBlock {
+                thinking: "reasoning".into(),
+            }),
+            ContentBlock::Text(TextBlock {
+                text: "answer".into(),
+            }),
+        ];
+        let msg = Msg::assistant("bot", MsgContent::Blocks(blocks));
+        let fmt = OpenAiFormatter;
+        let formatted = fmt.format(&[msg]);
+        assert_eq!(formatted[0]["reasoning_content"], "reasoning");
+        assert_eq!(formatted[0]["content"], "answer");
+
+        let parsed = fmt
+            .parse_response(json!({
+                "id": "chatcmpl-1",
+                "created": 1,
+                "choices": [{
+                    "message": {
+                        "role": "assistant",
+                        "reasoning_content": "reasoning",
+                        "content": "answer"
+                    }
+                }]
+            }))
+            .unwrap();
+        assert_eq!(parsed.get_thinking()[0].thinking, "reasoning");
+        assert_eq!(parsed.get_text(), "answer");
     }
 
     #[test]

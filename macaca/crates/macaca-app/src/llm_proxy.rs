@@ -110,6 +110,7 @@ mod tests {
             // Echo back which model was requested so tests can verify resolution.
             Ok(LlmResponse {
                 content: format!("model={}", options.model),
+                reasoning_content: None,
                 model: options.model.clone(),
                 usage: TokenUsage::default(),
                 finish_reason: "stop".into(),

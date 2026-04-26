@@ -649,6 +649,9 @@ pub struct ToolDefinition {
 pub struct LlmMessage {
     pub role: LlmRole,
     pub content: String,
+    /// Provider-specific reasoning content returned by thinking models.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning_content: Option<String>,
     /// Tool calls requested by the assistant (present when role=Assistant).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Vec<ToolCall>>,
@@ -663,6 +666,7 @@ impl LlmMessage {
         Self {
             role: LlmRole::System,
             content: content.into(),
+            reasoning_content: None,
             tool_calls: None,
             tool_call_id: None,
         }
@@ -673,6 +677,7 @@ impl LlmMessage {
         Self {
             role: LlmRole::User,
             content: content.into(),
+            reasoning_content: None,
             tool_calls: None,
             tool_call_id: None,
         }
@@ -683,6 +688,21 @@ impl LlmMessage {
         Self {
             role: LlmRole::Assistant,
             content: content.into(),
+            reasoning_content: None,
+            tool_calls: None,
+            tool_call_id: None,
+        }
+    }
+
+    /// Create an assistant message with provider-specific reasoning content.
+    pub fn assistant_with_reasoning(
+        content: impl Into<String>,
+        reasoning_content: impl Into<String>,
+    ) -> Self {
+        Self {
+            role: LlmRole::Assistant,
+            content: content.into(),
+            reasoning_content: Some(reasoning_content.into()),
             tool_calls: None,
             tool_call_id: None,
         }
@@ -696,6 +716,7 @@ impl LlmMessage {
         Self {
             role: LlmRole::Assistant,
             content: content.into(),
+            reasoning_content: None,
             tool_calls: Some(tool_calls),
             tool_call_id: None,
         }
@@ -706,6 +727,7 @@ impl LlmMessage {
         Self {
             role: LlmRole::Tool,
             content: content.into(),
+            reasoning_content: None,
             tool_calls: None,
             tool_call_id: Some(tool_call_id.into()),
         }
@@ -738,6 +760,9 @@ impl Default for LlmOptions {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LlmResponse {
     pub content: String,
+    /// Provider-specific reasoning content returned by thinking models.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning_content: Option<String>,
     pub model: String,
     pub usage: TokenUsage,
     pub finish_reason: String,
@@ -1108,6 +1133,7 @@ mod tests {
     fn llm_response_with_tool_calls() {
         let resp = LlmResponse {
             content: String::new(),
+            reasoning_content: None,
             model: "gpt-4".into(),
             usage: TokenUsage {
                 prompt_tokens: 10,

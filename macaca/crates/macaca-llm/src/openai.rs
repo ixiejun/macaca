@@ -245,6 +245,7 @@ impl LlmProvider for OpenAiProvider {
 
         Ok(LlmResponse {
             content,
+            reasoning_content: None,
             model: resp.model,
             usage: TokenUsage {
                 prompt_tokens: resp.usage.prompt_tokens,

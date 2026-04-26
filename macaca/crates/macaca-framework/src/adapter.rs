@@ -8,7 +8,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use macaca_llm::LlmProvider;
 
-use crate::message::{ContentBlock, TextBlock, ToolUseBlock};
+use crate::message::{ContentBlock, TextBlock, ThinkingBlock, ToolUseBlock};
 use crate::model::{ChatModel, ChatOptions, ChatResponse, ChatUsage, ModelError};
 use crate::tool::{ToolError, ToolHandler, ToolResponse, Toolkit};
 
@@ -65,6 +65,14 @@ impl ChatModel for LlmProviderAdapter {
 
         // Build content blocks from response
         let mut content_blocks = Vec::new();
+
+        if let Some(ref reasoning_content) = response.reasoning_content {
+            if !reasoning_content.is_empty() {
+                content_blocks.push(ContentBlock::Thinking(ThinkingBlock {
+                    thinking: reasoning_content.clone(),
+                }));
+            }
+        }
 
         if !response.content.is_empty() {
             content_blocks.push(ContentBlock::Text(TextBlock {
@@ -172,6 +180,14 @@ impl ChatModel for RoutedLlmAdapter {
 
         let mut content_blocks = Vec::new();
 
+        if let Some(ref reasoning_content) = response.reasoning_content {
+            if !reasoning_content.is_empty() {
+                content_blocks.push(ContentBlock::Thinking(ThinkingBlock {
+                    thinking: reasoning_content.clone(),
+                }));
+            }
+        }
+
         if !response.content.is_empty() {
             content_blocks.push(ContentBlock::Text(TextBlock {
                 text: response.content.clone(),
@@ -215,6 +231,10 @@ fn messages_from_json(messages: &[serde_json::Value]) -> Vec<macaca_proto::LlmMe
         .filter_map(|msg| {
             let role_str = msg["role"].as_str()?;
             let content = msg["content"].as_str().unwrap_or("").to_string();
+            let reasoning_content = msg["reasoning_content"]
+                .as_str()
+                .filter(|s| !s.is_empty())
+                .map(str::to_string);
 
             match role_str {
                 "system" => Some(macaca_proto::LlmMessage::system(content)),
@@ -245,14 +265,19 @@ fn messages_from_json(messages: &[serde_json::Value]) -> Vec<macaca_proto::LlmMe
                             })
                             .collect();
                         if tcs.is_empty() {
-                            Some(macaca_proto::LlmMessage::assistant(content))
+                            let mut message = macaca_proto::LlmMessage::assistant(content);
+                            message.reasoning_content = reasoning_content;
+                            Some(message)
                         } else {
-                            Some(macaca_proto::LlmMessage::assistant_with_tool_calls(
-                                content, tcs,
-                            ))
+                            let mut message =
+                                macaca_proto::LlmMessage::assistant_with_tool_calls(content, tcs);
+                            message.reasoning_content = reasoning_content;
+                            Some(message)
                         }
                     } else {
-                        Some(macaca_proto::LlmMessage::assistant(content))
+                        let mut message = macaca_proto::LlmMessage::assistant(content);
+                        message.reasoning_content = reasoning_content;
+                        Some(message)
                     }
                 }
                 "tool" => {

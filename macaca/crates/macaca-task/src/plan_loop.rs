@@ -3,10 +3,10 @@
 //! Continuously: process goals → review completed tasks → schedule new work.
 //! Runs as a background tokio task, tied to the application's lifetime.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use tracing::{info, warn};
 
@@ -100,9 +100,7 @@ impl PlanLoop {
         info!("Plan loop started");
         let mut last_failed_count: usize = 0;
         let mut review_emitted: HashSet<macaca_proto::TaskId> = HashSet::new();
-        let mut goal_retry_emitted: HashSet<macaca_proto::TaskId> = HashSet::new();
         let mut goal_eval_emitted: HashSet<macaca_proto::TaskId> = HashSet::new();
-        let mut goal_decomposing_since: HashMap<macaca_proto::TaskId, Instant> = HashMap::new();
 
         loop {
             // Wait for either: heartbeat timeout OR immediate wakeup notification
@@ -120,7 +118,6 @@ impl PlanLoop {
             // 1. Check for new goals
             if let Some(goal) = self.space.pop_goal().await {
                 info!(goal_id = %goal.id, "New goal found, requesting decomposition");
-                goal_decomposing_since.insert(goal.id, Instant::now());
                 let _ = event_tx
                     .send(PlanEvent::GoalReady {
                         goal_id: goal.id,
@@ -128,64 +125,6 @@ impl PlanLoop {
                         session_id: goal.session_id,
                     })
                     .await;
-            }
-
-            // 1b. Decomposing goals: transition to InProgress when tasks appear, or retry if still empty
-            {
-                let goals = self.space.list_goals().await;
-                let all_todos = self.space.list_all().await;
-                // Clean up: remove goals that now have tasks or left Decomposing state
-                goal_retry_emitted.retain(|id| {
-                    goals.iter().any(|g| {
-                        g.id == *id
-                            && g.status == TodoGoalStatus::Decomposing
-                            && !all_todos.iter().any(|t| t.parent_task == Some(*id))
-                    })
-                });
-                goal_decomposing_since.retain(|id, _| {
-                    goals
-                        .iter()
-                        .any(|g| g.id == *id && g.status == TodoGoalStatus::Decomposing)
-                });
-                for goal in &goals {
-                    if goal.status == TodoGoalStatus::Decomposing {
-                        let has_tasks = all_todos.iter().any(|t| t.parent_task == Some(goal.id));
-                        if has_tasks {
-                            // Decomposition succeeded — transition to InProgress
-                            info!(
-                                goal_id = %goal.id,
-                                "Goal decomposition complete, transitioning Decomposing → InProgress"
-                            );
-                            self.space
-                                .store()
-                                .update_goal_status(
-                                    &goal.application_id,
-                                    &goal.id,
-                                    TodoGoalStatus::InProgress,
-                                )
-                                .await;
-                            goal_decomposing_since.remove(&goal.id);
-                        } else if !goal_retry_emitted.contains(&goal.id) {
-                            let started_at = goal_decomposing_since
-                                .entry(goal.id)
-                                .or_insert_with(Instant::now);
-                            if started_at.elapsed() < Duration::from_secs(60) {
-                                continue;
-                            }
-                            // Decomposition failed (no tasks created) — retry once
-                            warn!(goal_id = %goal.id, "Decomposing goal has no tasks, re-emitting GoalReady for retry");
-                            goal_retry_emitted.insert(goal.id);
-                            goal_decomposing_since.insert(goal.id, Instant::now());
-                            let _ = event_tx
-                                .send(PlanEvent::GoalReady {
-                                    goal_id: goal.id,
-                                    description: goal.description.clone(),
-                                    session_id: goal.session_id.clone(),
-                                })
-                                .await;
-                        }
-                    }
-                }
             }
 
             // 2. Check for tasks needing review (with deduplication)
@@ -385,15 +324,20 @@ pub enum GoalEvaluation {
     },
 }
 
-/// Evaluates whether a completed goal meets quality standards using an LLM.
+/// Pure goal evaluation prompt/parser helper.
 ///
-/// Can be used independently of `PlanLoop` by the caller (e.g., agent_runner).
+/// Runtime model execution should happen through the framework agent/model path
+/// owned by the application runtime. The deprecated direct LLM API remains only
+/// for compatibility with older callers.
 pub struct GoalEvaluator {
     llm: Arc<dyn macaca_llm::LlmProvider>,
     model: String,
 }
 
 impl GoalEvaluator {
+    #[deprecated(
+        note = "Use GoalEvaluator::build_prompt + framework agent/model execution + parse_eval_response"
+    )]
     pub fn new(llm: Arc<dyn macaca_llm::LlmProvider>, model: impl Into<String>) -> Self {
         Self {
             llm,
@@ -401,17 +345,14 @@ impl GoalEvaluator {
         }
     }
 
-    /// Evaluate whether a goal's tasks collectively satisfy the goal.
-    ///
-    /// Conservative default: if LLM call or JSON parsing fails, returns `Satisfied`
-    /// so the system does not block indefinitely on evaluation errors.
-    pub async fn evaluate(
-        &self,
+    /// Build the goal evaluation prompt. The caller is responsible for running
+    /// this prompt through the traced framework agent/model path.
+    pub fn build_prompt(
         goal_description: &str,
         task_summaries: &[TaskSummary],
         completed: usize,
         failed: usize,
-    ) -> Result<GoalEvaluation, String> {
+    ) -> String {
         let summaries_text = task_summaries
             .iter()
             .map(|s| {
@@ -426,7 +367,7 @@ impl GoalEvaluator {
             .collect::<Vec<_>>()
             .join("\n");
 
-        let prompt = format!(
+        format!(
             r#"You are a quality evaluation agent. Evaluate whether the following goal has been satisfactorily completed.
 
 Goal: {goal_description}
@@ -443,7 +384,25 @@ Evaluate the overall quality and completeness. Respond with JSON:
 
 If all critical tasks completed and the goal is met, set satisfied=true.
 If there are gaps or quality issues, set satisfied=false and provide suggestions."#
-        );
+        )
+    }
+
+    /// Evaluate whether a goal's tasks collectively satisfy the goal.
+    ///
+    /// Deprecated: this direct LLM path bypasses framework trace/model routing.
+    /// Runtime callers should use `build_prompt`, execute through a traced
+    /// framework agent/model, then call `parse_eval_response`.
+    #[deprecated(
+        note = "Use GoalEvaluator::build_prompt + framework agent/model execution + parse_eval_response"
+    )]
+    pub async fn evaluate(
+        &self,
+        goal_description: &str,
+        task_summaries: &[TaskSummary],
+        completed: usize,
+        failed: usize,
+    ) -> Result<GoalEvaluation, String> {
+        let prompt = Self::build_prompt(goal_description, task_summaries, completed, failed);
 
         let messages = vec![LlmMessage::user(&prompt)];
         let options = LlmOptions {
@@ -462,7 +421,7 @@ If there are gaps or quality issues, set satisfied=false and provide suggestions
     }
 
     /// Parse the LLM evaluation response. Returns `Satisfied` on any parse failure.
-    fn parse_eval_response(content: &str) -> GoalEvaluation {
+    pub fn parse_eval_response(content: &str) -> GoalEvaluation {
         let content = content.trim();
         let json_str = if content.starts_with("```") {
             content
@@ -541,6 +500,26 @@ mod tests {
     }
 
     // ── GoalEvaluation parsing ──
+
+    #[test]
+    fn test_goal_evaluation_prompt_builder_preserves_contract() {
+        let summaries = vec![TaskSummary {
+            title: "Implement API".into(),
+            agent: "backend".into(),
+            status: "Completed".into(),
+            completion_summary: Some("API endpoints implemented".into()),
+        }];
+
+        let prompt = GoalEvaluator::build_prompt("Build weather app", &summaries, 1, 0);
+
+        assert!(prompt.contains("Goal: Build weather app"));
+        assert!(prompt.contains("Task Results (1 completed, 0 failed):"));
+        assert!(prompt
+            .contains("- [Completed] Implement API (agent: backend): API endpoints implemented"));
+        assert!(prompt.contains("\"satisfied\": true/false"));
+        assert!(prompt.contains("\"summary\": \"brief evaluation summary\""));
+        assert!(prompt.contains("\"suggestions\": [\"suggestion 1\", \"suggestion 2\"]"));
+    }
 
     #[test]
     fn test_goal_evaluation_satisfied_json() {

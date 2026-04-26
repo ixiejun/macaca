@@ -29,7 +29,7 @@ use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
 
 use futures::FutureExt;
-use macaca_app::{AppRegistry, AppRuntime};
+use macaca_app::{AppLoader, AppRegistry, AppRuntime};
 use macaca_driver_claude_code::{ClaudeCodeConfig, ClaudeCodeDriver};
 use macaca_framework::session::{
     InMemorySessionStore as FrameworkInMemorySessionStore, SessionStore as FrameworkSessionStore,
@@ -116,7 +116,7 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
     let runtime = AppRuntime::new();
     let mut app_dirs = HashMap::new();
     let mut skills_dirs = Vec::new();
-    let mut started_apps: Vec<(macaca_proto::ApplicationId, String)> = Vec::new();
+    let mut started_apps: Vec<(macaca_proto::ApplicationId, String, Vec<String>)> = Vec::new();
 
     // Auto-start all discovered apps
     for app in &discovered {
@@ -127,7 +127,23 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
                     let agent_count = kernel.agent_count().await;
                     app_dirs.insert(app_id, app.path.clone());
                     skills_dirs.push(app.path.join("skills"));
-                    started_apps.push((app_id.clone(), app.name.clone()));
+                    let app_agent_names =
+                        AppLoader::resolve_agent_configs(&app.manifest, &app.path)
+                            .map(|configs| {
+                                configs
+                                    .into_iter()
+                                    .map(|config| config.name)
+                                    .collect::<Vec<_>>()
+                            })
+                            .unwrap_or_else(|error| {
+                                tracing::warn!(
+                                    app_name = %app.name,
+                                    error = %error,
+                                    "Failed to resolve app agent names for executor registration"
+                                );
+                                Vec::new()
+                            });
+                    started_apps.push((app_id.clone(), app.name.clone(), app_agent_names));
                     info!(
                         app_id = %app_id.0,
                         app_name = %app.name,
@@ -539,22 +555,47 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
         let state_ref = Arc::clone(&state);
 
         tokio::spawn(async move {
-            // Get all agents from kernel
+            // Get all agents from kernel, then register each executor with
+            // only the agents declared by that application.
             let all_agents = kernel_ref.list_agents().await;
-            let app_agents: Vec<AgentInfo> = all_agents
-                .iter()
-                .map(|m| AgentInfo {
-                    id: m.id.0.to_string(),
-                    name: m.name.clone(),
-                    capabilities: m.capabilities.iter().map(|c| c.name.clone()).collect(),
-                    current_load: 0,
-                    max_load: 4,
-                    available: true,
-                })
-                .collect();
+            let agents_by_name: HashMap<_, _> =
+                all_agents.iter().map(|m| (m.name.clone(), m)).collect();
 
             // Register each app to executor registry
-            for (app_id, app_name) in apps_to_register {
+            for (app_id, app_name, app_agent_names) in apps_to_register {
+                let mut app_agents: Vec<AgentInfo> = app_agent_names
+                    .iter()
+                    .filter_map(|name| agents_by_name.get(name.as_str()).copied())
+                    .map(|m| AgentInfo {
+                        id: m.id.0.to_string(),
+                        name: m.name.clone(),
+                        capabilities: m.capabilities.iter().map(|c| c.name.clone()).collect(),
+                        current_load: 0,
+                        max_load: 4,
+                        available: true,
+                    })
+                    .collect();
+                if app_agents.is_empty() {
+                    tracing::warn!(
+                        app_id = %app_id.0,
+                        app_name = %app_name,
+                        "No app-scoped agents resolved; falling back to all registered agents"
+                    );
+                    app_agents = all_agents
+                        .iter()
+                        .map(|m| AgentInfo {
+                            id: m.id.0.to_string(),
+                            name: m.name.clone(),
+                            capabilities: m.capabilities.iter().map(|c| c.name.clone()).collect(),
+                            current_load: 0,
+                            max_load: 4,
+                            available: true,
+                        })
+                        .collect();
+                }
+                let workspace_agent_names: Vec<String> =
+                    app_agents.iter().map(|agent| agent.name.clone()).collect();
+
                 // Register this app to executor registry
                 let _executor = registry_ref
                     .register_application(app_id, app_name, app_agents.clone())
@@ -565,10 +606,9 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
                 todo_store_for_recovery.rollback_in_progress(&app_id).await;
 
                 // Create workspace directories for this app
-                let agent_names: Vec<String> = all_agents.iter().map(|a| a.name.clone()).collect();
                 let workspace =
                     crate::workspace::AppWorkspace::new(&config.workspace.root_dir, &app_id);
-                match workspace.ensure_dirs(&agent_names) {
+                match workspace.ensure_dirs(&workspace_agent_names) {
                     Ok(()) => {
                         tracing::info!(
                             app_id = %app_id.0,

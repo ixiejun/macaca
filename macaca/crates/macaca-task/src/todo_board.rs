@@ -105,6 +105,7 @@ impl TaskBoard {
             .store
             .list_agent_todos(&self.app_id, &self.session_id, &self.agent_name)
             .await;
+        let goals = self.store.list_goals(&self.app_id).await;
 
         // Group tasks by session_id, then apply sequential logic per session
         let mut by_session: std::collections::BTreeMap<String, Vec<TodoItem>> =
@@ -136,6 +137,15 @@ impl TaskBoard {
                     TodoStatus::Completed | TodoStatus::Cancelled | TodoStatus::Failed => continue,
                     // Claimable — take it
                     TodoStatus::Pending => {
+                        if !Self::parent_goal_allows_claim(task, &goals) {
+                            tracing::debug!(
+                                agent = %self.agent_name,
+                                task_id = %task.id,
+                                parent_task = ?task.parent_task,
+                                "Task pending but parent goal is not InProgress; skipping claim"
+                            );
+                            break; // Try next session
+                        }
                         let mut claimed = task.clone();
                         claimed.status = TodoStatus::Assigned;
                         claimed.updated_at = Utc::now();
@@ -154,6 +164,16 @@ impl TaskBoard {
             }
         }
         None
+    }
+
+    fn parent_goal_allows_claim(task: &TodoItem, goals: &[TodoGoal]) -> bool {
+        let Some(goal_id) = task.parent_task else {
+            return true;
+        };
+
+        goals
+            .iter()
+            .any(|goal| goal.id == goal_id && goal.status == TodoGoalStatus::InProgress)
     }
 
     /// Mark a task as in-progress. Called by the agent after claiming.
@@ -834,6 +854,46 @@ mod tests {
         space.complete_goal(&goal.id).await;
         let goals = space.list_goals().await;
         assert_eq!(goals[0].status, TodoGoalStatus::Completed);
+    }
+
+    #[tokio::test]
+    async fn board_does_not_claim_goal_tasks_until_goal_in_progress() {
+        let (app_id, store) = setup().await;
+        let board = TaskBoard::new(app_id.clone(), "backend", None, Arc::clone(&store));
+        let space = TaskSpace::new(app_id.clone(), None, Arc::clone(&store));
+
+        let goal = space.push_goal("Build feature").await;
+        let _ = space
+            .pop_goal()
+            .await
+            .expect("goal should move to decomposing");
+        space
+            .create_and_assign(
+                "backend",
+                "planner",
+                "Implement backend",
+                "Build API",
+                vec![],
+                5,
+                vec![],
+                Some(goal.id),
+            )
+            .await;
+
+        assert!(
+            board.claim_next().await.is_none(),
+            "tasks under a Decomposing goal must not be claimed"
+        );
+
+        store
+            .update_goal_status(&app_id, &goal.id, TodoGoalStatus::InProgress)
+            .await;
+        let claimed = board
+            .claim_next()
+            .await
+            .expect("task should be claimable after goal enters InProgress");
+        assert_eq!(claimed.title, "Implement backend");
+        assert_eq!(claimed.status, TodoStatus::Assigned);
     }
 
     #[tokio::test]

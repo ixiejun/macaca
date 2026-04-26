@@ -1,0 +1,12 @@
+{
+  "active": false,
+  "current_phase": "complete",
+  "completed_at": "2026-04-07T09:30:00Z",
+  "mode": "consensus-direct",
+  "input_spec": ".omx/specs/deep-interview-system-audit-clarification.md",
+  "status": "approved",
+  "prd_path": ".omx/plans/prd-system-audit-clarification.md",
+  "test_spec_path": ".omx/plans/test-spec-system-audit-clarification.md",
+  "consensus": "approved after architect and critic review",
+  "governance_decision": "This clarification lane stays outside OpenSpec; future refactor implementation must update OpenSpec artifacts, validate strictly, and confirm approval before code edits."
+}

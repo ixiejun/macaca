@@ -267,6 +267,7 @@ mod tests {
             } else {
                 Ok(LlmResponse {
                     content: "ok".into(),
+                    reasoning_content: None,
                     model: options.model.clone(),
                     usage: TokenUsage {
                         prompt_tokens: 10,
@@ -304,6 +305,7 @@ mod tests {
             } else {
                 Ok(LlmResponse {
                     content: "ok".into(),
+                    reasoning_content: None,
                     model: options.model.clone(),
                     usage: TokenUsage {
                         prompt_tokens: 10,

@@ -48,6 +48,7 @@ mod tests {
         ) -> Res<LlmResponse> {
             Ok(LlmResponse {
                 content: "ok".into(),
+                reasoning_content: None,
                 model: "mock".into(),
                 usage: TokenUsage {
                     prompt_tokens: 1,

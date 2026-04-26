@@ -6,9 +6,10 @@ ui_type: chat
 
 llm_config:
   provider: volces
-  model: glm-4.7
+  model: kimi-k2.5
 
 # Application entrypoint - coordinator receives all user messages
+entry_agent: coordinator
 entrypoint:
   type: workflow
   name: smart-router
@@ -76,7 +77,7 @@ agents:
       - name: conversation
         description: Engage in helpful technical conversations
     prompt_template: ""
-    model: glm-4.7
+    model: kimi-k2.5
     permission_level: system
     allowed_tools:
       - claude_code_execute
@@ -100,7 +101,7 @@ agents:
       - name: technical_risk_analysis
         description: Identify integration risks, edge cases, and rollout constraints
     prompt_template: ""
-    model: glm-4.7
+    model: kimi-k2.5
     permission_level: system
     allowed_tools:
       - file_read
@@ -116,7 +117,7 @@ agents:
       - name: frontend_development
         description: Implement web UI with Next.js, React, TypeScript, Tailwind CSS
     prompt_template: ""
-    model: glm-4.7
+    model: kimi-k2.5
     permission_level: user
     allowed_tools:
       - claude_code_execute
@@ -132,7 +133,7 @@ agents:
       - name: task_planning
         description: Decompose goals into tasks, assign to agents, review quality
     prompt_template: ""
-    model: glm-4.7
+    model: kimi-k2.5
     permission_level: system
     allowed_tools:
       - claude_code_execute
@@ -147,7 +148,7 @@ agents:
       - name: backend_development
         description: Implement Go REST API with PostgreSQL
     prompt_template: ""
-    model: glm-4.7
+    model: kimi-k2.5
     permission_level: user
     allowed_tools:
       - claude_code_execute

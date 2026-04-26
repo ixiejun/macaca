@@ -214,33 +214,36 @@ impl CreateTodoTool {
 
     fn tokenize(text: &str) -> HashSet<String> {
         const STOPWORDS: &[&str] = &[
-            "the",
-            "and",
-            "for",
-            "with",
-            "todo",
-            "task",
-            "agent",
-            "work",
-            "this",
-            "that",
-            "from",
-            "into",
-            "your",
-            "our",
+            "the", "and", "for", "with", "todo", "task", "agent", "work", "this", "that", "from",
+            "into", "your", "our",
         ];
         let stopwords: HashSet<&str> = STOPWORDS.iter().copied().collect();
 
-        text.to_ascii_lowercase()
+        let lower = text.to_ascii_lowercase();
+        let mut tokens: HashSet<String> = lower
             .split(|c: char| !c.is_ascii_alphanumeric() && c != '_')
             .filter(|t| t.len() >= 3 && !stopwords.contains(*t))
             .map(ToString::to_string)
-            .collect()
-    }
+            .collect();
 
-    fn capability_score(task_tokens: &HashSet<String>, profile: &[String]) -> usize {
-        let profile_tokens = Self::tokenize(&profile.join(" "));
-        task_tokens.intersection(&profile_tokens).count()
+        // Add lightweight multilingual capability hints for profile
+        // classification (e.g. foundation dependency inference).
+        for (needle, hints) in [
+            ("架构", &["architecture", "design"][..]),
+            ("设计", &["design"][..]),
+            ("规范", &["specification", "spec"][..]),
+            ("接口", &["interface", "api"][..]),
+            ("数据模型", &["data", "model"][..]),
+            ("技术风险", &["technical", "risk", "analysis"][..]),
+            ("前端", &["frontend", "ui"][..]),
+            ("后端", &["backend", "api"][..]),
+        ] {
+            if text.contains(needle) {
+                tokens.extend(hints.iter().map(|hint| hint.to_string()));
+            }
+        }
+
+        tokens
     }
 
     fn is_foundation_profile(profile: &[String]) -> bool {
@@ -265,54 +268,6 @@ impl CreateTodoTool {
             status,
             TodoStatus::Completed | TodoStatus::Cancelled | TodoStatus::Failed
         )
-    }
-
-    fn resolve_assignee(
-        &self,
-        requested: &str,
-        title: &str,
-        description: &str,
-    ) -> (String, Option<String>) {
-        if self.assignee_capabilities.is_empty() {
-            return (requested.to_string(), None);
-        }
-
-        let task_tokens = Self::tokenize(&format!("{title}\n{description}"));
-        if task_tokens.is_empty() {
-            return (requested.to_string(), None);
-        }
-
-        let blocked: HashSet<&str> = self
-            .disallowed_assignees
-            .iter()
-            .map(String::as_str)
-            .collect();
-
-        let requested_score = self
-            .assignee_capabilities
-            .get(requested)
-            .map(|p| Self::capability_score(&task_tokens, p))
-            .unwrap_or(0);
-
-        let best = self
-            .assignee_capabilities
-            .iter()
-            .filter(|(name, _)| !blocked.contains(name.as_str()))
-            .map(|(name, profile)| (name.clone(), Self::capability_score(&task_tokens, profile)))
-            .max_by_key(|(_, score)| *score);
-
-        if let Some((best_agent, best_score)) = best {
-            // Conservative reroute: only when requested has no semantic match and
-            // another allowed agent has a clear positive match.
-            if best_agent != requested && requested_score == 0 && best_score >= 2 {
-                let reason = format!(
-                    "rerouted by capability match (requested_score=0, best_agent={best_agent}, best_score={best_score})"
-                );
-                return (best_agent, Some(reason));
-            }
-        }
-
-        (requested.to_string(), None)
     }
 
     fn resolve_title_dependencies(&self, titles: &[String], existing: &[TodoItem]) -> Vec<TaskId> {
@@ -415,59 +370,15 @@ impl CreateTodoTool {
             .map(|t| t.id)
             .collect()
     }
-}
 
-#[async_trait]
-impl Tool for CreateTodoTool {
-    fn name(&self) -> &str {
-        "create_todo"
-    }
-    fn description(&self) -> &str {
-        "Create a new task and assign it to a specific agent's task board."
-    }
-    fn parameters_schema(&self) -> Value {
-        json!({
-            "type": "object",
-            "properties": {
-                "agent": { "type": "string", "description": "Target assignee agent name" },
-                "title": { "type": "string", "description": "Short task title" },
-                "description": { "type": "string", "description": "Detailed task description" },
-                "acceptance_criteria": {
-                    "type": "array", "items": { "type": "string" },
-                    "description": "List of criteria that must be met for the task to pass review"
-                },
-                "priority": { "type": "integer", "description": "Priority 0-10, higher = more urgent", "default": 5 },
-                "depends_on": {
-                    "type": "array", "items": { "type": "string" },
-                    "description": "Task IDs that must complete before this task can start"
-                },
-                "depends_on_titles": {
-                    "type": "array", "items": { "type": "string" },
-                    "description": "Task titles this task depends on (resolved within current scope)"
-                },
-                "depends_on_agents": {
-                    "type": "array",
-                    "description": "Cross-agent dependencies using symbolic references",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "type": { "type": "string", "enum": ["all_tasks", "specific_task"] },
-                            "agent": { "type": "string" },
-                            "title": { "type": "string" }
-                        },
-                        "required": ["type", "agent"]
-                    }
-                }
-            },
-            "required": ["agent", "title", "description"]
-        })
-    }
-    async fn execute(&self, input: Value) -> MacacaResult<Value> {
+    async fn create_one(&self, input: Value) -> MacacaResult<Value> {
         let agent = input["agent"]
             .as_str()
             .map(str::trim)
             .filter(|s| !s.is_empty())
-            .ok_or_else(|| macaca_proto::MacacaError::Task("missing required field: agent".into()))?;
+            .ok_or_else(|| {
+                macaca_proto::MacacaError::Task("missing required field: agent".into())
+            })?;
         let title = input["title"].as_str().unwrap_or_default();
         let description = input["description"].as_str().unwrap_or_default();
         let priority = input["priority"].as_u64().unwrap_or(5) as u8;
@@ -525,7 +436,7 @@ impl Tool for CreateTodoTool {
             )));
         }
 
-        let (resolved_agent, routing_reason) = self.resolve_assignee(agent, title, description);
+        let resolved_agent = agent.to_string();
         let existing_scope: Vec<TodoItem> = {
             let existing = self.space.list_all().await;
             if let Some(goal_id) = self.active_goal_id {
@@ -537,6 +448,33 @@ impl Tool for CreateTodoTool {
                 existing
             }
         };
+        if self.active_goal_id.is_some() {
+            let title_norm = Self::normalize_title(title);
+            if let Some(existing) = existing_scope.iter().find(|item| {
+                item.assigned_agent == resolved_agent
+                    && Self::normalize_title(&item.title) == title_norm
+                    && !Self::is_terminal_status(item.status)
+            }) {
+                tracing::info!(
+                    task_id = %existing.id,
+                    agent = %resolved_agent,
+                    goal_id = ?self.active_goal_id,
+                    title = %existing.title,
+                    "Deduplicated create_todo call within active goal"
+                );
+                return Ok(json!({
+                    "task_id": existing.id.to_string(),
+                    "agent": resolved_agent,
+                    "requested_agent": agent,
+                    "status": existing.status,
+                    "priority": existing.priority,
+                    "dependency_count": existing.depends_on.len(),
+                    "auto_inferred_dependencies": 0,
+                    "deduplicated": true,
+                    "routing_reason": Value::Null,
+                }));
+            }
+        }
 
         let mut deps: HashSet<TaskId> = depends_on_ids.into_iter().collect();
         for id in self.resolve_title_dependencies(&depends_on_titles, &existing_scope) {
@@ -580,7 +518,115 @@ impl Tool for CreateTodoTool {
             "priority": priority,
             "dependency_count": item.depends_on.len(),
             "auto_inferred_dependencies": inferred.len(),
-            "routing_reason": routing_reason,
+            "deduplicated": false,
+            "routing_reason": Value::Null,
+        }))
+    }
+}
+
+#[async_trait]
+impl Tool for CreateTodoTool {
+    fn name(&self) -> &str {
+        "create_todo"
+    }
+    fn description(&self) -> &str {
+        "Create a new task and assign it to a specific agent's task board."
+    }
+    fn parameters_schema(&self) -> Value {
+        json!({
+            "type": "object",
+            "properties": {
+                "agent": { "type": "string", "description": "Target assignee agent name" },
+                "title": { "type": "string", "description": "Short task title" },
+                "description": { "type": "string", "description": "Detailed task description" },
+                "acceptance_criteria": {
+                    "type": "array", "items": { "type": "string" },
+                    "description": "List of criteria that must be met for the task to pass review"
+                },
+                "priority": { "type": "integer", "description": "Priority 0-10, higher = more urgent", "default": 5 },
+                "depends_on": {
+                    "type": "array", "items": { "type": "string" },
+                    "description": "Task IDs that must complete before this task can start"
+                },
+                "depends_on_titles": {
+                    "type": "array", "items": { "type": "string" },
+                    "description": "Task titles this task depends on (resolved within current scope)"
+                },
+                "depends_on_agents": {
+                    "type": "array",
+                    "description": "Cross-agent dependencies using symbolic references",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "type": { "type": "string", "enum": ["all_tasks", "specific_task"] },
+                            "agent": { "type": "string" },
+                            "title": { "type": "string" }
+                        },
+                        "required": ["type", "agent"]
+                    }
+                }
+            },
+            "required": ["agent", "title", "description"]
+        })
+    }
+    async fn execute(&self, input: Value) -> MacacaResult<Value> {
+        self.create_one(input).await
+    }
+}
+
+/// Create multiple todos in one tool call.
+///
+/// This is optimized for planner decomposition: the planner can persist the
+/// whole task graph in a single ReAct action instead of spending one LLM round
+/// trip per task.
+pub struct CreateTodosTool {
+    pub create_todo: CreateTodoTool,
+}
+
+#[async_trait]
+impl Tool for CreateTodosTool {
+    fn name(&self) -> &str {
+        "create_todos"
+    }
+
+    fn description(&self) -> &str {
+        "Create multiple tasks and assign each to a specific agent's task board in one call. Preferred for goal decomposition."
+    }
+
+    fn parameters_schema(&self) -> Value {
+        let item_schema = self.create_todo.parameters_schema();
+        json!({
+            "type": "object",
+            "properties": {
+                "tasks": {
+                    "type": "array",
+                    "minItems": 1,
+                    "description": "Tasks to create, in dependency order. Each item uses the same schema as create_todo.",
+                    "items": item_schema
+                }
+            },
+            "required": ["tasks"]
+        })
+    }
+
+    async fn execute(&self, input: Value) -> MacacaResult<Value> {
+        let tasks = input["tasks"].as_array().ok_or_else(|| {
+            macaca_proto::MacacaError::Task("missing required field: tasks".into())
+        })?;
+        if tasks.is_empty() {
+            return Err(macaca_proto::MacacaError::Task(
+                "tasks must contain at least one task".into(),
+            ));
+        }
+
+        let mut created = Vec::with_capacity(tasks.len());
+        for task in tasks {
+            created.push(self.create_todo.create_one(task.clone()).await?);
+        }
+
+        Ok(json!({
+            "count": created.len(),
+            "created": created,
         }))
     }
 }
@@ -629,7 +675,8 @@ mod tests {
     #[tokio::test]
     async fn create_todo_requires_agent_field() {
         let dir = tempdir().expect("tempdir");
-        let db = RedbStore::open(dir.path().join("todo-tests-missing-agent.redb")).expect("open redb");
+        let db =
+            RedbStore::open(dir.path().join("todo-tests-missing-agent.redb")).expect("open redb");
         let store = Arc::new(TodoStore::new(Arc::new(db)));
         let space = Arc::new(TaskSpace::new(
             macaca_proto::ApplicationId(uuid::Uuid::new_v4()),
@@ -659,9 +706,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn create_todo_reroutes_to_capability_matched_agent() {
+    async fn create_todo_preserves_requested_agent_even_when_profile_differs() {
         let dir = tempdir().expect("tempdir");
-        let db = RedbStore::open(dir.path().join("todo-tests-reroute.redb")).expect("open redb");
+        let db =
+            RedbStore::open(dir.path().join("todo-tests-preserve-agent.redb")).expect("open redb");
         let store = Arc::new(TodoStore::new(Arc::new(db)));
         let space = Arc::new(TaskSpace::new(
             macaca_proto::ApplicationId(uuid::Uuid::new_v4()),
@@ -702,13 +750,69 @@ mod tests {
 
         assert_eq!(
             out["agent"].as_str().unwrap_or_default(),
-            "backend",
-            "should reroute to backend by capability match"
+            "architect",
+            "create_todo must preserve planner's explicit assignee"
         );
         assert_eq!(
             out["requested_agent"].as_str().unwrap_or_default(),
             "architect"
         );
+        assert!(out["routing_reason"].is_null());
+        let all = space.list_all().await;
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].assigned_agent, "architect");
+    }
+
+    #[tokio::test]
+    async fn create_todo_preserves_requested_agent_for_foundation_tasks() {
+        let dir = tempdir().expect("tempdir");
+        let db = RedbStore::open(dir.path().join("todo-tests-foundation-preserve.redb"))
+            .expect("open redb");
+        let store = Arc::new(TodoStore::new(Arc::new(db)));
+        let space = Arc::new(TaskSpace::new(
+            macaca_proto::ApplicationId(uuid::Uuid::new_v4()),
+            Some("session".into()),
+            store,
+        ));
+        let mut profiles = HashMap::new();
+        profiles.insert(
+            "architect".to_string(),
+            vec![
+                "architecture_design Define system boundaries and technical constraints".into(),
+                "interface_contract_design Define frontend/backend API and data contracts".into(),
+            ],
+        );
+        profiles.insert(
+            "backend".to_string(),
+            vec!["backend_development Implement Go REST API with PostgreSQL".into()],
+        );
+        let tool = CreateTodoTool {
+            space: Arc::clone(&space),
+            coordinator_name: "planner".into(),
+            disallowed_assignees: vec![],
+            assignee_capabilities: profiles,
+            active_goal_id: None,
+        };
+
+        let out = tool
+            .execute(json!({
+                "agent": "backend",
+                "title": "设计项目架构和API规范",
+                "description": "设计整体项目架构、接口规范、数据模型和前后端契约。输出架构设计文档。"
+            }))
+            .await
+            .expect("create_todo should succeed");
+
+        assert_eq!(
+            out["agent"].as_str().unwrap_or_default(),
+            "backend",
+            "create_todo must not override planner's explicit assignee"
+        );
+        assert_eq!(
+            out["requested_agent"].as_str().unwrap_or_default(),
+            "backend"
+        );
+        assert!(out["routing_reason"].is_null());
         let all = space.list_all().await;
         assert_eq!(all.len(), 1);
         assert_eq!(all[0].assigned_agent, "backend");
@@ -717,8 +821,8 @@ mod tests {
     #[tokio::test]
     async fn create_todo_auto_adds_foundation_dependencies_for_goal() {
         let dir = tempdir().expect("tempdir");
-        let db = RedbStore::open(dir.path().join("todo-tests-foundation-deps.redb"))
-            .expect("open redb");
+        let db =
+            RedbStore::open(dir.path().join("todo-tests-foundation-deps.redb")).expect("open redb");
         let store = Arc::new(TodoStore::new(Arc::new(db)));
         let app_id = macaca_proto::ApplicationId(uuid::Uuid::new_v4());
         let goal_id = macaca_proto::TaskId::new();
@@ -767,7 +871,10 @@ mod tests {
             .expect("frontend task create");
 
         assert!(
-            fe["auto_inferred_dependencies"].as_u64().unwrap_or_default() >= 1,
+            fe["auto_inferred_dependencies"]
+                .as_u64()
+                .unwrap_or_default()
+                >= 1,
             "frontend task should get inferred dependency on architect task"
         );
 
@@ -781,6 +888,101 @@ mod tests {
             fe_task.depends_on.contains(&arch_id),
             "frontend task should depend on architect task"
         );
+    }
+
+    #[tokio::test]
+    async fn create_todo_deduplicates_same_goal_agent_and_title() {
+        let dir = tempdir().expect("tempdir");
+        let db = RedbStore::open(dir.path().join("todo-tests-dedupe.redb")).expect("open redb");
+        let store = Arc::new(TodoStore::new(Arc::new(db)));
+        let goal_id = macaca_proto::TaskId::new();
+        let space = Arc::new(TaskSpace::new(
+            macaca_proto::ApplicationId(uuid::Uuid::new_v4()),
+            Some("session".into()),
+            Arc::clone(&store),
+        ));
+        let tool = CreateTodoTool {
+            space: Arc::clone(&space),
+            coordinator_name: "planner".into(),
+            disallowed_assignees: vec![],
+            assignee_capabilities: HashMap::new(),
+            active_goal_id: Some(goal_id),
+        };
+
+        let first = tool
+            .execute(json!({
+                "agent": "news_fact_checker",
+                "title": "DeepSeek V4 fact check",
+                "description": "Verify claims"
+            }))
+            .await
+            .expect("first create_todo should succeed");
+        let second = tool
+            .execute(json!({
+                "agent": "news_fact_checker",
+                "title": "  deepseek v4 fact check  ",
+                "description": "Verify claims again"
+            }))
+            .await
+            .expect("duplicate create_todo should return existing task");
+
+        assert_eq!(first["task_id"], second["task_id"]);
+        assert_eq!(second["deduplicated"].as_bool(), Some(true));
+        let all = space.list_all().await;
+        assert_eq!(all.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn create_todos_creates_multiple_tasks_in_one_call() {
+        let dir = tempdir().expect("tempdir");
+        let db = RedbStore::open(dir.path().join("todo-tests-batch.redb")).expect("open redb");
+        let store = Arc::new(TodoStore::new(Arc::new(db)));
+        let app_id = macaca_proto::ApplicationId(uuid::Uuid::new_v4());
+        let goal_id = macaca_proto::TaskId::new();
+        let space = Arc::new(TaskSpace::new(
+            app_id,
+            Some("session".into()),
+            Arc::clone(&store),
+        ));
+        let tool = CreateTodosTool {
+            create_todo: CreateTodoTool {
+                space: Arc::clone(&space),
+                coordinator_name: "planner".into(),
+                disallowed_assignees: vec![],
+                assignee_capabilities: HashMap::new(),
+                active_goal_id: Some(goal_id),
+            },
+        };
+
+        let out = tool
+            .execute(json!({
+                "tasks": [
+                    {
+                        "agent": "news_researcher",
+                        "title": "Collect sources",
+                        "description": "Gather source material",
+                        "priority": 9
+                    },
+                    {
+                        "agent": "news_writer",
+                        "title": "Draft article",
+                        "description": "Write the first draft",
+                        "priority": 8,
+                        "depends_on_titles": ["Collect sources"]
+                    }
+                ]
+            }))
+            .await
+            .expect("create_todos should succeed");
+
+        assert_eq!(out["count"].as_u64(), Some(2));
+        let all = space.list_all().await;
+        assert_eq!(all.len(), 2);
+        let writer = all
+            .iter()
+            .find(|task| task.assigned_agent == "news_writer")
+            .expect("writer task");
+        assert_eq!(writer.depends_on.len(), 1);
     }
 }
 

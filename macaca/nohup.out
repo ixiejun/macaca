@@ -1,0 +1,981 @@
+  [2m2026-04-01T09:04:08.023137Z[0m [32m INFO[0m [1;32mmacaca_cli::logging[0m[32m: [32mLogging system initialized with file output, [1;32mdir[0m[32m: ./logs, [1;32mprefix[0m[32m: macaca, [1;32mformat[0m[32m: json, [1;32mretention_days[0m[32m: 10, [1;32mcompress[0m[32m: true[0m
+    [2;3mat[0m crates/macaca-cli/src/logging.rs:167
+
+  [2m2026-04-01T09:04:08.027102Z[0m [32m INFO[0m [1;32mmacaca_web[0m[32m: [32mConfiguration loaded, [1;32mdefault_provider[0m[32m: dashscope[0m
+    [2;3mat[0m crates/macaca-web/src/lib.rs:57
+
+  [2m2026-04-01T09:04:08.029687Z[0m [32m INFO[0m [1;32mmacaca_web[0m[32m: [32mLLM provider initialized, [1;32mprovider[0m[32m: "dashscope"[0m
+    [2;3mat[0m crates/macaca-web/src/lib.rs:102
+
+  [2m2026-04-01T09:04:08.032141Z[0m [32m INFO[0m [1;32mmacaca_app::registry[0m[32m: [32mApps discovered, [1;32mcount[0m[32m: 1[0m
+    [2;3mat[0m crates/macaca-app/src/registry.rs:145
+
+  [2m2026-04-01T09:04:08.032183Z[0m [32m INFO[0m [1;32mmacaca_web[0m[32m: [32mApps discovered from standard directories, [1;32mcount[0m[32m: 1[0m
+    [2;3mat[0m crates/macaca-web/src/lib.rs:115
+
+  [2m2026-04-01T09:04:08.033176Z[0m [32m INFO[0m [1;32mmacaca_kernel::registry[0m[32m: [32magent registered, [1;32magent_id[0m[32m: 50c09316-522b-428c-975e-ec54d1599bae[0m
+    [2;3mat[0m crates/macaca-kernel/src/registry.rs:63
+
+  [2m2026-04-01T09:04:08.033249Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::status[0m[34m: [34magent status registered, [1;34magent_id[0m[34m: 50c09316-522b-428c-975e-ec54d1599bae[0m
+    [2;3mat[0m crates/macaca-kernel/src/status.rs:34
+
+  [2m2026-04-01T09:04:08.033316Z[0m [32m INFO[0m [1;32mmacaca_kernel::registry[0m[32m: [32magent registered, [1;32magent_id[0m[32m: e862f9d9-3c11-466c-8388-f7b1ba390c02[0m
+    [2;3mat[0m crates/macaca-kernel/src/registry.rs:63
+
+  [2m2026-04-01T09:04:08.033333Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::status[0m[34m: [34magent status registered, [1;34magent_id[0m[34m: e862f9d9-3c11-466c-8388-f7b1ba390c02[0m
+    [2;3mat[0m crates/macaca-kernel/src/status.rs:34
+
+  [2m2026-04-01T09:04:08.033353Z[0m [32m INFO[0m [1;32mmacaca_kernel::registry[0m[32m: [32magent registered, [1;32magent_id[0m[32m: c74f50ff-2a8d-4947-9a3f-57275005fda2[0m
+    [2;3mat[0m crates/macaca-kernel/src/registry.rs:63
+
+  [2m2026-04-01T09:04:08.033368Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::status[0m[34m: [34magent status registered, [1;34magent_id[0m[34m: c74f50ff-2a8d-4947-9a3f-57275005fda2[0m
+    [2;3mat[0m crates/macaca-kernel/src/status.rs:34
+
+  [2m2026-04-01T09:04:08.033398Z[0m [32m INFO[0m [1;32mmacaca_kernel::registry[0m[32m: [32magent registered, [1;32magent_id[0m[32m: a1939b4a-8ff6-4faf-9ab0-60987e2fe34d[0m
+    [2;3mat[0m crates/macaca-kernel/src/registry.rs:63
+
+  [2m2026-04-01T09:04:08.033414Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::status[0m[34m: [34magent status registered, [1;34magent_id[0m[34m: a1939b4a-8ff6-4faf-9ab0-60987e2fe34d[0m
+    [2;3mat[0m crates/macaca-kernel/src/status.rs:34
+
+  [2m2026-04-01T09:04:08.033433Z[0m [32m INFO[0m [1;32mmacaca_kernel::registry[0m[32m: [32magent registered, [1;32magent_id[0m[32m: f7635c11-64df-4df4-b947-5c226c04d79a[0m
+    [2;3mat[0m crates/macaca-kernel/src/registry.rs:63
+
+  [2m2026-04-01T09:04:08.033448Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::status[0m[34m: [34magent status registered, [1;34magent_id[0m[34m: f7635c11-64df-4df4-b947-5c226c04d79a[0m
+    [2;3mat[0m crates/macaca-kernel/src/status.rs:34
+
+  [2m2026-04-01T09:04:08.033477Z[0m [32m INFO[0m [1;32mmacaca_app::runtime[0m[32m: [32mapp started, [1;32mapp[0m[32m: fullstack-autodev, [1;32mid[0m[32m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea[0m
+    [2;3mat[0m crates/macaca-app/src/runtime.rs:86
+
+  [2m2026-04-01T09:04:08.033538Z[0m [32m INFO[0m [1;32mmacaca_web[0m[32m: [32mApp started, [1;32mapp_id[0m[32m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;32mapp_name[0m[32m: fullstack-autodev, [1;32magents[0m[32m: 5[0m
+    [2;3mat[0m crates/macaca-web/src/lib.rs:133
+
+  [2m2026-04-01T09:04:08.035640Z[0m [32m INFO[0m [1;32mmacaca_web[0m[32m: [32mKnowledge skills loaded into catalog, [1;32mcount[0m[32m: 3[0m
+    [2;3mat[0m crates/macaca-web/src/lib.rs:152
+
+  [2m2026-04-01T09:04:08.036122Z[0m [34mDEBUG[0m [1;34mmacaca_skill::registry[0m[34m: [34mloaded skill from "examples/apps/fullstack-autodev/skills/figma-mcp.yaml", [1;34mskill[0m[34m: figma-mcp[0m
+    [2;3mat[0m crates/macaca-skill/src/registry.rs:84
+
+  [2m2026-04-01T09:04:08.036641Z[0m [34mDEBUG[0m [1;34mmacaca_skill::registry[0m[34m: [34mloaded skill from "examples/apps/fullstack-autodev/skills/openspec.yaml", [1;34mskill[0m[34m: openspec[0m
+    [2;3mat[0m crates/macaca-skill/src/registry.rs:84
+
+  [2m2026-04-01T09:04:08.036669Z[0m [32m INFO[0m [1;32mmacaca_web[0m[32m: [32mExecutable skill tools loaded, [1;32mcount[0m[32m: 2[0m
+    [2;3mat[0m crates/macaca-web/src/lib.rs:172
+
+  [2m2026-04-01T09:04:08.036742Z[0m [32m INFO[0m [1;32mmacaca_web[0m[32m: [32mClaude Code driver tools loaded, [1;32mcount[0m[32m: 3[0m
+    [2;3mat[0m crates/macaca-web/src/lib.rs:187
+
+  [2m2026-04-01T09:04:08.036796Z[0m [32m INFO[0m [1;32mmacaca_web[0m[32m: [32mListAgents tool added[0m
+    [2;3mat[0m crates/macaca-web/src/lib.rs:221
+
+  [2m2026-04-01T09:04:08.036809Z[0m [32m INFO[0m [1;32mmacaca_web[0m[32m: [32mDelegateTask tool added[0m
+    [2;3mat[0m crates/macaca-web/src/lib.rs:297
+
+  [2m2026-04-01T09:04:08.036821Z[0m [32m INFO[0m [1;32mmacaca_web[0m[32m: [32mGetTaskResult tool added[0m
+    [2;3mat[0m crates/macaca-web/src/lib.rs:409
+
+  [2m2026-04-01T09:04:08.036845Z[0m [32m INFO[0m [1;32mmacaca_web[0m[32m: [32mComposite toolset ready, [1;32mtools[0m[32m: ["file_read", "file_write", "shell", "openspec", "figma-mcp", "claude_code_execute", "claude_code_resume", "claude_code_status", "list_agents", "delegate_task", "get_task_result"][0m
+    [2;3mat[0m crates/macaca-web/src/lib.rs:412
+
+  [2m2026-04-01T09:04:08.112479Z[0m [32m INFO[0m [1;32mmacaca_web[0m[32m: [32mSession store initialized, [1;32mpath[0m[32m: /Users/quantum/Library/Application Support/macaca/sessions.db[0m
+    [2;3mat[0m crates/macaca-web/src/lib.rs:424
+
+  [2m2026-04-01T09:04:08.112566Z[0m [32m INFO[0m [1;32mmacaca_web[0m[32m: [32mAuditLogger and AlertManager initialized[0m
+    [2;3mat[0m crates/macaca-web/src/lib.rs:430
+
+  [2m2026-04-01T09:04:08.112750Z[0m [32m INFO[0m [1;32mmacaca_web[0m[32m: [32mApplicationExecutorRegistry initialized and apps registered[0m
+    [2;3mat[0m crates/macaca-web/src/lib.rs:539
+
+  [2m2026-04-01T09:04:08.112898Z[0m [32m INFO[0m [1;32mmacaca_web[0m[32m: [32mHook event consumer started[0m
+    [2;3mat[0m crates/macaca-web/src/lib.rs:548
+
+  [2m2026-04-01T09:04:08.112979Z[0m [32m INFO[0m [1;32mmacaca_web::hook_consumer[0m[32m: [32mHook event consumer started[0m
+    [2;3mat[0m crates/macaca-web/src/hook_consumer.rs:28
+
+  [2m2026-04-01T09:04:08.114722Z[0m [32m INFO[0m [1;32mmacaca_web[0m[32m: [32mApp registered to executor, [1;32mapp_id[0m[32m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea[0m
+    [2;3mat[0m crates/macaca-web/src/lib.rs:508
+
+  [2m2026-04-01T09:04:08.115150Z[0m [32m INFO[0m [1;32mmacaca_kernel::executor::app_executor[0m[32m: [32mWorker loop started, waiting for commands, [1;32mapplication_id[0m[32m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:716
+
+  [2m2026-04-01T09:04:08.115504Z[0m [32m INFO[0m [1;32mmacaca_web[0m[32m: [32mMacaca OS API server starting, [1;32maddr[0m[32m: 0.0.0.0:3001[0m
+    [2;3mat[0m crates/macaca-web/src/lib.rs:585
+
+
+  Macaca OS API server: http://localhost:3001
+
+  [2m2026-04-01T09:04:08.116055Z[0m [32m INFO[0m [1;32mmacaca_kernel::executor::app_executor[0m[32m: [32mHook event forwarder started[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:731
+
+  [2m2026-04-01T09:04:08.117014Z[0m [32m INFO[0m [1;32mmacaca_web[0m[32m: [32mWorkspace directories created, [1;32mapp_id[0m[32m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;32mworkspace[0m[32m: /Users/quantum/.macaca/workspaces/a9435a4b-d123-5a4c-b0b7-d9b1342089ea[0m
+    [2;3mat[0m crates/macaca-web/src/lib.rs:518
+
+  [2m2026-04-01T09:04:08.165312Z[0m [32m INFO[0m [1;32mmacaca_web::hook_consumer[0m[32m: [32mSubscribed to hook events for app, [1;32mapp_id[0m[32m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;32mapp_name[0m[32m: fullstack-autodev[0m
+    [2;3mat[0m crates/macaca-web/src/hook_consumer.rs:44
+
+  [2m2026-04-01T09:04:18.117747Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 6µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:04:28.118039Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 8.208µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:04:38.117329Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 7.666µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:04:48.117900Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 8.125µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:04:58.117319Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 8.25µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:05:08.116847Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 8.917µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:05:18.116991Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 9.834µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:05:28.116948Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 4.291µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:05:38.129896Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 13.75µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:05:48.136658Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 5.625µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:05:58.140005Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 6.583µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:06:08.141732Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 11.917µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:06:18.143635Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 11.25µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:06:28.143929Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 4.375µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:06:38.143850Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 3.833µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:06:48.143876Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 19.208µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:06:58.144947Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 6.875µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:07:08.145452Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 18.875µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:07:18.144264Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 3.75µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:07:28.144205Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 3.958µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:07:38.144183Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 7.916µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:07:48.144866Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 7.25µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:07:58.143702Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 6.958µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:08:08.145306Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 4.875µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:08:18.144960Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 7.416µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:08:28.143581Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 4.958µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:08:38.144705Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 8.833µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:08:48.145015Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 3.709µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:08:58.144600Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 8.25µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:09:08.144721Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 3.333µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:09:18.143991Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 5.084µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:09:28.144156Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 4µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:09:38.144204Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 2.5µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:09:48.144571Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 7.708µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:09:58.144007Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 3.25µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:10:08.144067Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 5.667µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:10:18.144246Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 3.25µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:10:28.143828Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 2.917µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:10:38.144488Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 7.209µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:10:48.144996Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 6.5µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:10:58.144407Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 6.666µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:11:08.144678Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 8.666µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:11:18.144767Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 11.208µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:11:28.144527Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 5.875µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:11:38.144344Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 7.125µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:11:48.144713Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 8.375µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:11:58.144758Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 11.708µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:12:08.144687Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 7.5µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:12:18.144693Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 26.083µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:12:28.144988Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 7.167µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:12:38.144121Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 5µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:12:48.144253Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 8.708µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:12:58.144806Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 10.708µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:13:08.144303Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 9.333µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:13:18.143891Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 9.584µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:13:28.143954Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 7.584µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:13:38.144483Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 10.208µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:13:48.143721Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 8.334µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:13:58.143625Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 10.166µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:14:08.144292Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 8.209µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:14:18.144571Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 12.291µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:14:28.144467Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 33µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:14:38.143975Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 10.167µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:14:48.144605Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 5.042µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:14:58.144051Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 216.291µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:15:08.144039Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 4.709µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:15:18.144415Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 6.125µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:15:28.144291Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 9.208µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:15:38.144037Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 19.875µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:15:48.144302Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 12.25µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:15:58.144622Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 9.334µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:16:08.144521Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 10.709µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:16:18.143581Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 20.833µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:16:28.144194Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 9.042µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:16:38.143633Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 17µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:16:48.143857Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 4.083µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:16:58.143926Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 10.084µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:17:08.144348Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 10.666µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:17:18.143893Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 8.166µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:17:28.144005Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 8.292µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:17:38.143848Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 6.958µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:17:48.144847Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 8.834µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:17:58.144320Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 7.375µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:18:08.143951Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 8µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:18:18.143338Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 7.042µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:18:28.144067Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 3.833µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:18:38.144779Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 156.041µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:18:48.144736Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 7.084µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:18:58.143920Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 4.583µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:19:08.144000Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 3.167µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:19:18.144307Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 9.75µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:19:28.144131Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 5.458µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:19:38.144312Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 7.875µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:19:48.144262Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 4.541µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:19:58.144255Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 9µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:20:08.143589Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 4.75µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:20:18.144328Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 7.666µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:20:28.144554Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 5.417µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:20:38.144028Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 55.292µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:20:48.144288Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 65.917µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:20:58.143708Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 6.417µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:21:08.144404Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 3.916µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:21:18.144593Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 10.541µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:21:28.143720Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 20.542µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:21:38.144354Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 19µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:21:48.143753Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 60.833µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:21:58.144033Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 3.167µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:22:08.145302Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 48.541µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:22:18.144011Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 9.458µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:22:28.144129Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 21.75µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:22:38.144175Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 3.375µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:22:48.144410Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 13.375µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:22:58.143312Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 10.166µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:23:08.144445Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 31µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:23:18.144430Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 6.5µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:23:28.143836Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 18.667µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:23:38.143577Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 25.958µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:23:48.142897Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 71.208µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:23:58.144260Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 12.5µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:24:08.143510Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 13.375µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:24:18.144110Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 24.458µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:24:28.143638Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 5.125µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:24:38.143003Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 36.916µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:24:48.143738Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 23.5µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:24:58.144837Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 83.5µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:25:08.144277Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 124.334µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:25:18.143714Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 20.416µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:25:28.144454Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 8.125µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:25:38.143501Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 2.875µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:25:48.143930Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 13.834µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:25:58.143733Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 10.666µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:26:08.143226Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 124.417µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:26:18.143443Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 20.667µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:26:28.144043Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 15.292µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:26:38.143697Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 17.834µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:26:48.144527Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 3.25µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:26:58.143300Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 10.958µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:27:08.142879Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 3µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:27:18.143379Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 13.208µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:27:28.144235Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 10.583µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:27:38.143442Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 76.625µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:27:48.144682Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 52.417µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:27:58.144563Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 39.792µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:28:08.142580Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 28.208µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:28:18.144032Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 6.584µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:28:28.143795Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 7.875µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:28:38.144240Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 14.375µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:28:48.143501Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 2.625µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:28:58.142773Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 6.042µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:29:08.144076Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 7.458µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:29:18.143979Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 7µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:29:28.143308Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 6.834µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:29:38.144151Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 5.25µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:29:48.143689Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 26.667µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:29:58.143883Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 2.5µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:30:08.144233Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 6.5µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:30:18.143592Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 10.167µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:30:28.143800Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 11.541µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:30:38.144126Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 19.042µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:30:48.143798Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 12.209µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:30:58.143658Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 6.458µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:31:08.143615Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 12.083µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:31:18.142638Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 4.209µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:31:28.143685Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 11.5µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:31:38.144037Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 5.334µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:31:48.143313Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 12.75µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:31:58.144173Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 5.75µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:32:08.142299Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 13.25µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:32:18.143410Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 19.375µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:32:28.142974Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 13.542µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:32:38.143935Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 20.542µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:32:48.143496Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 3.209µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:32:58.144060Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 79.791µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:33:08.143362Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 52.083µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:33:18.143712Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 3.166µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:33:28.142633Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 3.292µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:33:38.144126Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 21.458µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:33:48.143291Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 12.292µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:33:58.143497Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 2.791µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:34:08.144045Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 5.833µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:34:18.143166Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 5.083µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:34:28.143264Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 9.625µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:34:38.143681Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 33.334µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:34:48.144259Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 43.875µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:34:58.143110Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 2.625µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:35:08.143530Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 64.334µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:35:18.142623Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 23.875µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:35:28.143247Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 21.75µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:35:38.143019Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 10.375µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:35:48.143870Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 31.958µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:35:58.143933Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 2.667µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:36:08.144295Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 35.208µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:36:18.143491Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 35.708µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:36:28.144165Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 27.25µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:36:38.144067Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 6.458µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:36:48.142864Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 24.417µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:36:58.143851Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 4.083µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:37:08.143227Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 17.417µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:37:18.144835Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 10.625µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:37:28.143803Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 12.5µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:37:38.144185Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 14.792µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:37:48.142702Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 3.875µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:37:58.144983Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 31.208µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:38:08.144855Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 4.458µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:38:18.144837Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 5.042µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:38:28.143928Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 2.291µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:38:38.144502Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 3.208µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:38:48.143485Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 18.708µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:38:58.144909Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 16.375µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:39:08.142491Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 3.708µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:39:18.144178Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 3.459µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:39:28.143034Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 2.834µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:39:38.143046Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 4.209µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:39:48.143958Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 25.916µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:39:58.145961Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 30.041µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:40:08.142845Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 50.25µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:40:18.143398Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 4.334µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:40:28.143816Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 2.708µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:40:38.143349Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 2.584µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:40:48.143320Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 20.958µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:40:58.142739Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 19.834µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:41:08.143818Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 14.25µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:41:18.143866Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 8.166µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:41:28.143584Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 7.375µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:41:38.143848Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 7.25µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:41:48.143496Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 3.75µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:41:58.143278Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 15.208µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:42:08.143374Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 14.375µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:42:18.142618Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 10.75µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:42:28.142917Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 10.083µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:42:38.143739Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 31.958µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:42:48.143504Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 13.125µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:42:58.143425Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 23.125µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:43:08.142461Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 3.25µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:43:18.142997Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 4.792µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:43:28.143545Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 9.292µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:43:38.142075Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 5.25µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:43:48.143420Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 28.5µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:43:58.143026Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 12.125µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:44:08.143451Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 18.583µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:44:18.142854Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 52.292µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:44:28.142849Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 12µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:44:38.142421Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 3.083µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:44:48.142163Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 4.375µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:44:58.142832Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 3.583µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:45:08.142070Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 11.291µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:45:18.142887Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 18.708µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:45:28.143145Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 2.375µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:45:38.142370Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 70.583µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:45:48.143452Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 32.333µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:45:58.143203Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 3.458µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:46:08.142525Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 21.334µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:46:18.142765Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 28.5µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:46:28.142663Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 2.25µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:46:38.142830Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 27.459µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:46:48.143104Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 14.792µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:46:58.142416Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 26.292µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:47:08.143678Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 25.917µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:47:18.142865Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 20.166µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:47:28.143500Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 9.375µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:47:38.143485Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 181.833µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:47:48.142930Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 11.041µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:47:58.143222Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 14.25µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:48:08.142999Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 22.584µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:48:18.144761Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 11.5µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:48:28.142672Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 15.041µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:48:38.142624Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 12.75µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:48:48.142999Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 3.708µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:48:58.142443Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 24.25µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:49:08.141649Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 4.875µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:49:18.143502Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 12.167µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:49:28.143196Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 3.125µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:49:38.142436Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 3.333µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:49:48.142859Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 3.125µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:49:58.143333Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 5.75µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:50:08.142299Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 3.334µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:50:18.143419Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 6.5µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:50:28.143384Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 33.958µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:50:38.142816Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 34.417µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:50:48.143512Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 11.708µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:50:58.142766Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 3.75µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:51:08.143269Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 29.291µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:51:18.142994Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 7.083µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:51:28.143072Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 16.708µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:51:38.142398Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 11.833µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:51:48.143555Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 21.917µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:51:58.144350Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 2.125µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:52:08.143330Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 2.417µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+
+  [2m2026-04-01T09:52:18.142757Z[0m [34mDEBUG[0m [1;34mmacaca_kernel::executor::app_executor[0m[34m: [34mWorker heartbeat, [1;34mapplication_id[0m[34m: a9435a4b-d123-5a4c-b0b7-d9b1342089ea, [1;34melapsed_since_last[0m[34m: 25.167µs[0m
+    [2;3mat[0m crates/macaca-kernel/src/executor/app_executor.rs:811
+

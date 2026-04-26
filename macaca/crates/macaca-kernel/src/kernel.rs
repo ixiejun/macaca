@@ -174,6 +174,7 @@ mod tests {
         ) -> MacacaResult<LlmResponse> {
             Ok(LlmResponse {
                 content: "kernel test output".into(),
+                reasoning_content: None,
                 model: "mock".into(),
                 usage: TokenUsage {
                     prompt_tokens: 5,

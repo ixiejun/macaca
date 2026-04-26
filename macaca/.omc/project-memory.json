@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1775926865238,
+  "lastScanned": 1777035764940,
   "projectRoot": "/Users/quantum/Code/dev/agent/macaca",
   "techStack": {
     "languages": [
@@ -28,7 +28,7 @@
     "namingStyle": null,
     "importStyle": null,
     "testPattern": null,
-    "fileOrganization": "type-based"
+    "fileOrganization": null
   },
   "structure": {
     "isMonorepo": false,
@@ -37,7 +37,6 @@
       "docs",
       "examples",
       "scripts",
-      "src",
       "tests"
     ],
     "gitBranches": null
@@ -48,14 +47,14 @@
       "path": "Library",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1775926865225,
+      "lastAccessed": 1777035764919,
       "keyFiles": []
     },
     "config": {
       "path": "config",
       "purpose": "Configuration files",
       "fileCount": 1,
-      "lastAccessed": 1775926865226,
+      "lastAccessed": 1777035764920,
       "keyFiles": [
         "default.toml"
       ]
@@ -64,14 +63,14 @@
       "path": "crates",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1775926865226,
+      "lastAccessed": 1777035764920,
       "keyFiles": []
     },
     "deploy": {
       "path": "deploy",
       "purpose": null,
       "fileCount": 2,
-      "lastAccessed": 1775926865226,
+      "lastAccessed": 1777035764920,
       "keyFiles": [
         "install-systemd.sh",
         "macaca.service"
@@ -80,8 +79,8 @@
     "docs": {
       "path": "docs",
       "purpose": "Documentation",
-      "fileCount": 12,
-      "lastAccessed": 1775926865226,
+      "fileCount": 13,
+      "lastAccessed": 1777035764920,
       "keyFiles": [
         "SYSTEM_AUDIT.md",
         "SYSTEM_OVERVIEW.md",
@@ -94,76 +93,64 @@
       "path": "examples",
       "purpose": "Example code",
       "fileCount": 1,
-      "lastAccessed": 1775926865226,
+      "lastAccessed": 1777035764921,
       "keyFiles": []
-    },
-    "hello-world": {
-      "path": "hello-world",
-      "purpose": null,
-      "fileCount": 2,
-      "lastAccessed": 1775926865226,
-      "keyFiles": [
-        "README.md",
-        "index.html"
-      ]
     },
     "infra": {
       "path": "infra",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1775926865226,
+      "lastAccessed": 1777035764921,
       "keyFiles": []
     },
     "logs": {
       "path": "logs",
       "purpose": null,
-      "fileCount": 11,
-      "lastAccessed": 1775926865227,
+      "fileCount": 4,
+      "lastAccessed": 1777035764921,
       "keyFiles": [
-        "macaca.2026-04-02.gz",
-        "macaca.2026-04-03.gz",
-        "macaca.2026-04-04.gz",
-        "macaca.2026-04-05.gz",
-        "macaca.2026-04-06.gz"
+        "macaca.2026-04-14.gz",
+        "macaca.2026-04-15.gz",
+        "macaca.2026-04-16.gz",
+        "macaca.2026-04-24"
       ]
     },
     "openspec": {
       "path": "openspec",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1775926865227,
+      "lastAccessed": 1777035764921,
       "keyFiles": []
     },
     "scripts": {
       "path": "scripts",
       "purpose": "Build/utility scripts",
       "fileCount": 3,
-      "lastAccessed": 1775926865227,
+      "lastAccessed": 1777035764921,
       "keyFiles": [
         "benchmark.py",
         "trace_watch.py",
         "verify_logs.py"
       ]
     },
-    "specs": {
-      "path": "specs",
+    "shared": {
+      "path": "shared",
       "purpose": null,
-      "fileCount": 0,
-      "lastAccessed": 1775926865227,
-      "keyFiles": []
-    },
-    "src": {
-      "path": "src",
-      "purpose": "Source code",
-      "fileCount": 0,
-      "lastAccessed": 1775926865227,
-      "keyFiles": []
+      "fileCount": 8,
+      "lastAccessed": 1777035764921,
+      "keyFiles": [
+        "Makefile",
+        "README.md",
+        "go.mod",
+        "go.sum",
+        "index.html"
+      ]
     },
     "target": {
       "path": "target",
       "purpose": null,
       "fileCount": 3,
-      "lastAccessed": 1775926865227,
+      "lastAccessed": 1777035764921,
       "keyFiles": [
         "CACHEDIR.TAG"
       ]
@@ -172,162 +159,19 @@
       "path": "tests",
       "purpose": "Test files",
       "fileCount": 1,
-      "lastAccessed": 1775926865227,
+      "lastAccessed": 1777035764921,
       "keyFiles": [
         "e2e_project_task.sh"
       ]
-    },
-    "src/app": {
-      "path": "src/app",
-      "purpose": "Application code",
-      "fileCount": 1,
-      "lastAccessed": 1775926865228,
-      "keyFiles": [
-        "page.tsx"
-      ]
-    },
-    "src/components": {
-      "path": "src/components",
-      "purpose": "UI components",
-      "fileCount": 0,
-      "lastAccessed": 1775926865228,
-      "keyFiles": []
     },
     "tests/fixtures": {
       "path": "tests/fixtures",
       "purpose": "Test fixtures",
       "fileCount": 0,
-      "lastAccessed": 1775926865228,
+      "lastAccessed": 1777035764922,
       "keyFiles": []
     }
   },
-  "hotPaths": [
-    {
-      "path": "",
-      "accessCount": 10,
-      "lastAccessed": 1775928595599,
-      "type": "directory"
-    },
-    {
-      "path": "beijing-weather/backend/internal/qweather/client_test.go",
-      "accessCount": 5,
-      "lastAccessed": 1775927492775,
-      "type": "file"
-    },
-    {
-      "path": "beijing-weather/backend/go.mod",
-      "accessCount": 5,
-      "lastAccessed": 1775928600045,
-      "type": "file"
-    },
-    {
-      "path": "beijing-weather/backend/internal/qweather/client.go",
-      "accessCount": 5,
-      "lastAccessed": 1775928602806,
-      "type": "file"
-    },
-    {
-      "path": "beijing-weather/backend/internal/qweather/types.go",
-      "accessCount": 4,
-      "lastAccessed": 1775927518143,
-      "type": "file"
-    },
-    {
-      "path": "beijing-weather/backend/internal/config/config.go",
-      "accessCount": 4,
-      "lastAccessed": 1775928592058,
-      "type": "file"
-    },
-    {
-      "path": "beijing-weather/backend/cmd/server/main.go",
-      "accessCount": 3,
-      "lastAccessed": 1775928592040,
-      "type": "file"
-    },
-    {
-      "path": "beijing-weather/backend/internal/handler/weather.go",
-      "accessCount": 3,
-      "lastAccessed": 1775928592856,
-      "type": "file"
-    },
-    {
-      "path": "beijing-weather/backend/internal/model/weather.go",
-      "accessCount": 3,
-      "lastAccessed": 1775928601450,
-      "type": "file"
-    },
-    {
-      "path": "beijing-weather/backend/internal/service/weather.go",
-      "accessCount": 3,
-      "lastAccessed": 1775928602335,
-      "type": "file"
-    },
-    {
-      "path": "beijing-weather/backend/internal/service/cache.go",
-      "accessCount": 3,
-      "lastAccessed": 1775928603267,
-      "type": "file"
-    },
-    {
-      "path": "beijing-weather/backend/internal/middleware/cors.go",
-      "accessCount": 2,
-      "lastAccessed": 1775928592996,
-      "type": "file"
-    },
-    {
-      "path": "beijing-weather/backend/internal/handler/health.go",
-      "accessCount": 2,
-      "lastAccessed": 1775928600804,
-      "type": "file"
-    },
-    {
-      "path": "beijing-weather/backend/internal/handler/airquality.go",
-      "accessCount": 2,
-      "lastAccessed": 1775928601397,
-      "type": "file"
-    },
-    {
-      "path": "beijing-weather/backend/internal/model/response.go",
-      "accessCount": 2,
-      "lastAccessed": 1775928601835,
-      "type": "file"
-    },
-    {
-      "path": "beijing-weather/backend/internal/middleware/ratelimit.go",
-      "accessCount": 2,
-      "lastAccessed": 1775928603700,
-      "type": "file"
-    },
-    {
-      "path": "beijing-weather/backend/internal/middleware/requestid.go",
-      "accessCount": 2,
-      "lastAccessed": 1775928604171,
-      "type": "file"
-    },
-    {
-      "path": "beijing-weather/backend/config.toml",
-      "accessCount": 1,
-      "lastAccessed": 1775927150832,
-      "type": "file"
-    },
-    {
-      "path": "beijing-weather/backend/cmd/example/main.go",
-      "accessCount": 1,
-      "lastAccessed": 1775927541606,
-      "type": "file"
-    },
-    {
-      "path": "Cargo.toml",
-      "accessCount": 1,
-      "lastAccessed": 1775928543277,
-      "type": "file"
-    },
-    {
-      "path": "crates/macaca-cli/src/main.rs",
-      "accessCount": 1,
-      "lastAccessed": 1775928543404,
-      "type": "file"
-    }
-  ],
+  "hotPaths": [],
   "userDirectives": []
 }

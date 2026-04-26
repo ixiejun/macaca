@@ -1,0 +1,24 @@
+name: playwright_search
+description: |
+  Browser-oriented web research helper for newsroom agents.
+  Use action="search" with args ["query", "--max-results", "8"] to collect search results.
+  Use action="fetch_url" with args ["https://..."] to extract title, meta description, and readable page text.
+  The helper uses Playwright when available and falls back to browserless HTTP extraction when Playwright is unavailable.
+version: "0.1.0"
+entry_point:
+  type: shell
+  command: node
+  args: ["examples/apps/newsroom-autowriter/skills/scripts/playwright_search.mjs"]
+parameters:
+  type: object
+  required: [action, args]
+  properties:
+    action:
+      type: string
+      enum: [search, fetch_url]
+      description: "search for web results, or fetch_url to inspect one page"
+    args:
+      type: array
+      items:
+        type: string
+      description: "For search: [query, --max-results, N]. For fetch_url: [url]."

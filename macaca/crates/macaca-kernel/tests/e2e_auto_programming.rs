@@ -59,6 +59,7 @@ impl LlmProvider for AutoProgrammingLlm {
 
         Ok(LlmResponse {
             content,
+            reasoning_content: None,
             model: "mock-auto-programming".into(),
             usage: TokenUsage {
                 prompt_tokens: 50,

@@ -12,6 +12,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use tokio::{fs, process::Command, time::timeout};
 
+use macaca_app::AppLoader;
 use macaca_framework::adapter::{SingleToolAdapter, ToolSetBridge};
 use macaca_framework::execution::ExecutionContext;
 use macaca_framework::session::{load_module_state, save_module_state};
@@ -105,11 +106,17 @@ pub(crate) async fn build_toolkit(
         }
     }
 
+    let app_agent_names = app_agent_names(state, app_id).await;
     let assignee_capabilities: HashMap<String, Vec<String>> = state
         .kernel
         .list_agents()
         .await
         .into_iter()
+        .filter(|m| {
+            app_agent_names
+                .as_ref()
+                .is_none_or(|names| names.contains(&m.name))
+        })
         .map(|m| {
             let profile = m
                 .capabilities
@@ -133,6 +140,25 @@ pub(crate) async fn build_toolkit(
     );
 
     toolkit
+}
+
+async fn app_agent_names(state: &Arc<AppState>, app_id: &ApplicationId) -> Option<HashSet<String>> {
+    let app = {
+        let registry = state.registry.read().await;
+        registry.get_app(app_id).cloned()
+    }?;
+
+    match AppLoader::resolve_agent_configs(&app.manifest, &app.path) {
+        Ok(configs) => Some(configs.into_iter().map(|config| config.name).collect()),
+        Err(error) => {
+            tracing::warn!(
+                app_id = %app_id,
+                error = %error,
+                "Failed to resolve app-scoped agent names; falling back to global agents"
+            );
+            None
+        }
+    }
 }
 
 async fn resolve_tool_policy(
@@ -178,11 +204,17 @@ async fn resolve_tool_policy(
 
     // Any supervisor-like agent should not receive executable TaskBoard todos.
     // Keep this capability-driven first, with entry-agent compatibility fallback.
+    let app_agent_names = app_agent_names(state, app_id).await;
     let mut disallowed_task_assignees: HashSet<String> = state
         .kernel
         .list_agents()
         .await
         .into_iter()
+        .filter(|m| {
+            app_agent_names
+                .as_ref()
+                .is_none_or(|names| names.contains(&m.name))
+        })
         .filter_map(|m| {
             let caps: HashSet<String> = m.capabilities.into_iter().map(|c| c.name).collect();
             let is_supervisor = caps.contains("todo_goal_management")
@@ -312,6 +344,24 @@ fn register_agent_tools(
                             .collect(),
                         assignee_capabilities: assignee_capabilities.clone(),
                         active_goal_id: goal_id,
+                    },
+                ))),
+                Some("todo"),
+            );
+            toolkit.register(
+                Box::new(SingleToolAdapter::new(Box::new(
+                    macaca_tools::CreateTodosTool {
+                        create_todo: macaca_tools::CreateTodoTool {
+                            space: Arc::clone(&space),
+                            coordinator_name: agent_name.to_string(),
+                            disallowed_assignees: policy
+                                .disallowed_task_assignees
+                                .iter()
+                                .cloned()
+                                .collect(),
+                            assignee_capabilities: assignee_capabilities.clone(),
+                            active_goal_id: goal_id,
+                        },
                     },
                 ))),
                 Some("todo"),

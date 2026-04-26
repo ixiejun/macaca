@@ -413,6 +413,7 @@ mod tests {
                 .unwrap_or_default();
             Ok(LlmResponse {
                 content,
+                reasoning_content: None,
                 model: options.model.clone(),
                 usage: TokenUsage {
                     prompt_tokens: 10,

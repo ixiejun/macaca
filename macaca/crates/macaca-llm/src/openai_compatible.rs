@@ -77,6 +77,8 @@ struct ChatMessage {
     #[serde(skip_serializing_if = "Option::is_none")]
     content: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    reasoning_content: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     tool_calls: Option<Vec<OaiToolCall>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     tool_call_id: Option<String>,
@@ -128,6 +130,8 @@ struct Choice {
 struct ResponseMessage {
     content: Option<String>,
     #[serde(default)]
+    reasoning_content: Option<String>,
+    #[serde(default)]
     tool_calls: Option<Vec<OaiToolCall>>,
 }
 
@@ -158,6 +162,7 @@ fn convert_message(m: &LlmMessage) -> ChatMessage {
         } else {
             Some(m.content.clone())
         },
+        reasoning_content: m.reasoning_content.clone(),
         tool_calls: None,
         tool_call_id: m.tool_call_id.clone(),
     };
@@ -262,6 +267,7 @@ impl LlmProvider for OpenAiCompatibleProvider {
         })?;
 
         let content = choice.message.content.unwrap_or_default();
+        let reasoning_content = choice.message.reasoning_content;
         let finish_reason = choice.finish_reason.unwrap_or_else(|| "stop".into());
         let model = resp.model.unwrap_or_else(|| options.model.clone());
         let tool_calls = choice.message.tool_calls.map(parse_tool_calls);
@@ -274,6 +280,7 @@ impl LlmProvider for OpenAiCompatibleProvider {
 
         Ok(LlmResponse {
             content,
+            reasoning_content,
             model,
             usage: TokenUsage {
                 prompt_tokens: usage.prompt_tokens,
@@ -325,5 +332,14 @@ mod tests {
         assert_eq!(role_str(LlmRole::User), "user");
         assert_eq!(role_str(LlmRole::Assistant), "assistant");
         assert_eq!(role_str(LlmRole::Tool), "tool");
+    }
+
+    #[test]
+    fn convert_message_preserves_reasoning_content() {
+        let msg = LlmMessage::assistant_with_reasoning("answer", "reasoning");
+        let wire = serde_json::to_value(convert_message(&msg)).unwrap();
+        assert_eq!(wire["role"], "assistant");
+        assert_eq!(wire["content"], "answer");
+        assert_eq!(wire["reasoning_content"], "reasoning");
     }
 }

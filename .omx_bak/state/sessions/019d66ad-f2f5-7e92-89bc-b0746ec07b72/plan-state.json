@@ -1,0 +1,9 @@
+{
+  "active": true,
+  "current_phase": "evidence-gathering",
+  "task_description": "Consensus direct plan for SYSTEM_AUDIT clarification artifacts",
+  "started_at": "2026-04-07T09:18:00Z",
+  "mode": "consensus-direct",
+  "input_spec": ".omx/specs/deep-interview-system-audit-clarification.md",
+  "status": "gathering evidence"
+}

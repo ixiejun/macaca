@@ -37,6 +37,7 @@ impl LlmProvider for MockLlm {
     ) -> MacacaResult<LlmResponse> {
         Ok(LlmResponse {
             content: "fullstack-autodev-response".into(),
+            reasoning_content: None,
             model: "mock".into(),
             usage: TokenUsage {
                 prompt_tokens: 5,

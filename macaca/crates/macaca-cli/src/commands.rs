@@ -32,6 +32,7 @@ impl LlmProvider for StubLlmProvider {
     ) -> MacacaResult<LlmResponse> {
         Ok(LlmResponse {
             content: "(stub LLM — no provider configured)".into(),
+            reasoning_content: None,
             model: "stub".into(),
             usage: TokenUsage {
                 prompt_tokens: 0,

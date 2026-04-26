@@ -1,0 +1,30 @@
+# Context Snapshot — system-audit-clarification
+
+- Task statement: 对 `macaca/docs/SYSTEM_AUDIT.md` 进行澄清（deep-interview 模式）
+- Desired outcome: 产出一份边界清晰、可继续 handoff 到后续 planning/execution 的澄清规范，而不是直接修改实现
+- Stated solution: 用户要求针对 `SYSTEM_AUDIT.md` 做需求澄清
+- Probable intent hypothesis: 用户想把当前审计报告从“观察/建议集合”收敛成可执行的优先级、范围与决策边界来源，避免后续重构跑偏
+- Known facts/evidence:
+  - 目标文件存在：`macaca/docs/SYSTEM_AUDIT.md`
+  - 文档内容包含架构审计、前端审计、技术债总结、重构建议
+  - 仓库内未发现其他文件直接引用 `SYSTEM_AUDIT.md`
+  - 相关代码证据存在于 `macaca-web/src/routes.rs`, `state.rs`, `macaca-kernel/src/audit.rs` 等
+  - 同目录存在相关审计/设计文档：`system-integration-audit.md`, `task-session-isolation-plan.md` 等
+- Constraints:
+  - 当前处于 deep-interview，不能直接实现
+  - 每轮只问一个问题
+  - 需要尽量基于代码库证据提问，不把可自行发现的信息抛给用户
+- Unknowns/open questions:
+  - 用户要“澄清”的对象是文档用途、受众、结论优先级，还是将其转成行动计划
+  - 希望输出为修订版文档、补充说明、执行 spec，还是 planning handoff
+  - 哪些审计结论应被视为绑定约束，哪些只是候选建议
+- Decision-boundary unknowns:
+  - OMX 是否可自行重排问题优先级
+  - OMX 是否可自行删改原审计结论措辞
+  - OMX 是否可把文档拆分为 audit + plan 两份产物
+- Likely codebase touchpoints:
+  - `macaca/docs/SYSTEM_AUDIT.md`
+  - `macaca/docs/system-integration-audit.md`
+  - `macaca/crates/macaca-web/src/routes.rs`
+  - `macaca/crates/macaca-web/src/state.rs`
+  - `macaca/crates/macaca-kernel/src/audit.rs`

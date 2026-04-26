@@ -11,8 +11,8 @@ pub use orchestration::{
     ReportResultTool, TaskResultData,
 };
 pub use todo::{
-    CheckTodoProgressTool, ClaimTaskTool, CreateGoalTool, CreateTodoTool, ListMyTasksTool,
-    OnGoalCreated, OnGoalRecorded, OnTodoReviewed, ReassignTaskTool, ReviewTodoTool, StartTaskTool,
-    SubmitTaskForReviewTool, UpdateTaskProgressTool,
+    CheckTodoProgressTool, ClaimTaskTool, CreateGoalTool, CreateTodoTool, CreateTodosTool,
+    ListMyTasksTool, OnGoalCreated, OnGoalRecorded, OnTodoReviewed, ReassignTaskTool,
+    ReviewTodoTool, StartTaskTool, SubmitTaskForReviewTool, UpdateTaskProgressTool,
 };
 pub use tool::{Tool, ToolSet, TraceEvent};
