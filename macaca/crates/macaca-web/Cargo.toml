@@ -10,6 +10,7 @@ macaca-kernel = { workspace = true }
 macaca-app = { workspace = true }
 macaca-sdk = { workspace = true }
 macaca-skill = { workspace = true }
+macaca-runtime-host = { workspace = true }
 macaca-tools = { workspace = true }
 macaca-runtime = { workspace = true }
 macaca-driver-claude-code = { workspace = true }

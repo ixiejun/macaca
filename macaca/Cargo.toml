@@ -16,11 +16,11 @@ members = [
     "crates/macaca-cli",
     "crates/macaca-driver",
     "crates/macaca-runtime",
-    "crates/macaca-mcp",
     "crates/macaca-skill",
     "crates/macaca-driver-claude-code",
     "crates/macaca-web",
     "crates/macaca-framework",
+    "crates/macaca-runtime-host",
     "crates/macaca-integration-tests",
 ]
 
@@ -83,7 +83,7 @@ macaca-gateway = { path = "crates/macaca-gateway" }
 macaca-cli = { path = "crates/macaca-cli" }
 macaca-driver = { path = "crates/macaca-driver" }
 macaca-runtime = { path = "crates/macaca-runtime" }
-macaca-mcp = { path = "crates/macaca-mcp" }
 macaca-skill = { path = "crates/macaca-skill" }
 macaca-driver-claude-code = { path = "crates/macaca-driver-claude-code" }
 macaca-web = { path = "crates/macaca-web" }
+macaca-runtime-host = { path = "crates/macaca-runtime-host" }

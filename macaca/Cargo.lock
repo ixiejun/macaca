@@ -1530,20 +1530,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "macaca-mcp"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "macaca-driver",
- "macaca-proto",
- "macaca-tools",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "macaca-memory"
 version = "0.1.0"
 dependencies = [
@@ -1602,6 +1588,24 @@ dependencies = [
  "sha2",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "macaca-runtime-host"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "dirs",
+ "macaca-framework",
+ "macaca-proto",
+ "macaca-skill",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "tokio",
+ "toml",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -1695,6 +1699,7 @@ dependencies = [
  "macaca-persist",
  "macaca-proto",
  "macaca-runtime",
+ "macaca-runtime-host",
  "macaca-sdk",
  "macaca-skill",
  "macaca-task",

@@ -122,3 +122,24 @@ prefix = "macaca"
 format = "json"
 retention_days = 10
 compress = true
+
+# ---------------------------------------------------------------------------
+# MCP (Model Context Protocol) runtime configuration
+# ---------------------------------------------------------------------------
+#
+# `[mcp.env]` — key/value pairs re-exported into the backend process
+# environment at startup so every stdio MCP child process inherits them
+# automatically (via tokio::process::Command default env inheritance).
+#
+# Value semantics:
+#   - A literal secret  → forwarded verbatim, e.g. `FIGMA_API_KEY = "figd_xxx"`
+#   - An ALL_CAPS identifier → treated as the name of an EXISTING shell env
+#     variable to forward, e.g. `FIGMA_API_KEY = "FIGMA_API_KEY"` only takes
+#     effect if you `export FIGMA_API_KEY=figd_xxx` before launching.
+#   - A placeholder starting with `YOUR_`, `REPLACE_`, or wrapped in `<...>`
+#     → skipped with an INFO log. Safe to commit placeholders to the repo.
+#
+# Replace the placeholder below with your Figma Personal Access Token before
+# starting the backend. Do NOT commit real tokens.
+[mcp.env]
+FIGMA_API_KEY = "YOUR_FIGMA_PERSONAL_ACCESS_TOKEN_HERE"
