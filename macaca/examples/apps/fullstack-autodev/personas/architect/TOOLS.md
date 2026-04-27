@@ -14,21 +14,48 @@ After completing a task, always call `submit_task_for_review` with a summary of 
 
 ## figma-mcp
 
-Fetch design context from Figma URLs.
+Fetch design context from Figma URLs via the `figma-developer-mcp` MCP server.
+The server auto-starts on first call (stdio transport); the backend must have
+`FIGMA_API_KEY` exported in its environment.
 
-```bash
-# Get design context
-figma-mcp get_design_context --file-key FILE_KEY --node-id NODE_ID
+### Available tools (exact names will be shown in your tool list at runtime)
 
-# Get full file
-figma-mcp get_file --file-key FILE_KEY
+- `get_figma_data` — fetch a Figma file or node subtree
+  - `fileKey` (string, required): 22-char id from the Figma URL
+  - `nodeId` (string, optional): specific node id (URL-decoded, e.g. `123:456`)
+  - `depth` (int, optional): recursion depth; use 2–3 for overview, deeper for detail
+- `download_figma_images` — export image assets for given nodeIds
+
+### Extract fileKey / nodeId from a Figma URL
+
 ```
-
-### Extract from Figma URL
-```
-https://www.figma.com/file/FILE_KEY/Design-Name?node-id=NODE_ID
+https://www.figma.com/file/<FILE_KEY>/Design-Name?node-id=<NODE_ID>
+https://www.figma.com/design/<FILE_KEY>/Design-Name?node-id=<NODE_ID>
                              ^^^^^^^^              ^^^^^^^
 ```
+
+`node-id` in the URL is URL-encoded (`%3A` = `:`). Decode before passing.
+
+### Typical invocation
+
+```json
+{
+  "tool": "get_figma_data",
+  "input": {
+    "fileKey": "abcDEF1234567890",
+    "nodeId": "123:456",
+    "depth": 3
+  }
+}
+```
+
+After receiving the JSON tree, summarize:
+- **Layout**: frame size, auto-layout direction, padding, spacing
+- **Typography**: font family / size / weight
+- **Colors**: fills / strokes / effects
+- **Component structure**: instances, variants, nested frames
+
+Publish the summary to `shared/design-context.md` for downstream implementers.
 
 ## file_read / file_write (builtin)
 

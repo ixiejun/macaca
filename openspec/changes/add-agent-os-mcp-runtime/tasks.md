@@ -61,17 +61,26 @@
 
 ## 6. `macaca-mcp` Consolidation
 
-- [ ] 6.1 Audit current `macaca-mcp` crate call sites.
-- [ ] 6.2 Decide whether `macaca-mcp` becomes a thin wrapper/re-export or is marked deprecated.
-- [ ] 6.3 Remove or replace stub protocol behavior so there is only one real MCP protocol implementation.
-- [ ] 6.4 Add compile-time deprecation comments/docs for any retained compatibility API.
-- [ ] 6.5 Add tests proving callers use the framework MCP implementation.
+- [x] 6.1 Audit current `macaca-mcp` crate call sites. Result: zero non-test `use macaca_mcp::` references — stub was truly orphaned.
+- [x] 6.2 Decide whether `macaca-mcp` becomes a thin wrapper/re-export or is marked deprecated. Decision: **delete**. The framework (`macaca-framework::mcp`) is the single protocol implementation, and the new `macaca-runtime-host` crate owns OS-level registry/runtime glue.
+- [x] 6.3 Remove or replace stub protocol behavior so there is only one real MCP protocol implementation. Crate directory removed; workspace members/dependencies updated in `macaca/Cargo.toml`.
+- [x] 6.4 Add compile-time deprecation comments/docs for any retained compatibility API. N/A after deletion; `macaca-web/src/mcp_runtime.rs` is now a documented `pub use macaca_runtime_host::mcp_runtime::*;` shell.
+- [x] 6.5 Add tests proving callers use the framework MCP implementation. `cargo test -p macaca-runtime-host` (12 tests) and `cargo test -p macaca-web` (40 tests) green; `grep -R macaca_mcp:: crates/` returns only historical test string literals.
+
+## 6bis. OS Runtime Host Consolidation (added 2026-04-24)
+
+- [x] 6bis.1 Create `macaca-runtime-host` crate owning MCP registry, runtime manager, lifecycle scopes, concurrency-isolation policy, and compatibility registry.
+- [x] 6bis.2 Promote `McpRuntimeManager`, `McpServerDefinition`, `McpToolPolicy`, `McpRuntimeStatus`, `probe_definition_statuses`, `definitions_from_skill_snapshot` out of `macaca-web` into `macaca-runtime-host::mcp_runtime`; keep `macaca-web/src/mcp_runtime.rs` as thin re-export shell for existing `crate::mcp_runtime::*` call sites.
+- [x] 6bis.3 Remove product-name hardcoding: introduce declarative `ConcurrencyIsolationPolicy { required_args, skip_if_any_arg_prefix }` + `apply_concurrency_isolation(policy, args)` generic function. Replaces the previous `if command.contains("playwright")` branch in runtime source.
+- [x] 6bis.4 Externalize compat mappings to `crates/macaca-runtime-host/resources/compat_mappings.toml` (bundled via `include_str!`) with an override layer via `CompatRegistry::load_with_override(...)`. Rust source no longer contains `"@playwright/mcp"` / `"playwright-mcp"` control-flow literals.
+- [x] 6bis.5 Update `macaca-web/src/skill_mcp.rs` to consult `macaca_runtime_host::compat::default_registry()` instead of hardcoding the playwright package check.
+
 
 ## 7. End-to-End Validation
 
-- [ ] 7.1 Run `cargo check -p macaca-framework -p macaca-web -p macaca-mcp`.
-- [ ] 7.2 Run framework MCP unit/integration tests.
-- [ ] 7.3 Run web MCP registry/runtime tests.
+- [x] 7.1 Run `cargo check --workspace` (was `-p macaca-framework -p macaca-web -p macaca-mcp`; `macaca-mcp` removed).
+- [x] 7.2 Run framework MCP unit/integration tests.
+- [x] 7.3 Run web MCP registry/runtime tests (40 pass; includes `compat_registry_resolves_playwright_mcp_package`).
 - [ ] 7.4 Start backend and verify MCP status API for a globally configured Playwright server.
 - [ ] 7.5 Send a direct task that uses `browser_navigate` and `browser_snapshot` against `https://example.com`.
 - [ ] 7.6 Run two concurrent sessions using Playwright and verify no browser profile contention.

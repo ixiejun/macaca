@@ -12,6 +12,8 @@ use axum::response::sse::Event;
 use macaca_app::AppLoader;
 use macaca_framework::tool::Toolkit;
 use macaca_proto::ApplicationId;
+use macaca_runtime_host::compat::default_registry;
+use macaca_runtime_host::mcp_runtime::apply_concurrency_isolation;
 use macaca_skill::{
     SkillMcpServerConfig, SkillPolicy, SkillRuntime, SkillRuntimeOptions, SkillSnapshot,
     SkillSnapshotEntry,
@@ -224,19 +226,21 @@ fn launch_from_explicit_server(
 }
 
 fn launch_from_compat_registry(skill: &SkillSnapshotEntry) -> Option<SkillMcpServerLaunch> {
-    let has_playwright_package = skill.install.iter().any(|install| {
-        install.package.as_deref() == Some("@playwright/mcp")
-            || install.bins.iter().any(|bin| bin == "playwright-mcp")
-    });
-    if has_playwright_package {
-        return Some(SkillMcpServerLaunch {
-            skill_name: skill.name.clone(),
-            server_id: "playwright".to_string(),
-            command: "playwright-mcp".to_string(),
-            args: vec!["--headless".to_string(), "--isolated".to_string()],
-        });
+    let registry = default_registry();
+    let entry = registry.resolve_for_skill(skill)?;
+    if !entry.server.transport.eq_ignore_ascii_case("stdio") {
+        return None;
     }
-    None
+    let args = match entry.concurrency_isolation.as_ref() {
+        Some(iso) => apply_concurrency_isolation(&iso.policy(), entry.server.args.clone()),
+        None => entry.server.args.clone(),
+    };
+    Some(SkillMcpServerLaunch {
+        skill_name: skill.name.clone(),
+        server_id: entry.id.clone(),
+        command: entry.server.command.clone(),
+        args,
+    })
 }
 
 fn launch_from_runtime_server_id(
@@ -247,7 +251,6 @@ fn launch_from_runtime_server_id(
         .into_iter()
         .find(|launch| {
             server_id == format!("skill:{}:{}", launch.skill_name, launch.server_id)
-                || server_id == format!("skill:{}:playwright", launch.skill_name)
         })
 }
 

@@ -88,6 +88,17 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
     let config = MacacaConfig::load_default();
     info!(default_provider = %config.llm.default_provider, "Configuration loaded");
 
+    // 1b. Publish [mcp.env] entries into the current process environment so
+    //     every stdio MCP child process (which inherits parent env by default)
+    //     automatically receives secrets such as FIGMA_API_KEY.
+    let mcp_env_outcomes = macaca_runtime_host::apply_mcp_env(&config.mcp.env);
+    if !mcp_env_outcomes.is_empty() {
+        info!(
+            entries = mcp_env_outcomes.len(),
+            "Applied [mcp.env] to process environment for MCP child inheritance"
+        );
+    }
+
     // 2. Create LLM router/provider registry from configuration.
     let llm_router = Arc::new(LlmRouter::from_config(&config.llm)?);
     let llm: Arc<dyn LlmProvider> = llm_router.clone();
