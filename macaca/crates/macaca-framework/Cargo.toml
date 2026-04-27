@@ -43,11 +43,12 @@ macaca-tools = { path = "../macaca-tools", optional = true }
 default = []
 a2a-client = ["dep:reqwest"]
 a2a-server = ["dep:axum"]
+mcp-http = ["dep:reqwest"]
 persist = ["dep:macaca-persist"]
 openai = ["dep:reqwest"]
 anthropic = ["dep:reqwest"]
-macaca-compat = ["dep:macaca-llm", "dep:macaca-tools"]
-full = ["a2a-client", "a2a-server", "persist", "openai", "anthropic", "macaca-compat"]
+macaca-compat = ["dep:macaca-llm", "dep:macaca-tools", "mcp-http"]
+full = ["a2a-client", "a2a-server", "mcp-http", "persist", "openai", "anthropic", "macaca-compat"]
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }

@@ -102,6 +102,13 @@ fn inline_to_agent_config(inline: &InlineAgentConfig) -> AgentConfig {
         max_tokens: inline.max_tokens,
         temperature: inline.temperature,
         persona_dir: None,
+        skills: inline
+            .skills
+            .as_ref()
+            .map(|skills| macaca_sdk::config::AgentSkillsConfig {
+                allow: skills.allow.clone(),
+                deny: skills.deny.clone(),
+            }),
     }
 }
 
@@ -207,6 +214,7 @@ layer: L2Wasm
                 allowed_tools: vec![],
                 max_tokens: None,
                 temperature: None,
+                skills: None,
             })],
             llm_config: None,
             entry_agent: None,

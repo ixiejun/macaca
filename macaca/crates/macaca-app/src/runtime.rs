@@ -241,6 +241,7 @@ mod tests {
                 allowed_tools: vec![],
                 max_tokens: None,
                 temperature: None,
+                skills: None,
             })],
             llm_config: None,
             entry_agent: None,

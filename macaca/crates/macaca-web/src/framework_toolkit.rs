@@ -5,10 +5,12 @@
 
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
+use std::convert::Infallible;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
+use axum::response::sse::Event;
 use async_trait::async_trait;
 use tokio::{fs, process::Command, time::timeout};
 
@@ -19,6 +21,10 @@ use macaca_framework::session::{load_module_state, save_module_state};
 use macaca_framework::tool::Toolkit;
 use macaca_proto::ApplicationId;
 
+use crate::mcp_runtime::{
+    definitions_from_skill_snapshot, McpRuntimeContext, McpRuntimeStatus, McpRuntimeStatusState,
+    McpDefinitionSource, McpRegistryConfig, McpServerDefinition, McpToolPolicy,
+};
 use crate::state::AppState;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -133,13 +139,306 @@ pub(crate) async fn build_toolkit(
         state,
         app_id,
         agent_name,
-        session_id,
+        session_id.clone(),
         goal_id,
         &policy,
         &assignee_capabilities,
     );
 
+    let mcp_context = McpRuntimeContext::for_agent(app_id, session_id.as_deref(), agent_name);
+    let mcp_policy = McpToolPolicy::default();
+    let close_emitter = mcp_close_event_emitter(state, session_id.as_deref(), agent_name);
+
+    let mut mcp_definitions = state.mcp_runtime.definitions().await;
+    mcp_definitions.extend(load_app_mcp_overlay_definitions(state, app_id).await);
+    emit_mcp_starting_events(state, session_id.as_deref(), agent_name, &mcp_definitions).await;
+    let mcp_statuses = state
+        .mcp_runtime
+        .register_definitions(
+            &mut toolkit,
+            mcp_definitions,
+            &mcp_policy,
+            &mcp_context,
+            close_emitter.clone(),
+        )
+        .await;
+    emit_mcp_runtime_events(state, session_id.as_deref(), agent_name, &mcp_statuses).await;
+
+    if let Some(snapshot) =
+        crate::skill_mcp::load_or_build_skill_snapshot(state, app_id, agent_name, session_id.as_deref()).await
+    {
+        let skill_definitions = definitions_from_skill_snapshot(&snapshot);
+        emit_mcp_starting_events(state, session_id.as_deref(), agent_name, &skill_definitions).await;
+        let skill_statuses = state
+            .mcp_runtime
+            .register_definitions(
+                &mut toolkit,
+                skill_definitions,
+                &mcp_policy,
+                &mcp_context,
+                close_emitter,
+            )
+            .await;
+        emit_skill_mcp_alias_events(state, session_id.as_deref(), agent_name, &skill_statuses).await;
+        emit_mcp_runtime_events(state, session_id.as_deref(), agent_name, &skill_statuses).await;
+    }
+
     toolkit
+}
+
+async fn load_app_mcp_overlay_definitions(
+    state: &Arc<AppState>,
+    app_id: &ApplicationId,
+) -> Vec<McpServerDefinition> {
+    let app = {
+        let registry = state.registry.read().await;
+        registry.get_app(app_id).cloned()
+    };
+    let Some(app) = app else {
+        return Vec::new();
+    };
+    let path = app.path.join("mcp.yaml");
+    if !path.exists() {
+        return Vec::new();
+    }
+    let Ok(content) = tokio::fs::read_to_string(&path).await else {
+        return Vec::new();
+    };
+    match serde_yaml::from_str::<McpRegistryConfig>(&content)
+        .map_err(|e| e.to_string())
+        .and_then(|config| config.into_definitions(McpDefinitionSource::App))
+    {
+        Ok(definitions) => definitions,
+        Err(error) => {
+            tracing::warn!(
+                app_id = %app_id,
+                path = %path.display(),
+                error = %error,
+                "Failed to load app MCP overlay"
+            );
+            Vec::new()
+        }
+    }
+}
+
+fn mcp_close_event_emitter(
+    state: &Arc<AppState>,
+    session_id: Option<&str>,
+    agent_name: &str,
+) -> Option<Arc<dyn Fn(McpRuntimeStatus) + Send + Sync>> {
+    let session_id = session_id.map(ToString::to_string)?;
+    let state = Arc::clone(state);
+    let agent_name = agent_name.to_string();
+    Some(Arc::new(move |status: McpRuntimeStatus| {
+        let state = Arc::clone(&state);
+        let session_id = session_id.clone();
+        let agent_name = agent_name.clone();
+        if let Ok(handle) = tokio::runtime::Handle::try_current() {
+            handle.spawn(async move {
+                let sse_tx = {
+                    let active_sessions = state.sessions.active_sessions.read().await;
+                    active_sessions
+                        .get(&session_id)
+                        .map(|session| Arc::clone(&session.sse_tx))
+                };
+                let payload = serde_json::json!({
+                    "agent": agent_name,
+                    "server_id": status.server_id,
+                    "lifecycle": status.lifecycle,
+                    "session_mode": status.session_mode,
+                    "state": "closed",
+                    "failure_reason": status.failure_reason,
+                });
+                emit_mcp_event(
+                    &state,
+                    &session_id,
+                    &sse_tx,
+                    "mcp_server_closed",
+                    &agent_name,
+                    &payload,
+                )
+                .await;
+            });
+        }
+    }))
+}
+
+async fn emit_mcp_runtime_events(
+    state: &Arc<AppState>,
+    session_id: Option<&str>,
+    agent_name: &str,
+    statuses: &[McpRuntimeStatus],
+) {
+    let Some(session_id) = session_id else {
+        return;
+    };
+
+    let sse_tx = {
+        let active_sessions = state.sessions.active_sessions.read().await;
+        active_sessions
+            .get(session_id)
+            .map(|session| Arc::clone(&session.sse_tx))
+    };
+
+    for status in statuses {
+        if matches!(status.state, McpRuntimeStatusState::Disabled) {
+            continue;
+        }
+
+        let payload = serde_json::json!({
+            "agent": agent_name,
+            "server_id": status.server_id,
+            "transport": status.transport,
+            "lifecycle": status.lifecycle,
+            "session_mode": status.session_mode,
+            "state": status.state,
+            "exposed_tools": status.exposed_tools,
+            "failure_reason": status.failure_reason,
+        });
+
+        emit_mcp_event(state, session_id, &sse_tx, "mcp_server_resolved", agent_name, &payload)
+            .await;
+
+        match status.state {
+            McpRuntimeStatusState::Ready => {
+                emit_mcp_event(state, session_id, &sse_tx, "mcp_server_ready", agent_name, &payload)
+                    .await;
+                if !status.exposed_tools.is_empty() {
+                    emit_mcp_event(
+                        state,
+                        session_id,
+                        &sse_tx,
+                        "mcp_tools_registered",
+                        agent_name,
+                        &payload,
+                    )
+                    .await;
+                }
+            }
+            McpRuntimeStatusState::Failed | McpRuntimeStatusState::DependencyMissing => {
+                emit_mcp_event(
+                    state,
+                    session_id,
+                    &sse_tx,
+                    "mcp_server_failed",
+                    agent_name,
+                    &payload,
+                )
+                .await;
+            }
+            McpRuntimeStatusState::Disabled => {}
+        }
+    }
+}
+
+async fn emit_skill_mcp_alias_events(
+    state: &Arc<AppState>,
+    session_id: Option<&str>,
+    agent_name: &str,
+    statuses: &[McpRuntimeStatus],
+) {
+    let Some(session_id) = session_id else {
+        return;
+    };
+    let sse_tx = {
+        let active_sessions = state.sessions.active_sessions.read().await;
+        active_sessions
+            .get(session_id)
+            .map(|session| Arc::clone(&session.sse_tx))
+    };
+
+    for status in statuses
+        .iter()
+        .filter(|status| status.server_id.starts_with("skill:"))
+    {
+        let payload = serde_json::json!({
+            "agent": agent_name,
+            "server_id": status.server_id,
+            "state": status.state,
+            "exposed_tools": status.exposed_tools,
+            "failure_reason": status.failure_reason,
+        });
+        let event_type = match status.state {
+            McpRuntimeStatusState::Ready => "skill_mcp_ready",
+            McpRuntimeStatusState::Failed | McpRuntimeStatusState::DependencyMissing => {
+                "skill_mcp_failed"
+            }
+            McpRuntimeStatusState::Disabled => "skill_mcp_disabled",
+        };
+        emit_mcp_event(state, session_id, &sse_tx, event_type, agent_name, &payload).await;
+        if matches!(status.state, McpRuntimeStatusState::Ready) && !status.exposed_tools.is_empty()
+        {
+            emit_mcp_event(
+                state,
+                session_id,
+                &sse_tx,
+                "skill_mcp_tools_registered",
+                agent_name,
+                &payload,
+            )
+            .await;
+        }
+    }
+}
+
+async fn emit_mcp_starting_events(
+    state: &Arc<AppState>,
+    session_id: Option<&str>,
+    agent_name: &str,
+    definitions: &[McpServerDefinition],
+) {
+    let Some(session_id) = session_id else {
+        return;
+    };
+    let sse_tx = {
+        let active_sessions = state.sessions.active_sessions.read().await;
+        active_sessions
+            .get(session_id)
+            .map(|session| Arc::clone(&session.sse_tx))
+    };
+
+    for definition in definitions.iter().filter(|definition| definition.enabled) {
+        let payload = serde_json::json!({
+            "agent": agent_name,
+            "server_id": definition.id,
+            "lifecycle": definition.lifecycle,
+            "session_mode": definition.session_mode,
+            "state": "starting",
+        });
+        emit_mcp_event(
+            state,
+            session_id,
+            &sse_tx,
+            "mcp_server_starting",
+            agent_name,
+            &payload,
+        )
+        .await;
+    }
+}
+
+async fn emit_mcp_event(
+    state: &Arc<AppState>,
+    session_id: &str,
+    sse_tx: &Option<Arc<tokio::sync::RwLock<tokio::sync::mpsc::Sender<Result<Event, Infallible>>>>>,
+    event_type: &str,
+    source: &str,
+    payload: &serde_json::Value,
+) {
+    state
+        .persist
+        .event_log
+        .append(session_id, event_type, source, payload.clone())
+        .await;
+
+    if let Some(sse_tx) = sse_tx {
+        let sender = sse_tx.read().await;
+        let _ = sender
+            .send(Ok(Event::default()
+                .event(event_type)
+                .data(payload.to_string())))
+            .await;
+    }
 }
 
 async fn app_agent_names(state: &Arc<AppState>, app_id: &ApplicationId) -> Option<HashSet<String>> {

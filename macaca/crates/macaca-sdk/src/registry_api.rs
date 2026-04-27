@@ -161,6 +161,7 @@ description = "From TOML file"
             max_tokens: None,
             temperature: None,
             persona_dir: None,
+            skills: None,
         };
         let err = register_from_config(&kernel, config).await.unwrap_err();
         assert!(err.to_string().contains("name"));

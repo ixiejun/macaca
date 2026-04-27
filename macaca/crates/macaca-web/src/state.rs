@@ -140,6 +140,8 @@ pub struct AppState {
     pub tools: Arc<dyn ToolSet>,
     /// Application executor registry for isolated multi-agent execution.
     pub executor_registry: Arc<ApplicationExecutorRegistry>,
+    /// Agent OS level MCP runtime and registry.
+    pub mcp_runtime: Arc<crate::mcp_runtime::McpRuntimeManager>,
     /// Persistence: session store, todo store, event log, audit logger, run tracer.
     pub persist: PersistenceState,
     /// Loop lifecycle: PlanLoop, WorkerLoop, Scheduler handles and wakers.

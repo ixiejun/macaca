@@ -589,6 +589,10 @@ pub(crate) async fn post_chat_v2(
         }
 
         // Cleanup
+        let _ = state_for_task
+            .mcp_runtime
+            .cleanup_session(&session_key_for_task)
+            .await;
         {
             let mut sessions = state_for_task.sessions.active_sessions.write().await;
             sessions.remove(&session_key_for_task);

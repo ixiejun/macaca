@@ -20,6 +20,7 @@ pub mod definition;
 pub mod discovery;
 pub mod provisioner;
 pub mod registry;
+pub mod runtime;
 pub mod tool;
 
 // Executable skills (YAML).
@@ -28,7 +29,14 @@ pub use registry::SkillRegistry;
 pub use tool::SkillTool;
 
 // Agent Skills (SKILL.md / agentskills.io).
-pub use agent_skill::{ActivatedSkill, AgentSkill};
+pub use agent_skill::{
+    ActivatedSkill, AgentSkill, SkillEntry, SkillExposure, SkillInstallSpec, SkillInvocationPolicy,
+    SkillMcpServerConfig, SkillMetadata, SkillSourceScope,
+};
 pub use catalog::{CatalogEntry, SkillCatalog};
 pub use discovery::{DiscoveredSkill, SkillScope};
 pub use provisioner::{ClientConfig, SkillProvisioner};
+pub use runtime::{
+    path_belongs_to_snapshot_skill, FilteredSkill, SkillPolicy, SkillRuntime, SkillRuntimeLimits,
+    SkillRuntimeOptions, SkillSnapshot, SkillSnapshotEntry,
+};

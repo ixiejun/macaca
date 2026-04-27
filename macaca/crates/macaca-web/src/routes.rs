@@ -17,8 +17,12 @@ use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::Json;
 use serde::{Deserialize, Serialize};
 
+use macaca_app::AppLoader;
 use macaca_proto::ApplicationId;
+use macaca_skill::{SkillPolicy, SkillRuntime, SkillRuntimeOptions};
 
+use crate::mcp_runtime::{McpRuntimeStatus, McpToolPolicy};
+use crate::skill_mcp::SkillMcpStatus;
 use crate::state::AppState;
 
 // ---------------------------------------------------------------------------
@@ -515,6 +519,133 @@ pub async fn get_skills(State(state): State<Arc<AppState>>) -> Json<Vec<SkillInf
         })
         .collect();
     Json(skills)
+}
+
+// ---------------------------------------------------------------------------
+// GET /api/apps/:id/skills — Per-app/agent standard AgentSkills status
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Deserialize, Default)]
+pub struct SkillStatusQuery {
+    pub agent: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct AppSkillStatus {
+    pub agent: String,
+    pub visible: Vec<AppSkillInfo>,
+    pub filtered: Vec<AppFilteredSkillInfo>,
+    pub mcp: Vec<SkillMcpStatus>,
+    pub truncated: bool,
+    pub compact: bool,
+}
+
+/// GET /api/mcp — Agent OS level MCP registry/runtime status.
+pub async fn get_mcp_status(State(state): State<Arc<AppState>>) -> Json<Vec<McpRuntimeStatus>> {
+    let statuses = state
+        .mcp_runtime
+        .probe_statuses(&McpToolPolicy::default())
+        .await;
+    Json(statuses)
+}
+
+#[derive(Serialize)]
+pub struct AppSkillInfo {
+    pub name: String,
+    pub description: String,
+    pub location: String,
+    pub source: String,
+}
+
+#[derive(Serialize)]
+pub struct AppFilteredSkillInfo {
+    pub name: String,
+    pub reason: String,
+    pub source: String,
+}
+
+pub async fn get_app_skills(
+    State(state): State<Arc<AppState>>,
+    axum::extract::Path(app_id): axum::extract::Path<String>,
+    Query(query): Query<SkillStatusQuery>,
+) -> Result<Json<Vec<AppSkillStatus>>, (StatusCode, Json<ErrorResponse>)> {
+    let app_uuid: uuid::Uuid = app_id
+        .parse()
+        .map_err(|_| err(StatusCode::BAD_REQUEST, "Invalid app_id".into()))?;
+    let app_id = ApplicationId(app_uuid);
+
+    let app = {
+        let registry = state.registry.read().await;
+        registry
+            .get_app(&app_id)
+            .cloned()
+            .ok_or_else(|| err(StatusCode::NOT_FOUND, "App not found".into()))?
+    };
+    let agent_configs = AppLoader::resolve_agent_configs(&app.manifest, &app.path)
+        .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let workspace_root = {
+        let workspaces = state.config.app_workspaces.read().await;
+        workspaces.get(&app_id).map(|ws| ws.root.clone())
+    };
+
+    let mut statuses = Vec::new();
+    for agent in agent_configs {
+        if query
+            .agent
+            .as_deref()
+            .is_some_and(|name| name != agent.name.as_str())
+        {
+            continue;
+        }
+        let policy = agent
+            .skills
+            .as_ref()
+            .map(|skills| SkillPolicy {
+                allow: skills.allow.clone(),
+                deny: skills.deny.clone(),
+            })
+            .unwrap_or_default();
+        let snapshot = SkillRuntime
+            .build_snapshot(
+                agent.name.clone(),
+                SkillRuntimeOptions {
+                    workspace_dir: workspace_root.clone(),
+                    app_dir: Some(app.path.clone()),
+                    policy,
+                    ..Default::default()
+                },
+            )
+            .await
+            .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        let mcp = crate::skill_mcp::probe_skill_mcp_servers(&snapshot).await;
+        statuses.push(AppSkillStatus {
+            agent: snapshot.agent,
+            visible: snapshot
+                .skills
+                .into_iter()
+                .map(|skill| AppSkillInfo {
+                    name: skill.name,
+                    description: skill.description,
+                    location: skill.location.display().to_string(),
+                    source: skill.source,
+                })
+                .collect(),
+            filtered: snapshot
+                .filtered
+                .into_iter()
+                .map(|skill| AppFilteredSkillInfo {
+                    name: skill.name,
+                    reason: skill.reason,
+                    source: skill.source,
+                })
+                .collect(),
+            mcp,
+            truncated: snapshot.truncated,
+            compact: snapshot.compact,
+        });
+    }
+
+    Ok(Json(statuses))
 }
 
 // ---------------------------------------------------------------------------

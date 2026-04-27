@@ -142,6 +142,15 @@ pub trait ToolMiddleware: Send + Sync {
     async fn after(&self, name: &str, response: &mut ToolResponse) -> Result<(), ToolError>;
 }
 
+/// Resource owned by a toolkit and cleaned up when the toolkit is dropped.
+///
+/// Tool handlers can hold shared references to external runtimes such as MCP
+/// subprocesses. Registering a cleanup resource makes the ownership explicit:
+/// once the agent toolkit goes away, the external runtime is closed too.
+pub trait ToolkitResource: Send + Sync {
+    fn close(self: Box<Self>);
+}
+
 // ---------------------------------------------------------------------------
 // ToolGroup
 // ---------------------------------------------------------------------------
@@ -198,6 +207,7 @@ pub struct Toolkit {
     tools: HashMap<String, RegisteredTool>,
     groups: HashMap<String, ToolGroup>,
     middlewares: Vec<Box<dyn ToolMiddleware>>,
+    resources: Vec<Box<dyn ToolkitResource>>,
 }
 
 impl Toolkit {
@@ -217,6 +227,7 @@ impl Toolkit {
             tools: HashMap::new(),
             groups,
             middlewares: Vec::new(),
+            resources: Vec::new(),
         }
     }
 
@@ -283,6 +294,11 @@ impl Toolkit {
     /// Append a middleware to the chain.
     pub fn add_middleware(&mut self, middleware: Box<dyn ToolMiddleware>) {
         self.middlewares.push(middleware);
+    }
+
+    /// Track an external resource for cleanup when this toolkit is dropped.
+    pub fn add_resource(&mut self, resource: Box<dyn ToolkitResource>) {
+        self.resources.push(resource);
     }
 
     // -----------------------------------------------------------------------
@@ -397,6 +413,14 @@ impl Toolkit {
 impl Default for Toolkit {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl Drop for Toolkit {
+    fn drop(&mut self) {
+        for resource in self.resources.drain(..) {
+            resource.close();
+        }
     }
 }
 

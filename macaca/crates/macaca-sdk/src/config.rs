@@ -48,6 +48,21 @@ pub struct AgentConfig {
     /// Directory containing persona Markdown files (IDENTITY.md, SOUL.md, etc.).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub persona_dir: Option<String>,
+
+    /// Optional standard AgentSkills visibility policy.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub skills: Option<AgentSkillsConfig>,
+}
+
+/// Per-agent standard AgentSkills visibility policy.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AgentSkillsConfig {
+    /// If set, only these skill names are visible to this agent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub allow: Option<Vec<String>>,
+    /// Skill names hidden from this agent.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub deny: Vec<String>,
 }
 
 /// A capability definition within agent config.

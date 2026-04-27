@@ -28,6 +28,7 @@ use macaca_persist::EventLog;
 use macaca_proto::ApplicationId;
 use macaca_runtime::agentic_loop::ResumeReason;
 use macaca_sdk::AgentPersona;
+use macaca_skill::{SkillPolicy, SkillRuntime, SkillRuntimeOptions};
 
 use crate::state::AppState;
 
@@ -163,7 +164,8 @@ impl FrameworkRunner {
         suppress_worker_lifecycle_tools: bool,
         allowed_tool_names: Option<&[&str]>,
     ) -> Result<HookedAgent<ReActAgent>, String> {
-        let system_prompt = Self::build_system_prompt(state, app_id, agent_name).await;
+        let system_prompt =
+            Self::build_system_prompt(state, app_id, agent_name, session_id.clone()).await;
         let selection = Self::resolve_model_selection(state, app_id, agent_name).await?;
         let model = Arc::new(RoutedLlmAdapter::new(
             Arc::clone(&state.llm_router),
@@ -240,7 +242,8 @@ impl FrameworkRunner {
         goal_id: Option<macaca_proto::TaskId>,
         event_tx: Option<mpsc::Sender<macaca_proto::AgentExecutionEvent>>,
     ) -> Result<HookedAgent<ReActAgent>, String> {
-        let system_prompt = Self::build_system_prompt(state, app_id, agent_name).await;
+        let system_prompt =
+            Self::build_system_prompt(state, app_id, agent_name, session_id.clone()).await;
         let selection = Self::resolve_model_selection(state, app_id, agent_name).await?;
         let model = Arc::new(RoutedLlmAdapter::new(
             Arc::clone(&state.llm_router),
@@ -285,7 +288,8 @@ impl FrameworkRunner {
         pause_signal: Arc<AtomicBool>,
         resume_rx: mpsc::Receiver<ResumeReason>,
     ) -> Result<(HookedAgent<ReActAgent>, tokio_util::sync::CancellationToken), String> {
-        let system_prompt = Self::build_system_prompt(state, app_id, agent_name).await;
+        let system_prompt =
+            Self::build_system_prompt(state, app_id, agent_name, session_id.clone()).await;
         let selection = Self::resolve_model_selection(state, app_id, agent_name).await?;
         let model = Arc::new(RoutedLlmAdapter::new(
             Arc::clone(&state.llm_router),
@@ -380,6 +384,7 @@ impl FrameworkRunner {
         state: &Arc<AppState>,
         app_id: &ApplicationId,
         agent_name: &str,
+        session_id: Option<String>,
     ) -> String {
         let app_dir = {
             let dirs = state.config.app_dirs.read().await;
@@ -415,6 +420,11 @@ impl FrameworkRunner {
         }
 
         // Inject workspace paths
+        let workspace_root = {
+            let workspaces = state.config.app_workspaces.read().await;
+            workspaces.get(app_id).map(|ws| ws.root.clone())
+        };
+        let skill_policy = resolve_agent_skill_policy(state, app_id, agent_name).await;
         {
             let workspaces = state.config.app_workspaces.read().await;
             if let Some(ws) = workspaces.get(app_id) {
@@ -433,8 +443,134 @@ impl FrameworkRunner {
             }
         }
 
+        // Inject AgentSkills catalog for progressive disclosure.
+        let snapshot_module = format!("skill_snapshot/{agent_name}");
+        let loaded_snapshot = if let Some(session_id) = session_id.as_deref() {
+            state
+                .sessions
+                .framework_session_store
+                .load(session_id, &snapshot_module)
+                .await
+                .ok()
+                .flatten()
+                .and_then(|value| serde_json::from_value::<macaca_skill::SkillSnapshot>(value).ok())
+        } else {
+            None
+        };
+        let skill_snapshot = match loaded_snapshot {
+            Some(snapshot) => Ok(snapshot),
+            None => {
+                let snapshot = SkillRuntime
+                    .build_snapshot(
+                        agent_name,
+                        SkillRuntimeOptions {
+                            workspace_dir: workspace_root,
+                            app_dir,
+                            policy: skill_policy,
+                            ..Default::default()
+                        },
+                    )
+                    .await;
+                if let (Some(session_id), Ok(snapshot)) = (session_id.as_deref(), &snapshot) {
+                    if let Ok(value) = serde_json::to_value(snapshot) {
+                        let _ = state
+                            .sessions
+                            .framework_session_store
+                            .save(session_id, &snapshot_module, value)
+                            .await;
+                    }
+                }
+                snapshot
+            }
+        };
+        match skill_snapshot {
+            Ok(snapshot) => {
+                tracing::info!(
+                    agent = %agent_name,
+                    visible = snapshot.skills.len(),
+                    filtered = snapshot.filtered.len(),
+                    truncated = snapshot.truncated,
+                    compact = snapshot.compact,
+                    "skill_catalog_built"
+                );
+                if let Some(session_id) = session_id.as_deref() {
+                    state
+                        .persist
+                        .event_log
+                        .append(
+                            session_id,
+                            "skill_catalog_built",
+                            agent_name,
+                            serde_json::json!({
+                                "agent": agent_name,
+                                "visible_count": snapshot.skills.len(),
+                                "filtered_count": snapshot.filtered.len(),
+                                "truncated": snapshot.truncated,
+                                "compact": snapshot.compact,
+                            }),
+                        )
+                        .await;
+                    state
+                        .persist
+                        .event_log
+                        .append(
+                            session_id,
+                            "skill_snapshot_created",
+                            agent_name,
+                            serde_json::json!({
+                                "agent": agent_name,
+                                "version": snapshot.version,
+                                "skills": snapshot.skills.iter().map(|skill| {
+                                    serde_json::json!({
+                                        "name": skill.name,
+                                        "location": skill.location,
+                                        "source": skill.source,
+                                    })
+                                }).collect::<Vec<_>>(),
+                                "filtered": snapshot.filtered,
+                            }),
+                        )
+                        .await;
+                }
+                if !snapshot.prompt.trim().is_empty() {
+                    prompt.push_str("\n\n## Available Skills\n\n");
+                    prompt.push_str(&snapshot.prompt);
+                }
+            }
+            Err(error) => {
+                tracing::warn!(agent = %agent_name, error = %error, "failed to build skill catalog");
+            }
+        }
+
         prompt
     }
+}
+
+async fn resolve_agent_skill_policy(
+    state: &Arc<AppState>,
+    app_id: &ApplicationId,
+    agent_name: &str,
+) -> SkillPolicy {
+    let registry = state.registry.read().await;
+    let Some(app) = registry.get_app(app_id) else {
+        return SkillPolicy::default();
+    };
+    for source in &app.manifest.agents {
+        let macaca_app::model::AgentSource::Inline(inline) = source else {
+            continue;
+        };
+        if inline.name != agent_name {
+            continue;
+        }
+        let Some(skills) = &inline.skills else {
+            return SkillPolicy::default();
+        };
+        return SkillPolicy {
+            allow: skills.allow.clone(),
+            deny: skills.deny.clone(),
+        };
+    }
+    SkillPolicy::default()
 }
 
 fn truncate_tool_output(text: &str, max_bytes: usize) -> String {
@@ -591,13 +727,30 @@ impl ToolMiddleware for SseToolMiddleware {
                 .append(
                     session_id,
                     "tool_call",
-                    "coordinator",
+                    &self.agent_name,
                     serde_json::json!({
                         "tool_name": name,
                         "tool_input": args.clone(),
                     }),
                 )
                 .await;
+            if name == "file_read" {
+                if let Some(path) = args.get("path").and_then(|value| value.as_str()) {
+                    if path.ends_with("SKILL.md") && path.contains("/skills/") {
+                        event_log
+                            .append(
+                                session_id,
+                                "skill_file_read",
+                                &self.agent_name,
+                                serde_json::json!({
+                                    "agent": self.agent_name,
+                                    "path": path,
+                                }),
+                            )
+                            .await;
+                    }
+                }
+            }
         }
         let event = Event::default().event("tool_call").data(
             serde_json::json!({
@@ -618,7 +771,7 @@ impl ToolMiddleware for SseToolMiddleware {
                 .append(
                     session_id,
                     "tool_result",
-                    "coordinator",
+                    &self.agent_name,
                     serde_json::json!({
                         "tool_name": name,
                         "output": display_result,

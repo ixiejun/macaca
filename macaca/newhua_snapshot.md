@@ -1,0 +1,154 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e6]:
+      - link "牛华网 Logo" [ref=e7] [cursor=pointer]:
+        - /url: /
+        - img "牛华网 Logo" [ref=e8]
+      - navigation [ref=e9]:
+        - link "首页" [ref=e10] [cursor=pointer]:
+          - /url: /
+        - link "新闻" [ref=e11] [cursor=pointer]:
+          - /url: /list/news
+        - link "科技" [ref=e12] [cursor=pointer]:
+          - /url: /list/tech
+        - link "财经" [ref=e13] [cursor=pointer]:
+          - /url: /list/finance
+        - link "数码" [ref=e14] [cursor=pointer]:
+          - /url: /list/digi
+        - link "游戏" [ref=e15] [cursor=pointer]:
+          - /url: /list/game
+        - link "汽车" [ref=e16] [cursor=pointer]:
+          - /url: /list/auto
+      - generic [ref=e17]:
+        - button "" [ref=e18] [cursor=pointer]:
+          - generic [ref=e19]: 
+        - text: 
+  - main [ref=e20]:
+    - generic [ref=e22]:
+      - heading "推荐文章" [level=2] [ref=e23]
+      - generic [ref=e24]:
+        - link "科技 2026-04-27 探索智慧科技：海尔让用户都能喝上安全好水 牛华网" [ref=e25] [cursor=pointer]:
+          - /url: /article/1083
+          - generic [ref=e26]:
+            - generic [ref=e27]:
+              - generic [ref=e28]: 科技
+              - generic [ref=e29]: 2026-04-27
+            - heading "探索智慧科技：海尔让用户都能喝上安全好水" [level=3] [ref=e30]
+            - paragraph [ref=e31]
+            - generic [ref=e34]: 牛华网
+        - link "科技 2026-04-27 清晨第一杯水直接喝！海尔净水首创滤芯自净化科技 牛华网" [ref=e35] [cursor=pointer]:
+          - /url: /article/1082
+          - generic [ref=e36]:
+            - generic [ref=e37]:
+              - generic [ref=e38]: 科技
+              - generic [ref=e39]: 2026-04-27
+            - heading "清晨第一杯水直接喝！海尔净水首创滤芯自净化科技" [level=3] [ref=e40]
+            - paragraph
+            - generic [ref=e43]: 牛华网
+        - link "科技 2026-04-27 卡萨帝厨电联合李锦记武汉发起隐形主厨寻味记 牛华网" [ref=e44] [cursor=pointer]:
+          - /url: /article/1081
+          - generic [ref=e45]:
+            - generic [ref=e46]:
+              - generic [ref=e47]: 科技
+              - generic [ref=e48]: 2026-04-27
+            - heading "卡萨帝厨电联合李锦记武汉发起隐形主厨寻味记" [level=3] [ref=e49]
+            - paragraph
+            - generic [ref=e52]: 牛华网
+        - link "科技 2026-04-27 快2秒排烟、调火！卡萨帝厨电x李锦记直播烹饪快人一步 牛华网" [ref=e53] [cursor=pointer]:
+          - /url: /article/1080
+          - generic [ref=e54]:
+            - generic [ref=e55]:
+              - generic [ref=e56]: 科技
+              - generic [ref=e57]: 2026-04-27
+            - heading "快2秒排烟、调火！卡萨帝厨电x李锦记直播烹饪快人一步" [level=3] [ref=e58]
+            - paragraph
+            - generic [ref=e61]: 牛华网
+        - link "科技 2026-04-27 卡萨帝厨电全国启动换新到家公益行活动 牛华网" [ref=e62] [cursor=pointer]:
+          - /url: /article/1079
+          - generic [ref=e63]:
+            - generic [ref=e64]:
+              - generic [ref=e65]: 科技
+              - generic [ref=e66]: 2026-04-27
+            - heading "卡萨帝厨电全国启动换新到家公益行活动" [level=3] [ref=e67]
+            - paragraph [ref=e68]
+            - generic [ref=e71]: 牛华网
+        - link "科技 2026-04-27 统帅空调：一年省392度电，够电车从青岛开到大理看风景 牛华网" [ref=e72] [cursor=pointer]:
+          - /url: /article/1078
+          - generic [ref=e73]:
+            - generic [ref=e74]:
+              - generic [ref=e75]: 科技
+              - generic [ref=e76]: 2026-04-27
+            - heading "统帅空调：一年省392度电，够电车从青岛开到大理看风景" [level=3] [ref=e77]
+            - paragraph
+            - generic [ref=e80]: 牛华网
+      - button "加载更多 " [ref=e82] [cursor=pointer]:
+        - text: 加载更多
+        - generic [ref=e83]: 
+    - generic [ref=e86]:
+      - heading "不错过任何科技动态" [level=2] [ref=e87]
+      - paragraph [ref=e88]: 订阅我们的周刊，获取精选科技内容和深度分析，每周直达您的邮箱
+      - generic [ref=e89]:
+        - textbox "您的邮箱地址" [ref=e90]
+        - button "立即订阅" [ref=e91] [cursor=pointer]
+      - paragraph [ref=e92]: 我们尊重您的隐私，不会向第三方分享您的信息
+  - contentinfo [ref=e93]:
+    - generic [ref=e94]:
+      - generic [ref=e95]:
+        - generic [ref=e96]:
+          - img "牛华网 Logo" [ref=e98]
+          - paragraph [ref=e99]: 探索科技前沿，分享极客文化，传递创新思想
+          - generic [ref=e100]:
+            - link "" [ref=e101] [cursor=pointer]:
+              - /url: "#"
+              - generic [ref=e102]: 
+            - link "" [ref=e103] [cursor=pointer]:
+              - /url: "#"
+              - generic [ref=e104]: 
+            - link "" [ref=e105] [cursor=pointer]:
+              - /url: "#"
+              - generic [ref=e106]: 
+        - generic [ref=e107]:
+          - heading "栏目" [level=3] [ref=e108]
+          - list [ref=e109]:
+            - listitem [ref=e110]:
+              - link "科技动态" [ref=e111] [cursor=pointer]:
+                - /url: /list/tech
+            - listitem [ref=e112]:
+              - link "人工智能" [ref=e113] [cursor=pointer]:
+                - /url: /list/ai
+            - listitem [ref=e114]:
+              - link "编程开发" [ref=e115] [cursor=pointer]:
+                - /url: /list/programming
+            - listitem [ref=e116]:
+              - link "前沿探索" [ref=e117] [cursor=pointer]:
+                - /url: /list/前沿
+        - generic [ref=e118]:
+          - heading "关于" [level=3] [ref=e119]
+          - list [ref=e120]:
+            - listitem [ref=e121]:
+              - link "关于我们" [ref=e122] [cursor=pointer]:
+                - /url: "#"
+            - listitem [ref=e123]:
+              - link "联系方式" [ref=e124] [cursor=pointer]:
+                - /url: "#"
+            - listitem [ref=e125]:
+              - link "加入我们" [ref=e126] [cursor=pointer]:
+                - /url: "#"
+            - listitem [ref=e127]:
+              - link "广告合作" [ref=e128] [cursor=pointer]:
+                - /url: "#"
+        - generic [ref=e129]:
+          - heading "订阅通讯" [level=3] [ref=e130]
+          - paragraph [ref=e131]: 获取每周科技精选内容
+          - generic [ref=e132]:
+            - textbox "您的邮箱地址" [ref=e133]
+            - button "订阅" [ref=e134] [cursor=pointer]
+      - generic [ref=e135]:
+        - paragraph [ref=e136]: © 2025 牛华网. 保留所有权利
+        - generic [ref=e137]:
+          - link "隐私政策" [ref=e138] [cursor=pointer]:
+            - /url: "#"
+          - link "使用条款" [ref=e139] [cursor=pointer]:
+            - /url: "#"
+          - link "Cookie 政策" [ref=e140] [cursor=pointer]:
+            - /url: "#"

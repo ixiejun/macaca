@@ -11,9 +11,11 @@ pub mod framework_toolkit;
 pub mod hook_consumer;
 pub mod loop_manager;
 pub mod metrics;
+pub mod mcp_runtime;
 pub mod routes;
 pub mod run_trace;
 pub mod session;
+pub mod skill_mcp;
 pub mod sse;
 pub mod state;
 pub mod workspace;
@@ -490,6 +492,7 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
     let default_model = llm_router.default_model_reference();
     let framework_session_store: Arc<dyn FrameworkSessionStore> =
         Arc::new(FrameworkInMemorySessionStore::new());
+    let mcp_runtime = Arc::new(mcp_runtime::McpRuntimeManager::load_default().await);
 
     // 10. Build shared state.
     let state = Arc::new_cyclic(|weak_state| {
@@ -507,6 +510,7 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
             llm_router: llm_router.clone(),
             tools,
             executor_registry: executor_registry.clone(),
+            mcp_runtime: Arc::clone(&mcp_runtime),
             persist: PersistenceState {
                 session_store,
                 todo_store,
@@ -665,12 +669,14 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
         .route("/api/apps", get(routes::get_apps))
         .route("/api/apps/{id}", get(routes::get_app))
         .route("/api/apps/{id}/agents", get(routes::get_app_agents))
+        .route("/api/apps/{id}/skills", get(routes::get_app_skills))
         .route(
             "/api/apps/{id}/agents/stream",
             get(routes::stream_agent_status),
         )
         .route("/api/apps/{id}/sessions", get(session::list_app_sessions))
         .route("/api/apps/reload", post(routes::reload_apps))
+        .route("/api/mcp", get(routes::get_mcp_status))
         .route("/api/sessions", get(session::list_sessions))
         .route("/api/sessions/{app_id}", get(session::get_session))
         .route(

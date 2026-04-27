@@ -73,6 +73,7 @@ fn inline_manifest(name: &str, agent_count: usize) -> AppManifest {
                 allowed_tools: vec![],
                 max_tokens: None,
                 temperature: None,
+                skills: None,
             })
         })
         .collect();

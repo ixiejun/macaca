@@ -65,6 +65,20 @@ pub struct InlineAgentConfig {
     pub max_tokens: Option<u32>,
     /// Temperature.
     pub temperature: Option<f32>,
+    /// Optional standard AgentSkills visibility policy.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub skills: Option<AgentSkillsConfig>,
+}
+
+/// Per-agent standard AgentSkills visibility policy in app manifests.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AgentSkillsConfig {
+    /// If set, only these skill names are visible to this agent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub allow: Option<Vec<String>>,
+    /// Skill names hidden from this agent.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub deny: Vec<String>,
 }
 
 /// A capability reference in inline config.
