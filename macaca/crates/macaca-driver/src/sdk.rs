@@ -113,6 +113,7 @@ macro_rules! export_driver {
                         driver_type: format!("{:?}", m.driver_type),
                         description: m.description.clone(),
                         capabilities: m.capabilities.clone(),
+                        trace_event_types: m.trace_event_types.clone(),
                     };
                     _sdk_json_to_c_char(serde_json::to_string(&abi))
                 } else {

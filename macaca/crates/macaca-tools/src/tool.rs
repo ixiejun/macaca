@@ -35,7 +35,7 @@ pub struct TraceEvent {
     pub title: Option<String>,
 
     /// Body content (thinking process, output text, logs, etc.)
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "thinking", alias = "text")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content: Option<String>,
 
     /// Tool/operation name
@@ -47,7 +47,7 @@ pub struct TraceEvent {
     pub tool_input: Option<Value>,
 
     /// Tool/operation output (text)
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "tool_result")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool_output: Option<String>,
 
     /// Whether this is an error event
