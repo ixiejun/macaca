@@ -15,7 +15,6 @@ use tokio::sync::RwLock;
 use macaca_kernel::executor::ExecutorEvent;
 use macaca_persist::{PersistStore, RedbStore};
 use macaca_proto::{ApplicationId, LlmMessage};
-use macaca_tools::TraceEvent;
 
 use crate::routes::{err, ErrorResponse};
 use crate::sse::{convert_executor_event_to_sse, load_plan_decisions, PlanDecisionEvent};
@@ -84,13 +83,6 @@ pub(crate) struct AgentTraceStep {
     pub output: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub is_error: Option<bool>,
-    // For cc_trace type
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub thinking: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub text: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tool_result: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub call_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -208,21 +200,14 @@ impl AgentTraceCollector {
                         content: Some(content.clone()),
                         ..Default::default()
                     },
-                    macaca_proto::AgentExecutionEvent::CcTrace {
-                        thinking,
-                        text,
-                        tool_name,
-                        tool_input,
-                        tool_result,
-                        is_error,
+                    macaca_proto::AgentExecutionEvent::DriverTrace {
+                        driver_name: _,
+                        trace,
                     } => AgentTraceStep {
-                        step_type: "cc_trace".to_string(),
-                        thinking: thinking.clone(),
-                        text: text.clone(),
-                        tool_name: tool_name.clone(),
-                        tool_input: tool_input.clone(),
-                        tool_result: tool_result.clone(),
-                        is_error: is_error.clone(),
+                        step_type: "driver_trace".to_string(),
+                        content: trace.get("content").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                        tool_name: trace.get("tool_name").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                        tool_input: trace.get("tool_input").cloned(),
                         ..Default::default()
                     },
                     macaca_proto::AgentExecutionEvent::Completed { success, error } => {
@@ -283,8 +268,6 @@ pub(crate) struct StoredTurn {
     pub status: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub trace_steps: Vec<StoredTraceStep>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub cc_trace_steps: Vec<TraceEvent>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<AssistantExecutionMeta>,
     /// Delegated agent traces keyed by agent name.
@@ -309,7 +292,6 @@ pub(crate) fn ensure_running_assistant_turn(turns: &mut Vec<StoredTurn>) -> &mut
                 content: String::new(),
                 status: Some("running".into()),
                 trace_steps: Vec::new(),
-                cc_trace_steps: Vec::new(),
                 meta: None,
                 agent_traces: std::collections::HashMap::new(),
             });
@@ -348,7 +330,6 @@ pub(crate) async fn persist_session_snapshot(
     status: Option<&str>,
     content: Option<String>,
     trace_steps: Option<Vec<StoredTraceStep>>,
-    cc_trace_steps: Option<Vec<TraceEvent>>,
     agent_traces: Option<std::collections::HashMap<String, Vec<AgentTrace>>>,
     meta: Option<AssistantExecutionMeta>,
 ) {
@@ -389,9 +370,6 @@ pub(crate) async fn persist_session_snapshot(
         }
         if let Some(trace_steps) = trace_steps {
             turn.trace_steps = trace_steps;
-        }
-        if let Some(cc_trace_steps) = cc_trace_steps {
-            turn.cc_trace_steps = cc_trace_steps;
         }
         if let Some(agent_traces) = agent_traces {
             turn.agent_traces = agent_traces;
@@ -463,7 +441,6 @@ pub(crate) fn build_turns_from_messages(messages: &[LlmMessage]) -> Vec<StoredTu
                 content: msg.content.clone(),
                 status: None,
                 trace_steps: Vec::new(),
-                cc_trace_steps: Vec::new(),
                 meta: None,
                 agent_traces: std::collections::HashMap::new(),
             }),
@@ -472,7 +449,6 @@ pub(crate) fn build_turns_from_messages(messages: &[LlmMessage]) -> Vec<StoredTu
                 content: msg.content.clone(),
                 status: Some("completed".into()),
                 trace_steps: Vec::new(),
-                cc_trace_steps: Vec::new(),
                 meta: None,
                 agent_traces: std::collections::HashMap::new(),
             }),
@@ -577,7 +553,6 @@ pub(crate) async fn update_session_realtime(
         session_id,
         app_id,
         Some(status),
-        None,
         None,
         None,
         None, // agent_traces: None — let periodic saver handle it
@@ -863,7 +838,7 @@ pub(crate) async fn get_session_by_id(
                 | "delegated_tool_call"
                 | "delegated_tool_result"
                 | "delegated_assistant"
-                | "delegated_cc_trace"
+                | "delegated_driver_trace"
                 | "delegated_done" => {
                     let resolved_agent = if !agent.is_empty() {
                         agent.clone()
@@ -903,18 +878,6 @@ pub(crate) async fn get_session_by_id(
                                     .and_then(|v| v.as_str())
                                     .map(|s| s.to_string()),
                                 is_error: evt.get("is_error").and_then(|v| v.as_bool()),
-                                thinking: evt
-                                    .get("thinking")
-                                    .and_then(|v| v.as_str())
-                                    .map(|s| s.to_string()),
-                                text: evt
-                                    .get("text")
-                                    .and_then(|v| v.as_str())
-                                    .map(|s| s.to_string()),
-                                tool_result: evt
-                                    .get("tool_result")
-                                    .and_then(|v| v.as_str())
-                                    .map(|s| s.to_string()),
                                 call_id: evt
                                     .get("call_id")
                                     .and_then(|v| v.as_str())
@@ -1248,7 +1211,7 @@ pub(crate) async fn stream_session_events(
         // executor events and let the broadcast channel close naturally.
 
         // Subscribe to EventLog broadcast so we can notify the frontend
-        // when new events are appended (e.g. cc_trace from delegated agents).
+        // when new events are appended (e.g. driver_trace from delegated agents).
         let mut event_log_rx = state.persist.event_log.subscribe();
         let stream_session_id = session_id.clone();
 
@@ -1332,7 +1295,6 @@ mod tests {
             content: content.into(),
             status: status.map(String::from),
             trace_steps: Vec::new(),
-            cc_trace_steps: Vec::new(),
             meta: None,
             agent_traces: std::collections::HashMap::new(),
         }
@@ -1363,7 +1325,6 @@ mod tests {
             content: content.into(),
             status: status.map(String::from),
             trace_steps: Vec::new(),
-            cc_trace_steps: Vec::new(),
             meta: None,
             agent_traces,
         }

@@ -405,7 +405,7 @@ impl AgenticLoop {
 
     /// Execute a single tool call with streaming events support.
     /// This method creates a channel to receive TraceEvents from tools like claude_code_execute
-    /// and forwards them as AgentExecutionEvent::CcTrace to the event_tx.
+    /// and forwards them as AgentExecutionEvent::DriverTrace to the event_tx.
     async fn execute_tool_call_with_events(
         &self,
         agent_id: &AgentId,
@@ -464,15 +464,13 @@ impl AgenticLoop {
         let forward_task = if let Some(tx) = event_tx.cloned() {
             Some(tokio::spawn(async move {
                 while let Some(trace) = trace_rx.recv().await {
-                    let cc_trace = AgentExecutionEvent::CcTrace {
-                        thinking: trace.thinking,
-                        text: trace.text,
-                        tool_name: trace.tool_name,
-                        tool_input: trace.tool_input,
-                        tool_result: trace.tool_result,
-                        is_error: trace.is_error,
+                    let driver_name = trace.driver_id.clone().unwrap_or_else(|| "unknown".to_string());
+                    let trace_value = serde_json::to_value(&trace).unwrap_or_default();
+                    let driver_trace = AgentExecutionEvent::DriverTrace {
+                        driver_name,
+                        trace: trace_value,
                     };
-                    if tx.send(cc_trace).await.is_err() {
+                    if tx.send(driver_trace).await.is_err() {
                         break;
                     }
                 }

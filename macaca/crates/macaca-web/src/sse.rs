@@ -79,7 +79,7 @@ pub(crate) fn convert_executor_event_to_sse(event: ExecutorEvent) -> Result<Even
                 macaca_proto::AgentExecutionEvent::ToolCall { .. } => "delegated_tool_call",
                 macaca_proto::AgentExecutionEvent::ToolResult { .. } => "delegated_tool_result",
                 macaca_proto::AgentExecutionEvent::Assistant { .. } => "delegated_assistant",
-                macaca_proto::AgentExecutionEvent::CcTrace { .. } => "delegated_cc_trace",
+                macaca_proto::AgentExecutionEvent::DriverTrace { .. } => "delegated_driver_trace",
                 macaca_proto::AgentExecutionEvent::Completed { .. } => "delegated_completed",
             };
             Ok(Event::default().event(event_type).data(

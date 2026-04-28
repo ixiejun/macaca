@@ -29,6 +29,10 @@ pub struct DriverManifest {
     pub driver_type: DriverType,
     pub description: String,
     pub capabilities: Vec<String>,
+    /// Driver 支持发送的 trace 事件类型列表（可选）
+    /// 例如: ["thinking", "tool_call", "tool_result", "text", "compilation", "error"]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trace_event_types: Option<Vec<String>>,
 }
 
 /// The core trait every software driver must implement.
@@ -80,6 +84,7 @@ mod tests {
             version: "0.1.0".into(),
             driver_type: DriverType::CliSubprocess,
             description: "Execute shell commands".into(),
+            trace_event_types: None,
             capabilities: vec!["execute_command".into()],
         };
         let json = serde_json::to_string(&manifest).unwrap();

@@ -229,23 +229,24 @@ impl FrameworkRunner {
             let executor_clone = Arc::clone(&executor);
             tokio::spawn(async move {
                 while let Some(trace) = trace_rx.recv().await {
-                    let event_data = serde_json::to_value(&trace).unwrap_or_default();
+                    let driver_name = trace.driver_id.clone().unwrap_or_else(|| "unknown".to_string());
+                    let trace_value = serde_json::to_value(&trace).unwrap_or_default();
 
-                    // Build delegated_cc_trace envelope matching convert_executor_event_to_sse format:
-                    // { task_id, agent, agent_tab, event: <CcTrace fields> }
+                    // Build delegated_driver_trace envelope
                     let delegated_envelope = serde_json::json!({
                         "task_id": task_id.to_string(),
                         "agent": agent_name_for_trace,
                         "agent_tab": agent_name_for_trace,
-                        "event": event_data,
+                        "driver_name": driver_name,
+                        "event": trace_value,
                     });
 
-                    // 1. Persist to EventLog as delegated_cc_trace (not cc_trace)
+                    // 1. Persist to EventLog
                     if let Some(ref sid) = session_id_for_trace {
                         event_log
                             .append(
                                 sid,
-                                "delegated_cc_trace",
+                                "delegated_driver_trace",
                                 &agent_name_for_trace,
                                 delegated_envelope.clone(),
                             )
@@ -255,24 +256,19 @@ impl FrameworkRunner {
                     // 2. Push to SSE stream directly (bypass broadcast channel)
                     if let Some(ref sse_tx) = sse_tx_opt {
                         let event = Event::default()
-                            .event("delegated_cc_trace")
+                            .event("delegated_driver_trace")
                             .data(delegated_envelope.to_string());
                         let sender = sse_tx.read().await;
                         let _ = sender.send(Ok(event)).await;
                     } else {
                         // Fallback: broadcast via executor if no direct SSE path
-                        let cc_trace = macaca_proto::AgentExecutionEvent::CcTrace {
-                            thinking: trace.thinking,
-                            text: trace.text,
-                            tool_name: trace.tool_name,
-                            tool_input: trace.tool_input,
-                            tool_result: trace.tool_result,
-                            is_error: trace.is_error,
-                        };
                         executor_clone.broadcast_event(macaca_kernel::executor::ExecutorEvent::AgentEvent {
                             task_id,
                             agent: agent_name_for_trace.clone(),
-                            event: cc_trace,
+                            event: macaca_proto::AgentExecutionEvent::DriverTrace {
+                                driver_name: driver_name.clone(),
+                                trace: trace_value,
+                            },
                         });
                     }
                 }
@@ -323,7 +319,7 @@ impl FrameworkRunner {
             crate::framework_toolkit::build_toolkit(state, app_id, agent_name, session_id, goal_id)
                 .await;
 
-        // Set up TraceEvent → AgentExecutionEvent::CcTrace forwarding
+        // Set up TraceEvent → AgentExecutionEvent::DriverTrace forwarding
         if let Some(ref agent_tx) = event_tx {
             let (trace_tx, mut trace_rx) = tokio::sync::mpsc::unbounded_channel::<macaca_tools::TraceEvent>();
             toolkit.set_event_tx(trace_tx);
@@ -331,15 +327,13 @@ impl FrameworkRunner {
             let agent_tx_clone = agent_tx.clone();
             tokio::spawn(async move {
                 while let Some(trace) = trace_rx.recv().await {
-                    let cc_trace = macaca_proto::AgentExecutionEvent::CcTrace {
-                        thinking: trace.thinking,
-                        text: trace.text,
-                        tool_name: trace.tool_name,
-                        tool_input: trace.tool_input,
-                        tool_result: trace.tool_result,
-                        is_error: trace.is_error,
+                    let driver_name = trace.driver_id.clone().unwrap_or_else(|| "unknown".to_string());
+                    let trace_value = serde_json::to_value(&trace).unwrap_or_default();
+                    let driver_trace = macaca_proto::AgentExecutionEvent::DriverTrace {
+                        driver_name,
+                        trace: trace_value,
                     };
-                    let _ = agent_tx_clone.send(cc_trace).await;
+                    let _ = agent_tx_clone.send(driver_trace).await;
                 }
             });
         }
@@ -405,24 +399,28 @@ impl FrameworkRunner {
             let agent_name_for_trace = agent_name.to_string();
             tokio::spawn(async move {
                 while let Some(trace) = trace_rx.recv().await {
-                    let event_data = serde_json::to_value(&trace).unwrap_or_default();
+                    let driver_name = trace.driver_id.clone().unwrap_or_else(|| "unknown".to_string());
+                    let trace_value = serde_json::to_value(&trace).unwrap_or_default();
 
                     // 1. Persist to EventLog first
                     if let Some(ref sid) = session_id_for_trace {
                         event_log_for_trace
                             .append(
                                 sid,
-                                "cc_trace",
+                                "driver_trace",
                                 &agent_name_for_trace,
-                                event_data.clone(),
+                                trace_value.clone(),
                             )
                             .await;
                     }
 
                     // 2. Push to SSE stream
                     let event = Event::default()
-                        .event("cc_trace")
-                        .data(event_data.to_string());
+                        .event("driver_trace")
+                        .data(serde_json::json!({
+                            "driver_name": driver_name,
+                            "event": trace_value,
+                        }).to_string());
                     let _ = sse_tx_for_trace.send(Ok(event)).await;
                 }
             });

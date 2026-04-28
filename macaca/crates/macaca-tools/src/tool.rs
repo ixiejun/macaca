@@ -6,17 +6,57 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::sync::mpsc::UnboundedSender;
 
-/// A trace event from tool execution (e.g., Claude Code internal steps).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// A trace event from tool/driver execution.
+///
+/// Generic structure supporting any driver (Claude Code, custom drivers, etc.).
+/// New fields are all `Option` + `skip_serializing_if` for backward compatibility.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TraceEvent {
+    /// Event semantic type (driver-defined, e.g. "thinking", "tool_call", "compilation", "file_read")
     #[serde(rename = "type")]
     pub event_type: String,
+
+    /// Source driver identifier (auto-injected by framework, drivers don't need to set this)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub driver_id: Option<String>,
+
+    /// Event timestamp in milliseconds (auto-injected by framework)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timestamp: Option<i64>,
+
+    /// Correlation ID (shared by multiple events in the same logical operation)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub correlation_id: Option<String>,
+
+    // --- Generic semantic fields ---
+
+    /// Title/summary (main heading for frontend rendering)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+
+    /// Body content (thinking process, output text, logs, etc.)
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "thinking", alias = "text")]
+    pub content: Option<String>,
+
+    /// Tool/operation name
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool_name: Option<String>,
+
+    /// Tool/operation input (structured JSON)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool_input: Option<Value>,
-    pub tool_result: Option<String>,
-    pub thinking: Option<String>,
-    pub text: Option<String>,
+
+    /// Tool/operation output (text)
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "tool_result")]
+    pub tool_output: Option<String>,
+
+    /// Whether this is an error event
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub is_error: Option<bool>,
+
+    /// Extension data (driver-specific non-standard fields)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<Value>,
 }
 
 /// A single callable tool.

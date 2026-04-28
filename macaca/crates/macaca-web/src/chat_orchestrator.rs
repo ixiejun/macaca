@@ -439,7 +439,6 @@ pub(crate) async fn post_chat_v2(
             content: req.prompt.clone(),
             status: None,
             trace_steps: Vec::new(),
-            cc_trace_steps: Vec::new(),
             meta: None,
             agent_traces: HashMap::new(),
         }],
@@ -575,7 +574,6 @@ pub(crate) async fn post_chat_v2(
                     content: final_content,
                     status: Some(status.to_string()),
                     trace_steps: Vec::new(),
-                    cc_trace_steps: Vec::new(),
                     meta: None,
                     agent_traces: HashMap::new(),
                 });

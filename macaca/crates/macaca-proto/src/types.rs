@@ -823,7 +823,7 @@ pub struct EventEntry {
     pub session_id: String,
     /// Event type: "thinking", "tool_call", "tool_result", "assistant", "content", "done",
     /// "error", "delegated_task_start", "delegated_thinking", "delegated_tool_call",
-    /// "delegated_tool_result", "delegated_assistant", "delegated_cc_trace",
+    /// "delegated_tool_result", "delegated_assistant", "delegated_driver_trace",
     /// "delegated_completed", "delegated_task_complete", "delegated_task_error",
     /// "plan_decision", "loop_paused", "loop_resumed", "fork_created",
     /// "run_trace" (structured pipeline phases), etc.
@@ -882,20 +882,12 @@ pub enum AgentExecutionEvent {
     },
     /// Agent produced assistant content
     Assistant { content: String },
-    /// Claude Code execution trace (for claude_code_execute tool)
-    CcTrace {
-        #[serde(skip_serializing_if = "Option::is_none")]
-        thinking: Option<String>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        text: Option<String>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        tool_name: Option<String>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        tool_input: Option<serde_json::Value>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        tool_result: Option<String>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        is_error: Option<bool>,
+    /// Generic driver event trace
+    DriverTrace {
+        /// Source driver name
+        driver_name: String,
+        /// Serialized TraceEvent (serde_json::Value to avoid cross-crate type dependency)
+        trace: serde_json::Value,
     },
     /// Execution completed
     Completed {

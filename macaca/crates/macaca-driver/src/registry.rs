@@ -102,6 +102,7 @@ mod tests {
                     driver_type: DriverType::CliSubprocess,
                     description: format!("Dummy {name} driver"),
                     capabilities: vec![],
+                    trace_event_types: None,
                 },
             }
         }

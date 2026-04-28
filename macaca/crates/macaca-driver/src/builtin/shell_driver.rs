@@ -28,6 +28,7 @@ impl ShellDriver {
                 driver_type: DriverType::CliSubprocess,
                 description: "Execute shell commands via subprocess".into(),
                 capabilities: vec!["execute_command".into()],
+                trace_event_types: None,
             },
             default_timeout: Duration::from_secs(30),
         }

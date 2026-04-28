@@ -15,6 +15,8 @@ use serde_json::Value;
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::debug;
 
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use crate::driver::{DriverManifest, DriverType, SoftwareDriver};
 use crate::plugin_abi::*;
 use macaca_proto::{DriverId, MacacaError, MacacaResult};
@@ -204,6 +206,7 @@ impl DynamicDriver {
                 driver_type,
                 description: manifest_abi.description,
                 capabilities: manifest_abi.capabilities,
+                trace_event_types: manifest_abi.trace_event_types,
             };
 
             debug!(
@@ -284,6 +287,7 @@ impl SoftwareDriver for DynamicDriver {
             fn_execute_tool: self.fn_execute_tool,
             fn_free_string: self.fn_free_string,
             fn_execute_tool_streaming: self.fn_execute_tool_streaming,
+            driver_name: self.manifest.name.clone(),
         });
 
         definitions
@@ -335,6 +339,7 @@ struct DynamicToolContext {
     fn_execute_tool: FnDriverExecuteTool,
     fn_free_string: FnDriverFreeString,
     fn_execute_tool_streaming: Option<FnDriverExecuteToolStreaming>,
+    driver_name: String,
 }
 
 // Safety: same C-ABI thread-safety contract as DynamicDriver.
@@ -432,7 +437,14 @@ impl Tool for DynamicTool {
         let tool_name = self.name.clone();
         let input_json = serde_json::to_string(&input)?;
 
+        let driver_name = ctx.driver_name.clone();
         tokio::task::spawn_blocking(move || {
+            // Context passed through FFI user_data pointer for the trampoline callback.
+            struct TrampolineCtx {
+                tx: UnboundedSender<TraceEvent>,
+                driver_name: String,
+            }
+
             // Trampoline callback: pure extern "C" fn, routes events via user_data
             unsafe extern "C" fn trampoline(
                 event_json: *const c_char,
@@ -441,13 +453,23 @@ impl Tool for DynamicTool {
                 if event_json.is_null() || user_data.is_null() {
                     return;
                 }
-                let tx = &*(user_data as *const UnboundedSender<TraceEvent>);
+                let tramp_ctx = &*(user_data as *const TrampolineCtx);
                 let json_str = match CStr::from_ptr(event_json).to_str() {
                     Ok(s) => s,
                     Err(_) => return,
                 };
-                if let Ok(event) = serde_json::from_str::<TraceEvent>(json_str) {
-                    let _ = tx.send(event);
+                if let Ok(mut event) = serde_json::from_str::<TraceEvent>(json_str) {
+                    // Framework auto-inject driver_id and timestamp
+                    if event.driver_id.is_none() {
+                        event.driver_id = Some(tramp_ctx.driver_name.clone());
+                    }
+                    if event.timestamp.is_none() {
+                        event.timestamp = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .map(|d| d.as_millis() as i64)
+                            .ok();
+                    }
+                    let _ = tramp_ctx.tx.send(event);
                 }
             }
 
@@ -458,8 +480,9 @@ impl Tool for DynamicTool {
                 MacacaError::Driver(format!("Input JSON contains null byte: {}", e))
             })?;
 
-            // user_data points to event_tx, which lives for the duration of this closure
-            let user_data = &event_tx as *const UnboundedSender<TraceEvent> as *mut c_void;
+            // user_data points to TrampolineCtx, which lives for the duration of this closure
+            let tramp_ctx = TrampolineCtx { tx: event_tx, driver_name };
+            let user_data = &tramp_ctx as *const TrampolineCtx as *mut c_void;
 
             unsafe {
                 let result_ptr = fn_streaming(

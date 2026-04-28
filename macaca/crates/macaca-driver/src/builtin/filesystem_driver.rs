@@ -26,6 +26,7 @@ impl FileSystemDriver {
                 driver_type: DriverType::FileIpc,
                 description: "Read and write files on the local filesystem".into(),
                 capabilities: vec!["file_read".into(), "file_write".into()],
+                trace_event_types: None,
             },
         }
     }

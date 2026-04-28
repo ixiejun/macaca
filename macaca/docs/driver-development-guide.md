@@ -314,6 +314,7 @@ pub struct DriverManifest {
     pub driver_type: DriverType, // Driver 类型
     pub description: String,    // 人类可读的描述
     pub capabilities: Vec<String>, // 能力标签列表
+    pub trace_event_types: Option<Vec<String>>, // 支持的 trace 事件类型（可选）
 }
 ```
 
@@ -1166,6 +1167,125 @@ cp driver.toml /path/to/macaca/drivers/weather/
 # 加载
 curl -X POST http://localhost:3001/api/drivers/reload
 ```
+
+---
+
+## 事件追踪规范 (Event Trace Specification)
+
+Driver 可以在工具执行过程中通过 `TraceEvent` 发送实时事件，前端会根据事件类型进行渲染展示。这是实现可观测性的核心机制。
+
+### 标准 TraceEvent 结构
+
+```rust
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TraceEvent {
+    pub event_type: String,           // 必填：事件语义类型
+    pub driver_id: Option<String>,    // 框架自动注入，无需填写
+    pub timestamp: Option<i64>,       // 框架自动注入，无需填写
+    pub correlation_id: Option<String>, // 可选：关联 ID
+    pub title: Option<String>,        // 可选：事件标题
+    pub content: Option<String>,      // 可选：主体内容
+    pub tool_name: Option<String>,    // 可选：工具名称
+    pub tool_input: Option<Value>,    // 可选：工具输入
+    pub tool_output: Option<String>,  // 可选：工具输出
+    pub is_error: Option<bool>,       // 可选：是否错误
+    pub metadata: Option<Value>,      // 可选：扩展数据
+}
+```
+
+> `TraceEvent` 实现了 `Default` trait，driver 开发者可以用 `..Default::default()` 简化构造。
+> `driver_id` 和 `timestamp` 由框架在 trampoline 层自动注入，driver 无需设置。
+
+### 标准事件类型
+
+| event_type | 用途 | 推荐填写的字段 |
+|------------|------|---------------|
+| `thinking` | AI 思考过程 | `content` |
+| `tool_call` | 工具调用 | `tool_name`, `tool_input` |
+| `tool_result` | 工具返回 | `tool_name`, `tool_output`, `is_error` |
+| `text` | 文本输出 | `content` |
+| `error` | 错误信息 | `content`, `is_error: true` |
+| `progress` | 进度更新 | `title`, `content`, `metadata` |
+| `compilation` | 编译事件 | `content`, `is_error`, `metadata` |
+| 自定义类型 | driver 特有事件 | `title`, `content`, `metadata` |
+
+### 在 Manifest 中声明 trace 能力
+
+在 `DriverManifest` 中通过 `trace_event_types` 字段声明 driver 支持发送的事件类型：
+
+```rust
+DriverManifest {
+    id: DriverId::new(),
+    name: "my-driver".into(),
+    version: "0.1.0".into(),
+    driver_type: DriverType::CliSubprocess,
+    description: "My custom driver".into(),
+    capabilities: vec!["my_capability".into()],
+    trace_event_types: Some(vec![
+        "thinking".into(),
+        "tool_call".into(),
+        "tool_result".into(),
+        "text".into(),
+    ]),
+}
+```
+
+如果 driver 不发送任何 trace 事件，设置为 `None` 即可。
+
+### 使用示例
+
+```rust
+// 在工具的 execute_streaming 实现中发送 trace 事件：
+async fn execute_streaming(
+    &self,
+    input: Value,
+    event_tx: Option<UnboundedSender<TraceEvent>>,
+) -> MacacaResult<Value> {
+    if let Some(ref tx) = event_tx {
+        // 报告思考过程
+        let _ = tx.send(TraceEvent {
+            event_type: "thinking".to_string(),
+            content: Some("分析用户请求...".to_string()),
+            ..Default::default()  // 其他字段为 None
+        });
+
+        // 报告工具调用
+        let _ = tx.send(TraceEvent {
+            event_type: "tool_call".to_string(),
+            tool_name: Some("execute_command".to_string()),
+            tool_input: Some(serde_json::json!({"command": "ls -la"})),
+            ..Default::default()
+        });
+
+        // 报告工具结果
+        let _ = tx.send(TraceEvent {
+            event_type: "tool_result".to_string(),
+            tool_name: Some("execute_command".to_string()),
+            tool_output: Some("total 42\ndrwxr-xr-x ...".to_string()),
+            is_error: Some(false),
+            ..Default::default()
+        });
+
+        // 报告错误
+        let _ = tx.send(TraceEvent {
+            event_type: "error".to_string(),
+            content: Some("编译失败: syntax error".to_string()),
+            is_error: Some(true),
+            ..Default::default()
+        });
+    }
+    // ... 执行逻辑 ...
+    Ok(serde_json::json!({"result": "done"}))
+}
+```
+
+### 向后兼容
+
+`TraceEvent` 保留了 `thinking`/`text`/`tool_result` 等 deprecated 字段用于向后兼容。现有 driver 无需修改即可继续工作。新 driver 推荐使用新的通用字段（`content`/`tool_output`）。
+
+### 前端渲染器
+
+前端根据 `driver_name` 路由至对应的 `TraceRendererPlugin` 进行渲染。如果 driver 的事件类型不是标准类型，前端会使用通用 JSON 渲染器（`GenericTraceRenderer`）展示。如需自定义渲染，可以在前端注册 `TraceRendererPlugin`。
 
 ---
 

@@ -99,6 +99,10 @@ pub struct DriverManifestAbi {
     pub driver_type: String,
     pub description: String,
     pub capabilities: Vec<String>,
+    /// Driver 支持发送的 trace 事件类型列表（可选）
+    /// 例如: ["thinking", "tool_call", "tool_result", "text", "compilation", "error"]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trace_event_types: Option<Vec<String>>,
 }
 
 // === Standard symbol names ===
@@ -165,6 +169,7 @@ mod tests {
             driver_type: "CliSubprocess".into(),
             description: "Shell command driver".into(),
             capabilities: vec!["execute_command".into()],
+            trace_event_types: None,
         };
         let json = serde_json::to_string(&manifest).unwrap();
         let parsed: DriverManifestAbi = serde_json::from_str(&json).unwrap();

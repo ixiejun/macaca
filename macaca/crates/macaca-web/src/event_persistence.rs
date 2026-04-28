@@ -99,8 +99,8 @@ pub fn spawn_session_event_collector(
                                 macaca_proto::AgentExecutionEvent::Assistant { .. } => {
                                     "delegated_assistant"
                                 }
-                                macaca_proto::AgentExecutionEvent::CcTrace { .. } => {
-                                    "delegated_cc_trace"
+                                macaca_proto::AgentExecutionEvent::DriverTrace { .. } => {
+                                    "delegated_driver_trace"
                                 }
                                 macaca_proto::AgentExecutionEvent::Completed { .. } => {
                                     "delegated_done"
