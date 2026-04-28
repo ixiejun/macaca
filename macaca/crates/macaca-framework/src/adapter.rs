@@ -403,6 +403,22 @@ impl ToolHandler for SingleToolAdapter {
         Ok(ToolResponse::text(text))
     }
 
+    #[cfg(feature = "macaca-compat")]
+    async fn execute_streaming(
+        &self,
+        args: serde_json::Value,
+        event_tx: Option<tokio::sync::mpsc::UnboundedSender<macaca_tools::TraceEvent>>,
+    ) -> Result<ToolResponse, ToolError> {
+        let result = self
+            .tool
+            .execute_streaming(args, event_tx)
+            .await
+            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+
+        let text = serde_json::to_string(&result).unwrap_or_else(|_| result.to_string());
+        Ok(ToolResponse::text(text))
+    }
+
     fn name(&self) -> &str {
         self.tool.name()
     }

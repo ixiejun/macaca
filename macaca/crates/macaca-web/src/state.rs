@@ -10,6 +10,7 @@ use axum::response::sse::Event;
 use tokio::sync::{mpsc, RwLock};
 
 use macaca_app::{AppRegistry, AppRuntime};
+use macaca_driver::DriverRegistry;
 use macaca_framework::session::SessionStore as FrameworkSessionStore;
 use macaca_kernel::{ApplicationExecutorRegistry, Kernel};
 use macaca_llm::{LlmProvider, LlmRouter};
@@ -142,6 +143,10 @@ pub struct AppState {
     pub executor_registry: Arc<ApplicationExecutorRegistry>,
     /// Agent OS level MCP runtime and registry.
     pub mcp_runtime: Arc<crate::mcp_runtime::McpRuntimeManager>,
+    /// Driver registry for managing loaded software drivers.
+    pub driver_registry: Arc<DriverRegistry>,
+    /// Path to the drivers directory (for reload).
+    pub drivers_dir: String,
     /// Persistence: session store, todo store, event log, audit logger, run tracer.
     pub persist: PersistenceState,
     /// Loop lifecycle: PlanLoop, WorkerLoop, Scheduler handles and wakers.

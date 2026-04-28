@@ -28,11 +28,11 @@ use axum::routing::{get, post};
 use axum::Router;
 use tokio::sync::RwLock;
 use tower_http::cors::{Any, CorsLayer};
-use tracing::info;
+use tracing::{info, error};
 
 use futures::FutureExt;
 use macaca_app::{AppLoader, AppRegistry, AppRuntime};
-use macaca_driver_claude_code::{ClaudeCodeConfig, ClaudeCodeDriver};
+use macaca_driver::DriverLoader;
 use macaca_framework::session::{
     InMemorySessionStore as FrameworkInMemorySessionStore, SessionStore as FrameworkSessionStore,
 };
@@ -49,23 +49,6 @@ use macaca_tools::{
 
 use crate::agent_runner::WebAgentRunner;
 use crate::state::{AppConfig, AppState, LoopState, PersistenceState, SessionState};
-
-/// Resolve Claude Code CLI path: `MACACA_CLAUDE_BIN`, then `~/.local/bin/claude` if it exists, else `claude`.
-fn resolve_claude_bin() -> String {
-    if let Ok(p) = std::env::var("MACACA_CLAUDE_BIN") {
-        let p = p.trim();
-        if !p.is_empty() {
-            return p.to_string();
-        }
-    }
-    if let Ok(home) = std::env::var("HOME") {
-        let candidate = PathBuf::from(&home).join(".local/bin/claude");
-        if candidate.is_file() {
-            return candidate.to_string_lossy().into_owned();
-        }
-    }
-    "claude".to_string()
-}
 
 // ---------------------------------------------------------------------------
 // Composite ToolSet: built-in + skill tools
@@ -204,18 +187,34 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
         }
     }
 
-    // Load Claude Code driver tools (claude_code_execute, resume, status).
-    let cc_work_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    let cc_bin = resolve_claude_bin();
-    info!(claude_bin = %cc_bin, "Claude Code CLI path resolved");
-    let cc_config = ClaudeCodeConfig::new(cc_work_dir)
-        .with_claude_bin(cc_bin)
-        .dangerously_skip_permissions()
-        .with_timeout(600);
-    let cc_driver = ClaudeCodeDriver::new(cc_config);
-    let cc_tools = macaca_driver::driver::SoftwareDriver::tools(&cc_driver);
-    info!(count = cc_tools.len(), "Claude Code driver tools loaded");
-    all_tools.extend(cc_tools);
+    // Load external driver plugins from configured directory.
+    // Driver tools are NOT added to the static CompositeToolSet; instead they
+    // are aggregated dynamically from `DriverRegistry` in `build_toolkit` so
+    // that `/api/drivers/reload` picks up new driver tools at runtime.
+    let drivers_dir = std::env::var("MACACA_DRIVERS_DIR")
+        .unwrap_or_else(|_| config.drivers.directory.clone());
+    let driver_registry = Arc::new(macaca_driver::DriverRegistry::new());
+    if config.drivers.auto_load {
+        let driver_loader = DriverLoader::new(&drivers_dir);
+        let load_results = driver_loader.load_all();
+
+        for result in load_results {
+            match result.result {
+                Ok(driver) => {
+                    let tool_count = macaca_driver::SoftwareDriver::tools(driver.as_ref()).len();
+                    info!(
+                        name = %result.name,
+                        tools = tool_count,
+                        "External driver loaded"
+                    );
+                    driver_registry.register(driver).await;
+                }
+                Err(e) => {
+                    error!(name = %result.name, error = %e, "Failed to load external driver");
+                }
+            }
+        }
+    }
 
     // 8. Initialize orchestration tools.
     // We need to create a shared reference for the executor registry that can be
@@ -522,6 +521,8 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
             tools,
             executor_registry: executor_registry.clone(),
             mcp_runtime: Arc::clone(&mcp_runtime),
+            driver_registry: Arc::clone(&driver_registry),
+            drivers_dir: drivers_dir.clone(),
             persist: PersistenceState {
                 session_store,
                 todo_store,
@@ -735,6 +736,8 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
             "/api/sessions/{id}/run-trace",
             get(routes::get_session_run_trace),
         )
+        .route("/api/drivers", get(routes::get_drivers))
+        .route("/api/drivers/reload", post(routes::reload_drivers))
         .layer(cors)
         .with_state(state);
 

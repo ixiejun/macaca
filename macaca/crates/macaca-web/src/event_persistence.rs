@@ -207,7 +207,9 @@ pub fn spawn_session_event_collector(
                         _ => {}
                     }
                 }
-                Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                    break;
+                }
                 Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
                     tracing::warn!(skipped = n, "Session event collector: broadcast lagged");
                 }

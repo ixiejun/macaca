@@ -1247,6 +1247,11 @@ pub(crate) async fn stream_session_events(
         // workers are still running delegated tasks. Always subscribe to
         // executor events and let the broadcast channel close naturally.
 
+        // Subscribe to EventLog broadcast so we can notify the frontend
+        // when new events are appended (e.g. cc_trace from delegated agents).
+        let mut event_log_rx = state.persist.event_log.subscribe();
+        let stream_session_id = session_id.clone();
+
         let Some(executor) = maybe_executor else {
             yield Ok(Event::default().event("session_end").data("{}"));
             return;
@@ -1258,19 +1263,57 @@ pub(crate) async fn stream_session_events(
             // executor events into this hot-swapped coordinator channel.
             // Reading executor_rx here would duplicate every delegated event.
             loop {
-                match coord_rx.recv().await {
-                    Some(event) => yield event,
-                    None => break,
+                tokio::select! {
+                    msg = coord_rx.recv() => {
+                        match msg {
+                            Some(event) => yield event,
+                            None => break,
+                        }
+                    }
+                    result = event_log_rx.recv() => {
+                        match result {
+                            Ok((notified_sid, latest_seq)) => {
+                                if notified_sid == stream_session_id {
+                                    yield Ok(Event::default()
+                                        .event("update")
+                                        .data(serde_json::json!({
+                                            "seq": latest_seq
+                                        }).to_string()));
+                                }
+                            }
+                            Err(broadcast::error::RecvError::Closed) => break,
+                            Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                        }
+                    }
                 }
             }
         } else {
             // No active coordinator — just stream executor events
             let mut executor_rx = executor.subscribe_to_events();
             loop {
-                match executor_rx.recv().await {
-                    Ok(event) => yield convert_executor_event_to_sse(event),
-                    Err(broadcast::error::RecvError::Closed) => break,
-                    Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                tokio::select! {
+                    result = executor_rx.recv() => {
+                        match result {
+                            Ok(event) => yield convert_executor_event_to_sse(event),
+                            Err(broadcast::error::RecvError::Closed) => break,
+                            Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                        }
+                    }
+                    result = event_log_rx.recv() => {
+                        match result {
+                            Ok((notified_sid, latest_seq)) => {
+                                if notified_sid == stream_session_id {
+                                    yield Ok(Event::default()
+                                        .event("update")
+                                        .data(serde_json::json!({
+                                            "seq": latest_seq
+                                        }).to_string()));
+                                }
+                            }
+                            Err(broadcast::error::RecvError::Closed) => break,
+                            Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                        }
+                    }
                 }
             }
         }

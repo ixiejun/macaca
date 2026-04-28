@@ -50,6 +50,16 @@ impl DriverRegistry {
             .collect()
     }
 
+    /// Returns manifests with tool counts for all registered drivers.
+    pub async fn list_drivers_with_tools(&self) -> Vec<(DriverManifest, usize)> {
+        self.drivers
+            .read()
+            .await
+            .values()
+            .map(|d| (d.manifest().clone(), d.tools().len()))
+            .collect()
+    }
+
     /// Get the number of registered drivers.
     pub async fn count(&self) -> usize {
         self.drivers.read().await.len()

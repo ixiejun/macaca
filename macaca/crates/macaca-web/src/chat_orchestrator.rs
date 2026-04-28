@@ -21,8 +21,9 @@ use macaca_kernel::AgentInfo;
 use macaca_persist::PersistStore;
 use macaca_proto::ApplicationId;
 
+use crate::event_persistence::spawn_session_event_collector;
 use crate::routes::{default_model, err, ErrorResponse};
-use crate::session::{SessionMeta, StoredSession, StoredTurn, APP_SESSIONS_PREFIX, SESSION_PREFIX};
+use crate::session::{AgentTraceCollector, SessionMeta, StoredSession, StoredTurn, APP_SESSIONS_PREFIX, SESSION_PREFIX};
 use crate::sse::convert_executor_event_to_sse;
 use crate::state::AppState;
 
@@ -372,13 +373,26 @@ pub(crate) async fn post_chat_v2(
     }
 
     // Subscribe to executor events for delegated agent tracking
+    let executor_for_collector = state.executor_registry.get(&app_id).await;
     let executor_events_rx = {
-        if let Some(executor) = state.executor_registry.get(&app_id).await {
+        if let Some(ref executor) = executor_for_collector {
             Some(executor.subscribe_to_events())
         } else {
             None
         }
     };
+
+    // Spawn the persistent event collector (EventLog + RunTracer + AgentTraceCollector)
+    let trace_collector = AgentTraceCollector::new();
+    if let Some(ref executor) = executor_for_collector {
+        spawn_session_event_collector(
+            Arc::clone(executor),
+            Arc::clone(&state.persist.event_log),
+            Arc::clone(&state.persist.run_tracer),
+            session_key.clone(),
+            Arc::clone(&trace_collector),
+        );
+    }
 
     // Ensure PlanLoop + WorkerLoops are running
     crate::loop_manager::ensure_plan_and_worker_loops(&state, &app_id, Some(session_key.clone()))
@@ -614,80 +628,32 @@ pub(crate) async fn post_chat_v2(
         }
     });
 
-    // Executor events forwarder: delegated agent traces → SSE stream + EventLog
+    // Executor events forwarder: delegated agent traces → SSE stream
+    // (EventLog persistence is handled by spawn_session_event_collector above)
     if let Some(mut exec_rx) = executor_events_rx {
         let sse_tx_for_exec = Arc::clone(&sse_tx);
-        let event_log_for_exec = Arc::clone(&state.persist.event_log);
-        let session_for_exec = session_key.clone();
         let forwarder_stop_flag = Arc::clone(&forwarder_stop);
         tokio::spawn(async move {
-            while let Ok(exec_event) = exec_rx.recv().await {
-                // Check if this forwarder has been superseded
-                if forwarder_stop_flag.load(std::sync::atomic::Ordering::Relaxed) {
-                    tracing::debug!("Executor event forwarder stopped (superseded)");
-                    break;
-                }
-                // Persist to EventLog
-                let (evt_type, evt_payload) = match &exec_event {
-                    macaca_kernel::executor::ExecutorEvent::TaskStarted { task_id, agent } => (
-                        "delegated_task_start",
-                        serde_json::json!({ "task_id": task_id.to_string(), "agent": agent }),
-                    ),
-                    macaca_kernel::executor::ExecutorEvent::AgentEvent {
-                        task_id,
-                        agent,
-                        event: agent_evt,
-                    } => {
-                        let sub = match agent_evt {
-                            macaca_proto::AgentExecutionEvent::Thinking { .. } => {
-                                "delegated_thinking"
-                            }
-                            macaca_proto::AgentExecutionEvent::ToolCall { .. } => {
-                                "delegated_tool_call"
-                            }
-                            macaca_proto::AgentExecutionEvent::ToolResult { .. } => {
-                                "delegated_tool_result"
-                            }
-                            macaca_proto::AgentExecutionEvent::Assistant { .. } => {
-                                "delegated_assistant"
-                            }
-                            macaca_proto::AgentExecutionEvent::CcTrace { .. } => {
-                                "delegated_cc_trace"
-                            }
-                            macaca_proto::AgentExecutionEvent::Completed { .. } => "delegated_done",
-                        };
-                        (
-                            sub,
-                            serde_json::json!({ "task_id": task_id.to_string(), "agent": agent, "event": agent_evt }),
-                        )
+            loop {
+                match exec_rx.recv().await {
+                    Ok(exec_event) => {
+                        // Check if this forwarder has been superseded
+                        if forwarder_stop_flag.load(std::sync::atomic::Ordering::Relaxed) {
+                            tracing::debug!("Executor event forwarder stopped (superseded)");
+                            break;
+                        }
+                        // Forward to SSE only
+                        let sse_event = convert_executor_event_to_sse(exec_event);
+                        let sender = sse_tx_for_exec.read().await;
+                        if sender.send(sse_event).await.is_err() {
+                            break;
+                        }
                     }
-                    macaca_kernel::executor::ExecutorEvent::TaskCompleted {
-                        task_id,
-                        agent,
-                        result,
-                    } => (
-                        "delegated_task_complete",
-                        serde_json::json!({ "task_id": task_id.to_string(), "agent": agent, "output": result.output, "success": result.success }),
-                    ),
-                    macaca_kernel::executor::ExecutorEvent::TaskFailed {
-                        task_id,
-                        agent,
-                        error,
-                    } => (
-                        "delegated_task_error",
-                        serde_json::json!({ "task_id": task_id.to_string(), "agent": agent, "error": error }),
-                    ),
-                    _ => continue,
-                };
-                event_log_for_exec
-                    .append(&session_for_exec, evt_type, "executor", evt_payload)
-                    .await;
-
-                // Forward to SSE
-                let sse_event = convert_executor_event_to_sse(exec_event);
-                let sender = sse_tx_for_exec.read().await;
-                if sender.send(sse_event).await.is_err() {
-                    // SSE closed but keep persisting to EventLog
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                        tracing::warn!("Executor event forwarder lagged by {} messages, continuing", n);
+                        continue;
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
                 }
             }
         });

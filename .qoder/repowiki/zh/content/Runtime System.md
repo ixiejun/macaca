@@ -8,12 +8,27 @@
 - [loop_detector.rs](file://macaca/crates/macaca-runtime/src/loop_detector.rs)
 - [permission.rs](file://macaca/crates/macaca-runtime/src/permission.rs)
 - [Cargo.toml](file://macaca/crates/macaca-runtime/Cargo.toml)
+- [lib.rs](file://macaca/crates/macaca-runtime-host/src/lib.rs)
+- [mcp_runtime.rs](file://macaca/crates/macaca-runtime-host/src/mcp_runtime.rs)
+- [compat.rs](file://macaca/crates/macaca-runtime-host/src/compat.rs)
+- [env_bridge.rs](file://macaca/crates/macaca-runtime-host/src/env_bridge.rs)
+- [compat_mappings.toml](file://macaca/crates/macaca-runtime-host/resources/compat_mappings.toml)
+- [mcp_runtime.rs](file://macaca/crates/macaca-web/src/mcp_runtime.rs)
+- [lib.rs](file://macaca/crates/macaca-framework/src/lib.rs)
+- [mcp.rs](file://macaca/crates/macaca-framework/src/mcp.rs)
 - [agent.rs](file://macaca/crates/macaca-agent/src/agent.rs)
 - [basic.rs](file://macaca/crates/macaca-agent/src/basic.rs)
 - [state_machine.rs](file://macaca/crates/macaca-agent/src/state_machine.rs)
 - [shutdown.rs](file://macaca/crates/macaca-agent/src/shutdown.rs)
 - [agent.rs](file://macaca/crates/macaca-framework/src/agent.rs)
 </cite>
+
+## 更新摘要
+**变更内容**
+- 新增macaca-runtime-host架构分析，替代原有macaca-web中的MCP逻辑
+- 添加MCP运行时管理器、兼容性映射和环境桥接功能的详细说明
+- 更新架构概览以反映新的分层设计
+- 增加新的组件关系图和生命周期管理说明
 
 ## 目录
 1. [简介](#简介)
@@ -30,11 +45,13 @@
 
 运行时系统是 Agent OS 的核心执行引擎，负责管理智能体的生命周期、执行循环和安全控制。该系统提供了完整的代理执行框架，包括上下文窗口管理、循环检测、权限控制和优雅关闭支持。
 
+**更新** 新架构引入了专门的 macaca-runtime-host crate，提供 MCP 运行时管理、兼容性映射和环境桥接功能，替代原有的 macaca-web 中的 MCP 逻辑，实现更清晰的职责分离和更好的可扩展性。
+
 运行时系统采用模块化设计，通过清晰的接口抽象和可插拔的组件架构，为各种类型的智能体提供统一的执行环境。系统特别注重安全性、可扩展性和可靠性，确保智能体能够在受控环境中安全地执行工具调用和任务处理。
 
 ## 项目结构
 
-运行时系统主要位于 `macaca-runtime` crate 中，同时与 `macaca-agent` 和 `macaca-framework` crate 协同工作，形成完整的智能体执行生态系统。
+运行时系统主要位于 `macaca-runtime` crate 中，同时与 `macaca-agent`、`macaca-framework` 和新增的 `macaca-runtime-host` crate 协同工作，形成完整的智能体执行生态系统。
 
 ```mermaid
 graph TB
@@ -45,6 +62,12 @@ Context[ContextWindowManager]
 Detector[LoopDetector]
 Perm[PermissionChecker]
 end
+subgraph "运行时主机层"
+RuntimeHost[macaca-runtime-host]
+McpMgr[McpRuntimeManager]
+Compat[CompatRegistry]
+EnvBridge[EnvBridge]
+end
 subgraph "智能体层"
 Agent[macaca-agent]
 Basic[BasicAgent]
@@ -54,28 +77,38 @@ end
 subgraph "框架层"
 Framework[macaca-framework]
 Hooked[HookedAgent]
+McpProto[McpProtocol]
 end
 Runtime --> Loop
 Runtime --> Context
 Runtime --> Detector
 Runtime --> Perm
+RuntimeHost --> McpMgr
+RuntimeHost --> Compat
+RuntimeHost --> EnvBridge
 Agent --> Basic
 Agent --> State
 Agent --> Shutdown
 Framework --> Hooked
+Framework --> McpProto
 Loop --> Agent
 Context --> Framework
 Detector --> Runtime
 Perm --> Agent
+McpMgr --> Framework
+Compat --> McpMgr
+EnvBridge --> McpMgr
 ```
 
 **图表来源**
 - [lib.rs:1-15](file://macaca/crates/macaca-runtime/src/lib.rs#L1-L15)
+- [lib.rs:1-23](file://macaca/crates/macaca-runtime-host/src/lib.rs#L1-L23)
 - [agent.rs:1-79](file://macaca/crates/macaca-agent/src/agent.rs#L1-L79)
-- [agent.rs:1-676](file://macaca/crates/macaca-framework/src/agent.rs#L1-L676)
+- [lib.rs:1-33](file://macaca/crates/macaca-framework/src/lib.rs#L1-L33)
 
 **章节来源**
 - [lib.rs:1-15](file://macaca/crates/macaca-runtime/src/lib.rs#L1-L15)
+- [lib.rs:1-23](file://macaca/crates/macaca-runtime-host/src/lib.rs#L1-L23)
 - [Cargo.toml:1-17](file://macaca/crates/macaca-runtime/Cargo.toml#L1-L17)
 
 ## 核心组件
@@ -94,25 +127,43 @@ Perm --> Agent
 ### 权限检查器 (PermissionChecker)
 权限检查器确保智能体只能执行被授权的操作，特别是文件系统访问和网络操作的安全控制。它支持基于工具名称和参数的细粒度权限控制。
 
+### MCP 运行时管理器 (McpRuntimeManager)
+**新增** MCP 运行时管理器是运行时主机层的核心组件，负责管理 MCP 服务器的生命周期、注册和状态跟踪。它提供了全局、应用、会话、代理会话和调用级别的生命周期管理。
+
+### 兼容性注册表 (CompatRegistry)
+**新增** 兼容性注册表提供声明式的技能到 MCP 服务器映射功能，替代了原有的硬编码产品特定分支。它支持从技能安装规范到 MCP 服务器定义的自动映射。
+
+### 环境桥接器 (EnvBridge)
+**新增** 环境桥接器负责将配置中的 MCP 环境变量安全地传递到 MCP 子进程中，支持字面量值、环境变量转发和占位符检测等多种语义。
+
 **章节来源**
 - [agentic_loop.rs:61-67](file://macaca/crates/macaca-runtime/src/agentic_loop.rs#L61-L67)
 - [context_window.rs:29-32](file://macaca/crates/macaca-runtime/src/context_window.rs#L29-L32)
 - [loop_detector.rs:40-49](file://macaca/crates/macaca-runtime/src/loop_detector.rs#L40-L49)
 - [permission.rs:5-31](file://macaca/crates/macaca-runtime/src/permission.rs#L5-L31)
+- [mcp_runtime.rs:284-289](file://macaca/crates/macaca-runtime-host/src/mcp_runtime.rs#L284-L289)
+- [compat.rs:100-104](file://macaca/crates/macaca-runtime-host/src/compat.rs#L100-L104)
+- [env_bridge.rs:27-40](file://macaca/crates/macaca-runtime-host/src/env_bridge.rs#L27-L40)
 
 ## 架构概览
 
-运行时系统采用分层架构设计，从底层的执行引擎到上层的智能体接口，形成了清晰的职责分离。
+运行时系统采用分层架构设计，从底层的执行引擎到上层的智能体接口，形成了清晰的职责分离。新增的 macaca-runtime-host 层提供了 MCP 运行时管理能力，实现了与 HTTP 主机的解耦。
 
 ```mermaid
 sequenceDiagram
 participant Client as 客户端应用
+participant RuntimeHost as 运行时主机
+participant McpMgr as MCP管理器
+participant Framework as 框架层
 participant Agent as 智能体
 participant Loop as 执行循环
 participant LLM as 大语言模型
 participant Tools as 工具集
 participant Perm as 权限检查器
-Client->>Agent : 创建智能体实例
+Client->>RuntimeHost : 创建运行时主机实例
+RuntimeHost->>McpMgr : 初始化MCP管理器
+McpMgr->>Framework : 注册MCP工具
+Framework->>Agent : 创建智能体实例
 Agent->>Loop : 初始化执行循环
 Loop->>Perm : 验证工具权限
 Perm-->>Loop : 权限验证结果
@@ -132,6 +183,7 @@ Loop-->>Client : 执行完成
 ```
 
 **图表来源**
+- [mcp_runtime.rs:335-377](file://macaca/crates/macaca-runtime-host/src/mcp_runtime.rs#L335-L377)
 - [agentic_loop.rs:233-314](file://macaca/crates/macaca-runtime/src/agentic_loop.rs#L233-L314)
 - [permission.rs:39-91](file://macaca/crates/macaca-runtime/src/permission.rs#L39-L91)
 
@@ -292,6 +344,146 @@ PermissionChecker <|-- DefaultPermissionChecker
 - [permission.rs:93-161](file://macaca/crates/macaca-runtime/src/permission.rs#L93-L161)
 - [permission.rs:163-325](file://macaca/crates/macaca-runtime/src/permission.rs#L163-L325)
 
+### MCP 运行时管理器 (McpRuntimeManager)
+
+**新增** MCP 运行时管理器是运行时主机层的核心组件，负责管理 MCP 服务器的完整生命周期。它提供了 OS 级别的 MCP 注册表和运行时管理功能。
+
+#### 生命周期管理
+```mermaid
+stateDiagram-v2
+[*] --> Global : 全局级别
+Global --> App : 应用级别
+App --> Session : 会话级别
+Session --> AgentSession : 代理会话级别
+AgentSession --> Call : 调用级别
+Call --> Session : 会话结束
+Session --> App : 应用结束
+App --> Global : 全局结束
+note right of Global
+单实例共享
+适合全局工具
+end note
+note right of App
+按应用隔离
+适合应用特定工具
+end note
+note right of Session
+按会话隔离
+适合临时工具
+end note
+note right of AgentSession
+按代理隔离
+适合并发敏感工具
+end note
+note right of Call
+按调用隔离
+适合一次性工具
+end note
+```
+
+**图表来源**
+- [mcp_runtime.rs:31-46](file://macaca/crates/macaca-runtime-host/src/mcp_runtime.rs#L31-L46)
+- [mcp_runtime.rs:795-836](file://macaca/crates/macaca-runtime-host/src/mcp_runtime.rs#L795-L836)
+
+#### 核心功能
+- **服务器定义管理**: 管理 MCP 服务器的配置和状态
+- **工具注册**: 将 MCP 工具注册到框架工具包中
+- **生命周期跟踪**: 跟踪运行时实例的引用计数和状态
+- **资源清理**: 提供会话、应用和全局级别的资源清理
+- **状态监控**: 提供 MCP 服务器的健康状态监控
+
+#### 配置选项
+- **传输配置**: 支持 stdio、SSE 和 streamable HTTP 传输
+- **会话模式**: 支持有状态和无状态会话模式
+- **工具前缀**: 支持工具名称冲突解决策略
+- **必需二进制**: 检查 MCP 服务器的依赖项
+
+**章节来源**
+- [mcp_runtime.rs:284-289](file://macaca/crates/macaca-runtime-host/src/mcp_runtime.rs#L284-L289)
+- [mcp_runtime.rs:335-377](file://macaca/crates/macaca-runtime-host/src/mcp_runtime.rs#L335-L377)
+- [mcp_runtime.rs:416-454](file://macaca/crates/macaca-runtime-host/src/mcp_runtime.rs#L416-L454)
+
+### 兼容性注册表 (CompatRegistry)
+
+**新增** 兼容性注册表提供声明式的技能到 MCP 服务器映射功能，消除了硬编码的产品特定分支逻辑。它支持从技能安装规范到 MCP 服务器定义的自动映射。
+
+#### 映射机制
+```mermaid
+flowchart TD
+Skill[技能快照] --> Match{匹配规则}
+Match --> |包名匹配| PackageMap[包名映射]
+Match --> |二进制匹配| BinMap[二进制映射]
+PackageMap --> Template[服务器模板]
+BinMap --> Template
+Template --> Policy[并发隔离策略]
+Policy --> Definition[MCP服务器定义]
+Definition --> ApplyArgs[应用参数]
+ApplyArgs --> Server[MCP服务器]
+```
+
+**图表来源**
+- [compat.rs:146-150](file://macaca/crates/macaca-runtime-host/src/compat.rs#L146-L150)
+- [compat.rs:179-212](file://macaca/crates/macaca-runtime-host/src/compat.rs#L179-L212)
+
+#### 配置格式
+- **包名匹配**: 支配 `install.package` 字段的匹配
+- **二进制匹配**: 支配 `install.bins` 字段的匹配
+- **服务器模板**: 定义生成的 MCP 服务器配置
+- **并发隔离**: 定义命令行参数的安全策略
+
+#### 内置映射
+- **Playwright**: 自动映射到 `playwright-mcp` 服务器
+- **Figma**: 自动映射到 `figma-developer-mcp` 服务器
+- **可扩展性**: 支持用户自定义映射覆盖
+
+**章节来源**
+- [compat.rs:100-104](file://macaca/crates/macaca-runtime-host/src/compat.rs#L100-L104)
+- [compat.rs:146-150](file://macaca/crates/macaca-runtime-host/src/compat.rs#L146-L150)
+- [compat_mappings.toml:43-75](file://macaca/crates/macaca-runtime-host/resources/compat_mappings.toml#L43-L75)
+
+### 环境桥接器 (EnvBridge)
+
+**新增** 环境桥接器负责将配置中的 MCP 环境变量安全地传递到 MCP 子进程中，支持多种语义和安全检查机制。
+
+#### 环境变量处理
+```mermaid
+flowchart TD
+Input[配置环境变量] --> Classify[分类处理]
+Classify --> Placeholder{占位符?}
+Classify --> Literal{字面量?}
+Classify --> EnvRef{环境变量引用?}
+Placeholder --> Skip[跳过]
+Literal --> Set[设置字面量]
+EnvRef --> Check{环境变量存在?}
+Check --> |存在| Forward[转发]
+Check --> |不存在| Skip
+Set --> Export[导出到进程]
+Forward --> Export
+Skip --> Log[记录日志]
+Export --> Done[完成]
+Log --> Done
+```
+
+**图表来源**
+- [env_bridge.rs:57-74](file://macaca/crates/macaca-runtime-host/src/env_bridge.rs#L57-L74)
+- [env_bridge.rs:86-127](file://macaca/crates/macaca-runtime-host/src/env_bridge.rs#L86-L127)
+
+#### 处理语义
+- **字面量值**: 直接设置为环境变量值
+- **环境变量转发**: 从现有环境变量转发值
+- **占位符检测**: 自动跳过占位符值（如 YOUR_TOKEN）
+- **空值处理**: 忽略空值和空白值
+
+#### 安全特性
+- **POSIX 兼容**: 自动将键名转换为大写
+- **占位符保护**: 防止占位符意外覆盖真实环境变量
+- **缺失检查**: 检测并报告缺失的环境变量引用
+- **审计日志**: 记录所有环境变量的应用结果
+
+**章节来源**
+- [env_bridge.rs:27-40](file://macaca/crates/macaca-runtime-host/src/env_bridge.rs#L27-L40)
+- [env_bridge.rs:86-127](file://macaca/crates/macaca-runtime-host/src/env_bridge.rs#L86-L127)
+
 ### 智能体生命周期管理
 
 运行时系统还提供了完整的智能体生命周期管理功能，确保智能体能够正确地创建、运行、暂停和终止。
@@ -356,7 +548,7 @@ Handle-->>OS : 发送关闭确认信号
 
 ## 依赖关系分析
 
-运行时系统通过清晰的依赖关系设计，实现了模块间的松耦合和高内聚。
+运行时系统通过清晰的依赖关系设计，实现了模块间的松耦合和高内聚。新增的 macaca-runtime-host 层提供了 MCP 运行时管理能力，与现有组件形成良好的协作关系。
 
 ```mermaid
 graph TB
@@ -366,11 +558,23 @@ Serde[serde]
 Tokio[tokio]
 Tracing[tracing]
 Sha2[sha2]
+Dirs[dirs]
+Toml[toml]
+Yaml[yaml]
+Uuid[uuid]
 end
 subgraph "内部模块"
 Proto[macaca-proto]
 Tools[macaca-tools]
 LLM[macaca-llm]
+Skill[macaca-skill]
+Framework[macaca-framework]
+end
+subgraph "运行时主机层"
+RuntimeHost[macaca-runtime-host]
+McpMgr[McpRuntimeManager]
+Compat[CompatRegistry]
+EnvBridge[EnvBridge]
 end
 Runtime[macaca-runtime] --> AsyncTrait
 Runtime --> Serde
@@ -380,10 +584,23 @@ Runtime --> Sha2
 Runtime --> Proto
 Runtime --> Tools
 Runtime --> LLM
+RuntimeHost --> Dirs
+RuntimeHost --> Toml
+RuntimeHost --> Yaml
+RuntimeHost --> Uuid
+RuntimeHost --> Proto
+RuntimeHost --> Skill
+RuntimeHost --> Framework
+McpMgr --> Framework
+McpMgr --> Tools
+McpMgr --> Proto
+Compat --> Framework
+EnvBridge --> Proto
 ```
 
 **图表来源**
 - [Cargo.toml:6-15](file://macaca/crates/macaca-runtime/Cargo.toml#L6-L15)
+- [Cargo.toml:7-19](file://macaca/crates/macaca-runtime-host/Cargo.toml#L7-L19)
 
 ### 核心依赖说明
 
@@ -393,14 +610,25 @@ Runtime --> LLM
 - **tokio**: 异步运行时和并发工具
 - **tracing**: 结构化日志记录和指标收集
 - **sha2**: 加密哈希算法用于循环检测
+- **dirs**: 用户目录定位
+- **toml/yaml**: 配置文件解析
+- **uuid**: 测试和唯一标识符生成
 
 #### 内部模块依赖
 - **macaca-proto**: 定义核心数据结构和类型
 - **macaca-tools**: 提供工具注册和执行接口
 - **macaca-llm**: 抽象 LLM 提供者接口
+- **macaca-skill**: 提供技能发现和管理功能
+- **macaca-framework**: 提供 MCP 协议和工具包功能
+
+#### 运行时主机依赖
+- **macaca-runtime-host**: 提供 MCP 运行时管理能力
+- **macaca-framework**: 提供 MCP 协议实现
+- **macaca-skill**: 提供技能元数据
 
 **章节来源**
 - [Cargo.toml:1-17](file://macaca/crates/macaca-runtime/Cargo.toml#L1-L17)
+- [Cargo.toml:7-19](file://macaca/crates/macaca-runtime-host/Cargo.toml#L7-L19)
 
 ## 性能考虑
 
@@ -410,16 +638,25 @@ Runtime --> LLM
 - **上下文修剪**: 自动管理对话历史的内存使用
 - **令牌估算**: 高效的内存占用预估算法
 - **滑动窗口**: 限制循环检测器的内存占用
+- **运行时实例缓存**: MCP 运行时实例的引用计数管理
 
 ### 并发执行优化
 - **异步执行**: 所有 I/O 操作都支持异步非阻塞
 - **超时控制**: 防止长时间阻塞影响整体性能
 - **事件驱动**: 减少轮询开销，提高响应速度
+- **并发隔离**: MCP 服务器的并发安全策略
 
 ### 安全性与性能平衡
 - **权限缓存**: 减少重复的权限检查开销
 - **哈希缓存**: 循环检测中的哈希值缓存
 - **配置优化**: 可调参数平衡安全性和性能
+- **资源池**: MCP 服务器连接的复用和管理
+
+### MCP 运行时性能
+- **生命周期管理**: 按需创建和销毁 MCP 服务器实例
+- **状态监控**: 实时监控 MCP 服务器的健康状态
+- **资源清理**: 自动清理闲置的 MCP 服务器实例
+- **并发控制**: 通过生命周期作用域控制并发访问
 
 ## 故障排除指南
 
@@ -453,25 +690,51 @@ Runtime --> LLM
 - 检查是否存在逻辑错误
 - 调整循环检测阈值
 
+#### MCP 服务器连接失败
+**症状**: MCP 工具无法注册或调用
+**解决方案**:
+- 检查 MCP 服务器配置和传输设置
+- 验证必需二进制文件的存在
+- 确认环境变量已正确传递
+- 查看 MCP 服务器的日志输出
+
+#### 兼容性映射失效
+**症状**: 技能无法正确映射到 MCP 服务器
+**解决方案**:
+- 检查技能的安装规范
+- 验证兼容性映射配置
+- 确认命令行参数的安全策略
+- 查看兼容性注册表的日志
+
 **章节来源**
 - [agentic_loop.rs:484-501](file://macaca/crates/macaca-runtime/src/agentic_loop.rs#L484-L501)
 - [context_window.rs:75-122](file://macaca/crates/macaca-runtime/src/context_window.rs#L75-L122)
 - [permission.rs:54-87](file://macaca/crates/macaca-runtime/src/permission.rs#L54-L87)
+- [mcp_runtime.rs:555-616](file://macaca/crates/macaca-runtime-host/src/mcp_runtime.rs#L555-L616)
+- [compat.rs:146-150](file://macaca/crates/macaca-runtime-host/src/compat.rs#L146-L150)
 
 ## 结论
 
 运行时系统为 Agent OS 提供了强大而灵活的执行环境。通过模块化的架构设计和完善的错误处理机制，系统能够可靠地管理各种类型的智能体执行任务。
+
+**更新** 新的 macaca-runtime-host 架构显著提升了系统的可扩展性和维护性。通过将 MCP 运行时管理、兼容性映射和环境桥接功能集中在一个专门的 crate 中，系统实现了更好的职责分离和更低的耦合度。
 
 ### 主要优势
 - **安全性**: 多层次的安全控制确保系统稳定运行
 - **可扩展性**: 模块化设计支持功能扩展和定制
 - **可观测性**: 丰富的事件和日志支持调试和监控
 - **可靠性**: 完善的错误处理和恢复机制
+- **可移植性**: MCP 运行时管理器可在不同主机类型间复用
+- **声明式配置**: 兼容性映射支持声明式技能管理
+- **环境安全**: 环境桥接器提供安全的环境变量传递
 
 ### 未来发展方向
 - **性能优化**: 进一步优化内存使用和执行效率
 - **监控增强**: 添加更详细的性能指标和监控功能
 - **配置管理**: 提供更灵活的运行时配置选项
 - **扩展接口**: 支持更多类型的工具和执行模式
+- **MCP 协议完善**: 增强对更多传输协议的支持
+- **并发控制**: 改进 MCP 服务器的并发访问控制
+- **可观测性**: 增强 MCP 运行时的监控和调试能力
 
-运行时系统为构建复杂的智能体应用奠定了坚实的基础，其设计理念和实现方式为类似系统的设计提供了宝贵的参考价值。
+运行时系统为构建复杂的智能体应用奠定了坚实的基础，其设计理念和实现方式为类似系统的设计提供了宝贵的参考价值。新的架构进一步增强了系统的稳定性和可维护性，为未来的功能扩展提供了良好的基础。

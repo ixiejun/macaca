@@ -16,16 +16,17 @@
 - [framework_runner.rs](file://macaca/crates/macaca-web/src/framework_runner.rs)
 - [framework_toolkit.rs](file://macaca/crates/macaca-web/src/framework_toolkit.rs)
 - [hook_consumer.rs](file://macaca/crates/macaca-web/src/hook_consumer.rs)
+- [mcp_runtime.rs](file://macaca/crates/macaca-web/src/mcp_runtime.rs)
+- [skill_mcp.rs](file://macaca/crates/macaca-web/src/skill_mcp.rs)
 </cite>
 
 ## 更新摘要
 **所做更改**
-- 新增框架运行器组件文档，包括 ReActAgent 构建器和工具中间件
-- 更新会话管理章节，增加框架会话存储和执行上下文管理
-- 新增运行追踪章节，详细说明跨组件运行状态监控
-- 更新聊天编排器章节，增加框架引擎支持和暂停/恢复机制
-- 新增钩子事件消费者章节，说明自动协调器通知系统
-- 更新依赖关系分析，增加新组件之间的交互关系
+- 新增MCP运行时管理器章节，详细说明系统级MCP服务器管理和技能支持的MCP工具注册
+- 更新路由模块，新增MCP状态查询API端点
+- 更新会话管理章节，增加MCP工具注册与生命周期管理
+- 新增技能MCP集成模块文档，说明从技能快照中提取MCP服务器定义
+- 更新依赖关系分析，增加MCP运行时管理器与框架运行器的交互
 
 ## 目录
 1. [简介](#简介)
@@ -42,10 +43,10 @@
 ## 简介
 本文件系统性梳理并文档化 Web 服务层，涵盖 REST API 设计与路由、SSE 实时事件流、会话管理、聊天编排器、事件持久化、计划与工作循环、运行追踪、工作空间权限等。文档同时提供 API 使用示例、错误处理策略、安全与性能优化建议，并给出客户端实现与调试方法。
 
-**更新** 本次更新反映了 Web 服务层的重大现代化，包括新增的框架运行器组件、会话管理增强和运行追踪系统。
+**更新** 本次更新反映了 Web 服务层的重大现代化，包括新增的框架运行器组件、会话管理增强、运行追踪系统，以及全新的MCP运行时集成模块。
 
 ## 项目结构
-Web 服务层位于 macaca-web crate，采用模块化组织：路由定义、SSE 转换与广播、会话与持久化、聊天编排器、事件收集与持久化、应用状态共享、代理执行器、计划与工作循环、运行追踪、工作空间权限等。
+Web 服务层位于 macaca-web crate，采用模块化组织：路由定义、SSE 转换与广播、会话与持久化、聊天编排器、事件收集与持久化、应用状态共享、代理执行器、计划与工作循环、运行追踪、工作空间权限、MCP运行时管理等。
 
 ```mermaid
 graph TB
@@ -54,16 +55,18 @@ AX["Axum Router"]
 CORS["CORS中间件"]
 END
 subgraph "路由模块"
-RT["routes.rs<br/>系统状态/应用/任务/日程/事件查询"]
+RT["routes.rs<br/>系统状态/应用/任务/日程/事件查询/MCP状态"]
 CH["chat_orchestrator.rs<br/>聊天SSE/停止控制/框架引擎"]
-SESS["session.rs<br/>会话列表/详情/事件流/框架会话"]
+SESS["session.rs<br/>会话列表/详情/事件流/框架会话/MCP工具注册"]
 SSE["sse.rs<br/>事件转换/广播/决策持久化"]
 EP["event_persistence.rs<br/>事件收集/写入EventLog"]
 LM["loop_manager.rs<br/>Plan/Worker循环生命周期/框架笔记本"]
 AR["agent_runner.rs<br/>框架原生代理执行器"]
-ST["state.rs<br/>共享AppState/框架会话存储"]
+ST["state.rs<br/>共享AppState/MCP运行时管理器"]
 WS["workspace.rs<br/>工作空间权限"]
 RT2["run_trace.rs<br/>运行追踪/跨组件监控"]
+MCP["mcp_runtime.rs<br/>MCP运行时管理器/服务器定义/工具注册"]
+SK["skill_mcp.rs<br/>技能MCP集成/工具提取/状态探测"]
 END
 subgraph "框架组件"
 FR["framework_runner.rs<br/>ReActAgent构建器/工具中间件"]
@@ -74,6 +77,7 @@ AX --> CORS --> RT
 RT --> CH
 RT --> SESS
 RT --> SSE
+RT --> MCP
 CH --> EP
 CH --> SSE
 CH --> LM
@@ -83,12 +87,15 @@ CH --> RT2
 CH --> FR
 SESS --> SSE
 SESS --> FR
+SESS --> MCP
+SESS --> SK
 LM --> SSE
 LM --> FR
 AR --> ST
 AR --> FR
 FR --> FT
 FR --> HC
+MCP --> SK
 WS --> AR
 RT2 --> SSE
 ```
@@ -107,15 +114,17 @@ RT2 --> SSE
 - [framework_runner.rs:1-800](file://macaca/crates/macaca-web/src/framework_runner.rs#L1-L800)
 - [framework_toolkit.rs:1-731](file://macaca/crates/macaca-web/src/framework_toolkit.rs#L1-L731)
 - [hook_consumer.rs:1-237](file://macaca/crates/macaca-web/src/hook_consumer.rs#L1-L237)
+- [mcp_runtime.rs:1-1012](file://macaca/crates/macaca-web/src/mcp_runtime.rs#L1-L1012)
+- [skill_mcp.rs:1-404](file://macaca/crates/macaca-web/src/skill_mcp.rs#L1-L404)
 
 **章节来源**
 - [lib.rs:82-662](file://macaca/crates/macaca-web/src/lib.rs#L82-L662)
 
 ## 核心组件
-- 应用状态 AppState：统一持有内核、运行时、注册表、LLM 提供商、工具集、执行器注册表、持久化存储、循环句柄、会话状态与配置。
-- 路由模块 routes.rs：提供系统状态、应用管理、技能查询、任务/目标/日程、事件日志等 REST 接口。
+- 应用状态 AppState：统一持有内核、运行时、注册表、LLM 提供商、工具集、执行器注册表、持久化存储、循环句柄、会话状态与配置，**新增MCP运行时管理器**。
+- 路由模块 routes.rs：提供系统状态、应用管理、技能查询、任务/目标/日程、事件日志、会话、**MCP状态查询**等 REST 接口。
 - SSE 模块 sse.rs：将执行器事件转换为 SSE 事件，支持广播到应用下所有会话、持久化计划决策。
-- 会话模块 session.rs：会话 CRUD、历史重建、事件流、代理轨迹收集与持久化、实时状态更新、框架会话存储。
+- 会话模块 session.rs：会话 CRUD、历史重建、事件流、代理轨迹收集与持久化、实时状态更新、框架会话存储、**MCP工具注册与生命周期管理**。
 - 聊天编排器 chat_orchestrator.rs：SSE 流式聊天、工作流执行、停止控制、错误诊断、运行追踪、框架引擎支持。
 - 事件持久化 event_persistence.rs：订阅执行器事件，写入 EventLog 并生成运行追踪。
 - 计划与工作循环 loop_manager.rs：PlanLoop/WorkerLoop 生命周期、事件消费、决策广播与持久化、框架笔记本管理。
@@ -125,9 +134,11 @@ RT2 --> SSE
 - 钩子事件消费者 hook_consumer.rs：监听 fork 事件并自动通知协调器。
 - 工作空间 workspace.rs：应用级工作空间隔离与访问控制。
 - 运行追踪 run_trace.rs：run_trace 事件的结构化记录与作用域选择。
+- **MCP运行时管理器 mcp_runtime.rs**：系统级MCP服务器定义、运行时生命周期管理、工具注册与状态监控。
+- **技能MCP集成 skill_mcp.rs**：从技能快照中提取MCP服务器定义、工具注册、状态探测与事件发射。
 
 **章节来源**
-- [state.rs:120-143](file://macaca/crates/macaca-web/src/state.rs#L120-L143)
+- [state.rs:120-154](file://macaca/crates/macaca-web/src/state.rs#L120-L154)
 - [routes.rs:44-791](file://macaca/crates/macaca-web/src/routes.rs#L44-L791)
 - [sse.rs:15-246](file://macaca/crates/macaca-web/src/sse.rs#L15-L246)
 - [session.rs:24-800](file://macaca/crates/macaca-web/src/session.rs#L24-L800)
@@ -140,9 +151,11 @@ RT2 --> SSE
 - [framework_runner.rs:1-800](file://macaca/crates/macaca-web/src/framework_runner.rs#L1-L800)
 - [framework_toolkit.rs:1-731](file://macaca/crates/macaca-web/src/framework_toolkit.rs#L1-L731)
 - [hook_consumer.rs:1-237](file://macaca/crates/macaca-web/src/hook_consumer.rs#L1-L237)
+- [mcp_runtime.rs:1-1012](file://macaca/crates/macaca-web/src/mcp_runtime.rs#L1-L1012)
+- [skill_mcp.rs:1-404](file://macaca/crates/macaca-web/src/skill_mcp.rs#L1-L404)
 
 ## 架构总览
-Web 服务层以 Axum Router 为核心入口，通过 AppState 注入各模块协作。聊天编排器负责 SSE 流与工作流执行；事件持久化模块将执行器事件写入 EventLog；SSE 模块将事件转换为前端可消费的事件流；会话模块负责会话生命周期与历史重建；计划/工作循环模块驱动任务板与目标完成；运行追踪模块提供跨组件的运行状态快照；框架运行器提供现代化的 ReActAgent 执行环境。
+Web 服务层以 Axum Router 为核心入口，通过 AppState 注入各模块协作。聊天编排器负责 SSE 流与工作流执行；事件持久化模块将执行器事件写入 EventLog；SSE 模块将事件转换为前端可消费的事件流；会话模块负责会话生命周期与历史重建；计划/工作循环模块驱动任务板与目标完成；运行追踪模块提供跨组件的运行状态快照；**MCP运行时管理器提供系统级MCP服务器管理与工具注册**；**技能MCP集成模块从技能快照中提取MCP定义并注册到工具包**。
 
 ```mermaid
 sequenceDiagram
@@ -150,12 +163,21 @@ participant C as "客户端"
 participant R as "路由(routes.rs)"
 participant CH as "聊天编排器(chat_orchestrator.rs)"
 participant FR as "框架运行器(framework_runner.rs)"
+participant MRM as "MCP运行时管理器(mcp_runtime.rs)"
+participant SM as "技能MCP(skill_mcp.rs)"
 participant EP as "事件持久化(event_persistence.rs)"
 participant EL as "事件日志(EventLog)"
 participant HC as "钩子消费者(hook_consumer.rs)"
+C->>R : GET /api/mcp
+R->>MRM : 查询MCP状态
+MRM-->>R : 返回MCP服务器状态
+R-->>C : MCP状态响应
 C->>R : POST /api/chat/v2
 R->>CH : 触发框架引擎聊天执行
 CH->>FR : 构建ReActAgent协调器
+FR->>SM : 注册技能MCP工具
+SM->>MRM : 从技能快照提取MCP定义
+MRM->>MRM : 注册MCP工具到工具包
 FR->>FR : 工具中间件/SSE钩子
 CH->>EP : 启动事件收集器
 CH->>SSE : 建立SSE通道
@@ -172,19 +194,23 @@ CH-->>SESS : 会话历史与轨迹更新
 - [chat_orchestrator.rs:268-799](file://macaca/crates/macaca-web/src/chat_orchestrator.rs#L268-L799)
 - [framework_runner.rs:208-268](file://macaca/crates/macaca-web/src/framework_runner.rs#L208-L268)
 - [hook_consumer.rs:27-236](file://macaca/crates/macaca-web/src/hook_consumer.rs#L27-L236)
+- [mcp_runtime.rs:280-322](file://macaca/crates/macaca-web/src/mcp_runtime.rs#L280-L322)
+- [skill_mcp.rs:50-74](file://macaca/crates/macaca-web/src/skill_mcp.rs#L50-L74)
 
 ## 详细组件分析
 
 ### REST API 设计与路由
 - 统一返回结构：错误响应统一为 JSON 包含 error 字段，便于前端一致处理。
-- 路由分层：系统状态、应用管理、技能、任务/目标/日程、事件日志、会话等接口清晰分离。
+- 路由分层：系统状态、应用管理、技能、任务/目标/日程、事件日志、会话、**MCP状态查询**等接口清晰分离。
 - 查询参数：如事件查询支持 since/limit，任务进度支持按会话过滤。
 - 错误处理：明确的状态码与错误信息，便于定位问题。
 - 引擎选择：新增 /api/chat/v2 支持框架引擎，通过 engine 参数选择执行方式。
+- **MCP状态查询**：新增 /api/mcp 端点，返回系统级MCP服务器状态与可用工具列表。
 
 **章节来源**
 - [routes.rs:28-41](file://macaca/crates/macaca-web/src/routes.rs#L28-L41)
 - [routes.rs:44-791](file://macaca/crates/macaca-web/src/routes.rs#L44-L791)
+- [routes.rs:543-550](file://macaca/crates/macaca-web/src/routes.rs#L543-L550)
 
 ### SSE 实时事件流
 - 事件类型：包含委托任务开始/进行/完成/失败/取消、代理思考/工具调用/结果、运行追踪等。
@@ -201,10 +227,12 @@ CH-->>SESS : 会话历史与轨迹更新
 - 实时状态：根据执行器事件更新会话状态，避免覆盖周期性保存的数据。
 - 历史重建：从 EventLog 重建代理轨迹，保证断线重连后仍可恢复。
 - 框架会话：新增框架会话存储，支持 ExecutionContext 和模块状态管理。
+- **MCP工具注册**：会话级别MCP工具注册与生命周期管理，支持按会话隔离的MCP工具。
 
 **章节来源**
 - [session.rs:24-800](file://macaca/crates/macaca-web/src/session.rs#L24-L800)
 - [chat_orchestrator.rs:486-799](file://macaca/crates/macaca-web/src/chat_orchestrator.rs#L486-L799)
+- [mcp_runtime.rs:280-322](file://macaca/crates/macaca-web/src/mcp_runtime.rs#L280-L322)
 
 ### 聊天编排器与工作流
 - 请求模型：支持 app_id、prompt、可选 session_id、engine 等字段。
@@ -212,6 +240,7 @@ CH-->>SESS : 会话历史与轨迹更新
 - 错误诊断：针对网络、鉴权、配额、请求格式、服务器错误、超时等场景提供诊断建议。
 - 运行追踪：在关键阶段记录 run_trace 事件，便于监控与排障。
 - 框架引擎：支持 engine=framework 参数，使用 ReActAgent 替代传统 AgenticLoop。
+- **MCP工具集成**：在聊天执行过程中自动注册技能MCP工具，提供浏览器自动化等能力。
 
 **章节来源**
 - [chat_orchestrator.rs:127-256](file://macaca/crates/macaca-web/src/chat_orchestrator.rs#L127-L256)
@@ -269,10 +298,79 @@ CH-->>SESS : 会话历史与轨迹更新
 - AppState：集中管理内核、运行时、注册表、LLM、工具集、执行器注册表、持久化、循环句柄、会话状态与配置。
 - 热插拔：SSE 发送器可热替换，支持浏览器刷新后恢复连接。
 - 框架会话：新增 framework_session_store，支持 ExecutionContext 和模块状态持久化。
+- **MCP运行时管理器**：新增 mcp_runtime 字段，提供系统级MCP服务器管理能力。
 
 **章节来源**
-- [state.rs:120-143](file://macaca/crates/macaca-web/src/state.rs#L120-L143)
+- [state.rs:120-154](file://macaca/crates/macaca-web/src/state.rs#L120-L154)
 - [session.rs:39-52](file://macaca/crates/macaca-web/src/session.rs#L39-L52)
+
+### MCP运行时管理器
+
+**新增** MCP运行时管理器是系统级MCP服务器管理的核心组件，提供以下功能：
+
+- **服务器定义管理**：支持全局、应用级、技能级等多种来源的MCP服务器定义，包括stdio、sse、streamable_http等传输协议。
+- **生命周期管理**：提供Global、App、Session、AgentSession、Call五种生命周期作用域，支持资源引用计数和自动清理。
+- **工具注册**：将MCP工具注册到框架工具包，支持工具前缀、冲突解决和权限控制。
+- **状态监控**：探测MCP服务器可用性，监控工具暴露情况，提供详细的运行状态报告。
+- **配置管理**：支持从~/.macaca/mcp.yaml加载默认配置，动态更新服务器定义。
+
+```mermaid
+flowchart TD
+A[MCP运行时管理器] --> B[服务器定义]
+B --> C[全局配置]
+B --> D[应用配置]
+B --> E[技能配置]
+B --> F[兼容性配置]
+A --> G[生命周期管理]
+G --> H[Global作用域]
+G --> I[App作用域]
+G --> J[Session作用域]
+G --> K[AgentSession作用域]
+G --> L[Call作用域]
+A --> M[工具注册]
+M --> N[权限控制]
+N --> O[允许/拒绝服务器]
+N --> P[允许/拒绝工具]
+A --> Q[状态监控]
+Q --> R[依赖检查]
+Q --> S[连接探测]
+Q --> T[工具列表获取]
+```
+
+**图表来源**
+- [mcp_runtime.rs:229-421](file://macaca/crates/macaca-web/src/mcp_runtime.rs#L229-L421)
+- [mcp_runtime.rs:423-546](file://macaca/crates/macaca-web/src/mcp_runtime.rs#L423-L546)
+
+**章节来源**
+- [mcp_runtime.rs:1-1012](file://macaca/crates/macaca-web/src/mcp_runtime.rs#L1-L1012)
+
+### 技能MCP集成模块
+
+**新增** 技能MCP集成模块负责从AgentSkills中提取MCP服务器定义并进行注册：
+
+- **技能快照处理**：从技能快照中提取MCP服务器配置，支持显式定义和兼容性定义。
+- **工具注册**：将技能提供的MCP工具注册到框架工具包，支持按代理会话的生命周期管理。
+- **状态探测**：探测技能MCP服务器的可用性和工具暴露情况，提供详细的诊断信息。
+- **事件发射**：在MCP服务器启动、停止等关键事件时发射事件到事件日志和SSE流。
+
+```mermaid
+flowchart LR
+A[技能快照] --> B[提取MCP定义]
+B --> C[兼容性处理]
+C --> D[工具注册]
+D --> E[状态监控]
+E --> F[事件发射]
+A --> G[命令解析]
+G --> H[启动参数处理]
+H --> I[隔离参数添加]
+```
+
+**图表来源**
+- [skill_mcp.rs:50-74](file://macaca/crates/macaca-web/src/skill_mcp.rs#L50-L74)
+- [skill_mcp.rs:76-113](file://macaca/crates/macaca-web/src/skill_mcp.rs#L76-L113)
+
+**章节来源**
+- [skill_mcp.rs:1-404](file://macaca/crates/macaca-web/src/skill_mcp.rs#L1-L404)
 
 ## 依赖关系分析
 
@@ -289,6 +387,7 @@ class AppState {
 +loops
 +sessions
 +config
++mcp_runtime : McpRuntimeManager
 }
 class ApplicationExecutorRegistry
 class Kernel
@@ -301,6 +400,8 @@ class LoopState
 class SessionState
 class FrameworkSessionStore
 class RunTracer
+class McpRuntimeManager
+class SkillMcpIntegration
 AppState --> ApplicationExecutorRegistry : "持有"
 AppState --> Kernel : "持有"
 AppState --> AppRuntime : "持有"
@@ -311,11 +412,13 @@ AppState --> PersistenceState : "持有"
 AppState --> LoopState : "持有"
 AppState --> SessionState : "持有"
 AppState --> RunTracer : "持有"
+AppState --> McpRuntimeManager : "持有"
 SessionState --> FrameworkSessionStore : "持有"
+McpRuntimeManager --> SkillMcpIntegration : "使用"
 ```
 
 **图表来源**
-- [state.rs:120-143](file://macaca/crates/macaca-web/src/state.rs#L120-L143)
+- [state.rs:120-154](file://macaca/crates/macaca-web/src/state.rs#L120-L154)
 
 **章节来源**
 - [state.rs:58-118](file://macaca/crates/macaca-web/src/state.rs#L58-L118)
@@ -328,12 +431,15 @@ SessionState --> FrameworkSessionStore : "持有"
 - LLM 调用优化：重试与速率限制、成本跟踪、回退模型配置。
 - 框架代理缓存：ReActAgent 构建器支持代理复用，减少初始化开销。
 - 钩子事件批处理：批量处理钩子事件，避免频繁的会话查找操作。
+- **MCP工具注册优化**：延迟注册策略，按需加载MCP工具，避免不必要的连接开销。
+- **MCP状态缓存**：MCP服务器状态探测结果缓存，减少重复连接开销。
 
 **章节来源**
 - [routes.rs:254-341](file://macaca/crates/macaca-web/src/routes.rs#L254-L341)
 - [session.rs:317-389](file://macaca/crates/macaca-web/src/session.rs#L317-L389)
 - [loop_manager.rs:246-248](file://macaca/crates/macaca-web/src/loop_manager.rs#L246-L248)
 - [lib.rs:107-128](file://macaca/crates/macaca-web/src/lib.rs#L107-L128)
+- [mcp_runtime.rs:485-546](file://macaca/crates/macaca-web/src/mcp_runtime.rs#L485-L546)
 
 ## 故障排查指南
 - LLM 错误诊断：网络、鉴权、配额、请求格式、服务器错误、超时等场景的诊断建议。
@@ -343,14 +449,18 @@ SessionState --> FrameworkSessionStore : "持有"
 - 日志与追踪：使用 run_trace 事件定位卡点阶段，结合事件日志查询接口定位具体事件。
 - 框架代理问题：检查 ReActAgent 构建器配置，验证工具中间件链路。
 - 钩子事件异常：确认 fork_to_session 映射正确，检查会话暂停/恢复状态。
+- **MCP服务器连接失败**：检查MCP服务器配置、依赖命令是否存在、网络连接状态。
+- **MCP工具不可用**：确认MCP服务器已连接、工具列表获取成功、权限策略允许。
+- **技能MCP集成问题**：检查技能快照构建、MCP定义提取、工具注册流程。
 
 **章节来源**
 - [chat_orchestrator.rs:38-103](file://macaca/crates/macaca-web/src/chat_orchestrator.rs#L38-L103)
 - [session.rs:317-389](file://macaca/crates/macaca-web/src/session.rs#L317-L389)
 - [routes.rs:751-790](file://macaca/crates/macaca-web/src/routes.rs#L751-L790)
+- [mcp_runtime.rs:485-546](file://macaca/crates/macaca-web/src/mcp_runtime.rs#L485-L546)
 
 ## 结论
-Web 服务层通过清晰的模块划分与强一致的事件持久化，实现了可靠的聊天编排、实时事件流、会话管理与任务驱动的计划/工作循环。配合运行追踪与工作空间权限模型，系统具备良好的可观测性与安全性。新增的框架运行器组件提供了现代化的 ReActAgent 执行环境，支持更灵活的工具管理和暂停/恢复机制。建议在生产环境中启用速率限制、成本跟踪与告警，并定期清理过期会话与事件以控制存储增长。
+Web 服务层通过清晰的模块划分与强一致的事件持久化，实现了可靠的聊天编排、实时事件流、会话管理与任务驱动的计划/工作循环。配合运行追踪与工作空间权限模型，系统具备良好的可观测性与安全性。新增的框架运行器组件提供了现代化的 ReActAgent 执行环境，支持更灵活的工具管理和暂停/恢复机制。**新增的MCP运行时集成模块实现了系统级MCP服务器管理与技能MCP工具注册，为浏览器自动化、外部服务集成等场景提供了强大的扩展能力。** 建议在生产环境中启用速率限制、成本跟踪与告警，并定期清理过期会话与事件以控制存储增长。
 
 ## 附录
 
@@ -362,6 +472,7 @@ Web 服务层通过清晰的模块划分与强一致的事件持久化，实现�
 - 实时代理状态流：GET /api/apps/{id}/agents/stream
 - 重新加载应用：POST /api/apps/reload
 - 技能列表：GET /api/skills
+- **MCP状态查询**：GET /api/mcp
 - 聊天请求（SSE）：POST /api/chat/v2
 - 停止聊天：POST /api/chat/stop
 - 会话列表：GET /api/sessions
@@ -375,6 +486,7 @@ Web 服务层通过清晰的模块划分与强一致的事件持久化，实现�
 **章节来源**
 - [lib.rs:608-646](file://macaca/crates/macaca-web/src/lib.rs#L608-L646)
 - [routes.rs:44-791](file://macaca/crates/macaca-web/src/routes.rs#L44-L791)
+- [routes.rs:543-550](file://macaca/crates/macaca-web/src/routes.rs#L543-L550)
 
 ### 客户端实现指南
 - SSE 连接：使用浏览器原生 EventSource 或现代 JS 的 fetch + ReadableStream，监听 delegated_* 与 plan_decision 等事件类型。
@@ -382,6 +494,7 @@ Web 服务层通过清晰的模块划分与强一致的事件持久化，实现�
 - 停止控制：在用户触发停止时调用 /api/chat/stop，确保所有执行器与循环被正确关闭。
 - 错误处理：对 error 事件与 HTTP 错误码进行统一处理，向用户展示诊断建议。
 - 框架引擎：通过 engine=framework 参数使用新的 ReActAgent 执行引擎。
+- **MCP工具使用**：在聊天请求中指定MCP工具名称，系统会自动注册相应的MCP工具并执行。
 
 **章节来源**
 - [chat_orchestrator.rs:148-256](file://macaca/crates/macaca-web/src/chat_orchestrator.rs#L148-L256)
@@ -392,7 +505,9 @@ Web 服务层通过清晰的模块划分与强一致的事件持久化，实现�
 - 事件日志：使用 /api/sessions/{id}/events 与 /api/sessions/{id}/run-trace 获取增量事件与运行快照。
 - 代理状态流：使用 /api/apps/{id}/agents/stream 观察代理活动变化。
 - 框架调试：通过框架运行器的日志输出观察 ReActAgent 的执行过程。
+- **MCP调试**：使用 /api/mcp 端点检查MCP服务器状态，确认工具注册情况。
 
 **章节来源**
 - [run_trace.rs:76-142](file://macaca/crates/macaca-web/src/run_trace.rs#L76-L142)
 - [routes.rs:751-790](file://macaca/crates/macaca-web/src/routes.rs#L751-L790)
+- [routes.rs:543-550](file://macaca/crates/macaca-web/src/routes.rs#L543-L550)

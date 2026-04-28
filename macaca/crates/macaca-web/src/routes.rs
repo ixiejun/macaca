@@ -1084,3 +1084,105 @@ pub async fn get_session_run_trace(
     let latest_seq = state.persist.event_log.latest_seq(&session_id).await;
     Ok(Json(EventsResponse { events, latest_seq }))
 }
+
+// ---------------------------------------------------------------------------
+// GET /api/drivers — List loaded drivers
+// ---------------------------------------------------------------------------
+
+#[derive(Serialize)]
+pub struct DriverInfo {
+    pub name: String,
+    pub version: String,
+    pub driver_type: String,
+    pub description: String,
+    pub capabilities: Vec<String>,
+    pub tools_count: usize,
+}
+
+#[derive(Serialize)]
+pub struct DriversResponse {
+    pub drivers: Vec<DriverInfo>,
+    pub total: usize,
+}
+
+pub async fn get_drivers(State(state): State<Arc<AppState>>) -> Json<DriversResponse> {
+    let driver_info = state.driver_registry.list_drivers_with_tools().await;
+    let drivers: Vec<DriverInfo> = driver_info
+        .into_iter()
+        .map(|(m, tool_count)| DriverInfo {
+            name: m.name,
+            version: m.version,
+            driver_type: format!("{:?}", m.driver_type),
+            description: m.description,
+            capabilities: m.capabilities,
+            tools_count: tool_count,
+        })
+        .collect();
+    let total = drivers.len();
+    Json(DriversResponse { drivers, total })
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/drivers/reload — Rescan and reload drivers directory
+// ---------------------------------------------------------------------------
+
+#[derive(Serialize)]
+pub struct DriverReloadResult {
+    pub name: String,
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct DriverReloadResponse {
+    pub loaded: usize,
+    pub failed: usize,
+    pub results: Vec<DriverReloadResult>,
+}
+
+pub async fn reload_drivers(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<DriverReloadResponse>, (StatusCode, Json<ErrorResponse>)> {
+    let loader = macaca_driver::DriverLoader::new(&state.drivers_dir);
+    let load_results = loader.load_all();
+
+    let mut loaded = 0usize;
+    let mut failed = 0usize;
+    let mut results = Vec::new();
+
+    for result in load_results {
+        match result.result {
+            Ok(driver) => {
+                let name = result.name.clone();
+                let tool_count = macaca_driver::SoftwareDriver::tools(driver.as_ref()).len();
+                state.driver_registry.register(driver).await;
+                loaded += 1;
+                tracing::info!(
+                    driver = %name,
+                    tools = tool_count,
+                    "Driver reloaded; tools will be available to agents on next execution"
+                );
+                results.push(DriverReloadResult {
+                    name,
+                    status: "ok".to_string(),
+                    error: None,
+                });
+            }
+            Err(e) => {
+                failed += 1;
+                results.push(DriverReloadResult {
+                    name: result.name.clone(),
+                    status: "error".to_string(),
+                    error: Some(e),
+                });
+            }
+        }
+    }
+
+    Ok(Json(DriverReloadResponse {
+        loaded,
+        failed,
+        results,
+    }))
+}

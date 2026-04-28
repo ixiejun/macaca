@@ -9,8 +9,6 @@ use async_trait::async_trait;
 
 use macaca_app::loader::AppLoader;
 use macaca_app::{AppLayer, AppRuntime, AppStatus};
-use macaca_driver::driver::{DriverType, SoftwareDriver};
-use macaca_driver_claude_code::{ClaudeCodeConfig, ClaudeCodeDriver};
 use macaca_kernel::Kernel;
 use macaca_llm::LlmProvider;
 use macaca_proto::config::KernelConfig;
@@ -307,71 +305,28 @@ async fn backend_persona_loads() {
 }
 
 // ---------------------------------------------------------------------------
-// Claude Code Driver Tests
+// Claude Code Driver Tests (disabled — driver moved to external plugin)
 // ---------------------------------------------------------------------------
 
 /// Verify the Claude Code Driver implements SoftwareDriver correctly.
 #[tokio::test]
+#[ignore = "claude-code driver moved to external plugin"]
 async fn claude_code_driver_lifecycle() {
-    let config = ClaudeCodeConfig::new("/tmp/test-project")
-        .with_model("claude-sonnet-4-20250514")
-        .with_timeout(120);
-
-    let mut driver = ClaudeCodeDriver::new(config);
-
-    // Check manifest
-    let manifest = driver.manifest();
-    assert_eq!(manifest.name, "claude-code");
-    assert_eq!(manifest.driver_type, DriverType::CliSubprocess);
-
-    // Initialize
-    driver.initialize().await.unwrap();
-
-    // Tools
-    let tools = driver.tools();
-    assert_eq!(tools.len(), 3);
-    let tool_names: Vec<&str> = tools.iter().map(|t| t.name()).collect();
-    assert!(tool_names.contains(&"claude_code_execute"));
-    assert!(tool_names.contains(&"claude_code_resume"));
-    assert!(tool_names.contains(&"claude_code_status"));
-
-    // Shutdown
-    driver.shutdown().await.unwrap();
+    // This test requires the macaca-driver-claude-code crate which has been
+    // extracted as an external driver plugin. Re-enable once a DriverLoader-
+    // based integration test is available.
 }
 
 /// Verify execute tool validates parameters.
 #[tokio::test]
+#[ignore = "claude-code driver moved to external plugin"]
 async fn claude_code_execute_validates_params() {
-    let config = ClaudeCodeConfig::new("/tmp");
-    let driver = ClaudeCodeDriver::new(config);
-    let tools = driver.tools();
-
-    let execute_tool = tools
-        .iter()
-        .find(|t| t.name() == "claude_code_execute")
-        .unwrap();
-
-    // Missing prompt should error
-    let result = execute_tool.execute(serde_json::json!({})).await;
-    assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("prompt"));
 }
 
 /// Verify status tool returns a result even if claude is not installed.
 #[tokio::test]
+#[ignore = "claude-code driver moved to external plugin"]
 async fn claude_code_status_graceful() {
-    let config = ClaudeCodeConfig::new("/tmp");
-    let driver = ClaudeCodeDriver::new(config);
-    let tools = driver.tools();
-
-    let status_tool = tools
-        .iter()
-        .find(|t| t.name() == "claude_code_status")
-        .unwrap();
-    let result = status_tool.execute(serde_json::json!({})).await.unwrap();
-
-    // Should return JSON with available field regardless of claude installation
-    assert!(result.is_object());
 }
 
 // ---------------------------------------------------------------------------

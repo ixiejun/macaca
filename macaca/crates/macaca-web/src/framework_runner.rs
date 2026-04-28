@@ -210,6 +210,75 @@ impl FrameworkRunner {
             agent_name: agent_name.to_string(),
         }));
 
+        // Set up TraceEvent → direct SSE + EventLog forwarding (bypasses executor broadcast)
+        {
+            let (trace_tx, mut trace_rx) = tokio::sync::mpsc::unbounded_channel::<macaca_tools::TraceEvent>();
+            toolkit.set_event_tx(trace_tx);
+
+            // Try to get direct SSE sender from the active session
+            let sse_tx_opt = if let Some(ref sid) = session_id {
+                let sessions = state.sessions.active_sessions.read().await;
+                sessions.get(sid).map(|s| Arc::clone(&s.sse_tx))
+            } else {
+                None
+            };
+
+            let event_log = Arc::clone(&state.persist.event_log);
+            let session_id_for_trace = session_id.clone();
+            let agent_name_for_trace = agent_name.to_string();
+            let executor_clone = Arc::clone(&executor);
+            tokio::spawn(async move {
+                while let Some(trace) = trace_rx.recv().await {
+                    let event_data = serde_json::to_value(&trace).unwrap_or_default();
+
+                    // Build delegated_cc_trace envelope matching convert_executor_event_to_sse format:
+                    // { task_id, agent, agent_tab, event: <CcTrace fields> }
+                    let delegated_envelope = serde_json::json!({
+                        "task_id": task_id.to_string(),
+                        "agent": agent_name_for_trace,
+                        "agent_tab": agent_name_for_trace,
+                        "event": event_data,
+                    });
+
+                    // 1. Persist to EventLog as delegated_cc_trace (not cc_trace)
+                    if let Some(ref sid) = session_id_for_trace {
+                        event_log
+                            .append(
+                                sid,
+                                "delegated_cc_trace",
+                                &agent_name_for_trace,
+                                delegated_envelope.clone(),
+                            )
+                            .await;
+                    }
+
+                    // 2. Push to SSE stream directly (bypass broadcast channel)
+                    if let Some(ref sse_tx) = sse_tx_opt {
+                        let event = Event::default()
+                            .event("delegated_cc_trace")
+                            .data(delegated_envelope.to_string());
+                        let sender = sse_tx.read().await;
+                        let _ = sender.send(Ok(event)).await;
+                    } else {
+                        // Fallback: broadcast via executor if no direct SSE path
+                        let cc_trace = macaca_proto::AgentExecutionEvent::CcTrace {
+                            thinking: trace.thinking,
+                            text: trace.text,
+                            tool_name: trace.tool_name,
+                            tool_input: trace.tool_input,
+                            tool_result: trace.tool_result,
+                            is_error: trace.is_error,
+                        };
+                        executor_clone.broadcast_event(macaca_kernel::executor::ExecutorEvent::AgentEvent {
+                            task_id,
+                            agent: agent_name_for_trace.clone(),
+                            event: cc_trace,
+                        });
+                    }
+                }
+            });
+        }
+
         let model_name = selection.primary.reference();
 
         let agent = ReActAgent::new(agent_name, &system_prompt, model, formatter)
@@ -253,6 +322,27 @@ impl FrameworkRunner {
         let mut toolkit =
             crate::framework_toolkit::build_toolkit(state, app_id, agent_name, session_id, goal_id)
                 .await;
+
+        // Set up TraceEvent → AgentExecutionEvent::CcTrace forwarding
+        if let Some(ref agent_tx) = event_tx {
+            let (trace_tx, mut trace_rx) = tokio::sync::mpsc::unbounded_channel::<macaca_tools::TraceEvent>();
+            toolkit.set_event_tx(trace_tx);
+
+            let agent_tx_clone = agent_tx.clone();
+            tokio::spawn(async move {
+                while let Some(trace) = trace_rx.recv().await {
+                    let cc_trace = macaca_proto::AgentExecutionEvent::CcTrace {
+                        thinking: trace.thinking,
+                        text: trace.text,
+                        tool_name: trace.tool_name,
+                        tool_input: trace.tool_input,
+                        tool_result: trace.tool_result,
+                        is_error: trace.is_error,
+                    };
+                    let _ = agent_tx_clone.send(cc_trace).await;
+                }
+            });
+        }
 
         if let Some(ref tx) = event_tx {
             toolkit.add_middleware(Box::new(ChannelToolMiddleware { tx: tx.clone() }));
@@ -304,6 +394,39 @@ impl FrameworkRunner {
             None,
         )
         .await;
+
+        // Set up TraceEvent → SSE forwarding for streaming tool execution
+        let (trace_tx, mut trace_rx) = tokio::sync::mpsc::unbounded_channel::<macaca_tools::TraceEvent>();
+        toolkit.set_event_tx(trace_tx);
+        {
+            let sse_tx_for_trace = sse_tx.clone();
+            let event_log_for_trace = Arc::clone(&state.persist.event_log);
+            let session_id_for_trace = session_id.clone();
+            let agent_name_for_trace = agent_name.to_string();
+            tokio::spawn(async move {
+                while let Some(trace) = trace_rx.recv().await {
+                    let event_data = serde_json::to_value(&trace).unwrap_or_default();
+
+                    // 1. Persist to EventLog first
+                    if let Some(ref sid) = session_id_for_trace {
+                        event_log_for_trace
+                            .append(
+                                sid,
+                                "cc_trace",
+                                &agent_name_for_trace,
+                                event_data.clone(),
+                            )
+                            .await;
+                    }
+
+                    // 2. Push to SSE stream
+                    let event = Event::default()
+                        .event("cc_trace")
+                        .data(event_data.to_string());
+                    let _ = sse_tx_for_trace.send(Ok(event)).await;
+                }
+            });
+        }
 
         // SSE tool middleware — emits tool_call / tool_result events
         toolkit.add_middleware(Box::new(SseToolMiddleware {

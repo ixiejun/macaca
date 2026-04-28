@@ -49,6 +49,7 @@ agents:
     allowed_tools:
       - file_read
       - file_write
+      - claude_code_execute
     persona_dir: "./personas/news_coordinator"
 
   - name: news_planner

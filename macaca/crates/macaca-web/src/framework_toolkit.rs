@@ -64,6 +64,19 @@ pub(crate) async fn build_toolkit(
     // state.tools is Arc<dyn ToolSet>, which ToolSetBridge accepts directly.
     let mut toolkit = ToolSetBridge::from_tool_set(Arc::clone(&state.tools));
 
+    // Dynamically aggregate driver tools from the DriverRegistry.
+    // This ensures tools from drivers loaded via `/api/drivers/reload` are
+    // visible to agents without requiring a full restart.
+    {
+        let driver_tools = state.driver_registry.aggregate_tools().await;
+        for tool in driver_tools {
+            toolkit.register(
+                Box::new(SingleToolAdapter::new(tool)),
+                None,
+            );
+        }
+    }
+
     if let Some(ref allowlist) = policy.base_allowed_tools {
         for tool in toolkit.get_definitions() {
             if let Some(name) = tool.get("name").and_then(|v| v.as_str()) {

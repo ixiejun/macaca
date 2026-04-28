@@ -111,6 +111,18 @@ pub trait ToolHandler: Send + Sync {
     /// Execute the tool with the given arguments.
     async fn execute(&self, args: Value) -> Result<ToolResponse, ToolError>;
 
+    /// Execute with streaming events support.
+    /// Default: delegates to execute()
+    #[cfg(feature = "macaca-compat")]
+    async fn execute_streaming(
+        &self,
+        args: Value,
+        event_tx: Option<tokio::sync::mpsc::UnboundedSender<macaca_tools::TraceEvent>>,
+    ) -> Result<ToolResponse, ToolError> {
+        let _ = event_tx;
+        self.execute(args).await
+    }
+
     /// The unique tool name (used for lookup and LLM definitions).
     fn name(&self) -> &str;
 
@@ -208,6 +220,9 @@ pub struct Toolkit {
     groups: HashMap<String, ToolGroup>,
     middlewares: Vec<Box<dyn ToolMiddleware>>,
     resources: Vec<Box<dyn ToolkitResource>>,
+    /// Optional event channel for streaming tool execution
+    #[cfg(feature = "macaca-compat")]
+    event_tx: Option<tokio::sync::mpsc::UnboundedSender<macaca_tools::TraceEvent>>,
 }
 
 impl Toolkit {
@@ -228,6 +243,8 @@ impl Toolkit {
             groups,
             middlewares: Vec::new(),
             resources: Vec::new(),
+            #[cfg(feature = "macaca-compat")]
+            event_tx: None,
         }
     }
 
@@ -294,6 +311,12 @@ impl Toolkit {
     /// Append a middleware to the chain.
     pub fn add_middleware(&mut self, middleware: Box<dyn ToolMiddleware>) {
         self.middlewares.push(middleware);
+    }
+
+    /// Set the event channel for streaming tool execution.
+    #[cfg(feature = "macaca-compat")]
+    pub fn set_event_tx(&mut self, tx: tokio::sync::mpsc::UnboundedSender<macaca_tools::TraceEvent>) {
+        self.event_tx = Some(tx);
     }
 
     /// Track an external resource for cleanup when this toolkit is dropped.
@@ -371,7 +394,14 @@ impl Toolkit {
             mw.before(name, &mut effective_args).await?;
         }
 
-        // 5. Execute handler.
+        // 5. Execute handler (streaming when event_tx is available).
+        #[cfg(feature = "macaca-compat")]
+        let mut response = {
+            registered.handler
+                .execute_streaming(effective_args, self.event_tx.clone())
+                .await?
+        };
+        #[cfg(not(feature = "macaca-compat"))]
         let mut response = registered.handler.execute(effective_args).await?;
 
         // 6. Run after-middleware.

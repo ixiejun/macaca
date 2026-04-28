@@ -91,6 +91,12 @@ reconnect_delay_ms = 1000
 [workspace]
 root_dir = "/Users/quantum/.macaca/workspaces"
 
+[drivers]
+# External driver plugin directory — located under macaca workspaces root
+directory = "/Users/quantum/.macaca/workspaces/drivers"
+# Whether to auto-load all drivers at startup
+auto_load = true
+
 [persist]
 engine = "redb"
 data_dir = "./data/persist"

@@ -30,5 +30,4 @@ serde = { workspace = true }
 serde_yaml = "0.9"
 reqwest = { version = "0.12", features = ["json"] }
 macaca-driver = { workspace = true }
-macaca-driver-claude-code = { workspace = true }
 macaca-skill = { workspace = true }

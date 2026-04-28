@@ -41,6 +41,9 @@ pub enum MacacaError {
     #[error("Serialization error: {0}")]
     Serialization(String),
 
+    #[error("Driver error: {0}")]
+    Driver(String),
+
     #[error(transparent)]
     Io(#[from] std::io::Error),
 

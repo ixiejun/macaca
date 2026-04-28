@@ -7,9 +7,11 @@ edition.workspace = true
 macaca-proto = { workspace = true }
 macaca-tools = { workspace = true }
 async-trait = { workspace = true }
+libloading = "0.7"
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
+toml = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true }
 [dev-dependencies]
