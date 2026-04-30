@@ -981,7 +981,46 @@ pub enum AgentExecutionEvent {
     },
 }
 
+pub trait AgentExecutionEventVisitor<R> {
+    fn thinking(&mut self, iteration: usize, content: Option<&str>) -> R;
+    fn tool_call(
+        &mut self,
+        tool_name: &str,
+        tool_input: &serde_json::Value,
+        call_id: Option<&str>,
+    ) -> R;
+    fn tool_result(&mut self, tool_name: &str, output: &str, is_error: Option<bool>) -> R;
+    fn assistant(&mut self, content: &str) -> R;
+    fn driver_trace(&mut self, driver_name: &str, trace: &serde_json::Value) -> R;
+    fn completed(&mut self, success: bool, error: Option<&str>) -> R;
+}
+
 impl AgentExecutionEvent {
+    pub fn accept<R>(&self, visitor: &mut dyn AgentExecutionEventVisitor<R>) -> R {
+        match self {
+            AgentExecutionEvent::Thinking { iteration, content } => {
+                visitor.thinking(*iteration, content.as_deref())
+            }
+            AgentExecutionEvent::ToolCall {
+                tool_name,
+                tool_input,
+                call_id,
+            } => visitor.tool_call(tool_name, tool_input, call_id.as_deref()),
+            AgentExecutionEvent::ToolResult {
+                tool_name,
+                output,
+                is_error,
+            } => visitor.tool_result(tool_name, output, *is_error),
+            AgentExecutionEvent::Assistant { content } => visitor.assistant(content),
+            AgentExecutionEvent::DriverTrace { driver_name, trace } => {
+                visitor.driver_trace(driver_name, trace)
+            }
+            AgentExecutionEvent::Completed { success, error } => {
+                visitor.completed(*success, error.as_deref())
+            }
+        }
+    }
+
     /// Create a thinking event
     pub fn thinking(iteration: usize) -> Self {
         Self::Thinking {
@@ -1052,6 +1091,46 @@ impl AgentExecutionEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
+
+    struct RecordingVisitor;
+
+    impl AgentExecutionEventVisitor<String> for RecordingVisitor {
+        fn thinking(&mut self, iteration: usize, content: Option<&str>) -> String {
+            format!("thinking:{iteration}:{}", content.unwrap_or(""))
+        }
+
+        fn tool_call(
+            &mut self,
+            tool_name: &str,
+            tool_input: &serde_json::Value,
+            call_id: Option<&str>,
+        ) -> String {
+            format!(
+                "tool_call:{tool_name}:{tool_input}:{}",
+                call_id.unwrap_or("")
+            )
+        }
+
+        fn tool_result(&mut self, tool_name: &str, output: &str, is_error: Option<bool>) -> String {
+            format!(
+                "tool_result:{tool_name}:{output}:{}",
+                is_error.unwrap_or(false)
+            )
+        }
+
+        fn assistant(&mut self, content: &str) -> String {
+            format!("assistant:{content}")
+        }
+
+        fn driver_trace(&mut self, driver_name: &str, trace: &serde_json::Value) -> String {
+            format!("driver_trace:{driver_name}:{trace}")
+        }
+
+        fn completed(&mut self, success: bool, error: Option<&str>) -> String {
+            format!("completed:{success}:{}", error.unwrap_or(""))
+        }
+    }
 
     #[test]
     fn agent_id_is_unique() {
@@ -1086,6 +1165,33 @@ mod tests {
         let req = TaskRequest::new("build a web app");
         assert_eq!(req.description, "build a web app");
         assert_eq!(req.priority, TaskPriority::Normal);
+    }
+
+    #[test]
+    fn agent_execution_event_visitor_dispatches_correctly() {
+        let event = AgentExecutionEvent::ToolCall {
+            tool_name: "file_read".into(),
+            tool_input: json!({"path":"/tmp/a.txt"}),
+            call_id: Some("call-1".into()),
+        };
+        let mut visitor = RecordingVisitor;
+        let result = event.accept(&mut visitor);
+        assert_eq!(
+            result,
+            r#"tool_call:file_read:{"path":"/tmp/a.txt"}:call-1"#
+        );
+    }
+
+    #[test]
+    fn agent_execution_event_serde_shape_is_unchanged() {
+        let event = AgentExecutionEvent::Thinking {
+            iteration: 2,
+            content: Some("planning".into()),
+        };
+        let json = serde_json::to_value(&event).unwrap();
+        assert_eq!(json["type"], "thinking");
+        assert_eq!(json["iteration"], 2);
+        assert_eq!(json["content"], "planning");
     }
 
     #[test]

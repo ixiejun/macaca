@@ -18,7 +18,7 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 
 use macaca_app::{app_entry_agent_name as manifest_entry_agent_name, AppLoader};
-use macaca_proto::ApplicationId;
+use macaca_proto::{ApplicationId, MacacaError, ProtoErrorAdapter};
 use macaca_skill::{SkillPolicy, SkillRuntime, SkillRuntimeOptions};
 
 use crate::mcp_runtime::{McpRuntimeStatus, McpToolPolicy};
@@ -36,6 +36,16 @@ pub struct ErrorResponse {
 
 pub(crate) fn err(status: StatusCode, msg: String) -> (StatusCode, Json<ErrorResponse>) {
     (status, Json(ErrorResponse { error: msg }))
+}
+
+pub(crate) fn proto_err(
+    status: StatusCode,
+    error: &MacacaError,
+) -> (StatusCode, Json<ErrorResponse>) {
+    err(
+        status,
+        format!("{}: {}", error.code(), error.display_message()),
+    )
 }
 
 pub(crate) fn default_model() -> String {
@@ -582,7 +592,7 @@ pub async fn get_app_skills(
             .ok_or_else(|| err(StatusCode::NOT_FOUND, "App not found".into()))?
     };
     let agent_configs = AppLoader::resolve_agent_configs(&app.manifest, &app.path)
-        .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .map_err(|e| proto_err(StatusCode::INTERNAL_SERVER_ERROR, &e))?;
     let workspace_root = {
         let workspaces = state.config.app_workspaces.read().await;
         workspaces.get(&app_id).map(|ws| ws.root.clone())
@@ -616,7 +626,7 @@ pub async fn get_app_skills(
                 },
             )
             .await
-            .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .map_err(|e| proto_err(StatusCode::INTERNAL_SERVER_ERROR, &e))?;
         let mcp = crate::skill_mcp::probe_skill_mcp_servers(&snapshot).await;
         statuses.push(AppSkillStatus {
             agent: snapshot.agent,

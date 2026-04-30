@@ -13,7 +13,7 @@ use tokio::sync::RwLock;
 
 use macaca_kernel::executor::ExecutorEvent;
 use macaca_persist::{PersistStore, RedbStore};
-use macaca_proto::{ApplicationId, LlmMessage};
+use macaca_proto::{AgentExecutionEventVisitor, ApplicationId, LlmMessage};
 
 use crate::routes::{err, ErrorResponse};
 use crate::sse::{convert_executor_event_to_sse, load_plan_decisions, PlanDecisionEvent};
@@ -201,6 +201,76 @@ fn delegated_driver_trace_step(payload: &serde_json::Value) -> AgentTraceStep {
     driver_trace_step(driver_name, &event)
 }
 
+struct AgentTraceStepVisitor;
+
+impl AgentExecutionEventVisitor<AgentTraceStep> for AgentTraceStepVisitor {
+    fn thinking(&mut self, iteration: usize, content: Option<&str>) -> AgentTraceStep {
+        AgentTraceStep {
+            step_type: "thinking".to_string(),
+            iteration: Some(iteration),
+            content: content.map(ToString::to_string),
+            ..Default::default()
+        }
+    }
+
+    fn tool_call(
+        &mut self,
+        tool_name: &str,
+        tool_input: &serde_json::Value,
+        call_id: Option<&str>,
+    ) -> AgentTraceStep {
+        AgentTraceStep {
+            step_type: "tool_call".to_string(),
+            tool_name: Some(tool_name.to_string()),
+            tool_input: Some(tool_input.clone()),
+            call_id: call_id.map(ToString::to_string),
+            ..Default::default()
+        }
+    }
+
+    fn tool_result(
+        &mut self,
+        tool_name: &str,
+        output: &str,
+        is_error: Option<bool>,
+    ) -> AgentTraceStep {
+        crate::metrics::record_tool_execution(tool_name, !is_error.unwrap_or(false));
+        AgentTraceStep {
+            step_type: "tool_result".to_string(),
+            tool_name: Some(tool_name.to_string()),
+            output: Some(output.to_string()),
+            is_error,
+            ..Default::default()
+        }
+    }
+
+    fn assistant(&mut self, content: &str) -> AgentTraceStep {
+        AgentTraceStep {
+            step_type: "assistant".to_string(),
+            content: Some(content.to_string()),
+            ..Default::default()
+        }
+    }
+
+    fn driver_trace(&mut self, driver_name: &str, trace: &serde_json::Value) -> AgentTraceStep {
+        driver_trace_step(Some(driver_name.to_string()), trace)
+    }
+
+    fn completed(&mut self, success: bool, error: Option<&str>) -> AgentTraceStep {
+        AgentTraceStep {
+            step_type: "completed".to_string(),
+            success: Some(success),
+            error: error.map(ToString::to_string),
+            ..Default::default()
+        }
+    }
+}
+
+fn trace_step_from_agent_event(event: &macaca_proto::AgentExecutionEvent) -> AgentTraceStep {
+    let mut visitor = AgentTraceStepVisitor;
+    event.accept(&mut visitor)
+}
+
 // ---------------------------------------------------------------------------
 // Agent Trace Collector for SSE Stream
 // ---------------------------------------------------------------------------
@@ -254,59 +324,7 @@ impl AgentTraceCollector {
         if let Some(agent_traces) = traces.get_mut(agent) {
             if let Some(trace) = agent_traces.iter_mut().find(|t| t.task_id == task_id) {
                 tracing::debug!(task_id = %task_id, agent = %agent, "AgentTraceCollector: found trace, adding step");
-                let step = match event {
-                    macaca_proto::AgentExecutionEvent::Thinking { iteration, content } => {
-                        AgentTraceStep {
-                            step_type: "thinking".to_string(),
-                            iteration: Some(*iteration),
-                            content: content.clone(),
-                            ..Default::default()
-                        }
-                    }
-                    macaca_proto::AgentExecutionEvent::ToolCall {
-                        tool_name,
-                        tool_input,
-                        ..
-                    } => AgentTraceStep {
-                        step_type: "tool_call".to_string(),
-                        tool_name: Some(tool_name.clone()),
-                        tool_input: Some(tool_input.clone()),
-                        ..Default::default()
-                    },
-                    macaca_proto::AgentExecutionEvent::ToolResult {
-                        tool_name,
-                        output,
-                        is_error,
-                    } => {
-                        crate::metrics::record_tool_execution(
-                            tool_name,
-                            !is_error.unwrap_or(false),
-                        );
-                        AgentTraceStep {
-                            step_type: "tool_result".to_string(),
-                            tool_name: Some(tool_name.clone()),
-                            output: Some(output.clone()),
-                            is_error: is_error.clone(),
-                            ..Default::default()
-                        }
-                    }
-                    macaca_proto::AgentExecutionEvent::Assistant { content } => AgentTraceStep {
-                        step_type: "assistant".to_string(),
-                        content: Some(content.clone()),
-                        ..Default::default()
-                    },
-                    macaca_proto::AgentExecutionEvent::DriverTrace { driver_name, trace } => {
-                        driver_trace_step(Some(driver_name.clone()), trace)
-                    }
-                    macaca_proto::AgentExecutionEvent::Completed { success, error } => {
-                        AgentTraceStep {
-                            step_type: "completed".to_string(),
-                            success: Some(*success),
-                            error: error.clone(),
-                            ..Default::default()
-                        }
-                    }
-                };
+                let step = trace_step_from_agent_event(event);
                 trace.steps.push(step);
             }
         }

@@ -12,6 +12,7 @@ use macaca_kernel::executor::app_executor::ApplicationExecutor;
 use macaca_kernel::executor::ExecutorEvent;
 use macaca_persist::EventLog;
 
+use crate::proto_event_visitors::delegated_persisted_event_name;
 use crate::run_trace::{phase, status, RunTracer};
 
 /// Spawn a per-session event collector that subscribes to executor events
@@ -85,36 +86,14 @@ pub fn spawn_session_event_collector(
                             task_id,
                             agent,
                             event: ref agent_evt,
-                        } => {
-                            let sub = match agent_evt {
-                                macaca_proto::AgentExecutionEvent::Thinking { .. } => {
-                                    "delegated_thinking"
-                                }
-                                macaca_proto::AgentExecutionEvent::ToolCall { .. } => {
-                                    "delegated_tool_call"
-                                }
-                                macaca_proto::AgentExecutionEvent::ToolResult { .. } => {
-                                    "delegated_tool_result"
-                                }
-                                macaca_proto::AgentExecutionEvent::Assistant { .. } => {
-                                    "delegated_assistant"
-                                }
-                                macaca_proto::AgentExecutionEvent::DriverTrace { .. } => {
-                                    "delegated_driver_trace"
-                                }
-                                macaca_proto::AgentExecutionEvent::Completed { .. } => {
-                                    "delegated_done"
-                                }
-                            };
-                            (
-                                sub,
-                                serde_json::json!({
-                                    "task_id": task_id.to_string(),
-                                    "agent": agent,
-                                    "event": agent_evt,
-                                }),
-                            )
-                        }
+                        } => (
+                            delegated_persisted_event_name(agent_evt),
+                            serde_json::json!({
+                                "task_id": task_id.to_string(),
+                                "agent": agent,
+                                "event": agent_evt,
+                            }),
+                        ),
                         ExecutorEvent::TaskCompleted {
                             task_id,
                             agent,

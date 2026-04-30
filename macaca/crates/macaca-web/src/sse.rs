@@ -10,6 +10,7 @@ use macaca_kernel::executor::ExecutorEvent;
 use macaca_persist::{PersistStore, RedbStore};
 use macaca_proto::ApplicationId;
 
+use crate::proto_event_visitors::delegated_sse_event_name;
 use crate::state::AppState;
 
 /// Separate key prefix for plan decision events — stored independently per session.
@@ -73,15 +74,7 @@ pub(crate) fn convert_executor_event_to_sse(event: ExecutorEvent) -> Result<Even
             agent,
             event: agent_event,
         } => {
-            // Forward the internal agent execution event
-            let event_type = match &agent_event {
-                macaca_proto::AgentExecutionEvent::Thinking { .. } => "delegated_thinking",
-                macaca_proto::AgentExecutionEvent::ToolCall { .. } => "delegated_tool_call",
-                macaca_proto::AgentExecutionEvent::ToolResult { .. } => "delegated_tool_result",
-                macaca_proto::AgentExecutionEvent::Assistant { .. } => "delegated_assistant",
-                macaca_proto::AgentExecutionEvent::DriverTrace { .. } => "delegated_driver_trace",
-                macaca_proto::AgentExecutionEvent::Completed { .. } => "delegated_completed",
-            };
+            let event_type = delegated_sse_event_name(&agent_event);
             Ok(Event::default().event(event_type).data(
                 serde_json::json!({
                     "task_id": task_id.to_string(),

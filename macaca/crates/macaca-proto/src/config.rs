@@ -21,6 +21,48 @@ pub struct MacacaConfig {
     pub drivers: DriversConfig,
 }
 
+pub struct MacacaConfigBuilder {
+    inner: MacacaConfig,
+}
+
+impl MacacaConfigBuilder {
+    pub fn new() -> Self {
+        Self {
+            inner: MacacaConfig::default(),
+        }
+    }
+
+    pub fn kernel(mut self, kernel: KernelConfig) -> Self {
+        self.inner.kernel = kernel;
+        self
+    }
+
+    pub fn llm(mut self, llm: LlmConfig) -> Self {
+        self.inner.llm = llm;
+        self
+    }
+
+    pub fn workspace(mut self, workspace: WorkspaceConfig) -> Self {
+        self.inner.workspace = workspace;
+        self
+    }
+
+    pub fn drivers(mut self, drivers: DriversConfig) -> Self {
+        self.inner.drivers = drivers;
+        self
+    }
+
+    pub fn build(self) -> MacacaConfig {
+        self.inner
+    }
+}
+
+impl Default for MacacaConfigBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// External driver plugin configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DriversConfig {
@@ -108,6 +150,42 @@ pub struct LlmProviderConfig {
     /// Default model for this provider (e.g. "" for DashScope, "gpt-4o" for OpenAI)
     #[serde(default)]
     pub default_model: Option<String>,
+}
+
+pub struct LlmProviderConfigBuilder {
+    inner: LlmProviderConfig,
+}
+
+impl LlmProviderConfigBuilder {
+    pub fn new(base_url: impl Into<String>) -> Self {
+        Self {
+            inner: LlmProviderConfig {
+                api_key_plan: None,
+                api_key: String::new(),
+                base_url: base_url.into(),
+                default_model: None,
+            },
+        }
+    }
+
+    pub fn api_key_plan(mut self, api_key_plan: impl Into<String>) -> Self {
+        self.inner.api_key_plan = Some(api_key_plan.into());
+        self
+    }
+
+    pub fn api_key(mut self, api_key: impl Into<String>) -> Self {
+        self.inner.api_key = api_key.into();
+        self
+    }
+
+    pub fn default_model(mut self, default_model: impl Into<String>) -> Self {
+        self.inner.default_model = Some(default_model.into());
+        self
+    }
+
+    pub fn build(self) -> LlmProviderConfig {
+        self.inner
+    }
 }
 
 /// Resolve one key field: empty → `Ok("")`; `ALL_CAPS` → `std::env::var`; else literal.
@@ -431,5 +509,55 @@ mod tests {
     fn load_nonexistent_falls_back_to_default() {
         let cfg = MacacaConfig::load_default();
         assert_eq!(cfg.persist.engine, "redb");
+    }
+
+    #[test]
+    fn macaca_config_builder_matches_default_then_overrides() {
+        let built = MacacaConfigBuilder::new()
+            .workspace(WorkspaceConfig {
+                root_dir: "/tmp/workspaces".into(),
+            })
+            .drivers(DriversConfig {
+                directory: "custom-drivers".into(),
+                auto_load: false,
+            })
+            .build();
+
+        assert_eq!(
+            built.kernel.max_agents,
+            MacacaConfig::default().kernel.max_agents
+        );
+        assert_eq!(built.workspace.root_dir, "/tmp/workspaces");
+        assert_eq!(built.drivers.directory, "custom-drivers");
+        assert!(!built.drivers.auto_load);
+    }
+
+    #[test]
+    fn llm_provider_config_builder_matches_manual_construction() {
+        let manual = LlmProviderConfig {
+            api_key_plan: Some("PLAN_KEY".into()),
+            api_key: "PAYGO_KEY".into(),
+            base_url: "https://example.com/v1".into(),
+            default_model: Some("gpt-test".into()),
+        };
+
+        let built = LlmProviderConfigBuilder::new("https://example.com/v1")
+            .api_key_plan("PLAN_KEY")
+            .api_key("PAYGO_KEY")
+            .default_model("gpt-test")
+            .build();
+
+        assert_eq!(built.api_key_plan, manual.api_key_plan);
+        assert_eq!(built.api_key, manual.api_key);
+        assert_eq!(built.base_url, manual.base_url);
+        assert_eq!(built.default_model, manual.default_model);
+    }
+
+    #[test]
+    fn macaca_config_builder_preserves_serde_shape() {
+        let json = serde_json::to_value(MacacaConfigBuilder::new().build()).unwrap();
+        assert!(json.get("kernel").is_some());
+        assert!(json.get("llm").is_some());
+        assert!(json.get("drivers").is_some());
     }
 }

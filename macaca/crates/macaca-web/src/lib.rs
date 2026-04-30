@@ -12,6 +12,7 @@ pub mod hook_consumer;
 pub mod loop_manager;
 pub mod mcp_runtime;
 pub mod metrics;
+pub mod proto_event_visitors;
 pub mod routes;
 pub mod run_trace;
 pub mod session;

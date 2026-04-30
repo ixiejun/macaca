@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+use macaca_proto::error::ProtoErrorAdapter;
 use macaca_proto::{ApplicationId, MacacaResult};
 
 use crate::loader::AppLoader;
@@ -133,7 +134,8 @@ impl AppRegistry {
                     Err(e) => {
                         tracing::warn!(
                             path = %manifest_path.display(),
-                            error = %e,
+                            error_code = e.code(),
+                            error = %e.display_message(),
                             "Failed to load app manifest"
                         );
                     }
