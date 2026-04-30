@@ -1,6 +1,5 @@
 //! Session management: types, CRUD handlers, and persistence.
 
-use std::collections::HashMap;
 use std::convert::Infallible;
 use std::sync::Arc;
 
@@ -72,6 +71,8 @@ pub(crate) struct AgentTraceStep {
     #[serde(rename = "type")]
     pub step_type: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub event_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub iteration: Option<usize>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content: Option<String>,
@@ -82,6 +83,8 @@ pub(crate) struct AgentTraceStep {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub output: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_output: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub is_error: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub call_id: Option<String>,
@@ -89,6 +92,18 @@ pub(crate) struct AgentTraceStep {
     pub success: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub driver_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub driver_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timestamp: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub correlation_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<serde_json::Value>,
 }
 
 /// Trace for a single delegated agent execution.
@@ -104,6 +119,86 @@ pub(crate) struct AgentTrace {
     pub output: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+}
+
+fn driver_trace_step(driver_name: Option<String>, trace: &serde_json::Value) -> AgentTraceStep {
+    AgentTraceStep {
+        step_type: "driver_trace".to_string(),
+        event_type: trace
+            .get("type")
+            .or_else(|| trace.get("event_type"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
+        content: trace
+            .get("content")
+            .or_else(|| trace.get("thinking"))
+            .or_else(|| trace.get("text"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
+        tool_name: trace
+            .get("tool_name")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
+        tool_input: trace.get("tool_input").cloned(),
+        tool_output: trace
+            .get("tool_output")
+            .or_else(|| trace.get("tool_result"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
+        output: trace
+            .get("output")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
+        is_error: trace.get("is_error").and_then(|v| v.as_bool()),
+        driver_id: trace
+            .get("driver_id")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
+        driver_name: driver_name.or_else(|| {
+            trace
+                .get("driver_name")
+                .or_else(|| trace.get("driver_id"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+        }),
+        title: trace
+            .get("title")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
+        timestamp: trace.get("timestamp").and_then(|v| v.as_i64()),
+        correlation_id: trace
+            .get("correlation_id")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
+        metadata: trace.get("metadata").cloned(),
+        ..Default::default()
+    }
+}
+
+fn delegated_driver_trace_step(payload: &serde_json::Value) -> AgentTraceStep {
+    let event = payload
+        .get("event")
+        .cloned()
+        .unwrap_or_else(|| serde_json::json!({}));
+    if event.get("trace").is_some() {
+        let driver_name = payload
+            .get("driver_name")
+            .or_else(|| event.get("driver_name"))
+            .or_else(|| event.get("driver_id"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        return driver_trace_step(
+            driver_name,
+            event.get("trace").unwrap_or(&serde_json::Value::Null),
+        );
+    }
+    let driver_name = payload
+        .get("driver_name")
+        .or_else(|| event.get("driver_name"))
+        .or_else(|| event.get("driver_id"))
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    driver_trace_step(driver_name, &event)
 }
 
 // ---------------------------------------------------------------------------
@@ -201,15 +296,9 @@ impl AgentTraceCollector {
                         ..Default::default()
                     },
                     macaca_proto::AgentExecutionEvent::DriverTrace {
-                        driver_name: _,
+                        driver_name,
                         trace,
-                    } => AgentTraceStep {
-                        step_type: "driver_trace".to_string(),
-                        content: trace.get("content").and_then(|v| v.as_str()).map(|s| s.to_string()),
-                        tool_name: trace.get("tool_name").and_then(|v| v.as_str()).map(|s| s.to_string()),
-                        tool_input: trace.get("tool_input").cloned(),
-                        ..Default::default()
-                    },
+                    } => driver_trace_step(Some(driver_name.clone()), trace),
                     macaca_proto::AgentExecutionEvent::Completed { success, error } => {
                         AgentTraceStep {
                             step_type: "completed".to_string(),
@@ -858,35 +947,40 @@ pub(crate) async fn get_session_by_id(
                                 .get("event")
                                 .cloned()
                                 .unwrap_or(serde_json::json!({}));
-                            let step = AgentTraceStep {
-                                step_type: step_type.to_string(),
-                                iteration: evt
-                                    .get("iteration")
-                                    .and_then(|v| v.as_u64())
-                                    .map(|v| v as usize),
-                                content: evt
-                                    .get("content")
-                                    .and_then(|v| v.as_str())
-                                    .map(|s| s.to_string()),
-                                tool_name: evt
-                                    .get("tool_name")
-                                    .and_then(|v| v.as_str())
-                                    .map(|s| s.to_string()),
-                                tool_input: evt.get("tool_input").cloned(),
-                                output: evt
-                                    .get("output")
-                                    .and_then(|v| v.as_str())
-                                    .map(|s| s.to_string()),
-                                is_error: evt.get("is_error").and_then(|v| v.as_bool()),
-                                call_id: evt
-                                    .get("call_id")
-                                    .and_then(|v| v.as_str())
-                                    .map(|s| s.to_string()),
-                                success: evt.get("success").and_then(|v| v.as_bool()),
-                                error: evt
-                                    .get("error")
-                                    .and_then(|v| v.as_str())
-                                    .map(|s| s.to_string()),
+                            let step = if event.event_type == "delegated_driver_trace" {
+                                delegated_driver_trace_step(payload)
+                            } else {
+                                AgentTraceStep {
+                                    step_type: step_type.to_string(),
+                                    iteration: evt
+                                        .get("iteration")
+                                        .and_then(|v| v.as_u64())
+                                        .map(|v| v as usize),
+                                    content: evt
+                                        .get("content")
+                                        .and_then(|v| v.as_str())
+                                        .map(|s| s.to_string()),
+                                    tool_name: evt
+                                        .get("tool_name")
+                                        .and_then(|v| v.as_str())
+                                        .map(|s| s.to_string()),
+                                    tool_input: evt.get("tool_input").cloned(),
+                                    output: evt
+                                        .get("output")
+                                        .and_then(|v| v.as_str())
+                                        .map(|s| s.to_string()),
+                                    is_error: evt.get("is_error").and_then(|v| v.as_bool()),
+                                    call_id: evt
+                                        .get("call_id")
+                                        .and_then(|v| v.as_str())
+                                        .map(|s| s.to_string()),
+                                    success: evt.get("success").and_then(|v| v.as_bool()),
+                                    error: evt
+                                        .get("error")
+                                        .and_then(|v| v.as_str())
+                                        .map(|s| s.to_string()),
+                                    ..Default::default()
+                                }
                             };
                             trace.steps.push(step);
                         }
@@ -1480,6 +1574,54 @@ mod tests {
             !json.contains("agent_traces"),
             "empty agent_traces should be skipped in JSON"
         );
+    }
+
+    #[test]
+    fn test_delegated_driver_trace_step_handles_direct_trace_payload() {
+        let payload = serde_json::json!({
+            "driver_name": "opencode",
+            "event": {
+                "type": "bash",
+                "driver_id": "opencode",
+                "tool_name": "bash",
+                "tool_input": { "cmd": "ls -la" },
+                "tool_output": "ok",
+                "title": "Bash"
+            }
+        });
+
+        let step = delegated_driver_trace_step(&payload);
+
+        assert_eq!(step.step_type, "driver_trace");
+        assert_eq!(step.event_type.as_deref(), Some("bash"));
+        assert_eq!(step.driver_name.as_deref(), Some("opencode"));
+        assert_eq!(step.driver_id.as_deref(), Some("opencode"));
+        assert_eq!(step.tool_name.as_deref(), Some("bash"));
+        assert_eq!(step.tool_output.as_deref(), Some("ok"));
+        assert_eq!(step.title.as_deref(), Some("Bash"));
+    }
+
+    #[test]
+    fn test_delegated_driver_trace_step_unwraps_nested_driver_trace_payload() {
+        let payload = serde_json::json!({
+            "event": {
+                "type": "driver_trace",
+                "driver_name": "claude-code",
+                "trace": {
+                    "type": "thinking",
+                    "driver_id": "claude-code",
+                    "content": "planning next action"
+                }
+            }
+        });
+
+        let step = delegated_driver_trace_step(&payload);
+
+        assert_eq!(step.step_type, "driver_trace");
+        assert_eq!(step.event_type.as_deref(), Some("thinking"));
+        assert_eq!(step.driver_name.as_deref(), Some("claude-code"));
+        assert_eq!(step.driver_id.as_deref(), Some("claude-code"));
+        assert_eq!(step.content.as_deref(), Some("planning next action"));
     }
 
     #[test]

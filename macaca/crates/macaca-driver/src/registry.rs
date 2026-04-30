@@ -40,6 +40,11 @@ impl DriverRegistry {
         Ok(())
     }
 
+    /// Remove all registered drivers.
+    pub async fn clear(&self) {
+        self.drivers.write().await.clear();
+    }
+
     /// List all registered driver manifests.
     pub async fn list_drivers(&self) -> Vec<DriverManifest> {
         self.drivers
@@ -147,6 +152,18 @@ mod tests {
         assert_eq!(registry.count().await, 1);
 
         registry.unregister(&id).await.unwrap();
+        assert_eq!(registry.count().await, 0);
+    }
+
+    #[tokio::test]
+    async fn clear_removes_all_drivers() {
+        let registry = DriverRegistry::new();
+        registry.register(Box::new(DummyDriver::new("a"))).await;
+        registry.register(Box::new(DummyDriver::new("b"))).await;
+        assert_eq!(registry.count().await, 2);
+
+        registry.clear().await;
+
         assert_eq!(registry.count().await, 0);
     }
 

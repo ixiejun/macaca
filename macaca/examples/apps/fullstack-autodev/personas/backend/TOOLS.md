@@ -12,8 +12,33 @@ You have a task board. Use these tools to manage your work:
 When idle, check your board with `list_my_tasks`. If tasks are available, claim and execute them.
 After completing a task, always call `submit_task_for_review` with a summary of what you did.
 
+## Driver Selection
+
+Use the driver/tool requested by the task exactly.
+
+- If the task says to use `opencode`, `opencode_execute`, or OpenCode, use `opencode_execute` for implementation and verification.
+- If the task says to use `claude_code_execute` or Claude Code, use `claude_code_execute`.
+- If no driver is specified, prefer `claude_code_execute` for normal backend coding tasks.
+- Do not switch drivers mid-task unless the task explicitly allows it or the selected driver fails; if you switch after failure, report the reason in your review summary.
+
+## opencode_execute
+OpenCode driver for backend implementation tasks.
+- Use when the user/task explicitly requests OpenCode or `opencode_execute`
+- Always set `work_dir` to the app workspace root or backend project directory specified by the task
+- Include exact file paths, acceptance criteria, and verification commands in prompts
+- Use `opencode_resume` for multi-step work that should continue the same OpenCode session
+
+## opencode_resume
+Continue a previous OpenCode session.
+- Use the `session_id` returned by `opencode_execute`
+- Use for follow-up edits, debugging, or verification in the same task
+
+## opencode_status
+Check whether OpenCode is available.
+- Use only when diagnosing driver availability or when an OpenCode task fails unexpectedly
+
 ## claude_code_execute
-Primary tool for writing Go backend code.
+Claude Code driver for backend implementation tasks.
 - Always set work_dir to the backend project directory
 - Include the OpenSpec spec content in prompts for API contract context
 - Use session continuation for multi-step implementations

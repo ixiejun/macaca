@@ -1145,6 +1145,7 @@ pub async fn reload_drivers(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<DriverReloadResponse>, (StatusCode, Json<ErrorResponse>)> {
     let loader = macaca_driver::DriverLoader::new(&state.drivers_dir);
+    state.driver_registry.clear().await;
     let load_results = loader.load_all();
 
     let mut loaded = 0usize;
