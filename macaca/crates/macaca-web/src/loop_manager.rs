@@ -14,6 +14,7 @@ use axum::response::sse::Event;
 use axum::Json;
 use futures::FutureExt;
 
+use macaca_app::{app_entry_agent_name_or, app_task_planning_contract, AppPlanningAgentProfile};
 use macaca_framework::execution::ExecutionContext;
 use macaca_framework::plan::PlanNotebook;
 use macaca_framework::session::{load_module_state, save_module_state};
@@ -202,13 +203,6 @@ fn goal_has_decomposed_tasks(
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum PlannerFrameworkBuilder {
-    Decomposition,
-    TracedWithGoal,
-    Worker,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum PlannerFrameworkCallKind {
     DecomposeGoal,
     Review,
@@ -222,14 +216,6 @@ impl PlannerFrameworkCallKind {
             Self::DecomposeGoal => std::time::Duration::from_secs(90),
             Self::Review | Self::FollowUp => std::time::Duration::from_secs(5 * 60),
             Self::GoalEvaluation => std::time::Duration::from_secs(10 * 60),
-        }
-    }
-
-    fn builder(self) -> PlannerFrameworkBuilder {
-        match self {
-            Self::DecomposeGoal => PlannerFrameworkBuilder::Decomposition,
-            Self::FollowUp | Self::GoalEvaluation => PlannerFrameworkBuilder::TracedWithGoal,
-            Self::Review => PlannerFrameworkBuilder::Worker,
         }
     }
 
@@ -303,43 +289,37 @@ async fn run_planner_framework_call(
     .await;
     executor.broadcast_event(executor_task_started(task_id, plan_agent_name));
 
-    let build_result = match kind.builder() {
-        PlannerFrameworkBuilder::Decomposition => {
-            crate::framework_runner::FrameworkRunner::build_planner_decomposition_agent(
-                state,
-                app_id,
-                plan_agent_name,
-                session_id,
-                task_id,
-                Arc::clone(&executor),
-                kind.goal_context(task_id),
-            )
-            .await
+    let intent = match kind {
+        PlannerFrameworkCallKind::DecomposeGoal => {
+            macaca_framework::construction::AgentBuildIntent::PlannerDecomposition {
+                goal_id: kind.goal_context(task_id),
+            }
         }
-        PlannerFrameworkBuilder::TracedWithGoal => {
-            crate::framework_runner::FrameworkRunner::build_traced_agent_with_goal(
-                state,
-                app_id,
-                plan_agent_name,
-                session_id,
-                task_id,
-                Arc::clone(&executor),
-                kind.goal_context(task_id),
-            )
-            .await
+        PlannerFrameworkCallKind::Review => {
+            macaca_framework::construction::AgentBuildIntent::PlannerReview { task_id }
         }
-        PlannerFrameworkBuilder::Worker => {
-            crate::framework_runner::FrameworkRunner::build_worker_agent(
-                state,
-                app_id,
-                plan_agent_name,
-                session_id,
-                task_id,
-                Arc::clone(&executor),
-            )
-            .await
+        PlannerFrameworkCallKind::FollowUp => {
+            macaca_framework::construction::AgentBuildIntent::PlannerFollowUp {
+                goal_id: kind.goal_context(task_id),
+            }
+        }
+        PlannerFrameworkCallKind::GoalEvaluation => {
+            macaca_framework::construction::AgentBuildIntent::GoalEvaluation {
+                goal_id: kind.goal_context(task_id),
+            }
         }
     };
+
+    let build_result = crate::framework_runner::FrameworkRunner::build_for_intent(
+        state,
+        app_id,
+        plan_agent_name,
+        session_id,
+        task_id,
+        Arc::clone(&executor),
+        intent,
+    )
+    .await;
 
     let result = match build_result {
         Ok(agent) => {
@@ -874,7 +854,7 @@ pub(crate) async fn ensure_plan_and_worker_loops(
         let registry = state.registry.read().await;
         registry
             .get_app(app_id)
-            .and_then(|a| a.manifest.entry_agent.clone())
+            .map(|app| app_entry_agent_name_or(&app.manifest, "entry_agent"))
     };
     let (entry_agent_name, plan_agent_name): (String, String) =
         if let Some(executor) = state.executor_registry.get(app_id).await {
@@ -1012,9 +992,8 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                 .await;
                                 {
                                     // Dynamically get available worker agents + capabilities (no hardcoding)
-                                    let (agent_names, agent_profiles, worker_dossiers): (
-                                        Vec<String>,
-                                        Vec<String>,
+                                    let (worker_profiles, worker_dossiers): (
+                                        Vec<AppPlanningAgentProfile>,
                                         Vec<PlannerWorkerDossier>,
                                     ) = if let Some(executor) = state_for_consumer
                                         .executor_registry
@@ -1037,8 +1016,6 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                                     && a.name != plan_agent_name_for_loop
                                             })
                                             .collect();
-                                        let names =
-                                            workers.iter().map(|a| a.name.clone()).collect();
                                         let dossiers = workers
                                             .iter()
                                             .map(|a| {
@@ -1064,115 +1041,78 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                             })
                                             .collect();
                                         let profiles = workers
-                                                .iter()
-                                                .map(|a| {
-                                                    let manifest = manifest_by_name.get(&a.name);
-                                                    let caps = manifest
-                                                        .map(|m| {
-                                                            m.capabilities
-                                                                .iter()
-                                                                .map(|c| {
-                                                                    format!(
-                                                                        "    - {}: {}",
-                                                                        c.name, c.description
-                                                                    )
-                                                                })
-                                                                .collect::<Vec<_>>()
-                                                        })
-                                                        .unwrap_or_else(|| {
-                                                            a.capabilities
-                                                                .iter()
-                                                                .map(|c| format!("    - {c}"))
-                                                                .collect()
-                                                        });
-                                                    let caps = if caps.is_empty() {
-                                                        "    - no capability metadata".to_string()
-                                                    } else {
-                                                        caps.join("\n")
-                                                    };
-                                                    let tools = manifest
-                                                        .map(|m| {
-                                                            if m.permission.allowed_tools.is_empty()
-                                                            {
-                                                                "all registered tools (open policy)"
-                                                                    .to_string()
-                                                            } else {
-                                                                m.permission.allowed_tools.join(", ")
-                                                            }
-                                                        })
-                                                        .unwrap_or_else(|| "unknown".to_string());
-                                                    let permission = manifest
-                                                        .map(|m| match m.permission.level {
-                                                            macaca_proto::PermissionLevel::System => {
-                                                                "system"
-                                                            }
-                                                            macaca_proto::PermissionLevel::User => {
-                                                                "user"
-                                                            }
-                                                        })
-                                                        .unwrap_or("unknown");
-                                                    let model = manifest
-                                                        .map(|m| m.model.as_str())
-                                                        .filter(|m| !m.is_empty())
-                                                        .unwrap_or("app default");
-                                                    format!(
-                                                        "- Agent `{}`\n  available: {}\n  load: {}/{}\n  permission: {}\n  model: {}\n  tools: {}\n  capabilities:\n{}",
-                                                        a.name,
-                                                        a.available,
-                                                        a.current_load,
-                                                        a.max_load,
-                                                        permission,
-                                                        model,
-                                                        tools,
-                                                        caps
-                                                    )
-                                                })
-                                                .collect();
-                                        (names, profiles, dossiers)
+                                            .iter()
+                                            .map(|a| {
+                                                let manifest = manifest_by_name.get(&a.name);
+                                                let capabilities = manifest
+                                                    .map(|m| {
+                                                        m.capabilities
+                                                            .iter()
+                                                            .map(|c| {
+                                                                format!(
+                                                                    "{}: {}",
+                                                                    c.name, c.description
+                                                                )
+                                                            })
+                                                            .collect::<Vec<_>>()
+                                                    })
+                                                    .filter(|caps| !caps.is_empty())
+                                                    .unwrap_or_else(|| a.capabilities.clone());
+                                                let allowed_tools = manifest
+                                                    .map(|m| m.permission.allowed_tools.clone())
+                                                    .unwrap_or_default();
+                                                let permission_level = manifest
+                                                    .map(|m| match m.permission.level {
+                                                        macaca_proto::PermissionLevel::System => {
+                                                            "system".to_string()
+                                                        }
+                                                        macaca_proto::PermissionLevel::User => {
+                                                            "user".to_string()
+                                                        }
+                                                    })
+                                                    .unwrap_or_else(|| "unknown".to_string());
+                                                let model = manifest
+                                                    .map(|m| m.model.clone())
+                                                    .filter(|model| !model.is_empty())
+                                                    .unwrap_or_else(|| "app default".to_string());
+                                                AppPlanningAgentProfile {
+                                                    name: a.name.clone(),
+                                                    capabilities,
+                                                    available: a.available,
+                                                    current_load: a.current_load as usize,
+                                                    max_load: a.max_load as usize,
+                                                    permission_level,
+                                                    model,
+                                                    allowed_tools,
+                                                }
+                                            })
+                                            .collect();
+                                        (profiles, dossiers)
                                     } else {
-                                        (vec![], vec![], vec![])
+                                        (vec![], vec![])
                                     };
-                                    let agents_list = if agent_names.is_empty() {
-                                        "no worker agents registered".to_string()
-                                    } else {
-                                        agent_names.join(", ")
+                                    let prompt = {
+                                        let registry = state_for_consumer.registry.read().await;
+                                        if let Some(app) = registry.get_app(&app_id_for_consumer) {
+                                            let contract = app_task_planning_contract(
+                                                &app.manifest,
+                                                worker_profiles.clone(),
+                                            );
+                                            macaca_task::build_decomposition_prompt(
+                                                &description,
+                                                &contract,
+                                            )
+                                        } else {
+                                            macaca_task::build_decomposition_prompt(
+                                                &description,
+                                                &macaca_app::AppTaskPlanningContract {
+                                                    workflow_name: "default".into(),
+                                                    entry_agent: entry_agent_for_loop.clone(),
+                                                    worker_agents: worker_profiles.clone(),
+                                                },
+                                            )
+                                        }
                                     };
-                                    let agents_profile_text = if agent_profiles.is_empty() {
-                                        "(none)".to_string()
-                                    } else {
-                                        agent_profiles.join("\n")
-                                    };
-                                    let prompt = format!(
-                                        "A new project goal has been submitted. You MUST decompose it into \
-                                         concrete tasks. Prefer one `create_todos` tool call with the full task graph; \
-                                         use `create_todo` only as a fallback for a single additional task.\n\n\
-                                         Goal: {}\n\n\
-                                         Available agents: {}.\n\
-                                         Agent dossiers:\n{}\n\n\
-                                         IMPORTANT ASSIGNMENT CONTRACT:\n\
-                                         - The `agent` you pass to `create_todo` is authoritative; the system will NOT automatically reroute it.\n\
-                                         - You must choose the correct worker agent from the dossiers above.\n\
-                                         - If the acceptance criteria require working code, files, APIs, UI, tests, or runnable behavior, assign to an implementation-capable agent rather than a design/spec-only agent.\n\
-                                         - Use design/spec agents for architecture, interfaces, data contracts, risk analysis, and handoff documents only.\n\
-                                         - If a task has both design and implementation work, split it into separate dependent tasks.\n\n\
-                                         INSTRUCTIONS:\n\
-                                         1. Briefly analyze the goal (1-2 sentences).\n\
-                                         2. Call `create_todos` once with ALL tasks whenever possible — you MUST create at least one task.\n\
-                                         3. Set priorities (0-10) and acceptance_criteria for each task.\n\
-                                         4. Assign each task to the MOST CAPABLE agent based on the dossiers above; use the exact agent name.\n\
-                                         5. Create foundational design/spec tasks first, then implementation tasks.\n\
-                                         6. If a foundational design/spec task is needed, assign it to an agent whose capability profile includes architecture/design/spec/interface/analysis when such a profile exists.\n\
-                                         7. Do not assign design/spec work to implementation agents solely because the task mentions API, backend, or frontend; choose the strongest capability profile.\n\
-                                         8. Use dependencies explicitly:\n\
-                                            - depends_on: known task IDs\n\
-                                            - depends_on_titles: task titles already created in this decomposition\n\
-                                            - depends_on_agents: symbolic cross-agent dependencies (all_tasks/specific_task)\n\
-                                         9. Do NOT create duplicate tasks with the same title and agent.\n\
-                                         10. Do NOT just describe tasks in text — you MUST invoke `create_todos` or `create_todo`.\n\
-                                         11. After creating the complete task chain, stop calling tools and reply exactly with: DECOMPOSITION_COMPLETE.\n\n\
-                                         Start by creating the complete task graph now.",
-                                        description, agents_list, agents_profile_text
-                                    );
                                     let decomposition_result = run_planner_framework_call(
                                         &state_for_consumer,
                                         &app_id_for_consumer,
@@ -2066,9 +2006,14 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                         task_id,
                                         &agent_name_clone,
                                     ));
-                                    match crate::framework_runner::FrameworkRunner::build_worker_agent(
-                                        &state_for_worker, &app_id_for_worker, &agent_name_clone, task_session.clone(),
-                                        task_id, Arc::clone(&executor_clone),
+                                    match crate::framework_runner::FrameworkRunner::build_for_intent(
+                                        &state_for_worker,
+                                        &app_id_for_worker,
+                                        &agent_name_clone,
+                                        task_session.clone(),
+                                        task_id,
+                                        Arc::clone(&executor_clone),
+                                        macaca_framework::construction::AgentBuildIntent::WorkerTask { task_id },
                                     ).await {
                                         Ok(agent) => {
                                             use macaca_framework::agent::Agent;
@@ -2220,9 +2165,14 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                         task_id,
                                         &agent_name_clone,
                                     ));
-                                    match crate::framework_runner::FrameworkRunner::build_worker_agent(
-                                        &state_for_worker, &app_id_for_worker, &agent_name_clone, task_session.clone(),
-                                        task_id, Arc::clone(&executor_clone),
+                                    match crate::framework_runner::FrameworkRunner::build_for_intent(
+                                        &state_for_worker,
+                                        &app_id_for_worker,
+                                        &agent_name_clone,
+                                        task_session.clone(),
+                                        task_id,
+                                        Arc::clone(&executor_clone),
+                                        macaca_framework::construction::AgentBuildIntent::WorkerTask { task_id },
                                     ).await {
                                         Ok(agent) => {
                                             use macaca_framework::agent::Agent;
@@ -2385,8 +2335,9 @@ mod tests {
         executor_task_completed, executor_task_failed, executor_task_started,
         goal_has_decomposed_tasks, mark_decomposition_in_notebook, mark_review_in_notebook,
         planner_scope_session_id, select_entry_and_plan_agents, worker_success_summary,
-        PlannerFrameworkBuilder, PlannerFrameworkCallKind, WorkerExecutionMode,
+        PlannerFrameworkCallKind, WorkerExecutionMode,
     };
+    use macaca_framework::construction::AgentBuildIntent;
     use macaca_framework::plan::{PlanNotebook, PlanState, SubTaskState};
     use macaca_kernel::executor::ExecutorEvent;
     use macaca_kernel::AgentInfo;
@@ -2599,28 +2550,40 @@ mod tests {
     }
 
     #[test]
-    fn planner_framework_call_uses_goal_builder_for_goal_scoped_calls() {
+    fn planner_framework_call_uses_goal_scoped_intents() {
         let goal_id = macaca_proto::TaskId::new();
 
         assert_eq!(
-            PlannerFrameworkCallKind::DecomposeGoal.builder(),
-            PlannerFrameworkBuilder::Decomposition
+            AgentBuildIntent::PlannerDecomposition {
+                goal_id: PlannerFrameworkCallKind::DecomposeGoal.goal_context(goal_id),
+            },
+            AgentBuildIntent::PlannerDecomposition {
+                goal_id: Some(goal_id)
+            }
         );
         assert_eq!(
             PlannerFrameworkCallKind::DecomposeGoal.goal_context(goal_id),
             Some(goal_id)
         );
         assert_eq!(
-            PlannerFrameworkCallKind::FollowUp.builder(),
-            PlannerFrameworkBuilder::TracedWithGoal
+            AgentBuildIntent::PlannerFollowUp {
+                goal_id: PlannerFrameworkCallKind::FollowUp.goal_context(goal_id),
+            },
+            AgentBuildIntent::PlannerFollowUp {
+                goal_id: Some(goal_id)
+            }
         );
         assert_eq!(
             PlannerFrameworkCallKind::FollowUp.goal_context(goal_id),
             Some(goal_id)
         );
         assert_eq!(
-            PlannerFrameworkCallKind::GoalEvaluation.builder(),
-            PlannerFrameworkBuilder::TracedWithGoal
+            AgentBuildIntent::GoalEvaluation {
+                goal_id: PlannerFrameworkCallKind::GoalEvaluation.goal_context(goal_id),
+            },
+            AgentBuildIntent::GoalEvaluation {
+                goal_id: Some(goal_id)
+            }
         );
         assert_eq!(
             PlannerFrameworkCallKind::GoalEvaluation.goal_context(goal_id),
@@ -2629,13 +2592,22 @@ mod tests {
     }
 
     #[test]
-    fn planner_framework_call_uses_worker_builder_for_review() {
+    fn planner_framework_call_uses_review_intent_for_review() {
         let task_id = macaca_proto::TaskId::new();
+        let intent = match PlannerFrameworkCallKind::Review {
+            PlannerFrameworkCallKind::DecomposeGoal => AgentBuildIntent::PlannerDecomposition {
+                goal_id: Some(task_id),
+            },
+            PlannerFrameworkCallKind::Review => AgentBuildIntent::PlannerReview { task_id },
+            PlannerFrameworkCallKind::FollowUp => AgentBuildIntent::PlannerFollowUp {
+                goal_id: Some(task_id),
+            },
+            PlannerFrameworkCallKind::GoalEvaluation => AgentBuildIntent::GoalEvaluation {
+                goal_id: Some(task_id),
+            },
+        };
 
-        assert_eq!(
-            PlannerFrameworkCallKind::Review.builder(),
-            PlannerFrameworkBuilder::Worker
-        );
+        assert_eq!(intent, AgentBuildIntent::PlannerReview { task_id });
         assert_eq!(PlannerFrameworkCallKind::Review.goal_context(task_id), None);
     }
 

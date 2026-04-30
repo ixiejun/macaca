@@ -40,7 +40,9 @@ macro_rules! export_driver {
 
         /// Small helper: try to serialize a JSON-serializable value to a
         /// `CString` and leak it as `*mut c_char`. Returns null on failure.
-        fn _sdk_json_to_c_char(json_string: Result<String, serde_json::Error>) -> *mut std::os::raw::c_char {
+        fn _sdk_json_to_c_char(
+            json_string: Result<String, serde_json::Error>,
+        ) -> *mut std::os::raw::c_char {
             match json_string {
                 Ok(json) => match std::ffi::CString::new(json) {
                     Ok(c) => c.into_raw(),
@@ -76,7 +78,9 @@ macro_rules! export_driver {
                     Err(_) => return std::ptr::null_mut(),
                 };
 
-                let create: fn(serde_json::Value) -> Result<
+                let create: fn(
+                    serde_json::Value,
+                ) -> Result<
                     Box<dyn $crate::driver::SoftwareDriver>,
                     Box<dyn std::error::Error>,
                 > = $create_fn;
@@ -165,18 +169,15 @@ macro_rules! export_driver {
                     return std::ptr::null_mut();
                 }
 
-                let tool_name_str =
-                    match unsafe { std::ffi::CStr::from_ptr(tool_name) }.to_str() {
-                        Ok(s) => s,
-                        Err(_) => return std::ptr::null_mut(),
-                    };
-                let input_str =
-                    match unsafe { std::ffi::CStr::from_ptr(input_json) }.to_str() {
-                        Ok(s) => s,
-                        Err(_) => return std::ptr::null_mut(),
-                    };
-                let input: serde_json::Value =
-                    serde_json::from_str(input_str).unwrap_or_default();
+                let tool_name_str = match unsafe { std::ffi::CStr::from_ptr(tool_name) }.to_str() {
+                    Ok(s) => s,
+                    Err(_) => return std::ptr::null_mut(),
+                };
+                let input_str = match unsafe { std::ffi::CStr::from_ptr(input_json) }.to_str() {
+                    Ok(s) => s,
+                    Err(_) => return std::ptr::null_mut(),
+                };
+                let input: serde_json::Value = serde_json::from_str(input_str).unwrap_or_default();
 
                 let guard = DRIVER_INSTANCE.lock().unwrap();
                 if let Some(ref driver) = *guard {
@@ -246,18 +247,15 @@ macro_rules! export_driver {
                     return std::ptr::null_mut();
                 }
 
-                let tool_name_str =
-                    match unsafe { std::ffi::CStr::from_ptr(tool_name) }.to_str() {
-                        Ok(s) => s,
-                        Err(_) => return std::ptr::null_mut(),
-                    };
-                let input_str =
-                    match unsafe { std::ffi::CStr::from_ptr(input_json) }.to_str() {
-                        Ok(s) => s,
-                        Err(_) => return std::ptr::null_mut(),
-                    };
-                let input: serde_json::Value =
-                    serde_json::from_str(input_str).unwrap_or_default();
+                let tool_name_str = match unsafe { std::ffi::CStr::from_ptr(tool_name) }.to_str() {
+                    Ok(s) => s,
+                    Err(_) => return std::ptr::null_mut(),
+                };
+                let input_str = match unsafe { std::ffi::CStr::from_ptr(input_json) }.to_str() {
+                    Ok(s) => s,
+                    Err(_) => return std::ptr::null_mut(),
+                };
+                let input: serde_json::Value = serde_json::from_str(input_str).unwrap_or_default();
 
                 let guard = DRIVER_INSTANCE.lock().unwrap();
                 if let Some(ref driver) = *guard {
@@ -269,7 +267,10 @@ macro_rules! export_driver {
                         let (trace_tx, mut trace_rx) =
                             tokio::sync::mpsc::unbounded_channel::<$crate::TraceEvent>();
 
-                        let ctx = _FfiCallbackCtx { callback, user_data };
+                        let ctx = _FfiCallbackCtx {
+                            callback,
+                            user_data,
+                        };
 
                         // Dedicated OS thread for forwarding trace events.
                         // Uses blocking_recv() so events are forwarded immediately
@@ -288,9 +289,7 @@ macro_rules! export_driver {
                                 }
                             }
                         });
-                        let fwd_thread = std::thread::spawn(move || {
-                            fwd_closure.call()
-                        });
+                        let fwd_thread = std::thread::spawn(move || fwd_closure.call());
 
                         // Build a single-threaded runtime and use LocalSet so that
                         // the tool execution can use spawn_local if needed.
@@ -305,9 +304,9 @@ macro_rules! export_driver {
                                 // runtime. trace_tx is moved into execute_streaming
                                 // and will be dropped when it completes, causing
                                 // the forwarding thread to exit.
-                                let exec_result = rt.block_on(local.run_until(
-                                    tool.execute_streaming(input, Some(trace_tx)),
-                                ));
+                                let exec_result = rt.block_on(
+                                    local.run_until(tool.execute_streaming(input, Some(trace_tx))),
+                                );
 
                                 // Wait for forwarding thread to drain all remaining events
                                 let _ = fwd_thread.join();

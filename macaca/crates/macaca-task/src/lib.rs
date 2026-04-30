@@ -11,7 +11,9 @@ pub mod tracker;
 pub mod worker_loop;
 
 pub use claim_diagnostics::{diagnose_session_claims, SessionClaimDiagnostics};
-pub use decompose::{DecomposedTask, LlmDecomposer, SimpleDecomposer, TaskDecomposer};
+pub use decompose::{
+    build_decomposition_prompt, DecomposedTask, LlmDecomposer, SimpleDecomposer, TaskDecomposer,
+};
 pub use plan_loop::{
     GoalEvaluation, GoalEvaluator, PlanEvent, PlanLoop, PlanLoopConfig, PlanLoopWaker, TaskSummary,
 };

@@ -139,9 +139,7 @@ impl DriverLoader {
 
         // Convert config to JSON string
         let config_json = match &manifest.config {
-            Some(config) => {
-                serde_json::to_string(config).unwrap_or_else(|_| "{}".to_string())
-            }
+            Some(config) => serde_json::to_string(config).unwrap_or_else(|_| "{}".to_string()),
             None => "{}".to_string(),
         };
 
@@ -190,8 +188,7 @@ impl DriverLoader {
             });
         }
 
-        let (success, failed): (Vec<_>, Vec<_>) =
-            results.iter().partition(|r| r.result.is_ok());
+        let (success, failed): (Vec<_>, Vec<_>) = results.iter().partition(|r| r.result.is_ok());
 
         info!(
             total = results.len(),

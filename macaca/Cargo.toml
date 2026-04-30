@@ -84,4 +84,5 @@ macaca-driver = { path = "crates/macaca-driver" }
 macaca-runtime = { path = "crates/macaca-runtime" }
 macaca-skill = { path = "crates/macaca-skill" }
 macaca-web = { path = "crates/macaca-web" }
+macaca-framework = { path = "crates/macaca-framework" }
 macaca-runtime-host = { path = "crates/macaca-runtime-host" }

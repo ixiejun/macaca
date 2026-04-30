@@ -10,8 +10,8 @@ pub mod framework_runner;
 pub mod framework_toolkit;
 pub mod hook_consumer;
 pub mod loop_manager;
-pub mod metrics;
 pub mod mcp_runtime;
+pub mod metrics;
 pub mod routes;
 pub mod run_trace;
 pub mod session;
@@ -28,7 +28,7 @@ use axum::routing::{get, post};
 use axum::Router;
 use tokio::sync::RwLock;
 use tower_http::cors::{Any, CorsLayer};
-use tracing::{info, error};
+use tracing::{error, info};
 
 use futures::FutureExt;
 use macaca_app::{AppLoader, AppRegistry, AppRuntime};
@@ -191,8 +191,8 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
     // Driver tools are NOT added to the static CompositeToolSet; instead they
     // are aggregated dynamically from `DriverRegistry` in `build_toolkit` so
     // that `/api/drivers/reload` picks up new driver tools at runtime.
-    let drivers_dir = std::env::var("MACACA_DRIVERS_DIR")
-        .unwrap_or_else(|_| config.drivers.directory.clone());
+    let drivers_dir =
+        std::env::var("MACACA_DRIVERS_DIR").unwrap_or_else(|_| config.drivers.directory.clone());
     let driver_registry = Arc::new(macaca_driver::DriverRegistry::new());
     if config.drivers.auto_load {
         let driver_loader = DriverLoader::new(&drivers_dir);

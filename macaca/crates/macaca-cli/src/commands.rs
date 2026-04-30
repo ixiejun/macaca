@@ -5,6 +5,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use tracing::info;
 
+use macaca_app::AppRuntime;
 use macaca_gateway::{DefaultEventHandler, DiscordAdapter, Gateway, TelegramAdapter};
 use macaca_kernel::Kernel;
 use macaca_llm::LlmProvider;
@@ -52,6 +53,7 @@ impl LlmProvider for StubLlmProvider {
 /// adapters if configured.
 pub async fn run_kernel() -> MacacaResult<()> {
     let config = MacacaConfig::load_default();
+    let app_runtime = AppRuntime::default();
 
     info!(
         max_agents = config.kernel.max_agents,
@@ -64,6 +66,7 @@ pub async fn run_kernel() -> MacacaResult<()> {
 
     info!(
         agents = kernel.agent_count().await,
+        loaded_apps = app_runtime.app_count().await,
         "Kernel started successfully"
     );
 
@@ -129,6 +132,7 @@ pub async fn list_agents() -> MacacaResult<()> {
 /// Display system status information.
 pub async fn show_status() -> MacacaResult<()> {
     let config = MacacaConfig::load_default();
+    let app_runtime = AppRuntime::default();
     let llm: Arc<dyn LlmProvider> = Arc::new(StubLlmProvider);
     let tools = Box::new(DefaultToolSet::new());
     let kernel = Kernel::new(&config.kernel, llm, tools);
@@ -139,8 +143,10 @@ pub async fn show_status() -> MacacaResult<()> {
     println!("{}", "=".repeat(40));
     println!("Version:         {}", env!("CARGO_PKG_VERSION"));
     println!("Agents:          {}", agent_count);
+    println!("Loaded apps:     {}", app_runtime.app_count().await);
     println!("Max agents:      {}", config.kernel.max_agents);
     println!("LLM provider:    {}", config.llm.default_provider);
+    println!("App runtime:     macaca-app/AppRuntime");
     println!("Gateway enabled: {}", config.gateway.enabled);
 
     if config.gateway.enabled {

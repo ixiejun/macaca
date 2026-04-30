@@ -17,15 +17,23 @@ use async_trait::async_trait;
 use axum::response::sse::Event;
 use tokio::sync::{mpsc, Mutex};
 
+use macaca_agent::{AgentCapabilitySet, AgentServices, AgentTransitionReason};
+use macaca_app::{app_agent_manifest_view, app_agent_prompt_semantics};
 use macaca_framework::adapter::RoutedLlmAdapter;
 use macaca_framework::agent::{Hook, HookRegistry, HookedAgent};
+use macaca_framework::construction::{
+    AgentBuildIntent, AgentBuildRequest, AgentBuildRequestBuilder, AgentExecutionInput,
+    AgentExecutionLauncher, AgentExecutionOutput, AgentIdentity, AgentLifecycleConfig,
+    AgentToolConfig, AgentTraceContext, ApplicationPromptParts, ApplicationSemantics,
+    ApplicationToolPolicy, TracedAgentFactory,
+};
 use macaca_framework::formatter::OpenAiFormatter;
 use macaca_framework::memory::InMemoryWorkingMemory;
 use macaca_framework::message::Msg;
 use macaca_framework::react_agent::ReActAgent;
-use macaca_framework::tool::{ToolError, ToolMiddleware, ToolResponse};
+use macaca_framework::tool::{ToolError, ToolMiddleware, ToolResponse, Toolkit};
 use macaca_persist::EventLog;
-use macaca_proto::ApplicationId;
+use macaca_proto::{AgentState, ApplicationId, Capability};
 use macaca_runtime::agentic_loop::ResumeReason;
 use macaca_sdk::AgentPersona;
 use macaca_skill::{SkillPolicy, SkillRuntime, SkillRuntimeOptions};
@@ -41,6 +49,107 @@ use crate::state::AppState;
 /// This is the bridge between the OS layer (AppState, personas, tool registry)
 /// and the framework layer (ReActAgent, Toolkit, WorkingMemory).
 pub struct FrameworkRunner;
+
+enum FrameworkRunnerBuildMode {
+    Executor {
+        executor: Arc<macaca_kernel::executor::ApplicationExecutor>,
+    },
+    Runtime {
+        event_tx: Option<mpsc::Sender<macaca_proto::AgentExecutionEvent>>,
+    },
+    Coordinator {
+        sse_tx: mpsc::Sender<Result<Event, Infallible>>,
+        pause_signal: Arc<AtomicBool>,
+        resume_rx: mpsc::Receiver<ResumeReason>,
+    },
+}
+
+struct WebTracedAgentFactory {
+    state: Arc<AppState>,
+    build_mode: FrameworkRunnerBuildMode,
+}
+
+struct PreparedAgentParts {
+    selection: macaca_llm::ModelSelection,
+    toolkit: Toolkit,
+}
+
+enum StandardAgentMode {
+    Executor {
+        executor: Arc<macaca_kernel::executor::ApplicationExecutor>,
+    },
+    Runtime {
+        event_tx: Option<mpsc::Sender<macaca_proto::AgentExecutionEvent>>,
+    },
+}
+
+enum DriverTraceRoute {
+    Executor {
+        state: Arc<AppState>,
+        executor: Arc<macaca_kernel::executor::ApplicationExecutor>,
+        task_id: macaca_proto::TaskId,
+        agent_name: String,
+        session_id: Option<String>,
+    },
+    Runtime {
+        tx: mpsc::Sender<macaca_proto::AgentExecutionEvent>,
+    },
+    Coordinator {
+        tx: mpsc::Sender<Result<Event, Infallible>>,
+        event_log: Arc<EventLog>,
+        agent_name: String,
+        session_id: Option<String>,
+    },
+}
+
+#[async_trait]
+impl TracedAgentFactory for WebTracedAgentFactory {
+    type Output = HookedAgent<ReActAgent>;
+
+    async fn build(&self, request: AgentBuildRequest) -> Result<Self::Output, String> {
+        match &self.build_mode {
+            FrameworkRunnerBuildMode::Executor { executor } => {
+                self.build_executor_agent(request, Arc::clone(executor))
+                    .await
+            }
+            FrameworkRunnerBuildMode::Runtime { event_tx } => {
+                self.build_runtime_agent(request, event_tx.clone()).await
+            }
+            FrameworkRunnerBuildMode::Coordinator { .. } => {
+                Err("Coordinator construction requires owned channels".into())
+            }
+        }
+    }
+}
+
+#[async_trait]
+impl AgentExecutionLauncher for WebTracedAgentFactory {
+    async fn launch(
+        &self,
+        intent: AgentBuildIntent,
+        input: AgentExecutionInput,
+    ) -> Result<AgentExecutionOutput, String> {
+        let request = AgentBuildRequestBuilder::new(input.identity.clone(), intent)
+            .system_prompt(input.prompt)
+            .services(AgentServices::default())
+            .capabilities(AgentCapabilitySet::default())
+            .lifecycle(AgentLifecycleConfig::default())
+            .trace(AgentTraceContext {
+                session_id: input.session_id.clone(),
+                task_id: input.task_id,
+                source_agent: input.identity.agent_name.clone(),
+            })
+            .tools(AgentToolConfig::default())
+            .build()?;
+
+        let _ = <Self as TracedAgentFactory>::build(self, request).await?;
+        Ok(AgentExecutionOutput {
+            agent_name: input.identity.agent_name,
+            session_id: input.session_id,
+            task_id: input.task_id,
+        })
+    }
+}
 
 impl FrameworkRunner {
     /// Deprecated: do not use. All agents must be constructed through traced
@@ -84,8 +193,14 @@ impl FrameworkRunner {
         task_id: macaca_proto::TaskId,
         executor: Arc<macaca_kernel::executor::ApplicationExecutor>,
     ) -> Result<HookedAgent<ReActAgent>, String> {
-        Self::build_traced_agent_internal(
-            state, app_id, agent_name, session_id, task_id, executor, None, false, None,
+        Self::build_for_intent(
+            state,
+            app_id,
+            agent_name,
+            session_id,
+            task_id,
+            executor,
+            AgentBuildIntent::RuntimeAgent,
         )
         .await
     }
@@ -101,8 +216,14 @@ impl FrameworkRunner {
         task_id: macaca_proto::TaskId,
         executor: Arc<macaca_kernel::executor::ApplicationExecutor>,
     ) -> Result<HookedAgent<ReActAgent>, String> {
-        Self::build_traced_agent_internal(
-            state, app_id, agent_name, session_id, task_id, executor, None, true, None,
+        Self::build_for_intent(
+            state,
+            app_id,
+            agent_name,
+            session_id,
+            task_id,
+            executor,
+            AgentBuildIntent::WorkerTask { task_id },
         )
         .await
     }
@@ -119,8 +240,14 @@ impl FrameworkRunner {
         executor: Arc<macaca_kernel::executor::ApplicationExecutor>,
         goal_id: Option<macaca_proto::TaskId>,
     ) -> Result<HookedAgent<ReActAgent>, String> {
-        Self::build_traced_agent_internal(
-            state, app_id, agent_name, session_id, task_id, executor, goal_id, false, None,
+        Self::build_for_intent(
+            state,
+            app_id,
+            agent_name,
+            session_id,
+            task_id,
+            executor,
+            AgentBuildIntent::PlannerFollowUp { goal_id },
         )
         .await
     }
@@ -139,161 +266,60 @@ impl FrameworkRunner {
         executor: Arc<macaca_kernel::executor::ApplicationExecutor>,
         goal_id: Option<macaca_proto::TaskId>,
     ) -> Result<HookedAgent<ReActAgent>, String> {
-        Self::build_traced_agent_internal(
+        Self::build_for_intent(
             state,
             app_id,
             agent_name,
             session_id,
             task_id,
             executor,
-            goal_id,
-            false,
-            Some(&["create_todo", "create_todos"]),
+            AgentBuildIntent::PlannerDecomposition { goal_id },
         )
         .await
     }
 
-    async fn build_traced_agent_internal(
+    /// Build a traced agent from an explicit framework build intent.
+    ///
+    /// This is the task-facing contract used by planner/worker runtime
+    /// consumers so they do not need to know legacy web builder naming.
+    pub async fn build_for_intent(
         state: &Arc<AppState>,
         app_id: &ApplicationId,
         agent_name: &str,
         session_id: Option<String>,
         task_id: macaca_proto::TaskId,
         executor: Arc<macaca_kernel::executor::ApplicationExecutor>,
-        goal_id: Option<macaca_proto::TaskId>,
-        suppress_worker_lifecycle_tools: bool,
-        allowed_tool_names: Option<&[&str]>,
+        intent: AgentBuildIntent,
     ) -> Result<HookedAgent<ReActAgent>, String> {
-        let system_prompt =
-            Self::build_system_prompt(state, app_id, agent_name, session_id.clone()).await;
-        let selection = Self::resolve_model_selection(state, app_id, agent_name).await?;
-        let model = Arc::new(RoutedLlmAdapter::new(
-            Arc::clone(&state.llm_router),
-            selection.clone(),
-        ));
-        let formatter = Arc::new(OpenAiFormatter);
-        let mut toolkit = crate::framework_toolkit::build_toolkit(
-            state,
-            app_id,
-            agent_name,
-            session_id.clone(),
-            goal_id,
+        let tools = match &intent {
+            AgentBuildIntent::PlannerDecomposition { goal_id } => AgentToolConfig {
+                goal_id: *goal_id,
+                suppress_worker_lifecycle_tools: false,
+                allowed_tool_names: Some(vec!["create_todo".into(), "create_todos".into()]),
+            },
+            AgentBuildIntent::PlannerFollowUp { goal_id }
+            | AgentBuildIntent::GoalEvaluation { goal_id } => AgentToolConfig {
+                goal_id: *goal_id,
+                ..Default::default()
+            },
+            AgentBuildIntent::PlannerReview { .. } | AgentBuildIntent::WorkerTask { .. } => {
+                AgentToolConfig {
+                    suppress_worker_lifecycle_tools: true,
+                    ..Default::default()
+                }
+            }
+            _ => AgentToolConfig::default(),
+        };
+        let goal_id = tools.goal_id;
+        let request = Self::build_request(
+            state, app_id, agent_name, session_id, task_id, goal_id, intent, tools,
         )
-        .await;
-
-        if suppress_worker_lifecycle_tools {
-            for tool_name in [
-                "claim_task",
-                "start_task",
-                "update_task_progress",
-                "submit_task_for_review",
-                "list_my_tasks",
-            ] {
-                toolkit.unregister(tool_name);
-            }
-        }
-        if let Some(allowed_tool_names) = allowed_tool_names {
-            let allowed: HashSet<&str> = allowed_tool_names.iter().copied().collect();
-            for tool in toolkit.get_definitions() {
-                if let Some(name) = tool.get("name").and_then(|v| v.as_str()) {
-                    if !allowed.contains(name) {
-                        toolkit.unregister(name);
-                    }
-                }
-            }
-        }
-
-        // Executor tool middleware — emits tool_call / tool_result via broadcast
-        toolkit.add_middleware(Box::new(ExecutorToolMiddleware {
-            executor: Arc::clone(&executor),
-            task_id,
-            agent_name: agent_name.to_string(),
-        }));
-
-        // Set up TraceEvent → direct SSE + EventLog forwarding (bypasses executor broadcast)
-        {
-            let (trace_tx, mut trace_rx) = tokio::sync::mpsc::unbounded_channel::<macaca_tools::TraceEvent>();
-            toolkit.set_event_tx(trace_tx);
-
-            // Try to get direct SSE sender from the active session
-            let sse_tx_opt = if let Some(ref sid) = session_id {
-                let sessions = state.sessions.active_sessions.read().await;
-                sessions.get(sid).map(|s| Arc::clone(&s.sse_tx))
-            } else {
-                None
-            };
-
-            let event_log = Arc::clone(&state.persist.event_log);
-            let session_id_for_trace = session_id.clone();
-            let agent_name_for_trace = agent_name.to_string();
-            let executor_clone = Arc::clone(&executor);
-            tokio::spawn(async move {
-                while let Some(trace) = trace_rx.recv().await {
-                    let driver_name = trace.driver_id.clone().unwrap_or_else(|| "unknown".to_string());
-                    let trace_value = serde_json::to_value(&trace).unwrap_or_default();
-
-                    // Build delegated_driver_trace envelope
-                    let delegated_envelope = serde_json::json!({
-                        "task_id": task_id.to_string(),
-                        "agent": agent_name_for_trace,
-                        "agent_tab": agent_name_for_trace,
-                        "driver_name": driver_name,
-                        "event": trace_value,
-                    });
-
-                    // 1. Persist to EventLog
-                    if let Some(ref sid) = session_id_for_trace {
-                        event_log
-                            .append(
-                                sid,
-                                "delegated_driver_trace",
-                                &agent_name_for_trace,
-                                delegated_envelope.clone(),
-                            )
-                            .await;
-                    }
-
-                    // 2. Push to SSE stream directly (bypass broadcast channel)
-                    if let Some(ref sse_tx) = sse_tx_opt {
-                        let event = Event::default()
-                            .event("delegated_driver_trace")
-                            .data(delegated_envelope.to_string());
-                        let sender = sse_tx.read().await;
-                        let _ = sender.send(Ok(event)).await;
-                    } else {
-                        // Fallback: broadcast via executor if no direct SSE path
-                        executor_clone.broadcast_event(macaca_kernel::executor::ExecutorEvent::AgentEvent {
-                            task_id,
-                            agent: agent_name_for_trace.clone(),
-                            event: macaca_proto::AgentExecutionEvent::DriverTrace {
-                                driver_name: driver_name.clone(),
-                                trace: trace_value,
-                            },
-                        });
-                    }
-                }
-            });
-        }
-
-        let model_name = selection.primary.reference();
-
-        let agent = ReActAgent::new(agent_name, &system_prompt, model, formatter)
-            .with_toolkit(toolkit)
-            .with_memory(Box::new(InMemoryWorkingMemory::new()))
-            .with_max_iters(25)
-            .with_model_name(model_name);
-
-        // Wrap with HookedAgent + ExecutorEmitterHook
-        let mut hooks = HookRegistry::new();
-        hooks.register_instance_hook(Box::new(ExecutorEmitterHook {
-            executor: Arc::clone(&executor),
-            task_id,
-            agent_name: agent_name.to_string(),
-            iteration: std::sync::atomic::AtomicUsize::new(0),
-        }));
-        let hooked = HookedAgent::new(agent, hooks);
-
-        Ok(hooked)
+        .await?;
+        let factory = WebTracedAgentFactory {
+            state: Arc::clone(state),
+            build_mode: FrameworkRunnerBuildMode::Executor { executor },
+        };
+        factory.build(request).await
     }
 
     /// Build a framework-native runtime agent for executor call sites that
@@ -307,56 +333,25 @@ impl FrameworkRunner {
         goal_id: Option<macaca_proto::TaskId>,
         event_tx: Option<mpsc::Sender<macaca_proto::AgentExecutionEvent>>,
     ) -> Result<HookedAgent<ReActAgent>, String> {
-        let system_prompt =
-            Self::build_system_prompt(state, app_id, agent_name, session_id.clone()).await;
-        let selection = Self::resolve_model_selection(state, app_id, agent_name).await?;
-        let model = Arc::new(RoutedLlmAdapter::new(
-            Arc::clone(&state.llm_router),
-            selection.clone(),
-        ));
-        let formatter = Arc::new(OpenAiFormatter);
-        let mut toolkit =
-            crate::framework_toolkit::build_toolkit(state, app_id, agent_name, session_id, goal_id)
-                .await;
-
-        // Set up TraceEvent → AgentExecutionEvent::DriverTrace forwarding
-        if let Some(ref agent_tx) = event_tx {
-            let (trace_tx, mut trace_rx) = tokio::sync::mpsc::unbounded_channel::<macaca_tools::TraceEvent>();
-            toolkit.set_event_tx(trace_tx);
-
-            let agent_tx_clone = agent_tx.clone();
-            tokio::spawn(async move {
-                while let Some(trace) = trace_rx.recv().await {
-                    let driver_name = trace.driver_id.clone().unwrap_or_else(|| "unknown".to_string());
-                    let trace_value = serde_json::to_value(&trace).unwrap_or_default();
-                    let driver_trace = macaca_proto::AgentExecutionEvent::DriverTrace {
-                        driver_name,
-                        trace: trace_value,
-                    };
-                    let _ = agent_tx_clone.send(driver_trace).await;
-                }
-            });
-        }
-
-        if let Some(ref tx) = event_tx {
-            toolkit.add_middleware(Box::new(ChannelToolMiddleware { tx: tx.clone() }));
-        }
-
-        let agent = ReActAgent::new(agent_name, &system_prompt, model, formatter)
-            .with_toolkit(toolkit)
-            .with_memory(Box::new(InMemoryWorkingMemory::new()))
-            .with_max_iters(25)
-            .with_model_name(selection.primary.reference());
-
-        let mut hooks = HookRegistry::new();
-        if let Some(tx) = event_tx {
-            hooks.register_instance_hook(Box::new(ChannelEmitterHook {
-                tx,
-                iteration: std::sync::atomic::AtomicUsize::new(0),
-            }));
-        }
-
-        Ok(HookedAgent::new(agent, hooks))
+        let request = Self::build_request(
+            state,
+            app_id,
+            agent_name,
+            session_id.clone(),
+            goal_id.unwrap_or_else(macaca_proto::TaskId::new),
+            goal_id,
+            AgentBuildIntent::RuntimeAgent,
+            AgentToolConfig {
+                goal_id,
+                ..Default::default()
+            },
+        )
+        .await?;
+        let factory = WebTracedAgentFactory {
+            state: Arc::clone(state),
+            build_mode: FrameworkRunnerBuildMode::Runtime { event_tx },
+        };
+        factory.build(request).await
     }
 
     /// Build a coordinator `ReActAgent` wrapped with `HookedAgent` for SSE bridging
@@ -372,100 +367,122 @@ impl FrameworkRunner {
         pause_signal: Arc<AtomicBool>,
         resume_rx: mpsc::Receiver<ResumeReason>,
     ) -> Result<(HookedAgent<ReActAgent>, tokio_util::sync::CancellationToken), String> {
-        let system_prompt =
-            Self::build_system_prompt(state, app_id, agent_name, session_id.clone()).await;
-        let selection = Self::resolve_model_selection(state, app_id, agent_name).await?;
-        let model = Arc::new(RoutedLlmAdapter::new(
-            Arc::clone(&state.llm_router),
-            selection.clone(),
-        ));
-        let formatter = Arc::new(OpenAiFormatter);
-        let mut toolkit = crate::framework_toolkit::build_toolkit(
+        let request = Self::build_request(
             state,
             app_id,
             agent_name,
             session_id.clone(),
+            macaca_proto::TaskId::new(),
             None,
+            AgentBuildIntent::CoordinatorChat,
+            AgentToolConfig::default(),
         )
-        .await;
+        .await?;
+        let factory = WebTracedAgentFactory {
+            state: Arc::clone(state),
+            build_mode: FrameworkRunnerBuildMode::Coordinator {
+                sse_tx,
+                pause_signal,
+                resume_rx,
+            },
+        };
 
-        // Set up TraceEvent → SSE forwarding for streaming tool execution
-        let (trace_tx, mut trace_rx) = tokio::sync::mpsc::unbounded_channel::<macaca_tools::TraceEvent>();
-        toolkit.set_event_tx(trace_tx);
-        {
-            let sse_tx_for_trace = sse_tx.clone();
-            let event_log_for_trace = Arc::clone(&state.persist.event_log);
-            let session_id_for_trace = session_id.clone();
-            let agent_name_for_trace = agent_name.to_string();
-            tokio::spawn(async move {
-                while let Some(trace) = trace_rx.recv().await {
-                    let driver_name = trace.driver_id.clone().unwrap_or_else(|| "unknown".to_string());
-                    let trace_value = serde_json::to_value(&trace).unwrap_or_default();
-
-                    // 1. Persist to EventLog first
-                    if let Some(ref sid) = session_id_for_trace {
-                        event_log_for_trace
-                            .append(
-                                sid,
-                                "driver_trace",
-                                &agent_name_for_trace,
-                                trace_value.clone(),
-                            )
-                            .await;
-                    }
-
-                    // 2. Push to SSE stream
-                    let event = Event::default()
-                        .event("driver_trace")
-                        .data(serde_json::json!({
-                            "driver_name": driver_name,
-                            "event": trace_value,
-                        }).to_string());
-                    let _ = sse_tx_for_trace.send(Ok(event)).await;
-                }
-            });
-        }
-
-        // SSE tool middleware — emits tool_call / tool_result events
-        toolkit.add_middleware(Box::new(SseToolMiddleware {
-            tx: sse_tx.clone(),
-            agent_name: agent_name.to_string(),
-            event_log: Some(Arc::clone(&state.persist.event_log)),
-            session_id: session_id.clone(),
-        }));
-
-        // Pause-on-goal middleware — blocks until goal completes
-        toolkit.add_middleware(Box::new(PauseOnGoalMiddleware {
-            pause_signal,
-            resume_rx: Arc::new(Mutex::new(resume_rx)),
-        }));
-
-        let model_name = selection.primary.reference();
-
-        let agent = ReActAgent::new(agent_name, &system_prompt, model, formatter)
-            .with_toolkit(toolkit)
-            .with_memory(Box::new(InMemoryWorkingMemory::new()))
-            .with_max_iters(50)
-            .with_model_name(model_name);
-
-        let cancel_token = agent.cancel_token();
-
-        // Wrap with HookedAgent + SseEmitterHook
-        let mut hooks = HookRegistry::new();
-        hooks.register_instance_hook(Box::new(SseEmitterHook {
-            tx: sse_tx,
-            agent_name: agent_name.to_string(),
-            event_log: Some(Arc::clone(&state.persist.event_log)),
-            session_id,
-        }));
-        let hooked = HookedAgent::new(agent, hooks);
-
-        Ok((hooked, cancel_token))
+        factory.build_coordinator(request).await
     }
 
     // -----------------------------------------------------------------------
     // Private helpers
     // -----------------------------------------------------------------------
+
+    async fn build_request(
+        state: &Arc<AppState>,
+        app_id: &ApplicationId,
+        agent_name: &str,
+        session_id: Option<String>,
+        task_id: macaca_proto::TaskId,
+        goal_id: Option<macaca_proto::TaskId>,
+        intent: AgentBuildIntent,
+        tools: AgentToolConfig,
+    ) -> Result<AgentBuildRequest, String> {
+        let app_manifest = {
+            let registry = state.registry.read().await;
+            registry.get_app(app_id).map(|app| app.manifest.clone())
+        };
+        let capabilities = Self::resolve_agent_capability_set(state, app_id, agent_name).await;
+        let system_prompt =
+            Self::build_system_prompt(state, app_id, agent_name, session_id.clone(), &capabilities)
+                .await;
+        let application = app_manifest.as_ref().map(|manifest| {
+            let semantics = app_agent_prompt_semantics(manifest, agent_name);
+            ApplicationSemantics {
+                workflow_name: Some(semantics.workflow_name),
+                entry_agent: Some(semantics.entry_agent),
+                prompt_parts: semantics.prompt_parts.map(|parts| ApplicationPromptParts {
+                    role: parts.role,
+                    constraints: parts.constraints,
+                    tools: parts.tools,
+                    handoff: parts.handoff,
+                }),
+                tool_policy: ApplicationToolPolicy {
+                    allowed_tool_names: semantics.tool_policy.allowed_tools,
+                    execution_tool_names: semantics.tool_policy.execution_tools,
+                    is_entry_agent: semantics.tool_policy.is_entry_agent,
+                },
+            }
+        });
+
+        AgentBuildRequestBuilder::new(
+            AgentIdentity {
+                app_id: *app_id,
+                agent_name: agent_name.to_string(),
+                session_id: session_id.clone(),
+            },
+            intent,
+        )
+        .system_prompt(system_prompt)
+        .services(AgentServices::default())
+        .capabilities(capabilities)
+        .lifecycle(AgentLifecycleConfig::default())
+        .trace(AgentTraceContext {
+            session_id,
+            task_id: Some(task_id),
+            source_agent: agent_name.to_string(),
+        })
+        .tools(AgentToolConfig { goal_id, ..tools })
+        .application_opt(application)
+        .build()
+    }
+
+    async fn resolve_agent_capability_set(
+        state: &Arc<AppState>,
+        app_id: &ApplicationId,
+        agent_name: &str,
+    ) -> AgentCapabilitySet {
+        {
+            let registry = state.registry.read().await;
+            if let Some(app) = registry.get_app(app_id) {
+                if let Some(agent) = app_agent_manifest_view(&app.manifest, agent_name) {
+                    return AgentCapabilitySet::from_legacy(
+                        agent
+                            .capabilities()
+                            .iter()
+                            .map(|capability| Capability {
+                                name: capability.name.clone(),
+                                description: capability.description.clone(),
+                            })
+                            .collect(),
+                    );
+                }
+            }
+        }
+        let manifests = state.kernel.list_agents().await;
+        let capabilities = manifests
+            .into_iter()
+            .find(|manifest| manifest.name == agent_name)
+            .map(|manifest| manifest.capabilities)
+            .unwrap_or_default();
+        AgentCapabilitySet::from_legacy(capabilities)
+    }
 
     /// Resolve the routed model selection for an agent.
     /// Priority: agent manifest model > app llm_config > system default.
@@ -506,7 +523,12 @@ impl FrameworkRunner {
         app_id: &ApplicationId,
         agent_name: &str,
         session_id: Option<String>,
+        capabilities: &AgentCapabilitySet,
     ) -> String {
+        let app_manifest = {
+            let registry = state.registry.read().await;
+            registry.get_app(app_id).map(|app| app.manifest.clone())
+        };
         let app_dir = {
             let dirs = state.config.app_dirs.read().await;
             dirs.iter()
@@ -527,17 +549,17 @@ impl FrameworkRunner {
 
         let mut prompt = if let Some(ref p) = persona {
             p.to_system_prompt(None)
+        } else if let Some(manifest) = app_manifest.as_ref() {
+            app_agent_prompt_semantics(manifest, agent_name).base_prompt
         } else {
             format!("You are the {} agent in Macaca OS.", agent_name)
         };
 
-        // Inject capabilities
-        let manifests = state.kernel.list_agents().await;
-        if let Some(info) = manifests.iter().find(|m| m.name == agent_name) {
-            let caps: Vec<&str> = info.capabilities.iter().map(|c| c.name.as_str()).collect();
-            if !caps.is_empty() {
-                prompt.push_str(&format!("\n\nYour capabilities: {}", caps.join(", ")));
-            }
+        // Inject capabilities from the macaca-agent capability abstraction.
+        let flattened = capabilities.flatten_for_legacy_api();
+        let caps: Vec<&str> = flattened.iter().map(|cap| cap.name.as_str()).collect();
+        if !caps.is_empty() {
+            prompt.push_str(&format!("\n\nYour capabilities: {}", caps.join(", ")));
         }
 
         // Inject workspace paths
@@ -664,6 +686,358 @@ impl FrameworkRunner {
         }
 
         prompt
+    }
+}
+
+impl WebTracedAgentFactory {
+    fn validate_lifecycle_config(lifecycle: &AgentLifecycleConfig) -> Result<(), String> {
+        if lifecycle.initial_state != AgentState::Created {
+            return Err(format!(
+                "unsupported initial agent state for traced construction: {:?}",
+                lifecycle.initial_state
+            ));
+        }
+        if let Some(policy) = &lifecycle.policy {
+            if !policy.can_transition(
+                lifecycle.initial_state,
+                AgentState::Running,
+                AgentTransitionReason::Start,
+            ) {
+                return Err("agent lifecycle policy rejects Created -> Running".into());
+            }
+        }
+        Ok(())
+    }
+
+    async fn prepare_agent_parts(
+        &self,
+        request: &AgentBuildRequest,
+        goal_id_override: Option<Option<macaca_proto::TaskId>>,
+    ) -> Result<PreparedAgentParts, String> {
+        Self::validate_lifecycle_config(&request.lifecycle)?;
+
+        let selection = FrameworkRunner::resolve_model_selection(
+            &self.state,
+            &request.identity.app_id,
+            &request.identity.agent_name,
+        )
+        .await?;
+        let mut toolkit = crate::framework_toolkit::build_toolkit(
+            &self.state,
+            &request.identity.app_id,
+            &request.identity.agent_name,
+            request.identity.session_id.clone(),
+            goal_id_override.unwrap_or(request.tools.goal_id),
+        )
+        .await;
+
+        if request.tools.suppress_worker_lifecycle_tools {
+            for tool_name in [
+                "claim_task",
+                "start_task",
+                "update_task_progress",
+                "submit_task_for_review",
+                "list_my_tasks",
+            ] {
+                toolkit.unregister(tool_name);
+            }
+        }
+        if let Some(ref allowed_tool_names) = request.tools.allowed_tool_names {
+            let allowed: HashSet<&str> = allowed_tool_names.iter().map(String::as_str).collect();
+            for tool in toolkit.get_definitions() {
+                if let Some(name) = tool.get("name").and_then(|v| v.as_str()) {
+                    if !allowed.contains(name) {
+                        toolkit.unregister(name);
+                    }
+                }
+            }
+        }
+
+        Ok(PreparedAgentParts { selection, toolkit })
+    }
+
+    fn build_react_agent(
+        llm_router: Arc<macaca_llm::LlmRouter>,
+        request: &AgentBuildRequest,
+        selection: &macaca_llm::ModelSelection,
+        toolkit: Toolkit,
+        max_iters: usize,
+    ) -> ReActAgent {
+        let model = Arc::new(RoutedLlmAdapter::new(llm_router, selection.clone()));
+        let formatter = Arc::new(OpenAiFormatter);
+        ReActAgent::new(
+            &request.identity.agent_name,
+            &request.system_prompt,
+            model,
+            formatter,
+        )
+        .with_toolkit(toolkit)
+        .with_memory(Box::new(InMemoryWorkingMemory::new()))
+        .with_max_iters(max_iters)
+        .with_model_name(selection.primary.reference())
+    }
+
+    async fn configure_standard_toolkit(
+        state: Arc<AppState>,
+        toolkit: &mut Toolkit,
+        mode: &StandardAgentMode,
+        task_id: macaca_proto::TaskId,
+        agent_name: &str,
+        session_id: Option<String>,
+    ) {
+        match mode {
+            StandardAgentMode::Executor { executor } => {
+                toolkit.add_middleware(Box::new(ExecutorToolMiddleware {
+                    executor: Arc::clone(executor),
+                    task_id,
+                    agent_name: agent_name.to_string(),
+                }));
+                Self::attach_driver_trace_route(
+                    toolkit,
+                    DriverTraceRoute::Executor {
+                        state,
+                        executor: Arc::clone(executor),
+                        task_id,
+                        agent_name: agent_name.to_string(),
+                        session_id,
+                    },
+                )
+                .await;
+            }
+            StandardAgentMode::Runtime { event_tx } => {
+                if let Some(ref agent_tx) = event_tx {
+                    Self::attach_driver_trace_route(
+                        toolkit,
+                        DriverTraceRoute::Runtime {
+                            tx: agent_tx.clone(),
+                        },
+                    )
+                    .await;
+                    toolkit.add_middleware(Box::new(ChannelToolMiddleware {
+                        tx: agent_tx.clone(),
+                    }));
+                }
+            }
+        }
+    }
+
+    fn build_standard_hooks(
+        mode: StandardAgentMode,
+        task_id: macaca_proto::TaskId,
+        agent_name: String,
+    ) -> HookRegistry {
+        let mut hooks = HookRegistry::new();
+        match mode {
+            StandardAgentMode::Executor { executor } => {
+                hooks.register_instance_hook(Box::new(ExecutorEmitterHook {
+                    executor,
+                    task_id,
+                    agent_name,
+                    iteration: std::sync::atomic::AtomicUsize::new(0),
+                }));
+            }
+            StandardAgentMode::Runtime { event_tx } => {
+                if let Some(tx) = event_tx {
+                    hooks.register_instance_hook(Box::new(ChannelEmitterHook {
+                        tx,
+                        iteration: std::sync::atomic::AtomicUsize::new(0),
+                    }));
+                }
+            }
+        }
+        hooks
+    }
+
+    async fn build_standard_agent(
+        &self,
+        request: AgentBuildRequest,
+        mode: StandardAgentMode,
+    ) -> Result<HookedAgent<ReActAgent>, String> {
+        let PreparedAgentParts {
+            selection,
+            mut toolkit,
+        } = self.prepare_agent_parts(&request, None).await?;
+
+        let task_id = request
+            .trace
+            .task_id
+            .ok_or_else(|| "standard build request missing task_id".to_string())?;
+        let session_id = request.identity.session_id.clone();
+        let agent_name = request.identity.agent_name.clone();
+        let llm_router = Arc::clone(&self.state.llm_router);
+
+        Self::configure_standard_toolkit(
+            Arc::clone(&self.state),
+            &mut toolkit,
+            &mode,
+            task_id,
+            &agent_name,
+            session_id,
+        )
+        .await;
+
+        let agent = Self::build_react_agent(llm_router, &request, &selection, toolkit, 25);
+        let hooks = Self::build_standard_hooks(mode, task_id, agent_name);
+        Ok(HookedAgent::new(agent, hooks))
+    }
+
+    async fn attach_driver_trace_route(toolkit: &mut Toolkit, route: DriverTraceRoute) {
+        let (trace_tx, mut trace_rx) =
+            tokio::sync::mpsc::unbounded_channel::<macaca_tools::TraceEvent>();
+        toolkit.set_event_tx(trace_tx);
+
+        tokio::spawn(async move {
+            while let Some(trace) = trace_rx.recv().await {
+                let driver_name = trace
+                    .driver_id
+                    .clone()
+                    .unwrap_or_else(|| "unknown".to_string());
+                let trace_value = serde_json::to_value(&trace).unwrap_or_default();
+
+                match &route {
+                    DriverTraceRoute::Executor {
+                        state,
+                        executor,
+                        task_id,
+                        agent_name,
+                        session_id,
+                    } => {
+                        let delegated_envelope = serde_json::json!({
+                            "task_id": task_id.to_string(),
+                            "agent": agent_name,
+                            "agent_tab": agent_name,
+                            "driver_name": driver_name,
+                            "event": trace_value,
+                        });
+
+                        if let Some(sid) = session_id {
+                            let sender_opt = {
+                                let sessions = state.sessions.active_sessions.read().await;
+                                sessions.get(sid).map(|session| Arc::clone(&session.sse_tx))
+                            };
+                            if let Some(sender) = sender_opt {
+                                let event = Event::default()
+                                    .event("delegated_driver_trace")
+                                    .data(delegated_envelope.to_string());
+                                let tx = sender.read().await;
+                                let _ = tx.send(Ok(event)).await;
+                            }
+                        }
+
+                        executor.broadcast_event(
+                            macaca_kernel::executor::ExecutorEvent::AgentEvent {
+                                task_id: *task_id,
+                                agent: agent_name.clone(),
+                                event: macaca_proto::AgentExecutionEvent::DriverTrace {
+                                    driver_name: driver_name.clone(),
+                                    trace: trace_value.clone(),
+                                },
+                            },
+                        );
+                    }
+                    DriverTraceRoute::Runtime { tx } => {
+                        let _ = tx
+                            .send(macaca_proto::AgentExecutionEvent::DriverTrace {
+                                driver_name: driver_name.clone(),
+                                trace: trace_value.clone(),
+                            })
+                            .await;
+                    }
+                    DriverTraceRoute::Coordinator {
+                        tx,
+                        event_log,
+                        agent_name,
+                        session_id,
+                    } => {
+                        if let Some(sid) = session_id {
+                            event_log
+                                .append(sid, "driver_trace", agent_name, trace_value.clone())
+                                .await;
+                        }
+                        let event = Event::default().event("driver_trace").data(
+                            serde_json::json!({
+                                "driver_name": driver_name,
+                                "event": trace_value,
+                            })
+                            .to_string(),
+                        );
+                        let _ = tx.send(Ok(event)).await;
+                    }
+                }
+            }
+        });
+    }
+
+    async fn build_executor_agent(
+        &self,
+        request: AgentBuildRequest,
+        executor: Arc<macaca_kernel::executor::ApplicationExecutor>,
+    ) -> Result<HookedAgent<ReActAgent>, String> {
+        self.build_standard_agent(request, StandardAgentMode::Executor { executor })
+            .await
+    }
+
+    async fn build_runtime_agent(
+        &self,
+        request: AgentBuildRequest,
+        event_tx: Option<mpsc::Sender<macaca_proto::AgentExecutionEvent>>,
+    ) -> Result<HookedAgent<ReActAgent>, String> {
+        self.build_standard_agent(request, StandardAgentMode::Runtime { event_tx })
+            .await
+    }
+
+    async fn build_coordinator(
+        self,
+        request: AgentBuildRequest,
+    ) -> Result<(HookedAgent<ReActAgent>, tokio_util::sync::CancellationToken), String> {
+        let llm_router = Arc::clone(&self.state.llm_router);
+        let PreparedAgentParts {
+            selection,
+            mut toolkit,
+        } = self.prepare_agent_parts(&request, Some(None)).await?;
+
+        let FrameworkRunnerBuildMode::Coordinator {
+            sse_tx,
+            pause_signal,
+            resume_rx,
+        } = self.build_mode
+        else {
+            return Err("invalid build mode for coordinator".into());
+        };
+
+        Self::attach_driver_trace_route(
+            &mut toolkit,
+            DriverTraceRoute::Coordinator {
+                tx: sse_tx.clone(),
+                event_log: Arc::clone(&self.state.persist.event_log),
+                agent_name: request.identity.agent_name.clone(),
+                session_id: request.identity.session_id.clone(),
+            },
+        )
+        .await;
+
+        toolkit.add_middleware(Box::new(SseToolMiddleware {
+            tx: sse_tx.clone(),
+            agent_name: request.identity.agent_name.clone(),
+            event_log: Some(Arc::clone(&self.state.persist.event_log)),
+            session_id: request.identity.session_id.clone(),
+        }));
+        toolkit.add_middleware(Box::new(PauseOnGoalMiddleware {
+            pause_signal,
+            resume_rx: Arc::new(Mutex::new(resume_rx)),
+        }));
+
+        let agent = Self::build_react_agent(llm_router, &request, &selection, toolkit, 50);
+
+        let cancel_token = agent.cancel_token();
+        let mut hooks = HookRegistry::new();
+        hooks.register_instance_hook(Box::new(SseEmitterHook {
+            tx: sse_tx,
+            agent_name: request.identity.agent_name,
+            event_log: Some(Arc::clone(&self.state.persist.event_log)),
+            session_id: request.identity.session_id,
+        }));
+        Ok((HookedAgent::new(agent, hooks), cancel_token))
     }
 }
 

@@ -250,11 +250,7 @@ pub struct McpRuntimeContext {
 }
 
 impl McpRuntimeContext {
-    pub fn for_agent(
-        app_id: &ApplicationId,
-        session_id: Option<&str>,
-        agent_name: &str,
-    ) -> Self {
+    pub fn for_agent(app_id: &ApplicationId, session_id: Option<&str>, agent_name: &str) -> Self {
         Self {
             app_id: Some(app_id.clone()),
             session_id: session_id.map(ToString::to_string),
@@ -308,7 +304,8 @@ impl McpRuntimeManager {
         let content = tokio::fs::read_to_string(&path)
             .await
             .map_err(|e| e.to_string())?;
-        let config: McpRegistryConfig = serde_yaml::from_str(&content).map_err(|e| e.to_string())?;
+        let config: McpRegistryConfig =
+            serde_yaml::from_str(&content).map_err(|e| e.to_string())?;
         let mut definitions = self.definitions.write().await;
         for definition in config.into_definitions(McpDefinitionSource::Global)? {
             definitions.insert(definition.id.clone(), definition);
@@ -363,13 +360,7 @@ impl McpRuntimeManager {
                 continue;
             }
             let status = self
-                .register_definition_tools(
-                    toolkit,
-                    &definition,
-                    policy,
-                    context,
-                    on_closed.clone(),
-                )
+                .register_definition_tools(toolkit, &definition, policy, context, on_closed.clone())
                 .await;
             statuses.push(status);
         }
@@ -383,12 +374,14 @@ impl McpRuntimeManager {
     ) -> McpRuntimeKey {
         let key = runtime_key(definition, context);
         let mut instances = self.instances.lock().await;
-        let record = instances.entry(key.clone()).or_insert(RuntimeInstanceRecord {
-            refs: 0,
-            state: McpRuntimeStatusState::Ready,
-            last_error: None,
-            last_used: Instant::now(),
-        });
+        let record = instances
+            .entry(key.clone())
+            .or_insert(RuntimeInstanceRecord {
+                refs: 0,
+                state: McpRuntimeStatusState::Ready,
+                last_error: None,
+                last_used: Instant::now(),
+            });
         record.refs += 1;
         record.last_used = Instant::now();
         key
@@ -458,7 +451,11 @@ impl McpRuntimeManager {
         matches: impl Fn(&McpRuntimeKey) -> bool,
     ) -> Vec<McpRuntimeStatus> {
         let mut instances = self.instances.lock().await;
-        let keys: Vec<_> = instances.keys().filter(|key| matches(key)).cloned().collect();
+        let keys: Vec<_> = instances
+            .keys()
+            .filter(|key| matches(key))
+            .cloned()
+            .collect();
         keys.into_iter()
             .filter_map(|key| {
                 instances.remove(&key).map(|record| McpRuntimeStatus {
@@ -552,7 +549,10 @@ fn default_mcp_config_path() -> Option<PathBuf> {
     dirs::home_dir().map(|home| home.join(".macaca").join("mcp.yaml"))
 }
 
-async fn probe_definition(definition: &McpServerDefinition, policy: &McpToolPolicy) -> McpRuntimeStatus {
+async fn probe_definition(
+    definition: &McpServerDefinition,
+    policy: &McpToolPolicy,
+) -> McpRuntimeStatus {
     if let Some(missing) = missing_required_bin(definition) {
         return status_for_definition(
             definition,
@@ -562,17 +562,18 @@ async fn probe_definition(definition: &McpServerDefinition, policy: &McpToolPoli
         );
     }
 
-    let mut client = match client_from_transport(definition.transport.clone(), McpTimeouts::default()) {
-        Ok(client) => client,
-        Err(error) => {
-            return status_for_definition(
-                definition,
-                McpRuntimeStatusState::Failed,
-                Vec::new(),
-                Some(error.to_string()),
-            )
-        }
-    };
+    let mut client =
+        match client_from_transport(definition.transport.clone(), McpTimeouts::default()) {
+            Ok(client) => client,
+            Err(error) => {
+                return status_for_definition(
+                    definition,
+                    McpRuntimeStatusState::Failed,
+                    Vec::new(),
+                    Some(error.to_string()),
+                )
+            }
+        };
     let connected = timeout(Duration::from_secs(15), client.connect()).await;
     if let Err(error) = flatten_timeout_result(connected) {
         return status_for_definition(
@@ -612,7 +613,12 @@ async fn probe_definition(definition: &McpServerDefinition, policy: &McpToolPoli
         .map(|tool| prefixed_tool_name(definition, &tool.name))
         .filter(|tool| policy.allows_tool(tool))
         .collect();
-    status_for_definition(definition, McpRuntimeStatusState::Ready, exposed_tools, None)
+    status_for_definition(
+        definition,
+        McpRuntimeStatusState::Ready,
+        exposed_tools,
+        None,
+    )
 }
 
 impl McpRuntimeManager {
@@ -633,20 +639,18 @@ impl McpRuntimeManager {
             );
         }
 
-        let mut client = match client_from_transport(
-            definition.transport.clone(),
-            McpTimeouts::default(),
-        ) {
-            Ok(client) => client,
-            Err(error) => {
-                return status_for_definition(
-                    definition,
-                    McpRuntimeStatusState::Failed,
-                    Vec::new(),
-                    Some(error.to_string()),
-                )
-            }
-        };
+        let mut client =
+            match client_from_transport(definition.transport.clone(), McpTimeouts::default()) {
+                Ok(client) => client,
+                Err(error) => {
+                    return status_for_definition(
+                        definition,
+                        McpRuntimeStatusState::Failed,
+                        Vec::new(),
+                        Some(error.to_string()),
+                    )
+                }
+            };
         if let Err(error) = client.connect().await {
             return status_for_definition(
                 definition,
@@ -704,7 +708,12 @@ impl McpRuntimeManager {
                     .into_iter()
                     .filter(|name| policy.allows_tool(name))
                     .collect();
-                status_for_definition(definition, McpRuntimeStatusState::Ready, exposed_tools, None)
+                status_for_definition(
+                    definition,
+                    McpRuntimeStatusState::Ready,
+                    exposed_tools,
+                    None,
+                )
             }
             Err(error) => status_for_definition(
                 definition,
@@ -726,7 +735,9 @@ impl McpClient for ClientBox {
         self.inner.connect().await
     }
 
-    async fn list_tools(&mut self) -> Result<Vec<macaca_framework::mcp::McpToolDef>, macaca_framework::mcp::McpError> {
+    async fn list_tools(
+        &mut self,
+    ) -> Result<Vec<macaca_framework::mcp::McpToolDef>, macaca_framework::mcp::McpError> {
         self.inner.list_tools().await
     }
 
@@ -752,9 +763,7 @@ fn missing_required_bin(definition: &McpServerDefinition) -> Option<String> {
     if let McpTransportConfig::Stdio { command, .. } = &definition.transport {
         required.push(command.clone());
     }
-    required
-        .into_iter()
-        .find(|bin| !command_exists(bin))
+    required.into_iter().find(|bin| !command_exists(bin))
 }
 
 fn command_exists(command: &str) -> bool {
@@ -1009,10 +1018,8 @@ mcpServers:
             required_args: vec!["--isolated".into()],
             skip_if_any_arg_prefix: vec!["--user-data-dir".into()],
         };
-        let args = apply_concurrency_isolation(
-            &policy,
-            vec!["--user-data-dir=/tmp/profile".into()],
-        );
+        let args =
+            apply_concurrency_isolation(&policy, vec!["--user-data-dir=/tmp/profile".into()]);
         assert_eq!(args, vec!["--user-data-dir=/tmp/profile".to_string()]);
     }
 

@@ -1,16 +1,88 @@
 //! App runtime — manages the lifecycle of loaded applications.
 
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use macaca_kernel::Kernel;
 use macaca_proto::{AgentId, ApplicationId, MacacaError, MacacaResult};
 use macaca_sdk::register_from_config;
+use macaca_sdk::AgentConfig;
 
 use crate::loader::AppLoader;
 use crate::model::{AppLayer, AppManifest, AppStatus, LoadedApp};
+
+/// Builder that incrementally validates and assembles application runtime
+/// inputs before registration into [`AppRuntime`].
+pub struct AppRuntimeBuilder {
+    manifest: AppManifest,
+    base_dir: PathBuf,
+}
+
+impl AppRuntimeBuilder {
+    pub fn new(manifest: AppManifest, base_dir: impl Into<PathBuf>) -> Self {
+        Self {
+            manifest,
+            base_dir: base_dir.into(),
+        }
+    }
+
+    pub fn manifest(&self) -> &AppManifest {
+        &self.manifest
+    }
+
+    pub fn base_dir(&self) -> &Path {
+        &self.base_dir
+    }
+
+    pub fn validate(&self) -> MacacaResult<()> {
+        AppLoader::validate_manifest(&self.manifest)?;
+        if self.manifest.layer == AppLayer::L2Wasm {
+            return Err(MacacaError::Config(
+                "L2 WASM apps are not yet supported".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    pub fn resolve_agent_configs(&self) -> MacacaResult<Vec<AgentConfig>> {
+        self.validate()?;
+        AppLoader::resolve_agent_configs(&self.manifest, &self.base_dir)
+    }
+
+    pub fn assemble_loaded_app(self, agent_ids: Vec<AgentId>) -> MacacaResult<LoadedApp> {
+        self.validate()?;
+        Ok(LoadedApp {
+            manifest: self.manifest,
+            agent_ids,
+            status: AppStatus::Running,
+        })
+    }
+}
+
+/// Factory for runtime builder creation. The default implementation is a thin
+/// compatibility layer around current `macaca-app` startup assembly.
+pub trait ApplicationRuntimeFactory: Send + Sync {
+    fn build_runtime_builder(
+        &self,
+        manifest: AppManifest,
+        base_dir: impl Into<PathBuf>,
+    ) -> AppRuntimeBuilder;
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+pub struct DefaultApplicationRuntimeFactory;
+
+impl ApplicationRuntimeFactory for DefaultApplicationRuntimeFactory {
+    fn build_runtime_builder(
+        &self,
+        manifest: AppManifest,
+        base_dir: impl Into<PathBuf>,
+    ) -> AppRuntimeBuilder {
+        AppRuntimeBuilder::new(manifest, base_dir)
+    }
+}
 
 /// Manages the lifecycle of loaded applications and their agents.
 #[derive(Clone)]
@@ -47,25 +119,22 @@ impl AppRuntime {
         base_dir: impl AsRef<Path>,
         kernel: &Kernel,
     ) -> MacacaResult<ApplicationId> {
-        let app_id = manifest.id;
+        let factory = DefaultApplicationRuntimeFactory;
+        let builder = factory.build_runtime_builder(manifest, base_dir.as_ref().to_path_buf());
+        let app_id = builder.manifest().id;
 
         {
             let apps = self.apps.read().await;
             if apps.contains_key(&app_id) {
                 return Err(MacacaError::Agent(format!(
                     "App '{}' ({}) is already loaded",
-                    manifest.name, app_id
+                    builder.manifest().name,
+                    app_id
                 )));
             }
         }
 
-        if manifest.layer == AppLayer::L2Wasm {
-            return Err(MacacaError::Config(
-                "L2 WASM apps are not yet supported".into(),
-            ));
-        }
-
-        let configs = AppLoader::resolve_agent_configs(&manifest, base_dir)?;
+        let configs = builder.resolve_agent_configs()?;
 
         let mut agent_ids = Vec::new();
         for config in configs {
@@ -73,12 +142,8 @@ impl AppRuntime {
             agent_ids.push(id);
         }
 
-        let name = manifest.name.clone();
-        let loaded = LoadedApp {
-            manifest,
-            agent_ids,
-            status: AppStatus::Running,
-        };
+        let name = builder.manifest().name.clone();
+        let loaded = builder.assemble_loaded_app(agent_ids)?;
 
         self.apps.write().await.insert(app_id, loaded);
         tracing::info!(app = %name, id = %app_id, "app started");
@@ -373,6 +438,48 @@ mod tests {
         };
         let err = runtime.start_app(manifest, ".", &kernel).await.unwrap_err();
         assert!(err.to_string().contains("WASM"));
+    }
+
+    #[tokio::test]
+    async fn start_app_from_file() {
+        let runtime = AppRuntime::new();
+        let kernel = make_kernel();
+        let dir = std::env::temp_dir().join("macaca_app_runtime_test");
+        std::fs::create_dir_all(&dir).unwrap();
+        let manifest_path = dir.join("app.yaml");
+        std::fs::write(
+            &manifest_path,
+            r#"
+name: runtime-file-app
+layer: L3Declarative
+agents:
+  - name: runtime-file-agent
+    prompt_template: "You are runtime-file-agent."
+    model: "mock"
+    capabilities:
+      - name: assist
+"#,
+        )
+        .unwrap();
+
+        let app_id = runtime
+            .start_app_from_file(&manifest_path, &kernel)
+            .await
+            .unwrap();
+        let status = runtime.app_status(&app_id).await.unwrap();
+        assert_eq!(status, AppStatus::Running);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn runtime_builder_preserves_manifest_validation_and_assembly() {
+        let manifest = inline_manifest("builder-app");
+        let builder = AppRuntimeBuilder::new(manifest.clone(), ".");
+        builder.validate().unwrap();
+        let loaded = builder.assemble_loaded_app(vec![AgentId::new()]).unwrap();
+        assert_eq!(loaded.manifest.name, manifest.name);
+        assert_eq!(loaded.status, AppStatus::Running);
+        assert_eq!(loaded.agent_ids.len(), 1);
     }
 
     #[tokio::test]

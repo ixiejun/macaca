@@ -82,13 +82,105 @@ pub struct AgentSkillsConfig {
 }
 
 /// A capability reference in inline config.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CapabilityRef {
     /// Capability name.
     pub name: String,
     /// Description.
     #[serde(default)]
     pub description: String,
+}
+
+/// Internal source of application capability information.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AppCapabilitySource {
+    Manifest,
+    Skill,
+    Driver,
+    ToolPolicy,
+    Provider,
+}
+
+/// Internal composite capability node for application-level capability tracking.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AppCapabilityNode {
+    Leaf(CapabilityRef),
+    Group {
+        source: AppCapabilitySource,
+        children: Vec<AppCapabilityNode>,
+    },
+}
+
+impl AppCapabilityNode {
+    fn flatten_into<'a>(&'a self, output: &mut Vec<&'a CapabilityRef>) {
+        match self {
+            Self::Leaf(capability) => output.push(capability),
+            Self::Group { children, .. } => {
+                for child in children {
+                    child.flatten_into(output);
+                }
+            }
+        }
+    }
+}
+
+/// Composite capability set for applications. Callers can flatten back to the
+/// legacy capability list while preserving source information internally.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct AppCapabilitySet {
+    root: Vec<AppCapabilityNode>,
+}
+
+impl AppCapabilitySet {
+    /// Construct a manifest-backed capability set from inline agent definitions.
+    pub fn from_manifest_agents(agents: &[AgentSource]) -> Self {
+        let mut root = Vec::new();
+        for source in agents {
+            if let AgentSource::Inline(inline) = source {
+                if inline.capabilities.is_empty() {
+                    continue;
+                }
+                root.push(AppCapabilityNode::Group {
+                    source: AppCapabilitySource::Manifest,
+                    children: inline
+                        .capabilities
+                        .iter()
+                        .cloned()
+                        .map(AppCapabilityNode::Leaf)
+                        .collect(),
+                });
+            }
+        }
+        Self { root }
+    }
+
+    /// Add a capability group from a specific source.
+    pub fn push_group(&mut self, source: AppCapabilitySource, capabilities: Vec<CapabilityRef>) {
+        if capabilities.is_empty() {
+            return;
+        }
+        self.root.push(AppCapabilityNode::Group {
+            source,
+            children: capabilities
+                .into_iter()
+                .map(AppCapabilityNode::Leaf)
+                .collect(),
+        });
+    }
+
+    /// Flatten all capabilities back into the legacy output format.
+    pub fn flatten_legacy(&self) -> Vec<CapabilityRef> {
+        let mut refs = Vec::new();
+        for node in &self.root {
+            node.flatten_into(&mut refs);
+        }
+        refs.into_iter().cloned().collect()
+    }
+
+    /// Returns the internal root nodes for structured callers.
+    pub fn roots(&self) -> &[AppCapabilityNode] {
+        &self.root
+    }
 }
 
 fn default_model() -> String {
@@ -386,5 +478,80 @@ resources:
         let resources = manifest.resources.unwrap();
         assert_eq!(resources.personas, Some("personas/".into()));
         assert_eq!(resources.skills, Some("skills/".into()));
+    }
+
+    #[test]
+    fn app_capability_set_flattens_manifest_capabilities() {
+        let agents = vec![AgentSource::Inline(InlineAgentConfig {
+            name: "a".into(),
+            capabilities: vec![
+                CapabilityRef {
+                    name: "design".into(),
+                    description: "design cap".into(),
+                },
+                CapabilityRef {
+                    name: "build".into(),
+                    description: "build cap".into(),
+                },
+            ],
+            prompt_template: String::new(),
+            model: default_model(),
+            permission_level: default_permission(),
+            allowed_tools: vec![],
+            max_tokens: None,
+            temperature: None,
+            skills: None,
+        })];
+
+        let set = AppCapabilitySet::from_manifest_agents(&agents);
+        let flattened = set.flatten_legacy();
+        assert_eq!(flattened.len(), 2);
+        assert_eq!(flattened[0].name, "design");
+        assert_eq!(flattened[1].name, "build");
+    }
+
+    #[test]
+    fn app_capability_set_preserves_visible_capability_count_across_sources() {
+        let agents = vec![AgentSource::Inline(InlineAgentConfig {
+            name: "a".into(),
+            capabilities: vec![CapabilityRef {
+                name: "design".into(),
+                description: "design cap".into(),
+            }],
+            prompt_template: String::new(),
+            model: default_model(),
+            permission_level: default_permission(),
+            allowed_tools: vec![],
+            max_tokens: None,
+            temperature: None,
+            skills: None,
+        })];
+
+        let mut set = AppCapabilitySet::from_manifest_agents(&agents);
+        set.push_group(
+            AppCapabilitySource::Driver,
+            vec![CapabilityRef {
+                name: "opencode".into(),
+                description: "driver capability".into(),
+            }],
+        );
+        set.push_group(
+            AppCapabilitySource::Skill,
+            vec![CapabilityRef {
+                name: "playwright_search".into(),
+                description: "skill capability".into(),
+            }],
+        );
+
+        assert_eq!(set.roots().len(), 3);
+        let flattened = set.flatten_legacy();
+        assert_eq!(flattened.len(), 3);
+        assert_eq!(
+            flattened
+                .iter()
+                .map(|cap| cap.name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["design", "opencode", "playwright_search"]
+        );
     }
 }

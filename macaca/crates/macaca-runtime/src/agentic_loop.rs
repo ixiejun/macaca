@@ -464,7 +464,10 @@ impl AgenticLoop {
         let forward_task = if let Some(tx) = event_tx.cloned() {
             Some(tokio::spawn(async move {
                 while let Some(trace) = trace_rx.recv().await {
-                    let driver_name = trace.driver_id.clone().unwrap_or_else(|| "unknown".to_string());
+                    let driver_name = trace
+                        .driver_id
+                        .clone()
+                        .unwrap_or_else(|| "unknown".to_string());
                     let trace_value = serde_json::to_value(&trace).unwrap_or_default();
                     let driver_trace = AgentExecutionEvent::DriverTrace {
                         driver_name,

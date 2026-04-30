@@ -82,11 +82,7 @@ impl DynamicDriver {
             // 2. Resolve all required symbols
             let fn_abi_version: FnDriverAbiVersion =
                 *library.get(symbols::ABI_VERSION.as_bytes()).map_err(|e| {
-                    MacacaError::Driver(format!(
-                        "Missing symbol {}: {}",
-                        symbols::ABI_VERSION,
-                        e
-                    ))
+                    MacacaError::Driver(format!("Missing symbol {}: {}", symbols::ABI_VERSION, e))
                 })?;
 
             let fn_create: FnDriverCreate =
@@ -109,24 +105,14 @@ impl DynamicDriver {
                     ))
                 })?;
 
-            let fn_execute_tool: FnDriverExecuteTool = *library
-                .get(symbols::EXECUTE_TOOL.as_bytes())
-                .map_err(|e| {
-                    MacacaError::Driver(format!(
-                        "Missing symbol {}: {}",
-                        symbols::EXECUTE_TOOL,
-                        e
-                    ))
+            let fn_execute_tool: FnDriverExecuteTool =
+                *library.get(symbols::EXECUTE_TOOL.as_bytes()).map_err(|e| {
+                    MacacaError::Driver(format!("Missing symbol {}: {}", symbols::EXECUTE_TOOL, e))
                 })?;
 
-            let fn_health_check: FnDriverHealthCheck = *library
-                .get(symbols::HEALTH_CHECK.as_bytes())
-                .map_err(|e| {
-                    MacacaError::Driver(format!(
-                        "Missing symbol {}: {}",
-                        symbols::HEALTH_CHECK,
-                        e
-                    ))
+            let fn_health_check: FnDriverHealthCheck =
+                *library.get(symbols::HEALTH_CHECK.as_bytes()).map_err(|e| {
+                    MacacaError::Driver(format!("Missing symbol {}: {}", symbols::HEALTH_CHECK, e))
                 })?;
 
             let fn_shutdown: FnDriverShutdown =
@@ -139,14 +125,9 @@ impl DynamicDriver {
                     MacacaError::Driver(format!("Missing symbol {}: {}", symbols::DESTROY, e))
                 })?;
 
-            let fn_free_string: FnDriverFreeString = *library
-                .get(symbols::FREE_STRING.as_bytes())
-                .map_err(|e| {
-                    MacacaError::Driver(format!(
-                        "Missing symbol {}: {}",
-                        symbols::FREE_STRING,
-                        e
-                    ))
+            let fn_free_string: FnDriverFreeString =
+                *library.get(symbols::FREE_STRING.as_bytes()).map_err(|e| {
+                    MacacaError::Driver(format!("Missing symbol {}: {}", symbols::FREE_STRING, e))
                 })?;
 
             // Optional: load streaming execution symbol (not required for v1 drivers)
@@ -165,9 +146,8 @@ impl DynamicDriver {
             }
 
             // 4. Create driver instance
-            let config_c = CString::new(config_json).map_err(|e| {
-                MacacaError::Driver(format!("Config contains null byte: {}", e))
-            })?;
+            let config_c = CString::new(config_json)
+                .map_err(|e| MacacaError::Driver(format!("Config contains null byte: {}", e)))?;
             let handle = fn_create(config_c.as_ptr());
             if handle.is_null() {
                 return Err(MacacaError::Driver(
@@ -179,23 +159,17 @@ impl DynamicDriver {
             let manifest_ptr = fn_manifest(handle);
             if manifest_ptr.is_null() {
                 fn_destroy(handle);
-                return Err(MacacaError::Driver(
-                    "Driver manifest returned null".into(),
-                ));
+                return Err(MacacaError::Driver("Driver manifest returned null".into()));
             }
             let manifest_res = CStr::from_ptr(manifest_ptr)
                 .to_str()
                 .map(|s| s.to_owned())
-                .map_err(|e| {
-                    MacacaError::Driver(format!("Invalid UTF-8 in manifest: {}", e))
-                });
+                .map_err(|e| MacacaError::Driver(format!("Invalid UTF-8 in manifest: {}", e)));
             fn_free_string(manifest_ptr); // always free, even on UTF-8 error
             let manifest_str = manifest_res?;
 
-            let manifest_abi: DriverManifestAbi =
-                serde_json::from_str(&manifest_str).map_err(|e| {
-                    MacacaError::Driver(format!("Invalid manifest JSON: {}", e))
-                })?;
+            let manifest_abi: DriverManifestAbi = serde_json::from_str(&manifest_str)
+                .map_err(|e| MacacaError::Driver(format!("Invalid manifest JSON: {}", e)))?;
 
             // 6. Convert ABI manifest → domain DriverManifest
             let driver_type = parse_driver_type(&manifest_abi.driver_type)?;
@@ -375,9 +349,8 @@ impl Tool for DynamicTool {
 
         // Bridge synchronous FFI call into async runtime via spawn_blocking
         tokio::task::spawn_blocking(move || unsafe {
-            let tool_name_c = CString::new(tool_name.as_str()).map_err(|e| {
-                MacacaError::Driver(format!("Tool name contains null byte: {}", e))
-            })?;
+            let tool_name_c = CString::new(tool_name.as_str())
+                .map_err(|e| MacacaError::Driver(format!("Tool name contains null byte: {}", e)))?;
             let input_c = CString::new(input_json.as_str()).map_err(|e| {
                 MacacaError::Driver(format!("Input JSON contains null byte: {}", e))
             })?;
@@ -386,9 +359,7 @@ impl Tool for DynamicTool {
                 (ctx.fn_execute_tool)(ctx.handle, tool_name_c.as_ptr(), input_c.as_ptr());
 
             if result_ptr.is_null() {
-                return Err(MacacaError::Driver(
-                    "Tool execution returned null".into(),
-                ));
+                return Err(MacacaError::Driver("Tool execution returned null".into()));
             }
 
             let result_res = CStr::from_ptr(result_ptr)
@@ -446,10 +417,7 @@ impl Tool for DynamicTool {
             }
 
             // Trampoline callback: pure extern "C" fn, routes events via user_data
-            unsafe extern "C" fn trampoline(
-                event_json: *const c_char,
-                user_data: *mut c_void,
-            ) {
+            unsafe extern "C" fn trampoline(event_json: *const c_char, user_data: *mut c_void) {
                 if event_json.is_null() || user_data.is_null() {
                     return;
                 }
@@ -473,15 +441,17 @@ impl Tool for DynamicTool {
                 }
             }
 
-            let tool_name_c = CString::new(tool_name.as_str()).map_err(|e| {
-                MacacaError::Driver(format!("Tool name contains null byte: {}", e))
-            })?;
+            let tool_name_c = CString::new(tool_name.as_str())
+                .map_err(|e| MacacaError::Driver(format!("Tool name contains null byte: {}", e)))?;
             let input_c = CString::new(input_json.as_str()).map_err(|e| {
                 MacacaError::Driver(format!("Input JSON contains null byte: {}", e))
             })?;
 
             // user_data points to TrampolineCtx, which lives for the duration of this closure
-            let tramp_ctx = TrampolineCtx { tx: event_tx, driver_name };
+            let tramp_ctx = TrampolineCtx {
+                tx: event_tx,
+                driver_name,
+            };
             let user_data = &tramp_ctx as *const TrampolineCtx as *mut c_void;
 
             unsafe {
@@ -502,15 +472,12 @@ impl Tool for DynamicTool {
                 let result_res = CStr::from_ptr(result_ptr)
                     .to_str()
                     .map(|s| s.to_owned())
-                    .map_err(|e| {
-                        MacacaError::Driver(format!("Invalid UTF-8 in result: {}", e))
-                    });
+                    .map_err(|e| MacacaError::Driver(format!("Invalid UTF-8 in result: {}", e)));
                 (ctx.fn_free_string)(result_ptr); // always free, even on UTF-8 error
                 let result_str = result_res?;
 
-                let result: ToolResultAbi = serde_json::from_str(&result_str).map_err(|e| {
-                    MacacaError::Driver(format!("Invalid result JSON: {}", e))
-                })?;
+                let result: ToolResultAbi = serde_json::from_str(&result_str)
+                    .map_err(|e| MacacaError::Driver(format!("Invalid result JSON: {}", e)))?;
 
                 if result.success {
                     Ok(result.output.unwrap_or(Value::Null))

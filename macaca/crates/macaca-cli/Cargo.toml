@@ -12,6 +12,7 @@ macaca-proto = { workspace = true }
 macaca-kernel = { workspace = true }
 macaca-llm = { workspace = true }
 macaca-agent = { workspace = true }
+macaca-app = { workspace = true }
 macaca-tools = { workspace = true }
 macaca-gateway = { workspace = true }
 tokio = { workspace = true }

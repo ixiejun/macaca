@@ -29,7 +29,6 @@ pub struct TraceEvent {
     pub correlation_id: Option<String>,
 
     // --- Generic semantic fields ---
-
     /// Title/summary (main heading for frontend rendering)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,

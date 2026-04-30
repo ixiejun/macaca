@@ -14,7 +14,7 @@ use chrono::Utc;
 use serde::Deserialize;
 use tokio::sync::RwLock;
 
-use macaca_app::AppLoader;
+use macaca_app::{app_entry_agent_name_or, AppLoader};
 use macaca_framework::execution::ExecutionContext;
 use macaca_framework::session::{load_module_state, save_module_state};
 use macaca_kernel::AgentInfo;
@@ -23,7 +23,10 @@ use macaca_proto::ApplicationId;
 
 use crate::event_persistence::spawn_session_event_collector;
 use crate::routes::{default_model, err, ErrorResponse};
-use crate::session::{AgentTraceCollector, SessionMeta, StoredSession, StoredTurn, APP_SESSIONS_PREFIX, SESSION_PREFIX};
+use crate::session::{
+    AgentTraceCollector, SessionMeta, StoredSession, StoredTurn, APP_SESSIONS_PREFIX,
+    SESSION_PREFIX,
+};
 use crate::sse::convert_executor_event_to_sse;
 use crate::state::AppState;
 
@@ -311,7 +314,7 @@ pub(crate) async fn post_chat_v2(
         let registry = state.registry.read().await;
         registry
             .get_app(&app_id)
-            .and_then(|a| a.manifest.entry_agent.clone())
+            .map(|app| app_entry_agent_name_or(&app.manifest, "coordinator"))
             .unwrap_or_else(|| "coordinator".to_string())
     };
 
@@ -648,7 +651,10 @@ pub(crate) async fn post_chat_v2(
                         }
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                        tracing::warn!("Executor event forwarder lagged by {} messages, continuing", n);
+                        tracing::warn!(
+                            "Executor event forwarder lagged by {} messages, continuing",
+                            n
+                        );
                         continue;
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Closed) => break,

@@ -10,11 +10,11 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
-use axum::response::sse::Event;
 use async_trait::async_trait;
+use axum::response::sse::Event;
 use tokio::{fs, process::Command, time::timeout};
 
-use macaca_app::AppLoader;
+use macaca_app::{app_agent_manifest_view, discovered_app_agent_names};
 use macaca_framework::adapter::{SingleToolAdapter, ToolSetBridge};
 use macaca_framework::execution::ExecutionContext;
 use macaca_framework::session::{load_module_state, save_module_state};
@@ -22,8 +22,8 @@ use macaca_framework::tool::Toolkit;
 use macaca_proto::ApplicationId;
 
 use crate::mcp_runtime::{
-    definitions_from_skill_snapshot, McpRuntimeContext, McpRuntimeStatus, McpRuntimeStatusState,
-    McpDefinitionSource, McpRegistryConfig, McpServerDefinition, McpToolPolicy,
+    definitions_from_skill_snapshot, McpDefinitionSource, McpRegistryConfig, McpRuntimeContext,
+    McpRuntimeStatus, McpRuntimeStatusState, McpServerDefinition, McpToolPolicy,
 };
 use crate::state::AppState;
 
@@ -70,10 +70,7 @@ pub(crate) async fn build_toolkit(
     {
         let driver_tools = state.driver_registry.aggregate_tools().await;
         for tool in driver_tools {
-            toolkit.register(
-                Box::new(SingleToolAdapter::new(tool)),
-                None,
-            );
+            toolkit.register(Box::new(SingleToolAdapter::new(tool)), None);
         }
     }
 
@@ -177,11 +174,17 @@ pub(crate) async fn build_toolkit(
         .await;
     emit_mcp_runtime_events(state, session_id.as_deref(), agent_name, &mcp_statuses).await;
 
-    if let Some(snapshot) =
-        crate::skill_mcp::load_or_build_skill_snapshot(state, app_id, agent_name, session_id.as_deref()).await
+    if let Some(snapshot) = crate::skill_mcp::load_or_build_skill_snapshot(
+        state,
+        app_id,
+        agent_name,
+        session_id.as_deref(),
+    )
+    .await
     {
         let skill_definitions = definitions_from_skill_snapshot(&snapshot);
-        emit_mcp_starting_events(state, session_id.as_deref(), agent_name, &skill_definitions).await;
+        emit_mcp_starting_events(state, session_id.as_deref(), agent_name, &skill_definitions)
+            .await;
         let skill_statuses = state
             .mcp_runtime
             .register_definitions(
@@ -192,7 +195,8 @@ pub(crate) async fn build_toolkit(
                 close_emitter,
             )
             .await;
-        emit_skill_mcp_alias_events(state, session_id.as_deref(), agent_name, &skill_statuses).await;
+        emit_skill_mcp_alias_events(state, session_id.as_deref(), agent_name, &skill_statuses)
+            .await;
         emit_mcp_runtime_events(state, session_id.as_deref(), agent_name, &skill_statuses).await;
     }
 
@@ -309,13 +313,27 @@ async fn emit_mcp_runtime_events(
             "failure_reason": status.failure_reason,
         });
 
-        emit_mcp_event(state, session_id, &sse_tx, "mcp_server_resolved", agent_name, &payload)
-            .await;
+        emit_mcp_event(
+            state,
+            session_id,
+            &sse_tx,
+            "mcp_server_resolved",
+            agent_name,
+            &payload,
+        )
+        .await;
 
         match status.state {
             McpRuntimeStatusState::Ready => {
-                emit_mcp_event(state, session_id, &sse_tx, "mcp_server_ready", agent_name, &payload)
-                    .await;
+                emit_mcp_event(
+                    state,
+                    session_id,
+                    &sse_tx,
+                    "mcp_server_ready",
+                    agent_name,
+                    &payload,
+                )
+                .await;
                 if !status.exposed_tools.is_empty() {
                     emit_mcp_event(
                         state,
@@ -460,8 +478,8 @@ async fn app_agent_names(state: &Arc<AppState>, app_id: &ApplicationId) -> Optio
         registry.get_app(app_id).cloned()
     }?;
 
-    match AppLoader::resolve_agent_configs(&app.manifest, &app.path) {
-        Ok(configs) => Some(configs.into_iter().map(|config| config.name).collect()),
+    match discovered_app_agent_names(&app) {
+        Ok(agent_names) => Some(agent_names.into_iter().collect()),
         Err(error) => {
             tracing::warn!(
                 app_id = %app_id,
@@ -483,17 +501,23 @@ async fn resolve_tool_policy(
         .as_ref()
         .map(|m| m.capabilities.iter().map(|c| c.name.clone()).collect())
         .unwrap_or_default();
-    let base_allowed_tools = manifest.as_ref().and_then(|m| {
-        (!m.permission.allowed_tools.is_empty())
-            .then_some(m.permission.allowed_tools.iter().cloned().collect())
-    });
-    let is_entry_agent = {
+    let (manifest_allowed_tools, is_entry_agent) = {
         let registry = state.registry.read().await;
         registry
             .get_app(app_id)
-            .and_then(|app| app.manifest.entry_agent.clone())
-            .is_some_and(|entry| entry == agent_name)
+            .and_then(|app| app_agent_manifest_view(&app.manifest, agent_name))
+            .map(|agent| (Some(agent.allowed_tools().to_vec()), agent.is_entry_agent()))
+            .unwrap_or((None, false))
     };
+    let base_allowed_tools = manifest_allowed_tools
+        .and_then(|allowed_tools| (!allowed_tools.is_empty()).then_some(allowed_tools))
+        .map(|allowed_tools| allowed_tools.into_iter().collect())
+        .or_else(|| {
+            manifest.as_ref().and_then(|m| {
+                (!m.permission.allowed_tools.is_empty())
+                    .then_some(m.permission.allowed_tools.iter().cloned().collect())
+            })
+        });
     // Capability-driven policy (preferred):
     // - todo_goal_management: can create/check goals
     // - task_planning / todo_planning: can create/review/reassign todos

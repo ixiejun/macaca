@@ -320,14 +320,12 @@ async fn claude_code_driver_lifecycle() {
 /// Verify execute tool validates parameters.
 #[tokio::test]
 #[ignore = "claude-code driver moved to external plugin"]
-async fn claude_code_execute_validates_params() {
-}
+async fn claude_code_execute_validates_params() {}
 
 /// Verify status tool returns a result even if claude is not installed.
 #[tokio::test]
 #[ignore = "claude-code driver moved to external plugin"]
-async fn claude_code_status_graceful() {
-}
+async fn claude_code_status_graceful() {}
 
 // ---------------------------------------------------------------------------
 // E2E Test (requires real Claude Code CLI)

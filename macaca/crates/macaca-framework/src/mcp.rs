@@ -399,9 +399,12 @@ impl McpClient for StdioMcpClient {
         if !self.connected {
             return Err(McpError::NotConnected);
         }
-        let result = timeout(self.timeouts.list_tools, self.send_request("tools/list", None))
-            .await
-            .map_err(|_| McpError::Timeout)??;
+        let result = timeout(
+            self.timeouts.list_tools,
+            self.send_request("tools/list", None),
+        )
+        .await
+        .map_err(|_| McpError::Timeout)??;
         let tools_value = result.get("tools").cloned().unwrap_or(Value::Array(vec![]));
         let tools: Vec<McpToolDef> =
             serde_json::from_value(tools_value).map_err(|e| McpError::Protocol(e.to_string()))?;
@@ -921,13 +924,9 @@ pub async fn register_mcp_tools(
     client: Arc<tokio::sync::RwLock<dyn McpClient>>,
     group_name: &str,
 ) -> Result<(), McpError> {
-    register_mcp_tools_with_options(
-        toolkit,
-        client,
-        McpToolRegistrationOptions::new(group_name),
-    )
-    .await
-    .map(|_| ())
+    register_mcp_tools_with_options(toolkit, client, McpToolRegistrationOptions::new(group_name))
+        .await
+        .map(|_| ())
 }
 
 /// Register all tools from an MCP client with explicit registration options.
@@ -969,12 +968,11 @@ pub async fn register_mcp_tools_with_options(
         {
             continue;
         }
-        let handler =
-            McpToolHandler::with_registered_name(
-                Arc::clone(&client),
-                tool_def,
-                registered_name.clone(),
-            );
+        let handler = McpToolHandler::with_registered_name(
+            Arc::clone(&client),
+            tool_def,
+            registered_name.clone(),
+        );
         toolkit.register(Box::new(handler), Some(&options.group_name));
         registered_names.push(registered_name);
     }

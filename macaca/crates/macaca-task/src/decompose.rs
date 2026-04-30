@@ -5,7 +5,11 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use macaca_proto::types::{LlmMessage, LlmOptions};
-use macaca_proto::{MacacaResult, Task, TaskId, TaskRequest};
+use macaca_proto::{
+    ApplicationPlanningAgentProfile as AppPlanningAgentProfile,
+    ApplicationTaskPlanningContract as AppTaskPlanningContract, MacacaResult, Task, TaskId,
+    TaskRequest,
+};
 
 /// Trait for breaking a high-level task into sub-task requests.
 /// Implementations may call an LLM or apply heuristic rules.
@@ -67,39 +71,18 @@ impl LlmDecomposer {
         goal: &str,
         available_agents: &[String],
     ) -> Result<Vec<DecomposedTask>, String> {
-        let agents_list = available_agents.join(", ");
-        let prompt = format!(
-            r#"You are a project planning agent. Decompose the following goal into 3-7 executable sub-tasks.
+        let contract = legacy_planning_contract(available_agents);
+        self.decompose_for_contract(goal, &contract).await
+    }
 
-Goal: {goal}
-
-Available agents: {agents_list}
-
-Output a JSON array of tasks. Each task should have:
-- "title": short task title
-- "description": detailed description of what to do
-- "assigned_agent": which agent should do this (must be one of the available agents)
-- "priority": 1-10 (10 = highest)
-- "sequence": execution order within this agent (1 = first task for this agent, 2 = second, etc.)
-- "acceptance_criteria": array of verification criteria
-- "depends_on_titles": array of task titles this depends on (empty if no dependencies)
-- "depends_on_agents": array of cross-agent dependencies, each is an object with:
-  - "type": "all_tasks" (wait for ALL tasks of that agent) or "specific_task" (wait for one task)
-  - "agent": agent name to depend on
-  - "title": (only for specific_task) the task title to depend on
-
-Rules:
-- Tasks should be ordered logically
-- Architecture/design tasks should come first with sequence 1, 2, etc.
-- Implementation tasks should depend on design agents using depends_on_agents
-- Testing tasks should depend on implementation tasks
-- Each task should be completable by a single agent
-- Use ONLY the available agents listed above
-- The "sequence" field determines execution order WITHIN each agent (1 runs first, then 2, etc.)
-- Use "depends_on_agents" to express CROSS-AGENT ordering (e.g., frontend waits for architect)
-
-Respond with ONLY a JSON array, no other text."#
-        );
+    /// Decompose using an application-level planning contract.
+    pub async fn decompose_for_contract(
+        &self,
+        goal: &str,
+        contract: &AppTaskPlanningContract,
+    ) -> Result<Vec<DecomposedTask>, String> {
+        let prompt = build_decomposition_prompt(goal, contract);
+        let available_agents = contract.available_agent_names();
 
         let messages = vec![LlmMessage::user(&prompt)];
         let options = LlmOptions {
@@ -165,7 +148,22 @@ Respond with ONLY a JSON array, no other text."#
         available_agents: &[String],
         space: &crate::todo_board::TaskSpace,
     ) -> Result<Vec<macaca_proto::types::TodoItem>, String> {
-        let mut decomposed = self.decompose(goal, available_agents).await?;
+        let contract = legacy_planning_contract(available_agents);
+        self.decompose_into_space_for_contract(goal, goal_id, &contract, space)
+            .await
+    }
+
+    /// Decompose and create tasks in a TaskSpace using an application-level
+    /// planning contract, resolving dependency references at creation time.
+    pub async fn decompose_into_space_for_contract(
+        &self,
+        goal: &str,
+        goal_id: &TaskId,
+        contract: &AppTaskPlanningContract,
+        space: &crate::todo_board::TaskSpace,
+    ) -> Result<Vec<macaca_proto::types::TodoItem>, String> {
+        let available_agents = contract.available_agent_names();
+        let mut decomposed = self.decompose_for_contract(goal, contract).await?;
 
         // Sort by sequence within each agent to ensure correct ordering
         decomposed.sort_by_key(|t| t.sequence);
@@ -244,6 +242,65 @@ Respond with ONLY a JSON array, no other text."#
 
         Ok(created_items)
     }
+}
+
+fn legacy_planning_contract(available_agents: &[String]) -> AppTaskPlanningContract {
+    AppTaskPlanningContract {
+        workflow_name: "default".into(),
+        entry_agent: "entry_agent".into(),
+        worker_agents: available_agents
+            .iter()
+            .cloned()
+            .map(AppPlanningAgentProfile::legacy)
+            .collect(),
+    }
+}
+
+/// Build the canonical decomposition prompt from an application planning
+/// contract. Runtime callers should supply a contract derived from
+/// `macaca-app` instead of reconstructing planner prompt rules ad hoc.
+pub fn build_decomposition_prompt(goal: &str, contract: &AppTaskPlanningContract) -> String {
+    let agents_list = if contract.worker_agents.is_empty() {
+        "no worker agents registered".to_string()
+    } else {
+        contract.available_agent_names().join(", ")
+    };
+    let agents_profile_text = contract.render_agent_profiles();
+
+    format!(
+        "A new project goal has been submitted under workflow `{}`. You MUST decompose it into \
+         concrete tasks. Prefer one `create_todos` tool call with the full task graph; \
+         use `create_todo` only as a fallback for a single additional task.\n\n\
+         Goal: {}\n\n\
+         Available agents: {}.\n\
+         Agent dossiers:\n{}\n\n\
+         IMPORTANT ASSIGNMENT CONTRACT:\n\
+         - The `agent` you pass to `create_todo` is authoritative; the system will NOT automatically reroute it.\n\
+         - You must choose the correct worker agent from the dossiers above.\n\
+         - If the acceptance criteria require working code, files, APIs, UI, tests, or runnable behavior, assign to an implementation-capable agent rather than a design/spec-only agent.\n\
+         - Use design/spec agents for architecture, interfaces, data contracts, risk analysis, and handoff documents only.\n\
+         - If a task has both design and implementation work, split it into separate dependent tasks.\n\n\
+         INSTRUCTIONS:\n\
+         1. Briefly analyze the goal (1-2 sentences).\n\
+         2. Call `create_todos` once with ALL tasks whenever possible — you MUST create at least one task.\n\
+         3. Set priorities (0-10) and acceptance_criteria for each task.\n\
+         4. Assign each task to the MOST CAPABLE agent based on the dossiers above; use the exact agent name.\n\
+         5. Create foundational design/spec tasks first, then implementation tasks.\n\
+         6. If a foundational design/spec task is needed, assign it to an agent whose capability profile includes architecture/design/spec/interface/analysis when such a profile exists.\n\
+         7. Do not assign design/spec work to implementation agents solely because the task mentions API, backend, or frontend; choose the strongest capability profile.\n\
+         8. Use dependencies explicitly:\n\
+            - depends_on: known task IDs\n\
+            - depends_on_titles: task titles already created in this decomposition\n\
+            - depends_on_agents: symbolic cross-agent dependencies (all_tasks/specific_task)\n\
+         9. Do NOT create duplicate tasks with the same title and agent.\n\
+         10. Do NOT just describe tasks in text — you MUST invoke `create_todos` or `create_todo`.\n\
+         11. After creating the complete task chain, stop calling tools and reply exactly with: DECOMPOSITION_COMPLETE.\n\n\
+         Start by creating the complete task graph now.",
+        contract.workflow_name,
+        goal,
+        agents_list,
+        agents_profile_text,
+    )
 }
 
 #[cfg(test)]
@@ -329,5 +386,29 @@ mod tests {
     fn parse_llm_output_invalid_json_returns_error() {
         let result = LlmDecomposer::parse_llm_output("not valid json");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn decomposition_prompt_uses_contract_rendering() {
+        let prompt = build_decomposition_prompt(
+            "Build a weather app",
+            &AppTaskPlanningContract {
+                workflow_name: "default".into(),
+                entry_agent: "coordinator".into(),
+                worker_agents: vec![AppPlanningAgentProfile {
+                    name: "backend".into(),
+                    capabilities: vec!["api: implement backend endpoints".into()],
+                    available: true,
+                    current_load: 0,
+                    max_load: 2,
+                    permission_level: "system".into(),
+                    model: "mock".into(),
+                    allowed_tools: vec!["claude_code_execute".into()],
+                }],
+            },
+        );
+        assert!(prompt.contains("workflow `default`"));
+        assert!(prompt.contains("Agent `backend`"));
+        assert!(prompt.contains("api: implement backend endpoints"));
     }
 }

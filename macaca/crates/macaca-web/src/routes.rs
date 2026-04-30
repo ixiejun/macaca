@@ -17,7 +17,7 @@ use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::Json;
 use serde::{Deserialize, Serialize};
 
-use macaca_app::AppLoader;
+use macaca_app::{app_entry_agent_name as manifest_entry_agent_name, AppLoader};
 use macaca_proto::ApplicationId;
 use macaca_skill::{SkillPolicy, SkillRuntime, SkillRuntimeOptions};
 
@@ -68,7 +68,7 @@ async fn app_entry_agent_name(state: &Arc<AppState>, app_id: &ApplicationId) -> 
     let registry = state.registry.read().await;
     registry
         .get_app(app_id)
-        .and_then(|app| app.manifest.entry_agent.clone())
+        .and_then(|app| manifest_entry_agent_name(&app.manifest).map(str::to_string))
 }
 
 fn entry_agent_activity_override(

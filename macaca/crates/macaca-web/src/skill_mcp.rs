@@ -249,9 +249,7 @@ fn launch_from_runtime_server_id(
 ) -> Option<SkillMcpServerLaunch> {
     resolve_skill_mcp_servers(snapshot)
         .into_iter()
-        .find(|launch| {
-            server_id == format!("skill:{}:{}", launch.skill_name, launch.server_id)
-        })
+        .find(|launch| server_id == format!("skill:{}:{}", launch.skill_name, launch.server_id))
 }
 
 #[cfg(test)]

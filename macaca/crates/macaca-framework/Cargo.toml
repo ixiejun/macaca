@@ -35,6 +35,7 @@ axum = { version = "0.8", optional = true }
 
 # Macaca ecosystem
 macaca-proto = { path = "../macaca-proto" }
+macaca-agent = { path = "../macaca-agent" }
 macaca-persist = { path = "../macaca-persist", optional = true }
 macaca-llm = { path = "../macaca-llm", optional = true }
 macaca-tools = { path = "../macaca-tools", optional = true }

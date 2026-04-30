@@ -15,6 +15,7 @@ pub mod a2a;
 #[cfg(feature = "macaca-compat")]
 pub mod adapter;
 pub mod agent;
+pub mod construction;
 pub mod execution;
 pub mod formatter;
 pub mod mcp;

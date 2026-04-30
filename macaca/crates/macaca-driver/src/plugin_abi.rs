@@ -51,10 +51,8 @@ pub type FnDriverFreeString = unsafe extern "C" fn(s: *mut c_char);
 /// Plugins call this callback during tool execution to push `TraceEvent`s.
 /// - `event_json`: JSON-serialized `TraceEvent` string (allocated by plugin, freed by plugin after callback returns)
 /// - `user_data`: opaque pointer passed by the host to route events to the correct channel
-pub type FnTraceEventCallback = unsafe extern "C" fn(
-    event_json: *const c_char,
-    user_data: *mut c_void,
-);
+pub type FnTraceEventCallback =
+    unsafe extern "C" fn(event_json: *const c_char, user_data: *mut c_void);
 
 /// Streaming tool execution — pushes `TraceEvent`s via callback during execution,
 /// then returns the final `ToolResultAbi` JSON (same format as `FnDriverExecuteTool`).

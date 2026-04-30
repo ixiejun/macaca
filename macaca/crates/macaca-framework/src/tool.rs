@@ -315,7 +315,10 @@ impl Toolkit {
 
     /// Set the event channel for streaming tool execution.
     #[cfg(feature = "macaca-compat")]
-    pub fn set_event_tx(&mut self, tx: tokio::sync::mpsc::UnboundedSender<macaca_tools::TraceEvent>) {
+    pub fn set_event_tx(
+        &mut self,
+        tx: tokio::sync::mpsc::UnboundedSender<macaca_tools::TraceEvent>,
+    ) {
         self.event_tx = Some(tx);
     }
 
@@ -397,7 +400,8 @@ impl Toolkit {
         // 5. Execute handler (streaming when event_tx is available).
         #[cfg(feature = "macaca-compat")]
         let mut response = {
-            registered.handler
+            registered
+                .handler
                 .execute_streaming(effective_args, self.event_tx.clone())
                 .await?
         };

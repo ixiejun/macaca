@@ -295,10 +295,9 @@ impl AgentTraceCollector {
                         content: Some(content.clone()),
                         ..Default::default()
                     },
-                    macaca_proto::AgentExecutionEvent::DriverTrace {
-                        driver_name,
-                        trace,
-                    } => driver_trace_step(Some(driver_name.clone()), trace),
+                    macaca_proto::AgentExecutionEvent::DriverTrace { driver_name, trace } => {
+                        driver_trace_step(Some(driver_name.clone()), trace)
+                    }
                     macaca_proto::AgentExecutionEvent::Completed { success, error } => {
                         AgentTraceStep {
                             step_type: "completed".to_string(),

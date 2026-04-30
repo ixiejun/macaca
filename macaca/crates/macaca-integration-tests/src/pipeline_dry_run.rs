@@ -106,7 +106,9 @@ fn format_agent_event(ev: &AgentExecutionEvent) -> String {
                 content.chars().take(120).collect::<String>()
             )
         }
-        AgentExecutionEvent::DriverTrace { driver_name, .. } => format!("driver_trace | {driver_name} | {ev:?}"),
+        AgentExecutionEvent::DriverTrace { driver_name, .. } => {
+            format!("driver_trace | {driver_name} | {ev:?}")
+        }
         AgentExecutionEvent::Completed { success, error } => {
             format!("completed | success={success} | error={error:?}")
         }

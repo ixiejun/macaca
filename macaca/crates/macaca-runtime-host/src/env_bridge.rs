@@ -171,10 +171,7 @@ mod tests {
             "MCP_TEST_LITERAL_EXPORT".into(),
             "figd_exported_via_apply".into(),
         );
-        env.insert(
-            "MCP_TEST_PLACEHOLDER_SKIP".into(),
-            "YOUR_TOKEN_HERE".into(),
-        );
+        env.insert("MCP_TEST_PLACEHOLDER_SKIP".into(), "YOUR_TOKEN_HERE".into());
 
         let outcomes = apply_mcp_env(&env);
 
@@ -201,10 +198,7 @@ mod tests {
         std::env::set_var("MCP_TEST_SRC_PRESENT", "real-value-from-shell");
 
         let mut env = HashMap::new();
-        env.insert(
-            "MCP_TEST_DST_PRESENT".into(),
-            "MCP_TEST_SRC_PRESENT".into(),
-        );
+        env.insert("MCP_TEST_DST_PRESENT".into(), "MCP_TEST_SRC_PRESENT".into());
 
         let outcomes = apply_mcp_env(&env);
         assert_eq!(
@@ -226,10 +220,7 @@ mod tests {
         std::env::remove_var("MCP_TEST_SRC_MISSING");
 
         let mut env = HashMap::new();
-        env.insert(
-            "MCP_TEST_DST_MISSING".into(),
-            "MCP_TEST_SRC_MISSING".into(),
-        );
+        env.insert("MCP_TEST_DST_MISSING".into(), "MCP_TEST_SRC_MISSING".into());
 
         let outcomes = apply_mcp_env(&env);
         assert_eq!(
@@ -245,10 +236,7 @@ mod tests {
         // convention so downstream MCP servers (e.g. figma-developer-mcp
         // expecting FIGMA_API_KEY) find the variable.
         let mut env = HashMap::new();
-        env.insert(
-            "mcp_test_lowercase_input".into(),
-            "literal-value-99".into(),
-        );
+        env.insert("mcp_test_lowercase_input".into(), "literal-value-99".into());
 
         let outcomes = apply_mcp_env(&env);
         assert_eq!(

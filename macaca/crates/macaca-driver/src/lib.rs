@@ -14,9 +14,9 @@ pub mod sdk;
 pub mod toolset;
 
 pub use driver::{DriverManifest, DriverType, SoftwareDriver};
-pub use macaca_tools::TraceEvent;
 pub use dynamic_driver::DynamicDriver;
 pub use loader::DriverLoader;
+pub use macaca_tools::TraceEvent;
 pub use registry::DriverRegistry;
 
 /// A generic `Send` wrapper for closures that capture FFI raw pointers.
@@ -31,6 +31,8 @@ pub struct SendableFn<F>(pub F);
 unsafe impl<F> Send for SendableFn<F> {}
 impl<F: FnOnce()> SendableFn<F> {
     /// Consume the wrapper and call the inner closure.
-    pub fn call(self) { (self.0)() }
+    pub fn call(self) {
+        (self.0)()
+    }
 }
 pub use toolset::DriverToolSet;
