@@ -57,6 +57,7 @@
 
 ## 文档索引
 
+- [渐进式重构顺序表](refactor-order.md)
 - [macaca-agent](macaca-agent.md)
 - [macaca-app](macaca-app.md)
 - [macaca-cli](macaca-cli.md)
@@ -81,4 +82,3 @@
 ## GitNexus 状态说明
 
 本轮曾按项目要求尝试运行 `npx gitnexus analyze` 刷新索引，但命令长时间停留在 npm 安装阶段，超过数分钟无有效分析进度后已中止。以下文档基于源码结构扫描、现有图谱概览和重点模块阅读形成。后续进入代码实现阶段前，仍需要按 `AGENTS.md` 要求重新刷新 GitNexus，并对将要修改的具体 symbol 逐一运行 impact analysis。
-
