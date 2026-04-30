@@ -7,6 +7,10 @@ use macaca_proto::{
 };
 use macaca_tools::ToolSet;
 
+static NOOP_MEMORY_SERVICE: NoopMemoryService = NoopMemoryService;
+static NOOP_IPC_SERVICE: NoopIpcService = NoopIpcService;
+static NOOP_PERSIST_SERVICE: NoopPersistService = NoopPersistService;
+
 // ── Service injection traits ──────────────────────────────────────────────────
 
 /// Stores and retrieves memories for an agent.
@@ -34,6 +38,44 @@ pub trait PersistService: Send + Sync {
     async fn load(&self, key: &str) -> MacacaResult<Option<Vec<u8>>>;
 }
 
+/// Default no-op memory service used when no memory backend is attached.
+pub struct NoopMemoryService;
+
+#[async_trait]
+impl MemoryService for NoopMemoryService {
+    async fn store(&self, _entry: MemoryEntry) -> MacacaResult<MemoryId> {
+        Ok(MemoryId::new())
+    }
+
+    async fn retrieve(&self, _query: &str, _limit: usize) -> MacacaResult<Vec<MemoryEntry>> {
+        Ok(Vec::new())
+    }
+}
+
+/// Default no-op IPC service used when no IPC backend is attached.
+pub struct NoopIpcService;
+
+#[async_trait]
+impl IpcService for NoopIpcService {
+    async fn send(&self, _msg: IpcMessage) -> MacacaResult<()> {
+        Ok(())
+    }
+}
+
+/// Default no-op persist service used when no persistence backend is attached.
+pub struct NoopPersistService;
+
+#[async_trait]
+impl PersistService for NoopPersistService {
+    async fn save(&self, _key: &str, _data: &[u8]) -> MacacaResult<()> {
+        Ok(())
+    }
+
+    async fn load(&self, _key: &str) -> MacacaResult<Option<Vec<u8>>> {
+        Ok(None)
+    }
+}
+
 // ── AgentServices ─────────────────────────────────────────────────────────────
 
 /// Optional kernel-provided services injected into an agent at run time.
@@ -51,6 +93,27 @@ impl AgentServices {
             ipc: None,
             persist: None,
         }
+    }
+
+    /// Return the configured memory service or a no-op fallback.
+    pub fn memory_service(&self) -> &dyn MemoryService {
+        self.memory.as_deref().unwrap_or(&NOOP_MEMORY_SERVICE)
+    }
+
+    /// Return the configured IPC service or a no-op fallback.
+    pub fn ipc_service(&self) -> &dyn IpcService {
+        self.ipc.as_deref().unwrap_or(&NOOP_IPC_SERVICE)
+    }
+
+    /// Return the configured persistence service or a no-op fallback.
+    pub fn persist_service(&self) -> &dyn PersistService {
+        self.persist.as_deref().unwrap_or(&NOOP_PERSIST_SERVICE)
+    }
+}
+
+impl Default for AgentServices {
+    fn default() -> Self {
+        Self::empty()
     }
 }
 
@@ -75,4 +138,47 @@ pub trait Agent: Send + Sync {
         tools: &dyn ToolSet,
         services: &AgentServices,
     ) -> MacacaResult<AgentOutput>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use macaca_proto::{AgentId, MemoryLayer, MessageId};
+
+    #[tokio::test]
+    async fn empty_services_use_noop_fallbacks() {
+        let services = AgentServices::empty();
+
+        let memory_id = services
+            .memory_service()
+            .store(MemoryEntry {
+                id: MemoryId::new(),
+                layer: MemoryLayer::Session,
+                content: "noop".into(),
+                metadata: serde_json::json!({}),
+                agent_id: None,
+                created_at: chrono::Utc::now(),
+                expires_at: None,
+            })
+            .await
+            .unwrap();
+        let memories = services.memory_service().retrieve("noop", 5).await.unwrap();
+        let persist = services.persist_service().load("missing").await.unwrap();
+        services
+            .ipc_service()
+            .send(IpcMessage {
+                id: MessageId::new(),
+                from: AgentId::new(),
+                to: Some(AgentId::new()),
+                topic: "noop".into(),
+                payload: serde_json::json!({ "kind": "noop" }),
+                timestamp: chrono::Utc::now(),
+            })
+            .await
+            .unwrap();
+
+        assert_ne!(memory_id, MemoryId::default());
+        assert!(memories.is_empty());
+        assert!(persist.is_none());
+    }
 }

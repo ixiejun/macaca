@@ -1327,6 +1327,7 @@ name = "macaca-agent"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "chrono",
  "macaca-llm",
  "macaca-proto",
  "macaca-tools",
