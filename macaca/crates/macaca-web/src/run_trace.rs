@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 
-use macaca_persist::EventLog;
+use macaca_persist::{AppendEventCommand, EventLog};
 use macaca_proto::{ApplicationId, RunTracePayload};
 use serde_json::json;
 
@@ -127,7 +127,12 @@ impl RunTracer {
         };
         let v = serde_json::to_value(&payload).unwrap_or_else(|_| json!({}));
         self.log
-            .append(session_id, "run_trace", "run_tracer", v)
+            .append_command(AppendEventCommand::new(
+                session_id,
+                "run_trace",
+                "run_tracer",
+                v,
+            ))
             .await;
     }
 }

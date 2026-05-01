@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use macaca_proto::error::{MacacaError, MacacaResult};
 use redb::{Database, ReadableTable, TableDefinition};
 
-use crate::store::PersistStore;
+use crate::store::{PersistBackend, PersistStore};
 
 const TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("macaca_data");
 
@@ -34,6 +34,12 @@ impl RedbStore {
             .map_err(|e| MacacaError::Persist(e.to_string()))?;
 
         Ok(Self { db: Arc::new(db) })
+    }
+}
+
+impl PersistBackend for RedbStore {
+    fn backend_name(&self) -> &'static str {
+        "redb"
     }
 }
 

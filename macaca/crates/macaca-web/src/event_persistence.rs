@@ -10,7 +10,7 @@ use tokio::task::JoinHandle;
 
 use macaca_kernel::executor::app_executor::ApplicationExecutor;
 use macaca_kernel::executor::ExecutorEvent;
-use macaca_persist::EventLog;
+use macaca_persist::{AppendEventCommand, EventLog};
 
 use crate::proto_event_visitors::delegated_persisted_event_name;
 use crate::run_trace::{phase, status, RunTracer};
@@ -131,7 +131,12 @@ pub fn spawn_session_event_collector(
                     };
 
                     event_log
-                        .append(&session_id, evt_type, "executor", evt_payload)
+                        .append_command(AppendEventCommand::new(
+                            &session_id,
+                            evt_type,
+                            "executor",
+                            evt_payload,
+                        ))
                         .await;
 
                     match &event {

@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
 use macaca_kernel::executor::ExecutorEvent;
-use macaca_persist::{PersistStore, RedbStore};
+use macaca_persist::PersistStore;
 use macaca_proto::{AgentExecutionEventVisitor, ApplicationId, LlmMessage};
 
 use crate::routes::{err, ErrorResponse};
@@ -429,8 +429,8 @@ pub(crate) fn session_status_from_executor_event(event: &ExecutorEvent) -> Optio
     }
 }
 
-pub(crate) async fn persist_session_snapshot(
-    store: &Arc<RedbStore>,
+pub(crate) async fn persist_session_snapshot<S>(
+    store: &Arc<S>,
     session_id: &str,
     app_id: &ApplicationId,
     status: Option<&str>,
@@ -438,7 +438,9 @@ pub(crate) async fn persist_session_snapshot(
     trace_steps: Option<Vec<StoredTraceStep>>,
     agent_traces: Option<std::collections::HashMap<String, Vec<AgentTrace>>>,
     meta: Option<AssistantExecutionMeta>,
-) {
+) where
+    S: PersistStore + ?Sized,
+{
     // Acquire per-session write lock to prevent concurrent read-modify-write
     // from overwriting each other's data (e.g., periodic saver vs snapshot closure).
     // We use a simple approach: lock the session_key_db string as a file-level mutex.
@@ -609,11 +611,13 @@ pub(crate) const APP_SESSIONS_PREFIX: &str = "app_sessions/";
 pub(crate) const AGENT_TRACES_PREFIX: &str = "agent_traces/";
 
 /// Save agent traces to a dedicated key (simple overwrite, no read-modify-write).
-pub(crate) async fn save_agent_traces(
-    store: &Arc<RedbStore>,
+pub(crate) async fn save_agent_traces<S>(
+    store: &Arc<S>,
     session_id: &str,
     traces: std::collections::HashMap<String, Vec<AgentTrace>>,
-) {
+) where
+    S: PersistStore + ?Sized,
+{
     if traces.is_empty() {
         return;
     }
@@ -624,10 +628,13 @@ pub(crate) async fn save_agent_traces(
 }
 
 /// Load agent traces from the dedicated key.
-pub(crate) async fn load_agent_traces(
-    store: &Arc<RedbStore>,
+pub(crate) async fn load_agent_traces<S>(
+    store: &Arc<S>,
     session_id: &str,
-) -> std::collections::HashMap<String, Vec<AgentTrace>> {
+) -> std::collections::HashMap<String, Vec<AgentTrace>>
+where
+    S: PersistStore + ?Sized,
+{
     let key = format!("{}{}", AGENT_TRACES_PREFIX, session_id);
     match store.get(&key).await {
         Ok(Some(data)) => serde_json::from_slice(&data).unwrap_or_default(),
@@ -641,12 +648,14 @@ pub(crate) async fn load_agent_traces(
 
 /// Update session status in real-time based on ExecutorEvent.
 /// This is called during SSE streaming to keep session status up-to-date.
-pub(crate) async fn update_session_realtime(
-    store: &Arc<RedbStore>,
+pub(crate) async fn update_session_realtime<S>(
+    store: &Arc<S>,
     session_id: &str,
     app_id: &ApplicationId,
     event: &ExecutorEvent,
-) {
+) where
+    S: PersistStore + ?Sized,
+{
     let Some(status) = session_status_from_executor_event(event) else {
         return;
     };
@@ -905,7 +914,12 @@ pub(crate) async fn get_session_by_id(
     // which survives browser disconnects. This always overwrites any
     // stored turns' agent_traces since EventLog is the single source of truth.
     {
-        let events = state.persist.event_log.query(&session_id, 0, 10000).await;
+        let events: Vec<_> = state
+            .persist
+            .event_log
+            .replay(&session_id, 0, 10000)
+            .await
+            .collect();
         let mut agent_traces: std::collections::HashMap<String, Vec<AgentTrace>> =
             std::collections::HashMap::new();
         let mut task_to_agent: std::collections::HashMap<String, String> =

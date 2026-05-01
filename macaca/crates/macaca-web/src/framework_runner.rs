@@ -32,7 +32,7 @@ use macaca_framework::memory::InMemoryWorkingMemory;
 use macaca_framework::message::Msg;
 use macaca_framework::react_agent::ReActAgent;
 use macaca_framework::tool::{ToolError, ToolMiddleware, ToolResponse, Toolkit};
-use macaca_persist::EventLog;
+use macaca_persist::{AppendEventCommand, EventLog};
 use macaca_proto::{AgentState, ApplicationId, Capability};
 use macaca_runtime::agentic_loop::ResumeReason;
 use macaca_sdk::AgentPersona;
@@ -640,7 +640,7 @@ impl FrameworkRunner {
                     state
                         .persist
                         .event_log
-                        .append(
+                        .append_command(AppendEventCommand::new(
                             session_id,
                             "skill_catalog_built",
                             agent_name,
@@ -651,12 +651,12 @@ impl FrameworkRunner {
                                 "truncated": snapshot.truncated,
                                 "compact": snapshot.compact,
                             }),
-                        )
+                        ))
                         .await;
                     state
                         .persist
                         .event_log
-                        .append(
+                        .append_command(AppendEventCommand::new(
                             session_id,
                             "skill_snapshot_created",
                             agent_name,
@@ -672,7 +672,7 @@ impl FrameworkRunner {
                                 }).collect::<Vec<_>>(),
                                 "filtered": snapshot.filtered,
                             }),
-                        )
+                        ))
                         .await;
                 }
                 if !snapshot.prompt.trim().is_empty() {
@@ -951,7 +951,12 @@ impl WebTracedAgentFactory {
                     } => {
                         if let Some(sid) = session_id {
                             event_log
-                                .append(sid, "driver_trace", agent_name, trace_value.clone())
+                                .append_command(AppendEventCommand::new(
+                                    sid,
+                                    "driver_trace",
+                                    agent_name,
+                                    trace_value.clone(),
+                                ))
                                 .await;
                         }
                         let event = Event::default().event("driver_trace").data(
@@ -1132,14 +1137,14 @@ impl Hook for SseEmitterHook {
     async fn pre_reply(&self, msg: Msg) -> macaca_framework::agent::AgentResult<Msg> {
         if let (Some(event_log), Some(session_id)) = (&self.event_log, &self.session_id) {
             event_log
-                .append(
+                .append_command(AppendEventCommand::new(
                     session_id,
                     "thinking",
                     "coordinator",
                     serde_json::json!({
                         "iteration": 0,
                     }),
-                )
+                ))
                 .await;
         }
         let event = Event::default().event("thinking").data(
@@ -1156,17 +1161,17 @@ impl Hook for SseEmitterHook {
         let text = msg.get_text();
         if let (Some(event_log), Some(session_id)) = (&self.event_log, &self.session_id) {
             event_log
-                .append(
+                .append_command(AppendEventCommand::new(
                     session_id,
                     "content",
                     "coordinator",
                     serde_json::json!({
                         "content": text,
                     }),
-                )
+                ))
                 .await;
             event_log
-                .append(
+                .append_command(AppendEventCommand::new(
                     session_id,
                     "done",
                     "coordinator",
@@ -1176,7 +1181,7 @@ impl Hook for SseEmitterHook {
                         "iterations": 0,
                         "tools_used": [],
                     }),
-                )
+                ))
                 .await;
         }
         let content_event = Event::default().event("content").data(
@@ -1219,7 +1224,7 @@ impl ToolMiddleware for SseToolMiddleware {
     async fn before(&self, name: &str, args: &mut serde_json::Value) -> Result<(), ToolError> {
         if let (Some(event_log), Some(session_id)) = (&self.event_log, &self.session_id) {
             event_log
-                .append(
+                .append_command(AppendEventCommand::new(
                     session_id,
                     "tool_call",
                     &self.agent_name,
@@ -1227,13 +1232,13 @@ impl ToolMiddleware for SseToolMiddleware {
                         "tool_name": name,
                         "tool_input": args.clone(),
                     }),
-                )
+                ))
                 .await;
             if name == "file_read" {
                 if let Some(path) = args.get("path").and_then(|value| value.as_str()) {
                     if path.ends_with("SKILL.md") && path.contains("/skills/") {
                         event_log
-                            .append(
+                            .append_command(AppendEventCommand::new(
                                 session_id,
                                 "skill_file_read",
                                 &self.agent_name,
@@ -1241,7 +1246,7 @@ impl ToolMiddleware for SseToolMiddleware {
                                     "agent": self.agent_name,
                                     "path": path,
                                 }),
-                            )
+                            ))
                             .await;
                     }
                 }
@@ -1263,7 +1268,7 @@ impl ToolMiddleware for SseToolMiddleware {
 
         if let (Some(event_log), Some(session_id)) = (&self.event_log, &self.session_id) {
             event_log
-                .append(
+                .append_command(AppendEventCommand::new(
                     session_id,
                     "tool_result",
                     &self.agent_name,
@@ -1271,7 +1276,7 @@ impl ToolMiddleware for SseToolMiddleware {
                         "tool_name": name,
                         "output": display_result,
                     }),
-                )
+                ))
                 .await;
         }
 

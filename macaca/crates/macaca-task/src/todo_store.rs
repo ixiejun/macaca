@@ -10,7 +10,7 @@
 
 use std::sync::Arc;
 
-use macaca_persist::{PersistStore, RedbStore};
+use macaca_persist::PersistBackend;
 use macaca_proto::{ApplicationId, TaskId, TodoGoal, TodoGoalStatus, TodoItem, TodoStatus};
 
 /// Key prefixes for todo storage.
@@ -25,11 +25,14 @@ const GLOBAL_SESSION: &str = "_global_";
 /// Every status change is immediately persisted — no batching, no timers.
 /// This ensures any restart recovers the full task board state.
 pub struct TodoStore {
-    store: Arc<RedbStore>,
+    store: Arc<dyn PersistBackend>,
 }
 
 impl TodoStore {
-    pub fn new(store: Arc<RedbStore>) -> Self {
+    pub fn new<T>(store: Arc<T>) -> Self
+    where
+        T: PersistBackend + 'static,
+    {
         Self { store }
     }
 
@@ -363,6 +366,7 @@ impl TodoStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use macaca_persist::RedbStore;
     use tempfile::tempdir;
 
     async fn test_store() -> TodoStore {

@@ -7,7 +7,7 @@ use axum::response::sse::Event;
 use serde::{Deserialize, Serialize};
 
 use macaca_kernel::executor::ExecutorEvent;
-use macaca_persist::{PersistStore, RedbStore};
+use macaca_persist::{AppendEventCommand, PersistStore};
 use macaca_proto::ApplicationId;
 
 use crate::proto_event_visitors::delegated_sse_event_name;
@@ -27,11 +27,13 @@ pub(crate) struct PlanDecisionEvent {
 }
 
 /// Append a plan decision to its dedicated per-session key (read-append-write).
-pub(crate) async fn save_plan_decision(
-    store: &Arc<RedbStore>,
+pub(crate) async fn save_plan_decision<S>(
+    store: &Arc<S>,
     app_id: &ApplicationId,
     decision: PlanDecisionEvent,
-) {
+) where
+    S: PersistStore + ?Sized,
+{
     let key = format!("{}{}", PLAN_DECISIONS_PREFIX, app_id);
     let mut decisions: Vec<PlanDecisionEvent> = match store.get(&key).await {
         Ok(Some(data)) => serde_json::from_slice(&data).unwrap_or_default(),
@@ -44,10 +46,13 @@ pub(crate) async fn save_plan_decision(
 }
 
 /// Load all plan decisions for an application.
-pub(crate) async fn load_plan_decisions(
-    store: &Arc<RedbStore>,
+pub(crate) async fn load_plan_decisions<S>(
+    store: &Arc<S>,
     app_id: &ApplicationId,
-) -> Vec<PlanDecisionEvent> {
+) -> Vec<PlanDecisionEvent>
+where
+    S: PersistStore + ?Sized,
+{
     let key = format!("{}{}", PLAN_DECISIONS_PREFIX, app_id);
     match store.get(&key).await {
         Ok(Some(data)) => serde_json::from_slice(&data).unwrap_or_default(),
@@ -255,12 +260,12 @@ pub(crate) async fn broadcast_to_app_sessions(
         state
             .persist
             .event_log
-            .append(
+            .append_command(AppendEventCommand::new(
                 &session.session_id,
                 "plan_decision",
                 "plan_loop",
                 log_payload.clone(),
-            )
+            ))
             .await;
     }
     for session in &matching {

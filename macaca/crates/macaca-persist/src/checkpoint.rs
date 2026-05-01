@@ -7,6 +7,54 @@ use crate::store::PersistStore;
 
 const SNAPSHOT_PREFIX: &str = "snapshot/";
 
+/// Snapshot memento for restore-critical session persistence state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SessionSnapshot {
+    pub session_id: String,
+    pub last_event_cursor: u64,
+    pub checkpoint_key: Option<String>,
+    pub coordinator_resume_key: Option<String>,
+}
+
+/// Builder-style additive entry for constructing checkpoint saves.
+#[derive(Debug, Default, Clone)]
+pub struct CheckpointBuilder {
+    agent_id: Option<AgentId>,
+    state: Option<AgentManifest>,
+}
+
+#[derive(Debug, Clone)]
+pub struct CheckpointRecord {
+    pub agent_id: AgentId,
+    pub state: AgentManifest,
+}
+
+impl CheckpointBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn agent_id(mut self, agent_id: AgentId) -> Self {
+        self.agent_id = Some(agent_id);
+        self
+    }
+
+    pub fn state(mut self, state: AgentManifest) -> Self {
+        self.state = Some(state);
+        self
+    }
+
+    pub fn build(self) -> MacacaResult<CheckpointRecord> {
+        let agent_id = self
+            .agent_id
+            .ok_or_else(|| MacacaError::Persist("checkpoint builder missing agent_id".into()))?;
+        let state = self
+            .state
+            .ok_or_else(|| MacacaError::Persist("checkpoint builder missing state".into()))?;
+        Ok(CheckpointRecord { agent_id, state })
+    }
+}
+
 /// Manages serialized [`AgentManifest`] snapshots in a [`PersistStore`].
 pub struct CheckpointManager {
     store: Arc<dyn PersistStore>,
@@ -27,8 +75,19 @@ impl CheckpointManager {
         agent_id: &AgentId,
         state: &AgentManifest,
     ) -> MacacaResult<()> {
-        let bytes = serde_json::to_vec(state)?;
-        self.store.set(&Self::key(agent_id), &bytes).await
+        self.save_record(
+            CheckpointBuilder::new()
+                .agent_id(*agent_id)
+                .state(state.clone())
+                .build()?,
+        )
+        .await
+    }
+
+    /// Persist a checkpoint record built through the additive builder entry.
+    pub async fn save_record(&self, record: CheckpointRecord) -> MacacaResult<()> {
+        let bytes = serde_json::to_vec(&record.state)?;
+        self.store.set(&Self::key(&record.agent_id), &bytes).await
     }
 
     /// Load and deserialize an agent state snapshot, returning `None` if absent.

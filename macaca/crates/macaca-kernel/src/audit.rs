@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use macaca_persist::{PersistStore, RedbStore};
+use macaca_persist::PersistBackend;
 use macaca_proto::ApplicationId;
 use serde::{Deserialize, Serialize};
 
@@ -92,11 +92,14 @@ const AUDIT_PREFIX: &str = "audit/";
 /// Persistent audit logger backed by RedbStore.
 #[derive(Clone)]
 pub struct AuditLogger {
-    store: Arc<RedbStore>,
+    store: Arc<dyn PersistBackend>,
 }
 
 impl AuditLogger {
-    pub fn new(store: Arc<RedbStore>) -> Self {
+    pub fn new<T>(store: Arc<T>) -> Self
+    where
+        T: PersistBackend + 'static,
+    {
         Self { store }
     }
 

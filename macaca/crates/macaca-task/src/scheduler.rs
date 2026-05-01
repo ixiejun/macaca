@@ -14,7 +14,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use macaca_persist::{PersistStore, RedbStore};
+use macaca_persist::PersistBackend;
 use macaca_proto::{ApplicationId, TaskId};
 
 // ── Key prefixes ─────────────────────────────────────────────────────────────
@@ -215,12 +215,15 @@ pub enum ScheduleEvent {
 /// }
 /// ```
 pub struct TaskScheduler {
-    store: Arc<RedbStore>,
+    store: Arc<dyn PersistBackend>,
     config: SchedulerConfig,
 }
 
 impl TaskScheduler {
-    pub fn new(store: Arc<RedbStore>, config: SchedulerConfig) -> Self {
+    pub fn new<T>(store: Arc<T>, config: SchedulerConfig) -> Self
+    where
+        T: PersistBackend + 'static,
+    {
         Self { store, config }
     }
 

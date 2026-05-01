@@ -19,6 +19,7 @@ use macaca_framework::adapter::{SingleToolAdapter, ToolSetBridge};
 use macaca_framework::execution::ExecutionContext;
 use macaca_framework::session::{load_module_state, save_module_state};
 use macaca_framework::tool::Toolkit;
+use macaca_persist::AppendEventCommand;
 use macaca_proto::ApplicationId;
 
 use crate::mcp_runtime::{
@@ -459,7 +460,12 @@ async fn emit_mcp_event(
     state
         .persist
         .event_log
-        .append(session_id, event_type, source, payload.clone())
+        .append_command(AppendEventCommand::new(
+            session_id,
+            event_type,
+            source,
+            payload.clone(),
+        ))
         .await;
 
     if let Some(sse_tx) = sse_tx {

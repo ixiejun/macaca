@@ -1060,11 +1060,12 @@ pub async fn get_session_events(
 ) -> Result<Json<EventsResponse>, (StatusCode, Json<ErrorResponse>)> {
     let since = params.since.unwrap_or(0);
     let limit = params.limit.unwrap_or(500);
-    let events = state
+    let events: Vec<_> = state
         .persist
         .event_log
-        .query(&session_id, since, limit)
-        .await;
+        .replay(&session_id, since, limit)
+        .await
+        .collect();
     let latest_seq = state.persist.event_log.latest_seq(&session_id).await;
     Ok(Json(EventsResponse { events, latest_seq }))
 }
@@ -1081,11 +1082,12 @@ pub async fn get_session_run_trace(
     let since = params.since.unwrap_or(0);
     let limit_out = params.limit.unwrap_or(500).clamp(1, 2000);
     let fetch_cap = (limit_out * 25).min(15_000);
-    let mut events = state
+    let mut events: Vec<_> = state
         .persist
         .event_log
-        .query(&session_id, since, fetch_cap)
-        .await;
+        .replay(&session_id, since, fetch_cap)
+        .await
+        .collect();
     events.retain(|e| e.event_type == "run_trace");
     if events.len() > limit_out {
         let skip = events.len() - limit_out;

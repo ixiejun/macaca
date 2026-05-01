@@ -11,6 +11,7 @@ use std::sync::Arc;
 use axum::response::sse::Event;
 use macaca_app::AppLoader;
 use macaca_framework::tool::Toolkit;
+use macaca_persist::AppendEventCommand;
 use macaca_proto::ApplicationId;
 use macaca_runtime_host::compat::default_registry;
 use macaca_runtime_host::mcp_runtime::apply_concurrency_isolation;
@@ -296,7 +297,12 @@ async fn emit_skill_mcp_event(
     state
         .persist
         .event_log
-        .append(session_id, event_type, agent_name, payload.clone())
+        .append_command(AppendEventCommand::new(
+            session_id,
+            event_type,
+            agent_name,
+            payload.clone(),
+        ))
         .await;
 
     let sse_tx = {

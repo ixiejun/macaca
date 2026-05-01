@@ -5,10 +5,10 @@ pub mod event_log;
 pub mod redb_store;
 pub mod store;
 
-pub use checkpoint::CheckpointManager;
-pub use event_log::EventLog;
+pub use checkpoint::{CheckpointBuilder, CheckpointManager, CheckpointRecord, SessionSnapshot};
+pub use event_log::{AppendEventCommand, EventLog, EventReplayIterator};
 pub use redb_store::RedbStore;
-pub use store::PersistStore;
+pub use store::{PersistBackend, PersistStore};
 
 #[cfg(test)]
 mod tests {
@@ -175,6 +175,44 @@ mod tests {
 
         let ids = mgr.list_snapshots().await.unwrap();
         assert!(ids.is_empty());
+    }
+
+    #[tokio::test]
+    async fn checkpoint_builder_preserves_snapshot_save_behavior() {
+        let (store, _dir) = temp_store();
+        let store: Arc<dyn PersistStore> = Arc::new(store);
+        let mgr = CheckpointManager::new(Arc::clone(&store));
+
+        let id = AgentId::new();
+        let manifest = sample_manifest(id);
+        let record = CheckpointBuilder::new()
+            .agent_id(id)
+            .state(manifest.clone())
+            .build()
+            .unwrap();
+        mgr.save_record(record).await.unwrap();
+
+        let loaded = mgr.load_snapshot(&id).await.unwrap().unwrap();
+        assert_eq!(loaded.id, id);
+        assert_eq!(loaded.name, manifest.name);
+    }
+
+    #[test]
+    fn session_snapshot_memento_captures_restore_metadata() {
+        let snapshot = SessionSnapshot {
+            session_id: "sess-1".into(),
+            last_event_cursor: 42,
+            checkpoint_key: Some("snapshot/agent-1".into()),
+            coordinator_resume_key: Some("resume/coordinator".into()),
+        };
+
+        assert_eq!(snapshot.session_id, "sess-1");
+        assert_eq!(snapshot.last_event_cursor, 42);
+        assert_eq!(snapshot.checkpoint_key.as_deref(), Some("snapshot/agent-1"));
+        assert_eq!(
+            snapshot.coordinator_resume_key.as_deref(),
+            Some("resume/coordinator")
+        );
     }
 
     // ── Session Storage Tests ─────────────────────────────────────────────

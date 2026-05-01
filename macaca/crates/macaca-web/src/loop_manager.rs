@@ -19,6 +19,7 @@ use macaca_framework::execution::ExecutionContext;
 use macaca_framework::plan::PlanNotebook;
 use macaca_framework::session::{load_module_state, save_module_state};
 use macaca_kernel::executor::{ApplicationExecutor, ExecutorEvent, TaskResult};
+use macaca_persist::AppendEventCommand;
 use macaca_kernel::AgentInfo;
 use macaca_proto::ApplicationId;
 
@@ -1753,12 +1754,12 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                         state_for_consumer
                                             .persist
                                             .event_log
-                                            .append(
+                                            .append_command(AppendEventCommand::new(
                                                 &sid,
                                                 "loop_resumed",
                                                 &entry_agent_for_loop,
                                                 resumed_payload.clone(),
-                                            )
+                                            ))
                                             .await;
                                         let _ = session
                                             .sse_tx

@@ -9,3 +9,11 @@ pub trait PersistStore: Send + Sync {
     async fn delete(&self, key: &str) -> MacacaResult<()>;
     async fn list_keys(&self, prefix: &str) -> MacacaResult<Vec<String>>;
 }
+
+/// Strategy boundary for concrete persistence backends.
+///
+/// Existing consumers may continue depending on `PersistStore`. This trait
+/// makes the backend identity explicit without forcing a breaking change.
+pub trait PersistBackend: PersistStore {
+    fn backend_name(&self) -> &'static str;
+}

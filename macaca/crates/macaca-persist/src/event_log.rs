@@ -4,16 +4,62 @@
 //! Events are never modified or deleted during normal operation.
 
 use std::collections::HashMap;
+use std::collections::VecDeque;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use tokio::sync::RwLock;
 
-use crate::store::PersistStore;
-use crate::RedbStore;
+use crate::store::PersistBackend;
 use macaca_proto::types::EventEntry;
 
 const EVENTS_PREFIX: &str = "events/";
+
+/// Command object for appending a single persisted event.
+#[derive(Debug, Clone)]
+pub struct AppendEventCommand {
+    pub session_id: String,
+    pub event_type: String,
+    pub source: String,
+    pub payload: serde_json::Value,
+}
+
+impl AppendEventCommand {
+    pub fn new(
+        session_id: impl Into<String>,
+        event_type: impl Into<String>,
+        source: impl Into<String>,
+        payload: serde_json::Value,
+    ) -> Self {
+        Self {
+            session_id: session_id.into(),
+            event_type: event_type.into(),
+            source: source.into(),
+            payload,
+        }
+    }
+}
+
+/// Stable replay primitive for ordered session event restoration.
+pub struct EventReplayIterator {
+    entries: VecDeque<EventEntry>,
+}
+
+impl EventReplayIterator {
+    fn new(entries: Vec<EventEntry>) -> Self {
+        Self {
+            entries: entries.into(),
+        }
+    }
+}
+
+impl Iterator for EventReplayIterator {
+    type Item = EventEntry;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.entries.pop_front()
+    }
+}
 
 /// Append-only event log for session events.
 ///
@@ -25,7 +71,7 @@ const EVENTS_PREFIX: &str = "events/";
 /// - Per-session sequences: each session has its own monotonic counter
 /// - Independent of SSE/browser: this is backend infrastructure
 pub struct EventLog {
-    store: Arc<RedbStore>,
+    store: Arc<dyn PersistBackend>,
     /// Per-session sequence counters. Loaded from DB on first access.
     seq_counters: RwLock<HashMap<String, AtomicU64>>,
     /// Broadcast notification when new events are appended.
@@ -34,7 +80,10 @@ pub struct EventLog {
 }
 
 impl EventLog {
-    pub fn new(store: Arc<RedbStore>) -> Self {
+    pub fn new<T>(store: Arc<T>) -> Self
+    where
+        T: PersistBackend + 'static,
+    {
         let (notify_tx, _) = tokio::sync::broadcast::channel(1024);
         Self {
             store,
@@ -90,9 +139,34 @@ impl EventLog {
         next
     }
 
-    /// Append an event to the log. Returns the assigned sequence number.
+    /// Append an event command to the log. Returns the assigned sequence number.
     ///
     /// This persists IMMEDIATELY — the event is durable before this function returns.
+    pub async fn append_command(&self, command: AppendEventCommand) -> u64 {
+        let seq = self.next_seq(&command.session_id).await;
+        let entry = EventEntry {
+            seq,
+            timestamp: chrono::Utc::now(),
+            session_id: command.session_id.clone(),
+            event_type: command.event_type,
+            source: command.source,
+            payload: command.payload,
+        };
+
+        let key = Self::event_key(&command.session_id, seq);
+        if let Ok(data) = serde_json::to_vec(&entry) {
+            let _ = self.store.set(&key, &data).await;
+        }
+
+        // Notify subscribers (non-blocking, ok if no subscribers)
+        let _ = self.notify_tx.send((command.session_id, seq));
+
+        seq
+    }
+
+    /// Append an event to the log. Returns the assigned sequence number.
+    ///
+    /// Kept for compatibility; internally delegates to `AppendEventCommand`.
     pub async fn append(
         &self,
         session_id: &str,
@@ -100,40 +174,27 @@ impl EventLog {
         source: &str,
         payload: serde_json::Value,
     ) -> u64 {
-        let seq = self.next_seq(session_id).await;
-        let entry = EventEntry {
-            seq,
-            timestamp: chrono::Utc::now(),
-            session_id: session_id.to_string(),
-            event_type: event_type.to_string(),
-            source: source.to_string(),
-            payload,
-        };
-
-        let key = Self::event_key(session_id, seq);
-        if let Ok(data) = serde_json::to_vec(&entry) {
-            let _ = self.store.set(&key, &data).await;
-        }
-
-        // Notify subscribers (non-blocking, ok if no subscribers)
-        let _ = self.notify_tx.send((session_id.to_string(), seq));
-
-        seq
+        self.append_command(AppendEventCommand::new(
+            session_id, event_type, source, payload,
+        ))
+        .await
     }
 
-    /// Query events for a session, starting from `since_seq` (exclusive).
-    /// Returns events with seq > since_seq, up to `limit`.
-    pub async fn query(&self, session_id: &str, since_seq: u64, limit: usize) -> Vec<EventEntry> {
+    /// Replay events for a session, starting from `since_seq` (exclusive).
+    pub async fn replay(
+        &self,
+        session_id: &str,
+        since_seq: u64,
+        limit: usize,
+    ) -> EventReplayIterator {
         let prefix = Self::session_prefix(session_id);
         let keys = self.store.list_keys(&prefix).await.unwrap_or_default();
 
         let mut entries = Vec::new();
-        // Keys are sorted lexicographically, which matches numeric order due to zero-padding
         for key in keys {
             if entries.len() >= limit {
                 break;
             }
-            // Extract seq from key
             let seq = key
                 .rsplit('/')
                 .next()
@@ -148,7 +209,14 @@ impl EventLog {
                 }
             }
         }
-        entries
+
+        EventReplayIterator::new(entries)
+    }
+
+    /// Query events for a session, starting from `since_seq` (exclusive).
+    /// Returns events with seq > since_seq, up to `limit`.
+    pub async fn query(&self, session_id: &str, since_seq: u64, limit: usize) -> Vec<EventEntry> {
+        self.replay(session_id, since_seq, limit).await.collect()
     }
 
     /// Get the latest sequence number for a session (0 if no events).
@@ -183,6 +251,7 @@ impl EventLog {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::RedbStore;
     use std::sync::Arc;
     use tempfile::tempdir;
 
@@ -276,5 +345,40 @@ mod tests {
         let (sid, seq) = rx.recv().await.unwrap();
         assert_eq!(sid, "sess1");
         assert_eq!(seq, 1);
+    }
+
+    #[tokio::test]
+    async fn replay_iterator_preserves_order_and_cursor() {
+        let log = test_log().await;
+        log.append("sess1", "a", "src", serde_json::json!({})).await;
+        log.append("sess1", "b", "src", serde_json::json!({})).await;
+        log.append("sess1", "c", "src", serde_json::json!({})).await;
+
+        let events: Vec<_> = log.replay("sess1", 1, 10).await.collect();
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0].seq, 2);
+        assert_eq!(events[0].event_type, "b");
+        assert_eq!(events[1].seq, 3);
+        assert_eq!(events[1].event_type, "c");
+    }
+
+    #[tokio::test]
+    async fn append_command_matches_legacy_append_behavior() {
+        let log = test_log().await;
+        let seq = log
+            .append_command(AppendEventCommand::new(
+                "sess1",
+                "thinking",
+                "coordinator",
+                serde_json::json!({"iteration": 1}),
+            ))
+            .await;
+        assert_eq!(seq, 1);
+
+        let events = log.query("sess1", 0, 10).await;
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].event_type, "thinking");
+        assert_eq!(events[0].source, "coordinator");
+        assert_eq!(events[0].payload["iteration"], 1);
     }
 }
