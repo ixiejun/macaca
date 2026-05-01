@@ -487,12 +487,13 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
     std::fs::create_dir_all(&data_dir).ok();
     let session_db_path = data_dir.join("sessions.db");
     let session_store_impl = Arc::new(RedbStore::open(&session_db_path)?);
-    let session_store_shared: Arc<dyn macaca_persist::PersistBackend> =
-        session_store_impl.clone();
+    let session_store_shared: Arc<dyn macaca_persist::PersistBackend> = session_store_impl.clone();
     let todo_store = Arc::new(macaca_task::TodoStore::new(Arc::clone(
         &session_store_shared,
     )));
-    let event_log = Arc::new(macaca_persist::EventLog::new(Arc::clone(&session_store_impl)));
+    let event_log = Arc::new(macaca_persist::EventLog::new(Arc::clone(
+        &session_store_impl,
+    )));
     let run_tracer = Arc::new(crate::run_trace::RunTracer::new(Arc::clone(&event_log)));
     info!(path = %session_db_path.display(), "Session store initialized");
 

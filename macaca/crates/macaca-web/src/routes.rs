@@ -739,7 +739,7 @@ pub async fn get_todo_progress(
             .map_err(|_| err(StatusCode::BAD_REQUEST, "Invalid app_id".into()))?,
     );
     let store = Arc::clone(&state.persist.todo_store);
-    let space = macaca_task::TaskSpace::new(app_id, query.session_id, store);
+    let space = macaca_task::TaskSpace::for_session(app_id, query.session_id, store);
     let p = space.overall_progress().await;
     Ok(Json(serde_json::json!({
         "total": p.total, "pending": p.pending, "assigned": p.assigned,
@@ -896,7 +896,7 @@ pub async fn create_schedule(
                         match event {
                             macaca_task::ScheduleEvent::Triggered { action, .. } => match action {
                                 macaca_task::ScheduleAction::CreateGoal { description } => {
-                                    let space = macaca_task::TaskSpace::new(
+                                    let space = macaca_task::TaskSpace::for_session(
                                         app_id_for_sched.clone(),
                                         None,
                                         Arc::clone(&state_for_sched.persist.todo_store),
@@ -909,13 +909,13 @@ pub async fn create_schedule(
                                     description,
                                     priority,
                                 } => {
-                                    let space = macaca_task::TaskSpace::new(
+                                    let space = macaca_task::TaskSpace::for_session(
                                         app_id_for_sched.clone(),
                                         None,
                                         Arc::clone(&state_for_sched.persist.todo_store),
                                     );
                                     space
-                                        .create_and_assign(
+                                        .create_task_assignment(
                                             &agent,
                                             "scheduler",
                                             &title,

@@ -214,7 +214,7 @@ impl LlmDecomposer {
             };
 
             let item = space
-                .create_and_assign(
+                .create_task_assignment(
                     agent,
                     "plan_agent",
                     &task.title,

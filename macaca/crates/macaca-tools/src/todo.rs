@@ -34,7 +34,7 @@ impl Tool for ClaimTaskTool {
         json!({ "type": "object", "properties": {}, "required": [] })
     }
     async fn execute(&self, _input: Value) -> MacacaResult<Value> {
-        match self.board.claim_next().await {
+        match self.board.claim_next_task().await {
             Some(task) => Ok(json!({
                 "task_id": task.id.to_string(),
                 "title": task.title,
@@ -78,7 +78,7 @@ impl Tool for StartTaskTool {
             uuid::Uuid::parse_str(task_id_str)
                 .map_err(|_| macaca_proto::MacacaError::Task("invalid task_id".into()))?,
         );
-        let ok = self.board.start_task(&task_id).await;
+        let ok = self.board.mark_task_in_progress(&task_id).await;
         Ok(json!({ "success": ok, "task_id": task_id_str }))
     }
 }
@@ -148,7 +148,7 @@ impl Tool for SubmitTaskForReviewTool {
                 .map_err(|_| macaca_proto::MacacaError::Task("invalid task_id".into()))?,
         );
         let summary = input["summary"].as_str().unwrap_or_default().to_string();
-        let ok = self.board.submit_for_review(&task_id, summary).await;
+        let ok = self.board.submit_task_for_review(&task_id, summary).await;
         Ok(json!({ "success": ok, "status": if ok { "pending_review" } else { "error" } }))
     }
 }
@@ -492,7 +492,7 @@ impl CreateTodoTool {
 
         let item = self
             .space
-            .create_and_assign(
+            .create_task_assignment(
                 &resolved_agent,
                 &self.coordinator_name,
                 title,
@@ -643,7 +643,7 @@ mod tests {
         let dir = tempdir().expect("tempdir");
         let db = RedbStore::open(dir.path().join("todo-tests.redb")).expect("open redb");
         let store = Arc::new(TodoStore::new(Arc::new(db)));
-        let space = Arc::new(TaskSpace::new(
+        let space = Arc::new(TaskSpace::for_session(
             macaca_proto::ApplicationId(uuid::Uuid::new_v4()),
             Some("session".into()),
             store,
@@ -678,7 +678,7 @@ mod tests {
         let db =
             RedbStore::open(dir.path().join("todo-tests-missing-agent.redb")).expect("open redb");
         let store = Arc::new(TodoStore::new(Arc::new(db)));
-        let space = Arc::new(TaskSpace::new(
+        let space = Arc::new(TaskSpace::for_session(
             macaca_proto::ApplicationId(uuid::Uuid::new_v4()),
             Some("session".into()),
             store,
@@ -711,7 +711,7 @@ mod tests {
         let db =
             RedbStore::open(dir.path().join("todo-tests-preserve-agent.redb")).expect("open redb");
         let store = Arc::new(TodoStore::new(Arc::new(db)));
-        let space = Arc::new(TaskSpace::new(
+        let space = Arc::new(TaskSpace::for_session(
             macaca_proto::ApplicationId(uuid::Uuid::new_v4()),
             Some("session".into()),
             store,
@@ -769,7 +769,7 @@ mod tests {
         let db = RedbStore::open(dir.path().join("todo-tests-foundation-preserve.redb"))
             .expect("open redb");
         let store = Arc::new(TodoStore::new(Arc::new(db)));
-        let space = Arc::new(TaskSpace::new(
+        let space = Arc::new(TaskSpace::for_session(
             macaca_proto::ApplicationId(uuid::Uuid::new_v4()),
             Some("session".into()),
             store,
@@ -826,7 +826,7 @@ mod tests {
         let store = Arc::new(TodoStore::new(Arc::new(db)));
         let app_id = macaca_proto::ApplicationId(uuid::Uuid::new_v4());
         let goal_id = macaca_proto::TaskId::new();
-        let space = Arc::new(TaskSpace::new(
+        let space = Arc::new(TaskSpace::for_session(
             app_id,
             Some("session".into()),
             Arc::clone(&store),
@@ -896,7 +896,7 @@ mod tests {
         let db = RedbStore::open(dir.path().join("todo-tests-dedupe.redb")).expect("open redb");
         let store = Arc::new(TodoStore::new(Arc::new(db)));
         let goal_id = macaca_proto::TaskId::new();
-        let space = Arc::new(TaskSpace::new(
+        let space = Arc::new(TaskSpace::for_session(
             macaca_proto::ApplicationId(uuid::Uuid::new_v4()),
             Some("session".into()),
             Arc::clone(&store),
@@ -939,7 +939,7 @@ mod tests {
         let store = Arc::new(TodoStore::new(Arc::new(db)));
         let app_id = macaca_proto::ApplicationId(uuid::Uuid::new_v4());
         let goal_id = macaca_proto::TaskId::new();
-        let space = Arc::new(TaskSpace::new(
+        let space = Arc::new(TaskSpace::for_session(
             app_id,
             Some("session".into()),
             Arc::clone(&store),
@@ -1034,7 +1034,10 @@ impl Tool for ReviewTodoTool {
             feedback: feedback.clone(),
             verified_criteria: vec![],
         };
-        let ok = self.space.review_task(&task_id, agent, result).await;
+        let ok = self
+            .space
+            .apply_review_result(&task_id, agent, result)
+            .await;
         if ok {
             if let Some(ref cb) = self.on_reviewed {
                 cb(task_id, agent.to_string(), passed);

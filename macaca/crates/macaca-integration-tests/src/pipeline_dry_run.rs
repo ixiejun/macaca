@@ -245,13 +245,13 @@ pub async fn run_full_pipeline_dry_run_with_config(config: PipelineDryRunConfig)
     {
         trace_stage(config, "2/5 session_scoped_claim_isolation");
         let res = async {
-            let sa = TaskSpace::new(app_id, Some("sess-a".into()), store.clone());
-            let sb = TaskSpace::new(app_id, Some("sess-b".into()), store.clone());
+            let sa = TaskSpace::for_session(app_id, Some("sess-a".into()), store.clone());
+            let sb = TaskSpace::for_session(app_id, Some("sess-b".into()), store.clone());
             let ta = sa
-                .create_and_assign("worker", "coord", "A", "da", vec![], 5, vec![], None)
+                .create_task_assignment("worker", "coord", "A", "da", vec![], 5, vec![], None)
                 .await;
             let tb = sb
-                .create_and_assign("worker", "coord", "B", "db", vec![], 5, vec![], None)
+                .create_task_assignment("worker", "coord", "B", "db", vec![], 5, vec![], None)
                 .await;
             trace(
                 config,
@@ -268,15 +268,17 @@ pub async fn run_full_pipeline_dry_run_with_config(config: PipelineDryRunConfig)
                 ),
             );
 
-            let board_a = TaskBoard::new(app_id, "worker", Some("sess-a".into()), store.clone());
-            let board_b = TaskBoard::new(app_id, "worker", Some("sess-b".into()), store.clone());
+            let board_a =
+                TaskBoard::for_agent(app_id, "worker", Some("sess-a".into()), store.clone());
+            let board_b =
+                TaskBoard::for_agent(app_id, "worker", Some("sess-b".into()), store.clone());
 
             let ca = board_a
-                .claim_next()
+                .claim_next_task()
                 .await
                 .ok_or_else(|| "session A: expected claim".to_string())?;
             let cb = board_b
-                .claim_next()
+                .claim_next_task()
                 .await
                 .ok_or_else(|| "session B: expected claim".to_string())?;
             trace(
@@ -316,12 +318,12 @@ pub async fn run_full_pipeline_dry_run_with_config(config: PipelineDryRunConfig)
     {
         trace_stage(config, "3/5 depends_on + review_unblocks_next");
         let res = async {
-            let space = TaskSpace::new(app_id, Some("sess-dep".into()), store.clone());
+            let space = TaskSpace::for_session(app_id, Some("sess-dep".into()), store.clone());
             let t1 = space
-                .create_and_assign("worker", "coord", "first", "d1", vec![], 5, vec![], None)
+                .create_task_assignment("worker", "coord", "first", "d1", vec![], 5, vec![], None)
                 .await;
             let t2 = space
-                .create_and_assign(
+                .create_task_assignment(
                     "worker",
                     "coord",
                     "second",
@@ -344,9 +346,10 @@ pub async fn run_full_pipeline_dry_run_with_config(config: PipelineDryRunConfig)
             }
             trace(config, "  (t2 correctly Blocked until t1 completes)");
 
-            let board = TaskBoard::new(app_id, "worker", Some("sess-dep".into()), store.clone());
+            let board =
+                TaskBoard::for_agent(app_id, "worker", Some("sess-dep".into()), store.clone());
             let c = board
-                .claim_next()
+                .claim_next_task()
                 .await
                 .ok_or_else(|| "claim first task".to_string())?;
             trace(
@@ -356,17 +359,20 @@ pub async fn run_full_pipeline_dry_run_with_config(config: PipelineDryRunConfig)
             if c.id != t1.id {
                 return err_msg("claimed task should be t1");
             }
-            if !board.start_task(&t1.id).await {
+            if !board.mark_task_in_progress(&t1.id).await {
                 return err_msg("start_task t1");
             }
             trace(config, "  start_task(t1) -> InProgress");
-            if !board.submit_for_review(&t1.id, "done summary".into()).await {
+            if !board
+                .submit_task_for_review(&t1.id, "done summary".into())
+                .await
+            {
                 return err_msg("submit_for_review t1");
             }
             trace(config, "  submit_for_review(t1) -> PendingReview");
 
             let ok_review = space
-                .review_task(
+                .apply_review_result(
                     &t1.id,
                     "worker",
                     TodoReviewResult {
@@ -400,7 +406,7 @@ pub async fn run_full_pipeline_dry_run_with_config(config: PipelineDryRunConfig)
             }
 
             let c2 = board
-                .claim_next()
+                .claim_next_task()
                 .await
                 .ok_or_else(|| "claim second task after unblock".to_string())?;
             trace(config, format!("  claim_next -> {} (expect t2)", c2.id));
@@ -418,7 +424,7 @@ pub async fn run_full_pipeline_dry_run_with_config(config: PipelineDryRunConfig)
     {
         trace_stage(config, "4/5 AgenticLoop + ScriptedLlm (create_todo)");
         let res = async {
-            let space = Arc::new(TaskSpace::new(
+            let space = Arc::new(TaskSpace::for_session(
                 app_id,
                 Some("sess-agentic".into()),
                 store.clone(),
@@ -529,13 +535,13 @@ pub async fn run_full_pipeline_dry_run_with_config(config: PipelineDryRunConfig)
                 ),
             );
 
-            let board = Arc::new(TaskBoard::new(
+            let board = Arc::new(TaskBoard::for_agent(
                 app_id,
                 "worker",
                 Some("sess-worker".into()),
                 store.clone(),
             ));
-            let space = Arc::new(TaskSpace::new(
+            let space = Arc::new(TaskSpace::for_session(
                 app_id,
                 Some("sess-worker".into()),
                 store.clone(),

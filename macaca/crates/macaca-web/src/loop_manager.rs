@@ -19,8 +19,8 @@ use macaca_framework::execution::ExecutionContext;
 use macaca_framework::plan::PlanNotebook;
 use macaca_framework::session::{load_module_state, save_module_state};
 use macaca_kernel::executor::{ApplicationExecutor, ExecutorEvent, TaskResult};
-use macaca_persist::AppendEventCommand;
 use macaca_kernel::AgentInfo;
+use macaca_persist::AppendEventCommand;
 use macaca_proto::ApplicationId;
 
 use crate::routes::{err, ErrorResponse};
@@ -630,7 +630,7 @@ async fn create_fallback_decomposition_tasks(
         "Planner produced no todos; creating capability-based fallback task chain"
     );
 
-    let space = macaca_task::TaskSpace::new(
+    let space = macaca_task::TaskSpace::for_session(
         app_id.clone(),
         session_id.map(str::to_string),
         Arc::clone(&state.persist.todo_store),
@@ -644,7 +644,7 @@ async fn create_fallback_decomposition_tasks(
             fallback_task_template(phase, &worker.name, goal_description);
         let depends_on = previous.into_iter().collect::<Vec<_>>();
         let item = space
-            .create_and_assign(
+            .create_task_assignment(
                 &worker.name,
                 plan_agent_name,
                 title,
@@ -754,7 +754,9 @@ async fn handle_worker_execution_success(
     mode: WorkerExecutionMode,
 ) {
     let summary = worker_success_summary(mode, title, output);
-    board.submit_for_review(&task_id, summary.clone()).await;
+    board
+        .submit_task_for_review(&task_id, summary.clone())
+        .await;
     executor.broadcast_event(executor_task_completed(
         task_id,
         agent_name,
@@ -810,7 +812,7 @@ async fn handle_worker_execution_failure(
     agent_name: &str,
     error: String,
 ) {
-    board.mark_failed(&task_id, error.clone()).await;
+    board.fail_task(&task_id, error.clone()).await;
     executor.broadcast_event(executor_task_failed(task_id, agent_name, error.clone()));
     crate::run_trace::emit_for_scope(
         &state.persist.run_tracer,
@@ -835,7 +837,7 @@ async fn handle_worker_execution_timeout(
     mode: WorkerExecutionMode,
 ) {
     let error = mode.timeout_error();
-    board.mark_failed(&task_id, error.into()).await;
+    board.fail_task(&task_id, error.into()).await;
     executor.broadcast_event(executor_task_failed(task_id, agent_name, error));
 }
 
@@ -888,13 +890,15 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                 handles.insert(app_id.clone(), Arc::clone(&shutdown));
 
                 let store = Arc::clone(&state.persist.todo_store);
-                let plan_space = Arc::new(macaca_task::TaskSpace::new(
+                let plan_space = Arc::new(macaca_task::TaskSpace::for_session(
                     app_id.clone(),
                     session_id.clone(),
                     Arc::clone(&store),
                 ));
-                let plan_loop =
-                    macaca_task::PlanLoop::new(plan_space, macaca_task::PlanLoopConfig::default());
+                let plan_loop = macaca_task::PlanLoop::with_components(
+                    plan_space,
+                    macaca_task::PlanLoopConfig::default(),
+                );
                 let plan_waker = plan_loop.waker();
                 state
                     .loops
@@ -908,7 +912,9 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                 let event_tx_for_consumer = event_tx.clone();
 
                 tokio::spawn(async move {
-                    plan_loop.run(shutdown, event_tx).await;
+                    plan_loop
+                        .run_with_default_template(shutdown, event_tx)
+                        .await;
                 });
 
                 let rt_plan_start = Arc::clone(&state.persist.run_tracer);
@@ -1560,7 +1566,7 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                 match evaluation_result {
                                     Ok(macaca_task::GoalEvaluation::Satisfied { summary }) => {
                                         tracing::info!(goal_id = %goal_id, summary = %summary, "Goal satisfied");
-                                        let space = macaca_task::TaskSpace::new(
+                                        let space = macaca_task::TaskSpace::for_session(
                                             app_id_for_consumer.clone(),
                                             None,
                                             Arc::clone(&state_for_consumer.persist.todo_store),
@@ -1694,7 +1700,7 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                             None,
                                         )
                                         .await;
-                                        let space = macaca_task::TaskSpace::new(
+                                        let space = macaca_task::TaskSpace::for_session(
                                             app_id_for_consumer.clone(),
                                             None,
                                             Arc::clone(&state_for_consumer.persist.todo_store),
@@ -1865,13 +1871,13 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                         continue;
                     }
 
-                    let board = Arc::new(macaca_task::TaskBoard::new(
+                    let board = Arc::new(macaca_task::TaskBoard::for_agent(
                         app_id.clone(),
                         agent_name.clone(),
                         session_id.clone(),
                         Arc::clone(&state.persist.todo_store),
                     ));
-                    let worker_loop = macaca_task::WorkerLoop::new(
+                    let worker_loop = macaca_task::WorkerLoop::with_components(
                         Arc::clone(&board),
                         macaca_task::WorkerLoopConfig::default(),
                     );
@@ -1883,7 +1889,9 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                         tokio::sync::mpsc::channel::<macaca_task::WorkerEvent>(32);
                     let shutdown_clone = Arc::clone(&shutdown);
                     tokio::spawn(async move {
-                        worker_loop.run(shutdown_clone, event_tx).await;
+                        worker_loop
+                            .run_with_default_template(shutdown_clone, event_tx)
+                            .await;
                     });
 
                     let executor_clone = Arc::clone(&executor);
@@ -2305,7 +2313,8 @@ pub(crate) async fn create_goal(
     })?;
     let store = Arc::clone(&state.persist.todo_store);
     let session_id = body["session_id"].as_str().map(|s| s.to_string());
-    let space = macaca_task::TaskSpace::new(app_id.clone(), session_id.clone(), Arc::clone(&store));
+    let space =
+        macaca_task::TaskSpace::for_session(app_id.clone(), session_id.clone(), Arc::clone(&store));
     let goal = space.push_goal(description).await;
 
     crate::run_trace::emit_for_scope(

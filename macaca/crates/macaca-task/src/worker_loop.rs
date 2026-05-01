@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use tracing::{info, warn};
+use tracing::info;
 
 use crate::todo_board::TaskBoard;
 
@@ -86,7 +86,12 @@ impl WorkerLoopWaker {
 }
 
 impl WorkerLoop {
+    #[deprecated(note = "Use WorkerLoop::with_components instead")]
     pub fn new(board: Arc<TaskBoard>, config: WorkerLoopConfig) -> Self {
+        Self::with_components(board, config)
+    }
+
+    pub fn with_components(board: Arc<TaskBoard>, config: WorkerLoopConfig) -> Self {
         Self {
             board,
             config,
@@ -104,7 +109,16 @@ impl WorkerLoop {
     /// Run the worker loop until shutdown is signaled.
     ///
     /// Emits `WorkerEvent`s for the agent runtime to process.
+    #[deprecated(note = "Use WorkerLoop::run_with_default_template instead")]
     pub async fn run(
+        &self,
+        shutdown: Arc<AtomicBool>,
+        event_tx: tokio::sync::mpsc::Sender<WorkerEvent>,
+    ) {
+        self.run_with_default_template(shutdown, event_tx).await;
+    }
+
+    pub async fn run_with_default_template(
         &self,
         shutdown: Arc<AtomicBool>,
         event_tx: tokio::sync::mpsc::Sender<WorkerEvent>,
@@ -117,111 +131,125 @@ impl WorkerLoop {
                 break;
             }
 
-            // 1. Try to claim a pending task
-            if let Some(task) = self.board.claim_next().await {
-                info!(
-                    agent = self.board.agent_name(),
-                    task_id = %task.id,
-                    title = %task.title,
-                    priority = task.priority,
-                    "Task claimed"
-                );
-
-                // Start the task
-                self.board.start_task(&task.id).await;
-
-                let claimed_id = task.id;
-                let _ = event_tx
-                    .send(WorkerEvent::TaskClaimed {
-                        task_id: task.id,
-                        title: task.title,
-                        description: task.description,
-                        acceptance_criteria: task.acceptance_criteria,
-                        context: task.context,
-                        optimization_suggestions: task.optimization_suggestions,
-                        attempt: task.attempt_count,
-                        session_id: task.session_id.clone(),
-                    })
-                    .await;
-
-                // Wait for the task to leave InProgress before claiming the next one.
-                // Poll the board until the task status changes (completed, review, failed, etc.)
-                loop {
-                    tokio::time::sleep(Duration::from_secs(5)).await;
-                    if shutdown.load(Ordering::SeqCst) {
-                        break;
-                    }
-                    match self.board.current_task().await {
-                        Some(t) if t.id == claimed_id => {
-                            // Still in progress — keep waiting
-                            continue;
-                        }
-                        _ => {
-                            // Task finished or no longer current — ready for next
-                            break;
-                        }
-                    }
-                }
+            if self.try_claim_task(&shutdown, &event_tx).await {
                 continue;
             }
 
-            // 2. Check for tasks needing optimization (retry)
-            let opt_tasks = self.board.needs_optimization_tasks().await;
-            if let Some(task) = opt_tasks.into_iter().next() {
-                info!(
-                    agent = self.board.agent_name(),
-                    task_id = %task.id,
-                    attempt = task.attempt_count,
-                    "Retrying task with optimization suggestions"
-                );
-
-                self.board.start_task(&task.id).await;
-
-                let retry_id = task.id;
-                let _ = event_tx
-                    .send(WorkerEvent::RetryTask {
-                        task_id: task.id,
-                        title: task.title,
-                        description: task.description,
-                        optimization_suggestions: task.optimization_suggestions.unwrap_or_default(),
-                        attempt: task.attempt_count,
-                        session_id: task.session_id.clone(),
-                    })
-                    .await;
-
-                // Wait for retry to complete before claiming next
-                loop {
-                    tokio::time::sleep(Duration::from_secs(5)).await;
-                    if shutdown.load(Ordering::SeqCst) {
-                        break;
-                    }
-                    match self.board.current_task().await {
-                        Some(t) if t.id == retry_id => continue,
-                        _ => break,
-                    }
-                }
+            if self.try_retry_task(&shutdown, &event_tx).await {
                 continue;
             }
 
-            // 3. No work available — idle
-            let has_any = !self.board.list_all().await.is_empty();
-            if has_any {
-                // Has tasks but none actionable (all blocked/in-review/completed)
-                let _ = event_tx.send(WorkerEvent::Idle).await;
+            self.emit_idle_if_needed(&event_tx).await;
+            if self.wait_for_next_tick(&shutdown).await {
+                break;
             }
+        }
+    }
 
-            // Wait for either: heartbeat timeout OR immediate wakeup notification
-            tokio::select! {
-                _ = tokio::time::sleep(self.config.heartbeat_interval) => {}
-                _ = self.notify.notified() => {
-                    tracing::info!(agent = self.board.agent_name(), "Worker loop woken up by event");
-                }
-                _ = async {
-                    while !shutdown.load(Ordering::SeqCst) {
-                        tokio::time::sleep(Duration::from_millis(100)).await;
-                    }
-                } => { break; }
+    async fn try_claim_task(
+        &self,
+        shutdown: &Arc<AtomicBool>,
+        event_tx: &tokio::sync::mpsc::Sender<WorkerEvent>,
+    ) -> bool {
+        let Some(task) = self.board.claim_next_task().await else {
+            return false;
+        };
+
+        info!(
+            agent = self.board.agent_name(),
+            task_id = %task.id,
+            title = %task.title,
+            priority = task.priority,
+            "Task claimed"
+        );
+
+        self.board.mark_task_in_progress(&task.id).await;
+
+        let claimed_id = task.id;
+        let _ = event_tx
+            .send(WorkerEvent::TaskClaimed {
+                task_id: task.id,
+                title: task.title,
+                description: task.description,
+                acceptance_criteria: task.acceptance_criteria,
+                context: task.context,
+                optimization_suggestions: task.optimization_suggestions,
+                attempt: task.attempt_count,
+                session_id: task.session_id.clone(),
+            })
+            .await;
+
+        self.wait_for_task_exit(shutdown, claimed_id).await;
+        true
+    }
+
+    async fn try_retry_task(
+        &self,
+        shutdown: &Arc<AtomicBool>,
+        event_tx: &tokio::sync::mpsc::Sender<WorkerEvent>,
+    ) -> bool {
+        let opt_tasks = self.board.needs_optimization_tasks().await;
+        let Some(task) = opt_tasks.into_iter().next() else {
+            return false;
+        };
+
+        info!(
+            agent = self.board.agent_name(),
+            task_id = %task.id,
+            attempt = task.attempt_count,
+            "Retrying task with optimization suggestions"
+        );
+
+        self.board.mark_task_in_progress(&task.id).await;
+
+        let retry_id = task.id;
+        let _ = event_tx
+            .send(WorkerEvent::RetryTask {
+                task_id: task.id,
+                title: task.title,
+                description: task.description,
+                optimization_suggestions: task.optimization_suggestions.unwrap_or_default(),
+                attempt: task.attempt_count,
+                session_id: task.session_id.clone(),
+            })
+            .await;
+
+        self.wait_for_task_exit(shutdown, retry_id).await;
+        true
+    }
+
+    async fn emit_idle_if_needed(&self, event_tx: &tokio::sync::mpsc::Sender<WorkerEvent>) {
+        let has_any = !self.board.list_all().await.is_empty();
+        if has_any {
+            let _ = event_tx.send(WorkerEvent::Idle).await;
+        }
+    }
+
+    async fn wait_for_task_exit(&self, shutdown: &Arc<AtomicBool>, task_id: macaca_proto::TaskId) {
+        loop {
+            tokio::time::sleep(Duration::from_secs(5)).await;
+            if shutdown.load(Ordering::SeqCst) {
+                break;
             }
+            match self.board.current_task().await {
+                Some(t) if t.id == task_id => continue,
+                _ => break,
+            }
+        }
+    }
+
+    async fn wait_for_next_tick(&self, shutdown: &Arc<AtomicBool>) -> bool {
+        tokio::select! {
+            _ = tokio::time::sleep(self.config.heartbeat_interval) => false,
+            _ = self.notify.notified() => {
+                tracing::info!(agent = self.board.agent_name(), "Worker loop woken up by event");
+                false
+            }
+            _ = async {
+                while !shutdown.load(Ordering::SeqCst) {
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                }
+            } => true
         }
     }
 }

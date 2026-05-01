@@ -593,7 +593,7 @@ fn register_agent_tools(
 ) {
     match policy.todo_policy {
         TodoToolPolicy::GoalManager => {
-            let space = Arc::new(macaca_task::TaskSpace::new(
+            let space = Arc::new(macaca_task::TaskSpace::for_session(
                 app_id.clone(),
                 session_id,
                 Arc::clone(&state.persist.todo_store),
@@ -669,7 +669,7 @@ fn register_agent_tools(
             );
         }
         TodoToolPolicy::Planner => {
-            let space = Arc::new(macaca_task::TaskSpace::new(
+            let space = Arc::new(macaca_task::TaskSpace::for_session(
                 app_id.clone(),
                 session_id,
                 Arc::clone(&state.persist.todo_store),
@@ -793,7 +793,7 @@ fn register_agent_tools(
         }
         TodoToolPolicy::Worker => {
             // Worker agents: task board tools.
-            let board = Arc::new(macaca_task::TaskBoard::new(
+            let board = Arc::new(macaca_task::TaskBoard::for_agent(
                 app_id.clone(),
                 agent_name,
                 session_id,

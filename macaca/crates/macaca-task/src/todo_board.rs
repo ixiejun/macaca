@@ -11,6 +11,8 @@ use macaca_proto::{
     ApplicationId, TaskId, TodoGoal, TodoGoalStatus, TodoItem, TodoReviewResult, TodoStatus,
 };
 
+use crate::dependency::{DefaultTaskDependencyResolver, TaskDependencyResolver};
+use crate::lifecycle::{DefaultTodoLifecyclePolicy, TodoLifecyclePolicy};
 use crate::todo_store::TodoStore;
 
 /// Detect cycles in a dependency graph. Returns Err with a message if a cycle is found.
@@ -75,20 +77,52 @@ pub struct TaskBoard {
     agent_name: String,
     session_id: Option<String>,
     store: Arc<TodoStore>,
+    lifecycle_policy: Arc<dyn TodoLifecyclePolicy>,
+    dependency_resolver: Arc<dyn TaskDependencyResolver>,
 }
 
 impl TaskBoard {
+    #[deprecated(note = "Use TaskBoard::for_agent instead")]
     pub fn new(
         app_id: ApplicationId,
         agent_name: impl Into<String>,
         session_id: Option<String>,
         store: Arc<TodoStore>,
     ) -> Self {
+        Self::for_agent(app_id, agent_name, session_id, store)
+    }
+
+    pub fn for_agent(
+        app_id: ApplicationId,
+        agent_name: impl Into<String>,
+        session_id: Option<String>,
+        store: Arc<TodoStore>,
+    ) -> Self {
+        Self::with_components(
+            app_id,
+            agent_name,
+            session_id,
+            store,
+            Arc::new(DefaultTodoLifecyclePolicy),
+            Arc::new(DefaultTaskDependencyResolver),
+        )
+    }
+
+    pub fn with_components(
+        app_id: ApplicationId,
+        agent_name: impl Into<String>,
+        session_id: Option<String>,
+        store: Arc<TodoStore>,
+        lifecycle_policy: Arc<dyn TodoLifecyclePolicy>,
+        dependency_resolver: Arc<dyn TaskDependencyResolver>,
+    ) -> Self {
         Self {
             app_id,
             agent_name: agent_name.into(),
             session_id,
             store,
+            lifecycle_policy,
+            dependency_resolver,
         }
     }
 
@@ -100,7 +134,12 @@ impl TaskBoard {
     /// or if the lowest-sequence task is not yet claimable (Blocked/InProgress/Assigned).
     /// Sequential ordering is enforced PER SESSION — different sessions are independent.
     /// Atomically transitions Pending → Assigned.
+    #[deprecated(note = "Use TaskBoard::claim_next_task instead")]
     pub async fn claim_next(&self) -> Option<TodoItem> {
+        self.claim_next_task().await
+    }
+
+    pub async fn claim_next_task(&self) -> Option<TodoItem> {
         let all = self
             .store
             .list_agent_todos(&self.app_id, &self.session_id, &self.agent_name)
@@ -137,7 +176,7 @@ impl TaskBoard {
                     TodoStatus::Completed | TodoStatus::Cancelled | TodoStatus::Failed => continue,
                     // Claimable — take it
                     TodoStatus::Pending => {
-                        if !Self::parent_goal_allows_claim(task, &goals) {
+                        if !self.dependency_resolver.can_claim_task(task, &goals) {
                             tracing::debug!(
                                 agent = %self.agent_name,
                                 task_id = %task.id,
@@ -147,7 +186,10 @@ impl TaskBoard {
                             break; // Try next session
                         }
                         let mut claimed = task.clone();
-                        claimed.status = TodoStatus::Assigned;
+                        let Some(next_status) = self.lifecycle_policy.on_claim(&claimed) else {
+                            break;
+                        };
+                        claimed.status = next_status;
                         claimed.updated_at = Utc::now();
                         self.store.save_todo(&claimed).await;
                         return Some(claimed);
@@ -166,25 +208,20 @@ impl TaskBoard {
         None
     }
 
-    fn parent_goal_allows_claim(task: &TodoItem, goals: &[TodoGoal]) -> bool {
-        let Some(goal_id) = task.parent_task else {
-            return true;
-        };
-
-        goals
-            .iter()
-            .any(|goal| goal.id == goal_id && goal.status == TodoGoalStatus::InProgress)
+    /// Mark a task as in-progress. Called by the agent after claiming.
+    #[deprecated(note = "Use TaskBoard::mark_task_in_progress instead")]
+    pub async fn start_task(&self, task_id: &TaskId) -> bool {
+        self.mark_task_in_progress(task_id).await
     }
 
-    /// Mark a task as in-progress. Called by the agent after claiming.
-    pub async fn start_task(&self, task_id: &TaskId) -> bool {
+    pub async fn mark_task_in_progress(&self, task_id: &TaskId) -> bool {
         if let Some(mut task) = self
             .store
             .get_todo(&self.app_id, &self.session_id, &self.agent_name, task_id)
             .await
         {
-            if task.status == TodoStatus::Assigned || task.status == TodoStatus::NeedsOptimization {
-                task.status = TodoStatus::InProgress;
+            if let Some(next_status) = self.lifecycle_policy.on_start(&task) {
+                task.status = next_status;
                 task.attempt_count += 1;
                 task.updated_at = Utc::now();
                 self.store.save_todo(&task).await;
@@ -195,14 +232,19 @@ impl TaskBoard {
     }
 
     /// Submit a completed task for Plan Agent review.
+    #[deprecated(note = "Use TaskBoard::submit_task_for_review instead")]
     pub async fn submit_for_review(&self, task_id: &TaskId, summary: String) -> bool {
+        self.submit_task_for_review(task_id, summary).await
+    }
+
+    pub async fn submit_task_for_review(&self, task_id: &TaskId, summary: String) -> bool {
         if let Some(mut task) = self
             .store
             .get_todo(&self.app_id, &self.session_id, &self.agent_name, task_id)
             .await
         {
-            if task.status == TodoStatus::InProgress {
-                task.status = TodoStatus::PendingReview;
+            if let Some(next_status) = self.lifecycle_policy.on_submit_for_review(&task) {
+                task.status = next_status;
                 task.completion_summary = Some(summary);
                 task.updated_at = Utc::now();
                 self.store.save_todo(&task).await;
@@ -230,13 +272,18 @@ impl TaskBoard {
     }
 
     /// Mark a task as failed (exceeded max attempts).
+    #[deprecated(note = "Use TaskBoard::fail_task instead")]
     pub async fn mark_failed(&self, task_id: &TaskId, error: String) -> bool {
+        self.fail_task(task_id, error).await
+    }
+
+    pub async fn fail_task(&self, task_id: &TaskId, error: String) -> bool {
         if let Some(mut task) = self
             .store
             .get_todo(&self.app_id, &self.session_id, &self.agent_name, task_id)
             .await
         {
-            task.status = TodoStatus::Failed;
+            task.status = self.lifecycle_policy.on_mark_failed(&task);
             task.review_feedback = Some(error);
             task.updated_at = Utc::now();
             self.store.save_todo(&task).await;
@@ -317,14 +364,43 @@ pub struct TaskSpace {
     app_id: ApplicationId,
     session_id: Option<String>,
     store: Arc<TodoStore>,
+    lifecycle_policy: Arc<dyn TodoLifecyclePolicy>,
+    dependency_resolver: Arc<dyn TaskDependencyResolver>,
 }
 
 impl TaskSpace {
+    #[deprecated(note = "Use TaskSpace::for_session instead")]
     pub fn new(app_id: ApplicationId, session_id: Option<String>, store: Arc<TodoStore>) -> Self {
+        Self::for_session(app_id, session_id, store)
+    }
+
+    pub fn for_session(
+        app_id: ApplicationId,
+        session_id: Option<String>,
+        store: Arc<TodoStore>,
+    ) -> Self {
+        Self::with_components(
+            app_id,
+            session_id,
+            store,
+            Arc::new(DefaultTodoLifecyclePolicy),
+            Arc::new(DefaultTaskDependencyResolver),
+        )
+    }
+
+    pub fn with_components(
+        app_id: ApplicationId,
+        session_id: Option<String>,
+        store: Arc<TodoStore>,
+        lifecycle_policy: Arc<dyn TodoLifecyclePolicy>,
+        dependency_resolver: Arc<dyn TaskDependencyResolver>,
+    ) -> Self {
         Self {
             app_id,
             session_id,
             store,
+            lifecycle_policy,
+            dependency_resolver,
         }
     }
 
@@ -334,7 +410,32 @@ impl TaskSpace {
     }
 
     /// Create a new task and assign it to an agent's board.
+    #[deprecated(note = "Use TaskSpace::create_task_assignment instead")]
     pub async fn create_and_assign(
+        &self,
+        agent: &str,
+        created_by: &str,
+        title: impl Into<String>,
+        description: impl Into<String>,
+        acceptance_criteria: Vec<String>,
+        priority: u8,
+        depends_on: Vec<TaskId>,
+        parent_task: Option<TaskId>,
+    ) -> TodoItem {
+        self.create_task_assignment(
+            agent,
+            created_by,
+            title,
+            description,
+            acceptance_criteria,
+            priority,
+            depends_on,
+            parent_task,
+        )
+        .await
+    }
+
+    pub async fn create_task_assignment(
         &self,
         agent: &str,
         created_by: &str,
@@ -365,21 +466,10 @@ impl TaskSpace {
         item.acceptance_criteria = acceptance_criteria;
         item.depends_on = depends_on.clone();
         item.parent_task = parent_task;
-
-        // If there are unmet dependencies, mark as Blocked.
-        // Use session-scoped list when session is set, else cross-session.
-        if !depends_on.is_empty() {
-            let all_todos = self.list_all_internal().await;
-            let completed_ids: Vec<TaskId> = all_todos
-                .iter()
-                .filter(|t| t.status == TodoStatus::Completed)
-                .map(|t| t.id)
-                .collect();
-            let all_met = depends_on.iter().all(|dep| completed_ids.contains(dep));
-            if !all_met {
-                item.status = TodoStatus::Blocked;
-            }
-        }
+        let all_todos = self.list_all_internal().await;
+        item.status = self
+            .dependency_resolver
+            .initial_status_for_new_task(&depends_on, &all_todos);
 
         self.store.save_todo(&item).await;
         item
@@ -387,7 +477,17 @@ impl TaskSpace {
 
     /// Review a task submitted by an agent.
     /// Searches across sessions (reviewer may not know the originating session).
+    #[deprecated(note = "Use TaskSpace::apply_review_result instead")]
     pub async fn review_task(
+        &self,
+        task_id: &TaskId,
+        agent: &str,
+        result: TodoReviewResult,
+    ) -> bool {
+        self.apply_review_result(task_id, agent, result).await
+    }
+
+    pub async fn apply_review_result(
         &self,
         task_id: &TaskId,
         agent: &str,
@@ -413,12 +513,8 @@ impl TaskSpace {
             task.review_feedback = Some(result.feedback.clone());
             task.updated_at = Utc::now();
 
-            if result.passed {
-                task.status = TodoStatus::Completed;
-            } else if task.attempt_count >= task.max_attempts {
-                task.status = TodoStatus::Failed;
-            } else {
-                task.status = TodoStatus::NeedsOptimization;
+            task.status = self.lifecycle_policy.on_review(&task, &result);
+            if task.status == TodoStatus::NeedsOptimization {
                 task.optimization_suggestions = Some(result.feedback);
             }
             self.store.save_todo(&task).await;
@@ -434,13 +530,18 @@ impl TaskSpace {
     }
 
     /// Skip a task (Pending/Blocked → Cancelled). Triggers dependency re-evaluation.
+    #[deprecated(note = "Use TaskSpace::cancel_task instead")]
     pub async fn skip_task(&self, task_id: &TaskId) -> bool {
+        self.cancel_task(task_id).await
+    }
+
+    pub async fn cancel_task(&self, task_id: &TaskId) -> bool {
         let all = self.list_all_internal().await;
         if let Some(mut task) = all.iter().find(|t| t.id == *task_id).cloned() {
-            if task.status != TodoStatus::Pending && task.status != TodoStatus::Blocked {
+            let Some(next_status) = self.lifecycle_policy.on_skip(&task) else {
                 return false;
-            }
-            task.status = TodoStatus::Cancelled;
+            };
+            task.status = next_status;
             task.updated_at = Utc::now();
             self.store.save_todo(&task).await;
             // Re-evaluate dependents (they'll stay Blocked since dep is Cancelled, not Completed)
@@ -456,23 +557,15 @@ impl TaskSpace {
     async fn unblock_dependents(&self, completed_id: &TaskId) {
         // Same scope as this TaskSpace: one chat/session only when session_id is set.
         let all = self.list_all_internal().await;
-        let completed_ids: Vec<TaskId> = all
-            .iter()
-            .filter(|t| t.status == TodoStatus::Completed)
-            .map(|t| t.id)
-            .collect();
+        let ready_ids = self
+            .dependency_resolver
+            .blocked_tasks_ready_after_completion(&all, completed_id);
 
         for mut item in all {
-            if item.status == TodoStatus::Blocked && item.depends_on.contains(completed_id) {
-                let all_met = item
-                    .depends_on
-                    .iter()
-                    .all(|dep| completed_ids.contains(dep));
-                if all_met {
-                    item.status = TodoStatus::Pending;
-                    item.updated_at = Utc::now();
-                    self.store.save_todo(&item).await;
-                }
+            if ready_ids.contains(&item.id) {
+                item.status = TodoStatus::Pending;
+                item.updated_at = Utc::now();
+                self.store.save_todo(&item).await;
             }
         }
     }
@@ -621,12 +714,12 @@ mod tests {
     #[tokio::test]
     async fn board_claim_by_sequence_number() {
         let (app_id, store) = setup().await;
-        let board = TaskBoard::new(app_id.clone(), "backend", None, Arc::clone(&store));
-        let space = TaskSpace::new(app_id.clone(), None, Arc::clone(&store));
+        let board = TaskBoard::for_agent(app_id.clone(), "backend", None, Arc::clone(&store));
+        let space = TaskSpace::for_session(app_id.clone(), None, Arc::clone(&store));
 
         // Created in order: seq 1, 2, 3 (auto-assigned)
         space
-            .create_and_assign(
+            .create_task_assignment(
                 "backend",
                 "coord",
                 "First task",
@@ -638,7 +731,7 @@ mod tests {
             )
             .await;
         space
-            .create_and_assign(
+            .create_task_assignment(
                 "backend",
                 "coord",
                 "Second task",
@@ -650,7 +743,7 @@ mod tests {
             )
             .await;
         space
-            .create_and_assign(
+            .create_task_assignment(
                 "backend",
                 "coord",
                 "Third task",
@@ -663,24 +756,24 @@ mod tests {
             .await;
 
         // Should claim by sequence order, not priority
-        let claimed = board.claim_next().await.unwrap();
+        let claimed = board.claim_next_task().await.unwrap();
         assert_eq!(claimed.title, "First task");
         assert_eq!(claimed.sequence_number, 1);
         assert_eq!(claimed.status, TodoStatus::Assigned);
 
         // seq 1 is now Assigned (not terminal), so claim_next blocks
-        let claimed2 = board.claim_next().await;
+        let claimed2 = board.claim_next_task().await;
         assert!(claimed2.is_none(), "Should block because seq 1 is Assigned");
     }
 
     #[tokio::test]
     async fn board_submit_and_review() {
         let (app_id, store) = setup().await;
-        let board = TaskBoard::new(app_id.clone(), "backend", None, Arc::clone(&store));
-        let space = TaskSpace::new(app_id.clone(), None, Arc::clone(&store));
+        let board = TaskBoard::for_agent(app_id.clone(), "backend", None, Arc::clone(&store));
+        let space = TaskSpace::for_session(app_id.clone(), None, Arc::clone(&store));
 
         let task = space
-            .create_and_assign(
+            .create_task_assignment(
                 "backend",
                 "coord",
                 "Write API",
@@ -693,12 +786,12 @@ mod tests {
             .await;
 
         // Agent claims and starts
-        board.claim_next().await;
-        board.start_task(&task.id).await;
+        board.claim_next_task().await;
+        board.mark_task_in_progress(&task.id).await;
 
         // Agent submits for review
         board
-            .submit_for_review(&task.id, "Done, all tests pass".into())
+            .submit_task_for_review(&task.id, "Done, all tests pass".into())
             .await;
 
         // Plan Agent reviews — pass
@@ -707,7 +800,7 @@ mod tests {
             feedback: "Looks good".into(),
             verified_criteria: vec![("returns 200".into(), true)],
         };
-        space.review_task(&task.id, "backend", result).await;
+        space.apply_review_result(&task.id, "backend", result).await;
 
         let updated = store
             .get_todo(&app_id, &None, "backend", &task.id)
@@ -719,11 +812,11 @@ mod tests {
     #[tokio::test]
     async fn review_fail_triggers_optimization() {
         let (app_id, store) = setup().await;
-        let board = TaskBoard::new(app_id.clone(), "backend", None, Arc::clone(&store));
-        let space = TaskSpace::new(app_id.clone(), None, Arc::clone(&store));
+        let board = TaskBoard::for_agent(app_id.clone(), "backend", None, Arc::clone(&store));
+        let space = TaskSpace::for_session(app_id.clone(), None, Arc::clone(&store));
 
         let task = space
-            .create_and_assign(
+            .create_task_assignment(
                 "backend",
                 "coord",
                 "Fix bug",
@@ -734,10 +827,10 @@ mod tests {
                 None,
             )
             .await;
-        board.claim_next().await;
-        board.start_task(&task.id).await;
+        board.claim_next_task().await;
+        board.mark_task_in_progress(&task.id).await;
         board
-            .submit_for_review(&task.id, "I think it's fixed".into())
+            .submit_task_for_review(&task.id, "I think it's fixed".into())
             .await;
 
         let result = TodoReviewResult {
@@ -745,7 +838,7 @@ mod tests {
             feedback: "Missing edge case handling".into(),
             verified_criteria: vec![],
         };
-        space.review_task(&task.id, "backend", result).await;
+        space.apply_review_result(&task.id, "backend", result).await;
 
         let updated = store
             .get_todo(&app_id, &None, "backend", &task.id)
@@ -758,12 +851,12 @@ mod tests {
     #[tokio::test]
     async fn dependency_blocking_and_unblocking() {
         let (app_id, store) = setup().await;
-        let board = TaskBoard::new(app_id.clone(), "backend", None, Arc::clone(&store));
-        let space = TaskSpace::new(app_id.clone(), None, Arc::clone(&store));
+        let board = TaskBoard::for_agent(app_id.clone(), "backend", None, Arc::clone(&store));
+        let space = TaskSpace::for_session(app_id.clone(), None, Arc::clone(&store));
 
         // Task A (no deps)
         let task_a = space
-            .create_and_assign(
+            .create_task_assignment(
                 "backend",
                 "coord",
                 "Task A",
@@ -776,7 +869,7 @@ mod tests {
             .await;
         // Task B depends on A
         let task_b = space
-            .create_and_assign(
+            .create_task_assignment(
                 "backend",
                 "coord",
                 "Task B",
@@ -796,11 +889,13 @@ mod tests {
         assert_eq!(b.status, TodoStatus::Blocked);
 
         // Complete A
-        board.claim_next().await;
-        board.start_task(&task_a.id).await;
-        board.submit_for_review(&task_a.id, "Done".into()).await;
+        board.claim_next_task().await;
+        board.mark_task_in_progress(&task_a.id).await;
+        board
+            .submit_task_for_review(&task_a.id, "Done".into())
+            .await;
         space
-            .review_task(
+            .apply_review_result(
                 &task_a.id,
                 "backend",
                 TodoReviewResult {
@@ -822,16 +917,16 @@ mod tests {
     #[tokio::test]
     async fn progress_summary() {
         let (app_id, store) = setup().await;
-        let space = TaskSpace::new(app_id.clone(), None, Arc::clone(&store));
+        let space = TaskSpace::for_session(app_id.clone(), None, Arc::clone(&store));
 
         space
-            .create_and_assign("backend", "coord", "T1", "d", vec![], 5, vec![], None)
+            .create_task_assignment("backend", "coord", "T1", "d", vec![], 5, vec![], None)
             .await;
         space
-            .create_and_assign("backend", "coord", "T2", "d", vec![], 5, vec![], None)
+            .create_task_assignment("backend", "coord", "T2", "d", vec![], 5, vec![], None)
             .await;
         space
-            .create_and_assign("frontend", "coord", "T3", "d", vec![], 5, vec![], None)
+            .create_task_assignment("frontend", "coord", "T3", "d", vec![], 5, vec![], None)
             .await;
 
         let progress = space.overall_progress().await;
@@ -843,7 +938,7 @@ mod tests {
     #[tokio::test]
     async fn goal_lifecycle() {
         let (app_id, store) = setup().await;
-        let space = TaskSpace::new(app_id, None, Arc::clone(&store));
+        let space = TaskSpace::for_session(app_id, None, Arc::clone(&store));
 
         let goal = space.push_goal("Build auth system").await;
         assert_eq!(space.list_goals().await.len(), 1);
@@ -859,8 +954,8 @@ mod tests {
     #[tokio::test]
     async fn board_does_not_claim_goal_tasks_until_goal_in_progress() {
         let (app_id, store) = setup().await;
-        let board = TaskBoard::new(app_id.clone(), "backend", None, Arc::clone(&store));
-        let space = TaskSpace::new(app_id.clone(), None, Arc::clone(&store));
+        let board = TaskBoard::for_agent(app_id.clone(), "backend", None, Arc::clone(&store));
+        let space = TaskSpace::for_session(app_id.clone(), None, Arc::clone(&store));
 
         let goal = space.push_goal("Build feature").await;
         let _ = space
@@ -868,7 +963,7 @@ mod tests {
             .await
             .expect("goal should move to decomposing");
         space
-            .create_and_assign(
+            .create_task_assignment(
                 "backend",
                 "planner",
                 "Implement backend",
@@ -881,7 +976,7 @@ mod tests {
             .await;
 
         assert!(
-            board.claim_next().await.is_none(),
+            board.claim_next_task().await.is_none(),
             "tasks under a Decomposing goal must not be claimed"
         );
 
@@ -889,7 +984,7 @@ mod tests {
             .update_goal_status(&app_id, &goal.id, TodoGoalStatus::InProgress)
             .await;
         let claimed = board
-            .claim_next()
+            .claim_next_task()
             .await
             .expect("task should be claimable after goal enters InProgress");
         assert_eq!(claimed.title, "Implement backend");
@@ -902,11 +997,11 @@ mod tests {
         let sess_a = Some("session-a".to_string());
         let sess_b = Some("session-b".to_string());
 
-        let space_a = TaskSpace::new(app_id.clone(), sess_a, Arc::clone(&store));
-        let space_b = TaskSpace::new(app_id.clone(), sess_b, Arc::clone(&store));
+        let space_a = TaskSpace::for_session(app_id.clone(), sess_a, Arc::clone(&store));
+        let space_b = TaskSpace::for_session(app_id.clone(), sess_b, Arc::clone(&store));
 
         space_a
-            .create_and_assign(
+            .create_task_assignment(
                 "backend",
                 "coord",
                 "Task A",
@@ -918,7 +1013,7 @@ mod tests {
             )
             .await;
         space_b
-            .create_and_assign(
+            .create_task_assignment(
                 "backend",
                 "coord",
                 "Task B",

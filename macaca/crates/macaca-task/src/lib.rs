@@ -2,6 +2,8 @@
 
 pub mod claim_diagnostics;
 pub mod decompose;
+pub mod dependency;
+pub mod lifecycle;
 pub mod plan_loop;
 pub mod queue;
 pub mod scheduler;
@@ -14,6 +16,8 @@ pub use claim_diagnostics::{diagnose_session_claims, SessionClaimDiagnostics};
 pub use decompose::{
     build_decomposition_prompt, DecomposedTask, LlmDecomposer, SimpleDecomposer, TaskDecomposer,
 };
+pub use dependency::{DefaultTaskDependencyResolver, TaskDependencyResolver};
+pub use lifecycle::{DefaultTodoLifecyclePolicy, TodoLifecyclePolicy};
 pub use plan_loop::{
     GoalEvaluation, GoalEvaluator, PlanEvent, PlanLoop, PlanLoopConfig, PlanLoopWaker, TaskSummary,
 };
