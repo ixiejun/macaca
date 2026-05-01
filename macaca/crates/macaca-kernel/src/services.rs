@@ -8,9 +8,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use macaca_agent::{IpcService, MemoryService, PersistService};
+use macaca_ipc::DynMessageSender;
 use macaca_proto::{IpcMessage, MacacaResult, MemoryEntry, MemoryId};
-
-use macaca_ipc::bus;
 use macaca_memory::store::MemoryStore;
 use macaca_persist::store::PersistStore;
 
@@ -41,18 +40,18 @@ impl<S: MemoryStore> MemoryService for MemoryServiceAdapter<S> {
 // ── IpcServiceAdapter ────────────────────────────────────────────────────────
 
 /// Wraps any `bus::MessageSender` as an `AgentServices::IpcService`.
-pub struct IpcServiceAdapter<S: bus::MessageSender> {
-    sender: Arc<S>,
+pub struct IpcServiceAdapter {
+    sender: DynMessageSender,
 }
 
-impl<S: bus::MessageSender> IpcServiceAdapter<S> {
-    pub fn new(sender: Arc<S>) -> Self {
+impl IpcServiceAdapter {
+    pub fn new(sender: DynMessageSender) -> Self {
         Self { sender }
     }
 }
 
 #[async_trait]
-impl<S: bus::MessageSender> IpcService for IpcServiceAdapter<S> {
+impl IpcService for IpcServiceAdapter {
     async fn send(&self, msg: IpcMessage) -> MacacaResult<()> {
         self.sender.send(msg).await
     }
@@ -124,7 +123,7 @@ mod tests {
     #[tokio::test]
     async fn ipc_service_adapter() {
         let bus = macaca_ipc::LocalBus::new();
-        let sender = Arc::new(bus.sender());
+        let sender = macaca_ipc::IpcTransport::create_sender(&bus);
         let adapter = IpcServiceAdapter::new(sender);
 
         let msg = IpcMessage {
