@@ -486,16 +486,21 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
         .join("macaca");
     std::fs::create_dir_all(&data_dir).ok();
     let session_db_path = data_dir.join("sessions.db");
-    let session_store = Arc::new(RedbStore::open(&session_db_path)?);
-    let todo_store = Arc::new(macaca_task::TodoStore::new(Arc::clone(&session_store)));
-    let event_log = Arc::new(macaca_persist::EventLog::new(Arc::clone(&session_store)));
+    let session_store_impl = Arc::new(RedbStore::open(&session_db_path)?);
+    let session_store_shared: Arc<dyn macaca_persist::PersistBackend> =
+        session_store_impl.clone();
+    let todo_store = Arc::new(macaca_task::TodoStore::new(Arc::clone(
+        &session_store_shared,
+    )));
+    let event_log = Arc::new(macaca_persist::EventLog::new(Arc::clone(&session_store_impl)));
     let run_tracer = Arc::new(crate::run_trace::RunTracer::new(Arc::clone(&event_log)));
     info!(path = %session_db_path.display(), "Session store initialized");
 
     // 9a. Initialize audit logger and alert manager.
     let audit_logger = Arc::new(macaca_kernel::audit::AuditLogger::new(Arc::clone(
-        &session_store,
+        &session_store_shared,
     )));
+    let session_store = session_store_shared;
     let alert_config = macaca_kernel::alert::AlertConfig::default();
     let alert_manager = Arc::new(macaca_kernel::alert::AlertManager::new(alert_config));
     info!("AuditLogger and AlertManager initialized");

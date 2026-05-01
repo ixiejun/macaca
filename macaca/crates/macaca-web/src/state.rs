@@ -14,7 +14,7 @@ use macaca_driver::DriverRegistry;
 use macaca_framework::session::SessionStore as FrameworkSessionStore;
 use macaca_kernel::{ApplicationExecutorRegistry, Kernel};
 use macaca_llm::{LlmProvider, LlmRouter};
-use macaca_persist::{EventLog, RedbStore};
+use macaca_persist::{EventLog, PersistBackend};
 use macaca_proto::{ApplicationId, ForkId, LlmMessage};
 use macaca_runtime::agentic_loop::ResumeReason;
 use macaca_skill::SkillCatalog;
@@ -63,7 +63,7 @@ pub struct ActiveSession {
 /// Persistence-related state: stores, logs, tracers.
 pub struct PersistenceState {
     /// Persistent session store (redb-backed).
-    pub session_store: Arc<RedbStore>,
+    pub session_store: Arc<dyn PersistBackend>,
     /// Shared TodoStore for the Task Board system.
     pub todo_store: Arc<TodoStore>,
     /// Append-only event log (redb-backed, durable before SSE send).

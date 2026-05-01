@@ -202,7 +202,8 @@ pub enum ScheduleEvent {
 /// use macaca_proto::ApplicationId;
 ///
 /// async fn example(store: Arc<macaca_persist::RedbStore>) {
-///     let scheduler = TaskScheduler::new(Arc::clone(&store), SchedulerConfig::default());
+///     let store: Arc<dyn macaca_persist::PersistBackend> = store;
+///     let scheduler = TaskScheduler::new(store, SchedulerConfig::default());
 ///     let app_id = ApplicationId::new();
 ///     let shutdown = Arc::new(AtomicBool::new(false));
 ///     let (tx, mut rx) = tokio::sync::mpsc::channel(32);
@@ -220,10 +221,7 @@ pub struct TaskScheduler {
 }
 
 impl TaskScheduler {
-    pub fn new<T>(store: Arc<T>, config: SchedulerConfig) -> Self
-    where
-        T: PersistBackend + 'static,
-    {
+    pub fn new(store: Arc<dyn PersistBackend>, config: SchedulerConfig) -> Self {
         Self { store, config }
     }
 

@@ -12,7 +12,7 @@
 
 ## 3. Backend Strategy Migration
 
-- [ ] 3.1 将 `macaca-web` 共享 session store 类型收敛到 `PersistBackend` / `PersistStore`
+- [x] 3.1 将 `macaca-web` 共享 session store 类型收敛到 `PersistBackend` / `PersistStore`
 - [x] 3.2 将 `macaca-task::TodoStore` 迁移到 `PersistBackend`
 - [x] 3.3 将 `macaca-task::TaskScheduler` 迁移到 `PersistBackend`
 - [x] 3.4 将 `macaca-kernel::AuditLogger` 迁移到 `PersistBackend`

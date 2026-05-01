@@ -1,9 +1,12 @@
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use tracing::{debug, warn};
 
 use macaca_proto::{IpcMessage, MacacaError, MacacaResult};
 
 use crate::bus::{MessageReceiver, MessageSender};
+use crate::transport::{DynMessageReceiver, DynMessageSender, IpcTransport, IpcTransportKind};
 
 const SUBJECT_PREFIX: &str = "aos.";
 
@@ -113,17 +116,42 @@ impl NatsBus {
         Ok(Self { client })
     }
 
-    pub fn sender(&self) -> NatsSender {
+    pub(crate) fn make_sender(&self) -> NatsSender {
         NatsSender {
             client: self.client.clone(),
         }
     }
 
-    pub fn receiver(&self) -> NatsReceiver {
+    pub(crate) fn make_receiver(&self) -> NatsReceiver {
         NatsReceiver {
             client: self.client.clone(),
             subscriber: None,
         }
+    }
+
+    #[deprecated(note = "use IpcTransport::create_sender or IpcTransportFactory instead")]
+    pub fn sender(&self) -> NatsSender {
+        self.make_sender()
+    }
+
+    #[deprecated(note = "use IpcTransport::create_receiver or IpcTransportFactory instead")]
+    pub fn receiver(&self) -> NatsReceiver {
+        self.make_receiver()
+    }
+}
+
+#[async_trait]
+impl IpcTransport for NatsBus {
+    fn kind(&self) -> IpcTransportKind {
+        IpcTransportKind::Nats
+    }
+
+    fn create_sender(&self) -> DynMessageSender {
+        Arc::new(self.make_sender())
+    }
+
+    fn create_receiver(&self) -> DynMessageReceiver {
+        Box::new(self.make_receiver())
     }
 }
 
@@ -138,8 +166,9 @@ mod tests {
     #[ignore]
     async fn nats_connect() {
         let bus = NatsBus::connect("nats://127.0.0.1:4222").await.unwrap();
-        let _sender = bus.sender();
-        let _receiver = bus.receiver();
+        let _sender = bus.make_sender();
+        let _receiver = bus.make_receiver();
+        assert_eq!(bus.kind(), IpcTransportKind::Nats);
     }
 
     #[tokio::test]
@@ -149,8 +178,8 @@ mod tests {
         use macaca_proto::{AgentId, IpcMessage, MessageId};
 
         let bus = NatsBus::connect("nats://127.0.0.1:4222").await.unwrap();
-        let sender = bus.sender();
-        let mut receiver = bus.receiver();
+        let sender = bus.make_sender();
+        let mut receiver = bus.make_receiver();
 
         receiver.subscribe("test.topic").await.unwrap();
 

@@ -29,10 +29,7 @@ pub struct TodoStore {
 }
 
 impl TodoStore {
-    pub fn new<T>(store: Arc<T>) -> Self
-    where
-        T: PersistBackend + 'static,
-    {
+    pub fn new(store: Arc<dyn PersistBackend>) -> Self {
         Self { store }
     }
 

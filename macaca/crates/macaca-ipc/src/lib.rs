@@ -10,7 +10,12 @@
 pub mod bus;
 pub mod local;
 pub mod nats;
+pub mod transport;
 
 pub use bus::{MessageReceiver, MessageSender};
 pub use local::{LocalBus, LocalReceiver, LocalSender};
 pub use nats::{NatsBus, NatsReceiver, NatsSender};
+pub use transport::{
+    DynMessageReceiver, DynMessageSender, IpcTransport, IpcTransportConfig, IpcTransportFactory,
+    IpcTransportKind,
+};

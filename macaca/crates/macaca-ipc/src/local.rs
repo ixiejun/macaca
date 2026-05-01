@@ -8,6 +8,7 @@ use tracing::{debug, warn};
 use macaca_proto::{IpcMessage, MacacaError, MacacaResult};
 
 use crate::bus::{MessageReceiver, MessageSender};
+use crate::transport::{DynMessageReceiver, DynMessageSender, IpcTransport, IpcTransportKind};
 
 const CHANNEL_CAPACITY: usize = 256;
 
@@ -28,18 +29,30 @@ impl LocalBus {
     }
 
     /// Create a sender that shares this bus's topic registry.
-    pub fn sender(&self) -> LocalSender {
+    pub(crate) fn make_sender(&self) -> LocalSender {
         LocalSender {
             topics: Arc::clone(&self.topics),
         }
     }
 
     /// Create a receiver that shares this bus's topic registry.
-    pub fn receiver(&self) -> LocalReceiver {
+    pub(crate) fn make_receiver(&self) -> LocalReceiver {
         LocalReceiver {
             topics: Arc::clone(&self.topics),
             subscriptions: HashMap::new(),
         }
+    }
+
+    /// Legacy compatibility entry.
+    #[deprecated(note = "use IpcTransport::create_sender or IpcTransportFactory instead")]
+    pub fn sender(&self) -> LocalSender {
+        self.make_sender()
+    }
+
+    /// Legacy compatibility entry.
+    #[deprecated(note = "use IpcTransport::create_receiver or IpcTransportFactory instead")]
+    pub fn receiver(&self) -> LocalReceiver {
+        self.make_receiver()
     }
 
     /// Obtain or create a broadcast channel for `topic`.
@@ -51,6 +64,21 @@ impl LocalBus {
                 tx
             })
             .clone()
+    }
+}
+
+#[async_trait]
+impl IpcTransport for LocalBus {
+    fn kind(&self) -> IpcTransportKind {
+        IpcTransportKind::Local
+    }
+
+    fn create_sender(&self) -> DynMessageSender {
+        Arc::new(self.make_sender())
+    }
+
+    fn create_receiver(&self) -> DynMessageReceiver {
+        Box::new(self.make_receiver())
     }
 }
 
@@ -166,8 +194,8 @@ mod tests {
     #[tokio::test]
     async fn publish_and_receive() {
         let bus = LocalBus::new();
-        let sender = bus.sender();
-        let mut receiver = bus.receiver();
+        let sender = bus.make_sender();
+        let mut receiver = bus.make_receiver();
 
         receiver.subscribe("greet").await.unwrap();
 
@@ -182,7 +210,7 @@ mod tests {
     #[tokio::test]
     async fn send_direct_requires_to() {
         let bus = LocalBus::new();
-        let sender = bus.sender();
+        let sender = bus.make_sender();
         let msg = make_msg("direct");
         // No `to` set — should error
         let result = sender.send(msg).await;
@@ -192,8 +220,8 @@ mod tests {
     #[tokio::test]
     async fn send_direct_delivers_to_agent_topic() {
         let bus = LocalBus::new();
-        let sender = bus.sender();
-        let mut receiver = bus.receiver();
+        let sender = bus.make_sender();
+        let mut receiver = bus.make_receiver();
 
         let agent_id = AgentId::new();
         receiver.subscribe(&agent_id.0.to_string()).await.unwrap();
@@ -209,8 +237,8 @@ mod tests {
     #[tokio::test]
     async fn unsubscribe_stops_delivery() {
         let bus = LocalBus::new();
-        let sender = bus.sender();
-        let mut receiver = bus.receiver();
+        let sender = bus.make_sender();
+        let mut receiver = bus.make_receiver();
 
         receiver.subscribe("events").await.unwrap();
         receiver.unsubscribe("events").await.unwrap();
@@ -224,7 +252,7 @@ mod tests {
     #[tokio::test]
     async fn publish_with_no_subscribers_is_ok() {
         let bus = LocalBus::new();
-        let sender = bus.sender();
+        let sender = bus.make_sender();
         // No receiver subscribed — should not error.
         let result = sender.publish("orphan", make_msg("orphan")).await;
         assert!(result.is_ok());
@@ -233,8 +261,8 @@ mod tests {
     #[tokio::test]
     async fn multiple_topics() {
         let bus = LocalBus::new();
-        let sender = bus.sender();
-        let mut receiver = bus.receiver();
+        let sender = bus.make_sender();
+        let mut receiver = bus.make_receiver();
 
         receiver.subscribe("a").await.unwrap();
         receiver.subscribe("b").await.unwrap();
@@ -250,5 +278,21 @@ mod tests {
 
         assert!(received_ids.contains(&msg_a.id));
         assert!(received_ids.contains(&msg_b.id));
+    }
+
+    #[tokio::test]
+    async fn transport_bridge_matches_local_behavior() {
+        let bus = LocalBus::new();
+        let sender = bus.create_sender();
+        let mut receiver = bus.create_receiver();
+
+        receiver.subscribe("bridge.local").await.unwrap();
+
+        let msg = make_msg("bridge.local");
+        sender.publish("bridge.local", msg.clone()).await.unwrap();
+
+        let received = receiver.recv().await.unwrap();
+        assert_eq!(received.id, msg.id);
+        assert_eq!(bus.kind(), IpcTransportKind::Local);
     }
 }
