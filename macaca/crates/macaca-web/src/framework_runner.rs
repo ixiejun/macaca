@@ -888,42 +888,28 @@ impl WebTracedAgentFactory {
 
         tokio::spawn(async move {
             while let Some(trace) = trace_rx.recv().await {
+                let framework_tool_wrapper = trace.driver_id.is_none()
+                    && matches!(trace.event_type.as_str(), "tool_call" | "tool_result");
                 let driver_name = trace
                     .driver_id
                     .clone()
-                    .unwrap_or_else(|| "unknown".to_string());
+                    .unwrap_or_else(|| "macaca-framework".to_string());
                 let trace_value = serde_json::to_value(&trace).unwrap_or_default();
 
                 match &route {
                     DriverTraceRoute::Executor {
-                        state,
                         executor,
                         task_id,
                         agent_name,
-                        session_id,
+                        ..
                     } => {
-                        let delegated_envelope = serde_json::json!({
-                            "task_id": task_id.to_string(),
-                            "agent": agent_name,
-                            "agent_tab": agent_name,
-                            "driver_name": driver_name,
-                            "event": trace_value,
-                        });
-
-                        if let Some(sid) = session_id {
-                            let sender_opt = {
-                                let sessions = state.sessions.active_sessions.read().await;
-                                sessions.get(sid).map(|session| Arc::clone(&session.sse_tx))
-                            };
-                            if let Some(sender) = sender_opt {
-                                let event = Event::default()
-                                    .event("delegated_driver_trace")
-                                    .data(delegated_envelope.to_string());
-                                let tx = sender.read().await;
-                                let _ = tx.send(Ok(event)).await;
-                            }
+                        if framework_tool_wrapper {
+                            continue;
                         }
 
+                        // Executor routes publish through the executor broadcast channel only.
+                        // post_chat_v2 owns the SSE forwarding for that channel; sending here
+                        // as well would duplicate delegated_driver_trace events in the live UI.
                         executor.broadcast_event(
                             macaca_kernel::executor::ExecutorEvent::AgentEvent {
                                 task_id: *task_id,
@@ -949,6 +935,10 @@ impl WebTracedAgentFactory {
                         agent_name,
                         session_id,
                     } => {
+                        if framework_tool_wrapper {
+                            continue;
+                        }
+
                         if let Some(sid) = session_id {
                             event_log
                                 .append_command(AppendEventCommand::new(

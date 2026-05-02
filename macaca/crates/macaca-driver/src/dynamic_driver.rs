@@ -328,26 +328,13 @@ pub struct DynamicTool {
     ctx: Arc<DynamicToolContext>,
 }
 
-#[async_trait]
-impl Tool for DynamicTool {
-    fn name(&self) -> &str {
-        &self.name
-    }
-
-    fn description(&self) -> &str {
-        &self.description
-    }
-
-    fn parameters_schema(&self) -> Value {
-        self.parameters_schema.clone()
-    }
-
-    async fn execute(&self, input: Value) -> MacacaResult<Value> {
+impl DynamicTool {
+    async fn execute_via_ffi(&self, input: Value) -> MacacaResult<Value> {
         let ctx = Arc::clone(&self.ctx);
         let tool_name = self.name.clone();
         let input_json = serde_json::to_string(&input)?;
 
-        // Bridge synchronous FFI call into async runtime via spawn_blocking
+        // Bridge synchronous FFI call into async runtime via spawn_blocking.
         tokio::task::spawn_blocking(move || unsafe {
             let tool_name_c = CString::new(tool_name.as_str())
                 .map_err(|e| MacacaError::Driver(format!("Tool name contains null byte: {}", e)))?;
@@ -383,6 +370,25 @@ impl Tool for DynamicTool {
         .await
         .map_err(|e| MacacaError::Driver(format!("Task join error: {}", e)))?
     }
+}
+
+#[async_trait]
+impl Tool for DynamicTool {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn description(&self) -> &str {
+        &self.description
+    }
+
+    fn parameters_schema(&self) -> Value {
+        self.parameters_schema.clone()
+    }
+
+    async fn execute(&self, input: Value) -> MacacaResult<Value> {
+        self.execute_via_ffi(input).await
+    }
 
     async fn execute_streaming(
         &self,
@@ -393,15 +399,15 @@ impl Tool for DynamicTool {
         let fn_streaming = match self.ctx.fn_execute_tool_streaming {
             Some(f) => f,
             None => {
-                // Fall back to non-streaming execute()
-                return self.execute(input).await;
+                // Fall back to non-streaming FFI execution.
+                return self.execute_via_ffi(input).await;
             }
         };
 
         // If no event sender, also fall back to non-streaming
         let event_tx = match event_tx {
             Some(tx) => tx,
-            None => return self.execute(input).await,
+            None => return self.execute_via_ffi(input).await,
         };
 
         let ctx = Arc::clone(&self.ctx);

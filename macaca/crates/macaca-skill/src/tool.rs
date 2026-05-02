@@ -149,7 +149,12 @@ mod tests {
     #[tokio::test]
     async fn skill_tool_execute_shell() {
         let tool = SkillTool::new(echo_skill());
-        let result = tool.execute(serde_json::json!({})).await.unwrap();
+        let result = macaca_tools::ToolCommandExecutor::execute_command(
+            &tool,
+            macaca_tools::ToolCommand::new(serde_json::json!({})),
+        )
+        .await
+        .unwrap();
         assert_eq!(result["exit_code"], 0);
         assert!(result["stdout"]
             .as_str()
@@ -176,10 +181,14 @@ mod tests {
                 }
             }),
         });
-        let result = tool
-            .execute(serde_json::json!({"action": "init", "args": ["--verbose"]}))
-            .await
-            .unwrap();
+        let result = macaca_tools::ToolCommandExecutor::execute_command(
+            &tool,
+            macaca_tools::ToolCommand::new(
+                serde_json::json!({"action": "init", "args": ["--verbose"]}),
+            ),
+        )
+        .await
+        .unwrap();
         assert_eq!(result["exit_code"], 0);
         let stdout = result["stdout"].as_str().unwrap();
         assert!(stdout.contains("init"));
@@ -198,7 +207,11 @@ mod tests {
             },
             parameters: serde_json::json!({}),
         });
-        let result = tool.execute(serde_json::json!({})).await;
+        let result = macaca_tools::ToolCommandExecutor::execute_command(
+            &tool,
+            macaca_tools::ToolCommand::new(serde_json::json!({})),
+        )
+        .await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("McpDriver"));
     }

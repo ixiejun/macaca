@@ -9,9 +9,9 @@ use async_trait::async_trait;
 
 use macaca_agent::{IpcService, MemoryService, PersistService};
 use macaca_ipc::DynMessageSender;
-use macaca_proto::{IpcMessage, MacacaResult, MemoryEntry, MemoryId};
 use macaca_memory::store::MemoryStore;
 use macaca_persist::store::PersistStore;
+use macaca_proto::{IpcMessage, MacacaResult, MemoryEntry, MemoryId};
 
 // ── MemoryServiceAdapter ─────────────────────────────────────────────────────
 

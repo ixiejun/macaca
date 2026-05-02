@@ -62,7 +62,7 @@ pub(crate) async fn build_toolkit(
     let policy = resolve_tool_policy(state, app_id, agent_name).await;
 
     // Base tools from the global ToolSet via ToolSetBridge.
-    // state.tools is Arc<dyn ToolSet>, which ToolSetBridge accepts directly.
+    // state.tools is Arc<dyn ToolCatalog>, which ToolSetBridge accepts directly.
     let mut toolkit = ToolSetBridge::from_tool_set(Arc::clone(&state.tools));
 
     // Dynamically aggregate driver tools from the DriverRegistry.

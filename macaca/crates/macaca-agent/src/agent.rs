@@ -5,7 +5,7 @@ use macaca_llm::LlmProvider;
 use macaca_proto::{
     AgentId, AgentOutput, AgentState, Capability, IpcMessage, MacacaResult, MemoryEntry, MemoryId,
 };
-use macaca_tools::ToolSet;
+use macaca_tools::ToolCatalog;
 
 static NOOP_MEMORY_SERVICE: NoopMemoryService = NoopMemoryService;
 static NOOP_IPC_SERVICE: NoopIpcService = NoopIpcService;
@@ -135,7 +135,7 @@ pub trait Agent: Send + Sync {
     async fn run(
         &self,
         llm: &dyn LlmProvider,
-        tools: &dyn ToolSet,
+        tools: &dyn ToolCatalog,
         services: &AgentServices,
     ) -> MacacaResult<AgentOutput>;
 }

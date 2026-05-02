@@ -9,7 +9,7 @@ use macaca_proto::{
     AgentId, AgentManifest, AgentOutput, AgentState, Capability, LlmMessage, LlmOptions,
     MacacaError, MacacaResult, Permission,
 };
-use macaca_tools::ToolSet;
+use macaca_tools::ToolCatalog;
 
 use crate::config::AgentConfig;
 
@@ -153,7 +153,7 @@ impl Agent for DeclarativeAgent {
     async fn run(
         &self,
         llm: &dyn LlmProvider,
-        _tools: &dyn ToolSet,
+        _tools: &dyn ToolCatalog,
         _services: &AgentServices,
     ) -> MacacaResult<AgentOutput> {
         if self.prompt_template.is_empty() {

@@ -15,4 +15,8 @@ pub use todo::{
     ListMyTasksTool, OnGoalCreated, OnGoalRecorded, OnTodoReviewed, ReassignTaskTool,
     ReviewTodoTool, StartTaskTool, SubmitTaskForReviewTool, UpdateTaskProgressTool,
 };
-pub use tool::{Tool, ToolSet, TraceEvent};
+pub use tool::{
+    CompositeToolSet, Tool, ToolCatalog, ToolCommand, ToolCommandContext, ToolCommandExecutor,
+    ToolCommandMiddleware, ToolCommandPipeline, ToolSchemaProvider, ToolSet, TraceEvent,
+    TraceToolCommandMiddleware,
+};

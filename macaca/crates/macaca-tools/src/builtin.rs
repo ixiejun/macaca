@@ -281,6 +281,17 @@ impl ToolSet for DefaultToolSet {
 mod tests {
     use super::*;
 
+    async fn exec_tool(
+        tool: &dyn Tool,
+        input: serde_json::Value,
+    ) -> MacacaResult<serde_json::Value> {
+        crate::tool::ToolCommandExecutor::execute_command(
+            tool,
+            crate::tool::ToolCommand::new(input),
+        )
+        .await
+    }
+
     #[tokio::test]
     async fn file_read_write_roundtrip() {
         let dir = tempfile::tempdir().unwrap();
@@ -288,15 +299,16 @@ mod tests {
         let path_str = path.to_str().unwrap();
 
         let write_tool = FileWriteTool;
-        let result = write_tool
-            .execute(serde_json::json!({ "path": path_str, "content": "hello aos" }))
-            .await
-            .unwrap();
+        let result = exec_tool(
+            &write_tool,
+            serde_json::json!({ "path": path_str, "content": "hello aos" }),
+        )
+        .await
+        .unwrap();
         assert_eq!(result["bytes_written"], 9);
 
         let read_tool = FileReadTool;
-        let result = read_tool
-            .execute(serde_json::json!({ "path": path_str }))
+        let result = exec_tool(&read_tool, serde_json::json!({ "path": path_str }))
             .await
             .unwrap();
         assert_eq!(result["content"], "hello aos");
@@ -304,15 +316,13 @@ mod tests {
 
     #[tokio::test]
     async fn file_read_missing_path_field() {
-        let result = FileReadTool.execute(serde_json::json!({})).await;
+        let result = exec_tool(&FileReadTool, serde_json::json!({})).await;
         assert!(result.is_err());
     }
 
     #[tokio::test]
     async fn file_write_missing_content_field() {
-        let result = FileWriteTool
-            .execute(serde_json::json!({ "path": "/tmp/x" }))
-            .await;
+        let result = exec_tool(&FileWriteTool, serde_json::json!({ "path": "/tmp/x" })).await;
         assert!(result.is_err());
     }
 
@@ -321,21 +331,22 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("alias.txt");
         let path_str = path.to_str().unwrap();
-        let result = FileWriteTool
-            .execute(serde_json::json!({
+        let result = exec_tool(
+            &FileWriteTool,
+            serde_json::json!({
                 "file_path": path_str,
                 "text": "via aliases"
-            }))
-            .await
-            .unwrap();
+            }),
+        )
+        .await
+        .unwrap();
         assert_eq!(result["bytes_written"], 11);
     }
 
     #[tokio::test]
     async fn shell_tool_echo() {
         let tool = ShellTool::default();
-        let result = tool
-            .execute(serde_json::json!({ "command": "echo hello" }))
+        let result = exec_tool(&tool, serde_json::json!({ "command": "echo hello" }))
             .await
             .unwrap();
         assert_eq!(result["stdout"].as_str().unwrap().trim(), "hello");
@@ -347,9 +358,11 @@ mod tests {
         let tool = ShellTool {
             default_timeout: Duration::from_millis(100),
         };
-        let result = tool
-            .execute(serde_json::json!({ "command": "sleep 10" }))
-            .await;
+        let result = crate::tool::ToolCommandExecutor::execute_command(
+            &tool,
+            crate::tool::ToolCommand::new(serde_json::json!({ "command": "sleep 10" })),
+        )
+        .await;
         assert!(result.is_err());
         let msg = result.unwrap_err().to_string();
         assert!(msg.contains("timed out"));
@@ -358,17 +371,22 @@ mod tests {
     #[tokio::test]
     async fn shell_tool_exit_code() {
         let tool = ShellTool::default();
-        let result = tool
-            .execute(serde_json::json!({ "command": "exit 42" }))
-            .await
-            .unwrap();
+        let result = crate::tool::ToolCommandExecutor::execute_command(
+            &tool,
+            crate::tool::ToolCommand::new(serde_json::json!({ "command": "exit 42" })),
+        )
+        .await
+        .unwrap();
         assert_eq!(result["exit_code"], 42);
     }
 
     #[test]
     fn default_toolset_contains_all_builtins() {
         let ts = DefaultToolSet::new();
-        let names: Vec<&str> = ts.tools().iter().map(|t| t.name()).collect();
+        let names: Vec<&str> = crate::tool::ToolCatalog::all_tools(&ts)
+            .iter()
+            .map(|t| t.name())
+            .collect();
         assert!(names.contains(&"file_read"));
         assert!(names.contains(&"file_write"));
         assert!(names.contains(&"shell"));
@@ -377,7 +395,7 @@ mod tests {
     #[test]
     fn toolset_get_tool_by_name() {
         let ts = DefaultToolSet::new();
-        assert!(ts.get_tool("file_read").is_some());
-        assert!(ts.get_tool("nonexistent").is_none());
+        assert!(crate::tool::ToolCatalog::find_tool(&ts, "file_read").is_some());
+        assert!(crate::tool::ToolCatalog::find_tool(&ts, "nonexistent").is_none());
     }
 }

@@ -18,8 +18,8 @@ use macaca_proto::types::{
 use macaca_runtime::{AgenticLoop, LoopResult, RuntimeConfig};
 use macaca_task::{TaskBoard, TaskSpace, TodoStore};
 use macaca_tools::{
-    ClaimTaskTool, CreateTodoTool, ReviewTodoTool, StartTaskTool, SubmitTaskForReviewTool, Tool,
-    ToolSet,
+    ClaimTaskTool, CompositeToolSet, CreateTodoTool, ReviewTodoTool, StartTaskTool,
+    SubmitTaskForReviewTool,
 };
 use serde_json::json;
 use tempfile::tempdir;
@@ -182,13 +182,7 @@ pub fn response_with_tools(tool_calls: Vec<ToolCall>) -> LlmResponse {
     }
 }
 
-struct LocalToolSet(Vec<Box<dyn Tool>>);
-
-impl ToolSet for LocalToolSet {
-    fn tools(&self) -> &[Box<dyn Tool>] {
-        &self.0
-    }
-}
+type LocalToolSet = CompositeToolSet;
 
 fn open_temp_store() -> Result<(tempfile::TempDir, Arc<TodoStore>), String> {
     let dir = tempdir().map_err(|e| e.to_string())?;
@@ -436,7 +430,7 @@ pub async fn run_full_pipeline_dry_run_with_config(config: PipelineDryRunConfig)
                 assignee_capabilities: std::collections::HashMap::new(),
                 active_goal_id: None,
             };
-            let tools = LocalToolSet(vec![Box::new(create)]);
+            let tools = LocalToolSet::new(vec![Box::new(create)]);
             let llm = ScriptedLlm::new(
                 "script",
                 vec![
@@ -547,7 +541,7 @@ pub async fn run_full_pipeline_dry_run_with_config(config: PipelineDryRunConfig)
                 store.clone(),
             ));
 
-            let tools = LocalToolSet(vec![
+            let tools = LocalToolSet::new(vec![
                 Box::new(ClaimTaskTool {
                     board: board.clone(),
                 }),

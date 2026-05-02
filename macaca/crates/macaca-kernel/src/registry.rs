@@ -124,7 +124,7 @@ mod tests {
     use macaca_proto::{
         AgentOutput, AgentState, Capability, Permission, PermissionLevel, TokenUsage,
     };
-    use macaca_tools::ToolSet;
+    use macaca_tools::ToolCatalog;
 
     fn make_manifest(id: AgentId, state: AgentState) -> AgentManifest {
         AgentManifest {
@@ -162,7 +162,7 @@ mod tests {
         async fn run(
             &self,
             _llm: &dyn LlmProvider,
-            _tools: &dyn ToolSet,
+            _tools: &dyn ToolCatalog,
             _services: &AgentServices,
         ) -> MacacaResult<AgentOutput> {
             Ok(AgentOutput {

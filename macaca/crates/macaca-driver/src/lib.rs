@@ -16,7 +16,10 @@ pub mod toolset;
 pub use driver::{DriverManifest, DriverType, SoftwareDriver};
 pub use dynamic_driver::DynamicDriver;
 pub use loader::DriverLoader;
-pub use macaca_tools::TraceEvent;
+pub use macaca_tools::{
+    CompositeToolSet, ToolCatalog, ToolCommand, ToolCommandContext, ToolCommandExecutor,
+    ToolSchemaProvider, TraceEvent,
+};
 pub use registry::DriverRegistry;
 
 /// A generic `Send` wrapper for closures that capture FFI raw pointers.

@@ -1,30 +1,39 @@
-//! `DriverToolSet` — aggregates tools from all drivers + standalone tools into a unified `ToolSet`.
+//! `DriverToolSet` — compatibility wrapper over `macaca_tools::CompositeToolSet`.
 
-use macaca_tools::{Tool, ToolSet};
+use macaca_tools::{CompositeToolSet, Tool, ToolSet};
 
 /// A `ToolSet` that combines tools from all registered drivers
 /// with any standalone tools.
 pub struct DriverToolSet {
-    tools: Vec<Box<dyn Tool>>,
+    inner: CompositeToolSet,
 }
 
 impl DriverToolSet {
     /// Create from a list of driver tools and standalone tools.
+    #[deprecated(note = "use macaca_tools::CompositeToolSet::from_groups()")]
     pub fn new(driver_tools: Vec<Box<dyn Tool>>, standalone_tools: Vec<Box<dyn Tool>>) -> Self {
-        let mut tools = driver_tools;
-        tools.extend(standalone_tools);
-        Self { tools }
+        Self {
+            inner: CompositeToolSet::from_groups(vec![driver_tools, standalone_tools]),
+        }
     }
 
     /// Create an empty toolset.
+    #[deprecated(note = "use macaca_tools::CompositeToolSet::empty()")]
     pub fn empty() -> Self {
-        Self { tools: vec![] }
+        Self {
+            inner: CompositeToolSet::empty(),
+        }
+    }
+
+    pub fn from_composite(inner: CompositeToolSet) -> Self {
+        Self { inner }
     }
 }
 
 impl ToolSet for DriverToolSet {
+    #[allow(deprecated)]
     fn tools(&self) -> &[Box<dyn Tool>] {
-        &self.tools
+        macaca_tools::ToolCatalog::all_tools(&self.inner)
     }
 }
 
@@ -34,13 +43,13 @@ mod tests {
 
     #[test]
     fn empty_toolset() {
-        let ts = DriverToolSet::empty();
-        assert!(ts.tools().is_empty());
+        let ts = DriverToolSet::from_composite(CompositeToolSet::empty());
+        assert!(macaca_tools::ToolCatalog::all_tools(&ts).is_empty());
     }
 
     #[test]
     fn combined_toolset() {
-        let ts = DriverToolSet::new(vec![], vec![]);
-        assert!(ts.tools().is_empty());
+        let ts = DriverToolSet::from_composite(CompositeToolSet::from_groups(vec![vec![], vec![]]));
+        assert!(macaca_tools::ToolCatalog::all_tools(&ts).is_empty());
     }
 }

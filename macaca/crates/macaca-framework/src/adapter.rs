@@ -294,12 +294,12 @@ fn messages_from_json(messages: &[serde_json::Value]) -> Vec<macaca_proto::LlmMe
 // LegacyToolHandler: macaca_tools::Tool → ToolHandler
 // ---------------------------------------------------------------------------
 
-/// Wraps a single tool from `macaca_tools::ToolSet` as a framework `ToolHandler`.
+/// Wraps a single tool from `macaca_tools::ToolCatalog` as a framework `ToolHandler`.
 pub struct LegacyToolHandler {
     tool_name: String,
     tool_description: String,
     tool_schema: serde_json::Value,
-    tool_set: Arc<dyn macaca_tools::ToolSet>,
+    tool_set: Arc<dyn macaca_tools::ToolCatalog>,
 }
 
 impl LegacyToolHandler {
@@ -307,7 +307,7 @@ impl LegacyToolHandler {
         name: String,
         description: String,
         schema: serde_json::Value,
-        tool_set: Arc<dyn macaca_tools::ToolSet>,
+        tool_set: Arc<dyn macaca_tools::ToolCatalog>,
     ) -> Self {
         Self {
             tool_name: name,
@@ -321,15 +321,15 @@ impl LegacyToolHandler {
 #[async_trait]
 impl ToolHandler for LegacyToolHandler {
     async fn execute(&self, args: serde_json::Value) -> Result<ToolResponse, ToolError> {
-        let tool = self
-            .tool_set
-            .get_tool(&self.tool_name)
+        let tool = macaca_tools::ToolCatalog::find_tool(self.tool_set.as_ref(), &self.tool_name)
             .ok_or_else(|| ToolError::NotFound(self.tool_name.clone()))?;
 
-        let result = tool
-            .execute(args)
-            .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+        let result = macaca_tools::ToolCommandExecutor::execute_command(
+            tool,
+            macaca_tools::ToolCommand::new(args),
+        )
+        .await
+        .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
 
         let text = serde_json::to_string(&result).unwrap_or_else(|_| result.to_string());
         Ok(ToolResponse::text(text))
@@ -347,17 +347,17 @@ impl ToolHandler for LegacyToolHandler {
 }
 
 // ---------------------------------------------------------------------------
-// ToolSetBridge: macaca_tools::ToolSet → Toolkit
+// ToolSetBridge: macaca_tools::ToolCatalog → Toolkit
 // ---------------------------------------------------------------------------
 
-/// Converts a `macaca_tools::ToolSet` into a framework `Toolkit`.
+/// Converts a `macaca_tools::ToolCatalog` into a framework `Toolkit`.
 pub struct ToolSetBridge;
 
 impl ToolSetBridge {
-    /// Register all tools from a `macaca_tools::ToolSet` into a new `Toolkit`.
-    pub fn from_tool_set(tool_set: Arc<dyn macaca_tools::ToolSet>) -> Toolkit {
+    /// Register all tools from a `macaca_tools::ToolCatalog` into a new `Toolkit`.
+    pub fn from_tool_set(tool_set: Arc<dyn macaca_tools::ToolCatalog>) -> Toolkit {
         let mut toolkit = Toolkit::new();
-        let definitions = tool_set.to_definitions();
+        let definitions = macaca_tools::ToolCatalog::definitions(tool_set.as_ref());
         for def in definitions {
             let handler = LegacyToolHandler::new(
                 def.name.clone(),
@@ -393,11 +393,12 @@ impl SingleToolAdapter {
 #[async_trait]
 impl ToolHandler for SingleToolAdapter {
     async fn execute(&self, args: serde_json::Value) -> Result<ToolResponse, ToolError> {
-        let result = self
-            .tool
-            .execute(args)
-            .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+        let result = macaca_tools::ToolCommandExecutor::execute_command(
+            self.tool.as_ref(),
+            macaca_tools::ToolCommand::new(args),
+        )
+        .await
+        .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
 
         let text = serde_json::to_string(&result).unwrap_or_else(|_| result.to_string());
         Ok(ToolResponse::text(text))
@@ -409,11 +410,18 @@ impl ToolHandler for SingleToolAdapter {
         args: serde_json::Value,
         event_tx: Option<tokio::sync::mpsc::UnboundedSender<macaca_tools::TraceEvent>>,
     ) -> Result<ToolResponse, ToolError> {
-        let result = self
-            .tool
-            .execute_streaming(args, event_tx)
-            .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+        let result = macaca_tools::ToolCommandExecutor::execute_command(
+            self.tool.as_ref(),
+            macaca_tools::ToolCommand::with_context(
+                args,
+                macaca_tools::ToolCommandContext {
+                    event_tx,
+                    ..Default::default()
+                },
+            ),
+        )
+        .await
+        .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
 
         let text = serde_json::to_string(&result).unwrap_or_else(|_| result.to_string());
         Ok(ToolResponse::text(text))
@@ -428,7 +436,7 @@ impl ToolHandler for SingleToolAdapter {
     }
 
     fn schema(&self) -> serde_json::Value {
-        self.tool.parameters_schema()
+        macaca_tools::ToolSchemaProvider::tool_schema(self.tool.as_ref())
     }
 }
 

@@ -8,7 +8,7 @@ use macaca_proto::config::KernelConfig;
 use macaca_proto::{
     AgentActivity, AgentId, AgentManifest, AgentOutput, AgentState, MacacaError, MacacaResult,
 };
-use macaca_tools::ToolSet;
+use macaca_tools::ToolCatalog;
 
 use crate::registry::AgentRegistry;
 use crate::scheduler::{Scheduler, SimpleScheduler};
@@ -20,12 +20,16 @@ pub struct Kernel {
     scheduler: Box<dyn Scheduler>,
     status_tracker: AgentStatusTracker,
     llm: Arc<dyn LlmProvider>,
-    tools: Arc<dyn ToolSet>,
+    tools: Arc<dyn ToolCatalog>,
 }
 
 impl Kernel {
     /// Create a new kernel with the given configuration.
-    pub fn new(config: &KernelConfig, llm: Arc<dyn LlmProvider>, tools: Box<dyn ToolSet>) -> Self {
+    pub fn new(
+        config: &KernelConfig,
+        llm: Arc<dyn LlmProvider>,
+        tools: Box<dyn ToolCatalog>,
+    ) -> Self {
         Self {
             registry: AgentRegistry::new(config.max_agents),
             scheduler: Box::new(SimpleScheduler),
@@ -205,7 +209,7 @@ mod tests {
         async fn run(
             &self,
             llm: &dyn LlmProvider,
-            _tools: &dyn ToolSet,
+            _tools: &dyn ToolCatalog,
             _services: &AgentServices,
         ) -> MacacaResult<AgentOutput> {
             let msgs = vec![LlmMessage::user("test")];

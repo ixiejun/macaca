@@ -3,7 +3,6 @@
 //! These tools allow the coordinator agent to delegate tasks to other agents.
 
 use async_trait::async_trait;
-use futures::FutureExt;
 use macaca_proto::{MacacaError, MacacaResult};
 use serde_json::Value;
 use std::sync::Arc;

@@ -145,7 +145,7 @@ macro_rules! export_driver {
                         .map(|t| $crate::plugin_abi::ToolDefinitionAbi {
                             name: t.name().to_string(),
                             description: t.description().to_string(),
-                            parameters_schema: t.parameters_schema(),
+                            parameters_schema: $crate::ToolSchemaProvider::tool_schema(t.as_ref()),
                         })
                         .collect();
                     _sdk_json_to_c_char(serde_json::to_string(&defs))
@@ -191,18 +191,23 @@ macro_rules! export_driver {
                             .enable_all()
                             .build()
                         {
-                            Ok(rt) => match rt.block_on(tool.execute(input)) {
-                                Ok(output) => $crate::plugin_abi::ToolResultAbi {
-                                    success: true,
-                                    output: Some(output),
-                                    error: None,
-                                },
-                                Err(e) => $crate::plugin_abi::ToolResultAbi {
-                                    success: false,
-                                    output: None,
-                                    error: Some(e.to_string()),
-                                },
-                            },
+                            Ok(rt) => {
+                                match rt.block_on($crate::ToolCommandExecutor::execute_command(
+                                    tool.as_ref(),
+                                    $crate::ToolCommand::new(input),
+                                )) {
+                                    Ok(output) => $crate::plugin_abi::ToolResultAbi {
+                                        success: true,
+                                        output: Some(output),
+                                        error: None,
+                                    },
+                                    Err(e) => $crate::plugin_abi::ToolResultAbi {
+                                        success: false,
+                                        output: None,
+                                        error: Some(e.to_string()),
+                                    },
+                                }
+                            }
                             Err(e) => $crate::plugin_abi::ToolResultAbi {
                                 success: false,
                                 output: None,
@@ -305,7 +310,14 @@ macro_rules! export_driver {
                                 // and will be dropped when it completes, causing
                                 // the forwarding thread to exit.
                                 let exec_result = rt.block_on(
-                                    local.run_until(tool.execute_streaming(input, Some(trace_tx))),
+                                    local.run_until($crate::ToolCommandExecutor::execute_command(
+                                        tool.as_ref(),
+                                        $crate::ToolCommand::with_context(
+                                            input,
+                                            $crate::ToolCommandContext::default()
+                                                .with_event_tx(trace_tx),
+                                        ),
+                                    )),
                                 );
 
                                 // Wait for forwarding thread to drain all remaining events

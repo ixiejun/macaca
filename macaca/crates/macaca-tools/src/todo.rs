@@ -594,7 +594,7 @@ impl Tool for CreateTodosTool {
     }
 
     fn parameters_schema(&self) -> Value {
-        let item_schema = self.create_todo.parameters_schema();
+        let item_schema = crate::tool::ToolSchemaProvider::tool_schema(&self.create_todo);
         json!({
             "type": "object",
             "properties": {
@@ -638,6 +638,14 @@ mod tests {
     use macaca_task::TodoStore;
     use tempfile::tempdir;
 
+    async fn exec_tool(tool: &dyn Tool, input: Value) -> MacacaResult<Value> {
+        crate::tool::ToolCommandExecutor::execute_command(
+            tool,
+            crate::tool::ToolCommand::new(input),
+        )
+        .await
+    }
+
     #[tokio::test]
     async fn create_todo_rejects_supervisor_agents() {
         let dir = tempdir().expect("tempdir");
@@ -656,14 +664,16 @@ mod tests {
             active_goal_id: None,
         };
 
-        let err = tool
-            .execute(json!({
+        let err = exec_tool(
+            &tool,
+            json!({
                 "agent": "coordinator",
                 "title": "Should fail",
                 "description": "Coordinator must not get TaskBoard work"
-            }))
-            .await
-            .expect_err("coordinator assignment should be rejected");
+            }),
+        )
+        .await
+        .expect_err("coordinator assignment should be rejected");
 
         assert!(
             err.to_string()
@@ -691,13 +701,15 @@ mod tests {
             active_goal_id: None,
         };
 
-        let err = tool
-            .execute(json!({
+        let err = exec_tool(
+            &tool,
+            json!({
                 "title": "Missing agent",
                 "description": "should fail when agent is not provided"
-            }))
-            .await
-            .expect_err("missing agent must be rejected");
+            }),
+        )
+        .await
+        .expect_err("missing agent must be rejected");
 
         assert!(
             err.to_string().contains("missing required field: agent"),
@@ -739,14 +751,16 @@ mod tests {
             active_goal_id: None,
         };
 
-        let out = tool
-            .execute(json!({
+        let out = exec_tool(
+            &tool,
+            json!({
                 "agent": "architect",
                 "title": "Implement Go backend API service",
                 "description": "Build REST endpoints and database integration in golang"
-            }))
-            .await
-            .expect("create_todo should succeed");
+            }),
+        )
+        .await
+        .expect("create_todo should succeed");
 
         assert_eq!(
             out["agent"].as_str().unwrap_or_default(),
@@ -794,8 +808,7 @@ mod tests {
             active_goal_id: None,
         };
 
-        let out = tool
-            .execute(json!({
+        let out = exec_tool(&tool, json!({
                 "agent": "backend",
                 "title": "设计项目架构和API规范",
                 "description": "设计整体项目架构、接口规范、数据模型和前后端契约。输出架构设计文档。"
@@ -848,27 +861,31 @@ mod tests {
             active_goal_id: Some(goal_id),
         };
 
-        let arch = tool
-            .execute(json!({
+        let arch = exec_tool(
+            &tool,
+            json!({
                 "agent": "architect",
                 "title": "Define architecture and interfaces",
                 "description": "Produce design spec and API contracts"
-            }))
-            .await
-            .expect("architect task create");
+            }),
+        )
+        .await
+        .expect("architect task create");
         let arch_id = macaca_proto::TaskId(
             uuid::Uuid::parse_str(arch["task_id"].as_str().unwrap_or_default())
                 .expect("arch task id"),
         );
 
-        let fe = tool
-            .execute(json!({
+        let fe = exec_tool(
+            &tool,
+            json!({
                 "agent": "frontend",
                 "title": "Implement UI from spec",
                 "description": "Build pages and connect to backend API"
-            }))
-            .await
-            .expect("frontend task create");
+            }),
+        )
+        .await
+        .expect("frontend task create");
 
         assert!(
             fe["auto_inferred_dependencies"]
@@ -909,22 +926,26 @@ mod tests {
             active_goal_id: Some(goal_id),
         };
 
-        let first = tool
-            .execute(json!({
+        let first = exec_tool(
+            &tool,
+            json!({
                 "agent": "news_fact_checker",
                 "title": "DeepSeek V4 fact check",
                 "description": "Verify claims"
-            }))
-            .await
-            .expect("first create_todo should succeed");
-        let second = tool
-            .execute(json!({
+            }),
+        )
+        .await
+        .expect("first create_todo should succeed");
+        let second = exec_tool(
+            &tool,
+            json!({
                 "agent": "news_fact_checker",
                 "title": "  deepseek v4 fact check  ",
                 "description": "Verify claims again"
-            }))
-            .await
-            .expect("duplicate create_todo should return existing task");
+            }),
+        )
+        .await
+        .expect("duplicate create_todo should return existing task");
 
         assert_eq!(first["task_id"], second["task_id"]);
         assert_eq!(second["deduplicated"].as_bool(), Some(true));
@@ -954,8 +975,9 @@ mod tests {
             },
         };
 
-        let out = tool
-            .execute(json!({
+        let out = exec_tool(
+            &tool,
+            json!({
                 "tasks": [
                     {
                         "agent": "news_researcher",
@@ -971,9 +993,10 @@ mod tests {
                         "depends_on_titles": ["Collect sources"]
                     }
                 ]
-            }))
-            .await
-            .expect("create_todos should succeed");
+            }),
+        )
+        .await
+        .expect("create_todos should succeed");
 
         assert_eq!(out["count"].as_u64(), Some(2));
         let all = space.list_all().await;

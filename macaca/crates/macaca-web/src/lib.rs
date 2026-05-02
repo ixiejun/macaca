@@ -45,26 +45,12 @@ use macaca_proto::{ApplicationId, LlmMessage, MacacaResult};
 use macaca_sdk::AgentPersona;
 use macaca_skill::{SkillCatalog, SkillRegistry};
 use macaca_tools::{
-    DefaultToolSet, DelegateTaskTool, GetTaskResultTool, ListAgentsTool, Tool, ToolSet,
+    CompositeToolSet, DefaultToolSet, DelegateTaskTool, GetTaskResultTool, ListAgentsTool, Tool,
+    ToolCatalog,
 };
 
 use crate::agent_runner::WebAgentRunner;
 use crate::state::{AppConfig, AppState, LoopState, PersistenceState, SessionState};
-
-// ---------------------------------------------------------------------------
-// Composite ToolSet: built-in + skill tools
-// ---------------------------------------------------------------------------
-
-/// A ToolSet that combines built-in tools with executable skill tools.
-struct CompositeToolSet {
-    tools: Vec<Box<dyn Tool>>,
-}
-
-impl ToolSet for CompositeToolSet {
-    fn tools(&self) -> &[Box<dyn Tool>] {
-        &self.tools
-    }
-}
 
 /// Start the Macaca OS web server.
 pub async fn start_server(port: u16) -> MacacaResult<()> {
@@ -478,7 +464,7 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
     let tool_names: Vec<&str> = all_tools.iter().map(|t| t.name()).collect();
     info!(tools = ?tool_names, "Composite toolset ready");
 
-    let tools: Arc<dyn ToolSet> = Arc::new(CompositeToolSet { tools: all_tools });
+    let tools: Arc<dyn ToolCatalog> = Arc::new(CompositeToolSet::new(all_tools));
 
     // 9. Initialize persistent session store.
     let data_dir = dirs::data_local_dir()

@@ -97,7 +97,7 @@ mod tests {
         AgentManifest, AgentOutput, Capability, Permission, PermissionLevel, TaskId, TaskPriority,
         TaskStatus, TokenUsage,
     };
-    use macaca_tools::ToolSet;
+    use macaca_tools::ToolCatalog;
 
     struct MockAgent {
         id: AgentId,
@@ -119,7 +119,7 @@ mod tests {
         async fn run(
             &self,
             _llm: &dyn LlmProvider,
-            _tools: &dyn ToolSet,
+            _tools: &dyn ToolCatalog,
             _services: &AgentServices,
         ) -> MacacaResult<AgentOutput> {
             Ok(AgentOutput {

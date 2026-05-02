@@ -19,7 +19,7 @@ use macaca_proto::{ApplicationId, ForkId, LlmMessage};
 use macaca_runtime::agentic_loop::ResumeReason;
 use macaca_skill::SkillCatalog;
 use macaca_task::TodoStore;
-use macaca_tools::ToolSet;
+use macaca_tools::ToolCatalog;
 
 use crate::workspace::AppWorkspace;
 
@@ -138,7 +138,7 @@ pub struct AppState {
     /// Shared router/resolver used by framework-based agents.
     pub llm_router: Arc<LlmRouter>,
     /// Composite toolset: built-in tools + executable skill tools + claude code tools.
-    pub tools: Arc<dyn ToolSet>,
+    pub tools: Arc<dyn ToolCatalog>,
     /// Application executor registry for isolated multi-agent execution.
     pub executor_registry: Arc<ApplicationExecutorRegistry>,
     /// Agent OS level MCP runtime and registry.

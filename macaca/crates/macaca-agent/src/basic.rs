@@ -5,7 +5,7 @@ use macaca_llm::LlmProvider;
 use macaca_proto::{
     AgentId, AgentOutput, AgentState, Capability, LlmMessage, LlmOptions, MacacaResult,
 };
-use macaca_tools::ToolSet;
+use macaca_tools::ToolCatalog;
 use tracing::instrument;
 
 use crate::agent::{Agent, AgentServices};
@@ -189,7 +189,7 @@ impl Agent for BasicAgent {
     async fn run(
         &self,
         llm: &dyn LlmProvider,
-        _tools: &dyn ToolSet,
+        _tools: &dyn ToolCatalog,
         _services: &AgentServices,
     ) -> MacacaResult<AgentOutput> {
         let messages = vec![

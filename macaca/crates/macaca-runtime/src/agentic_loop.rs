@@ -11,7 +11,7 @@ use macaca_proto::{
     AgentExecutionEvent, AgentId, LlmMessage, LlmOptions, MacacaError, MacacaResult, Permission,
     TokenUsage, ToolCall,
 };
-use macaca_tools::{ToolSet, TraceEvent};
+use macaca_tools::{ToolCatalog, TraceEvent};
 use tokio::sync::mpsc;
 use tracing::{debug, error, info, instrument, warn};
 
@@ -80,7 +80,7 @@ impl AgenticLoop {
         &self,
         agent_id: &AgentId,
         llm: &dyn LlmProvider,
-        tools: &dyn ToolSet,
+        tools: &dyn ToolCatalog,
         messages: &mut Vec<LlmMessage>,
         options_with_tools: &LlmOptions,
         total_usage: &mut TokenUsage,
@@ -234,7 +234,7 @@ impl AgenticLoop {
         &self,
         agent_id: &AgentId,
         llm: &dyn LlmProvider,
-        tools: &dyn ToolSet,
+        tools: &dyn ToolCatalog,
         initial_messages: Vec<LlmMessage>,
         options: &LlmOptions,
         permission: &Permission,
@@ -252,10 +252,7 @@ impl AgenticLoop {
         // Build LlmOptions with tool definitions injected.
         let options_with_tools = {
             let mut opts = options.clone();
-            let defs = tools.to_definitions();
-            if !defs.is_empty() {
-                opts.tools = Some(defs);
-            }
+            opts.tools = tool_definitions(tools);
             opts
         };
 
@@ -321,7 +318,7 @@ impl AgenticLoop {
         &self,
         agent_id: &AgentId,
         llm: &dyn LlmProvider,
-        tools: &dyn ToolSet,
+        tools: &dyn ToolCatalog,
         initial_messages: Vec<LlmMessage>,
         options: &LlmOptions,
         permission: &Permission,
@@ -333,7 +330,7 @@ impl AgenticLoop {
         let mut loop_detector = LoopDetector::new(LoopDetectorConfig::default());
         let ctx_manager = ContextWindowManager::new(ContextWindowConfig::default());
         let options_with_tools = LlmOptions {
-            tools: Some(tools.to_definitions()),
+            tools: tool_definitions(tools),
             ..options.clone()
         };
 
@@ -409,7 +406,7 @@ impl AgenticLoop {
     async fn execute_tool_call_with_events(
         &self,
         agent_id: &AgentId,
-        tools: &dyn ToolSet,
+        tools: &dyn ToolCatalog,
         tool_call: &ToolCall,
         permission: &Permission,
         permission_checker: Option<&dyn PermissionChecker>,
@@ -438,14 +435,15 @@ impl AgenticLoop {
         }
 
         // Find tool
-        let tool = tools.get_tool(&tool_call.name).ok_or_else(|| {
-            error!(
-                agent_id = %agent_id,
-                tool_name = %tool_name,
-                "[TOOL] Tool not found"
-            );
-            MacacaError::NotFound(format!("Tool '{}' not found", tool_call.name))
-        })?;
+        let tool =
+            macaca_tools::ToolCatalog::find_tool(tools, &tool_call.name).ok_or_else(|| {
+                error!(
+                    agent_id = %agent_id,
+                    tool_name = %tool_name,
+                    "[TOOL] Tool not found"
+                );
+                MacacaError::NotFound(format!("Tool '{}' not found", tool_call.name))
+            })?;
 
         // Create channel for trace events if we have an event sender
         let (trace_tx, mut trace_rx) = if event_tx.is_some() {
@@ -484,7 +482,14 @@ impl AgenticLoop {
 
         let result = tokio::time::timeout(
             timeout_duration,
-            tool.execute_streaming(tool_call.arguments.clone(), trace_tx),
+            execute_tool_command(
+                tool,
+                tool_call.arguments.clone(),
+                macaca_tools::ToolCommandContext {
+                    event_tx: trace_tx,
+                    ..Default::default()
+                },
+            ),
         )
         .await
         .map_err(|_| {
@@ -526,7 +531,7 @@ impl AgenticLoop {
     async fn execute_tool_call(
         &self,
         agent_id: &AgentId,
-        tools: &dyn ToolSet,
+        tools: &dyn ToolCatalog,
         tool_call: &ToolCall,
         permission: &Permission,
         permission_checker: Option<&dyn PermissionChecker>,
@@ -542,14 +547,17 @@ impl AgenticLoop {
         }
 
         // Find tool
-        let tool = tools
-            .get_tool(&tool_call.name)
+        let tool = macaca_tools::ToolCatalog::find_tool(tools, &tool_call.name)
             .ok_or_else(|| MacacaError::NotFound(format!("Tool '{}' not found", tool_call.name)))?;
 
         // Execute with timeout
         let result = tokio::time::timeout(
             self.config.tool_timeout,
-            tool.execute(tool_call.arguments.clone()),
+            execute_tool_command(
+                tool,
+                tool_call.arguments.clone(),
+                macaca_tools::ToolCommandContext::default(),
+            ),
         )
         .await
         .map_err(|_| {
@@ -575,6 +583,29 @@ fn accumulate_usage(total: &mut TokenUsage, delta: &TokenUsage) {
     total.prompt_tokens += delta.prompt_tokens;
     total.completion_tokens += delta.completion_tokens;
     total.total_tokens += delta.total_tokens;
+}
+
+fn tool_definitions(
+    tools: &dyn macaca_tools::ToolCatalog,
+) -> Option<Vec<macaca_proto::ToolDefinition>> {
+    let defs = macaca_tools::ToolCatalog::definitions(tools);
+    if defs.is_empty() {
+        None
+    } else {
+        Some(defs)
+    }
+}
+
+async fn execute_tool_command(
+    tool: &dyn macaca_tools::Tool,
+    input: serde_json::Value,
+    context: macaca_tools::ToolCommandContext,
+) -> MacacaResult<serde_json::Value> {
+    macaca_tools::ToolCommandExecutor::execute_command(
+        tool,
+        macaca_tools::ToolCommand::with_context(input, context),
+    )
+    .await
 }
 
 // ── Pausable Agentic Loop ────────────────────────────────────────────────────────
@@ -662,7 +693,7 @@ impl PausableAgenticLoop {
         &self,
         agent_id: &AgentId,
         llm: &dyn LlmProvider,
-        tools: &dyn ToolSet,
+        tools: &dyn ToolCatalog,
         mut messages: Vec<LlmMessage>,
         options: &LlmOptions,
         permission: &Permission,
@@ -670,7 +701,7 @@ impl PausableAgenticLoop {
         event_tx: Option<mpsc::Sender<AgentExecutionEvent>>,
     ) -> MacacaResult<LoopResult> {
         let options_with_tools = LlmOptions {
-            tools: Some(tools.to_definitions()),
+            tools: tool_definitions(tools),
             ..options.clone()
         };
 
