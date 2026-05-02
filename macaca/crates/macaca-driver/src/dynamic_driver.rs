@@ -176,8 +176,8 @@ impl DynamicDriver {
                 }
             };
 
-            let manifest_abi: DriverManifestAbi = serde_json::from_str(&manifest_str)
-                .map_err(|e| {
+            let manifest_abi: DriverManifestAbi =
+                serde_json::from_str(&manifest_str).map_err(|e| {
                     proxy.destroy();
                     MacacaError::Driver(format!("Invalid manifest JSON: {}", e))
                 })?;

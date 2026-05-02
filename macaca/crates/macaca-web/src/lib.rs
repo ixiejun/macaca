@@ -42,7 +42,7 @@ use macaca_persist::RedbStore;
 use macaca_proto::config::{KernelConfig, MacacaConfig};
 use macaca_proto::{ApplicationId, LlmMessage, MacacaResult};
 use macaca_sdk::AgentPersona;
-use macaca_skill::{SkillCatalog, SkillRegistry};
+use macaca_skill::{ExecutableSkillToolSet, SkillCatalog};
 use macaca_tools::{
     CompositeToolSet, DefaultToolSet, DelegateTaskTool, GetTaskResultTool, ListAgentsTool, Tool,
     ToolCatalog,
@@ -161,10 +161,10 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
     // Load executable skill tools from all app skills directories.
     for dir in &skills_dirs {
         if dir.exists() {
-            let mut skill_registry = SkillRegistry::new();
-            match skill_registry.load_from_directory(dir).await {
+            let mut skill_tools = ExecutableSkillToolSet::new();
+            match skill_tools.load_from_directory(dir).await {
                 Ok(n) => {
-                    let skill_tools = skill_registry.instantiate_all_tools();
+                    let skill_tools = skill_tools.into_tools();
                     info!(count = n, "Executable skill tools loaded");
                     all_tools.extend(skill_tools);
                 }

@@ -10,6 +10,8 @@ use std::path::{Path, PathBuf};
 
 use macaca_proto::{MacacaError, MacacaResult};
 
+use crate::handle::SkillRuntimeHandle;
+
 /// Configuration for a skills-aware client.
 #[derive(Debug, Clone)]
 pub struct ClientConfig {
@@ -223,6 +225,24 @@ impl SkillProvisioner {
         Ok(())
     }
 
+    /// Provision a specific skill and return a lifecycle handle.
+    pub async fn provision_skill_with_handle(
+        &self,
+        skill_name: &str,
+        client_name: &str,
+    ) -> MacacaResult<SkillRuntimeHandle> {
+        self.provision_skill(skill_name, client_name).await?;
+        let client = self
+            .clients
+            .get(client_name)
+            .ok_or_else(|| MacacaError::NotFound(format!("Unknown client: {client_name}")))?;
+        Ok(SkillRuntimeHandle::provisioned(
+            skill_name,
+            client_name,
+            client.skills_dir.join(skill_name),
+        ))
+    }
+
     /// Provision skills declared in an app manifest to the appropriate client.
     ///
     /// Given a list of skill names and a target client, provisions each skill.
@@ -366,6 +386,36 @@ mod tests {
         // Both SKILL.md and helpers.sh should be copied.
         assert!(target.path().join("skills/golang/SKILL.md").exists());
         assert!(target.path().join("skills/golang/helpers.sh").exists());
+    }
+
+    #[tokio::test]
+    async fn provision_skill_with_handle_returns_state() {
+        let central = tempfile::tempdir().unwrap();
+        let client = tempfile::tempdir().unwrap();
+        let skill_dir = central.path().join("browser");
+        tokio::fs::create_dir_all(&skill_dir).await.unwrap();
+        tokio::fs::write(
+            skill_dir.join("SKILL.md"),
+            "---\nname: browser\ndescription: Browser\n---\nBody",
+        )
+        .await
+        .unwrap();
+
+        let mut provisioner = SkillProvisioner::with_central_store(central.path().to_path_buf());
+        provisioner.register_client(ClientConfig {
+            name: "test-client".into(),
+            skills_dir: client.path().to_path_buf(),
+        });
+
+        let handle = provisioner
+            .provision_skill_with_handle("browser", "test-client")
+            .await
+            .unwrap();
+
+        assert_eq!(handle.skill_id, "browser");
+        assert_eq!(handle.client_id, "test-client");
+        assert_eq!(handle.state, crate::handle::SkillRuntimeState::Provisioned);
+        assert!(handle.target_dir.join("SKILL.md").exists());
     }
 
     #[tokio::test]

@@ -1,7 +1,6 @@
 //! AgentSkills runtime — discovery, filtering, prompt formatting, and snapshots.
 
 use std::collections::{HashMap, HashSet};
-use std::env;
 use std::path::{Path, PathBuf};
 
 use macaca_proto::MacacaResult;
@@ -9,6 +8,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::agent_skill::{AgentSkill, SkillEntry, SkillExposure, SkillSourceScope};
 use crate::agent_skill::{SkillInstallSpec, SkillMcpServerConfig};
+use crate::policy::{normalize_policy_set, PolicyDecision, SkillExposureContext, SkillPolicyChain};
+use crate::source::SkillSourceSet;
 
 const DEFAULT_MAX_CANDIDATES_PER_ROOT: usize = 300;
 const DEFAULT_MAX_SKILLS_LOADED_PER_SOURCE: usize = 200;
@@ -150,48 +151,12 @@ impl SkillRuntime {
 }
 
 async fn discover_skill_entries(options: &SkillRuntimeOptions) -> MacacaResult<Vec<SkillEntry>> {
-    let mut sources: Vec<(PathBuf, SkillSourceScope, String)> = Vec::new();
-    if let Some(workspace) = &options.workspace_dir {
-        sources.push((
-            workspace.join("skills"),
-            SkillSourceScope::Workspace,
-            "workspace".into(),
-        ));
-    }
-    if let Some(app_dir) = &options.app_dir {
-        sources.push((
-            app_dir.join(".agents").join("skills"),
-            SkillSourceScope::ProjectAgents,
-            "project_agents".into(),
-        ));
-        sources.push((
-            app_dir.join("skills"),
-            SkillSourceScope::Application,
-            "application".into(),
-        ));
-    }
-    if let Some(home) = home_dir() {
-        sources.push((
-            home.join(".agents").join("skills"),
-            SkillSourceScope::UserAgents,
-            "user_agents".into(),
-        ));
-        sources.push((
-            home.join(".macaca").join("skills"),
-            SkillSourceScope::MacacaCentral,
-            "macaca_central".into(),
-        ));
-    }
-    if let Some(bundled) = &options.bundled_dir {
-        sources.push((bundled.clone(), SkillSourceScope::Bundled, "bundled".into()));
-    }
-    for dir in &options.extra_dirs {
-        sources.push((dir.clone(), SkillSourceScope::Extra, "extra".into()));
-    }
-
+    let sources = SkillSourceSet::from_options(options);
     let mut by_name: HashMap<String, SkillEntry> = HashMap::new();
-    for (dir, scope, source) in sources {
-        for entry in scan_source_dir(&dir, scope, &source, &options.limits).await? {
+    for source in sources.iter() {
+        for entry in
+            scan_source_dir(&source.root, source.scope, &source.label, &options.limits).await?
+        {
             let should_insert = by_name
                 .get(&entry.skill.name)
                 .map(|existing| entry.skill.source_scope < existing.skill.source_scope)
@@ -315,81 +280,30 @@ fn filter_entries(
         .policy
         .allow
         .as_ref()
-        .map(|items| normalize_set(items.iter().map(String::as_str)));
-    let deny = normalize_set(options.policy.deny.iter().map(String::as_str));
+        .map(|items| normalize_policy_set(items.iter().map(String::as_str)));
+    let deny = normalize_policy_set(options.policy.deny.iter().map(String::as_str));
+    let chain = SkillPolicyChain::default_chain();
 
     let mut visible = Vec::new();
     let mut filtered = Vec::new();
     for entry in entries {
         let name = entry.skill.name.clone();
         let source = entry.skill.source.clone();
-        let reason = filter_reason(&entry, allow.as_ref(), &deny, options);
-        if let Some(reason) = reason {
-            filtered.push(FilteredSkill {
+        let ctx = SkillExposureContext {
+            allow: allow.as_ref(),
+            deny: &deny,
+            options,
+        };
+        match chain.evaluate(&entry, &ctx) {
+            PolicyDecision::Allow | PolicyDecision::AllowFinal => visible.push(entry),
+            PolicyDecision::Deny(reason) => filtered.push(FilteredSkill {
                 name,
                 reason,
                 source,
-            });
-        } else {
-            visible.push(entry);
+            }),
         }
     }
     (visible, filtered)
-}
-
-fn filter_reason(
-    entry: &SkillEntry,
-    allow: Option<&HashSet<String>>,
-    deny: &HashSet<String>,
-    options: &SkillRuntimeOptions,
-) -> Option<String> {
-    let key = entry
-        .metadata
-        .skill_key
-        .as_deref()
-        .unwrap_or(entry.skill.name.as_str());
-    if deny.contains(entry.skill.name.as_str()) || deny.contains(key) {
-        return Some("denied_by_policy".into());
-    }
-    if let Some(allow) = allow {
-        if !allow.contains(entry.skill.name.as_str()) && !allow.contains(key) {
-            return Some("denied_by_policy".into());
-        }
-    }
-    if entry.invocation.disable_model_invocation {
-        return Some("disabled_model_invocation".into());
-    }
-    if entry.metadata.always {
-        return None;
-    }
-    if !entry.metadata.os.is_empty() && !entry.metadata.os.iter().any(|os| os_matches_current(os)) {
-        return Some("os_mismatch".into());
-    }
-    for bin in &entry.metadata.requires_bins {
-        if !has_binary(bin) {
-            return Some("missing_bin".into());
-        }
-    }
-    if !entry.metadata.requires_any_bins.is_empty()
-        && !entry
-            .metadata
-            .requires_any_bins
-            .iter()
-            .any(|bin| has_binary(bin))
-    {
-        return Some("missing_bin".into());
-    }
-    for env_name in &entry.metadata.requires_env {
-        if env::var_os(env_name).is_none() && !options.env_overrides.contains(env_name) {
-            return Some("missing_env".into());
-        }
-    }
-    for config in &entry.metadata.requires_config {
-        if !options.config_flags.contains(config) {
-            return Some("missing_config".into());
-        }
-    }
-    None
 }
 
 fn build_prompt(
@@ -477,14 +391,6 @@ fn skill_prompt_preamble() -> String {
     .join("\n")
 }
 
-fn normalize_set<'a>(items: impl Iterator<Item = &'a str>) -> HashSet<String> {
-    items
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-        .map(str::to_string)
-        .collect()
-}
-
 fn escape_xml(input: &str) -> String {
     input
         .replace('&', "&amp;")
@@ -492,31 +398,6 @@ fn escape_xml(input: &str) -> String {
         .replace('>', "&gt;")
         .replace('"', "&quot;")
         .replace('\'', "&apos;")
-}
-
-fn has_binary(bin: &str) -> bool {
-    let bin = bin.trim();
-    if bin.is_empty() {
-        return false;
-    }
-    let Some(paths) = env::var_os("PATH") else {
-        return false;
-    };
-    env::split_paths(&paths).any(|dir| dir.join(bin).is_file())
-}
-
-fn os_matches_current(skill_os: &str) -> bool {
-    let requested = skill_os.trim().to_ascii_lowercase();
-    let current = env::consts::OS;
-    requested == current
-        || matches!(
-            (requested.as_str(), current),
-            ("darwin", "macos") | ("macos", "macos")
-        )
-}
-
-fn home_dir() -> Option<PathBuf> {
-    env::var_os("HOME").map(PathBuf::from)
 }
 
 /// Return true when `path` is inside any skill in a snapshot.
@@ -532,6 +413,8 @@ pub fn path_belongs_to_snapshot_skill(snapshot: &SkillSnapshot, path: &Path) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::policy::os_matches_current;
+    use std::env;
 
     async fn write_skill(root: &Path, dir: &str, body: &str) {
         let skill_dir = root.join(dir);

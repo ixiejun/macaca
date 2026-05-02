@@ -7,53 +7,48 @@ use std::time::Duration;
 use macaca_proto::{MacacaError, MacacaResult};
 use macaca_tools::Tool;
 
-use crate::definition::{SkillDefinition, SkillEntryPoint};
+use crate::adapter::SkillToolAdapter;
+use crate::definition::SkillDefinition;
 
 /// A Tool backed by a skill definition.
 ///
 /// Executes the skill's entry point (shell command, script, etc.)
 /// when invoked.
 pub struct SkillTool {
-    definition: SkillDefinition,
+    adapter: SkillToolAdapter,
 }
 
 impl SkillTool {
     /// Create a new SkillTool from a definition.
+    #[deprecated(note = "Use SkillToolAdapter::local and SkillTool::from_adapter for new code.")]
     pub fn new(definition: SkillDefinition) -> Self {
-        Self { definition }
+        Self {
+            adapter: SkillToolAdapter::local(definition),
+        }
+    }
+
+    /// Create a new SkillTool from an adapter.
+    pub fn from_adapter(adapter: SkillToolAdapter) -> Self {
+        Self { adapter }
     }
 }
 
 #[async_trait]
 impl Tool for SkillTool {
     fn name(&self) -> &str {
-        &self.definition.name
+        &self.adapter.definition().name
     }
 
     fn description(&self) -> &str {
-        &self.definition.description
+        &self.adapter.definition().description
     }
 
     fn parameters_schema(&self) -> Value {
-        self.definition.parameters.clone()
+        self.adapter.definition().parameters.clone()
     }
 
     async fn execute(&self, input: Value) -> MacacaResult<Value> {
-        match &self.definition.entry_point {
-            SkillEntryPoint::ShellCommand { command, args } => {
-                execute_shell(command, args, &input).await
-            }
-            SkillEntryPoint::Script { path, interpreter } => {
-                let cmd = interpreter.as_deref().unwrap_or("sh");
-                execute_shell(cmd, &[path.clone()], &input).await
-            }
-            SkillEntryPoint::McpServer { .. } => {
-                // MCP-backed skills should be connected via McpDriver instead.
-                Err(MacacaError::Agent(
-                    "MCP skills should be loaded via McpDriver, not SkillTool".into(),
-                ))
-            }
-        }
+        self.adapter.execute(input).await
     }
 }
 
@@ -63,7 +58,11 @@ impl Tool for SkillTool {
 /// as the first extra argument. If it contains an `args` field (array of
 /// strings), those are appended after. This allows LLMs to call skills
 /// like `npx openspec init --work-dir ./myproject`.
-async fn execute_shell(command: &str, base_args: &[String], input: &Value) -> MacacaResult<Value> {
+pub(crate) async fn execute_shell_entry(
+    command: &str,
+    base_args: &[String],
+    input: &Value,
+) -> MacacaResult<Value> {
     // Build full argument list: base_args + action + extra args.
     let mut full_args: Vec<String> = base_args.to_vec();
 
@@ -125,6 +124,7 @@ async fn execute_shell(command: &str, base_args: &[String], input: &Value) -> Ma
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::definition::SkillEntryPoint;
 
     fn echo_skill() -> SkillDefinition {
         SkillDefinition {
@@ -141,14 +141,14 @@ mod tests {
 
     #[test]
     fn skill_tool_metadata() {
-        let tool = SkillTool::new(echo_skill());
+        let tool = SkillTool::from_adapter(crate::SkillToolAdapter::local(echo_skill()));
         assert_eq!(tool.name(), "echo-skill");
         assert_eq!(tool.description(), "Echoes input");
     }
 
     #[tokio::test]
     async fn skill_tool_execute_shell() {
-        let tool = SkillTool::new(echo_skill());
+        let tool = SkillTool::from_adapter(crate::SkillToolAdapter::local(echo_skill()));
         let result = macaca_tools::ToolCommandExecutor::execute_command(
             &tool,
             macaca_tools::ToolCommand::new(serde_json::json!({})),
@@ -165,7 +165,7 @@ mod tests {
 
     #[tokio::test]
     async fn skill_tool_execute_with_action_and_args() {
-        let tool = SkillTool::new(SkillDefinition {
+        let tool = SkillTool::from_adapter(crate::SkillToolAdapter::local(SkillDefinition {
             name: "echo-action".into(),
             description: "Echo with action".into(),
             version: "0.1.0".into(),
@@ -180,7 +180,7 @@ mod tests {
                     "args": { "type": "array", "items": { "type": "string" } }
                 }
             }),
-        });
+        }));
         let result = macaca_tools::ToolCommandExecutor::execute_command(
             &tool,
             macaca_tools::ToolCommand::new(
@@ -197,7 +197,7 @@ mod tests {
 
     #[tokio::test]
     async fn mcp_skill_returns_error() {
-        let tool = SkillTool::new(SkillDefinition {
+        let tool = SkillTool::from_adapter(crate::SkillToolAdapter::local(SkillDefinition {
             name: "mcp-skill".into(),
             description: "An MCP skill".into(),
             version: "0.1.0".into(),
@@ -206,7 +206,7 @@ mod tests {
                 args: vec![],
             },
             parameters: serde_json::json!({}),
-        });
+        }));
         let result = macaca_tools::ToolCommandExecutor::execute_command(
             &tool,
             macaca_tools::ToolCommand::new(serde_json::json!({})),

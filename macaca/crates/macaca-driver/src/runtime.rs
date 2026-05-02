@@ -6,9 +6,7 @@ use std::sync::Arc;
 use macaca_tools::Tool;
 
 use crate::driver::DriverManifest;
-use crate::load_command::{
-    DriverLoadCommand, DriverLoadEntry, DriverLoadReport, DriverLoadStatus,
-};
+use crate::load_command::{DriverLoadCommand, DriverLoadEntry, DriverLoadReport, DriverLoadStatus};
 use crate::loader::DriverLoader;
 use crate::registry::DriverRegistry;
 
@@ -47,7 +45,8 @@ impl DriverRuntime {
     }
 
     pub async fn reload(&self) -> DriverLoadReport {
-        self.load_with_command(DriverLoadCommand::Reload, true).await
+        self.load_with_command(DriverLoadCommand::Reload, true)
+            .await
     }
 
     async fn load_with_command(

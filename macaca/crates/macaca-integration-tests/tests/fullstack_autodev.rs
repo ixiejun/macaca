@@ -14,7 +14,7 @@ use macaca_llm::LlmProvider;
 use macaca_proto::config::KernelConfig;
 use macaca_proto::{LlmMessage, LlmOptions, LlmResponse, MacacaResult, TokenUsage};
 use macaca_sdk::AgentPersona;
-use macaca_skill::{SkillCatalog, SkillRegistry};
+use macaca_skill::{ExecutableSkillToolSet, SkillCatalog};
 use macaca_tools::{DefaultToolSet, Tool};
 
 // ---------------------------------------------------------------------------
@@ -133,32 +133,42 @@ async fn app_starts_with_three_agents() {
 // Skills Tests — Executable Skills (YAML)
 // ---------------------------------------------------------------------------
 
-/// Verify YAML skill files load correctly via SkillRegistry.
+/// Verify YAML skill files load correctly via ExecutableSkillToolSet.
 #[tokio::test]
 async fn yaml_skills_load_from_registry() {
     let skills_dir = app_dir().join("skills");
     assert!(skills_dir.exists(), "skills directory not found");
 
-    let mut registry = SkillRegistry::new();
-    let loaded = registry.load_from_directory(&skills_dir).await.unwrap();
+    let mut toolset = ExecutableSkillToolSet::new();
+    let loaded = toolset.load_from_directory(&skills_dir).await.unwrap();
+    let snapshot = toolset.snapshot();
 
     // Should load YAML skills only: openspec, figma-mcp (2 yaml files).
-    // SKILL.md subdirectories (golang, shadcn-ui) are NOT loaded by SkillRegistry.
+    // SKILL.md subdirectories (golang, shadcn-ui) are NOT loaded as executable skills.
     assert_eq!(loaded, 2, "Expected 2 YAML skills, got {loaded}");
-    assert!(registry.get("openspec").is_some(), "openspec skill missing");
     assert!(
-        registry.get("figma-mcp").is_some(),
+        snapshot.skills.iter().any(|skill| skill.name == "openspec"),
+        "openspec skill missing"
+    );
+    assert!(
+        snapshot
+            .skills
+            .iter()
+            .any(|skill| skill.name == "figma-mcp"),
         "figma-mcp skill missing"
     );
 
-    // SKILL.md skills should NOT be in the registry.
+    // SKILL.md skills should NOT be in the executable skill snapshot.
     assert!(
-        registry.get("golang").is_none(),
-        "golang should not be in SkillRegistry"
+        !snapshot.skills.iter().any(|skill| skill.name == "golang"),
+        "golang should not be in executable skill snapshot"
     );
     assert!(
-        registry.get("shadcn-ui").is_none(),
-        "shadcn-ui should not be in SkillRegistry"
+        !snapshot
+            .skills
+            .iter()
+            .any(|skill| skill.name == "shadcn-ui"),
+        "shadcn-ui should not be in executable skill snapshot"
     );
 }
 
@@ -166,11 +176,11 @@ async fn yaml_skills_load_from_registry() {
 #[tokio::test]
 async fn yaml_skills_instantiate_as_tools() {
     let skills_dir = app_dir().join("skills");
-    let mut registry = SkillRegistry::new();
-    registry.load_from_directory(&skills_dir).await.unwrap();
+    let mut toolset = ExecutableSkillToolSet::new();
+    toolset.load_from_directory(&skills_dir).await.unwrap();
 
     // YAML skill → executable tool
-    let openspec_tool = registry.instantiate_tool("openspec").unwrap();
+    let openspec_tool = toolset.tool("openspec").unwrap();
     assert_eq!(openspec_tool.name(), "openspec");
 }
 

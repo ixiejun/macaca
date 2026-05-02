@@ -5,7 +5,10 @@ use std::path::Path;
 
 use macaca_proto::{MacacaError, MacacaResult};
 
+use crate::adapter::SkillToolAdapter;
 use crate::definition::SkillDefinition;
+use crate::facade::load_executable_skill_definitions;
+use crate::snapshot::SkillRegistrySnapshot;
 use crate::tool::SkillTool;
 
 /// Registry of available skills.
@@ -46,72 +49,58 @@ impl SkillRegistry {
         self.skills.remove(name).is_some()
     }
 
+    /// Capture executable skill definitions as a reloadable snapshot.
+    pub fn snapshot(&self) -> SkillRegistrySnapshot {
+        SkillRegistrySnapshot::new(self.skills.values().cloned().collect())
+    }
+
+    /// Replace current registry state from a snapshot.
+    pub fn reload_from_snapshot(&mut self, snapshot: SkillRegistrySnapshot) {
+        self.skills.clear();
+        for skill in snapshot.skills {
+            self.register(skill);
+        }
+    }
+
     /// Load executable skills from a directory.
     ///
     /// Discovers `*.yaml` and `*.yml` files and parses them as `SkillDefinition`.
     /// For SKILL.md knowledge skills, use [`SkillCatalog`](crate::SkillCatalog) instead.
     ///
     /// Silently skips files that fail to parse.
+    #[deprecated(
+        note = "Use SkillRegistrySnapshot/reload primitives or a future SkillRegistryLoader facade for migration-safe loading."
+    )]
     pub async fn load_from_directory(&mut self, dir: impl AsRef<Path>) -> MacacaResult<usize> {
-        let dir = dir.as_ref();
-        if !dir.exists() {
-            return Err(MacacaError::NotFound(format!(
-                "Skills directory not found: {}",
-                dir.display()
-            )));
+        let definitions = load_executable_skill_definitions(dir.as_ref()).await?;
+        let count = definitions.len();
+        for definition in definitions {
+            self.register(definition);
         }
-
-        let mut loaded = 0;
-        let mut entries = tokio::fs::read_dir(dir).await.map_err(MacacaError::Io)?;
-
-        while let Some(entry) = entries.next_entry().await.map_err(MacacaError::Io)? {
-            let path = entry.path();
-
-            // Skip directories — SKILL.md subdirectories are handled by SkillCatalog.
-            if path.is_dir() {
-                continue;
-            }
-
-            // YAML skill files.
-            let ext = path.extension().and_then(|e| e.to_str());
-            if ext != Some("yaml") && ext != Some("yml") {
-                continue;
-            }
-
-            match tokio::fs::read_to_string(&path).await {
-                Ok(content) => match serde_yaml::from_str::<SkillDefinition>(&content) {
-                    Ok(skill) => {
-                        tracing::debug!(skill = %skill.name, "loaded skill from {:?}", path);
-                        self.register(skill);
-                        loaded += 1;
-                    }
-                    Err(e) => {
-                        tracing::warn!("failed to parse skill {:?}: {}", path, e);
-                    }
-                },
-                Err(e) => {
-                    tracing::warn!("failed to read {:?}: {}", path, e);
-                }
-            }
-        }
-
-        Ok(loaded)
+        Ok(count)
     }
 
     /// Create a `Tool` instance from a registered skill.
+    #[deprecated(note = "Use SkillToolAdapter or collect through a tool exposure facade.")]
     pub fn instantiate_tool(&self, name: &str) -> MacacaResult<SkillTool> {
         let skill = self
             .skills
             .get(name)
             .ok_or_else(|| MacacaError::NotFound(format!("Skill '{}' not found", name)))?;
-        Ok(SkillTool::new(skill.clone()))
+        Ok(SkillTool::from_adapter(SkillToolAdapter::local(
+            skill.clone(),
+        )))
     }
 
     /// Create `Tool` instances for all registered skills.
+    #[deprecated(note = "Use SkillToolAdapter or collect through a tool exposure facade.")]
     pub fn instantiate_all_tools(&self) -> Vec<Box<dyn macaca_tools::Tool>> {
         self.skills
             .values()
-            .map(|s| Box::new(SkillTool::new(s.clone())) as Box<dyn macaca_tools::Tool>)
+            .map(|s| {
+                Box::new(SkillTool::from_adapter(SkillToolAdapter::local(s.clone())))
+                    as Box<dyn macaca_tools::Tool>
+            })
             .collect()
     }
 }
@@ -169,6 +158,21 @@ mod tests {
         assert!(!reg.unregister("removable")); // Already gone
     }
 
+    #[test]
+    fn snapshot_and_reload_registry() {
+        let mut reg = SkillRegistry::new();
+        reg.register(make_skill("a"));
+        reg.register(make_skill("b"));
+
+        let snapshot = reg.snapshot();
+        assert_eq!(snapshot.len(), 2);
+
+        let mut restored = SkillRegistry::new();
+        restored.reload_from_snapshot(snapshot);
+        assert!(restored.get("a").is_some());
+        assert!(restored.get("b").is_some());
+    }
+
     #[tokio::test]
     async fn load_from_directory() {
         let dir = tempfile::tempdir().unwrap();
@@ -196,16 +200,20 @@ entry_point:
             .await
             .unwrap();
 
-        let mut reg = SkillRegistry::new();
-        let loaded = reg.load_from_directory(dir.path()).await.unwrap();
+        let mut toolset = crate::ExecutableSkillToolSet::new();
+        let loaded = toolset.load_from_directory(dir.path()).await.unwrap();
+        let snapshot = toolset.snapshot();
         assert_eq!(loaded, 1);
-        assert!(reg.get("loaded-skill").is_some());
+        assert!(snapshot
+            .skills
+            .iter()
+            .any(|skill| skill.name == "loaded-skill"));
     }
 
     #[tokio::test]
     async fn load_from_missing_directory() {
-        let mut reg = SkillRegistry::new();
-        let err = reg
+        let mut toolset = crate::ExecutableSkillToolSet::new();
+        let err = toolset
             .load_from_directory("/nonexistent/path")
             .await
             .unwrap_err();
@@ -239,28 +247,35 @@ entry_point:
         .await
         .unwrap();
 
-        let mut reg = SkillRegistry::new();
-        let loaded = reg.load_from_directory(dir.path()).await.unwrap();
+        let mut toolset = crate::ExecutableSkillToolSet::new();
+        let loaded = toolset.load_from_directory(dir.path()).await.unwrap();
+        let snapshot = toolset.snapshot();
         // Only YAML skill loaded; SKILL.md subdirectory is skipped.
         assert_eq!(loaded, 1);
-        assert!(reg.get("shell-skill").is_some());
-        assert!(reg.get("shadcn-ui").is_none());
+        assert!(snapshot
+            .skills
+            .iter()
+            .any(|skill| skill.name == "shell-skill"));
+        assert!(!snapshot
+            .skills
+            .iter()
+            .any(|skill| skill.name == "shadcn-ui"));
     }
 
     #[test]
     fn instantiate_tool() {
-        let mut reg = SkillRegistry::new();
-        reg.register(make_skill("my-skill"));
-        let tool = reg.instantiate_tool("my-skill").unwrap();
+        let mut toolset = crate::ExecutableSkillToolSet::new();
+        toolset.registry.register(make_skill("my-skill"));
+        let tool = toolset.tool("my-skill").unwrap();
         assert_eq!(tool.name(), "my-skill");
     }
 
     #[test]
     fn instantiate_all_tools() {
-        let mut reg = SkillRegistry::new();
-        reg.register(make_skill("a"));
-        reg.register(make_skill("b"));
-        let tools = reg.instantiate_all_tools();
+        let mut toolset = crate::ExecutableSkillToolSet::new();
+        toolset.registry.register(make_skill("a"));
+        toolset.registry.register(make_skill("b"));
+        let tools = toolset.into_tools();
         assert_eq!(tools.len(), 2);
     }
 }

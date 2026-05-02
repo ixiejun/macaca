@@ -16,8 +16,8 @@ use macaca_proto::ApplicationId;
 use macaca_runtime_host::compat::default_registry;
 use macaca_runtime_host::mcp_runtime::apply_concurrency_isolation;
 use macaca_skill::{
-    SkillMcpServerConfig, SkillPolicy, SkillRuntime, SkillRuntimeOptions, SkillSnapshot,
-    SkillSnapshotEntry,
+    SkillMcpServerConfig, SkillPolicy, SkillRuntimeFacade, SkillSnapshot, SkillSnapshotEntry,
+    SkillSnapshotRequest,
 };
 use serde::Serialize;
 
@@ -144,16 +144,13 @@ pub(crate) async fn load_or_build_skill_snapshot(
         workspaces.get(app_id).map(|ws| ws.root.clone())
     };
     let policy = resolve_agent_skill_policy(state, app_id, agent_name).await;
-    let snapshot = SkillRuntime
-        .build_snapshot(
-            agent_name,
-            SkillRuntimeOptions {
-                workspace_dir,
-                app_dir: Some(app.path),
-                policy,
-                ..Default::default()
-            },
-        )
+    let request = SkillSnapshotRequest::builder(agent_name)
+        .workspace_dir(workspace_dir)
+        .app_dir(Some(app.path))
+        .policy(policy)
+        .build();
+    let snapshot = SkillRuntimeFacade::new()
+        .build_snapshot(request)
         .await
         .ok()?;
     if let Some(session_id) = session_id {

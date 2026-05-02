@@ -1350,6 +1350,7 @@ dependencies = [
  "macaca-llm",
  "macaca-proto",
  "macaca-sdk",
+ "macaca-skill",
  "macaca-tools",
  "serde",
  "serde_json",

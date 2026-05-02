@@ -14,18 +14,35 @@
 //!
 //! Agent OS acts as both a skill store and a skills-aware client.
 
+pub mod adapter;
 pub mod agent_skill;
 pub mod catalog;
 pub mod definition;
 pub mod discovery;
+pub mod facade;
+pub mod handle;
+pub mod policy;
 pub mod provisioner;
 pub mod registry;
+pub mod request;
 pub mod runtime;
+pub mod snapshot;
+pub mod source;
 pub mod tool;
 
 // Executable skills (YAML).
+pub use adapter::{LocalSkillRuntimeProxy, SkillRuntimeProxy, SkillToolAdapter};
 pub use definition::{SkillDefinition, SkillEntryPoint};
+pub use facade::{
+    load_executable_skill_definitions, ExecutableSkillToolSet, SkillCatalogSourceView,
+    SkillRuntimeFacade,
+};
+pub use handle::{SkillRuntimeHandle, SkillRuntimeState};
+pub use policy::{PolicyDecision, SkillExposureContext, SkillExposurePolicy, SkillPolicyChain};
 pub use registry::SkillRegistry;
+pub use request::{SkillSnapshotRequest, SkillSnapshotRequestBuilder};
+pub use snapshot::SkillRegistrySnapshot;
+pub use source::{SkillSource, SkillSourceSet};
 pub use tool::SkillTool;
 
 // Agent Skills (SKILL.md / agentskills.io).

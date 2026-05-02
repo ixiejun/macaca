@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use macaca_proto::MacacaResult;
+use macaca_skill::{SkillSource, SkillSourceScope};
 
 /// Default global skills directory.
 pub fn global_skills_dir() -> PathBuf {
@@ -55,21 +55,35 @@ impl SkillLoader {
 
     /// List all skill directories (global + app).
     pub fn list_skill_dirs(&self) -> Vec<PathBuf> {
-        let mut dirs = Vec::new();
+        self.skill_sources()
+            .into_iter()
+            .map(|source| source.root)
+            .collect()
+    }
 
-        // Add global skills directory if it exists
+    /// List all configured skill sources using the shared skill source primitive.
+    pub fn skill_sources(&self) -> Vec<SkillSource> {
+        let mut sources = Vec::new();
+
         if self.global_dir.exists() {
-            dirs.push(self.global_dir.clone());
+            sources.push(SkillSource {
+                root: self.global_dir.clone(),
+                scope: SkillSourceScope::MacacaCentral,
+                label: "global".into(),
+            });
         }
 
-        // Add app skills directory if it exists
         if let Some(ref app_dir) = self.app_dir {
             if app_dir.exists() {
-                dirs.push(app_dir.clone());
+                sources.push(SkillSource {
+                    root: app_dir.clone(),
+                    scope: SkillSourceScope::Application,
+                    label: "application".into(),
+                });
             }
         }
 
-        dirs
+        sources
     }
 
     /// Check if a skill exists (by name).

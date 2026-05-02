@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 /// How a skill executes its functionality.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type")]
 pub enum SkillEntryPoint {
     /// Execute a shell command. Arguments are passed as JSON via stdin.
@@ -38,7 +38,7 @@ pub enum SkillEntryPoint {
 }
 
 /// Definition of a skill — metadata + entry point.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SkillDefinition {
     /// Unique skill name (e.g., "web-search", "code-review").
     pub name: String,

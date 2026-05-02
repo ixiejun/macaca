@@ -1,0 +1,11 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - heading "Hello from Frontend!" [level=1] [ref=e5]
+      - paragraph [ref=e6]: Fetching message from the backend...
+    - generic [ref=e9]: Disconnected
+    - generic [ref=e11]:
+      - paragraph [ref=e12]: Connection Failed
+      - paragraph [ref=e13]: Unable to reach the backend server. Please ensure it is running on port 8080.
+      - button "Retry" [ref=e14] [cursor=pointer]
+  - paragraph [ref=e15]: "Backend: http://localhost:8080/api/hello"

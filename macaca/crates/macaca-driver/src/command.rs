@@ -39,9 +39,7 @@ impl DriverCommand {
 
     pub fn tool_name(&self) -> &str {
         match self {
-            Self::Execute { tool_name, .. } | Self::ExecuteStreaming { tool_name, .. } => {
-                tool_name
-            }
+            Self::Execute { tool_name, .. } | Self::ExecuteStreaming { tool_name, .. } => tool_name,
         }
     }
 

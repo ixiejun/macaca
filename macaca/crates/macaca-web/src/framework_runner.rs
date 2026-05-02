@@ -36,7 +36,7 @@ use macaca_persist::{AppendEventCommand, EventLog};
 use macaca_proto::{AgentState, ApplicationId, Capability};
 use macaca_runtime::agentic_loop::ResumeReason;
 use macaca_sdk::AgentPersona;
-use macaca_skill::{SkillPolicy, SkillRuntime, SkillRuntimeOptions};
+use macaca_skill::{SkillPolicy, SkillRuntimeFacade, SkillSnapshotRequest};
 
 use crate::state::AppState;
 
@@ -603,17 +603,12 @@ impl FrameworkRunner {
         let skill_snapshot = match loaded_snapshot {
             Some(snapshot) => Ok(snapshot),
             None => {
-                let snapshot = SkillRuntime
-                    .build_snapshot(
-                        agent_name,
-                        SkillRuntimeOptions {
-                            workspace_dir: workspace_root,
-                            app_dir,
-                            policy: skill_policy,
-                            ..Default::default()
-                        },
-                    )
-                    .await;
+                let request = SkillSnapshotRequest::builder(agent_name)
+                    .workspace_dir(workspace_root)
+                    .app_dir(app_dir)
+                    .policy(skill_policy)
+                    .build();
+                let snapshot = SkillRuntimeFacade::new().build_snapshot(request).await;
                 if let (Some(session_id), Ok(snapshot)) = (session_id.as_deref(), &snapshot) {
                     if let Ok(value) = serde_json::to_value(snapshot) {
                         let _ = state

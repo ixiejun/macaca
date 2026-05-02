@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 
 use macaca_app::{app_entry_agent_name as manifest_entry_agent_name, AppLoader};
 use macaca_proto::{ApplicationId, MacacaError, ProtoErrorAdapter};
-use macaca_skill::{SkillPolicy, SkillRuntime, SkillRuntimeOptions};
+use macaca_skill::{SkillPolicy, SkillRuntimeFacade, SkillSnapshotRequest};
 
 use crate::mcp_runtime::{McpRuntimeStatus, McpToolPolicy};
 use crate::skill_mcp::SkillMcpStatus;
@@ -615,16 +615,13 @@ pub async fn get_app_skills(
                 deny: skills.deny.clone(),
             })
             .unwrap_or_default();
-        let snapshot = SkillRuntime
-            .build_snapshot(
-                agent.name.clone(),
-                SkillRuntimeOptions {
-                    workspace_dir: workspace_root.clone(),
-                    app_dir: Some(app.path.clone()),
-                    policy,
-                    ..Default::default()
-                },
-            )
+        let request = SkillSnapshotRequest::builder(agent.name.clone())
+            .workspace_dir(workspace_root.clone())
+            .app_dir(Some(app.path.clone()))
+            .policy(policy)
+            .build();
+        let snapshot = SkillRuntimeFacade::new()
+            .build_snapshot(request)
             .await
             .map_err(|e| proto_err(StatusCode::INTERNAL_SERVER_ERROR, &e))?;
         let mcp = crate::skill_mcp::probe_skill_mcp_servers(&snapshot).await;
