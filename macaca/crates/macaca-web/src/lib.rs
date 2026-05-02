@@ -33,7 +33,6 @@ use tracing::{error, info};
 
 use futures::FutureExt;
 use macaca_app::{AppLoader, AppRegistry, AppRuntime};
-use macaca_driver::DriverLoader;
 use macaca_framework::session::{
     InMemorySessionStore as FrameworkInMemorySessionStore, SessionStore as FrameworkSessionStore,
 };
@@ -181,23 +180,27 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
     let drivers_dir =
         std::env::var("MACACA_DRIVERS_DIR").unwrap_or_else(|_| config.drivers.directory.clone());
     let driver_registry = Arc::new(macaca_driver::DriverRegistry::new());
+    let driver_runtime = Arc::new(macaca_driver::DriverRuntime::new(
+        drivers_dir.clone(),
+        Arc::clone(&driver_registry),
+    ));
     if config.drivers.auto_load {
-        let driver_loader = DriverLoader::new(&drivers_dir);
-        let load_results = driver_loader.load_all();
-
-        for result in load_results {
-            match result.result {
-                Ok(driver) => {
-                    let tool_count = macaca_driver::SoftwareDriver::tools(driver.as_ref()).len();
+        let report = driver_runtime.load_all().await;
+        for entry in &report.entries {
+            match entry.status {
+                macaca_driver::DriverLoadStatus::Loaded => {
                     info!(
-                        name = %result.name,
-                        tools = tool_count,
+                        name = %entry.name,
+                        tools = entry.tool_count.unwrap_or_default(),
                         "External driver loaded"
                     );
-                    driver_registry.register(driver).await;
                 }
-                Err(e) => {
-                    error!(name = %result.name, error = %e, "Failed to load external driver");
+                macaca_driver::DriverLoadStatus::Failed => {
+                    error!(
+                        name = %entry.name,
+                        error = %entry.error.as_deref().unwrap_or("unknown error"),
+                        "Failed to load external driver"
+                    );
                 }
             }
         }
@@ -515,6 +518,7 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
             executor_registry: executor_registry.clone(),
             mcp_runtime: Arc::clone(&mcp_runtime),
             driver_registry: Arc::clone(&driver_registry),
+            driver_runtime: Arc::clone(&driver_runtime),
             drivers_dir: drivers_dir.clone(),
             persist: PersistenceState {
                 session_store,

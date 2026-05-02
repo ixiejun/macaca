@@ -1118,16 +1118,16 @@ pub struct DriversResponse {
 }
 
 pub async fn get_drivers(State(state): State<Arc<AppState>>) -> Json<DriversResponse> {
-    let driver_info = state.driver_registry.list_drivers_with_tools().await;
+    let driver_info = state.driver_runtime.list_inventory().await;
     let drivers: Vec<DriverInfo> = driver_info
         .into_iter()
-        .map(|(m, tool_count)| DriverInfo {
-            name: m.name,
-            version: m.version,
-            driver_type: format!("{:?}", m.driver_type),
-            description: m.description,
-            capabilities: m.capabilities,
-            tools_count: tool_count,
+        .map(|item| DriverInfo {
+            name: item.manifest.name,
+            version: item.manifest.version,
+            driver_type: format!("{:?}", item.manifest.driver_type),
+            description: item.manifest.description,
+            capabilities: item.manifest.capabilities,
+            tools_count: item.tool_count,
         })
         .collect();
     let total = drivers.len();
@@ -1156,46 +1156,36 @@ pub struct DriverReloadResponse {
 pub async fn reload_drivers(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<DriverReloadResponse>, (StatusCode, Json<ErrorResponse>)> {
-    let loader = macaca_driver::DriverLoader::new(&state.drivers_dir);
-    state.driver_registry.clear().await;
-    let load_results = loader.load_all();
-
-    let mut loaded = 0usize;
-    let mut failed = 0usize;
+    let report = state.driver_runtime.reload().await;
     let mut results = Vec::new();
 
-    for result in load_results {
-        match result.result {
-            Ok(driver) => {
-                let name = result.name.clone();
-                let tool_count = macaca_driver::SoftwareDriver::tools(driver.as_ref()).len();
-                state.driver_registry.register(driver).await;
-                loaded += 1;
+    for entry in &report.entries {
+        match entry.status {
+            macaca_driver::DriverLoadStatus::Loaded => {
                 tracing::info!(
-                    driver = %name,
-                    tools = tool_count,
+                    driver = %entry.name,
+                    tools = entry.tool_count.unwrap_or_default(),
                     "Driver reloaded; tools will be available to agents on next execution"
                 );
                 results.push(DriverReloadResult {
-                    name,
+                    name: entry.name.clone(),
                     status: "ok".to_string(),
                     error: None,
                 });
             }
-            Err(e) => {
-                failed += 1;
+            macaca_driver::DriverLoadStatus::Failed => {
                 results.push(DriverReloadResult {
-                    name: result.name.clone(),
+                    name: entry.name.clone(),
                     status: "error".to_string(),
-                    error: Some(e),
+                    error: entry.error.clone(),
                 });
             }
         }
     }
 
     Ok(Json(DriverReloadResponse {
-        loaded,
-        failed,
+        loaded: report.loaded,
+        failed: report.failed,
         results,
     }))
 }

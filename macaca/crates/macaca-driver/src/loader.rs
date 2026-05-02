@@ -6,7 +6,7 @@ use serde::Deserialize;
 use tracing::{error, info, warn};
 
 use crate::driver::SoftwareDriver;
-use crate::dynamic_driver::DynamicDriver;
+use crate::factory::{DriverCreateContext, DriverFactory, DynamicDriverFactory};
 use crate::plugin_abi::DRIVER_ABI_VERSION;
 use macaca_proto::MacacaResult;
 
@@ -114,8 +114,8 @@ impl DriverLoader {
         results
     }
 
-    /// Load a single driver from its directory and manifest.
-    pub fn load_driver(
+    /// Load a single driver from its directory and manifest through the canonical factory path.
+    pub fn load_driver_with_factory(
         &self,
         driver_dir: &Path,
         manifest: &DriverManifestToml,
@@ -143,14 +143,14 @@ impl DriverLoader {
             None => "{}".to_string(),
         };
 
-        // Load the dynamic driver
         info!(
             name = %manifest.driver.name,
             library = %library_path.display(),
             "Loading driver"
         );
 
-        let driver = DynamicDriver::load(&library_path, &config_json)?;
+        let factory = DynamicDriverFactory::new(manifest.driver.name.clone(), library_path);
+        let driver = factory.create(DriverCreateContext::new(config_json))?;
 
         info!(
             name = %manifest.driver.name,
@@ -158,13 +158,21 @@ impl DriverLoader {
             "Driver loaded successfully"
         );
 
-        Ok(Box::new(driver))
+        Ok(driver)
     }
 
-    /// Scan and load all drivers from the directory.
-    ///
-    /// Returns results for every discovered driver, including failures.
-    pub fn load_all(&self) -> Vec<DriverLoadResult> {
+    /// Load a single driver from its directory and manifest.
+    #[deprecated(note = "use DriverLoader::load_driver_with_factory()")]
+    pub fn load_driver(
+        &self,
+        driver_dir: &Path,
+        manifest: &DriverManifestToml,
+    ) -> MacacaResult<Box<dyn SoftwareDriver>> {
+        self.load_driver_with_factory(driver_dir, manifest)
+    }
+
+    /// Scan and load all drivers from the directory through the crate-internal runtime path.
+    pub(crate) fn load_all_internal(&self) -> Vec<DriverLoadResult> {
         info!(dir = %self.drivers_dir.display(), "Loading all drivers");
 
         if !self.drivers_dir.exists() {
@@ -180,7 +188,7 @@ impl DriverLoader {
 
         for (path, manifest) in discovered {
             let name = manifest.driver.name.clone();
-            let result = self.load_driver(&path, &manifest);
+            let result = self.load_driver_with_factory(&path, &manifest);
             results.push(DriverLoadResult {
                 name,
                 path: path.clone(),
@@ -207,5 +215,13 @@ impl DriverLoader {
         }
 
         results
+    }
+
+    /// Scan and load all drivers from the directory.
+    ///
+    /// Returns results for every discovered driver, including failures.
+    #[deprecated(note = "use DriverRuntime::load_all() or DriverRuntime::reload()")]
+    pub fn load_all(&self) -> Vec<DriverLoadResult> {
+        self.load_all_internal()
     }
 }

@@ -70,14 +70,20 @@ impl DriverRegistry {
         self.drivers.read().await.len()
     }
 
-    /// Collect all tools from all registered drivers.
-    pub async fn aggregate_tools(&self) -> Vec<Box<dyn Tool>> {
+    /// Collect all tools from all registered drivers through the canonical registry query path.
+    pub async fn collect_tools(&self) -> Vec<Box<dyn Tool>> {
         let guard = self.drivers.read().await;
         let mut all_tools = Vec::new();
         for driver in guard.values() {
             all_tools.extend(driver.tools());
         }
         all_tools
+    }
+
+    /// Collect all tools from all registered drivers.
+    #[deprecated(note = "use DriverRegistry::collect_tools()")]
+    pub async fn aggregate_tools(&self) -> Vec<Box<dyn Tool>> {
+        self.collect_tools().await
     }
 }
 
@@ -178,7 +184,7 @@ mod tests {
     async fn aggregate_tools_empty() {
         let registry = DriverRegistry::new();
         registry.register(Box::new(DummyDriver::new("a"))).await;
-        let tools = registry.aggregate_tools().await;
+        let tools = registry.collect_tools().await;
         assert!(tools.is_empty()); // DummyDriver has no tools
     }
 }

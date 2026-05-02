@@ -5,22 +5,35 @@
 //! seamlessly with the Agent OS tool system.
 
 pub mod builtin;
+pub mod command;
 pub mod driver;
 pub mod dynamic_driver;
+mod dynamic_proxy;
+pub mod factory;
+pub mod load_command;
 pub mod loader;
 pub mod plugin_abi;
 pub mod registry;
+pub mod runtime;
 pub mod sdk;
+pub mod session;
 pub mod toolset;
+pub mod trace;
 
+pub use command::DriverCommand;
 pub use driver::{DriverManifest, DriverType, SoftwareDriver};
 pub use dynamic_driver::DynamicDriver;
+pub use factory::{DriverCreateContext, DriverFactory, DynamicDriverFactory};
+pub use load_command::{DriverLoadCommand, DriverLoadEntry, DriverLoadReport, DriverLoadStatus};
 pub use loader::DriverLoader;
 pub use macaca_tools::{
     CompositeToolSet, ToolCatalog, ToolCommand, ToolCommandContext, ToolCommandExecutor,
     ToolSchemaProvider, TraceEvent,
 };
 pub use registry::DriverRegistry;
+pub use runtime::{DriverInventoryItem, DriverRuntime};
+pub use session::DriverSessionState;
+pub use trace::DriverTraceAdapter;
 
 /// A generic `Send` wrapper for closures that capture FFI raw pointers.
 ///

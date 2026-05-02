@@ -69,7 +69,7 @@ pub(crate) async fn build_toolkit(
     // This ensures tools from drivers loaded via `/api/drivers/reload` are
     // visible to agents without requiring a full restart.
     {
-        let driver_tools = state.driver_registry.aggregate_tools().await;
+        let driver_tools = state.driver_runtime.collect_tools().await;
         for tool in driver_tools {
             toolkit.register(Box::new(SingleToolAdapter::new(tool)), None);
         }
