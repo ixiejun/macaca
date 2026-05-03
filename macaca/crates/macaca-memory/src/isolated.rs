@@ -70,8 +70,7 @@ impl<V: VectorStore, E: EmbeddingProvider> IsolatedMemoryManager<V, E> {
         self.app_id
     }
 
-    /// Store a memory entry. The entry's `agent_id` is forcibly set to this manager's agent.
-    pub async fn store(&self, mut entry: MemoryEntry) -> MacacaResult<MemoryId> {
+    async fn store_entry(&self, mut entry: MemoryEntry) -> MacacaResult<MemoryId> {
         // Force agent_id — prevent cross-agent contamination.
         entry.agent_id = Some(self.agent_id);
 
@@ -108,8 +107,7 @@ impl<V: VectorStore, E: EmbeddingProvider> IsolatedMemoryManager<V, E> {
         Ok(id)
     }
 
-    /// Retrieve entries scoped to this agent.
-    pub async fn retrieve(&self, query: &str, limit: usize) -> MacacaResult<Vec<MemoryEntry>> {
+    async fn retrieve_entries(&self, query: &str, limit: usize) -> MacacaResult<Vec<MemoryEntry>> {
         let agent_id = self.agent_id;
 
         // Session: filter by agent_id via list
@@ -168,14 +166,12 @@ impl<V: VectorStore, E: EmbeddingProvider> IsolatedMemoryManager<V, E> {
         Ok(results)
     }
 
-    /// List entries for this agent from the file layer.
-    pub async fn list(&self, limit: usize) -> MacacaResult<Vec<MemoryEntry>> {
+    async fn list_entries(&self, limit: usize) -> MacacaResult<Vec<MemoryEntry>> {
         // File layer is already directory-scoped, so list all.
         self.file.list(None, limit).await
     }
 
-    /// Get a specific entry by ID (only if it belongs to this agent's scope).
-    pub async fn get(&self, id: &MemoryId) -> MacacaResult<Option<MemoryEntry>> {
+    async fn get_entry(&self, id: &MemoryId) -> MacacaResult<Option<MemoryEntry>> {
         // Check file layer (directory-scoped to this agent).
         if let Some(entry) = self.file.get(id).await? {
             return Ok(Some(entry));
@@ -189,8 +185,7 @@ impl<V: VectorStore, E: EmbeddingProvider> IsolatedMemoryManager<V, E> {
         Ok(None)
     }
 
-    /// Delete a memory entry from all layers.
-    pub async fn delete(&self, id: &MemoryId) -> MacacaResult<()> {
+    async fn delete_entry(&self, id: &MemoryId) -> MacacaResult<()> {
         let (s_res, f_res) = tokio::join!(self.session.delete(id), self.file.delete(id));
         s_res?;
         f_res?;
@@ -201,6 +196,75 @@ impl<V: VectorStore, E: EmbeddingProvider> IsolatedMemoryManager<V, E> {
             }
         }
         Ok(())
+    }
+
+    pub async fn remember_text(
+        &self,
+        input: crate::facade::RememberText,
+    ) -> MacacaResult<MemoryId> {
+        let entry = MemoryEntry {
+            id: MemoryId::new(),
+            layer: input.layer,
+            content: input.content,
+            metadata: input.metadata,
+            agent_id: input.agent_id,
+            created_at: chrono::Utc::now(),
+            expires_at: None,
+        };
+        self.store_entry(entry).await
+    }
+
+    pub async fn recall(
+        &self,
+        query: crate::facade::RecallQuery,
+    ) -> MacacaResult<crate::facade::RecallResult> {
+        self.retrieve_entries(&query.query, query.limit)
+            .await
+            .map(crate::facade::RecallResult::new)
+    }
+
+    pub async fn list_memories(&self, limit: usize) -> MacacaResult<crate::facade::RecallResult> {
+        self.list_entries(limit)
+            .await
+            .map(crate::facade::RecallResult::new)
+    }
+
+    pub async fn get_memory(&self, id: &MemoryId) -> MacacaResult<Option<MemoryEntry>> {
+        self.get_entry(id).await
+    }
+
+    pub async fn forget(&self, input: crate::facade::ForgetMemory) -> MacacaResult<()> {
+        self.delete_entry(&input.id).await
+    }
+
+    /// Store a memory entry through the legacy direct manager API.
+    #[deprecated(note = "use IsolatedMemoryManager::remember_text for new text memories")]
+    pub async fn store(&self, entry: MemoryEntry) -> MacacaResult<MemoryId> {
+        self.store_entry(entry).await
+    }
+
+    /// Retrieve scoped entries through the legacy direct manager API.
+    #[deprecated(note = "use IsolatedMemoryManager::recall with RecallQuery")]
+    pub async fn retrieve(&self, query: &str, limit: usize) -> MacacaResult<Vec<MemoryEntry>> {
+        self.retrieve_entries(query, limit).await
+    }
+
+    /// List scoped entries through the legacy direct manager API.
+    #[deprecated(note = "use IsolatedMemoryManager::list_memories")]
+    pub async fn list(&self, limit: usize) -> MacacaResult<Vec<MemoryEntry>> {
+        self.list_entries(limit).await
+    }
+
+    /// Get a scoped entry through the legacy direct manager API.
+    #[deprecated(note = "use IsolatedMemoryManager::get_memory")]
+    pub async fn get(&self, id: &MemoryId) -> MacacaResult<Option<MemoryEntry>> {
+        self.get_entry(id).await
+    }
+
+    /// Delete a scoped entry through the legacy direct manager API.
+    #[deprecated(note = "use IsolatedMemoryManager::forget")]
+    pub async fn delete(&self, id: &MemoryId) -> MacacaResult<()> {
+        self.delete_entry(id).await
     }
 }
 
@@ -216,7 +280,7 @@ impl<V: VectorStore, E: EmbeddingProvider> MemoryRetriever for IsolatedMemoryMan
             .collect::<Vec<_>>()
             .join(" ");
         let query = format!("{} {}", context.description, history_snippet);
-        self.retrieve(query.trim(), 10).await
+        self.retrieve_entries(query.trim(), 10).await
     }
 }
 
@@ -288,8 +352,8 @@ mod tests {
         let entry = make_entry("test content");
         assert!(entry.agent_id.is_none()); // No agent_id initially.
 
-        let id = mgr.store(entry).await.unwrap();
-        let got = mgr.get(&id).await.unwrap().unwrap();
+        let id = mgr.store_entry(entry).await.unwrap();
+        let got = mgr.get_entry(&id).await.unwrap().unwrap();
         assert_eq!(got.agent_id, Some(mgr.agent_id()));
     }
 
@@ -297,12 +361,25 @@ mod tests {
     async fn store_and_retrieve() {
         let dir = TempDir::new().unwrap();
         let mgr = make_isolated(&dir);
-        mgr.store(make_entry("isolated memory content"))
+        mgr.store_entry(make_entry("isolated memory content"))
             .await
             .unwrap();
-        let results = mgr.retrieve("isolated", 10).await.unwrap();
+        let results = mgr.retrieve_entries("isolated", 10).await.unwrap();
         assert!(!results.is_empty());
         assert!(results.iter().any(|e| e.content.contains("isolated")));
+    }
+
+    #[tokio::test]
+    async fn isolated_facade_forces_agent_scope() {
+        let dir = TempDir::new().unwrap();
+        let mgr = make_isolated(&dir);
+        let id = mgr
+            .remember_text(crate::facade::RememberText::new("isolated facade memory"))
+            .await
+            .unwrap();
+        let entry = mgr.get_memory(&id).await.unwrap().unwrap();
+
+        assert_eq!(entry.agent_id, Some(mgr.agent_id()));
     }
 
     #[tokio::test]
@@ -335,18 +412,24 @@ mod tests {
             );
 
         // Agent A stores a memory.
-        mgr_a.store(make_entry("secret A data")).await.unwrap();
+        mgr_a
+            .store_entry(make_entry("secret A data"))
+            .await
+            .unwrap();
 
         // Agent B stores a memory.
-        mgr_b.store(make_entry("secret B data")).await.unwrap();
+        mgr_b
+            .store_entry(make_entry("secret B data"))
+            .await
+            .unwrap();
 
         // Agent A can only see its own memories.
-        let a_results = mgr_a.retrieve("secret", 10).await.unwrap();
+        let a_results = mgr_a.retrieve_entries("secret", 10).await.unwrap();
         assert_eq!(a_results.len(), 1);
         assert!(a_results[0].content.contains("A data"));
 
         // Agent B can only see its own memories.
-        let b_results = mgr_b.retrieve("secret", 10).await.unwrap();
+        let b_results = mgr_b.retrieve_entries("secret", 10).await.unwrap();
         assert_eq!(b_results.len(), 1);
         assert!(b_results[0].content.contains("B data"));
     }
@@ -355,18 +438,18 @@ mod tests {
     async fn delete_entry() {
         let dir = TempDir::new().unwrap();
         let mgr = make_isolated(&dir);
-        let id = mgr.store(make_entry("to delete")).await.unwrap();
-        mgr.delete(&id).await.unwrap();
-        assert!(mgr.get(&id).await.unwrap().is_none());
+        let id = mgr.store_entry(make_entry("to delete")).await.unwrap();
+        mgr.delete_entry(&id).await.unwrap();
+        assert!(mgr.get_entry(&id).await.unwrap().is_none());
     }
 
     #[tokio::test]
     async fn list_entries() {
         let dir = TempDir::new().unwrap();
         let mgr = make_isolated(&dir);
-        mgr.store(make_entry("entry 1")).await.unwrap();
-        mgr.store(make_entry("entry 2")).await.unwrap();
-        let results = mgr.list(10).await.unwrap();
+        mgr.store_entry(make_entry("entry 1")).await.unwrap();
+        mgr.store_entry(make_entry("entry 2")).await.unwrap();
+        let results = mgr.list_entries(10).await.unwrap();
         assert_eq!(results.len(), 2);
     }
 
@@ -402,7 +485,7 @@ mod tests {
                 None,
             );
 
-        mgr.store(make_entry("scoped file")).await.unwrap();
+        mgr.store_entry(make_entry("scoped file")).await.unwrap();
 
         // Verify the file was created in the scoped directory.
         let scoped_dir = dir

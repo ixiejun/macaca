@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use tracing::debug;
 
 use crate::store::MemoryQueryContext;
-use macaca_proto::{AgentId, MacacaResult, MemoryEntry, MemoryId, TaskId};
+use macaca_proto::{AgentId, MacacaResult, MemoryEntry, MemoryId};
 
 use crate::embedding::MockEmbedding;
 use crate::file::FileMemory;
@@ -35,9 +35,7 @@ impl<V: VectorStore, E: EmbeddingProvider> MemoryManager<V, E> {
         }
     }
 
-    /// Store an entry in session and file layers; also embed + upsert into the vector
-    /// layer if both vector store and embedding provider are configured.
-    pub async fn store(&self, entry: MemoryEntry) -> MacacaResult<MemoryId> {
+    async fn store_entry(&self, entry: MemoryEntry) -> MacacaResult<MemoryId> {
         let id = entry.id;
 
         // Store in session and file concurrently.
@@ -70,8 +68,7 @@ impl<V: VectorStore, E: EmbeddingProvider> MemoryManager<V, E> {
         Ok(id)
     }
 
-    /// Retrieve entries from all available layers, deduplicated by MemoryId.
-    pub async fn retrieve(&self, query: &str, limit: usize) -> MacacaResult<Vec<MemoryEntry>> {
+    async fn retrieve_entries(&self, query: &str, limit: usize) -> MacacaResult<Vec<MemoryEntry>> {
         let (session_res, file_res) = tokio::join!(
             self.session.retrieve(query, limit),
             self.file.retrieve(query, limit)
@@ -120,13 +117,83 @@ impl<V: VectorStore, E: EmbeddingProvider> MemoryManager<V, E> {
         Ok(results)
     }
 
-    /// List entries from the file layer (persistent).
-    pub async fn list(
+    async fn list_entries(
         &self,
         agent_id: Option<&AgentId>,
         limit: usize,
     ) -> MacacaResult<Vec<MemoryEntry>> {
         self.file.list(agent_id, limit).await
+    }
+
+    pub async fn remember_text(
+        &self,
+        input: crate::facade::RememberText,
+    ) -> MacacaResult<MemoryId> {
+        let entry = MemoryEntry {
+            id: MemoryId::new(),
+            layer: input.layer,
+            content: input.content,
+            metadata: input.metadata,
+            agent_id: input.agent_id,
+            created_at: chrono::Utc::now(),
+            expires_at: None,
+        };
+        self.store_entry(entry).await
+    }
+
+    pub async fn recall(
+        &self,
+        query: crate::facade::RecallQuery,
+    ) -> MacacaResult<crate::facade::RecallResult> {
+        self.retrieve_entries(&query.query, query.limit)
+            .await
+            .map(crate::facade::RecallResult::new)
+    }
+
+    pub async fn list_memories(
+        &self,
+        agent_id: Option<&AgentId>,
+        limit: usize,
+    ) -> MacacaResult<crate::facade::RecallResult> {
+        self.list_entries(agent_id, limit)
+            .await
+            .map(crate::facade::RecallResult::new)
+    }
+
+    pub async fn forget(&self, input: crate::facade::ForgetMemory) -> MacacaResult<()> {
+        let (s_res, f_res) =
+            tokio::join!(self.session.delete(&input.id), self.file.delete(&input.id));
+        s_res?;
+        f_res?;
+
+        if let Some(vector) = &self.vector {
+            if let Err(e) = vector.delete(&input.id.0.to_string()).await {
+                debug!("memory_manager: vector delete failed: {e}");
+            }
+        }
+        Ok(())
+    }
+
+    /// Store an entry through the legacy direct manager API.
+    #[deprecated(note = "use MemoryManager::remember_text for new text memories")]
+    pub async fn store(&self, entry: MemoryEntry) -> MacacaResult<MemoryId> {
+        self.store_entry(entry).await
+    }
+
+    /// Retrieve entries through the legacy direct manager API.
+    #[deprecated(note = "use MemoryManager::recall with RecallQuery")]
+    pub async fn retrieve(&self, query: &str, limit: usize) -> MacacaResult<Vec<MemoryEntry>> {
+        self.retrieve_entries(query, limit).await
+    }
+
+    /// List persistent entries through the legacy direct manager API.
+    #[deprecated(note = "use MemoryManager::list_memories")]
+    pub async fn list(
+        &self,
+        agent_id: Option<&AgentId>,
+        limit: usize,
+    ) -> MacacaResult<Vec<MemoryEntry>> {
+        self.list_entries(agent_id, limit).await
     }
 }
 
@@ -143,7 +210,7 @@ impl<V: VectorStore, E: EmbeddingProvider> MemoryRetriever for MemoryManager<V, 
             .collect::<Vec<_>>()
             .join(" ");
         let query = format!("{} {}", context.description, history_snippet);
-        self.retrieve(query.trim(), 10).await
+        self.retrieve_entries(query.trim(), 10).await
     }
 }
 
@@ -184,8 +251,10 @@ mod tests {
     async fn store_and_retrieve() {
         let dir = TempDir::new().unwrap();
         let mgr = make_manager(&dir);
-        mgr.store(make_entry("agent memory content")).await.unwrap();
-        let results = mgr.retrieve("agent memory", 10).await.unwrap();
+        mgr.store_entry(make_entry("agent memory content"))
+            .await
+            .unwrap();
+        let results = mgr.retrieve_entries("agent memory", 10).await.unwrap();
         assert!(!results.is_empty());
         assert!(results.iter().any(|e| e.content.contains("agent memory")));
     }
@@ -194,8 +263,10 @@ mod tests {
     async fn deduplication_across_layers() {
         let dir = TempDir::new().unwrap();
         let mgr = make_manager(&dir);
-        mgr.store(make_entry("duplicate content")).await.unwrap();
-        let results = mgr.retrieve("duplicate", 10).await.unwrap();
+        mgr.store_entry(make_entry("duplicate content"))
+            .await
+            .unwrap();
+        let results = mgr.retrieve_entries("duplicate", 10).await.unwrap();
         // Same entry stored in both layers should appear only once.
         assert_eq!(results.len(), 1);
     }
@@ -204,10 +275,12 @@ mod tests {
     async fn auto_retrieve_uses_description() {
         let dir = TempDir::new().unwrap();
         let mgr = make_manager(&dir);
-        mgr.store(make_entry("rust async programming"))
+        mgr.store_entry(make_entry("rust async programming"))
             .await
             .unwrap();
-        mgr.store(make_entry("unrelated topic")).await.unwrap();
+        mgr.store_entry(make_entry("unrelated topic"))
+            .await
+            .unwrap();
 
         let ctx = MemoryQueryContext {
             task_id: TaskId::new(),
@@ -229,8 +302,34 @@ mod tests {
             None,
             None,
         );
-        let id = mgr.store(make_entry("no vectors")).await.unwrap();
-        let results = mgr.retrieve("no vectors", 10).await.unwrap();
+        let id = mgr.store_entry(make_entry("no vectors")).await.unwrap();
+        let results = mgr.retrieve_entries("no vectors", 10).await.unwrap();
         assert!(results.iter().any(|e| e.id == id));
+    }
+
+    #[tokio::test]
+    async fn facade_remember_recall_and_forget_text() {
+        let dir = TempDir::new().unwrap();
+        let mgr = make_manager(&dir);
+
+        let id = mgr
+            .remember_text(crate::facade::RememberText::new("facade memory"))
+            .await
+            .unwrap();
+        let result = mgr
+            .recall(crate::facade::RecallQuery::new("facade", 10))
+            .await
+            .unwrap();
+
+        assert!(result.entries.iter().any(|entry| entry.id == id));
+
+        mgr.forget(crate::facade::ForgetMemory { id })
+            .await
+            .unwrap();
+        let result = mgr
+            .recall(crate::facade::RecallQuery::new("facade", 10))
+            .await
+            .unwrap();
+        assert!(result.entries.iter().all(|entry| entry.id != id));
     }
 }

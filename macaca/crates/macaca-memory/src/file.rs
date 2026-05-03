@@ -116,6 +116,24 @@ impl MemoryStore for FileMemory {
     }
 }
 
+#[async_trait]
+impl crate::snapshot::MemorySnapshotStore for FileMemory {
+    async fn snapshot(&self, limit: usize) -> MacacaResult<crate::snapshot::MemorySnapshot> {
+        let entries = self.list(None, limit).await?;
+        Ok(crate::snapshot::MemorySnapshot::new(entries))
+    }
+
+    async fn replay_snapshot(
+        &self,
+        snapshot: &crate::snapshot::MemorySnapshot,
+    ) -> MacacaResult<()> {
+        for entry in snapshot.entries.iter().cloned() {
+            self.store(entry).await?;
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
