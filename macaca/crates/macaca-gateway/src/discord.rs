@@ -3,6 +3,7 @@
 //! This adapter implements the [`ImAdapter`] trait but does not connect to
 //! the real Discord API. It serves as a structural placeholder until
 //! the `serenity` SDK is integrated.
+#![allow(deprecated)]
 
 use std::sync::Arc;
 
@@ -13,6 +14,8 @@ use macaca_proto::config::DiscordConfig;
 use macaca_proto::error::MacacaResult;
 
 use crate::adapter::{EventHandler, ImAdapter};
+use crate::message::GatewayReply;
+use crate::transport::GatewayTransport;
 
 /// Stub Discord adapter backed by [`DiscordConfig`].
 ///
@@ -63,6 +66,21 @@ impl ImAdapter for DiscordAdapter {
     }
 }
 
+#[async_trait]
+impl GatewayTransport for DiscordAdapter {
+    fn name(&self) -> &str {
+        "discord"
+    }
+
+    async fn send_reply(&self, reply: &GatewayReply) -> MacacaResult<()> {
+        self.send_message(&reply.channel_id, &reply.content).await
+    }
+
+    async fn stop(&self) -> MacacaResult<()> {
+        ImAdapter::stop(self).await
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -78,7 +96,7 @@ mod tests {
     #[test]
     fn discord_adapter_name() {
         let adapter = DiscordAdapter::new(test_config());
-        assert_eq!(adapter.name(), "discord");
+        assert_eq!(ImAdapter::name(&adapter), "discord");
     }
 
     #[test]
@@ -96,7 +114,7 @@ mod tests {
         let adapter = DiscordAdapter::new(test_config());
         let handler: Arc<dyn EventHandler> = Arc::new(DefaultEventHandler);
         adapter.start(handler).await.unwrap();
-        adapter.stop().await.unwrap();
+        ImAdapter::stop(&adapter).await.unwrap();
     }
 
     #[tokio::test]

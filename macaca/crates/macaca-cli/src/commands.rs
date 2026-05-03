@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use tracing::info;
 
 use macaca_app::AppRuntime;
-use macaca_gateway::{DefaultEventHandler, DiscordAdapter, Gateway, TelegramAdapter};
+use macaca_gateway::GatewayBuilder;
 use macaca_kernel::Kernel;
 use macaca_llm::LlmProvider;
 use macaca_proto::config::{KernelConfig, MacacaConfig};
@@ -72,22 +72,7 @@ pub async fn run_kernel() -> MacacaResult<()> {
 
     // Set up gateway if enabled
     if config.gateway.enabled {
-        let handler = Arc::new(DefaultEventHandler);
-        let mut gateway = Gateway::new(handler);
-
-        if let Some(ref tg_config) = config.gateway.telegram {
-            if tg_config.enabled {
-                gateway.register_adapter(Box::new(TelegramAdapter::new(tg_config.clone())));
-            }
-        }
-
-        if let Some(ref dc_config) = config.gateway.discord {
-            if dc_config.enabled {
-                gateway.register_adapter(Box::new(DiscordAdapter::new(dc_config.clone())));
-            }
-        }
-
-        gateway.start_all().await?;
+        let gateway = GatewayBuilder::new(config.gateway.clone()).start().await?;
         info!(
             adapters = gateway.adapter_count(),
             "Gateway adapters running"

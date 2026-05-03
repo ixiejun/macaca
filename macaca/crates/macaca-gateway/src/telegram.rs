@@ -5,6 +5,7 @@
 //! Sending uses `sendMessage` with HTML parse mode for plain text and
 //! Markdown for code blocks.  Messages exceeding Telegram's 4 096-character
 //! limit are automatically split at newline boundaries.
+#![allow(deprecated)]
 
 use std::sync::Arc;
 
@@ -16,9 +17,10 @@ use macaca_proto::error::MacacaResult;
 use macaca_proto::types::GatewayEvent;
 
 use crate::adapter::{EventHandler, ImAdapter};
-
-// Telegram Bot API message length limit.
-const TELEGRAM_MAX_LEN: usize = 4096;
+use crate::message::GatewayReply;
+use crate::telegram_format::{split_message, TELEGRAM_MAX_LEN};
+use crate::telegram_parser;
+use crate::transport::GatewayTransport;
 
 // ── TelegramAdapter ────────────────────────────────────────────────────────
 
@@ -48,46 +50,7 @@ impl TelegramAdapter {
     /// - Any other `/command [args…]` → [`GatewayEvent::Command`]
     /// - Plain text → [`GatewayEvent::TaskRequest`]
     pub(crate) fn parse_message(text: &str, user_id: &str, channel_id: &str) -> GatewayEvent {
-        let text = text.trim();
-        if let Some(rest) = text.strip_prefix('/') {
-            // Split command from arguments on the first space.
-            let (cmd_raw, arg_str) = match rest.split_once(' ') {
-                Some((c, a)) => (c, a),
-                None => (rest, ""),
-            };
-            // Strip any @BotName suffix (e.g. /start@MyBot).
-            let command = cmd_raw
-                .split_once('@')
-                .map(|(c, _)| c)
-                .unwrap_or(cmd_raw)
-                .to_string();
-            let args: Vec<String> = arg_str.split_whitespace().map(|s| s.to_string()).collect();
-
-            if command == "status" {
-                return GatewayEvent::StatusQuery {
-                    user_id: user_id.into(),
-                    channel_id: channel_id.into(),
-                    task_id: args.first().and_then(|id| {
-                        uuid::Uuid::parse_str(id)
-                            .ok()
-                            .map(macaca_proto::types::TaskId)
-                    }),
-                };
-            }
-
-            return GatewayEvent::Command {
-                user_id: user_id.into(),
-                channel_id: channel_id.into(),
-                command,
-                args,
-            };
-        }
-
-        GatewayEvent::TaskRequest {
-            user_id: user_id.into(),
-            channel_id: channel_id.into(),
-            content: text.to_string(),
-        }
+        telegram_parser::parse_message(text, user_id, channel_id)
     }
 }
 
@@ -252,253 +215,17 @@ impl ImAdapter for TelegramAdapter {
     }
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-
-/// Split `text` into chunks of at most `max_len` characters.
-///
-/// Prefers splitting at newline boundaries to preserve formatting.  Falls
-/// back to a hard split at `max_len` when no newline is found within the
-/// current window.
-pub(crate) fn split_message(text: &str, max_len: usize) -> Vec<String> {
-    if text.len() <= max_len {
-        return vec![text.to_string()];
+#[async_trait]
+impl GatewayTransport for TelegramAdapter {
+    fn name(&self) -> &str {
+        "telegram"
     }
 
-    let mut chunks = Vec::new();
-    let mut remaining = text;
-
-    while !remaining.is_empty() {
-        if remaining.len() <= max_len {
-            chunks.push(remaining.to_string());
-            break;
-        }
-
-        // Try to split at a newline within the allowed window.
-        let window = &remaining[..max_len];
-        let split_at = window
-            .rfind('\n')
-            .map(|i| i + 1) // include the newline in the current chunk
-            .unwrap_or(max_len); // hard split if no newline found
-
-        chunks.push(remaining[..split_at].to_string());
-        remaining = &remaining[split_at..];
+    async fn send_reply(&self, reply: &GatewayReply) -> MacacaResult<()> {
+        self.send_message(&reply.channel_id, &reply.content).await
     }
 
-    chunks
-}
-
-// ── Tests ──────────────────────────────────────────────────────────────────
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn test_config() -> TelegramConfig {
-        TelegramConfig {
-            enabled: true,
-            bot_token_env: "TEST_TELEGRAM_TOKEN".into(),
-            allowed_user_ids: vec!["user1".into(), "user2".into()],
-        }
-    }
-
-    // ── adapter metadata ──
-
-    #[test]
-    fn telegram_adapter_name() {
-        let adapter = TelegramAdapter::new(test_config());
-        assert_eq!(adapter.name(), "telegram");
-    }
-
-    #[test]
-    fn telegram_adapter_config_access() {
-        let cfg = test_config();
-        let adapter = TelegramAdapter::new(cfg.clone());
-        assert_eq!(adapter.config().bot_token_env, "TEST_TELEGRAM_TOKEN");
-        assert_eq!(adapter.config().allowed_user_ids.len(), 2);
-    }
-
-    // ── parse_message ──
-
-    #[test]
-    fn test_parse_task_request() {
-        let event = TelegramAdapter::parse_message("build me a web app", "42", "100");
-        match event {
-            GatewayEvent::TaskRequest {
-                user_id,
-                channel_id,
-                content,
-            } => {
-                assert_eq!(user_id, "42");
-                assert_eq!(channel_id, "100");
-                assert_eq!(content, "build me a web app");
-            }
-            other => panic!("expected TaskRequest, got {:?}", other),
-        }
-    }
-
-    #[test]
-    fn test_parse_status_command_no_id() {
-        let event = TelegramAdapter::parse_message("/status", "1", "2");
-        match event {
-            GatewayEvent::StatusQuery {
-                user_id,
-                channel_id,
-                task_id,
-            } => {
-                assert_eq!(user_id, "1");
-                assert_eq!(channel_id, "2");
-                assert!(task_id.is_none());
-            }
-            other => panic!("expected StatusQuery, got {:?}", other),
-        }
-    }
-
-    #[test]
-    fn test_parse_status_command_with_valid_uuid() {
-        let id = "550e8400-e29b-41d4-a716-446655440000";
-        let msg = format!("/status {}", id);
-        let event = TelegramAdapter::parse_message(&msg, "1", "2");
-        match event {
-            GatewayEvent::StatusQuery { task_id, .. } => {
-                assert!(task_id.is_some());
-            }
-            other => panic!("expected StatusQuery, got {:?}", other),
-        }
-    }
-
-    #[test]
-    fn test_parse_status_command_with_invalid_id() {
-        // Non-UUID arg → task_id is None.
-        let event = TelegramAdapter::parse_message("/status abc123", "1", "2");
-        match event {
-            GatewayEvent::StatusQuery { task_id, .. } => {
-                assert!(task_id.is_none());
-            }
-            other => panic!("expected StatusQuery, got {:?}", other),
-        }
-    }
-
-    #[test]
-    fn test_parse_generic_command() {
-        let event = TelegramAdapter::parse_message("/agents list all", "7", "9");
-        match event {
-            GatewayEvent::Command {
-                user_id,
-                channel_id,
-                command,
-                args,
-            } => {
-                assert_eq!(user_id, "7");
-                assert_eq!(channel_id, "9");
-                assert_eq!(command, "agents");
-                assert_eq!(args, vec!["list", "all"]);
-            }
-            other => panic!("expected Command, got {:?}", other),
-        }
-    }
-
-    #[test]
-    fn test_parse_command_with_bot_suffix() {
-        // Telegram sends /start@BotName in group chats.
-        let event = TelegramAdapter::parse_message("/help@MyBot", "1", "2");
-        match event {
-            GatewayEvent::Command { command, args, .. } => {
-                assert_eq!(command, "help");
-                assert!(args.is_empty());
-            }
-            other => panic!("expected Command, got {:?}", other),
-        }
-    }
-
-    #[test]
-    fn test_parse_trims_whitespace() {
-        let event = TelegramAdapter::parse_message("  hello world  ", "1", "2");
-        match event {
-            GatewayEvent::TaskRequest { content, .. } => {
-                assert_eq!(content, "hello world");
-            }
-            other => panic!("expected TaskRequest, got {:?}", other),
-        }
-    }
-
-    // ── split_message ──
-
-    #[test]
-    fn test_split_message_short() {
-        let chunks = split_message("hello", 100);
-        assert_eq!(chunks, vec!["hello"]);
-    }
-
-    #[test]
-    fn test_split_message_exact_limit() {
-        let text = "a".repeat(100);
-        let chunks = split_message(&text, 100);
-        assert_eq!(chunks.len(), 1);
-        assert_eq!(chunks[0].len(), 100);
-    }
-
-    #[test]
-    fn test_split_message_long_no_newline() {
-        // 200 chars, no newlines → hard split at 100.
-        let text = "x".repeat(200);
-        let chunks = split_message(&text, 100);
-        assert_eq!(chunks.len(), 2);
-        assert_eq!(chunks[0].len(), 100);
-        assert_eq!(chunks[1].len(), 100);
-    }
-
-    #[test]
-    fn test_split_message_splits_at_newline() {
-        // Two paragraphs — split should happen at the newline.
-        let text = format!("{}\n{}", "a".repeat(60), "b".repeat(60));
-        let chunks = split_message(&text, 100);
-        // First chunk ends with '\n', second is the b's.
-        assert_eq!(chunks.len(), 2);
-        assert!(chunks[0].ends_with('\n'));
-        assert!(chunks[1].starts_with('b'));
-    }
-
-    #[test]
-    fn test_split_message_empty() {
-        let chunks = split_message("", 100);
-        assert_eq!(chunks, vec![""]);
-    }
-
-    #[test]
-    fn test_split_message_three_chunks() {
-        // 300 chars, no newlines → 3 hard-split chunks of 100.
-        let text = "z".repeat(300);
-        let chunks = split_message(&text, 100);
-        assert_eq!(chunks.len(), 3);
-        for c in &chunks {
-            assert_eq!(c.len(), 100);
-        }
-    }
-
-    // ── adapter lifecycle (stub — no real network) ──
-
-    #[tokio::test]
-    async fn telegram_adapter_start_without_token_is_ok() {
-        // Token env var not set → start returns Ok (just warns).
-        std::env::remove_var("TEST_TELEGRAM_TOKEN");
-        let adapter = TelegramAdapter::new(test_config());
-        let handler: Arc<dyn EventHandler> = Arc::new(crate::gateway::DefaultEventHandler);
-        adapter.start(handler).await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn telegram_adapter_stop_is_ok() {
-        let adapter = TelegramAdapter::new(test_config());
-        adapter.stop().await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn telegram_adapter_send_without_token_is_ok() {
-        std::env::remove_var("TEST_TELEGRAM_TOKEN");
-        let adapter = TelegramAdapter::new(test_config());
-        adapter
-            .send_message("chat_123", "Hello from test")
-            .await
-            .unwrap();
+    async fn stop(&self) -> MacacaResult<()> {
+        ImAdapter::stop(self).await
     }
 }
