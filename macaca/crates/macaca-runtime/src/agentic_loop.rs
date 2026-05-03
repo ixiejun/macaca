@@ -8,16 +8,18 @@ use std::time::Duration;
 
 use macaca_llm::LlmProvider;
 use macaca_proto::{
-    AgentExecutionEvent, AgentId, LlmMessage, LlmOptions, MacacaError, MacacaResult, Permission,
-    TokenUsage, ToolCall,
+    AgentExecutionEvent, AgentId, LlmMessage, LlmOptions, MacacaResult, Permission, TokenUsage,
+    ToolCall,
 };
-use macaca_tools::{ToolCatalog, TraceEvent};
+use macaca_tools::ToolCatalog;
 use tokio::sync::mpsc;
 use tracing::{debug, error, info, instrument, warn};
 
 use crate::context_window::{ContextWindowConfig, ContextWindowManager};
+use crate::events::RuntimeEventSink;
 use crate::loop_detector::{LoopDetector, LoopDetectorAction, LoopDetectorConfig};
 use crate::permission::PermissionChecker;
+use crate::template::RuntimeIterationOutcome;
 
 /// Configuration for the agentic runtime loop.
 #[derive(Debug, Clone)]
@@ -50,14 +52,6 @@ pub struct LoopResult {
     pub messages: Vec<LlmMessage>,
 }
 
-/// Result of a single iteration of the agentic loop.
-enum IterationResult {
-    /// Tools were executed; caller should continue the loop.
-    ToolsExecuted,
-    /// LLM produced a final response (no tool calls).
-    FinalResponse { content: String },
-}
-
 /// The agentic execution loop.
 ///
 /// Drives the LLM → tool → LLM cycle until the model produces a final
@@ -74,7 +68,7 @@ impl AgenticLoop {
     /// Core single-iteration logic shared by all loop variants.
     ///
     /// Handles LLM call, tool execution, event emission, and loop detection.
-    /// Returns `IterationResult` so callers can decide whether to continue.
+    /// Returns `RuntimeIterationOutcome` so callers can decide whether to continue.
     #[allow(clippy::too_many_arguments)]
     async fn run_iteration(
         &self,
@@ -90,11 +84,9 @@ impl AgenticLoop {
         permission: &Permission,
         permission_checker: Option<&dyn PermissionChecker>,
         event_tx: Option<&mpsc::Sender<AgentExecutionEvent>>,
-    ) -> MacacaResult<IterationResult> {
-        // Emit thinking event
-        if let Some(tx) = event_tx {
-            let _ = tx.send(AgentExecutionEvent::thinking(iteration)).await;
-        }
+    ) -> MacacaResult<RuntimeIterationOutcome> {
+        let event_sink = RuntimeEventSink::new(event_tx);
+        event_sink.emit_thinking(iteration).await;
 
         debug!(iteration, "Sending request to LLM");
 
@@ -103,14 +95,7 @@ impl AgenticLoop {
         let response = llm.chat(trimmed, options_with_tools).await?;
         accumulate_usage(total_usage, &response.usage);
 
-        // Emit assistant event if there's content
-        if !response.content.is_empty() {
-            if let Some(tx) = event_tx {
-                let _ = tx
-                    .send(AgentExecutionEvent::assistant(response.content.clone()))
-                    .await;
-            }
-        }
+        event_sink.emit_assistant(response.content.clone()).await;
 
         // Check for tool calls
         let tool_calls = response.tool_calls.clone().unwrap_or_default();
@@ -128,7 +113,7 @@ impl AgenticLoop {
         if tool_calls.is_empty() {
             // No tool calls — the model produced a final response.
             debug!(iteration, "LLM returned final response");
-            return Ok(IterationResult::FinalResponse {
+            return Ok(RuntimeIterationOutcome::FinalResponse {
                 content: response.content,
             });
         }
@@ -148,12 +133,7 @@ impl AgenticLoop {
                 }
                 LoopDetectorAction::Terminate(msg) => {
                     error!(msg = %msg, "Loop detector terminated loop");
-                    // Emit completed(false) event on termination
-                    if let Some(tx) = event_tx {
-                        let _ = tx
-                            .send(AgentExecutionEvent::completed(false, Some(msg)))
-                            .await;
-                    }
+                    event_sink.emit_completed(false, Some(msg)).await;
                     let last_content = messages
                         .iter()
                         .rev()
@@ -161,38 +141,31 @@ impl AgenticLoop {
                         .map(|m| m.content.clone())
                         .unwrap_or_default();
                     // Signal callers to stop by returning a FinalResponse with the last content
-                    return Ok(IterationResult::FinalResponse {
+                    return Ok(RuntimeIterationOutcome::FinalResponse {
                         content: last_content,
                     });
                 }
             }
 
             // Emit tool_call event
-            if let Some(tx) = event_tx {
-                let _ = tx
-                    .send(AgentExecutionEvent::tool_call_with_id(
-                        tc.name.clone(),
-                        tc.arguments.clone(),
-                        tc.id.clone(),
-                    ))
-                    .await;
-            }
+            event_sink
+                .emit(AgentExecutionEvent::tool_call_with_id(
+                    tc.name.clone(),
+                    tc.arguments.clone(),
+                    tc.id.clone(),
+                ))
+                .await;
 
-            // Execute tool — use events variant when event_tx is present
-            let tool_result = if event_tx.is_some() {
-                self.execute_tool_call_with_events(
+            let tool_result = self
+                .execute_tool_command(
                     agent_id,
                     tools,
                     tc,
                     permission,
                     permission_checker,
-                    event_tx,
+                    &event_sink,
                 )
-                .await
-            } else {
-                self.execute_tool_call(agent_id, tools, tc, permission, permission_checker)
-                    .await
-            };
+                .await;
 
             let (result_value, is_error) = match tool_result {
                 Ok(value) => {
@@ -203,20 +176,18 @@ impl AgenticLoop {
             };
 
             // Emit tool_result event
-            if let Some(tx) = event_tx {
-                let _ = tx
-                    .send(AgentExecutionEvent::tool_result_with_error(
-                        tc.name.clone(),
-                        result_value.clone(),
-                        is_error,
-                    ))
-                    .await;
-            }
+            event_sink
+                .emit(AgentExecutionEvent::tool_result_with_error(
+                    tc.name.clone(),
+                    result_value.clone(),
+                    is_error,
+                ))
+                .await;
 
             messages.push(LlmMessage::tool_result(&tc.id, result_value));
         }
 
-        Ok(IterationResult::ToolsExecuted)
+        Ok(RuntimeIterationOutcome::ToolsExecuted)
     }
 
     /// Run the agentic loop.
@@ -230,7 +201,7 @@ impl AgenticLoop {
     /// - `permission` — the agent's permission policy
     /// - `permission_checker` — optional checker; if `None`, all tools are allowed
     #[instrument(name = "agentic_loop", skip_all, fields(agent_id = %agent_id, max_iter = self.config.max_iterations))]
-    pub async fn run(
+    pub async fn execute(
         &self,
         agent_id: &AgentId,
         llm: &dyn LlmProvider,
@@ -297,7 +268,7 @@ impl AgenticLoop {
                 )
                 .await?
             {
-                IterationResult::FinalResponse { content } => {
+                RuntimeIterationOutcome::FinalResponse { content } => {
                     return Ok(LoopResult {
                         content,
                         total_usage,
@@ -305,16 +276,43 @@ impl AgenticLoop {
                         messages,
                     });
                 }
-                IterationResult::ToolsExecuted => continue,
+                RuntimeIterationOutcome::ToolsExecuted => continue,
             }
         }
+    }
+
+    /// Run the agentic loop.
+    ///
+    /// Deprecated compatibility wrapper. Use [`AgenticLoop::execute`] for new code.
+    #[deprecated(note = "use AgenticLoop::execute")]
+    #[instrument(name = "agentic_loop_legacy", skip_all, fields(agent_id = %agent_id, max_iter = self.config.max_iterations))]
+    pub async fn run(
+        &self,
+        agent_id: &AgentId,
+        llm: &dyn LlmProvider,
+        tools: &dyn ToolCatalog,
+        initial_messages: Vec<LlmMessage>,
+        options: &LlmOptions,
+        permission: &Permission,
+        permission_checker: Option<&dyn PermissionChecker>,
+    ) -> MacacaResult<LoopResult> {
+        self.execute(
+            agent_id,
+            llm,
+            tools,
+            initial_messages,
+            options,
+            permission,
+            permission_checker,
+        )
+        .await
     }
 
     /// Run the agentic loop with event callbacks for progress tracking.
     ///
     /// This is similar to `run` but sends events to the provided channel during execution.
     #[instrument(name = "agentic_loop_with_events", skip_all, fields(agent_id = %agent_id, max_iter = self.config.max_iterations))]
-    pub async fn run_with_events(
+    pub async fn execute_with_events(
         &self,
         agent_id: &AgentId,
         llm: &dyn LlmProvider,
@@ -364,7 +362,7 @@ impl AgenticLoop {
                 )
                 .await?
             {
-                IterationResult::FinalResponse { content } => {
+                RuntimeIterationOutcome::FinalResponse { content } => {
                     // Emit completed(true) on normal finish
                     if let Some(ref tx) = event_tx {
                         let _ = tx.send(AgentExecutionEvent::completed(true, None)).await;
@@ -376,7 +374,7 @@ impl AgenticLoop {
                         messages,
                     });
                 }
-                IterationResult::ToolsExecuted => continue,
+                RuntimeIterationOutcome::ToolsExecuted => continue,
             }
         }
 
@@ -400,175 +398,55 @@ impl AgenticLoop {
         })
     }
 
-    /// Execute a single tool call with streaming events support.
-    /// This method creates a channel to receive TraceEvents from tools like claude_code_execute
-    /// and forwards them as AgentExecutionEvent::DriverTrace to the event_tx.
-    async fn execute_tool_call_with_events(
+    /// Run the agentic loop with event callbacks for progress tracking.
+    ///
+    /// Deprecated compatibility wrapper. Use [`AgenticLoop::execute_with_events`] for new code.
+    #[deprecated(note = "use AgenticLoop::execute_with_events")]
+    #[instrument(name = "agentic_loop_with_events_legacy", skip_all, fields(agent_id = %agent_id, max_iter = self.config.max_iterations))]
+    pub async fn run_with_events(
         &self,
         agent_id: &AgentId,
+        llm: &dyn LlmProvider,
         tools: &dyn ToolCatalog,
-        tool_call: &ToolCall,
+        initial_messages: Vec<LlmMessage>,
+        options: &LlmOptions,
         permission: &Permission,
         permission_checker: Option<&dyn PermissionChecker>,
-        event_tx: Option<&mpsc::Sender<AgentExecutionEvent>>,
-    ) -> MacacaResult<serde_json::Value> {
-        let tool_name = &tool_call.name;
-        let args_preview = serde_json::to_string(&tool_call.arguments)
-            .map(|s| s.chars().take(200).collect::<String>())
-            .unwrap_or_else(|_| "<serialize error>".to_string());
-
-        info!(
-            agent_id = %agent_id,
-            tool_name = %tool_name,
-            args_preview = %args_preview,
-            "[TOOL] Executing tool"
-        );
-
-        // Permission check (includes path and network access enforcement)
-        if let Some(checker) = permission_checker {
-            checker.check_tool_with_args(
-                agent_id,
-                permission,
-                &tool_call.name,
-                &tool_call.arguments,
-            )?;
-        }
-
-        // Find tool
-        let tool =
-            macaca_tools::ToolCatalog::find_tool(tools, &tool_call.name).ok_or_else(|| {
-                error!(
-                    agent_id = %agent_id,
-                    tool_name = %tool_name,
-                    "[TOOL] Tool not found"
-                );
-                MacacaError::NotFound(format!("Tool '{}' not found", tool_call.name))
-            })?;
-
-        // Create channel for trace events if we have an event sender
-        let (trace_tx, mut trace_rx) = if event_tx.is_some() {
-            let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<TraceEvent>();
-            (Some(tx), rx)
-        } else {
-            let (_, rx) = tokio::sync::mpsc::unbounded_channel::<TraceEvent>();
-            (None, rx)
-        };
-
-        // Execute with timeout, streaming events if available
-        let tool_name = tool_call.name.clone();
-        let timeout_duration = self.config.tool_timeout;
-
-        // Spawn a task to forward trace events in real-time while tool executes
-        let forward_task = if let Some(tx) = event_tx.cloned() {
-            Some(tokio::spawn(async move {
-                while let Some(trace) = trace_rx.recv().await {
-                    let driver_name = trace
-                        .driver_id
-                        .clone()
-                        .unwrap_or_else(|| "unknown".to_string());
-                    let trace_value = serde_json::to_value(&trace).unwrap_or_default();
-                    let driver_trace = AgentExecutionEvent::DriverTrace {
-                        driver_name,
-                        trace: trace_value,
-                    };
-                    if tx.send(driver_trace).await.is_err() {
-                        break;
-                    }
-                }
-            }))
-        } else {
-            None
-        };
-
-        let result = tokio::time::timeout(
-            timeout_duration,
-            execute_tool_command(
-                tool,
-                tool_call.arguments.clone(),
-                macaca_tools::ToolCommandContext {
-                    event_tx: trace_tx,
-                    ..Default::default()
-                },
-            ),
+        event_tx: Option<mpsc::Sender<AgentExecutionEvent>>,
+    ) -> MacacaResult<LoopResult> {
+        self.execute_with_events(
+            agent_id,
+            llm,
+            tools,
+            initial_messages,
+            options,
+            permission,
+            permission_checker,
+            event_tx,
         )
         .await
-        .map_err(|_| {
-            error!(
-                agent_id = %agent_id,
-                tool_name = %tool_name,
-                timeout_secs = timeout_duration.as_secs(),
-                "[TOOL] Tool execution timed out"
-            );
-            MacacaError::Timeout(format!(
-                "Tool '{}' timed out after {}s",
-                tool_name,
-                timeout_duration.as_secs()
-            ))
-        })??;
-
-        // Wait for the forward task to finish processing all events
-        // The task will exit when trace_tx is dropped (which happens when execute_streaming completes)
-        // and trace_rx.recv() returns None
-        if let Some(task) = forward_task {
-            let _ = task.await;
-        }
-
-        let result_preview = serde_json::to_string(&result)
-            .map(|s| s.chars().take(200).collect::<String>())
-            .unwrap_or_else(|_| "<serialize error>".to_string());
-
-        info!(
-            agent_id = %agent_id,
-            tool_name = %tool_name,
-            result_preview = %result_preview,
-            "[TOOL] Tool execution completed"
-        );
-
-        Ok(result)
     }
 
-    /// Execute a single tool call with permission checking and timeout.
-    async fn execute_tool_call(
+    /// Execute a single tool call through the runtime command boundary.
+    async fn execute_tool_command(
         &self,
         agent_id: &AgentId,
         tools: &dyn ToolCatalog,
         tool_call: &ToolCall,
         permission: &Permission,
         permission_checker: Option<&dyn PermissionChecker>,
+        event_sink: &RuntimeEventSink<'_>,
     ) -> MacacaResult<serde_json::Value> {
-        // Permission check (includes path and network access enforcement)
-        if let Some(checker) = permission_checker {
-            checker.check_tool_with_args(
-                agent_id,
-                permission,
-                &tool_call.name,
-                &tool_call.arguments,
-            )?;
-        }
-
-        // Find tool
-        let tool = macaca_tools::ToolCatalog::find_tool(tools, &tool_call.name)
-            .ok_or_else(|| MacacaError::NotFound(format!("Tool '{}' not found", tool_call.name)))?;
-
-        // Execute with timeout
-        let result = tokio::time::timeout(
+        crate::execution::execute_tool_call(
+            agent_id,
+            tools,
+            tool_call,
+            permission,
+            permission_checker,
             self.config.tool_timeout,
-            execute_tool_command(
-                tool,
-                tool_call.arguments.clone(),
-                macaca_tools::ToolCommandContext::default(),
-            ),
+            event_sink.sender(),
         )
         .await
-        .map_err(|_| {
-            MacacaError::Timeout(format!(
-                "Tool '{}' timed out after {}s",
-                tool_call.name,
-                self.config.tool_timeout.as_secs()
-            ))
-        })??;
-
-        Ok(result)
     }
 }
 
@@ -594,18 +472,6 @@ fn tool_definitions(
     } else {
         Some(defs)
     }
-}
-
-async fn execute_tool_command(
-    tool: &dyn macaca_tools::Tool,
-    input: serde_json::Value,
-    context: macaca_tools::ToolCommandContext,
-) -> MacacaResult<serde_json::Value> {
-    macaca_tools::ToolCommandExecutor::execute_command(
-        tool,
-        macaca_tools::ToolCommand::with_context(input, context),
-    )
-    .await
 }
 
 // ── Pausable Agentic Loop ────────────────────────────────────────────────────────
@@ -685,11 +551,11 @@ impl PausableAgenticLoop {
         None
     }
 
-    /// Run with pause support.
+    /// Execute with pause support.
     ///
     /// The loop will check for pause signals at the start of each iteration.
     /// When paused, it will wait until resumed via `resume()`.
-    pub async fn run_with_pause(
+    pub async fn execute_with_pause(
         &self,
         agent_id: &AgentId,
         llm: &dyn LlmProvider,
@@ -798,7 +664,7 @@ impl PausableAgenticLoop {
                 )
                 .await?
             {
-                IterationResult::FinalResponse { content } => {
+                RuntimeIterationOutcome::FinalResponse { content } => {
                     if let Some(ref tx) = event_tx {
                         let _ = tx.send(AgentExecutionEvent::completed(true, None)).await;
                     }
@@ -809,7 +675,7 @@ impl PausableAgenticLoop {
                         messages,
                     });
                 }
-                IterationResult::ToolsExecuted => continue,
+                RuntimeIterationOutcome::ToolsExecuted => continue,
             }
         }
 
@@ -831,6 +697,34 @@ impl PausableAgenticLoop {
             iterations: iterations - 1,
             messages,
         })
+    }
+
+    /// Run with pause support.
+    ///
+    /// Deprecated compatibility wrapper. Use [`PausableAgenticLoop::execute_with_pause`] for new code.
+    #[deprecated(note = "use PausableAgenticLoop::execute_with_pause")]
+    pub async fn run_with_pause(
+        &self,
+        agent_id: &AgentId,
+        llm: &dyn LlmProvider,
+        tools: &dyn ToolCatalog,
+        messages: Vec<LlmMessage>,
+        options: &LlmOptions,
+        permission: &Permission,
+        permission_checker: Option<&dyn PermissionChecker>,
+        event_tx: Option<mpsc::Sender<AgentExecutionEvent>>,
+    ) -> MacacaResult<LoopResult> {
+        self.execute_with_pause(
+            agent_id,
+            llm,
+            tools,
+            messages,
+            options,
+            permission,
+            permission_checker,
+            event_tx,
+        )
+        .await
     }
 }
 
@@ -992,7 +886,7 @@ mod tests {
         ];
 
         let result = runner
-            .run(
+            .execute(
                 &agent_id,
                 &llm,
                 &tools,
@@ -1024,7 +918,7 @@ mod tests {
         ];
 
         let result = runner
-            .run(
+            .execute(
                 &agent_id,
                 &llm,
                 &tools,
@@ -1055,7 +949,7 @@ mod tests {
         let messages = vec![LlmMessage::user("Loop forever")];
 
         let result = runner
-            .run(
+            .execute(
                 &agent_id,
                 &llm,
                 &tools,
@@ -1095,7 +989,7 @@ mod tests {
         let checker = DefaultPermissionChecker;
 
         let result = runner
-            .run(
+            .execute(
                 &agent_id,
                 &llm,
                 &tools,
@@ -1171,7 +1065,7 @@ mod tests {
         let agent_id = AgentId::new();
 
         let result = runner
-            .run(
+            .execute(
                 &agent_id,
                 &UnknownToolLlm,
                 &tools,
@@ -1190,6 +1084,61 @@ mod tests {
             .find(|m| m.role == macaca_proto::LlmRole::Tool)
             .unwrap();
         assert!(tool_msg.content.contains("not found"));
+    }
+
+    #[tokio::test]
+    async fn execute_with_events_preserves_event_order() {
+        let runner = AgenticLoop::new(RuntimeConfig {
+            max_iterations: 5,
+            tool_timeout: Duration::from_secs(5),
+        });
+        let llm = MockToolLlm::new();
+        let tools = macaca_tools::DefaultToolSet::new();
+        let agent_id = AgentId::new();
+        let (tx, mut rx) = mpsc::channel(16);
+
+        let result = runner
+            .execute_with_events(
+                &agent_id,
+                &llm,
+                &tools,
+                vec![LlmMessage::user("Run echo hello")],
+                &LlmOptions::default(),
+                &default_permission(),
+                None,
+                Some(tx),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(result.iterations, 2);
+
+        let mut kinds = Vec::new();
+        while let Some(event) = rx.recv().await {
+            let kind = match event {
+                AgentExecutionEvent::Thinking { .. } => "thinking",
+                AgentExecutionEvent::ToolCall { .. } => "tool_call",
+                AgentExecutionEvent::DriverTrace { .. } => "driver_trace",
+                AgentExecutionEvent::ToolResult { .. } => "tool_result",
+                AgentExecutionEvent::Assistant { .. } => "assistant",
+                AgentExecutionEvent::Completed { .. } => "completed",
+            };
+            kinds.push(kind);
+        }
+
+        assert_eq!(
+            kinds,
+            vec![
+                "thinking",
+                "tool_call",
+                "driver_trace",
+                "driver_trace",
+                "tool_result",
+                "thinking",
+                "assistant",
+                "completed"
+            ]
+        );
     }
 
     #[test]

@@ -16,11 +16,11 @@ use macaca_kernel::{ApplicationExecutorRegistry, Kernel};
 use macaca_llm::{LlmProvider, LlmRouter};
 use macaca_persist::{EventLog, PersistBackend};
 use macaca_proto::{ApplicationId, ForkId, LlmMessage};
-use macaca_runtime::agentic_loop::ResumeReason;
 use macaca_skill::SkillCatalog;
 use macaca_task::TodoStore;
 use macaca_tools::ToolCatalog;
 
+use crate::runtime_resume::RuntimeResumeSignal;
 use crate::workspace::AppWorkspace;
 
 /// Mapping from fork_id to session context for hook notifications.
@@ -46,7 +46,7 @@ pub struct ActiveSession {
     /// Pause signal for the agentic loop.
     pub pause_signal: Arc<AtomicBool>,
     /// Channel to send resume reason to the waiting loop.
-    pub resume_tx: mpsc::Sender<ResumeReason>,
+    pub resume_tx: mpsc::Sender<RuntimeResumeSignal>,
     /// Hot-swappable SSE event sender. When the browser refreshes,
     /// the stream endpoint replaces this with a new sender so the
     /// coordinator's subsequent events reach the new connection.

@@ -5,8 +5,11 @@
 
 pub mod agentic_loop;
 pub mod context_window;
+mod events;
+mod execution;
 pub mod loop_detector;
 pub mod permission;
+mod template;
 
 pub use agentic_loop::{AgenticLoop, LoopResult, RuntimeConfig};
 pub use context_window::{ContextWindowConfig, ContextWindowManager};

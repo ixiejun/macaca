@@ -11,10 +11,10 @@ use std::time::Duration;
 
 use macaca_kernel::executor::fork_manager::HookEvent;
 use macaca_proto::{ApplicationId, LlmRole};
-use macaca_runtime::agentic_loop::ResumeReason;
 use tokio::sync::broadcast::Receiver;
 use tracing::{info, warn};
 
+use crate::runtime_resume::RuntimeResumeSignal;
 use crate::state::AppState;
 
 /// Start the hook event consumer background task.
@@ -23,7 +23,7 @@ use crate::state::AppState;
 /// When a ForkValidated event is received, it:
 /// 1. Looks up the fork_to_session mapping to find the coordinator session
 /// 2. Gets the task result from the fork
-/// 3. Sends a ResumeReason to the waiting coordinator loop
+/// 3. Sends a runtime resume signal to the waiting coordinator loop
 pub async fn start_hook_event_consumer(state: Arc<AppState>) {
     info!("Hook event consumer started");
 
@@ -114,12 +114,13 @@ pub async fn start_hook_event_consumer(state: Arc<AppState>) {
                                         // Clear pause signal
                                         session.pause_signal.store(false, Ordering::SeqCst);
 
-                                        // Send resume reason
-                                        let resume_reason = ResumeReason::DelegateCompleted {
-                                            task_id,
-                                            success: true,
-                                            output,
-                                        };
+                                        // Send resume signal
+                                        let resume_reason =
+                                            RuntimeResumeSignal::DelegateCompleted {
+                                                task_id,
+                                                success: true,
+                                                output,
+                                            };
 
                                         if let Err(e) = session.resume_tx.send(resume_reason).await
                                         {
@@ -167,7 +168,7 @@ pub async fn start_hook_event_consumer(state: Arc<AppState>) {
 
                                 session.pause_signal.store(false, Ordering::SeqCst);
 
-                                let resume_reason = ResumeReason::DelegateFailed {
+                                let resume_reason = RuntimeResumeSignal::DelegateFailed {
                                     task_id: task_id.0.to_string(),
                                     error,
                                 };

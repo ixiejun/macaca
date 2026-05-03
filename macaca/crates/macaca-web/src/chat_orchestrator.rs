@@ -352,7 +352,7 @@ pub(crate) async fn post_chat_v2(
     // Pause/resume channel for create_goal coordination
     let pause_signal = Arc::new(AtomicBool::new(false));
     let (resume_tx, resume_rx) =
-        tokio::sync::mpsc::channel::<macaca_runtime::agentic_loop::ResumeReason>(4);
+        tokio::sync::mpsc::channel::<crate::runtime_resume::RuntimeResumeSignal>(4);
 
     // Stop old forwarder if re-entering the same session
     let forwarder_stop = Arc::new(AtomicBool::new(false));

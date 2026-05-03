@@ -1741,7 +1741,7 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                     let sessions =
                                         state_for_consumer.sessions.active_sessions.read().await;
                                     if let Some(session) = sessions.get(&sid) {
-                                        let resume_reason = macaca_runtime::agentic_loop::ResumeReason::DelegateCompleted {
+                                        let resume_reason = crate::runtime_resume::RuntimeResumeSignal::DelegateCompleted {
                                             task_id: goal_id_str.clone(),
                                             success: true,
                                             output: format!("Goal completed: {}", description),

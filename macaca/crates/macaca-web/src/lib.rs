@@ -15,6 +15,7 @@ pub mod metrics;
 pub mod proto_event_visitors;
 pub mod routes;
 pub mod run_trace;
+pub mod runtime_resume;
 pub mod session;
 pub mod skill_mcp;
 pub mod sse;

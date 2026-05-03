@@ -663,7 +663,7 @@ pub async fn run_full_pipeline_dry_run_with_config(config: PipelineDryRunConfig)
     report
 }
 
-/// 跑 `AgenticLoop::run_with_events`：与事件 drain 并发，`verbose` 时打印每一跳。
+/// 跑 `AgenticLoop::execute_with_events`：与事件 drain 并发，`verbose` 时打印每一跳。
 async fn run_agentic_traced(
     cfg: PipelineDryRunConfig,
     label: &str,
@@ -686,7 +686,7 @@ async fn run_agentic_traced(
         }
     };
 
-    let run_fut = loop_.run_with_events(
+    let run_fut = loop_.execute_with_events(
         agent_id,
         llm,
         tools,

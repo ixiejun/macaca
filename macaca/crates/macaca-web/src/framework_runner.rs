@@ -34,10 +34,10 @@ use macaca_framework::react_agent::ReActAgent;
 use macaca_framework::tool::{ToolError, ToolMiddleware, ToolResponse, Toolkit};
 use macaca_persist::{AppendEventCommand, EventLog};
 use macaca_proto::{AgentState, ApplicationId, Capability};
-use macaca_runtime::agentic_loop::ResumeReason;
 use macaca_sdk::AgentPersona;
 use macaca_skill::{SkillPolicy, SkillRuntimeFacade, SkillSnapshotRequest};
 
+use crate::runtime_resume::RuntimeResumeSignal;
 use crate::state::AppState;
 
 // ---------------------------------------------------------------------------
@@ -60,7 +60,7 @@ enum FrameworkRunnerBuildMode {
     Coordinator {
         sse_tx: mpsc::Sender<Result<Event, Infallible>>,
         pause_signal: Arc<AtomicBool>,
-        resume_rx: mpsc::Receiver<ResumeReason>,
+        resume_rx: mpsc::Receiver<RuntimeResumeSignal>,
     },
 }
 
@@ -365,7 +365,7 @@ impl FrameworkRunner {
         session_id: Option<String>,
         sse_tx: mpsc::Sender<Result<Event, Infallible>>,
         pause_signal: Arc<AtomicBool>,
-        resume_rx: mpsc::Receiver<ResumeReason>,
+        resume_rx: mpsc::Receiver<RuntimeResumeSignal>,
     ) -> Result<(HookedAgent<ReActAgent>, tokio_util::sync::CancellationToken), String> {
         let request = Self::build_request(
             state,
@@ -1480,7 +1480,7 @@ mod tests {
 /// external pause signal mechanism with a tool-level block.
 pub struct PauseOnGoalMiddleware {
     pause_signal: Arc<AtomicBool>,
-    resume_rx: Arc<Mutex<mpsc::Receiver<ResumeReason>>>,
+    resume_rx: Arc<Mutex<mpsc::Receiver<RuntimeResumeSignal>>>,
 }
 
 #[async_trait]
@@ -1505,7 +1505,7 @@ impl ToolMiddleware for PauseOnGoalMiddleware {
             Some(reason) => {
                 self.pause_signal.store(false, Ordering::SeqCst);
                 let context = match &reason {
-                    ResumeReason::DelegateCompleted { output, .. } => output.clone(),
+                    RuntimeResumeSignal::DelegateCompleted { output, .. } => output.clone(),
                     _ => "Goal processing completed.".to_string(),
                 };
                 response
