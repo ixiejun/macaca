@@ -447,6 +447,67 @@ impl ToolHandler for SingleToolAdapter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use macaca_proto::types::TokenUsage;
+    use macaca_proto::{LlmMessage, LlmOptions, LlmResponse, MacacaError, MacacaResult};
+
+    struct EchoProvider {
+        name: String,
+    }
+
+    #[async_trait]
+    impl LlmProvider for EchoProvider {
+        fn name(&self) -> &str {
+            &self.name
+        }
+
+        async fn chat(
+            &self,
+            messages: Vec<LlmMessage>,
+            options: &LlmOptions,
+        ) -> MacacaResult<LlmResponse> {
+            let content = messages
+                .last()
+                .map(|message| message.content.clone())
+                .unwrap_or_default();
+            Ok(LlmResponse {
+                content,
+                reasoning_content: None,
+                model: options.model.clone(),
+                usage: TokenUsage::default(),
+                finish_reason: "stop".into(),
+                tool_calls: None,
+            })
+        }
+    }
+
+    struct FailingProvider;
+
+    #[async_trait]
+    impl LlmProvider for FailingProvider {
+        fn name(&self) -> &str {
+            "failing"
+        }
+
+        async fn chat(
+            &self,
+            _messages: Vec<LlmMessage>,
+            _options: &LlmOptions,
+        ) -> MacacaResult<LlmResponse> {
+            Err(MacacaError::Llm("forced failure".into()))
+        }
+    }
+
+    fn text_content(response: &ChatResponse) -> String {
+        response
+            .content
+            .iter()
+            .filter_map(|block| match block {
+                ContentBlock::Text(text) => Some(text.text.as_str()),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join("")
+    }
 
     #[test]
     fn test_messages_from_json_user() {
@@ -508,5 +569,73 @@ mod tests {
         ];
         let result = messages_from_json(&msgs);
         assert_eq!(result.len(), 3); // invalid role skipped
+    }
+
+    #[tokio::test]
+    async fn routed_adapter_uses_default_selection_and_fallbacks_without_model_override() {
+        let mut router = macaca_llm::LlmRouter::new();
+        router.register("openai", Arc::new(FailingProvider));
+        router.register(
+            "anthropic",
+            Arc::new(EchoProvider {
+                name: "anthropic".into(),
+            }),
+        );
+        let selection = macaca_llm::ModelSelection {
+            primary: macaca_llm::ModelTarget {
+                provider: "openai".into(),
+                model: "gpt-4o".into(),
+            },
+            fallbacks: vec![macaca_llm::ModelTarget {
+                provider: "anthropic".into(),
+                model: "claude-sonnet-4".into(),
+            }],
+            source: "test".into(),
+        };
+        let adapter = RoutedLlmAdapter::new(Arc::new(router), selection);
+
+        let response = adapter
+            .chat(
+                vec![serde_json::json!({"role": "user", "content": "hello"})],
+                &ChatOptions::default(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(text_content(&response), "hello");
+    }
+
+    #[tokio::test]
+    async fn routed_adapter_explicit_model_override_uses_router_resolution() {
+        let mut router = macaca_llm::LlmRouter::new();
+        router.register("openai", Arc::new(FailingProvider));
+        router.register(
+            "anthropic",
+            Arc::new(EchoProvider {
+                name: "anthropic".into(),
+            }),
+        );
+        let selection = macaca_llm::ModelSelection {
+            primary: macaca_llm::ModelTarget {
+                provider: "openai".into(),
+                model: "gpt-4o".into(),
+            },
+            fallbacks: Vec::new(),
+            source: "test".into(),
+        };
+        let adapter = RoutedLlmAdapter::new(Arc::new(router), selection);
+
+        let response = adapter
+            .chat(
+                vec![serde_json::json!({"role": "user", "content": "override"})],
+                &ChatOptions {
+                    model: Some("anthropic:claude-sonnet-4".into()),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(text_content(&response), "override");
     }
 }

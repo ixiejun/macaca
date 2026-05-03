@@ -33,6 +33,12 @@ The system SHALL resolve the effective provider/model for every framework agent 
 - **THEN** the selected provider and model match the explicit reference
 - **AND** the route plan preserves that selection for execution and tracing
 
+#### Scenario: Legacy provider-name helper is not used by upper production code
+- **GIVEN** the deprecated provider-name helper remains callable for compatibility
+- **WHEN** framework, web, or app production code needs provider/model resolution
+- **THEN** it uses `LlmRouter::resolve_selection` or a routed adapter
+- **AND** it does not call the deprecated helper directly
+
 ### Requirement: Routed Framework Model Execution
 
 All framework-based agents SHALL execute through a routed `ChatModel` adapter backed by the shared provider registry/router.
@@ -48,3 +54,30 @@ All framework-based agents SHALL execute through a routed `ChatModel` adapter ba
 - **WHEN** the primary model fails
 - **THEN** the runtime retries according to the resolved fallback chain
 - **AND** the actual provider/model used can be observed in logs or trace metadata
+
+### Requirement: App LLM proxy uses router-backed selection
+
+App-level LLM proxying SHALL reuse the shared router model-selection contract instead of implementing a separate provider/model precedence algorithm.
+
+#### Scenario: User override takes precedence through router selection
+- **GIVEN** an app default provider/model
+- **AND** a user override provider/model
+- **WHEN** the app LLM proxy handles a chat request
+- **THEN** it resolves the effective target through `ModelSelectionRequest`
+- **AND** the user override target is used.
+
+#### Scenario: Legacy proxy constructor remains callable
+- **GIVEN** legacy code still constructs an app LLM proxy with the old constructor
+- **WHEN** the crate is compiled
+- **THEN** the constructor remains available
+- **AND** it is marked deprecated for migration discovery.
+
+### Requirement: LlmProvider remains valid execution boundary
+
+The system SHALL preserve `LlmProvider` as the low-level execution trait even when provider/model routing decisions are centralized.
+
+#### Scenario: Execution-only callers keep LlmProvider
+- **GIVEN** a component already receives a resolved provider or router as `Arc<dyn LlmProvider>`
+- **WHEN** it only executes `chat`
+- **THEN** it may continue using `LlmProvider`
+- **AND** it does not need to depend on router-specific APIs.

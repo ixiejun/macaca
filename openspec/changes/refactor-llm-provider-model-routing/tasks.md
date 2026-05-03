@@ -1,24 +1,47 @@
-## 1. Registry and Resolution
+## 1. OpenSpec and Prerequisite
 
-- [ ] 1.1 梳理并统一 `macaca-llm` 中现有 provider 注册入口与 `LlmRouter` 能力
-- [ ] 1.2 定义统一的 model selection / route plan 结构，覆盖默认值、agent override、显式 provider:model 引用与 fallback
-- [ ] 1.3 实现并测试 model resolver 的 precedence 规则与兼容解析
+- [x] 1.1 Complete bottom-level resolver prerequisite in `refactor-macaca-llm-provider-resolver`.
+- [x] 1.2 Keep `LlmProvider` as the execution trait; do not deprecate it.
+- [x] 1.3 Update this design/tasks/spec to describe consumer migration boundaries.
+- [x] 1.4 Validate with `openspec validate refactor-llm-provider-model-routing --strict`.
 
-## 2. Framework Integration
+## 2. Impact and Baseline
 
-- [ ] 2.1 在 `macaca-framework` 中新增基于 router 的 `ChatModel` adapter
-- [ ] 2.2 让 framework runner 的 coordinator / planner / worker 构建统一走 routed model
-- [ ] 2.3 移除 framework runner 中对“单 provider + 单模型字符串”的隐式假设
+- [x] 2.1 Run GitNexus impact for `RoutedLlmAdapter`.
+- [x] 2.2 Run GitNexus impact for `resolve_model_selection`.
+- [x] 2.3 Run GitNexus impact for `build_react_agent`.
+- [x] 2.4 Run GitNexus impact for `LlmProviderAdapter`.
+- [x] 2.5 Run GitNexus impact for `LlmProxy`.
+- [x] 2.6 Run GitNexus impact for `resolve_model`.
+- [x] 2.7 Run baseline focused tests and checks.
 
-## 3. Web Bootstrap Refactor
+## 3. Framework Routed Adapter
 
-- [ ] 3.1 将 `macaca-web` 启动层改为从 config 初始化 provider registry / router
-- [ ] 3.2 删除 `macaca-web/src/lib.rs` 中硬编码 provider 构造分支
-- [ ] 3.3 让 `AppState` 持有统一的 router / routed model factory，而不是单 provider 假设
+- [x] 3.1 Add tests proving `RoutedLlmAdapter` uses `chat_with_selection` and fallback chain when no explicit model is supplied.
+- [x] 3.2 Add tests proving explicit model override routes through router `chat`.
+- [x] 3.3 Keep `LlmProviderAdapter` callable for legacy direct-provider integration.
 
-## 4. Compatibility and Verification
+## 4. Web Framework Runner
 
-- [ ] 4.1 保持现有 `default_provider` 与 `providers.<name>.default_model` 配置兼容
-- [ ] 4.2 补充单元测试：旧配置、agent model override、provider 显式选择、fallback chain
-- [ ] 4.3 手动验证 fullstack-autodev 的 coordinator / planner / worker 都能正常命中目标模型
-- [ ] 4.4 `cargo check` 与相关测试通过
+- [x] 4.1 Confirm coordinator / executor / runtime agent construction uses `RoutedLlmAdapter`.
+- [x] 4.2 Confirm `FrameworkRunner::resolve_model_selection` uses `ModelSelectionRequest`.
+- [x] 4.3 Verify production framework/web code does not call deprecated `resolve_provider_name`.
+
+## 5. App LLM Proxy Migration
+
+- [x] 5.1 Add router-backed `LlmProxy` constructor.
+- [x] 5.2 Make router-backed proxy resolve user/app/agent precedence through `ModelSelectionRequest`.
+- [x] 5.3 Mark legacy `LlmProxy::new` deprecated but callable.
+- [x] 5.4 Migrate proxy tests to the router-backed constructor.
+- [x] 5.5 Add compatibility test for deprecated constructor under local `#[allow(deprecated)]`.
+
+## 6. Verification
+
+- [x] 6.1 Run `cargo fmt`.
+- [x] 6.2 Run `cargo test -p macaca-llm router -- --nocapture`.
+- [x] 6.3 Run `cargo test -p macaca-framework adapter --features macaca-compat -- --nocapture`.
+- [x] 6.4 Run `cargo test -p macaca-app llm_proxy -- --nocapture`.
+- [x] 6.5 Run `cargo check -p macaca-llm -p macaca-framework -p macaca-app -p macaca-web`.
+- [x] 6.6 Run deprecated usage grep for `resolve_provider_name` and legacy `LlmProxy::new`.
+- [x] 6.7 Run `openspec validate refactor-llm-provider-model-routing --strict`.
+- [x] 6.8 Run `gitnexus_detect_changes(scope: "all")`.
