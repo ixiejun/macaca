@@ -1329,6 +1329,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "macaca-llm",
+ "macaca-memory",
  "macaca-proto",
  "macaca-tools",
  "serde",

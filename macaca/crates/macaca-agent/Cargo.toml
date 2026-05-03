@@ -7,6 +7,7 @@ edition.workspace = true
 macaca-proto = { workspace = true }
 macaca-llm = { workspace = true }
 macaca-tools = { workspace = true }
+macaca-memory = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
