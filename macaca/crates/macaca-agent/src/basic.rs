@@ -8,73 +8,7 @@ use macaca_proto::{
 use macaca_tools::ToolCatalog;
 use tracing::instrument;
 
-use crate::agent::{Agent, AgentServices};
-
-#[derive(Debug, Clone)]
-pub enum CapabilitySource {
-    Legacy,
-    Manifest,
-    Persona,
-    Skill,
-    Driver,
-    Mcp,
-}
-
-#[derive(Debug, Clone)]
-pub enum AgentCapabilityNode {
-    Leaf(Capability),
-    Group {
-        source: CapabilitySource,
-        children: Vec<AgentCapabilityNode>,
-    },
-}
-
-impl AgentCapabilityNode {
-    fn flatten_into(&self, out: &mut Vec<Capability>) {
-        match self {
-            Self::Leaf(capability) => out.push(capability.clone()),
-            Self::Group { children, .. } => {
-                for child in children {
-                    child.flatten_into(out);
-                }
-            }
-        }
-    }
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct AgentCapabilitySet {
-    nodes: Vec<AgentCapabilityNode>,
-}
-
-impl AgentCapabilitySet {
-    pub fn from_legacy(capabilities: Vec<Capability>) -> Self {
-        Self {
-            nodes: capabilities
-                .into_iter()
-                .map(AgentCapabilityNode::Leaf)
-                .collect(),
-        }
-    }
-
-    pub fn push_group(&mut self, source: CapabilitySource, children: Vec<Capability>) {
-        self.nodes.push(AgentCapabilityNode::Group {
-            source,
-            children: children
-                .into_iter()
-                .map(AgentCapabilityNode::Leaf)
-                .collect(),
-        });
-    }
-
-    pub fn flatten_for_legacy_api(&self) -> Vec<Capability> {
-        let mut flattened = Vec::new();
-        for node in &self.nodes {
-            node.flatten_into(&mut flattened);
-        }
-        flattened
-    }
-}
+use crate::{agent::Agent, capability::AgentCapabilitySet, services::AgentServices};
 
 pub struct BasicAgentBuilder {
     id: AgentId,
@@ -94,11 +28,13 @@ pub struct BasicAgent {
 
 impl BasicAgent {
     /// Create a new BasicAgent with the given task description.
+    #[deprecated(note = "use BasicAgentBuilder::new(...).build() for new code")]
     pub fn new(task_description: impl Into<String>) -> Self {
         BasicAgentBuilder::new(task_description).build()
     }
 
     /// Create with an explicit id (useful for testing).
+    #[deprecated(note = "use BasicAgentBuilder::new(...).with_id(...).build() for new code")]
     pub fn with_id(id: AgentId, task_description: impl Into<String>) -> Self {
         BasicAgentBuilder::new(task_description).with_id(id).build()
     }
@@ -213,6 +149,7 @@ impl Agent for BasicAgent {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::capability::CapabilitySource;
     use async_trait::async_trait;
     use macaca_llm::LlmProvider;
     use macaca_proto::{LlmMessage, LlmOptions, LlmResponse, MacacaResult, TokenUsage};
@@ -248,10 +185,10 @@ mod tests {
 
     #[tokio::test]
     async fn basic_agent_returns_llm_response() {
-        let agent = BasicAgent::new("What is 6 * 7?");
+        let agent = BasicAgentBuilder::new("What is 6 * 7?").build();
         let llm = MockLlm;
         let tools = DefaultToolSet::new();
-        let services = AgentServices::empty();
+        let services = AgentServices::builder().build();
 
         let output = agent.run(&llm, &tools, &services).await.unwrap();
         assert_eq!(output.result, "42");
@@ -260,13 +197,13 @@ mod tests {
 
     #[test]
     fn basic_agent_initial_state_is_created() {
-        let agent = BasicAgent::new("test");
+        let agent = BasicAgentBuilder::new("test").build();
         assert_eq!(agent.state(), AgentState::Created);
     }
 
     #[test]
     fn basic_agent_has_capability() {
-        let agent = BasicAgent::new("test");
+        let agent = BasicAgentBuilder::new("test").build();
         assert_eq!(agent.capabilities().len(), 1);
         assert_eq!(agent.capabilities()[0].name, "text_generation");
     }

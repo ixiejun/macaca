@@ -68,7 +68,7 @@ impl Kernel {
     /// Builds an `AgentServices` bundle (empty for now — real injection in Phase 4+)
     /// and invokes `agent.run()`.
     pub async fn execute_agent(&self, agent_id: &AgentId) -> MacacaResult<AgentOutput> {
-        let services = AgentServices::empty();
+        let services = AgentServices::builder().build();
         let llm = Arc::clone(&self.llm);
         let tools = Arc::clone(&self.tools);
 

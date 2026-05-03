@@ -6,6 +6,7 @@
 - 优先遵循现有项目约定，而非发明新模式。
 
 # Rust / Macaca 默认规范
+- 禁止巨型文件，每个文件代码行数最多不得超过500行，如果代码过多就要考虑是否没有采用设计模式，没有对代码功能进行科学的拆分，在编程前缺少对架构进行优雅的设计
 - 用Superpowers执行 brainstorm、write-plan，用OpenSpec编写proposal、design、tasks、spec之前必须先考虑能否采用/Users/quantum/Code/dev/agent/macaca/docs/design_patterns.md里的某种设计模式
 - 对于可用多种设计模式实现的，优先考虑可扩展性和性能开销
 - 不可过度设计

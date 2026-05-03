@@ -5,17 +5,22 @@
 
 pub mod agent;
 pub mod basic;
+pub mod capability;
+pub mod lifecycle;
+pub mod services;
 pub mod shutdown;
 pub mod state_machine;
 
-pub use agent::{
-    Agent, AgentServices, IpcService, MemoryService, NoopIpcService, NoopMemoryService,
-    NoopPersistService, PersistService,
+pub use agent::Agent;
+pub use basic::{BasicAgent, BasicAgentBuilder};
+pub use capability::{AgentCapabilityNode, AgentCapabilitySet, CapabilitySource};
+pub use lifecycle::{
+    AgentLifecyclePolicy, AgentLifecycleTransition, AgentTransitionReason,
+    DefaultAgentLifecyclePolicy,
 };
-pub use basic::{
-    AgentCapabilityNode, AgentCapabilitySet, BasicAgent, BasicAgentBuilder, CapabilitySource,
+pub use services::{
+    AgentServices, AgentServicesBuilder, IpcService, MemoryService, NoopIpcService,
+    NoopMemoryService, NoopPersistService, PersistService,
 };
 pub use shutdown::ShutdownHandle;
-pub use state_machine::{
-    AgentLifecyclePolicy, AgentStateMachine, AgentTransitionReason, DefaultAgentLifecyclePolicy,
-};
+pub use state_machine::AgentStateMachine;

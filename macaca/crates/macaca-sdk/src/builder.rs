@@ -289,7 +289,7 @@ model: mock-model
         let agent = AgentBuilder::from_config(sample_config()).build().unwrap();
         let llm = MockLlm;
         let tools = DefaultToolSet::new();
-        let services = AgentServices::empty();
+        let services = AgentServices::builder().build();
 
         let output = agent.run(&llm, &tools, &services).await.unwrap();
         assert!(output.result.contains("You are a test agent."));
@@ -304,7 +304,7 @@ model: mock-model
 
         let llm = MockLlm;
         let tools = DefaultToolSet::new();
-        let services = AgentServices::empty();
+        let services = AgentServices::builder().build();
 
         let err = agent.run(&llm, &tools, &services).await.unwrap_err();
         assert!(err.to_string().contains("prompt template"));

@@ -2,58 +2,9 @@
 
 use macaca_proto::{AgentState, MacacaError, MacacaResult};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AgentTransitionReason {
-    Start,
-    Suspend,
-    Resume,
-    Terminate,
-}
-
-pub trait AgentLifecyclePolicy: Send + Sync {
-    fn can_transition(
-        &self,
-        from: AgentState,
-        to: AgentState,
-        reason: AgentTransitionReason,
-    ) -> bool;
-}
-
-pub struct DefaultAgentLifecyclePolicy;
-
-impl AgentLifecyclePolicy for DefaultAgentLifecyclePolicy {
-    fn can_transition(
-        &self,
-        from: AgentState,
-        to: AgentState,
-        reason: AgentTransitionReason,
-    ) -> bool {
-        matches!(
-            (from, to, reason),
-            (
-                AgentState::Created,
-                AgentState::Running,
-                AgentTransitionReason::Start
-            ) | (
-                AgentState::Running,
-                AgentState::Suspended,
-                AgentTransitionReason::Suspend
-            ) | (
-                AgentState::Running,
-                AgentState::Terminated,
-                AgentTransitionReason::Terminate
-            ) | (
-                AgentState::Suspended,
-                AgentState::Running,
-                AgentTransitionReason::Resume
-            ) | (
-                AgentState::Suspended,
-                AgentState::Terminated,
-                AgentTransitionReason::Terminate
-            )
-        )
-    }
-}
+use crate::lifecycle::{
+    AgentLifecyclePolicy, AgentLifecycleTransition, DefaultAgentLifecyclePolicy,
+};
 
 /// Manages an agent's lifecycle state and validates transitions.
 ///
@@ -72,6 +23,7 @@ pub struct AgentStateMachine {
 
 impl AgentStateMachine {
     /// Create a new state machine starting in [`AgentState::Created`].
+    #[deprecated(note = "use AgentStateMachine::default() for new code")]
     pub fn new() -> Self {
         Self {
             state: AgentState::Created,
@@ -79,7 +31,12 @@ impl AgentStateMachine {
         }
     }
 
+    #[deprecated(note = "use AgentStateMachine::with_lifecycle_policy(...) for new code")]
     pub fn with_policy(policy: Box<dyn AgentLifecyclePolicy>) -> Self {
+        Self::with_lifecycle_policy(policy)
+    }
+
+    pub fn with_lifecycle_policy(policy: Box<dyn AgentLifecyclePolicy>) -> Self {
         Self {
             state: AgentState::Created,
             policy,
@@ -91,11 +48,22 @@ impl AgentStateMachine {
         self.state
     }
 
+    /// Return whether the next transition would be accepted without mutating state.
+    pub fn can_transition_to(&self, next: AgentState) -> bool {
+        AgentLifecycleTransition::new(self.state, next)
+            .map(|transition| {
+                self.policy
+                    .can_transition(transition.from, transition.to, transition.reason)
+            })
+            .unwrap_or(false)
+    }
+
     /// Attempt to transition to `next`. Returns `Err` for invalid transitions.
     pub fn transition(&mut self, next: AgentState) -> MacacaResult<()> {
-        let valid =
-            self.policy
-                .can_transition(self.state, next, transition_reason(self.state, next)?);
+        let transition = AgentLifecycleTransition::new(self.state, next)?;
+        let valid = self
+            .policy
+            .can_transition(transition.from, transition.to, transition.reason);
 
         if valid {
             self.state = next;
@@ -111,21 +79,10 @@ impl AgentStateMachine {
 
 impl Default for AgentStateMachine {
     fn default() -> Self {
-        Self::new()
-    }
-}
-
-fn transition_reason(from: AgentState, to: AgentState) -> MacacaResult<AgentTransitionReason> {
-    match (from, to) {
-        (AgentState::Created, AgentState::Running) => Ok(AgentTransitionReason::Start),
-        (AgentState::Running, AgentState::Suspended) => Ok(AgentTransitionReason::Suspend),
-        (AgentState::Suspended, AgentState::Running) => Ok(AgentTransitionReason::Resume),
-        (AgentState::Running, AgentState::Terminated)
-        | (AgentState::Suspended, AgentState::Terminated) => Ok(AgentTransitionReason::Terminate),
-        _ => Err(MacacaError::Agent(format!(
-            "invalid state transition: {:?} -> {:?}",
-            from, to
-        ))),
+        Self {
+            state: AgentState::Created,
+            policy: Box::new(DefaultAgentLifecyclePolicy),
+        }
     }
 }
 
@@ -152,7 +109,7 @@ mod tests {
 
         let policy = DefaultAgentLifecyclePolicy;
         for (from, to, expected) in cases {
-            let actual = transition_reason(from, to)
+            let actual = crate::lifecycle::transition_reason(from, to)
                 .map(|reason| policy.can_transition(from, to, reason))
                 .unwrap_or(false);
             assert_eq!((from, to, actual), (from, to, expected));
@@ -161,21 +118,21 @@ mod tests {
 
     #[test]
     fn created_to_running() {
-        let mut sm = AgentStateMachine::new();
+        let mut sm = AgentStateMachine::default();
         assert!(sm.transition(AgentState::Running).is_ok());
         assert_eq!(sm.state(), AgentState::Running);
     }
 
     #[test]
     fn running_to_suspended() {
-        let mut sm = AgentStateMachine::new();
+        let mut sm = AgentStateMachine::default();
         sm.transition(AgentState::Running).unwrap();
         assert!(sm.transition(AgentState::Suspended).is_ok());
     }
 
     #[test]
     fn suspended_to_running() {
-        let mut sm = AgentStateMachine::new();
+        let mut sm = AgentStateMachine::default();
         sm.transition(AgentState::Running).unwrap();
         sm.transition(AgentState::Suspended).unwrap();
         assert!(sm.transition(AgentState::Running).is_ok());
@@ -183,28 +140,40 @@ mod tests {
 
     #[test]
     fn running_to_terminated() {
-        let mut sm = AgentStateMachine::new();
+        let mut sm = AgentStateMachine::default();
         sm.transition(AgentState::Running).unwrap();
         assert!(sm.transition(AgentState::Terminated).is_ok());
     }
 
     #[test]
     fn invalid_created_to_suspended() {
-        let mut sm = AgentStateMachine::new();
+        let mut sm = AgentStateMachine::default();
         assert!(sm.transition(AgentState::Suspended).is_err());
     }
 
     #[test]
     fn invalid_created_to_terminated() {
-        let mut sm = AgentStateMachine::new();
+        let mut sm = AgentStateMachine::default();
         assert!(sm.transition(AgentState::Terminated).is_err());
     }
 
     #[test]
     fn invalid_terminated_to_running() {
-        let mut sm = AgentStateMachine::new();
+        let mut sm = AgentStateMachine::default();
         sm.transition(AgentState::Running).unwrap();
         sm.transition(AgentState::Terminated).unwrap();
         assert!(sm.transition(AgentState::Running).is_err());
+    }
+
+    #[test]
+    fn can_transition_to_matches_transition_success_matrix() {
+        let mut sm = AgentStateMachine::default();
+        assert!(sm.can_transition_to(AgentState::Running));
+        assert!(!sm.can_transition_to(AgentState::Suspended));
+
+        sm.transition(AgentState::Running).unwrap();
+        assert!(sm.can_transition_to(AgentState::Suspended));
+        assert!(sm.can_transition_to(AgentState::Terminated));
+        assert!(!sm.can_transition_to(AgentState::Created));
     }
 }
