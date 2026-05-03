@@ -4,6 +4,7 @@ use crate::dashscope::DashScopeProvider;
 use crate::openai::OpenAiProvider;
 use crate::openai_compatible::OpenAiCompatibleProvider;
 use crate::provider::LlmProvider;
+use crate::resolver::ResolverChain;
 use crate::{CostTracker, RateLimiter, ResilientConfig, ResilientLlmWrapper};
 use macaca_proto::{
     config::LlmConfig,
@@ -53,6 +54,7 @@ pub struct LlmRouter {
     default_provider: Option<String>,
     default_model: Option<String>,
     provider_defaults: HashMap<String, String>,
+    resolver: ResolverChain,
 }
 
 impl LlmRouter {
@@ -62,6 +64,7 @@ impl LlmRouter {
             default_provider: None,
             default_model: None,
             provider_defaults: HashMap::new(),
+            resolver: ResolverChain::built_in(),
         }
     }
 
@@ -257,7 +260,7 @@ impl LlmRouter {
         {
             provider_hint.to_string()
         } else {
-            Self::resolve_provider_name(trimmed).to_string()
+            self.resolver.resolve_provider(trimmed)
         };
 
         Ok(ModelTarget {
@@ -274,32 +277,9 @@ impl LlmRouter {
     /// - `qwen*` → `"dashscope"` (covers qwen-*, qwen2-*, qwen3-*, etc.)
     /// - `deepseek-*` → `"deepseek"`
     /// - anything else → uses the model string as the provider key
-    fn resolve_provider_name(model: &str) -> &str {
-        // Models with "/" separator are from aggregator platforms (e.g. OpenRouter).
-        // Format: "provider/model-name" or "provider/model:variant"
-        // Examples: "qwen/qwen3.6-plus:free", "openai/gpt-4o", "anthropic/claude-3.5-sonnet"
-        // Must check BEFORE bare-prefix rules so "qwen/..." goes to openrouter, not dashscope.
-        if model.contains('/') {
-            "openrouter"
-        } else if model.starts_with("gpt-") || model.starts_with("o1") || model.starts_with("o3") {
-            "openai"
-        } else if model.starts_with("claude-") {
-            "anthropic"
-        } else if model.starts_with("qwen") {
-            "dashscope"
-        } else if model.starts_with("deepseek-") {
-            "deepseek"
-        } else if model
-            .get(..8)
-            .is_some_and(|p| p.eq_ignore_ascii_case("minimax-"))
-        {
-            // MiniMax-M2.7, MiniMax-M2.7-highspeed, etc. (Token Plan / OpenAI-compatible)
-            "minimax"
-        } else {
-            // Fall back to using the model string itself as the provider key,
-            // allowing callers to register arbitrary names.
-            model
-        }
+    #[deprecated(note = "use macaca_llm::ResolverChain::resolve_provider")]
+    pub fn resolve_provider_name(model: &str) -> String {
+        ResolverChain::built_in().resolve_provider(model)
     }
 
     async fn chat_once(
@@ -387,273 +367,5 @@ impl Default for LlmRouter {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use async_trait::async_trait;
-    use macaca_proto::types::TokenUsage;
-
-    struct EchoProvider {
-        name: String,
-    }
-
-    #[async_trait]
-    impl LlmProvider for EchoProvider {
-        fn name(&self) -> &str {
-            &self.name
-        }
-
-        async fn chat(
-            &self,
-            messages: Vec<LlmMessage>,
-            options: &LlmOptions,
-        ) -> MacacaResult<LlmResponse> {
-            let content = messages
-                .last()
-                .map(|m| m.content.clone())
-                .unwrap_or_default();
-            Ok(LlmResponse {
-                content,
-                reasoning_content: None,
-                model: options.model.clone(),
-                usage: TokenUsage {
-                    prompt_tokens: 10,
-                    completion_tokens: 5,
-                    total_tokens: 15,
-                },
-                finish_reason: "stop".into(),
-                tool_calls: None,
-            })
-        }
-    }
-
-    #[test]
-    fn resolve_provider_name_gpt() {
-        assert_eq!(LlmRouter::resolve_provider_name("gpt-4o"), "openai");
-        assert_eq!(LlmRouter::resolve_provider_name("gpt-4-turbo"), "openai");
-    }
-
-    #[test]
-    fn resolve_provider_name_claude() {
-        assert_eq!(
-            LlmRouter::resolve_provider_name("claude-3-5-sonnet-20241022"),
-            "anthropic"
-        );
-    }
-
-    #[test]
-    fn resolve_provider_name_qwen() {
-        assert_eq!(LlmRouter::resolve_provider_name("qwen-turbo"), "dashscope");
-        assert_eq!(LlmRouter::resolve_provider_name("qwen-max"), "dashscope");
-        assert_eq!(LlmRouter::resolve_provider_name("qwen-plus"), "dashscope");
-        // Qwen2/3 series
-        assert_eq!(LlmRouter::resolve_provider_name("qwen3-max"), "dashscope");
-        assert_eq!(
-            LlmRouter::resolve_provider_name("qwen2.5-coder-32b"),
-            "dashscope"
-        );
-    }
-
-    #[test]
-    fn resolve_provider_name_deepseek() {
-        assert_eq!(
-            LlmRouter::resolve_provider_name("deepseek-chat"),
-            "deepseek"
-        );
-        assert_eq!(
-            LlmRouter::resolve_provider_name("deepseek-coder"),
-            "deepseek"
-        );
-    }
-
-    #[test]
-    fn resolve_provider_name_openrouter() {
-        // Models with "/" are routed to openrouter (aggregator platform)
-        assert_eq!(
-            LlmRouter::resolve_provider_name("qwen/qwen3.6-plus:free"),
-            "openrouter"
-        );
-        assert_eq!(
-            LlmRouter::resolve_provider_name("openai/gpt-4o"),
-            "openrouter"
-        );
-        assert_eq!(
-            LlmRouter::resolve_provider_name("anthropic/claude-3.5-sonnet"),
-            "openrouter"
-        );
-        assert_eq!(
-            LlmRouter::resolve_provider_name("meta-llama/llama-3-70b"),
-            "openrouter"
-        );
-    }
-
-    #[test]
-    fn resolve_provider_name_unknown_falls_back_to_model() {
-        assert_eq!(LlmRouter::resolve_provider_name("llama-3"), "llama-3");
-    }
-
-    #[test]
-    fn resolve_provider_name_minimax_models() {
-        assert_eq!(LlmRouter::resolve_provider_name("MiniMax-M2.7"), "minimax");
-        assert_eq!(
-            LlmRouter::resolve_provider_name("MiniMax-M2.7-highspeed"),
-            "minimax"
-        );
-        assert_eq!(LlmRouter::resolve_provider_name("minimax-m2"), "minimax");
-    }
-
-    #[tokio::test]
-    async fn router_dispatches_to_registered_provider() {
-        let mut router = LlmRouter::new();
-        router.register(
-            "openai",
-            Arc::new(EchoProvider {
-                name: "openai".into(),
-            }),
-        );
-
-        let messages = vec![LlmMessage::user("hello")];
-        let options = LlmOptions {
-            model: "gpt-4o".into(),
-            ..Default::default()
-        };
-
-        let resp = router.chat(messages, &options).await.unwrap();
-        assert_eq!(resp.content, "hello");
-    }
-
-    #[tokio::test]
-    async fn router_returns_error_for_missing_provider() {
-        let router = LlmRouter::new();
-        let messages = vec![LlmMessage::user("hi")];
-        let options = LlmOptions {
-            model: "gpt-4".into(),
-            ..Default::default()
-        };
-        assert!(router.chat(messages, &options).await.is_err());
-    }
-
-    #[test]
-    fn resolve_selection_prefers_agent_over_app_and_system() {
-        let mut router = LlmRouter::new();
-        router.set_default_provider("openai");
-        router.set_provider_default_model("openai", "gpt-4o");
-        router.register(
-            "openai",
-            Arc::new(EchoProvider {
-                name: "openai".into(),
-            }),
-        );
-        router.register(
-            "anthropic",
-            Arc::new(EchoProvider {
-                name: "anthropic".into(),
-            }),
-        );
-
-        let selection = router
-            .resolve_selection(&ModelSelectionRequest {
-                agent_model: Some("anthropic:claude-sonnet-4".into()),
-                app_model: Some("gpt-4.1".into()),
-                app_provider: Some("openai".into()),
-                system_model: Some("openai:gpt-4o".into()),
-                ..Default::default()
-            })
-            .unwrap();
-
-        assert_eq!(
-            selection.primary,
-            ModelTarget {
-                provider: "anthropic".into(),
-                model: "claude-sonnet-4".into(),
-            }
-        );
-        assert_eq!(selection.source, "agent");
-    }
-
-    #[test]
-    fn resolve_selection_uses_app_provider_hint() {
-        let mut router = LlmRouter::new();
-        router.set_default_provider("openai");
-        router.set_provider_default_model("openai", "gpt-4o");
-        router.set_provider_default_model("anthropic", "claude-sonnet-4");
-        router.register(
-            "openai",
-            Arc::new(EchoProvider {
-                name: "openai".into(),
-            }),
-        );
-        router.register(
-            "anthropic",
-            Arc::new(EchoProvider {
-                name: "anthropic".into(),
-            }),
-        );
-
-        let selection = router
-            .resolve_selection(&ModelSelectionRequest {
-                app_model: Some("claude-3-5-sonnet-20241022".into()),
-                app_provider: Some("anthropic".into()),
-                ..Default::default()
-            })
-            .unwrap();
-
-        assert_eq!(selection.primary.provider, "anthropic");
-        assert_eq!(selection.primary.model, "claude-3-5-sonnet-20241022");
-    }
-
-    #[tokio::test]
-    async fn chat_with_selection_uses_fallback_target() {
-        struct FailingProvider;
-
-        #[async_trait]
-        impl LlmProvider for FailingProvider {
-            fn name(&self) -> &str {
-                "fail"
-            }
-
-            async fn chat(
-                &self,
-                _messages: Vec<LlmMessage>,
-                _options: &LlmOptions,
-            ) -> MacacaResult<LlmResponse> {
-                Err(MacacaError::Llm("boom".into()))
-            }
-        }
-
-        let mut router = LlmRouter::new();
-        router.register("openai", Arc::new(FailingProvider));
-        router.register(
-            "anthropic",
-            Arc::new(EchoProvider {
-                name: "anthropic".into(),
-            }),
-        );
-
-        let selection = ModelSelection {
-            primary: ModelTarget {
-                provider: "openai".into(),
-                model: "gpt-4o".into(),
-            },
-            fallbacks: vec![ModelTarget {
-                provider: "anthropic".into(),
-                model: "claude-sonnet-4".into(),
-            }],
-            source: "test",
-        };
-
-        let response = router
-            .chat_with_selection(
-                vec![LlmMessage::user("hello")],
-                &LlmOptions {
-                    model: "gpt-4o".into(),
-                    ..Default::default()
-                },
-                &selection,
-            )
-            .await
-            .unwrap();
-
-        assert_eq!(response.model, "claude-sonnet-4");
-        assert_eq!(response.content, "hello");
-    }
-}
+#[path = "router_tests.rs"]
+mod router_tests;

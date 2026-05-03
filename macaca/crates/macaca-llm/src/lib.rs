@@ -36,6 +36,7 @@ pub mod openai_compatible;
 pub mod provider;
 pub mod rate_limit;
 pub mod resilient;
+pub mod resolver;
 pub mod router;
 pub mod tool_wire;
 
@@ -48,4 +49,5 @@ pub use openai_compatible::OpenAiCompatibleProvider;
 pub use provider::LlmProvider;
 pub use rate_limit::RateLimiter;
 pub use resilient::{ResilientConfig, ResilientLlmWrapper};
+pub use resolver::{PrefixProviderResolver, ProviderResolver, ResolverChain};
 pub use router::{LlmRouter, ModelSelection, ModelSelectionRequest, ModelTarget};
