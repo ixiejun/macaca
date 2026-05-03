@@ -13,7 +13,7 @@ use std::sync::Arc;
 
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
-use axum::response::sse::{Event, KeepAlive, Sse};
+use axum::response::sse::{Event, Sse};
 use axum::Json;
 use serde::{Deserialize, Serialize};
 
@@ -21,9 +21,9 @@ use macaca_app::{app_entry_agent_name as manifest_entry_agent_name, AppLoader};
 use macaca_proto::{ApplicationId, MacacaError, ProtoErrorAdapter};
 use macaca_skill::{SkillPolicy, SkillRuntimeFacade, SkillSnapshotRequest};
 
-use crate::mcp_runtime::{McpRuntimeStatus, McpToolPolicy};
 use crate::skill_mcp::SkillMcpStatus;
 use crate::state::AppState;
+use macaca_runtime_host::{McpRuntimeStatus, McpToolPolicy};
 
 // ---------------------------------------------------------------------------
 // Shared utilities (used by sibling modules via `crate::routes::err` etc.)
@@ -552,10 +552,7 @@ pub struct AppSkillStatus {
 
 /// GET /api/mcp — Agent OS level MCP registry/runtime status.
 pub async fn get_mcp_status(State(state): State<Arc<AppState>>) -> Json<Vec<McpRuntimeStatus>> {
-    let statuses = state
-        .mcp_runtime
-        .probe_statuses(&McpToolPolicy::default())
-        .await;
+    let statuses = state.mcp_runtime.probe(&McpToolPolicy::default()).await;
     Json(statuses)
 }
 

@@ -5,7 +5,6 @@
 //! visible skill snapshots into framework toolkit tools.
 
 use std::collections::HashSet;
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::response::sse::Event;
@@ -14,7 +13,10 @@ use macaca_framework::tool::Toolkit;
 use macaca_persist::AppendEventCommand;
 use macaca_proto::ApplicationId;
 use macaca_runtime_host::compat::default_registry;
-use macaca_runtime_host::mcp_runtime::apply_concurrency_isolation;
+use macaca_runtime_host::{
+    apply_concurrency_isolation, probe_definition_statuses, McpRuntimeContext,
+    McpRuntimeStatusState, McpToolPolicy,
+};
 use macaca_skill::{
     SkillMcpServerConfig, SkillPolicy, SkillRuntimeFacade, SkillSnapshot, SkillSnapshotEntry,
     SkillSnapshotRequest,
@@ -62,14 +64,15 @@ pub(crate) async fn register_skill_backed_mcp_tools(
     else {
         return;
     };
-    let definitions = crate::mcp_runtime::definitions_from_skill_snapshot(&snapshot);
-    let context = crate::mcp_runtime::McpRuntimeContext::for_agent(app_id, session_id, agent_name);
+    let definitions =
+        macaca_runtime_host::McpServerFactory::with_default_registry().from_skill_snapshot(&snapshot);
+    let context = McpRuntimeContext::for_agent(app_id, session_id, agent_name);
     let _ = state
         .mcp_runtime
         .register_definitions(
             toolkit,
             definitions,
-            &crate::mcp_runtime::McpToolPolicy::default(),
+            &McpToolPolicy::default(),
             &context,
             None,
         )
@@ -77,12 +80,9 @@ pub(crate) async fn register_skill_backed_mcp_tools(
 }
 
 pub(crate) async fn probe_skill_mcp_servers(snapshot: &SkillSnapshot) -> Vec<SkillMcpStatus> {
-    let definitions = crate::mcp_runtime::definitions_from_skill_snapshot(snapshot);
-    let statuses = crate::mcp_runtime::probe_definition_statuses(
-        definitions,
-        &crate::mcp_runtime::McpToolPolicy::default(),
-    )
-    .await;
+    let definitions =
+        macaca_runtime_host::McpServerFactory::with_default_registry().from_skill_snapshot(snapshot);
+    let statuses = probe_definition_statuses(definitions, &McpToolPolicy::default()).await;
     statuses
         .into_iter()
         .map(|status| {
@@ -99,12 +99,11 @@ pub(crate) async fn probe_skill_mcp_servers(snapshot: &SkillSnapshot) -> Vec<Ski
                     .unwrap_or_default(),
                 args: launch.map(|launch| launch.args).unwrap_or_default(),
                 state: match status.state {
-                    crate::mcp_runtime::McpRuntimeStatusState::Ready => SkillMcpStatusState::Ready,
-                    crate::mcp_runtime::McpRuntimeStatusState::DependencyMissing => {
+                    McpRuntimeStatusState::Ready => SkillMcpStatusState::Ready,
+                    McpRuntimeStatusState::DependencyMissing => {
                         SkillMcpStatusState::DependencyMissing
                     }
-                    crate::mcp_runtime::McpRuntimeStatusState::Failed
-                    | crate::mcp_runtime::McpRuntimeStatusState::Disabled => {
+                    McpRuntimeStatusState::Failed | McpRuntimeStatusState::Disabled => {
                         SkillMcpStatusState::Failed
                     }
                 },
@@ -253,7 +252,7 @@ fn launch_from_runtime_server_id(
 #[cfg(test)]
 fn command_exists(command: &str) -> bool {
     if command.contains(std::path::MAIN_SEPARATOR) {
-        return PathBuf::from(command).is_file();
+        return std::path::PathBuf::from(command).is_file();
     }
     let Some(path) = std::env::var_os("PATH") else {
         return false;
@@ -339,8 +338,8 @@ mod tests {
         SkillSnapshotEntry {
             name: "playwright-mcp".into(),
             description: "Browser".into(),
-            location: PathBuf::from("/tmp/SKILL.md"),
-            base_dir: PathBuf::from("/tmp"),
+            location: std::path::PathBuf::from("/tmp/SKILL.md"),
+            base_dir: std::path::PathBuf::from("/tmp"),
             source: "test".into(),
             source_scope: macaca_skill::SkillSourceScope::MacacaCentral,
             primary_env: None,

@@ -22,11 +22,11 @@ use macaca_framework::tool::Toolkit;
 use macaca_persist::AppendEventCommand;
 use macaca_proto::ApplicationId;
 
-use crate::mcp_runtime::{
-    definitions_from_skill_snapshot, McpDefinitionSource, McpRegistryConfig, McpRuntimeContext,
-    McpRuntimeStatus, McpRuntimeStatusState, McpServerDefinition, McpToolPolicy,
-};
 use crate::state::AppState;
+use macaca_runtime_host::{
+    McpDefinitionSource, McpRegistryConfig, McpRuntimeContext, McpRuntimeStatus,
+    McpRuntimeStatusState, McpServerDefinition, McpToolPolicy,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum TodoToolPolicy {
@@ -183,7 +183,8 @@ pub(crate) async fn build_toolkit(
     )
     .await
     {
-        let skill_definitions = definitions_from_skill_snapshot(&snapshot);
+        let skill_definitions =
+            macaca_runtime_host::McpServerFactory::with_default_registry().from_skill_snapshot(&snapshot);
         emit_mcp_starting_events(state, session_id.as_deref(), agent_name, &skill_definitions)
             .await;
         let skill_statuses = state
@@ -224,8 +225,10 @@ async fn load_app_mcp_overlay_definitions(
     };
     match serde_yaml::from_str::<McpRegistryConfig>(&content)
         .map_err(|e| e.to_string())
-        .and_then(|config| config.into_definitions(McpDefinitionSource::App))
-    {
+        .and_then(|config| {
+            macaca_runtime_host::McpServerFactory::with_default_registry()
+                .from_registry_config(config, McpDefinitionSource::App)
+        }) {
         Ok(definitions) => definitions,
         Err(error) => {
             tracing::warn!(

@@ -83,6 +83,7 @@ pub fn classify_entry(value: &str) -> McpEnvApplyOutcome {
 /// conventionally uppercase, so we explicitly uppercase each key here before
 /// calling `set_var`. The returned `HashMap`'s keys use the same uppercased
 /// form so callers can log a stable identifier.
+#[deprecated(note = "Use `RuntimeEnvBuilder::apply_process_env` instead.")]
 pub fn apply_mcp_env(env: &HashMap<String, String>) -> HashMap<String, McpEnvApplyOutcome> {
     let mut outcomes = HashMap::with_capacity(env.len());
     for (raw_key, value) in env {
@@ -127,6 +128,7 @@ pub fn apply_mcp_env(env: &HashMap<String, String>) -> HashMap<String, McpEnvApp
 }
 
 #[cfg(test)]
+#[allow(deprecated)]
 mod tests {
     use super::*;
 

@@ -14,10 +14,20 @@
 
 pub mod compat;
 pub mod env_bridge;
+pub mod factory;
+pub mod lease;
 pub mod mcp_runtime;
+pub mod transport;
 
+#[allow(deprecated)]
 pub use env_bridge::{apply_mcp_env, McpEnvApplyOutcome};
+pub use factory::{McpServerFactory, RuntimeEnvBuilder};
+#[allow(deprecated)]
 pub use mcp_runtime::{
-    ConcurrencyIsolationPolicy, McpLifecycleScope, McpRuntimeManager, McpRuntimeStatus,
+    apply_concurrency_isolation, probe_definition_statuses, ConcurrencyIsolationPolicy,
+    McpDefinitionSource, McpLifecycleScope, McpRegistryConfig, McpRuntimeContext,
+    McpRuntimeFacade, McpRuntimeManager, McpRuntimeStatus, McpRuntimeStatusState,
     McpServerDefinition, McpToolPolicy,
 };
+pub use lease::McpSessionLease;
+pub use transport::{ConfigBackedMcpTransport, McpTransport};

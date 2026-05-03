@@ -16,7 +16,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use macaca_framework::mcp::{
-    client_from_transport, register_mcp_tools_with_options, McpClient, McpSessionMode, McpTimeouts,
+    register_mcp_tools_with_options, McpClient, McpSessionMode, McpTimeouts,
     McpToolNameConflictPolicy, McpToolRegistrationOptions, McpTransportConfig,
 };
 use macaca_framework::tool::Toolkit;
@@ -27,6 +27,8 @@ use tokio::sync::{Mutex, RwLock};
 use tokio::time::timeout;
 
 use crate::compat::{default_registry, CompatRegistry};
+use crate::lease::McpSessionLease;
+use crate::transport::{bridge_for_config, McpTransport};
 
 /// Lifecycle scope for Agent OS managed MCP instances.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -137,6 +139,7 @@ pub struct McpRegistryConfig {
 }
 
 impl McpRegistryConfig {
+    #[deprecated(note = "Use `McpServerFactory::from_registry_config` instead.")]
     pub fn into_definitions(
         self,
         source: McpDefinitionSource,
@@ -278,13 +281,119 @@ struct RuntimeInstanceRecord {
 }
 
 /// Agent OS MCP runtime manager.
+#[deprecated(note = "Use `McpRuntimeFacade` as the primary host-facing entry point.")]
 #[derive(Debug, Default)]
 pub struct McpRuntimeManager {
     definitions: RwLock<BTreeMap<String, McpServerDefinition>>,
     instances: Mutex<BTreeMap<McpRuntimeKey, RuntimeInstanceRecord>>,
 }
 
+/// Stable host-facing facade for MCP runtime orchestration.
+#[allow(deprecated)]
+#[derive(Debug, Clone, Default)]
+pub struct McpRuntimeFacade {
+    manager: Arc<McpRuntimeManager>,
+}
+
+#[allow(deprecated)]
+impl McpRuntimeFacade {
+    #[allow(deprecated)]
+    pub fn new() -> Self {
+        Self {
+            manager: Arc::new(McpRuntimeManager::new()),
+        }
+    }
+
+    pub fn from_manager(manager: Arc<McpRuntimeManager>) -> Self {
+        Self { manager }
+    }
+
+    #[allow(deprecated)]
+    pub async fn load_default() -> Self {
+        Self {
+            manager: Arc::new(McpRuntimeManager::load_default().await),
+        }
+    }
+
+    #[allow(deprecated)]
+    pub async fn upsert_definition(&self, definition: McpServerDefinition) {
+        self.manager.upsert_definition(definition).await;
+    }
+
+    #[allow(deprecated)]
+    pub async fn definitions(&self) -> Vec<McpServerDefinition> {
+        self.manager.definitions().await
+    }
+
+    #[allow(deprecated)]
+    pub async fn probe(&self, policy: &McpToolPolicy) -> Vec<McpRuntimeStatus> {
+        self.manager.probe_statuses(policy).await
+    }
+
+    #[allow(deprecated)]
+    pub async fn register(
+        &self,
+        toolkit: &mut Toolkit,
+        policy: &McpToolPolicy,
+        context: &McpRuntimeContext,
+    ) -> Vec<McpRuntimeStatus> {
+        Arc::clone(&self.manager)
+            .register_tools(toolkit, policy, context)
+            .await
+    }
+
+    #[allow(deprecated)]
+    pub async fn register_definitions(
+        &self,
+        toolkit: &mut Toolkit,
+        definitions: Vec<McpServerDefinition>,
+        policy: &McpToolPolicy,
+        context: &McpRuntimeContext,
+        on_closed: Option<Arc<dyn Fn(McpRuntimeStatus) + Send + Sync>>,
+    ) -> Vec<McpRuntimeStatus> {
+        Arc::clone(&self.manager)
+            .register_definitions(toolkit, definitions, policy, context, on_closed)
+            .await
+    }
+
+    #[allow(deprecated)]
+    pub async fn cleanup_session(&self, session_id: &str) -> Vec<McpRuntimeStatus> {
+        self.manager.cleanup_session(session_id).await
+    }
+
+    #[allow(deprecated)]
+    pub async fn cleanup_app(&self, app_id: &ApplicationId) -> Vec<McpRuntimeStatus> {
+        self.manager.cleanup_app(app_id).await
+    }
+
+    #[allow(deprecated)]
+    pub async fn cleanup_all(&self) -> Vec<McpRuntimeStatus> {
+        self.manager.cleanup_all().await
+    }
+
+    #[allow(deprecated)]
+    pub async fn cleanup_idle(&self, ttl: Duration) -> Vec<McpRuntimeStatus> {
+        self.manager.cleanup_idle(ttl).await
+    }
+
+    #[allow(deprecated)]
+    pub async fn acquire_lease(
+        &self,
+        definition: &McpServerDefinition,
+        context: &McpRuntimeContext,
+    ) -> McpSessionLease {
+        self.manager.acquire_lease(definition, context).await
+    }
+
+    #[allow(deprecated)]
+    pub async fn release_lease(&self, lease: McpSessionLease) -> Option<McpRuntimeStatus> {
+        self.manager.release_lease(lease).await
+    }
+}
+
+#[allow(deprecated)]
 impl McpRuntimeManager {
+    #[deprecated(note = "Use `McpRuntimeFacade::new` instead.")]
     pub fn new() -> Self {
         Self {
             definitions: RwLock::new(BTreeMap::new()),
@@ -292,6 +401,7 @@ impl McpRuntimeManager {
         }
     }
 
+    #[deprecated(note = "Use `McpRuntimeFacade::load_default` instead.")]
     pub async fn load_default() -> Self {
         let manager = Self::new();
         if let Some(path) = default_mcp_config_path() {
@@ -300,6 +410,7 @@ impl McpRuntimeManager {
         manager
     }
 
+    #[deprecated(note = "Use `McpServerFactory`-backed facade loading instead.")]
     pub async fn load_config_file(&self, path: PathBuf) -> Result<(), String> {
         let content = tokio::fs::read_to_string(&path)
             .await
@@ -307,12 +418,15 @@ impl McpRuntimeManager {
         let config: McpRegistryConfig =
             serde_yaml::from_str(&content).map_err(|e| e.to_string())?;
         let mut definitions = self.definitions.write().await;
-        for definition in config.into_definitions(McpDefinitionSource::Global)? {
+        for definition in crate::factory::McpServerFactory::with_default_registry()
+            .from_registry_config(config, McpDefinitionSource::Global)?
+        {
             definitions.insert(definition.id.clone(), definition);
         }
         Ok(())
     }
 
+    #[deprecated(note = "Use `McpRuntimeFacade::upsert_definition` instead.")]
     pub async fn upsert_definition(&self, definition: McpServerDefinition) {
         self.definitions
             .write()
@@ -320,15 +434,18 @@ impl McpRuntimeManager {
             .insert(definition.id.clone(), definition);
     }
 
+    #[deprecated(note = "Use `McpRuntimeFacade::definitions` instead.")]
     pub async fn definitions(&self) -> Vec<McpServerDefinition> {
         self.definitions.read().await.values().cloned().collect()
     }
 
+    #[deprecated(note = "Use `McpRuntimeFacade::probe` instead.")]
     pub async fn probe_statuses(&self, policy: &McpToolPolicy) -> Vec<McpRuntimeStatus> {
         let definitions = self.definitions().await;
         probe_definition_statuses(definitions, policy).await
     }
 
+    #[deprecated(note = "Use `McpRuntimeFacade::register` instead.")]
     pub async fn register_tools(
         self: &Arc<Self>,
         toolkit: &mut Toolkit,
@@ -340,6 +457,7 @@ impl McpRuntimeManager {
             .await
     }
 
+    #[deprecated(note = "Use `McpRuntimeFacade::register_definitions` instead.")]
     pub async fn register_definitions(
         self: &Arc<Self>,
         toolkit: &mut Toolkit,
@@ -367,6 +485,7 @@ impl McpRuntimeManager {
         statuses
     }
 
+    #[deprecated(note = "Use `acquire_lease` for explicit runtime ownership.")]
     pub async fn acquire_runtime_key(
         &self,
         definition: &McpServerDefinition,
@@ -387,43 +506,51 @@ impl McpRuntimeManager {
         key
     }
 
+    #[deprecated(note = "Use `release_lease` for explicit runtime ownership release.")]
     pub async fn release_runtime_key(&self, key: &McpRuntimeKey) -> Option<McpRuntimeStatus> {
-        let mut instances = self.instances.lock().await;
-        let record = instances.get_mut(key)?;
-        if record.refs > 1 {
-            record.refs -= 1;
-            return None;
-        }
-        let record = instances.remove(key)?;
-        Some(McpRuntimeStatus {
-            server_id: key.server_id.clone(),
-            transport: "runtime".to_string(),
-            lifecycle: key.scope.clone(),
-            session_mode: McpSessionMode::Stateful,
-            state: record.state,
-            exposed_tools: Vec::new(),
-            failure_reason: record.last_error,
-        })
+        self.release_runtime_record(key, false).await
     }
 
+    pub async fn acquire_lease(
+        &self,
+        definition: &McpServerDefinition,
+        context: &McpRuntimeContext,
+    ) -> McpSessionLease {
+        #[allow(deprecated)]
+        {
+            McpSessionLease::new(self.acquire_runtime_key(definition, context).await)
+        }
+    }
+
+    pub async fn release_lease(&self, lease: McpSessionLease) -> Option<McpRuntimeStatus> {
+        #[allow(deprecated)]
+        {
+            self.release_runtime_record(lease.key(), false).await
+        }
+    }
+
+    #[deprecated(note = "Use `McpRuntimeFacade::cleanup_session` instead.")]
     pub async fn cleanup_session(&self, session_id: &str) -> Vec<McpRuntimeStatus> {
         self.cleanup_matching(|key| key.session_id.as_deref() == Some(session_id))
             .await
     }
 
+    #[deprecated(note = "Use `McpRuntimeFacade::cleanup_app` instead.")]
     pub async fn cleanup_app(&self, app_id: &ApplicationId) -> Vec<McpRuntimeStatus> {
         let app = app_id.0.to_string();
         self.cleanup_matching(|key| key.app_id.as_deref() == Some(app.as_str()))
             .await
     }
 
+    #[deprecated(note = "Use `McpRuntimeFacade::cleanup_all` instead.")]
     pub async fn cleanup_all(&self) -> Vec<McpRuntimeStatus> {
         self.cleanup_matching(|_| true).await
     }
 
+    #[deprecated(note = "Use `McpRuntimeFacade::cleanup_idle` instead.")]
     pub async fn cleanup_idle(&self, ttl: Duration) -> Vec<McpRuntimeStatus> {
         let now = Instant::now();
-        let mut instances = self.instances.lock().await;
+        let instances = self.instances.lock().await;
         let keys: Vec<_> = instances
             .iter()
             .filter_map(|(key, record)| {
@@ -431,44 +558,49 @@ impl McpRuntimeManager {
                     .then_some(key.clone())
             })
             .collect();
-        keys.into_iter()
-            .filter_map(|key| {
-                instances.remove(&key).map(|record| McpRuntimeStatus {
-                    server_id: key.server_id,
-                    transport: "runtime".to_string(),
-                    lifecycle: key.scope,
-                    session_mode: McpSessionMode::Stateful,
-                    state: record.state,
-                    exposed_tools: Vec::new(),
-                    failure_reason: record.last_error,
-                })
-            })
-            .collect()
+        drop(instances);
+        let mut statuses = Vec::new();
+        for key in keys {
+            if let Some(status) = self.release_runtime_record(&key, true).await {
+                statuses.push(status);
+            }
+        }
+        statuses
     }
 
     async fn cleanup_matching(
         &self,
         matches: impl Fn(&McpRuntimeKey) -> bool,
     ) -> Vec<McpRuntimeStatus> {
-        let mut instances = self.instances.lock().await;
+        let instances = self.instances.lock().await;
         let keys: Vec<_> = instances
             .keys()
             .filter(|key| matches(key))
             .cloned()
             .collect();
-        keys.into_iter()
-            .filter_map(|key| {
-                instances.remove(&key).map(|record| McpRuntimeStatus {
-                    server_id: key.server_id,
-                    transport: "runtime".to_string(),
-                    lifecycle: key.scope,
-                    session_mode: McpSessionMode::Stateful,
-                    state: record.state,
-                    exposed_tools: Vec::new(),
-                    failure_reason: record.last_error,
-                })
-            })
-            .collect()
+        drop(instances);
+        let mut statuses = Vec::new();
+        for key in keys {
+            if let Some(status) = self.release_runtime_record(&key, true).await {
+                statuses.push(status);
+            }
+        }
+        statuses
+    }
+
+    async fn release_runtime_record(
+        &self,
+        key: &McpRuntimeKey,
+        force_remove: bool,
+    ) -> Option<McpRuntimeStatus> {
+        let mut instances = self.instances.lock().await;
+        let record = instances.get_mut(key)?;
+        if !force_remove && record.refs > 1 {
+            record.refs -= 1;
+            return None;
+        }
+        let record = instances.remove(key)?;
+        Some(runtime_status_from_record(key, record))
     }
 }
 
@@ -493,19 +625,20 @@ pub async fn probe_definition_statuses(
 }
 
 impl McpServerConfigEntry {
-    fn into_definition(self, id: String) -> Result<McpServerDefinition, String> {
+    pub(crate) fn into_definition_with_registry(
+        self,
+        id: String,
+        registry: &CompatRegistry,
+    ) -> Result<McpServerDefinition, String> {
         let transport = match self.transport.as_str() {
             "stdio" => {
                 let command = self
                     .command
                     .ok_or_else(|| format!("MCP server {id} missing command"))?;
-                // Apply declarative concurrency-isolation policy if either
-                // authored on this entry OR discoverable from the registry
-                // by command substring.
                 let policy = self
                     .concurrency_isolation
                     .clone()
-                    .or_else(|| default_registry().policy_for_command(&command));
+                    .or_else(|| registry.policy_for_command(&command));
                 let args = policy
                     .as_ref()
                     .map(|p| apply_concurrency_isolation(p, self.args.clone()))
@@ -543,6 +676,10 @@ impl McpServerConfigEntry {
             concurrency_isolation: self.concurrency_isolation,
         })
     }
+
+    fn into_definition(self, id: String) -> Result<McpServerDefinition, String> {
+        self.into_definition_with_registry(id, default_registry())
+    }
 }
 
 fn default_mcp_config_path() -> Option<PathBuf> {
@@ -562,8 +699,8 @@ async fn probe_definition(
         );
     }
 
-    let mut client =
-        match client_from_transport(definition.transport.clone(), McpTimeouts::default()) {
+    let transport = bridge_for_config(definition.transport.clone());
+    let mut client = match transport.create_client(McpTimeouts::default()) {
             Ok(client) => client,
             Err(error) => {
                 return status_for_definition(
@@ -621,6 +758,7 @@ async fn probe_definition(
     )
 }
 
+#[allow(deprecated)]
 impl McpRuntimeManager {
     async fn register_definition_tools(
         self: &Arc<Self>,
@@ -639,8 +777,8 @@ impl McpRuntimeManager {
             );
         }
 
-        let mut client =
-            match client_from_transport(definition.transport.clone(), McpTimeouts::default()) {
+        let transport = bridge_for_config(definition.transport.clone());
+        let mut client = match transport.create_client(McpTimeouts::default()) {
                 Ok(client) => client,
                 Err(error) => {
                     return status_for_definition(
@@ -660,21 +798,21 @@ impl McpRuntimeManager {
             );
         }
 
-        let runtime_key = self.acquire_runtime_key(definition, context).await;
+        let lease = self.acquire_lease(definition, context).await;
         let runtime = Arc::clone(self);
         let closed_definition = definition.clone();
         let close_callback = on_closed.map(|on_closed| {
             let runtime = Arc::clone(&runtime);
-            let runtime_key = runtime_key.clone();
+            let lease = lease.clone();
             Arc::new(move || {
                 let runtime = Arc::clone(&runtime);
-                let runtime_key = runtime_key.clone();
+                let lease = lease.clone();
                 let closed_definition = closed_definition.clone();
                 let on_closed = Arc::clone(&on_closed);
                 if let Ok(handle) = tokio::runtime::Handle::try_current() {
                     handle.spawn(async move {
                         let status = runtime
-                            .release_runtime_key(&runtime_key)
+                            .release_lease(lease)
                             .await
                             .unwrap_or_else(|| {
                                 status_for_definition(
@@ -852,8 +990,24 @@ fn prefixed_tool_name(definition: &McpServerDefinition, tool_name: &str) -> Stri
         .unwrap_or_else(|| tool_name.to_string())
 }
 
+fn runtime_status_from_record(
+    key: &McpRuntimeKey,
+    record: RuntimeInstanceRecord,
+) -> McpRuntimeStatus {
+    McpRuntimeStatus {
+        server_id: key.server_id.clone(),
+        transport: "runtime".to_string(),
+        lifecycle: key.scope.clone(),
+        session_mode: McpSessionMode::Stateful,
+        state: record.state,
+        exposed_tools: Vec::new(),
+        failure_reason: record.last_error,
+    }
+}
+
 /// Resolve MCP definitions declared by a visible skill snapshot, consulting
 /// the process-default compatibility registry.
+#[deprecated(note = "Use `McpServerFactory::from_skill_snapshot` instead.")]
 pub fn definitions_from_skill_snapshot(snapshot: &SkillSnapshot) -> Vec<McpServerDefinition> {
     definitions_from_skill_snapshot_with_registry(snapshot, default_registry())
 }
@@ -929,6 +1083,7 @@ fn flatten_timeout_result<T>(
 }
 
 #[cfg(test)]
+#[allow(deprecated)]
 mod tests {
     use super::*;
     use macaca_skill::{SkillInstallSpec, SkillSnapshot, SkillSourceScope};
@@ -1104,6 +1259,58 @@ mcpServers:
 
         assert!(manager.release_runtime_key(&key).await.is_none());
         assert!(manager.release_runtime_key(&key).await.is_some());
+    }
+
+    #[tokio::test]
+    async fn facade_delegates_definitions_and_probe() {
+        let facade = McpRuntimeFacade::new();
+        let mut definition = stdio_definition("disabled", "missing-binary");
+        definition.enabled = false;
+        facade.upsert_definition(definition).await;
+
+        let definitions = facade.definitions().await;
+        assert_eq!(definitions.len(), 1);
+        assert_eq!(definitions[0].id, "disabled");
+
+        let statuses = facade.probe(&McpToolPolicy::default()).await;
+        assert_eq!(statuses.len(), 1);
+        assert_eq!(statuses[0].server_id, "disabled");
+        assert_eq!(statuses[0].state, McpRuntimeStatusState::Disabled);
+    }
+
+    #[tokio::test]
+    async fn facade_lease_release_delegates_to_runtime_manager() {
+        let facade = McpRuntimeFacade::new();
+        let definition = stdio_definition("playwright", "playwright-mcp");
+        let context = McpRuntimeContext {
+            app_id: Some(ApplicationId(uuid::Uuid::nil())),
+            session_id: Some("session-a".into()),
+            agent_name: Some("agent-a".into()),
+        };
+
+        let lease_a = facade.acquire_lease(&definition, &context).await;
+        let lease_b = facade.acquire_lease(&definition, &context).await;
+
+        assert!(facade.release_lease(lease_a).await.is_none());
+        assert!(facade.release_lease(lease_b).await.is_some());
+    }
+
+    #[tokio::test]
+    async fn cleanup_session_forces_release_for_matching_leases() {
+        let manager = McpRuntimeManager::new();
+        let definition = stdio_definition("playwright", "playwright-mcp");
+        let context = McpRuntimeContext {
+            app_id: Some(ApplicationId(uuid::Uuid::nil())),
+            session_id: Some("session-a".into()),
+            agent_name: Some("agent-a".into()),
+        };
+
+        let _lease_a = manager.acquire_lease(&definition, &context).await;
+        let _lease_b = manager.acquire_lease(&definition, &context).await;
+
+        let statuses = manager.cleanup_session("session-a").await;
+        assert_eq!(statuses.len(), 1);
+        assert_eq!(statuses[0].server_id, "playwright");
     }
 
     #[test]

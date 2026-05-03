@@ -142,7 +142,7 @@ pub struct AppState {
     /// Application executor registry for isolated multi-agent execution.
     pub executor_registry: Arc<ApplicationExecutorRegistry>,
     /// Agent OS level MCP runtime and registry.
-    pub mcp_runtime: Arc<crate::mcp_runtime::McpRuntimeManager>,
+    pub mcp_runtime: Arc<macaca_runtime_host::McpRuntimeFacade>,
     /// Driver registry for managing loaded software drivers.
     pub driver_registry: Arc<DriverRegistry>,
     /// Driver runtime facade for lifecycle, inventory, and tool collection.

@@ -10,7 +10,6 @@ pub mod framework_runner;
 pub mod framework_toolkit;
 pub mod hook_consumer;
 pub mod loop_manager;
-pub mod mcp_runtime;
 pub mod metrics;
 pub mod proto_event_visitors;
 pub mod routes;
@@ -41,8 +40,7 @@ use macaca_kernel::{AgentInfo, ApplicationExecutorRegistry, Kernel};
 use macaca_llm::{LlmProvider, LlmRouter};
 use macaca_persist::RedbStore;
 use macaca_proto::config::{KernelConfig, MacacaConfig};
-use macaca_proto::{ApplicationId, LlmMessage, MacacaResult};
-use macaca_sdk::AgentPersona;
+use macaca_proto::MacacaResult;
 use macaca_skill::{ExecutableSkillToolSet, SkillCatalog};
 use macaca_tools::{
     CompositeToolSet, DefaultToolSet, DelegateTaskTool, GetTaskResultTool, ListAgentsTool, Tool,
@@ -61,7 +59,7 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
     // 1b. Publish [mcp.env] entries into the current process environment so
     //     every stdio MCP child process (which inherits parent env by default)
     //     automatically receives secrets such as FIGMA_API_KEY.
-    let mcp_env_outcomes = macaca_runtime_host::apply_mcp_env(&config.mcp.env);
+    let mcp_env_outcomes = macaca_runtime_host::RuntimeEnvBuilder::apply_process_env(&config.mcp.env);
     if !mcp_env_outcomes.is_empty() {
         info!(
             entries = mcp_env_outcomes.len(),
@@ -499,7 +497,7 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
     let default_model = llm_router.default_model_reference();
     let framework_session_store: Arc<dyn FrameworkSessionStore> =
         Arc::new(FrameworkInMemorySessionStore::new());
-    let mcp_runtime = Arc::new(mcp_runtime::McpRuntimeManager::load_default().await);
+    let mcp_runtime = Arc::new(macaca_runtime_host::McpRuntimeFacade::load_default().await);
 
     // 10. Build shared state.
     let state = Arc::new_cyclic(|weak_state| {
