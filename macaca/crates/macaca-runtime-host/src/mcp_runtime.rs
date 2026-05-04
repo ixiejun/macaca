@@ -701,16 +701,16 @@ async fn probe_definition(
 
     let transport = bridge_for_config(definition.transport.clone());
     let mut client = match transport.create_client(McpTimeouts::default()) {
-            Ok(client) => client,
-            Err(error) => {
-                return status_for_definition(
-                    definition,
-                    McpRuntimeStatusState::Failed,
-                    Vec::new(),
-                    Some(error.to_string()),
-                )
-            }
-        };
+        Ok(client) => client,
+        Err(error) => {
+            return status_for_definition(
+                definition,
+                McpRuntimeStatusState::Failed,
+                Vec::new(),
+                Some(error.to_string()),
+            )
+        }
+    };
     let connected = timeout(Duration::from_secs(15), client.connect()).await;
     if let Err(error) = flatten_timeout_result(connected) {
         return status_for_definition(
@@ -779,16 +779,16 @@ impl McpRuntimeManager {
 
         let transport = bridge_for_config(definition.transport.clone());
         let mut client = match transport.create_client(McpTimeouts::default()) {
-                Ok(client) => client,
-                Err(error) => {
-                    return status_for_definition(
-                        definition,
-                        McpRuntimeStatusState::Failed,
-                        Vec::new(),
-                        Some(error.to_string()),
-                    )
-                }
-            };
+            Ok(client) => client,
+            Err(error) => {
+                return status_for_definition(
+                    definition,
+                    McpRuntimeStatusState::Failed,
+                    Vec::new(),
+                    Some(error.to_string()),
+                )
+            }
+        };
         if let Err(error) = client.connect().await {
             return status_for_definition(
                 definition,
@@ -811,17 +811,14 @@ impl McpRuntimeManager {
                 let on_closed = Arc::clone(&on_closed);
                 if let Ok(handle) = tokio::runtime::Handle::try_current() {
                     handle.spawn(async move {
-                        let status = runtime
-                            .release_lease(lease)
-                            .await
-                            .unwrap_or_else(|| {
-                                status_for_definition(
-                                    &closed_definition,
-                                    McpRuntimeStatusState::Ready,
-                                    Vec::new(),
-                                    None,
-                                )
-                            });
+                        let status = runtime.release_lease(lease).await.unwrap_or_else(|| {
+                            status_for_definition(
+                                &closed_definition,
+                                McpRuntimeStatusState::Ready,
+                                Vec::new(),
+                                None,
+                            )
+                        });
                         on_closed(status);
                     });
                 }

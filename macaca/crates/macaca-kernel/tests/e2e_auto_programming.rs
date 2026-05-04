@@ -14,8 +14,10 @@ use async_trait::async_trait;
 use macaca_kernel::{Kernel, KernelBuilder};
 use macaca_llm::LlmProvider;
 use macaca_proto::config::KernelConfig;
-use macaca_proto::{LlmMessage, LlmOptions, LlmResponse, LlmRole, MacacaResult, TokenUsage};
-use macaca_sdk::{AgentBuilder, AgentConfig};
+use macaca_proto::{
+    AgentManifest, LlmMessage, LlmOptions, LlmResponse, LlmRole, MacacaResult, TokenUsage,
+};
+use macaca_sdk::{AgentBuilder, AgentConfig, DeclarativeAgent};
 use macaca_tools::DefaultToolSet;
 
 // ── Mock LLM for AC1 Auto-Programming ────────────────────────────────────────
@@ -151,6 +153,13 @@ model: mock-auto-programming
     .unwrap()
 }
 
+fn build_agent_from_config(config: AgentConfig) -> (DeclarativeAgent, AgentManifest) {
+    let spec = AgentBuilder::from_config(config).build_spec().unwrap();
+    let manifest = spec.manifest();
+    let agent = spec.into_agent();
+    (agent, manifest)
+}
+
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 /// AC1 full flow: boot kernel -> register code-gen agent -> execute -> verify
@@ -161,9 +170,7 @@ async fn test_ac1_auto_programming_flow() {
 
     // Build a code-gen DeclarativeAgent via AgentBuilder
     let config = code_gen_config();
-    let (agent, manifest) = AgentBuilder::from_config(config)
-        .build_with_manifest()
-        .unwrap();
+    let (agent, manifest) = build_agent_from_config(config);
     let agent_id = manifest.id;
 
     // Register with the kernel
@@ -211,9 +218,7 @@ async fn test_ac1_agent_receives_prompt() {
     let kernel = make_kernel();
 
     let config = code_gen_config();
-    let (agent, manifest) = AgentBuilder::from_config(config)
-        .build_with_manifest()
-        .unwrap();
+    let (agent, manifest) = build_agent_from_config(config);
     let agent_id = manifest.id;
 
     kernel
@@ -237,9 +242,7 @@ async fn test_ac1_agent_receives_prompt() {
 
     // Now test with a planner agent that does NOT mention "todo" in its prompt
     let planner_cfg = planner_config();
-    let (planner, planner_manifest) = AgentBuilder::from_config(planner_cfg)
-        .build_with_manifest()
-        .unwrap();
+    let (planner, planner_manifest) = build_agent_from_config(planner_cfg);
     let planner_id = planner_manifest.id;
 
     kernel
@@ -269,9 +272,7 @@ async fn test_ac1_multi_agent_scenario() {
 
     // Register planner agent
     let planner_cfg = planner_config();
-    let (planner, planner_manifest) = AgentBuilder::from_config(planner_cfg)
-        .build_with_manifest()
-        .unwrap();
+    let (planner, planner_manifest) = build_agent_from_config(planner_cfg);
     let planner_id = planner_manifest.id;
 
     kernel
@@ -281,9 +282,7 @@ async fn test_ac1_multi_agent_scenario() {
 
     // Register code-gen agent
     let coder_cfg = code_gen_config();
-    let (coder, coder_manifest) = AgentBuilder::from_config(coder_cfg)
-        .build_with_manifest()
-        .unwrap();
+    let (coder, coder_manifest) = build_agent_from_config(coder_cfg);
     let coder_id = coder_manifest.id;
 
     kernel
@@ -339,9 +338,7 @@ async fn test_ac1_kernel_full_lifecycle() {
 
     // Register
     let config = code_gen_config();
-    let (agent, manifest) = AgentBuilder::from_config(config)
-        .build_with_manifest()
-        .unwrap();
+    let (agent, manifest) = build_agent_from_config(config);
     let agent_id = manifest.id;
 
     kernel
@@ -378,9 +375,7 @@ async fn test_ac1_kernel_full_lifecycle() {
 
     // Can re-register a new agent after cleanup
     let config2 = planner_config();
-    let (agent2, manifest2) = AgentBuilder::from_config(config2)
-        .build_with_manifest()
-        .unwrap();
+    let (agent2, manifest2) = build_agent_from_config(config2);
     let agent2_id = manifest2.id;
 
     kernel

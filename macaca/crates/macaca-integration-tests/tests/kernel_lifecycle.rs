@@ -9,9 +9,10 @@ use macaca_kernel::{Kernel, KernelBuilder};
 use macaca_llm::LlmProvider;
 use macaca_proto::config::KernelConfig;
 use macaca_proto::{
-    AgentId, LlmMessage, LlmOptions, LlmResponse, MacacaError, MacacaResult, TokenUsage,
+    AgentId, AgentManifest, LlmMessage, LlmOptions, LlmResponse, MacacaError, MacacaResult,
+    TokenUsage,
 };
-use macaca_sdk::{AgentBuilder, AgentConfig};
+use macaca_sdk::{AgentBuilder, AgentConfig, DeclarativeAgent, MacacaSdk};
 use macaca_tools::DefaultToolSet;
 
 // ---------------------------------------------------------------------------
@@ -74,6 +75,13 @@ max_tokens: 100
     .unwrap()
 }
 
+fn build_declarative_agent(config: AgentConfig) -> (DeclarativeAgent, AgentManifest) {
+    let spec = AgentBuilder::from_config(config).build_spec().unwrap();
+    let manifest = spec.manifest();
+    let agent = spec.into_agent();
+    (agent, manifest)
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -85,9 +93,7 @@ async fn declarative_agent_full_lifecycle() {
 
     // Build agent from config via SDK
     let config = sample_agent_config("lifecycle-agent");
-    let (agent, manifest) = AgentBuilder::from_config(config)
-        .build_with_manifest()
-        .unwrap();
+    let (agent, manifest) = build_declarative_agent(config);
     let agent_id = manifest.id;
 
     // Register
@@ -121,9 +127,7 @@ async fn register_multiple_agents() {
     let mut ids = Vec::new();
     for i in 0..4 {
         let config = sample_agent_config(&format!("agent-{i}"));
-        let (agent, manifest) = AgentBuilder::from_config(config)
-            .build_with_manifest()
-            .unwrap();
+        let (agent, manifest) = build_declarative_agent(config);
         let id = manifest.id;
         kernel
             .register_agent(Box::new(agent), manifest)
@@ -162,13 +166,14 @@ async fn unregister_nonexistent_agent_returns_error() {
     assert!(result.is_err());
 }
 
-/// SDK register_from_config convenience function works end-to-end.
+/// SDK facade registration works end-to-end.
 #[tokio::test]
-async fn sdk_register_from_config_end_to_end() {
+async fn sdk_facade_register_config_end_to_end() {
     let kernel = make_kernel();
     let config = sample_agent_config("sdk-agent");
 
-    let id = macaca_sdk::register_from_config(&kernel, config)
+    let id = MacacaSdk::for_kernel(&kernel)
+        .register_config(config)
         .await
         .unwrap();
 

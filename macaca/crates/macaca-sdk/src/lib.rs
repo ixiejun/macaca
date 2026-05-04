@@ -6,10 +6,19 @@
 
 pub mod builder;
 pub mod config;
+pub mod facade;
 pub mod persona;
+pub mod persona_prototype;
 pub mod registry_api;
+pub mod spec;
+pub mod validation;
 
 pub use builder::{AgentBuilder, DeclarativeAgent};
 pub use config::AgentConfig;
+pub use facade::{AgentRegistryApi, KernelAgentRegistry, MacacaSdk};
 pub use persona::AgentPersona;
+pub use persona_prototype::{PersonaOverrides, PersonaPrototype};
+#[allow(deprecated)]
 pub use registry_api::{register_from_config, register_from_file};
+pub use spec::{AgentSpec, AgentSpecBuilder, TracePolicy};
+pub use validation::{SdkValidationChain, SdkValidator};

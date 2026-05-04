@@ -22,12 +22,11 @@ pub mod transport;
 #[allow(deprecated)]
 pub use env_bridge::{apply_mcp_env, McpEnvApplyOutcome};
 pub use factory::{McpServerFactory, RuntimeEnvBuilder};
+pub use lease::McpSessionLease;
 #[allow(deprecated)]
 pub use mcp_runtime::{
     apply_concurrency_isolation, probe_definition_statuses, ConcurrencyIsolationPolicy,
-    McpDefinitionSource, McpLifecycleScope, McpRegistryConfig, McpRuntimeContext,
-    McpRuntimeFacade, McpRuntimeManager, McpRuntimeStatus, McpRuntimeStatusState,
-    McpServerDefinition, McpToolPolicy,
+    McpDefinitionSource, McpLifecycleScope, McpRegistryConfig, McpRuntimeContext, McpRuntimeFacade,
+    McpRuntimeManager, McpRuntimeStatus, McpRuntimeStatusState, McpServerDefinition, McpToolPolicy,
 };
-pub use lease::McpSessionLease;
 pub use transport::{ConfigBackedMcpTransport, McpTransport};

@@ -5,22 +5,25 @@ use std::path::Path;
 use macaca_kernel::Kernel;
 use macaca_proto::{AgentId, MacacaResult};
 
-use crate::builder::AgentBuilder;
 use crate::config::AgentConfig;
+use crate::facade::MacacaSdk;
 
 /// Build a [`DeclarativeAgent`](crate::DeclarativeAgent) from an [`AgentConfig`]
 /// and register it with the kernel.
+#[deprecated(note = "use MacacaSdk::for_kernel(kernel).register_config(config) instead")]
 pub async fn register_from_config(kernel: &Kernel, config: AgentConfig) -> MacacaResult<AgentId> {
-    let (agent, manifest) = AgentBuilder::from_config(config).build_with_manifest()?;
-    kernel.register_agent(Box::new(agent), manifest).await
+    MacacaSdk::for_kernel(kernel).register_config(config).await
 }
 
 /// Load an agent config from a file and register the resulting agent with the kernel.
 ///
 /// File format is detected by extension (`.yaml`/`.yml` or `.toml`).
+#[deprecated(
+    note = "use AgentConfig::from_file(path) plus MacacaSdk::for_kernel(kernel).register_config(config) instead"
+)]
 pub async fn register_from_file(kernel: &Kernel, path: impl AsRef<Path>) -> MacacaResult<AgentId> {
     let config = AgentConfig::from_file(path)?;
-    register_from_config(kernel, config).await
+    MacacaSdk::for_kernel(kernel).register_config(config).await
 }
 
 #[cfg(test)]

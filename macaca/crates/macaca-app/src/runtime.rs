@@ -7,8 +7,8 @@ use tokio::sync::RwLock;
 
 use macaca_kernel::Kernel;
 use macaca_proto::{AgentId, ApplicationId, MacacaError, MacacaResult};
-use macaca_sdk::register_from_config;
 use macaca_sdk::AgentConfig;
+use macaca_sdk::MacacaSdk;
 
 use crate::loader::AppLoader;
 use crate::model::{AppLayer, AppManifest, AppStatus, LoadedApp};
@@ -137,8 +137,9 @@ impl AppRuntime {
         let configs = builder.resolve_agent_configs()?;
 
         let mut agent_ids = Vec::new();
+        let sdk = MacacaSdk::for_kernel(kernel);
         for config in configs {
-            let id = register_from_config(kernel, config).await?;
+            let id = sdk.register_config(config).await?;
             agent_ids.push(id);
         }
 

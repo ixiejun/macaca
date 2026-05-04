@@ -5,6 +5,8 @@ use std::path::Path;
 
 use macaca_proto::{MacacaError, MacacaResult, PermissionLevel};
 
+use crate::validation::SdkValidationChain;
+
 /// Declarative configuration for an agent, loadable from YAML or TOML.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentConfig {
@@ -123,38 +125,7 @@ impl AgentConfig {
 
     /// Validate required fields and values.
     pub fn validate(&self) -> MacacaResult<()> {
-        if self.name.trim().is_empty() {
-            return Err(MacacaError::Config(
-                "Agent config 'name' must not be empty".into(),
-            ));
-        }
-
-        match self.permission_level.as_str() {
-            "system" | "user" => {}
-            other => {
-                return Err(MacacaError::Config(format!(
-                    "Invalid permission_level '{other}'. Must be 'system' or 'user'"
-                )));
-            }
-        }
-
-        for cap in &self.capabilities {
-            if cap.name.trim().is_empty() {
-                return Err(MacacaError::Config(
-                    "Capability name must not be empty".into(),
-                ));
-            }
-        }
-
-        if let Some(temp) = self.temperature {
-            if !(0.0..=2.0).contains(&temp) {
-                return Err(MacacaError::Config(format!(
-                    "Temperature {temp} out of range [0.0, 2.0]"
-                )));
-            }
-        }
-
-        Ok(())
+        SdkValidationChain::default_rules().validate(self)
     }
 
     /// Resolve the parsed `permission_level` string into a [`PermissionLevel`].

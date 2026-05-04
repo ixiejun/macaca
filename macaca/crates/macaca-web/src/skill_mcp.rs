@@ -64,8 +64,8 @@ pub(crate) async fn register_skill_backed_mcp_tools(
     else {
         return;
     };
-    let definitions =
-        macaca_runtime_host::McpServerFactory::with_default_registry().from_skill_snapshot(&snapshot);
+    let definitions = macaca_runtime_host::McpServerFactory::with_default_registry()
+        .from_skill_snapshot(&snapshot);
     let context = McpRuntimeContext::for_agent(app_id, session_id, agent_name);
     let _ = state
         .mcp_runtime
@@ -80,8 +80,8 @@ pub(crate) async fn register_skill_backed_mcp_tools(
 }
 
 pub(crate) async fn probe_skill_mcp_servers(snapshot: &SkillSnapshot) -> Vec<SkillMcpStatus> {
-    let definitions =
-        macaca_runtime_host::McpServerFactory::with_default_registry().from_skill_snapshot(snapshot);
+    let definitions = macaca_runtime_host::McpServerFactory::with_default_registry()
+        .from_skill_snapshot(snapshot);
     let statuses = probe_definition_statuses(definitions, &McpToolPolicy::default()).await;
     statuses
         .into_iter()

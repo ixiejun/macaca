@@ -198,10 +198,12 @@ permission_level: system
     .unwrap();
 
     // 3. Build agent with persona prompt injected.
-    let (agent, manifest) = AgentBuilder::from_config(config)
+    let spec = AgentBuilder::from_config(config)
         .with_prompt(system_prompt)
-        .build_with_manifest()
+        .build_spec()
         .unwrap();
+    let manifest = spec.manifest();
+    let agent = spec.into_agent();
 
     let agent_id = manifest.id;
     kernel

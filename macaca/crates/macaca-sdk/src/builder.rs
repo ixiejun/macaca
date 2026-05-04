@@ -12,6 +12,7 @@ use macaca_proto::{
 use macaca_tools::ToolCatalog;
 
 use crate::config::AgentConfig;
+use crate::spec::AgentSpec;
 
 /// Fluent builder for constructing a [`DeclarativeAgent`] from an [`AgentConfig`].
 pub struct AgentBuilder {
@@ -43,50 +44,27 @@ impl AgentBuilder {
         self
     }
 
+    /// Build the SDK declaration product.
+    pub fn build_spec(self) -> MacacaResult<AgentSpec> {
+        let mut builder = crate::spec::AgentSpecBuilder::from_config(self.config);
+        if let Some(id) = self.id {
+            builder = builder.with_id(id);
+        }
+        builder.build()
+    }
+
     /// Build the [`DeclarativeAgent`].
+    #[deprecated(
+        note = "use AgentBuilder::build_spec() and runtime-specific factory/adapters instead"
+    )]
     pub fn build(self) -> MacacaResult<DeclarativeAgent> {
-        self.config.validate()?;
-
-        let id = self.id.unwrap_or_default();
-
-        let capabilities: Vec<Capability> = self
-            .config
-            .capabilities
-            .iter()
-            .map(|c| Capability {
-                name: c.name.clone(),
-                description: c.description.clone(),
-            })
-            .collect();
-
-        let permission = Permission {
-            level: self.config.resolved_permission_level(),
-            allowed_tools: self.config.allowed_tools.clone(),
-            allowed_paths: self.config.allowed_paths.clone(),
-            network_access: self.config.network_access,
-        };
-
-        let options = LlmOptions {
-            model: self.config.model.clone(),
-            max_tokens: self.config.max_tokens,
-            temperature: self.config.temperature,
-            stop_sequences: Vec::new(),
-            tools: None,
-        };
-
-        Ok(DeclarativeAgent {
-            id,
-            name: self.config.name.clone(),
-            capabilities,
-            permission,
-            prompt_template: self.config.prompt_template.clone(),
-            llm_options: options,
-            state: AgentState::Created,
-        })
+        Ok(self.build_spec()?.into_agent())
     }
 
     /// Build and also produce the corresponding [`AgentManifest`].
+    #[deprecated(note = "use AgentBuilder::build_spec() plus AgentSpec::manifest() instead")]
     pub fn build_with_manifest(self) -> MacacaResult<(DeclarativeAgent, AgentManifest)> {
+        #[allow(deprecated)]
         let agent = self.build()?;
         let manifest = agent.manifest();
         Ok((agent, manifest))
@@ -107,6 +85,20 @@ pub struct DeclarativeAgent {
 }
 
 impl DeclarativeAgent {
+    pub(crate) fn from_spec(spec: AgentSpec) -> Self {
+        let (id, name, capabilities, permission, prompt_template, llm_options, state) =
+            spec.into_parts();
+        Self {
+            id,
+            name,
+            capabilities,
+            permission,
+            prompt_template,
+            llm_options,
+            state,
+        }
+    }
+
     /// The agent's human-readable name.
     pub fn name(&self) -> &str {
         &self.name

@@ -183,8 +183,8 @@ pub(crate) async fn build_toolkit(
     )
     .await
     {
-        let skill_definitions =
-            macaca_runtime_host::McpServerFactory::with_default_registry().from_skill_snapshot(&snapshot);
+        let skill_definitions = macaca_runtime_host::McpServerFactory::with_default_registry()
+            .from_skill_snapshot(&snapshot);
         emit_mcp_starting_events(state, session_id.as_deref(), agent_name, &skill_definitions)
             .await;
         let skill_statuses = state
