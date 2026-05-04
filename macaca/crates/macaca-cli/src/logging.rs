@@ -7,7 +7,7 @@
 //! - Cleans up logs older than retention period
 
 use std::fs::{self, File};
-use std::io::{self, Write};
+use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::Duration;

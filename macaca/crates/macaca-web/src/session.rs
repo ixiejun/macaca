@@ -16,7 +16,7 @@ use macaca_persist::PersistStore;
 use macaca_proto::{AgentExecutionEventVisitor, ApplicationId, LlmMessage};
 
 use crate::routes::{err, ErrorResponse};
-use crate::sse::{convert_executor_event_to_sse, load_plan_decisions, PlanDecisionEvent};
+use crate::sse::convert_executor_event_to_sse;
 use crate::state::AppState;
 
 // ---------------------------------------------------------------------------
@@ -700,6 +700,26 @@ pub(crate) struct SessionListItem {
 pub(crate) struct SessionListQuery {
     #[serde(default)]
     status: Option<String>,
+    #[serde(default)]
+    limit: Option<usize>,
+    #[serde(default)]
+    offset: Option<usize>,
+}
+
+fn paged_sessions(
+    mut sessions: Vec<SessionListItem>,
+    default_limit: Option<usize>,
+    limit: Option<usize>,
+    offset: Option<usize>,
+) -> Vec<SessionListItem> {
+    sessions.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+    let offset = offset.unwrap_or(0);
+    let limit = limit.or(default_limit).map(|value| value.clamp(1, 100));
+    let iter = sessions.into_iter().skip(offset);
+    match limit {
+        Some(limit) => iter.take(limit).collect(),
+        None => iter.collect(),
+    }
 }
 
 pub(crate) async fn list_sessions(
@@ -740,10 +760,12 @@ pub(crate) async fn list_sessions(
         }
     }
 
-    // Sort by updated_at descending
-    sessions.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
-
-    Ok(Json(sessions))
+    Ok(Json(paged_sessions(
+        sessions,
+        None,
+        query.limit,
+        query.offset,
+    )))
 }
 
 // ---------------------------------------------------------------------------
@@ -753,6 +775,7 @@ pub(crate) async fn list_sessions(
 pub(crate) async fn list_app_sessions(
     State(state): State<Arc<AppState>>,
     axum::extract::Path(app_id): axum::extract::Path<String>,
+    Query(query): Query<SessionListQuery>,
 ) -> Result<Json<Vec<SessionListItem>>, (StatusCode, Json<ErrorResponse>)> {
     // Collect session IDs from per-session index keys
     // Format: app_sessions/{app_id}/{session_id}
@@ -826,10 +849,12 @@ pub(crate) async fn list_app_sessions(
         }
     }
 
-    // Sort by updated_at descending
-    sessions.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
-
-    Ok(Json(sessions))
+    Ok(Json(paged_sessions(
+        sessions,
+        Some(20),
+        query.limit,
+        query.offset,
+    )))
 }
 
 // ---------------------------------------------------------------------------
@@ -848,8 +873,6 @@ pub(crate) struct SessionDetail {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
     pub status: String,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub plan_decisions: Vec<PlanDecisionEvent>,
     /// URL to fetch events from the EventLog for this session.
     pub events_url: String,
     /// Total number of events persisted in EventLog for this session.
@@ -901,285 +924,10 @@ pub(crate) async fn get_session_by_id(
         })
         .collect();
 
-    let mut turns = if stored.turns.is_empty() {
+    let turns = if stored.turns.is_empty() {
         build_turns_from_messages(&stored.messages)
     } else {
         stored.turns.clone()
-    };
-
-    // Rebuild agent traces from EventLog (the authoritative source).
-    // Group delegated_* events by agent to construct per-agent trace histories.
-    // Rebuild agent traces from EventLog (the authoritative, durable source).
-    // EventLog is written by the independent event_collector_handle task,
-    // which survives browser disconnects. This always overwrites any
-    // stored turns' agent_traces since EventLog is the single source of truth.
-    {
-        let events: Vec<_> = state
-            .persist
-            .event_log
-            .replay(&session_id, 0, 10000)
-            .await
-            .collect();
-        let mut agent_traces: std::collections::HashMap<String, Vec<AgentTrace>> =
-            std::collections::HashMap::new();
-        let mut task_to_agent: std::collections::HashMap<String, String> =
-            std::collections::HashMap::new();
-
-        for event in &events {
-            let payload = &event.payload;
-            let agent = payload
-                .get("agent")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string();
-            let task_id = payload
-                .get("task_id")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string();
-
-            match event.event_type.as_str() {
-                "delegated_task_start" => {
-                    if agent.is_empty() || task_id.is_empty() {
-                        continue;
-                    }
-                    task_to_agent.insert(task_id.clone(), agent.clone());
-                    let trace = AgentTrace {
-                        task_id: task_id.clone(),
-                        agent: agent.clone(),
-                        status: "running".to_string(),
-                        steps: Vec::new(),
-                        output: None,
-                        error: None,
-                    };
-                    agent_traces.entry(agent).or_default().push(trace);
-                }
-                "delegated_thinking"
-                | "delegated_tool_call"
-                | "delegated_tool_result"
-                | "delegated_assistant"
-                | "delegated_driver_trace"
-                | "delegated_done" => {
-                    let resolved_agent = if !agent.is_empty() {
-                        agent.clone()
-                    } else {
-                        task_to_agent.get(&task_id).cloned().unwrap_or_default()
-                    };
-                    if resolved_agent.is_empty() || task_id.is_empty() {
-                        continue;
-                    }
-                    if let Some(traces) = agent_traces.get_mut(&resolved_agent) {
-                        if let Some(trace) = traces.iter_mut().rfind(|t| t.task_id == task_id) {
-                            let step_type = event
-                                .event_type
-                                .strip_prefix("delegated_")
-                                .unwrap_or(&event.event_type);
-                            let evt = payload
-                                .get("event")
-                                .cloned()
-                                .unwrap_or(serde_json::json!({}));
-                            let step = if event.event_type == "delegated_driver_trace" {
-                                delegated_driver_trace_step(payload)
-                            } else {
-                                AgentTraceStep {
-                                    step_type: step_type.to_string(),
-                                    iteration: evt
-                                        .get("iteration")
-                                        .and_then(|v| v.as_u64())
-                                        .map(|v| v as usize),
-                                    content: evt
-                                        .get("content")
-                                        .and_then(|v| v.as_str())
-                                        .map(|s| s.to_string()),
-                                    tool_name: evt
-                                        .get("tool_name")
-                                        .and_then(|v| v.as_str())
-                                        .map(|s| s.to_string()),
-                                    tool_input: evt.get("tool_input").cloned(),
-                                    output: evt
-                                        .get("output")
-                                        .and_then(|v| v.as_str())
-                                        .map(|s| s.to_string()),
-                                    is_error: evt.get("is_error").and_then(|v| v.as_bool()),
-                                    call_id: evt
-                                        .get("call_id")
-                                        .and_then(|v| v.as_str())
-                                        .map(|s| s.to_string()),
-                                    success: evt.get("success").and_then(|v| v.as_bool()),
-                                    error: evt
-                                        .get("error")
-                                        .and_then(|v| v.as_str())
-                                        .map(|s| s.to_string()),
-                                    ..Default::default()
-                                }
-                            };
-                            trace.steps.push(step);
-                        }
-                    }
-                }
-                "delegated_task_complete" => {
-                    let resolved_agent = if !agent.is_empty() {
-                        agent.clone()
-                    } else {
-                        task_to_agent.get(&task_id).cloned().unwrap_or_default()
-                    };
-                    if resolved_agent.is_empty() {
-                        continue;
-                    }
-                    if let Some(traces) = agent_traces.get_mut(&resolved_agent) {
-                        if let Some(trace) = traces.iter_mut().rfind(|t| t.task_id == task_id) {
-                            trace.status = "completed".to_string();
-                            trace.output = payload
-                                .get("output")
-                                .and_then(|v| v.as_str())
-                                .map(|s| s.to_string());
-                        }
-                    }
-                }
-                "delegated_task_error" => {
-                    let resolved_agent = if !agent.is_empty() {
-                        agent.clone()
-                    } else {
-                        task_to_agent.get(&task_id).cloned().unwrap_or_default()
-                    };
-                    if resolved_agent.is_empty() {
-                        continue;
-                    }
-                    if let Some(traces) = agent_traces.get_mut(&resolved_agent) {
-                        if let Some(trace) = traces.iter_mut().rfind(|t| t.task_id == task_id) {
-                            trace.status = "error".to_string();
-                            trace.error = payload
-                                .get("error")
-                                .and_then(|v| v.as_str())
-                                .map(|s| s.to_string());
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
-
-        // Rebuild coordinator trace_steps from EventLog (source of truth).
-        // Coordinator events: thinking, tool_call, tool_result, content
-        let mut coordinator_traces: Vec<StoredTraceStep> = Vec::new();
-        let mut latest_coordinator_content: Option<String> = None;
-        let mut coordinator_done = false;
-        for event in &events {
-            if event.source != "coordinator" {
-                continue;
-            }
-            let payload = &event.payload;
-            match event.event_type.as_str() {
-                "thinking" => {
-                    coordinator_traces.push(StoredTraceStep {
-                        step_type: "thinking".into(),
-                        iteration: payload
-                            .get("iteration")
-                            .and_then(|v| v.as_u64())
-                            .map(|v| v as usize),
-                        content: payload
-                            .get("content")
-                            .and_then(|v| v.as_str())
-                            .map(|s| s.to_string()),
-                        tool_name: None,
-                        tool_input: None,
-                        output: None,
-                    });
-                }
-                "tool_call" => {
-                    coordinator_traces.push(StoredTraceStep {
-                        step_type: "tool_call".into(),
-                        iteration: None,
-                        tool_name: payload
-                            .get("tool_name")
-                            .and_then(|v| v.as_str())
-                            .map(|s| s.to_string()),
-                        tool_input: payload.get("tool_input").cloned(),
-                        content: None,
-                        output: None,
-                    });
-                }
-                "tool_result" => {
-                    coordinator_traces.push(StoredTraceStep {
-                        step_type: "tool_result".into(),
-                        iteration: None,
-                        tool_name: payload
-                            .get("tool_name")
-                            .and_then(|v| v.as_str())
-                            .map(|s| s.to_string()),
-                        output: payload
-                            .get("output")
-                            .and_then(|v| v.as_str())
-                            .map(|s| s.to_string()),
-                        content: None,
-                        tool_input: None,
-                    });
-                }
-                "content" => {
-                    if let Some(content) = payload
-                        .get("content")
-                        .and_then(|v| v.as_str())
-                        .map(|s| s.to_string())
-                    {
-                        latest_coordinator_content = Some(content.clone());
-                        coordinator_traces.push(StoredTraceStep {
-                            step_type: "assistant".into(),
-                            iteration: None,
-                            tool_name: None,
-                            tool_input: None,
-                            output: None,
-                            content: Some(content),
-                        });
-                    }
-                }
-                "done" => {
-                    coordinator_done = true;
-                    coordinator_traces.push(StoredTraceStep {
-                        step_type: "done".into(),
-                        iteration: None,
-                        tool_name: None,
-                        tool_input: None,
-                        output: Some(payload.to_string()),
-                        content: None,
-                    });
-                }
-                _ => {}
-            }
-        }
-
-        // Running sessions can have persisted EventLog traces before the final
-        // assistant turn is saved. Create a placeholder assistant turn so a
-        // browser refresh can restore both coordinator and delegated history.
-        if (!agent_traces.is_empty()
-            || !coordinator_traces.is_empty()
-            || latest_coordinator_content.is_some())
-            && !turns.iter().any(|t| t.role == "assistant")
-        {
-            let turn = ensure_running_assistant_turn(&mut turns);
-            turn.status = Some(stored.meta.status.clone());
-        }
-
-        if let Some(assistant_turn) = turns.iter_mut().rev().find(|t| t.role == "assistant") {
-            if !agent_traces.is_empty() {
-                assistant_turn.agent_traces = agent_traces;
-            }
-            if !coordinator_traces.is_empty() {
-                assistant_turn.trace_steps = coordinator_traces;
-            }
-            if let Some(content) = latest_coordinator_content {
-                assistant_turn.content = content;
-            }
-            if coordinator_done {
-                assistant_turn.status = Some("completed".to_string());
-            }
-        }
-    }
-
-    // Load plan decision events from independent storage.
-    let plan_decisions = if let Ok(app_uuid) = uuid::Uuid::parse_str(&stored.meta.app_id) {
-        load_plan_decisions(&state.persist.session_store, &ApplicationId(app_uuid)).await
-    } else {
-        Vec::new()
     };
 
     // EventLog metadata for frontend migration.
@@ -1198,7 +946,6 @@ pub(crate) async fn get_session_by_id(
             .find_map(|turn| turn.meta.as_ref().and_then(|meta| meta.model.clone())),
         turns,
         status: stored.meta.status,
-        plan_decisions,
         events_url,
         events_count,
     }))

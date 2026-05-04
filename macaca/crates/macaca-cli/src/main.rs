@@ -1,6 +1,12 @@
 //! Agent OS CLI entry point.
 
+#![deny(deprecated)]
+
 use clap::{Parser, Subcommand};
+use macaca_cli::command_handlers::{
+    AgentsCommandHandler, CliCommandHandler, RunCommandHandler, StatusCommandHandler,
+    VersionCommandHandler, WebCommandHandler,
+};
 use macaca_proto::config::MacacaConfig;
 
 /// Agent OS — autonomous agent orchestration platform.
@@ -47,30 +53,15 @@ async fn main() {
     let cli = Cli::parse();
 
     let result = match cli.command {
-        Commands::Run => macaca_cli::run_kernel().await,
-        Commands::Agents => macaca_cli::list_agents().await,
-        Commands::Status => macaca_cli::show_status().await,
+        Commands::Run => RunCommandHandler.run().await,
+        Commands::Agents => AgentsCommandHandler.run().await,
+        Commands::Status => StatusCommandHandler.run().await,
         Commands::Version => {
-            println!("Macaca Agent OS v{}", env!("CARGO_PKG_VERSION"));
-            Ok(())
+            VersionCommandHandler::new(env!("CARGO_PKG_VERSION"))
+                .run()
+                .await
         }
-        Commands::Web { port } => {
-            #[cfg(feature = "systemd")]
-            {
-                // Notify systemd we're ready
-                let _ = sd_notify::notify(true, &[sd_notify::NotifyState::Ready]);
-
-                // Spawn watchdog heartbeat task
-                tokio::spawn(async {
-                    let mut interval = tokio::time::interval(std::time::Duration::from_secs(10));
-                    loop {
-                        interval.tick().await;
-                        let _ = sd_notify::notify(false, &[sd_notify::NotifyState::Watchdog]);
-                    }
-                });
-            }
-            macaca_web::WebServerBuilder::new().port(port).serve().await
-        }
+        Commands::Web { port } => WebCommandHandler::new(port).run().await,
     };
 
     if let Err(e) = result {

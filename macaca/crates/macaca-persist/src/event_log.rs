@@ -10,6 +10,10 @@ use std::sync::Arc;
 
 use tokio::sync::RwLock;
 
+use crate::event_index::{
+    agent_from_payload, event_matches, index_key, index_prefix_for_query, select_index,
+    seq_from_key, EventLogQuery, SelectedIndex,
+};
 use crate::store::PersistBackend;
 use macaca_proto::types::EventEntry;
 
@@ -22,6 +26,8 @@ pub struct AppendEventCommand {
     pub event_type: String,
     pub source: String,
     pub payload: serde_json::Value,
+    pub app_id: Option<String>,
+    pub agent_name: Option<String>,
 }
 
 impl AppendEventCommand {
@@ -36,7 +42,19 @@ impl AppendEventCommand {
             event_type: event_type.into(),
             source: source.into(),
             payload,
+            app_id: None,
+            agent_name: None,
         }
+    }
+
+    pub fn with_app_id(mut self, app_id: impl Into<String>) -> Self {
+        self.app_id = Some(app_id.into());
+        self
+    }
+
+    pub fn with_agent_name(mut self, agent_name: impl Into<String>) -> Self {
+        self.agent_name = Some(agent_name.into());
+        self
     }
 }
 
@@ -105,6 +123,59 @@ impl EventLog {
         format!("{}{}/", EVENTS_PREFIX, session_id)
     }
 
+    async fn write_event_indexes(
+        &self,
+        entry: &EventEntry,
+        canonical_key: &str,
+        agent: Option<&str>,
+    ) {
+        self.write_index(
+            SelectedIndex::Source,
+            &entry.session_id,
+            &entry.source,
+            entry.seq,
+            canonical_key,
+        )
+        .await;
+        self.write_index(
+            SelectedIndex::EventType,
+            &entry.session_id,
+            &entry.event_type,
+            entry.seq,
+            canonical_key,
+        )
+        .await;
+        if let Some(agent) = agent.filter(|agent| !agent.is_empty()) {
+            self.write_index(
+                SelectedIndex::Agent,
+                &entry.session_id,
+                agent,
+                entry.seq,
+                canonical_key,
+            )
+            .await;
+        }
+    }
+
+    async fn write_index(
+        &self,
+        index: SelectedIndex,
+        session_id: &str,
+        value: &str,
+        seq: u64,
+        canonical_key: &str,
+    ) {
+        let key = index_key(index, session_id, value, seq);
+        let _ = self.store.set(&key, canonical_key.as_bytes()).await;
+    }
+
+    async fn get_entry(&self, key: &str) -> Option<EventEntry> {
+        match self.store.get(key).await {
+            Ok(Some(data)) => serde_json::from_slice::<EventEntry>(&data).ok(),
+            _ => None,
+        }
+    }
+
     /// Get or initialize the sequence counter for a session.
     /// On first access, scans DB to find the highest existing seq.
     async fn next_seq(&self, session_id: &str) -> u64 {
@@ -144,6 +215,10 @@ impl EventLog {
     /// This persists IMMEDIATELY — the event is durable before this function returns.
     pub async fn append_command(&self, command: AppendEventCommand) -> u64 {
         let seq = self.next_seq(&command.session_id).await;
+        let agent_name = command
+            .agent_name
+            .clone()
+            .or_else(|| agent_from_payload(&command.payload));
         let entry = EventEntry {
             seq,
             timestamp: chrono::Utc::now(),
@@ -156,6 +231,8 @@ impl EventLog {
         let key = Self::event_key(&command.session_id, seq);
         if let Ok(data) = serde_json::to_vec(&entry) {
             let _ = self.store.set(&key, &data).await;
+            self.write_event_indexes(&entry, &key, agent_name.as_deref())
+                .await;
         }
 
         // Notify subscribers (non-blocking, ok if no subscribers)
@@ -219,6 +296,45 @@ impl EventLog {
         self.replay(session_id, since_seq, limit).await.collect()
     }
 
+    /// Query events for a session using secondary indexes when a scope filter is present.
+    pub async fn query_indexed(&self, query: EventLogQuery) -> Vec<EventEntry> {
+        if query.limit == 0 {
+            return Vec::new();
+        }
+        let Some(selected) = select_index(&query) else {
+            return self
+                .replay(&query.session_id, query.since_seq, query.limit)
+                .await
+                .collect();
+        };
+        let Some(prefix) = index_prefix_for_query(&query, selected) else {
+            return Vec::new();
+        };
+        let keys = self.store.list_keys(&prefix).await.unwrap_or_default();
+        let mut entries = Vec::new();
+        for key in keys {
+            if entries.len() >= query.limit {
+                break;
+            }
+            let seq = seq_from_key(&key);
+            if seq <= query.since_seq {
+                continue;
+            }
+            let Some(pointer) = self.store.get(&key).await.ok().flatten() else {
+                continue;
+            };
+            let Ok(canonical_key) = String::from_utf8(pointer) else {
+                continue;
+            };
+            if let Some(entry) = self.get_entry(&canonical_key).await {
+                if event_matches(&entry, &query, Some(selected)) {
+                    entries.push(entry);
+                }
+            }
+        }
+        entries
+    }
+
     /// Get the latest sequence number for a session (0 if no events).
     pub async fn latest_seq(&self, session_id: &str) -> u64 {
         {
@@ -245,140 +361,5 @@ impl EventLog {
             .await
             .unwrap_or_default()
             .len()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::RedbStore;
-    use std::sync::Arc;
-    use tempfile::tempdir;
-
-    async fn test_log() -> EventLog {
-        let dir = tempdir().unwrap();
-        let db_path = dir.path().join("test.redb");
-        // Leak the tempdir so it outlives the test
-        let _dir = Box::leak(Box::new(dir));
-        let store = Arc::new(RedbStore::open(db_path).unwrap());
-        EventLog::new(store)
-    }
-
-    #[tokio::test]
-    async fn append_and_query() {
-        let log = test_log().await;
-        let s1 = log
-            .append(
-                "sess1",
-                "thinking",
-                "coordinator",
-                serde_json::json!({"iteration": 1}),
-            )
-            .await;
-        let s2 = log
-            .append(
-                "sess1",
-                "tool_call",
-                "coordinator",
-                serde_json::json!({"tool": "list_agents"}),
-            )
-            .await;
-        assert_eq!(s1, 1);
-        assert_eq!(s2, 2);
-
-        let events = log.query("sess1", 0, 100).await;
-        assert_eq!(events.len(), 2);
-        assert_eq!(events[0].event_type, "thinking");
-        assert_eq!(events[1].event_type, "tool_call");
-    }
-
-    #[tokio::test]
-    async fn query_since_seq() {
-        let log = test_log().await;
-        log.append("sess1", "a", "src", serde_json::json!({})).await;
-        log.append("sess1", "b", "src", serde_json::json!({})).await;
-        log.append("sess1", "c", "src", serde_json::json!({})).await;
-
-        let events = log.query("sess1", 1, 100).await;
-        assert_eq!(events.len(), 2);
-        assert_eq!(events[0].event_type, "b");
-        assert_eq!(events[1].event_type, "c");
-    }
-
-    #[tokio::test]
-    async fn query_with_limit() {
-        let log = test_log().await;
-        for i in 0..10 {
-            log.append("sess1", &format!("e{}", i), "src", serde_json::json!({}))
-                .await;
-        }
-        let events = log.query("sess1", 0, 3).await;
-        assert_eq!(events.len(), 3);
-    }
-
-    #[tokio::test]
-    async fn sessions_are_isolated() {
-        let log = test_log().await;
-        log.append("sess1", "a", "src", serde_json::json!({})).await;
-        log.append("sess2", "b", "src", serde_json::json!({})).await;
-
-        assert_eq!(log.query("sess1", 0, 100).await.len(), 1);
-        assert_eq!(log.query("sess2", 0, 100).await.len(), 1);
-    }
-
-    #[tokio::test]
-    async fn latest_seq() {
-        let log = test_log().await;
-        assert_eq!(log.latest_seq("sess1").await, 0);
-        log.append("sess1", "a", "src", serde_json::json!({})).await;
-        log.append("sess1", "b", "src", serde_json::json!({})).await;
-        // After two appends: counter is at 2 (next_seq returned 1 then 2,
-        // counter.fetch_add leaves it at 2 after the second call)
-        assert_eq!(log.latest_seq("sess1").await, 2);
-    }
-
-    #[tokio::test]
-    async fn notify_on_append() {
-        let log = test_log().await;
-        let mut rx = log.subscribe();
-        log.append("sess1", "a", "src", serde_json::json!({})).await;
-        let (sid, seq) = rx.recv().await.unwrap();
-        assert_eq!(sid, "sess1");
-        assert_eq!(seq, 1);
-    }
-
-    #[tokio::test]
-    async fn replay_iterator_preserves_order_and_cursor() {
-        let log = test_log().await;
-        log.append("sess1", "a", "src", serde_json::json!({})).await;
-        log.append("sess1", "b", "src", serde_json::json!({})).await;
-        log.append("sess1", "c", "src", serde_json::json!({})).await;
-
-        let events: Vec<_> = log.replay("sess1", 1, 10).await.collect();
-        assert_eq!(events.len(), 2);
-        assert_eq!(events[0].seq, 2);
-        assert_eq!(events[0].event_type, "b");
-        assert_eq!(events[1].seq, 3);
-        assert_eq!(events[1].event_type, "c");
-    }
-
-    #[tokio::test]
-    async fn append_command_matches_legacy_append_behavior() {
-        let log = test_log().await;
-        let seq = log
-            .append_command(AppendEventCommand::new(
-                "sess1",
-                "thinking",
-                "coordinator",
-                serde_json::json!({"iteration": 1}),
-            ))
-            .await;
-        assert_eq!(seq, 1);
-
-        let events = log.query("sess1", 0, 10).await;
-        assert_eq!(events.len(), 1);
-        assert_eq!(events[0].event_type, "thinking");
-        assert_eq!(events[0].source, "coordinator");
-        assert_eq!(events[0].payload["iteration"], 1);
     }
 }

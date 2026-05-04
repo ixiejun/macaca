@@ -18,6 +18,7 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 
 use macaca_app::{app_entry_agent_name as manifest_entry_agent_name, AppLoader};
+use macaca_persist::EventLogQuery;
 use macaca_proto::{ApplicationId, MacacaError, ProtoErrorAdapter};
 use macaca_skill::{SkillPolicy, SkillRuntimeFacade, SkillSnapshotRequest};
 
@@ -1034,6 +1035,9 @@ pub async fn toggle_schedule(
 pub struct EventsQuery {
     pub since: Option<u64>,
     pub limit: Option<usize>,
+    pub source: Option<String>,
+    pub agent: Option<String>,
+    pub event_type: Option<String>,
 }
 
 /// Response payload for the events endpoint.
@@ -1053,13 +1057,14 @@ pub async fn get_session_events(
     axum::extract::Query(params): axum::extract::Query<EventsQuery>,
 ) -> Result<Json<EventsResponse>, (StatusCode, Json<ErrorResponse>)> {
     let since = params.since.unwrap_or(0);
-    let limit = params.limit.unwrap_or(500);
-    let events: Vec<_> = state
-        .persist
-        .event_log
-        .replay(&session_id, since, limit)
-        .await
-        .collect();
+    let limit = params.limit.unwrap_or(500).clamp(1, 2000);
+    let query = EventLogQuery::new(session_id.clone())
+        .since(since)
+        .limit(limit)
+        .source(params.source)
+        .agent(params.agent)
+        .event_type(params.event_type);
+    let events = state.persist.event_log.query_indexed(query).await;
     let latest_seq = state.persist.event_log.latest_seq(&session_id).await;
     Ok(Json(EventsResponse { events, latest_seq }))
 }
@@ -1075,18 +1080,11 @@ pub async fn get_session_run_trace(
 ) -> Result<Json<EventsResponse>, (StatusCode, Json<ErrorResponse>)> {
     let since = params.since.unwrap_or(0);
     let limit_out = params.limit.unwrap_or(500).clamp(1, 2000);
-    let fetch_cap = (limit_out * 25).min(15_000);
-    let mut events: Vec<_> = state
-        .persist
-        .event_log
-        .replay(&session_id, since, fetch_cap)
-        .await
-        .collect();
-    events.retain(|e| e.event_type == "run_trace");
-    if events.len() > limit_out {
-        let skip = events.len() - limit_out;
-        events.drain(..skip);
-    }
+    let query = EventLogQuery::new(session_id.clone())
+        .since(since)
+        .limit(limit_out)
+        .event_type(Some("run_trace".to_string()));
+    let events = state.persist.event_log.query_indexed(query).await;
     let latest_seq = state.persist.event_log.latest_seq(&session_id).await;
     Ok(Json(EventsResponse { events, latest_seq }))
 }

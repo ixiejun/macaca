@@ -46,6 +46,9 @@ pub(crate) async fn save_plan_decision<S>(
 }
 
 /// Load all plan decisions for an application.
+#[deprecated(
+    note = "app-scoped plan decision reads are legacy; use session EventLog plan_decision events"
+)]
 pub(crate) async fn load_plan_decisions<S>(
     store: &Arc<S>,
     app_id: &ApplicationId,

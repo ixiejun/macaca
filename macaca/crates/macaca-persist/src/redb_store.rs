@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use macaca_proto::error::{MacacaError, MacacaResult};
-use redb::{Database, ReadableTable, TableDefinition};
+use redb::{Database, TableDefinition};
 
 use crate::store::{PersistBackend, PersistStore};
 
@@ -34,6 +34,18 @@ impl RedbStore {
             .map_err(|e| MacacaError::Persist(e.to_string()))?;
 
         Ok(Self { db: Arc::new(db) })
+    }
+
+    fn prefix_upper_bound(prefix: &str) -> Option<String> {
+        let mut bytes = prefix.as_bytes().to_vec();
+        for index in (0..bytes.len()).rev() {
+            if bytes[index] != u8::MAX {
+                bytes[index] += 1;
+                bytes.truncate(index + 1);
+                return String::from_utf8(bytes).ok();
+            }
+        }
+        None
     }
 }
 
@@ -122,14 +134,24 @@ impl PersistStore for RedbStore {
                 .open_table(TABLE)
                 .map_err(|e| MacacaError::Persist(e.to_string()))?;
             let mut keys = Vec::new();
-            for entry in table
-                .iter()
-                .map_err(|e| MacacaError::Persist(e.to_string()))?
-            {
-                let (k, _) = entry.map_err(|e| MacacaError::Persist(e.to_string()))?;
-                let k_str = k.value().to_owned();
-                if k_str.starts_with(&prefix) {
-                    keys.push(k_str);
+            if let Some(end) = Self::prefix_upper_bound(&prefix) {
+                for entry in table
+                    .range(prefix.as_str()..end.as_str())
+                    .map_err(|e| MacacaError::Persist(e.to_string()))?
+                {
+                    let (k, _) = entry.map_err(|e| MacacaError::Persist(e.to_string()))?;
+                    keys.push(k.value().to_owned());
+                }
+            } else {
+                for entry in table
+                    .range(prefix.as_str()..)
+                    .map_err(|e| MacacaError::Persist(e.to_string()))?
+                {
+                    let (k, _) = entry.map_err(|e| MacacaError::Persist(e.to_string()))?;
+                    let k_str = k.value().to_owned();
+                    if k_str.starts_with(&prefix) {
+                        keys.push(k_str);
+                    }
                 }
             }
             Ok(keys)

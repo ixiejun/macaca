@@ -51,7 +51,7 @@ impl LlmProvider for StubLlmProvider {
 /// Loads configuration from `config/default.toml` (with env overrides),
 /// creates a kernel with the stub LLM, and optionally starts gateway
 /// adapters if configured.
-pub async fn run_kernel() -> MacacaResult<()> {
+pub async fn execute_run_kernel() -> MacacaResult<()> {
     let config = MacacaConfig::load_default();
     let app_runtime = AppRuntime::default();
 
@@ -90,8 +90,14 @@ pub async fn run_kernel() -> MacacaResult<()> {
     Ok(())
 }
 
+/// Initialize and run the kernel with optional gateway adapters.
+#[deprecated(note = "Use RunCommandHandler through CliCommandHandler dispatch instead")]
+pub async fn run_kernel() -> MacacaResult<()> {
+    execute_run_kernel().await
+}
+
 /// List all agents currently registered with the kernel.
-pub async fn list_agents() -> MacacaResult<()> {
+pub async fn execute_list_agents() -> MacacaResult<()> {
     let config = MacacaConfig::load_default();
     let llm: Arc<dyn LlmProvider> = Arc::new(StubLlmProvider);
     let tools = Box::new(DefaultToolSet::new());
@@ -114,8 +120,14 @@ pub async fn list_agents() -> MacacaResult<()> {
     Ok(())
 }
 
+/// List all agents currently registered with the kernel.
+#[deprecated(note = "Use AgentsCommandHandler through CliCommandHandler dispatch instead")]
+pub async fn list_agents() -> MacacaResult<()> {
+    execute_list_agents().await
+}
+
 /// Display system status information.
-pub async fn show_status() -> MacacaResult<()> {
+pub async fn execute_show_status() -> MacacaResult<()> {
     let config = MacacaConfig::load_default();
     let app_runtime = AppRuntime::default();
     let llm: Arc<dyn LlmProvider> = Arc::new(StubLlmProvider);
@@ -153,10 +165,22 @@ pub async fn show_status() -> MacacaResult<()> {
 }
 
 /// Create a kernel instance from config (for testing and composition).
-pub fn create_kernel(config: &KernelConfig) -> Kernel {
+pub fn create_kernel_with_stub_provider(config: &KernelConfig) -> Kernel {
     let llm: Arc<dyn LlmProvider> = Arc::new(StubLlmProvider);
     let tools = Box::new(DefaultToolSet::new());
     build_kernel(config.clone(), llm, tools)
+}
+
+/// Display system status information.
+#[deprecated(note = "Use StatusCommandHandler through CliCommandHandler dispatch instead")]
+pub async fn show_status() -> MacacaResult<()> {
+    execute_show_status().await
+}
+
+/// Create a kernel instance from config (for testing and composition).
+#[deprecated(note = "Use create_kernel_with_stub_provider instead")]
+pub fn create_kernel(config: &KernelConfig) -> Kernel {
+    create_kernel_with_stub_provider(config)
 }
 
 fn build_kernel(
@@ -183,24 +207,24 @@ mod tests {
     #[test]
     fn create_kernel_returns_valid_kernel() {
         let config = test_kernel_config();
-        let _kernel = create_kernel(&config);
+        let _kernel = create_kernel_with_stub_provider(&config);
     }
 
     #[tokio::test]
     async fn list_agents_empty() {
         // Should succeed and print "No agents registered."
-        list_agents().await.unwrap();
+        execute_list_agents().await.unwrap();
     }
 
     #[tokio::test]
     async fn show_status_succeeds() {
-        show_status().await.unwrap();
+        execute_show_status().await.unwrap();
     }
 
     #[tokio::test]
     async fn kernel_starts_with_stub_llm() {
         let config = test_kernel_config();
-        let kernel = create_kernel(&config);
+        let kernel = create_kernel_with_stub_provider(&config);
         assert_eq!(kernel.agent_count().await, 0);
     }
 

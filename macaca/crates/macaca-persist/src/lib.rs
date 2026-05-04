@@ -1,11 +1,16 @@
 //! aos-persist: redb-backed persistence layer for Agent OS.
 
 pub mod checkpoint;
+pub mod event_index;
 pub mod event_log;
 pub mod redb_store;
 pub mod store;
 
+#[cfg(test)]
+mod event_log_tests;
+
 pub use checkpoint::{CheckpointBuilder, CheckpointManager, CheckpointRecord, SessionSnapshot};
+pub use event_index::EventLogQuery;
 pub use event_log::{AppendEventCommand, EventLog, EventReplayIterator};
 pub use redb_store::RedbStore;
 pub use store::{PersistBackend, PersistStore};
