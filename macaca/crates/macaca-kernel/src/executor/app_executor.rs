@@ -37,8 +37,8 @@ pub enum WorkerHealth {
 
 use super::{
     AgentInfo, AgentRunner, ApplicationId, CallbackDispatcher, DelegatedTask, EventBus,
-    ExecutionQueue, ExecutorCommand, ExecutorEvent, ForkManager, RoutingDecision, SystemEvent,
-    TaskContext, TaskId, TaskResult, TaskRouter, TaskStatus,
+    ExecutionQueue, ExecutorCommand, ExecutorEvent, ExecutorEventFactory, ForkManager,
+    RoutingDecision, SystemEvent, TaskContext, TaskId, TaskResult, TaskRouter, TaskStatus,
 };
 use macaca_proto::TaskId as ProtoTaskId;
 
@@ -865,12 +865,11 @@ impl ApplicationExecutor {
                                     let agent_name = task.to_agent.clone();
                                     let prompt = task.prompt.clone();
                                     let context = task.context.clone();
+                                    let events =
+                                        ExecutorEventFactory::new(task_id, agent_name.clone());
 
                                     // Notify task started
-                                    let start_event = ExecutorEvent::TaskStarted {
-                                        task_id,
-                                        agent: agent_name.clone(),
-                                    };
+                                    let start_event = events.started();
                                     let _ = event_tx.send(start_event.clone()).await;
                                     let _ = event_broadcast.send(start_event);
 
@@ -947,11 +946,8 @@ impl ApplicationExecutor {
                                             }
 
                                             // Notify task completed
-                                            let completed_event = ExecutorEvent::TaskCompleted {
-                                                task_id,
-                                                agent: agent_name.clone(),
-                                                result: task_result,
-                                            };
+                                            let completed_event =
+                                                events.completed_with_result(task_result);
                                             let _ = event_tx.send(completed_event.clone()).await;
                                             let _ = event_broadcast.send(completed_event);
                                         }
@@ -964,23 +960,11 @@ impl ApplicationExecutor {
                                             );
 
                                             // Store error result with original task_id
-                                            let error_result = TaskResult {
-                                                task_id,
-                                                success: false,
-                                                output: String::new(),
-                                                error: Some(e.clone()),
-                                                artifacts: vec![],
-                                                completed_at: chrono::Utc::now(),
-                                                tokens_used: None,
-                                            };
+                                            let error_result = events.failed_result(e.clone());
                                             queue.store_result(error_result).await;
 
                                             // Notify task failed
-                                            let failed_event = ExecutorEvent::TaskFailed {
-                                                task_id,
-                                                agent: agent_name.clone(),
-                                                error: e,
-                                            };
+                                            let failed_event = events.failed(e);
                                             let _ = event_tx.send(failed_event.clone()).await;
                                             let _ = event_broadcast.send(failed_event);
                                         }

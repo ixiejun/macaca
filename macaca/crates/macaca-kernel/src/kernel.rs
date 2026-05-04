@@ -11,7 +11,7 @@ use macaca_proto::{
 use macaca_tools::ToolCatalog;
 
 use crate::registry::AgentRegistry;
-use crate::scheduler::{Scheduler, SimpleScheduler};
+use crate::scheduler::Scheduler;
 use crate::status::AgentStatusTracker;
 
 /// The core kernel that manages agents and orchestrates task execution.
@@ -24,19 +24,29 @@ pub struct Kernel {
 }
 
 impl Kernel {
+    pub(crate) fn from_parts(
+        config: KernelConfig,
+        llm: Arc<dyn LlmProvider>,
+        tools: Box<dyn ToolCatalog>,
+        scheduler: Box<dyn Scheduler>,
+    ) -> Self {
+        Self {
+            registry: AgentRegistry::new(config.max_agents),
+            scheduler,
+            status_tracker: AgentStatusTracker::new(),
+            llm,
+            tools: Arc::from(tools),
+        }
+    }
+
     /// Create a new kernel with the given configuration.
+    #[deprecated(note = "use KernelBuilder for new kernel construction")]
     pub fn new(
         config: &KernelConfig,
         llm: Arc<dyn LlmProvider>,
         tools: Box<dyn ToolCatalog>,
     ) -> Self {
-        Self {
-            registry: AgentRegistry::new(config.max_agents),
-            scheduler: Box::new(SimpleScheduler),
-            status_tracker: AgentStatusTracker::new(),
-            llm,
-            tools: Arc::from(tools),
-        }
+        crate::kernel_builder::KernelBuilder::new(config.clone(), llm, tools).build()
     }
 
     /// Register a new agent with the kernel.
@@ -154,6 +164,8 @@ impl Kernel {
 
 #[cfg(test)]
 mod tests {
+    #![allow(deprecated)]
+
     use super::*;
     use async_trait::async_trait;
     use chrono::Utc;
@@ -229,7 +241,7 @@ mod tests {
             agent_timeout_ms: 30000,
         };
         let llm: Arc<dyn LlmProvider> = Arc::new(MockLlm);
-        Kernel::new(&config, llm, Box::new(DefaultToolSet::new()))
+        crate::KernelBuilder::new(config, llm, Box::new(DefaultToolSet::new())).build()
     }
 
     fn make_test_agent() -> (AgentId, Box<dyn Agent>, AgentManifest) {

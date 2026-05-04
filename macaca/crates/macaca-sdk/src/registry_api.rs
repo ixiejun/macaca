@@ -29,6 +29,7 @@ mod tests {
     use std::sync::Arc;
 
     use async_trait::async_trait;
+    use macaca_kernel::KernelBuilder;
     use macaca_llm::LlmProvider;
     use macaca_proto::config::KernelConfig;
     use macaca_proto::{LlmMessage, LlmOptions, LlmResponse, MacacaResult as Res, TokenUsage};
@@ -68,7 +69,7 @@ mod tests {
             agent_timeout_ms: 30000,
         };
         let llm: Arc<dyn LlmProvider> = Arc::new(MockLlm);
-        Kernel::new(&config, llm, Box::new(DefaultToolSet::new()))
+        KernelBuilder::new(config, llm, Box::new(DefaultToolSet::new())).build()
     }
 
     #[tokio::test]

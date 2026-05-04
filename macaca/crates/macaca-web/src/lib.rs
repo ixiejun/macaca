@@ -36,7 +36,7 @@ use macaca_app::{AppLoader, AppRegistry, AppRuntime};
 use macaca_framework::session::{
     InMemorySessionStore as FrameworkInMemorySessionStore, SessionStore as FrameworkSessionStore,
 };
-use macaca_kernel::{AgentInfo, ApplicationExecutorRegistry, Kernel};
+use macaca_kernel::{AgentInfo, ApplicationExecutorRegistry, KernelBuilder};
 use macaca_llm::{LlmProvider, LlmRouter};
 use macaca_persist::RedbStore;
 use macaca_proto::config::{KernelConfig, MacacaConfig};
@@ -59,7 +59,8 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
     // 1b. Publish [mcp.env] entries into the current process environment so
     //     every stdio MCP child process (which inherits parent env by default)
     //     automatically receives secrets such as FIGMA_API_KEY.
-    let mcp_env_outcomes = macaca_runtime_host::RuntimeEnvBuilder::apply_process_env(&config.mcp.env);
+    let mcp_env_outcomes =
+        macaca_runtime_host::RuntimeEnvBuilder::apply_process_env(&config.mcp.env);
     if !mcp_env_outcomes.is_empty() {
         info!(
             entries = mcp_env_outcomes.len(),
@@ -79,11 +80,14 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
         heartbeat_interval_ms: 5000,
         agent_timeout_ms: 60000,
     };
-    let kernel = Arc::new(Kernel::new(
-        &kernel_config,
-        Arc::clone(&llm),
-        Box::new(DefaultToolSet::new()),
-    ));
+    let kernel = Arc::new(
+        KernelBuilder::new(
+            kernel_config,
+            Arc::clone(&llm),
+            Box::new(DefaultToolSet::new()),
+        )
+        .build(),
+    );
 
     // 4. Initialize app registry and discover apps.
     let mut registry = AppRegistry::new();

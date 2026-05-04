@@ -44,6 +44,7 @@ use uuid::Uuid;
 pub mod app_executor;
 pub mod bus;
 pub mod callback;
+pub mod event_factory;
 pub mod fork_manager;
 pub mod queue;
 pub mod router;
@@ -55,6 +56,7 @@ pub use app_executor::{
 };
 pub use bus::{EventBus, SystemEvent};
 pub use callback::CallbackDispatcher;
+pub use event_factory::ExecutorEventFactory;
 pub use fork_manager::{DelegateResult, ForkContext, ForkManager, HookEvent, MergeResult};
 pub use macaca_proto::ApplicationId;
 pub use queue::ExecutionQueue;

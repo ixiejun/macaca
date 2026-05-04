@@ -7,12 +7,12 @@ use tracing::info;
 
 use macaca_app::AppRuntime;
 use macaca_gateway::GatewayBuilder;
-use macaca_kernel::Kernel;
+use macaca_kernel::{Kernel, KernelBuilder};
 use macaca_llm::LlmProvider;
 use macaca_proto::config::{KernelConfig, MacacaConfig};
 use macaca_proto::error::MacacaResult;
 use macaca_proto::types::{LlmMessage, LlmOptions, LlmResponse, TokenUsage};
-use macaca_tools::DefaultToolSet;
+use macaca_tools::{DefaultToolSet, ToolCatalog};
 
 /// A no-op LLM provider used when no real provider is configured.
 ///
@@ -62,7 +62,7 @@ pub async fn run_kernel() -> MacacaResult<()> {
 
     let llm: Arc<dyn LlmProvider> = Arc::new(StubLlmProvider);
     let tools = Box::new(DefaultToolSet::new());
-    let kernel = Kernel::new(&config.kernel, llm, tools);
+    let kernel = build_kernel(config.kernel.clone(), llm, tools);
 
     info!(
         agents = kernel.agent_count().await,
@@ -95,7 +95,7 @@ pub async fn list_agents() -> MacacaResult<()> {
     let config = MacacaConfig::load_default();
     let llm: Arc<dyn LlmProvider> = Arc::new(StubLlmProvider);
     let tools = Box::new(DefaultToolSet::new());
-    let kernel = Kernel::new(&config.kernel, llm, tools);
+    let kernel = build_kernel(config.kernel.clone(), llm, tools);
 
     let agents = kernel.list_agents().await;
     if agents.is_empty() {
@@ -120,7 +120,7 @@ pub async fn show_status() -> MacacaResult<()> {
     let app_runtime = AppRuntime::default();
     let llm: Arc<dyn LlmProvider> = Arc::new(StubLlmProvider);
     let tools = Box::new(DefaultToolSet::new());
-    let kernel = Kernel::new(&config.kernel, llm, tools);
+    let kernel = build_kernel(config.kernel.clone(), llm, tools);
 
     let agent_count = kernel.agent_count().await;
 
@@ -156,7 +156,15 @@ pub async fn show_status() -> MacacaResult<()> {
 pub fn create_kernel(config: &KernelConfig) -> Kernel {
     let llm: Arc<dyn LlmProvider> = Arc::new(StubLlmProvider);
     let tools = Box::new(DefaultToolSet::new());
-    Kernel::new(config, llm, tools)
+    build_kernel(config.clone(), llm, tools)
+}
+
+fn build_kernel(
+    config: KernelConfig,
+    llm: Arc<dyn LlmProvider>,
+    tools: Box<dyn ToolCatalog>,
+) -> Kernel {
+    KernelBuilder::new(config, llm, tools).build()
 }
 
 #[cfg(test)]

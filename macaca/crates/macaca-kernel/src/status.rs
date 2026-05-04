@@ -7,6 +7,8 @@ use tokio::sync::RwLock;
 
 use macaca_proto::{AgentActivity, AgentId, AgentRuntimeStatus, AgentState};
 
+use crate::status_transition::AgentStatusTransitionPolicy;
+
 /// Thread-safe tracker for agent runtime status.
 pub struct AgentStatusTracker {
     statuses: Arc<RwLock<HashMap<AgentId, AgentRuntimeStatus>>>,
@@ -44,8 +46,7 @@ impl AgentStatusTracker {
     pub async fn update_state(&self, agent_id: &AgentId, state: AgentState) {
         let mut statuses = self.statuses.write().await;
         if let Some(status) = statuses.get_mut(agent_id) {
-            status.state = state;
-            status.updated_at = Utc::now();
+            AgentStatusTransitionPolicy::apply_state(status, state);
         }
     }
 
@@ -53,8 +54,7 @@ impl AgentStatusTracker {
     pub async fn update_activity(&self, agent_id: &AgentId, activity: AgentActivity) {
         let mut statuses = self.statuses.write().await;
         if let Some(status) = statuses.get_mut(agent_id) {
-            status.activity = activity;
-            status.updated_at = Utc::now();
+            AgentStatusTransitionPolicy::apply_activity(status, activity);
         }
     }
 
@@ -102,8 +102,10 @@ impl AgentStatusTracker {
 
     /// Convenience method: mark agent as idle.
     pub async fn set_idle(&self, agent_id: &AgentId) {
-        self.update_activity(agent_id, AgentActivity::Idle).await;
-        self.set_task(agent_id, None).await;
+        let mut statuses = self.statuses.write().await;
+        if let Some(status) = statuses.get_mut(agent_id) {
+            AgentStatusTransitionPolicy::apply_idle(status);
+        }
     }
 
     /// Get the status of a specific agent.

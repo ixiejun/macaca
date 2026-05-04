@@ -26,8 +26,10 @@ pub trait Scheduler: Send + Sync {
 /// one capability whose name appears in the task description (case-insensitive).
 ///
 /// If no capability match is found it falls back to the first `Running` agent.
+#[deprecated(note = "use SchedulerFactory::build(SchedulerKind::Simple) for new kernel code")]
 pub struct SimpleScheduler;
 
+#[allow(deprecated)]
 #[async_trait]
 impl Scheduler for SimpleScheduler {
     async fn select_agent(
@@ -88,6 +90,8 @@ impl Scheduler for SimpleScheduler {
 
 #[cfg(test)]
 mod tests {
+    #![allow(deprecated)]
+
     use super::*;
     use async_trait::async_trait as at;
     use chrono::Utc;
@@ -98,6 +102,8 @@ mod tests {
         TaskStatus, TokenUsage,
     };
     use macaca_tools::ToolCatalog;
+
+    use crate::{SchedulerFactory, SchedulerKind};
 
     struct MockAgent {
         id: AgentId,
@@ -182,7 +188,8 @@ mod tests {
         reg.register(agent, manifest).await.unwrap();
 
         let task = make_task("search the web for Rust");
-        let selected = SimpleScheduler.select_agent(&reg, &task).await.unwrap();
+        let scheduler = SchedulerFactory::build(SchedulerKind::Simple);
+        let selected = scheduler.select_agent(&reg, &task).await.unwrap();
         assert_eq!(selected, Some(id));
     }
 
@@ -203,7 +210,8 @@ mod tests {
         reg.register(agent, manifest).await.unwrap();
 
         let task = make_task("search something");
-        let selected = SimpleScheduler.select_agent(&reg, &task).await.unwrap();
+        let scheduler = SchedulerFactory::build(SchedulerKind::Simple);
+        let selected = scheduler.select_agent(&reg, &task).await.unwrap();
         assert_eq!(selected, None);
     }
 
@@ -225,7 +233,8 @@ mod tests {
 
         // Task description has no matching capability name.
         let task = make_task("do something unrelated");
-        let selected = SimpleScheduler.select_agent(&reg, &task).await.unwrap();
+        let scheduler = SchedulerFactory::build(SchedulerKind::Simple);
+        let selected = scheduler.select_agent(&reg, &task).await.unwrap();
         assert_eq!(selected, Some(id));
     }
 
@@ -233,7 +242,8 @@ mod tests {
     async fn returns_none_when_registry_empty() {
         let reg = AgentRegistry::new(10);
         let task = make_task("any task");
-        let selected = SimpleScheduler.select_agent(&reg, &task).await.unwrap();
+        let scheduler = SchedulerFactory::build(SchedulerKind::Simple);
+        let selected = scheduler.select_agent(&reg, &task).await.unwrap();
         assert_eq!(selected, None);
     }
 }

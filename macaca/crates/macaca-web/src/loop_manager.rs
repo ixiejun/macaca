@@ -18,7 +18,7 @@ use macaca_app::{app_entry_agent_name_or, app_task_planning_contract, AppPlannin
 use macaca_framework::execution::ExecutionContext;
 use macaca_framework::plan::PlanNotebook;
 use macaca_framework::session::{load_module_state, save_module_state};
-use macaca_kernel::executor::{ApplicationExecutor, ExecutorEvent, TaskResult};
+use macaca_kernel::executor::{ApplicationExecutor, ExecutorEvent, ExecutorEventFactory};
 use macaca_kernel::AgentInfo;
 use macaca_persist::AppendEventCommand;
 use macaca_proto::ApplicationId;
@@ -158,10 +158,7 @@ async fn update_agent_activity_by_name(
 }
 
 fn executor_task_started(task_id: macaca_proto::TaskId, agent: &str) -> ExecutorEvent {
-    ExecutorEvent::TaskStarted {
-        task_id,
-        agent: agent.to_string(),
-    }
+    ExecutorEventFactory::new(task_id, agent).started()
 }
 
 fn executor_task_completed(
@@ -169,19 +166,7 @@ fn executor_task_completed(
     agent: &str,
     output: impl Into<String>,
 ) -> ExecutorEvent {
-    ExecutorEvent::TaskCompleted {
-        task_id,
-        agent: agent.to_string(),
-        result: TaskResult {
-            task_id,
-            success: true,
-            output: output.into(),
-            error: None,
-            artifacts: vec![],
-            completed_at: chrono::Utc::now(),
-            tokens_used: None,
-        },
-    }
+    ExecutorEventFactory::new(task_id, agent).completed(output)
 }
 
 fn executor_task_failed(
@@ -189,11 +174,7 @@ fn executor_task_failed(
     agent: &str,
     error: impl Into<String>,
 ) -> ExecutorEvent {
-    ExecutorEvent::TaskFailed {
-        task_id,
-        agent: agent.to_string(),
-        error: error.into(),
-    }
+    ExecutorEventFactory::new(task_id, agent).failed(error)
 }
 
 fn goal_has_decomposed_tasks(

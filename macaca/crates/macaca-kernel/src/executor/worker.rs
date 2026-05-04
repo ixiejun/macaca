@@ -7,8 +7,8 @@ use chrono::Utc;
 use tokio::sync::{mpsc, RwLock};
 
 use super::{
-    AgentInfo, DelegatedTask, EventBus, RoutingDecision, SystemEvent, TaskContext,
-    TaskExecutor as TaskExecutorTrait, TaskId, TaskResult, TaskRouter,
+    AgentInfo, DelegatedTask, EventBus, ExecutorEventFactory, RoutingDecision, SystemEvent,
+    TaskContext, TaskExecutor as TaskExecutorTrait, TaskId, TaskResult, TaskRouter,
 };
 
 /// Maximum number of retries for failed tasks.
@@ -133,6 +133,7 @@ impl TaskExecutor {
     async fn execute_task(&self, task: DelegatedTask) {
         let task_id = task.id;
         let to_agent = task.to_agent.clone();
+        let events = ExecutorEventFactory::new(task_id, to_agent.clone());
 
         tracing::info!(task_id = %task_id, agent = %to_agent, "Executing task");
 
@@ -146,13 +147,7 @@ impl TaskExecutor {
             .await;
 
         // Send TaskStarted to event channel
-        let _ = self
-            .event_tx
-            .send(ExecutorEvent::TaskStarted {
-                task_id,
-                agent: to_agent.clone(),
-            })
-            .await;
+        let _ = self.event_tx.send(events.started()).await;
 
         // Execute the agent
         let result = self.run_agent(&task).await;
@@ -162,7 +157,6 @@ impl TaskExecutor {
                 tracing::info!(task_id = %task_id, success = task_result.success, "Task completed");
 
                 // Publish TaskCompleted event
-                let agent_name = to_agent.clone();
                 let _ = self
                     .event_bus
                     .emit(SystemEvent::TaskCompleted {
@@ -173,17 +167,15 @@ impl TaskExecutor {
                     })
                     .await;
 
-                let _ = self.event_tx.send(ExecutorEvent::TaskCompleted {
-                    task_id,
-                    agent: agent_name,
-                    result: task_result,
-                });
+                let _ = self
+                    .event_tx
+                    .send(events.completed_with_result(task_result))
+                    .await;
             }
             Err(error) => {
                 tracing::error!(task_id = %task_id, error = %error, "Task failed");
 
                 // Publish TaskFailed event
-                let agent_name = to_agent.clone();
                 let _ = self
                     .event_bus
                     .emit(SystemEvent::TaskFailed {
@@ -193,11 +185,7 @@ impl TaskExecutor {
                     })
                     .await;
 
-                let _ = self.event_tx.send(ExecutorEvent::TaskFailed {
-                    task_id,
-                    agent: agent_name,
-                    error,
-                });
+                let _ = self.event_tx.send(events.failed(error)).await;
             }
         }
     }
