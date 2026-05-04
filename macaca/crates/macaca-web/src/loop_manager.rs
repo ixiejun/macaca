@@ -14,7 +14,7 @@ use axum::response::sse::Event;
 use axum::Json;
 use futures::FutureExt;
 
-use macaca_app::{app_entry_agent_name_or, app_task_planning_contract, AppPlanningAgentProfile};
+use macaca_app::{app_entry_agent_name, app_task_planning_contract, AppPlanningAgentProfile};
 use macaca_framework::execution::ExecutionContext;
 use macaca_framework::plan::PlanNotebook;
 use macaca_framework::session::{load_module_state, save_module_state};
@@ -836,9 +836,11 @@ pub(crate) async fn ensure_plan_and_worker_loops(
     // Determine entry/planner agents from declarative config + capabilities.
     let manifest_entry = {
         let registry = state.registry.read().await;
-        registry
-            .get_app(app_id)
-            .map(|app| app_entry_agent_name_or(&app.manifest, "entry_agent"))
+        registry.get_app(app_id).map(|app| {
+            app_entry_agent_name(&app.manifest)
+                .unwrap_or("entry_agent")
+                .to_string()
+        })
     };
     let (entry_agent_name, plan_agent_name): (String, String) =
         if let Some(executor) = state.executor_registry.get(app_id).await {

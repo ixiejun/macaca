@@ -25,12 +25,13 @@
 - 让 `macaca-framework` 接住来自 application 层的结构化 prompt / capability / tool policy 输入，而不是只接收大段最终字符串。
 - 让 `macaca-cli` 的 app startup / inspect / debug 路径复用 `macaca-app` 的 runtime 装配入口。
 - 在迁移过程中保持行为 1:1 兼容，不改变现有应用的 session、trace、resume、todo、driver、MCP、skill 语义。
+- 将仍需保留的旧 helper 标记为 `deprecated`，禁止仓库内新旧 consumer 继续直接调用，但不删除实现，便于后续迁移检索。
 
 ## Non-Goals
 
 - 不在本 change 中重写 planner / coordinator / worker 的业务调度逻辑。
 - 不在本 change 中修改 manifest schema。
-- 不一次性删除所有旧 helper；旧入口允许先委托到新抽象。
+- 不一次性删除所有旧 helper；旧入口允许先委托到新抽象，但必须标记为 `deprecated`。
 - 不把 `macaca-app` 的应用语义下沉成内核级协议；本轮仍以主要消费方迁移为边界。
 - 不为 `FULLSTACK-AUTODEV` 或 `NEWSROOM-AUTOWRITER` 增加任何特化分支。
 
@@ -53,6 +54,7 @@
   - 刷新后历史 trace 恢复不能退化。
   - planner / coordinator / worker 的 application-level tool visibility 不能退化。
   - app startup、workflow prompt、entry agent 选择、allowed_tools 解释语义必须保持兼容。
+  - 旧 helper 仅允许作为 `deprecated` 兼容层保留，仓库内主要消费方不得继续直接调用。
 
 ## Rollout Strategy
 

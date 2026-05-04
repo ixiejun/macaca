@@ -69,7 +69,7 @@ async fn main() {
                     }
                 });
             }
-            macaca_web::start_server(port).await
+            macaca_web::WebServerBuilder::new().port(port).serve().await
         }
     };
 

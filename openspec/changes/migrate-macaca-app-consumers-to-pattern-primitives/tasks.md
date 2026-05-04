@@ -12,7 +12,14 @@
 - [x] 2.2 将 `macaca-web` 的 workflow prompt 消费入口迁移到 `WorkflowPromptStrategy` / `WorkflowPromptParts` 或兼容 façade
 - [x] 2.3 清理 `macaca-web` 中与 application-level tool/driver policy 重复的解释逻辑，改为消费 `macaca-app` 结构化输入
 - [x] 2.4 保留现有 web façade 名称，对外行为保持兼容
-- [ ] 2.5 验证新建 session、刷新恢复、实时 trace、历史 trace 行为不退化
+- [x] 2.5 将 `macaca-web` 对旧 app compatibility helper 的直接调用迁移到新 contract
+- [ ] 2.6 验证新建 session、刷新恢复、实时 trace、历史 trace 行为不退化
+
+## 2A. Deprecated Compatibility Helpers
+
+- [x] 2A.1 将 `app_agent_base_prompt`、`app_entry_agent_name_or`、`legacy_app_task_planning_contract` 标记为 `deprecated`
+- [x] 2A.2 保留旧 helper 行为与委托路径，不删除实现
+- [x] 2A.3 确认仓库内主要 consumer 不再直接调用这些 deprecated helper
 
 ## 3. macaca-task Migration
 
@@ -41,4 +48,5 @@
 - [x] 6.5 运行 `cargo check -p macaca-framework -p macaca-web -p macaca-task -p macaca-cli`
 - [ ] 6.6 运行至少一轮真实 session 联调，验证实时 trace、刷新恢复、历史事件恢复与增量推送
 - [ ] 6.7 运行 `gitnexus_detect_changes(scope: "all")`，确认影响范围符合预期
-- [x] 6.8 更新 checklist，只在真实完成后勾选
+- [x] 6.8 grep 确认仓库内无 `app_entry_agent_name_or`、`app_agent_base_prompt`、`legacy_app_task_planning_contract` 的业务侧直接调用
+- [x] 6.9 更新 checklist，只在真实完成后勾选

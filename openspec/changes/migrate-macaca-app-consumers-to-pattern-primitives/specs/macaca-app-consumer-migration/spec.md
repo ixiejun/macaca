@@ -71,3 +71,21 @@
 - **WHEN** 用户刷新浏览器并重新进入该 session
 - **THEN** 历史 trace SHALL 能从持久化事件中恢复
 - **AND** 后续增量 trace SHALL 继续实时推送
+
+### Requirement: Deprecated app compatibility helpers SHALL stay internal-only for repository consumers
+
+系统 SHALL 保留旧的 app compatibility helper 作为 `deprecated` 兼容层，但仓库内主要消费方不得继续直接依赖这些路径。
+
+#### Scenario: Deprecated helper remains callable for compatibility
+
+- **GIVEN** 旧 helper 仍被保留用于兼容或迁移检索
+- **WHEN** 迁移完成
+- **THEN** helper 实现 SHALL 继续存在并委托到新的结构化 contract
+- **AND** helper SHALL 被标记为 `deprecated`
+
+#### Scenario: Repository consumers stop calling deprecated helper
+
+- **GIVEN** `macaca-web`、`macaca-cli`、`macaca-task`、`macaca-framework` 是 `macaca-app` 的主要消费方
+- **WHEN** 迁移完成
+- **THEN** 这些 consumer SHALL 不再直接调用 `app_entry_agent_name_or`、`app_agent_base_prompt`、`legacy_app_task_planning_contract`
+- **AND** 相关语义 SHALL 改由稳定 contract 或显式兼容 façade 获取

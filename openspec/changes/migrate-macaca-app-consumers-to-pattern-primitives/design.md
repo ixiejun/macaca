@@ -30,7 +30,7 @@
 
 - 不改变 manifest schema。
 - 不重构 kernel 级协议。
-- 不在本 change 中彻底消灭所有旧 helper 名称；允许 façade 继续存在，但内部必须委托。
+- 不在本 change 中彻底消灭所有旧 helper 名称；允许 façade 继续存在，但内部必须委托并标记 `deprecated`。
 - 不重写 planner/worker/coordinator 业务流程。
 
 ## Decisions
@@ -85,6 +85,20 @@ CLI 中 app startup / inspect / debug 路径如果绕开 `macaca-app` 的 builde
 - CLI 统一通过 `AppRuntimeBuilder` / `ApplicationRuntimeFactory` 触发 app 装配或读取结果。
 - CLI 只做命令行输入输出 adapter。
 
+### 5. Deprecated Compatibility Path
+
+对已经被结构化 contract 替代的旧 helper：
+
+- `app_agent_base_prompt`
+- `app_entry_agent_name_or`
+- `legacy_app_task_planning_contract`
+
+保留实现以便后续检索，但统一标记为 `deprecated`，并把仓库内 consumer 迁移到以下路径：
+
+- entry agent fallback：直接使用 `app_entry_agent_name(...).unwrap_or(...)`
+- prompt：使用 `app_agent_prompt_semantics(...).base_prompt`
+- planning contract：使用 `app_task_planning_contract(...)` 或显式结构体构造
+
 ## Migration Plan
 
 ### Slice 1: Web 迁移
@@ -92,6 +106,7 @@ CLI 中 app startup / inspect / debug 路径如果绕开 `macaca-app` 的 builde
 - 识别 `macaca-web` 中仍在重复解释 app runtime / workflow prompt / tool policy 的位置。
 - 建立 `macaca-app` facade consumption path。
 - 保留原 façade 名称，对外行为不变。
+- 迁走对 `app_entry_agent_name_or` 等兼容 helper 的直接调用。
 
 ### Slice 2: Task 迁移
 
@@ -115,6 +130,9 @@ CLI 中 app startup / inspect / debug 路径如果绕开 `macaca-app` 的 builde
 
 - 风险：prompt 结构化后可能出现文本漂移，影响 planner/coordinator 行为  
   缓解：对 `FULLSTACK-AUTODEV` 与 `NEWSROOM-AUTOWRITER` 做 fixture 等价验证。
+
+- 风险：给旧 helper 加 `deprecated` 后，仓库内仍有残留调用会扩大 warning 面  
+  缓解：先迁 consumer，再标记 deprecated，并用 grep/编译验证仓库内无残留直接调用。
 
 - 风险：framework 接入结构化 application 输入后，可能与先前 `macaca-agent` / `macaca-app` 提案重叠  
   缓解：本 change 明确聚焦“消费方迁移”，不重复设计 application 抽象本身。

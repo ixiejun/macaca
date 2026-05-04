@@ -4,6 +4,8 @@
 //! with Macaca OS applications. Uses axum for the HTTP layer.
 
 pub mod agent_runner;
+pub mod bootstrap;
+pub mod chat_mediator;
 pub mod chat_orchestrator;
 pub mod event_persistence;
 pub mod framework_runner;
@@ -11,27 +13,26 @@ pub mod framework_toolkit;
 pub mod hook_consumer;
 pub mod loop_manager;
 pub mod metrics;
+pub mod orchestration_tools;
 pub mod proto_event_visitors;
+pub mod route_command;
 pub mod routes;
 pub mod run_trace;
 pub mod runtime_resume;
 pub mod session;
+pub mod session_replay;
 pub mod skill_mcp;
 pub mod sse;
 pub mod state;
+pub mod trace_events;
 pub mod workspace;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use axum::routing::{get, post};
-use axum::Router;
-use tokio::sync::RwLock;
-use tower_http::cors::{Any, CorsLayer};
 use tracing::{error, info};
 
-use futures::FutureExt;
 use macaca_app::{AppLoader, AppRegistry, AppRuntime};
 use macaca_framework::session::{
     InMemorySessionStore as FrameworkInMemorySessionStore, SessionStore as FrameworkSessionStore,
@@ -42,16 +43,20 @@ use macaca_persist::RedbStore;
 use macaca_proto::config::{KernelConfig, MacacaConfig};
 use macaca_proto::MacacaResult;
 use macaca_skill::{ExecutableSkillToolSet, SkillCatalog};
-use macaca_tools::{
-    CompositeToolSet, DefaultToolSet, DelegateTaskTool, GetTaskResultTool, ListAgentsTool, Tool,
-    ToolCatalog,
-};
+use macaca_tools::{DefaultToolSet, Tool};
 
 use crate::agent_runner::WebAgentRunner;
+pub use crate::bootstrap::{WebRuntimeFacade, WebServerBuilder};
+use crate::orchestration_tools::build_web_tools;
 use crate::state::{AppConfig, AppState, LoopState, PersistenceState, SessionState};
 
 /// Start the Macaca OS web server.
+#[deprecated(note = "Use WebServerBuilder::new().port(port).serve() instead")]
 pub async fn start_server(port: u16) -> MacacaResult<()> {
+    WebServerBuilder::new().port(port).serve().await
+}
+
+pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
     // 1. Load configuration from config/default.toml
     let config = MacacaConfig::load_default();
     info!(default_provider = %config.llm.default_provider, "Configuration loaded");
@@ -210,267 +215,10 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
     }
 
     // 8. Initialize orchestration tools.
-    // We need to create a shared reference for the executor registry that can be
-    // populated after state creation. This allows delegate_task tool to access the registry.
-    let executor_registry_ref: Arc<RwLock<Option<Arc<ApplicationExecutorRegistry>>>> =
-        Arc::new(RwLock::new(None));
-
-    // Create dynamic ListAgentsTool that fetches from kernel
-    let kernel_for_callback = Arc::clone(&kernel);
-    let list_agents_tool = ListAgentsTool::new().with_agents_callback(move || {
-        let kernel = Arc::clone(&kernel_for_callback);
-        async move {
-            let agents = kernel.list_agents().await;
-            agents
-                .into_iter()
-                .map(|agent| {
-                    let capabilities: Vec<String> =
-                        agent.capabilities.into_iter().map(|cap| cap.name).collect();
-                    serde_json::json!({
-                        "name": agent.name,
-                        "capabilities": capabilities
-                    })
-                })
-                .collect()
-        }
-        .boxed()
-    });
-    all_tools.push(Box::new(list_agents_tool));
-    info!("ListAgents tool added");
-
-    // Create DelegateTaskTool with callback to executor registry
-    // Uses Fork-Join workflow: creates a Fork that inherits parent context
-    let delegate_session_id: Arc<tokio::sync::RwLock<Option<String>>> =
-        Arc::new(tokio::sync::RwLock::new(None));
-    let registry_for_delegate = Arc::clone(&executor_registry_ref);
-    let delegate_tool = DelegateTaskTool::empty_with_session_id(Arc::clone(&delegate_session_id))
-        .with_callback(
-            move |app_id, to_agent, prompt, priority, parallel, session_id| {
-                let registry = Arc::clone(&registry_for_delegate);
-                async move {
-                    // Get the registry reference
-                    let registry_guard = registry.read().await;
-                    let registry = registry_guard
-                        .as_ref()
-                        .ok_or_else(|| "Executor registry not initialized".to_string())?;
-
-                    // If app_id is empty, use the first registered app
-                    let app_id = if app_id.is_empty() {
-                        let apps = registry.list_applications().await;
-                        apps.first()
-                            .map(|(id, _)| id.clone())
-                            .ok_or_else(|| "No applications registered in executor".to_string())?
-                    } else {
-                        // Parse string to ApplicationId
-                        uuid::Uuid::parse_str(&app_id)
-                            .map(macaca_proto::ApplicationId)
-                            .map_err(|e| format!("Invalid application ID: {}", e))?
-                    };
-
-                    // Get the executor for this app
-                    let executor = registry
-                        .get(&app_id)
-                        .await
-                        .ok_or_else(|| format!("App '{}' not found in registry", app_id))?;
-
-                    // Get the ForkManager from the executor
-                    let fork_manager = executor.fork_manager();
-
-                    // Create acceptance criteria
-                    let acceptance_criteria = macaca_proto::AcceptanceCriteria {
-                        description: format!(
-                            "Task delegated to {}: {}",
-                            to_agent,
-                            prompt.chars().take(100).collect::<String>()
-                        ),
-                        required_artifacts: vec![],
-                        auto_accept: false,
-                    };
-
-                    // Create a Fork for this delegation
-                    let fork_id = fork_manager
-                        .create_fork(
-                            None, // parent_fork_id - None for now, will be set by caller context
-                            app_id.clone(),
-                            to_agent.clone(),
-                            prompt.clone(),
-                            vec![],        // inherited_messages - will be populated by caller
-                            String::new(), // system_prompt - will be set by caller
-                            acceptance_criteria,
-                        )
-                        .await
-                        .map_err(|e| format!("Fork creation failed: {}", e))?;
-
-                    // Start the fork (transition from Pending to Running)
-                    fork_manager
-                        .start_fork(fork_id)
-                        .await
-                        .map_err(|e| format!("Fork start failed: {}", e))?;
-
-                    // Also delegate the actual task to the executor
-                    let task_context = session_id.map(|sid| macaca_kernel::TaskContext {
-                        session_id: Some(sid),
-                        artifacts: vec![],
-                        env: std::collections::HashMap::new(),
-                    });
-                    let task_id = executor
-                        .delegate_task(
-                            "coordinator", // from_agent
-                            &to_agent,
-                            prompt,
-                            priority,
-                            parallel,
-                            task_context,
-                        )
-                        .await
-                        .map_err(|e| format!("Delegation failed: {}", e))?;
-
-                    // Suspend the fork waiting for the task to complete
-                    fork_manager
-                        .suspend_fork(fork_id, macaca_proto::TaskId(task_id.0))
-                        .await
-                        .map_err(|e| format!("Fork suspend failed: {}", e))?;
-
-                    // Return the fork_id - caller can use get_fork_result to check status
-                    Ok(format!("fork:{}", fork_id))
-                }
-                .boxed()
-            },
-        );
-    all_tools.push(Box::new(delegate_tool));
-    info!("DelegateTask tool added");
-
-    // Create GetTaskResultTool with callback to executor registry
-    // Supports both fork_id (format: "fork:uuid") and task_id (format: "uuid")
-    let registry_for_result = Arc::clone(&executor_registry_ref);
-    let get_result_tool =
-        GetTaskResultTool::empty().with_callback(move |app_id, task_or_fork_id| {
-            let registry = Arc::clone(&registry_for_result);
-            async move {
-                // Get the registry reference
-                let registry_guard = registry.read().await;
-                let registry = registry_guard
-                    .as_ref()
-                    .ok_or_else(|| "Executor registry not initialized".to_string())?;
-
-                // If app_id is empty, use the first registered app
-                let app_id = if app_id.is_empty() {
-                    let apps = registry.list_applications().await;
-                    apps.first()
-                        .map(|(id, _)| id.clone())
-                        .ok_or_else(|| "No applications registered in executor".to_string())?
-                } else {
-                    // Parse string to ApplicationId
-                    uuid::Uuid::parse_str(&app_id)
-                        .map(macaca_proto::ApplicationId)
-                        .map_err(|e| format!("Invalid application ID: {}", e))?
-                };
-
-                // Get the executor for this app
-                let executor = registry
-                    .get(&app_id)
-                    .await
-                    .ok_or_else(|| format!("App '{}' not found in registry", app_id))?;
-
-                // Check if this is a fork_id (format: "fork:fork-{uuid}" or "fork:{uuid}")
-                if let Some(fork_id_str) = task_or_fork_id.strip_prefix("fork:") {
-                    // Handle both "fork-{uuid}" format (from Display) and plain UUID
-                    let uuid_str = if let Some(uuid_part) = fork_id_str.strip_prefix("fork-") {
-                        uuid_part
-                    } else {
-                        fork_id_str
-                    };
-                    let fork_id_uuid = uuid::Uuid::parse_str(uuid_str)
-                        .map_err(|e| format!("Invalid fork_id '{}': {}", uuid_str, e))?;
-                    let fork_id = macaca_proto::ForkId(fork_id_uuid);
-
-                    let fork_manager = executor.fork_manager();
-                    let fork = fork_manager
-                        .get_fork(fork_id)
-                        .await
-                        .ok_or_else(|| format!("Fork '{}' not found", fork_id))?;
-
-                    let (status_str, output, error) = match fork.state {
-                        macaca_proto::ForkState::Pending => ("pending".to_string(), None, None),
-                        macaca_proto::ForkState::Running => ("running".to_string(), None, None),
-                        macaca_proto::ForkState::WaitingForHook => {
-                            ("waiting".to_string(), None, None)
-                        }
-                        macaca_proto::ForkState::Completed => {
-                            let output = fork
-                                .own_messages
-                                .iter()
-                                .filter_map(|m| {
-                                    if m.role == macaca_proto::LlmRole::Assistant {
-                                        Some(m.content.clone())
-                                    } else {
-                                        None
-                                    }
-                                })
-                                .collect::<Vec<_>>()
-                                .join("\n");
-                            ("completed".to_string(), Some(output), None)
-                        }
-                        macaca_proto::ForkState::Failed { ref error } => {
-                            ("failed".to_string(), None, Some(error.clone()))
-                        }
-                        macaca_proto::ForkState::Merged => ("merged".to_string(), None, None),
-                        macaca_proto::ForkState::Cancelled => ("cancelled".to_string(), None, None),
-                    };
-
-                    return Ok(macaca_tools::orchestration::TaskResultData {
-                        status: status_str,
-                        output,
-                        error,
-                    });
-                }
-
-                // Otherwise treat as task_id
-                let task_id_uuid = uuid::Uuid::parse_str(&task_or_fork_id)
-                    .map_err(|e| format!("Invalid task_id: {}", e))?;
-                let task_id = macaca_kernel::TaskId(task_id_uuid);
-
-                // Get task status and result
-                let status = executor
-                    .get_task_status(&task_id)
-                    .await
-                    .ok_or_else(|| format!("Task '{}' not found", task_id))?;
-
-                let (status_str, output, error) = match status {
-                    macaca_kernel::TaskStatus::Queued => ("queued".to_string(), None, None),
-                    macaca_kernel::TaskStatus::Running => ("running".to_string(), None, None),
-                    macaca_kernel::TaskStatus::Completed => {
-                        if let Some(result) = executor.get_task_result(task_id).await {
-                            ("completed".to_string(), Some(result.output), result.error)
-                        } else {
-                            ("completed".to_string(), None, None)
-                        }
-                    }
-                    macaca_kernel::TaskStatus::Failed => {
-                        if let Some(result) = executor.get_task_result(task_id).await {
-                            ("failed".to_string(), Some(result.output), result.error)
-                        } else {
-                            ("failed".to_string(), None, Some("Task failed".to_string()))
-                        }
-                    }
-                    macaca_kernel::TaskStatus::Cancelled => ("cancelled".to_string(), None, None),
-                };
-
-                Ok(macaca_tools::TaskResultData {
-                    status: status_str,
-                    output,
-                    error,
-                })
-            }
-            .boxed()
-        });
-    all_tools.push(Box::new(get_result_tool));
-    info!("GetTaskResult tool added");
-
-    let tool_names: Vec<&str> = all_tools.iter().map(|t| t.name()).collect();
-    info!(tools = ?tool_names, "Composite toolset ready");
-
-    let tools: Arc<dyn ToolCatalog> = Arc::new(CompositeToolSet::new(all_tools));
+    let tool_assembly = build_web_tools(Arc::clone(&kernel), all_tools);
+    let tools = tool_assembly.tools;
+    let executor_registry_ref = tool_assembly.executor_registry_ref;
+    let delegate_session_id = tool_assembly.delegate_session_id;
 
     // 9. Initialize persistent session store.
     let data_dir = dirs::data_local_dir()
@@ -669,77 +417,7 @@ pub async fn start_server(port: u16) -> MacacaResult<()> {
     }
 
     // 11. Build axum router.
-    let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any);
-
-    let app = Router::new()
-        .route("/metrics", get(metrics::metrics_handler))
-        .route("/", get(routes::root_not_found))
-        .route("/api/status", get(routes::get_status))
-        .route("/api/apps", get(routes::get_apps))
-        .route("/api/apps/{id}", get(routes::get_app))
-        .route("/api/apps/{id}/agents", get(routes::get_app_agents))
-        .route("/api/apps/{id}/skills", get(routes::get_app_skills))
-        .route(
-            "/api/apps/{id}/agents/stream",
-            get(routes::stream_agent_status),
-        )
-        .route("/api/apps/{id}/sessions", get(session::list_app_sessions))
-        .route("/api/apps/reload", post(routes::reload_apps))
-        .route("/api/mcp", get(routes::get_mcp_status))
-        .route("/api/sessions", get(session::list_sessions))
-        .route("/api/sessions/{app_id}", get(session::get_session))
-        .route(
-            "/api/sessions/detail/{session_id}",
-            get(session::get_session_by_id),
-        )
-        .route(
-            "/api/sessions/stream/{session_id}",
-            get(session::stream_session_events),
-        )
-        .route("/api/skills", get(routes::get_skills))
-        .route("/api/chat/v2", post(chat_orchestrator::post_chat_v2))
-        .route("/api/chat/stop", post(chat_orchestrator::post_chat_stop))
-        .route("/api/apps/{app_id}/todos", get(routes::list_todos))
-        .route(
-            "/api/apps/{app_id}/todos/progress",
-            get(routes::get_todo_progress),
-        )
-        .route(
-            "/api/apps/{app_id}/todos/claim-diagnostics",
-            get(routes::get_todo_claim_diagnostics),
-        )
-        .route(
-            "/api/apps/{app_id}/todos/{agent_name}",
-            get(routes::list_agent_todos),
-        )
-        .route(
-            "/api/apps/{app_id}/goals",
-            get(routes::list_goals).post(loop_manager::create_goal),
-        )
-        .route(
-            "/api/apps/{app_id}/schedules",
-            get(routes::list_schedules).post(routes::create_schedule),
-        )
-        .route(
-            "/api/apps/{app_id}/schedules/{id}",
-            get(routes::get_schedule).delete(routes::delete_schedule),
-        )
-        .route(
-            "/api/apps/{app_id}/schedules/{id}/toggle",
-            axum::routing::put(routes::toggle_schedule),
-        )
-        .route("/api/sessions/{id}/events", get(routes::get_session_events))
-        .route(
-            "/api/sessions/{id}/run-trace",
-            get(routes::get_session_run_trace),
-        )
-        .route("/api/drivers", get(routes::get_drivers))
-        .route("/api/drivers/reload", post(routes::reload_drivers))
-        .layer(cors)
-        .with_state(state);
+    let app = WebRuntimeFacade::new(state).router();
 
     // 12. Start server.
     let addr = format!("0.0.0.0:{port}");

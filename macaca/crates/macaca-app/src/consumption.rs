@@ -83,6 +83,7 @@ pub fn app_entry_agent_name(manifest: &AppManifest) -> Option<&str> {
 }
 
 /// Resolve the effective entry agent name with a caller-provided fallback.
+#[deprecated(note = "Use `app_entry_agent_name(manifest).unwrap_or(fallback)` instead.")]
 pub fn app_entry_agent_name_or(manifest: &AppManifest, fallback: &str) -> String {
     app_entry_agent_name(manifest)
         .unwrap_or(fallback)
@@ -102,6 +103,7 @@ pub fn app_entry_workflow_name(manifest: &AppManifest) -> String {
 /// prompt rules. Non-entry agents retain the legacy generic fallback. Entry
 /// agents continue to identify as the concrete agent name, while workflow
 /// constraints and tool policy come from `WorkflowPromptStrategy`.
+#[deprecated(note = "Use `app_agent_prompt_semantics(manifest, agent_name).base_prompt` instead.")]
 pub fn app_agent_base_prompt(manifest: &AppManifest, agent_name: &str) -> String {
     app_agent_prompt_semantics(manifest, agent_name).base_prompt
 }
@@ -112,7 +114,9 @@ pub fn app_agent_prompt_semantics(
     manifest: &AppManifest,
     agent_name: &str,
 ) -> AppAgentPromptSemantics {
-    let entry_agent = app_entry_agent_name_or(manifest, agent_name);
+    let entry_agent = app_entry_agent_name(manifest)
+        .unwrap_or(agent_name)
+        .to_string();
     let workflow_name = app_entry_workflow_name(manifest);
     let is_entry_agent = entry_agent == agent_name;
     let tool_policy = app_agent_manifest_view(manifest, agent_name)
@@ -178,7 +182,9 @@ pub fn app_task_planning_contract(
 ) -> AppTaskPlanningContract {
     AppTaskPlanningContract {
         workflow_name: app_entry_workflow_name(manifest),
-        entry_agent: app_entry_agent_name_or(manifest, "entry_agent"),
+        entry_agent: app_entry_agent_name(manifest)
+            .unwrap_or("entry_agent")
+            .to_string(),
         worker_agents,
     }
 }
@@ -189,6 +195,9 @@ pub fn app_task_planning_contract(
 /// This keeps compatibility behavior centralized in `macaca-app` while newer
 /// runtime paths pass a real application manifest into
 /// [`app_task_planning_contract`].
+#[deprecated(
+    note = "Use `app_task_planning_contract` or construct `AppTaskPlanningContract` explicitly."
+)]
 pub fn legacy_app_task_planning_contract(available_agents: &[String]) -> AppTaskPlanningContract {
     AppTaskPlanningContract {
         workflow_name: DEFAULT_WORKFLOW.into(),
@@ -274,6 +283,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn entry_agent_helpers_preserve_fallback_behavior() {
         let manifest = manifest();
         assert_eq!(app_entry_agent_name(&manifest), Some("coordinator"));
@@ -289,6 +299,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn entry_agent_base_prompt_uses_workflow_sections() {
         let manifest = manifest();
         let prompt = app_agent_base_prompt(&manifest, "coordinator");
@@ -298,6 +309,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn worker_base_prompt_preserves_legacy_generic_fallback() {
         let manifest = manifest();
         let prompt = app_agent_base_prompt(&manifest, "backend");
@@ -342,6 +354,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn legacy_task_planning_contract_preserves_legacy_defaults() {
         let contract = legacy_app_task_planning_contract(&["backend".into(), "frontend".into()]);
         assert_eq!(contract.workflow_name, "default");

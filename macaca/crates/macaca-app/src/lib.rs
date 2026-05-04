@@ -12,6 +12,7 @@ pub mod runtime;
 pub mod skills;
 pub mod workflow;
 
+#[allow(deprecated)]
 pub use consumption::{
     app_agent_base_prompt, app_agent_manifest_view, app_agent_prompt_semantics,
     app_entry_agent_name, app_entry_agent_name_or, app_entry_workflow_name,

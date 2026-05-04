@@ -42,17 +42,15 @@ The API server runs on port 3001. All endpoints return JSON.
 
 ### Chat & Sessions
 
-**POST** `/api/chat` - Send chat message
+**POST** `/api/chat/v2` - Send chat message with enhanced session and trace support
 
 ```json
 {
   "app_id": "uuid",
-  "message": "Create a REST API for a todo app",
+  "prompt": "Create a REST API for a todo app",
   "session_id": "optional-uuid"
 }
 ```
-
-**POST** `/api/chat/v2` - Chat v2 endpoint with enhanced features
 
 **POST** `/api/chat/stop` - Cancel running chat
 
@@ -140,4 +138,3 @@ The API server runs on port 3001. All endpoints return JSON.
 ### Metrics
 
 **GET** `/metrics` - Prometheus metrics
-

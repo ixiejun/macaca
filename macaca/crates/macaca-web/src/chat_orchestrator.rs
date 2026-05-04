@@ -14,7 +14,7 @@ use chrono::Utc;
 use serde::Deserialize;
 use tokio::sync::RwLock;
 
-use macaca_app::{app_entry_agent_name_or, AppLoader};
+use macaca_app::{app_entry_agent_name, AppLoader};
 use macaca_framework::execution::ExecutionContext;
 use macaca_framework::session::{load_module_state, save_module_state};
 use macaca_kernel::AgentInfo;
@@ -314,7 +314,11 @@ pub(crate) async fn post_chat_v2(
         let registry = state.registry.read().await;
         registry
             .get_app(&app_id)
-            .map(|app| app_entry_agent_name_or(&app.manifest, "coordinator"))
+            .map(|app| {
+                app_entry_agent_name(&app.manifest)
+                    .unwrap_or("coordinator")
+                    .to_string()
+            })
             .unwrap_or_else(|| "coordinator".to_string())
     };
 
