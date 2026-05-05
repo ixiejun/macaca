@@ -125,6 +125,13 @@ impl<V: VectorStore, E: EmbeddingProvider> MemoryManager<V, E> {
         self.file.list(agent_id, limit).await
     }
 
+    pub async fn get_entry(&self, id: &MemoryId) -> MacacaResult<Option<MemoryEntry>> {
+        if let Some(entry) = self.session.get(id).await? {
+            return Ok(Some(entry));
+        }
+        self.file.get(id).await
+    }
+
     pub async fn remember_text(
         &self,
         input: crate::facade::RememberText,

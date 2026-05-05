@@ -2,6 +2,7 @@
 
 pub mod backend;
 pub mod cache;
+pub mod core;
 pub mod embedding;
 pub mod facade;
 pub mod file;
@@ -15,6 +16,15 @@ pub mod vector;
 
 pub use backend::{MemoryBackendConfig, MemoryBackendFactory};
 pub use cache::{CachedEmbeddingProvider, EmbeddingCache};
+pub use core::{
+    BuiltinAgentPrivateMemory, BuiltinSessionSharedMemory, DefaultMemoryRouter,
+    MemoryArtifactCapability, MemoryCapabilitySet, MemoryDeleteRequest, MemoryFabricFacade,
+    MemoryFacade, MemoryFlushCapability, MemoryGetRequest, MemoryGovernanceCapability,
+    MemoryIdentity, MemoryLifecycleCapability, MemoryLifecycleEvent, MemoryLifecycleEventKind,
+    MemoryPrefetchRequest, MemoryPromptCapability, MemoryProvider, MemoryProviderDescriptor,
+    MemoryRoute, MemoryRouter, MemoryScope, MemorySearchCapability, MemorySearchRequest,
+    MemoryStatusReport, MemoryStoreCapability, MemoryVisibility, MemoryWriteRequest,
+};
 pub use embedding::{DashScopeEmbedding, MockEmbedding};
 pub use facade::{ForgetMemory, RecallQuery, RecallResult, RememberText};
 pub use file::FileMemory;
