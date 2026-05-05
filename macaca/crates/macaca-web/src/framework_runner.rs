@@ -37,6 +37,7 @@ use macaca_proto::{AgentState, ApplicationId, Capability};
 use macaca_sdk::AgentPersona;
 use macaca_skill::{SkillPolicy, SkillRuntimeFacade, SkillSnapshotRequest};
 
+use crate::context_reporting_model::ContextReportingChatModel;
 use crate::runtime_resume::RuntimeResumeSignal;
 use crate::state::AppState;
 
@@ -409,9 +410,14 @@ impl FrameworkRunner {
             registry.get_app(app_id).map(|app| app.manifest.clone())
         };
         let capabilities = Self::resolve_agent_capability_set(state, app_id, agent_name).await;
-        let system_prompt =
-            Self::build_system_prompt(state, app_id, agent_name, session_id.clone(), &capabilities)
-                .await;
+        let system_prompt = Self::build_context_system_prompt(
+            state,
+            app_id,
+            agent_name,
+            session_id.clone(),
+            &capabilities,
+        )
+        .await;
         let application = app_manifest.as_ref().map(|manifest| {
             let semantics = app_agent_prompt_semantics(manifest, agent_name);
             ApplicationSemantics {
@@ -517,8 +523,8 @@ impl FrameworkRunner {
             .map_err(|e| e.to_string())
     }
 
-    /// Load the agent's persona and build the system prompt.
-    async fn build_system_prompt(
+    /// Load the agent's persona and build the system prompt through the context boundary.
+    async fn build_context_system_prompt(
         state: &Arc<AppState>,
         app_id: &ApplicationId,
         agent_name: &str,
@@ -682,6 +688,19 @@ impl FrameworkRunner {
 
         prompt
     }
+
+    #[deprecated(
+        note = "Use build_context_system_prompt through the context facade; kept for migration discovery."
+    )]
+    async fn build_system_prompt(
+        state: &Arc<AppState>,
+        app_id: &ApplicationId,
+        agent_name: &str,
+        session_id: Option<String>,
+        capabilities: &AgentCapabilitySet,
+    ) -> String {
+        Self::build_context_system_prompt(state, app_id, agent_name, session_id, capabilities).await
+    }
 }
 
 impl WebTracedAgentFactory {
@@ -753,12 +772,19 @@ impl WebTracedAgentFactory {
 
     fn build_react_agent(
         llm_router: Arc<macaca_llm::LlmRouter>,
+        event_log: Arc<EventLog>,
         request: &AgentBuildRequest,
         selection: &macaca_llm::ModelSelection,
         toolkit: Toolkit,
         max_iters: usize,
     ) -> ReActAgent {
-        let model = Arc::new(RoutedLlmAdapter::new(llm_router, selection.clone()));
+        let model = Arc::new(ContextReportingChatModel::new(
+            Arc::new(RoutedLlmAdapter::new(llm_router, selection.clone())),
+            event_log,
+            request.identity.app_id,
+            request.identity.session_id.clone(),
+            request.identity.agent_name.clone(),
+        ));
         let formatter = Arc::new(OpenAiFormatter);
         ReActAgent::new(
             &request.identity.agent_name,
@@ -871,7 +897,14 @@ impl WebTracedAgentFactory {
         )
         .await;
 
-        let agent = Self::build_react_agent(llm_router, &request, &selection, toolkit, 25);
+        let agent = Self::build_react_agent(
+            llm_router,
+            Arc::clone(&self.state.persist.event_log),
+            &request,
+            &selection,
+            toolkit,
+            25,
+        );
         let hooks = Self::build_standard_hooks(mode, task_id, agent_name);
         Ok(HookedAgent::new(agent, hooks))
     }
@@ -1017,7 +1050,14 @@ impl WebTracedAgentFactory {
             resume_rx: Arc::new(Mutex::new(resume_rx)),
         }));
 
-        let agent = Self::build_react_agent(llm_router, &request, &selection, toolkit, 50);
+        let agent = Self::build_react_agent(
+            llm_router,
+            Arc::clone(&self.state.persist.event_log),
+            &request,
+            &selection,
+            toolkit,
+            50,
+        );
 
         let cancel_token = agent.cancel_token();
         let mut hooks = HookRegistry::new();

@@ -6,6 +6,7 @@
 
 use std::time::Duration;
 
+use macaca_context::{ContextAssembleInput, ContextBudget, ContextManagerFacade};
 use macaca_llm::LlmProvider;
 use macaca_proto::{
     AgentExecutionEvent, AgentId, LlmMessage, LlmOptions, MacacaResult, Permission, TokenUsage,
@@ -92,7 +93,24 @@ impl AgenticLoop {
 
         // Call LLM (trim context window if needed; internal history stays intact)
         let trimmed = ctx_manager.trim_if_needed(messages.clone());
-        let response = llm.chat(trimmed, options_with_tools).await?;
+        let assembled = ContextManagerFacade::legacy()
+            .assemble(ContextAssembleInput {
+                app_id: None,
+                session_id: None,
+                agent_name: agent_id.to_string(),
+                model: options_with_tools.model.clone(),
+                base_messages: trimmed,
+                options: options_with_tools.clone(),
+                budget: ContextBudget::default(),
+            })
+            .await?;
+        tracing::debug!(
+            engine = %assembled.report.engine_id,
+            request_id = %assembled.report.request_id,
+            estimated_tokens = assembled.report.estimated_total_tokens,
+            "runtime_context_report"
+        );
+        let response = llm.chat(assembled.messages, &assembled.options).await?;
         accumulate_usage(total_usage, &response.usage);
 
         event_sink.emit_assistant(response.content.clone()).await;

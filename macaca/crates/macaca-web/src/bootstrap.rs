@@ -121,6 +121,10 @@ impl WebRuntimeFacade {
                 "/api/sessions/{id}/run-trace",
                 get(routes::get_session_run_trace),
             )
+            .route(
+                "/api/sessions/{id}/context-reports",
+                get(routes::get_session_context_reports),
+            )
             .route("/api/drivers", get(routes::get_drivers))
             .route("/api/drivers/reload", post(routes::reload_drivers))
             .layer(cors)

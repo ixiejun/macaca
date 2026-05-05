@@ -13,6 +13,7 @@ macaca-skill = { workspace = true }
 macaca-runtime-host = { workspace = true }
 macaca-tools = { workspace = true }
 macaca-runtime = { workspace = true }
+macaca-context = { workspace = true }
 macaca-driver = { workspace = true }
 macaca-persist = { workspace = true }
 macaca-task = { workspace = true }

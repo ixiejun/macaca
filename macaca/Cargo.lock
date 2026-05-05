@@ -1389,6 +1389,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "macaca-context"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "macaca-proto",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "macaca-driver"
 version = "0.1.0"
 dependencies = [
@@ -1581,6 +1595,7 @@ name = "macaca-runtime"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "macaca-context",
  "macaca-llm",
  "macaca-proto",
  "macaca-tools",
@@ -1693,6 +1708,7 @@ dependencies = [
  "futures",
  "macaca-agent",
  "macaca-app",
+ "macaca-context",
  "macaca-driver",
  "macaca-framework",
  "macaca-kernel",

@@ -1089,6 +1089,27 @@ pub async fn get_session_run_trace(
     Ok(Json(EventsResponse { events, latest_seq }))
 }
 
+/// GET /api/sessions/:id/context-reports?since={seq}&limit={n}&agent={agent}
+///
+/// Returns request-scoped context report summaries. Full prompt content is not
+/// persisted by default; payloads contain source counts, token estimates, and hashes.
+pub async fn get_session_context_reports(
+    State(state): State<Arc<AppState>>,
+    axum::extract::Path(session_id): axum::extract::Path<String>,
+    axum::extract::Query(params): axum::extract::Query<EventsQuery>,
+) -> Result<Json<EventsResponse>, (StatusCode, Json<ErrorResponse>)> {
+    let since = params.since.unwrap_or(0);
+    let limit_out = params.limit.unwrap_or(100).clamp(1, 500);
+    let query = EventLogQuery::new(session_id.clone())
+        .since(since)
+        .limit(limit_out)
+        .agent(params.agent)
+        .event_type(Some("context_report".to_string()));
+    let events = state.persist.event_log.query_indexed(query).await;
+    let latest_seq = state.persist.event_log.latest_seq(&session_id).await;
+    Ok(Json(EventsResponse { events, latest_seq }))
+}
+
 // ---------------------------------------------------------------------------
 // GET /api/drivers — List loaded drivers
 // ---------------------------------------------------------------------------

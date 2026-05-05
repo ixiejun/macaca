@@ -7,6 +7,7 @@ pub mod agent_runner;
 pub mod bootstrap;
 pub mod chat_mediator;
 pub mod chat_orchestrator;
+mod context_reporting_model;
 pub mod event_persistence;
 pub mod framework_runner;
 pub mod framework_toolkit;

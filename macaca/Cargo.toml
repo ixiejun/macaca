@@ -16,6 +16,7 @@ members = [
     "crates/macaca-cli",
     "crates/macaca-driver",
     "crates/macaca-runtime",
+    "crates/macaca-context",
     "crates/macaca-skill",
     "crates/macaca-web",
     "crates/macaca-framework",
@@ -82,6 +83,7 @@ macaca-gateway = { path = "crates/macaca-gateway" }
 macaca-cli = { path = "crates/macaca-cli" }
 macaca-driver = { path = "crates/macaca-driver" }
 macaca-runtime = { path = "crates/macaca-runtime" }
+macaca-context = { path = "crates/macaca-context" }
 macaca-skill = { path = "crates/macaca-skill" }
 macaca-web = { path = "crates/macaca-web" }
 macaca-framework = { path = "crates/macaca-framework" }
