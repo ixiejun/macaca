@@ -137,6 +137,62 @@ impl Default for ContextRecallRuntimeConfig {
     }
 }
 
+/// Where to resolve agent profile Markdown files (`AGENTS.md`, `SOUL.md`, etc.).
+///
+/// The OS layer stays application-agnostic: resolution uses only configured paths and
+/// well-known filenames — never hard-coded business agent names.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentProfileRootKind {
+    /// Application install: `{app_dir}/personas/{agent_name}` (same tree as `IDENTITY.md` / `TOOLS.md`).
+    #[default]
+    PersonaDirectory,
+    /// Data workspace private sandbox: `{data_dir}/workspaces/{app_id}/agents/{agent_name}`.
+    AgentPrivateWorkspace,
+}
+
+fn default_agent_profile_max_file_bytes() -> u64 {
+    2 * 1024 * 1024
+}
+
+fn default_agent_profile_inject_heartbeat() -> bool {
+    true
+}
+
+fn default_agent_profile_include_memory_seed() -> bool {
+    true
+}
+
+/// Tunables for [`crate::config::ContextConfig::agent_profile`].
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AgentProfileContextConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub root_kind: AgentProfileRootKind,
+    /// Per-file byte budget before UTF-8 truncation/skip diagnostics.
+    #[serde(default = "default_agent_profile_max_file_bytes")]
+    pub max_file_bytes: u64,
+    /// When false, `HEARTBEAT.md` is never read by the profile provider (operators may gate cadence elsewhere).
+    #[serde(default = "default_agent_profile_inject_heartbeat")]
+    pub inject_heartbeat: bool,
+    /// When false, `MEMORY.md` is omitted from candidates (seed/audit injection disabled for this agent).
+    #[serde(default = "default_agent_profile_include_memory_seed")]
+    pub include_memory_seed: bool,
+}
+
+impl Default for AgentProfileContextConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            root_kind: AgentProfileRootKind::default(),
+            max_file_bytes: default_agent_profile_max_file_bytes(),
+            inject_heartbeat: default_agent_profile_inject_heartbeat(),
+            include_memory_seed: default_agent_profile_include_memory_seed(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContextConfig {
     #[serde(default = "default_context_engine")]
@@ -153,6 +209,8 @@ pub struct ContextConfig {
     pub workspace_guides: WorkspaceGuideSourcesConfig,
     #[serde(default)]
     pub recall: ContextRecallRuntimeConfig,
+    #[serde(default)]
+    pub agent_profile: AgentProfileContextConfig,
 }
 
 fn default_context_engine() -> String {
@@ -185,6 +243,7 @@ impl Default for ContextConfig {
             reserve_output_tokens: default_context_reserve_output_tokens(),
             workspace_guides: WorkspaceGuideSourcesConfig::default(),
             recall: ContextRecallRuntimeConfig::default(),
+            agent_profile: AgentProfileContextConfig::default(),
         }
     }
 }
@@ -831,6 +890,7 @@ mod tests {
         assert_eq!(cfg.kernel.max_agents, 16);
         assert_eq!(cfg.context.default_engine, "legacy");
         assert!(cfg.context.emit_reports);
+        assert!(!cfg.context.agent_profile.enabled);
         assert_eq!(cfg.context.workspace_guides.entries.len(), 6);
         assert_eq!(cfg.memory.embedding.model, "text-embedding-v4");
         assert_eq!(cfg.memory.vector.backend, "milvus");

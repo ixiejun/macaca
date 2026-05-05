@@ -38,7 +38,9 @@ use macaca_framework::react_agent::ReActAgent;
 use macaca_framework::tool::{ToolError, ToolMiddleware, ToolResponse, Toolkit};
 use macaca_memory::TestMemoryManager;
 use macaca_persist::{AppendEventCommand, EventLog};
-use macaca_proto::config::{ContextConfig, WorkspaceGuideSourcesConfig};
+use macaca_proto::config::{
+    AgentProfileContextConfig, AgentProfileRootKind, ContextConfig, WorkspaceGuideSourcesConfig,
+};
 use macaca_proto::{AgentState, ApplicationId, Capability};
 use macaca_sdk::AgentPersona;
 use macaca_skill::{SkillPolicy, SkillRuntimeFacade, SkillSnapshotRequest};
@@ -555,6 +557,9 @@ impl FrameworkRunner {
                 if let Some(ref guides) = app_context.workspace_guides {
                     config.workspace_guides = guides.clone();
                 }
+                if let Some(ref ap) = app_context.agent_profile {
+                    config.agent_profile = ap.clone();
+                }
             }
             if let Some(agent) = app_agent_manifest_view(&app.manifest, agent_name) {
                 if let Some(engine) = agent.context_engine().filter(|value| !value.is_empty()) {
@@ -563,6 +568,37 @@ impl FrameworkRunner {
             }
         }
         config
+    }
+
+    /// Resolves the on-disk directory scanned by [`macaca_context::ProfileFileContextProvider`].
+    ///
+    /// The path is never interpreted as a workflow name — only as filesystem layout dictated by
+    /// [`AgentProfileRootKind`] and the active [`ApplicationId`].
+    async fn resolve_agent_profile_root(
+        state: &Arc<AppState>,
+        app_id: &ApplicationId,
+        agent_name: &str,
+        cfg: &AgentProfileContextConfig,
+    ) -> Option<std::path::PathBuf> {
+        if !cfg.enabled {
+            return None;
+        }
+        match cfg.root_kind {
+            AgentProfileRootKind::PersonaDirectory => {
+                let dirs = state.config.app_dirs.read().await;
+                let app_dir = dirs
+                    .iter()
+                    .find(|(id, _)| **id == *app_id)
+                    .map(|(_, path)| path.clone())?;
+                Some(app_dir.join("personas").join(agent_name))
+            }
+            AgentProfileRootKind::AgentPrivateWorkspace => {
+                let workspaces = state.config.app_workspaces.read().await;
+                workspaces
+                    .get(app_id)
+                    .map(|ws| ws.agent_workspace(agent_name))
+            }
+        }
     }
 
     /// Load the agent's persona and build the system prompt through the context boundary.
@@ -600,7 +636,11 @@ impl FrameworkRunner {
         let mut composer = PromptComposer::new();
 
         let base_prompt = if let Some(ref p) = persona {
-            p.to_system_prompt(None)
+            if merged_context.agent_profile.enabled {
+                p.to_system_prompt_delegating_profile_files(None)
+            } else {
+                p.to_system_prompt(None)
+            }
         } else if let Some(manifest) = app_manifest.as_ref() {
             app_agent_prompt_semantics(manifest, agent_name).base_prompt
         } else {
@@ -934,6 +974,7 @@ impl WebTracedAgentFactory {
         persist_backend: Arc<dyn macaca_persist::PersistBackend>,
         workspace_memory: Option<Arc<TestMemoryManager>>,
         merged_context_config: ContextConfig,
+        agent_profile_root: Option<std::path::PathBuf>,
         request: &AgentBuildRequest,
         selection: &macaca_llm::ModelSelection,
         toolkit: Toolkit,
@@ -947,6 +988,7 @@ impl WebTracedAgentFactory {
             request.identity.session_id.clone(),
             request.identity.agent_name.clone(),
             merged_context_config,
+            agent_profile_root,
             workspace_memory,
         ));
         let formatter = Arc::new(OpenAiFormatter);
@@ -1061,17 +1103,27 @@ impl WebTracedAgentFactory {
         )
         .await;
 
+        let merged_ctx = FrameworkRunner::resolve_context_config(
+            &self.state,
+            &request.identity.app_id,
+            &request.identity.agent_name,
+        )
+        .await;
+        let profile_root = FrameworkRunner::resolve_agent_profile_root(
+            &self.state,
+            &request.identity.app_id,
+            &request.identity.agent_name,
+            &merged_ctx.agent_profile,
+        )
+        .await;
+
         let agent = Self::build_react_agent(
             llm_router,
             Arc::clone(&self.state.persist.event_log),
             Arc::clone(&self.state.persist.session_store),
             self.state.workspace_memory.clone(),
-            FrameworkRunner::resolve_context_config(
-                &self.state,
-                &request.identity.app_id,
-                &request.identity.agent_name,
-            )
-            .await,
+            merged_ctx,
+            profile_root,
             &request,
             &selection,
             toolkit,
@@ -1222,17 +1274,27 @@ impl WebTracedAgentFactory {
             resume_rx: Arc::new(Mutex::new(resume_rx)),
         }));
 
+        let merged_ctx = FrameworkRunner::resolve_context_config(
+            &self.state,
+            &request.identity.app_id,
+            &request.identity.agent_name,
+        )
+        .await;
+        let profile_root = FrameworkRunner::resolve_agent_profile_root(
+            &self.state,
+            &request.identity.app_id,
+            &request.identity.agent_name,
+            &merged_ctx.agent_profile,
+        )
+        .await;
+
         let agent = Self::build_react_agent(
             llm_router,
             Arc::clone(&self.state.persist.event_log),
             Arc::clone(&self.state.persist.session_store),
             self.state.workspace_memory.clone(),
-            FrameworkRunner::resolve_context_config(
-                &self.state,
-                &request.identity.app_id,
-                &request.identity.agent_name,
-            )
-            .await,
+            merged_ctx,
+            profile_root,
             &request,
             &selection,
             toolkit,

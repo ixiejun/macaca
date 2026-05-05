@@ -13,6 +13,7 @@ pub mod engine;
 pub mod estimate;
 pub mod memory;
 pub mod preflight;
+pub mod profile;
 pub mod prompt;
 pub mod report;
 pub mod source;
@@ -53,6 +54,11 @@ pub use memory::{
 pub use preflight::{
     read_only_recall_tool_name, ContextPreflightRecallConfig, ContextPreflightRecallInput,
     ContextPreflightRecallOutput,
+};
+pub use profile::{
+    canonical_root, default_policy_for, load_profile_file, load_profile_file_at_canonical_root,
+    profile_provider_arc, AgentProfileFileKind, ProfileFileContextProvider, ProfileKindPolicy,
+    ProfileLoadOutput, ProfileSkipReason,
 };
 pub use prompt::{
     CompiledPrompt, PromptComposer, PromptSection, PromptSectionBuilder, PromptStability,

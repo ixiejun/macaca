@@ -148,4 +148,19 @@ compress = true
 # Replace the placeholder below with your Figma Personal Access Token before
 # starting the backend. Do NOT commit real tokens.
 [mcp.env]
-FIGMA_API_KEY = "YOUR_FIGMA_PERSONAL_ACCESS_TOKEN_HERE"
+FIGMA_API_KEY = "figd_DP_td8sx285ub8u2nVClYoOfavmFsTNwd0oHQtpr"
+
+# ---------------------------------------------------------------------------
+# Context engine + composer (macaca-proto `ContextConfig`)
+# ---------------------------------------------------------------------------
+# Loads OpenClaw-style profile Markdown via `ProfileFileContextProvider` into the composer.
+# - `persona_directory`: `{app_dir}/personas/{agent_name}` (same tree as IDENTITY.md / TOOLS.md)
+# - `agent_private_workspace`: `{data_dir}/workspaces/{app_id}/agents/{agent_name}`
+[context.agent_profile]
+enabled = true
+root_kind = "persona_directory"
+# Per-file byte budget before truncation (optional; default is 2 MiB)
+# max_file_bytes = 2097152
+# include HEARTBEAT.md / MEMORY.md seed (defaults: true / true)
+# inject_heartbeat = true
+# include_memory_seed = true

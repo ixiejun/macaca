@@ -117,6 +117,11 @@ impl AgentPersona {
     ///
     /// Sections are concatenated in order, each wrapped with a header.
     /// If `base_prompt` is provided, it is prepended before persona sections.
+    ///
+    /// ### Composer integration
+    /// When `ContextConfig.agent_profile` is enabled, prefer
+    /// [`Self::to_system_prompt_delegating_profile_files`] for Markdown files that duplicate the
+    /// composer's profile injection, otherwise identical sections appear twice.
     pub fn to_system_prompt(&self, base_prompt: Option<&str>) -> String {
         let mut parts: Vec<String> = Vec::new();
 
@@ -140,6 +145,27 @@ impl AgentPersona {
             if let Some(text) = content {
                 parts.push(format!("## {label}\n\n{text}"));
             }
+        }
+
+        parts.join("\n\n")
+    }
+
+    /// Emit only sections that are **not** covered by the context composer's profile provider.
+    ///
+    /// Markdown that maps 1:1 to composer profile files (`IDENTITY.md`, `TOOLS.md`, …) should
+    /// ride the composer pipeline for auditability; today the only persona file that stays here is
+    /// `BOOTSTRAP.md`, which is outside that manifest.
+    pub fn to_system_prompt_delegating_profile_files(&self, base_prompt: Option<&str>) -> String {
+        let mut parts: Vec<String> = Vec::new();
+
+        if let Some(base) = base_prompt {
+            if !base.is_empty() {
+                parts.push(base.to_string());
+            }
+        }
+
+        if let Some(ref text) = self.bootstrap {
+            parts.push(format!("## Bootstrap\n\n{text}"));
         }
 
         parts.join("\n\n")
@@ -186,6 +212,20 @@ mod tests {
         assert!(!prompt.contains("## Bootstrap"));
         assert_eq!(persona.section_count(), 2);
         assert!(!persona.is_empty());
+    }
+
+    #[test]
+    fn delegating_prompt_leaves_only_bootstrap() {
+        let persona = AgentPersona {
+            bootstrap: Some("boot".into()),
+            identity: Some("id".into()),
+            tools: Some("tools".into()),
+            ..Default::default()
+        };
+        let prompt = persona.to_system_prompt_delegating_profile_files(None);
+        assert!(prompt.contains("Bootstrap"));
+        assert!(!prompt.contains("Identity"));
+        assert!(!prompt.contains("Tools"));
     }
 
     #[test]

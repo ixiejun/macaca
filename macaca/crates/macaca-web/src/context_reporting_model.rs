@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use macaca_context::{
-    ContextAssembleInput, ContextBudget, ContextEngineSelection, ContextFacade,
-    ContextPreflightRecallConfig,
+    profile_provider_arc, ContextAssembleInput, ContextBudget, ContextEngineSelection,
+    ContextFacade, ContextPreflightRecallConfig, ContextProvider,
 };
 use macaca_framework::model::{ChatModel, ChatOptions, ChatResponse, ModelError};
 use macaca_memory::TestMemoryManager;
@@ -36,6 +36,10 @@ pub(crate) struct ContextReportingChatModel {
     context_budget: ContextBudget,
     recall_runtime: macaca_proto::config::ContextRecallRuntimeConfig,
     workspace_memory: Option<Arc<TestMemoryManager>>,
+    /// Tunables copied from [`ContextConfig::agent_profile`] for hot-path injection checks.
+    agent_profile: macaca_proto::config::AgentProfileContextConfig,
+    /// Resolved directory that stores `AGENTS.md` / `IDENTITY.md`, depending on [`AgentProfileRootKind`].
+    agent_profile_root: Option<std::path::PathBuf>,
 }
 
 impl ContextReportingChatModel {
@@ -49,6 +53,7 @@ impl ContextReportingChatModel {
         session_id: Option<String>,
         agent_name: String,
         merged_context_config: ContextConfig,
+        agent_profile_root: Option<std::path::PathBuf>,
         workspace_memory: Option<Arc<TestMemoryManager>>,
     ) -> Self {
         Self {
@@ -59,8 +64,8 @@ impl ContextReportingChatModel {
             session_id,
             agent_name,
             context_selection: ContextEngineSelection {
-                engine_id: merged_context_config.default_engine,
-                fallback_engine_id: merged_context_config.fallback_engine,
+                engine_id: merged_context_config.default_engine.clone(),
+                fallback_engine_id: merged_context_config.fallback_engine.clone(),
             },
             context_budget: ContextBudget::new(
                 merged_context_config.max_tokens,
@@ -68,6 +73,8 @@ impl ContextReportingChatModel {
             ),
             recall_runtime: merged_context_config.recall.clone(),
             workspace_memory,
+            agent_profile: merged_context_config.agent_profile.clone(),
+            agent_profile_root,
         }
     }
 
@@ -123,8 +130,14 @@ impl ContextReportingChatModel {
         };
         let lineage_count = self.lineage_compactions(session_id).await;
         let preflight_cfg = self.preflight_config();
+        let mut providers: Vec<std::sync::Arc<dyn ContextProvider>> = Vec::new();
+        if self.agent_profile.enabled {
+            if let Some(root) = self.agent_profile_root.clone() {
+                providers.push(profile_provider_arc(root, self.agent_profile.clone()));
+            }
+        }
         match ContextFacade::builtins(self.context_selection.clone())
-            .assemble_model_context(input, &[])
+            .assemble_model_context(input, &providers)
             .await
         {
             Ok(mut assembled) => {

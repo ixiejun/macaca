@@ -84,6 +84,9 @@ pub struct AppContextConfig {
     /// Optional override for workspace guide files (priorities and per-file byte budgets).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub workspace_guides: Option<macaca_proto::config::WorkspaceGuideSourcesConfig>,
+    /// Optional inject of Markdown profile candidates (`AGENTS.md`, etc.) through the composer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_profile: Option<macaca_proto::config::AgentProfileContextConfig>,
 }
 
 /// Per-agent standard AgentSkills visibility policy in app manifests.
