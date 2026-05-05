@@ -14,6 +14,7 @@ pub struct MemoryCapabilitySet {
     pub flush: bool,
     pub artifact: bool,
     pub governance: bool,
+    pub knowledge: bool,
 }
 
 impl MemoryCapabilitySet {

@@ -73,6 +73,7 @@ pub struct AgenticLoop {
 }
 
 impl AgenticLoop {
+    /// Build one loop instance with fixed runtime policy.
     pub fn new(config: RuntimeConfig) -> Self {
         Self { config }
     }
@@ -102,7 +103,16 @@ impl AgenticLoop {
 
         debug!(iteration, "Sending request to LLM");
 
-        // Call LLM (trim context window if needed; internal history stays intact)
+        // The runtime now has a two-stage context pipeline:
+        // 1. `ContextWindowManager` performs a coarse trim on the in-memory
+        //    transcript to avoid obviously oversized requests.
+        // 2. `ContextRuntimeFacade` runs the selected context engine
+        //    (`legacy`, `windowed`, `pruning`, `summary`, ...) to perform
+        //    provider-neutral prompt assembly and emit a structured report.
+        //
+        // The original `messages` vector is intentionally left intact so the
+        // runtime keeps its full internal history even if the outgoing prompt is
+        // trimmed or rewritten for this specific model call.
         let trimmed = ctx_manager.trim_if_needed(messages.clone());
         let assembled = ContextRuntimeFacade::builtins(ContextEngineSelection {
             engine_id: self.config.context_engine.clone(),
@@ -118,6 +128,9 @@ impl AgenticLoop {
             budget: self.config.context_budget,
         })
         .await?;
+        // Emit a compact driver trace summary rather than the full prompt body.
+        // This keeps runtime tracing cheap while still exposing enough metadata
+        // for debugging engine selection, pruning, and token pressure.
         event_sink
             .emit(AgentExecutionEvent::DriverTrace {
                 driver_name: "macaca-context".into(),
@@ -139,6 +152,8 @@ impl AgenticLoop {
             estimated_tokens = assembled.report.estimated_total_tokens,
             "runtime_context_report"
         );
+        // Only the assembled prompt slice is sent to the LLM. Any trimming,
+        // pruning, or fallback has already been applied by the context engine.
         let response = llm.chat(assembled.messages, &assembled.options).await?;
         accumulate_usage(total_usage, &response.usage);
 
@@ -247,6 +262,12 @@ impl AgenticLoop {
     /// - `options` — LLM options (model, temperature, etc.)
     /// - `permission` — the agent's permission policy
     /// - `permission_checker` — optional checker; if `None`, all tools are allowed
+    ///
+    /// Runtime model:
+    /// - each iteration assembles context through the configured context engine
+    /// - the LLM response is inspected for tool calls
+    /// - tool results are appended back into transcript history
+    /// - the loop repeats until a final assistant answer is produced
     #[instrument(name = "agentic_loop", skip_all, fields(agent_id = %agent_id, max_iter = self.config.max_iterations))]
     pub async fn execute(
         &self,

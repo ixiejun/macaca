@@ -10,6 +10,7 @@
 //! The goal is to let the rest of Macaca depend on one generic memory boundary
 //! without deleting the legacy storage implementations in the same change.
 
+pub mod active_recall;
 pub mod adapter;
 pub mod capability;
 pub mod facade;
@@ -22,11 +23,15 @@ pub mod status;
 #[cfg(test)]
 mod tests;
 
+pub use active_recall::{
+    ActiveRecallBudget, ActiveRecallCandidate, ActiveRecallCapability, ActiveRecallDecision,
+    ActiveRecallRequest, ActiveRecallResult, DefaultActiveRecallStrategy,
+};
 pub use adapter::{BuiltinAgentPrivateMemory, BuiltinSessionSharedMemory, MemoryFabricFacade};
 pub use capability::{
     MemoryArtifactCapability, MemoryFlushCapability, MemoryGovernanceCapability,
-    MemoryLifecycleCapability, MemoryPromptCapability, MemorySearchCapability,
-    MemoryStoreCapability,
+    MemoryKnowledgeCapability, MemoryLifecycleCapability, MemoryPromptCapability,
+    MemorySearchCapability, MemoryStoreCapability,
 };
 pub use facade::{
     MemoryDeleteRequest, MemoryFacade, MemoryGetRequest, MemoryPrefetchRequest,

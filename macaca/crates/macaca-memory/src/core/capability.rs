@@ -7,6 +7,7 @@ use super::facade::{
 };
 use super::lifecycle::MemoryLifecycleEvent;
 use super::scope::MemoryScope;
+use crate::governance::{KnowledgeCompileRequest, KnowledgeCompileResult};
 
 /// Optional capability for providers that can persist new memories.
 #[async_trait]
@@ -53,4 +54,19 @@ pub trait MemoryArtifactCapability: Send + Sync {
 #[async_trait]
 pub trait MemoryGovernanceCapability: Send + Sync {
     async fn validate_delete(&self, request: &MemoryDeleteRequest) -> MacacaResult<()>;
+}
+
+/// Optional capability for providers that can compile raw memory into knowledge.
+///
+/// This trait deliberately mirrors the governance-level compiler contract while
+/// keeping it available through the generic provider capability surface. A
+/// remote provider, MCP provider, local compiler, or custom user implementation
+/// can all expose the same method without upper application code knowing where
+/// the compiler runs.
+#[async_trait]
+pub trait MemoryKnowledgeCapability: Send + Sync {
+    async fn compile_knowledge(
+        &self,
+        request: KnowledgeCompileRequest,
+    ) -> MacacaResult<KnowledgeCompileResult>;
 }

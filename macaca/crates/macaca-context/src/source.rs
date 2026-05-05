@@ -6,6 +6,10 @@ use crate::estimate::estimate_text_tokens;
 use crate::prompt::TrustLevel;
 use crate::report::{ContextDecisionReport, ContextSourceKind, ContextSourceReport};
 
+/// Stable reference to an original context source.
+///
+/// Engines and renderers keep this separate from rendered text so reports can
+/// point back to the originating artifact even after excerpting or summarizing.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ContextSourceReference {
     pub id: String,
@@ -15,6 +19,7 @@ pub struct ContextSourceReference {
 }
 
 impl ContextSourceReference {
+    /// Create a source reference without an external artifact handle.
     pub fn new(id: impl Into<String>, kind: ContextSourceKind, label: impl Into<String>) -> Self {
         Self {
             id: id.into(),
@@ -24,12 +29,14 @@ impl ContextSourceReference {
         }
     }
 
+    /// Attach an optional artifact reference for downstream diagnostics/UI linking.
     pub fn artifact_ref(mut self, artifact_ref: impl Into<String>) -> Self {
         self.artifact_ref = Some(artifact_ref.into());
         self
     }
 }
 
+/// Input given to a renderer before pruning/normalization.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ContextRenderInput {
     pub source: ContextSourceReference,
@@ -38,6 +45,7 @@ pub struct ContextRenderInput {
 }
 
 impl ContextRenderInput {
+    /// Create one render request carrying source metadata, text, and trust level.
     pub fn new(
         source: ContextSourceReference,
         content: impl Into<String>,
@@ -51,6 +59,7 @@ impl ContextRenderInput {
     }
 }
 
+/// How a source was represented after rendering.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ContextRenderMode {
@@ -61,6 +70,7 @@ pub enum ContextRenderMode {
 }
 
 impl ContextRenderMode {
+    /// Stable string representation used in reports and persisted events.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Full => "full",
@@ -71,6 +81,7 @@ impl ContextRenderMode {
     }
 }
 
+/// Pruning policy output for one render request.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PruningDecision {
     pub mode: ContextRenderMode,
@@ -79,6 +90,7 @@ pub struct PruningDecision {
 }
 
 impl PruningDecision {
+    /// Keep the full source text.
     pub fn full(reason: impl Into<String>) -> Self {
         Self {
             mode: ContextRenderMode::Full,
@@ -87,6 +99,7 @@ impl PruningDecision {
         }
     }
 
+    /// Keep only a bounded excerpt of the source text.
     pub fn excerpt(max_bytes: usize, reason: impl Into<String>) -> Self {
         Self {
             mode: ContextRenderMode::Excerpt,
@@ -95,6 +108,7 @@ impl PruningDecision {
         }
     }
 
+    /// Drop the source from prompt text entirely.
     pub fn dropped(reason: impl Into<String>) -> Self {
         Self {
             mode: ContextRenderMode::Dropped,
@@ -104,6 +118,7 @@ impl PruningDecision {
     }
 }
 
+/// Rendered source plus accounting metadata.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ContextSnippet {
     pub source: ContextSourceReference,
@@ -116,6 +131,7 @@ pub struct ContextSnippet {
 }
 
 impl ContextSnippet {
+    /// Convert a rendered snippet into its report representation.
     pub fn to_report(&self) -> ContextSourceReport {
         ContextSourceReport::included(
             self.source.id.clone(),
@@ -133,10 +149,12 @@ impl ContextSnippet {
     }
 }
 
+/// Policy trait deciding whether a source should stay full, become an excerpt, or be dropped.
 pub trait PruningPolicy: Send + Sync {
     fn decide(&self, input: &ContextRenderInput) -> PruningDecision;
 }
 
+/// Default generic pruning thresholds used by the builtin renderer.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DefaultPruningPolicy {
     pub max_full_bytes: usize,
@@ -155,6 +173,7 @@ impl Default for DefaultPruningPolicy {
 }
 
 impl PruningPolicy for DefaultPruningPolicy {
+    /// Apply size-based, source-agnostic pruning rules.
     fn decide(&self, input: &ContextRenderInput) -> PruningDecision {
         let bytes = input.content.len();
         if self.drop_empty && input.content.trim().is_empty() {
@@ -167,14 +186,17 @@ impl PruningPolicy for DefaultPruningPolicy {
     }
 }
 
+/// Optional policy trait for allocating token budget by source kind.
 pub trait BudgetPolicy: Send + Sync {
     fn budget_for(&self, kind: &ContextSourceKind, total_budget: u32) -> u32;
 }
 
+/// Generic default source-kind budget split.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct DefaultBudgetPolicy;
 
 impl BudgetPolicy for DefaultBudgetPolicy {
+    /// Allocate budget percentages by broad source category.
     fn budget_for(&self, kind: &ContextSourceKind, total_budget: u32) -> u32 {
         let percent = match kind {
             ContextSourceKind::SystemPrompt | ContextSourceKind::ToolSchema => 30,
@@ -191,10 +213,12 @@ impl BudgetPolicy for DefaultBudgetPolicy {
     }
 }
 
+/// Rendering contract for transforming raw context into prompt-safe snippets.
 pub trait ContextRenderable: Send + Sync {
     fn render(&self, input: ContextRenderInput) -> ContextSnippet;
 }
 
+/// Builtin renderer combining a pruning policy with standardized snippet output.
 #[derive(Debug, Clone)]
 pub struct DefaultSourceRenderer<P = DefaultPruningPolicy> {
     policy: P,
@@ -209,6 +233,7 @@ impl Default for DefaultSourceRenderer {
 }
 
 impl<P> DefaultSourceRenderer<P> {
+    /// Create a renderer with a caller-supplied pruning policy.
     pub fn new(policy: P) -> Self {
         Self { policy }
     }
@@ -218,6 +243,7 @@ impl<P> ContextRenderable for DefaultSourceRenderer<P>
 where
     P: PruningPolicy,
 {
+    /// Render one source according to the pruning policy and compute accounting metadata.
     fn render(&self, input: ContextRenderInput) -> ContextSnippet {
         let decision = self.policy.decide(&input);
         let original_tokens = estimate_text_tokens(&input.content);
@@ -235,6 +261,7 @@ where
     }
 }
 
+/// Convert one rendered snippet into a standardized info decision for the report.
 pub fn decision_for_snippet(snippet: &ContextSnippet) -> ContextDecisionReport {
     ContextDecisionReport::info(
         format!("context_render_{}", snippet.mode.as_str()),
@@ -247,6 +274,7 @@ pub fn decision_for_snippet(snippet: &ContextSnippet) -> ContextDecisionReport {
     )
 }
 
+/// Render final prompt text according to the pruning decision.
 fn render_text(input: &ContextRenderInput, decision: &PruningDecision) -> String {
     match decision.mode {
         ContextRenderMode::Full => input.content.clone(),
@@ -260,6 +288,7 @@ fn render_text(input: &ContextRenderInput, decision: &PruningDecision) -> String
     }
 }
 
+/// Render a plain-text excerpt with a provenance header.
 fn render_plain_excerpt(input: &ContextRenderInput, max_bytes: usize) -> String {
     let excerpt = bounded_chars(&input.content, max_bytes);
     format!(
@@ -271,6 +300,7 @@ fn render_plain_excerpt(input: &ContextRenderInput, max_bytes: usize) -> String 
     )
 }
 
+/// Render a JSON-safe excerpt so structured tool output remains valid JSON.
 fn render_json_excerpt(input: &ContextRenderInput, max_bytes: usize) -> String {
     serde_json::json!({
         "truncated": true,
@@ -282,6 +312,7 @@ fn render_json_excerpt(input: &ContextRenderInput, max_bytes: usize) -> String {
     .to_string()
 }
 
+/// Truncate a string by UTF-8 byte budget without cutting a code point in half.
 fn bounded_chars(input: &str, max_bytes: usize) -> String {
     input
         .chars()
@@ -297,6 +328,7 @@ fn bounded_chars(input: &str, max_bytes: usize) -> String {
         .collect()
 }
 
+/// Stable string name for trust level in reports/events.
 fn trust_level_name(level: TrustLevel) -> &'static str {
     match level {
         TrustLevel::Trusted => "trusted",
@@ -304,6 +336,7 @@ fn trust_level_name(level: TrustLevel) -> &'static str {
     }
 }
 
+/// Small helper trait for user-friendly labels in excerpt headers.
 trait SourceKindLabel {
     fn kind_label(&self) -> &'static str;
 }

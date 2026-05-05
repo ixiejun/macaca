@@ -4,9 +4,16 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use crate::prompt::TrustLevel;
-use crate::report::ContextSourceKind;
+use crate::report::{
+    ContextDecisionReport, ContextDecisionSeverity, ContextSourceKind, ContextSourceReport,
+};
 use crate::source::{ContextSnippet, ContextSourceReference};
 
+/// Privacy classification attached to recalled memory items.
+///
+/// This makes privacy explicit at the context-engine boundary so future prompt
+/// policies can decide whether certain memory can be injected, redacted, or
+/// shown only to specific personas.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum PrivacyTier {
@@ -16,19 +23,23 @@ pub enum PrivacyTier {
     Secret,
 }
 
+/// Bounded confidence score for recalled memory.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ConfidenceScore(u8);
 
 impl ConfidenceScore {
+    /// Clamp caller-provided confidence into the inclusive 0..=100 range.
     pub fn new(score: u8) -> Self {
         Self(score.min(100))
     }
 
+    /// Return the raw bounded score.
     pub fn value(self) -> u8 {
         self.0
     }
 }
 
+/// Provenance attached to recalled memory so injected context remains auditable.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ContextSourceProvenance {
     pub provider_id: String,
@@ -36,6 +47,11 @@ pub struct ContextSourceProvenance {
     pub evidence: Vec<String>,
 }
 
+/// Query shape used by memory/wiki recall providers.
+///
+/// The query is intentionally prompt-centric rather than storage-centric:
+/// providers receive the user's retrieval query plus a max token budget, then
+/// decide how many results they can safely return.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MemoryRecallQuery {
     pub query: String,
@@ -43,6 +59,7 @@ pub struct MemoryRecallQuery {
     pub max_tokens: u32,
 }
 
+/// One recalled memory candidate before prompt rendering.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MemoryRecallItem {
     pub source: ContextSourceReference,
@@ -53,6 +70,11 @@ pub struct MemoryRecallItem {
 }
 
 impl MemoryRecallItem {
+    /// Convert recalled memory into an untrusted dynamic prompt candidate.
+    ///
+    /// Memory recall is intentionally modeled as untrusted/dynamic even when it
+    /// comes from internal stores, because recalled facts should not mutate the
+    /// stable prompt hash or silently outrank the core system prompt.
     pub fn into_untrusted_snippet(self) -> ContextSnippet {
         let estimated_tokens = crate::estimate::estimate_text_tokens(&self.text);
         ContextSnippet {
@@ -67,25 +89,178 @@ impl MemoryRecallItem {
     }
 }
 
+/// Budget limits applied to active recall.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ActiveRecallBudget {
+    pub max_hits: usize,
+    pub max_chars: usize,
+    pub max_tokens: u32,
+    pub timeout_ms: u64,
+}
+
+impl Default for ActiveRecallBudget {
+    fn default() -> Self {
+        Self {
+            max_hits: 8,
+            max_chars: 4_000,
+            max_tokens: 1_000,
+            timeout_ms: 1_500,
+        }
+    }
+}
+
+/// Per-candidate decision emitted by active recall policy.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RecallDecision {
+    pub selected: bool,
+    pub reason: String,
+}
+
+impl RecallDecision {
+    /// Decision that keeps a candidate in the recall result.
+    pub fn selected(reason: impl Into<String>) -> Self {
+        Self {
+            selected: true,
+            reason: reason.into(),
+        }
+    }
+
+    /// Decision that skips a candidate while preserving the reason.
+    pub fn skipped(reason: impl Into<String>) -> Self {
+        Self {
+            selected: false,
+            reason: reason.into(),
+        }
+    }
+}
+
+/// One recall candidate after policy scoring but before prompt rendering.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RecallCandidate {
+    pub item: MemoryRecallItem,
+    pub score: u32,
+    pub freshness_rank: u32,
+    pub decision: RecallDecision,
+}
+
+/// Result returned by active recall providers.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MemoryPrefetchResult {
+    pub candidates: Vec<RecallCandidate>,
+    pub snippets: Vec<ContextSnippet>,
+    pub decisions: Vec<ContextDecisionReport>,
+}
+
+impl MemoryPrefetchResult {
+    /// Create an empty result with a bounded diagnostic note.
+    pub fn empty(message: impl Into<String>) -> Self {
+        Self {
+            candidates: Vec::new(),
+            snippets: Vec::new(),
+            decisions: vec![ContextDecisionReport {
+                code: "active_recall_empty".into(),
+                severity: ContextDecisionSeverity::Info,
+                message: message.into(),
+            }],
+        }
+    }
+}
+
+/// Strategy contract for active memory recall.
+#[async_trait]
+pub trait ActiveRecallCapability: Send + Sync {
+    fn provider_id(&self) -> &str;
+
+    async fn prefetch(
+        &self,
+        query: MemoryRecallQuery,
+    ) -> macaca_proto::MacacaResult<MemoryPrefetchResult>;
+}
+
+/// Policy used to score and truncate recall candidates.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ActiveRecallPolicy {
+    pub budget: ActiveRecallBudget,
+    pub include_application_shared: bool,
+    pub include_user_scoped: bool,
+    pub include_knowledge: bool,
+}
+
+impl Default for ActiveRecallPolicy {
+    fn default() -> Self {
+        Self {
+            budget: ActiveRecallBudget::default(),
+            include_application_shared: false,
+            include_user_scoped: false,
+            include_knowledge: false,
+        }
+    }
+}
+
+impl ActiveRecallPolicy {
+    /// Decide whether a candidate can be admitted into the bounded result.
+    pub fn admit_candidate(
+        &self,
+        candidate: &MemoryRecallItem,
+        used_hits: usize,
+        used_chars: usize,
+        used_tokens: u32,
+    ) -> RecallDecision {
+        if used_hits >= self.budget.max_hits {
+            return RecallDecision::skipped("hit_budget_exhausted");
+        }
+        if used_chars >= self.budget.max_chars {
+            return RecallDecision::skipped("char_budget_exhausted");
+        }
+        if used_tokens >= self.budget.max_tokens {
+            return RecallDecision::skipped("token_budget_exhausted");
+        }
+        if candidate.text.trim().is_empty() {
+            return RecallDecision::skipped("empty_candidate");
+        }
+        RecallDecision::selected("within_budget")
+    }
+}
+
+/// Aggregate active recall report used by diagnostics and UI.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ActiveRecallReport {
+    pub provider_id: String,
+    pub source_breakdown: Vec<ContextSourceReport>,
+    pub decisions: Vec<ContextDecisionReport>,
+    pub total_candidates: usize,
+    pub selected_candidates: usize,
+    pub latency_ms: u64,
+}
+
+/// Hook input delivered to memory providers during lifecycle moments.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MemoryProviderHookInput {
     pub session_id: String,
     pub bounded_context_summary: String,
 }
 
+/// Contract for long-term memory providers that can supply prompt context.
+///
+/// Besides direct recall, the trait also exposes lifecycle hooks so providers
+/// can persist turn summaries, flush state before compaction, or react when a
+/// runtime switches to a new session lineage node.
 #[async_trait]
 pub trait MemorySourceProvider: Send + Sync {
     fn provider_id(&self) -> &str;
 
+    /// Recall memory candidates for prompt construction.
     async fn recall(
         &self,
         query: MemoryRecallQuery,
     ) -> macaca_proto::MacacaResult<Vec<MemoryRecallItem>>;
 
+    /// Optional hook after a turn completes and a bounded summary is available.
     async fn sync_turn(&self, _input: MemoryProviderHookInput) -> macaca_proto::MacacaResult<()> {
         Ok(())
     }
 
+    /// Optional hook before the runtime compacts the current conversation.
     async fn before_compaction(
         &self,
         _input: MemoryProviderHookInput,
@@ -93,6 +268,7 @@ pub trait MemorySourceProvider: Send + Sync {
         Ok(())
     }
 
+    /// Optional hook when the active session lineage node changes.
     async fn session_switched(
         &self,
         _input: MemoryProviderHookInput,
@@ -101,16 +277,19 @@ pub trait MemorySourceProvider: Send + Sync {
     }
 }
 
+/// Contract for wiki/digest style providers that return curated knowledge snippets.
 #[async_trait]
 pub trait WikiDigestSourceProvider: Send + Sync {
     fn provider_id(&self) -> &str;
 
+    /// Return bounded digest items relevant to the query.
     async fn digest(
         &self,
         query: MemoryRecallQuery,
     ) -> macaca_proto::MacacaResult<Vec<MemoryRecallItem>>;
 }
 
+/// Helper for building a `Memory`-kind source reference with provider provenance.
 pub fn memory_source(
     provider_id: impl Into<String>,
     source_id: impl Into<String>,
@@ -124,6 +303,7 @@ pub fn memory_source(
     .artifact_ref(provider_id.into())
 }
 
+/// Helper for building a `WikiDigest`-kind source reference with provider provenance.
 pub fn wiki_digest_source(
     provider_id: impl Into<String>,
     source_id: impl Into<String>,

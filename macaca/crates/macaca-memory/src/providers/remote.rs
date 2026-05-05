@@ -275,6 +275,7 @@ impl MemoryFacade for RemoteMemoryProvider {
                 flush: true,
                 artifact: false,
                 governance: true,
+                knowledge: true,
             },
         )
     }
@@ -293,6 +294,7 @@ impl MemoryProvider for RemoteMemoryProvider {
                 flush: true,
                 artifact: false,
                 governance: true,
+                knowledge: true,
             },
         )
     }

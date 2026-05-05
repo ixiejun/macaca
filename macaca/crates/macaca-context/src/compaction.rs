@@ -5,6 +5,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::estimate::estimate_text_tokens;
 
+/// Input signal evaluated by a compaction policy.
+///
+/// Engines use this to decide whether a conversation should stay verbatim or
+/// be replaced by a reference-only summary plus a shortened recent tail.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CompactionTrigger {
     pub estimated_tokens: u32,
@@ -13,16 +17,19 @@ pub struct CompactionTrigger {
     pub focus_topic: Option<String>,
 }
 
+/// Decision emitted by a compaction policy.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CompactionDecision {
     pub should_compact: bool,
     pub reason: String,
 }
 
+/// Strategy trait for deciding whether compaction should occur.
 pub trait CompactionPolicy: Send + Sync {
     fn decide(&self, trigger: &CompactionTrigger) -> CompactionDecision;
 }
 
+/// Percent-of-budget threshold policy used by the builtin summary engine.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ThresholdCompactionPolicy {
     pub threshold_percent: u8,
@@ -37,6 +44,7 @@ impl Default for ThresholdCompactionPolicy {
 }
 
 impl CompactionPolicy for ThresholdCompactionPolicy {
+    /// Compact either on explicit manual request or when token pressure crosses the threshold.
     fn decide(&self, trigger: &CompactionTrigger) -> CompactionDecision {
         if trigger.manual {
             return CompactionDecision {
@@ -59,6 +67,12 @@ impl CompactionPolicy for ThresholdCompactionPolicy {
     }
 }
 
+/// Structured payload for the synthetic compaction summary injected into prompts.
+///
+/// The envelope is designed to be:
+/// - reference only, not executable as fresh instruction
+/// - machine-readable enough for future tooling
+/// - human-readable enough for debugging and manual inspection
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CompactionSummaryEnvelope {
     pub root_session_id: String,
@@ -73,6 +87,7 @@ pub struct CompactionSummaryEnvelope {
 }
 
 impl CompactionSummaryEnvelope {
+    /// Render the summary in an explicit reference-only wrapper.
     pub fn render_reference_only(&self) -> String {
         format!(
             "<context_summary source=\"compaction\" trusted=\"false\" instruction_priority=\"reference_only\" root_session_id=\"{}\" source_segment_id=\"{}\" successor_segment_id=\"{}\">\n\
@@ -96,11 +111,13 @@ impl CompactionSummaryEnvelope {
         )
     }
 
+    /// Estimate token cost of the rendered summary.
     pub fn estimated_tokens(&self) -> u32 {
         estimate_text_tokens(&self.render_reference_only())
     }
 }
 
+/// Session lineage node kinds tracked by the compaction/fork model.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum LineageKind {
@@ -110,6 +127,10 @@ pub enum LineageKind {
     IsolatedChild,
 }
 
+/// Logical lineage metadata for one session node.
+///
+/// This lets the runtime reason about "root conversation" versus successor,
+/// fork, or isolated child nodes without overloading plain session ids.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SessionLineage {
     pub root_session_id: String,
@@ -119,6 +140,7 @@ pub struct SessionLineage {
 }
 
 impl SessionLineage {
+    /// Construct a root lineage node where the session is its own root.
     pub fn root(session_id: impl Into<String>) -> Self {
         let session_id = session_id.into();
         Self {
@@ -129,6 +151,7 @@ impl SessionLineage {
         }
     }
 
+    /// Construct a compaction-successor lineage node.
     pub fn successor(
         root_session_id: impl Into<String>,
         parent_session_id: impl Into<String>,
@@ -143,6 +166,7 @@ impl SessionLineage {
     }
 }
 
+/// Persistable transcript segment metadata associated with a lineage node.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TranscriptSegment {
     pub segment_id: String,
@@ -151,6 +175,7 @@ pub struct TranscriptSegment {
     pub lineage: SessionLineage,
 }
 
+/// Hook payload delivered before/after compaction lifecycle callbacks.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CompactionHookInput {
     pub lineage: SessionLineage,
@@ -158,8 +183,13 @@ pub struct CompactionHookInput {
     pub estimated_tokens: u32,
 }
 
+/// Observer trait for systems that need to react to compaction events.
+///
+/// Persistence, memory sync, or lineage tracking can plug in here without
+/// hardcoding those concerns into the summary engine itself.
 #[async_trait]
 pub trait CompactionLifecycleHook: Send + Sync {
+    /// Invoked immediately before compaction rewrites the prompt history.
     async fn before_compaction(
         &self,
         _input: CompactionHookInput,
@@ -167,6 +197,7 @@ pub trait CompactionLifecycleHook: Send + Sync {
         Ok(())
     }
 
+    /// Invoked after compaction has successfully produced a successor summary.
     async fn after_compaction(
         &self,
         _input: CompactionHookInput,
@@ -182,6 +213,7 @@ pub struct NoopCompactionLifecycleHook;
 #[async_trait]
 impl CompactionLifecycleHook for NoopCompactionLifecycleHook {}
 
+/// Render bullet lines for summary sections while keeping empty sections explicit.
 fn render_lines(lines: &[String]) -> String {
     if lines.is_empty() {
         "- (none)".into()

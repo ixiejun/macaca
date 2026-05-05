@@ -8,6 +8,11 @@ use serde::{Deserialize, Serialize};
 use crate::engine::{ContextAssembleInput, ContextAssembleResult};
 use crate::report::{ContextDecisionReport, ContextDecisionSeverity};
 
+/// Safety limits applied when an external context adapter participates in assembly.
+///
+/// External adapters are intentionally treated as less trusted than the builtin
+/// engines. These limits bound execution time and payload size so a buggy or
+/// hostile adapter cannot silently explode the request budget.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ContextAdapterSafetyPolicy {
     pub timeout_ms: u64,
@@ -30,11 +35,13 @@ impl Default for ContextAdapterSafetyPolicy {
 }
 
 impl ContextAdapterSafetyPolicy {
+    /// Convert the configured timeout into a runtime `Duration`.
     pub fn timeout(&self) -> Duration {
         Duration::from_millis(self.timeout_ms)
     }
 }
 
+/// Fallback policy used when an external adapter contributes nothing or fails.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ContextFallbackPolicy {
     pub fallback_engine_id: String,
@@ -50,12 +57,18 @@ impl Default for ContextFallbackPolicy {
     }
 }
 
+/// Minimal metadata identifying an external context adapter implementation.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ExternalContextAdapterInfo {
     pub id: String,
     pub version: String,
 }
 
+/// Contract for adapters that source context from an external runtime/process.
+///
+/// The trait mirrors the builtin `ContextEngine` boundary closely so upper
+/// layers can switch between builtin and external assembly without changing the
+/// request/response shape.
 #[async_trait]
 pub trait ExternalContextAdapter: Send + Sync {
     fn info(&self) -> ExternalContextAdapterInfo;
@@ -66,6 +79,14 @@ pub trait ExternalContextAdapter: Send + Sync {
     ) -> macaca_proto::MacacaResult<ContextAssembleResult>;
 }
 
+/// Validate that an external adapter result respects the configured guardrails.
+///
+/// Today the checks focus on two invariants:
+/// - the adapter must not exceed the caller's prompt budget
+/// - the emitted report payload must stay below a bounded size
+///
+/// Validation errors are returned as `ContextDecisionReport` so callers can
+/// surface them in the same diagnostics pipeline as builtin engine decisions.
 pub fn validate_external_result(
     result: &ContextAssembleResult,
     input: &ContextAssembleInput,
@@ -95,15 +116,21 @@ pub fn validate_external_result(
     Ok(())
 }
 
+/// Lightweight conformance assertions for engines/adapters.
+///
+/// These helpers document invariants the rest of the stack assumes from any
+/// engine-like component without forcing a heavyweight certification layer.
 pub struct ContextEngineConformance;
 
 impl ContextEngineConformance {
+    /// Assert that the result preserves the minimum report fields required by upper layers.
     pub fn assert_preserves_required_report_fields(result: &ContextAssembleResult) {
         assert!(!result.report.engine_id.trim().is_empty());
         assert!(!result.report.request_id.trim().is_empty());
         assert!(result.report.token_budget > 0);
     }
 
+    /// Compile-time reminder that upper layers should depend on abstractions, not concrete types.
     pub fn assert_upper_layers_need_no_concrete_type<T: ?Sized + Send + Sync>(_engine: &T) {}
 }
 

@@ -112,6 +112,7 @@ impl MemoryFacade for McpMemoryProvider {
                 flush: true,
                 artifact: false,
                 governance: true,
+                knowledge: false,
             },
         )
     }
@@ -130,6 +131,7 @@ impl MemoryProvider for McpMemoryProvider {
                 flush: true,
                 artifact: false,
                 governance: true,
+                knowledge: false,
             },
         )
     }

@@ -23,6 +23,7 @@ use crate::source::{
     DefaultSourceRenderer,
 };
 
+/// Stable metadata describing a concrete context engine implementation.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ContextEngineInfo {
     pub id: String,
@@ -31,6 +32,7 @@ pub struct ContextEngineInfo {
 }
 
 impl ContextEngineInfo {
+    /// Build engine metadata using the current crate version as the engine version.
     pub fn new(id: impl Into<String>, name: impl Into<String>) -> Self {
         Self {
             id: id.into(),
@@ -40,11 +42,21 @@ impl ContextEngineInfo {
     }
 }
 
+/// Optional engine-authored patch for model options.
+///
+/// The current runtime keeps this minimal, but the type exists so engines can
+/// eventually adjust tools or other request options without changing the
+/// high-level runtime boundary again.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ContextOptionsPatch {
     pub tools: Option<Vec<ToolDefinition>>,
 }
 
+/// Full pre-LLM input envelope sent into a context engine.
+///
+/// Upper layers provide raw messages plus model options and a context budget.
+/// The engine is responsible for transforming those messages into the final
+/// prompt slice while preserving enough metadata to emit a structured report.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContextAssembleInput {
     pub app_id: Option<ApplicationId>,
@@ -57,6 +69,7 @@ pub struct ContextAssembleInput {
 }
 
 impl ContextAssembleInput {
+    /// Compatibility constructor for legacy call sites that do not track app/session identity.
     pub fn legacy(
         agent_name: impl Into<String>,
         model: impl Into<String>,
@@ -75,6 +88,7 @@ impl ContextAssembleInput {
     }
 }
 
+/// Output of one context-engine assembly pass.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContextAssembleResult {
     pub messages: Vec<LlmMessage>,
@@ -83,6 +97,7 @@ pub struct ContextAssembleResult {
     pub report: ContextReport,
 }
 
+/// Post-turn callback input for engines that need to observe completed turns.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ContextAfterTurnInput {
     pub app_id: Option<ApplicationId>,
@@ -91,6 +106,11 @@ pub struct ContextAfterTurnInput {
     pub report: Option<ContextReport>,
 }
 
+/// Provider-neutral context-engine contract.
+///
+/// `assemble()` runs immediately before a model call. Implementations may trim,
+/// prune, summarize, or annotate the outgoing context, but must always return a
+/// `ContextReport` explaining what happened.
 #[async_trait]
 pub trait ContextEngine: Send + Sync {
     fn info(&self) -> ContextEngineInfo;
@@ -102,6 +122,7 @@ pub trait ContextEngine: Send + Sync {
     }
 }
 
+/// Runtime selection and fallback policy for context engines.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ContextEngineSelection {
     pub engine_id: String,
@@ -117,6 +138,10 @@ impl ContextEngineSelection {
     }
 }
 
+/// Compatibility engine that preserves the old passthrough behavior.
+///
+/// This is the additive migration seam: upper layers always talk to a context
+/// engine, but `legacy` keeps behavior unchanged while still producing reports.
 #[derive(Debug, Clone, Default)]
 pub struct LegacyContextEngine;
 
@@ -141,6 +166,11 @@ impl ContextEngine for LegacyContextEngine {
     }
 }
 
+/// Engine that enforces a simple context-window trim policy.
+///
+/// It keeps a leading system prompt when present, preserves a configurable
+/// number of recent messages, and inserts a synthetic note describing that the
+/// omitted middle section was trimmed for budget reasons.
 #[derive(Debug, Clone)]
 pub struct WindowedContextEngine {
     preserve_recent: usize,
@@ -193,6 +223,11 @@ impl ContextEngine for WindowedContextEngine {
     }
 }
 
+/// Engine that normalizes large or untrusted sources through a renderer.
+///
+/// Instead of making pruning decisions inline, the engine delegates each
+/// message to `ContextRenderable`. That keeps pruning policy pluggable while
+/// centralizing report accounting in one place.
 #[derive(Debug, Clone, Default)]
 pub struct PruningContextEngine<R = DefaultSourceRenderer> {
     renderer: R,
@@ -201,6 +236,7 @@ pub struct PruningContextEngine<R = DefaultSourceRenderer> {
 impl<R> PruningContextEngine<R> {
     pub const ID: &'static str = "pruning";
 
+    /// Build a pruning engine with a caller-supplied renderer/policy stack.
     pub fn new(renderer: R) -> Self {
         Self { renderer }
     }
@@ -280,6 +316,14 @@ where
     }
 }
 
+/// Engine that layers compaction semantics on top of pruning.
+///
+/// Runtime flow:
+/// 1. Run the pruning engine so oversized/untrusted sources are normalized.
+/// 2. Evaluate token pressure against the compaction policy.
+/// 3. If compaction triggers, synthesize a reference-only summary message.
+/// 4. Preserve only the leading system prompt and the most recent interaction tail.
+/// 5. Notify lifecycle hooks before and after compaction.
 #[derive(Clone)]
 pub struct SummaryContextEngine {
     pruning: PruningContextEngine,
@@ -393,20 +437,27 @@ impl ContextEngine for SummaryContextEngine {
     }
 }
 
+/// Registry of available context-engine implementations.
+///
+/// The registry is intentionally lightweight: callers resolve by id and fall
+/// back to `legacy` when the requested engine is missing.
 #[derive(Default)]
 pub struct ContextEngineRegistry {
     engines: HashMap<String, Arc<dyn ContextEngine>>,
 }
 
 impl ContextEngineRegistry {
+    /// Create an empty registry.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Create a registry containing only the legacy compatibility engine.
     pub fn with_legacy() -> Self {
         Self::new().register(Arc::new(LegacyContextEngine))
     }
 
+    /// Create a registry with all builtin engines shipped by this crate.
     pub fn with_builtins() -> Self {
         Self::with_legacy()
             .register(Arc::new(WindowedContextEngine::default()))
@@ -416,16 +467,19 @@ impl ContextEngineRegistry {
             .register(Arc::new(SummaryContextEngine::default()))
     }
 
+    /// Register one engine under its reported id.
     pub fn register(mut self, engine: Arc<dyn ContextEngine>) -> Self {
         let id = engine.info().id;
         self.engines.insert(id, engine);
         self
     }
 
+    /// Lookup one engine by id.
     pub fn get(&self, id: &str) -> Option<Arc<dyn ContextEngine>> {
         self.engines.get(id).cloned()
     }
 
+    /// Resolve the requested engine or guarantee a usable legacy engine.
     pub fn resolve_or_legacy(&self, id: Option<&str>) -> Arc<dyn ContextEngine> {
         id.and_then(|id| self.get(id))
             .or_else(|| self.get(LegacyContextEngine::ID))
@@ -433,6 +487,10 @@ impl ContextEngineRegistry {
     }
 }
 
+/// Runtime-facing facade that applies engine selection and fallback policy.
+///
+/// Most runtime/framework callers should use this instead of the registry
+/// directly so fallback behavior and report bookkeeping stay consistent.
 #[derive(Clone)]
 pub struct ContextRuntimeFacade {
     registry: Arc<ContextEngineRegistry>,
@@ -440,6 +498,7 @@ pub struct ContextRuntimeFacade {
 }
 
 impl ContextRuntimeFacade {
+    /// Build a facade from an explicit registry and selection policy.
     pub fn new(registry: ContextEngineRegistry, selection: ContextEngineSelection) -> Self {
         Self {
             registry: Arc::new(registry),
@@ -447,14 +506,17 @@ impl ContextRuntimeFacade {
         }
     }
 
+    /// Build a facade backed by the builtin engine set.
     pub fn builtins(selection: ContextEngineSelection) -> Self {
         Self::new(ContextEngineRegistry::with_builtins(), selection)
     }
 
+    /// Convenience constructor for pure legacy behavior.
     pub fn legacy() -> Self {
         Self::builtins(ContextEngineSelection::legacy())
     }
 
+    /// Assemble context using the selected engine and fallback if the primary fails.
     pub async fn assemble(
         &self,
         input: ContextAssembleInput,
@@ -489,24 +551,29 @@ impl ContextRuntimeFacade {
     }
 }
 
+/// Thin single-engine facade used by simpler call sites and tests.
 #[derive(Clone)]
 pub struct ContextManagerFacade {
     engine: Arc<dyn ContextEngine>,
 }
 
 impl ContextManagerFacade {
+    /// Wrap one engine behind a stable facade.
     pub fn new(engine: Arc<dyn ContextEngine>) -> Self {
         Self { engine }
     }
 
+    /// Convenience constructor for the legacy engine.
     pub fn legacy() -> Self {
         Self::new(Arc::new(LegacyContextEngine))
     }
 
+    /// Return metadata for the wrapped engine.
     pub fn engine_info(&self) -> ContextEngineInfo {
         self.engine.info()
     }
 
+    /// Delegate assembly directly to the wrapped engine.
     pub async fn assemble(
         &self,
         input: ContextAssembleInput,
@@ -519,6 +586,7 @@ impl ContextManagerFacade {
     }
 }
 
+/// Build the compatibility report used by the passthrough engine.
 fn build_legacy_report(input: &ContextAssembleInput) -> ContextReport {
     let mut report =
         build_report_for_messages(LegacyContextEngine::ID, input, &input.base_messages);
@@ -529,6 +597,10 @@ fn build_legacy_report(input: &ContextAssembleInput) -> ContextReport {
     report
 }
 
+/// Convert a concrete message slice into a normalized `ContextReport`.
+///
+/// Multiple engines share this function so token accounting, prompt hashing,
+/// and source categorization remain consistent across strategies.
 fn build_report_for_messages(
     engine_id: &str,
     input: &ContextAssembleInput,
@@ -595,6 +667,7 @@ fn build_report_for_messages(
         .build()
 }
 
+/// Estimate tokens for a whole message slice using the shared text estimator.
 fn estimate_messages_tokens(messages: &[LlmMessage]) -> u32 {
     messages
         .iter()
@@ -602,6 +675,7 @@ fn estimate_messages_tokens(messages: &[LlmMessage]) -> u32 {
         .sum()
 }
 
+/// Trim a message slice to budget while preserving recent context.
 fn trim_to_budget(
     messages: Vec<LlmMessage>,
     budget: ContextBudget,
@@ -633,6 +707,7 @@ fn trim_to_budget(
     output
 }
 
+/// Best-effort mapping from message role to report source category.
 fn message_source_kind(message: &LlmMessage) -> ContextSourceKind {
     match message.role {
         macaca_proto::LlmRole::System => ContextSourceKind::SystemPrompt,

@@ -8,6 +8,11 @@ use crate::memory::MemoryRecallQuery;
 use crate::report::{ContextDecisionReport, ContextDecisionSeverity};
 use crate::source::ContextSnippet;
 
+/// Configuration for bounded recall that runs before normal context assembly completes.
+///
+/// Preflight recall is intentionally opt-in because it changes the prompt by
+/// injecting additional memory before the model call. The config keeps the
+/// feature bounded by tool allowlist, timeout, and token/character budgets.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ContextPreflightRecallConfig {
     pub enabled: bool,
@@ -32,10 +37,12 @@ impl Default for ContextPreflightRecallConfig {
 }
 
 impl ContextPreflightRecallConfig {
+    /// Convert the configured timeout into a runtime `Duration`.
     pub fn timeout(&self) -> Duration {
         Duration::from_millis(self.timeout_ms)
     }
 
+    /// Check whether a tool name is explicitly allowed for preflight recall.
     pub fn allows_tool(&self, tool_name: &str) -> bool {
         self.allowed_tool_names
             .iter()
@@ -43,12 +50,18 @@ impl ContextPreflightRecallConfig {
     }
 }
 
+/// Request envelope for one preflight recall pass.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ContextPreflightRecallInput {
     pub query: MemoryRecallQuery,
     pub config: ContextPreflightRecallConfig,
 }
 
+/// Result of a preflight recall attempt.
+///
+/// The output mirrors the reporting model used by the engines themselves:
+/// snippets are returned separately from explanatory decisions so callers can
+/// degrade gracefully without losing observability.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ContextPreflightRecallOutput {
     pub snippets: Vec<ContextSnippet>,
@@ -56,6 +69,7 @@ pub struct ContextPreflightRecallOutput {
 }
 
 impl ContextPreflightRecallOutput {
+    /// Standard "feature disabled" output used when preflight recall is off.
     pub fn empty_disabled() -> Self {
         Self {
             snippets: Vec::new(),
@@ -66,6 +80,7 @@ impl ContextPreflightRecallOutput {
         }
     }
 
+    /// Standard warning output used when preflight recall degrades non-fatally.
     pub fn degraded_warning(message: impl Into<String>) -> Self {
         Self {
             snippets: Vec::new(),
@@ -78,6 +93,11 @@ impl ContextPreflightRecallOutput {
     }
 }
 
+/// Conservative heuristic for identifying read-only recall tools.
+///
+/// This helper is deliberately biased toward false negatives rather than false
+/// positives: a tool should only be auto-classified as safe for preflight if
+/// its name clearly implies read/search semantics.
 pub fn read_only_recall_tool_name(tool_name: &str) -> bool {
     let lower = tool_name.to_ascii_lowercase();
     lower.contains("recall")

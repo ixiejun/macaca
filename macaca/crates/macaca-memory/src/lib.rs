@@ -8,12 +8,14 @@
 //! Instead, it wraps builtin managers behind scope-aware traits so callers can
 //! migrate to a generic memory contract without losing backward compatibility.
 
+pub mod artifacts;
 pub mod backend;
 pub mod cache;
 pub mod core;
 pub mod embedding;
 pub mod facade;
 pub mod file;
+pub mod governance;
 pub mod isolated;
 pub mod manager;
 pub mod providers;
@@ -28,17 +30,31 @@ pub mod vector_topology;
 pub use backend::{MemoryBackendConfig, MemoryBackendFactory};
 pub use cache::{CachedEmbeddingProvider, EmbeddingCache};
 pub use core::{
-    BuiltinAgentPrivateMemory, BuiltinSessionSharedMemory, DefaultMemoryRouter,
-    MemoryArtifactCapability, MemoryCapabilitySet, MemoryDeleteRequest, MemoryFabricFacade,
-    MemoryFacade, MemoryFlushCapability, MemoryGetRequest, MemoryGovernanceCapability,
-    MemoryIdentity, MemoryLifecycleCapability, MemoryLifecycleEvent, MemoryLifecycleEventKind,
-    MemoryPrefetchRequest, MemoryPromptCapability, MemoryProvider, MemoryProviderDescriptor,
-    MemoryRoute, MemoryRouter, MemoryScope, MemorySearchCapability, MemorySearchRequest,
-    MemoryStatusReport, MemoryStoreCapability, MemoryVisibility, MemoryWriteRequest,
+    ActiveRecallBudget, ActiveRecallCandidate, ActiveRecallCapability, ActiveRecallDecision,
+    ActiveRecallRequest, ActiveRecallResult, BuiltinAgentPrivateMemory, BuiltinSessionSharedMemory,
+    DefaultActiveRecallStrategy, DefaultMemoryRouter, MemoryArtifactCapability,
+    MemoryCapabilitySet, MemoryDeleteRequest, MemoryFabricFacade, MemoryFacade,
+    MemoryFlushCapability, MemoryGetRequest, MemoryGovernanceCapability, MemoryIdentity,
+    MemoryKnowledgeCapability, MemoryLifecycleCapability, MemoryLifecycleEvent,
+    MemoryLifecycleEventKind, MemoryPrefetchRequest, MemoryPromptCapability, MemoryProvider,
+    MemoryProviderDescriptor, MemoryRoute, MemoryRouter, MemoryScope, MemorySearchCapability,
+    MemorySearchRequest, MemoryStatusReport, MemoryStoreCapability, MemoryVisibility,
+    MemoryWriteRequest,
 };
 pub use embedding::{DashScopeEmbedding, MockEmbedding};
 pub use facade::{ForgetMemory, RecallQuery, RecallResult, RememberText};
 pub use file::FileMemory;
+pub use governance::{
+    compiled_digest_candidates, ArtifactContent, ArtifactKind, CandidateCaptureResult,
+    CandidateDecision, CandidatePromotionResult, CandidateSource, ClaimConfidence, ClaimEvidence,
+    ClaimFreshness, ClaimGroup, FacadeDeletePropagator, GovernedMemoryFacade, KnowledgeClaim,
+    KnowledgeCompileCapability, KnowledgeCompileRequest, KnowledgeCompileResult, KnowledgeCompiler,
+    KnowledgeContextCandidate, KnowledgeContextSourceKind, MemoryArtifact, MemoryArtifactList,
+    MemoryArtifactScope, MemoryAuditEvent, MemoryAuditEventKind, MemoryCandidate,
+    MemoryCandidateCapture, MemoryCandidateStore, MemoryDeletePropagation,
+    MemoryDeletePropagationStep, MemoryDeletePropagator, MemoryPromotionDecision,
+    MemoryPromotionPolicy, MemoryPromotionPolicyId, MemoryPromotionTarget, MemoryTombstone,
+};
 pub use isolated::{IsolatedMemoryManager, TestIsolatedMemoryManager};
 pub use manager::{MemoryManager, TestMemoryManager};
 pub use providers::{

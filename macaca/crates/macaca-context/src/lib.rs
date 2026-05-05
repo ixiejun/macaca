@@ -4,6 +4,7 @@
 //! web, memory, and skill crates should depend on these abstractions instead
 //! of coupling to a concrete context management implementation.
 
+pub mod active_recall;
 pub mod adapter;
 pub mod budget;
 pub mod compaction;
@@ -15,6 +16,9 @@ pub mod prompt;
 pub mod report;
 pub mod source;
 
+pub use active_recall::{
+    active_recall_degraded, render_active_recall_fence, DefaultActiveRecallProvider,
+};
 pub use adapter::{
     validate_external_result, ContextAdapterSafetyPolicy, ContextEngineConformance,
     ContextFallbackPolicy, ExternalContextAdapter, ExternalContextAdapterInfo,
@@ -33,9 +37,10 @@ pub use engine::{
 };
 pub use estimate::estimate_text_tokens;
 pub use memory::{
-    memory_source, wiki_digest_source, ConfidenceScore, ContextSourceProvenance,
-    MemoryProviderHookInput, MemoryRecallItem, MemoryRecallQuery, MemorySourceProvider,
-    PrivacyTier, WikiDigestSourceProvider,
+    memory_source, wiki_digest_source, ActiveRecallBudget, ActiveRecallCapability,
+    ActiveRecallPolicy, ActiveRecallReport, ConfidenceScore, ContextSourceProvenance,
+    MemoryPrefetchResult, MemoryProviderHookInput, MemoryRecallItem, MemoryRecallQuery,
+    MemorySourceProvider, PrivacyTier, RecallCandidate, RecallDecision, WikiDigestSourceProvider,
 };
 pub use preflight::{
     read_only_recall_tool_name, ContextPreflightRecallConfig, ContextPreflightRecallInput,
@@ -46,8 +51,8 @@ pub use prompt::{
     TrustLevel,
 };
 pub use report::{
-    ContextDecisionReport, ContextDecisionSeverity, ContextReport, ContextReportBuilder,
-    ContextSourceKind, ContextSourceReport,
+    ActiveRecallDiagnostics, ContextDecisionReport, ContextDecisionSeverity, ContextReport,
+    ContextReportBuilder, ContextSourceKind, ContextSourceReport,
 };
 pub use source::{
     decision_for_snippet, BudgetPolicy, ContextRenderInput, ContextRenderMode, ContextRenderable,
