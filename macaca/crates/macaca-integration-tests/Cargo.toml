@@ -7,6 +7,7 @@ publish = false
 [dependencies]
 macaca-proto = { workspace = true }
 macaca-llm = { workspace = true }
+macaca-context = { workspace = true }
 macaca-persist = { workspace = true }
 macaca-runtime = { workspace = true }
 macaca-task = { workspace = true }

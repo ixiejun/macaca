@@ -133,6 +133,22 @@ impl ContextDecisionReport {
     }
 }
 
+/// Composer plan summary stored on `ContextReport` (inspectable without full prompt text).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ComposerPlanSummary {
+    pub plan_id: String,
+    pub selected_source_ids: Vec<String>,
+    pub skipped: Vec<ComposerSkipRecord>,
+}
+
+/// Audit row for a dropped composer candidate.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ComposerSkipRecord {
+    pub source_id: String,
+    pub reason_code: String,
+    pub message: String,
+}
+
 /// Top-level report emitted for every assembled prompt.
 ///
 /// This object is the main observability artifact of the context-engine
@@ -177,6 +193,9 @@ pub struct ContextReport {
     pub decisions: Vec<ContextDecisionReport>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub active_recall: Vec<ActiveRecallDiagnostics>,
+    /// Context composer plan when the composer pipeline ran for this assembly.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub composer: Option<ComposerPlanSummary>,
 }
 
 /// Incremental builder that keeps token accounting logic in one place.
@@ -215,6 +234,7 @@ impl ContextReportBuilder {
                 sources: Vec::new(),
                 decisions: Vec::new(),
                 active_recall: Vec::new(),
+                composer: None,
             },
         }
     }

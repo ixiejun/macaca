@@ -18,6 +18,8 @@ pub mod agent;
 pub mod construction;
 pub mod execution;
 pub mod formatter;
+/// OpenAI-style chat JSON ⇄ `LlmMessage` bridge (shared carrier for `ContextFacade`).
+pub mod llm_wire;
 pub mod mcp;
 pub mod memory;
 pub mod message;

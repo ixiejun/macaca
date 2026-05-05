@@ -8,12 +8,16 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use macaca_context::{ContextAssembleInput, ContextEngineSelection, ContextFacade};
 use macaca_proto::AgentId;
 use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 
 use crate::agent::{Agent, AgentError, AgentResult};
 use crate::formatter::Formatter;
+use crate::llm_wire::{
+    chat_options_to_llm_options, llm_messages_to_json_values, messages_from_json_values,
+};
 use crate::memory::{CompressionConfig, InMemoryWorkingMemory, MemoryCompressor, WorkingMemory};
 use crate::message::{ContentBlock, Msg, MsgContent, Role};
 use crate::model::{ChatModel, ChatOptions, ChatResponse};
@@ -114,7 +118,9 @@ impl ReActAgent {
     // Private helpers
     // -----------------------------------------------------------------------
 
-    /// Reasoning step: build the context, call the LLM, persist the response.
+    /// Encodes working memory + system prompt as provider JSON, then runs
+    /// `macaca_context::ContextFacade` (Composer → Engine) before calling the underlying
+    /// `ChatModel`, sharing the same OS boundary as `macaca-runtime` / `macaca-web`.
     async fn reasoning(&self, _iteration: usize) -> AgentResult<ChatResponse> {
         let memory_msgs = {
             let mem = self.memory.lock().await;
@@ -144,10 +150,24 @@ impl ReActAgent {
             ..Default::default()
         };
 
-        // Call the LLM
+        let llm_opts = chat_options_to_llm_options(&options);
+        let base_messages = messages_from_json_values(&formatted);
+        let facade_input = ContextAssembleInput::legacy(
+            self.name.clone(),
+            llm_opts.model.clone(),
+            base_messages,
+            llm_opts,
+        );
+        let assembled = ContextFacade::builtins(ContextEngineSelection::legacy())
+            .assemble_model_context(facade_input, &[])
+            .await
+            .map_err(|e| AgentError::Llm(e.to_string()))?;
+        let chat_payload = llm_messages_to_json_values(&assembled.messages);
+
+        // Call the LLM with OS-assembled messages (legacy equivalent when provider list is empty).
         let response = self
             .model
-            .chat(formatted, &options)
+            .chat(chat_payload, &options)
             .await
             .map_err(|e| AgentError::Llm(e.to_string()))?;
 

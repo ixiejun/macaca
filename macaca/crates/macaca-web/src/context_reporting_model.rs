@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use macaca_context::{
-    ContextAssembleInput, ContextBudget, ContextEngineSelection, ContextPreflightRecallConfig,
-    ContextRuntimeFacade,
+    ContextAssembleInput, ContextBudget, ContextEngineSelection, ContextFacade,
+    ContextPreflightRecallConfig,
 };
 use macaca_framework::model::{ChatModel, ChatOptions, ChatResponse, ModelError};
 use macaca_memory::TestMemoryManager;
@@ -99,7 +99,7 @@ impl ContextReportingChatModel {
     ///
     /// This is the hot path used before every framework chat call:
     /// - build `ContextAssembleInput`
-    /// - assemble via `ContextRuntimeFacade`
+    /// - assemble via [`ContextFacade`]（Composer → Context engine）
     /// - enrich the report with lineage/preflight details
     /// - persist the report to the session event log
     /// - hand back assembled messages/options in framework-native JSON format
@@ -123,8 +123,8 @@ impl ContextReportingChatModel {
         };
         let lineage_count = self.lineage_compactions(session_id).await;
         let preflight_cfg = self.preflight_config();
-        match ContextRuntimeFacade::builtins(self.context_selection.clone())
-            .assemble(input)
+        match ContextFacade::builtins(self.context_selection.clone())
+            .assemble_model_context(input, &[])
             .await
         {
             Ok(mut assembled) => {

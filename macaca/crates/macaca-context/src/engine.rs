@@ -489,8 +489,11 @@ impl ContextEngineRegistry {
 
 /// Runtime-facing facade that applies engine selection and fallback policy.
 ///
-/// Most runtime/framework callers should use this instead of the registry
-/// directly so fallback behavior and report bookkeeping stay consistent.
+/// **Integration note:** Upper layers (`macaca-runtime`, `macaca-web`, `macaca-framework`)
+/// should prefer [`crate::ContextFacade`], which runs the **context composer** pipeline
+/// (provider candidates → plan → optional injected user message) before delegating to this
+/// engine facade. `ContextRuntimeFacade` remains the thin engine-only wrapper for tests,
+/// adapters, and call sites that intentionally skip composer stages.
 #[derive(Clone)]
 pub struct ContextRuntimeFacade {
     registry: Arc<ContextEngineRegistry>,

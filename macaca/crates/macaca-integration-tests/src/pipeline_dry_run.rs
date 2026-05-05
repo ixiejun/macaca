@@ -9,6 +9,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use macaca_context::ContextBudget;
 use macaca_persist::RedbStore;
 use macaca_proto::error::MacacaResult;
 use macaca_proto::types::{
@@ -457,6 +458,9 @@ pub async fn run_full_pipeline_dry_run_with_config(config: PipelineDryRunConfig)
             let loop_ = AgenticLoop::new(RuntimeConfig {
                 max_iterations: 8,
                 tool_timeout: Duration::from_secs(5),
+                context_engine: "legacy".into(),
+                context_fallback_engine: "legacy".into(),
+                context_budget: ContextBudget::default(),
             });
             let agent_id = AgentId::new();
             trace(
@@ -599,6 +603,9 @@ pub async fn run_full_pipeline_dry_run_with_config(config: PipelineDryRunConfig)
             let loop_ = AgenticLoop::new(RuntimeConfig {
                 max_iterations: 12,
                 tool_timeout: Duration::from_secs(5),
+                context_engine: "legacy".into(),
+                context_fallback_engine: "legacy".into(),
+                context_budget: ContextBudget::default(),
             });
             let agent_id = AgentId::new();
             trace(

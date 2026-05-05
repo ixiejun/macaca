@@ -8,6 +8,7 @@ pub mod active_recall;
 pub mod adapter;
 pub mod budget;
 pub mod compaction;
+pub mod composer;
 pub mod engine;
 pub mod estimate;
 pub mod memory;
@@ -28,6 +29,13 @@ pub use compaction::{
     CompactionDecision, CompactionHookInput, CompactionLifecycleHook, CompactionPolicy,
     CompactionSummaryEnvelope, CompactionTrigger, LineageKind, NoopCompactionLifecycleHook,
     SessionLineage, ThresholdCompactionPolicy, TranscriptSegment,
+};
+pub use composer::{
+    merge_composer_into_messages, sort_providers, ContextCacheClass, ContextCandidate,
+    ContextCandidateKind, ContextComposeContext, ContextComposer, ContextFacade, ContextPlan,
+    ContextPlanBuilder, ContextPlanDecision, ContextProvider, ContextProviderDiagnostics,
+    ContextProviderOutcome, ContextProviderStage, ContextScope, ContextTarget,
+    DefaultContextComposer,
 };
 pub use engine::{
     ContextAfterTurnInput, ContextAssembleInput, ContextAssembleResult, ContextEngine,
@@ -51,8 +59,9 @@ pub use prompt::{
     TrustLevel,
 };
 pub use report::{
-    ActiveRecallDiagnostics, ContextDecisionReport, ContextDecisionSeverity, ContextReport,
-    ContextReportBuilder, ContextSourceKind, ContextSourceReport,
+    ActiveRecallDiagnostics, ComposerPlanSummary, ComposerSkipRecord, ContextDecisionReport,
+    ContextDecisionSeverity, ContextReport, ContextReportBuilder, ContextSourceKind,
+    ContextSourceReport,
 };
 pub use source::{
     decision_for_snippet, BudgetPolicy, ContextRenderInput, ContextRenderMode, ContextRenderable,

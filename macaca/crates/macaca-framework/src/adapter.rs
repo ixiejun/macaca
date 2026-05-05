@@ -34,7 +34,7 @@ impl ChatModel for LlmProviderAdapter {
         messages: Vec<serde_json::Value>,
         options: &ChatOptions,
     ) -> Result<ChatResponse, ModelError> {
-        let llm_messages = messages_from_json(&messages);
+        let llm_messages = crate::llm_wire::messages_from_json_values(&messages);
 
         let mut llm_options = macaca_proto::LlmOptions {
             model: options.model.clone().unwrap_or_default(),
@@ -136,7 +136,7 @@ impl ChatModel for RoutedLlmAdapter {
         messages: Vec<serde_json::Value>,
         options: &ChatOptions,
     ) -> Result<ChatResponse, ModelError> {
-        let llm_messages = messages_from_json(&messages);
+        let llm_messages = crate::llm_wire::messages_from_json_values(&messages);
 
         let mut llm_options = macaca_proto::LlmOptions {
             model: options
@@ -224,73 +224,6 @@ impl ChatModel for RoutedLlmAdapter {
     }
 }
 
-/// Convert JSON messages (as produced by Formatter) back to LlmMessage.
-fn messages_from_json(messages: &[serde_json::Value]) -> Vec<macaca_proto::LlmMessage> {
-    messages
-        .iter()
-        .filter_map(|msg| {
-            let role_str = msg["role"].as_str()?;
-            let content = msg["content"].as_str().unwrap_or("").to_string();
-            let reasoning_content = msg["reasoning_content"]
-                .as_str()
-                .filter(|s| !s.is_empty())
-                .map(str::to_string);
-
-            match role_str {
-                "system" => Some(macaca_proto::LlmMessage::system(content)),
-                "user" => Some(macaca_proto::LlmMessage::user(content)),
-                "assistant" => {
-                    if let Some(tool_calls) = msg["tool_calls"].as_array() {
-                        let tcs: Vec<macaca_proto::ToolCall> = tool_calls
-                            .iter()
-                            .filter_map(|tc| {
-                                let name = tc["function"]["name"]
-                                    .as_str()
-                                    .or_else(|| tc["name"].as_str())?
-                                    .to_string();
-                                let args = if let Some(fa) = tc["function"].get("arguments") {
-                                    if let Some(s) = fa.as_str() {
-                                        serde_json::from_str(s).unwrap_or(serde_json::json!({}))
-                                    } else {
-                                        fa.clone()
-                                    }
-                                } else {
-                                    tc.get("input").cloned().unwrap_or(serde_json::json!({}))
-                                };
-                                Some(macaca_proto::ToolCall {
-                                    id: tc["id"].as_str().unwrap_or("").to_string(),
-                                    name,
-                                    arguments: args,
-                                })
-                            })
-                            .collect();
-                        if tcs.is_empty() {
-                            let mut message = macaca_proto::LlmMessage::assistant(content);
-                            message.reasoning_content = reasoning_content;
-                            Some(message)
-                        } else {
-                            let mut message =
-                                macaca_proto::LlmMessage::assistant_with_tool_calls(content, tcs);
-                            message.reasoning_content = reasoning_content;
-                            Some(message)
-                        }
-                    } else {
-                        let mut message = macaca_proto::LlmMessage::assistant(content);
-                        message.reasoning_content = reasoning_content;
-                        Some(message)
-                    }
-                }
-                "tool" => {
-                    let tool_call_id = msg["tool_call_id"].as_str().unwrap_or("");
-                    Some(macaca_proto::LlmMessage::tool_result(tool_call_id, content))
-                }
-                _ => None,
-            }
-        })
-        .collect()
-}
-
-// ---------------------------------------------------------------------------
 // LegacyToolHandler: macaca_tools::Tool → ToolHandler
 // ---------------------------------------------------------------------------
 
@@ -512,7 +445,7 @@ mod tests {
     #[test]
     fn test_messages_from_json_user() {
         let msgs = vec![serde_json::json!({"role": "user", "content": "hello"})];
-        let result = messages_from_json(&msgs);
+        let result = crate::llm_wire::messages_from_json_values(&msgs);
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].role, macaca_proto::LlmRole::User);
         assert_eq!(result[0].content, "hello");
@@ -521,7 +454,7 @@ mod tests {
     #[test]
     fn test_messages_from_json_system() {
         let msgs = vec![serde_json::json!({"role": "system", "content": "You are helpful."})];
-        let result = messages_from_json(&msgs);
+        let result = crate::llm_wire::messages_from_json_values(&msgs);
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].role, macaca_proto::LlmRole::System);
     }
@@ -539,7 +472,7 @@ mod tests {
                 }
             }]
         })];
-        let result = messages_from_json(&msgs);
+        let result = crate::llm_wire::messages_from_json_values(&msgs);
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].role, macaca_proto::LlmRole::Assistant);
         let tcs = result[0].tool_calls.as_ref().unwrap();
@@ -554,7 +487,7 @@ mod tests {
             "tool_call_id": "call_1",
             "content": "found 5 results"
         })];
-        let result = messages_from_json(&msgs);
+        let result = crate::llm_wire::messages_from_json_values(&msgs);
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].role, macaca_proto::LlmRole::Tool);
     }
@@ -567,7 +500,7 @@ mod tests {
             serde_json::json!({"role": "assistant", "content": "hello"}),
             serde_json::json!({"role": "invalid", "content": "skip"}),
         ];
-        let result = messages_from_json(&msgs);
+        let result = crate::llm_wire::messages_from_json_values(&msgs);
         assert_eq!(result.len(), 3); // invalid role skipped
     }
 

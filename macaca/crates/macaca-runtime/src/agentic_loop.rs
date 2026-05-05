@@ -6,9 +6,7 @@
 
 use std::time::Duration;
 
-use macaca_context::{
-    ContextAssembleInput, ContextBudget, ContextEngineSelection, ContextRuntimeFacade,
-};
+use macaca_context::{ContextAssembleInput, ContextBudget, ContextEngineSelection, ContextFacade};
 use macaca_llm::LlmProvider;
 use macaca_proto::{
     AgentExecutionEvent, AgentId, LlmMessage, LlmOptions, MacacaResult, Permission, TokenUsage,
@@ -106,27 +104,30 @@ impl AgenticLoop {
         // The runtime now has a two-stage context pipeline:
         // 1. `ContextWindowManager` performs a coarse trim on the in-memory
         //    transcript to avoid obviously oversized requests.
-        // 2. `ContextRuntimeFacade` runs the selected context engine
-        //    (`legacy`, `windowed`, `pruning`, `summary`, ...) to perform
-        //    provider-neutral prompt assembly and emit a structured report.
+        // 2. `ContextFacade` runs the composer (provider candidates) then the selected
+        //    context engine (`legacy`, `windowed`, `pruning`, `summary`, …) for
+        //    provider-neutral prompt assembly and a structured report.
         //
         // The original `messages` vector is intentionally left intact so the
         // runtime keeps its full internal history even if the outgoing prompt is
         // trimmed or rewritten for this specific model call.
         let trimmed = ctx_manager.trim_if_needed(messages.clone());
-        let assembled = ContextRuntimeFacade::builtins(ContextEngineSelection {
+        let assembled = ContextFacade::builtins(ContextEngineSelection {
             engine_id: self.config.context_engine.clone(),
             fallback_engine_id: self.config.context_fallback_engine.clone(),
         })
-        .assemble(ContextAssembleInput {
-            app_id: None,
-            session_id: None,
-            agent_name: agent_id.to_string(),
-            model: options_with_tools.model.clone(),
-            base_messages: trimmed,
-            options: options_with_tools.clone(),
-            budget: self.config.context_budget,
-        })
+        .assemble_model_context(
+            ContextAssembleInput {
+                app_id: None,
+                session_id: None,
+                agent_name: agent_id.to_string(),
+                model: options_with_tools.model.clone(),
+                base_messages: trimmed,
+                options: options_with_tools.clone(),
+                budget: self.config.context_budget,
+            },
+            &[],
+        )
         .await?;
         // Emit a compact driver trace summary rather than the full prompt body.
         // This keeps runtime tracing cheap while still exposing enough metadata
