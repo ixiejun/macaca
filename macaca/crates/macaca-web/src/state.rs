@@ -15,7 +15,7 @@ use macaca_framework::session::SessionStore as FrameworkSessionStore;
 use macaca_kernel::{ApplicationExecutorRegistry, Kernel};
 use macaca_llm::{LlmProvider, LlmRouter};
 use macaca_persist::{EventLog, PersistBackend};
-use macaca_proto::{ApplicationId, ForkId, LlmMessage};
+use macaca_proto::{config::ContextConfig, ApplicationId, ForkId, LlmMessage};
 use macaca_skill::SkillCatalog;
 use macaca_task::TodoStore;
 use macaca_tools::ToolCatalog;
@@ -119,6 +119,8 @@ pub struct AppConfig {
     pub app_workspaces: RwLock<HashMap<ApplicationId, AppWorkspace>>,
     /// Default model for LLM requests (e.g. "" for DashScope).
     pub default_model: String,
+    /// Runtime context-engine configuration.
+    pub context: ContextConfig,
     /// Skill catalog for progressive disclosure (SKILL.md knowledge skills).
     pub catalog: RwLock<SkillCatalog>,
     /// Alert manager (deduplication + routing to log/webhook channels).
@@ -141,6 +143,8 @@ pub struct AppState {
     pub tools: Arc<dyn ToolCatalog>,
     /// Application executor registry for isolated multi-agent execution.
     pub executor_registry: Arc<ApplicationExecutorRegistry>,
+    /// Optional shared long-term memory (only when `context.recall.expose_memory_tools`).
+    pub workspace_memory: Option<Arc<macaca_memory::TestMemoryManager>>,
     /// Agent OS level MCP runtime and registry.
     pub mcp_runtime: Arc<macaca_runtime_host::McpRuntimeFacade>,
     /// Driver registry for managing loaded software drivers.

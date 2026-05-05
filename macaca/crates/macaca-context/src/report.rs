@@ -14,10 +14,16 @@ pub enum ContextSourceKind {
     DynamicPrompt,
     History,
     ToolSchema,
+    ToolResult,
     Skill,
     Memory,
+    WikiDigest,
     Trace,
     Workspace,
+    FileRead,
+    CommandOutput,
+    SearchResult,
+    CompactionSummary,
     External,
     Unknown,
 }
@@ -30,6 +36,14 @@ pub struct ContextSourceReport {
     pub estimated_tokens: u32,
     pub byte_size: usize,
     pub included: bool,
+    #[serde(default)]
+    pub pruned_tokens: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub render_mode: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trust_level: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_ref: Option<String>,
 }
 
 impl ContextSourceReport {
@@ -47,7 +61,25 @@ impl ContextSourceReport {
             estimated_tokens,
             byte_size,
             included: true,
+            pruned_tokens: 0,
+            render_mode: None,
+            trust_level: None,
+            source_ref: None,
         }
+    }
+
+    pub fn with_rendering(
+        mut self,
+        render_mode: impl Into<String>,
+        trust_level: impl Into<String>,
+        source_ref: Option<String>,
+        pruned_tokens: u32,
+    ) -> Self {
+        self.render_mode = Some(render_mode.into());
+        self.trust_level = Some(trust_level.into());
+        self.source_ref = source_ref;
+        self.pruned_tokens = pruned_tokens;
+        self
     }
 }
 
@@ -82,7 +114,17 @@ pub struct ContextReport {
     pub app_id: Option<ApplicationId>,
     pub session_id: Option<String>,
     pub agent_name: String,
+    /// Engine that actually assembled context (after composite/fallback policy).
     pub engine_id: String,
+    /// Engine id requested by configuration before fallback.
+    #[serde(default)]
+    pub requested_engine_id: String,
+    /// True when the primary engine failed and fallback engine produced this report.
+    #[serde(default)]
+    pub engine_fallback_applied: bool,
+    /// Count of compaction-successor nodes under the session root lineage (diagnostic).
+    #[serde(default)]
+    pub lineage_compaction_count: u32,
     pub model: String,
     pub created_at: DateTime<Utc>,
     pub estimated_total_tokens: u32,
@@ -115,6 +157,9 @@ impl ContextReportBuilder {
                 session_id: None,
                 agent_name: String::new(),
                 engine_id: engine_id.into(),
+                requested_engine_id: String::new(),
+                engine_fallback_applied: false,
+                lineage_compaction_count: 0,
                 model: String::new(),
                 created_at: Utc::now(),
                 estimated_total_tokens: 0,
@@ -149,6 +194,26 @@ impl ContextReportBuilder {
         self
     }
 
+    pub fn engine(mut self, engine_id: impl Into<String>) -> Self {
+        self.report.engine_id = engine_id.into();
+        self
+    }
+
+    pub fn engine_selection(
+        mut self,
+        requested_engine_id: impl Into<String>,
+        fallback_applied: bool,
+    ) -> Self {
+        self.report.requested_engine_id = requested_engine_id.into();
+        self.report.engine_fallback_applied = fallback_applied;
+        self
+    }
+
+    pub fn lineage_compactions(mut self, count: u32) -> Self {
+        self.report.lineage_compaction_count = count;
+        self
+    }
+
     pub fn budget(mut self, budget: ContextBudget) -> Self {
         self.report.token_budget = budget.input_budget();
         self
@@ -174,12 +239,23 @@ impl ContextReportBuilder {
             ContextSourceKind::ToolSchema => {
                 self.report.tool_schema_tokens += source.estimated_tokens;
             }
+            ContextSourceKind::ToolResult => {
+                self.report.trace_tokens += source.estimated_tokens;
+            }
             ContextSourceKind::Skill => self.report.skill_tokens += source.estimated_tokens,
-            ContextSourceKind::Memory => self.report.memory_tokens += source.estimated_tokens,
-            ContextSourceKind::Trace => self.report.trace_tokens += source.estimated_tokens,
+            ContextSourceKind::Memory | ContextSourceKind::WikiDigest => {
+                self.report.memory_tokens += source.estimated_tokens;
+            }
+            ContextSourceKind::Trace
+            | ContextSourceKind::FileRead
+            | ContextSourceKind::CommandOutput
+            | ContextSourceKind::SearchResult => {
+                self.report.trace_tokens += source.estimated_tokens;
+            }
             _ => {}
         }
         self.report.estimated_total_tokens += source.estimated_tokens;
+        self.report.pruned_tokens += source.pruned_tokens;
         self.report.sources.push(source);
         self
     }

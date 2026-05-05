@@ -123,6 +123,36 @@ pub(crate) async fn build_toolkit(
         }
     }
 
+    if let Some(memory) = state.workspace_memory.as_ref() {
+        let limit = state
+            .config
+            .context
+            .recall
+            .memory_search_default_limit
+            .clamp(1, 32);
+        if policy.allows_base_tool("memory_search") {
+            toolkit.register(
+                Box::new(SingleToolAdapter::new(Box::new(
+                    crate::context_memory_tools::WorkspaceMemorySearchTool {
+                        memory: Arc::clone(memory),
+                        default_limit: limit,
+                    },
+                ))),
+                None,
+            );
+        }
+        if policy.allows_base_tool("memory_get") {
+            toolkit.register(
+                Box::new(SingleToolAdapter::new(Box::new(
+                    crate::context_memory_tools::WorkspaceMemoryGetTool {
+                        memory: Arc::clone(memory),
+                    },
+                ))),
+                None,
+            );
+        }
+    }
+
     let app_agent_names = app_agent_names(state, app_id).await;
     let assignee_capabilities: HashMap<String, Vec<String>> = state
         .kernel

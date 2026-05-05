@@ -8,6 +8,8 @@ use crate::error::{MacacaError, MacacaResult};
 pub struct MacacaConfig {
     pub kernel: KernelConfig,
     pub llm: LlmConfig,
+    #[serde(default)]
+    pub context: ContextConfig,
     pub memory: MemoryConfig,
     pub ipc: IpcConfig,
     pub persist: PersistConfig,
@@ -19,6 +21,172 @@ pub struct MacacaConfig {
     pub mcp: McpConfigSection,
     #[serde(default)]
     pub drivers: DriversConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkspaceGuideSourcesConfig {
+    #[serde(default = "default_workspace_guide_entries")]
+    pub entries: Vec<WorkspaceGuideEntry>,
+}
+
+impl Default for WorkspaceGuideSourcesConfig {
+    fn default() -> Self {
+        Self {
+            entries: default_workspace_guide_entries(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct WorkspaceGuideEntry {
+    pub relative_path: String,
+    #[serde(default)]
+    pub priority: i32,
+    #[serde(default = "default_workspace_guide_max_bytes")]
+    pub max_bytes: u32,
+}
+
+fn default_workspace_guide_max_bytes() -> u32 {
+    16 * 1024
+}
+
+fn default_workspace_guide_entries() -> Vec<WorkspaceGuideEntry> {
+    vec![
+        WorkspaceGuideEntry {
+            relative_path: "AGENTS.md".into(),
+            priority: 0,
+            max_bytes: default_workspace_guide_max_bytes(),
+        },
+        WorkspaceGuideEntry {
+            relative_path: "SOUL.md".into(),
+            priority: 10,
+            max_bytes: default_workspace_guide_max_bytes(),
+        },
+        WorkspaceGuideEntry {
+            relative_path: "TOOLS.md".into(),
+            priority: 20,
+            max_bytes: default_workspace_guide_max_bytes(),
+        },
+        WorkspaceGuideEntry {
+            relative_path: "IDENTITY.md".into(),
+            priority: 30,
+            max_bytes: default_workspace_guide_max_bytes(),
+        },
+        WorkspaceGuideEntry {
+            relative_path: "USER.md".into(),
+            priority: 40,
+            max_bytes: default_workspace_guide_max_bytes(),
+        },
+        WorkspaceGuideEntry {
+            relative_path: "HEARTBEAT.md".into(),
+            priority: 50,
+            max_bytes: default_workspace_guide_max_bytes(),
+        },
+    ]
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContextRecallRuntimeConfig {
+    /// When true, the web runtime exposes read-only `memory_search` / `memory_get` tools.
+    #[serde(default)]
+    pub expose_memory_tools: bool,
+    #[serde(default = "default_memory_search_limit")]
+    pub memory_search_default_limit: u32,
+    #[serde(default)]
+    pub preflight_recall_enabled: bool,
+    #[serde(default)]
+    pub preflight_allowed_tools: Vec<String>,
+    #[serde(default = "default_preflight_timeout_ms")]
+    pub preflight_timeout_ms: u64,
+    #[serde(default = "default_preflight_max_chars")]
+    pub preflight_max_chars: usize,
+    #[serde(default = "default_preflight_max_tokens")]
+    pub preflight_max_tokens: u32,
+    #[serde(default)]
+    pub preflight_fatal_on_failure: bool,
+}
+
+fn default_memory_search_limit() -> u32 {
+    8
+}
+
+fn default_preflight_timeout_ms() -> u64 {
+    1_500
+}
+
+fn default_preflight_max_chars() -> usize {
+    4_000
+}
+
+fn default_preflight_max_tokens() -> u32 {
+    1_000
+}
+
+impl Default for ContextRecallRuntimeConfig {
+    fn default() -> Self {
+        Self {
+            expose_memory_tools: false,
+            memory_search_default_limit: default_memory_search_limit(),
+            preflight_recall_enabled: false,
+            preflight_allowed_tools: Vec::new(),
+            preflight_timeout_ms: default_preflight_timeout_ms(),
+            preflight_max_chars: default_preflight_max_chars(),
+            preflight_max_tokens: default_preflight_max_tokens(),
+            preflight_fatal_on_failure: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContextConfig {
+    #[serde(default = "default_context_engine")]
+    pub default_engine: String,
+    #[serde(default = "default_context_fallback_engine")]
+    pub fallback_engine: String,
+    #[serde(default = "default_context_emit_reports")]
+    pub emit_reports: bool,
+    #[serde(default = "default_context_max_tokens")]
+    pub max_tokens: u32,
+    #[serde(default = "default_context_reserve_output_tokens")]
+    pub reserve_output_tokens: u32,
+    #[serde(default)]
+    pub workspace_guides: WorkspaceGuideSourcesConfig,
+    #[serde(default)]
+    pub recall: ContextRecallRuntimeConfig,
+}
+
+fn default_context_engine() -> String {
+    "legacy".into()
+}
+
+fn default_context_fallback_engine() -> String {
+    "legacy".into()
+}
+
+fn default_context_emit_reports() -> bool {
+    true
+}
+
+fn default_context_max_tokens() -> u32 {
+    120_000
+}
+
+fn default_context_reserve_output_tokens() -> u32 {
+    4_096
+}
+
+impl Default for ContextConfig {
+    fn default() -> Self {
+        Self {
+            default_engine: default_context_engine(),
+            fallback_engine: default_context_fallback_engine(),
+            emit_reports: default_context_emit_reports(),
+            max_tokens: default_context_max_tokens(),
+            reserve_output_tokens: default_context_reserve_output_tokens(),
+            workspace_guides: WorkspaceGuideSourcesConfig::default(),
+            recall: ContextRecallRuntimeConfig::default(),
+        }
+    }
 }
 
 pub struct MacacaConfigBuilder {
@@ -407,6 +575,7 @@ impl Default for MacacaConfig {
                 rate_limit_rpm: 60,
                 providers: HashMap::new(),
             },
+            context: ContextConfig::default(),
             memory: MemoryConfig {
                 session_ttl_seconds: 3600,
                 file_store_path: "./data/memory/files".into(),
@@ -496,9 +665,19 @@ mod tests {
     use super::*;
 
     #[test]
+    fn context_recall_is_disabled_by_default() {
+        let cfg = MacacaConfig::default();
+        assert!(!cfg.context.recall.expose_memory_tools);
+        assert!(!cfg.context.recall.preflight_recall_enabled);
+    }
+
+    #[test]
     fn default_config_is_valid() {
         let cfg = MacacaConfig::default();
         assert_eq!(cfg.kernel.max_agents, 16);
+        assert_eq!(cfg.context.default_engine, "legacy");
+        assert!(cfg.context.emit_reports);
+        assert_eq!(cfg.context.workspace_guides.entries.len(), 6);
         assert_eq!(cfg.memory.embedding.model, "text-embedding-v4");
         assert_eq!(cfg.memory.vector.backend, "milvus");
         assert_eq!(cfg.memory.embedding.dimensions, 1024);

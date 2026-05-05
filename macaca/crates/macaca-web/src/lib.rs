@@ -7,6 +7,7 @@ pub mod agent_runner;
 pub mod bootstrap;
 pub mod chat_mediator;
 pub mod chat_orchestrator;
+mod context_memory_tools;
 mod context_reporting_model;
 pub mod event_persistence;
 pub mod framework_runner;
@@ -27,6 +28,8 @@ pub mod sse;
 pub mod state;
 pub mod trace_events;
 pub mod workspace;
+
+use std::time::Duration;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -252,6 +255,20 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
         Arc::new(FrameworkInMemorySessionStore::new());
     let mcp_runtime = Arc::new(macaca_runtime_host::McpRuntimeFacade::load_default().await);
 
+    let workspace_memory: Option<Arc<macaca_memory::TestMemoryManager>> =
+        if config.context.recall.expose_memory_tools {
+            let mem_dir = data_dir.join("workspace_memory");
+            std::fs::create_dir_all(&mem_dir).ok();
+            let factory = macaca_memory::MemoryBackendFactory::new(
+                macaca_memory::MemoryBackendConfig::new(mem_dir).session_ttl(Duration::from_secs(
+                    config.memory.session_ttl_seconds.max(1),
+                )),
+            );
+            Some(Arc::new(factory.test_manager()))
+        } else {
+            None
+        };
+
     // 10. Build shared state.
     let state = Arc::new_cyclic(|weak_state| {
         // Create the real agent runner with the actual weak state
@@ -268,6 +285,7 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
             llm_router: llm_router.clone(),
             tools,
             executor_registry: executor_registry.clone(),
+            workspace_memory: workspace_memory.clone(),
             mcp_runtime: Arc::clone(&mcp_runtime),
             driver_registry: Arc::clone(&driver_registry),
             driver_runtime: Arc::clone(&driver_runtime),
@@ -299,6 +317,7 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
                 app_dirs: tokio::sync::RwLock::new(app_dirs),
                 app_workspaces: tokio::sync::RwLock::new(HashMap::new()),
                 default_model,
+                context: config.context.clone(),
                 catalog: tokio::sync::RwLock::new(catalog),
                 alert_manager: alert_manager.clone(),
             },

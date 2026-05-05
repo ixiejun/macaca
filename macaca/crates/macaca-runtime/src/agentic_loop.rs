@@ -6,7 +6,9 @@
 
 use std::time::Duration;
 
-use macaca_context::{ContextAssembleInput, ContextBudget, ContextManagerFacade};
+use macaca_context::{
+    ContextAssembleInput, ContextBudget, ContextEngineSelection, ContextRuntimeFacade,
+};
 use macaca_llm::LlmProvider;
 use macaca_proto::{
     AgentExecutionEvent, AgentId, LlmMessage, LlmOptions, MacacaResult, Permission, TokenUsage,
@@ -29,6 +31,12 @@ pub struct RuntimeConfig {
     pub max_iterations: usize,
     /// Timeout for a single tool execution.
     pub tool_timeout: Duration,
+    /// Selected runtime context engine.
+    pub context_engine: String,
+    /// Fallback context engine if the selected engine fails.
+    pub context_fallback_engine: String,
+    /// Provider-neutral context budget.
+    pub context_budget: ContextBudget,
 }
 
 impl Default for RuntimeConfig {
@@ -36,6 +44,9 @@ impl Default for RuntimeConfig {
         Self {
             max_iterations: 25,
             tool_timeout: Duration::from_secs(60),
+            context_engine: "legacy".into(),
+            context_fallback_engine: "legacy".into(),
+            context_budget: ContextBudget::default(),
         }
     }
 }
@@ -93,17 +104,35 @@ impl AgenticLoop {
 
         // Call LLM (trim context window if needed; internal history stays intact)
         let trimmed = ctx_manager.trim_if_needed(messages.clone());
-        let assembled = ContextManagerFacade::legacy()
-            .assemble(ContextAssembleInput {
-                app_id: None,
-                session_id: None,
-                agent_name: agent_id.to_string(),
-                model: options_with_tools.model.clone(),
-                base_messages: trimmed,
-                options: options_with_tools.clone(),
-                budget: ContextBudget::default(),
+        let assembled = ContextRuntimeFacade::builtins(ContextEngineSelection {
+            engine_id: self.config.context_engine.clone(),
+            fallback_engine_id: self.config.context_fallback_engine.clone(),
+        })
+        .assemble(ContextAssembleInput {
+            app_id: None,
+            session_id: None,
+            agent_name: agent_id.to_string(),
+            model: options_with_tools.model.clone(),
+            base_messages: trimmed,
+            options: options_with_tools.clone(),
+            budget: self.config.context_budget,
+        })
+        .await?;
+        event_sink
+            .emit(AgentExecutionEvent::DriverTrace {
+                driver_name: "macaca-context".into(),
+                trace: serde_json::json!({
+                    "event_type": "context_report",
+                    "engine_id": assembled.report.engine_id,
+                    "request_id": assembled.report.request_id,
+                    "estimated_total_tokens": assembled.report.estimated_total_tokens,
+                    "token_budget": assembled.report.token_budget,
+                    "pruned_tokens": assembled.report.pruned_tokens,
+                    "source_count": assembled.report.sources.len(),
+                    "decision_count": assembled.report.decisions.len(),
+                }),
             })
-            .await?;
+            .await;
         tracing::debug!(
             engine = %assembled.report.engine_id,
             request_id = %assembled.report.request_id,
@@ -926,6 +955,7 @@ mod tests {
         let runner = AgenticLoop::new(RuntimeConfig {
             max_iterations: 10,
             tool_timeout: Duration::from_secs(5),
+            ..RuntimeConfig::default()
         });
         let llm = MockToolLlm::new();
         let tools = macaca_tools::DefaultToolSet::new();
@@ -960,6 +990,7 @@ mod tests {
         let runner = AgenticLoop::new(RuntimeConfig {
             max_iterations: 3,
             tool_timeout: Duration::from_secs(5),
+            ..RuntimeConfig::default()
         });
         let llm = InfiniteToolLlm;
         let tools = macaca_tools::DefaultToolSet::new();
@@ -991,6 +1022,7 @@ mod tests {
         let runner = AgenticLoop::new(RuntimeConfig {
             max_iterations: 5,
             tool_timeout: Duration::from_secs(5),
+            ..RuntimeConfig::default()
         });
         let llm = MockToolLlm::new();
         let tools = macaca_tools::DefaultToolSet::new();
@@ -1109,6 +1141,7 @@ mod tests {
         let runner = AgenticLoop::new(RuntimeConfig {
             max_iterations: 5,
             tool_timeout: Duration::from_secs(5),
+            ..RuntimeConfig::default()
         });
         let llm = MockToolLlm::new();
         let tools = macaca_tools::DefaultToolSet::new();
@@ -1136,6 +1169,11 @@ mod tests {
             let kind = match event {
                 AgentExecutionEvent::Thinking { .. } => "thinking",
                 AgentExecutionEvent::ToolCall { .. } => "tool_call",
+                AgentExecutionEvent::DriverTrace { driver_name, .. }
+                    if driver_name == "macaca-context" =>
+                {
+                    continue;
+                }
                 AgentExecutionEvent::DriverTrace { .. } => "driver_trace",
                 AgentExecutionEvent::ToolResult { .. } => "tool_result",
                 AgentExecutionEvent::Assistant { .. } => "assistant",

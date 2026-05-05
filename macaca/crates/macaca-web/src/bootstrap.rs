@@ -125,6 +125,14 @@ impl WebRuntimeFacade {
                 "/api/sessions/{id}/context-reports",
                 get(routes::get_session_context_reports),
             )
+            .route(
+                "/api/sessions/{id}/compact",
+                post(routes::manual_compact_session),
+            )
+            .route(
+                "/api/sessions/{id}/lineage",
+                get(routes::get_session_lineage),
+            )
             .route("/api/drivers", get(routes::get_drivers))
             .route("/api/drivers/reload", post(routes::reload_drivers))
             .layer(cors)

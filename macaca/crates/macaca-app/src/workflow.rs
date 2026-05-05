@@ -245,6 +245,7 @@ impl WorkflowEngine {
                 entrypoint: None,
                 workflows: None,
                 resources: None,
+                context: None,
             },
             workflow_name: DEFAULT_WORKFLOW.into(),
             coordinator: DEFAULT_COORDINATOR.into(),
@@ -268,6 +269,7 @@ impl WorkflowEngine {
                 entrypoint: None,
                 workflows: None,
                 resources: None,
+                context: None,
             },
             workflow_name: DEFAULT_WORKFLOW.into(),
             coordinator: DEFAULT_COORDINATOR.into(),
@@ -477,6 +479,7 @@ mod tests {
             entrypoint: None,
             workflows: Some(workflows),
             resources: None,
+            context: None,
         }
     }
 
@@ -562,6 +565,7 @@ mod tests {
                 max_tokens: None,
                 temperature: None,
                 skills: None,
+                context_engine: None,
             })],
             ..default_manifest_with_workflow()
         };

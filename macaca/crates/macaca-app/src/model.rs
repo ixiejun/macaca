@@ -68,6 +68,22 @@ pub struct InlineAgentConfig {
     /// Optional standard AgentSkills visibility policy.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub skills: Option<AgentSkillsConfig>,
+    /// Optional context engine override for this agent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_engine: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AppContextConfig {
+    /// Optional default context engine for this application.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub engine: Option<String>,
+    /// Optional fallback engine for this application.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fallback_engine: Option<String>,
+    /// Optional override for workspace guide files (priorities and per-file byte budgets).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_guides: Option<macaca_proto::config::WorkspaceGuideSourcesConfig>,
 }
 
 /// Per-agent standard AgentSkills visibility policy in app manifests.
@@ -241,6 +257,9 @@ pub struct AppManifest {
     /// Resource path configuration.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resources: Option<ResourceConfig>,
+    /// Optional context engine configuration for this application.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context: Option<AppContextConfig>,
 }
 
 /// UI type for frontend rendering.
@@ -423,6 +442,7 @@ agents:
                 entrypoint: None,
                 workflows: None,
                 resources: None,
+                context: None,
             },
             agent_ids: vec![],
             status: AppStatus::Loaded,
@@ -501,6 +521,7 @@ resources:
             max_tokens: None,
             temperature: None,
             skills: None,
+            context_engine: None,
         })];
 
         let set = AppCapabilitySet::from_manifest_agents(&agents);
@@ -525,6 +546,7 @@ resources:
             max_tokens: None,
             temperature: None,
             skills: None,
+            context_engine: None,
         })];
 
         let mut set = AppCapabilitySet::from_manifest_agents(&agents);

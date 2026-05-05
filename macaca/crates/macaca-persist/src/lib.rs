@@ -3,6 +3,7 @@
 pub mod checkpoint;
 pub mod event_index;
 pub mod event_log;
+pub mod lineage;
 pub mod redb_store;
 pub mod store;
 
@@ -12,6 +13,7 @@ mod event_log_tests;
 pub use checkpoint::{CheckpointBuilder, CheckpointManager, CheckpointRecord, SessionSnapshot};
 pub use event_index::EventLogQuery;
 pub use event_log::{AppendEventCommand, EventLog, EventReplayIterator};
+pub use lineage::SessionLineageStore;
 pub use redb_store::RedbStore;
 pub use store::{PersistBackend, PersistStore};
 

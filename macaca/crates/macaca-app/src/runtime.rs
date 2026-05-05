@@ -309,12 +309,14 @@ mod tests {
                 max_tokens: None,
                 temperature: None,
                 skills: None,
+                context_engine: None,
             })],
             llm_config: None,
             entry_agent: None,
             entrypoint: None,
             workflows: None,
             resources: None,
+            context: None,
         }
     }
 
@@ -437,6 +439,7 @@ mod tests {
             entrypoint: None,
             workflows: None,
             resources: None,
+            context: None,
         };
         let err = runtime.start_app(manifest, ".", &kernel).await.unwrap_err();
         assert!(err.to_string().contains("WASM"));
@@ -501,6 +504,7 @@ agents:
             entrypoint: None,
             workflows: None,
             resources: None,
+            context: None,
         };
         let app_id = runtime.start_app(manifest, ".", &kernel).await.unwrap();
         let agents = runtime.app_agents(&app_id).await.unwrap();

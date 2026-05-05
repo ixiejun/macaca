@@ -61,6 +61,10 @@ impl<'a> AppAgentManifestView<'a> {
         &self.inline.capabilities
     }
 
+    pub fn context_engine(&self) -> Option<&str> {
+        self.inline.context_engine.as_deref()
+    }
+
     pub fn has_capability(&self, capability_name: &str) -> bool {
         self.inline
             .capabilities
@@ -263,12 +267,14 @@ mod tests {
                 max_tokens: None,
                 temperature: None,
                 skills: Some(AgentSkillsConfig::default()),
+                context_engine: None,
             })],
             llm_config: None,
             entry_agent: Some("coordinator".into()),
             entrypoint: None,
             workflows: None,
             resources: None,
+            context: None,
         }
     }
 

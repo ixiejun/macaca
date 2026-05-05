@@ -74,6 +74,7 @@ fn inline_manifest(name: &str, agent_count: usize) -> AppManifest {
                 max_tokens: None,
                 temperature: None,
                 skills: None,
+                context_engine: None,
             })
         })
         .collect();
@@ -91,6 +92,7 @@ fn inline_manifest(name: &str, agent_count: usize) -> AppManifest {
         entrypoint: None,
         workflows: None,
         resources: None,
+        context: None,
     }
 }
 

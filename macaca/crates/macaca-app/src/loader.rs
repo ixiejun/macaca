@@ -168,6 +168,7 @@ layer: L2Wasm
             entrypoint: None,
             workflows: None,
             resources: None,
+            context: None,
         };
         let configs = AppLoader::resolve_agent_configs(&manifest, ".").unwrap();
         assert!(configs.is_empty());
@@ -188,6 +189,7 @@ layer: L2Wasm
             entrypoint: None,
             workflows: None,
             resources: None,
+            context: None,
         };
         let err = AppLoader::resolve_agent_configs(&manifest, ".").unwrap_err();
         assert!(err.to_string().contains("WASM"));
@@ -215,12 +217,14 @@ layer: L2Wasm
                 max_tokens: None,
                 temperature: None,
                 skills: None,
+                context_engine: None,
             })],
             llm_config: None,
             entry_agent: None,
             entrypoint: None,
             workflows: None,
             resources: None,
+            context: None,
         };
         let configs = AppLoader::resolve_agent_configs(&manifest, ".").unwrap();
         assert_eq!(configs.len(), 1);
@@ -256,6 +260,7 @@ capabilities:
             entrypoint: None,
             workflows: None,
             resources: None,
+            context: None,
         };
         let configs = AppLoader::resolve_agent_configs(&manifest, &dir).unwrap();
         assert_eq!(configs.len(), 1);

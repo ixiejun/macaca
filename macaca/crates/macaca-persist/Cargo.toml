@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+macaca-context = { workspace = true }
 macaca-proto = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

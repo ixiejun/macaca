@@ -10,6 +10,7 @@
 
 use std::collections::HashSet;
 use std::convert::Infallible;
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -19,6 +20,9 @@ use tokio::sync::{mpsc, Mutex};
 
 use macaca_agent::{AgentCapabilitySet, AgentServices, AgentTransitionReason};
 use macaca_app::{app_agent_manifest_view, app_agent_prompt_semantics};
+use macaca_context::{
+    ContextSourceKind, PromptComposer, PromptSection, PromptStability, TrustLevel,
+};
 use macaca_framework::adapter::RoutedLlmAdapter;
 use macaca_framework::agent::{Hook, HookRegistry, HookedAgent};
 use macaca_framework::construction::{
@@ -32,7 +36,9 @@ use macaca_framework::memory::InMemoryWorkingMemory;
 use macaca_framework::message::Msg;
 use macaca_framework::react_agent::ReActAgent;
 use macaca_framework::tool::{ToolError, ToolMiddleware, ToolResponse, Toolkit};
+use macaca_memory::TestMemoryManager;
 use macaca_persist::{AppendEventCommand, EventLog};
+use macaca_proto::config::{ContextConfig, WorkspaceGuideSourcesConfig};
 use macaca_proto::{AgentState, ApplicationId, Capability};
 use macaca_sdk::AgentPersona;
 use macaca_skill::{SkillPolicy, SkillRuntimeFacade, SkillSnapshotRequest};
@@ -523,6 +529,42 @@ impl FrameworkRunner {
             .map_err(|e| e.to_string())
     }
 
+    async fn resolve_context_config(
+        state: &Arc<AppState>,
+        app_id: &ApplicationId,
+        agent_name: &str,
+    ) -> ContextConfig {
+        let mut config = state.config.context.clone();
+        let registry = state.registry.read().await;
+        if let Some(app) = registry.get_app(app_id) {
+            if let Some(app_context) = app.manifest.context.as_ref() {
+                if let Some(engine) = app_context
+                    .engine
+                    .as_ref()
+                    .filter(|value| !value.is_empty())
+                {
+                    config.default_engine = engine.clone();
+                }
+                if let Some(fallback) = app_context
+                    .fallback_engine
+                    .as_ref()
+                    .filter(|value| !value.is_empty())
+                {
+                    config.fallback_engine = fallback.clone();
+                }
+                if let Some(ref guides) = app_context.workspace_guides {
+                    config.workspace_guides = guides.clone();
+                }
+            }
+            if let Some(agent) = app_agent_manifest_view(&app.manifest, agent_name) {
+                if let Some(engine) = agent.context_engine().filter(|value| !value.is_empty()) {
+                    config.default_engine = engine.to_string();
+                }
+            }
+        }
+        config
+    }
+
     /// Load the agent's persona and build the system prompt through the context boundary.
     async fn build_context_system_prompt(
         state: &Arc<AppState>,
@@ -531,6 +573,8 @@ impl FrameworkRunner {
         session_id: Option<String>,
         capabilities: &AgentCapabilitySet,
     ) -> String {
+        let merged_context =
+            FrameworkRunner::resolve_context_config(state, app_id, agent_name).await;
         let app_manifest = {
             let registry = state.registry.read().await;
             registry.get_app(app_id).map(|app| app.manifest.clone())
@@ -553,19 +597,42 @@ impl FrameworkRunner {
             None
         };
 
-        let mut prompt = if let Some(ref p) = persona {
+        let mut composer = PromptComposer::new();
+
+        let base_prompt = if let Some(ref p) = persona {
             p.to_system_prompt(None)
         } else if let Some(manifest) = app_manifest.as_ref() {
             app_agent_prompt_semantics(manifest, agent_name).base_prompt
         } else {
             format!("You are the {} agent in Macaca OS.", agent_name)
         };
+        composer = composer.push_section(prompt_section(
+            "000-base",
+            ContextSourceKind::SystemPrompt,
+            PromptStability::Stable,
+            TrustLevel::Trusted,
+            base_prompt,
+        ));
 
         // Inject capabilities from the macaca-agent capability abstraction.
         let flattened = capabilities.flatten_for_legacy_api();
         let caps: Vec<&str> = flattened.iter().map(|cap| cap.name.as_str()).collect();
         if !caps.is_empty() {
-            prompt.push_str(&format!("\n\nYour capabilities: {}", caps.join(", ")));
+            composer = composer.push_section(prompt_section(
+                "100-capabilities",
+                ContextSourceKind::SystemPrompt,
+                PromptStability::Stable,
+                TrustLevel::Trusted,
+                format!("Your capabilities: {}", caps.join(", ")),
+            ));
+        }
+
+        if let Some(ref dir) = app_dir {
+            for section in
+                load_workspace_guide_sections(dir, &merged_context.workspace_guides).await
+            {
+                composer = composer.push_section(section);
+            }
         }
 
         // Inject workspace paths
@@ -577,17 +644,23 @@ impl FrameworkRunner {
         {
             let workspaces = state.config.app_workspaces.read().await;
             if let Some(ws) = workspaces.get(app_id) {
-                prompt.push_str(&format!(
-                    "\n\n## Workspace Paths\n\
-                     - Workspace root (default cwd for file/shell tools): {}\n\
-                     - Shared workspace: {}\n\
-                     - Your private workspace: {}\n\
-                     Relative paths are resolved from the workspace root above. \
-                     Create project files in the shared workspace. \
-                     Use your private workspace for temporary/scratch files only.",
-                    ws.root.display(),
-                    ws.shared.display(),
-                    ws.agent_workspace(agent_name).display(),
+                composer = composer.push_section(prompt_section(
+                    "300-workspace-paths",
+                    ContextSourceKind::Workspace,
+                    PromptStability::Dynamic,
+                    TrustLevel::Trusted,
+                    format!(
+                        "## Workspace Paths\n\
+                         - Workspace root (default cwd for file/shell tools): {}\n\
+                         - Shared workspace: {}\n\
+                         - Your private workspace: {}\n\
+                         Relative paths are resolved from the workspace root above. \
+                         Create project files in the shared workspace. \
+                         Use your private workspace for temporary/scratch files only.",
+                        ws.root.display(),
+                        ws.shared.display(),
+                        ws.agent_workspace(agent_name).display(),
+                    ),
                 ));
             }
         }
@@ -677,8 +750,13 @@ impl FrameworkRunner {
                         .await;
                 }
                 if !snapshot.prompt.trim().is_empty() {
-                    prompt.push_str("\n\n## Available Skills\n\n");
-                    prompt.push_str(&snapshot.prompt);
+                    composer = composer.push_section(prompt_section(
+                        "400-skills",
+                        ContextSourceKind::Skill,
+                        PromptStability::Stable,
+                        TrustLevel::Trusted,
+                        format!("## Available Skills\n\n{}", snapshot.prompt),
+                    ));
                 }
             }
             Err(error) => {
@@ -686,7 +764,7 @@ impl FrameworkRunner {
             }
         }
 
-        prompt
+        composer.compile().text
     }
 
     #[deprecated(
@@ -701,6 +779,86 @@ impl FrameworkRunner {
     ) -> String {
         Self::build_context_system_prompt(state, app_id, agent_name, session_id, capabilities).await
     }
+}
+
+fn prompt_section(
+    id: impl Into<String>,
+    kind: ContextSourceKind,
+    stability: PromptStability,
+    trust_level: TrustLevel,
+    content: impl Into<String>,
+) -> PromptSection {
+    PromptSection {
+        id: id.into(),
+        kind,
+        stability,
+        trust_level,
+        content: content.into(),
+    }
+}
+
+async fn load_workspace_guide_sections(
+    app_dir: &Path,
+    guides: &WorkspaceGuideSourcesConfig,
+) -> Vec<PromptSection> {
+    #[derive(Clone)]
+    struct EntryRef<'a> {
+        priority: i32,
+        path: &'a str,
+        max_bytes: u32,
+    }
+    let mut ordered: Vec<EntryRef<'_>> = guides
+        .entries
+        .iter()
+        .map(|e| EntryRef {
+            priority: e.priority,
+            path: e.relative_path.as_str(),
+            max_bytes: e.max_bytes.max(512),
+        })
+        .collect();
+    ordered.sort_by(|a, b| a.priority.cmp(&b.priority).then_with(|| a.path.cmp(b.path)));
+    let mut sections = Vec::new();
+    for (seq, entry) in ordered.into_iter().enumerate() {
+        let path = app_dir.join(entry.path);
+        let Ok(content) = tokio::fs::read_to_string(&path).await else {
+            continue;
+        };
+        let content = content.trim();
+        if content.is_empty() {
+            continue;
+        }
+        let label = entry.path.trim_end_matches(".md").replace('_', " ");
+        sections.push(prompt_section(
+            format!("200-guide-{seq:03}-{}", entry.path.replace('/', "__")),
+            ContextSourceKind::Workspace,
+            PromptStability::Stable,
+            TrustLevel::Trusted,
+            format!(
+                "## {label}\n\n{}",
+                bounded_guide_content(content, entry.max_bytes as usize)
+            ),
+        ));
+    }
+    sections
+}
+
+fn bounded_guide_content(content: &str, max_bytes: usize) -> String {
+    if content.len() <= max_bytes {
+        return content.to_string();
+    }
+    let excerpt = content
+        .chars()
+        .scan(0usize, |used, ch| {
+            let len = ch.len_utf8();
+            if *used + len > max_bytes {
+                None
+            } else {
+                *used += len;
+                Some(ch)
+            }
+        })
+        .collect::<String>();
+    format!("{excerpt}\n\n[workspace guide truncated at {max_bytes} bytes]")
 }
 
 impl WebTracedAgentFactory {
@@ -773,6 +931,9 @@ impl WebTracedAgentFactory {
     fn build_react_agent(
         llm_router: Arc<macaca_llm::LlmRouter>,
         event_log: Arc<EventLog>,
+        persist_backend: Arc<dyn macaca_persist::PersistBackend>,
+        workspace_memory: Option<Arc<TestMemoryManager>>,
+        merged_context_config: ContextConfig,
         request: &AgentBuildRequest,
         selection: &macaca_llm::ModelSelection,
         toolkit: Toolkit,
@@ -781,9 +942,12 @@ impl WebTracedAgentFactory {
         let model = Arc::new(ContextReportingChatModel::new(
             Arc::new(RoutedLlmAdapter::new(llm_router, selection.clone())),
             event_log,
+            persist_backend,
             request.identity.app_id,
             request.identity.session_id.clone(),
             request.identity.agent_name.clone(),
+            merged_context_config,
+            workspace_memory,
         ));
         let formatter = Arc::new(OpenAiFormatter);
         ReActAgent::new(
@@ -900,6 +1064,14 @@ impl WebTracedAgentFactory {
         let agent = Self::build_react_agent(
             llm_router,
             Arc::clone(&self.state.persist.event_log),
+            Arc::clone(&self.state.persist.session_store),
+            self.state.workspace_memory.clone(),
+            FrameworkRunner::resolve_context_config(
+                &self.state,
+                &request.identity.app_id,
+                &request.identity.agent_name,
+            )
+            .await,
             &request,
             &selection,
             toolkit,
@@ -1053,6 +1225,14 @@ impl WebTracedAgentFactory {
         let agent = Self::build_react_agent(
             llm_router,
             Arc::clone(&self.state.persist.event_log),
+            Arc::clone(&self.state.persist.session_store),
+            self.state.workspace_memory.clone(),
+            FrameworkRunner::resolve_context_config(
+                &self.state,
+                &request.identity.app_id,
+                &request.identity.agent_name,
+            )
+            .await,
             &request,
             &selection,
             toolkit,
