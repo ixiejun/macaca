@@ -16,6 +16,7 @@ pub mod facade;
 pub mod file;
 pub mod isolated;
 pub mod manager;
+pub mod providers;
 pub mod query;
 pub mod session;
 pub mod snapshot;
@@ -40,6 +41,15 @@ pub use facade::{ForgetMemory, RecallQuery, RecallResult, RememberText};
 pub use file::FileMemory;
 pub use isolated::{IsolatedMemoryManager, TestIsolatedMemoryManager};
 pub use manager::{MemoryManager, TestMemoryManager};
+pub use providers::{
+    BuiltinMemoryProviderFactory, MemoryProviderConfig, MemoryProviderEndpointConfig,
+    MemoryProviderFactory, MemoryProviderFactoryResult, MemoryProviderProfileConfig,
+    MemoryProviderProfilesConfig, MemoryProviderRegistry, MemoryProviderRegistryError,
+    MemoryProviderRemoteEnvelope, MemoryProviderRemoteResult, MemoryProviderResilienceConfig,
+    MemoryProviderRuntime, MemoryProviderRuntimeConfig, MemoryProviderRuntimeStatus,
+    MemoryProviderSlotBinding, MemoryProviderSlotKind, MemoryProviderSlotOverride,
+    MemoryProviderSlotScope, MemoryProviderToolConfig, MemoryProviderTransportKind,
+};
 pub use query::{SimilarityVectorQueryStrategy, VectorQuery, VectorQueryStrategy};
 pub use session::SessionMemory;
 pub use snapshot::{MemorySnapshot, MemorySnapshotStore};
