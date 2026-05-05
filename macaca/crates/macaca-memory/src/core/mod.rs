@@ -1,4 +1,14 @@
 //! Memory Fabric core abstractions.
+//!
+//! This module defines the provider-neutral API introduced by the
+//! `add-memory-fabric-core` change:
+//! - `scope` models ownership and visibility
+//! - `facade` defines the stable request/response contract
+//! - `router` maps scope to logical memory lanes
+//! - `adapter` bridges the new contract to existing builtin managers
+//!
+//! The goal is to let the rest of Macaca depend on one generic memory boundary
+//! without deleting the legacy storage implementations in the same change.
 
 pub mod adapter;
 pub mod capability;

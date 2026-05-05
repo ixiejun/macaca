@@ -1,4 +1,12 @@
 //! aos-memory: three-layer memory system for Agent OS.
+//!
+//! The crate now exposes two layers of API side by side:
+//! - legacy managers/stores (`manager`, `isolated`, `store`, `vector`, ...)
+//! - the new memory fabric core (`core`) introduced as an additive boundary
+//!
+//! The fabric layer does not replace the old implementation immediately.
+//! Instead, it wraps builtin managers behind scope-aware traits so callers can
+//! migrate to a generic memory contract without losing backward compatibility.
 
 pub mod backend;
 pub mod cache;
@@ -13,6 +21,8 @@ pub mod session;
 pub mod snapshot;
 pub mod store;
 pub mod vector;
+pub mod vector_backend;
+pub mod vector_topology;
 
 pub use backend::{MemoryBackendConfig, MemoryBackendFactory};
 pub use cache::{CachedEmbeddingProvider, EmbeddingCache};
@@ -35,3 +45,12 @@ pub use session::SessionMemory;
 pub use snapshot::{MemorySnapshot, MemorySnapshotStore};
 pub use store::{EmbeddingProvider, MemoryRetriever, MemoryStore, VectorSearchResult, VectorStore};
 pub use vector::{InMemoryVectorStore, MilvusStore};
+pub use vector_backend::{
+    MilvusCollectionStoreFactory, TopologyVectorMemoryBackend, VectorBackendStatus,
+    VectorCollectionSchema, VectorCollectionStoreFactory, VectorMemoryBackend, VectorMemoryHit,
+    VectorMemoryRecord,
+};
+pub use vector_topology::{
+    sanitize_identifier, DefaultVectorTopologyResolver, VectorMemoryTopology, VectorTopologyKey,
+    VectorTopologyResolver,
+};

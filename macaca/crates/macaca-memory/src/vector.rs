@@ -7,9 +7,8 @@ use serde_json::Value;
 use tokio::sync::RwLock;
 use tracing::debug;
 
-use macaca_proto::{MacacaError, MacacaResult};
-
 use crate::store::{VectorSearchResult, VectorStore};
+use macaca_proto::{MacacaError, MacacaResult};
 
 // ── Milvus REST types ──────────────────────────────────────────────────────────
 

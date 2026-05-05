@@ -15,11 +15,21 @@ use super::router::{DefaultMemoryRouter, MemoryRoute, MemoryRouter};
 use super::scope::MemoryVisibility;
 use super::status::{MemoryCapabilitySet, MemoryStatusReport};
 
+/// Builtin adapter that exposes `IsolatedMemoryManager` through the new fabric facade.
+///
+/// Runtime principle:
+/// - validate that the caller really asked for `AgentPrivate`
+/// - enrich metadata with explicit scope information
+/// - delegate storage/recall to the legacy isolated manager
+///
+/// This keeps the new fabric API additive: callers can move to `MemoryFacade`
+/// without rewriting the proven private-memory backend immediately.
 pub struct BuiltinAgentPrivateMemory<'a, V: VectorStore, E: EmbeddingProvider> {
     manager: &'a IsolatedMemoryManager<V, E>,
 }
 
 impl<'a, V: VectorStore, E: EmbeddingProvider> BuiltinAgentPrivateMemory<'a, V, E> {
+    /// Wrap an existing isolated manager as a fabric-compatible private provider.
     pub fn new(manager: &'a IsolatedMemoryManager<V, E>) -> Self {
         Self { manager }
     }
@@ -31,6 +41,7 @@ where
     V: VectorStore,
     E: EmbeddingProvider,
 {
+    /// Persist a private memory after enforcing private visibility.
     async fn remember(&self, request: MemoryWriteRequest) -> MacacaResult<MemoryId> {
         request.scope.validate()?;
         ensure_visibility(request.scope.visibility, MemoryVisibility::AgentPrivate)?;
@@ -46,6 +57,7 @@ where
         self.manager.remember_text(input).await
     }
 
+    /// Recall only from the wrapped agent-private store.
     async fn search(&self, request: MemorySearchRequest) -> MacacaResult<Vec<MemoryEntry>> {
         request.scope.validate()?;
         ensure_visibility(request.scope.visibility, MemoryVisibility::AgentPrivate)?;
@@ -56,18 +68,21 @@ where
         Ok(result.entries)
     }
 
+    /// Point lookup inside the private adapter.
     async fn get(&self, request: MemoryGetRequest) -> MacacaResult<Option<MemoryEntry>> {
         request.scope.validate()?;
         ensure_visibility(request.scope.visibility, MemoryVisibility::AgentPrivate)?;
         self.manager.get_memory(&request.id).await
     }
 
+    /// Delete from the private adapter only.
     async fn delete(&self, request: MemoryDeleteRequest) -> MacacaResult<()> {
         request.scope.validate()?;
         ensure_visibility(request.scope.visibility, MemoryVisibility::AgentPrivate)?;
         self.manager.forget(ForgetMemory { id: request.id }).await
     }
 
+    /// Report the capabilities exposed by this builtin adapter.
     fn status(&self) -> MemoryStatusReport {
         MemoryStatusReport::healthy(
             "builtin-agent-private",
@@ -76,11 +91,17 @@ where
     }
 }
 
+/// Builtin adapter that exposes the legacy shared/session memory manager.
+///
+/// Unlike the private adapter, this wrapper allows collaborative memory scoped
+/// by session or project. It still depends on the caller-supplied `MemoryScope`
+/// so shared access remains explicit and auditable.
 pub struct BuiltinSessionSharedMemory<'a, V: VectorStore, E: EmbeddingProvider> {
     manager: &'a MemoryManager<V, E>,
 }
 
 impl<'a, V: VectorStore, E: EmbeddingProvider> BuiltinSessionSharedMemory<'a, V, E> {
+    /// Wrap an existing shared memory manager as a fabric-compatible provider.
     pub fn new(manager: &'a MemoryManager<V, E>) -> Self {
         Self { manager }
     }
@@ -92,6 +113,7 @@ where
     V: VectorStore,
     E: EmbeddingProvider,
 {
+    /// Persist shared memory after enforcing shared visibility.
     async fn remember(&self, request: MemoryWriteRequest) -> MacacaResult<MemoryId> {
         request.scope.validate()?;
         ensure_visibility(request.scope.visibility, MemoryVisibility::SessionShared)?;
@@ -104,6 +126,7 @@ where
         self.manager.remember_text(input).await
     }
 
+    /// Recall from the wrapped shared memory backend.
     async fn search(&self, request: MemorySearchRequest) -> MacacaResult<Vec<MemoryEntry>> {
         request.scope.validate()?;
         ensure_visibility(request.scope.visibility, MemoryVisibility::SessionShared)?;
@@ -114,18 +137,21 @@ where
         Ok(result.entries)
     }
 
+    /// Point lookup inside the shared adapter.
     async fn get(&self, request: MemoryGetRequest) -> MacacaResult<Option<MemoryEntry>> {
         request.scope.validate()?;
         ensure_visibility(request.scope.visibility, MemoryVisibility::SessionShared)?;
         self.manager.get_entry(&request.id).await
     }
 
+    /// Delete from the shared adapter only.
     async fn delete(&self, request: MemoryDeleteRequest) -> MacacaResult<()> {
         request.scope.validate()?;
         ensure_visibility(request.scope.visibility, MemoryVisibility::SessionShared)?;
         self.manager.forget(ForgetMemory { id: request.id }).await
     }
 
+    /// Report the capabilities exposed by this builtin adapter.
     fn status(&self) -> MemoryStatusReport {
         MemoryStatusReport::healthy(
             "builtin-session-shared",
@@ -134,6 +160,15 @@ where
     }
 }
 
+/// Default fabric implementation that composes private/shared adapters behind one facade.
+///
+/// `MemoryFabricFacade` is the core orchestrator added by the proposal:
+/// - callers speak only `MemoryFacade`
+/// - the router decides which visibility lane should handle the request
+/// - builtin adapters translate the request back into legacy managers
+///
+/// This design provides a migration seam: the public API becomes generic and
+/// scope-aware today, while concrete storage backends can evolve independently.
 pub struct MemoryFabricFacade<P, S, R = DefaultMemoryRouter> {
     private_memory: P,
     shared_memory: S,
@@ -141,12 +176,14 @@ pub struct MemoryFabricFacade<P, S, R = DefaultMemoryRouter> {
 }
 
 impl<P, S> MemoryFabricFacade<P, S, DefaultMemoryRouter> {
+    /// Build a fabric with the builtin default router.
     pub fn new(private_memory: P, shared_memory: S) -> Self {
         Self::with_router(private_memory, shared_memory, DefaultMemoryRouter)
     }
 }
 
 impl<P, S, R> MemoryFabricFacade<P, S, R> {
+    /// Build a fabric with an explicit routing policy.
     pub fn with_router(private_memory: P, shared_memory: S, router: R) -> Self {
         Self {
             private_memory,
@@ -163,6 +200,7 @@ where
     S: MemoryFacade,
     R: MemoryRouter,
 {
+    /// Route writes to the owning provider.
     async fn remember(&self, request: MemoryWriteRequest) -> MacacaResult<MemoryId> {
         match self.router.route(&request.scope)? {
             MemoryRoute::AgentPrivate => self.private_memory.remember(request).await,
@@ -171,6 +209,11 @@ where
         }
     }
 
+    /// Route recall according to the router policy.
+    ///
+    /// Composite recall is the only multi-provider path in the builtin fabric:
+    /// the facade fans out, merges the results, sorts them by recency, removes
+    /// duplicate ids, and then reapplies the caller's limit.
     async fn search(&self, request: MemorySearchRequest) -> MacacaResult<Vec<MemoryEntry>> {
         match self.router.recall_route(&request.scope)? {
             MemoryRoute::AgentPrivate => self.private_memory.search(request).await,
@@ -180,6 +223,7 @@ where
         }
     }
 
+    /// Route point lookup to the owning provider.
     async fn get(&self, request: MemoryGetRequest) -> MacacaResult<Option<MemoryEntry>> {
         match self.router.route(&request.scope)? {
             MemoryRoute::AgentPrivate => self.private_memory.get(request).await,
@@ -188,6 +232,7 @@ where
         }
     }
 
+    /// Route deletion to the owning provider.
     async fn delete(&self, request: MemoryDeleteRequest) -> MacacaResult<()> {
         match self.router.route(&request.scope)? {
             MemoryRoute::AgentPrivate => self.private_memory.delete(request).await,
@@ -196,6 +241,7 @@ where
         }
     }
 
+    /// Synthesize a minimal health snapshot for the composed fabric.
     fn status(&self) -> MemoryStatusReport {
         let private = self.private_memory.status();
         let shared = self.shared_memory.status();
@@ -216,6 +262,14 @@ where
     S: MemoryFacade,
     R: MemoryRouter,
 {
+    /// Execute a composite recall over multiple routes and merge the results.
+    ///
+    /// The merge strategy is intentionally deterministic and easy to reason about:
+    /// - each route receives the same logical request with only visibility adjusted
+    /// - results are concatenated
+    /// - newer entries win by sorting on `created_at`
+    /// - duplicate ids are removed
+    /// - the original request limit is enforced at the very end
     async fn search_composite(
         &self,
         request: MemorySearchRequest,
@@ -243,6 +297,7 @@ where
     }
 }
 
+/// Guardrail ensuring an adapter only serves the visibility it was built for.
 fn ensure_visibility(actual: MemoryVisibility, expected: MemoryVisibility) -> MacacaResult<()> {
     if actual != expected {
         return Err(MacacaError::Memory(format!(
@@ -252,12 +307,19 @@ fn ensure_visibility(actual: MemoryVisibility, expected: MemoryVisibility) -> Ma
     Ok(())
 }
 
+/// Helper for builtin fabric routes that exist in the enum but do not yet have adapters.
 fn unsupported_route<T>(route: MemoryRoute) -> MacacaResult<T> {
     Err(MacacaError::Memory(format!(
         "memory route {route:?} is not implemented by builtin fabric"
     )))
 }
 
+/// Inject structured scope metadata into the outgoing memory payload.
+///
+/// This is the bridge between the new scope-aware API and older backends that
+/// still store opaque JSON metadata. By materializing the scope explicitly, the
+/// resulting memory entries remain auditable and future migrations can recover
+/// the original ownership context from persisted records.
 fn with_scope_metadata(mut metadata: Value, scope: &super::scope::MemoryScope) -> Value {
     let scope_value = json!({
         "application_id": scope.identity.application_id.to_string(),
