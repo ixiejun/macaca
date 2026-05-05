@@ -2,7 +2,7 @@
 
 - [x] 1.1 阅读现有 snapshot/file/session/vector memory 代码。
 - [x] 1.2 阅读 context report/artifact 相关代码。
-- [ ] 1.3 对计划修改的 memory facade/governance/artifacts 符号运行 GitNexus upstream impact analysis。
+- [x] 1.3 对计划修改的 memory facade/governance/artifacts 符号运行 GitNexus upstream impact analysis。
 
 ## 2. Governance model
 
@@ -57,10 +57,15 @@
 - [x] 8.2 运行 `cargo test -p macaca-memory`。
 - [x] 8.3 运行相关上层 cargo check。
 - [x] 8.4 运行 `openspec validate add-memory-governance-knowledge-layer --strict`。
-- [ ] 8.5 运行 `gitnexus_detect_changes()`。
+- [x] 8.5 运行 `gitnexus_detect_changes()`。
 
-Note: GitNexus MCP tools are not exposed in this session. `npx gitnexus status`
-reports the existing index is stale, the CLI does not resolve the newly touched
-memory symbols by name, and it does not provide a working `detect-changes`
-command here. Implementation was kept additive to new `macaca-memory`
-governance/artifacts modules plus exports.
+Note: Rebuilt the GitNexus index for `/Users/quantum/Code/dev/agent` with
+`npx gitnexus analyze . --force --skip-agents-md`, then ran `npx gitnexus
+impact -r agent --depth 2` for:
+- `Struct:macaca/crates/macaca-memory/src/governance/facade.rs:GovernedMemoryFacade`
+- `Struct:macaca/crates/macaca-memory/src/governance/candidate.rs:MemoryCandidate`
+- `Struct:macaca/crates/macaca-memory/src/governance/compiler.rs:KnowledgeCompiler`
+
+All three impact checks returned `risk: LOW` and `impactedCount: 0`. A follow-up
+`npx gitnexus detect-changes -s all -r agent` reported `Changes: 3 files, 21
+symbols` and `Risk level: low`.
