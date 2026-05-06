@@ -53,6 +53,8 @@ pub struct ContextProviderDiagnostics {
 pub struct ContextProviderOutcome {
     pub candidates: Vec<ContextCandidate>,
     pub diagnostics: Vec<ContextProviderDiagnostics>,
+    /// Optional bounded recall telemetry merged into [`crate::report::ContextReport::active_recall`].
+    pub active_recall_report: Option<crate::report::ActiveRecallDiagnostics>,
 }
 
 /// Provider contract: add candidates only; never touch raw LLM message vectors.

@@ -15,7 +15,9 @@ use crate::engine::{
     ContextAssembleInput, ContextAssembleResult, ContextEngineSelection, ContextRuntimeFacade,
 };
 use crate::prompt::CompiledPrompt;
-use crate::report::{ComposerPlanSummary, ComposerSkipRecord};
+use crate::report::{
+    ActiveRecallDiagnostics, ComposerPlanSummary, ComposerSkipRecord, ContextDecisionReport,
+};
 
 /// Merges composer output (`CompiledPrompt::text`) with the visible message history for this call.
 ///
@@ -102,8 +104,15 @@ impl ContextFacade {
         };
 
         let mut collected: Vec<crate::composer::candidate::ContextCandidate> = Vec::new();
+        let mut active_recall_telemetry: Vec<ActiveRecallDiagnostics> = Vec::new();
+        let mut pipeline_notes: Vec<crate::composer::provider::ContextProviderDiagnostics> =
+            Vec::new();
         for provider in sort_providers(providers) {
             let outcome = provider.contribute(&ctx).await?;
+            if let Some(report) = outcome.active_recall_report {
+                active_recall_telemetry.push(report);
+            }
+            pipeline_notes.extend(outcome.diagnostics);
             collected.extend(outcome.candidates);
         }
 
@@ -116,6 +125,17 @@ impl ContextFacade {
 
         let mut assembled = self.engine.assemble(input).await?;
         assembled.report.composer = Some(summary);
+        assembled
+            .report
+            .active_recall
+            .extend(active_recall_telemetry);
+        for note in pipeline_notes {
+            assembled.report.decisions.push(ContextDecisionReport {
+                code: "context_provider_diagnostic".into(),
+                severity: crate::report::ContextDecisionSeverity::Info,
+                message: format!("{}: {}", note.provider_id, note.message),
+            });
+        }
         Ok(assembled)
     }
 }

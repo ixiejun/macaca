@@ -2,19 +2,24 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use macaca_context::{
-    profile_provider_arc, ContextAssembleInput, ContextBudget, ContextEngineSelection,
-    ContextFacade, ContextPreflightRecallConfig, ContextProvider,
+    mcp_capability_provider_arc, memory_active_recall_provider_arc, profile_provider_arc,
+    runtime_tool_capability_provider_arc, skill_capability_provider_arc, ActiveRecallBudget,
+    ActiveRecallCapability, ActiveRecallPolicy, ContextAssembleInput, ContextBudget,
+    ContextEngineSelection, ContextFacade, ContextPreflightRecallConfig, ContextProvider,
+    DefaultActiveRecallProvider, McpCapabilityCatalog, RuntimeToolCapabilityCatalog,
+    SkillCapabilityCatalog,
 };
 use macaca_framework::model::{ChatModel, ChatOptions, ChatResponse, ModelError};
 use macaca_memory::TestMemoryManager;
 use macaca_persist::{AppendEventCommand, EventLog, SessionLineageStore};
-use macaca_proto::{config::ContextConfig, ApplicationId};
+use macaca_proto::{config::ContextConfig, AgentId, ApplicationId};
 
 use crate::context_memory_injection::{apply_active_recall, apply_preflight_memory};
 use crate::context_message_codec::{
     framework_messages_to_llm, framework_options_to_llm, llm_messages_to_framework,
     llm_options_to_framework,
 };
+use crate::workspace_memory_recall_source::WorkspaceMemoryRecallSource;
 
 /// ChatModel wrapper that injects context-engine assembly and persists context reports.
 ///
@@ -25,6 +30,12 @@ use crate::context_message_codec::{
 /// - optionally inject preflight memory recall
 /// - emit a structured `context_report` event
 /// - call the underlying chat model with the assembled prompt
+///
+/// ## Capability context (skills / MCP / runtime tools)
+/// Tier-1 capability indices are supplied as frozen [`SkillCapabilityCatalog`] /
+/// [`McpCapabilityCatalog`] / [`RuntimeToolCapabilityCatalog`] snapshots built when the framework
+/// agent is constructed. They flow through [`ContextProviderStage::CapabilityIndex`] providers so
+/// skill bodies and MCP resource payloads stay out of the default path (progressive disclosure).
 pub(crate) struct ContextReportingChatModel {
     inner: Arc<dyn ChatModel>,
     event_log: Arc<EventLog>,
@@ -40,11 +51,26 @@ pub(crate) struct ContextReportingChatModel {
     agent_profile: macaca_proto::config::AgentProfileContextConfig,
     /// Resolved directory that stores `AGENTS.md` / `IDENTITY.md`, depending on [`AgentProfileRootKind`].
     agent_profile_root: Option<std::path::PathBuf>,
+    /// Composer-stage vector memory recall (see [`macaca_proto::config::ActiveVectorMemoryContextConfig`]).
+    active_vector_memory: macaca_proto::config::ActiveVectorMemoryContextConfig,
+    /// Narrow recall capability (built when [`Self::active_vector_memory`] is enabled and backend exists).
+    memory_recall_capability: Option<Arc<dyn ActiveRecallCapability>>,
+    /// Frozen skill catalog rows (metadata only) for [`macaca_context::SkillContextProvider`].
+    skill_capability_catalog: Arc<SkillCapabilityCatalog>,
+    /// MCP server/tool summaries from probe (compact; no resource bodies).
+    mcp_capability_catalog: Arc<McpCapabilityCatalog>,
+    /// Framework toolkit registration names only.
+    runtime_tool_capability_catalog: Arc<RuntimeToolCapabilityCatalog>,
+    /// MCP servers in [`macaca_runtime_host::McpRuntimeStatusState::Ready`] — dependency gap checks only.
+    ready_mcp_server_ids: Arc<Vec<String>>,
 }
 
 impl ContextReportingChatModel {
     #[allow(clippy::too_many_arguments)]
     /// Build a reporting wrapper from merged app/runtime context configuration.
+    ///
+    /// `routing_agent_id` should match the kernel [`AgentManifest::id`] for `agent_name` when the
+    /// agent is registered; it is required for returning agent-scoped memory rows during active recall.
     pub(crate) fn new(
         inner: Arc<dyn ChatModel>,
         event_log: Arc<EventLog>,
@@ -55,7 +81,18 @@ impl ContextReportingChatModel {
         merged_context_config: ContextConfig,
         agent_profile_root: Option<std::path::PathBuf>,
         workspace_memory: Option<Arc<TestMemoryManager>>,
+        routing_agent_id: Option<AgentId>,
+        skill_capability_catalog: Arc<SkillCapabilityCatalog>,
+        mcp_capability_catalog: Arc<McpCapabilityCatalog>,
+        runtime_tool_capability_catalog: Arc<RuntimeToolCapabilityCatalog>,
+        ready_mcp_server_ids: Arc<Vec<String>>,
     ) -> Self {
+        // Resolve capability before moving `workspace_memory` into the struct field.
+        let memory_recall_capability = Self::build_workspace_recall_capability(
+            &merged_context_config,
+            workspace_memory.as_ref(),
+            routing_agent_id,
+        );
         Self {
             inner,
             event_log,
@@ -75,7 +112,58 @@ impl ContextReportingChatModel {
             workspace_memory,
             agent_profile: merged_context_config.agent_profile.clone(),
             agent_profile_root,
+            active_vector_memory: merged_context_config.active_vector_memory.clone(),
+            memory_recall_capability,
+            skill_capability_catalog,
+            mcp_capability_catalog,
+            runtime_tool_capability_catalog,
+            ready_mcp_server_ids,
         }
+    }
+
+    /// Builds the [`ActiveRecallCapability`] stack used by [`MemoryActiveRecallContextProvider`].
+    ///
+    /// Returns `None` when the feature is disabled or no in-process workspace memory backend is
+    /// wired — this keeps unit tests lightweight while preserving production wiring through
+    /// [`TestMemoryManager`].
+    ///
+    /// `routing_agent_id` should be the [`AgentId`] from the kernel manifest for the same
+    /// `agent_name` as this chat model. When `None`, agent-private memory rows (tagged with
+    /// `MemoryEntry::agent_id`) are not returned, matching the fail-closed policy in
+    /// [`crate::workspace_memory_recall_source::workspace_memory_entry_visible_for_recall`].
+    fn build_workspace_recall_capability(
+        cfg: &ContextConfig,
+        workspace_memory: Option<&Arc<TestMemoryManager>>,
+        routing_agent_id: Option<AgentId>,
+    ) -> Option<Arc<dyn ActiveRecallCapability>> {
+        if !cfg.active_vector_memory.enabled {
+            return None;
+        }
+        let wm = workspace_memory?;
+        let source = Arc::new(WorkspaceMemoryRecallSource::new(
+            Arc::clone(wm),
+            cfg.active_vector_memory.max_hits,
+            routing_agent_id,
+        ));
+        let policy = ActiveRecallPolicy {
+            budget: ActiveRecallBudget {
+                max_hits: cfg.active_vector_memory.max_hits,
+                max_chars: cfg.active_vector_memory.max_chars,
+                max_tokens: cfg.active_vector_memory.max_tokens,
+                timeout_ms: cfg.active_vector_memory.timeout_ms,
+            },
+            ..ActiveRecallPolicy::default()
+        };
+        Some(Arc::new(DefaultActiveRecallProvider::new(
+            "workspace-active-recall",
+            source,
+            policy,
+        )))
+    }
+
+    /// True when active recall already ran through the composer pipeline for this configuration.
+    fn composer_handles_active_vector_recall(&self) -> bool {
+        self.active_vector_memory.enabled && self.memory_recall_capability.is_some()
     }
 
     /// Convert persisted config into the preflight recall runtime config.
@@ -136,6 +224,24 @@ impl ContextReportingChatModel {
                 providers.push(profile_provider_arc(root, self.agent_profile.clone()));
             }
         }
+        providers.push(skill_capability_provider_arc(
+            Arc::clone(&self.skill_capability_catalog),
+            Arc::clone(&self.ready_mcp_server_ids),
+        ));
+        providers.push(mcp_capability_provider_arc(Arc::clone(
+            &self.mcp_capability_catalog,
+        )));
+        providers.push(runtime_tool_capability_provider_arc(Arc::clone(
+            &self.runtime_tool_capability_catalog,
+        )));
+        if let Some(capability) = self.memory_recall_capability.clone() {
+            if self.active_vector_memory.enabled {
+                providers.push(memory_active_recall_provider_arc(
+                    capability,
+                    self.active_vector_memory.clone(),
+                ));
+            }
+        }
         match ContextFacade::builtins(self.context_selection.clone())
             .assemble_model_context(input, &providers)
             .await
@@ -147,6 +253,7 @@ impl ContextReportingChatModel {
                     &self.recall_runtime,
                     self.workspace_memory.as_ref(),
                     &preflight_cfg,
+                    self.composer_handles_active_vector_recall(),
                     &mut assembled,
                     messages,
                 )

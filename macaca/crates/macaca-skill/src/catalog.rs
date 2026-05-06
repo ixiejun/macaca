@@ -108,6 +108,9 @@ impl SkillCatalog {
     /// Tier 1: Render the catalog as a compact string for prompt injection.
     ///
     /// Format: XML-like structure per agentskills.io recommendation.
+    #[deprecated(
+        note = "Prefer macaca_context capability providers (SkillContextProvider) or SkillRuntimeFacade snapshots; direct prompt concatenation bypasses context reports and budget."
+    )]
     pub fn catalog_prompt(&self) -> String {
         let entries = self.catalog();
         if entries.is_empty() {
@@ -198,6 +201,8 @@ impl Default for SkillCatalog {
 
 #[cfg(test)]
 mod tests {
+    #![allow(deprecated)] // Exercises deprecated `catalog_prompt` until callers migrate entirely.
+
     use super::*;
 
     async fn make_skill_dir(base: &Path, name: &str, desc: &str) -> PathBuf {

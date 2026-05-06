@@ -7,11 +7,13 @@
 pub mod active_recall;
 pub mod adapter;
 pub mod budget;
+pub mod capability;
 pub mod compaction;
 pub mod composer;
 pub mod engine;
 pub mod estimate;
 pub mod memory;
+pub mod memory_active_recall_provider;
 pub mod preflight;
 pub mod profile;
 pub mod prompt;
@@ -19,13 +21,21 @@ pub mod report;
 pub mod source;
 
 pub use active_recall::{
-    active_recall_degraded, render_active_recall_fence, DefaultActiveRecallProvider,
+    active_recall_degraded, active_recall_diagnostics_from_prefetch, render_active_recall_fence,
+    DefaultActiveRecallProvider,
 };
 pub use adapter::{
     validate_external_result, ContextAdapterSafetyPolicy, ContextEngineConformance,
     ContextFallbackPolicy, ExternalContextAdapter, ExternalContextAdapterInfo,
 };
 pub use budget::ContextBudget;
+pub use capability::{
+    mcp_capability_provider_arc, mcp_tool_collisions, runtime_tool_capability_provider_arc,
+    skill_capability_provider_arc, CapabilityCollisionRecord, DeclaredCapabilityDependency,
+    McpCapabilityCatalog, McpContextProvider, McpServerCapabilitySummary, RuntimeToolCapabilityCatalog,
+    RuntimeToolCapabilityProvider, SkillCapabilityCatalog, SkillCapabilityRecord, SkillContextProvider,
+    SkillFilterDiagnostic,
+};
 pub use compaction::{
     CompactionDecision, CompactionHookInput, CompactionLifecycleHook, CompactionPolicy,
     CompactionSummaryEnvelope, CompactionTrigger, LineageKind, NoopCompactionLifecycleHook,
@@ -50,6 +60,9 @@ pub use memory::{
     ActiveRecallPolicy, ActiveRecallReport, ConfidenceScore, ContextSourceProvenance,
     MemoryPrefetchResult, MemoryProviderHookInput, MemoryRecallItem, MemoryRecallQuery,
     MemorySourceProvider, PrivacyTier, RecallCandidate, RecallDecision, WikiDigestSourceProvider,
+};
+pub use memory_active_recall_provider::{
+    memory_active_recall_provider_arc, MemoryActiveRecallContextProvider,
 };
 pub use preflight::{
     read_only_recall_tool_name, ContextPreflightRecallConfig, ContextPreflightRecallInput,

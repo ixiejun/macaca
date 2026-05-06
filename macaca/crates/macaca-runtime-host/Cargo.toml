@@ -20,4 +20,5 @@ dirs = "5"
 
 [dev-dependencies]
 tokio = { workspace = true }
+toml = { workspace = true }
 uuid = { workspace = true }

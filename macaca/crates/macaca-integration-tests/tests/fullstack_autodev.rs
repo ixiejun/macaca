@@ -92,7 +92,7 @@ async fn app_manifest_loads() {
     // LLM config present
     let llm_config = manifest.llm_config.as_ref().unwrap();
     assert_eq!(llm_config.provider, "volces");
-    assert_eq!(llm_config.model, "glm-4.7");
+    assert_eq!(llm_config.model, "kimi-k2.5");
 }
 
 /// Start the fullstack-autodev app and verify 5 agents are registered.
@@ -143,19 +143,19 @@ async fn yaml_skills_load_from_registry() {
     let loaded = toolset.load_from_directory(&skills_dir).await.unwrap();
     let snapshot = toolset.snapshot();
 
-    // Should load YAML skills only: openspec, figma-mcp (2 yaml files).
-    // SKILL.md subdirectories (golang, shadcn-ui) are NOT loaded as executable skills.
-    assert_eq!(loaded, 2, "Expected 2 YAML skills, got {loaded}");
+    // YAML skills: root-level `openspec.yaml` only. SKILL.md dirs (openspec/, figma-mcp/, etc.)
+    // are agent skills (`SkillCatalog`), not executable YAML tools here.
+    assert_eq!(loaded, 1, "Expected 1 YAML skill, got {loaded}");
     assert!(
         snapshot.skills.iter().any(|skill| skill.name == "openspec"),
-        "openspec skill missing"
+        "openspec YAML skill missing"
     );
     assert!(
-        snapshot
+        !snapshot
             .skills
             .iter()
             .any(|skill| skill.name == "figma-mcp"),
-        "figma-mcp skill missing"
+        "figma-mcp must not appear in YAML executable snapshot when only SKILL.md is present"
     );
 
     // SKILL.md skills should NOT be in the executable skill snapshot.
@@ -196,8 +196,8 @@ async fn agent_skills_load_via_catalog() {
     let mut catalog = SkillCatalog::new();
     let loaded = catalog.load_from_directory(&skills_dir).await.unwrap();
 
-    // Should load SKILL.md subdirectories: golang, openspec, shadcn-ui (3 skills).
-    assert_eq!(loaded, 3, "Expected 3 agent skills, got {loaded}");
+    // SKILL.md dirs: golang, openspec/, figma-mcp/, shadcn-ui/.
+    assert_eq!(loaded, 4, "Expected 4 agent skills, got {loaded}");
 
     // Verify catalog entries (tier 1 — name + description only).
     let golang = catalog
@@ -209,6 +209,14 @@ async fn agent_skills_load_via_catalog() {
         .get("openspec")
         .expect("openspec skill missing from catalog");
     assert!(openspec.description.len() > 0);
+
+    let figma = catalog
+        .get("figma-mcp")
+        .expect("figma-mcp skill missing from catalog");
+    assert!(
+        figma.description.contains("Figma") || figma.description.contains("figma"),
+        "figma-mcp catalog description should mention Figma"
+    );
 
     let shadcn = catalog
         .get("shadcn-ui")
@@ -248,6 +256,7 @@ async fn agent_skills_activate() {
 
 /// Verify the catalog generates a prompt suitable for injection.
 #[tokio::test]
+#[allow(deprecated)] // `catalog_prompt` is deprecated with migration to composer capability providers.
 async fn agent_skills_catalog_prompt() {
     let skills_dir = app_dir().join("skills");
 

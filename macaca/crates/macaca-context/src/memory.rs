@@ -56,7 +56,45 @@ pub struct ContextSourceProvenance {
 pub struct MemoryRecallQuery {
     pub query: String,
     pub session_id: Option<String>,
+    /// Application namespace for topology-aware backends (provider-neutral “database” semantic).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub application_id: Option<String>,
+    /// Agent route for agent-private collection semantics (never an app workflow name).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_name: Option<String>,
     pub max_tokens: u32,
+    /// When true, include memories tagged for the routed agent private scope.
+    #[serde(default = "serde_default_true_bool")]
+    pub include_agent_private: bool,
+    /// When true, include session-wide shared memories.
+    #[serde(default = "serde_default_true_bool")]
+    pub include_session_shared: bool,
+}
+
+fn serde_default_true_bool() -> bool {
+    true
+}
+
+impl MemoryRecallQuery {
+    /// Minimal constructor used by tests and simple call sites.
+    pub fn lite(query: impl Into<String>, max_tokens: u32) -> Self {
+        Self {
+            query: query.into(),
+            session_id: None,
+            application_id: None,
+            agent_name: None,
+            max_tokens,
+            include_agent_private: true,
+            include_session_shared: true,
+        }
+    }
+
+    /// Attaches a session id for routing [`MemorySourceProvider`] implementations.
+    #[must_use]
+    pub fn with_session_id(mut self, session_id: impl Into<String>) -> Self {
+        self.session_id = Some(session_id.into());
+        self
+    }
 }
 
 /// One recalled memory candidate before prompt rendering.

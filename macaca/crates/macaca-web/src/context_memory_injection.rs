@@ -10,20 +10,32 @@ use tokio::time::timeout;
 
 use crate::context_message_codec::last_user_text_from_framework;
 
-/// Run active recall as a dynamic, request-only context source.
+/// Run active recall as a dynamic, request-only context source (legacy injection path).
 ///
 /// This is the web-layer Strategy adapter that connects the current workspace
 /// memory manager to the context engine report contract. It is deliberately
 /// provider-shaped: callers pass the memory backend and runtime config in, so a
 /// future pluggable memory fabric can replace `TestMemoryManager` without
 /// changing the chat orchestration flow.
+///
+/// ## Composer migration
+/// Prefer [`macaca_context::MemoryActiveRecallContextProvider`] when
+/// `active_vector_memory` is enabled: it feeds recall through the composer as
+/// fenced `macaca_context::ContextCandidate` rows. Pass `composer_recall_active = true` from
+/// [`crate::context_reporting_model::ContextReportingChatModel::composer_handles_active_vector_recall`]
+/// so this function returns immediately (recall already ran via the provider), avoiding duplicate
+/// retrieval and duplicate system-side text.
 pub(crate) async fn apply_active_recall(
     recall_runtime: &macaca_proto::config::ContextRecallRuntimeConfig,
     workspace_memory: Option<&Arc<TestMemoryManager>>,
     preflight_cfg: &ContextPreflightRecallConfig,
+    composer_recall_active: bool,
     assembled: &mut macaca_context::ContextAssembleResult,
     incoming_framework_messages: &[serde_json::Value],
 ) {
+    if composer_recall_active {
+        return;
+    }
     if !preflight_cfg.enabled {
         return;
     }

@@ -41,9 +41,9 @@ use macaca_persist::{AppendEventCommand, EventLog};
 use macaca_proto::config::{
     AgentProfileContextConfig, AgentProfileRootKind, ContextConfig, WorkspaceGuideSourcesConfig,
 };
-use macaca_proto::{AgentState, ApplicationId, Capability};
+use macaca_proto::{AgentId, AgentState, ApplicationId, Capability};
 use macaca_sdk::AgentPersona;
-use macaca_skill::{SkillPolicy, SkillRuntimeFacade, SkillSnapshotRequest};
+use macaca_skill::SkillPolicy;
 
 use crate::context_reporting_model::ContextReportingChatModel;
 use crate::runtime_resume::RuntimeResumeSignal;
@@ -705,42 +705,19 @@ impl FrameworkRunner {
             }
         }
 
-        // Inject AgentSkills catalog for progressive disclosure.
-        let snapshot_module = format!("skill_snapshot/{agent_name}");
-        let loaded_snapshot = if let Some(session_id) = session_id.as_deref() {
-            state
-                .sessions
-                .framework_session_store
-                .load(session_id, &snapshot_module)
-                .await
-                .ok()
-                .flatten()
-                .and_then(|value| serde_json::from_value::<macaca_skill::SkillSnapshot>(value).ok())
-        } else {
-            None
-        };
-        let skill_snapshot = match loaded_snapshot {
-            Some(snapshot) => Ok(snapshot),
-            None => {
-                let request = SkillSnapshotRequest::builder(agent_name)
-                    .workspace_dir(workspace_root)
-                    .app_dir(app_dir)
-                    .policy(skill_policy)
-                    .build();
-                let snapshot = SkillRuntimeFacade::new().build_snapshot(request).await;
-                if let (Some(session_id), Ok(snapshot)) = (session_id.as_deref(), &snapshot) {
-                    if let Ok(value) = serde_json::to_value(snapshot) {
-                        let _ = state
-                            .sessions
-                            .framework_session_store
-                            .save(session_id, &snapshot_module, value)
-                            .await;
-                    }
-                }
-                snapshot
-            }
-        };
-        match skill_snapshot {
+        // Skill discovery telemetry + session cache (Tier-1 progressive disclosure now flows through
+        // context composer providers; do not duplicate `snapshot.prompt` here — see
+        // `ContextReportingChatModel` capability providers / `capability_catalog`).
+        match crate::capability_catalog::resolve_skill_snapshot_cached(
+            state,
+            agent_name,
+            session_id.as_deref(),
+            skill_policy,
+            workspace_root,
+            app_dir,
+        )
+        .await
+        {
             Ok(snapshot) => {
                 tracing::info!(
                     agent = %agent_name,
@@ -788,15 +765,6 @@ impl FrameworkRunner {
                             }),
                         ))
                         .await;
-                }
-                if !snapshot.prompt.trim().is_empty() {
-                    composer = composer.push_section(prompt_section(
-                        "400-skills",
-                        ContextSourceKind::Skill,
-                        PromptStability::Stable,
-                        TrustLevel::Trusted,
-                        format!("## Available Skills\n\n{}", snapshot.prompt),
-                    ));
                 }
             }
             Err(error) => {
@@ -968,6 +936,76 @@ impl WebTracedAgentFactory {
         Ok(PreparedAgentParts { selection, toolkit })
     }
 
+    /// Maps skill/MCP/toolkit runtime state into composer-ready capability DTOs (Adapter pattern).
+    async fn resolve_framework_capability_catalogs(
+        state: &Arc<AppState>,
+        request: &AgentBuildRequest,
+        toolkit: &Toolkit,
+    ) -> (
+        Arc<macaca_context::SkillCapabilityCatalog>,
+        Arc<macaca_context::McpCapabilityCatalog>,
+        Arc<macaca_context::RuntimeToolCapabilityCatalog>,
+        Arc<Vec<String>>,
+    ) {
+        let app_dir = {
+            let dirs = state.config.app_dirs.read().await;
+            dirs.iter()
+                .find(|(id, _)| **id == request.identity.app_id)
+                .map(|(_, path)| path.clone())
+        };
+        let workspace_root = {
+            let workspaces = state.config.app_workspaces.read().await;
+            workspaces
+                .get(&request.identity.app_id)
+                .map(|ws| ws.root.clone())
+        };
+        let skill_policy = resolve_agent_skill_policy(
+            state,
+            &request.identity.app_id,
+            &request.identity.agent_name,
+        )
+        .await;
+        let skill_cap = Arc::new(
+            match crate::capability_catalog::resolve_skill_snapshot_cached(
+                state,
+                &request.identity.agent_name,
+                request.identity.session_id.as_deref(),
+                skill_policy,
+                workspace_root,
+                app_dir,
+            )
+            .await
+            {
+                Ok(snap) => {
+                    crate::capability_catalog::skill_capability_catalog_from_snapshot(&snap)
+                }
+                Err(error) => {
+                    tracing::warn!(
+                        agent = %request.identity.agent_name,
+                        error = %error,
+                        "skill snapshot failed for capability catalogs; composing empty skill index"
+                    );
+                    macaca_context::SkillCapabilityCatalog::default()
+                }
+            },
+        );
+        let mcp_policy = macaca_runtime_host::McpToolPolicy::default();
+        let (mcp_cat, ready) =
+            crate::capability_catalog::probe_mcp_capability_inputs(&state.mcp_runtime, &mcp_policy)
+                .await;
+        let rt_cap = Arc::new(crate::capability_catalog::runtime_tool_capability_catalog_from_toolkit(
+            toolkit,
+        ));
+        (
+            skill_cap,
+            Arc::new(mcp_cat),
+            rt_cap,
+            Arc::new(ready),
+        )
+    }
+
+    /// Builds a [`ReActAgent`] with [`ContextReportingChatModel`]: kernel-backed `routing_agent_id`,
+    /// composer capability providers (skills/MCP/runtime tools), and vector recall when enabled.
     fn build_react_agent(
         llm_router: Arc<macaca_llm::LlmRouter>,
         event_log: Arc<EventLog>,
@@ -979,6 +1017,11 @@ impl WebTracedAgentFactory {
         selection: &macaca_llm::ModelSelection,
         toolkit: Toolkit,
         max_iters: usize,
+        routing_agent_id: Option<AgentId>,
+        skill_capability_catalog: Arc<macaca_context::SkillCapabilityCatalog>,
+        mcp_capability_catalog: Arc<macaca_context::McpCapabilityCatalog>,
+        runtime_tool_capability_catalog: Arc<macaca_context::RuntimeToolCapabilityCatalog>,
+        ready_mcp_server_ids: Arc<Vec<String>>,
     ) -> ReActAgent {
         let model = Arc::new(ContextReportingChatModel::new(
             Arc::new(RoutedLlmAdapter::new(llm_router, selection.clone())),
@@ -990,6 +1033,11 @@ impl WebTracedAgentFactory {
             merged_context_config,
             agent_profile_root,
             workspace_memory,
+            routing_agent_id,
+            skill_capability_catalog,
+            mcp_capability_catalog,
+            runtime_tool_capability_catalog,
+            ready_mcp_server_ids,
         ));
         let formatter = Arc::new(OpenAiFormatter);
         ReActAgent::new(
@@ -1116,6 +1164,15 @@ impl WebTracedAgentFactory {
             &merged_ctx.agent_profile,
         )
         .await;
+        // Align recall visibility with rows stored under this kernel manifest id (see `MemoryEntry::agent_id`).
+        let routing_agent_id = self
+            .state
+            .kernel
+            .get_agent_by_name(&request.identity.agent_name)
+            .await
+            .map(|m| m.id);
+        let (skill_capability_catalog, mcp_capability_catalog, runtime_tool_capability_catalog, ready_mcp_server_ids) =
+            Self::resolve_framework_capability_catalogs(&self.state, &request, &toolkit).await;
 
         let agent = Self::build_react_agent(
             llm_router,
@@ -1128,6 +1185,11 @@ impl WebTracedAgentFactory {
             &selection,
             toolkit,
             25,
+            routing_agent_id,
+            skill_capability_catalog,
+            mcp_capability_catalog,
+            runtime_tool_capability_catalog,
+            ready_mcp_server_ids,
         );
         let hooks = Self::build_standard_hooks(mode, task_id, agent_name);
         Ok(HookedAgent::new(agent, hooks))
@@ -1287,6 +1349,14 @@ impl WebTracedAgentFactory {
             &merged_ctx.agent_profile,
         )
         .await;
+        let routing_agent_id = self
+            .state
+            .kernel
+            .get_agent_by_name(&request.identity.agent_name)
+            .await
+            .map(|m| m.id);
+        let (skill_capability_catalog, mcp_capability_catalog, runtime_tool_capability_catalog, ready_mcp_server_ids) =
+            Self::resolve_framework_capability_catalogs(&self.state, &request, &toolkit).await;
 
         let agent = Self::build_react_agent(
             llm_router,
@@ -1299,6 +1369,11 @@ impl WebTracedAgentFactory {
             &selection,
             toolkit,
             50,
+            routing_agent_id,
+            skill_capability_catalog,
+            mcp_capability_catalog,
+            runtime_tool_capability_catalog,
+            ready_mcp_server_ids,
         );
 
         let cancel_token = agent.cancel_token();

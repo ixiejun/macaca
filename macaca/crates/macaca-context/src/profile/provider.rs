@@ -87,6 +87,7 @@ impl ProfileFileContextProvider {
             return ContextProviderOutcome {
                 candidates: Vec::new(),
                 diagnostics,
+                active_recall_report: None,
             };
         }
 
@@ -107,6 +108,7 @@ impl ProfileFileContextProvider {
         ContextProviderOutcome {
             candidates: vec![candidate],
             diagnostics,
+            active_recall_report: None,
         }
     }
 }
@@ -140,6 +142,7 @@ impl ContextProvider for ProfileFileContextProvider {
                         provider_id: self.provider_id().to_string(),
                         message: reason.to_string(),
                     }],
+                    active_recall_report: None,
                 });
             }
         };
@@ -185,6 +188,7 @@ impl ContextProvider for ProfileFileContextProvider {
         Ok(ContextProviderOutcome {
             candidates: collected,
             diagnostics: pooled_diagnostics,
+            active_recall_report: None,
         })
     }
 }

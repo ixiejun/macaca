@@ -120,6 +120,30 @@ impl ActiveRecallCapability for DefaultActiveRecallProvider {
     }
 }
 
+/// Builds [`crate::report::ActiveRecallDiagnostics`] without duplicating full memory bodies.
+///
+/// This mirrors [`DefaultActiveRecallProvider::report_from_result`] but works for any
+/// [`ActiveRecallCapability`] implementation id string.
+pub fn active_recall_diagnostics_from_prefetch(
+    provider_id: impl Into<String>,
+    result: &MemoryPrefetchResult,
+    latency_ms: u64,
+) -> crate::report::ActiveRecallDiagnostics {
+    let provider_id = provider_id.into();
+    crate::report::ActiveRecallDiagnostics {
+        provider_id,
+        source_breakdown: result
+            .snippets
+            .iter()
+            .map(|snippet| snippet.to_report())
+            .collect(),
+        decisions: result.decisions.clone(),
+        total_candidates: result.candidates.len(),
+        selected_candidates: result.snippets.len(),
+        latency_ms,
+    }
+}
+
 /// Convert recall snippets into a fenced dynamic section string.
 pub fn render_active_recall_fence(result: &MemoryPrefetchResult) -> String {
     let body = result
@@ -205,11 +229,7 @@ mod tests {
             },
         );
         let result = provider
-            .prefetch(MemoryRecallQuery {
-                query: "test".into(),
-                session_id: Some("s1".into()),
-                max_tokens: 100,
-            })
+            .prefetch(MemoryRecallQuery::lite("test", 100).with_session_id("s1"))
             .await
             .unwrap();
 
@@ -228,11 +248,7 @@ mod tests {
         let provider =
             DefaultActiveRecallProvider::new("active", source, ActiveRecallPolicy::default());
         let result = provider
-            .prefetch(MemoryRecallQuery {
-                query: "fact".into(),
-                session_id: None,
-                max_tokens: 100,
-            })
+            .prefetch(MemoryRecallQuery::lite("fact", 100))
             .await
             .unwrap();
 
@@ -250,11 +266,7 @@ mod tests {
         let provider =
             DefaultActiveRecallProvider::new("active", source, ActiveRecallPolicy::default());
         let result = provider
-            .prefetch(MemoryRecallQuery {
-                query: "memory".into(),
-                session_id: None,
-                max_tokens: 100,
-            })
+            .prefetch(MemoryRecallQuery::lite("memory", 100))
             .await
             .unwrap();
         let report = provider.report_from_result(&result, 12);
