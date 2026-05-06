@@ -683,7 +683,30 @@ pub struct SessionQuery {
     session_id: Option<String>,
 }
 
-/// GET /api/apps/{app_id}/todos — list todos (optionally filtered by session_id)
+fn required_session_id<'a>(
+    query: &'a SessionQuery,
+    route_name: &str,
+) -> Result<&'a str, (StatusCode, Json<ErrorResponse>)> {
+    let Some(session_id) = query.session_id.as_deref().map(str::trim) else {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            format!("{route_name} requires session_id"),
+        ));
+    };
+    if session_id.is_empty() {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            format!("{route_name} requires non-empty session_id"),
+        ));
+    }
+    Ok(session_id)
+}
+
+/// GET /api/apps/{app_id}/todos — list todos for the current session only.
+///
+/// The Web UI Task Board is intentionally session-scoped. Requiring `session_id`
+/// here prevents accidental application-wide scans when a caller forgets to pass
+/// the current chat session id.
 pub async fn list_todos(
     State(state): State<Arc<AppState>>,
     axum::extract::Path(app_id): axum::extract::Path<String>,
@@ -694,11 +717,8 @@ pub async fn list_todos(
             .map_err(|_| err(StatusCode::BAD_REQUEST, "Invalid app_id".into()))?,
     );
     let store = Arc::clone(&state.persist.todo_store);
-    let mut todos = if let Some(ref sid) = query.session_id {
-        store.list_all_todos_for_session(&app_id, sid).await
-    } else {
-        store.list_all_todos(&app_id).await
-    };
+    let session_id = required_session_id(&query, "list_todos")?;
+    let mut todos = store.list_all_todos_for_session(&app_id, session_id).await;
     todos.sort_by_key(|t| t.sequence_number);
     Ok(Json(
         serde_json::json!({ "todos": todos, "count": todos.len() }),
@@ -1485,7 +1505,7 @@ mod tests {
         ProviderHealthSnapshot,
     };
 
-    use super::external_adapter_runtime_rows;
+    use super::{external_adapter_runtime_rows, required_session_id, SessionQuery};
     use crate::state::ExternalAdapterRuntimeInstallation;
 
     #[test]
@@ -1577,5 +1597,33 @@ mod tests {
         assert_eq!(rows[0]["runtime_status"], "observed_via_health_ledger");
         assert_eq!(rows[0]["last_health"]["outcome"], "success");
         assert_eq!(rows[0]["last_health"]["implementation_version"], "1.2.3");
+    }
+
+    #[test]
+    fn required_session_id_rejects_missing_or_blank_values() {
+        let missing = required_session_id(&SessionQuery::default(), "list_todos").unwrap_err();
+        assert_eq!(missing.0, axum::http::StatusCode::BAD_REQUEST);
+
+        let blank = required_session_id(
+            &SessionQuery {
+                session_id: Some("  ".into()),
+            },
+            "list_todos",
+        )
+        .unwrap_err();
+        assert_eq!(blank.0, axum::http::StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn required_session_id_trims_and_accepts_current_session() {
+        let query = SessionQuery {
+            session_id: Some(" session-a ".into()),
+        };
+        let session_id = match required_session_id(&query, "list_todos") {
+            Ok(session_id) => session_id,
+            Err(_) => panic!("expected required_session_id to accept a non-empty session id"),
+        };
+
+        assert_eq!(session_id, "session-a");
     }
 }
