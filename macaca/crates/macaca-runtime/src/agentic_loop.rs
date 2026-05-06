@@ -6,9 +6,13 @@
 
 use std::time::Duration;
 
-use macaca_context::{ContextAssembleInput, ContextBudget, ContextEngineSelection, ContextFacade};
+use macaca_context::{
+    assemble_context_providers, ContextAssembleInput, ContextBudget, ContextEngineSelection,
+    ContextFacade, ContextFacadeAssemblyPolicy, ProviderAssemblyEnvironment, ProviderFactoryInput,
+};
 use macaca_llm::LlmProvider;
 use macaca_proto::{
+    config::ContextConfig,
     AgentExecutionEvent, AgentId, LlmMessage, LlmOptions, MacacaResult, Permission, TokenUsage,
     ToolCall,
 };
@@ -35,6 +39,8 @@ pub struct RuntimeConfig {
     pub context_fallback_engine: String,
     /// Provider-neutral context budget.
     pub context_budget: ContextBudget,
+    /// Merged [`ContextConfig`] slice — when default, catalog assembly yields only neutral skips.
+    pub context: ContextConfig,
 }
 
 impl Default for RuntimeConfig {
@@ -45,6 +51,7 @@ impl Default for RuntimeConfig {
             context_engine: "legacy".into(),
             context_fallback_engine: "legacy".into(),
             context_budget: ContextBudget::default(),
+            context: ContextConfig::default(),
         }
     }
 }
@@ -112,6 +119,23 @@ impl AgenticLoop {
         // runtime keeps its full internal history even if the outgoing prompt is
         // trimmed or rewritten for this specific model call.
         let trimmed = ctx_manager.trim_if_needed(messages.clone());
+        let env = ProviderAssemblyEnvironment::kernel_minimal();
+        let factory_input = ProviderFactoryInput {
+            agent_name: agent_id.to_string(),
+            session_id: None,
+            params: serde_json::json!({}),
+        };
+        let (providers, _) = assemble_context_providers(
+            &self.config.context,
+            &env,
+            &factory_input,
+            None,
+        )
+        .await?;
+        let policy = ContextFacadeAssemblyPolicy::from_context_config_parts(
+            self.config.context.governance.clone(),
+            self.config.context.trust_governance.clone(),
+        );
         let assembled = ContextFacade::builtins(ContextEngineSelection {
             engine_id: self.config.context_engine.clone(),
             fallback_engine_id: self.config.context_fallback_engine.clone(),
@@ -126,7 +150,8 @@ impl AgenticLoop {
                 options: options_with_tools.clone(),
                 budget: self.config.context_budget,
             },
-            &[],
+            &providers,
+            policy,
         )
         .await?;
         // Emit a compact driver trace summary rather than the full prompt body.

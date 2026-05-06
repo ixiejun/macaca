@@ -65,6 +65,11 @@ pub trait ContextProvider: Send + Sync {
 
     fn stage(&self) -> ContextProviderStage;
 
+    /// Optional semver for diagnostics (registry/catalog may wrap providers with a [`crate::catalog::VersionedContextProvider`]).
+    fn implementation_version(&self) -> Option<&'static str> {
+        None
+    }
+
     /// Return candidates for this model call.
     async fn contribute(
         &self,

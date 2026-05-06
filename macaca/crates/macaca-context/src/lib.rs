@@ -8,10 +8,12 @@ pub mod active_recall;
 pub mod adapter;
 pub mod budget;
 pub mod capability;
+pub mod catalog;
 pub mod compaction;
 pub mod composer;
 pub mod engine;
 pub mod estimate;
+pub mod governance;
 pub mod memory;
 pub mod memory_active_recall_provider;
 pub mod preflight;
@@ -41,9 +43,14 @@ pub use compaction::{
     CompactionSummaryEnvelope, CompactionTrigger, LineageKind, NoopCompactionLifecycleHook,
     SessionLineage, ThresholdCompactionPolicy, TranscriptSegment,
 };
+pub use catalog::{
+    assemble_context_providers, list_builtin_family_descriptors, ProviderAssemblyEnvironment,
+    ProviderHealthLedger, ProviderHealthSnapshot, VersionedContextProvider,
+};
 pub use composer::{
     merge_composer_into_messages, sort_providers, ContextCacheClass, ContextCandidate,
-    ContextCandidateKind, ContextComposeContext, ContextComposer, ContextFacade, ContextPlan,
+    ContextCandidateKind, ContextComposeContext, ContextComposer, ContextFacade,
+    ContextFacadeAssemblyPolicy, ContextPlan,
     ContextPlanBuilder, ContextPlanDecision, ContextProvider, ContextProviderDiagnostics,
     ContextProviderOutcome, ContextProviderStage, ContextScope, ContextTarget,
     DefaultContextComposer,
@@ -77,10 +84,16 @@ pub use prompt::{
     CompiledPrompt, PromptComposer, PromptSection, PromptSectionBuilder, PromptStability,
     TrustLevel,
 };
+pub use governance::{
+    apply_trust_policies_to_candidates, governance_config_fingerprint,
+    run_governed_provider_chain, run_ungoverned_provider_chain, validate_opaque_external_payload,
+    ContextProviderFactory, ContextProviderRegistry, ExternalCandidateLimits, GovernedCollection,
+    OpaqueExternalPayload, ProviderFactoryInput, ProviderFamilyDescriptor,
+};
 pub use report::{
     ActiveRecallDiagnostics, ComposerPlanSummary, ComposerSkipRecord, ContextDecisionReport,
     ContextDecisionSeverity, ContextReport, ContextReportBuilder, ContextSourceKind,
-    ContextSourceReport,
+    ContextSourceReport, ProviderInvocationSummary, ProviderRuntimeSummary,
 };
 pub use source::{
     decision_for_snippet, BudgetPolicy, ContextRenderInput, ContextRenderMode, ContextRenderable,

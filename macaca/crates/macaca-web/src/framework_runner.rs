@@ -1022,6 +1022,7 @@ impl WebTracedAgentFactory {
         mcp_capability_catalog: Arc<macaca_context::McpCapabilityCatalog>,
         runtime_tool_capability_catalog: Arc<macaca_context::RuntimeToolCapabilityCatalog>,
         ready_mcp_server_ids: Arc<Vec<String>>,
+        provider_health_ledger: Option<Arc<macaca_context::ProviderHealthLedger>>,
     ) -> ReActAgent {
         let model = Arc::new(ContextReportingChatModel::new(
             Arc::new(RoutedLlmAdapter::new(llm_router, selection.clone())),
@@ -1038,6 +1039,7 @@ impl WebTracedAgentFactory {
             mcp_capability_catalog,
             runtime_tool_capability_catalog,
             ready_mcp_server_ids,
+            provider_health_ledger,
         ));
         let formatter = Arc::new(OpenAiFormatter);
         ReActAgent::new(
@@ -1190,6 +1192,7 @@ impl WebTracedAgentFactory {
             mcp_capability_catalog,
             runtime_tool_capability_catalog,
             ready_mcp_server_ids,
+            Some(Arc::clone(&self.state.provider_health_ledger)),
         );
         let hooks = Self::build_standard_hooks(mode, task_id, agent_name);
         Ok(HookedAgent::new(agent, hooks))
@@ -1374,6 +1377,7 @@ impl WebTracedAgentFactory {
             mcp_capability_catalog,
             runtime_tool_capability_catalog,
             ready_mcp_server_ids,
+            Some(Arc::clone(&self.state.provider_health_ledger)),
         );
 
         let cancel_token = agent.cancel_token();

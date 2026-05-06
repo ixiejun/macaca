@@ -8,7 +8,9 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use macaca_context::{ContextAssembleInput, ContextEngineSelection, ContextFacade};
+use macaca_context::{
+    ContextAssembleInput, ContextEngineSelection, ContextFacade, ContextFacadeAssemblyPolicy,
+};
 use macaca_proto::AgentId;
 use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
@@ -159,7 +161,7 @@ impl ReActAgent {
             llm_opts,
         );
         let assembled = ContextFacade::builtins(ContextEngineSelection::legacy())
-            .assemble_model_context(facade_input, &[])
+            .assemble_model_context(facade_input, &[], ContextFacadeAssemblyPolicy::default())
             .await
             .map_err(|e| AgentError::Llm(e.to_string()))?;
         let chat_payload = llm_messages_to_json_values(&assembled.messages);

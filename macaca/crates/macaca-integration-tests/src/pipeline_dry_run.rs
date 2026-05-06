@@ -461,6 +461,7 @@ pub async fn run_full_pipeline_dry_run_with_config(config: PipelineDryRunConfig)
                 context_engine: "legacy".into(),
                 context_fallback_engine: "legacy".into(),
                 context_budget: ContextBudget::default(),
+                context: macaca_proto::config::ContextConfig::default(),
             });
             let agent_id = AgentId::new();
             trace(
@@ -606,6 +607,7 @@ pub async fn run_full_pipeline_dry_run_with_config(config: PipelineDryRunConfig)
                 context_engine: "legacy".into(),
                 context_fallback_engine: "legacy".into(),
                 context_budget: ContextBudget::default(),
+                context: macaca_proto::config::ContextConfig::default(),
             });
             let agent_id = AgentId::new();
             trace(

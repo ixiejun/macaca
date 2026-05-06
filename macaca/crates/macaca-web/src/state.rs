@@ -19,6 +19,7 @@ use macaca_proto::{config::ContextConfig, ApplicationId, ForkId, LlmMessage};
 use macaca_skill::SkillCatalog;
 use macaca_task::TodoStore;
 use macaca_tools::ToolCatalog;
+use macaca_context::{ContextProviderRegistry, ProviderHealthLedger};
 
 use crate::runtime_resume::RuntimeResumeSignal;
 use crate::workspace::AppWorkspace;
@@ -161,4 +162,8 @@ pub struct AppState {
     pub sessions: SessionState,
     /// Application configuration: directories, models, skills, alerts.
     pub config: AppConfig,
+    /// Neutral context-provider factory registry (extensions / tests) — empty by default.
+    pub context_provider_registry: Arc<ContextProviderRegistry>,
+    /// Last-known invocation summaries for `GET /api/context/provider-runtime`.
+    pub provider_health_ledger: Arc<ProviderHealthLedger>,
 }

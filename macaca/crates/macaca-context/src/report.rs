@@ -196,6 +196,42 @@ pub struct ContextReport {
     /// Context composer plan when the composer pipeline ran for this assembly.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub composer: Option<ComposerPlanSummary>,
+    /// Provider-runtime governance summary (timeouts, drops, policy fingerprint) — no raw prompt text.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider_runtime: Option<ProviderRuntimeSummary>,
+}
+
+/// Redacted observability surface for how [`crate::governance::pipeline`] executed providers.
+///
+/// This structure is safe to persist or show in admin UIs: it records timing, ids, counts,
+/// and policy metadata — never verbatim candidate bodies or user secrets by default.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ProviderRuntimeSummary {
+    /// SHA-256 hex over a canonical JSON snapshot of the governance knobs that were active
+    /// for this request (stable ordering inside the fingerprint helper).
+    pub policy_fingerprint: String,
+    /// Optional operator-supplied label mirrored from runtime configuration for auditing.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub policy_label: String,
+    /// Per-provider invocation records in pipeline order.
+    pub invocations: Vec<ProviderInvocationSummary>,
+}
+
+/// One provider pass through the governed pipeline.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ProviderInvocationSummary {
+    /// `ContextProvider::provider_id`.
+    pub provider_id: String,
+    /// `ok`, `timeout`, or `error`.
+    pub outcome: String,
+    pub latency_ms: u64,
+    /// Candidates accepted after governance filters for this invocation.
+    pub candidates_accepted: usize,
+    /// Candidates dropped (deny-prefix, invalid, or token budget trim attributable to this row).
+    pub candidates_dropped: usize,
+    /// Optional semver attached by [`crate::catalog::VersionedContextProvider`] or custom providers.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub implementation_version: Option<String>,
 }
 
 /// Incremental builder that keeps token accounting logic in one place.
@@ -235,6 +271,7 @@ impl ContextReportBuilder {
                 decisions: Vec::new(),
                 active_recall: Vec::new(),
                 composer: None,
+                provider_runtime: None,
             },
         }
     }
@@ -345,6 +382,12 @@ impl ContextReportBuilder {
             self = self.decision(decision);
         }
         self.report.active_recall.push(diagnostics);
+        self
+    }
+
+    /// Attach provider runtime summary produced by the governance pipeline.
+    pub fn provider_runtime(mut self, summary: ProviderRuntimeSummary) -> Self {
+        self.report.provider_runtime = Some(summary);
         self
     }
 

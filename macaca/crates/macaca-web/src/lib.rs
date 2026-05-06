@@ -325,6 +325,8 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
                 catalog: tokio::sync::RwLock::new(catalog),
                 alert_manager: alert_manager.clone(),
             },
+            context_provider_registry: Arc::new(macaca_context::ContextProviderRegistry::new()),
+            provider_health_ledger: Arc::new(macaca_context::ProviderHealthLedger::new()),
         }
     });
 

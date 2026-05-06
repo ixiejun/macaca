@@ -2,17 +2,19 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use macaca_context::{
-    mcp_capability_provider_arc, memory_active_recall_provider_arc, profile_provider_arc,
-    runtime_tool_capability_provider_arc, skill_capability_provider_arc, ActiveRecallBudget,
-    ActiveRecallCapability, ActiveRecallPolicy, ContextAssembleInput, ContextBudget,
-    ContextEngineSelection, ContextFacade, ContextPreflightRecallConfig, ContextProvider,
-    DefaultActiveRecallProvider, McpCapabilityCatalog, RuntimeToolCapabilityCatalog,
-    SkillCapabilityCatalog,
+    assemble_context_providers, ActiveRecallBudget, ActiveRecallCapability, ActiveRecallPolicy,
+    ContextAssembleInput, ContextBudget, ContextEngineSelection, ContextFacade,
+    ContextFacadeAssemblyPolicy, ContextPreflightRecallConfig,
+    DefaultActiveRecallProvider, McpCapabilityCatalog, ProviderAssemblyEnvironment,
+    ProviderFactoryInput, ProviderHealthLedger, RuntimeToolCapabilityCatalog, SkillCapabilityCatalog,
 };
 use macaca_framework::model::{ChatModel, ChatOptions, ChatResponse, ModelError};
 use macaca_memory::TestMemoryManager;
 use macaca_persist::{AppendEventCommand, EventLog, SessionLineageStore};
-use macaca_proto::{config::ContextConfig, AgentId, ApplicationId};
+use macaca_proto::{
+    config::ContextConfig,
+    AgentId, ApplicationId,
+};
 
 use crate::context_memory_injection::{apply_active_recall, apply_preflight_memory};
 use crate::context_message_codec::{
@@ -63,6 +65,10 @@ pub(crate) struct ContextReportingChatModel {
     runtime_tool_capability_catalog: Arc<RuntimeToolCapabilityCatalog>,
     /// MCP servers in [`macaca_runtime_host::McpRuntimeStatusState::Ready`] — dependency gap checks only.
     ready_mcp_server_ids: Arc<Vec<String>>,
+    /// Merged `ContextConfig` (families, governance, trust governance, engines, recall, …).
+    context_config: ContextConfig,
+    /// Optional rolling health snapshots (OS-level; no prompt bodies).
+    provider_health_ledger: Option<Arc<ProviderHealthLedger>>,
 }
 
 impl ContextReportingChatModel {
@@ -86,6 +92,7 @@ impl ContextReportingChatModel {
         mcp_capability_catalog: Arc<McpCapabilityCatalog>,
         runtime_tool_capability_catalog: Arc<RuntimeToolCapabilityCatalog>,
         ready_mcp_server_ids: Arc<Vec<String>>,
+        provider_health_ledger: Option<Arc<ProviderHealthLedger>>,
     ) -> Self {
         // Resolve capability before moving `workspace_memory` into the struct field.
         let memory_recall_capability = Self::build_workspace_recall_capability(
@@ -118,6 +125,8 @@ impl ContextReportingChatModel {
             mcp_capability_catalog,
             runtime_tool_capability_catalog,
             ready_mcp_server_ids,
+            context_config: merged_context_config.clone(),
+            provider_health_ledger,
         }
     }
 
@@ -218,35 +227,55 @@ impl ContextReportingChatModel {
         };
         let lineage_count = self.lineage_compactions(session_id).await;
         let preflight_cfg = self.preflight_config();
-        let mut providers: Vec<std::sync::Arc<dyn ContextProvider>> = Vec::new();
-        if self.agent_profile.enabled {
-            if let Some(root) = self.agent_profile_root.clone() {
-                providers.push(profile_provider_arc(root, self.agent_profile.clone()));
+        let env = ProviderAssemblyEnvironment {
+            agent_profile_root: self.agent_profile_root.clone(),
+            agent_profile: self.agent_profile.clone(),
+            skill_capability_catalog: Some(Arc::clone(&self.skill_capability_catalog)),
+            mcp_capability_catalog: Some(Arc::clone(&self.mcp_capability_catalog)),
+            runtime_tool_capability_catalog: Some(Arc::clone(&self.runtime_tool_capability_catalog)),
+            ready_mcp_server_ids: Some(Arc::clone(&self.ready_mcp_server_ids)),
+            memory_recall_capability: self.memory_recall_capability.clone(),
+            active_vector_memory: self.active_vector_memory.clone(),
+        };
+        let factory_input = ProviderFactoryInput {
+            agent_name: self.agent_name.clone(),
+            session_id: Some(session_id.to_string()),
+            params: serde_json::json!({}),
+        };
+        let (providers, catalog_notes) = match assemble_context_providers(
+            &self.context_config,
+            &env,
+            &factory_input,
+            None,
+        )
+        .await
+        {
+            Ok(p) => p,
+            Err(error) => {
+                tracing::warn!(
+                    agent = %self.agent_name,
+                    error = %error,
+                    "catalog assembly failed before context facade"
+                );
+                return None;
             }
-        }
-        providers.push(skill_capability_provider_arc(
-            Arc::clone(&self.skill_capability_catalog),
-            Arc::clone(&self.ready_mcp_server_ids),
-        ));
-        providers.push(mcp_capability_provider_arc(Arc::clone(
-            &self.mcp_capability_catalog,
-        )));
-        providers.push(runtime_tool_capability_provider_arc(Arc::clone(
-            &self.runtime_tool_capability_catalog,
-        )));
-        if let Some(capability) = self.memory_recall_capability.clone() {
-            if self.active_vector_memory.enabled {
-                providers.push(memory_active_recall_provider_arc(
-                    capability,
-                    self.active_vector_memory.clone(),
-                ));
-            }
-        }
+        };
+        let policy = ContextFacadeAssemblyPolicy::from_context_config_parts(
+            self.context_config.governance.clone(),
+            self.context_config.trust_governance.clone(),
+        );
         match ContextFacade::builtins(self.context_selection.clone())
-            .assemble_model_context(input, &providers)
+            .assemble_model_context(input, &providers, policy)
             .await
         {
             Ok(mut assembled) => {
+                assembled.report.decisions.extend(catalog_notes);
+                if let (Some(ledger), Some(summary)) = (
+                    self.provider_health_ledger.as_ref(),
+                    assembled.report.provider_runtime.as_ref(),
+                ) {
+                    ledger.record_provider_runtime_summary(summary);
+                }
                 assembled.report.lineage_compaction_count = lineage_count;
                 let message_count_before_recall = assembled.messages.len();
                 apply_active_recall(
@@ -312,6 +341,9 @@ impl ContextReportingChatModel {
                                 "prompt_hash": report.prompt_hash,
                                 "source_count": report.sources.len(),
                                 "decision_count": report.decisions.len(),
+                                "provider_runtime": report.provider_runtime.as_ref().map(|runtime| {
+                                    serde_json::to_value(runtime).unwrap_or_else(|_| serde_json::Value::Null)
+                                }),
                                 "active_recall": report.active_recall.iter().map(|recall| {
                                     serde_json::json!({
                                         "provider_id": recall.provider_id,

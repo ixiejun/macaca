@@ -6,12 +6,14 @@
 //!
 //! Call order is always **Composer → Engine**, coordinated by [`crate::composer::facade::ContextFacade`].
 
+mod assembly_policy;
 mod candidate;
 mod default_composer;
 mod facade;
 mod plan;
 mod provider;
 
+pub use assembly_policy::ContextFacadeAssemblyPolicy;
 pub use candidate::{
     ContextCacheClass, ContextCandidate, ContextCandidateKind, ContextScope, ContextTarget,
 };

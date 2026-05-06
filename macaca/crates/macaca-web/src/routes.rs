@@ -1357,3 +1357,16 @@ pub async fn reload_drivers(
         results,
     }))
 }
+
+/// Operator snapshot: built-in family descriptors, registry plugins, and rolling health — **no** prompt bodies.
+pub async fn get_context_provider_runtime(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
+    let builtin = macaca_context::list_builtin_family_descriptors();
+    let registry_rows = state.context_provider_registry.list_registered_descriptors();
+    let health = state.provider_health_ledger.snapshot();
+    Json(serde_json::json!({
+        "builtin_family_descriptors": builtin,
+        "registry_family_descriptors": registry_rows,
+        "registry_family_ids": state.context_provider_registry.list_family_ids(),
+        "health": health,
+    }))
+}

@@ -74,6 +74,10 @@ impl WebRuntimeFacade {
             .route("/api/apps/{id}/sessions", get(session::list_app_sessions))
             .route("/api/apps/reload", post(routes::reload_apps))
             .route("/api/mcp", get(routes::get_mcp_status))
+            .route(
+                "/api/context/provider-runtime",
+                get(routes::get_context_provider_runtime),
+            )
             .route("/api/sessions", get(session::list_sessions))
             .route("/api/sessions/{app_id}", get(session::get_session))
             .route(

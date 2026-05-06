@@ -8,15 +8,17 @@ use std::sync::Arc;
 use macaca_proto::{LlmMessage, LlmRole, MacacaResult};
 use uuid::Uuid;
 
+use crate::composer::assembly_policy::ContextFacadeAssemblyPolicy;
 use crate::composer::default_composer::{ContextComposer, DefaultContextComposer};
 use crate::composer::plan::ContextPlan;
-use crate::composer::provider::{sort_providers, ContextComposeContext, ContextProvider};
+use crate::composer::provider::{ContextComposeContext, ContextProvider};
 use crate::engine::{
     ContextAssembleInput, ContextAssembleResult, ContextEngineSelection, ContextRuntimeFacade,
 };
+use crate::governance::{run_governed_provider_chain, run_ungoverned_provider_chain};
 use crate::prompt::CompiledPrompt;
 use crate::report::{
-    ActiveRecallDiagnostics, ComposerPlanSummary, ComposerSkipRecord, ContextDecisionReport,
+    ComposerPlanSummary, ComposerSkipRecord, ContextDecisionReport,
 };
 
 /// Merges composer output (`CompiledPrompt::text`) with the visible message history for this call.
@@ -93,27 +95,52 @@ impl ContextFacade {
         self
     }
 
-    /// Providers → plan → merge into messages → [`ContextRuntimeFacade::assemble`].
+    /// Providers → governance pipeline (optional) → **trust policy** (optional) → plan → merge into messages → engine assembly.
+    ///
+    /// When [`ContextGovernanceRuntimeConfig::enabled`] is `true`, each `ContextProvider::contribute`
+    /// call is bounded by `per_provider_timeout_ms` and outputs pass through redaction/deny/validation
+    /// strategies before [`ContextComposer::compose`]. When disabled, the legacy ungoverned fan-in is
+    /// used to preserve deterministic unit-test baselines.
+    ///
+    /// Trust promotions run **after** the governed/ungoverned collection finishes but **before**
+    /// composer budgeting so prompt trust metadata reflects operator policy.
     pub async fn assemble_model_context(
         &self,
         mut input: ContextAssembleInput,
         providers: &[Arc<dyn ContextProvider>],
+        policy: ContextFacadeAssemblyPolicy,
     ) -> MacacaResult<ContextAssembleResult> {
         let ctx = ContextComposeContext {
             assemble_input: &input,
         };
 
-        let mut collected: Vec<crate::composer::candidate::ContextCandidate> = Vec::new();
-        let mut active_recall_telemetry: Vec<ActiveRecallDiagnostics> = Vec::new();
-        let mut pipeline_notes: Vec<crate::composer::provider::ContextProviderDiagnostics> =
-            Vec::new();
-        for provider in sort_providers(providers) {
-            let outcome = provider.contribute(&ctx).await?;
-            if let Some(report) = outcome.active_recall_report {
-                active_recall_telemetry.push(report);
-            }
-            pipeline_notes.extend(outcome.diagnostics);
-            collected.extend(outcome.candidates);
+        let gov = policy.governance;
+
+        let (
+            mut collected,
+            pipeline_notes,
+            active_recall_telemetry,
+            mut governance_decisions,
+            provider_runtime,
+        ) = if gov.enabled {
+            let bundle = run_governed_provider_chain(providers, &ctx, &gov).await?;
+            (
+                bundle.candidates,
+                bundle.provider_diagnostics,
+                bundle.active_recall,
+                bundle.governance_decisions,
+                Some(bundle.summary),
+            )
+        } else {
+            let (c, n, a) = run_ungoverned_provider_chain(providers, &ctx).await?;
+            (c, n, a, Vec::new(), None)
+        };
+
+        if let Some(ref tg) = policy.trust_governance {
+            governance_decisions.extend(crate::governance::trust_policy::apply_trust_policies_to_candidates(
+                &mut collected,
+                tg,
+            ));
         }
 
         let plan_tag = Uuid::new_v4().to_string();
@@ -125,10 +152,11 @@ impl ContextFacade {
 
         let mut assembled = self.engine.assemble(input).await?;
         assembled.report.composer = Some(summary);
-        assembled
-            .report
-            .active_recall
-            .extend(active_recall_telemetry);
+        assembled.report.active_recall.extend(active_recall_telemetry);
+        assembled.report.provider_runtime = provider_runtime;
+        for d in governance_decisions {
+            assembled.report.decisions.push(d);
+        }
         for note in pipeline_notes {
             assembled.report.decisions.push(ContextDecisionReport {
                 code: "context_provider_diagnostic".into(),
@@ -143,6 +171,7 @@ impl ContextFacade {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::composer::ContextFacadeAssemblyPolicy;
     use crate::prompt::{PromptComposer, PromptSection};
     use crate::report::ContextSourceKind;
 
@@ -209,7 +238,14 @@ mod tests {
         };
 
         let f = ContextFacade::legacy();
-        let via_facade = f.assemble_model_context(input.clone(), &[]).await.unwrap();
+        let via_facade = f
+            .assemble_model_context(
+                input.clone(),
+                &[],
+                ContextFacadeAssemblyPolicy::default(),
+            )
+            .await
+            .unwrap();
 
         let via_engine = ContextRuntimeFacade::legacy()
             .assemble(input)
