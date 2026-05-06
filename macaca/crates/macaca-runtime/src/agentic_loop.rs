@@ -12,9 +12,8 @@ use macaca_context::{
 };
 use macaca_llm::LlmProvider;
 use macaca_proto::{
-    config::ContextConfig,
-    AgentExecutionEvent, AgentId, LlmMessage, LlmOptions, MacacaResult, Permission, TokenUsage,
-    ToolCall,
+    config::ContextConfig, AgentExecutionEvent, AgentId, LlmMessage, LlmOptions, MacacaResult,
+    Permission, TokenUsage, ToolCall,
 };
 use macaca_tools::ToolCatalog;
 use tokio::sync::mpsc;
@@ -125,16 +124,12 @@ impl AgenticLoop {
             session_id: None,
             params: serde_json::json!({}),
         };
-        let (providers, _) = assemble_context_providers(
-            &self.config.context,
-            &env,
-            &factory_input,
-            None,
-        )
-        .await?;
+        let (providers, _) =
+            assemble_context_providers(&self.config.context, &env, &factory_input, None).await?;
         let policy = ContextFacadeAssemblyPolicy::from_context_config_parts(
             self.config.context.governance.clone(),
             self.config.context.trust_governance.clone(),
+            self.config.context.knowledge_digest.clone(),
         );
         let assembled = ContextFacade::builtins(ContextEngineSelection {
             engine_id: self.config.context_engine.clone(),

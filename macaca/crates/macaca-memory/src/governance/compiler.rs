@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use macaca_proto::MemoryId;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::HashMap;
 
 use crate::core::scope::MemoryScope;
 
@@ -86,13 +87,55 @@ pub trait KnowledgeCompileCapability: Send + Sync {
     fn compile(&self, request: KnowledgeCompileRequest) -> KnowledgeCompileResult;
 }
 
+/// Replaceable strategy for deterministic contradiction detection.
+pub trait ContradictionStrategy: Send + Sync {
+    fn detect(&self, claims: &[KnowledgeClaim]) -> Vec<ClaimGroup>;
+}
+
+/// Deterministic contradiction detector for simple negation pairs.
+#[derive(Debug, Default)]
+pub struct DeterministicContradictionStrategy;
+
+impl ContradictionStrategy for DeterministicContradictionStrategy {
+    fn detect(&self, claims: &[KnowledgeClaim]) -> Vec<ClaimGroup> {
+        let mut by_positive: HashMap<String, Vec<String>> = HashMap::new();
+        let mut by_negative: HashMap<String, Vec<String>> = HashMap::new();
+
+        for claim in claims {
+            if let Some(key) = normalized_positive_key(&claim.statement) {
+                by_positive.entry(key).or_default().push(claim.id.clone());
+            }
+            if let Some(key) = normalized_negative_key(&claim.statement) {
+                by_negative.entry(key).or_default().push(claim.id.clone());
+            }
+        }
+
+        let mut groups = Vec::new();
+        for (key, positives) in by_positive {
+            let Some(negatives) = by_negative.get(&key) else {
+                continue;
+            };
+            let mut claim_ids = positives.clone();
+            claim_ids.extend(negatives.clone());
+            claim_ids.sort();
+            claim_ids.dedup();
+            groups.push(ClaimGroup {
+                group_id: format!("conflict-{}", stable_group_key(&key)),
+                claims: claim_ids,
+                reason: format!("deterministic negation conflict for '{key}'"),
+            });
+        }
+        groups
+    }
+}
+
 /// Default local compiler that lifts high-confidence candidates into claims.
 #[derive(Debug, Default)]
 pub struct KnowledgeCompiler;
 
 impl KnowledgeCompileCapability for KnowledgeCompiler {
     fn compile(&self, request: KnowledgeCompileRequest) -> KnowledgeCompileResult {
-        let claims = request
+        let mut claims: Vec<KnowledgeClaim> = request
             .candidates
             .into_iter()
             .filter(|candidate| candidate.confidence >= 0.75 || candidate.recurrence_count >= 2)
@@ -112,11 +155,60 @@ impl KnowledgeCompileCapability for KnowledgeCompiler {
                 claim
             })
             .collect();
+        claims.extend(request.existing_claims);
+        let conflicts = DeterministicContradictionStrategy.detect(&claims);
+        for group in &conflicts {
+            for claim in &mut claims {
+                if group.claims.iter().any(|id| id == &claim.id) {
+                    claim.conflict_group = Some(group.group_id.clone());
+                }
+            }
+        }
         KnowledgeCompileResult {
             scope: request.scope,
             claims,
-            conflicts: Vec::new(),
+            conflicts,
             compiled_at: Utc::now(),
         }
     }
+}
+
+fn normalized_positive_key(statement: &str) -> Option<String> {
+    let normalized = normalize_statement(statement);
+    if let Some((left, right)) = normalized.split_once(" requires ") {
+        return Some(format!("{} requires {}", left.trim(), right.trim()));
+    }
+    if let Some((left, right)) = normalized.split_once(" is ") {
+        return Some(format!("{} is {}", left.trim(), right.trim()));
+    }
+    None
+}
+
+fn normalized_negative_key(statement: &str) -> Option<String> {
+    let normalized = normalize_statement(statement);
+    if let Some((left, right)) = normalized.split_once(" does not require ") {
+        return Some(format!("{} requires {}", left.trim(), right.trim()));
+    }
+    if let Some((left, right)) = normalized.split_once(" is not ") {
+        return Some(format!("{} is {}", left.trim(), right.trim()));
+    }
+    None
+}
+
+fn normalize_statement(statement: &str) -> String {
+    statement
+        .trim()
+        .trim_end_matches('.')
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_ascii_lowercase()
+}
+
+fn stable_group_key(key: &str) -> String {
+    key.chars()
+        .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { '-' })
+        .collect::<String>()
+        .trim_matches('-')
+        .to_string()
 }

@@ -3,10 +3,15 @@
 //!
 //! ## Routing model
 //! [`macaca_context::MemoryRecallQuery`] carries **session / application / agent** hints. The
-//! legacy [`macaca_memory::TestMemoryManager`] performs a unified vector/text search; this adapter
-//! enforces conservative visibility rules so agent-private rows tagged with another [`AgentId`]
+//! runtime-backed memory facade performs recall; this adapter enforces conservative visibility
+//! rules so agent-private rows tagged with another [`AgentId`]
 //! cannot surface during recall (fail-closed for cross-agent isolation).
+//!
+//! ## Tombstones
+//! Optional [`macaca_memory::TombstoneIndex`] aligns recall with digest compilation and
+//! `memory_forget` tooling so governance-deleted ids cannot reappear in fenced recall.
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -14,8 +19,12 @@ use macaca_context::{
     memory_source, ConfidenceScore, ContextSourceProvenance, MemoryRecallItem, MemoryRecallQuery,
     MemorySourceProvider, PrivacyTier,
 };
-use macaca_memory::{RecallQuery, RecallResult, TestMemoryManager};
-use macaca_proto::{MemoryEntry, MacacaResult};
+use macaca_memory::{
+    ActiveRecallBudget, ActiveRecallRequest, MemoryScope, MemorySearchRequest, TombstoneIndex,
+};
+use macaca_proto::{MacacaResult, MemoryEntry};
+
+use crate::memory_runtime::WebMemoryRuntime;
 
 /// Pure predicate: whether a workspace [`MemoryEntry`] may be returned for active recall.
 ///
@@ -51,26 +60,32 @@ pub(crate) fn workspace_memory_entry_visible_for_recall(
     query.include_session_shared
 }
 
-/// Binds [`TestMemoryManager`] recall to the composer active-recall contract.
+/// Binds [`WebMemoryRuntime`] recall to the composer active-recall contract.
 pub struct WorkspaceMemoryRecallSource {
-    manager: Arc<TestMemoryManager>,
+    runtime: Arc<WebMemoryRuntime>,
+    scope: MemoryScope,
     search_limit: usize,
     /// When known, agent-private memories tagged for another id are filtered out.
     current_agent_id: Option<macaca_proto::AgentId>,
+    tombstones: Option<Arc<dyn TombstoneIndex>>,
 }
 
 impl WorkspaceMemoryRecallSource {
     /// `search_limit` is typically derived from [`macaca_proto::config::ActiveVectorMemoryContextConfig::max_hits`].
     #[must_use]
     pub fn new(
-        manager: Arc<TestMemoryManager>,
+        runtime: Arc<WebMemoryRuntime>,
+        scope: MemoryScope,
         search_limit: usize,
         current_agent_id: Option<macaca_proto::AgentId>,
+        tombstones: Option<Arc<dyn TombstoneIndex>>,
     ) -> Self {
         Self {
-            manager,
+            runtime,
+            scope,
             search_limit: search_limit.max(1),
             current_agent_id,
+            tombstones,
         }
     }
 
@@ -101,12 +116,50 @@ impl WorkspaceMemoryRecallSource {
         &self,
         query: &MemoryRecallQuery,
     ) -> MacacaResult<Vec<MemoryRecallItem>> {
-        let bundle: RecallResult = self
-            .manager
-            .recall(RecallQuery::new(&query.query, self.search_limit))
-            .await?;
+        let tomb_set: HashSet<String> = match &self.tombstones {
+            Some(idx) => match idx.tombstoned_memory_id_strings().await {
+                Ok(v) => v.into_iter().collect(),
+                Err(e) => {
+                    tracing::warn!(
+                        target: "macaca.workspace_memory",
+                        error = %e,
+                        "tombstone snapshot failed during recall; continuing without tombstone filter (fail-open)"
+                    );
+                    HashSet::new()
+                }
+            },
+            None => HashSet::new(),
+        };
+
+        let entries =
+            if self.scope.identity.agent_id.is_some() || self.scope.identity.agent_name.is_some() {
+                let result = self
+                    .runtime
+                    .active_recall(ActiveRecallRequest {
+                        scope: self.scope.clone(),
+                        query: query.query.clone(),
+                        budget: ActiveRecallBudget {
+                            max_hits: self.search_limit,
+                            max_chars: usize::MAX,
+                            ..ActiveRecallBudget::default()
+                        },
+                    })
+                    .await?;
+                result.selected
+            } else {
+                self.runtime
+                    .search(MemorySearchRequest::new(
+                        self.scope.clone(),
+                        query.query.clone(),
+                        self.search_limit,
+                    ))
+                    .await?
+            };
         let mut items = Vec::new();
-        for entry in bundle.entries {
+        for entry in entries {
+            if tomb_set.contains(&entry.id.0.to_string()) {
+                continue;
+            }
             if self.row_visible(&entry, query) {
                 items.push(self.map_entry(entry));
             }
@@ -129,9 +182,20 @@ impl MemorySourceProvider for WorkspaceMemoryRecallSource {
 #[cfg(test)]
 mod tests {
     use super::workspace_memory_entry_visible_for_recall;
+    use super::WorkspaceMemoryRecallSource;
+    use async_trait::async_trait;
     use chrono::Utc;
-    use macaca_context::MemoryRecallQuery;
-    use macaca_proto::{AgentId, MemoryEntry, MemoryId, MemoryLayer};
+    use macaca_context::{MemoryRecallQuery, MemorySourceProvider};
+    use macaca_memory::{
+        ActiveRecallCandidate, ActiveRecallDecision, ActiveRecallRequest, ActiveRecallResult,
+        KnowledgeCompileCapability, KnowledgeCompileRequest, KnowledgeCompileResult,
+        MemoryBackendConfig, MemoryBackendFactory, MemoryDeleteRequest, MemoryGetRequest,
+        MemoryRuntimeFacade, MemoryRuntimeStatus, MemorySearchRequest, MemoryWriteRequest,
+        RememberText, SharedTombstoneRegistry,
+    };
+    use macaca_proto::{AgentId, MacacaResult, MemoryEntry, MemoryId, MemoryLayer};
+    use std::sync::Arc;
+    use tempfile::tempdir;
 
     fn entry_with_agent(agent: Option<AgentId>) -> MemoryEntry {
         MemoryEntry {
@@ -150,11 +214,7 @@ mod tests {
         let entry = entry_with_agent(None);
         let mut q = MemoryRecallQuery::lite("q", 1024);
         q.include_session_shared = true;
-        assert!(workspace_memory_entry_visible_for_recall(
-            &entry,
-            &q,
-            None
-        ));
+        assert!(workspace_memory_entry_visible_for_recall(&entry, &q, None));
         q.include_session_shared = false;
         assert!(!workspace_memory_entry_visible_for_recall(&entry, &q, None));
     }
@@ -165,10 +225,22 @@ mod tests {
         let b = AgentId::new();
         let entry = entry_with_agent(Some(a));
         let mut q = MemoryRecallQuery::lite("q", 1024);
-        assert!(workspace_memory_entry_visible_for_recall(&entry, &q, Some(a)));
-        assert!(!workspace_memory_entry_visible_for_recall(&entry, &q, Some(b)));
+        assert!(workspace_memory_entry_visible_for_recall(
+            &entry,
+            &q,
+            Some(a)
+        ));
+        assert!(!workspace_memory_entry_visible_for_recall(
+            &entry,
+            &q,
+            Some(b)
+        ));
         q.include_agent_private = false;
-        assert!(!workspace_memory_entry_visible_for_recall(&entry, &q, Some(a)));
+        assert!(!workspace_memory_entry_visible_for_recall(
+            &entry,
+            &q,
+            Some(a)
+        ));
     }
 
     #[test]
@@ -177,5 +249,133 @@ mod tests {
         let entry = entry_with_agent(Some(a));
         let q = MemoryRecallQuery::lite("q", 1024);
         assert!(!workspace_memory_entry_visible_for_recall(&entry, &q, None));
+    }
+
+    #[tokio::test]
+    async fn tombstone_registry_hides_matching_row_before_mapping() {
+        let dir = tempdir().unwrap();
+        let factory = MemoryBackendFactory::new(MemoryBackendConfig::new(dir.path().to_path_buf()));
+        let mgr = Arc::new(factory.test_manager());
+        let id = mgr
+            .remember_text(RememberText::new("uniq-tombstone-recall-marker-xyz"))
+            .await
+            .unwrap();
+
+        let reg = Arc::new(SharedTombstoneRegistry::new());
+        reg.record(id).await;
+
+        let runtime = Arc::new(
+            crate::memory_runtime::WebMemoryRuntime::from_workspace_memory(Arc::clone(&mgr)),
+        );
+        let scope = macaca_memory::MemoryScope::project_shared(
+            macaca_proto::ApplicationId::new(),
+            "workspace",
+        );
+        let with_ts = WorkspaceMemoryRecallSource::new(
+            Arc::clone(&runtime),
+            scope.clone(),
+            8,
+            None,
+            Some(reg),
+        );
+        let q = MemoryRecallQuery::lite("uniq-tombstone-recall-marker-xyz", 1024);
+        let empty = MemorySourceProvider::recall(&with_ts, q.clone())
+            .await
+            .unwrap();
+        assert!(empty.is_empty());
+
+        let no_ts = WorkspaceMemoryRecallSource::new(Arc::clone(&runtime), scope, 8, None, None);
+        let hits = MemorySourceProvider::recall(&no_ts, q).await.unwrap();
+        assert!(!hits.is_empty());
+    }
+
+    struct RecallFakeRuntime {
+        entries: Vec<MemoryEntry>,
+    }
+
+    #[async_trait]
+    impl MemoryRuntimeFacade for RecallFakeRuntime {
+        async fn remember(&self, _request: MemoryWriteRequest) -> MacacaResult<MemoryId> {
+            Ok(MemoryId::new())
+        }
+
+        async fn search(&self, _request: MemorySearchRequest) -> MacacaResult<Vec<MemoryEntry>> {
+            Ok(self.entries.clone())
+        }
+
+        async fn get(&self, _request: MemoryGetRequest) -> MacacaResult<Option<MemoryEntry>> {
+            Ok(None)
+        }
+
+        async fn delete(&self, _request: MemoryDeleteRequest) -> MacacaResult<()> {
+            Ok(())
+        }
+
+        async fn active_recall(
+            &self,
+            _request: ActiveRecallRequest,
+        ) -> MacacaResult<ActiveRecallResult> {
+            let candidates = self
+                .entries
+                .iter()
+                .cloned()
+                .map(|entry| ActiveRecallCandidate {
+                    entry,
+                    score: 100,
+                    estimated_tokens: 1,
+                    decision: ActiveRecallDecision::selected("fake"),
+                })
+                .collect();
+            Ok(ActiveRecallResult {
+                provider_id: "fake-runtime".into(),
+                candidates,
+                selected: self.entries.clone(),
+                latency_ms: 0,
+                diagnostics: Vec::new(),
+            })
+        }
+
+        async fn compile_knowledge(
+            &self,
+            request: KnowledgeCompileRequest,
+        ) -> MacacaResult<KnowledgeCompileResult> {
+            Ok(macaca_memory::KnowledgeCompiler::default().compile(request))
+        }
+
+        async fn status(&self) -> MemoryRuntimeStatus {
+            MemoryRuntimeStatus::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn active_recall_source_uses_runtime_and_preserves_scope_filtering() {
+        let current_agent = AgentId::new();
+        let other_agent = AgentId::new();
+        let runtime = Arc::new(crate::memory_runtime::WebMemoryRuntime::new(Arc::new(
+            RecallFakeRuntime {
+                entries: vec![
+                    entry_with_agent(Some(current_agent)),
+                    entry_with_agent(Some(other_agent)),
+                    entry_with_agent(None),
+                ],
+            },
+        )));
+        let source = WorkspaceMemoryRecallSource::new(
+            runtime,
+            macaca_memory::MemoryScope::agent_private(
+                macaca_proto::ApplicationId::new(),
+                current_agent,
+            ),
+            8,
+            Some(current_agent),
+            None,
+        );
+
+        let mut query = MemoryRecallQuery::lite("x", 1024);
+        query.include_agent_private = true;
+        query.include_session_shared = false;
+        let hits = source.recall(query).await.unwrap();
+
+        assert_eq!(hits.len(), 1);
     }
 }

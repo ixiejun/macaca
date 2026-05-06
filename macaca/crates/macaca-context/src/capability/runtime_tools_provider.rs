@@ -31,7 +31,10 @@ impl ContextProvider for RuntimeToolCapabilityProvider {
         ContextProviderStage::CapabilityIndex
     }
 
-    async fn contribute(&self, _ctx: &ContextComposeContext<'_>) -> MacacaResult<ContextProviderOutcome> {
+    async fn contribute(
+        &self,
+        _ctx: &ContextComposeContext<'_>,
+    ) -> MacacaResult<ContextProviderOutcome> {
         Ok(ContextProviderOutcome {
             candidates: if let Some(c) = runtime_tool_catalog_to_candidate(&self.catalog) {
                 vec![c]

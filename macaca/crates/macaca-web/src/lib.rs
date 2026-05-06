@@ -5,19 +5,20 @@
 
 pub mod agent_runner;
 pub mod bootstrap;
+mod capability_catalog;
 pub mod chat_mediator;
 pub mod chat_orchestrator;
-mod capability_catalog;
 mod context_memory_injection;
 mod context_memory_tools;
 mod context_message_codec;
 mod context_reporting_model;
-mod workspace_memory_recall_source;
 pub mod event_persistence;
+mod external_context_adapter;
 pub mod framework_runner;
 pub mod framework_toolkit;
 pub mod hook_consumer;
 pub mod loop_manager;
+mod memory_runtime;
 pub mod metrics;
 pub mod orchestration_tools;
 pub mod proto_event_visitors;
@@ -28,10 +29,13 @@ pub mod runtime_resume;
 pub mod session;
 pub mod session_replay;
 pub mod skill_mcp;
+mod source_artifact;
 pub mod sse;
 pub mod state;
 pub mod trace_events;
 pub mod workspace;
+mod workspace_knowledge_digest_capability;
+mod workspace_memory_recall_source;
 
 use std::time::Duration;
 
@@ -55,6 +59,7 @@ use macaca_tools::{DefaultToolSet, Tool};
 
 use crate::agent_runner::WebAgentRunner;
 pub use crate::bootstrap::{WebRuntimeFacade, WebServerBuilder};
+use crate::external_context_adapter::install_external_adapters_from_config;
 use crate::orchestration_tools::build_web_tools;
 use crate::state::{AppConfig, AppState, LoopState, PersistenceState, SessionState};
 
@@ -259,7 +264,7 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
         Arc::new(FrameworkInMemorySessionStore::new());
     let mcp_runtime = Arc::new(macaca_runtime_host::McpRuntimeFacade::load_default().await);
 
-    let workspace_memory: Option<Arc<macaca_memory::TestMemoryManager>> =
+    let (workspace_memory, workspace_memory_tombstones) =
         if config.context.recall.expose_memory_tools {
             let mem_dir = data_dir.join("workspace_memory");
             std::fs::create_dir_all(&mem_dir).ok();
@@ -268,10 +273,24 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
                     config.memory.session_ttl_seconds.max(1),
                 )),
             );
-            Some(Arc::new(factory.test_manager()))
+            let tomb = Arc::new(macaca_memory::SharedTombstoneRegistry::new());
+            (
+                Some(Arc::new(factory.test_manager())),
+                Some(Arc::clone(&tomb)),
+            )
         } else {
-            None
+            (None, None)
         };
+    let memory_runtime = workspace_memory.as_ref().map(|memory| {
+        Arc::new(crate::memory_runtime::WebMemoryRuntime::from_workspace_memory(Arc::clone(memory)))
+    });
+    let configured_external_adapters = install_external_adapters_from_config(&config.context)?;
+    let external_adapter_installations = configured_external_adapters.installations.clone();
+    let external_adapter_runtime_registry = Arc::new(
+        crate::state::ExternalAdapterRuntimeRegistry::new()
+            .with_installations(external_adapter_installations),
+    );
+    let context_engine_registry = Arc::new(configured_external_adapters.registry);
 
     // 10. Build shared state.
     let state = Arc::new_cyclic(|weak_state| {
@@ -289,7 +308,9 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
             llm_router: llm_router.clone(),
             tools,
             executor_registry: executor_registry.clone(),
+            memory_runtime: memory_runtime.clone(),
             workspace_memory: workspace_memory.clone(),
+            workspace_memory_tombstones: workspace_memory_tombstones.clone(),
             mcp_runtime: Arc::clone(&mcp_runtime),
             driver_registry: Arc::clone(&driver_registry),
             driver_runtime: Arc::clone(&driver_runtime),
@@ -326,6 +347,8 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
                 alert_manager: alert_manager.clone(),
             },
             context_provider_registry: Arc::new(macaca_context::ContextProviderRegistry::new()),
+            context_engine_registry: Arc::clone(&context_engine_registry),
+            external_adapter_runtime_registry: Arc::clone(&external_adapter_runtime_registry),
             provider_health_ledger: Arc::new(macaca_context::ProviderHealthLedger::new()),
         }
     });

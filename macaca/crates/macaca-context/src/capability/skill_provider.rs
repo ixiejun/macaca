@@ -24,7 +24,10 @@ pub struct SkillContextProvider {
 
 impl SkillContextProvider {
     #[must_use]
-    pub fn new(catalog: Arc<SkillCapabilityCatalog>, ready_mcp_server_ids: Arc<Vec<String>>) -> Self {
+    pub fn new(
+        catalog: Arc<SkillCapabilityCatalog>,
+        ready_mcp_server_ids: Arc<Vec<String>>,
+    ) -> Self {
         Self {
             catalog,
             ready_mcp_server_ids,
@@ -42,7 +45,10 @@ impl ContextProvider for SkillContextProvider {
         ContextProviderStage::CapabilityIndex
     }
 
-    async fn contribute(&self, _ctx: &ContextComposeContext<'_>) -> MacacaResult<ContextProviderOutcome> {
+    async fn contribute(
+        &self,
+        _ctx: &ContextComposeContext<'_>,
+    ) -> MacacaResult<ContextProviderOutcome> {
         let mut diagnostics = Vec::new();
         for note in skill_missing_dependency_notes(&self.catalog, &self.ready_mcp_server_ids) {
             diagnostics.push(ContextProviderDiagnostics {

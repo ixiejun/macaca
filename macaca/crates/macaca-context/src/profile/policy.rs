@@ -5,9 +5,7 @@
 
 use macaca_proto::config::AgentProfileContextConfig;
 
-use crate::composer::{
-    ContextCacheClass, ContextCandidateKind, ContextScope, ContextTarget,
-};
+use crate::composer::{ContextCacheClass, ContextCandidateKind, ContextScope, ContextTarget};
 use crate::prompt::TrustLevel;
 
 use super::kinds::AgentProfileFileKind;

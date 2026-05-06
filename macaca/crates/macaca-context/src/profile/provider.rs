@@ -60,7 +60,12 @@ impl ProfileFileContextProvider {
         pol: &ProfileKindPolicy,
     ) -> ContextProviderOutcome {
         let mut diagnostics: Vec<ContextProviderDiagnostics> = Vec::new();
-        let mut notes: Vec<String> = pol.static_diagnostics.iter().map(ToString::to_string).collect();
+        let mut notes: Vec<String> = pol
+            .static_diagnostics
+            .iter()
+            .map(ToString::to_string)
+            .collect();
+        notes.extend(out.load_notes.iter().cloned());
 
         if out.truncated_by_cap {
             diagnostics.push(ContextProviderDiagnostics {
@@ -103,6 +108,9 @@ impl ProfileFileContextProvider {
             content: body.to_string(),
             token_estimate,
             diagnostics: notes,
+            evidence_memory_ids: Vec::new(),
+            digest_strength: None,
+            source_report: None,
         };
 
         ContextProviderOutcome {
@@ -158,7 +166,8 @@ impl ContextProvider for ProfileFileContextProvider {
             };
 
             let policy = default_policy_for(kind, &self.config);
-            match load_profile_file_at_canonical_root(&resolved_root, kind, &self.config, skip).await
+            match load_profile_file_at_canonical_root(&resolved_root, kind, &self.config, skip)
+                .await
             {
                 Ok(Some(out)) => {
                     let partial = Self::outcome_for_load(kind, out, &policy);
@@ -174,6 +183,12 @@ impl ContextProvider for ProfileFileContextProvider {
                             kind.file_name(),
                             ProfileSkipReason::PathNotConfinedToRoot
                         ),
+                    });
+                }
+                Err(ProfileSkipReason::ContentRejected(reason)) => {
+                    pooled_diagnostics.push(ContextProviderDiagnostics {
+                        provider_id: self.provider_id().to_string(),
+                        message: format!("rejected {}: {reason}", kind.file_name()),
                     });
                 }
                 Err(other) => {

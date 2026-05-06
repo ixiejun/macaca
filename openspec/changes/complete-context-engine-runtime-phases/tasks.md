@@ -35,7 +35,7 @@
 
 - [x] 5.1 Wire selected `pruning` engine into framework/runtime LLM payload assembly.
 - [x] 5.2 Ensure large tool result, trace event, command stdout, file read, and search result sources render as summary/excerpt/source ref in model context.
-- [ ] 5.3 Preserve original source payload in EventLog/session/artifact store.
+- [x] 5.3 Preserve original source payload in EventLog/session/artifact store via `ContextSourceArtifactRepository` and `context_source_artifact` EventLog rows before `context_report` persistence.
 - [x] 5.4 Show pruning decisions, pruned tokens, render mode, trust level, and source ref in context report API/UI.
 - [x] 5.5 Add integration tests proving large stdout/file read is not fully sent to LLM while original payload remains retrievable.
 
@@ -52,10 +52,10 @@
 
 ## 7. Phase 4 Memory Recall and Wiki Runtime Flow
 
-- [ ] 7.1 Implement read-only `memory_search`, `memory_get`, and wiki/digest recall entry points through context source providers _(memory tools + optional preflight wired when `context.recall.expose_memory_tools`; wiki/digest recall tool still pending)_.
+- [x] 7.1 Implement read-only `memory_search`, `memory_get`, and wiki/digest recall entry points through context source providers. `memory_search` / `memory_get` are runtime-backed tools; wiki/digest recall enters through `KnowledgeDigestContextProvider` and `WorkspaceKnowledgeDigestCapability` so it stays reportable.
 - [x] 7.2 Add recall policy with max tokens/chars, timeout, provenance, confidence, privacy tier, and source budget.
 - [x] 7.3 Add opt-in preflight recall runtime step with read-only tool allowlist and safe degradation.
-- [ ] 7.4 Inject recall output as dynamic/untrusted/request-only context and never write it back to canonical transcript _(wire-only injection with explicit untrusted prefix; persistence boundary still framework-owned)_.
+- [x] 7.4 Inject recall output as dynamic/untrusted/request-only context and never write it back to canonical transcript. Active recall and knowledge digest candidates are dynamic/untrusted, carry request-only diagnostics, and tests assert provider contribution does not mutate base messages.
 - [x] 7.5 Surface memory/wiki recall sources and warnings in `ContextReport`.
 - [x] 7.6 Add tests proving memory is not globally loaded by default and recall is visible only when explicitly enabled or invoked.
 
@@ -73,5 +73,5 @@
 - [x] 9.1 Run `openspec validate complete-context-engine-runtime-phases --strict`.
 - [x] 9.2 Run targeted Rust tests for `macaca-context`, `macaca-runtime`, `macaca-framework`, `macaca-web`, `macaca-memory`, and `macaca-persist`.
 - [x] 9.3 Run frontend lint/build or targeted UI tests for context report and lineage views.
-- [ ] 9.4 Run GitNexus impact and change detection using available CLI/MCP workflow.
-- [ ] 9.5 Update this checklist only after runtime behavior and verification evidence are complete.
+- [x] 9.4 Run GitNexus impact and change detection using available CLI/MCP workflow. Evidence: GitNexus impact for `assemble_and_emit_report` and `ContextReportingChatModel` returned LOW risk during closure verification; final detect-changes is re-run with this update.
+- [x] 9.5 Update this checklist only after runtime behavior and verification evidence are complete. This checklist now mirrors `complete-context-engine-all-phases` completion evidence and the runtime spec includes Phase 6-10 gates.

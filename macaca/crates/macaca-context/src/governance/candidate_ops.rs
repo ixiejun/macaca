@@ -50,8 +50,13 @@ pub fn validate_governed_candidate(c: &ContextCandidate) -> Result<(), String> {
 #[must_use]
 pub fn with_rewritten_content(mut c: ContextCandidate, new_content: String) -> ContextCandidate {
     let tokens = estimate_text_tokens(&new_content).max(1);
+    let byte_size = new_content.len();
     c.content = new_content;
     c.token_estimate = tokens;
+    if let Some(report) = c.source_report.as_mut() {
+        report.estimated_tokens = tokens;
+        report.byte_size = byte_size;
+    }
     c
 }
 
@@ -75,6 +80,9 @@ mod tests {
             content: content.into(),
             token_estimate: 1,
             diagnostics: Vec::new(),
+            evidence_memory_ids: Vec::new(),
+            digest_strength: None,
+            source_report: None,
         }
     }
 

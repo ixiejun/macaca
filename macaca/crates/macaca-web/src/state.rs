@@ -1,15 +1,21 @@
 //! Shared application state for the web server.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::convert::Infallible;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use axum::response::sse::Event;
+use serde::Serialize;
 use tokio::sync::{mpsc, RwLock};
 
 use macaca_app::{AppRegistry, AppRuntime};
+use macaca_context::{
+    ContextAdapterSafetyPolicy, ContextEngineInfo, ContextEngineRegistry, ContextFallbackPolicy,
+    ContextProviderRegistry, ProviderHealthLedger,
+};
 use macaca_driver::{DriverRegistry, DriverRuntime};
 use macaca_framework::session::SessionStore as FrameworkSessionStore;
 use macaca_kernel::{ApplicationExecutorRegistry, Kernel};
@@ -19,10 +25,144 @@ use macaca_proto::{config::ContextConfig, ApplicationId, ForkId, LlmMessage};
 use macaca_skill::SkillCatalog;
 use macaca_task::TodoStore;
 use macaca_tools::ToolCatalog;
-use macaca_context::{ContextProviderRegistry, ProviderHealthLedger};
 
 use crate::runtime_resume::RuntimeResumeSignal;
 use crate::workspace::AppWorkspace;
+
+/// Operator-visible installation record for one external adapter engine.
+///
+/// The web layer keeps this inventory separate from `ContextEngineRegistry` so
+/// `/api/context/provider-runtime` can report installation metadata even before
+/// an adapter participates in a request. Today the only concrete install path is
+/// a local registry overlay, but the shape is transport-neutral so future
+/// process/RPC/WASM loaders can publish into the same surface.
+#[derive(Clone, Debug, Serialize)]
+pub struct ExternalAdapterRuntimeInstallation {
+    /// Stable engine metadata reported by the installed adapter wrapper.
+    pub engine: ContextEngineInfo,
+    /// Transport family used to reach the adapter implementation.
+    pub transport: String,
+    /// Which runtime mechanism installed this adapter into the current process.
+    pub installation_source: String,
+    /// Coarse-grained lifecycle state exported to operator diagnostics.
+    pub runtime_state: String,
+    /// Default safety guardrails currently associated with this adapter.
+    pub default_safety_policy: ContextAdapterSafetyPolicy,
+    /// Default fallback policy currently associated with this adapter.
+    pub default_fallback_policy: ContextFallbackPolicy,
+    /// Current circuit-breaker state. Phase 9 still exposes this as metadata only.
+    pub circuit_breaker_runtime_state: String,
+    /// Last time the inventory row was synchronized from runtime state.
+    pub last_sync_epoch_ms: u128,
+}
+
+/// Dedicated inventory for installed external adapter engines.
+///
+/// This is intentionally a separate registry from `ContextEngineRegistry`:
+/// `ContextEngineRegistry` answers "what engines can be selected right now?",
+/// while this structure answers "which external adapters are installed, how did
+/// they get here, and what runtime defaults/status are attached to them?".
+#[derive(Default)]
+pub struct ExternalAdapterRuntimeRegistry {
+    rows: RwLock<HashMap<String, ExternalAdapterRuntimeInstallation>>,
+}
+
+impl ExternalAdapterRuntimeRegistry {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Create the runtime inventory with a precomputed installation snapshot.
+    ///
+    /// Startup wiring uses this when config-driven adapter installation succeeds before the full
+    /// `AppState` exists. The snapshot remains mutable afterwards via `sync_registry_overlay_engines`.
+    pub fn with_installations(
+        self,
+        installations: Vec<ExternalAdapterRuntimeInstallation>,
+    ) -> Self {
+        let rows = installations
+            .into_iter()
+            .map(|installation| (installation.engine.id.clone(), installation))
+            .collect();
+        Self {
+            rows: RwLock::new(rows),
+        }
+    }
+
+    fn now_ms() -> u128 {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|duration| duration.as_millis())
+            .unwrap_or(0)
+    }
+
+    /// Synchronize the explicit inventory with the subset of engine registry rows
+    /// that currently represent non-builtin overlay engines.
+    ///
+    /// Until dedicated install APIs land, registry overlays are the only concrete
+    /// installation mechanism. This method keeps the operator surface explicit and
+    /// prunes stale rows if an overlay engine disappears from the runtime.
+    pub async fn sync_registry_overlay_engines(
+        &self,
+        builtin_engine_ids: &HashSet<String>,
+        registry_engine_rows: &[ContextEngineInfo],
+    ) {
+        let now_ms = Self::now_ms();
+        let mut rows = self.rows.write().await;
+        let active_overlay_ids: HashSet<_> = registry_engine_rows
+            .iter()
+            .filter(|engine| !builtin_engine_ids.contains(&engine.id))
+            .map(|engine| engine.id.clone())
+            .collect();
+
+        rows.retain(|engine_id, _| active_overlay_ids.contains(engine_id));
+
+        for engine in registry_engine_rows
+            .iter()
+            .filter(|engine| !builtin_engine_ids.contains(&engine.id))
+        {
+            let existing = rows.get(&engine.id).cloned();
+            rows.insert(
+                engine.id.clone(),
+                ExternalAdapterRuntimeInstallation {
+                    engine: engine.clone(),
+                    transport: existing
+                        .as_ref()
+                        .map(|row| row.transport.clone())
+                        .unwrap_or_else(|| "registry_overlay".to_string()),
+                    installation_source: existing
+                        .as_ref()
+                        .map(|row| row.installation_source.clone())
+                        .unwrap_or_else(|| "context_engine_registry_overlay".to_string()),
+                    runtime_state: existing
+                        .as_ref()
+                        .map(|row| row.runtime_state.clone())
+                        .unwrap_or_else(|| "installed".to_string()),
+                    default_safety_policy: existing
+                        .as_ref()
+                        .map(|row| row.default_safety_policy.clone())
+                        .unwrap_or_default(),
+                    default_fallback_policy: existing
+                        .as_ref()
+                        .map(|row| row.default_fallback_policy.clone())
+                        .unwrap_or_default(),
+                    circuit_breaker_runtime_state: existing
+                        .as_ref()
+                        .map(|row| row.circuit_breaker_runtime_state.clone())
+                        .unwrap_or_else(|| "not_implemented".to_string()),
+                    last_sync_epoch_ms: now_ms,
+                },
+            );
+        }
+    }
+
+    /// Return a stable, operator-facing snapshot sorted by `engine.id`.
+    pub async fn snapshot(&self) -> Vec<ExternalAdapterRuntimeInstallation> {
+        let mut rows: Vec<_> = self.rows.read().await.values().cloned().collect();
+        rows.sort_by(|left, right| left.engine.id.cmp(&right.engine.id));
+        rows
+    }
+}
 
 /// Mapping from fork_id to session context for hook notifications.
 #[derive(Clone, Debug)]
@@ -144,8 +284,16 @@ pub struct AppState {
     pub tools: Arc<dyn ToolCatalog>,
     /// Application executor registry for isolated multi-agent execution.
     pub executor_registry: Arc<ApplicationExecutorRegistry>,
-    /// Optional shared long-term memory (only when `context.recall.expose_memory_tools`).
+    /// Canonical web memory runtime used by production tools, active recall, and knowledge digest.
+    ///
+    /// The runtime is optional because memory exposure is still controlled by
+    /// `context.recall.expose_memory_tools`. When present, upper web code must prefer this facade
+    /// over concrete managers so provider/runtime implementations remain swappable.
+    pub memory_runtime: Option<Arc<crate::memory_runtime::WebMemoryRuntime>>,
+    /// Legacy builtin backing store retained for compatibility and default runtime construction.
     pub workspace_memory: Option<Arc<macaca_memory::TestMemoryManager>>,
+    /// Tombstone registry paired with [`Self::workspace_memory`] for digest + `memory_forget` coordination.
+    pub workspace_memory_tombstones: Option<Arc<macaca_memory::SharedTombstoneRegistry>>,
     /// Agent OS level MCP runtime and registry.
     pub mcp_runtime: Arc<macaca_runtime_host::McpRuntimeFacade>,
     /// Driver registry for managing loaded software drivers.
@@ -164,6 +312,68 @@ pub struct AppState {
     pub config: AppConfig,
     /// Neutral context-provider factory registry (extensions / tests) — empty by default.
     pub context_provider_registry: Arc<ContextProviderRegistry>,
+    /// Neutral context-engine registry (extensions / tests) overlaid on top of builtin engines.
+    pub context_engine_registry: Arc<ContextEngineRegistry>,
+    /// Explicit installation/runtime inventory for external adapter engines.
+    pub external_adapter_runtime_registry: Arc<ExternalAdapterRuntimeRegistry>,
     /// Last-known invocation summaries for `GET /api/context/provider-runtime`.
     pub provider_health_ledger: Arc<ProviderHealthLedger>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ExternalAdapterRuntimeRegistry;
+    use std::collections::HashSet;
+
+    use macaca_context::ContextEngineInfo;
+
+    #[tokio::test]
+    async fn external_adapter_runtime_registry_syncs_only_overlay_engines() {
+        let registry = ExternalAdapterRuntimeRegistry::new();
+        registry
+            .sync_registry_overlay_engines(
+                &HashSet::from(["legacy".to_string()]),
+                &[
+                    ContextEngineInfo::new("legacy", "Legacy Context Engine"),
+                    ContextEngineInfo::new("custom-external", "Custom External Engine"),
+                ],
+            )
+            .await;
+
+        let snapshot = registry.snapshot().await;
+        assert_eq!(snapshot.len(), 1);
+        assert_eq!(snapshot[0].engine.id, "custom-external");
+        assert_eq!(
+            snapshot[0].installation_source,
+            "context_engine_registry_overlay"
+        );
+        assert_eq!(snapshot[0].runtime_state, "installed");
+    }
+
+    #[tokio::test]
+    async fn external_adapter_runtime_registry_prunes_removed_overlay_engines() {
+        let registry = ExternalAdapterRuntimeRegistry::new();
+        registry
+            .sync_registry_overlay_engines(
+                &HashSet::new(),
+                &[ContextEngineInfo::new(
+                    "custom-external",
+                    "Custom External Engine",
+                )],
+            )
+            .await;
+        registry
+            .sync_registry_overlay_engines(
+                &HashSet::new(),
+                &[ContextEngineInfo::new(
+                    "replacement-external",
+                    "Replacement External Engine",
+                )],
+            )
+            .await;
+
+        let snapshot = registry.snapshot().await;
+        assert_eq!(snapshot.len(), 1);
+        assert_eq!(snapshot[0].engine.id, "replacement-external");
+    }
 }

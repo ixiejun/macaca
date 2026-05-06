@@ -41,6 +41,83 @@ async fn missing_files_yield_none_without_error() {
 }
 
 #[tokio::test]
+async fn heartbeat_respects_inject_flag_false() {
+    let dir = tempdir().unwrap();
+    fs::write(dir.path().join("HEARTBEAT.md"), "cadence-noise-for-test")
+        .await
+        .unwrap();
+    let cfg = AgentProfileContextConfig {
+        enabled: true,
+        inject_heartbeat: false,
+        max_file_bytes: 1024,
+        ..Default::default()
+    };
+    let assemble = ContextAssembleInput {
+        app_id: None,
+        session_id: None,
+        agent_name: "t".into(),
+        model: "m".into(),
+        base_messages: Vec::new(),
+        options: LlmOptions::default(),
+        budget: crate::budget::ContextBudget::default(),
+    };
+    let ctx = ContextComposeContext {
+        assemble_input: &assemble,
+    };
+    let prov = ProfileFileContextProvider::new(dir.path().to_path_buf(), cfg);
+    let out = prov.contribute(&ctx).await.unwrap();
+    assert!(
+        !out.candidates
+            .iter()
+            .any(|c| c.source_id.contains("HEARTBEAT")),
+        "{:?}",
+        out.candidates
+            .iter()
+            .map(|c| &c.source_id)
+            .collect::<Vec<_>>()
+    );
+}
+
+#[tokio::test]
+async fn yaml_frontmatter_stripped_from_loaded_body() {
+    let dir = tempdir().unwrap();
+    let body = "---\ntitle: x\n---\n\nHelloBody";
+    fs::write(dir.path().join("SOUL.md"), body).await.unwrap();
+    let cfg = AgentProfileContextConfig {
+        enabled: true,
+        max_file_bytes: 1024,
+        ..Default::default()
+    };
+    let out = load_profile_file(dir.path(), AgentProfileFileKind::Soul, &cfg, false)
+        .await
+        .unwrap()
+        .expect("soul loaded");
+    assert!(
+        !out.text.contains("title:"),
+        "frontmatter leaked: {}",
+        out.text
+    );
+    assert!(out.text.contains("HelloBody"));
+}
+
+#[tokio::test]
+async fn oversized_line_budget_rejected() {
+    let dir = tempdir().unwrap();
+    let many = vec!["line"; 12].join("\n");
+    fs::write(dir.path().join("USER.md"), many).await.unwrap();
+    let cfg = AgentProfileContextConfig {
+        enabled: true,
+        max_file_bytes: 1024,
+        profile_max_content_lines: 10,
+        ..Default::default()
+    };
+    let err = load_profile_file(dir.path(), AgentProfileFileKind::User, &cfg, false)
+        .await
+        .unwrap_err();
+    assert!(matches!(err, ProfileSkipReason::ContentRejected(_)));
+}
+
+#[tokio::test]
 async fn oversized_read_is_truncated() {
     let dir = tempdir().unwrap();
     let path = dir.path().join("SOUL.md");

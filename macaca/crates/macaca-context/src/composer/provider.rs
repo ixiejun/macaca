@@ -1,6 +1,10 @@
 //! [`ContextProvider`] trait: one link in a Chain-of-Responsibility pipeline.
 //!
 //! Behavior:
+//! **Legacy engine path:** [`crate::LegacyContextEngine`] is the historical “pass-through” assembler
+//! (no composer fan-in). Prefer [`super::facade::ContextFacade::assemble_model_context`] for OS features
+//! requiring provider candidates.
+//!
 //! 1. `ContextFacade` sorts providers by [`ContextProviderStage`] ascending, then by
 //!    `provider_id`, and calls them in that order for determinism.
 //! 2. Each provider returns [`crate::composer::ContextCandidate`] values asynchronously and
@@ -26,12 +30,14 @@ pub enum ContextProviderStage {
     StableProfile = 0,
     /// Capability catalogs (skills / MCP summaries, etc.).
     CapabilityIndex = 1,
+    /// Compiled knowledge digests (governed claims) — runs **before** raw vector injection.
+    KnowledgeDigest = 2,
     /// Active recall and similar dynamic memory.
-    ActiveRecall = 2,
+    ActiveRecall = 3,
     /// Runtime injection (trace, diagnostics).
-    RuntimeDynamic = 3,
+    RuntimeDynamic = 4,
     /// Diagnostics-only (may leave `content` empty if not meant for the model).
-    Diagnostics = 4,
+    Diagnostics = 5,
 }
 
 /// Read-only snapshot passed into providers for one assembly pass.

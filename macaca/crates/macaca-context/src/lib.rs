@@ -14,6 +14,7 @@ pub mod composer;
 pub mod engine;
 pub mod estimate;
 pub mod governance;
+pub mod knowledge_digest;
 pub mod memory;
 pub mod memory_active_recall_provider;
 pub mod preflight;
@@ -28,45 +29,56 @@ pub use active_recall::{
 };
 pub use adapter::{
     validate_external_result, ContextAdapterSafetyPolicy, ContextEngineConformance,
-    ContextFallbackPolicy, ExternalContextAdapter, ExternalContextAdapterInfo,
+    ContextFallbackPolicy, ExternalAdapterContextEngine, ExternalContextAdapter,
+    ExternalContextAdapterInfo,
 };
 pub use budget::ContextBudget;
 pub use capability::{
     mcp_capability_provider_arc, mcp_tool_collisions, runtime_tool_capability_provider_arc,
     skill_capability_provider_arc, CapabilityCollisionRecord, DeclaredCapabilityDependency,
-    McpCapabilityCatalog, McpContextProvider, McpServerCapabilitySummary, RuntimeToolCapabilityCatalog,
-    RuntimeToolCapabilityProvider, SkillCapabilityCatalog, SkillCapabilityRecord, SkillContextProvider,
-    SkillFilterDiagnostic,
+    McpCapabilityCatalog, McpContextProvider, McpServerCapabilitySummary,
+    RuntimeToolCapabilityCatalog, RuntimeToolCapabilityProvider, SkillCapabilityCatalog,
+    SkillCapabilityRecord, SkillContextProvider, SkillFilterDiagnostic,
+};
+pub use catalog::{
+    assemble_context_providers, list_builtin_family_descriptors, ProviderAssemblyEnvironment,
+    ProviderHealthLedger, ProviderHealthSnapshot, VersionedContextProvider,
 };
 pub use compaction::{
     CompactionDecision, CompactionHookInput, CompactionLifecycleHook, CompactionPolicy,
     CompactionSummaryEnvelope, CompactionTrigger, LineageKind, NoopCompactionLifecycleHook,
     SessionLineage, ThresholdCompactionPolicy, TranscriptSegment,
 };
-pub use catalog::{
-    assemble_context_providers, list_builtin_family_descriptors, ProviderAssemblyEnvironment,
-    ProviderHealthLedger, ProviderHealthSnapshot, VersionedContextProvider,
-};
 pub use composer::{
-    merge_composer_into_messages, sort_providers, ContextCacheClass, ContextCandidate,
-    ContextCandidateKind, ContextComposeContext, ContextComposer, ContextFacade,
-    ContextFacadeAssemblyPolicy, ContextPlan,
-    ContextPlanBuilder, ContextPlanDecision, ContextProvider, ContextProviderDiagnostics,
-    ContextProviderOutcome, ContextProviderStage, ContextScope, ContextTarget,
-    DefaultContextComposer,
+    merge_composer_into_messages, sort_providers, CapabilityCandidate, ContextCacheClass,
+    ContextCandidate, ContextCandidateKind, ContextComposeContext, ContextComposer, ContextFacade,
+    ContextFacadeAssemblyPolicy, ContextPlan, ContextPlanBuilder, ContextPlanDecision,
+    ContextProvider, ContextProviderDiagnostics, ContextProviderOutcome, ContextProviderStage,
+    ContextScope, ContextTarget, DefaultContextComposer, DigestStrengthSnapshot,
 };
 pub use engine::{
-    ContextAfterTurnInput, ContextAssembleInput, ContextAssembleResult, ContextEngine,
-    ContextEngineInfo, ContextEngineRegistry, ContextEngineSelection, ContextManagerFacade,
-    ContextOptionsPatch, ContextRuntimeFacade, LegacyContextEngine, PruningContextEngine,
-    SummaryContextEngine, WindowedContextEngine,
+    list_builtin_engine_infos, ContextAfterTurnInput, ContextAssembleInput, ContextAssembleResult,
+    ContextEngine, ContextEngineInfo, ContextEngineRegistry, ContextEngineSelection,
+    ContextManagerFacade, ContextOptionsPatch, ContextRuntimeFacade, LegacyContextEngine,
+    PruningContextEngine, SummaryContextEngine, WindowedContextEngine,
 };
 pub use estimate::estimate_text_tokens;
+pub use governance::{
+    apply_trust_policies_to_candidates, governance_config_fingerprint, run_governed_provider_chain,
+    run_ungoverned_provider_chain, validate_opaque_external_payload, ContextProviderFactory,
+    ContextProviderRegistry, ExternalCandidateLimits, GovernedCollection, OpaqueExternalPayload,
+    ProviderFactoryInput, ProviderFamilyDescriptor,
+};
+pub use knowledge_digest::{
+    apply_digest_vs_raw_selection, digest_candidate_id, filter_digest_items_by_tombstones,
+    knowledge_digest_provider_arc, KnowledgeDigestContextProvider, ACTIVE_VECTOR_RECALL_SOURCE_ID,
+};
 pub use memory::{
     memory_source, wiki_digest_source, ActiveRecallBudget, ActiveRecallCapability,
     ActiveRecallPolicy, ActiveRecallReport, ConfidenceScore, ContextSourceProvenance,
-    MemoryPrefetchResult, MemoryProviderHookInput, MemoryRecallItem, MemoryRecallQuery,
-    MemorySourceProvider, PrivacyTier, RecallCandidate, RecallDecision, WikiDigestSourceProvider,
+    KnowledgeDigestCapability, KnowledgeDigestItem, MemoryPrefetchResult, MemoryProviderHookInput,
+    MemoryRecallItem, MemoryRecallQuery, MemorySourceProvider, PrivacyTier, RecallCandidate,
+    RecallDecision, WikiDigestSourceProvider,
 };
 pub use memory_active_recall_provider::{
     memory_active_recall_provider_arc, MemoryActiveRecallContextProvider,
@@ -81,14 +93,8 @@ pub use profile::{
     ProfileLoadOutput, ProfileSkipReason,
 };
 pub use prompt::{
-    CompiledPrompt, PromptComposer, PromptSection, PromptSectionBuilder, PromptStability,
-    TrustLevel,
-};
-pub use governance::{
-    apply_trust_policies_to_candidates, governance_config_fingerprint,
-    run_governed_provider_chain, run_ungoverned_provider_chain, validate_opaque_external_payload,
-    ContextProviderFactory, ContextProviderRegistry, ExternalCandidateLimits, GovernedCollection,
-    OpaqueExternalPayload, ProviderFactoryInput, ProviderFamilyDescriptor,
+    CompiledContext, CompiledPrompt, PromptComposer, PromptSection, PromptSectionBuilder,
+    PromptStability, TrustLevel,
 };
 pub use report::{
     ActiveRecallDiagnostics, ComposerPlanSummary, ComposerSkipRecord, ContextDecisionReport,

@@ -123,18 +123,20 @@ pub(crate) async fn build_toolkit(
         }
     }
 
-    if let Some(memory) = state.workspace_memory.as_ref() {
+    if let Some(runtime) = state.memory_runtime.as_ref() {
         let limit = state
             .config
             .context
             .recall
             .memory_search_default_limit
             .clamp(1, 32);
+        let scope = crate::context_memory_tools::workspace_tool_scope(*app_id);
         if policy.allows_base_tool("memory_search") {
             toolkit.register(
                 Box::new(SingleToolAdapter::new(Box::new(
                     crate::context_memory_tools::WorkspaceMemorySearchTool {
-                        memory: Arc::clone(memory),
+                        runtime: Arc::clone(runtime),
+                        scope: scope.clone(),
                         default_limit: limit,
                     },
                 ))),
@@ -145,11 +147,26 @@ pub(crate) async fn build_toolkit(
             toolkit.register(
                 Box::new(SingleToolAdapter::new(Box::new(
                     crate::context_memory_tools::WorkspaceMemoryGetTool {
-                        memory: Arc::clone(memory),
+                        runtime: Arc::clone(runtime),
+                        scope: scope.clone(),
                     },
                 ))),
                 None,
             );
+        }
+        if policy.allows_base_tool("memory_forget") {
+            if let Some(ts) = state.workspace_memory_tombstones.as_ref() {
+                toolkit.register(
+                    Box::new(SingleToolAdapter::new(Box::new(
+                        crate::context_memory_tools::WorkspaceMemoryForgetTool {
+                            runtime: Arc::clone(runtime),
+                            scope: scope.clone(),
+                            tombstones: Arc::clone(ts),
+                        },
+                    ))),
+                    None,
+                );
+            }
         }
     }
 

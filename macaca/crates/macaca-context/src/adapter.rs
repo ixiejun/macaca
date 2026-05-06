@@ -1,11 +1,15 @@
 //! External context adapter safety boundary contracts.
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
-use crate::engine::{ContextAssembleInput, ContextAssembleResult};
+use crate::engine::{
+    ContextAssembleInput, ContextAssembleResult, ContextEngine, ContextEngineInfo,
+    ContextEngineRegistry, ContextEngineSelection, ContextRuntimeFacade,
+};
 use crate::report::{ContextDecisionReport, ContextDecisionSeverity};
 
 /// Safety limits applied when an external context adapter participates in assembly.
@@ -79,6 +83,116 @@ pub trait ExternalContextAdapter: Send + Sync {
     ) -> macaca_proto::MacacaResult<ContextAssembleResult>;
 }
 
+/// Context-engine wrapper that runs an external adapter behind explicit safety and fallback policy.
+///
+/// Transport details remain outside this crate: callers install any process/RPC/WASM bridge by
+/// implementing [`ExternalContextAdapter`] and optionally overlaying this engine into a runtime
+/// registry. The wrapper enforces bounded execution, validates adapter output, and degrades through
+/// a builtin-or-overlay fallback registry instead of crashing the main loop.
+pub struct ExternalAdapterContextEngine {
+    adapter: Arc<dyn ExternalContextAdapter>,
+    safety: ContextAdapterSafetyPolicy,
+    fallback: ContextFallbackPolicy,
+    fallback_registry: ContextEngineRegistry,
+}
+
+impl ExternalAdapterContextEngine {
+    pub fn new(
+        adapter: Arc<dyn ExternalContextAdapter>,
+        safety: ContextAdapterSafetyPolicy,
+        fallback: ContextFallbackPolicy,
+    ) -> Self {
+        Self {
+            adapter,
+            safety,
+            fallback,
+            fallback_registry: ContextEngineRegistry::with_builtins(),
+        }
+    }
+
+    pub fn with_fallback_registry(mut self, registry: ContextEngineRegistry) -> Self {
+        self.fallback_registry = registry;
+        self
+    }
+
+    async fn fallback_with_decision(
+        &self,
+        input: ContextAssembleInput,
+        decision: ContextDecisionReport,
+    ) -> macaca_proto::MacacaResult<ContextAssembleResult> {
+        let fallback = ContextRuntimeFacade::new(
+            self.fallback_registry.clone(),
+            ContextEngineSelection {
+                engine_id: self.fallback.fallback_engine_id.clone(),
+                fallback_engine_id: self.fallback.fallback_engine_id.clone(),
+            },
+        );
+        let mut result = fallback.assemble(input).await?;
+        result.report.decisions.push(decision);
+        Ok(result)
+    }
+}
+
+#[async_trait]
+impl ContextEngine for ExternalAdapterContextEngine {
+    fn info(&self) -> ContextEngineInfo {
+        let adapter = self.adapter.info();
+        ContextEngineInfo {
+            id: adapter.id,
+            name: "External Adapter Context Engine".into(),
+            version: adapter.version,
+        }
+    }
+
+    async fn assemble(
+        &self,
+        input: ContextAssembleInput,
+    ) -> macaca_proto::MacacaResult<ContextAssembleResult> {
+        let adapter_id = self.info().id;
+        let timeout = self.safety.timeout();
+        let call = tokio::time::timeout(timeout, self.adapter.assemble(input.clone())).await;
+        let result = match call {
+            Ok(Ok(result)) => result,
+            Ok(Err(error)) => {
+                return self
+                    .fallback_with_decision(
+                        input,
+                        ContextDecisionReport {
+                            code: "external_context_adapter_fallback".into(),
+                            severity: ContextDecisionSeverity::Warning,
+                            message: format!(
+                                "External context adapter '{adapter_id}' failed; fallback '{}' was used: {error}",
+                                self.fallback.fallback_engine_id
+                            ),
+                        },
+                    )
+                    .await;
+            }
+            Err(_) => {
+                return self
+                    .fallback_with_decision(
+                        input,
+                        ContextDecisionReport {
+                            code: "external_context_adapter_timeout".into(),
+                            severity: ContextDecisionSeverity::Warning,
+                            message: format!(
+                                "External context adapter '{adapter_id}' exceeded {}ms; fallback '{}' was used.",
+                                self.safety.timeout_ms, self.fallback.fallback_engine_id
+                            ),
+                        },
+                    )
+                    .await;
+            }
+        };
+
+        if let Err(decision) = validate_external_result(&result, &input, &self.safety) {
+            return self.fallback_with_decision(input, decision).await;
+        }
+
+        Ok(result)
+    }
+}
+
 /// Validate that an external adapter result respects the configured guardrails.
 ///
 /// Today the checks focus on two invariants:
@@ -139,6 +253,7 @@ mod tests {
     use super::*;
     use crate::engine::{ContextAssembleInput, ContextEngine};
     use macaca_proto::{LlmMessage, LlmOptions};
+    use std::sync::Arc;
 
     #[test]
     fn safety_policy_defaults_are_bounded() {
@@ -158,5 +273,116 @@ mod tests {
         );
         let result = crate::LegacyContextEngine.assemble(input).await.unwrap();
         ContextEngineConformance::assert_preserves_required_report_fields(&result);
+    }
+
+    struct StaticExternalAdapter {
+        result: Option<ContextAssembleResult>,
+        sleep_ms: u64,
+    }
+
+    #[async_trait]
+    impl ExternalContextAdapter for StaticExternalAdapter {
+        fn info(&self) -> ExternalContextAdapterInfo {
+            ExternalContextAdapterInfo {
+                id: "external-test".into(),
+                version: "1.0.0".into(),
+            }
+        }
+
+        async fn assemble(
+            &self,
+            input: ContextAssembleInput,
+        ) -> macaca_proto::MacacaResult<ContextAssembleResult> {
+            if self.sleep_ms > 0 {
+                tokio::time::sleep(Duration::from_millis(self.sleep_ms)).await;
+            }
+            Ok(self.result.clone().unwrap_or(ContextAssembleResult {
+                messages: input.base_messages.clone(),
+                options: input.options.clone(),
+                options_patch: Default::default(),
+                report: crate::ContextReportBuilder::new("external-test")
+                    .identity(
+                        input.app_id,
+                        input.session_id.clone(),
+                        input.agent_name.clone(),
+                        input.model.clone(),
+                    )
+                    .budget(input.budget)
+                    .engine("external-test")
+                    .build(),
+            }))
+        }
+    }
+
+    #[tokio::test]
+    async fn external_adapter_engine_degrades_to_fallback_on_timeout() {
+        let engine = ExternalAdapterContextEngine::new(
+            Arc::new(StaticExternalAdapter {
+                result: None,
+                sleep_ms: 20,
+            }),
+            ContextAdapterSafetyPolicy {
+                timeout_ms: 1,
+                ..Default::default()
+            },
+            ContextFallbackPolicy::default(),
+        );
+        let result = engine
+            .assemble(ContextAssembleInput::legacy(
+                "agent",
+                "model",
+                vec![LlmMessage::user("hello")],
+                LlmOptions::default(),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(result.report.engine_id, "legacy");
+        assert!(result
+            .report
+            .decisions
+            .iter()
+            .any(|decision| decision.code == "external_context_adapter_timeout"));
+    }
+
+    #[tokio::test]
+    async fn external_adapter_engine_degrades_to_fallback_on_validation_failure() {
+        let input = ContextAssembleInput::legacy(
+            "agent",
+            "model",
+            vec![LlmMessage::user("hello")],
+            LlmOptions::default(),
+        );
+        let mut oversized_report = crate::ContextReportBuilder::new("external-test")
+            .identity(
+                input.app_id,
+                input.session_id.clone(),
+                input.agent_name.clone(),
+                input.model.clone(),
+            )
+            .budget(input.budget)
+            .engine("external-test")
+            .build();
+        oversized_report.estimated_total_tokens = input.budget.input_budget() + 1;
+        let oversized = ContextAssembleResult {
+            messages: input.base_messages.clone(),
+            options: input.options.clone(),
+            options_patch: Default::default(),
+            report: oversized_report,
+        };
+        let engine = ExternalAdapterContextEngine::new(
+            Arc::new(StaticExternalAdapter {
+                result: Some(oversized),
+                sleep_ms: 0,
+            }),
+            ContextAdapterSafetyPolicy::default(),
+            ContextFallbackPolicy::default(),
+        );
+        let result = engine.assemble(input).await.unwrap();
+        assert_eq!(result.report.engine_id, "legacy");
+        assert!(result
+            .report
+            .decisions
+            .iter()
+            .any(|decision| decision.code == "external_context_budget_exceeded"));
     }
 }

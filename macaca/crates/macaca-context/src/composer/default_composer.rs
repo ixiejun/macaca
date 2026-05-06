@@ -171,6 +171,7 @@ fn map_candidate_kind_to_source_kind(k: ContextCandidateKind) -> ContextSourceKi
     match k {
         ContextCandidateKind::ProfileBootstrap => ContextSourceKind::Workspace,
         ContextCandidateKind::CapabilityIndex => ContextSourceKind::Skill,
+        ContextCandidateKind::KnowledgeDigest => ContextSourceKind::WikiDigest,
         ContextCandidateKind::MemoryRecall => ContextSourceKind::Memory,
         ContextCandidateKind::WorkspaceGuide => ContextSourceKind::Workspace,
         ContextCandidateKind::RuntimeDiagnostic => ContextSourceKind::Trace,
@@ -252,6 +253,9 @@ mod tests {
             content: "first".into(),
             token_estimate: 1,
             diagnostics: vec![],
+            evidence_memory_ids: vec![],
+            digest_strength: None,
+            source_report: None,
         };
         let c2 = ContextCandidate {
             source_id: "b".into(),
@@ -264,6 +268,9 @@ mod tests {
             content: "second".into(),
             token_estimate: 1,
             diagnostics: vec![],
+            evidence_memory_ids: vec![],
+            digest_strength: None,
+            source_report: None,
         };
         let composer = DefaultContextComposer::new();
         let (p1, _) =
@@ -286,6 +293,9 @@ mod tests {
             content: "x".into(),
             token_estimate: 1_000_000,
             diagnostics: vec![],
+            evidence_memory_ids: vec![],
+            digest_strength: None,
+            source_report: None,
         };
         let composer = DefaultContextComposer::new();
         let (plan, _) = ContextComposer::compose(&composer, "p", &input, vec![big]).unwrap();

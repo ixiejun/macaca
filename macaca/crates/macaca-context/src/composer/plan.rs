@@ -16,7 +16,7 @@ pub struct ContextPlanDecision {
 }
 
 /// Full output of one composer run: selected set, skipped set, and plan id.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ContextPlan {
     /// Independent from `ContextReport.request_id`; identifies this composer pass only.
     pub plan_id: String,

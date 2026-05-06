@@ -3,12 +3,14 @@
 //! 2) Builder / Composite via [`crate::composer::DefaultContextComposer`];
 //! 3) Delegation to [`crate::engine::ContextRuntimeFacade`] for the engine stage.
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use macaca_proto::{LlmMessage, LlmRole, MacacaResult};
 use uuid::Uuid;
 
 use crate::composer::assembly_policy::ContextFacadeAssemblyPolicy;
+use crate::composer::candidate_fingerprint::fingerprint_selected_candidates;
 use crate::composer::default_composer::{ContextComposer, DefaultContextComposer};
 use crate::composer::plan::ContextPlan;
 use crate::composer::provider::{ContextComposeContext, ContextProvider};
@@ -16,9 +18,11 @@ use crate::engine::{
     ContextAssembleInput, ContextAssembleResult, ContextEngineSelection, ContextRuntimeFacade,
 };
 use crate::governance::{run_governed_provider_chain, run_ungoverned_provider_chain};
+use crate::knowledge_digest::apply_digest_vs_raw_selection;
 use crate::prompt::CompiledPrompt;
 use crate::report::{
-    ComposerPlanSummary, ComposerSkipRecord, ContextDecisionReport,
+    ComposerPlanSummary, ComposerSkipRecord, ContextDecisionReport, ContextSourceReport,
+    KnowledgeDigestDiagnostics,
 };
 
 /// Merges composer output (`CompiledPrompt::text`) with the visible message history for this call.
@@ -54,6 +58,8 @@ pub fn merge_composer_into_messages(
 }
 
 fn summarize_plan(plan: &ContextPlan) -> ComposerPlanSummary {
+    let (stable_candidate_fingerprint, dynamic_candidate_fingerprint) =
+        fingerprint_selected_candidates(&plan.selected);
     ComposerPlanSummary {
         plan_id: plan.plan_id.clone(),
         selected_source_ids: plan.selected.iter().map(|c| c.source_id.clone()).collect(),
@@ -66,7 +72,68 @@ fn summarize_plan(plan: &ContextPlan) -> ComposerPlanSummary {
                 message: s.message.clone(),
             })
             .collect(),
+        stable_candidate_fingerprint,
+        dynamic_candidate_fingerprint,
     }
+}
+
+fn summarize_knowledge_digest_candidates(
+    candidates: &[crate::composer::ContextCandidate],
+    selected: &[crate::composer::ContextCandidate],
+) -> Vec<KnowledgeDigestDiagnostics> {
+    let mut total_by_provider: BTreeMap<String, usize> = BTreeMap::new();
+    let mut selected_by_provider: BTreeMap<String, Vec<ContextSourceReport>> = BTreeMap::new();
+
+    for candidate in candidates.iter().filter(|candidate| {
+        candidate.kind == crate::composer::ContextCandidateKind::KnowledgeDigest
+    }) {
+        let provider_id = candidate
+            .source_report
+            .as_ref()
+            .and_then(|report| report.provenance_provider_id.clone())
+            .unwrap_or_else(|| "knowledge_digest".into());
+        *total_by_provider.entry(provider_id).or_default() += 1;
+    }
+
+    for candidate in selected.iter().filter(|candidate| {
+        candidate.kind == crate::composer::ContextCandidateKind::KnowledgeDigest
+    }) {
+        let Some(report) = candidate.source_report.clone() else {
+            continue;
+        };
+        let provider_id = report
+            .provenance_provider_id
+            .clone()
+            .unwrap_or_else(|| "knowledge_digest".into());
+        selected_by_provider
+            .entry(provider_id)
+            .or_default()
+            .push(report);
+    }
+
+    let mut summaries = Vec::new();
+    for (provider_id, total_candidates) in total_by_provider {
+        let source_breakdown = selected_by_provider
+            .remove(&provider_id)
+            .unwrap_or_default();
+        summaries.push(KnowledgeDigestDiagnostics {
+            provider_id,
+            total_candidates,
+            selected_candidates: source_breakdown.len(),
+            source_breakdown,
+        });
+    }
+
+    for (provider_id, source_breakdown) in selected_by_provider {
+        summaries.push(KnowledgeDigestDiagnostics {
+            provider_id,
+            total_candidates: source_breakdown.len(),
+            selected_candidates: source_breakdown.len(),
+            source_breakdown,
+        });
+    }
+
+    summaries
 }
 
 /// Preferred OS entry point: composer first, engine second.
@@ -81,6 +148,17 @@ impl ContextFacade {
     pub fn builtins(selection: ContextEngineSelection) -> Self {
         Self {
             engine: ContextRuntimeFacade::builtins(selection),
+            composer: DefaultContextComposer::new(),
+        }
+    }
+
+    /// Same builtin engine registry as [`ContextRuntimeFacade::builtins_with_overlay`], plus the composer.
+    pub fn builtins_with_engine_overlay(
+        selection: ContextEngineSelection,
+        overlay: &crate::engine::ContextEngineRegistry,
+    ) -> Self {
+        Self {
+            engine: ContextRuntimeFacade::builtins_with_overlay(selection, overlay),
             composer: DefaultContextComposer::new(),
         }
     }
@@ -136,23 +214,39 @@ impl ContextFacade {
             (c, n, a, Vec::new(), None)
         };
 
-        if let Some(ref tg) = policy.trust_governance {
-            governance_decisions.extend(crate::governance::trust_policy::apply_trust_policies_to_candidates(
-                &mut collected,
-                tg,
-            ));
+        if policy.knowledge_digest.enabled {
+            let (next, digest_decisions) =
+                apply_digest_vs_raw_selection(collected, &policy.knowledge_digest);
+            collected = next;
+            governance_decisions.extend(digest_decisions);
         }
 
+        if let Some(ref tg) = policy.trust_governance {
+            governance_decisions.extend(
+                crate::governance::trust_policy::apply_trust_policies_to_candidates(
+                    &mut collected,
+                    tg,
+                ),
+            );
+        }
+
+        let digest_candidates = collected.clone();
         let plan_tag = Uuid::new_v4().to_string();
         let (plan, compiled) =
             ContextComposer::compose(&self.composer, plan_tag, &input, collected)?;
         let summary = summarize_plan(&plan);
+        let knowledge_digest =
+            summarize_knowledge_digest_candidates(&digest_candidates, &plan.selected);
 
         input.base_messages = merge_composer_into_messages(input.base_messages.clone(), &compiled);
 
         let mut assembled = self.engine.assemble(input).await?;
         assembled.report.composer = Some(summary);
-        assembled.report.active_recall.extend(active_recall_telemetry);
+        assembled
+            .report
+            .active_recall
+            .extend(active_recall_telemetry);
+        assembled.report.knowledge_digest = knowledge_digest;
         assembled.report.provider_runtime = provider_runtime;
         for d in governance_decisions {
             assembled.report.decisions.push(d);
@@ -173,7 +267,7 @@ mod tests {
     use super::*;
     use crate::composer::ContextFacadeAssemblyPolicy;
     use crate::prompt::{PromptComposer, PromptSection};
-    use crate::report::ContextSourceKind;
+    use crate::report::{ContextSourceKind, ContextSourceReport};
 
     #[test]
     fn stable_hash_ignores_dynamic_only_when_stable_empty() {
@@ -223,6 +317,88 @@ mod tests {
         assert_eq!(m[2].content, "hello");
     }
 
+    #[test]
+    fn knowledge_digest_summary_tracks_selected_rows() {
+        let selected_row = ContextSourceReport::included(
+            "claim-1",
+            ContextSourceKind::WikiDigest,
+            "compiled-knowledge",
+            12,
+            64,
+        )
+        .with_rendering("full", "untrusted", None, 0)
+        .with_recall_metadata(
+            "workspace-knowledge-digest",
+            "claim-1",
+            88,
+            "workspace",
+            true,
+        );
+
+        let all_candidates = vec![
+            crate::composer::ContextCandidate {
+                source_id: "knowledge_digest/claim/claim-1".into(),
+                kind: crate::composer::ContextCandidateKind::KnowledgeDigest,
+                scope: crate::composer::ContextScope::Session,
+                priority: 55,
+                trust: crate::prompt::TrustLevel::Untrusted,
+                cache_class: crate::composer::ContextCacheClass::Dynamic,
+                target: crate::composer::ContextTarget::UserSide,
+                content: "claim 1".into(),
+                token_estimate: 12,
+                diagnostics: vec![],
+                evidence_memory_ids: vec!["memory-a".into()],
+                digest_strength: None,
+                source_report: Some(selected_row.clone()),
+            },
+            crate::composer::ContextCandidate {
+                source_id: "knowledge_digest/claim/claim-2".into(),
+                kind: crate::composer::ContextCandidateKind::KnowledgeDigest,
+                scope: crate::composer::ContextScope::Session,
+                priority: 55,
+                trust: crate::prompt::TrustLevel::Untrusted,
+                cache_class: crate::composer::ContextCacheClass::Dynamic,
+                target: crate::composer::ContextTarget::UserSide,
+                content: "claim 2".into(),
+                token_estimate: 12,
+                diagnostics: vec![],
+                evidence_memory_ids: vec!["memory-b".into()],
+                digest_strength: None,
+                source_report: Some(
+                    ContextSourceReport::included(
+                        "claim-2",
+                        ContextSourceKind::WikiDigest,
+                        "compiled-knowledge",
+                        12,
+                        64,
+                    )
+                    .with_rendering("full", "untrusted", None, 0)
+                    .with_recall_metadata(
+                        "workspace-knowledge-digest",
+                        "claim-2",
+                        77,
+                        "workspace",
+                        true,
+                    ),
+                ),
+            },
+        ];
+
+        let summaries =
+            summarize_knowledge_digest_candidates(&all_candidates, &all_candidates[..1]);
+        assert_eq!(summaries.len(), 1);
+        assert_eq!(summaries[0].provider_id, "workspace-knowledge-digest");
+        assert_eq!(summaries[0].total_candidates, 2);
+        assert_eq!(summaries[0].selected_candidates, 1);
+        assert_eq!(summaries[0].source_breakdown.len(), 1);
+        assert_eq!(
+            summaries[0].source_breakdown[0]
+                .provenance_source_id
+                .as_deref(),
+            Some("claim-1")
+        );
+    }
+
     #[tokio::test]
     async fn empty_providers_matches_runtime_facade_legacy() {
         use macaca_proto::LlmOptions;
@@ -239,11 +415,7 @@ mod tests {
 
         let f = ContextFacade::legacy();
         let via_facade = f
-            .assemble_model_context(
-                input.clone(),
-                &[],
-                ContextFacadeAssemblyPolicy::default(),
-            )
+            .assemble_model_context(input.clone(), &[], ContextFacadeAssemblyPolicy::default())
             .await
             .unwrap();
 

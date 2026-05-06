@@ -49,6 +49,16 @@ pub struct ContextSourceReport {
     pub trust_level: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_ref: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provenance_provider_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provenance_source_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub confidence_score: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub privacy_tier: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub request_only: Option<bool>,
 }
 
 impl ContextSourceReport {
@@ -71,6 +81,11 @@ impl ContextSourceReport {
             render_mode: None,
             trust_level: None,
             source_ref: None,
+            provenance_provider_id: None,
+            provenance_source_id: None,
+            confidence_score: None,
+            privacy_tier: None,
+            request_only: None,
         }
     }
 
@@ -88,6 +103,23 @@ impl ContextSourceReport {
         self.pruned_tokens = pruned_tokens;
         self
     }
+
+    /// Attach bounded recall metadata for dynamic/request-only sources.
+    pub fn with_recall_metadata(
+        mut self,
+        provider_id: impl Into<String>,
+        source_id: impl Into<String>,
+        confidence_score: u8,
+        privacy_tier: impl Into<String>,
+        request_only: bool,
+    ) -> Self {
+        self.provenance_provider_id = Some(provider_id.into());
+        self.provenance_source_id = Some(source_id.into());
+        self.confidence_score = Some(confidence_score);
+        self.privacy_tier = Some(privacy_tier.into());
+        self.request_only = Some(request_only);
+        self
+    }
 }
 
 /// Bounded active recall diagnostics stored in context reports.
@@ -103,6 +135,20 @@ pub struct ActiveRecallDiagnostics {
     pub latency_ms: u64,
     pub source_breakdown: Vec<ContextSourceReport>,
     pub decisions: Vec<ContextDecisionReport>,
+}
+
+/// Bounded governed wiki/digest diagnostics stored in context reports.
+///
+/// Unlike `sources`, this structure is strictly diagnostic: it keeps the
+/// selected governed digest claims, their provider provenance, and bounded
+/// metadata without altering top-level token accounting that already reflects
+/// the merged prompt assembly path.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct KnowledgeDigestDiagnostics {
+    pub provider_id: String,
+    pub total_candidates: usize,
+    pub selected_candidates: usize,
+    pub source_breakdown: Vec<ContextSourceReport>,
 }
 
 /// Severity levels for context-engine decisions.
@@ -139,6 +185,12 @@ pub struct ComposerPlanSummary {
     pub plan_id: String,
     pub selected_source_ids: Vec<String>,
     pub skipped: Vec<ComposerSkipRecord>,
+    /// SHA-256 hex over **stable** composer candidates (post selection, pre engine).
+    #[serde(default)]
+    pub stable_candidate_fingerprint: String,
+    /// SHA-256 hex over **dynamic/unknown** composer candidates.
+    #[serde(default)]
+    pub dynamic_candidate_fingerprint: String,
 }
 
 /// Audit row for a dropped composer candidate.
@@ -193,6 +245,8 @@ pub struct ContextReport {
     pub decisions: Vec<ContextDecisionReport>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub active_recall: Vec<ActiveRecallDiagnostics>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub knowledge_digest: Vec<KnowledgeDigestDiagnostics>,
     /// Context composer plan when the composer pipeline ran for this assembly.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub composer: Option<ComposerPlanSummary>,
@@ -270,6 +324,7 @@ impl ContextReportBuilder {
                 sources: Vec::new(),
                 decisions: Vec::new(),
                 active_recall: Vec::new(),
+                knowledge_digest: Vec::new(),
                 composer: None,
                 provider_runtime: None,
             },

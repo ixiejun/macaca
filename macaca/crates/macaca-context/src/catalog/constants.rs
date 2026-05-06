@@ -18,11 +18,15 @@ pub const FAMILY_RUNTIME_TOOL_CAPABILITY: &str = "runtime_tool_capability";
 /// Active vector / workspace memory recall path.
 pub const FAMILY_MEMORY_ACTIVE_RECALL: &str = "memory_active_recall";
 
+/// Governed knowledge digest / compiled claims (`KnowledgeDigestContextProvider`).
+pub const FAMILY_KNOWLEDGE_DIGEST: &str = "knowledge_digest";
+
 /// Implicit default ordering when `provider_families` in TOML is empty.
 pub const BUILTIN_FAMILY_ORDER: &[&str] = &[
     FAMILY_AGENT_PROFILE,
     FAMILY_SKILL_CAPABILITY,
     FAMILY_MCP_CAPABILITY,
     FAMILY_RUNTIME_TOOL_CAPABILITY,
+    FAMILY_KNOWLEDGE_DIGEST,
     FAMILY_MEMORY_ACTIVE_RECALL,
 ];

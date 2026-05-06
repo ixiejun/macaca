@@ -5,6 +5,7 @@
 //! 2. Canonicalise the root once — every file must remain under that prefix after canonicalisation.
 //! 3. Open the candidate path, enforce a byte cap per [`macaca_proto::config::AgentProfileContextConfig::max_file_bytes`].
 //! 4. Decode UTF-8 with explicit handling for lossy replacement.
+//! 5. Strip optional YAML frontmatter; run lightweight content scans (NUL, line budgets).
 
 use std::path::{Path, PathBuf};
 
@@ -26,6 +27,8 @@ pub struct ProfileLoadOutput {
     pub resolved_path: PathBuf,
     /// True when UTF-8 decoding replaced invalid bytes (never silent in diagnostics).
     pub utf8_lossy: bool,
+    /// Loader notes (frontmatter stripping, scan outcomes) surfaced as provider diagnostics only.
+    pub load_notes: Vec<String>,
 }
 
 /// Reasons a profile file might be skipped without treating the run as fatal.
@@ -37,6 +40,8 @@ pub enum ProfileSkipReason {
     RootResolutionFailed(String),
     /// Explicit `std::io::Error` mid-flight.
     Io(String),
+    /// Lightweight scan rejects unsafe or oversized payloads.
+    ContentRejected(String),
 }
 
 /// Template-method entry: load `kind` if present and permitted by policy/config.
@@ -77,7 +82,9 @@ pub async fn load_profile_file_at_canonical_root(
 
     enforce_containment(root_ok, &candidate).await?;
 
-    read_limited_utf8(&candidate, config.max_file_bytes).await
+    let mut output = read_limited_utf8(&candidate, config.max_file_bytes).await?;
+    finalize_loaded_profile_body(&mut output, config)?;
+    Ok(Some(output))
 }
 
 /// Canonicalise and validate `root` before issuing per-file loads.
@@ -89,6 +96,65 @@ pub fn canonical_root(root: &Path) -> Result<PathBuf, ProfileSkipReason> {
         )));
     }
     std::fs::canonicalize(root).map_err(|e| ProfileSkipReason::RootResolutionFailed(e.to_string()))
+}
+
+fn finalize_loaded_profile_body(
+    output: &mut ProfileLoadOutput,
+    config: &AgentProfileContextConfig,
+) -> Result<(), ProfileSkipReason> {
+    let (stripped, mut notes) = strip_leading_yaml_frontmatter(&output.text);
+    output.text = stripped;
+    output.load_notes.append(&mut notes);
+    scan_profile_markdown_after_frontmatter(&output.text, config)
+}
+
+fn strip_leading_yaml_frontmatter(text: &str) -> (String, Vec<String>) {
+    let mut notes = Vec::new();
+    let lines: Vec<&str> = text.lines().collect();
+    if lines.is_empty() || lines[0].trim() != "---" {
+        return (text.to_string(), notes);
+    }
+    let mut close: Option<usize> = None;
+    for idx in 1..lines.len() {
+        if lines[idx].trim() == "---" {
+            close = Some(idx);
+            break;
+        }
+    }
+    let Some(close_idx) = close else {
+        notes.push(
+            "profile_yaml_frontmatter: unclosed delimiter (missing closing ---); kept full bytes"
+                .into(),
+        );
+        return (text.to_string(), notes);
+    };
+    let body = lines[close_idx.saturating_add(1)..].join("\n");
+    notes.push(format!(
+        "profile_yaml_frontmatter: stripped {} preamble lines including delimiters",
+        close_idx.saturating_add(1)
+    ));
+    (body, notes)
+}
+
+fn scan_profile_markdown_after_frontmatter(
+    text: &str,
+    config: &AgentProfileContextConfig,
+) -> Result<(), ProfileSkipReason> {
+    if text.contains('\0') {
+        return Err(ProfileSkipReason::ContentRejected(
+            "NUL byte detected in profile text".into(),
+        ));
+    }
+    if config.profile_max_content_lines > 0 {
+        let n = text.lines().count();
+        let cap = usize::try_from(config.profile_max_content_lines).unwrap_or(usize::MAX);
+        if n > cap {
+            return Err(ProfileSkipReason::ContentRejected(format!(
+                "profile exceeds profile_max_content_lines={cap} (saw {n} lines)",
+            )));
+        }
+    }
+    Ok(())
 }
 
 /// Security gate: both paths are canonicalised and the file must be a child of `root_canon`.
@@ -109,10 +175,7 @@ async fn enforce_containment(root_canon: &Path, candidate: &Path) -> Result<(), 
 }
 
 /// Reads up to `max + 1` bytes to detect oversize files, then truncates to `max` UTF-8 safe.
-async fn read_limited_utf8(
-    path: &Path,
-    max: u64,
-) -> Result<Option<ProfileLoadOutput>, ProfileSkipReason> {
+async fn read_limited_utf8(path: &Path, max: u64) -> Result<ProfileLoadOutput, ProfileSkipReason> {
     let max_usize = usize::try_from(max).unwrap_or(usize::MAX);
     // `AsyncReadExt::take` requires `&mut self`; `tokio::fs::File` must stay mutable until the read finishes.
     #[allow(unused_mut)]
@@ -147,13 +210,14 @@ async fn read_limited_utf8(
         .await
         .map_err(|e| ProfileSkipReason::Io(format!("canonicalize {}: {e}", path.display())))?;
 
-    Ok(Some(ProfileLoadOutput {
+    Ok(ProfileLoadOutput {
         text,
         truncated_by_cap,
         raw_bytes,
         resolved_path,
         utf8_lossy,
-    }))
+        load_notes: Vec::new(),
+    })
 }
 
 impl std::fmt::Display for ProfileSkipReason {
@@ -164,6 +228,7 @@ impl std::fmt::Display for ProfileSkipReason {
             }
             ProfileSkipReason::RootResolutionFailed(m) => write!(f, "{m}"),
             ProfileSkipReason::Io(m) => write!(f, "{m}"),
+            ProfileSkipReason::ContentRejected(m) => write!(f, "{m}"),
         }
     }
 }

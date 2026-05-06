@@ -2,6 +2,11 @@
 //!
 //! Remote transports (MCP stdio, HTTP bridges, WASM shims) stay **outside** this module.  Here we
 //! only enforce **structural** limits so hostile or buggy peers cannot allocate unbounded memory.
+//!
+//! ## Stable port contract
+//! In-process composers own the canonical [`crate::composer::ContextCandidate`] shape. Any remote
+//! participant MUST validate through [`validate_opaque_external_payload`] (or stricter local
+//! middleware) before emitting candidates so budget, trust tagging, and report accounting stay coherent.
 
 use crate::report::{ContextDecisionReport, ContextDecisionSeverity};
 
@@ -68,4 +73,53 @@ pub fn validate_opaque_external_payload(
         });
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::composer::{
+        ContextCacheClass, ContextCandidate, ContextCandidateKind, ContextScope, ContextTarget,
+    };
+    use crate::prompt::TrustLevel;
+
+    #[test]
+    fn oversized_payload_fails_before_candidate_construction() {
+        let payload = OpaqueExternalPayload {
+            transport_class: "test".into(),
+            schema_version: 1,
+            source_id: "x".into(),
+            body: "nope".repeat(10_000),
+        };
+        let limits = ExternalCandidateLimits {
+            max_source_id_bytes: 128,
+            max_body_bytes: 64,
+        };
+        let err = validate_opaque_external_payload(&payload, &limits).unwrap_err();
+        assert_eq!(err.code, "external_context_body_too_large");
+
+        let ok = OpaqueExternalPayload {
+            transport_class: "test".into(),
+            schema_version: 1,
+            source_id: "custom_ctx/row1".into(),
+            body: "safe body".into(),
+        };
+        validate_opaque_external_payload(&ok, &limits).expect("should fit");
+
+        let _candidate = ContextCandidate {
+            source_id: ok.source_id.clone(),
+            kind: ContextCandidateKind::Custom,
+            scope: ContextScope::Request,
+            priority: 10,
+            trust: TrustLevel::Untrusted,
+            cache_class: ContextCacheClass::Dynamic,
+            target: ContextTarget::UserSide,
+            content: ok.body,
+            token_estimate: 3,
+            diagnostics: vec![format!("transport={}", ok.transport_class)],
+            evidence_memory_ids: vec![],
+            digest_strength: None,
+            source_report: None,
+        };
+    }
 }

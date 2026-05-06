@@ -44,13 +44,15 @@ impl DefaultActiveRecallProvider {
         result: &MemoryPrefetchResult,
         latency_ms: u64,
     ) -> ActiveRecallReport {
+        let selected_source_breakdown = result
+            .candidates
+            .iter()
+            .filter(|candidate| candidate.decision.selected)
+            .map(|candidate| candidate.item.to_report())
+            .collect();
         ActiveRecallReport {
             provider_id: self.provider_id.clone(),
-            source_breakdown: result
-                .snippets
-                .iter()
-                .map(|snippet| snippet.to_report())
-                .collect(),
+            source_breakdown: selected_source_breakdown,
             decisions: result.decisions.clone(),
             total_candidates: result.candidates.len(),
             selected_candidates: result.snippets.len(),
@@ -274,5 +276,26 @@ mod tests {
 
         assert!(!serialized.contains(full_text));
         assert!(serialized.contains("source_breakdown"));
+    }
+
+    #[tokio::test]
+    async fn active_recall_report_keeps_provenance_and_privacy_metadata() {
+        let source = Arc::new(FakeMemorySource {
+            items: vec![item("a", "remembered fact")],
+        });
+        let provider =
+            DefaultActiveRecallProvider::new("active", source, ActiveRecallPolicy::default());
+        let result = provider
+            .prefetch(MemoryRecallQuery::lite("fact", 100))
+            .await
+            .unwrap();
+        let report = provider.report_from_result(&result, 12);
+        let row = report.source_breakdown.first().unwrap();
+
+        assert_eq!(row.provenance_provider_id.as_deref(), Some("fake-memory"));
+        assert_eq!(row.provenance_source_id.as_deref(), Some("a"));
+        assert_eq!(row.confidence_score, Some(90));
+        assert_eq!(row.privacy_tier.as_deref(), Some("workspace"));
+        assert_eq!(row.request_only, Some(true));
     }
 }

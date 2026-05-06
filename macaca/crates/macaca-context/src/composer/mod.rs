@@ -8,6 +8,7 @@
 
 mod assembly_policy;
 mod candidate;
+mod candidate_fingerprint;
 mod default_composer;
 mod facade;
 mod plan;
@@ -15,7 +16,8 @@ mod provider;
 
 pub use assembly_policy::ContextFacadeAssemblyPolicy;
 pub use candidate::{
-    ContextCacheClass, ContextCandidate, ContextCandidateKind, ContextScope, ContextTarget,
+    CapabilityCandidate, ContextCacheClass, ContextCandidate, ContextCandidateKind, ContextScope,
+    ContextTarget, DigestStrengthSnapshot,
 };
 pub use default_composer::{ContextComposer, ContextPlanBuilder, DefaultContextComposer};
 pub use facade::{merge_composer_into_messages, ContextFacade};

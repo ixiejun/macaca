@@ -25,7 +25,7 @@ pub use config::{
 pub use factory::{
     BuiltinMemoryProviderFactory, MemoryProviderFactory, MemoryProviderFactoryResult,
 };
-pub use mcp::{mcp_provider_diagnostics, McpMemoryProvider};
+pub use mcp::{mcp_provider_diagnostics, McpMemoryProvider, MemoryMcpClient};
 pub use registry::{MemoryProviderRegistry, MemoryProviderRegistryError};
 pub use remote::{MemoryProviderRemoteEnvelope, MemoryProviderRemoteResult, RemoteMemoryProvider};
 pub use runtime::{MemoryProviderRuntime, MemoryProviderRuntimeStatus};

@@ -168,6 +168,24 @@ Recall runtime 行为：
 9. 增加 `windowed`/`summary` engines、fallback event 和 config/manifest/profile selection。
 10. 完成 E2E/集成测试后更新 tasks，只有 runtime 验收通过的 Phase 才标为完成。
 
+## Closure Addendum: Phase 6-10
+
+`complete-context-engine-runtime-phases` now also records the closure evidence that was implemented
+under `complete-context-engine-all-phases` so the two OpenSpec changes do not contradict each other.
+The closure keeps the original design-pattern boundaries:
+
+- Phase 6 uses a Repository/Adapter boundary (`ContextSourceArtifactRepository`) for pruned source
+  retrieval. Context engines and UI code do not construct raw storage keys.
+- Phase 7 uses Memento-style compaction snapshots plus a lineage facade so normal UI keeps one
+  logical session while diagnostics can expand root-to-tip state.
+- Phase 8 uses Chain of Responsibility source providers for memory/wiki/digest recall. Recall rows
+  are dynamic, untrusted, request-only, bounded by policy, and diagnostics persist metadata rather
+  than canonical transcript messages.
+- Phase 9 uses Ports and Adapters / Bridge for custom in-process engines and external context
+  adapters. External output is schema-validated, bounded, trust-fenced, and fail-open/fallback.
+- Phase 10 keeps legacy prompt/context entry points searchable as deprecated compatibility shims,
+  while production context assembly enters through facade/composer/runtime selection.
+
 ## Risks / Trade-offs
 
 - Risk: prompt migration 改变模型行为。

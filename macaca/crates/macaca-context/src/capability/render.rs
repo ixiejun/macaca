@@ -4,17 +4,19 @@ use crate::capability::model::{
     CapabilityCollisionRecord, McpCapabilityCatalog, McpServerCapabilitySummary,
     RuntimeToolCapabilityCatalog, SkillCapabilityCatalog,
 };
+use crate::estimate::estimate_text_tokens;
+use crate::prompt::TrustLevel;
 use crate::{
     ContextCacheClass, ContextCandidate, ContextCandidateKind, ContextScope, ContextTarget,
 };
-use crate::estimate::estimate_text_tokens;
-use crate::prompt::TrustLevel;
 
 /// Computes duplicate local tool keys across MCP servers (same bare name advertised twice).
 ///
 /// Modeling note: MCP clients often register tools prefixed by server; collisions here mean the
 /// **declared exposed name** clashes before any client-side rewrite — still worth auditing.
-pub fn mcp_tool_collisions(servers: &[McpServerCapabilitySummary]) -> Vec<CapabilityCollisionRecord> {
+pub fn mcp_tool_collisions(
+    servers: &[McpServerCapabilitySummary],
+) -> Vec<CapabilityCollisionRecord> {
     let mut buckets: std::collections::BTreeMap<String, Vec<String>> =
         std::collections::BTreeMap::new();
     for srv in servers {
@@ -54,10 +56,7 @@ fn render_skill_capability_text(cat: &SkillCapabilityCatalog) -> String {
                 .iter()
                 .map(|d| d.capability_id.as_str())
                 .collect();
-            w.push_str(&format!(
-                r#" declared_capabilities="{}""#,
-                deps.join(",")
-            ));
+            w.push_str(&format!(r#" declared_capabilities="{}""#, deps.join(",")));
         }
         w.push_str(">\n");
         w.push_str(&format!("    <id>{}</id>\n", xml_escape(&e.stable_id)));
@@ -124,6 +123,9 @@ fn skill_candidates(cat: &SkillCapabilityCatalog) -> Option<ContextCandidate> {
         content: text,
         token_estimate: tokens,
         diagnostics: Vec::new(),
+        evidence_memory_ids: Vec::new(),
+        digest_strength: None,
+        source_report: None,
     })
 }
 
@@ -137,8 +139,7 @@ pub fn skill_missing_dependency_notes(
     cat: &SkillCapabilityCatalog,
     ready_mcp_servers: &[String],
 ) -> Vec<String> {
-    let ready: std::collections::BTreeSet<String> =
-        ready_mcp_servers.iter().cloned().collect();
+    let ready: std::collections::BTreeSet<String> = ready_mcp_servers.iter().cloned().collect();
     let mut notes = Vec::new();
     for e in &cat.entries {
         for dep in &e.declared_dependencies {
@@ -181,10 +182,7 @@ fn render_mcp_capability_text(cat: &McpCapabilityCatalog) -> String {
     w.push_str("<mcp_servers>\n");
     for srv in &cat.servers {
         w.push_str("  <server>\n");
-        w.push_str(&format!(
-            "    <id>{}</id>\n",
-            xml_escape(&srv.server_id)
-        ));
+        w.push_str(&format!("    <id>{}</id>\n", xml_escape(&srv.server_id)));
         w.push_str(&format!(
             "    <transport>{}</transport>\n",
             xml_escape(&srv.transport)
@@ -230,6 +228,9 @@ pub fn mcp_catalog_to_candidate(cat: &McpCapabilityCatalog) -> Option<ContextCan
         content: format!("```mcp_capability_index\n{text}\n```"),
         token_estimate: tokens,
         diagnostics: Vec::new(),
+        evidence_memory_ids: Vec::new(),
+        digest_strength: None,
+        source_report: None,
     })
 }
 
@@ -246,7 +247,9 @@ fn render_runtime_tools_text(cat: &RuntimeToolCapabilityCatalog) -> String {
     w
 }
 
-pub fn runtime_tool_catalog_to_candidate(cat: &RuntimeToolCapabilityCatalog) -> Option<ContextCandidate> {
+pub fn runtime_tool_catalog_to_candidate(
+    cat: &RuntimeToolCapabilityCatalog,
+) -> Option<ContextCandidate> {
     if cat.tool_names.is_empty() {
         return None;
     }
@@ -266,14 +269,17 @@ pub fn runtime_tool_catalog_to_candidate(cat: &RuntimeToolCapabilityCatalog) -> 
         content: text,
         token_estimate: tokens,
         diagnostics: Vec::new(),
+        evidence_memory_ids: Vec::new(),
+        digest_strength: None,
+        source_report: None,
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::SkillCapabilityRecord;
     use crate::capability::model::DeclaredCapabilityDependency;
+    use crate::SkillCapabilityRecord;
 
     #[test]
     fn collision_detects_duplicate_tool_across_servers() {

@@ -23,6 +23,18 @@ pub enum PrivacyTier {
     Secret,
 }
 
+impl PrivacyTier {
+    /// Stable string form reused by diagnostics/UI payloads.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Public => "public",
+            Self::Workspace => "workspace",
+            Self::UserPrivate => "user_private",
+            Self::Secret => "secret",
+        }
+    }
+}
+
 /// Bounded confidence score for recalled memory.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ConfidenceScore(u8);
@@ -124,6 +136,30 @@ impl MemoryRecallItem {
             trust_level: TrustLevel::Untrusted,
             mode: crate::source::ContextRenderMode::Full,
         }
+    }
+
+    /// Convert recalled memory into a redacted report row for diagnostics/UI.
+    pub fn to_report(&self) -> ContextSourceReport {
+        ContextSourceReport::included(
+            self.source.id.clone(),
+            self.source.kind.clone(),
+            self.source.label.clone(),
+            crate::estimate::estimate_text_tokens(&self.text),
+            self.text.len(),
+        )
+        .with_rendering(
+            crate::source::ContextRenderMode::Full.as_str(),
+            "untrusted",
+            self.source.artifact_ref.clone(),
+            0,
+        )
+        .with_recall_metadata(
+            self.provenance.provider_id.clone(),
+            self.provenance.source_id.clone(),
+            self.confidence.value(),
+            self.privacy_tier.as_str(),
+            true,
+        )
     }
 }
 
@@ -315,6 +351,75 @@ pub trait MemorySourceProvider: Send + Sync {
     }
 }
 
+/// One governed digest row normalized for context assembly (DTO / anti-corruption boundary).
+///
+/// [`KnowledgeDigestContextProvider`] renders this into [`crate::composer::ContextCandidate`] with
+/// **reference-only** provenance: `evidence_memory_ids` mirrors `ClaimEvidence::source_id` from the
+/// memory governance compiler. Operators may correlate these with tombstone/audit logs without
+/// stuffing raw row bodies into prompt reports.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct KnowledgeDigestItem {
+    pub claim_id: String,
+    pub label: String,
+    pub statement: String,
+    pub provenance: ContextSourceProvenance,
+    pub evidence_memory_ids: Vec<String>,
+    pub confidence: f32,
+    pub freshness: f32,
+    pub privacy_tier: PrivacyTier,
+    pub request_only: bool,
+    pub redacted: bool,
+}
+
+impl KnowledgeDigestItem {
+    /// Convert the claim confidence score into the bounded integer range used by reports/UI.
+    pub fn confidence_score(&self) -> u8 {
+        let bounded = (self.confidence * 100.0).round().clamp(0.0, 100.0);
+        bounded as u8
+    }
+
+    /// Convert governed digest metadata into a redacted report row for diagnostics/UI.
+    pub fn to_report(&self, rendered_text: &str) -> ContextSourceReport {
+        let evidence_ref = (!self.evidence_memory_ids.is_empty())
+            .then(|| format!("evidence_refs={}", self.evidence_memory_ids.join(",")));
+        ContextSourceReport::included(
+            self.claim_id.clone(),
+            ContextSourceKind::WikiDigest,
+            self.label.clone(),
+            crate::estimate::estimate_text_tokens(rendered_text),
+            rendered_text.len(),
+        )
+        .with_rendering(
+            crate::source::ContextRenderMode::Full.as_str(),
+            "untrusted",
+            evidence_ref,
+            0,
+        )
+        .with_recall_metadata(
+            self.provenance.provider_id.clone(),
+            self.provenance.source_id.clone(),
+            self.confidence_score(),
+            self.privacy_tier.as_str(),
+            self.request_only,
+        )
+    }
+}
+
+/// Port implemented by memory-side adapters (see web/kernel bridges) to expose compiled digests.
+///
+/// ### Dependency inversion
+/// `macaca-context` never imports vector drivers or Milvus; it only awaits bounded `Vec` rows that
+/// were **already** filtered by governance (tombstones, scope, promotions).
+#[async_trait]
+pub trait KnowledgeDigestCapability: Send + Sync {
+    fn capability_id(&self) -> &str;
+
+    async fn digest_for_request(
+        &self,
+        input: &crate::engine::ContextAssembleInput,
+    ) -> macaca_proto::MacacaResult<Vec<KnowledgeDigestItem>>;
+}
+
 /// Contract for wiki/digest style providers that return curated knowledge snippets.
 #[async_trait]
 pub trait WikiDigestSourceProvider: Send + Sync {
@@ -388,6 +493,60 @@ mod tests {
     fn wiki_digest_is_separate_source_kind() {
         let source = wiki_digest_source("wiki", "claim-1", "claim");
         assert_eq!(source.kind, ContextSourceKind::WikiDigest);
+    }
+
+    #[test]
+    fn knowledge_digest_report_preserves_governance_metadata() {
+        let item = KnowledgeDigestItem {
+            claim_id: "claim-1".into(),
+            label: "compiled-knowledge".into(),
+            statement: "deploy only after health checks pass".into(),
+            provenance: ContextSourceProvenance {
+                provider_id: "workspace-knowledge-digest".into(),
+                source_id: "claim-1".into(),
+                evidence: vec!["memory-a".into(), "memory-b".into()],
+            },
+            evidence_memory_ids: vec!["memory-a".into(), "memory-b".into()],
+            confidence: 0.87,
+            freshness: 0.92,
+            privacy_tier: PrivacyTier::Workspace,
+            request_only: true,
+            redacted: true,
+        };
+
+        let report = item.to_report("[Governed knowledge digest]");
+        assert_eq!(
+            report.provenance_provider_id.as_deref(),
+            Some("workspace-knowledge-digest")
+        );
+        assert_eq!(report.provenance_source_id.as_deref(), Some("claim-1"));
+        assert_eq!(report.confidence_score, Some(87));
+        assert_eq!(report.privacy_tier.as_deref(), Some("workspace"));
+        assert_eq!(report.request_only, Some(true));
+        assert_eq!(report.trust_level.as_deref(), Some("untrusted"));
+    }
+
+    #[test]
+    fn recall_item_report_preserves_provenance_and_privacy_metadata() {
+        let item = MemoryRecallItem {
+            source: memory_source("provider", "memory-1", "fact"),
+            text: "remembered fact".into(),
+            provenance: ContextSourceProvenance {
+                provider_id: "provider".into(),
+                source_id: "memory-1".into(),
+                evidence: vec!["turn/1".into()],
+            },
+            confidence: ConfidenceScore::new(87),
+            privacy_tier: PrivacyTier::UserPrivate,
+        };
+
+        let report = item.to_report();
+        assert_eq!(report.provenance_provider_id.as_deref(), Some("provider"));
+        assert_eq!(report.provenance_source_id.as_deref(), Some("memory-1"));
+        assert_eq!(report.confidence_score, Some(87));
+        assert_eq!(report.privacy_tier.as_deref(), Some("user_private"));
+        assert_eq!(report.request_only, Some(true));
+        assert_eq!(report.trust_level.as_deref(), Some("untrusted"));
     }
 
     #[test]

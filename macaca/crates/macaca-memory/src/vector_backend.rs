@@ -336,70 +336,6 @@ mod tests {
         }
     }
 
-    async fn assert_private_collections_are_isolated<F>(backend: &TopologyVectorMemoryBackend<F>)
-    where
-        F: VectorCollectionStoreFactory,
-    {
-        let app_id = ApplicationId::new();
-        let agent_a = MemoryScope::agent_private(app_id, AgentId::new());
-        let agent_b = MemoryScope::agent_private(app_id, AgentId::new());
-        let record_a = VectorMemoryRecord::new(
-            MemoryId::new(),
-            agent_a.clone(),
-            "agent a private vector",
-            vec![1.0, 0.0, 0.0],
-        );
-        let record_b = VectorMemoryRecord::new(
-            MemoryId::new(),
-            agent_b.clone(),
-            "agent b private vector",
-            vec![1.0, 0.0, 0.0],
-        );
-
-        backend.upsert_record(record_a.clone()).await.unwrap();
-        backend.upsert_record(record_b.clone()).await.unwrap();
-
-        let hits_a = backend
-            .search(&agent_a, vec![1.0, 0.0, 0.0], 10)
-            .await
-            .unwrap();
-        let hits_b = backend
-            .search(&agent_b, vec![1.0, 0.0, 0.0], 10)
-            .await
-            .unwrap();
-
-        assert_eq!(hits_a.len(), 1);
-        assert_eq!(hits_a[0].memory_id, record_a.memory_id);
-        assert_eq!(hits_b.len(), 1);
-        assert_eq!(hits_b[0].memory_id, record_b.memory_id);
-    }
-
-    async fn assert_shared_collection_is_explicit<F>(backend: &TopologyVectorMemoryBackend<F>)
-    where
-        F: VectorCollectionStoreFactory,
-    {
-        let app_id = ApplicationId::new();
-        let agent = AgentId::new();
-        let private_scope = MemoryScope::agent_private(app_id, agent);
-        let shared_scope = MemoryScope::session_shared(app_id, "session-1");
-
-        backend
-            .upsert_record(VectorMemoryRecord::new(
-                MemoryId::new(),
-                private_scope.clone(),
-                "private only",
-                vec![1.0, 0.0, 0.0],
-            ))
-            .await
-            .unwrap();
-
-        let shared_hits = backend
-            .search(&shared_scope, vec![1.0, 0.0, 0.0], 10)
-            .await
-            .unwrap();
-        assert!(shared_hits.is_empty());
-    }
-
     #[tokio::test]
     async fn backend_resolves_topology_and_round_trips_hits() {
         let backend = TopologyVectorMemoryBackend::new(InMemoryBackendFactory::default());
@@ -443,12 +379,24 @@ mod tests {
     #[tokio::test]
     async fn conformance_private_collections_are_isolated() {
         let backend = TopologyVectorMemoryBackend::new(InMemoryBackendFactory::default());
-        assert_private_collections_are_isolated(&backend).await;
+        crate::vector_conformance::assert_private_collections_are_isolated(&backend)
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
     async fn conformance_shared_collection_is_explicit() {
         let backend = TopologyVectorMemoryBackend::new(InMemoryBackendFactory::default());
-        assert_shared_collection_is_explicit(&backend).await;
+        crate::vector_conformance::assert_shared_collection_is_explicit(&backend)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn reusable_conformance_harness_passes_for_in_memory_topology_backend() {
+        let backend = TopologyVectorMemoryBackend::new(InMemoryBackendFactory::default());
+        crate::vector_conformance::assert_vector_backend_conformance(&backend)
+            .await
+            .unwrap();
     }
 }

@@ -164,3 +164,39 @@ root_kind = "persona_directory"
 # include HEARTBEAT.md / MEMORY.md seed (defaults: true / true)
 # inject_heartbeat = true
 # include_memory_seed = true
+
+# External context adapters are installed into the engine registry at startup.
+# They can then be selected through:
+# - [context].default_engine
+# - app manifest context.engine
+# - agent-level context_engine override
+#
+# `http_json` contract:
+# - request body  = serialized macaca_context::ContextAssembleInput
+# - response body = serialized macaca_context::ContextAssembleResult
+#
+# Header values follow the same convention as other config sections:
+# - literal strings are used verbatim
+# - ALL_CAPS identifiers are resolved from process env at startup
+#
+# [[context.external_adapters]]
+# id = "workspace-sidecar"
+# display_name = "Workspace Context Sidecar"
+# version = "1.0.0"
+# enabled = false
+# transport = "http_json"
+#
+# [context.external_adapters.http_json]
+# url = "http://127.0.0.1:8787/assemble"
+# headers = { AUTHORIZATION = "EXTERNAL_CONTEXT_BEARER" }
+#
+# [context.external_adapters.safety]
+# timeout_ms = 2000
+# max_payload_bytes = 262144
+# require_schema_validation = true
+# require_budget_validation = true
+# circuit_breaker_failures = 3
+#
+# [context.external_adapters.fallback]
+# fallback_engine_id = "legacy"
+# empty_external_contribution = true

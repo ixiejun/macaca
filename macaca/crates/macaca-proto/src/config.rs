@@ -179,6 +179,10 @@ pub struct AgentProfileContextConfig {
     /// When false, `MEMORY.md` is omitted from candidates (seed/audit injection disabled for this agent).
     #[serde(default = "default_agent_profile_include_memory_seed")]
     pub include_memory_seed: bool,
+    /// When > 0, reject profile bodies exceeding this **line** count after frontmatter stripping.
+    /// `0` disables the check (default).
+    #[serde(default)]
+    pub profile_max_content_lines: u32,
 }
 
 impl Default for AgentProfileContextConfig {
@@ -189,6 +193,7 @@ impl Default for AgentProfileContextConfig {
             max_file_bytes: default_agent_profile_max_file_bytes(),
             inject_heartbeat: default_agent_profile_inject_heartbeat(),
             include_memory_seed: default_agent_profile_include_memory_seed(),
+            profile_max_content_lines: 0,
         }
     }
 }
@@ -266,6 +271,76 @@ impl Default for ActiveVectorMemoryContextConfig {
     }
 }
 
+/// Controls [`macaca_context::KnowledgeDigestContextProvider`] **and** digest-vs-raw suppression in
+/// [`macaca_context::ContextFacade::assemble_model_context`].
+///
+/// The memory governance layer does the heavy lifting (claims, tombstones, redaction). This struct
+/// only tunes how compiled digests enter the composer and how they interact with raw vector recall
+/// candidates (Strategy pattern — tunable thresholds without altering memory fabric code).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct KnowledgeDigestContextConfig {
+    /// Enables the provider family and the post-provider digest-vs-raw merge pass.
+    #[serde(default)]
+    pub enabled: bool,
+    /// Wall-clock ceiling for `KnowledgeDigestCapability::digest_for_request` inside the provider.
+    #[serde(default = "default_knowledge_digest_timeout_ms")]
+    pub timeout_ms: u64,
+    /// Minimum [`KnowledgeClaim::confidence`] scalar for a digest to participate in **suppression**
+    /// of overlapping raw recall (0..=1 domain matching memory compiler conventions).
+    #[serde(default = "default_knowledge_digest_min_confidence")]
+    pub min_confidence_for_suppression: f32,
+    /// Minimum [`KnowledgeClaim::freshness`] for a digest to be classified as **strong** (not stale).
+    #[serde(default = "default_knowledge_digest_min_freshness_strong")]
+    pub min_freshness_strong: f32,
+    /// Freshness at or below this cutoff is **stale**: such digests never suppress fresh raw recall.
+    #[serde(default = "default_knowledge_digest_stale_cutoff")]
+    pub stale_freshness_cutoff: f32,
+    /// Minimum number of evidence rows referenced by a claim before suppression logic activates.
+    #[serde(default = "default_knowledge_digest_min_evidence")]
+    pub min_evidence_count: usize,
+    /// Result row ceiling forwarded to the workspace adapter when synthesizing compiler inputs.
+    #[serde(default = "default_knowledge_digest_max_compiler_rows")]
+    pub max_compiler_rows: usize,
+}
+
+fn default_knowledge_digest_timeout_ms() -> u64 {
+    1_200
+}
+
+fn default_knowledge_digest_min_confidence() -> f32 {
+    0.55
+}
+
+fn default_knowledge_digest_min_freshness_strong() -> f32 {
+    0.35
+}
+
+fn default_knowledge_digest_stale_cutoff() -> f32 {
+    0.22
+}
+
+fn default_knowledge_digest_min_evidence() -> usize {
+    1
+}
+
+fn default_knowledge_digest_max_compiler_rows() -> usize {
+    24
+}
+
+impl Default for KnowledgeDigestContextConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            timeout_ms: default_knowledge_digest_timeout_ms(),
+            min_confidence_for_suppression: default_knowledge_digest_min_confidence(),
+            min_freshness_strong: default_knowledge_digest_min_freshness_strong(),
+            stale_freshness_cutoff: default_knowledge_digest_stale_cutoff(),
+            min_evidence_count: default_knowledge_digest_min_evidence(),
+            max_compiler_rows: default_knowledge_digest_max_compiler_rows(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContextConfig {
     #[serde(default = "default_context_engine")]
@@ -286,6 +361,9 @@ pub struct ContextConfig {
     pub agent_profile: AgentProfileContextConfig,
     #[serde(default)]
     pub active_vector_memory: ActiveVectorMemoryContextConfig,
+    /// Governed knowledge digest provider + digest-vs-raw merge (OpenSpec `knowledge-digest-context`).
+    #[serde(default)]
+    pub knowledge_digest: KnowledgeDigestContextConfig,
     /// Provider-runtime governance: timeouts, redaction, allow/deny, and failure isolation
     /// applied at the [`macaca_context::ContextFacade`] composer boundary.
     #[serde(default)]
@@ -294,6 +372,13 @@ pub struct ContextConfig {
     /// Empty means: use the documented built-in default order inside the catalog assembler.
     #[serde(default)]
     pub provider_families: Vec<ContextProviderFamilyConfig>,
+    /// Declarative external context adapters installed into the runtime at startup.
+    ///
+    /// These rows remain application-agnostic: they describe transport, safety, and fallback
+    /// policy only. The web/runtime layer decides how to instantiate each transport and then
+    /// overlays the resulting engine into the neutral `ContextEngineRegistry`.
+    #[serde(default)]
+    pub external_adapters: Vec<ContextExternalAdapterConfig>,
     /// Optional trust promotion rules (`ContextCandidate::trust`) evaluated after redaction/deny
     /// and before composer budgeting — application-neutral pattern matching only.
     #[serde(default)]
@@ -314,6 +399,137 @@ pub struct ContextProviderFamilyConfig {
 
 fn default_context_provider_family_enabled() -> bool {
     true
+}
+
+fn default_context_external_adapter_enabled() -> bool {
+    true
+}
+
+fn default_external_adapter_transport() -> ContextExternalAdapterTransportKind {
+    ContextExternalAdapterTransportKind::HttpJson
+}
+
+/// Transport kinds supported by the Phase 9 external adapter installer.
+///
+/// Additional transports can be added without changing the surrounding config shape: each row keeps
+/// neutral engine metadata plus transport-specific endpoint settings.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ContextExternalAdapterTransportKind {
+    /// POST [`macaca_context::ContextAssembleInput`] as JSON and expect
+    /// [`macaca_context::ContextAssembleResult`] JSON in response.
+    #[default]
+    HttpJson,
+}
+
+/// Endpoint settings for the `http_json` external adapter transport.
+///
+/// Header values follow the same convention used elsewhere in config:
+/// - literal strings are sent verbatim
+/// - `ALL_CAPS_WITH_UNDERSCORES` values are treated as environment variable names
+///   and resolved at startup
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ContextExternalAdapterHttpJsonConfig {
+    pub url: String,
+    #[serde(default)]
+    pub headers: HashMap<String, String>,
+}
+
+fn default_external_adapter_timeout_ms() -> u64 {
+    2_000
+}
+
+fn default_external_adapter_max_payload_bytes() -> usize {
+    256 * 1024
+}
+
+fn default_external_adapter_require_schema_validation() -> bool {
+    true
+}
+
+fn default_external_adapter_require_budget_validation() -> bool {
+    true
+}
+
+fn default_external_adapter_circuit_breaker_failures() -> u32 {
+    3
+}
+
+/// Runtime safety guardrails mapped into `macaca-context` external adapter validation.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ContextExternalAdapterSafetyConfig {
+    #[serde(default = "default_external_adapter_timeout_ms")]
+    pub timeout_ms: u64,
+    #[serde(default = "default_external_adapter_max_payload_bytes")]
+    pub max_payload_bytes: usize,
+    #[serde(default = "default_external_adapter_require_schema_validation")]
+    pub require_schema_validation: bool,
+    #[serde(default = "default_external_adapter_require_budget_validation")]
+    pub require_budget_validation: bool,
+    #[serde(default = "default_external_adapter_circuit_breaker_failures")]
+    pub circuit_breaker_failures: u32,
+}
+
+impl Default for ContextExternalAdapterSafetyConfig {
+    fn default() -> Self {
+        Self {
+            timeout_ms: default_external_adapter_timeout_ms(),
+            max_payload_bytes: default_external_adapter_max_payload_bytes(),
+            require_schema_validation: default_external_adapter_require_schema_validation(),
+            require_budget_validation: default_external_adapter_require_budget_validation(),
+            circuit_breaker_failures: default_external_adapter_circuit_breaker_failures(),
+        }
+    }
+}
+
+fn default_external_adapter_fallback_engine_id() -> String {
+    "legacy".into()
+}
+
+fn default_external_adapter_empty_contribution_fallback() -> bool {
+    true
+}
+
+/// Fallback behavior used when an external adapter times out, errors, or emits an invalid result.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ContextExternalAdapterFallbackConfig {
+    #[serde(default = "default_external_adapter_fallback_engine_id")]
+    pub fallback_engine_id: String,
+    #[serde(default = "default_external_adapter_empty_contribution_fallback")]
+    pub empty_external_contribution: bool,
+}
+
+impl Default for ContextExternalAdapterFallbackConfig {
+    fn default() -> Self {
+        Self {
+            fallback_engine_id: default_external_adapter_fallback_engine_id(),
+            empty_external_contribution: default_external_adapter_empty_contribution_fallback(),
+        }
+    }
+}
+
+/// One declarative external adapter engine installation row.
+///
+/// The `id` becomes the selectable `ContextEngineInfo.id`. Operators can choose it through
+/// `context.default_engine`, app manifest context, or agent-level overrides once the runtime
+/// installs the row successfully.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ContextExternalAdapterConfig {
+    pub id: String,
+    #[serde(default)]
+    pub display_name: Option<String>,
+    #[serde(default)]
+    pub version: Option<String>,
+    #[serde(default = "default_context_external_adapter_enabled")]
+    pub enabled: bool,
+    #[serde(default = "default_external_adapter_transport")]
+    pub transport: ContextExternalAdapterTransportKind,
+    #[serde(default)]
+    pub http_json: Option<ContextExternalAdapterHttpJsonConfig>,
+    #[serde(default)]
+    pub safety: ContextExternalAdapterSafetyConfig,
+    #[serde(default)]
+    pub fallback: ContextExternalAdapterFallbackConfig,
 }
 
 /// Rule-based promotion of `TrustLevel` on [`macaca_context::composer::ContextCandidate`].
@@ -391,8 +607,10 @@ impl Default for ContextConfig {
             recall: ContextRecallRuntimeConfig::default(),
             agent_profile: AgentProfileContextConfig::default(),
             active_vector_memory: ActiveVectorMemoryContextConfig::default(),
+            knowledge_digest: KnowledgeDigestContextConfig::default(),
             governance: ContextGovernanceRuntimeConfig::default(),
             provider_families: Vec::new(),
+            external_adapters: Vec::new(),
             trust_governance: ContextTrustGovernanceConfig::default(),
         }
     }
@@ -1106,6 +1324,7 @@ mod tests {
         assert!(cfg.context.emit_reports);
         assert!(!cfg.context.agent_profile.enabled);
         assert_eq!(cfg.context.workspace_guides.entries.len(), 6);
+        assert!(cfg.context.external_adapters.is_empty());
         assert_eq!(cfg.memory.embedding.model, "text-embedding-v4");
         assert_eq!(cfg.memory.vector.backend, "milvus");
         assert_eq!(cfg.memory.embedding.dimensions, 1024);
@@ -1167,5 +1386,104 @@ mod tests {
         assert!(json.get("kernel").is_some());
         assert!(json.get("llm").is_some());
         assert!(json.get("drivers").is_some());
+    }
+
+    #[test]
+    fn load_external_context_adapter_config_from_toml() {
+        let raw = r#"
+            [kernel]
+            max_agents = 1
+            heartbeat_interval_ms = 1000
+            agent_timeout_ms = 1000
+
+            [llm]
+            default_provider = "test"
+            max_tokens_per_request = 1
+            rate_limit_rpm = 1
+
+            [llm.providers.test]
+            api_key = "KEY"
+            base_url = "https://example.com"
+
+            [memory]
+            session_ttl_seconds = 1
+            file_store_path = "./tmp"
+            auto_retrieve_on = "task_start"
+
+            [memory.vector]
+            backend = "milvus"
+            milvus_url = "http://localhost:19530"
+            collection_name = "agent_memory"
+
+            [memory.embedding]
+            provider = "dashscope"
+            model = "text-embedding-v4"
+            api_key = "KEY"
+            dimensions = 1024
+            base_url = "https://example.com"
+
+            [memory.compression]
+            enabled = false
+            threshold_entries = 1
+            strategy = "none"
+
+            [ipc]
+            nats_url = "nats://localhost:4222"
+            nats_auto_start = false
+            reconnect_max_attempts = 1
+            reconnect_delay_ms = 1
+
+            [persist]
+            engine = "redb"
+            data_dir = "./data"
+            snapshot_interval_seconds = 1
+
+            [gateway]
+            enabled = false
+
+            [observability]
+            log_level = "info"
+            tracing_enabled = false
+            otlp_endpoint = ""
+
+            [[context.external_adapters]]
+            id = "workspace-sidecar"
+            transport = "http_json"
+
+            [context.external_adapters.http_json]
+            url = "http://127.0.0.1:8787/assemble"
+            headers = { AUTHORIZATION = "EXTERNAL_CONTEXT_TOKEN" }
+
+            [context.external_adapters.fallback]
+            fallback_engine_id = "legacy"
+            empty_external_contribution = true
+        "#;
+
+        let cfg: MacacaConfig = toml::from_str(raw).unwrap();
+        assert_eq!(cfg.context.external_adapters.len(), 1);
+        let adapter = &cfg.context.external_adapters[0];
+        assert_eq!(adapter.id, "workspace-sidecar");
+        assert_eq!(
+            adapter.transport,
+            ContextExternalAdapterTransportKind::HttpJson
+        );
+        assert_eq!(
+            adapter
+                .http_json
+                .as_ref()
+                .unwrap()
+                .url,
+            "http://127.0.0.1:8787/assemble"
+        );
+        assert_eq!(
+            adapter
+                .http_json
+                .as_ref()
+                .unwrap()
+                .headers
+                .get("AUTHORIZATION")
+                .unwrap(),
+            "EXTERNAL_CONTEXT_TOKEN"
+        );
     }
 }

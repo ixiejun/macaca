@@ -122,6 +122,10 @@ impl WebRuntimeFacade {
             )
             .route("/api/sessions/{id}/events", get(routes::get_session_events))
             .route(
+                "/api/sessions/{id}/source-artifact",
+                get(routes::get_session_source_artifact),
+            )
+            .route(
                 "/api/sessions/{id}/run-trace",
                 get(routes::get_session_run_trace),
             )

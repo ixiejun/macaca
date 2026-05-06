@@ -28,8 +28,8 @@
 ## 5. MCP provider
 
 - [x] 5.1 定义 MCP memory provider config。
-- [x] 5.2 将 search/get/write/delete 映射到 MCP tools。
-- [x] 5.3 对 MCP 返回做 schema validation 和 trust boundary 标记。
+- [ ] 5.2 将 search/get/write/delete 映射到 MCP tools（需接入 live MCP client；当前固定未接线错误不算完成）。
+- [ ] 5.3 对 MCP 返回做 schema validation 和 trust boundary 标记（需 live MCP client 返回路径覆盖）。
 
 ## 6. Resilience
 

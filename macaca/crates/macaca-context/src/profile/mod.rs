@@ -12,6 +12,9 @@ mod provider;
 mod tests;
 
 pub use kinds::AgentProfileFileKind;
-pub use loader::{canonical_root, load_profile_file, load_profile_file_at_canonical_root, ProfileLoadOutput, ProfileSkipReason};
+pub use loader::{
+    canonical_root, load_profile_file, load_profile_file_at_canonical_root, ProfileLoadOutput,
+    ProfileSkipReason,
+};
 pub use policy::{default_policy_for, ProfileKindPolicy};
 pub use provider::{profile_provider_arc, ProfileFileContextProvider};

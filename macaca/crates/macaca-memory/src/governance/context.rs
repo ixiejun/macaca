@@ -30,6 +30,8 @@ pub struct KnowledgeContextCandidate {
 
 impl KnowledgeContextCandidate {
     pub fn from_claim(claim: &KnowledgeClaim) -> Self {
+        // Evidence strings retain `source_kind:source_id` so downstream adapters can parse or expose
+        // reference-only provenance; digest-vs-raw overlap compares `source_id` with recall snippets.
         Self {
             source_kind: KnowledgeContextSourceKind::WikiDigest,
             source_id: claim.id.clone(),

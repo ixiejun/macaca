@@ -19,6 +19,7 @@ use axum::response::sse::Event;
 use tokio::sync::{mpsc, Mutex};
 
 use macaca_agent::{AgentCapabilitySet, AgentServices, AgentTransitionReason};
+use macaca_app::model::AppContextConfig;
 use macaca_app::{app_agent_manifest_view, app_agent_prompt_semantics};
 use macaca_context::{
     ContextSourceKind, PromptComposer, PromptSection, PromptStability, TrustLevel,
@@ -36,7 +37,6 @@ use macaca_framework::memory::InMemoryWorkingMemory;
 use macaca_framework::message::Msg;
 use macaca_framework::react_agent::ReActAgent;
 use macaca_framework::tool::{ToolError, ToolMiddleware, ToolResponse, Toolkit};
-use macaca_memory::TestMemoryManager;
 use macaca_persist::{AppendEventCommand, EventLog};
 use macaca_proto::config::{
     AgentProfileContextConfig, AgentProfileRootKind, ContextConfig, WorkspaceGuideSourcesConfig,
@@ -539,33 +539,53 @@ impl FrameworkRunner {
         let mut config = state.config.context.clone();
         let registry = state.registry.read().await;
         if let Some(app) = registry.get_app(app_id) {
-            if let Some(app_context) = app.manifest.context.as_ref() {
-                if let Some(engine) = app_context
-                    .engine
-                    .as_ref()
-                    .filter(|value| !value.is_empty())
-                {
-                    config.default_engine = engine.clone();
-                }
-                if let Some(fallback) = app_context
-                    .fallback_engine
-                    .as_ref()
-                    .filter(|value| !value.is_empty())
-                {
-                    config.fallback_engine = fallback.clone();
-                }
-                if let Some(ref guides) = app_context.workspace_guides {
-                    config.workspace_guides = guides.clone();
-                }
-                if let Some(ref ap) = app_context.agent_profile {
-                    config.agent_profile = ap.clone();
-                }
+            let agent_engine = app_agent_manifest_view(&app.manifest, agent_name)
+                .and_then(|agent| agent.context_engine().map(str::to_owned))
+                .filter(|value| !value.is_empty());
+            config = Self::merge_context_config_overrides(
+                config,
+                app.manifest.context.as_ref(),
+                agent_engine.as_deref(),
+            );
+        }
+        config
+    }
+
+    /// Merge system-level context defaults with optional app and agent overrides.
+    ///
+    /// Precedence is intentionally narrow and deterministic:
+    /// 1. system config provides the base
+    /// 2. app context may override default/fallback engine and supporting profile fields
+    /// 3. agent context engine may override only the primary engine selection
+    fn merge_context_config_overrides(
+        mut config: ContextConfig,
+        app_context: Option<&AppContextConfig>,
+        agent_engine: Option<&str>,
+    ) -> ContextConfig {
+        if let Some(app_context) = app_context {
+            if let Some(engine) = app_context
+                .engine
+                .as_ref()
+                .filter(|value| !value.is_empty())
+            {
+                config.default_engine = engine.clone();
             }
-            if let Some(agent) = app_agent_manifest_view(&app.manifest, agent_name) {
-                if let Some(engine) = agent.context_engine().filter(|value| !value.is_empty()) {
-                    config.default_engine = engine.to_string();
-                }
+            if let Some(fallback) = app_context
+                .fallback_engine
+                .as_ref()
+                .filter(|value| !value.is_empty())
+            {
+                config.fallback_engine = fallback.clone();
             }
+            if let Some(ref guides) = app_context.workspace_guides {
+                config.workspace_guides = guides.clone();
+            }
+            if let Some(ref ap) = app_context.agent_profile {
+                config.agent_profile = ap.clone();
+            }
+        }
+        if let Some(engine) = agent_engine.filter(|value| !value.is_empty()) {
+            config.default_engine = engine.to_string();
         }
         config
     }
@@ -993,15 +1013,10 @@ impl WebTracedAgentFactory {
         let (mcp_cat, ready) =
             crate::capability_catalog::probe_mcp_capability_inputs(&state.mcp_runtime, &mcp_policy)
                 .await;
-        let rt_cap = Arc::new(crate::capability_catalog::runtime_tool_capability_catalog_from_toolkit(
-            toolkit,
-        ));
-        (
-            skill_cap,
-            Arc::new(mcp_cat),
-            rt_cap,
-            Arc::new(ready),
-        )
+        let rt_cap = Arc::new(
+            crate::capability_catalog::runtime_tool_capability_catalog_from_toolkit(toolkit),
+        );
+        (skill_cap, Arc::new(mcp_cat), rt_cap, Arc::new(ready))
     }
 
     /// Builds a [`ReActAgent`] with [`ContextReportingChatModel`]: kernel-backed `routing_agent_id`,
@@ -1010,7 +1025,8 @@ impl WebTracedAgentFactory {
         llm_router: Arc<macaca_llm::LlmRouter>,
         event_log: Arc<EventLog>,
         persist_backend: Arc<dyn macaca_persist::PersistBackend>,
-        workspace_memory: Option<Arc<TestMemoryManager>>,
+        memory_runtime: Option<Arc<crate::memory_runtime::WebMemoryRuntime>>,
+        workspace_memory_tombstones: Option<Arc<macaca_memory::SharedTombstoneRegistry>>,
         merged_context_config: ContextConfig,
         agent_profile_root: Option<std::path::PathBuf>,
         request: &AgentBuildRequest,
@@ -1023,6 +1039,7 @@ impl WebTracedAgentFactory {
         runtime_tool_capability_catalog: Arc<macaca_context::RuntimeToolCapabilityCatalog>,
         ready_mcp_server_ids: Arc<Vec<String>>,
         provider_health_ledger: Option<Arc<macaca_context::ProviderHealthLedger>>,
+        context_engine_registry: Arc<macaca_context::ContextEngineRegistry>,
     ) -> ReActAgent {
         let model = Arc::new(ContextReportingChatModel::new(
             Arc::new(RoutedLlmAdapter::new(llm_router, selection.clone())),
@@ -1033,13 +1050,15 @@ impl WebTracedAgentFactory {
             request.identity.agent_name.clone(),
             merged_context_config,
             agent_profile_root,
-            workspace_memory,
+            memory_runtime,
+            workspace_memory_tombstones,
             routing_agent_id,
             skill_capability_catalog,
             mcp_capability_catalog,
             runtime_tool_capability_catalog,
             ready_mcp_server_ids,
             provider_health_ledger,
+            context_engine_registry,
         ));
         let formatter = Arc::new(OpenAiFormatter);
         ReActAgent::new(
@@ -1173,14 +1192,19 @@ impl WebTracedAgentFactory {
             .get_agent_by_name(&request.identity.agent_name)
             .await
             .map(|m| m.id);
-        let (skill_capability_catalog, mcp_capability_catalog, runtime_tool_capability_catalog, ready_mcp_server_ids) =
-            Self::resolve_framework_capability_catalogs(&self.state, &request, &toolkit).await;
+        let (
+            skill_capability_catalog,
+            mcp_capability_catalog,
+            runtime_tool_capability_catalog,
+            ready_mcp_server_ids,
+        ) = Self::resolve_framework_capability_catalogs(&self.state, &request, &toolkit).await;
 
         let agent = Self::build_react_agent(
             llm_router,
             Arc::clone(&self.state.persist.event_log),
             Arc::clone(&self.state.persist.session_store),
-            self.state.workspace_memory.clone(),
+            self.state.memory_runtime.clone(),
+            self.state.workspace_memory_tombstones.clone(),
             merged_ctx,
             profile_root,
             &request,
@@ -1193,6 +1217,7 @@ impl WebTracedAgentFactory {
             runtime_tool_capability_catalog,
             ready_mcp_server_ids,
             Some(Arc::clone(&self.state.provider_health_ledger)),
+            Arc::clone(&self.state.context_engine_registry),
         );
         let hooks = Self::build_standard_hooks(mode, task_id, agent_name);
         Ok(HookedAgent::new(agent, hooks))
@@ -1358,14 +1383,19 @@ impl WebTracedAgentFactory {
             .get_agent_by_name(&request.identity.agent_name)
             .await
             .map(|m| m.id);
-        let (skill_capability_catalog, mcp_capability_catalog, runtime_tool_capability_catalog, ready_mcp_server_ids) =
-            Self::resolve_framework_capability_catalogs(&self.state, &request, &toolkit).await;
+        let (
+            skill_capability_catalog,
+            mcp_capability_catalog,
+            runtime_tool_capability_catalog,
+            ready_mcp_server_ids,
+        ) = Self::resolve_framework_capability_catalogs(&self.state, &request, &toolkit).await;
 
         let agent = Self::build_react_agent(
             llm_router,
             Arc::clone(&self.state.persist.event_log),
             Arc::clone(&self.state.persist.session_store),
-            self.state.workspace_memory.clone(),
+            self.state.memory_runtime.clone(),
+            self.state.workspace_memory_tombstones.clone(),
             merged_ctx,
             profile_root,
             &request,
@@ -1378,6 +1408,7 @@ impl WebTracedAgentFactory {
             runtime_tool_capability_catalog,
             ready_mcp_server_ids,
             Some(Arc::clone(&self.state.provider_health_ledger)),
+            Arc::clone(&self.state.context_engine_registry),
         );
 
         let cancel_token = agent.cancel_token();
@@ -1777,9 +1808,11 @@ impl ToolMiddleware for ExecutorToolMiddleware {
 
 #[cfg(test)]
 mod tests {
-    use super::{tool_response_text, truncate_tool_output};
+    use super::{tool_response_text, truncate_tool_output, FrameworkRunner};
+    use macaca_app::model::AppContextConfig;
     use macaca_framework::message::{ContentBlock, TextBlock};
     use macaca_framework::tool::ToolResponse;
+    use macaca_proto::config::{AgentProfileContextConfig, ContextConfig};
 
     #[test]
     fn truncate_tool_output_respects_utf8_boundaries() {
@@ -1829,6 +1862,52 @@ mod tests {
         };
 
         assert_eq!(tool_response_text(&response), "");
+    }
+
+    #[test]
+    fn production_code_does_not_call_deprecated_build_system_prompt_shim() {
+        let source = include_str!("framework_runner.rs");
+        let forbidden = concat!("Self::", "build_system_prompt(");
+        assert!(
+            !source.contains(forbidden),
+            "production path should call build_context_system_prompt directly"
+        );
+    }
+
+    #[test]
+    fn context_config_precedence_agent_overrides_app_and_system_engine() {
+        let mut base = ContextConfig::default();
+        base.default_engine = "system-windowed".into();
+        base.fallback_engine = "system-legacy".into();
+
+        let merged = FrameworkRunner::merge_context_config_overrides(
+            base,
+            Some(&AppContextConfig {
+                engine: Some("app-pruning".into()),
+                fallback_engine: Some("app-summary".into()),
+                workspace_guides: None,
+                agent_profile: Some(AgentProfileContextConfig {
+                    enabled: true,
+                    ..Default::default()
+                }),
+            }),
+            Some("agent-custom"),
+        );
+
+        assert_eq!(merged.default_engine, "agent-custom");
+        assert_eq!(merged.fallback_engine, "app-summary");
+        assert!(merged.agent_profile.enabled);
+    }
+
+    #[test]
+    fn context_config_precedence_keeps_system_defaults_when_overrides_absent() {
+        let mut base = ContextConfig::default();
+        base.default_engine = "system-windowed".into();
+        base.fallback_engine = "system-legacy".into();
+
+        let merged = FrameworkRunner::merge_context_config_overrides(base.clone(), None, None);
+        assert_eq!(merged.default_engine, base.default_engine);
+        assert_eq!(merged.fallback_engine, base.fallback_engine);
     }
 }
 

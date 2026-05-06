@@ -10,7 +10,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::prompt::TrustLevel;
-use crate::report::ContextSourceKind;
+use crate::report::{ContextSourceKind, ContextSourceReport};
 
 /// Semantic kind for a candidate: what this content represents for reporting and rendering.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -20,6 +20,8 @@ pub enum ContextCandidateKind {
     ProfileBootstrap,
     /// Compact capability index (skills / MCP summaries, etc.).
     CapabilityIndex,
+    /// Governed knowledge digest / compiled wiki claims (memory governance layer).
+    KnowledgeDigest,
     /// Active or passive memory recall.
     MemoryRecall,
     /// Workspace guides, path hints, etc.
@@ -72,8 +74,21 @@ pub enum ContextCacheClass {
     Unknown,
 }
 
+/// Numeric signals copied from memory governance claims for Strategy-style suppression decisions.
+///
+/// Only [`ContextCandidateKind::KnowledgeDigest`] rows populate this structure; other kinds leave it
+/// `None` so the merge pass can ignore them cheaply.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub struct DigestStrengthSnapshot {
+    pub confidence: f32,
+    pub freshness: f32,
+}
+
+/// Alias: capability rows (skills / MCP / runtime tools) use [`ContextCandidateKind::CapabilityIndex`].
+pub type CapabilityCandidate = ContextCandidate;
+
 /// One candidate: the only shape a provider may emit (anti-corruption boundary).
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ContextCandidate {
     /// Stable id unique within a provider; used for dedup and tie-break.
     pub source_id: String,
@@ -91,6 +106,19 @@ pub struct ContextCandidate {
     /// Human-readable diagnostics for the plan (not sent to the model by default).
     #[serde(default)]
     pub diagnostics: Vec<String>,
+    /// Stable opaque identifiers for memory rows cited by compiled claims (used exclusively by the
+    /// digest-vs-raw **Strategy** for overlap testing — never shown to the model verbatim).
+    #[serde(default)]
+    pub evidence_memory_ids: Vec<String>,
+    /// Structured strength metadata for governed knowledge rows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub digest_strength: Option<DigestStrengthSnapshot>,
+    /// Optional diagnostics-only report row preserved across governance/composer stages.
+    ///
+    /// This lets runtime reports expose per-candidate metadata such as provenance or privacy even
+    /// when the actual prompt text is merged into synthetic request messages later.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_report: Option<ContextSourceReport>,
 }
 
 impl ContextCandidate {
@@ -99,6 +127,7 @@ impl ContextCandidate {
         match self.kind {
             ContextCandidateKind::ProfileBootstrap => ContextSourceKind::Workspace,
             ContextCandidateKind::CapabilityIndex => ContextSourceKind::Skill,
+            ContextCandidateKind::KnowledgeDigest => ContextSourceKind::WikiDigest,
             ContextCandidateKind::MemoryRecall => ContextSourceKind::Memory,
             ContextCandidateKind::WorkspaceGuide => ContextSourceKind::Workspace,
             ContextCandidateKind::RuntimeDiagnostic => ContextSourceKind::Trace,

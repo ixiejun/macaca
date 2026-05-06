@@ -1591,6 +1591,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.18",
+ "toml",
  "uuid",
 ]
 
@@ -1728,9 +1729,11 @@ dependencies = [
  "macaca-tools",
  "once_cell",
  "prometheus",
+ "reqwest",
  "serde",
  "serde_json",
  "serde_yaml",
+ "tempfile",
  "tokio",
  "tokio-util",
  "tower-http",

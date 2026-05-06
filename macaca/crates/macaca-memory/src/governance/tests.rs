@@ -10,11 +10,16 @@ use crate::core::{
 };
 
 use super::{
-    compiled_digest_candidates, ArtifactContent, ArtifactKind, CandidateDecision, CandidateSource,
-    ClaimGroup, ConservativePromotionPolicy, FacadeDeletePropagator, GovernedMemoryFacade,
-    KnowledgeCompileCapability, KnowledgeCompileRequest, KnowledgeCompiler, MemoryArtifact,
-    MemoryAuditEventKind, MemoryCandidate, MemoryCandidateCapture, MemoryCandidateStore,
-    MemoryDeletePropagation, MemoryDeletePropagationStep, MemoryPromotionPolicy, MemoryTombstone,
+    audit_candidate_capture, compiled_digest_candidates, ArtifactContent, ArtifactKind,
+    CandidateDecision, CandidateSource, CitationArtifact, ClaimGroup, ConservativePromotionPolicy,
+    DefaultMemoryCandidateCapturePolicy, DisabledMemoryCompactionStrategy, FacadeDeletePropagator,
+    GovernedMemoryFacade, InMemoryGovernanceJournal, KnowledgeCompileCapability,
+    KnowledgeCompileRequest, KnowledgeCompiler, MemoryArtifact, MemoryAuditEventKind,
+    MemoryCandidate, MemoryCandidateCapture, MemoryCandidateCapturePolicy, MemoryCandidateStore,
+    MemoryCompactionStrategy, MemoryDeletePropagation, MemoryDeletePropagationStep,
+    MemoryGovernanceJournal, MemoryPromotionPolicy, MemoryProviderMigrationPlan,
+    MemoryProviderMigrationPort, MemoryProviderMigrationRuntime, MemoryProviderMigrationStatus,
+    MemoryTombstone, ProjectDecisionLogArtifact, WikiDigestArtifact,
 };
 
 fn private_scope() -> MemoryScope {
@@ -29,6 +34,17 @@ fn candidate(id: &str, source: CandidateSource, confidence: f32) -> MemoryCandid
         "remember the architecture invariant",
     )
     .confidence(confidence)
+}
+
+fn statement_candidate(id: &str, statement: &str) -> MemoryCandidate {
+    MemoryCandidate::new(
+        id,
+        private_scope(),
+        CandidateSource::AgentSummary,
+        statement,
+    )
+    .confidence(0.9)
+    .recurrence_count(2)
 }
 
 #[derive(Default)]
@@ -220,6 +236,41 @@ fn compiler_emits_claims_with_evidence_for_strong_candidates() {
 }
 
 #[test]
+fn compiler_groups_boolean_contradictions_by_subject() {
+    let compiler = KnowledgeCompiler;
+    let result = compiler.compile(KnowledgeCompileRequest {
+        scope: private_scope(),
+        candidates: vec![
+            statement_candidate("candidate-a", "deployment requires redis"),
+            statement_candidate("candidate-b", "deployment does not require redis"),
+        ],
+        existing_claims: Vec::new(),
+    });
+
+    assert_eq!(result.conflicts.len(), 1);
+    let conflict = &result.conflicts[0];
+    assert!(conflict.claims.contains(&"claim-candidate-a".to_string()));
+    assert!(conflict.claims.contains(&"claim-candidate-b".to_string()));
+    assert!(result
+        .claims
+        .iter()
+        .all(|claim| claim.conflict_group == Some(conflict.group_id.clone())));
+}
+
+#[test]
+fn compiler_preserves_exact_evidence_ids_for_claims() {
+    let compiler = KnowledgeCompiler;
+    let result = compiler.compile(KnowledgeCompileRequest {
+        scope: private_scope(),
+        candidates: vec![statement_candidate("memory-row-42", "runtime is pluggable")],
+        existing_claims: Vec::new(),
+    });
+
+    assert_eq!(result.claims.len(), 1);
+    assert_eq!(result.claims[0].evidence[0].source_id, "memory-row-42");
+}
+
+#[test]
 fn compiled_digest_exports_context_candidates() {
     let compiler = KnowledgeCompiler;
     let result = compiler.compile(KnowledgeCompileRequest {
@@ -265,4 +316,154 @@ fn artifacts_default_to_redacted_summaries() {
 
     assert!(artifact.content.redacted);
     assert!(!artifact.content.body.contains("secret"));
+}
+
+#[test]
+fn typed_artifacts_keep_evidence_refs_without_raw_secret_body() {
+    let base = MemoryArtifact {
+        id: "wiki-digest".into(),
+        kind: ArtifactKind::WikiDigest,
+        scope: private_scope(),
+        path: Some("memory/wiki.md".into()),
+        content: ArtifactContent {
+            content_type: "text/markdown".into(),
+            body: "summary only; evidence_refs=[evidence-1]".into(),
+            redacted: true,
+            metadata: serde_json::json!({"evidence_ids":["evidence-1"]}),
+        },
+        updated_at: Utc::now(),
+    };
+    let wiki = WikiDigestArtifact {
+        artifact: base.clone(),
+        evidence_ids: vec!["evidence-1".into()],
+    };
+    let decision = ProjectDecisionLogArtifact {
+        artifact: MemoryArtifact {
+            kind: ArtifactKind::ProjectDecisionLog,
+            ..base.clone()
+        },
+        evidence_ids: wiki.evidence_ids.clone(),
+    };
+    let citation = CitationArtifact {
+        artifact: MemoryArtifact {
+            kind: ArtifactKind::Citation,
+            ..base
+        },
+        evidence_ids: vec!["evidence-1".into()],
+    };
+
+    assert!(wiki.artifact.content.redacted);
+    assert!(!wiki.artifact.content.body.contains("raw-secret"));
+    assert_eq!(decision.evidence_ids, vec!["evidence-1"]);
+    assert_eq!(citation.evidence_ids, vec!["evidence-1"]);
+}
+
+#[tokio::test]
+async fn governance_runtime_captures_candidate_and_lists_audit() {
+    let journal = InMemoryGovernanceJournal::new();
+    let candidate = candidate("candidate-runtime-1", CandidateSource::AgentSummary, 0.9);
+    audit_candidate_capture(&journal, &candidate).await.unwrap();
+    let audits = journal.list_audits(&candidate.scope, 10).await.unwrap();
+
+    assert_eq!(audits.len(), 1);
+    assert_eq!(audits[0].kind, MemoryAuditEventKind::CapturedCandidate);
+    assert_eq!(
+        audits[0].candidate_id.as_deref(),
+        Some("candidate-runtime-1")
+    );
+}
+
+#[test]
+fn default_candidate_capture_policy_is_conservative() {
+    let policy = DefaultMemoryCandidateCapturePolicy;
+    assert!(policy.should_capture(&CandidateSource::UserExplicit, "remember this"));
+    assert!(policy.should_capture(&CandidateSource::AgentSummary, "summary"));
+    assert!(!policy.should_capture(&CandidateSource::AutoCapture, "ordinary chat"));
+    assert!(!policy.should_capture(&CandidateSource::UserExplicit, "   "));
+}
+
+#[tokio::test]
+async fn disabled_compaction_strategy_is_truthful() {
+    let strategy = DisabledMemoryCompactionStrategy;
+    let result = strategy.compact(private_scope(), Vec::new()).await.unwrap();
+
+    assert!(result.candidates.is_empty());
+    assert_eq!(result.diagnostics, vec!["compaction_disabled"]);
+}
+
+#[derive(Clone)]
+struct MigrationPort {
+    entries: Arc<RwLock<Vec<MemoryEntry>>>,
+    drop_writes: bool,
+}
+
+#[async_trait]
+impl MemoryProviderMigrationPort for MigrationPort {
+    async fn list_entries(
+        &self,
+        _scope: &MemoryScope,
+        limit: usize,
+    ) -> MacacaResult<Vec<MemoryEntry>> {
+        let mut rows = self.entries.read().await.clone();
+        rows.truncate(limit);
+        Ok(rows)
+    }
+
+    async fn write_entry(&self, entry: MemoryEntry) -> MacacaResult<()> {
+        if !self.drop_writes {
+            self.entries.write().await.push(entry);
+        }
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn migration_keeps_source_authoritative_when_verification_fails() {
+    let scope = private_scope();
+    let source = MigrationPort {
+        entries: Arc::new(RwLock::new(vec![
+            MemoryEntry {
+                id: MemoryId::new(),
+                layer: macaca_proto::MemoryLayer::Session,
+                content: "one".into(),
+                metadata: serde_json::Value::Null,
+                agent_id: None,
+                created_at: Utc::now(),
+                expires_at: None,
+            },
+            MemoryEntry {
+                id: MemoryId::new(),
+                layer: macaca_proto::MemoryLayer::Session,
+                content: "two".into(),
+                metadata: serde_json::Value::Null,
+                agent_id: None,
+                created_at: Utc::now(),
+                expires_at: None,
+            },
+        ])),
+        drop_writes: false,
+    };
+    let target = MigrationPort {
+        entries: Arc::new(RwLock::new(Vec::new())),
+        drop_writes: true,
+    };
+    let runtime = MemoryProviderMigrationRuntime::new(InMemoryGovernanceJournal::new());
+    let result = runtime
+        .migrate(
+            MemoryProviderMigrationPlan {
+                source_provider_id: "source".into(),
+                target_provider_id: "target".into(),
+                scope,
+                batch_size: 10,
+            },
+            &source,
+            &target,
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(result.status, MemoryProviderMigrationStatus::Failed);
+    assert!(result.source_authoritative);
+    assert_eq!(result.copied_entries, 2);
+    assert_eq!(result.verified_entries, 0);
 }

@@ -3,25 +3,59 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use macaca_context::{
     assemble_context_providers, ActiveRecallBudget, ActiveRecallCapability, ActiveRecallPolicy,
-    ContextAssembleInput, ContextBudget, ContextEngineSelection, ContextFacade,
-    ContextFacadeAssemblyPolicy, ContextPreflightRecallConfig,
-    DefaultActiveRecallProvider, McpCapabilityCatalog, ProviderAssemblyEnvironment,
-    ProviderFactoryInput, ProviderHealthLedger, RuntimeToolCapabilityCatalog, SkillCapabilityCatalog,
+    ContextAssembleInput, ContextBudget, ContextEngineRegistry, ContextEngineSelection,
+    ContextFacade, ContextFacadeAssemblyPolicy, ContextPreflightRecallConfig,
+    DefaultActiveRecallProvider, KnowledgeDigestCapability, McpCapabilityCatalog,
+    ProviderAssemblyEnvironment, ProviderFactoryInput, ProviderHealthLedger,
+    RuntimeToolCapabilityCatalog, SkillCapabilityCatalog,
 };
 use macaca_framework::model::{ChatModel, ChatOptions, ChatResponse, ModelError};
-use macaca_memory::TestMemoryManager;
+use macaca_memory::{MemoryScope, SharedTombstoneRegistry};
 use macaca_persist::{AppendEventCommand, EventLog, SessionLineageStore};
-use macaca_proto::{
-    config::ContextConfig,
-    AgentId, ApplicationId,
-};
+use macaca_proto::{config::ContextConfig, AgentId, ApplicationId};
 
 use crate::context_memory_injection::{apply_active_recall, apply_preflight_memory};
 use crate::context_message_codec::{
     framework_messages_to_llm, framework_options_to_llm, llm_messages_to_framework,
     llm_options_to_framework,
 };
+use crate::memory_runtime::WebMemoryRuntime;
+use crate::source_artifact::persist_pruned_source_artifacts;
+use crate::workspace_knowledge_digest_capability::WorkspaceKnowledgeDigestCapability;
 use crate::workspace_memory_recall_source::WorkspaceMemoryRecallSource;
+
+fn source_report_value(source: &macaca_context::ContextSourceReport) -> serde_json::Value {
+    serde_json::to_value(source).unwrap_or_else(|_| serde_json::Value::Null)
+}
+
+/// Build the active-recall scope for the current framework model call.
+///
+/// Agent-private scope is preferred when the kernel resolved a concrete agent id; that preserves
+/// the existing fail-closed private-memory filtering. When an agent id is unavailable, the runtime
+/// falls back to session/project shared scope rather than guessing a private owner.
+fn recall_scope(
+    application_id: ApplicationId,
+    session_id: Option<&str>,
+    routing_agent_id: Option<AgentId>,
+) -> MemoryScope {
+    if let Some(agent_id) = routing_agent_id {
+        return MemoryScope::agent_private(application_id, agent_id)
+            .session_id(session_id.unwrap_or("workspace"));
+    }
+    digest_scope(application_id, session_id)
+}
+
+/// Build the shared digest scope used by runtime-backed knowledge compilation.
+///
+/// The session id is used when available. A stable project-shared fallback keeps non-session tool
+/// and digest paths scoped to the application workspace without introducing application-specific
+/// names or unscoped global memory reads.
+fn digest_scope(application_id: ApplicationId, session_id: Option<&str>) -> MemoryScope {
+    match session_id {
+        Some(id) if !id.trim().is_empty() => MemoryScope::session_shared(application_id, id),
+        _ => MemoryScope::project_shared(application_id, "workspace"),
+    }
+}
 
 /// ChatModel wrapper that injects context-engine assembly and persists context reports.
 ///
@@ -48,7 +82,7 @@ pub(crate) struct ContextReportingChatModel {
     context_selection: ContextEngineSelection,
     context_budget: ContextBudget,
     recall_runtime: macaca_proto::config::ContextRecallRuntimeConfig,
-    workspace_memory: Option<Arc<TestMemoryManager>>,
+    memory_runtime: Option<Arc<WebMemoryRuntime>>,
     /// Tunables copied from [`ContextConfig::agent_profile`] for hot-path injection checks.
     agent_profile: macaca_proto::config::AgentProfileContextConfig,
     /// Resolved directory that stores `AGENTS.md` / `IDENTITY.md`, depending on [`AgentProfileRootKind`].
@@ -57,6 +91,8 @@ pub(crate) struct ContextReportingChatModel {
     active_vector_memory: macaca_proto::config::ActiveVectorMemoryContextConfig,
     /// Narrow recall capability (built when [`Self::active_vector_memory`] is enabled and backend exists).
     memory_recall_capability: Option<Arc<dyn ActiveRecallCapability>>,
+    /// Optional digest compiler bridge (enabled via [`ContextConfig::knowledge_digest`]).
+    knowledge_digest_capability: Option<Arc<dyn KnowledgeDigestCapability>>,
     /// Frozen skill catalog rows (metadata only) for [`macaca_context::SkillContextProvider`].
     skill_capability_catalog: Arc<SkillCapabilityCatalog>,
     /// MCP server/tool summaries from probe (compact; no resource bodies).
@@ -69,6 +105,8 @@ pub(crate) struct ContextReportingChatModel {
     context_config: ContextConfig,
     /// Optional rolling health snapshots (OS-level; no prompt bodies).
     provider_health_ledger: Option<Arc<ProviderHealthLedger>>,
+    /// In-process custom context engines overlaid on top of builtin engines.
+    context_engine_registry: Arc<ContextEngineRegistry>,
 }
 
 impl ContextReportingChatModel {
@@ -86,19 +124,31 @@ impl ContextReportingChatModel {
         agent_name: String,
         merged_context_config: ContextConfig,
         agent_profile_root: Option<std::path::PathBuf>,
-        workspace_memory: Option<Arc<TestMemoryManager>>,
+        memory_runtime: Option<Arc<WebMemoryRuntime>>,
+        workspace_memory_tombstones: Option<Arc<SharedTombstoneRegistry>>,
         routing_agent_id: Option<AgentId>,
         skill_capability_catalog: Arc<SkillCapabilityCatalog>,
         mcp_capability_catalog: Arc<McpCapabilityCatalog>,
         runtime_tool_capability_catalog: Arc<RuntimeToolCapabilityCatalog>,
         ready_mcp_server_ids: Arc<Vec<String>>,
         provider_health_ledger: Option<Arc<ProviderHealthLedger>>,
+        context_engine_registry: Arc<ContextEngineRegistry>,
     ) -> Self {
         // Resolve capability before moving `workspace_memory` into the struct field.
         let memory_recall_capability = Self::build_workspace_recall_capability(
             &merged_context_config,
-            workspace_memory.as_ref(),
+            memory_runtime.as_ref(),
+            workspace_memory_tombstones.as_ref(),
+            app_id,
+            session_id.as_deref(),
             routing_agent_id,
+        );
+        let knowledge_digest_capability = Self::build_workspace_knowledge_digest_capability(
+            &merged_context_config,
+            memory_runtime.as_ref(),
+            workspace_memory_tombstones.as_ref(),
+            app_id,
+            session_id.as_deref(),
         );
         Self {
             inner,
@@ -116,25 +166,25 @@ impl ContextReportingChatModel {
                 merged_context_config.reserve_output_tokens,
             ),
             recall_runtime: merged_context_config.recall.clone(),
-            workspace_memory,
+            memory_runtime,
             agent_profile: merged_context_config.agent_profile.clone(),
             agent_profile_root,
             active_vector_memory: merged_context_config.active_vector_memory.clone(),
             memory_recall_capability,
+            knowledge_digest_capability,
             skill_capability_catalog,
             mcp_capability_catalog,
             runtime_tool_capability_catalog,
             ready_mcp_server_ids,
             context_config: merged_context_config.clone(),
             provider_health_ledger,
+            context_engine_registry,
         }
     }
 
     /// Builds the [`ActiveRecallCapability`] stack used by [`MemoryActiveRecallContextProvider`].
     ///
-    /// Returns `None` when the feature is disabled or no in-process workspace memory backend is
-    /// wired — this keeps unit tests lightweight while preserving production wiring through
-    /// [`TestMemoryManager`].
+    /// Returns `None` when the feature is disabled or no runtime facade is wired.
     ///
     /// `routing_agent_id` should be the [`AgentId`] from the kernel manifest for the same
     /// `agent_name` as this chat model. When `None`, agent-private memory rows (tagged with
@@ -142,17 +192,25 @@ impl ContextReportingChatModel {
     /// [`crate::workspace_memory_recall_source::workspace_memory_entry_visible_for_recall`].
     fn build_workspace_recall_capability(
         cfg: &ContextConfig,
-        workspace_memory: Option<&Arc<TestMemoryManager>>,
+        memory_runtime: Option<&Arc<WebMemoryRuntime>>,
+        tombstones: Option<&Arc<SharedTombstoneRegistry>>,
+        application_id: ApplicationId,
+        session_id: Option<&str>,
         routing_agent_id: Option<AgentId>,
     ) -> Option<Arc<dyn ActiveRecallCapability>> {
         if !cfg.active_vector_memory.enabled {
             return None;
         }
-        let wm = workspace_memory?;
+        let runtime = memory_runtime?;
+        let tomb_index: Option<Arc<dyn macaca_memory::TombstoneIndex>> =
+            tombstones.map(|reg| Arc::clone(reg) as Arc<dyn macaca_memory::TombstoneIndex>);
+        let scope = recall_scope(application_id, session_id, routing_agent_id);
         let source = Arc::new(WorkspaceMemoryRecallSource::new(
-            Arc::clone(wm),
+            Arc::clone(runtime),
+            scope,
             cfg.active_vector_memory.max_hits,
             routing_agent_id,
+            tomb_index,
         ));
         let policy = ActiveRecallPolicy {
             budget: ActiveRecallBudget {
@@ -167,6 +225,30 @@ impl ContextReportingChatModel {
             "workspace-active-recall",
             source,
             policy,
+        )))
+    }
+
+    /// Builds the [`KnowledgeDigestCapability`] used by [`macaca_context::KnowledgeDigestContextProvider`].
+    ///
+    /// Disabled when configuration toggles digest compilation off or no runtime facade exists.
+    fn build_workspace_knowledge_digest_capability(
+        cfg: &ContextConfig,
+        memory_runtime: Option<&Arc<WebMemoryRuntime>>,
+        tombstones: Option<&Arc<SharedTombstoneRegistry>>,
+        application_id: ApplicationId,
+        session_id: Option<&str>,
+    ) -> Option<Arc<dyn KnowledgeDigestCapability>> {
+        if !cfg.knowledge_digest.enabled {
+            return None;
+        }
+        let runtime = memory_runtime?;
+        let tomb_index: Option<Arc<dyn macaca_memory::TombstoneIndex>> = tombstones
+            .map(|registry| Arc::clone(registry) as Arc<dyn macaca_memory::TombstoneIndex>);
+        Some(Arc::new(WorkspaceKnowledgeDigestCapability::new(
+            Arc::clone(runtime),
+            digest_scope(application_id, session_id),
+            cfg.knowledge_digest.max_compiler_rows,
+            tomb_index,
         )))
     }
 
@@ -232,10 +314,14 @@ impl ContextReportingChatModel {
             agent_profile: self.agent_profile.clone(),
             skill_capability_catalog: Some(Arc::clone(&self.skill_capability_catalog)),
             mcp_capability_catalog: Some(Arc::clone(&self.mcp_capability_catalog)),
-            runtime_tool_capability_catalog: Some(Arc::clone(&self.runtime_tool_capability_catalog)),
+            runtime_tool_capability_catalog: Some(Arc::clone(
+                &self.runtime_tool_capability_catalog,
+            )),
             ready_mcp_server_ids: Some(Arc::clone(&self.ready_mcp_server_ids)),
             memory_recall_capability: self.memory_recall_capability.clone(),
             active_vector_memory: self.active_vector_memory.clone(),
+            knowledge_digest_capability: self.knowledge_digest_capability.clone(),
+            knowledge_digest: self.context_config.knowledge_digest.clone(),
         };
         let factory_input = ProviderFactoryInput {
             agent_name: self.agent_name.clone(),
@@ -263,10 +349,14 @@ impl ContextReportingChatModel {
         let policy = ContextFacadeAssemblyPolicy::from_context_config_parts(
             self.context_config.governance.clone(),
             self.context_config.trust_governance.clone(),
+            self.context_config.knowledge_digest.clone(),
         );
-        match ContextFacade::builtins(self.context_selection.clone())
-            .assemble_model_context(input, &providers, policy)
-            .await
+        match ContextFacade::builtins_with_engine_overlay(
+            self.context_selection.clone(),
+            &self.context_engine_registry,
+        )
+        .assemble_model_context(input, &providers, policy)
+        .await
         {
             Ok(mut assembled) => {
                 assembled.report.decisions.extend(catalog_notes);
@@ -280,7 +370,8 @@ impl ContextReportingChatModel {
                 let message_count_before_recall = assembled.messages.len();
                 apply_active_recall(
                     &self.recall_runtime,
-                    self.workspace_memory.as_ref(),
+                    self.memory_runtime.as_ref(),
+                    recall_scope(self.app_id, self.session_id.as_deref(), None),
                     &preflight_cfg,
                     self.composer_handles_active_vector_recall(),
                     &mut assembled,
@@ -289,7 +380,8 @@ impl ContextReportingChatModel {
                 .await;
                 apply_preflight_memory(
                     &self.recall_runtime,
-                    self.workspace_memory.as_ref(),
+                    self.memory_runtime.as_ref(),
+                    digest_scope(self.app_id, self.session_id.as_deref()),
                     &preflight_cfg,
                     &mut assembled,
                     messages,
@@ -304,7 +396,16 @@ impl ContextReportingChatModel {
                         llm_messages_to_framework(&assembled.messages)
                     };
                 let output_options = llm_options_to_framework(&assembled.options, options);
-                let report = assembled.report.clone();
+                let mut report = assembled.report.clone();
+                persist_pruned_source_artifacts(
+                    &self.event_log,
+                    session_id,
+                    &self.agent_name,
+                    Some(self.app_id.to_string()),
+                    &mut report,
+                    messages,
+                )
+                .await;
                 let fallback_decisions = assembled
                     .report
                     .decisions
@@ -351,6 +452,7 @@ impl ContextReportingChatModel {
                                         "selected_candidates": recall.selected_candidates,
                                         "latency_ms": recall.latency_ms,
                                         "source_count": recall.source_breakdown.len(),
+                                        "source_breakdown": recall.source_breakdown.iter().map(source_report_value).collect::<Vec<_>>(),
                                         "decisions": recall.decisions.iter().map(|decision| {
                                             serde_json::json!({
                                                 "code": decision.code,
@@ -360,20 +462,16 @@ impl ContextReportingChatModel {
                                         }).collect::<Vec<_>>(),
                                     })
                                 }).collect::<Vec<_>>(),
-                                "source_breakdown": report.sources.iter().map(|source| {
+                                "knowledge_digest": report.knowledge_digest.iter().map(|digest| {
                                     serde_json::json!({
-                                        "id": source.id,
-                                        "kind": source.kind,
-                                        "label": source.label,
-                                        "estimated_tokens": source.estimated_tokens,
-                                        "byte_size": source.byte_size,
-                                        "included": source.included,
-                                        "pruned_tokens": source.pruned_tokens,
-                                        "render_mode": source.render_mode,
-                                        "trust_level": source.trust_level,
-                                        "source_ref": source.source_ref,
+                                        "provider_id": digest.provider_id,
+                                        "total_candidates": digest.total_candidates,
+                                        "selected_candidates": digest.selected_candidates,
+                                        "source_count": digest.source_breakdown.len(),
+                                        "source_breakdown": digest.source_breakdown.iter().map(source_report_value).collect::<Vec<_>>(),
                                     })
                                 }).collect::<Vec<_>>(),
+                                "source_breakdown": report.sources.iter().map(source_report_value).collect::<Vec<_>>(),
                                 "decisions": report.decisions.iter().map(|decision| {
                                     serde_json::json!({
                                         "code": decision.code,

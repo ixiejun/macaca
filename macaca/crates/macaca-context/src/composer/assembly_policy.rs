@@ -1,7 +1,9 @@
 //! Policy bundle for [`super::facade::ContextFacade`] — keeps governance knobs separate from
 //! transport-level context while allowing a single entrypoint for callers (Strategy objects).
 
-use macaca_proto::config::{ContextGovernanceRuntimeConfig, ContextTrustGovernanceConfig};
+use macaca_proto::config::{
+    ContextGovernanceRuntimeConfig, ContextTrustGovernanceConfig, KnowledgeDigestContextConfig,
+};
 
 /// Full assembly policy: governance pipeline + optional trust promotions.
 ///
@@ -15,6 +17,8 @@ pub struct ContextFacadeAssemblyPolicy {
     pub governance: ContextGovernanceRuntimeConfig,
     /// Optional: when `promotions` is empty, treat as `None` at the facade (no trust work).
     pub trust_governance: Option<ContextTrustGovernanceConfig>,
+    /// Knowledge digest provider + digest-vs-raw merge (`ContextConfig::knowledge_digest`).
+    pub knowledge_digest: KnowledgeDigestContextConfig,
 }
 
 impl Default for ContextFacadeAssemblyPolicy {
@@ -22,6 +26,7 @@ impl Default for ContextFacadeAssemblyPolicy {
         Self {
             governance: ContextGovernanceRuntimeConfig::default(),
             trust_governance: None,
+            knowledge_digest: KnowledgeDigestContextConfig::default(),
         }
     }
 }
@@ -32,6 +37,7 @@ impl ContextFacadeAssemblyPolicy {
         Self {
             governance: governance.unwrap_or_default(),
             trust_governance: None,
+            knowledge_digest: KnowledgeDigestContextConfig::default(),
         }
     }
 
@@ -39,6 +45,7 @@ impl ContextFacadeAssemblyPolicy {
     pub fn from_context_config_parts(
         governance: ContextGovernanceRuntimeConfig,
         trust: ContextTrustGovernanceConfig,
+        knowledge_digest: KnowledgeDigestContextConfig,
     ) -> Self {
         let trust_governance = if trust.promotions.is_empty() {
             None
@@ -48,6 +55,7 @@ impl ContextFacadeAssemblyPolicy {
         Self {
             governance,
             trust_governance,
+            knowledge_digest,
         }
     }
 }

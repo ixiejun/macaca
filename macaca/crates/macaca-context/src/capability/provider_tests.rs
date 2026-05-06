@@ -10,9 +10,9 @@ use crate::capability::model::{
     RuntimeToolCapabilityCatalog, SkillCapabilityCatalog, SkillCapabilityRecord,
 };
 use crate::{
-    mcp_capability_provider_arc, runtime_tool_capability_provider_arc, skill_capability_provider_arc,
-    CapabilityCollisionRecord, ContextAssembleInput, ContextComposeContext, ContextProviderStage,
-    TrustLevel,
+    mcp_capability_provider_arc, runtime_tool_capability_provider_arc,
+    skill_capability_provider_arc, CapabilityCollisionRecord, ContextAssembleInput,
+    ContextComposeContext, ContextProviderStage, TrustLevel,
 };
 
 fn compose_ctx(input: &ContextAssembleInput) -> ContextComposeContext<'_> {
@@ -77,10 +77,7 @@ async fn skill_capability_provider_dependency_gap_becomes_diagnostics() {
     let provider = skill_capability_provider_arc(catalog, ready);
 
     let assemble = ContextAssembleInput::legacy("agent", "model", vec![], Default::default());
-    let out = provider
-        .contribute(&compose_ctx(&assemble))
-        .await
-        .unwrap();
+    let out = provider.contribute(&compose_ctx(&assemble)).await.unwrap();
     assert_eq!(out.candidates.len(), 1);
     assert!(out.diagnostics.iter().any(|d| d.message.contains("figma")));
 }
@@ -94,10 +91,7 @@ async fn runtime_tool_capability_provider_emits_sorted_names() {
     let provider = runtime_tool_capability_provider_arc(catalog);
 
     let assemble = ContextAssembleInput::legacy("agent", "model", vec![], Default::default());
-    let out = provider
-        .contribute(&compose_ctx(&assemble))
-        .await
-        .unwrap();
+    let out = provider.contribute(&compose_ctx(&assemble)).await.unwrap();
     assert_eq!(out.candidates.len(), 1);
     let body = &out.candidates[0].content;
     let z = body.find("z_last").expect("z_last present");

@@ -9,12 +9,15 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use macaca_context::{
-    mcp_tool_collisions, DeclaredCapabilityDependency, McpCapabilityCatalog, McpServerCapabilitySummary,
-    RuntimeToolCapabilityCatalog, SkillCapabilityCatalog, SkillCapabilityRecord, SkillFilterDiagnostic,
+    mcp_tool_collisions, DeclaredCapabilityDependency, McpCapabilityCatalog,
+    McpServerCapabilitySummary, RuntimeToolCapabilityCatalog, SkillCapabilityCatalog,
+    SkillCapabilityRecord, SkillFilterDiagnostic,
 };
 use macaca_framework::tool::Toolkit;
-use macaca_runtime_host::{McpRuntimeFacade, McpRuntimeStatus, McpRuntimeStatusState, McpToolPolicy};
-use macaca_skill::{SkillPolicy, SkillRuntimeFacade, SkillSnapshotRequest, SkillSnapshot};
+use macaca_runtime_host::{
+    McpRuntimeFacade, McpRuntimeStatus, McpRuntimeStatusState, McpToolPolicy,
+};
+use macaca_skill::{SkillPolicy, SkillRuntimeFacade, SkillSnapshot, SkillSnapshotRequest};
 
 use crate::state::AppState;
 
@@ -81,16 +84,25 @@ pub fn mcp_capability_catalog_from_statuses(statuses: &[McpRuntimeStatus]) -> Mc
         })
         .collect();
     let collisions = mcp_tool_collisions(&servers);
-    McpCapabilityCatalog { servers, collisions }
+    McpCapabilityCatalog {
+        servers,
+        collisions,
+    }
 }
 
 /// Collects tool **names** only from JSON tool definitions (compact router index).
 #[must_use]
-pub fn runtime_tool_capability_catalog_from_toolkit(toolkit: &Toolkit) -> RuntimeToolCapabilityCatalog {
+pub fn runtime_tool_capability_catalog_from_toolkit(
+    toolkit: &Toolkit,
+) -> RuntimeToolCapabilityCatalog {
     let mut tool_names: Vec<String> = toolkit
         .get_definitions()
         .iter()
-        .filter_map(|def| def.get("name").and_then(|v| v.as_str()).map(std::string::ToString::to_string))
+        .filter_map(|def| {
+            def.get("name")
+                .and_then(|v| v.as_str())
+                .map(std::string::ToString::to_string)
+        })
         .collect();
     tool_names.sort();
     tool_names.dedup();
@@ -201,11 +213,16 @@ mod tests {
     #[test]
     fn mcp_catalog_maps_statuses_and_detects_cross_server_tool_collision() {
         let statuses = [
-            sample_mcp_status("figma", McpRuntimeStatusState::Ready, vec![
-                "get_figma_data".into(),
-                "shared_tool".into(),
-            ]),
-            sample_mcp_status("other", McpRuntimeStatusState::Ready, vec!["shared_tool".into()]),
+            sample_mcp_status(
+                "figma",
+                McpRuntimeStatusState::Ready,
+                vec!["get_figma_data".into(), "shared_tool".into()],
+            ),
+            sample_mcp_status(
+                "other",
+                McpRuntimeStatusState::Ready,
+                vec!["shared_tool".into()],
+            ),
         ];
 
         assert_eq!(
@@ -263,14 +280,15 @@ mod tests {
         let row = &cat.entries[0];
         assert_eq!(row.stable_id, "skill:application:figma-mcp");
         assert_eq!(row.declared_dependencies.len(), 1);
-        assert_eq!(row.declared_dependencies[0].capability_id, "mcp_server:figma");
-        assert!(
-            row.declared_dependencies[0]
-                .notes
-                .as_ref()
-                .expect("transport note")
-                .contains("stdio")
+        assert_eq!(
+            row.declared_dependencies[0].capability_id,
+            "mcp_server:figma"
         );
+        assert!(row.declared_dependencies[0]
+            .notes
+            .as_ref()
+            .expect("transport note")
+            .contains("stdio"));
     }
 
     #[test]

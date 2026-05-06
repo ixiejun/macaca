@@ -296,6 +296,15 @@ impl EventLog {
         self.replay(session_id, since_seq, limit).await.collect()
     }
 
+    /// Load one immutable event row by exact per-session sequence number.
+    ///
+    /// This supports diagnostics paths that follow a stable `events/{session}/{seq}`
+    /// reference back to the canonical EventLog payload without scanning the full
+    /// session history.
+    pub async fn get_by_seq(&self, session_id: &str, seq: u64) -> Option<EventEntry> {
+        self.get_entry(&Self::event_key(session_id, seq)).await
+    }
+
     /// Query events for a session using secondary indexes when a scope filter is present.
     pub async fn query_indexed(&self, query: EventLogQuery) -> Vec<EventEntry> {
         if query.limit == 0 {

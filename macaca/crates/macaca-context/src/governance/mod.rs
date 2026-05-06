@@ -14,13 +14,16 @@ pub mod registry;
 pub mod trust_policy;
 
 pub use candidate_ops::{
-    is_denied_by_prefix, redact_plain_substrings, validate_governed_candidate, with_rewritten_content,
+    is_denied_by_prefix, redact_plain_substrings, validate_governed_candidate,
+    with_rewritten_content,
 };
 pub use external_boundary::{
     validate_opaque_external_payload, ExternalCandidateLimits, OpaqueExternalPayload,
 };
 pub use fingerprint::governance_config_fingerprint;
-pub use pipeline::{run_governed_provider_chain, run_ungoverned_provider_chain, GovernedCollection};
+pub use pipeline::{
+    run_governed_provider_chain, run_ungoverned_provider_chain, GovernedCollection,
+};
 pub use registry::{
     ContextProviderFactory, ContextProviderRegistry, ProviderFactoryInput, ProviderFamilyDescriptor,
 };

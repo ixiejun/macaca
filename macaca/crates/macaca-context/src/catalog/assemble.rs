@@ -11,16 +11,18 @@ use macaca_proto::config::{ContextConfig, ContextProviderFamilyConfig};
 use macaca_proto::MacacaResult;
 
 use crate::capability::{
-    mcp_capability_provider_arc, runtime_tool_capability_provider_arc, skill_capability_provider_arc,
+    mcp_capability_provider_arc, runtime_tool_capability_provider_arc,
+    skill_capability_provider_arc,
 };
 use crate::catalog::constants::{
-    BUILTIN_FAMILY_ORDER, FAMILY_AGENT_PROFILE, FAMILY_MCP_CAPABILITY, FAMILY_MEMORY_ACTIVE_RECALL,
-    FAMILY_RUNTIME_TOOL_CAPABILITY, FAMILY_SKILL_CAPABILITY,
+    BUILTIN_FAMILY_ORDER, FAMILY_AGENT_PROFILE, FAMILY_KNOWLEDGE_DIGEST, FAMILY_MCP_CAPABILITY,
+    FAMILY_MEMORY_ACTIVE_RECALL, FAMILY_RUNTIME_TOOL_CAPABILITY, FAMILY_SKILL_CAPABILITY,
 };
 use crate::catalog::descriptor::MACACA_CONTEXT_CRATE_SEMVER;
 use crate::catalog::versioned::VersionedContextProvider;
 use crate::composer::ContextProvider;
 use crate::governance::{ContextProviderRegistry, ProviderFactoryInput};
+use crate::knowledge_digest::knowledge_digest_provider_arc;
 use crate::memory_active_recall_provider::memory_active_recall_provider_arc;
 use crate::profile::profile_provider_arc;
 use crate::report::{ContextDecisionReport, ContextDecisionSeverity};
@@ -35,10 +37,13 @@ pub struct ProviderAssemblyEnvironment {
     pub agent_profile: macaca_proto::config::AgentProfileContextConfig,
     pub skill_capability_catalog: Option<Arc<crate::capability::SkillCapabilityCatalog>>,
     pub mcp_capability_catalog: Option<Arc<crate::capability::McpCapabilityCatalog>>,
-    pub runtime_tool_capability_catalog: Option<Arc<crate::capability::RuntimeToolCapabilityCatalog>>,
+    pub runtime_tool_capability_catalog:
+        Option<Arc<crate::capability::RuntimeToolCapabilityCatalog>>,
     pub ready_mcp_server_ids: Option<Arc<Vec<String>>>,
     pub memory_recall_capability: Option<Arc<dyn crate::memory::ActiveRecallCapability>>,
     pub active_vector_memory: macaca_proto::config::ActiveVectorMemoryContextConfig,
+    pub knowledge_digest_capability: Option<Arc<dyn crate::memory::KnowledgeDigestCapability>>,
+    pub knowledge_digest: macaca_proto::config::KnowledgeDigestContextConfig,
 }
 
 impl ProviderAssemblyEnvironment {
@@ -53,6 +58,8 @@ impl ProviderAssemblyEnvironment {
             ready_mcp_server_ids: None,
             memory_recall_capability: None,
             active_vector_memory: Default::default(),
+            knowledge_digest_capability: None,
+            knowledge_digest: Default::default(),
         }
     }
 }
@@ -183,6 +190,29 @@ pub async fn assemble_context_providers(
                     ))
                 } else {
                     diagnostics.push(skip_diag(fid, "runtime tool catalog unavailable"));
+                    None
+                }
+            }
+            FAMILY_KNOWLEDGE_DIGEST => {
+                if !cfg.knowledge_digest.enabled {
+                    diagnostics.push(skip_diag(
+                        fid,
+                        "knowledge_digest disabled in KnowledgeDigestContextConfig",
+                    ));
+                    None
+                } else if let Some(cap) = env.knowledge_digest_capability.as_ref() {
+                    Some(VersionedContextProvider::new(
+                        knowledge_digest_provider_arc(
+                            Arc::clone(cap),
+                            cfg.knowledge_digest.clone(),
+                        ),
+                        MACACA_CONTEXT_CRATE_SEMVER,
+                    ))
+                } else {
+                    diagnostics.push(skip_diag(
+                        fid,
+                        "knowledge_digest capability adapter not wired for this environment",
+                    ));
                     None
                 }
             }

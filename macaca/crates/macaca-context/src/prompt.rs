@@ -102,6 +102,11 @@ pub struct CompiledPrompt {
     pub sections: Vec<PromptSection>,
 }
 
+/// [`ContextFacade`] composer output: model-call-ready text plus stable/dynamic SHA-256 (`stable_hash` / `full_hash`).
+///
+/// Paired with [`crate::composer::ContextPlan`] this matches the integration plan’s “compiled context” bundle.
+pub type CompiledContext = CompiledPrompt;
+
 #[derive(Debug, Clone)]
 pub struct PromptComposer {
     boundary_marker: String,

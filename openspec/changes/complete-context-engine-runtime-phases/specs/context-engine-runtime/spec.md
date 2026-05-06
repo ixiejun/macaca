@@ -169,3 +169,142 @@ Macaca SHALL allow applications and agents to select built-in or custom context 
 - **WHEN** config selects that implementation
 - **THEN** framework/runtime/web layers MUST call it only through public context abstractions
 - **AND** no upper layer may require its concrete type
+
+### Requirement: Phase 6 SHALL preserve retrievable originals for every pruned source
+
+Macaca SHALL treat pruning as non-destructive for every supported source kind. Any source rendered as excerpt, summary, or dropped content in model-visible context MUST preserve its original payload in canonical storage and MUST remain retrievable through a source reference or an authorized debug path.
+
+#### Scenario: Pruned source remains retrievable through scoped repository
+
+- **GIVEN** a large model-call source is pruned before entering model context
+- **WHEN** a maintainer or debug client follows the `ContextReport` source reference
+- **THEN** Macaca MUST resolve the reference through a scoped repository or adapter boundary
+- **AND** the pruning step MUST NOT rewrite or replace the original payload in EventLog, artifact storage, or session storage
+
+#### Scenario: Source retrieval rejects cross-session references
+
+- **GIVEN** a context report source ref belongs to session `A`
+- **WHEN** a client attempts to resolve it through session `B`
+- **THEN** Macaca MUST reject the lookup
+- **AND** the response MUST NOT reveal the source payload or whether the source exists outside the authorized scope
+
+#### Scenario: Source retrieval reports unavailable originals explicitly
+
+- **GIVEN** an old or unsupported pruned source has no stable canonical original payload
+- **WHEN** diagnostics render that source
+- **THEN** Macaca MUST report an explicit unavailable reason
+- **AND** it MUST NOT claim that the original is retrievable
+
+### Requirement: Phase 7 SHALL provide lineage-aware logical session UX
+
+Macaca SHALL expose compaction lineage as a first-class runtime capability. Logical session access SHALL resolve to the current lineage tip by default, while diagnostics and UI SHALL allow operators to inspect the root-to-tip lineage without losing auditability.
+
+#### Scenario: Logical session access resolves to lineage tip
+
+- **GIVEN** a root session has one or more compaction successor nodes
+- **WHEN** runtime or web code loads the logical session for normal operation
+- **THEN** Macaca MUST resolve the request to the current lineage tip by default
+- **AND** the original lineage root and predecessor chain MUST remain queryable
+
+#### Scenario: UI shows lineage and compaction details
+
+- **GIVEN** a session has been compacted manually or automatically
+- **WHEN** a user opens the chat trace or diagnostics UI
+- **THEN** the UI MUST show root session id, tip session id, successor chain, and compaction summary metadata
+- **AND** a debug interaction MUST allow root-to-tip lineage expansion without changing the default logical-session view
+
+#### Scenario: Compaction summary is reference-only
+
+- **GIVEN** a compaction summary is inserted into the successor context
+- **WHEN** the summary is rendered for a model request
+- **THEN** it MUST be fenced or otherwise marked as reference-only context
+- **AND** it MUST NOT be treated as a new user instruction
+
+### Requirement: Phase 8 SHALL provide full runtime memory and wiki recall injection
+
+Macaca SHALL support memory recall and wiki/digest recall as optional runtime context sources. These recall outputs MUST be bounded, untrusted, request-only, and explicitly described in `ContextReport`.
+
+#### Scenario: Wiki or digest recall is runtime-selectable
+
+- **GIVEN** wiki/digest recall is enabled through config, profile, or explicit source-provider path
+- **WHEN** a model request is assembled
+- **THEN** Macaca MUST retrieve wiki/digest recall through the context runtime path
+- **AND** the result MUST be included only as dynamic, untrusted, request-only context
+
+#### Scenario: Recall carries provenance and privacy metadata
+
+- **GIVEN** memory recall, wiki recall, preflight recall, or active recall returns one or more context items
+- **WHEN** those items are injected into a model request
+- **THEN** each injected item MUST carry provenance, confidence, privacy tier, and source id metadata
+- **AND** the canonical transcript MUST NOT be mutated by that injection
+
+#### Scenario: Recall provider cannot mutate transcript
+
+- **GIVEN** a memory or wiki/digest context provider contributes recall candidates
+- **WHEN** the provider is invoked during model request assembly
+- **THEN** it MUST receive request metadata and source query inputs only
+- **AND** it MUST NOT receive a mutable reference to the canonical transcript
+
+#### Scenario: Recall diagnostics may persist without duplicating recall body as transcript
+
+- **GIVEN** recall output is injected into a model request
+- **WHEN** Macaca records diagnostics
+- **THEN** diagnostics MAY store source ids, evidence ids, warnings, budgets, and bounded summaries
+- **AND** the injected full recall body MUST NOT be appended as a canonical transcript message
+
+### Requirement: Phase 9 SHALL provide installable custom engines and safe external adapters
+
+Macaca SHALL allow operators to install custom in-process context engines/providers and SHALL provide a safe adapter boundary for process, RPC, or WASM-backed external context managers.
+
+#### Scenario: Custom in-process engine is registered and selected by config
+
+- **GIVEN** an operator registers a custom in-process context engine or provider that passes the published conformance checks
+- **WHEN** system, application, or agent profile configuration selects that implementation
+- **THEN** runtime, framework, and web code MUST invoke it only through public context abstractions
+- **AND** no application logic changes MUST be required to activate it
+
+#### Scenario: External adapter output is validated and bounded
+
+- **GIVEN** an external process, RPC service, or WASM adapter returns assembled context or diagnostics
+- **WHEN** Macaca receives the adapter output
+- **THEN** Macaca MUST enforce timeout, payload size, schema validation, trust fencing, and fallback policy before the output reaches the LLM request
+- **AND** malformed or oversized output MUST degrade safely without crashing the main loop
+
+#### Scenario: External adapter is opt-in
+
+- **GIVEN** no external context adapter is explicitly configured
+- **WHEN** Macaca boots runtime, framework, or web context paths
+- **THEN** no external process, RPC service, or WASM context adapter MUST be started
+- **AND** builtin context engines/providers MUST remain available
+
+### Requirement: Phase 10 SHALL enforce migration and archive discipline
+
+Macaca SHALL complete context-engine migration only when deprecated legacy prompt/context entry points remain searchable, all production consumers have migrated away from them, and verification/archival gates have been satisfied.
+
+#### Scenario: Deprecated legacy entry remains searchable but unused by production
+
+- **GIVEN** a prompt or context entry point has been replaced by `ContextFacade`, `ContextRuntimeFacade`, or equivalent abstractions
+- **WHEN** migration reaches final closure
+- **THEN** the old entry point MUST remain in the codebase with a deprecated marker and replacement guidance
+- **AND** no non-test production code MUST continue to call it
+
+#### Scenario: Archive gates require evidence
+
+- **GIVEN** maintainers want to archive context-engine related changes
+- **WHEN** they evaluate readiness
+- **THEN** OpenSpec validation, targeted tests, Phase status updates, and available GitNexus impact/change evidence MUST all be complete
+- **AND** a change MUST NOT be archived while runtime or diagnostics gaps remain open for any claimed-complete Phase
+
+#### Scenario: Deprecated API remains for migration search
+
+- **GIVEN** a legacy prompt/context API is replaced
+- **WHEN** maintainers search for migration targets
+- **THEN** the legacy API MUST remain present with replacement guidance
+- **AND** it MUST NOT be deleted solely to make scans pass
+
+#### Scenario: New closure code remains application-generic
+
+- **GIVEN** new code is added for context phase closure
+- **WHEN** maintainers run final scans or review implementation
+- **THEN** the code MUST NOT branch on hardcoded application names, workflow names, driver names, provider names, or business-specific identifiers
+- **AND** behavior selection MUST come from config, manifest, profile, or registered provider capabilities

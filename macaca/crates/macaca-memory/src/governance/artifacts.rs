@@ -10,6 +10,7 @@ pub enum ArtifactKind {
     MemoryReport,
     ProjectDecisionLog,
     WikiDigest,
+    Citation,
     GovernanceSummary,
 }
 
@@ -38,6 +39,27 @@ pub struct MemoryArtifact {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryArtifactList {
     pub items: Vec<MemoryArtifact>,
+}
+
+/// Project decision log artifact wrapper with exact evidence references.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectDecisionLogArtifact {
+    pub artifact: MemoryArtifact,
+    pub evidence_ids: Vec<String>,
+}
+
+/// Wiki digest artifact wrapper with bounded/redacted body by default.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WikiDigestArtifact {
+    pub artifact: MemoryArtifact,
+    pub evidence_ids: Vec<String>,
+}
+
+/// Citation artifact wrapper for exact source lookup.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CitationArtifact {
+    pub artifact: MemoryArtifact,
+    pub evidence_ids: Vec<String>,
 }
 
 /// Logical scope tags for artifact visibility.

@@ -11,8 +11,8 @@ use std::sync::{Arc, RwLock};
 use async_trait::async_trait;
 use macaca_proto::MacacaResult;
 
-use crate::catalog::descriptor::MACACA_CONTEXT_CRATE_SEMVER;
 pub use crate::catalog::descriptor::ProviderFamilyDescriptor;
+use crate::catalog::descriptor::MACACA_CONTEXT_CRATE_SEMVER;
 use crate::composer::{ContextProvider, ContextProviderStage};
 /// Input envelope passed to factories. Intentionally small and JSON-friendly so higher layers can
 /// forward opaque extension payloads without coupling crates to each provider’s concrete ctor args.
@@ -47,7 +47,10 @@ pub trait ContextProviderFactory: Send + Sync {
     }
 
     /// Produce a ready-to-run provider instance.
-    async fn build_provider(&self, input: &ProviderFactoryInput) -> MacacaResult<Arc<dyn ContextProvider>>;
+    async fn build_provider(
+        &self,
+        input: &ProviderFactoryInput,
+    ) -> MacacaResult<Arc<dyn ContextProvider>>;
 }
 
 /// Thread-safe in-process registry (first milestone: local only; no RPC/WASM in this crate).
@@ -168,7 +171,10 @@ mod tests {
         let reg = ContextProviderRegistry::new();
         reg.register(Arc::new(AlphaFactory));
         reg.register(Arc::new(BetaFactory));
-        assert_eq!(reg.list_family_ids(), vec!["alpha".to_string(), "beta".to_string()]);
+        assert_eq!(
+            reg.list_family_ids(),
+            vec!["alpha".to_string(), "beta".to_string()]
+        );
 
         let a = reg.get("alpha").expect("alpha registered");
         let p = a

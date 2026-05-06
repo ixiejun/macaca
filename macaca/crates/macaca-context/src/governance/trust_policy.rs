@@ -31,6 +31,7 @@ pub(crate) fn candidate_kind_snake(kind: ContextCandidateKind) -> &'static str {
     match kind {
         ContextCandidateKind::ProfileBootstrap => "profile_bootstrap",
         ContextCandidateKind::CapabilityIndex => "capability_index",
+        ContextCandidateKind::KnowledgeDigest => "knowledge_digest",
         ContextCandidateKind::MemoryRecall => "memory_recall",
         ContextCandidateKind::WorkspaceGuide => "workspace_guide",
         ContextCandidateKind::RuntimeDiagnostic => "runtime_diagnostic",
@@ -47,8 +48,7 @@ fn rule_matches(rule: &TrustPromotionRule, c: &ContextCandidate) -> bool {
         return false;
     }
     if let Some(ref want_kind) = rule.match_candidate_kind {
-        if want_kind.is_empty()
-            || want_kind.to_lowercase().as_str() != candidate_kind_snake(c.kind)
+        if want_kind.is_empty() || want_kind.to_lowercase().as_str() != candidate_kind_snake(c.kind)
         {
             return false;
         }

@@ -86,6 +86,26 @@ impl ContextAssembleInput {
             budget: ContextBudget::default(),
         }
     }
+
+    /// Returns the **most recent non-empty user** message text, scanning from the end.
+    ///
+    /// ### Why this exists
+    /// Vector memory **active recall** and **knowledge digest** compilation both need a
+    /// retrieval-oriented query derived from the live user turn instead of inventing synthetic
+    /// keywords. Sharing one helper keeps [`crate::memory::MemoryRecallQuery`] construction
+    /// deterministic across providers (Adapter pattern).
+    pub fn last_user_message_text(&self) -> Option<String> {
+        use macaca_proto::LlmRole;
+        for message in self.base_messages.iter().rev() {
+            if message.role == LlmRole::User {
+                let trimmed = message.content.trim();
+                if !trimmed.is_empty() {
+                    return Some(message.content.clone());
+                }
+            }
+        }
+        None
+    }
 }
 
 /// Output of one context-engine assembly pass.
@@ -441,7 +461,7 @@ impl ContextEngine for SummaryContextEngine {
 ///
 /// The registry is intentionally lightweight: callers resolve by id and fall
 /// back to `legacy` when the requested engine is missing.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct ContextEngineRegistry {
     engines: HashMap<String, Arc<dyn ContextEngine>>,
 }
@@ -479,6 +499,28 @@ impl ContextEngineRegistry {
         self.engines.get(id).cloned()
     }
 
+    /// Overlay another registry on top of this one, replacing duplicate ids with the overlay copy.
+    pub fn merge_from(mut self, overlay: &ContextEngineRegistry) -> Self {
+        for (id, engine) in &overlay.engines {
+            self.engines.insert(id.clone(), Arc::clone(engine));
+        }
+        self
+    }
+
+    /// Stable list of registered engine ids for diagnostics/UIs.
+    pub fn list_engine_ids(&self) -> Vec<String> {
+        let mut ids: Vec<_> = self.engines.keys().cloned().collect();
+        ids.sort();
+        ids
+    }
+
+    /// Stable list of registered engine metadata for diagnostics/UIs.
+    pub fn list_engine_infos(&self) -> Vec<ContextEngineInfo> {
+        let mut rows: Vec<_> = self.engines.values().map(|engine| engine.info()).collect();
+        rows.sort_by(|a, b| a.id.cmp(&b.id));
+        rows
+    }
+
     /// Resolve the requested engine or guarantee a usable legacy engine.
     pub fn resolve_or_legacy(&self, id: Option<&str>) -> Arc<dyn ContextEngine> {
         id.and_then(|id| self.get(id))
@@ -512,6 +554,17 @@ impl ContextRuntimeFacade {
     /// Build a facade backed by the builtin engine set.
     pub fn builtins(selection: ContextEngineSelection) -> Self {
         Self::new(ContextEngineRegistry::with_builtins(), selection)
+    }
+
+    /// Build a facade backed by builtin engines plus a caller-supplied overlay registry.
+    pub fn builtins_with_overlay(
+        selection: ContextEngineSelection,
+        overlay: &ContextEngineRegistry,
+    ) -> Self {
+        Self::new(
+            ContextEngineRegistry::with_builtins().merge_from(overlay),
+            selection,
+        )
     }
 
     /// Convenience constructor for pure legacy behavior.
@@ -552,6 +605,11 @@ impl ContextRuntimeFacade {
             }
         }
     }
+}
+
+/// Stable metadata for all builtin context engines shipped by this crate.
+pub fn list_builtin_engine_infos() -> Vec<ContextEngineInfo> {
+    ContextEngineRegistry::with_builtins().list_engine_infos()
 }
 
 /// Thin single-engine facade used by simpler call sites and tests.
@@ -726,6 +784,29 @@ mod tests {
     use super::*;
     use macaca_proto::{LlmMessage, LlmOptions, ToolDefinition};
 
+    struct CustomTestEngine;
+
+    #[async_trait]
+    impl ContextEngine for CustomTestEngine {
+        fn info(&self) -> ContextEngineInfo {
+            ContextEngineInfo::new("custom-test", "Custom Test Engine")
+        }
+
+        async fn assemble(
+            &self,
+            input: ContextAssembleInput,
+        ) -> MacacaResult<ContextAssembleResult> {
+            let mut report = build_legacy_report(&input);
+            report.engine_id = "custom-test".into();
+            Ok(ContextAssembleResult {
+                messages: input.base_messages,
+                options: input.options,
+                options_patch: ContextOptionsPatch::default(),
+                report,
+            })
+        }
+    }
+
     #[tokio::test]
     async fn legacy_engine_preserves_messages_and_options() {
         let messages = vec![LlmMessage::system("system"), LlmMessage::user("hello")];
@@ -863,5 +944,29 @@ mod tests {
             registry.resolve_or_legacy(Some("summary")).info().id,
             "summary"
         );
+    }
+
+    #[tokio::test]
+    async fn runtime_facade_can_select_overlay_custom_engine() {
+        let overlay = ContextEngineRegistry::new().register(Arc::new(CustomTestEngine));
+        let facade = ContextRuntimeFacade::builtins_with_overlay(
+            ContextEngineSelection {
+                engine_id: "custom-test".into(),
+                fallback_engine_id: "legacy".into(),
+            },
+            &overlay,
+        );
+        let result = facade
+            .assemble(ContextAssembleInput::legacy(
+                "agent",
+                "model",
+                vec![LlmMessage::user("hello")],
+                LlmOptions::default(),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(result.report.engine_id, "custom-test");
+        assert_eq!(result.report.requested_engine_id, "custom-test");
+        assert!(!result.report.engine_fallback_applied);
     }
 }

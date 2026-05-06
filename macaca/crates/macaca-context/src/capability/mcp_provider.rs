@@ -35,7 +35,10 @@ impl ContextProvider for McpContextProvider {
         ContextProviderStage::CapabilityIndex
     }
 
-    async fn contribute(&self, _ctx: &ContextComposeContext<'_>) -> MacacaResult<ContextProviderOutcome> {
+    async fn contribute(
+        &self,
+        _ctx: &ContextComposeContext<'_>,
+    ) -> MacacaResult<ContextProviderOutcome> {
         let mut diagnostics = Vec::new();
         for c in &self.catalog.collisions {
             diagnostics.push(ContextProviderDiagnostics {

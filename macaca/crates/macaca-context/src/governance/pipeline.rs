@@ -13,16 +13,17 @@ use macaca_proto::{MacacaError, MacacaResult};
 use tokio::time::timeout;
 
 use crate::composer::{
-    ContextCandidate, ContextComposeContext, ContextProvider, ContextProviderDiagnostics,
-    ContextProviderOutcome, sort_providers,
+    sort_providers, ContextCandidate, ContextComposeContext, ContextProvider,
+    ContextProviderDiagnostics, ContextProviderOutcome,
 };
 use crate::governance::candidate_ops::{
-    is_denied_by_prefix, redact_plain_substrings, validate_governed_candidate, with_rewritten_content,
+    is_denied_by_prefix, redact_plain_substrings, validate_governed_candidate,
+    with_rewritten_content,
 };
 use crate::governance::fingerprint::governance_config_fingerprint;
 use crate::report::{
-    ActiveRecallDiagnostics, ContextDecisionReport, ContextDecisionSeverity, ProviderInvocationSummary,
-    ProviderRuntimeSummary,
+    ActiveRecallDiagnostics, ContextDecisionReport, ContextDecisionSeverity,
+    ProviderInvocationSummary, ProviderRuntimeSummary,
 };
 
 /// Result of the governed provider collection pass executed inside [`crate::composer::ContextFacade`].
@@ -276,8 +277,8 @@ mod tests {
 
     use crate::budget::ContextBudget;
     use crate::composer::{
-        ContextCacheClass, ContextCandidate, ContextCandidateKind, ContextComposeContext, ContextProvider,
-        ContextProviderOutcome, ContextProviderStage, ContextScope, ContextTarget,
+        ContextCacheClass, ContextCandidate, ContextCandidateKind, ContextComposeContext,
+        ContextProvider, ContextProviderOutcome, ContextProviderStage, ContextScope, ContextTarget,
     };
     use crate::engine::ContextAssembleInput;
     use crate::prompt::TrustLevel;
@@ -306,6 +307,9 @@ mod tests {
             content: content.into(),
             token_estimate: 4,
             diagnostics: Vec::new(),
+            evidence_memory_ids: Vec::new(),
+            digest_strength: None,
+            source_report: None,
         }
     }
 
@@ -413,12 +417,10 @@ mod tests {
             .expect("fail-open must not abort");
 
         assert_eq!(bundle.summary.invocations[0].outcome, "error");
-        assert!(
-            bundle
-                .provider_diagnostics
-                .iter()
-                .any(|d| d.message.contains("fail-open"))
-        );
+        assert!(bundle
+            .provider_diagnostics
+            .iter()
+            .any(|d| d.message.contains("fail-open")));
     }
 
     #[tokio::test]
@@ -457,18 +459,15 @@ mod tests {
             candidates: vec![sample_candidate("blocked:x", "payload")],
             ..Default::default()
         };
-        let providers: Vec<Arc<dyn ContextProvider>> =
-            vec![Arc::new(StaticProvider { out })];
+        let providers: Vec<Arc<dyn ContextProvider>> = vec![Arc::new(StaticProvider { out })];
         let bundle = super::run_governed_provider_chain(&providers, &ctx, &cfg)
             .await
             .unwrap();
         assert!(bundle.candidates.is_empty());
-        assert!(
-            bundle
-                .governance_decisions
-                .iter()
-                .any(|d| d.code == "governance_deny_prefix")
-        );
+        assert!(bundle
+            .governance_decisions
+            .iter()
+            .any(|d| d.code == "governance_deny_prefix"));
     }
 
     #[tokio::test]
@@ -486,8 +485,7 @@ mod tests {
             candidates: vec![sample_candidate("ok", "before SECRET after")],
             ..Default::default()
         };
-        let providers: Vec<Arc<dyn ContextProvider>> =
-            vec![Arc::new(StaticProvider { out })];
+        let providers: Vec<Arc<dyn ContextProvider>> = vec![Arc::new(StaticProvider { out })];
         let bundle = super::run_governed_provider_chain(&providers, &ctx, &cfg)
             .await
             .unwrap();
@@ -497,12 +495,10 @@ mod tests {
             "{}",
             bundle.candidates[0].content
         );
-        assert!(
-            bundle
-                .governance_decisions
-                .iter()
-                .any(|d| d.code == "governance_redaction")
-        );
+        assert!(bundle
+            .governance_decisions
+            .iter()
+            .any(|d| d.code == "governance_redaction"));
     }
 
     #[tokio::test]
