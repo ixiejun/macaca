@@ -12,6 +12,7 @@ use macaca_proto::{
 };
 use tracing::{info, warn};
 
+use crate::abi::{ApplicationAbiAdapter, ApplicationAbiLoadResult, WasmApplicationAbiAdapter};
 use crate::package::load_yaml_app_package_descriptor;
 use crate::runtime_guard::{
     package_requires_wasm_runtime, PackageGuardContext, PackageRuntimeGuard,
@@ -61,6 +62,9 @@ impl PackageLoaderFactory {
     }
 
     /// Phase 04 execution entry intentionally rejects WASM execution.
+    #[deprecated(
+        note = "use WasmApplicationAbiAdapter::execute_unavailable() so WASM execution failures are reported through Application ABI v0"
+    )]
     pub fn execute_if_available(descriptor: &PackageDescriptor) -> Result<(), PackageGuardError> {
         if package_requires_wasm_runtime(descriptor) {
             warn!(
@@ -72,6 +76,22 @@ impl PackageLoaderFactory {
             ));
         }
         Ok(())
+    }
+
+    /// Load Application ABI metadata for a WASM component package without executing it.
+    ///
+    /// Phase 05 introduces this additive bridge so package metadata can flow
+    /// into Application ABI v0 while the real WASM runtime is still absent.
+    pub fn load_wasm_application_abi_metadata(
+        descriptor: PackageDescriptor,
+    ) -> Result<ApplicationAbiLoadResult, PackageGuardError> {
+        info!(
+            package_id = %descriptor.manifest.id,
+            "package loader selected WASM Application ABI metadata-only path"
+        );
+        WasmApplicationAbiAdapter::new(descriptor)
+            .load()
+            .map_err(|error| PackageGuardError::RuntimeUnavailable(error.to_string()))
     }
 }
 
@@ -117,9 +137,31 @@ mod tests {
             PackageRuntime::new(PackageRuntimeKind::WasmComponent, "1"),
         ));
 
+        #[allow(deprecated)]
         let err = PackageLoaderFactory::execute_if_available(&descriptor).unwrap_err();
 
         assert!(matches!(err, PackageGuardError::RuntimeUnavailable(_)));
+    }
+
+    #[test]
+    fn wasm_application_abi_metadata_loader_does_not_execute() {
+        let descriptor = PackageDescriptor::new(PackageManifest::new(
+            PackageId::new("pkg.wasm"),
+            PackageType::Application,
+            "1.0.0",
+            DeveloperId::new("dev.wasm"),
+            PackageRuntime::new(PackageRuntimeKind::WasmComponent, "0"),
+        ));
+
+        let load = PackageLoaderFactory::load_wasm_application_abi_metadata(descriptor).unwrap();
+
+        assert_eq!(
+            load.descriptor.runtime_kind,
+            Some(PackageRuntimeKind::WasmComponent)
+        );
+        assert!(load
+            .trace_events
+            .contains(&"application_abi.wasm_metadata.loaded".into()));
     }
 
     #[test]

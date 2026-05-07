@@ -3,7 +3,10 @@
 //! Supports native (L1), WASM (L2, stub), and declarative (L3) application
 //! layers. Apps are loaded from manifest files and managed by the [`AppRuntime`].
 
+pub mod abi;
 pub mod consumption;
+pub mod host;
+pub mod lifecycle;
 pub mod llm_proxy;
 pub mod loader;
 pub mod model;
@@ -15,6 +18,11 @@ pub mod runtime_guard;
 pub mod skills;
 pub mod workflow;
 
+pub use abi::{
+    app_manifest_to_abi_descriptor, is_runtime_unavailable, ApplicationAbiAdapter,
+    ApplicationAbiDescriptor, ApplicationAbiInstance, ApplicationAbiLoadResult,
+    MetadataOnlyApplicationAbiInstance, WasmApplicationAbiAdapter, YamlApplicationAbiAdapter,
+};
 #[allow(deprecated)]
 pub use consumption::{
     app_agent_base_prompt, app_agent_manifest_view, app_agent_prompt_semantics,
@@ -23,6 +31,11 @@ pub use consumption::{
     legacy_app_task_planning_contract, AppAgentManifestView, AppAgentPromptSemantics,
     AppPlanningAgentProfile, AppTaskPlanningContract, AppToolPolicyView,
 };
+pub use host::{
+    is_unavailable as is_application_host_unavailable, ApplicationHost, ApplicationHostBackend,
+    UnavailableApplicationHostBackend,
+};
+pub use lifecycle::ApplicationLifecycle;
 pub use llm_proxy::{LlmProxy, UserLlmOverride};
 pub use loader::AppLoader;
 pub use model::{

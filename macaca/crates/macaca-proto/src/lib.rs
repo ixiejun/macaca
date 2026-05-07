@@ -1,3 +1,4 @@
+pub mod application_abi;
 pub mod config;
 pub mod error;
 pub mod kernel;
@@ -7,6 +8,7 @@ pub mod service;
 pub mod service_bus;
 pub mod types;
 
+pub use application_abi::*;
 pub use config::{LlmProviderConfigBuilder, MacacaConfigBuilder};
 pub use error::*;
 pub use kernel::*;

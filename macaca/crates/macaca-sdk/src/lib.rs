@@ -4,6 +4,7 @@
 //! and registration helpers to construct and register agents with
 //! the kernel from declarative config files.
 
+pub mod application;
 pub mod builder;
 pub mod config;
 pub mod facade;
@@ -13,6 +14,9 @@ pub mod registry_api;
 pub mod spec;
 pub mod validation;
 
+pub use application::{
+    service_call_command, trace_emit_command, ApplicationAbiBuilder, ApplicationHostCommandBuilder,
+};
 pub use builder::{AgentBuilder, DeclarativeAgent};
 pub use config::AgentConfig;
 pub use facade::{AgentRegistryApi, KernelAgentRegistry, KernelPrimitiveSdk, MacacaSdk};
