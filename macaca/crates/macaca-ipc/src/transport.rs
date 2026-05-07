@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use macaca_proto::MacacaResult;
+use macaca_proto::{ServiceBusResult, ServiceEnvelope, ServiceReply, ServiceTransportKind};
 
 use crate::bus::{MessageReceiver, MessageSender};
 use crate::local::LocalBus;
@@ -11,6 +12,9 @@ pub type DynMessageSender = Arc<dyn MessageSender>;
 
 /// Dynamic receiver type returned by the transport bridge.
 pub type DynMessageReceiver = Box<dyn MessageReceiver>;
+
+/// Dynamic service transport used by the service bus facade.
+pub type DynServiceTransport = Arc<dyn ServiceTransport>;
 
 /// Selects which IPC transport implementation to use.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -33,6 +37,22 @@ pub trait IpcTransport: Send + Sync {
     fn create_sender(&self) -> DynMessageSender;
 
     fn create_receiver(&self) -> DynMessageReceiver;
+}
+
+/// Bridge contract for typed service bus transports.
+///
+/// The trait is separate from message pub/sub transports because a service call
+/// has request/reply semantics, trace requirements, deadline handling, and
+/// policy hooks.  Local transport is the first implementation; future child
+/// process, MCP, HTTP, and signed remote A2A transports can implement this
+/// contract without changing callers.
+#[async_trait::async_trait]
+pub trait ServiceTransport: Send + Sync {
+    /// Return the transport kind for routing, trace, and audit records.
+    fn kind(&self) -> ServiceTransportKind;
+
+    /// Execute one already-validated service envelope.
+    async fn call(&self, envelope: ServiceEnvelope) -> ServiceBusResult<ServiceReply>;
 }
 
 /// Factory for transport selection from explicit configuration.

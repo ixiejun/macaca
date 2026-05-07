@@ -36,7 +36,11 @@ pub fn install_external_adapters_from_config(
 ) -> MacacaResult<ConfiguredExternalContextAdapters> {
     let mut registry = ContextEngineRegistry::new();
     let mut installations = Vec::new();
-    for adapter in config.external_adapters.iter().filter(|adapter| adapter.enabled) {
+    for adapter in config
+        .external_adapters
+        .iter()
+        .filter(|adapter| adapter.enabled)
+    {
         let (engine, installation) = build_external_adapter(adapter)?;
         registry = registry.register(engine);
         installations.push(installation);
@@ -85,8 +89,12 @@ fn build_external_adapter(
         empty_external_contribution: config.fallback.empty_external_contribution,
     };
     let engine = Arc::new(
-        ExternalAdapterContextEngine::new(Arc::clone(&transport.2), safety.clone(), fallback.clone())
-            .with_fallback_registry(ContextEngineRegistry::with_builtins()),
+        ExternalAdapterContextEngine::new(
+            Arc::clone(&transport.2),
+            safety.clone(),
+            fallback.clone(),
+        )
+        .with_fallback_registry(ContextEngineRegistry::with_builtins()),
     ) as Arc<dyn ContextEngine>;
     let engine_info = engine.info();
     let installation = ExternalAdapterRuntimeInstallation {
@@ -146,7 +154,9 @@ impl HttpJsonExternalContextAdapter {
             endpoint_url: endpoint_url.to_string(),
             headers,
             client: reqwest::Client::builder()
-                .timeout(std::time::Duration::from_millis(config.safety.timeout_ms.max(1)))
+                .timeout(std::time::Duration::from_millis(
+                    config.safety.timeout_ms.max(1),
+                ))
                 .build()
                 .map_err(|error| {
                     MacacaError::Config(format!(
@@ -164,10 +174,7 @@ impl ExternalContextAdapter for HttpJsonExternalContextAdapter {
         self.info.clone()
     }
 
-    async fn assemble(
-        &self,
-        input: ContextAssembleInput,
-    ) -> MacacaResult<ContextAssembleResult> {
+    async fn assemble(&self, input: ContextAssembleInput) -> MacacaResult<ContextAssembleResult> {
         let mut request = self.client.post(&self.endpoint_url).json(&input);
         for (name, value) in &self.headers {
             request = request.header(name, value);
@@ -186,12 +193,15 @@ impl ExternalContextAdapter for HttpJsonExternalContextAdapter {
                 self.info.id, status, body
             )));
         }
-        response.json::<ContextAssembleResult>().await.map_err(|error| {
-            MacacaError::Serialization(format!(
-                "external context adapter '{}' returned invalid JSON: {error}",
-                self.info.id
-            ))
-        })
+        response
+            .json::<ContextAssembleResult>()
+            .await
+            .map_err(|error| {
+                MacacaError::Serialization(format!(
+                    "external context adapter '{}' returned invalid JSON: {error}",
+                    self.info.id
+                ))
+            })
     }
 }
 
@@ -226,9 +236,7 @@ mod tests {
     };
     use macaca_proto::{LlmMessage, LlmOptions};
 
-    async fn echo_context(
-        Json(input): Json<ContextAssembleInput>,
-    ) -> Json<ContextAssembleResult> {
+    async fn echo_context(Json(input): Json<ContextAssembleInput>) -> Json<ContextAssembleResult> {
         Json(ContextAssembleResult {
             messages: input.base_messages.clone(),
             options: input.options.clone(),

@@ -14,6 +14,7 @@ pub mod registry;
 pub mod resource;
 pub mod scheduler;
 pub mod scheduler_factory;
+pub mod service_bus_bridge;
 pub mod service_call;
 pub mod service_lifecycle;
 pub mod service_registry;
@@ -36,6 +37,7 @@ pub use resource::{InMemoryResourceManager, ResourceManager};
 #[allow(deprecated)]
 pub use scheduler::{Scheduler, SimpleScheduler};
 pub use scheduler_factory::{SchedulerFactory, SchedulerKind};
+pub use service_bus_bridge::SystemServiceBusHandler;
 pub use service_call::{
     ServiceCallContext, ServiceCallExecutor, ServiceCallMiddleware, TraceRequiredMiddleware,
 };

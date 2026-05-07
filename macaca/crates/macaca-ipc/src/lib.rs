@@ -9,13 +9,21 @@
 
 pub mod bus;
 pub mod local;
+pub mod local_service;
 pub mod nats;
+pub mod service_bus;
 pub mod transport;
 
 pub use bus::{MessageReceiver, MessageSender};
 pub use local::{LocalBus, LocalReceiver, LocalSender};
+pub use local_service::{LocalServiceHandler, LocalServiceTransport};
 pub use nats::{NatsBus, NatsReceiver, NatsSender};
+pub use service_bus::{
+    DeadlineBusMiddleware, InMemoryServiceBusTraceSink, ServiceBus, ServiceBusContext,
+    ServiceBusMiddleware, ServiceBusTraceEvent, ServiceBusTraceSink, StaticDenyBusMiddleware,
+    TraceRequiredBusMiddleware,
+};
 pub use transport::{
-    DynMessageReceiver, DynMessageSender, IpcTransport, IpcTransportConfig, IpcTransportFactory,
-    IpcTransportKind,
+    DynMessageReceiver, DynMessageSender, DynServiceTransport, IpcTransport, IpcTransportConfig,
+    IpcTransportFactory, IpcTransportKind, ServiceTransport,
 };
