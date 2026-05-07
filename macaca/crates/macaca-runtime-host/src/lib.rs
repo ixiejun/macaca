@@ -17,6 +17,7 @@ pub mod env_bridge;
 pub mod factory;
 pub mod lease;
 pub mod mcp_runtime;
+pub mod package;
 pub mod transport;
 
 #[allow(deprecated)]
@@ -29,4 +30,5 @@ pub use mcp_runtime::{
     McpDefinitionSource, McpLifecycleScope, McpRegistryConfig, McpRuntimeContext, McpRuntimeFacade,
     McpRuntimeManager, McpRuntimeStatus, McpRuntimeStatusState, McpServerDefinition, McpToolPolicy,
 };
+pub use package::{runtime_host_mcp_package_descriptor, RuntimeHostPackageRequirement};
 pub use transport::{ConfigBackedMcpTransport, McpTransport};

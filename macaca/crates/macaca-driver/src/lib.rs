@@ -12,6 +12,7 @@ mod dynamic_proxy;
 pub mod factory;
 pub mod load_command;
 pub mod loader;
+pub mod package;
 pub mod plugin_abi;
 pub mod registry;
 pub mod runtime;
@@ -31,6 +32,7 @@ pub use macaca_tools::{
     CompositeToolSet, ToolCatalog, ToolCommand, ToolCommandContext, ToolCommandExecutor,
     ToolSchemaProvider, TraceEvent,
 };
+pub use package::driver_manifest_package_descriptor;
 pub use registry::DriverRegistry;
 pub use runtime::{DriverInventoryItem, DriverRuntime};
 pub use service_adapter::driver_service_descriptor;

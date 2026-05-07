@@ -21,6 +21,7 @@ pub mod definition;
 pub mod discovery;
 pub mod facade;
 pub mod handle;
+pub mod package;
 pub mod policy;
 pub mod provisioner;
 pub mod registry;
@@ -39,6 +40,7 @@ pub use facade::{
     SkillRuntimeFacade,
 };
 pub use handle::{SkillRuntimeHandle, SkillRuntimeState};
+pub use package::{agent_skill_package_descriptor, skill_entry_package_descriptor};
 pub use policy::{PolicyDecision, SkillExposureContext, SkillExposurePolicy, SkillPolicyChain};
 pub use registry::SkillRegistry;
 pub use request::{SkillSnapshotRequest, SkillSnapshotRequestBuilder};

@@ -7,8 +7,11 @@ pub mod consumption;
 pub mod llm_proxy;
 pub mod loader;
 pub mod model;
+pub mod package;
+pub mod package_loader;
 pub mod registry;
 pub mod runtime;
+pub mod runtime_guard;
 pub mod skills;
 pub mod workflow;
 
@@ -26,9 +29,17 @@ pub use model::{
     AppCapabilityNode, AppCapabilitySet, AppCapabilitySource, AppLayer, AppLlmConfig, AppManifest,
     AppStatus,
 };
+pub use package::{
+    app_manifest_to_package_descriptor, load_yaml_app_package_descriptor,
+    AppPackageDescriptorBuilder,
+};
+pub use package_loader::{PackageLoaderFactory, PackageLoaderKind};
 pub use registry::{AppRegistry, DiscoveredApp, DEFAULT_APP, STANDARD_APP_DIRS};
 pub use runtime::{
     AppRuntime, AppRuntimeBuilder, ApplicationRuntimeFactory, DefaultApplicationRuntimeFactory,
+};
+pub use runtime_guard::{
+    package_requires_wasm_runtime, PackageGuardContext, PackageGuardTraceEvent, PackageRuntimeGuard,
 };
 pub use skills::{global_skills_dir, SkillLoader};
 pub use workflow::{
