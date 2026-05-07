@@ -74,6 +74,11 @@
 
 - 这一阶段不是先改业务代码，而是先把“怎么安全改”固定住。
 - 当前这一步已经在进行中，`docs/design-pattern-refactor-plans/` 就属于这个阶段的产物。
+- Route C 阶段 0 的治理产物已经独立落盘：
+  - [`../agent-os-microkernel-boundaries.md`](../agent-os-microkernel-boundaries.md)
+  - [`../route-c-regression-matrix.md`](../route-c-regression-matrix.md)
+  - [`../route-c-phase-template.md`](../route-c-phase-template.md)
+  - [`../route-c-architecture-governance.md`](../route-c-architecture-governance.md)
 
 ### 阶段 1：最底层稳定 contract
 

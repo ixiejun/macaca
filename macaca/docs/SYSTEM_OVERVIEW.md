@@ -131,6 +131,10 @@ Macaca 当前至少有两条可见执行路径：
 ## 8. Links to Deeper References and Audit
 
 - 当前实现审计与重构依据：[`SYSTEM_AUDIT.md`](./SYSTEM_AUDIT.md)
+- Route C 微内核边界治理：[`agent-os-microkernel-boundaries.md`](./agent-os-microkernel-boundaries.md)
+- Route C 回归矩阵：[`route-c-regression-matrix.md`](./route-c-regression-matrix.md)
+- Route C 阶段实施模板：[`route-c-phase-template.md`](./route-c-phase-template.md)
+- Route C 架构治理规则：[`route-c-architecture-governance.md`](./route-c-architecture-governance.md)
 - 非 canonical 深度参考：[`../ARCHITECTURE-v2.md`](../ARCHITECTURE-v2.md)
 - 已批准的澄清计划：[`../../.omx/plans/prd-system-audit-clarification.md`](../../.omx/plans/prd-system-audit-clarification.md)
 - 验证矩阵：[`../../.omx/plans/test-spec-system-audit-clarification.md`](../../.omx/plans/test-spec-system-audit-clarification.md)

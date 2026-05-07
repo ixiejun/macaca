@@ -27,5 +27,8 @@ futures = { workspace = true }
 tokio = { workspace = true }
 async-trait = { workspace = true }
 macaca-sdk = { workspace = true }
+macaca-driver = { workspace = true }
+macaca-gateway = { workspace = true }
+macaca-skill = { workspace = true }
 chrono = { workspace = true }
 tempfile = "3"

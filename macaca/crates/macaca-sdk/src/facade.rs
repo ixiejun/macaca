@@ -2,7 +2,7 @@
 
 use async_trait::async_trait;
 
-use macaca_kernel::Kernel;
+use macaca_kernel::{DefaultKernelFacade, Kernel, KernelFacade};
 use macaca_proto::{AgentId, AgentManifest, MacacaResult};
 
 use crate::builder::DeclarativeAgent;
@@ -77,15 +77,57 @@ impl<'a> MacacaSdk<KernelAgentRegistry<'a>> {
     }
 }
 
+/// SDK-facing access point for microkernel primitive discovery.
+///
+/// This wrapper is intentionally small: it gives applications and future
+/// tooling a stable place to receive a `KernelFacade` without importing
+/// `macaca-web` or provider-specific crates.  Runtime behavior stays unchanged
+/// in Phase 01; later phases can inject a service-backed facade here.
+pub struct KernelPrimitiveSdk<F = DefaultKernelFacade> {
+    facade: F,
+}
+
+impl<F> KernelPrimitiveSdk<F>
+where
+    F: KernelFacade,
+{
+    /// Create SDK primitive access around a facade implementation.
+    pub fn new(facade: F) -> Self {
+        Self { facade }
+    }
+
+    /// Borrow the underlying microkernel facade.
+    ///
+    /// Keeping this as a borrow preserves ownership for callers that need to
+    /// share one facade across multiple application or tooling components.
+    pub fn facade(&self) -> &F {
+        &self.facade
+    }
+
+    /// Consume the SDK wrapper and return the underlying facade.
+    pub fn into_inner(self) -> F {
+        self.facade
+    }
+}
+
+impl Default for KernelPrimitiveSdk<DefaultKernelFacade> {
+    fn default() -> Self {
+        Self::new(DefaultKernelFacade::new())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::sync::Arc;
 
-    use macaca_kernel::KernelBuilder;
+    use macaca_kernel::{CapabilityRegistry, KernelBuilder};
     use macaca_llm::LlmProvider;
     use macaca_proto::config::KernelConfig;
-    use macaca_proto::{LlmMessage, LlmOptions, LlmResponse, TokenUsage};
+    use macaca_proto::{
+        CapabilityDescriptor, CapabilityId, KernelServiceId, LlmMessage, LlmOptions, LlmResponse,
+        ServiceScope, TokenUsage,
+    };
     use macaca_tools::DefaultToolSet;
 
     struct MockLlm;
@@ -145,5 +187,24 @@ prompt_template: "Hello"
         assert_eq!(agents.len(), 1);
         assert_eq!(agents[0].id, id);
         assert_eq!(agents[0].name, "facade-agent");
+    }
+
+    #[test]
+    fn primitive_sdk_exposes_kernel_facade_without_web_dependency() {
+        let sdk = KernelPrimitiveSdk::default();
+        let descriptor = CapabilityDescriptor::new(
+            CapabilityId::new("capability.example"),
+            KernelServiceId::new("service.example"),
+            ServiceScope::Global,
+            "Example descriptor for SDK primitive access.",
+        );
+
+        sdk.facade().register_capability(descriptor).unwrap();
+
+        let found = sdk
+            .facade()
+            .get_capability(&CapabilityId::new("capability.example"))
+            .unwrap();
+        assert!(found.is_some());
     }
 }

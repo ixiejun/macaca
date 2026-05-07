@@ -1468,11 +1468,7 @@ mod tests {
             ContextExternalAdapterTransportKind::HttpJson
         );
         assert_eq!(
-            adapter
-                .http_json
-                .as_ref()
-                .unwrap()
-                .url,
+            adapter.http_json.as_ref().unwrap().url,
             "http://127.0.0.1:8787/assemble"
         );
         assert_eq!(

@@ -16,6 +16,7 @@ pub mod plugin_abi;
 pub mod registry;
 pub mod runtime;
 pub mod sdk;
+pub mod service_adapter;
 pub mod session;
 pub mod toolset;
 pub mod trace;
@@ -32,6 +33,7 @@ pub use macaca_tools::{
 };
 pub use registry::DriverRegistry;
 pub use runtime::{DriverInventoryItem, DriverRuntime};
+pub use service_adapter::driver_service_descriptor;
 pub use session::DriverSessionState;
 pub use trace::DriverTraceAdapter;
 

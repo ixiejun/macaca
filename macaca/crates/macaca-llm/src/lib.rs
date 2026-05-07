@@ -38,6 +38,7 @@ pub mod rate_limit;
 pub mod resilient;
 pub mod resolver;
 pub mod router;
+pub mod service_adapter;
 pub mod tool_wire;
 
 pub use anthropic::AnthropicProvider;
@@ -51,3 +52,4 @@ pub use rate_limit::RateLimiter;
 pub use resilient::{ResilientConfig, ResilientLlmWrapper};
 pub use resolver::{PrefixProviderResolver, ProviderResolver, ResolverChain};
 pub use router::{LlmRouter, ModelSelection, ModelSelectionRequest, ModelTarget};
+pub use service_adapter::llm_service_descriptor;

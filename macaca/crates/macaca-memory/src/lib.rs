@@ -24,6 +24,7 @@ pub mod providers;
 pub mod query;
 pub mod query_pipeline;
 pub mod runtime;
+pub mod service_adapter;
 pub mod session;
 pub mod snapshot;
 pub mod store;
@@ -90,6 +91,7 @@ pub use query_pipeline::{
 pub use runtime::{
     ComposedMemoryRuntime, MemoryRuntimeBuilder, MemoryRuntimeFacade, MemoryRuntimeStatus,
 };
+pub use service_adapter::memory_service_descriptor;
 pub use session::SessionMemory;
 pub use snapshot::{MemorySnapshot, MemorySnapshotStore};
 pub use store::{EmbeddingProvider, MemoryRetriever, MemoryStore, VectorSearchResult, VectorStore};

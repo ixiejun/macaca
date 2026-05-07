@@ -7,6 +7,7 @@ pub mod lifecycle;
 pub mod plan_loop;
 pub mod queue;
 pub mod scheduler;
+pub mod service_adapter;
 pub mod todo_board;
 pub mod todo_store;
 pub mod tracker;
@@ -23,6 +24,7 @@ pub use plan_loop::{
 };
 pub use queue::TaskQueue;
 pub use scheduler::{ScheduleAction, ScheduleEntry, ScheduleEvent, SchedulerConfig, TaskScheduler};
+pub use service_adapter::task_service_descriptor;
 pub use todo_board::{ProgressSummary, TaskBoard, TaskSpace};
 pub use todo_store::TodoStore;
 pub use tracker::TaskTracker;

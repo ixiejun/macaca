@@ -15,7 +15,7 @@ pub mod validation;
 
 pub use builder::{AgentBuilder, DeclarativeAgent};
 pub use config::AgentConfig;
-pub use facade::{AgentRegistryApi, KernelAgentRegistry, MacacaSdk};
+pub use facade::{AgentRegistryApi, KernelAgentRegistry, KernelPrimitiveSdk, MacacaSdk};
 pub use persona::AgentPersona;
 pub use persona_prototype::{PersonaOverrides, PersonaPrototype};
 #[allow(deprecated)]
