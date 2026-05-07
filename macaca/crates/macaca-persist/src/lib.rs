@@ -5,6 +5,7 @@ pub mod entitlement_store;
 pub mod event_index;
 pub mod event_log;
 pub mod lineage;
+pub mod payment_store;
 pub mod redb_store;
 pub mod store;
 
@@ -16,6 +17,7 @@ pub use entitlement_store::{EntitlementStore, InMemoryEntitlementStore};
 pub use event_index::EventLogQuery;
 pub use event_log::{AppendEventCommand, EventLog, EventReplayIterator};
 pub use lineage::SessionLineageStore;
+pub use payment_store::{InMemoryPaymentStore, PaymentStateTransition, PaymentStore};
 pub use redb_store::RedbStore;
 pub use store::{PersistBackend, PersistStore};
 

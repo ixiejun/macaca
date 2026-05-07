@@ -1,5 +1,6 @@
 //! aos-task: task decomposition, scheduling, and lifecycle.
 
+pub mod a2a_task;
 pub mod claim_diagnostics;
 pub mod decompose;
 pub mod dependency;
@@ -13,6 +14,7 @@ pub mod todo_store;
 pub mod tracker;
 pub mod worker_loop;
 
+pub use a2a_task::{A2APaymentReferences, A2ATaskRequestContext, A2ATaskTraceContext};
 pub use claim_diagnostics::{diagnose_session_claims, SessionClaimDiagnostics};
 pub use decompose::{
     build_decomposition_prompt, DecomposedTask, LlmDecomposer, SimpleDecomposer, TaskDecomposer,

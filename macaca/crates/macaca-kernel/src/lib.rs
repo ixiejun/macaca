@@ -1,5 +1,7 @@
 //! `aos-kernel` — agent runtime, scheduler, and orchestrator.
 
+pub mod a2a;
+pub mod a2a_event;
 pub mod alert;
 pub mod audit;
 pub mod capability_registry;
@@ -9,6 +11,7 @@ pub mod kernel;
 pub mod kernel_builder;
 pub mod logging;
 pub mod orchestrator;
+pub mod payment_policy;
 pub mod plugin_registry;
 pub mod policy;
 pub mod registry;
@@ -32,6 +35,7 @@ pub use facade::{
 pub use kernel::Kernel;
 pub use kernel_builder::KernelBuilder;
 pub use orchestrator::AgentOrchestrator;
+pub use payment_policy::{DefaultPaymentPolicyEngine, PaymentPolicyDecision, PaymentPolicyEngine};
 pub use plugin_registry::{
     is_valid_transition as is_valid_plugin_lifecycle_transition, PluginRegistry,
     PluginRegistryEntry, PluginRegistrySnapshot,
@@ -55,6 +59,13 @@ pub use system_service::{MockSystemService, SystemService};
 pub use trace_service_adapter::trace_service_descriptor;
 
 // Re-export executor types
+pub use a2a::{
+    local_simulated_terms, A2ACoordinator, A2APaymentFacade, A2AProtocolAdapter,
+    LocalSimulatedA2AAdapter,
+};
+pub use a2a_event::{
+    A2APaymentEvent, A2APaymentEventSink, InMemoryA2APaymentEventSink, NoopA2APaymentEventSink,
+};
 pub use executor::{
     AgentInfo, AgentRunner, ApplicationExecutor, ApplicationExecutorConfig,
     ApplicationExecutorRegistry, CallbackDispatcher, DelegateResult, DelegatedTask, EventBus,

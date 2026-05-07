@@ -1,3 +1,4 @@
+pub mod a2a;
 pub mod application_abi;
 pub mod commerce;
 pub mod config;
@@ -11,6 +12,10 @@ pub mod service_bus;
 pub mod types;
 pub mod ui;
 
+#[cfg(test)]
+mod a2a_tests;
+
+pub use a2a::*;
 pub use application_abi::*;
 pub use commerce::*;
 pub use config::{LlmProviderConfigBuilder, MacacaConfigBuilder};
