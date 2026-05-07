@@ -9,6 +9,7 @@ pub mod kernel;
 pub mod kernel_builder;
 pub mod logging;
 pub mod orchestrator;
+pub mod plugin_registry;
 pub mod policy;
 pub mod registry;
 pub mod resource;
@@ -31,6 +32,10 @@ pub use facade::{
 pub use kernel::Kernel;
 pub use kernel_builder::KernelBuilder;
 pub use orchestrator::AgentOrchestrator;
+pub use plugin_registry::{
+    is_valid_transition as is_valid_plugin_lifecycle_transition, PluginRegistry,
+    PluginRegistryEntry, PluginRegistrySnapshot,
+};
 pub use policy::{DefaultAllowPolicyEngine, PolicyEngine, StaticDenyPolicyEngine};
 pub use registry::{AgentEntry, AgentRegistry};
 pub use resource::{InMemoryResourceManager, ResourceManager};

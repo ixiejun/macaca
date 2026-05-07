@@ -6,6 +6,7 @@ description = "Agent OS runtime host — MCP runtime manager, skill-backed tool 
 
 [dependencies]
 macaca-proto = { workspace = true }
+macaca-kernel = { workspace = true }
 macaca-skill = { workspace = true }
 macaca-framework = { path = "../macaca-framework", features = ["macaca-compat"] }
 

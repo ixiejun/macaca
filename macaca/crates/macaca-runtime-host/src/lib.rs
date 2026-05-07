@@ -18,6 +18,7 @@ pub mod factory;
 pub mod lease;
 pub mod mcp_runtime;
 pub mod package;
+pub mod plugin;
 pub mod transport;
 
 #[allow(deprecated)]
@@ -31,4 +32,9 @@ pub use mcp_runtime::{
     McpRuntimeManager, McpRuntimeStatus, McpRuntimeStatusState, McpServerDefinition, McpToolPolicy,
 };
 pub use package::{runtime_host_mcp_package_descriptor, RuntimeHostPackageRequirement};
+pub use plugin::{
+    plugin_failure_event, DescriptorPluginHost, PluginHost, PluginHostFactory,
+    PluginLifecycleController, PluginManifestValidator, PluginRuntimeFacade, PluginRuntimeGuard,
+    PluginRuntimeResult,
+};
 pub use transport::{ConfigBackedMcpTransport, McpTransport};

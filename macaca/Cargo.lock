@@ -1621,6 +1621,7 @@ dependencies = [
  "async-trait",
  "dirs",
  "macaca-framework",
+ "macaca-kernel",
  "macaca-proto",
  "macaca-skill",
  "serde",
