@@ -66,6 +66,7 @@ pub struct PackageRuntimeGuard {
 
 impl Default for PackageRuntimeGuard {
     fn default() -> Self {
+        #[allow(deprecated)]
         Self {
             steps: vec![
                 Box::new(SchemaStep),
@@ -74,7 +75,7 @@ impl Default for PackageRuntimeGuard {
                 Box::new(PermissionStep),
                 Box::new(RequiredServiceStep),
                 Box::new(OptionalServiceStep),
-                Box::new(CommerceInertStep),
+                Box::new(DeprecatedCommerceInertStep),
             ],
         }
     }
@@ -280,11 +281,21 @@ impl PackageGuardStep for OptionalServiceStep {
     }
 }
 
-struct CommerceInertStep;
+/// Legacy synchronous commerce marker.
+///
+/// Runtime entitlement checks are now performed by
+/// `CommercialPackageGuard`/`EntitlementRuntimeFacade`. This step remains in
+/// the existing synchronous metadata guard so older callers can locate and
+/// migrate the previous precheck path without changing YAML package loading.
+#[deprecated(
+    note = "use CommercialPackageGuard with EntitlementRuntimeFacade for Store/Entitlement checks"
+)]
+struct DeprecatedCommerceInertStep;
 
-impl PackageGuardStep for CommerceInertStep {
+#[allow(deprecated)]
+impl PackageGuardStep for DeprecatedCommerceInertStep {
     fn name(&self) -> &'static str {
-        "commerce_inert"
+        "commerce_deprecated_marker"
     }
 
     fn evaluate(
@@ -296,7 +307,7 @@ impl PackageGuardStep for CommerceInertStep {
         descriptor
             .manifest
             .metadata
-            .insert("commerce.precheck".into(), "inert".into());
+            .insert("commerce.precheck".into(), "deprecated_marker".into());
         Ok(())
     }
 }

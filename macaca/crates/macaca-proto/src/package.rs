@@ -12,7 +12,7 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{CapabilityId, KernelServiceId};
+use crate::{CapabilityId, CommerceMetadata, KernelServiceId};
 
 /// Stable package identity.
 ///
@@ -176,15 +176,6 @@ pub struct PackageCapability {
     pub description: String,
 }
 
-/// Commerce metadata preserved by Phase 04 but not enforced.
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
-pub struct PackageCommerceMetadata {
-    pub license: Option<String>,
-    pub subscription: Option<String>,
-    pub price: Option<String>,
-    pub distribution: Option<String>,
-}
-
 /// Compatibility facts evaluated by runtime guards.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PackageCompatibility {
@@ -215,7 +206,7 @@ pub struct PackageManifest {
     pub required_services: Vec<PackageServiceRequirement>,
     pub optional_services: Vec<PackageServiceRequirement>,
     pub provides: Vec<PackageCapability>,
-    pub commerce: PackageCommerceMetadata,
+    pub commerce: CommerceMetadata,
     pub compatibility: PackageCompatibility,
     pub metadata: BTreeMap<String, String>,
 }
@@ -241,7 +232,7 @@ impl PackageManifest {
             required_services: Vec::new(),
             optional_services: Vec::new(),
             provides: Vec::new(),
-            commerce: PackageCommerceMetadata::default(),
+            commerce: CommerceMetadata::default(),
             compatibility: PackageCompatibility::default(),
             metadata: BTreeMap::new(),
         }
@@ -326,6 +317,7 @@ pub type PackageResult<T> = Result<T, PackageGuardError>;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::LicenseType;
 
     fn fixture_manifest(
         package_type: PackageType,
@@ -360,7 +352,7 @@ mod tests {
             id: CapabilityId::new("cap.provided"),
             description: "Provided capability".into(),
         });
-        manifest.commerce.license = Some("free".into());
+        manifest.commerce.license_type = LicenseType::free();
         manifest
             .metadata
             .insert("format".into(), "package-manifest-v0".into());

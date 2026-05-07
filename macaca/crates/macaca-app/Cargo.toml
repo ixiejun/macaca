@@ -11,6 +11,7 @@ macaca-llm = { workspace = true }
 macaca-tools = { workspace = true }
 macaca-kernel = { workspace = true }
 macaca-skill = { workspace = true }
+macaca-runtime-host = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = "0.9"
@@ -21,3 +22,6 @@ thiserror = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
 dirs = "5"
+
+[dev-dependencies]
+macaca-persist = { workspace = true }

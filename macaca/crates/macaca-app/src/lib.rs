@@ -5,6 +5,7 @@
 
 pub mod abi;
 pub mod consumption;
+pub mod commercial_package;
 pub mod genui;
 pub mod host;
 pub mod lifecycle;
@@ -32,6 +33,7 @@ pub use consumption::{
     legacy_app_task_planning_contract, AppAgentManifestView, AppAgentPromptSemantics,
     AppPlanningAgentProfile, AppTaskPlanningContract, AppToolPolicyView,
 };
+pub use commercial_package::{is_commercial_package, CommercialPackageGuard};
 pub use genui::{text_component, GenUiResult, GenUiRuntime, UiIntentValidator};
 pub use host::{
     is_unavailable as is_application_host_unavailable, ApplicationHost, ApplicationHostBackend,

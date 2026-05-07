@@ -13,6 +13,7 @@
 //! registration layered on top.
 
 pub mod compat;
+pub mod entitlement;
 pub mod env_bridge;
 pub mod factory;
 pub mod lease;
@@ -24,6 +25,7 @@ pub mod transport;
 #[allow(deprecated)]
 pub use env_bridge::{apply_mcp_env, McpEnvApplyOutcome};
 pub use factory::{McpServerFactory, RuntimeEnvBuilder};
+pub use entitlement::{CapabilityCallContext, EntitlementOperation, EntitlementRuntimeFacade};
 pub use lease::McpSessionLease;
 #[allow(deprecated)]
 pub use mcp_runtime::{

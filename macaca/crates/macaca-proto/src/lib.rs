@@ -1,4 +1,5 @@
 pub mod application_abi;
+pub mod commerce;
 pub mod config;
 pub mod error;
 pub mod kernel;
@@ -11,6 +12,7 @@ pub mod types;
 pub mod ui;
 
 pub use application_abi::*;
+pub use commerce::*;
 pub use config::{LlmProviderConfigBuilder, MacacaConfigBuilder};
 pub use error::*;
 pub use kernel::*;

@@ -19,6 +19,7 @@ pub mod agent_skill;
 pub mod catalog;
 pub mod definition;
 pub mod discovery;
+pub mod encrypted_package;
 pub mod facade;
 pub mod handle;
 pub mod package;
@@ -55,6 +56,10 @@ pub use agent_skill::{
 };
 pub use catalog::{CatalogEntry, SkillCatalog};
 pub use discovery::{DiscoveredSkill, SkillScope};
+pub use encrypted_package::{
+    encrypted_package_metadata, DecryptedPackage, EncryptedPackageAuthorizer,
+    EncryptedPackageDecryptor, EncryptedPackageLoader, EncryptedPackageMetadata,
+};
 pub use provisioner::{ClientConfig, SkillProvisioner};
 pub use runtime::{
     path_belongs_to_snapshot_skill, FilteredSkill, SkillPolicy, SkillRuntime, SkillRuntimeLimits,
