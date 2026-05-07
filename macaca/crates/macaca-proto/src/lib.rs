@@ -7,6 +7,7 @@ pub mod package;
 pub mod service;
 pub mod service_bus;
 pub mod types;
+pub mod ui;
 
 pub use application_abi::*;
 pub use config::{LlmProviderConfigBuilder, MacacaConfigBuilder};
@@ -17,3 +18,4 @@ pub use package::*;
 pub use service::*;
 pub use service_bus::*;
 pub use types::*;
+pub use ui::*;

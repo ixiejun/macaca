@@ -16,6 +16,7 @@ pub mod event_persistence;
 mod external_context_adapter;
 pub mod framework_runner;
 pub mod framework_toolkit;
+pub mod genui_routes;
 pub mod hook_consumer;
 pub mod loop_manager;
 mod memory_runtime;

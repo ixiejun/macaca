@@ -9,7 +9,7 @@ use tower_http::cors::{Any, CorsLayer};
 use macaca_proto::MacacaResult;
 
 use crate::state::AppState;
-use crate::{chat_orchestrator, loop_manager, metrics, routes, session};
+use crate::{chat_orchestrator, genui_routes, loop_manager, metrics, routes, session};
 
 /// Canonical builder for starting the web server.
 #[derive(Debug, Clone)]
@@ -107,6 +107,14 @@ impl WebRuntimeFacade {
             .route(
                 "/api/apps/{app_id}/goals",
                 get(routes::list_goals).post(loop_manager::create_goal),
+            )
+            .route(
+                "/api/apps/{app_id}/genui/surface",
+                get(genui_routes::get_genui_surface),
+            )
+            .route(
+                "/api/apps/{app_id}/genui/events",
+                post(genui_routes::post_genui_event),
             )
             .route(
                 "/api/apps/{app_id}/schedules",

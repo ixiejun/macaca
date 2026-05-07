@@ -13,6 +13,8 @@ use macaca_proto::{
 };
 use tracing::{info, warn};
 
+use crate::genui::GenUiRuntime;
+
 /// Backend contract used by [`ApplicationHost`] to keep routing pluggable.
 ///
 /// Production web/framework code can supply a backend that writes to EventLog,
@@ -52,7 +54,9 @@ impl ApplicationHostBackend for UnavailableApplicationHostBackend {
             ApplicationImport::CapabilityRequest => {
                 "capability policy backend is not wired for this ApplicationHost"
             }
-            ApplicationImport::UiRender => "UI render backend belongs to a later GenUI phase",
+            ApplicationImport::UiRender => {
+                "GenUI renderer backend is not wired for this ApplicationHost"
+            }
             ApplicationImport::PaymentCreateIntent => {
                 "payment intent backend belongs to a later Store/payment phase"
             }
@@ -100,6 +104,25 @@ where
             import = %command.import,
             "application host command accepted for backend dispatch"
         );
+        if matches!(command.import, ApplicationImport::UiRender) {
+            info!("application host received GenUI render command");
+            // Validate the UiIntent payload before delegating to the backend.
+            // This keeps the ABI host boundary traceable and prevents unsafe
+            // UI schema from leaking into presentation shells.
+            let intent = serde_json::from_value(command.payload.clone()).map_err(|error| {
+                ApplicationAbiError::InvalidDeclaration(format!(
+                    "invalid GenUI intent payload: {error}"
+                ))
+            })?;
+            GenUiRuntime::new()
+                .render_command(intent, command.trace.clone().expect("trace checked above"))
+                .map_err(|error| {
+                    ApplicationAbiError::InvalidDeclaration(format!(
+                        "invalid GenUI render command: {error}"
+                    ))
+                })?;
+        }
+
         self.backend.dispatch(command).await
     }
 }
