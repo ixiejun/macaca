@@ -9,12 +9,17 @@ pub mod builder;
 pub mod config;
 pub mod evm;
 pub mod facade;
+pub mod package_client;
 pub mod package_fixtures;
 pub mod persona;
 pub mod persona_prototype;
 pub mod registry_api;
+pub mod service_client;
 pub mod spec;
+pub mod status_client;
 pub mod system_facade;
+pub mod task_client;
+pub mod trace_client;
 pub mod validation;
 
 pub use application::{
@@ -34,11 +39,15 @@ pub use persona::AgentPersona;
 pub use persona_prototype::{PersonaOverrides, PersonaPrototype};
 #[allow(deprecated)]
 pub use registry_api::{register_from_config, register_from_file};
+pub use service_client::{ServiceCallCommand, ServiceCallResult, ServiceInspectionResult};
 pub use spec::{AgentSpec, AgentSpecBuilder, TracePolicy};
 pub use system_facade::{
-    kernel_status_snapshot, ApprovalDecisionCommand, PackageInspectionCommand,
+    kernel_status_snapshot, ApprovalDecisionCommand, EmptySystemPackageClient,
+    EmptySystemTraceClient, PackageInspectionCommand, PackageInspectionResult,
     ServiceInspectionCommand, SessionEventQueryCommand, StaticSystemStatusDataSource, SystemFacade,
-    SystemStatusDataSource, SystemStatusSnapshot, TaskBoardDataSource, TaskBoardQueryCommand,
-    TaskBoardQueryResult, TodoStoreTaskBoardDataSource, TraceTailCommand,
+    SystemPackageClient, SystemServiceClient, SystemStatusClient, SystemStatusDataSource,
+    SystemStatusSnapshot, SystemTaskClient, SystemTraceClient, TaskBoardDataSource,
+    TaskBoardQueryCommand, TaskBoardQueryResult, TodoStoreTaskBoardDataSource, TraceQueryResult,
+    TraceTailCommand, UnavailableSystemServiceClient,
 };
 pub use validation::{SdkValidationChain, SdkValidator};

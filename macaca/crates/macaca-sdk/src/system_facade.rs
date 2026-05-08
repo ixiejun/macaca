@@ -1,70 +1,42 @@
 //! Shell-facing system facade for Web and CLI thin-shell migration.
 //!
-//! This module defines typed commands and replaceable data-source traits for
-//! presentation shells. Web routes and CLI handlers should translate transport
-//! input into these commands, then delegate to a facade implementation. The SDK
-//! owns command shape and orchestration boundaries, while concrete crates own
-//! storage adapters, terminal formatting, HTTP status mapping, and SSE transport.
+//! `SystemFacade` is the SDK-owned Facade that upper presentation shells call
+//! instead of reaching into provider crates or Web internals. The facade is
+//! deliberately composed from small Strategy clients so each capability can be
+//! migrated to `ServiceRuntime` independently in later Route C phases.
 
-use std::sync::Arc;
-
-use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use tracing::{info, warn};
+use tracing::info;
 
-use macaca_kernel::Kernel;
-use macaca_proto::{ApplicationId, MacacaResult, TodoItem};
-use macaca_task::TodoStore;
+use macaca_proto::MacacaResult;
 
-/// Command used by shells to request one session-scoped task board view.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TaskBoardQueryCommand {
-    pub app_id: ApplicationId,
-    pub session_id: String,
-}
-
-impl TaskBoardQueryCommand {
-    /// Build a session-scoped task board query and reject blank session ids.
-    pub fn new(app_id: ApplicationId, session_id: impl Into<String>) -> MacacaResult<Self> {
-        let session_id = session_id.into().trim().to_string();
-        if session_id.is_empty() {
-            return Err(macaca_proto::MacacaError::Config(
-                "task board query requires non-empty session_id".into(),
-            ));
-        }
-        Ok(Self { app_id, session_id })
-    }
-}
-
-/// Replay command for shell-facing session event reads.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SessionEventQueryCommand {
-    pub session_id: String,
-    pub since: Option<u64>,
-    pub limit: Option<usize>,
-}
-
-/// Cursor command for shell-facing trace tail operations.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TraceTailCommand {
-    pub session_id: String,
-    pub since: Option<u64>,
-}
-
-/// Read-only service inspection command.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ServiceInspectionCommand {
-    pub scope: String,
-}
-
-/// Read-only package inspection command.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PackageInspectionCommand {
-    pub package_ref: Option<String>,
-}
+pub use crate::package_client::{
+    EmptySystemPackageClient, PackageInspectionCommand, PackageInspectionResult,
+    SystemPackageClient,
+};
+pub use crate::service_client::{
+    ServiceCallCommand, ServiceCallResult, ServiceInspectionCommand, ServiceInspectionResult,
+    SystemServiceClient, UnavailableSystemServiceClient,
+};
+pub use crate::status_client::{
+    kernel_status_snapshot, StaticSystemStatusDataSource, SystemStatusClient,
+    SystemStatusDataSource, SystemStatusSnapshot,
+};
+pub use crate::task_client::{
+    SystemTaskClient, TaskBoardDataSource, TaskBoardQueryCommand, TaskBoardQueryResult,
+    TodoStoreTaskBoardDataSource,
+};
+pub use crate::trace_client::{
+    EmptySystemTraceClient, SessionEventQueryCommand, SystemTraceClient, TraceQueryResult,
+    TraceTailCommand,
+};
 
 /// Policy-ready approval command produced by Web/CLI confirmation surfaces.
+///
+/// Approval processing still belongs to policy/runtime services. S3 keeps this
+/// command in the SDK so presentation shells can produce an auditable decision
+/// object without becoming the policy engine.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ApprovalDecisionCommand {
     pub decision_id: String,
@@ -72,119 +44,68 @@ pub struct ApprovalDecisionCommand {
     pub decided_at: DateTime<Utc>,
 }
 
-/// Replay-safe task board result preserving the current Web response shape.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TaskBoardQueryResult {
-    pub todos: Vec<TodoItem>,
-    pub count: usize,
-}
-
-/// Small system status snapshot used by CLI status-like commands.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SystemStatusSnapshot {
-    pub version: String,
-    pub agent_count: usize,
-    pub loaded_apps: usize,
-    pub max_agents: usize,
-    pub llm_provider: String,
-    pub app_runtime: String,
-    pub gateway_enabled: bool,
-}
-
-/// Replaceable data source for task-board reads.
-#[async_trait]
-pub trait TaskBoardDataSource: Send + Sync {
-    /// Return all task items for the requested application/session scope.
-    async fn list_session_todos(
-        &self,
-        command: &TaskBoardQueryCommand,
-    ) -> MacacaResult<Vec<TodoItem>>;
-}
-
-/// Adapter that lets current `TodoStore` back the SDK facade without Web owning semantics.
-pub struct TodoStoreTaskBoardDataSource {
-    store: Arc<TodoStore>,
-}
-
-impl TodoStoreTaskBoardDataSource {
-    /// Create a data source over the existing task store.
-    pub fn new(store: Arc<TodoStore>) -> Self {
-        Self { store }
-    }
-}
-
-#[async_trait]
-impl TaskBoardDataSource for TodoStoreTaskBoardDataSource {
-    async fn list_session_todos(
-        &self,
-        command: &TaskBoardQueryCommand,
-    ) -> MacacaResult<Vec<TodoItem>> {
-        Ok(self
-            .store
-            .list_all_todos_for_session(&command.app_id, &command.session_id)
-            .await)
-    }
-}
-
-/// Replaceable data source for CLI/system status inspection.
-#[async_trait]
-pub trait SystemStatusDataSource: Send + Sync {
-    /// Return one shell-facing status snapshot.
-    async fn status_snapshot(&self) -> MacacaResult<SystemStatusSnapshot>;
-}
-
-/// Adapter that reads status from kernel/app runtime counts without Web state.
-pub struct StaticSystemStatusDataSource {
-    snapshot: SystemStatusSnapshot,
-}
-
-impl StaticSystemStatusDataSource {
-    /// Create a status source from an already prepared snapshot.
-    pub fn new(snapshot: SystemStatusSnapshot) -> Self {
-        Self { snapshot }
-    }
-}
-
-#[async_trait]
-impl SystemStatusDataSource for StaticSystemStatusDataSource {
-    async fn status_snapshot(&self) -> MacacaResult<SystemStatusSnapshot> {
-        Ok(self.snapshot.clone())
-    }
-}
-
-/// Build a CLI-oriented status snapshot from lower-layer runtime objects.
-pub async fn kernel_status_snapshot(
-    kernel: &Kernel,
-    loaded_apps: usize,
-    max_agents: usize,
-    llm_provider: impl Into<String>,
-    gateway_enabled: bool,
-) -> SystemStatusSnapshot {
-    SystemStatusSnapshot {
-        version: env!("CARGO_PKG_VERSION").into(),
-        agent_count: kernel.agent_count().await,
-        loaded_apps,
-        max_agents,
-        llm_provider: llm_provider.into(),
-        app_runtime: "macaca-app/AppRuntime".into(),
-        gateway_enabled,
-    }
-}
-
 /// SDK system facade consumed by Web/CLI thin shells.
-pub struct SystemFacade<T, S> {
+///
+/// The type parameters are intentionally capability-scoped Strategy clients.
+/// Existing two-client call sites keep working through default service, trace,
+/// and package clients that return structured empty/unavailable responses until
+/// later Route C phases attach concrete runtime-backed implementations.
+pub struct SystemFacade<
+    T,
+    S,
+    SV = UnavailableSystemServiceClient,
+    TR = EmptySystemTraceClient,
+    P = EmptySystemPackageClient,
+> {
     task_board: T,
     status: S,
+    service: SV,
+    trace: TR,
+    package: P,
 }
 
 impl<T, S> SystemFacade<T, S>
 where
-    T: TaskBoardDataSource,
-    S: SystemStatusDataSource,
+    T: SystemTaskClient,
+    S: SystemStatusClient,
 {
-    /// Create a facade from explicit replaceable data-source adapters.
+    /// Create a facade from the current compatibility task and status clients.
+    ///
+    /// This constructor preserves the pre-S3 Web/CLI call shape. It installs
+    /// explicit empty/unavailable clients for capabilities whose service-backed
+    /// implementations are intentionally deferred to later Route C phases.
     pub fn new(task_board: T, status: S) -> Self {
-        Self { task_board, status }
+        Self {
+            task_board,
+            status,
+            service: UnavailableSystemServiceClient,
+            trace: EmptySystemTraceClient,
+            package: EmptySystemPackageClient,
+        }
+    }
+}
+
+impl<T, S, SV, TR, P> SystemFacade<T, S, SV, TR, P>
+where
+    T: SystemTaskClient,
+    S: SystemStatusClient,
+    SV: SystemServiceClient,
+    TR: SystemTraceClient,
+    P: SystemPackageClient,
+{
+    /// Create a facade from explicit capability clients.
+    ///
+    /// This constructor is the preferred composition path for tests and future
+    /// serviceized runtimes because it makes every SDK boundary dependency
+    /// visible at construction time.
+    pub fn with_clients(task_board: T, status: S, service: SV, trace: TR, package: P) -> Self {
+        Self {
+            task_board,
+            status,
+            service,
+            trace,
+            package,
+        }
     }
 
     /// Query a session-scoped task board through the facade boundary.
@@ -197,46 +118,105 @@ where
             session_id = %command.session_id,
             "system facade task board query started"
         );
-        let mut todos = self.task_board.list_session_todos(&command).await?;
-        todos.sort_by_key(|todo| todo.sequence_number);
-        let count = todos.len();
+        let result = self.task_board.query_task_board(&command).await?;
         info!(
             app_id = %command.app_id.0,
             session_id = %command.session_id,
-            count,
+            count = result.count,
             "system facade task board query completed"
         );
-        Ok(TaskBoardQueryResult { todos, count })
+        Ok(result)
     }
 
     /// Return a shell-facing status snapshot without exposing presentation internals.
     pub async fn status_snapshot(&self) -> MacacaResult<SystemStatusSnapshot> {
         info!("system facade status snapshot requested");
-        let snapshot = self.status.status_snapshot().await?;
-        if snapshot.max_agents == 0 {
-            warn!("system facade status snapshot reported zero max_agents");
-        }
-        Ok(snapshot)
+        self.status.status_snapshot().await
+    }
+
+    /// Inspect service availability through the SDK service client boundary.
+    pub async fn inspect_services(
+        &self,
+        command: ServiceInspectionCommand,
+    ) -> MacacaResult<ServiceInspectionResult> {
+        info!(
+            scope = %command.scope,
+            "system facade service inspection started"
+        );
+        self.service.inspect_services(&command).await
+    }
+
+    /// Dispatch a service command through the replaceable SDK service client.
+    pub async fn call_service(
+        &self,
+        command: ServiceCallCommand,
+    ) -> MacacaResult<ServiceCallResult> {
+        info!(
+            service_id = %command.service_id,
+            command = %command.command_name,
+            "system facade service call started"
+        );
+        self.service.call_service(&command).await
+    }
+
+    /// Replay session events through the replaceable trace client.
+    pub async fn replay_events(
+        &self,
+        command: SessionEventQueryCommand,
+    ) -> MacacaResult<TraceQueryResult> {
+        info!(
+            session_id = %command.session_id,
+            since = ?command.since,
+            limit = ?command.limit,
+            "system facade trace replay started"
+        );
+        self.trace.replay_events(&command).await
+    }
+
+    /// Tail session trace events through the replaceable trace client.
+    pub async fn tail_trace(&self, command: TraceTailCommand) -> MacacaResult<TraceQueryResult> {
+        info!(
+            session_id = %command.session_id,
+            since = ?command.since,
+            "system facade trace tail started"
+        );
+        self.trace.tail_trace(&command).await
+    }
+
+    /// Inspect packages through the replaceable package client.
+    pub async fn inspect_packages(
+        &self,
+        command: PackageInspectionCommand,
+    ) -> MacacaResult<PackageInspectionResult> {
+        info!(
+            package_ref = ?command.package_ref,
+            "system facade package inspection started"
+        );
+        self.package.inspect_packages(&command).await
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use async_trait::async_trait;
     use chrono::Utc;
-    use macaca_proto::TodoStatus;
+    use macaca_proto::{ApplicationId, TodoItem, TodoStatus};
 
-    struct MockTaskBoardDataSource {
+    struct MockTaskBoardClient {
         todos: Vec<TodoItem>,
     }
 
     #[async_trait]
-    impl TaskBoardDataSource for MockTaskBoardDataSource {
-        async fn list_session_todos(
+    impl SystemTaskClient for MockTaskBoardClient {
+        async fn query_task_board(
             &self,
             _command: &TaskBoardQueryCommand,
-        ) -> MacacaResult<Vec<TodoItem>> {
-            Ok(self.todos.clone())
+        ) -> MacacaResult<TaskBoardQueryResult> {
+            let mut todos = self.todos.clone();
+            todos.sort_by_key(|todo| todo.sequence_number);
+            let count = todos.len();
+            Ok(TaskBoardQueryResult { todos, count })
         }
     }
 
@@ -261,7 +241,7 @@ mod tests {
     #[tokio::test]
     async fn system_facade_returns_sorted_task_board_without_web_dependency() {
         let facade = SystemFacade::new(
-            MockTaskBoardDataSource {
+            MockTaskBoardClient {
                 todos: vec![todo(2), todo(1)],
             },
             StaticSystemStatusDataSource::new(SystemStatusSnapshot {
@@ -283,6 +263,26 @@ mod tests {
             .unwrap();
         assert_eq!(result.count, 2);
         assert_eq!(result.todos[0].sequence_number, 1);
+    }
+
+    #[tokio::test]
+    async fn default_service_client_returns_structured_unavailable() {
+        let facade = SystemFacade::new(
+            MockTaskBoardClient { todos: Vec::new() },
+            StaticSystemStatusDataSource::new(SystemStatusSnapshot {
+                version: "test".into(),
+                agent_count: 0,
+                loaded_apps: 0,
+                max_agents: 8,
+                llm_provider: "stub".into(),
+                app_runtime: "macaca-app/AppRuntime".into(),
+                gateway_enabled: false,
+            }),
+        );
+        let command =
+            ServiceCallCommand::new("service-a", "command-a", serde_json::json!({})).unwrap();
+        let error = facade.call_service(command).await.unwrap_err();
+        assert!(error.to_string().contains("unavailable"));
     }
 
     #[test]

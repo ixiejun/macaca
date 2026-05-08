@@ -125,7 +125,18 @@ Web/CLI/Frontend 只能是 shell 和 adapter，不得定义核心 session、task
 - deprecated 构造入口必须保留在代码库中以便迁移检索，但新生产代码不应再以它们作为默认路径。
 - 当 compat 边界不再需要某个 provider crate 时，应优先删除对应依赖而不是继续扩大 allowlist。
 
-## 10. 审查清单
+## 10. SDK/SystemFacade 收敛
+
+路线 C S3 将 Web/CLI 等 presentation shell 收敛到 SDK-owned `SystemFacade`：
+
+- `SystemFacade` 只能作为 shell-facing Facade，负责组合 command-driven capability clients，不得构造 provider、driver、gateway、application workflow 或业务专用实现。
+- SDK client 必须按能力拆分为 Task、Status、Service、Trace、Package 等 Strategy 边界，后续 S4-S12 可以逐个替换为 `ServiceRuntime` 或远程 service adapter。
+- Web/CLI 只能负责输入解析、输出格式化、HTTP/terminal/SSE 映射和 presentation logging，不得定义 session、task、trace、service、package 核心语义。
+- 尚未迁移到具体 service 的能力必须返回结构化 empty 或 unavailable，不得 panic、阻塞等待或静默调用 provider crate。
+- SDK 命令类型必须可序列化、可审计、provider-neutral，并在关键执行节点记录 trace/log，方便 Route C regression 和 GitNexus blast-radius 审查。
+- S3 不迁移 PlanLoop/WorkerLoop/review、LLM/Memory/Context、Driver/Skill/MCP、Application lifecycle、Gateway、Payment、Web3、EVM provider 行为；这些由后续阶段单独治理。
+
+## 11. 审查清单
 
 任何 Route C OpenSpec 都必须回答：
 

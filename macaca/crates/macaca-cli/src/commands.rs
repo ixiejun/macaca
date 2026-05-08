@@ -12,7 +12,10 @@ use macaca_llm::LlmProvider;
 use macaca_proto::config::{KernelConfig, MacacaConfig};
 use macaca_proto::error::MacacaResult;
 use macaca_proto::types::{LlmMessage, LlmOptions, LlmResponse, TokenUsage};
-use macaca_sdk::{kernel_status_snapshot, StaticSystemStatusDataSource, SystemFacade};
+use macaca_sdk::{
+    kernel_status_snapshot, StaticSystemStatusDataSource, SystemFacade, SystemTaskClient,
+    TaskBoardQueryCommand, TaskBoardQueryResult,
+};
 use macaca_tools::{DefaultToolSet, ToolCatalog};
 
 /// A no-op LLM provider used when no real provider is configured.
@@ -186,12 +189,15 @@ pub async fn execute_show_status() -> MacacaResult<()> {
 struct EmptyCliTaskBoardDataSource;
 
 #[async_trait]
-impl macaca_sdk::TaskBoardDataSource for EmptyCliTaskBoardDataSource {
-    async fn list_session_todos(
+impl SystemTaskClient for EmptyCliTaskBoardDataSource {
+    async fn query_task_board(
         &self,
-        _command: &macaca_sdk::TaskBoardQueryCommand,
-    ) -> MacacaResult<Vec<macaca_proto::TodoItem>> {
-        Ok(Vec::new())
+        _command: &TaskBoardQueryCommand,
+    ) -> MacacaResult<TaskBoardQueryResult> {
+        Ok(TaskBoardQueryResult {
+            todos: Vec::new(),
+            count: 0,
+        })
     }
 }
 
