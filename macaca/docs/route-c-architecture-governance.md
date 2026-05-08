@@ -84,7 +84,27 @@ Web/CLI/Frontend 只能是 shell 和 adapter，不得定义核心 session、task
 - 现有 `/api/chat/v2`、trace、task board、resume 链路不得退化。
 - 新 package/ABI/Store/Web3 能力必须 additive-first。
 
-## 7. 审查清单
+## 7. 依赖边界门禁
+
+路线 C S0 引入可执行依赖边界门禁：
+
+- 测试文件：`macaca/crates/macaca-integration-tests/tests/route_c_dependency_boundaries.rs`
+- Allowlist 文档：`macaca/docs/route-c-serviceization-allowlist.md`
+- 运行命令：`cargo test -p macaca-integration-tests route_c_dependency_boundaries`
+
+该门禁使用 `cargo metadata --no-deps --format-version 1` 检查 workspace 直接依赖边，并用 Specification + Visitor 的方式执行以下治理规则：
+
+- Kernel 不得新增 direct provider dependency。
+- Web/CLI 等 presentation shell 不得新增 provider construction hub 依赖。
+- CLI 不得长期依赖 Web internals。
+- Optional module 不得成为 base OS 必需依赖。
+- Service provider 不得反向依赖 presentation shell。
+
+当前仍存在的宏内核式依赖必须显式写入 allowlist。Allowlist 不是架构批准，只是迁移债务快照；每一行都必须包含 rule id、from crate、to crate、当前原因、替代 service/facade path、目标迁移阶段、过期条件和 owner/status。
+
+新增例外必须先走 OpenSpec，并同步更新 allowlist 文档和测试内 allowlist。禁止只在代码中静默放行新增依赖。
+
+## 8. 审查清单
 
 任何 Route C OpenSpec 都必须回答：
 
@@ -94,4 +114,4 @@ Web/CLI/Frontend 只能是 shell 和 adapter，不得定义核心 session、task
 - 是否支持 permission/policy？
 - 缺失 optional module 时如何表现？
 - 如何验证不破坏 Route C regression matrix？
-
+- 是否触发依赖边界门禁？如果触发，是否有 OpenSpec 和 allowlist 迁移计划？
