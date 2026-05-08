@@ -104,7 +104,19 @@ Web/CLI/Frontend 只能是 shell 和 adapter，不得定义核心 session、task
 
 新增例外必须先走 OpenSpec，并同步更新 allowlist 文档和测试内 allowlist。禁止只在代码中静默放行新增依赖。
 
-## 8. 审查清单
+## 8. ServiceRuntime 治理
+
+路线 C S1 引入 host-owned `ServiceRuntime`。它的职责是运行时编排，而不是 provider 迁移：
+
+- `ServiceRuntime` 归属 `macaca-runtime-host`，负责 provider-neutral service 的注册、启动、调用、停止、清理、事件和 snapshot。
+- Kernel 仍只拥有 service registry、service call adapter、trace/audit primitive 等系统不变量，不拥有 provider runtime orchestration。
+- Runtime service call 必须先经过 trace-required decorator 和 policy decorator，再进入 service bus。
+- Runtime policy 必须是 Strategy，可以被后续权限、预算、地域、entitlement、optional module availability 策略替换。
+- Runtime decorator chain 必须是可组合的，后续 resource、entitlement、metering enforcement 通过 decorator 增加，不得写进 provider-specific 分支。
+- `ServiceRuntime` 必须通过 descriptor/factory 注册 service，不得硬编码 app、workflow、provider、driver、gateway、model、chain 或业务名称。
+- Task、LLM、Memory、Driver、Skill、MCP、Gateway、Payment、Web3、EVM 等 provider 迁移发生在后续 S 阶段，S1 不移除 allowlist 债务。
+
+## 9. 审查清单
 
 任何 Route C OpenSpec 都必须回答：
 
@@ -115,3 +127,4 @@ Web/CLI/Frontend 只能是 shell 和 adapter，不得定义核心 session、task
 - 缺失 optional module 时如何表现？
 - 如何验证不破坏 Route C regression matrix？
 - 是否触发依赖边界门禁？如果触发，是否有 OpenSpec 和 allowlist 迁移计划？
+- 如果涉及 service runtime，是否证明 trace/policy/decorator/snapshot/event 设计可审计且可替换？

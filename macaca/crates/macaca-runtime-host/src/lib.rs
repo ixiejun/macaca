@@ -20,6 +20,11 @@ pub mod lease;
 pub mod mcp_runtime;
 pub mod package;
 pub mod plugin;
+pub mod service_decorator;
+pub mod service_provider;
+pub mod service_runtime;
+pub mod service_runtime_error;
+pub mod service_runtime_event;
 pub mod transport;
 
 #[allow(deprecated)]
@@ -38,5 +43,21 @@ pub use plugin::{
     plugin_failure_event, DescriptorPluginHost, PluginHost, PluginHostFactory,
     PluginLifecycleController, PluginManifestValidator, PluginRuntimeFacade, PluginRuntimeGuard,
     PluginRuntimeResult,
+};
+pub use service_decorator::{
+    AllowAllServiceRuntimePolicy, DenyAllServiceRuntimePolicy, EntitlementRuntimeDecorator,
+    MeteringRuntimeDecorator, PolicyRuntimeDecorator, ResourceRuntimeDecorator,
+    ServiceRuntimeCallContext, ServiceRuntimeDecorator, ServiceRuntimePolicy,
+    ServiceRuntimePolicyDecision, TraceRequiredRuntimeDecorator,
+};
+pub use service_provider::{
+    ServiceProviderFactory, ServiceProviderFactoryContext, ServiceProviderInstance,
+    StaticServiceProviderFactory,
+};
+pub use service_runtime::ServiceRuntime;
+pub use service_runtime_error::{ServiceRuntimeConfig, ServiceRuntimeError};
+pub use service_runtime_event::{
+    InMemoryServiceRuntimeEventSink, ServiceRuntimeEvent, ServiceRuntimeEventSink,
+    ServiceRuntimeServiceSnapshot, ServiceRuntimeSnapshot,
 };
 pub use transport::{ConfigBackedMcpTransport, McpTransport};

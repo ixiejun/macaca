@@ -6,6 +6,7 @@ description = "Agent OS runtime host — MCP runtime manager, skill-backed tool 
 
 [dependencies]
 macaca-proto = { workspace = true }
+macaca-ipc = { workspace = true }
 macaca-kernel = { workspace = true }
 macaca-persist = { workspace = true }
 macaca-skill = { workspace = true }
@@ -19,6 +20,7 @@ tokio = { workspace = true }
 async-trait = { workspace = true }
 tracing = { workspace = true }
 chrono = { workspace = true }
+thiserror = { workspace = true }
 dirs = "5"
 
 [dev-dependencies]
