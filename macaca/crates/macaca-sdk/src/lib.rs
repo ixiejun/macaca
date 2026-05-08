@@ -29,6 +29,7 @@ pub use builder::{AgentBuilder, DeclarativeAgent};
 pub use config::AgentConfig;
 pub use evm::MacacaEvmSdk;
 pub use facade::{AgentRegistryApi, KernelAgentRegistry, KernelPrimitiveSdk, MacacaSdk};
+pub use macaca_task::{TaskServiceSnapshot, TaskServiceSnapshotCommand};
 pub use package_fixtures::{
     driver_plugin_fixture, evm_optional_fixture, free_skill_fixture, gateway_plugin_fixture,
     genui_app_fixture, invalid_missing_required_service_fixture, invalid_missing_runtime_fixture,
@@ -50,4 +51,5 @@ pub use system_facade::{
     TaskBoardQueryCommand, TaskBoardQueryResult, TodoStoreTaskBoardDataSource, TraceQueryResult,
     TraceTailCommand, UnavailableSystemServiceClient,
 };
+pub use task_client::{TaskServiceClient, UnavailableTaskServiceClient};
 pub use validation::{SdkValidationChain, SdkValidator};

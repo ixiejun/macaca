@@ -1,8 +1,10 @@
 //! SDK task client boundary for shell-facing task board operations.
 //!
 //! Route C keeps task semantics out of Web and CLI. This module models task
-//! board reads as typed commands and adapts the current `TodoStore` as a local
-//! compatibility backend until S4 promotes Task/Planner/Review into services.
+//! board reads and task-service calls as typed commands. The current
+//! compatibility backend still reads the `TodoStore` directly for session
+//! board queries, while the richer task service client stays replaceable for
+//! later S4 runtime wiring.
 
 use std::sync::Arc;
 
@@ -10,8 +12,12 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
-use macaca_proto::{ApplicationId, MacacaError, MacacaResult, TodoItem};
-use macaca_task::TodoStore;
+use macaca_proto::{ApplicationId, MacacaError, MacacaResult, TodoGoal, TodoItem};
+use macaca_task::{
+    ClaimTaskCommand, CreateGoalCommand, QueryTaskBoardCommand, ResumeCoordinatorCommand,
+    ReviewTaskCommand, StartTaskCommand, SubmitReviewCommand, TaskServiceSnapshot,
+    TaskServiceSnapshotCommand, TodoStore,
+};
 
 /// Command used by shells to request one session-scoped task board view.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -101,3 +107,111 @@ impl SystemTaskClient for TodoStoreTaskBoardDataSource {
 pub trait TaskBoardDataSource: SystemTaskClient {}
 
 impl<T> TaskBoardDataSource for T where T: SystemTaskClient {}
+
+/// Replaceable client for the typed Task Service boundary.
+///
+/// The client remains intentionally small and capability-scoped.  Web and CLI
+/// can depend on this trait when they need typed goal, claim, review, resume,
+/// or snapshot interactions without taking a dependency on the eventual task
+/// service host implementation.
+#[async_trait]
+pub trait TaskServiceClient: Send + Sync {
+    /// Create a new goal in the task service boundary.
+    async fn create_goal(&self, command: &CreateGoalCommand) -> MacacaResult<TodoGoal>;
+
+    /// Query the existing session-scoped task board.
+    async fn query_task_board(
+        &self,
+        command: &QueryTaskBoardCommand,
+    ) -> MacacaResult<TaskBoardQueryResult>;
+
+    /// Claim one task from the task service boundary.
+    async fn claim_task(&self, command: &ClaimTaskCommand) -> MacacaResult<Option<TodoItem>>;
+
+    /// Mark a task as started by an agent.
+    async fn start_task(&self, command: &StartTaskCommand) -> MacacaResult<bool>;
+
+    /// Submit a task for review.
+    async fn submit_review(&self, command: &SubmitReviewCommand) -> MacacaResult<bool>;
+
+    /// Apply a review result to a task.
+    async fn review_task(&self, command: &ReviewTaskCommand) -> MacacaResult<bool>;
+
+    /// Request coordinator resume after a task lifecycle milestone.
+    async fn resume_coordinator(&self, command: &ResumeCoordinatorCommand) -> MacacaResult<()>;
+
+    /// Inspect the deterministic task service snapshot.
+    async fn snapshot(
+        &self,
+        command: &TaskServiceSnapshotCommand,
+    ) -> MacacaResult<TaskServiceSnapshot>;
+}
+
+/// Compatibility placeholder for shells that are not yet wired to a runtime-backed Task Service.
+#[derive(Debug, Default, Clone)]
+pub struct UnavailableTaskServiceClient;
+
+#[async_trait]
+impl TaskServiceClient for UnavailableTaskServiceClient {
+    async fn create_goal(&self, _command: &CreateGoalCommand) -> MacacaResult<TodoGoal> {
+        Err(MacacaError::Config(
+            "task service create_goal is unavailable through the local SDK compatibility client"
+                .into(),
+        ))
+    }
+
+    async fn query_task_board(
+        &self,
+        command: &QueryTaskBoardCommand,
+    ) -> MacacaResult<TaskBoardQueryResult> {
+        Err(MacacaError::Config(format!(
+            "task service board query for session '{}' is unavailable through the local SDK compatibility client",
+            command.session_id
+        )))
+    }
+
+    async fn claim_task(&self, _command: &ClaimTaskCommand) -> MacacaResult<Option<TodoItem>> {
+        Err(MacacaError::Config(
+            "task service claim_task is unavailable through the local SDK compatibility client"
+                .into(),
+        ))
+    }
+
+    async fn start_task(&self, _command: &StartTaskCommand) -> MacacaResult<bool> {
+        Err(MacacaError::Config(
+            "task service start_task is unavailable through the local SDK compatibility client"
+                .into(),
+        ))
+    }
+
+    async fn submit_review(&self, _command: &SubmitReviewCommand) -> MacacaResult<bool> {
+        Err(MacacaError::Config(
+            "task service submit_review is unavailable through the local SDK compatibility client"
+                .into(),
+        ))
+    }
+
+    async fn review_task(&self, _command: &ReviewTaskCommand) -> MacacaResult<bool> {
+        Err(MacacaError::Config(
+            "task service review_task is unavailable through the local SDK compatibility client"
+                .into(),
+        ))
+    }
+
+    async fn resume_coordinator(&self, _command: &ResumeCoordinatorCommand) -> MacacaResult<()> {
+        Err(MacacaError::Config(
+            "task service resume_coordinator is unavailable through the local SDK compatibility client"
+                .into(),
+        ))
+    }
+
+    async fn snapshot(
+        &self,
+        _command: &TaskServiceSnapshotCommand,
+    ) -> MacacaResult<TaskServiceSnapshot> {
+        Err(MacacaError::Config(
+            "task service snapshot is unavailable through the local SDK compatibility client"
+                .into(),
+        ))
+    }
+}
