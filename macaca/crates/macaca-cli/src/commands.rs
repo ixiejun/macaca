@@ -7,7 +7,7 @@ use tracing::info;
 
 use macaca_app::AppRuntime;
 use macaca_gateway::GatewayBuilder;
-use macaca_kernel::{Kernel, KernelBuilder};
+use macaca_kernel::{Kernel, KernelBuilder, KernelProviderCompat};
 use macaca_llm::LlmProvider;
 use macaca_proto::config::{KernelConfig, MacacaConfig};
 use macaca_proto::error::MacacaResult;
@@ -219,7 +219,7 @@ fn build_kernel(
     llm: Arc<dyn LlmProvider>,
     tools: Box<dyn ToolCatalog>,
 ) -> Kernel {
-    KernelBuilder::new(config, llm, tools).build()
+    KernelBuilder::from_compat(config, KernelProviderCompat::new(llm, tools)).build()
 }
 
 #[cfg(test)]

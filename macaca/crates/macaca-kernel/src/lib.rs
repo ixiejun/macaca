@@ -19,6 +19,7 @@ pub mod orchestrator;
 pub mod payment_policy;
 pub mod plugin_registry;
 pub mod policy;
+pub mod provider_compat;
 pub mod registry;
 pub mod resource;
 pub mod scheduler;
@@ -55,6 +56,7 @@ pub use plugin_registry::{
     PluginRegistryEntry, PluginRegistrySnapshot,
 };
 pub use policy::{DefaultAllowPolicyEngine, PolicyEngine, StaticDenyPolicyEngine};
+pub use provider_compat::{KernelProviderCompat, LegacyLlmProvider, LegacyToolCatalog};
 pub use registry::{AgentEntry, AgentRegistry};
 pub use resource::{InMemoryResourceManager, ResourceManager};
 #[allow(deprecated)]

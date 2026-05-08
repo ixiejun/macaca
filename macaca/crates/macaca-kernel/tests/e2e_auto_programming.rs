@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use macaca_kernel::{Kernel, KernelBuilder};
+use macaca_kernel::{Kernel, KernelBuilder, KernelProviderCompat};
 use macaca_llm::LlmProvider;
 use macaca_proto::config::KernelConfig;
 use macaca_proto::{
@@ -118,7 +118,11 @@ fn make_kernel() -> Kernel {
         agent_timeout_ms: 30000,
     };
     let llm: Arc<dyn LlmProvider> = Arc::new(AutoProgrammingLlm);
-    KernelBuilder::new(config, llm, Box::new(DefaultToolSet::new())).build()
+    KernelBuilder::from_compat(
+        config,
+        KernelProviderCompat::new(llm, Box::new(DefaultToolSet::new())),
+    )
+    .build()
 }
 
 fn code_gen_config() -> AgentConfig {

@@ -3,13 +3,12 @@
 use std::sync::Arc;
 
 use macaca_agent::AgentServices;
-use macaca_llm::LlmProvider;
 use macaca_proto::config::KernelConfig;
 use macaca_proto::{
     AgentActivity, AgentId, AgentManifest, AgentOutput, AgentState, MacacaError, MacacaResult,
 };
-use macaca_tools::ToolCatalog;
 
+use crate::provider_compat::KernelProviderCompat;
 use crate::registry::AgentRegistry;
 use crate::scheduler::Scheduler;
 use crate::status::AgentStatusTracker;
@@ -19,34 +18,39 @@ pub struct Kernel {
     registry: AgentRegistry,
     scheduler: Box<dyn Scheduler>,
     status_tracker: AgentStatusTracker,
-    llm: Arc<dyn LlmProvider>,
-    tools: Arc<dyn ToolCatalog>,
+    providers: KernelProviderCompat,
 }
 
 impl Kernel {
     pub(crate) fn from_parts(
         config: KernelConfig,
-        llm: Arc<dyn LlmProvider>,
-        tools: Box<dyn ToolCatalog>,
+        providers: KernelProviderCompat,
         scheduler: Box<dyn Scheduler>,
     ) -> Self {
+        tracing::info!(
+            max_agents = config.max_agents,
+            "kernel created through provider compatibility boundary"
+        );
         Self {
             registry: AgentRegistry::new(config.max_agents),
             scheduler,
             status_tracker: AgentStatusTracker::new(),
-            llm,
-            tools: Arc::from(tools),
+            providers,
         }
     }
 
     /// Create a new kernel with the given configuration.
-    #[deprecated(note = "use KernelBuilder for new kernel construction")]
+    #[deprecated(note = "use KernelBuilder::from_compat for new kernel construction")]
     pub fn new(
         config: &KernelConfig,
-        llm: Arc<dyn LlmProvider>,
-        tools: Box<dyn ToolCatalog>,
+        llm: Arc<dyn crate::LegacyLlmProvider>,
+        tools: Box<dyn crate::LegacyToolCatalog>,
     ) -> Self {
-        crate::kernel_builder::KernelBuilder::new(config.clone(), llm, tools).build()
+        crate::kernel_builder::KernelBuilder::from_compat(
+            config.clone(),
+            crate::KernelProviderCompat::new(llm, tools),
+        )
+        .build()
     }
 
     /// Register a new agent with the kernel.
@@ -78,9 +82,8 @@ impl Kernel {
     /// Builds an `AgentServices` bundle (empty for now — real injection in Phase 4+)
     /// and invokes `agent.run()`.
     pub async fn execute_agent(&self, agent_id: &AgentId) -> MacacaResult<AgentOutput> {
+        tracing::info!(agent_id = %agent_id.0, "kernel agent execution started");
         let services = AgentServices::builder().build();
-        let llm = Arc::clone(&self.llm);
-        let tools = Arc::clone(&self.tools);
 
         // Mark as thinking
         self.status_tracker
@@ -93,11 +96,12 @@ impl Kernel {
             .ok_or_else(|| MacacaError::NotFound(format!("Agent {} not found", agent_id.0)))?;
         let output = entry
             .agent
-            .run(llm.as_ref(), tools.as_ref(), &services)
+            .run(self.providers.llm(), self.providers.tools(), &services)
             .await;
 
         // Mark as idle after execution
         self.status_tracker.set_idle(agent_id).await;
+        tracing::info!(agent_id = %agent_id.0, "kernel agent execution finished");
 
         output
     }
@@ -179,7 +183,7 @@ mod tests {
     struct MockLlm;
 
     #[async_trait]
-    impl LlmProvider for MockLlm {
+    impl crate::LegacyLlmProvider for MockLlm {
         fn name(&self) -> &str {
             "mock"
         }
@@ -220,8 +224,8 @@ mod tests {
         }
         async fn run(
             &self,
-            llm: &dyn LlmProvider,
-            _tools: &dyn ToolCatalog,
+            llm: &dyn crate::LegacyLlmProvider,
+            _tools: &dyn crate::LegacyToolCatalog,
             _services: &AgentServices,
         ) -> MacacaResult<AgentOutput> {
             let msgs = vec![LlmMessage::user("test")];
@@ -240,8 +244,12 @@ mod tests {
             heartbeat_interval_ms: 5000,
             agent_timeout_ms: 30000,
         };
-        let llm: Arc<dyn LlmProvider> = Arc::new(MockLlm);
-        crate::KernelBuilder::new(config, llm, Box::new(DefaultToolSet::new())).build()
+        let llm: Arc<dyn crate::LegacyLlmProvider> = Arc::new(MockLlm);
+        crate::KernelBuilder::from_compat(
+            config,
+            crate::KernelProviderCompat::new(llm, Box::new(DefaultToolSet::new())),
+        )
+        .build()
     }
 
     fn make_test_agent() -> (AgentId, Box<dyn Agent>, AgentManifest) {

@@ -402,7 +402,7 @@ mod tests {
     use std::sync::Arc;
 
     use async_trait::async_trait;
-    use macaca_kernel::KernelBuilder;
+    use macaca_kernel::{KernelBuilder, KernelProviderCompat};
     use macaca_llm::LlmProvider;
     use macaca_proto::config::KernelConfig;
     use macaca_proto::{LlmMessage, LlmOptions, LlmResponse, MacacaResult, TokenUsage};
@@ -447,7 +447,11 @@ mod tests {
             agent_timeout_ms: 1000,
         };
         let kernel = Arc::new(
-            KernelBuilder::new(config, Arc::clone(&llm), Box::new(DefaultToolSet::new())).build(),
+            KernelBuilder::from_compat(
+                config,
+                KernelProviderCompat::new(Arc::clone(&llm), Box::new(DefaultToolSet::new())),
+            )
+            .build(),
         );
         WorkflowEngine::new(kernel, llm)
     }

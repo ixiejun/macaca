@@ -116,7 +116,16 @@ Web/CLI/Frontend 只能是 shell 和 adapter，不得定义核心 session、task
 - `ServiceRuntime` 必须通过 descriptor/factory 注册 service，不得硬编码 app、workflow、provider、driver、gateway、model、chain 或业务名称。
 - Task、LLM、Memory、Driver、Skill、MCP、Gateway、Payment、Web3、EVM 等 provider 迁移发生在后续 S 阶段，S1 不移除 allowlist 债务。
 
-## 9. 审查清单
+## 9. Kernel Provider Compatibility
+
+路线 C S2 开始收敛 `macaca-kernel` 的 provider 依赖面：
+
+- `Kernel` 和 `KernelBuilder` 可以暂时保留 deprecated 兼容入口，但新构造逻辑应优先通过 provider compatibility bundle、facade 或后续 `ServiceRuntime` 路径。
+- provider-facing 兼容代码必须隔离在专门的 compat 边界中，不得回流成 kernel core 的默认架构。
+- deprecated 构造入口必须保留在代码库中以便迁移检索，但新生产代码不应再以它们作为默认路径。
+- 当 compat 边界不再需要某个 provider crate 时，应优先删除对应依赖而不是继续扩大 allowlist。
+
+## 10. 审查清单
 
 任何 Route C OpenSpec 都必须回答：
 

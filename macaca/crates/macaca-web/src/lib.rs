@@ -52,7 +52,7 @@ use macaca_app::{AppLoader, AppRegistry, AppRuntime};
 use macaca_framework::session::{
     InMemorySessionStore as FrameworkInMemorySessionStore, SessionStore as FrameworkSessionStore,
 };
-use macaca_kernel::{AgentInfo, ApplicationExecutorRegistry, KernelBuilder};
+use macaca_kernel::{AgentInfo, ApplicationExecutorRegistry, KernelBuilder, KernelProviderCompat};
 use macaca_llm::{LlmProvider, LlmRouter};
 use macaca_persist::RedbStore;
 use macaca_proto::config::{KernelConfig, MacacaConfig};
@@ -102,10 +102,9 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
         agent_timeout_ms: 60000,
     };
     let kernel = Arc::new(
-        KernelBuilder::new(
+        KernelBuilder::from_compat(
             kernel_config,
-            Arc::clone(&llm),
-            Box::new(DefaultToolSet::new()),
+            KernelProviderCompat::new(Arc::clone(&llm), Box::new(DefaultToolSet::new())),
         )
         .build(),
     );

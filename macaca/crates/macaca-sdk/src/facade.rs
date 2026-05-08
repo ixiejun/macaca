@@ -121,7 +121,7 @@ mod tests {
     use super::*;
     use std::sync::Arc;
 
-    use macaca_kernel::{CapabilityRegistry, KernelBuilder};
+    use macaca_kernel::{CapabilityRegistry, KernelBuilder, KernelProviderCompat};
     use macaca_llm::LlmProvider;
     use macaca_proto::config::KernelConfig;
     use macaca_proto::{
@@ -165,7 +165,11 @@ mod tests {
             agent_timeout_ms: 30000,
         };
         let llm: Arc<dyn LlmProvider> = Arc::new(MockLlm);
-        KernelBuilder::new(config, llm, Box::new(DefaultToolSet::new())).build()
+        KernelBuilder::from_compat(
+            config,
+            KernelProviderCompat::new(llm, Box::new(DefaultToolSet::new())),
+        )
+        .build()
     }
 
     #[tokio::test]

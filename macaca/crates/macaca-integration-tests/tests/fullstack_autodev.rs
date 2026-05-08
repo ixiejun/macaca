@@ -9,7 +9,7 @@ use async_trait::async_trait;
 
 use macaca_app::loader::AppLoader;
 use macaca_app::{AppLayer, AppRuntime, AppStatus};
-use macaca_kernel::{Kernel, KernelBuilder};
+use macaca_kernel::{Kernel, KernelBuilder, KernelProviderCompat};
 use macaca_llm::LlmProvider;
 use macaca_proto::config::KernelConfig;
 use macaca_proto::{LlmMessage, LlmOptions, LlmResponse, MacacaResult, TokenUsage};
@@ -55,7 +55,11 @@ fn make_kernel() -> Kernel {
         agent_timeout_ms: 30000,
     };
     let llm: Arc<dyn LlmProvider> = Arc::new(MockLlm);
-    KernelBuilder::new(config, llm, Box::new(DefaultToolSet::new())).build()
+    KernelBuilder::from_compat(
+        config,
+        KernelProviderCompat::new(llm, Box::new(DefaultToolSet::new())),
+    )
+    .build()
 }
 
 fn app_dir() -> std::path::PathBuf {
