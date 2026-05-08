@@ -9,6 +9,7 @@ pub mod builder;
 pub mod config;
 pub mod evm;
 pub mod facade;
+pub mod package_fixtures;
 pub mod persona;
 pub mod persona_prototype;
 pub mod registry_api;
@@ -23,6 +24,12 @@ pub use builder::{AgentBuilder, DeclarativeAgent};
 pub use config::AgentConfig;
 pub use evm::MacacaEvmSdk;
 pub use facade::{AgentRegistryApi, KernelAgentRegistry, KernelPrimitiveSdk, MacacaSdk};
+pub use package_fixtures::{
+    driver_plugin_fixture, evm_optional_fixture, free_skill_fixture, gateway_plugin_fixture,
+    genui_app_fixture, invalid_missing_required_service_fixture, invalid_missing_runtime_fixture,
+    paid_skill_fixture, wasm_stub_app_fixture, web3_optional_fixture, yaml_app_fixture,
+    EcosystemPackageFixtureBuilder,
+};
 pub use persona::AgentPersona;
 pub use persona_prototype::{PersonaOverrides, PersonaPrototype};
 #[allow(deprecated)]

@@ -138,3 +138,27 @@ Macaca 当前至少有两条可见执行路径：
 - 非 canonical 深度参考：[`../ARCHITECTURE-v2.md`](../ARCHITECTURE-v2.md)
 - 已批准的澄清计划：[`../../.omx/plans/prd-system-audit-clarification.md`](../../.omx/plans/prd-system-audit-clarification.md)
 - 验证矩阵：[`../../.omx/plans/test-spec-system-audit-clarification.md`](../../.omx/plans/test-spec-system-audit-clarification.md)
+
+<a id="ecosystem-hardening"></a>
+## 9. Ecosystem Hardening
+
+Route C Phase 13 treats third-party development as an operating-system concern.
+Applications, plugins, skills, MCP packages, GenUI surfaces, Store-submitted
+packages, optional Web3 packages, and optional EVM/DApp packages must be
+developable, packageable, certifiable, traceable, and debuggable without
+modifying Macaca source code.
+
+Developer guides:
+
+- Application development: [`developer/application-development-guide.md`](./developer/application-development-guide.md)
+- Plugin development: [`developer/plugin-development-guide.md`](./developer/plugin-development-guide.md)
+- GenUI development: [`developer/genui-development-guide.md`](./developer/genui-development-guide.md)
+- Store submission: [`developer/store-submission-guide.md`](./developer/store-submission-guide.md)
+- Web3 and DApp development: [`developer/web3-dapp-development-guide.md`](./developer/web3-dapp-development-guide.md)
+
+All ecosystem packages must pass compatibility certification before they are
+considered installable. The checker reports `compatible`,
+`compatible_with_warnings`, or `incompatible` with stable diagnostic codes,
+trace/audit events, and actionable field paths. Optional Web3/EVM modules remain
+optional; unavailable optional modules must degrade with structured warnings and
+must not break normal applications.

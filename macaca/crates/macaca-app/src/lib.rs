@@ -5,6 +5,7 @@
 
 pub mod abi;
 pub mod commercial_package;
+pub mod compatibility_checker;
 pub mod consumption;
 pub mod dapp_capability;
 pub mod genui;
@@ -28,6 +29,10 @@ pub use abi::{
     MetadataOnlyApplicationAbiInstance, WasmApplicationAbiAdapter, YamlApplicationAbiAdapter,
 };
 pub use commercial_package::{is_commercial_package, CommercialPackageGuard};
+pub use compatibility_checker::{
+    CompatibilityDiagnostic, CompatibilityHostContext, CompatibilityReport, CompatibilitySeverity,
+    CompatibilityStatus, CompatibilityTraceEvent, PackageCompatibilityChecker,
+};
 #[allow(deprecated)]
 pub use consumption::{
     app_agent_base_prompt, app_agent_manifest_view, app_agent_prompt_semantics,
