@@ -27,6 +27,10 @@ pub mod status;
 pub mod status_transition;
 pub mod system_service;
 pub mod trace_service_adapter;
+pub mod web3;
+pub mod web3_event;
+#[cfg(test)]
+mod web3_tests;
 
 pub use capability_registry::{CapabilityRegistry, InMemoryCapabilityRegistry};
 pub use facade::{
@@ -57,6 +61,13 @@ pub use status::AgentStatusTracker;
 pub use status_transition::AgentStatusTransitionPolicy;
 pub use system_service::{MockSystemService, SystemService};
 pub use trace_service_adapter::trace_service_descriptor;
+pub use web3::{
+    DefaultWeb3PolicyEngine, MockWeb3Adapter, UnavailableWeb3Adapter, Web3Adapter, Web3Facade,
+    Web3PolicyEngine,
+};
+pub use web3_event::{
+    InMemoryWeb3TraceEventSink, NoopWeb3TraceEventSink, Web3TraceEvent, Web3TraceEventSink,
+};
 
 // Re-export executor types
 pub use a2a::{

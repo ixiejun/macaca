@@ -18,6 +18,7 @@ pub mod registry;
 pub mod runtime;
 pub mod runtime_guard;
 pub mod skills;
+pub mod web3_capability;
 pub mod workflow;
 
 pub use abi::{
@@ -59,6 +60,7 @@ pub use runtime_guard::{
     package_requires_wasm_runtime, PackageGuardContext, PackageGuardTraceEvent, PackageRuntimeGuard,
 };
 pub use skills::{global_skills_dir, SkillLoader};
+pub use web3_capability::AppWeb3CapabilityRequest;
 pub use workflow::{
     DefaultWorkflowPromptStrategy, WorkflowContext, WorkflowEngine, WorkflowPromptContext,
     WorkflowPromptParts, WorkflowPromptStrategy, WorkflowResult, DEFAULT_COORDINATOR,

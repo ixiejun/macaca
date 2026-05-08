@@ -34,6 +34,7 @@ mod source_artifact;
 pub mod sse;
 pub mod state;
 pub mod trace_events;
+pub mod web3_status;
 pub mod workspace;
 mod workspace_knowledge_digest_capability;
 mod workspace_memory_recall_source;

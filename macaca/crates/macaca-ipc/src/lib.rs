@@ -13,6 +13,7 @@ pub mod local_service;
 pub mod nats;
 pub mod service_bus;
 pub mod transport;
+pub mod web3_bridge;
 
 pub use bus::{MessageReceiver, MessageSender};
 pub use local::{LocalBus, LocalReceiver, LocalSender};
@@ -27,3 +28,4 @@ pub use transport::{
     DynMessageReceiver, DynMessageSender, DynServiceTransport, IpcTransport, IpcTransportConfig,
     IpcTransportFactory, IpcTransportKind, ServiceTransport,
 };
+pub use web3_bridge::Web3ServiceCall;
