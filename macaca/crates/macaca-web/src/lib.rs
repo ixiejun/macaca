@@ -29,6 +29,7 @@ pub mod run_trace;
 pub mod runtime_resume;
 pub mod session;
 pub mod session_replay;
+pub mod shell;
 pub mod skill_mcp;
 mod source_artifact;
 pub mod sse;

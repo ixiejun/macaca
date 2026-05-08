@@ -15,6 +15,7 @@ macaca-agent = { workspace = true }
 macaca-app = { workspace = true }
 macaca-tools = { workspace = true }
 macaca-gateway = { workspace = true }
+macaca-sdk = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }

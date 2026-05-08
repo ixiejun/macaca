@@ -12,6 +12,7 @@ use macaca_llm::LlmProvider;
 use macaca_proto::config::{KernelConfig, MacacaConfig};
 use macaca_proto::error::MacacaResult;
 use macaca_proto::types::{LlmMessage, LlmOptions, LlmResponse, TokenUsage};
+use macaca_sdk::{kernel_status_snapshot, StaticSystemStatusDataSource, SystemFacade};
 use macaca_tools::{DefaultToolSet, ToolCatalog};
 
 /// A no-op LLM provider used when no real provider is configured.
@@ -134,17 +135,29 @@ pub async fn execute_show_status() -> MacacaResult<()> {
     let tools = Box::new(DefaultToolSet::new());
     let kernel = build_kernel(config.kernel.clone(), llm, tools);
 
-    let agent_count = kernel.agent_count().await;
+    let snapshot = kernel_status_snapshot(
+        &kernel,
+        app_runtime.app_count().await,
+        config.kernel.max_agents,
+        config.llm.default_provider.clone(),
+        config.gateway.enabled,
+    )
+    .await;
+    let facade = SystemFacade::new(
+        EmptyCliTaskBoardDataSource,
+        StaticSystemStatusDataSource::new(snapshot),
+    );
+    let snapshot = facade.status_snapshot().await?;
 
     println!("Agent OS Status");
     println!("{}", "=".repeat(40));
-    println!("Version:         {}", env!("CARGO_PKG_VERSION"));
-    println!("Agents:          {}", agent_count);
-    println!("Loaded apps:     {}", app_runtime.app_count().await);
-    println!("Max agents:      {}", config.kernel.max_agents);
-    println!("LLM provider:    {}", config.llm.default_provider);
-    println!("App runtime:     macaca-app/AppRuntime");
-    println!("Gateway enabled: {}", config.gateway.enabled);
+    println!("Version:         {}", snapshot.version);
+    println!("Agents:          {}", snapshot.agent_count);
+    println!("Loaded apps:     {}", snapshot.loaded_apps);
+    println!("Max agents:      {}", snapshot.max_agents);
+    println!("LLM provider:    {}", snapshot.llm_provider);
+    println!("App runtime:     {}", snapshot.app_runtime);
+    println!("Gateway enabled: {}", snapshot.gateway_enabled);
 
     if config.gateway.enabled {
         if let Some(ref tg) = config.gateway.telegram {
@@ -162,6 +175,24 @@ pub async fn execute_show_status() -> MacacaResult<()> {
     }
 
     Ok(())
+}
+
+/// CLI-only empty task-board adapter used when a command only needs status.
+///
+/// Keeping this as an explicit adapter avoids making the CLI depend on Web
+/// state while satisfying the typed SDK facade shape. Commands that need real
+/// task-board data should provide a concrete store-backed adapter instead.
+#[derive(Debug, Default)]
+struct EmptyCliTaskBoardDataSource;
+
+#[async_trait]
+impl macaca_sdk::TaskBoardDataSource for EmptyCliTaskBoardDataSource {
+    async fn list_session_todos(
+        &self,
+        _command: &macaca_sdk::TaskBoardQueryCommand,
+    ) -> MacacaResult<Vec<macaca_proto::TodoItem>> {
+        Ok(Vec::new())
+    }
 }
 
 /// Create a kernel instance from config (for testing and composition).

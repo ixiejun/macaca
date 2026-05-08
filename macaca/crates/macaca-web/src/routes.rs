@@ -27,6 +27,7 @@ use macaca_persist::{AppendEventCommand, EventLogQuery, SessionLineageStore};
 use macaca_proto::{ApplicationId, MacacaError, ProtoErrorAdapter};
 use macaca_skill::{SkillPolicy, SkillRuntimeFacade, SkillSnapshotRequest};
 
+use crate::shell::WebShellFacade;
 use crate::skill_mcp::SkillMcpStatus;
 use crate::source_artifact::{
     ContextSourceArtifactRepository, SourceArtifactQuery, SourceArtifactResponse,
@@ -718,11 +719,12 @@ pub async fn list_todos(
     );
     let store = Arc::clone(&state.persist.todo_store);
     let session_id = required_session_id(&query, "list_todos")?;
-    let mut todos = store.list_all_todos_for_session(&app_id, session_id).await;
-    todos.sort_by_key(|t| t.sequence_number);
-    Ok(Json(
-        serde_json::json!({ "todos": todos, "count": todos.len() }),
-    ))
+    let shell = WebShellFacade::for_task_board(store);
+    let response = shell
+        .list_todos_json(app_id, session_id)
+        .await
+        .map_err(|error| err(StatusCode::BAD_REQUEST, error.to_string()))?;
+    Ok(Json(response))
 }
 
 /// GET /api/apps/{app_id}/todos/claim-diagnostics — why workers may not claim `Pending` tasks (session-scoped).
