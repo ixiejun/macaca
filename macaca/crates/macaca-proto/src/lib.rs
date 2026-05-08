@@ -3,6 +3,7 @@ pub mod application_abi;
 pub mod commerce;
 pub mod config;
 pub mod error;
+pub mod evm;
 pub mod kernel;
 pub mod orchestration;
 pub mod package;
@@ -16,6 +17,8 @@ pub mod web3;
 #[cfg(test)]
 mod a2a_tests;
 #[cfg(test)]
+mod evm_tests;
+#[cfg(test)]
 mod web3_tests;
 
 pub use a2a::*;
@@ -23,6 +26,7 @@ pub use application_abi::*;
 pub use commerce::*;
 pub use config::{LlmProviderConfigBuilder, MacacaConfigBuilder};
 pub use error::*;
+pub use evm::*;
 pub use kernel::*;
 pub use orchestration::*;
 pub use package::*;

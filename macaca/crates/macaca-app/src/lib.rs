@@ -4,8 +4,9 @@
 //! layers. Apps are loaded from manifest files and managed by the [`AppRuntime`].
 
 pub mod abi;
-pub mod consumption;
 pub mod commercial_package;
+pub mod consumption;
+pub mod dapp_capability;
 pub mod genui;
 pub mod host;
 pub mod lifecycle;
@@ -26,6 +27,7 @@ pub use abi::{
     ApplicationAbiDescriptor, ApplicationAbiInstance, ApplicationAbiLoadResult,
     MetadataOnlyApplicationAbiInstance, WasmApplicationAbiAdapter, YamlApplicationAbiAdapter,
 };
+pub use commercial_package::{is_commercial_package, CommercialPackageGuard};
 #[allow(deprecated)]
 pub use consumption::{
     app_agent_base_prompt, app_agent_manifest_view, app_agent_prompt_semantics,
@@ -34,7 +36,7 @@ pub use consumption::{
     legacy_app_task_planning_contract, AppAgentManifestView, AppAgentPromptSemantics,
     AppPlanningAgentProfile, AppTaskPlanningContract, AppToolPolicyView,
 };
-pub use commercial_package::{is_commercial_package, CommercialPackageGuard};
+pub use dapp_capability::AppDappCapabilityRequest;
 pub use genui::{text_component, GenUiResult, GenUiRuntime, UiIntentValidator};
 pub use host::{
     is_unavailable as is_application_host_unavailable, ApplicationHost, ApplicationHostBackend,

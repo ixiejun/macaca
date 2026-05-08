@@ -7,6 +7,7 @@
 pub mod application;
 pub mod builder;
 pub mod config;
+pub mod evm;
 pub mod facade;
 pub mod persona;
 pub mod persona_prototype;
@@ -19,6 +20,7 @@ pub use application::{
 };
 pub use builder::{AgentBuilder, DeclarativeAgent};
 pub use config::AgentConfig;
+pub use evm::MacacaEvmSdk;
 pub use facade::{AgentRegistryApi, KernelAgentRegistry, KernelPrimitiveSdk, MacacaSdk};
 pub use persona::AgentPersona;
 pub use persona_prototype::{PersonaOverrides, PersonaPrototype};
