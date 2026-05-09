@@ -15,12 +15,15 @@ use axum::response::sse::Event;
 use tokio::{fs, process::Command, time::timeout};
 
 use macaca_app::{app_agent_manifest_view, discovered_app_agent_names};
+use macaca_driver::{DriverServiceScope, DriverToolCatalogCommand};
 use macaca_framework::adapter::{SingleToolAdapter, ToolSetBridge};
 use macaca_framework::execution::ExecutionContext;
 use macaca_framework::session::{load_module_state, save_module_state};
 use macaca_framework::tool::Toolkit;
 use macaca_persist::AppendEventCommand;
 use macaca_proto::ApplicationId;
+use macaca_proto::TraceContext;
+use macaca_skill::{SkillServiceScope, SkillToolCatalogCommand};
 
 use crate::state::AppState;
 use macaca_runtime_host::{
@@ -65,13 +68,73 @@ pub(crate) async fn build_toolkit(
     // state.tools is Arc<dyn ToolCatalog>, which ToolSetBridge accepts directly.
     let mut toolkit = ToolSetBridge::from_tool_set(Arc::clone(&state.tools));
 
-    // Dynamically aggregate driver tools from the DriverRegistry.
-    // This ensures tools from drivers loaded via `/api/drivers/reload` are
-    // visible to agents without requiring a full restart.
-    {
-        let driver_tools = state.driver_runtime.collect_tools().await;
-        for tool in driver_tools {
-            toolkit.register(Box::new(SingleToolAdapter::new(tool)), None);
+    // Dynamically aggregate driver tools through Driver Service.  The direct
+    // runtime path remains as a deprecated fallback so S6 can be rolled back
+    // without changing user-visible tool availability.
+    let driver_catalog = state
+        .driver_client
+        .tool_catalog(DriverToolCatalogCommand {
+            trace: TraceContext::new("web-toolkit-driver-catalog"),
+            scope: DriverServiceScope::session(
+                *app_id,
+                session_id.clone().unwrap_or_default(),
+                agent_name,
+            )
+            .unwrap_or_default(),
+            include_disabled: false,
+        })
+        .await;
+    match driver_catalog {
+        Ok(catalog) => {
+            for descriptor in catalog.tools {
+                if let Some(tool) = crate::service_tool_adapter::service_tool_from_descriptor(
+                    descriptor,
+                    state,
+                    *app_id,
+                    session_id.clone(),
+                    agent_name,
+                ) {
+                    toolkit.register(Box::new(SingleToolAdapter::new(tool)), None);
+                }
+            }
+        }
+        Err(error) => {
+            tracing::warn!(
+                error = %error,
+                "Driver Service catalog failed; using deprecated direct driver runtime fallback"
+            );
+            #[allow(deprecated)]
+            let driver_tools = state.driver_runtime.collect_tools().await;
+            for tool in driver_tools {
+                toolkit.register(Box::new(SingleToolAdapter::new(tool)), None);
+            }
+        }
+    }
+
+    let skill_catalog = state
+        .skill_client
+        .tool_catalog(SkillToolCatalogCommand {
+            trace: TraceContext::new("web-toolkit-skill-catalog"),
+            scope: SkillServiceScope::agent(
+                *app_id,
+                session_id.clone().unwrap_or_default(),
+                agent_name,
+            )
+            .unwrap_or_default(),
+            include_disabled: false,
+        })
+        .await;
+    if let Ok(catalog) = skill_catalog {
+        for descriptor in catalog.tools {
+            if let Some(tool) = crate::service_tool_adapter::service_tool_from_descriptor(
+                descriptor,
+                state,
+                *app_id,
+                session_id.clone(),
+                agent_name,
+            ) {
+                toolkit.register(Box::new(SingleToolAdapter::new(tool)), None);
+            }
         }
     }
 

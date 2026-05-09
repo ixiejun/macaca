@@ -14,12 +14,14 @@
 
 pub mod compat;
 pub mod context_service_provider;
+pub mod driver_service_provider;
 pub mod entitlement;
 pub mod env_bridge;
 pub mod factory;
 pub mod lease;
 pub mod llm_service_provider;
 pub mod mcp_runtime;
+pub mod mcp_service_provider;
 pub mod memory_service_provider;
 pub mod package;
 pub mod plugin;
@@ -28,9 +30,11 @@ pub mod service_provider;
 pub mod service_runtime;
 pub mod service_runtime_error;
 pub mod service_runtime_event;
+pub mod skill_service_provider;
 pub mod transport;
 
 pub use context_service_provider::ContextSystemServiceProvider;
+pub use driver_service_provider::DriverSystemServiceProvider;
 pub use entitlement::{CapabilityCallContext, EntitlementOperation, EntitlementRuntimeFacade};
 #[allow(deprecated)]
 pub use env_bridge::{apply_mcp_env, McpEnvApplyOutcome};
@@ -43,6 +47,7 @@ pub use mcp_runtime::{
     McpDefinitionSource, McpLifecycleScope, McpRegistryConfig, McpRuntimeContext, McpRuntimeFacade,
     McpRuntimeManager, McpRuntimeStatus, McpRuntimeStatusState, McpServerDefinition, McpToolPolicy,
 };
+pub use mcp_service_provider::{mcp_service_descriptor, McpSystemServiceProvider};
 pub use memory_service_provider::MemorySystemServiceProvider;
 pub use package::{runtime_host_mcp_package_descriptor, RuntimeHostPackageRequirement};
 pub use plugin::{
@@ -66,4 +71,5 @@ pub use service_runtime_event::{
     InMemoryServiceRuntimeEventSink, ServiceRuntimeEvent, ServiceRuntimeEventSink,
     ServiceRuntimeServiceSnapshot, ServiceRuntimeSnapshot,
 };
+pub use skill_service_provider::SkillSystemServiceProvider;
 pub use transport::{ConfigBackedMcpTransport, McpTransport};

@@ -14,10 +14,14 @@ use macaca_context::{
     SkillCapabilityRecord, SkillFilterDiagnostic,
 };
 use macaca_framework::tool::Toolkit;
+use macaca_proto::{ApplicationId, TraceContext};
 use macaca_runtime_host::{
     McpRuntimeFacade, McpRuntimeStatus, McpRuntimeStatusState, McpToolPolicy,
 };
-use macaca_skill::{SkillPolicy, SkillRuntimeFacade, SkillSnapshot, SkillSnapshotRequest};
+use macaca_skill::{
+    SkillPolicy, SkillRuntimeFacade, SkillServiceScope, SkillSnapshot, SkillSnapshotRequest,
+    SkillSnapshotServiceCommand,
+};
 
 use crate::state::AppState;
 
@@ -135,6 +139,7 @@ pub async fn probe_mcp_capability_inputs(
 /// cache keys stay consistent (`skill_snapshot/{agent}` module).
 pub async fn resolve_skill_snapshot_cached(
     state: &Arc<AppState>,
+    app_id: &ApplicationId,
     agent_name: &str,
     session_id: Option<&str>,
     skill_policy: SkillPolicy,
@@ -160,10 +165,37 @@ pub async fn resolve_skill_snapshot_cached(
         None => {
             let request = SkillSnapshotRequest::builder(agent_name)
                 .workspace_dir(workspace_root)
-                .app_dir(app_dir)
+                .app_dir(app_dir.clone())
                 .policy(skill_policy)
                 .build();
-            let snapshot = SkillRuntimeFacade::new().build_snapshot(request).await?;
+            let snapshot = match state
+                .skill_client
+                .snapshot(SkillSnapshotServiceCommand {
+                    trace: TraceContext::new("web-capability-skill-snapshot"),
+                    scope: SkillServiceScope::agent(
+                        *app_id,
+                        session_id.unwrap_or("no-session"),
+                        agent_name,
+                    )
+                    .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?,
+                    agent_name: agent_name.to_string(),
+                    app_dir: app_dir.clone(),
+                    include_instructions: true,
+                    policy: Default::default(),
+                })
+                .await
+            {
+                Ok(snapshot) => snapshot,
+                Err(error) => {
+                    tracing::warn!(
+                        error = %error,
+                        agent = %agent_name,
+                        "Skill Service capability snapshot failed; using deprecated facade fallback"
+                    );
+                    #[allow(deprecated)]
+                    SkillRuntimeFacade::new().build_snapshot(request).await?
+                }
+            };
             if let Some(session_id) = session_id {
                 if let Ok(value) = serde_json::to_value(&snapshot) {
                     let _ = state

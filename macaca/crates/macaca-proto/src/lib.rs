@@ -1,10 +1,12 @@
 pub mod a2a;
 pub mod application_abi;
+pub mod capability_tool;
 pub mod commerce;
 pub mod config;
 pub mod error;
 pub mod evm;
 pub mod kernel;
+pub mod mcp_service;
 pub mod orchestration;
 pub mod package;
 pub mod plugin;
@@ -23,11 +25,13 @@ mod web3_tests;
 
 pub use a2a::*;
 pub use application_abi::*;
+pub use capability_tool::*;
 pub use commerce::*;
 pub use config::{LlmProviderConfigBuilder, MacacaConfigBuilder};
 pub use error::*;
 pub use evm::*;
 pub use kernel::*;
+pub use mcp_service::*;
 pub use orchestration::*;
 pub use package::*;
 pub use plugin::*;

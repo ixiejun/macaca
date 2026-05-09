@@ -730,6 +730,7 @@ impl FrameworkRunner {
         // `ContextReportingChatModel` capability providers / `capability_catalog`).
         match crate::capability_catalog::resolve_skill_snapshot_cached(
             state,
+            app_id,
             agent_name,
             session_id.as_deref(),
             skill_policy,
@@ -988,6 +989,7 @@ impl WebTracedAgentFactory {
         let skill_cap = Arc::new(
             match crate::capability_catalog::resolve_skill_snapshot_cached(
                 state,
+                &request.identity.app_id,
                 &request.identity.agent_name,
                 request.identity.session_id.as_deref(),
                 skill_policy,

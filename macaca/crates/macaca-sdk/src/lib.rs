@@ -8,9 +8,11 @@ pub mod application;
 pub mod builder;
 pub mod config;
 pub mod context_client;
+pub mod driver_client;
 pub mod evm;
 pub mod facade;
 pub mod llm_client;
+pub mod mcp_client;
 pub mod memory_client;
 pub mod package_client;
 pub mod package_fixtures;
@@ -18,6 +20,7 @@ pub mod persona;
 pub mod persona_prototype;
 pub mod registry_api;
 pub mod service_client;
+pub mod skill_client;
 pub mod spec;
 pub mod status_client;
 pub mod system_facade;
@@ -33,10 +36,14 @@ pub use config::AgentConfig;
 pub use context_client::{
     ServiceBackedContextClient, SystemContextClient, UnavailableSystemContextClient,
 };
+pub use driver_client::{
+    ServiceBackedDriverClient, SystemDriverClient, UnavailableSystemDriverClient,
+};
 pub use evm::MacacaEvmSdk;
 pub use facade::{AgentRegistryApi, KernelAgentRegistry, KernelPrimitiveSdk, MacacaSdk};
 pub use llm_client::{ServiceBackedLlmClient, SystemLlmClient, UnavailableSystemLlmClient};
 pub use macaca_task::{TaskServiceSnapshot, TaskServiceSnapshotCommand};
+pub use mcp_client::{ServiceBackedMcpClient, SystemMcpClient, UnavailableSystemMcpClient};
 pub use memory_client::{
     ServiceBackedMemoryClient, SystemMemoryClient, UnavailableSystemMemoryClient,
 };
@@ -51,6 +58,7 @@ pub use persona_prototype::{PersonaOverrides, PersonaPrototype};
 #[allow(deprecated)]
 pub use registry_api::{register_from_config, register_from_file};
 pub use service_client::{ServiceCallCommand, ServiceCallResult, ServiceInspectionResult};
+pub use skill_client::{ServiceBackedSkillClient, SystemSkillClient, UnavailableSystemSkillClient};
 pub use spec::{AgentSpec, AgentSpecBuilder, TracePolicy};
 pub use system_facade::{
     kernel_status_snapshot, ApprovalDecisionCommand, EmptySystemPackageClient,

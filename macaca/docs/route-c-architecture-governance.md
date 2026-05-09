@@ -150,7 +150,22 @@ Web/CLI/Frontend 只能是 shell 和 adapter，不得定义核心 session、task
 - Context Service 可以通过 Memory Service client 主动召回长期记忆，但不得直接绑定具体 memory backend；LLM 调用属于 LLM Service，不属于 Context Service。
 - 任何新增 LLM/Memory/Context 调用路径必须记录 trace id、application/session/agent scope、command、completion/failure 和 snapshot/event，不得泄露 prompt body、memory body、embedding、API key 或 secret。
 
-## 12. 审查清单
+## 12. Driver / Skill / MCP Service Ownership
+
+路线 C S6 将 Driver、Skill、MCP 收敛为可替换 system service，而不是 Web/CLI presentation shell 内部能力：
+
+- `macaca-driver` 只拥有 provider-neutral Driver command/result/snapshot DTO、driver descriptor 和领域 adapter，不依赖 kernel、runtime-host、Web 或 CLI。
+- `macaca-skill` 只拥有 provider-neutral Skill snapshot、executable load、tool catalog、tool invoke、status、service snapshot DTO 和领域 adapter，不依赖 kernel、runtime-host、Web 或 CLI。
+- MCP service DTO 归属 `macaca-proto`，因为 SDK 需要消费 MCP service command/result 但不得依赖 `macaca-runtime-host`，避免 SDK/runtime-host/framework 形成依赖环。
+- `macaca-runtime-host` 拥有 Driver/Skill/MCP 的 `SystemService` provider wrapper、service lifecycle、trace-required dispatch、policy/decorator chain 和 snapshot emission。
+- `macaca-sdk` 只提供 `SystemDriverClient`、`SystemSkillClient`、`SystemMcpClient`、`SystemFacade` 这类 shell-facing client/facade，不构造 DriverRuntime、SkillRuntimeFacade、ExecutableSkillToolSet、McpRuntimeFacade 或 Toolkit。
+- Web、CLI、framework 只能作为 adapter：Web 负责 HTTP/SSE/UI 映射和 host-local Toolkit 组装，CLI 负责 terminal 输出，framework 负责 agent/toolkit seam，不得定义 driver、skill、MCP 的核心语义。
+- Driver/Skill tool catalog 和 invocation 应通过 service client + service-backed tool adapter；旧 direct runtime/toolset 入口必须保留为 deprecated 搜索锚点，不得作为新生产代码默认路径。
+- MCP protocol lifecycle 属于 MCP Service，但当前 framework `Toolkit` 是 host-local 可变对象，MCP tool attach 仍可暂时通过 deprecated `McpRuntimeFacade::register_definitions` 作为兼容债务保留。该债务的过期条件是 MCP attach 能通过 service-owned host handle、tool proxy registry 或等价可审计资源句柄表达，而不是把 raw Toolkit 跨 service 边界移动。
+- 缺少 Driver/Skill/MCP runtime-backed service 时必须返回结构化 unavailable 或空 inventory，不得 panic、阻塞等待或静默构造 provider。
+- 任何新增 Driver/Skill/MCP 调用路径必须记录 trace id、application/session/agent scope、command、completion/failure 和 snapshot/event，不得泄露 env、headers、API key、provider credentials、raw command secrets 或未脱敏 tool payload。
+
+## 13. 审查清单
 
 任何 Route C OpenSpec 都必须回答：
 

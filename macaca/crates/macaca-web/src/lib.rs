@@ -30,6 +30,7 @@ pub mod routes;
 pub mod run_trace;
 pub mod runtime_resume;
 mod service_runtime_client;
+mod service_tool_adapter;
 pub mod session;
 pub mod session_replay;
 pub mod shell;
@@ -311,6 +312,46 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
         )
         .await
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+    service_runtime
+        .register_provider(
+            &macaca_runtime_host::StaticServiceProviderFactory::new(
+                macaca_runtime_host::ServiceProviderInstance::new(
+                    macaca_driver::driver_service_descriptor(),
+                    Arc::new(macaca_runtime_host::DriverSystemServiceProvider::new(
+                        Arc::clone(&driver_runtime),
+                    )),
+                ),
+            ),
+            macaca_runtime_host::ServiceProviderFactoryContext::new(),
+        )
+        .await
+        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+    service_runtime
+        .register_provider(
+            &macaca_runtime_host::StaticServiceProviderFactory::new(
+                macaca_runtime_host::ServiceProviderInstance::new(
+                    macaca_skill::skill_service_descriptor(),
+                    Arc::new(macaca_runtime_host::SkillSystemServiceProvider::new()),
+                ),
+            ),
+            macaca_runtime_host::ServiceProviderFactoryContext::new(),
+        )
+        .await
+        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+    service_runtime
+        .register_provider(
+            &macaca_runtime_host::StaticServiceProviderFactory::new(
+                macaca_runtime_host::ServiceProviderInstance::new(
+                    macaca_runtime_host::mcp_service_descriptor(),
+                    Arc::new(macaca_runtime_host::McpSystemServiceProvider::new(
+                        Arc::clone(&mcp_runtime),
+                    )),
+                ),
+            ),
+            macaca_runtime_host::ServiceProviderFactoryContext::new(),
+        )
+        .await
+        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
     if let Some(runtime) = memory_runtime.as_ref() {
         let memory_service: Arc<dyn macaca_kernel::SystemService> =
             Arc::new(macaca_runtime_host::MemorySystemServiceProvider::new(
@@ -375,6 +416,27 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
         )
         .await
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+    service_runtime
+        .start(
+            &KernelServiceId::new(macaca_driver::DRIVER_SERVICE_ID),
+            TraceContext::new("web-startup-driver-service"),
+        )
+        .await
+        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+    service_runtime
+        .start(
+            &KernelServiceId::new(macaca_skill::SKILL_SERVICE_ID),
+            TraceContext::new("web-startup-skill-service"),
+        )
+        .await
+        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+    service_runtime
+        .start(
+            &KernelServiceId::new(macaca_proto::MCP_SERVICE_ID),
+            TraceContext::new("web-startup-mcp-service"),
+        )
+        .await
+        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
     let generic_service_client: Arc<dyn macaca_sdk::SystemServiceClient> = Arc::new(
         crate::service_runtime_client::WebRuntimeSystemServiceClient::new(
             Arc::clone(&service_runtime),
@@ -394,6 +456,15 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
     let context_client: Arc<dyn macaca_sdk::SystemContextClient> = Arc::new(
         macaca_sdk::ServiceBackedContextClient::new(Arc::clone(&generic_service_client)),
     );
+    let driver_client: Arc<dyn macaca_sdk::SystemDriverClient> = Arc::new(
+        macaca_sdk::ServiceBackedDriverClient::new(Arc::clone(&generic_service_client)),
+    );
+    let skill_client: Arc<dyn macaca_sdk::SystemSkillClient> = Arc::new(
+        macaca_sdk::ServiceBackedSkillClient::new(Arc::clone(&generic_service_client)),
+    );
+    let mcp_client: Arc<dyn macaca_sdk::SystemMcpClient> = Arc::new(
+        macaca_sdk::ServiceBackedMcpClient::new(Arc::clone(&generic_service_client)),
+    );
 
     // 10. Build shared state.
     let state = Arc::new_cyclic(|weak_state| {
@@ -410,6 +481,9 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
             llm_client: Arc::clone(&llm_client),
             memory_client: Arc::clone(&memory_client),
             context_client: Arc::clone(&context_client),
+            driver_client: Arc::clone(&driver_client),
+            skill_client: Arc::clone(&skill_client),
+            mcp_client: Arc::clone(&mcp_client),
             llm: llm.clone(),
             llm_router: llm_router.clone(),
             tools,

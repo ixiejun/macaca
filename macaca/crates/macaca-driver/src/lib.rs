@@ -18,6 +18,7 @@ pub mod registry;
 pub mod runtime;
 pub mod sdk;
 pub mod service_adapter;
+pub mod service_contract;
 pub mod session;
 pub mod toolset;
 pub mod trace;
@@ -36,6 +37,7 @@ pub use package::driver_manifest_package_descriptor;
 pub use registry::DriverRegistry;
 pub use runtime::{DriverInventoryItem, DriverRuntime};
 pub use service_adapter::driver_service_descriptor;
+pub use service_contract::*;
 pub use session::DriverSessionState;
 pub use trace::DriverTraceAdapter;
 

@@ -22,7 +22,10 @@ use macaca_kernel::{ApplicationExecutorRegistry, Kernel};
 use macaca_llm::{LlmProvider, LlmRouter};
 use macaca_persist::{EventLog, PersistBackend};
 use macaca_proto::{config::ContextConfig, ApplicationId, ForkId, LlmMessage};
-use macaca_sdk::{SystemContextClient, SystemLlmClient, SystemMemoryClient};
+use macaca_sdk::{
+    SystemContextClient, SystemDriverClient, SystemLlmClient, SystemMcpClient, SystemMemoryClient,
+    SystemSkillClient,
+};
 use macaca_skill::SkillCatalog;
 use macaca_task::TodoStore;
 use macaca_tools::ToolCatalog;
@@ -283,6 +286,12 @@ pub struct AppState {
     pub memory_client: Arc<dyn SystemMemoryClient>,
     /// The serviceized Context client used by new Route C call paths.
     pub context_client: Arc<dyn SystemContextClient>,
+    /// The serviceized Driver client used by new Route C call paths.
+    pub driver_client: Arc<dyn SystemDriverClient>,
+    /// The serviceized Skill client used by new Route C call paths.
+    pub skill_client: Arc<dyn SystemSkillClient>,
+    /// The serviceized MCP client used by new Route C call paths.
+    pub mcp_client: Arc<dyn SystemMcpClient>,
     /// The LLM provider (DashScope by default).
     #[deprecated(note = "Use AppState::llm_client for new LLM call paths")]
     pub llm: Arc<dyn LlmProvider>,
@@ -305,10 +314,13 @@ pub struct AppState {
     /// Tombstone registry paired with [`Self::workspace_memory`] for digest + `memory_forget` coordination.
     pub workspace_memory_tombstones: Option<Arc<macaca_memory::SharedTombstoneRegistry>>,
     /// Agent OS level MCP runtime and registry.
+    #[deprecated(note = "Use AppState::mcp_client for new MCP call paths")]
     pub mcp_runtime: Arc<macaca_runtime_host::McpRuntimeFacade>,
     /// Driver registry for managing loaded software drivers.
+    #[deprecated(note = "Use AppState::driver_client for new driver call paths")]
     pub driver_registry: Arc<DriverRegistry>,
     /// Driver runtime facade for lifecycle, inventory, and tool collection.
+    #[deprecated(note = "Use AppState::driver_client for new driver call paths")]
     pub driver_runtime: Arc<DriverRuntime>,
     /// Path to the drivers directory (for reload).
     pub drivers_dir: String,

@@ -3,14 +3,14 @@
 use std::path::PathBuf;
 
 /// Driver runtime load intent.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum DriverLoadCommand {
     LoadAll,
     Reload,
 }
 
 /// Aggregate report for a driver load command.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DriverLoadReport {
     pub command: DriverLoadCommand,
     pub loaded: usize,
@@ -19,7 +19,7 @@ pub struct DriverLoadReport {
 }
 
 /// Per-driver load report entry.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DriverLoadEntry {
     pub name: String,
     pub path: PathBuf,
@@ -29,7 +29,7 @@ pub struct DriverLoadEntry {
 }
 
 /// Per-driver load status.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum DriverLoadStatus {
     Loaded,
     Failed,

@@ -23,8 +23,12 @@ use macaca_context::{
     CompactionSummaryEnvelope, ContextAdapterSafetyPolicy, ContextEngineInfo,
     ContextFallbackPolicy, LineageKind, ProviderHealthSnapshot, SessionLineage, TranscriptSegment,
 };
+use macaca_driver::{DriverInventoryCommand, DriverLoadServiceCommand, DriverServiceScope};
 use macaca_persist::{AppendEventCommand, EventLogQuery, SessionLineageStore};
-use macaca_proto::{ApplicationId, MacacaError, ProtoErrorAdapter};
+use macaca_proto::{
+    ApplicationId, MacacaError, McpProbeCommand, McpRuntimeStatusView, McpToolPolicySnapshot,
+    ProtoErrorAdapter, TraceContext,
+};
 use macaca_skill::{SkillPolicy, SkillRuntimeFacade, SkillSnapshotRequest};
 
 use crate::shell::WebShellFacade;
@@ -33,7 +37,6 @@ use crate::source_artifact::{
     ContextSourceArtifactRepository, SourceArtifactQuery, SourceArtifactResponse,
 };
 use crate::state::{AppState, ExternalAdapterRuntimeInstallation};
-use macaca_runtime_host::{McpRuntimeStatus, McpToolPolicy};
 
 // ---------------------------------------------------------------------------
 // Shared utilities (used by sibling modules via `crate::routes::err` etc.)
@@ -561,9 +564,22 @@ pub struct AppSkillStatus {
 }
 
 /// GET /api/mcp — Agent OS level MCP registry/runtime status.
-pub async fn get_mcp_status(State(state): State<Arc<AppState>>) -> Json<Vec<McpRuntimeStatus>> {
-    let statuses = state.mcp_runtime.probe(&McpToolPolicy::default()).await;
-    Json(statuses)
+pub async fn get_mcp_status(State(state): State<Arc<AppState>>) -> Json<Vec<McpRuntimeStatusView>> {
+    let trace = TraceContext::new("web-route-mcp-status");
+    let command = McpProbeCommand::new(trace, McpToolPolicySnapshot::default());
+    match command {
+        Ok(command) => match state.mcp_client.probe(command).await {
+            Ok(result) => Json(result.statuses),
+            Err(error) => {
+                tracing::warn!(error = %error, "MCP service status failed; returning empty status");
+                Json(Vec::new())
+            }
+        },
+        Err(error) => {
+            tracing::warn!(error = %error, "MCP service status command rejected");
+            Json(Vec::new())
+        }
+    }
 }
 
 #[derive(Serialize)]
@@ -1338,18 +1354,31 @@ pub struct DriversResponse {
 }
 
 pub async fn get_drivers(State(state): State<Arc<AppState>>) -> Json<DriversResponse> {
-    let driver_info = state.driver_runtime.list_inventory().await;
-    let drivers: Vec<DriverInfo> = driver_info
-        .into_iter()
-        .map(|item| DriverInfo {
-            name: item.manifest.name,
-            version: item.manifest.version,
-            driver_type: format!("{:?}", item.manifest.driver_type),
-            description: item.manifest.description,
-            capabilities: item.manifest.capabilities,
-            tools_count: item.tool_count,
+    let command = DriverInventoryCommand {
+        trace: TraceContext::new("web-route-driver-inventory"),
+        scope: DriverServiceScope::default(),
+        include_tools: true,
+    };
+    let result = state.driver_client.inventory(command).await;
+    let drivers: Vec<DriverInfo> = result
+        .map(|inventory| {
+            inventory
+                .entries
+                .into_iter()
+                .map(|item| DriverInfo {
+                    name: item.name,
+                    version: item.version.unwrap_or_default(),
+                    driver_type: item.driver_type,
+                    description: item.description,
+                    capabilities: item.capabilities,
+                    tools_count: item.tool_count,
+                })
+                .collect()
         })
-        .collect();
+        .unwrap_or_else(|error| {
+            tracing::warn!(error = %error, "Driver service inventory failed; returning empty list");
+            Vec::new()
+        });
     let total = drivers.len();
     Json(DriversResponse { drivers, total })
 }
@@ -1376,7 +1405,14 @@ pub struct DriverReloadResponse {
 pub async fn reload_drivers(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<DriverReloadResponse>, (StatusCode, Json<ErrorResponse>)> {
-    let report = state.driver_runtime.reload().await;
+    let report = state
+        .driver_client
+        .reload(
+            DriverLoadServiceCommand::new(TraceContext::new("web-route-driver-reload"), true)
+                .map_err(|e| proto_err(StatusCode::INTERNAL_SERVER_ERROR, &e))?,
+        )
+        .await
+        .map_err(|e| proto_err(StatusCode::INTERNAL_SERVER_ERROR, &e))?;
     let mut results = Vec::new();
 
     for entry in &report.entries {

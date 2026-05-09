@@ -66,6 +66,19 @@ S5 已建立 LLM、Memory、Context 的 provider-neutral service contract、runt
 | `macaca-web -> macaca-memory` | Context active recall、preflight recall、knowledge digest hot path 已经通过 `SystemMemoryClient` / Memory Service。 | 显式 memory tools 和兼容 `WebMemoryRuntime` 仍保留，后续需要工具服务化或 memory tool client 化后删除。 |
 | `macaca-web -> macaca-context` | Context service 已注册，framework context path 已把 memory recall 底层切到 Memory Service。 | `ContextReportingChatModel` 仍在 Web 本地组装 provider catalog 和调用 `ContextFacade`，后续需要完整 `SystemContextClient` / `ContextAssembler` seam。 |
 
+## 4.2 S6 Driver / Skill / MCP 迁移状态
+
+S6 已建立 Driver、Skill、MCP 的 provider-neutral service contract、runtime-host service provider wrapper、SDK focused clients 和 Web runtime-backed service client。Web startup 会注册并启动 Driver/Skill/MCP services；driver status/reload route、MCP status route、Driver/Skill framework tool catalog 和 tool invocation 已优先走 service client。旧 direct runtime 字段保留为 deprecated 搜索锚点。
+
+| Edge | Current S6 status | Remaining debt |
+| --- | --- | --- |
+| `macaca-web -> macaca-driver` | Driver status/reload route 与 framework driver tool catalog/invocation 已通过 `SystemDriverClient` / Driver Service。 | Web 仍保留 `DriverRuntime` / `DriverRegistry` deprecated 字段作为 startup/provider adapter 兼容锚点，Cargo 直接边仍存在。删除需等 driver runtime 构造移动到 runtime-host composition 或 service factory。 |
+| `macaca-web -> macaca-skill` | Skill snapshot cache path、capability catalog 和 framework skill tool catalog/invocation 已通过 `SystemSkillClient` / Skill Service，失败时回退旧 facade。 | Web startup 仍直接加载 knowledge skill catalog 与 executable skill compatibility tools；部分 routes 仍保留 deprecated fallback，Cargo 直接边仍存在。 |
+| `macaca-web -> macaca-tools` | Driver/Skill service-backed tool adapter 已替代对应 direct tool registration。 | Web 仍负责 host-local framework `Toolkit` composition、base workspace tools、memory tools、todo tools；该边在 S12 thin shell 或 dedicated Tool Service/Toolkit Service 前不能删除。 |
+| `macaca-runtime-host -> macaca-driver` | Runtime-host 新增 `DriverSystemServiceProvider`，这是 service provider ownership，不是 presentation/provider hub。 | 属于 S6 目标架构边，不应放入 presentation/kernel allowlist；后续如引入 remote service，可替换为 provider factory。 |
+| `macaca-runtime-host -> macaca-skill` | Runtime-host 新增 `SkillSystemServiceProvider` 与 MCP skill-backed definition conversion，属于 service provider ownership。 | 属于 S6 目标架构边。 |
+| MCP host-local Toolkit attach | MCP Service 已支持 register/probe/catalog/status/snapshot/cleanup DTO 与 provider。 | Framework `Toolkit` 是 host-local 可变对象，global MCP 与 skill-backed MCP attach 仍通过 deprecated `McpRuntimeFacade::register_definitions`。过期条件：实现 service-owned toolkit handle/proxy registry 后，Web 不再直接调用 MCP runtime attach。 |
+
 ## 5. 新增例外流程
 
 1. 创建或更新 OpenSpec change，解释为什么短期不能立即迁移。

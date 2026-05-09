@@ -1410,6 +1410,7 @@ name = "macaca-driver"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "chrono",
  "libloading",
  "macaca-proto",
  "macaca-tools",
@@ -1624,6 +1625,7 @@ dependencies = [
  "chrono",
  "dirs",
  "macaca-context",
+ "macaca-driver",
  "macaca-framework",
  "macaca-ipc",
  "macaca-kernel",
@@ -1632,6 +1634,7 @@ dependencies = [
  "macaca-persist",
  "macaca-proto",
  "macaca-skill",
+ "macaca-tools",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -1651,10 +1654,12 @@ dependencies = [
  "chrono",
  "macaca-agent",
  "macaca-context",
+ "macaca-driver",
  "macaca-kernel",
  "macaca-llm",
  "macaca-memory",
  "macaca-proto",
+ "macaca-skill",
  "macaca-task",
  "macaca-tools",
  "serde",
@@ -1673,6 +1678,7 @@ name = "macaca-skill"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "chrono",
  "macaca-proto",
  "macaca-tools",
  "serde",

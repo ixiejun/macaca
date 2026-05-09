@@ -29,6 +29,7 @@ pub mod registry;
 pub mod request;
 pub mod runtime;
 pub mod service_adapter;
+pub mod service_contract;
 pub mod snapshot;
 pub mod source;
 pub mod tool;
@@ -66,3 +67,4 @@ pub use runtime::{
     SkillRuntimeOptions, SkillSnapshot, SkillSnapshotEntry,
 };
 pub use service_adapter::skill_service_descriptor;
+pub use service_contract::*;

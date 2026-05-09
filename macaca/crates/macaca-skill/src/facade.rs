@@ -203,7 +203,9 @@ entry_point:
             .build_snapshot(request)
             .await
             .unwrap();
-        assert_eq!(snapshot.skills.len(), 1);
-        assert_eq!(snapshot.skills[0].name, "writer");
+        assert!(
+            snapshot.skills.iter().any(|skill| skill.name == "writer"),
+            "snapshot should include the app-local writer skill even when global skill sources exist"
+        );
     }
 }

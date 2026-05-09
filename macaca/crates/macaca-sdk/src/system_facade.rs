@@ -12,7 +12,9 @@ use tracing::info;
 use macaca_proto::MacacaResult;
 
 pub use crate::context_client::{SystemContextClient, UnavailableSystemContextClient};
+pub use crate::driver_client::{SystemDriverClient, UnavailableSystemDriverClient};
 pub use crate::llm_client::{SystemLlmClient, UnavailableSystemLlmClient};
+pub use crate::mcp_client::{SystemMcpClient, UnavailableSystemMcpClient};
 pub use crate::memory_client::{SystemMemoryClient, UnavailableSystemMemoryClient};
 pub use crate::package_client::{
     EmptySystemPackageClient, PackageInspectionCommand, PackageInspectionResult,
@@ -22,6 +24,7 @@ pub use crate::service_client::{
     ServiceCallCommand, ServiceCallResult, ServiceInspectionCommand, ServiceInspectionResult,
     SystemServiceClient, UnavailableSystemServiceClient,
 };
+pub use crate::skill_client::{SystemSkillClient, UnavailableSystemSkillClient};
 pub use crate::status_client::{
     kernel_status_snapshot, StaticSystemStatusDataSource, SystemStatusClient,
     SystemStatusDataSource, SystemStatusSnapshot,
@@ -62,6 +65,9 @@ pub struct SystemFacade<
     L = UnavailableSystemLlmClient,
     M = UnavailableSystemMemoryClient,
     C = UnavailableSystemContextClient,
+    D = UnavailableSystemDriverClient,
+    SK = UnavailableSystemSkillClient,
+    MCP = UnavailableSystemMcpClient,
 > {
     task_board: T,
     status: S,
@@ -71,6 +77,9 @@ pub struct SystemFacade<
     llm: L,
     memory: M,
     context: C,
+    driver: D,
+    skill: SK,
+    mcp: MCP,
 }
 
 impl<T, S> SystemFacade<T, S>
@@ -93,6 +102,9 @@ where
             llm: UnavailableSystemLlmClient,
             memory: UnavailableSystemMemoryClient,
             context: UnavailableSystemContextClient,
+            driver: UnavailableSystemDriverClient,
+            skill: UnavailableSystemSkillClient,
+            mcp: UnavailableSystemMcpClient,
         }
     }
 }
@@ -107,6 +119,9 @@ impl<T, S, SV, TR, P>
         UnavailableSystemLlmClient,
         UnavailableSystemMemoryClient,
         UnavailableSystemContextClient,
+        UnavailableSystemDriverClient,
+        UnavailableSystemSkillClient,
+        UnavailableSystemMcpClient,
     >
 where
     T: SystemTaskClient,
@@ -130,11 +145,14 @@ where
             llm: UnavailableSystemLlmClient,
             memory: UnavailableSystemMemoryClient,
             context: UnavailableSystemContextClient,
+            driver: UnavailableSystemDriverClient,
+            skill: UnavailableSystemSkillClient,
+            mcp: UnavailableSystemMcpClient,
         }
     }
 }
 
-impl<T, S, SV, TR, P, L, M, C> SystemFacade<T, S, SV, TR, P, L, M, C>
+impl<T, S, SV, TR, P, L, M, C, D, SK, MCP> SystemFacade<T, S, SV, TR, P, L, M, C, D, SK, MCP>
 where
     T: SystemTaskClient,
     S: SystemStatusClient,
@@ -144,6 +162,9 @@ where
     L: SystemLlmClient,
     M: SystemMemoryClient,
     C: SystemContextClient,
+    D: SystemDriverClient,
+    SK: SystemSkillClient,
+    MCP: SystemMcpClient,
 {
     /// Create a facade with all current Route C capability clients installed.
     ///
@@ -159,6 +180,9 @@ where
         llm: L,
         memory: M,
         context: C,
+        driver: D,
+        skill: SK,
+        mcp: MCP,
     ) -> Self {
         Self {
             task_board,
@@ -169,7 +193,25 @@ where
             llm,
             memory,
             context,
+            driver,
+            skill,
+            mcp,
         }
+    }
+
+    /// Borrow the focused Driver Service client.
+    pub fn driver_client(&self) -> &D {
+        &self.driver
+    }
+
+    /// Borrow the focused Skill Service client.
+    pub fn skill_client(&self) -> &SK {
+        &self.skill
+    }
+
+    /// Borrow the focused MCP Service client.
+    pub fn mcp_client(&self) -> &MCP {
+        &self.mcp
     }
 
     /// Query a session-scoped task board through the facade boundary.

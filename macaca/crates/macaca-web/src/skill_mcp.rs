@@ -11,15 +11,15 @@ use axum::response::sse::Event;
 use macaca_app::AppLoader;
 use macaca_framework::tool::Toolkit;
 use macaca_persist::AppendEventCommand;
-use macaca_proto::ApplicationId;
+use macaca_proto::{ApplicationId, TraceContext};
 use macaca_runtime_host::compat::default_registry;
 use macaca_runtime_host::{
     apply_concurrency_isolation, probe_definition_statuses, McpRuntimeContext,
     McpRuntimeStatusState, McpToolPolicy,
 };
 use macaca_skill::{
-    SkillMcpServerConfig, SkillPolicy, SkillRuntimeFacade, SkillSnapshot, SkillSnapshotEntry,
-    SkillSnapshotRequest,
+    SkillMcpServerConfig, SkillPolicy, SkillRuntimeFacade, SkillServiceScope, SkillSnapshot,
+    SkillSnapshotEntry, SkillSnapshotRequest, SkillSnapshotServiceCommand,
 };
 use serde::Serialize;
 
@@ -143,15 +143,43 @@ pub(crate) async fn load_or_build_skill_snapshot(
         workspaces.get(app_id).map(|ws| ws.root.clone())
     };
     let policy = resolve_agent_skill_policy(state, app_id, agent_name).await;
+    let app_dir = app.path.clone();
     let request = SkillSnapshotRequest::builder(agent_name)
         .workspace_dir(workspace_dir)
-        .app_dir(Some(app.path))
+        .app_dir(Some(app_dir.clone()))
         .policy(policy)
         .build();
-    let snapshot = SkillRuntimeFacade::new()
-        .build_snapshot(request)
+    let snapshot = match state
+        .skill_client
+        .snapshot(SkillSnapshotServiceCommand {
+            trace: TraceContext::new("web-skill-mcp-snapshot"),
+            scope: SkillServiceScope::agent(
+                *app_id,
+                session_id.unwrap_or("no-session"),
+                agent_name,
+            )
+            .ok()?,
+            agent_name: agent_name.to_string(),
+            app_dir: Some(app_dir),
+            include_instructions: true,
+            policy: Default::default(),
+        })
         .await
-        .ok()?;
+    {
+        Ok(snapshot) => snapshot,
+        Err(error) => {
+            tracing::warn!(
+                error = %error,
+                agent = %agent_name,
+                "Skill Service snapshot failed; using deprecated SkillRuntimeFacade fallback"
+            );
+            #[allow(deprecated)]
+            SkillRuntimeFacade::new()
+                .build_snapshot(request)
+                .await
+                .ok()?
+        }
+    };
     if let Some(session_id) = session_id {
         if let Ok(value) = serde_json::to_value(&snapshot) {
             let _ = state
