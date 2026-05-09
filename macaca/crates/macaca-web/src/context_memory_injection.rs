@@ -4,12 +4,18 @@ use macaca_context::{
     ActiveRecallDiagnostics, ContextDecisionReport, ContextDecisionSeverity,
     ContextPreflightRecallConfig, ContextSourceKind, ContextSourceReport,
 };
-use macaca_memory::{ActiveRecallBudget, ActiveRecallRequest, MemoryScope, MemorySearchRequest};
-use macaca_proto::{LlmMessage, MemoryEntry};
+use macaca_memory::{MemoryPolicyHints, MemoryPrefetchCommand, MemoryScope};
+use macaca_proto::{LlmMessage, MemoryEntry, TraceContext};
 use tokio::time::timeout;
 
 use crate::context_message_codec::last_user_text_from_framework;
-use crate::memory_runtime::WebMemoryRuntime;
+
+fn memory_trace(session_id: Option<&str>, agent_name: Option<&str>) -> TraceContext {
+    let mut trace = TraceContext::new(uuid::Uuid::new_v4().to_string());
+    trace.session_id = session_id.map(str::to_owned);
+    trace.agent = agent_name.map(str::to_owned);
+    trace
+}
 
 fn legacy_memory_source_report(
     entry: &MemoryEntry,
@@ -42,10 +48,10 @@ fn legacy_memory_source_report(
 
 /// Run active recall as a dynamic, request-only context source (legacy injection path).
 ///
-/// This is the web-layer Strategy adapter that connects the current workspace
-/// memory runtime to the context engine report contract. It is deliberately
-/// provider-shaped: callers pass the runtime facade and scope in, so concrete
-/// memory providers remain swappable without changing chat orchestration.
+/// This is the web-layer Strategy adapter that connects the Memory Service to
+/// the context engine report contract. It is deliberately client-shaped:
+/// callers pass the focused SDK facade and scope in, so concrete memory
+/// providers remain swappable without changing chat orchestration.
 ///
 /// ## Composer migration
 /// Prefer [`macaca_context::MemoryActiveRecallContextProvider`] when
@@ -56,7 +62,7 @@ fn legacy_memory_source_report(
 /// retrieval and duplicate system-side text.
 pub(crate) async fn apply_active_recall(
     recall_runtime: &macaca_proto::config::ContextRecallRuntimeConfig,
-    memory_runtime: Option<&Arc<WebMemoryRuntime>>,
+    memory_client: &Arc<dyn macaca_sdk::SystemMemoryClient>,
     scope: MemoryScope,
     preflight_cfg: &ContextPreflightRecallConfig,
     composer_recall_active: bool,
@@ -69,13 +75,6 @@ pub(crate) async fn apply_active_recall(
     if !preflight_cfg.enabled {
         return;
     }
-    let Some(runtime) = memory_runtime else {
-        assembled.report.decisions.push(ContextDecisionReport::info(
-            "active_recall_skipped",
-            "active recall enabled but no memory runtime is configured",
-        ));
-        return;
-    };
     let Some(query) = last_user_text_from_framework(incoming_framework_messages) else {
         return;
     };
@@ -85,20 +84,18 @@ pub(crate) async fn apply_active_recall(
 
     let started = std::time::Instant::now();
     let limit = recall_runtime.memory_search_default_limit.clamp(1, 16) as usize;
-    let recall = timeout(
-        preflight_cfg.timeout(),
-        runtime.active_recall(ActiveRecallRequest {
-            scope,
-            query: query.to_owned(),
-            budget: ActiveRecallBudget {
-                max_hits: limit,
-                max_chars: preflight_cfg.max_chars,
-                max_tokens: preflight_cfg.max_tokens,
-                timeout_ms: preflight_cfg.timeout_ms,
-            },
-        }),
-    )
-    .await;
+    let trace = memory_trace(
+        scope.identity.session_id.as_deref(),
+        scope.identity.agent_name.as_deref(),
+    );
+    let command = MemoryPrefetchCommand {
+        scope,
+        trace,
+        query: query.to_owned(),
+        limit,
+        policy: MemoryPolicyHints::default(),
+    };
+    let recall = timeout(preflight_cfg.timeout(), memory_client.prefetch(command)).await;
 
     let result = match recall {
         Ok(Ok(result)) => result,
@@ -120,7 +117,7 @@ pub(crate) async fn apply_active_recall(
         }
     };
 
-    if result.selected.is_empty() {
+    if result.entries.is_empty() {
         assembled.report.decisions.push(ContextDecisionReport::info(
             "active_recall_empty",
             "active memory recall returned no rows",
@@ -134,7 +131,7 @@ pub(crate) async fn apply_active_recall(
     let mut selected = 0usize;
     let mut used_chars = 0usize;
     let mut used_tokens = 0u32;
-    for entry in result.selected.iter().take(limit) {
+    for entry in result.entries.iter().take(limit) {
         let candidate = format!(
             "[{}] memory_id={} agent_id={}\n{}",
             selected + 1,
@@ -195,7 +192,7 @@ pub(crate) async fn apply_active_recall(
         .active_recall
         .push(ActiveRecallDiagnostics {
             provider_id: "workspace-memory".into(),
-            total_candidates: result.candidates.len(),
+            total_candidates: result.total_candidates,
             selected_candidates: selected,
             latency_ms: started.elapsed().as_millis() as u64,
             source_breakdown,
@@ -218,7 +215,7 @@ pub(crate) async fn apply_active_recall(
 /// above user history.
 pub(crate) async fn apply_preflight_memory(
     recall_runtime: &macaca_proto::config::ContextRecallRuntimeConfig,
-    memory_runtime: Option<&Arc<WebMemoryRuntime>>,
+    memory_client: &Arc<dyn macaca_sdk::SystemMemoryClient>,
     scope: MemoryScope,
     preflight_cfg: &ContextPreflightRecallConfig,
     assembled: &mut macaca_context::ContextAssembleResult,
@@ -227,13 +224,6 @@ pub(crate) async fn apply_preflight_memory(
     if !preflight_cfg.enabled || !preflight_cfg.allows_tool("memory_search") {
         return;
     }
-    let Some(runtime) = memory_runtime else {
-        assembled.report.decisions.push(ContextDecisionReport::info(
-            "preflight_memory_skipped",
-            "preflight recall allowed memory_search but no memory runtime is configured",
-        ));
-        return;
-    };
     let Some(query) = last_user_text_from_framework(incoming_framework_messages) else {
         return;
     };
@@ -241,13 +231,19 @@ pub(crate) async fn apply_preflight_memory(
         return;
     }
     let limit = recall_runtime.memory_search_default_limit.clamp(1, 16) as usize;
-    let recall_res = match timeout(
-        preflight_cfg.timeout(),
-        runtime.search(MemorySearchRequest::new(scope, query.to_owned(), limit)),
-    )
-    .await
-    {
-        Ok(res) => res,
+    let trace = memory_trace(
+        scope.identity.session_id.as_deref(),
+        scope.identity.agent_name.as_deref(),
+    );
+    let command = MemoryPrefetchCommand {
+        scope,
+        trace,
+        query: query.to_owned(),
+        limit,
+        policy: MemoryPolicyHints::default(),
+    };
+    let recall_res = match timeout(preflight_cfg.timeout(), memory_client.prefetch(command)).await {
+        Ok(res) => res.map(|result| result.entries),
         Err(_) => {
             assembled.report.decisions.push(ContextDecisionReport {
                 code: "preflight_recall_degraded".into(),
@@ -379,90 +375,89 @@ mod tests {
     use chrono::Utc;
     use macaca_context::{ContextOptionsPatch, ContextReportBuilder};
     use macaca_memory::{
-        ActiveRecallCandidate, ActiveRecallDecision, ActiveRecallResult,
-        KnowledgeCompileCapability, KnowledgeCompileRequest, KnowledgeCompileResult,
-        MemoryRuntimeFacade, MemoryRuntimeStatus,
+        MemoryForgetCommand, MemoryGetCommand, MemoryGetResult, MemoryRecallCommand,
+        MemoryRecallResult, MemoryRememberCommand, MemoryRememberResult, MemoryServiceSnapshot,
+        MemoryServiceSnapshotCommand, MemoryStatusCommand, MemoryStatusReport,
     };
     use macaca_proto::{ApplicationId, LlmOptions, LlmRole, MemoryEntry, MemoryId, MemoryLayer};
 
-    struct StaticMemoryRuntime {
+    struct StaticMemoryClient {
         entries: Vec<MemoryEntry>,
         fail_search: bool,
     }
 
     #[async_trait]
-    impl MemoryRuntimeFacade for StaticMemoryRuntime {
+    impl macaca_sdk::SystemMemoryClient for StaticMemoryClient {
         async fn remember(
             &self,
-            _request: macaca_memory::MemoryWriteRequest,
-        ) -> macaca_proto::MacacaResult<MemoryId> {
-            Ok(MemoryId::new())
+            _command: MemoryRememberCommand,
+        ) -> macaca_proto::MacacaResult<MemoryRememberResult> {
+            Ok(MemoryRememberResult {
+                id: MemoryId::new(),
+                stored_at: Utc::now(),
+            })
         }
 
-        async fn search(
+        async fn recall(
             &self,
-            _request: MemorySearchRequest,
-        ) -> macaca_proto::MacacaResult<Vec<MemoryEntry>> {
+            _command: MemoryRecallCommand,
+        ) -> macaca_proto::MacacaResult<MemoryRecallResult> {
             if self.fail_search {
                 return Err(macaca_proto::MacacaError::Agent("search failed".into()));
             }
-            Ok(self.entries.clone())
+            Ok(MemoryRecallResult::new(self.entries.clone()))
+        }
+
+        async fn prefetch(
+            &self,
+            _command: MemoryPrefetchCommand,
+        ) -> macaca_proto::MacacaResult<MemoryRecallResult> {
+            self.recall(MemoryRecallCommand {
+                scope: MemoryScope::project_shared(ApplicationId::new(), "workspace"),
+                trace: TraceContext::new("test"),
+                query: "test".into(),
+                limit: self.entries.len().max(1),
+                policy: MemoryPolicyHints::default(),
+            })
+            .await
         }
 
         async fn get(
             &self,
-            _request: macaca_memory::MemoryGetRequest,
-        ) -> macaca_proto::MacacaResult<Option<MemoryEntry>> {
-            Ok(self.entries.first().cloned())
+            command: MemoryGetCommand,
+        ) -> macaca_proto::MacacaResult<MemoryGetResult> {
+            Ok(MemoryGetResult::new(
+                self.entries
+                    .iter()
+                    .find(|entry| entry.id == command.id)
+                    .cloned(),
+            ))
         }
 
-        async fn delete(
-            &self,
-            _request: macaca_memory::MemoryDeleteRequest,
-        ) -> macaca_proto::MacacaResult<()> {
+        async fn forget(&self, _command: MemoryForgetCommand) -> macaca_proto::MacacaResult<()> {
             Ok(())
         }
 
-        async fn active_recall(
+        async fn status(
             &self,
-            _request: ActiveRecallRequest,
-        ) -> macaca_proto::MacacaResult<ActiveRecallResult> {
-            Ok(ActiveRecallResult {
-                provider_id: "workspace-memory".into(),
-                candidates: self
-                    .entries
-                    .iter()
-                    .cloned()
-                    .map(|entry| ActiveRecallCandidate {
-                        entry,
-                        score: 85,
-                        estimated_tokens: 16,
-                        decision: ActiveRecallDecision {
-                            selected: true,
-                            reason: "test".into(),
-                        },
-                    })
-                    .collect(),
-                selected: self.entries.clone(),
-                latency_ms: 1,
-                diagnostics: Vec::new(),
-            })
+            _command: MemoryStatusCommand,
+        ) -> macaca_proto::MacacaResult<MemoryStatusReport> {
+            Ok(MemoryStatusReport::healthy(
+                "test-memory-client",
+                macaca_memory::MemoryCapabilitySet::basic_store_search(),
+            ))
         }
 
-        async fn compile_knowledge(
+        async fn snapshot(
             &self,
-            request: KnowledgeCompileRequest,
-        ) -> macaca_proto::MacacaResult<KnowledgeCompileResult> {
-            Ok(
-                <macaca_memory::KnowledgeCompiler as KnowledgeCompileCapability>::compile(
-                    &macaca_memory::KnowledgeCompiler::default(),
-                    request,
-                ),
-            )
-        }
-
-        async fn status(&self) -> MemoryRuntimeStatus {
-            MemoryRuntimeStatus::default()
+            _command: MemoryServiceSnapshotCommand,
+        ) -> macaca_proto::MacacaResult<MemoryServiceSnapshot> {
+            Ok(MemoryServiceSnapshot::new(
+                "test-memory-client",
+                true,
+                macaca_memory::MemoryCapabilitySet::basic_store_search(),
+                None,
+            ))
         }
     }
 
@@ -510,16 +505,16 @@ mod tests {
 
     #[tokio::test]
     async fn preflight_memory_is_invisible_by_default() {
-        let runtime = Arc::new(WebMemoryRuntime::new(Arc::new(StaticMemoryRuntime {
+        let memory_client: Arc<dyn macaca_sdk::SystemMemoryClient> = Arc::new(StaticMemoryClient {
             entries: vec![entry("remembered fact")],
             fail_search: false,
-        })));
+        });
         let mut result = assembled();
         let recall_runtime = macaca_proto::config::ContextRecallRuntimeConfig::default();
 
         apply_preflight_memory(
             &recall_runtime,
-            Some(&runtime),
+            &memory_client,
             MemoryScope::project_shared(ApplicationId::new(), "workspace"),
             &preflight_cfg(false),
             &mut result,
@@ -533,16 +528,16 @@ mod tests {
 
     #[tokio::test]
     async fn preflight_memory_fails_open_with_warning() {
-        let runtime = Arc::new(WebMemoryRuntime::new(Arc::new(StaticMemoryRuntime {
+        let memory_client: Arc<dyn macaca_sdk::SystemMemoryClient> = Arc::new(StaticMemoryClient {
             entries: vec![entry("remembered fact")],
             fail_search: true,
-        })));
+        });
         let mut result = assembled();
         let recall_runtime = macaca_proto::config::ContextRecallRuntimeConfig::default();
 
         apply_preflight_memory(
             &recall_runtime,
-            Some(&runtime),
+            &memory_client,
             MemoryScope::project_shared(ApplicationId::new(), "workspace"),
             &preflight_cfg(true),
             &mut result,
@@ -560,16 +555,16 @@ mod tests {
 
     #[tokio::test]
     async fn legacy_active_recall_reports_request_only_metadata() {
-        let runtime = Arc::new(WebMemoryRuntime::new(Arc::new(StaticMemoryRuntime {
+        let memory_client: Arc<dyn macaca_sdk::SystemMemoryClient> = Arc::new(StaticMemoryClient {
             entries: vec![entry("remembered fact")],
             fail_search: false,
-        })));
+        });
         let mut result = assembled();
         let recall_runtime = macaca_proto::config::ContextRecallRuntimeConfig::default();
 
         apply_active_recall(
             &recall_runtime,
-            Some(&runtime),
+            &memory_client,
             MemoryScope::project_shared(ApplicationId::new(), "workspace"),
             &preflight_cfg(true),
             false,

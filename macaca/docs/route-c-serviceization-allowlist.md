@@ -41,14 +41,11 @@ cargo test -p macaca-integration-tests route_c_dependency_boundaries
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `kernel-no-provider-deps` | `macaca-kernel` | `macaca-driver` | Kernel 当前仍承载 driver execution 兼容路径。 | Driver Service facade | S6 | Driver 调用全部经 ServiceRuntime 或 SystemFacade。 | Route C / active debt |
 | `kernel-no-provider-deps` | `macaca-kernel` | `macaca-gateway` | Kernel 当前仍保留 gateway 兼容注册和协调入口。 | Gateway Service facade | S8 | Gateway provider 通过 service/plugin 注册，不再由 kernel 直接依赖。 | Route C / active debt |
-| `kernel-no-provider-deps` | `macaca-kernel` | `macaca-llm` | Kernel 当前仍保留 LLM provider 兼容路径。 | LLM Service facade | S5 | LLM 调用全部经 service contract。 | Route C / active debt |
-| `kernel-no-provider-deps` | `macaca-kernel` | `macaca-memory` | Kernel 当前仍保留 memory/context 兼容路径。 | Memory/Context Service facade | S5 | 记忆和上下文召回全部经 Memory/Context Service。 | Route C / active debt |
 | `kernel-no-provider-deps` | `macaca-kernel` | `macaca-persist` | Kernel 当前仍直接使用持久化能力保存系统状态。 | Persistence Service contract | S1/S2 | Kernel 只依赖 persistence contract 或 service facade。 | Route C / active debt |
 | `kernel-no-provider-deps` | `macaca-kernel` | `macaca-skill` | Kernel 当前仍保留 skill/MCP 兼容路径。 | Skill/MCP Service facade | S6 | Skill/MCP 通过 service/plugin runtime 接入。 | Route C / active debt |
 | `kernel-no-provider-deps` | `macaca-kernel` | `macaca-task` | Kernel 当前仍保留 task primitive 与 task service 混合路径。 | Task Service facade | S4 | Planner/worker/review 全部迁到 Task Service。 | Route C / active debt |
 | `kernel-no-provider-deps` | `macaca-kernel` | `macaca-tools` | Kernel 当前仍保留 tools 调用兼容入口。 | Tool/Skill Service facade | S6 | 工具能力通过 Skill/Tool Service 调用。 | Route C / active debt |
 | `presentation-no-provider-construction-hub` | `macaca-cli` | `macaca-gateway` | CLI 当前仍包含 gateway 启动/检查兼容入口。 | Gateway Service client | S8 | CLI 只通过 SDK/SystemFacade 调 gateway service。 | Route C / active debt |
-| `presentation-no-provider-construction-hub` | `macaca-cli` | `macaca-llm` | CLI 当前仍存在 LLM pipeline 兼容调用。 | LLM Service client | S5 | CLI 不再直接依赖 LLM provider crate。 | Route C / active debt |
 | `presentation-no-provider-construction-hub` | `macaca-cli` | `macaca-tools` | CLI 当前仍直接访问 tools 兼容能力。 | Tool/Skill Service client | S6 | CLI 工具调用全部经 service client。 | Route C / active debt |
 | `presentation-no-provider-construction-hub` | `macaca-web` | `macaca-driver` | Web 当前仍是部分 driver execution 的协调入口。 | Driver Service client | S6 | Web 只订阅 driver trace/state，不构造 driver provider。 | Route C / active debt |
 | `presentation-no-provider-construction-hub` | `macaca-web` | `macaca-llm` | Web 当前仍保留 chat/pipeline LLM 兼容路径。 | LLM Service client | S5 | `/api/chat/v2` 经 SystemFacade/service client 调用。 | Route C / active debt |
@@ -58,6 +55,16 @@ cargo test -p macaca-integration-tests route_c_dependency_boundaries
 | `presentation-no-provider-construction-hub` | `macaca-web` | `macaca-task` | Web 当前仍直接访问 task board/session task 状态。 | Task Service client | S4 | Task board 通过 Task Service 分页 API 获取。 | Route C / active debt |
 | `presentation-no-provider-construction-hub` | `macaca-web` | `macaca-tools` | Web 当前仍直接依赖 tools 兼容能力。 | Tool/Skill Service client | S6 | Web 工具相关展示通过 Skill/Tool Service view model。 | Route C / active debt |
 | `cli-no-web-internals` | `macaca-cli` | `macaca-web` | CLI 当前复用 Web server startup 兼容路径。 | shared shell facade in `macaca-sdk` | S12 | Web/CLI thin shell 完成后，CLI 不再依赖 Web crate。 | Route C / active debt |
+
+## 4.1 S5 LLM / Memory / Context 迁移状态
+
+S5 已建立 LLM、Memory、Context 的 provider-neutral service contract、runtime-host service provider wrapper、SDK focused clients 和 Web runtime-backed service client。Kernel 对 `macaca-llm` / `macaca-memory` 的直接 Cargo 依赖已移除：LLM legacy provider 类型经 `macaca-agent::LlmProvider` 暴露，kernel memory adapter 兼容实现已退出 kernel 边界。CLI 对 `macaca-llm` 的直接依赖也已移除，兼容 provider 通过 `macaca-agent::LlmProvider` 实现。Allowlist 中 Web 的相关依赖仍未删除，原因是 Cargo 直接依赖边还存在，用于 DTO、兼容字段、显式 memory tools、model selection 兼容路径和 UI/view model。删除剩余 allowlist 必须等依赖门禁和 `cargo metadata` 证明直接边消失。
+
+| Edge | Current S5 status | Remaining debt |
+| --- | --- | --- |
+| `macaca-web -> macaca-llm` | Framework model dispatch 已经通过 `SystemLlmClient` / LLM Service；旧 provider fields 保留为 deprecated 搜索锚点。 | `llm_router` 仍用于 model selection 兼容解析，后续应迁到 LLM Service model-selection command。 |
+| `macaca-web -> macaca-memory` | Context active recall、preflight recall、knowledge digest hot path 已经通过 `SystemMemoryClient` / Memory Service。 | 显式 memory tools 和兼容 `WebMemoryRuntime` 仍保留，后续需要工具服务化或 memory tool client 化后删除。 |
+| `macaca-web -> macaca-context` | Context service 已注册，framework context path 已把 memory recall 底层切到 Memory Service。 | `ContextReportingChatModel` 仍在 Web 本地组装 provider catalog 和调用 `ContextFacade`，后续需要完整 `SystemContextClient` / `ContextAssembler` seam。 |
 
 ## 5. 新增例外流程
 

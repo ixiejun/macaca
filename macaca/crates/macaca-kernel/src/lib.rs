@@ -48,7 +48,7 @@ pub use facade::{
     DefaultKernelFacade, InMemoryTraceEventBus, KernelFacade, KernelTraceEvent, TraceEventBus,
 };
 pub use kernel::Kernel;
-pub use kernel_builder::KernelBuilder;
+pub use kernel_builder::{KernelBuilder, KernelServiceClientCompat};
 pub use orchestrator::AgentOrchestrator;
 pub use payment_policy::{DefaultPaymentPolicyEngine, PaymentPolicyDecision, PaymentPolicyEngine};
 pub use plugin_registry::{
@@ -56,6 +56,7 @@ pub use plugin_registry::{
     PluginRegistryEntry, PluginRegistrySnapshot,
 };
 pub use policy::{DefaultAllowPolicyEngine, PolicyEngine, StaticDenyPolicyEngine};
+#[allow(deprecated)]
 pub use provider_compat::{KernelProviderCompat, LegacyLlmProvider, LegacyToolCatalog};
 pub use registry::{AgentEntry, AgentRegistry};
 pub use resource::{InMemoryResourceManager, ResourceManager};
@@ -68,7 +69,7 @@ pub use service_call::{
 };
 pub use service_lifecycle::{DefaultServiceLifecycleController, ServiceLifecycleController};
 pub use service_registry::{InMemorySystemServiceRegistry, SystemServiceRegistry};
-pub use services::{IpcServiceAdapter, MemoryServiceAdapter, PersistServiceAdapter};
+pub use services::{IpcServiceAdapter, PersistServiceAdapter};
 pub use status::AgentStatusTracker;
 pub use status_transition::AgentStatusTransitionPolicy;
 pub use system_service::{MockSystemService, SystemService};

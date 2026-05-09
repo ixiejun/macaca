@@ -24,7 +24,7 @@ use macaca_app::{app_agent_manifest_view, app_agent_prompt_semantics};
 use macaca_context::{
     ContextSourceKind, PromptComposer, PromptSection, PromptStability, TrustLevel,
 };
-use macaca_framework::adapter::RoutedLlmAdapter;
+use macaca_framework::adapter::ServiceChatModelAdapter;
 use macaca_framework::agent::{Hook, HookRegistry, HookedAgent};
 use macaca_framework::construction::{
     AgentBuildIntent, AgentBuildRequest, AgentBuildRequestBuilder, AgentExecutionInput,
@@ -1022,10 +1022,11 @@ impl WebTracedAgentFactory {
     /// Builds a [`ReActAgent`] with [`ContextReportingChatModel`]: kernel-backed `routing_agent_id`,
     /// composer capability providers (skills/MCP/runtime tools), and vector recall when enabled.
     fn build_react_agent(
-        llm_router: Arc<macaca_llm::LlmRouter>,
+        llm_client: Arc<dyn macaca_sdk::SystemLlmClient>,
+        context_client: Arc<dyn macaca_sdk::SystemContextClient>,
+        memory_client: Arc<dyn macaca_sdk::SystemMemoryClient>,
         event_log: Arc<EventLog>,
         persist_backend: Arc<dyn macaca_persist::PersistBackend>,
-        memory_runtime: Option<Arc<crate::memory_runtime::WebMemoryRuntime>>,
         workspace_memory_tombstones: Option<Arc<macaca_memory::SharedTombstoneRegistry>>,
         merged_context_config: ContextConfig,
         agent_profile_root: Option<std::path::PathBuf>,
@@ -1041,8 +1042,18 @@ impl WebTracedAgentFactory {
         provider_health_ledger: Option<Arc<macaca_context::ProviderHealthLedger>>,
         context_engine_registry: Arc<macaca_context::ContextEngineRegistry>,
     ) -> ReActAgent {
+        let llm_scope = macaca_llm::LlmServiceScope::new(
+            request.identity.app_id,
+            request
+                .identity
+                .session_id
+                .clone()
+                .unwrap_or_else(|| "framework-sessionless".into()),
+            request.identity.agent_name.clone(),
+        )
+        .expect("framework runner builds agents only after request identity validation");
         let model = Arc::new(ContextReportingChatModel::new(
-            Arc::new(RoutedLlmAdapter::new(llm_router, selection.clone())),
+            Arc::new(ServiceChatModelAdapter::new(llm_client, llm_scope)),
             event_log,
             persist_backend,
             request.identity.app_id,
@@ -1050,7 +1061,8 @@ impl WebTracedAgentFactory {
             request.identity.agent_name.clone(),
             merged_context_config,
             agent_profile_root,
-            memory_runtime,
+            context_client,
+            memory_client,
             workspace_memory_tombstones,
             routing_agent_id,
             skill_capability_catalog,
@@ -1160,7 +1172,8 @@ impl WebTracedAgentFactory {
             .ok_or_else(|| "standard build request missing task_id".to_string())?;
         let session_id = request.identity.session_id.clone();
         let agent_name = request.identity.agent_name.clone();
-        let llm_router = Arc::clone(&self.state.llm_router);
+        let llm_client = Arc::clone(&self.state.llm_client);
+        let context_client = Arc::clone(&self.state.context_client);
 
         Self::configure_standard_toolkit(
             Arc::clone(&self.state),
@@ -1200,10 +1213,11 @@ impl WebTracedAgentFactory {
         ) = Self::resolve_framework_capability_catalogs(&self.state, &request, &toolkit).await;
 
         let agent = Self::build_react_agent(
-            llm_router,
+            llm_client,
+            context_client,
+            Arc::clone(&self.state.memory_client),
             Arc::clone(&self.state.persist.event_log),
             Arc::clone(&self.state.persist.session_store),
-            self.state.memory_runtime.clone(),
             self.state.workspace_memory_tombstones.clone(),
             merged_ctx,
             profile_root,
@@ -1327,7 +1341,8 @@ impl WebTracedAgentFactory {
         self,
         request: AgentBuildRequest,
     ) -> Result<(HookedAgent<ReActAgent>, tokio_util::sync::CancellationToken), String> {
-        let llm_router = Arc::clone(&self.state.llm_router);
+        let llm_client = Arc::clone(&self.state.llm_client);
+        let context_client = Arc::clone(&self.state.context_client);
         let PreparedAgentParts {
             selection,
             mut toolkit,
@@ -1391,10 +1406,11 @@ impl WebTracedAgentFactory {
         ) = Self::resolve_framework_capability_catalogs(&self.state, &request, &toolkit).await;
 
         let agent = Self::build_react_agent(
-            llm_router,
+            llm_client,
+            context_client,
+            Arc::clone(&self.state.memory_client),
             Arc::clone(&self.state.persist.event_log),
             Arc::clone(&self.state.persist.session_store),
-            self.state.memory_runtime.clone(),
             self.state.workspace_memory_tombstones.clone(),
             merged_ctx,
             profile_root,

@@ -3,7 +3,7 @@
 //!
 //! ## Routing model
 //! [`macaca_context::MemoryRecallQuery`] carries **session / application / agent** hints. The
-//! runtime-backed memory facade performs recall; this adapter enforces conservative visibility
+//! service-backed memory client performs recall; this adapter enforces conservative visibility
 //! rules so agent-private rows tagged with another [`AgentId`]
 //! cannot surface during recall (fail-closed for cross-agent isolation).
 //!
@@ -19,12 +19,8 @@ use macaca_context::{
     memory_source, ConfidenceScore, ContextSourceProvenance, MemoryRecallItem, MemoryRecallQuery,
     MemorySourceProvider, PrivacyTier,
 };
-use macaca_memory::{
-    ActiveRecallBudget, ActiveRecallRequest, MemoryScope, MemorySearchRequest, TombstoneIndex,
-};
-use macaca_proto::{MacacaResult, MemoryEntry};
-
-use crate::memory_runtime::WebMemoryRuntime;
+use macaca_memory::{MemoryPolicyHints, MemoryPrefetchCommand, MemoryScope, TombstoneIndex};
+use macaca_proto::{MacacaResult, MemoryEntry, TraceContext};
 
 /// Pure predicate: whether a workspace [`MemoryEntry`] may be returned for active recall.
 ///
@@ -60,9 +56,9 @@ pub(crate) fn workspace_memory_entry_visible_for_recall(
     query.include_session_shared
 }
 
-/// Binds [`WebMemoryRuntime`] recall to the composer active-recall contract.
+/// Binds the Memory Service client to the composer active-recall contract.
 pub struct WorkspaceMemoryRecallSource {
-    runtime: Arc<WebMemoryRuntime>,
+    memory_client: Arc<dyn macaca_sdk::SystemMemoryClient>,
     scope: MemoryScope,
     search_limit: usize,
     /// When known, agent-private memories tagged for another id are filtered out.
@@ -74,14 +70,14 @@ impl WorkspaceMemoryRecallSource {
     /// `search_limit` is typically derived from [`macaca_proto::config::ActiveVectorMemoryContextConfig::max_hits`].
     #[must_use]
     pub fn new(
-        runtime: Arc<WebMemoryRuntime>,
+        memory_client: Arc<dyn macaca_sdk::SystemMemoryClient>,
         scope: MemoryScope,
         search_limit: usize,
         current_agent_id: Option<macaca_proto::AgentId>,
         tombstones: Option<Arc<dyn TombstoneIndex>>,
     ) -> Self {
         Self {
-            runtime,
+            memory_client,
             scope,
             search_limit: search_limit.max(1),
             current_agent_id,
@@ -131,30 +127,20 @@ impl WorkspaceMemoryRecallSource {
             None => HashSet::new(),
         };
 
-        let entries =
-            if self.scope.identity.agent_id.is_some() || self.scope.identity.agent_name.is_some() {
-                let result = self
-                    .runtime
-                    .active_recall(ActiveRecallRequest {
-                        scope: self.scope.clone(),
-                        query: query.query.clone(),
-                        budget: ActiveRecallBudget {
-                            max_hits: self.search_limit,
-                            max_chars: usize::MAX,
-                            ..ActiveRecallBudget::default()
-                        },
-                    })
-                    .await?;
-                result.selected
-            } else {
-                self.runtime
-                    .search(MemorySearchRequest::new(
-                        self.scope.clone(),
-                        query.query.clone(),
-                        self.search_limit,
-                    ))
-                    .await?
-            };
+        let mut trace = TraceContext::new(uuid::Uuid::new_v4().to_string());
+        trace.session_id = self.scope.identity.session_id.clone();
+        trace.agent = self.scope.identity.agent_name.clone();
+        let result = self
+            .memory_client
+            .prefetch(MemoryPrefetchCommand {
+                scope: self.scope.clone(),
+                trace,
+                query: query.query.clone(),
+                limit: self.search_limit,
+                policy: MemoryPolicyHints::default(),
+            })
+            .await?;
+        let entries = result.entries;
         let mut items = Vec::new();
         for entry in entries {
             if tomb_set.contains(&entry.id.0.to_string()) {
@@ -187,11 +173,10 @@ mod tests {
     use chrono::Utc;
     use macaca_context::{MemoryRecallQuery, MemorySourceProvider};
     use macaca_memory::{
-        ActiveRecallCandidate, ActiveRecallDecision, ActiveRecallRequest, ActiveRecallResult,
-        KnowledgeCompileCapability, KnowledgeCompileRequest, KnowledgeCompileResult,
-        MemoryBackendConfig, MemoryBackendFactory, MemoryDeleteRequest, MemoryGetRequest,
-        MemoryRuntimeFacade, MemoryRuntimeStatus, MemorySearchRequest, MemoryWriteRequest,
-        RememberText, SharedTombstoneRegistry,
+        MemoryBackendConfig, MemoryBackendFactory, MemoryForgetCommand, MemoryPrefetchCommand,
+        MemoryRecallCommand, MemoryRecallResult, MemoryRememberCommand, MemoryRememberResult,
+        MemoryServiceSnapshot, MemoryServiceSnapshotCommand, MemoryStatusCommand,
+        MemoryStatusReport, RememberText, SharedTombstoneRegistry,
     };
     use macaca_proto::{AgentId, MacacaResult, MemoryEntry, MemoryId, MemoryLayer};
     use std::sync::Arc;
@@ -251,6 +236,81 @@ mod tests {
         assert!(!workspace_memory_entry_visible_for_recall(&entry, &q, None));
     }
 
+    struct StaticMemoryClient {
+        entries: Vec<MemoryEntry>,
+    }
+
+    #[async_trait]
+    impl macaca_sdk::SystemMemoryClient for StaticMemoryClient {
+        async fn remember(
+            &self,
+            _command: MemoryRememberCommand,
+        ) -> MacacaResult<MemoryRememberResult> {
+            Ok(MemoryRememberResult {
+                id: MemoryId::new(),
+                stored_at: Utc::now(),
+            })
+        }
+
+        async fn recall(&self, _command: MemoryRecallCommand) -> MacacaResult<MemoryRecallResult> {
+            Ok(MemoryRecallResult::new(self.entries.clone()))
+        }
+
+        async fn prefetch(
+            &self,
+            _command: MemoryPrefetchCommand,
+        ) -> MacacaResult<MemoryRecallResult> {
+            Ok(MemoryRecallResult::new(self.entries.clone()))
+        }
+
+        async fn get(
+            &self,
+            command: macaca_memory::MemoryGetCommand,
+        ) -> MacacaResult<macaca_memory::MemoryGetResult> {
+            Ok(macaca_memory::MemoryGetResult::new(
+                self.entries
+                    .iter()
+                    .find(|entry| entry.id == command.id)
+                    .cloned(),
+            ))
+        }
+
+        async fn forget(&self, _command: MemoryForgetCommand) -> MacacaResult<()> {
+            Ok(())
+        }
+
+        async fn status(&self, _command: MemoryStatusCommand) -> MacacaResult<MemoryStatusReport> {
+            Ok(MemoryStatusReport::healthy(
+                "test-memory-client",
+                macaca_memory::MemoryCapabilitySet::basic_store_search(),
+            ))
+        }
+
+        async fn snapshot(
+            &self,
+            _command: MemoryServiceSnapshotCommand,
+        ) -> MacacaResult<MemoryServiceSnapshot> {
+            Ok(MemoryServiceSnapshot::new(
+                "test-memory-client",
+                true,
+                macaca_memory::MemoryCapabilitySet::basic_store_search(),
+                None,
+            ))
+        }
+    }
+
+    async fn client_from_manager(
+        mgr: &Arc<macaca_memory::TestMemoryManager>,
+        query: &str,
+    ) -> Arc<dyn macaca_sdk::SystemMemoryClient> {
+        let entries = mgr
+            .recall(macaca_memory::RecallQuery::new(query, 8))
+            .await
+            .unwrap()
+            .entries;
+        Arc::new(StaticMemoryClient { entries })
+    }
+
     #[tokio::test]
     async fn tombstone_registry_hides_matching_row_before_mapping() {
         let dir = tempdir().unwrap();
@@ -264,15 +324,13 @@ mod tests {
         let reg = Arc::new(SharedTombstoneRegistry::new());
         reg.record(id).await;
 
-        let runtime = Arc::new(
-            crate::memory_runtime::WebMemoryRuntime::from_workspace_memory(Arc::clone(&mgr)),
-        );
+        let memory_client = client_from_manager(&mgr, "uniq-tombstone-recall-marker-xyz").await;
         let scope = macaca_memory::MemoryScope::project_shared(
             macaca_proto::ApplicationId::new(),
             "workspace",
         );
         let with_ts = WorkspaceMemoryRecallSource::new(
-            Arc::clone(&runtime),
+            Arc::clone(&memory_client),
             scope.clone(),
             8,
             None,
@@ -284,84 +342,25 @@ mod tests {
             .unwrap();
         assert!(empty.is_empty());
 
-        let no_ts = WorkspaceMemoryRecallSource::new(Arc::clone(&runtime), scope, 8, None, None);
+        let no_ts =
+            WorkspaceMemoryRecallSource::new(Arc::clone(&memory_client), scope, 8, None, None);
         let hits = MemorySourceProvider::recall(&no_ts, q).await.unwrap();
         assert!(!hits.is_empty());
-    }
-
-    struct RecallFakeRuntime {
-        entries: Vec<MemoryEntry>,
-    }
-
-    #[async_trait]
-    impl MemoryRuntimeFacade for RecallFakeRuntime {
-        async fn remember(&self, _request: MemoryWriteRequest) -> MacacaResult<MemoryId> {
-            Ok(MemoryId::new())
-        }
-
-        async fn search(&self, _request: MemorySearchRequest) -> MacacaResult<Vec<MemoryEntry>> {
-            Ok(self.entries.clone())
-        }
-
-        async fn get(&self, _request: MemoryGetRequest) -> MacacaResult<Option<MemoryEntry>> {
-            Ok(None)
-        }
-
-        async fn delete(&self, _request: MemoryDeleteRequest) -> MacacaResult<()> {
-            Ok(())
-        }
-
-        async fn active_recall(
-            &self,
-            _request: ActiveRecallRequest,
-        ) -> MacacaResult<ActiveRecallResult> {
-            let candidates = self
-                .entries
-                .iter()
-                .cloned()
-                .map(|entry| ActiveRecallCandidate {
-                    entry,
-                    score: 100,
-                    estimated_tokens: 1,
-                    decision: ActiveRecallDecision::selected("fake"),
-                })
-                .collect();
-            Ok(ActiveRecallResult {
-                provider_id: "fake-runtime".into(),
-                candidates,
-                selected: self.entries.clone(),
-                latency_ms: 0,
-                diagnostics: Vec::new(),
-            })
-        }
-
-        async fn compile_knowledge(
-            &self,
-            request: KnowledgeCompileRequest,
-        ) -> MacacaResult<KnowledgeCompileResult> {
-            Ok(macaca_memory::KnowledgeCompiler::default().compile(request))
-        }
-
-        async fn status(&self) -> MemoryRuntimeStatus {
-            MemoryRuntimeStatus::default()
-        }
     }
 
     #[tokio::test]
     async fn active_recall_source_uses_runtime_and_preserves_scope_filtering() {
         let current_agent = AgentId::new();
         let other_agent = AgentId::new();
-        let runtime = Arc::new(crate::memory_runtime::WebMemoryRuntime::new(Arc::new(
-            RecallFakeRuntime {
-                entries: vec![
-                    entry_with_agent(Some(current_agent)),
-                    entry_with_agent(Some(other_agent)),
-                    entry_with_agent(None),
-                ],
-            },
-        )));
+        let memory_client: Arc<dyn macaca_sdk::SystemMemoryClient> = Arc::new(StaticMemoryClient {
+            entries: vec![
+                entry_with_agent(Some(current_agent)),
+                entry_with_agent(Some(other_agent)),
+                entry_with_agent(None),
+            ],
+        });
         let source = WorkspaceMemoryRecallSource::new(
-            runtime,
+            memory_client,
             macaca_memory::MemoryScope::agent_private(
                 macaca_proto::ApplicationId::new(),
                 current_agent,

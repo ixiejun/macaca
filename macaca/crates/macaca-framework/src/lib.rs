@@ -14,6 +14,8 @@
 pub mod a2a;
 #[cfg(feature = "macaca-compat")]
 pub mod adapter;
+#[cfg(feature = "macaca-compat")]
+mod adapter_llm;
 pub mod agent;
 pub mod construction;
 pub mod execution;

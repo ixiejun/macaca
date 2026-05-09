@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing::{info, warn};
 
-use macaca_proto::{MacacaError, MacacaResult};
+use macaca_proto::{MacacaError, MacacaResult, TraceContext};
 
 /// Read-only service inspection command.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -37,6 +37,7 @@ pub struct ServiceCallCommand {
     pub service_id: String,
     pub command_name: String,
     pub payload: Value,
+    pub trace: Option<TraceContext>,
 }
 
 impl ServiceCallCommand {
@@ -57,7 +58,14 @@ impl ServiceCallCommand {
             service_id,
             command_name,
             payload,
+            trace: None,
         })
+    }
+
+    /// Attach trace context required by Route C service-runtime dispatch.
+    pub fn with_trace(mut self, trace: TraceContext) -> Self {
+        self.trace = Some(trace);
+        self
     }
 }
 

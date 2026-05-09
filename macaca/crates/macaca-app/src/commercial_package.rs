@@ -155,6 +155,9 @@ mod tests {
             .unwrap();
 
         assert!(decision.allowed);
-        assert_eq!(decision.entitlement_id.as_ref().unwrap().as_str(), "entitlement.app");
+        assert_eq!(
+            decision.entitlement_id.as_ref().unwrap().as_str(),
+            "entitlement.app"
+        );
     }
 }

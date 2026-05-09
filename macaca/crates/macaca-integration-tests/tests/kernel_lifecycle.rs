@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use macaca_kernel::{Kernel, KernelBuilder, KernelProviderCompat};
+use macaca_kernel::{Kernel, KernelBuilder, KernelServiceClientCompat};
 use macaca_llm::LlmProvider;
 use macaca_proto::config::KernelConfig;
 use macaca_proto::{
@@ -57,9 +57,12 @@ fn make_kernel() -> Kernel {
         agent_timeout_ms: 30000,
     };
     let llm: Arc<dyn LlmProvider> = Arc::new(MockLlm);
-    KernelBuilder::from_compat(
+    KernelBuilder::from_service_clients(
         config,
-        KernelProviderCompat::new(llm, Box::new(DefaultToolSet::new())),
+        KernelServiceClientCompat::from_agent_provider_boxed_tools(
+            llm,
+            Box::new(DefaultToolSet::new()),
+        ),
     )
     .build()
 }

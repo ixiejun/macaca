@@ -123,50 +123,54 @@ pub(crate) async fn build_toolkit(
         }
     }
 
-    if let Some(runtime) = state.memory_runtime.as_ref() {
-        let limit = state
-            .config
-            .context
-            .recall
-            .memory_search_default_limit
-            .clamp(1, 32);
-        let scope = crate::context_memory_tools::workspace_tool_scope(*app_id);
-        if policy.allows_base_tool("memory_search") {
+    let limit = state
+        .config
+        .context
+        .recall
+        .memory_search_default_limit
+        .clamp(1, 32);
+    let scope = crate::context_memory_tools::workspace_tool_scope(*app_id);
+    if policy.allows_base_tool("memory_search") {
+        toolkit.register(
+            Box::new(SingleToolAdapter::new(Box::new(
+                crate::context_memory_tools::ServiceWorkspaceMemorySearchTool {
+                    client: Arc::clone(&state.memory_client),
+                    scope: scope.clone(),
+                    default_limit: limit,
+                    session_id: session_id.clone(),
+                    agent_name: agent_name.to_string(),
+                },
+            ))),
+            None,
+        );
+    }
+    if policy.allows_base_tool("memory_get") {
+        toolkit.register(
+            Box::new(SingleToolAdapter::new(Box::new(
+                crate::context_memory_tools::ServiceWorkspaceMemoryGetTool {
+                    client: Arc::clone(&state.memory_client),
+                    scope: scope.clone(),
+                    session_id: session_id.clone(),
+                    agent_name: agent_name.to_string(),
+                },
+            ))),
+            None,
+        );
+    }
+    if policy.allows_base_tool("memory_forget") {
+        if let Some(ts) = state.workspace_memory_tombstones.as_ref() {
             toolkit.register(
                 Box::new(SingleToolAdapter::new(Box::new(
-                    crate::context_memory_tools::WorkspaceMemorySearchTool {
-                        runtime: Arc::clone(runtime),
+                    crate::context_memory_tools::ServiceWorkspaceMemoryForgetTool {
+                        client: Arc::clone(&state.memory_client),
                         scope: scope.clone(),
-                        default_limit: limit,
+                        tombstones: Arc::clone(ts),
+                        session_id: session_id.clone(),
+                        agent_name: agent_name.to_string(),
                     },
                 ))),
                 None,
             );
-        }
-        if policy.allows_base_tool("memory_get") {
-            toolkit.register(
-                Box::new(SingleToolAdapter::new(Box::new(
-                    crate::context_memory_tools::WorkspaceMemoryGetTool {
-                        runtime: Arc::clone(runtime),
-                        scope: scope.clone(),
-                    },
-                ))),
-                None,
-            );
-        }
-        if policy.allows_base_tool("memory_forget") {
-            if let Some(ts) = state.workspace_memory_tombstones.as_ref() {
-                toolkit.register(
-                    Box::new(SingleToolAdapter::new(Box::new(
-                        crate::context_memory_tools::WorkspaceMemoryForgetTool {
-                            runtime: Arc::clone(runtime),
-                            scope: scope.clone(),
-                            tombstones: Arc::clone(ts),
-                        },
-                    ))),
-                    None,
-                );
-            }
         }
     }
 

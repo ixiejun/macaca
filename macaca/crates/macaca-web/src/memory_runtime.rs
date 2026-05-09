@@ -205,3 +205,43 @@ impl MemoryRuntimeFacade for WebMemoryRuntime {
         self.inner.status().await
     }
 }
+
+#[async_trait]
+impl MemoryFacade for WebMemoryRuntime {
+    async fn remember(&self, request: MemoryWriteRequest) -> MacacaResult<MemoryId> {
+        MemoryRuntimeFacade::remember(self, request).await
+    }
+
+    async fn search(&self, request: MemorySearchRequest) -> MacacaResult<Vec<MemoryEntry>> {
+        MemoryRuntimeFacade::search(self, request).await
+    }
+
+    async fn get(&self, request: MemoryGetRequest) -> MacacaResult<Option<MemoryEntry>> {
+        MemoryRuntimeFacade::get(self, request).await
+    }
+
+    async fn delete(&self, request: MemoryDeleteRequest) -> MacacaResult<()> {
+        MemoryRuntimeFacade::delete(self, request).await
+    }
+
+    fn status(&self) -> macaca_memory::MemoryStatusReport {
+        // `MemoryFacade::status` is intentionally synchronous because callers
+        // use it while producing lightweight service snapshots.  The wrapped
+        // `MemoryRuntimeFacade` exposes richer asynchronous diagnostics, so the
+        // web adapter returns the stable capability contract advertised by this
+        // runtime instead of blocking inside an async status call.
+        macaca_memory::MemoryStatusReport::healthy(
+            "web-memory-runtime",
+            macaca_memory::MemoryCapabilitySet {
+                store: true,
+                search: true,
+                prompt: true,
+                lifecycle: true,
+                flush: false,
+                artifact: false,
+                governance: false,
+                knowledge: true,
+            },
+        )
+    }
+}

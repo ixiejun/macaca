@@ -7,8 +7,11 @@
 pub mod application;
 pub mod builder;
 pub mod config;
+pub mod context_client;
 pub mod evm;
 pub mod facade;
+pub mod llm_client;
+pub mod memory_client;
 pub mod package_client;
 pub mod package_fixtures;
 pub mod persona;
@@ -27,9 +30,16 @@ pub use application::{
 };
 pub use builder::{AgentBuilder, DeclarativeAgent};
 pub use config::AgentConfig;
+pub use context_client::{
+    ServiceBackedContextClient, SystemContextClient, UnavailableSystemContextClient,
+};
 pub use evm::MacacaEvmSdk;
 pub use facade::{AgentRegistryApi, KernelAgentRegistry, KernelPrimitiveSdk, MacacaSdk};
+pub use llm_client::{ServiceBackedLlmClient, SystemLlmClient, UnavailableSystemLlmClient};
 pub use macaca_task::{TaskServiceSnapshot, TaskServiceSnapshotCommand};
+pub use memory_client::{
+    ServiceBackedMemoryClient, SystemMemoryClient, UnavailableSystemMemoryClient,
+};
 pub use package_fixtures::{
     driver_plugin_fixture, evm_optional_fixture, free_skill_fixture, gateway_plugin_fixture,
     genui_app_fixture, invalid_missing_required_service_fixture, invalid_missing_runtime_fixture,

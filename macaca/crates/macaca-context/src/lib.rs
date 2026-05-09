@@ -21,6 +21,7 @@ pub mod preflight;
 pub mod profile;
 pub mod prompt;
 pub mod report;
+pub mod service_contract;
 pub mod source;
 
 pub use active_recall::{
@@ -100,6 +101,15 @@ pub use report::{
     ActiveRecallDiagnostics, ComposerPlanSummary, ComposerSkipRecord, ContextDecisionReport,
     ContextDecisionSeverity, ContextReport, ContextReportBuilder, ContextSourceKind,
     ContextSourceReport, ProviderInvocationSummary, ProviderRuntimeSummary,
+};
+pub use service_contract::{
+    ContextActiveRecallCommand, ContextActiveRecallServiceResult, ContextAssembleCommand,
+    ContextAssembleServiceResult, ContextAssemblySnapshot, ContextEngineInventoryCommand,
+    ContextPolicyHints, ContextProviderInventoryCommand, ContextProviderInventoryItem,
+    ContextReportResult, ContextServiceEvent, ContextServiceRuntimeCapabilities,
+    ContextServiceScope, ContextServiceSnapshot, ContextServiceSnapshotCommand,
+    CONTEXT_ACTIVE_RECALL_COMMAND, CONTEXT_ASSEMBLE_COMMAND, CONTEXT_ENGINE_INVENTORY_COMMAND,
+    CONTEXT_PROVIDER_INVENTORY_COMMAND, CONTEXT_SERVICE_ID, CONTEXT_SNAPSHOT_COMMAND,
 };
 pub use source::{
     decision_for_snippet, BudgetPolicy, ContextRenderInput, ContextRenderMode, ContextRenderable,

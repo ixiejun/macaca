@@ -22,6 +22,7 @@ use macaca_kernel::{ApplicationExecutorRegistry, Kernel};
 use macaca_llm::{LlmProvider, LlmRouter};
 use macaca_persist::{EventLog, PersistBackend};
 use macaca_proto::{config::ContextConfig, ApplicationId, ForkId, LlmMessage};
+use macaca_sdk::{SystemContextClient, SystemLlmClient, SystemMemoryClient};
 use macaca_skill::SkillCatalog;
 use macaca_task::TodoStore;
 use macaca_tools::ToolCatalog;
@@ -276,9 +277,17 @@ pub struct AppState {
     pub runtime: AppRuntime,
     /// Application registry for discovering apps.
     pub registry: RwLock<AppRegistry>,
+    /// The serviceized LLM client used by new Route C call paths.
+    pub llm_client: Arc<dyn SystemLlmClient>,
+    /// The serviceized Memory client used by new Route C call paths.
+    pub memory_client: Arc<dyn SystemMemoryClient>,
+    /// The serviceized Context client used by new Route C call paths.
+    pub context_client: Arc<dyn SystemContextClient>,
     /// The LLM provider (DashScope by default).
+    #[deprecated(note = "Use AppState::llm_client for new LLM call paths")]
     pub llm: Arc<dyn LlmProvider>,
     /// Shared router/resolver used by framework-based agents.
+    #[deprecated(note = "Use AppState::llm_client for new model dispatch paths")]
     pub llm_router: Arc<LlmRouter>,
     /// Composite toolset: built-in tools + executable skill tools + claude code tools.
     pub tools: Arc<dyn ToolCatalog>,
@@ -289,6 +298,7 @@ pub struct AppState {
     /// The runtime is optional because memory exposure is still controlled by
     /// `context.recall.expose_memory_tools`. When present, upper web code must prefer this facade
     /// over concrete managers so provider/runtime implementations remain swappable.
+    #[deprecated(note = "Use AppState::memory_client for new memory call paths")]
     pub memory_runtime: Option<Arc<crate::memory_runtime::WebMemoryRuntime>>,
     /// Legacy builtin backing store retained for compatibility and default runtime construction.
     pub workspace_memory: Option<Arc<macaca_memory::TestMemoryManager>>,

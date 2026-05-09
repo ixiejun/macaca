@@ -5,29 +5,32 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use tracing::info;
 
+use macaca_agent::LlmProvider;
 use macaca_app::AppRuntime;
 use macaca_gateway::GatewayBuilder;
-use macaca_kernel::{Kernel, KernelBuilder, KernelProviderCompat};
-use macaca_llm::LlmProvider;
+use macaca_kernel::{Kernel, KernelBuilder, KernelServiceClientCompat};
 use macaca_proto::config::{KernelConfig, MacacaConfig};
 use macaca_proto::error::MacacaResult;
 use macaca_proto::types::{LlmMessage, LlmOptions, LlmResponse, TokenUsage};
 use macaca_sdk::{
-    kernel_status_snapshot, StaticSystemStatusDataSource, SystemFacade, SystemTaskClient,
-    TaskBoardQueryCommand, TaskBoardQueryResult,
+    kernel_status_snapshot, ServiceInspectionCommand, StaticSystemStatusDataSource, SystemFacade,
+    SystemTaskClient, TaskBoardQueryCommand, TaskBoardQueryResult,
 };
 use macaca_tools::{DefaultToolSet, ToolCatalog};
 
-/// A no-op LLM provider used when no real provider is configured.
+/// Compatibility LLM provider used only to satisfy legacy kernel construction.
 ///
-/// Returns a canned response for every request. This allows the CLI
-/// to boot the kernel without requiring API keys.
-struct StubLlmProvider;
+/// Route C S5 moves production LLM calls behind SDK/SystemFacade service
+/// clients.  Some CLI commands still need to instantiate the legacy kernel
+/// compatibility bundle for read-only status and registry inspection.  This
+/// provider makes that compatibility path explicit and fails chat calls with a
+/// structured unavailable response instead of pretending to be a real model.
+struct CliUnavailableLlmProvider;
 
 #[async_trait]
-impl LlmProvider for StubLlmProvider {
+impl LlmProvider for CliUnavailableLlmProvider {
     fn name(&self) -> &str {
-        "stub"
+        "cli-unavailable-service-compat"
     }
 
     async fn chat(
@@ -36,9 +39,9 @@ impl LlmProvider for StubLlmProvider {
         _options: &LlmOptions,
     ) -> MacacaResult<LlmResponse> {
         Ok(LlmResponse {
-            content: "(stub LLM — no provider configured)".into(),
+            content: "(LLM service unavailable through CLI compatibility provider)".into(),
             reasoning_content: None,
-            model: "stub".into(),
+            model: "cli-unavailable-service-compat".into(),
             usage: TokenUsage {
                 prompt_tokens: 0,
                 completion_tokens: 0,
@@ -64,7 +67,7 @@ pub async fn execute_run_kernel() -> MacacaResult<()> {
         "Initializing Agent OS kernel"
     );
 
-    let llm: Arc<dyn LlmProvider> = Arc::new(StubLlmProvider);
+    let llm: Arc<dyn LlmProvider> = Arc::new(CliUnavailableLlmProvider);
     let tools = Box::new(DefaultToolSet::new());
     let kernel = build_kernel(config.kernel.clone(), llm, tools);
 
@@ -103,7 +106,7 @@ pub async fn run_kernel() -> MacacaResult<()> {
 /// List all agents currently registered with the kernel.
 pub async fn execute_list_agents() -> MacacaResult<()> {
     let config = MacacaConfig::load_default();
-    let llm: Arc<dyn LlmProvider> = Arc::new(StubLlmProvider);
+    let llm: Arc<dyn LlmProvider> = Arc::new(CliUnavailableLlmProvider);
     let tools = Box::new(DefaultToolSet::new());
     let kernel = build_kernel(config.kernel.clone(), llm, tools);
 
@@ -134,7 +137,7 @@ pub async fn list_agents() -> MacacaResult<()> {
 pub async fn execute_show_status() -> MacacaResult<()> {
     let config = MacacaConfig::load_default();
     let app_runtime = AppRuntime::default();
-    let llm: Arc<dyn LlmProvider> = Arc::new(StubLlmProvider);
+    let llm: Arc<dyn LlmProvider> = Arc::new(CliUnavailableLlmProvider);
     let tools = Box::new(DefaultToolSet::new());
     let kernel = build_kernel(config.kernel.clone(), llm, tools);
 
@@ -161,6 +164,21 @@ pub async fn execute_show_status() -> MacacaResult<()> {
     println!("LLM provider:    {}", snapshot.llm_provider);
     println!("App runtime:     {}", snapshot.app_runtime);
     println!("Gateway enabled: {}", snapshot.gateway_enabled);
+    let service_inventory = facade
+        .inspect_services(ServiceInspectionCommand::new("cli-status")?)
+        .await?;
+    let service_status = if service_inventory.services.is_empty() {
+        "unavailable"
+    } else {
+        "available"
+    };
+    println!(
+        "Services:        {service_status} ({})",
+        service_inventory.services.join(", ")
+    );
+    println!("  LLM Service:    {service_status}");
+    println!("  Memory Service: {service_status}");
+    println!("  Context Service:{service_status}");
 
     if config.gateway.enabled {
         if let Some(ref tg) = config.gateway.telegram {
@@ -203,7 +221,7 @@ impl SystemTaskClient for EmptyCliTaskBoardDataSource {
 
 /// Create a kernel instance from config (for testing and composition).
 pub fn create_kernel_with_stub_provider(config: &KernelConfig) -> Kernel {
-    let llm: Arc<dyn LlmProvider> = Arc::new(StubLlmProvider);
+    let llm: Arc<dyn LlmProvider> = Arc::new(CliUnavailableLlmProvider);
     let tools = Box::new(DefaultToolSet::new());
     build_kernel(config.clone(), llm, tools)
 }
@@ -225,7 +243,12 @@ fn build_kernel(
     llm: Arc<dyn LlmProvider>,
     tools: Box<dyn ToolCatalog>,
 ) -> Kernel {
-    KernelBuilder::from_compat(config, KernelProviderCompat::new(llm, tools)).build()
+    tracing::debug!(
+        llm_provider = %llm.name(),
+        "CLI kernel builder ignores legacy provider and uses service-client compatibility seam"
+    );
+    KernelBuilder::from_service_clients(config, KernelServiceClientCompat::from_boxed_tools(tools))
+        .build()
 }
 
 #[cfg(test)]
@@ -259,15 +282,15 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn kernel_starts_with_stub_llm() {
+    async fn kernel_starts_with_unavailable_llm_compat_provider() {
         let config = test_kernel_config();
         let kernel = create_kernel_with_stub_provider(&config);
         assert_eq!(kernel.agent_count().await, 0);
     }
 
     #[test]
-    fn stub_llm_provider_name() {
-        let provider = StubLlmProvider;
-        assert_eq!(provider.name(), "stub");
+    fn unavailable_llm_compat_provider_name() {
+        let provider = CliUnavailableLlmProvider;
+        assert_eq!(provider.name(), "cli-unavailable-service-compat");
     }
 }

@@ -6,9 +6,7 @@ edition.workspace = true
 [dependencies]
 macaca-proto = { workspace = true }
 macaca-agent = { workspace = true }
-macaca-llm = { workspace = true }
 macaca-tools = { workspace = true }
-macaca-memory = { workspace = true }
 macaca-ipc = { workspace = true }
 macaca-task = { workspace = true }
 macaca-persist = { workspace = true }

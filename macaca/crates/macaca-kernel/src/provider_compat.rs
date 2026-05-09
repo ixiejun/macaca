@@ -7,7 +7,7 @@
 
 use std::sync::Arc;
 
-pub use macaca_llm::LlmProvider as LegacyLlmProvider;
+pub use macaca_agent::LlmProvider as LegacyLlmProvider;
 pub use macaca_tools::ToolCatalog as LegacyToolCatalog;
 
 /// Migration bundle that groups the legacy provider handles still required by
@@ -17,11 +17,13 @@ pub use macaca_tools::ToolCatalog as LegacyToolCatalog;
 /// keeping the core kernel implementation focused on orchestration and agent
 /// lifecycle behavior.
 #[derive(Clone)]
+#[deprecated(note = "Use service-client/SystemFacade construction for new kernel wiring")]
 pub struct KernelProviderCompat {
     llm: Arc<dyn LegacyLlmProvider>,
     tools: Arc<dyn LegacyToolCatalog>,
 }
 
+#[allow(deprecated)]
 impl KernelProviderCompat {
     /// Build the compatibility bundle from the legacy direct constructor inputs.
     ///

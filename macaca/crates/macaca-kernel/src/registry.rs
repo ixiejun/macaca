@@ -119,8 +119,7 @@ mod tests {
     use super::*;
     use async_trait::async_trait;
     use chrono::Utc;
-    use macaca_agent::AgentServices;
-    use macaca_llm::LlmProvider;
+    use macaca_agent::{AgentServices, LlmProvider};
     use macaca_proto::{
         AgentOutput, AgentState, Capability, Permission, PermissionLevel, TokenUsage,
     };

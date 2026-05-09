@@ -2,7 +2,9 @@
 
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use macaca_proto::config::KernelConfig;
+use macaca_proto::{LlmMessage, LlmOptions, LlmResponse, MacacaError, MacacaResult};
 
 use crate::{
     Kernel, KernelProviderCompat, LegacyLlmProvider, LegacyToolCatalog, SchedulerFactory,
@@ -14,6 +16,87 @@ pub struct KernelBuilder {
     config: KernelConfig,
     providers: KernelProviderCompat,
     scheduler_kind: SchedulerKind,
+}
+
+/// Provider-neutral kernel construction bundle for service-client-era callers.
+///
+/// The kernel execution path still accepts the legacy `Agent::run` provider
+/// shape, so this bundle uses an internal unavailable adapter until agent
+/// execution itself is serviceized. New callers can depend on this struct
+/// instead of constructing `KernelProviderCompat` directly.
+pub struct KernelServiceClientCompat {
+    llm: Arc<dyn LegacyLlmProvider>,
+    tools: Arc<dyn LegacyToolCatalog>,
+}
+
+impl KernelServiceClientCompat {
+    /// Create a bundle from shared tool catalog handles.
+    pub fn new(tools: Arc<dyn LegacyToolCatalog>) -> Self {
+        Self {
+            llm: Arc::new(UnavailableKernelLlmProvider),
+            tools,
+        }
+    }
+
+    /// Create a bundle from boxed tool catalog handles.
+    pub fn from_boxed_tools(tools: Box<dyn LegacyToolCatalog>) -> Self {
+        Self {
+            llm: Arc::new(UnavailableKernelLlmProvider),
+            tools: Arc::from(tools),
+        }
+    }
+
+    /// Create a bundle with an agent-level LLM bridge for legacy `Agent::run` execution.
+    ///
+    /// Route C S5 removes direct provider construction from upper layers, but
+    /// the historical `Agent::run` ABI still receives an `LlmProvider`
+    /// reference.  This method concentrates that temporary bridge in the
+    /// construction seam instead of spreading deprecated `KernelProviderCompat`
+    /// calls through Web, SDK fixtures, and integration tests.
+    pub fn from_agent_provider(
+        llm: Arc<dyn LegacyLlmProvider>,
+        tools: Arc<dyn LegacyToolCatalog>,
+    ) -> Self {
+        Self { llm, tools }
+    }
+
+    /// Create a bundle with an agent-level LLM bridge and boxed tool catalog.
+    pub fn from_agent_provider_boxed_tools(
+        llm: Arc<dyn LegacyLlmProvider>,
+        tools: Box<dyn LegacyToolCatalog>,
+    ) -> Self {
+        Self::from_agent_provider(llm, Arc::from(tools))
+    }
+
+    /// Convert to the deprecated compatibility bundle in one isolated place.
+    #[allow(deprecated)]
+    fn into_provider_compat(self) -> KernelProviderCompat {
+        KernelProviderCompat::from_shared(self.llm, self.tools)
+    }
+}
+
+/// Internal null-object provider used only by the service-client construction seam.
+///
+/// It preserves the previous CLI/status behavior: if legacy execution is
+/// accidentally invoked without a real LLM service bridge, callers receive a
+/// structured unavailable error instead of a fake model response.
+struct UnavailableKernelLlmProvider;
+
+#[async_trait]
+impl LegacyLlmProvider for UnavailableKernelLlmProvider {
+    fn name(&self) -> &str {
+        "kernel-service-client-unavailable-llm"
+    }
+
+    async fn chat(
+        &self,
+        _messages: Vec<LlmMessage>,
+        _options: &LlmOptions,
+    ) -> MacacaResult<LlmResponse> {
+        Err(MacacaError::Llm(
+            "Kernel service-client construction has no legacy LLM provider".into(),
+        ))
+    }
 }
 
 impl KernelBuilder {
@@ -42,6 +125,15 @@ impl KernelBuilder {
             providers,
             scheduler_kind: SchedulerKind::default(),
         }
+    }
+
+    /// Create a builder from the provider-neutral service-client compatibility bundle.
+    ///
+    /// This is the preferred S5 construction seam for new code because it does
+    /// not require callers to import or instantiate `LegacyLlmProvider`. The
+    /// old provider bundle stays available as a deprecated migration memento.
+    pub fn from_service_clients(config: KernelConfig, compat: KernelServiceClientCompat) -> Self {
+        Self::from_compat(config, compat.into_provider_compat())
     }
 
     /// Override the scheduler strategy.

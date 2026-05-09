@@ -38,6 +38,7 @@ macaca-proto = { path = "../macaca-proto" }
 macaca-context = { path = "../macaca-context" }
 macaca-agent = { path = "../macaca-agent" }
 macaca-persist = { path = "../macaca-persist", optional = true }
+macaca-sdk = { path = "../macaca-sdk", optional = true }
 macaca-llm = { path = "../macaca-llm", optional = true }
 macaca-tools = { path = "../macaca-tools", optional = true }
 
@@ -50,6 +51,7 @@ persist = ["dep:macaca-persist"]
 openai = ["dep:reqwest"]
 anthropic = ["dep:reqwest"]
 macaca-compat = ["dep:macaca-llm", "dep:macaca-tools", "mcp-http"]
+service-clients = ["dep:macaca-sdk", "dep:macaca-llm"]
 full = ["a2a-client", "a2a-server", "mcp-http", "persist", "openai", "anthropic", "macaca-compat"]
 
 [dev-dependencies]

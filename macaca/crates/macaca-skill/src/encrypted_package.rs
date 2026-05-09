@@ -134,8 +134,8 @@ pub fn encrypted_package_metadata(manifest: &PackageManifest) -> Option<Encrypte
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
 
     use macaca_proto::{
         DeveloperId, EntitlementDecision, EntitlementState, LicenseType, PackageId,

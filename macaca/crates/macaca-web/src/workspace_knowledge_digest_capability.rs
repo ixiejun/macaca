@@ -1,16 +1,14 @@
 //! [`WorkspaceKnowledgeDigestCapability`] — Adapter implementing
-//! [`macaca_context::KnowledgeDigestCapability`] on top of [`crate::memory_runtime::WebMemoryRuntime`].
+//! [`macaca_context::KnowledgeDigestCapability`] on top of the Memory Service client.
 //!
 //! ## Flow
 //! 1. Derive the same **retrieval query** string the active-recall provider would use
 //!    (latest user turn text via [`macaca_context::ContextAssembleInput::last_user_message_text`]).
-//! 2. Pull a bounded set of [`macaca_proto::MemoryEntry`] rows through the runtime facade.
-//! 3. Lift rows into [`macaca_memory::MemoryCandidate`] objects inside a neutral [`macaca_memory::MemoryScope`].
-//! 4. Run the runtime-backed knowledge compiler.
-//! 5. Map non-revoked [`macaca_memory::KnowledgeClaim`] rows into [`macaca_context::KnowledgeDigestItem`], copying
+//! 2. Pull a bounded set of [`macaca_proto::MemoryEntry`] rows through the Memory Service facade.
+//! 3. Map rows into redacted [`macaca_context::KnowledgeDigestItem`] entries, copying
 //!    only **opaque** evidence ids (`ClaimEvidence::source_id`) so digest-vs-raw suppression can align with
 //!    fenced recall rows without leaking full memory payloads into structured reports.
-//! 6. Apply [`macaca_context::filter_digest_items_by_tombstones`] when an optional [`macaca_memory::TombstoneIndex`] is wired
+//! 4. Apply [`macaca_context::filter_digest_items_by_tombstones`] when an optional [`macaca_memory::TombstoneIndex`] is wired
 //!    (shared registry updated by [`crate::context_memory_tools::WorkspaceMemoryForgetTool`] or a governance facade snapshot).
 //!
 //! ## Failure semantics
@@ -25,17 +23,12 @@ use macaca_context::{
     filter_digest_items_by_tombstones, ContextAssembleInput, ContextSourceProvenance,
     KnowledgeDigestCapability, KnowledgeDigestItem, PrivacyTier,
 };
-use macaca_memory::{
-    CandidateSource, KnowledgeCompileRequest, MemoryCandidate, MemoryScope, MemorySearchRequest,
-    TombstoneIndex,
-};
-use macaca_proto::MacacaResult;
-
-use crate::memory_runtime::WebMemoryRuntime;
+use macaca_memory::{MemoryPolicyHints, MemoryPrefetchCommand, MemoryScope, TombstoneIndex};
+use macaca_proto::{MacacaResult, TraceContext};
 
 /// Workspace memory → knowledge digest port adapter.
 pub struct WorkspaceKnowledgeDigestCapability {
-    runtime: Arc<WebMemoryRuntime>,
+    memory_client: Arc<dyn macaca_sdk::SystemMemoryClient>,
     scope: MemoryScope,
     search_limit: usize,
     /// Optional tombstone ledger — when present, evidence pointers referencing deleted ids are stripped.
@@ -49,13 +42,13 @@ impl WorkspaceKnowledgeDigestCapability {
     /// [`macaca_memory`] without coupling this crate to a single storage backend.
     #[must_use]
     pub fn new(
-        runtime: Arc<WebMemoryRuntime>,
+        memory_client: Arc<dyn macaca_sdk::SystemMemoryClient>,
         scope: MemoryScope,
         search_limit: usize,
         tombstones: Option<Arc<dyn TombstoneIndex>>,
     ) -> Self {
         Self {
-            runtime,
+            memory_client,
             scope,
             search_limit: search_limit.max(1),
             tombstones,
@@ -82,59 +75,36 @@ impl KnowledgeDigestCapability for WorkspaceKnowledgeDigestCapability {
         };
 
         let scope = self.compile_scope(input);
+        let mut trace = TraceContext::new(uuid::Uuid::new_v4().to_string());
+        trace.session_id = scope.identity.session_id.clone();
+        trace.agent = scope.identity.agent_name.clone();
         let entries = self
-            .runtime
-            .search(MemorySearchRequest::new(
-                scope.clone(),
-                query.to_owned(),
-                self.search_limit,
-            ))
-            .await?;
-
-        let candidates: Vec<MemoryCandidate> = entries
-            .into_iter()
-            .map(|entry| {
-                MemoryCandidate::new(
-                    entry.id.0.to_string(),
-                    scope.clone(),
-                    CandidateSource::AgentSummary,
-                    entry.content,
-                )
-                .confidence(0.9)
-                .recurrence_count(2)
+            .memory_client
+            .prefetch(MemoryPrefetchCommand {
+                scope: scope.clone(),
+                trace,
+                query: query.to_owned(),
+                limit: self.search_limit,
+                policy: MemoryPolicyHints::default(),
             })
-            .collect();
-
-        if candidates.is_empty() {
-            return Ok(Vec::new());
-        }
-
-        let compiled = self
-            .runtime
-            .compile_knowledge(KnowledgeCompileRequest {
-                scope,
-                candidates,
-                existing_claims: Vec::new(),
-            })
-            .await?;
+            .await?
+            .entries;
 
         let mut out = Vec::new();
-        for claim in compiled.claims {
-            if claim.revoked {
-                continue;
-            }
+        for entry in entries {
+            let memory_id = entry.id.0.to_string();
             out.push(KnowledgeDigestItem {
-                claim_id: claim.id.clone(),
-                label: "compiled-knowledge".into(),
-                statement: claim.statement,
+                claim_id: format!("memory-digest-{memory_id}"),
+                label: "memory-digest".into(),
+                statement: entry.content,
                 provenance: ContextSourceProvenance {
                     provider_id: self.capability_id().into(),
-                    source_id: claim.id,
-                    evidence: claim.evidence.iter().map(|e| e.source_id.clone()).collect(),
+                    source_id: memory_id.clone(),
+                    evidence: vec![memory_id.clone()],
                 },
-                evidence_memory_ids: claim.evidence.iter().map(|e| e.source_id.clone()).collect(),
-                confidence: claim.confidence.0,
-                freshness: claim.freshness.0,
+                evidence_memory_ids: vec![memory_id],
+                confidence: 0.8,
+                freshness: 0.8,
                 privacy_tier: PrivacyTier::Workspace,
                 request_only: true,
                 redacted: true,
@@ -166,10 +136,13 @@ mod tests {
     use std::time::Duration;
 
     use macaca_memory::{
-        FileMemory, InMemoryVectorStore, MockEmbedding, RememberText, SessionMemory,
-        SharedTombstoneRegistry, TestMemoryManager,
+        FileMemory, InMemoryVectorStore, MemoryForgetCommand, MemoryPrefetchCommand,
+        MemoryRecallCommand, MemoryRecallResult, MemoryRememberCommand, MemoryRememberResult,
+        MemoryServiceSnapshot, MemoryServiceSnapshotCommand, MemoryStatusCommand,
+        MemoryStatusReport, MockEmbedding, RememberText, SessionMemory, SharedTombstoneRegistry,
+        TestMemoryManager,
     };
-    use macaca_proto::{ApplicationId, LlmMessage, LlmOptions};
+    use macaca_proto::{ApplicationId, LlmMessage, LlmOptions, MemoryEntry, MemoryId};
 
     fn temp_memory_dir() -> PathBuf {
         let unique = format!(
@@ -202,6 +175,81 @@ mod tests {
         )
     }
 
+    struct StaticMemoryClient {
+        entries: Vec<MemoryEntry>,
+    }
+
+    #[async_trait]
+    impl macaca_sdk::SystemMemoryClient for StaticMemoryClient {
+        async fn remember(
+            &self,
+            _command: MemoryRememberCommand,
+        ) -> MacacaResult<MemoryRememberResult> {
+            Ok(MemoryRememberResult {
+                id: MemoryId::new(),
+                stored_at: chrono::Utc::now(),
+            })
+        }
+
+        async fn recall(&self, _command: MemoryRecallCommand) -> MacacaResult<MemoryRecallResult> {
+            Ok(MemoryRecallResult::new(self.entries.clone()))
+        }
+
+        async fn prefetch(
+            &self,
+            _command: MemoryPrefetchCommand,
+        ) -> MacacaResult<MemoryRecallResult> {
+            Ok(MemoryRecallResult::new(self.entries.clone()))
+        }
+
+        async fn get(
+            &self,
+            command: macaca_memory::MemoryGetCommand,
+        ) -> MacacaResult<macaca_memory::MemoryGetResult> {
+            Ok(macaca_memory::MemoryGetResult::new(
+                self.entries
+                    .iter()
+                    .find(|entry| entry.id == command.id)
+                    .cloned(),
+            ))
+        }
+
+        async fn forget(&self, _command: MemoryForgetCommand) -> MacacaResult<()> {
+            Ok(())
+        }
+
+        async fn status(&self, _command: MemoryStatusCommand) -> MacacaResult<MemoryStatusReport> {
+            Ok(MemoryStatusReport::healthy(
+                "test-memory-client",
+                macaca_memory::MemoryCapabilitySet::basic_store_search(),
+            ))
+        }
+
+        async fn snapshot(
+            &self,
+            _command: MemoryServiceSnapshotCommand,
+        ) -> MacacaResult<MemoryServiceSnapshot> {
+            Ok(MemoryServiceSnapshot::new(
+                "test-memory-client",
+                true,
+                macaca_memory::MemoryCapabilitySet::basic_store_search(),
+                None,
+            ))
+        }
+    }
+
+    async fn client_from_manager(
+        manager: &Arc<TestMemoryManager>,
+        query: &str,
+    ) -> Arc<dyn macaca_sdk::SystemMemoryClient> {
+        let entries = manager
+            .recall(macaca_memory::RecallQuery::new(query, 8))
+            .await
+            .unwrap()
+            .entries;
+        Arc::new(StaticMemoryClient { entries })
+    }
+
     #[tokio::test]
     async fn digest_for_request_compiles_workspace_memory_into_digest_rows() {
         let dir = temp_memory_dir();
@@ -213,10 +261,9 @@ mod tests {
             .await
             .unwrap();
 
-        let runtime =
-            Arc::new(crate::memory_runtime::WebMemoryRuntime::from_workspace_memory(manager));
+        let memory_client = client_from_manager(&manager, "deployment knowledge").await;
         let scope = macaca_memory::MemoryScope::project_shared(ApplicationId::new(), "workspace");
-        let capability = WorkspaceKnowledgeDigestCapability::new(runtime, scope, 8, None);
+        let capability = WorkspaceKnowledgeDigestCapability::new(memory_client, scope, 8, None);
 
         let rows = capability
             .digest_for_request(&assemble_input("deployment knowledge"))
@@ -248,11 +295,10 @@ mod tests {
         let tombstones = Arc::new(SharedTombstoneRegistry::new());
         tombstones.record(deleted_id).await;
 
-        let runtime =
-            Arc::new(crate::memory_runtime::WebMemoryRuntime::from_workspace_memory(manager));
+        let memory_client = client_from_manager(&manager, "credential note").await;
         let scope = macaca_memory::MemoryScope::project_shared(ApplicationId::new(), "workspace");
         let capability =
-            WorkspaceKnowledgeDigestCapability::new(runtime, scope, 8, Some(tombstones));
+            WorkspaceKnowledgeDigestCapability::new(memory_client, scope, 8, Some(tombstones));
 
         let rows = capability
             .digest_for_request(&assemble_input("credential note"))

@@ -28,20 +28,6 @@ pub fn entries() -> Vec<AllowlistEntry> {
         AllowlistEntry::new(
             "kernel-no-provider-deps",
             "macaca-kernel",
-            "macaca-llm",
-            "S5",
-            "LLM Service facade",
-        ),
-        AllowlistEntry::new(
-            "kernel-no-provider-deps",
-            "macaca-kernel",
-            "macaca-memory",
-            "S5",
-            "Memory/Context Service facade",
-        ),
-        AllowlistEntry::new(
-            "kernel-no-provider-deps",
-            "macaca-kernel",
             "macaca-persist",
             "S1/S2",
             "Persistence Service contract",
@@ -73,13 +59,6 @@ pub fn entries() -> Vec<AllowlistEntry> {
             "macaca-gateway",
             "S8",
             "Gateway Service client",
-        ),
-        AllowlistEntry::new(
-            "presentation-no-provider-construction-hub",
-            "macaca-cli",
-            "macaca-llm",
-            "S5",
-            "LLM Service client",
         ),
         AllowlistEntry::new(
             "presentation-no-provider-construction-hub",

@@ -136,7 +136,21 @@ Web/CLI/Frontend 只能是 shell 和 adapter，不得定义核心 session、task
 - SDK 命令类型必须可序列化、可审计、provider-neutral，并在关键执行节点记录 trace/log，方便 Route C regression 和 GitNexus blast-radius 审查。
 - S3 不迁移 PlanLoop/WorkerLoop/review、LLM/Memory/Context、Driver/Skill/MCP、Application lifecycle、Gateway、Payment、Web3、EVM provider 行为；这些由后续阶段单独治理。
 
-## 11. 审查清单
+## 11. LLM / Memory / Context Service Ownership
+
+路线 C S5 将 LLM、Memory、Context 收敛为可替换 system service，而不是 presentation shell 或 kernel 内置 provider：
+
+- `macaca-llm` 只拥有 provider-neutral LLM command/result/snapshot DTO 和领域 adapter，不依赖 kernel、runtime-host、Web 或 CLI。
+- `macaca-memory` 只拥有 MemoryScope、AgentPrivate、SessionShared、topology labels、remember/recall/prefetch/forget/status/snapshot DTO 和 memory fabric 策略。
+- `macaca-context` 只拥有 context assemble、active recall orchestration、provider/engine inventory、context report DTO 和 context engine strategy。
+- `macaca-runtime-host` 拥有 LLM/Memory/Context 的 `SystemService` provider wrapper、service lifecycle、trace-required dispatch、policy/decorator chain 和 snapshot emission。
+- `macaca-sdk` 只提供 `SystemLlmClient`、`SystemMemoryClient`、`SystemContextClient`、`SystemFacade` 这类 shell-facing client/facade，不构造 provider、memory backend 或 context engine。
+- Web、CLI、framework 只能作为 adapter：Web 负责 HTTP/SSE/UI 映射，CLI 负责 terminal 输出，framework 负责 ChatModel/ContextAssembler seam，不得定义 LLM provider、memory store、context engine 的核心语义。
+- 缺少 runtime-backed service 时必须返回结构化 unavailable 或空 inventory，不得 panic、阻塞等待或静默构造 stub provider 冒充真实服务。
+- Context Service 可以通过 Memory Service client 主动召回长期记忆，但不得直接绑定具体 memory backend；LLM 调用属于 LLM Service，不属于 Context Service。
+- 任何新增 LLM/Memory/Context 调用路径必须记录 trace id、application/session/agent scope、command、completion/failure 和 snapshot/event，不得泄露 prompt body、memory body、embedding、API key 或 secret。
+
+## 12. 审查清单
 
 任何 Route C OpenSpec 都必须回答：
 

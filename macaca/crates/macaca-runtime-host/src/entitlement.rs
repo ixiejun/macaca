@@ -193,7 +193,9 @@ impl EntitlementRuntimeFacade {
                 reason = %decision.reason,
                 "entitlement validation rejected"
             );
-            return Err(CommerceError::EntitlementRejected(decision.state.to_string()));
+            return Err(CommerceError::EntitlementRejected(
+                decision.state.to_string(),
+            ));
         }
 
         Ok(decision)
@@ -264,7 +266,10 @@ impl EntitlementRuntimeFacade {
                 manifest.developer.clone(),
                 operation.as_str(),
                 record.state.clone(),
-                format!("entitlement state {} does not allow operation", record.state),
+                format!(
+                    "entitlement state {} does not allow operation",
+                    record.state
+                ),
             )
         };
         decision.entitlement_id = Some(record.entitlement_id.clone());
@@ -351,8 +356,12 @@ impl EntitlementRuntimeFacade {
         if let (Some(event_log), Some(session_id)) = (&self.event_log, &event.session_id) {
             let payload = serde_json::to_value(&event)
                 .map_err(|error| CommerceError::MeteringRejected(error.to_string()))?;
-            let mut command =
-                AppendEventCommand::new(session_id.clone(), "metering_event", "entitlement", payload);
+            let mut command = AppendEventCommand::new(
+                session_id.clone(),
+                "metering_event",
+                "entitlement",
+                payload,
+            );
             if let Some(app_id) = context.app_id {
                 command = command.with_app_id(app_id);
             }
@@ -453,7 +462,10 @@ mod tests {
     #[tokio::test]
     async fn paid_package_with_valid_entitlement_is_allowed() {
         let store = Arc::new(InMemoryEntitlementStore::new());
-        store.upsert_record(record(EntitlementState::valid())).await.unwrap();
+        store
+            .upsert_record(record(EntitlementState::valid()))
+            .await
+            .unwrap();
         let facade = EntitlementRuntimeFacade::new(store);
 
         let decision = facade
@@ -462,13 +474,19 @@ mod tests {
             .unwrap();
 
         assert!(decision.allowed);
-        assert_eq!(decision.entitlement_id.as_ref().unwrap().as_str(), "entitlement.valid");
+        assert_eq!(
+            decision.entitlement_id.as_ref().unwrap().as_str(),
+            "entitlement.valid"
+        );
     }
 
     #[tokio::test]
     async fn paid_capability_call_emits_metering_event_to_event_log() {
         let store = Arc::new(InMemoryEntitlementStore::new());
-        store.upsert_record(record(EntitlementState::valid())).await.unwrap();
+        store
+            .upsert_record(record(EntitlementState::valid()))
+            .await
+            .unwrap();
         let dir = tempfile::tempdir().unwrap();
         let event_log = Arc::new(EventLog::new(Arc::new(
             RedbStore::open(dir.path().join("events.db")).unwrap(),

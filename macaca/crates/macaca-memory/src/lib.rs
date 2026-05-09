@@ -25,6 +25,7 @@ pub mod query;
 pub mod query_pipeline;
 pub mod runtime;
 pub mod service_adapter;
+pub mod service_contract;
 pub mod session;
 pub mod snapshot;
 pub mod store;
@@ -92,6 +93,14 @@ pub use runtime::{
     ComposedMemoryRuntime, MemoryRuntimeBuilder, MemoryRuntimeFacade, MemoryRuntimeStatus,
 };
 pub use service_adapter::memory_service_descriptor;
+pub use service_contract::{
+    topology_labels_for_scope, MemoryForgetCommand, MemoryGetCommand, MemoryGetResult,
+    MemoryPolicyHints, MemoryPrefetchCommand, MemoryRecallCommand, MemoryRecallResult,
+    MemoryRememberCommand, MemoryRememberResult, MemoryServiceSnapshot,
+    MemoryServiceSnapshotCommand, MemoryStatusCommand, MemoryTopologyLabels, MEMORY_FORGET_COMMAND,
+    MEMORY_GET_COMMAND, MEMORY_PREFETCH_COMMAND, MEMORY_RECALL_COMMAND, MEMORY_REMEMBER_COMMAND,
+    MEMORY_SERVICE_ID, MEMORY_SNAPSHOT_COMMAND, MEMORY_STATUS_COMMAND,
+};
 pub use session::SessionMemory;
 pub use snapshot::{MemorySnapshot, MemorySnapshotStore};
 pub use store::{EmbeddingProvider, MemoryRetriever, MemoryStore, VectorSearchResult, VectorStore};

@@ -13,11 +13,14 @@
 //! registration layered on top.
 
 pub mod compat;
+pub mod context_service_provider;
 pub mod entitlement;
 pub mod env_bridge;
 pub mod factory;
 pub mod lease;
+pub mod llm_service_provider;
 pub mod mcp_runtime;
+pub mod memory_service_provider;
 pub mod package;
 pub mod plugin;
 pub mod service_decorator;
@@ -27,17 +30,20 @@ pub mod service_runtime_error;
 pub mod service_runtime_event;
 pub mod transport;
 
+pub use context_service_provider::ContextSystemServiceProvider;
+pub use entitlement::{CapabilityCallContext, EntitlementOperation, EntitlementRuntimeFacade};
 #[allow(deprecated)]
 pub use env_bridge::{apply_mcp_env, McpEnvApplyOutcome};
 pub use factory::{McpServerFactory, RuntimeEnvBuilder};
-pub use entitlement::{CapabilityCallContext, EntitlementOperation, EntitlementRuntimeFacade};
 pub use lease::McpSessionLease;
+pub use llm_service_provider::LlmSystemServiceProvider;
 #[allow(deprecated)]
 pub use mcp_runtime::{
     apply_concurrency_isolation, probe_definition_statuses, ConcurrencyIsolationPolicy,
     McpDefinitionSource, McpLifecycleScope, McpRegistryConfig, McpRuntimeContext, McpRuntimeFacade,
     McpRuntimeManager, McpRuntimeStatus, McpRuntimeStatusState, McpServerDefinition, McpToolPolicy,
 };
+pub use memory_service_provider::MemorySystemServiceProvider;
 pub use package::{runtime_host_mcp_package_descriptor, RuntimeHostPackageRequirement};
 pub use plugin::{
     plugin_failure_event, DescriptorPluginHost, PluginHost, PluginHostFactory,

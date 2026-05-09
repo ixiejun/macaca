@@ -11,6 +11,8 @@ pub mod chat_orchestrator;
 mod context_memory_injection;
 mod context_memory_tools;
 mod context_message_codec;
+mod context_report_events;
+mod context_reporting_memory;
 mod context_reporting_model;
 pub mod event_persistence;
 mod external_context_adapter;
@@ -27,6 +29,7 @@ pub mod route_command;
 pub mod routes;
 pub mod run_trace;
 pub mod runtime_resume;
+mod service_runtime_client;
 pub mod session;
 pub mod session_replay;
 pub mod shell;
@@ -52,11 +55,13 @@ use macaca_app::{AppLoader, AppRegistry, AppRuntime};
 use macaca_framework::session::{
     InMemorySessionStore as FrameworkInMemorySessionStore, SessionStore as FrameworkSessionStore,
 };
-use macaca_kernel::{AgentInfo, ApplicationExecutorRegistry, KernelBuilder, KernelProviderCompat};
+use macaca_kernel::{
+    AgentInfo, ApplicationExecutorRegistry, KernelBuilder, KernelServiceClientCompat,
+};
 use macaca_llm::{LlmProvider, LlmRouter};
 use macaca_persist::RedbStore;
 use macaca_proto::config::{KernelConfig, MacacaConfig};
-use macaca_proto::MacacaResult;
+use macaca_proto::{KernelServiceId, MacacaResult, TraceContext};
 use macaca_skill::{ExecutableSkillToolSet, SkillCatalog};
 use macaca_tools::{DefaultToolSet, Tool};
 
@@ -102,9 +107,12 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
         agent_timeout_ms: 60000,
     };
     let kernel = Arc::new(
-        KernelBuilder::from_compat(
+        KernelBuilder::from_service_clients(
             kernel_config,
-            KernelProviderCompat::new(Arc::clone(&llm), Box::new(DefaultToolSet::new())),
+            KernelServiceClientCompat::from_agent_provider_boxed_tools(
+                Arc::clone(&llm),
+                Box::new(DefaultToolSet::new()),
+            ),
         )
         .build(),
     );
@@ -286,6 +294,48 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
     let memory_runtime = workspace_memory.as_ref().map(|memory| {
         Arc::new(crate::memory_runtime::WebMemoryRuntime::from_workspace_memory(Arc::clone(memory)))
     });
+    let service_runtime = Arc::new(macaca_runtime_host::ServiceRuntime::new(
+        macaca_runtime_host::ServiceRuntimeConfig::default(),
+    ));
+    service_runtime
+        .register_provider(
+            &macaca_runtime_host::StaticServiceProviderFactory::new(
+                macaca_runtime_host::ServiceProviderInstance::new(
+                    macaca_llm::llm_service_descriptor(),
+                    Arc::new(macaca_runtime_host::LlmSystemServiceProvider::new(
+                        Arc::clone(&llm),
+                    )),
+                ),
+            ),
+            macaca_runtime_host::ServiceProviderFactoryContext::new(),
+        )
+        .await
+        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+    if let Some(runtime) = memory_runtime.as_ref() {
+        let memory_service: Arc<dyn macaca_kernel::SystemService> =
+            Arc::new(macaca_runtime_host::MemorySystemServiceProvider::new(
+                Arc::clone(runtime) as Arc<dyn macaca_memory::MemoryFacade>,
+            ));
+        service_runtime
+            .register_provider(
+                &macaca_runtime_host::StaticServiceProviderFactory::new(
+                    macaca_runtime_host::ServiceProviderInstance::new(
+                        macaca_memory::memory_service_descriptor(),
+                        memory_service,
+                    ),
+                ),
+                macaca_runtime_host::ServiceProviderFactoryContext::new(),
+            )
+            .await
+            .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+        service_runtime
+            .start(
+                &KernelServiceId::new(macaca_memory::MEMORY_SERVICE_ID),
+                TraceContext::new("web-startup-memory-service"),
+            )
+            .await
+            .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+    }
     let configured_external_adapters = install_external_adapters_from_config(&config.context)?;
     let external_adapter_installations = configured_external_adapters.installations.clone();
     let external_adapter_runtime_registry = Arc::new(
@@ -293,6 +343,57 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
             .with_installations(external_adapter_installations),
     );
     let context_engine_registry = Arc::new(configured_external_adapters.registry);
+    service_runtime
+        .register_provider(
+            &macaca_runtime_host::StaticServiceProviderFactory::new(
+                macaca_runtime_host::ServiceProviderInstance::new(
+                    macaca_proto::ServiceDescriptor::new(
+                        KernelServiceId::new(macaca_context::CONTEXT_SERVICE_ID),
+                        macaca_proto::ServiceType::new("context"),
+                        macaca_proto::TraceSchemaRef::new("trace.system_service.context.v1"),
+                    ),
+                    Arc::new(macaca_runtime_host::ContextSystemServiceProvider::new(
+                        (*context_engine_registry).clone(),
+                    )),
+                ),
+            ),
+            macaca_runtime_host::ServiceProviderFactoryContext::new(),
+        )
+        .await
+        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+    service_runtime
+        .start(
+            &KernelServiceId::new(macaca_context::CONTEXT_SERVICE_ID),
+            TraceContext::new("web-startup-context-service"),
+        )
+        .await
+        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+    service_runtime
+        .start(
+            &KernelServiceId::new(macaca_llm::LLM_SERVICE_ID),
+            TraceContext::new("web-startup-llm-service"),
+        )
+        .await
+        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+    let generic_service_client: Arc<dyn macaca_sdk::SystemServiceClient> = Arc::new(
+        crate::service_runtime_client::WebRuntimeSystemServiceClient::new(
+            Arc::clone(&service_runtime),
+            "macaca.web",
+        ),
+    );
+    let llm_client: Arc<dyn macaca_sdk::SystemLlmClient> = Arc::new(
+        macaca_sdk::ServiceBackedLlmClient::new(Arc::clone(&generic_service_client)),
+    );
+    let memory_client: Arc<dyn macaca_sdk::SystemMemoryClient> = if memory_runtime.is_some() {
+        Arc::new(macaca_sdk::ServiceBackedMemoryClient::new(Arc::clone(
+            &generic_service_client,
+        )))
+    } else {
+        Arc::new(macaca_sdk::UnavailableSystemMemoryClient)
+    };
+    let context_client: Arc<dyn macaca_sdk::SystemContextClient> = Arc::new(
+        macaca_sdk::ServiceBackedContextClient::new(Arc::clone(&generic_service_client)),
+    );
 
     // 10. Build shared state.
     let state = Arc::new_cyclic(|weak_state| {
@@ -306,6 +407,9 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
             kernel: kernel.clone(),
             runtime: runtime.clone(),
             registry: tokio::sync::RwLock::new(registry),
+            llm_client: Arc::clone(&llm_client),
+            memory_client: Arc::clone(&memory_client),
+            context_client: Arc::clone(&context_client),
             llm: llm.clone(),
             llm_router: llm_router.clone(),
             tools,

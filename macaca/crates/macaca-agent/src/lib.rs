@@ -18,6 +18,7 @@ pub use lifecycle::{
     AgentLifecyclePolicy, AgentLifecycleTransition, AgentTransitionReason,
     DefaultAgentLifecyclePolicy,
 };
+pub use macaca_llm::LlmProvider;
 pub use services::{
     AgentServices, AgentServicesBuilder, IpcService, MemoryService, NoopIpcService,
     NoopMemoryService, NoopPersistService, PersistService,

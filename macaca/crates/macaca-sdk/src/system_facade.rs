@@ -11,6 +11,9 @@ use tracing::info;
 
 use macaca_proto::MacacaResult;
 
+pub use crate::context_client::{SystemContextClient, UnavailableSystemContextClient};
+pub use crate::llm_client::{SystemLlmClient, UnavailableSystemLlmClient};
+pub use crate::memory_client::{SystemMemoryClient, UnavailableSystemMemoryClient};
 pub use crate::package_client::{
     EmptySystemPackageClient, PackageInspectionCommand, PackageInspectionResult,
     SystemPackageClient,
@@ -56,12 +59,18 @@ pub struct SystemFacade<
     SV = UnavailableSystemServiceClient,
     TR = EmptySystemTraceClient,
     P = EmptySystemPackageClient,
+    L = UnavailableSystemLlmClient,
+    M = UnavailableSystemMemoryClient,
+    C = UnavailableSystemContextClient,
 > {
     task_board: T,
     status: S,
     service: SV,
     trace: TR,
     package: P,
+    llm: L,
+    memory: M,
+    context: C,
 }
 
 impl<T, S> SystemFacade<T, S>
@@ -81,11 +90,24 @@ where
             service: UnavailableSystemServiceClient,
             trace: EmptySystemTraceClient,
             package: EmptySystemPackageClient,
+            llm: UnavailableSystemLlmClient,
+            memory: UnavailableSystemMemoryClient,
+            context: UnavailableSystemContextClient,
         }
     }
 }
 
-impl<T, S, SV, TR, P> SystemFacade<T, S, SV, TR, P>
+impl<T, S, SV, TR, P>
+    SystemFacade<
+        T,
+        S,
+        SV,
+        TR,
+        P,
+        UnavailableSystemLlmClient,
+        UnavailableSystemMemoryClient,
+        UnavailableSystemContextClient,
+    >
 where
     T: SystemTaskClient,
     S: SystemStatusClient,
@@ -93,11 +115,11 @@ where
     TR: SystemTraceClient,
     P: SystemPackageClient,
 {
-    /// Create a facade from explicit capability clients.
+    /// Create a facade from explicit pre-S5 capability clients.
     ///
-    /// This constructor is the preferred composition path for tests and future
-    /// serviceized runtimes because it makes every SDK boundary dependency
-    /// visible at construction time.
+    /// This constructor keeps existing callers source-compatible and installs
+    /// explicit Null Object clients for S5 capabilities until a runtime-backed
+    /// composition path is provided.
     pub fn with_clients(task_board: T, status: S, service: SV, trace: TR, package: P) -> Self {
         Self {
             task_board,
@@ -105,6 +127,48 @@ where
             service,
             trace,
             package,
+            llm: UnavailableSystemLlmClient,
+            memory: UnavailableSystemMemoryClient,
+            context: UnavailableSystemContextClient,
+        }
+    }
+}
+
+impl<T, S, SV, TR, P, L, M, C> SystemFacade<T, S, SV, TR, P, L, M, C>
+where
+    T: SystemTaskClient,
+    S: SystemStatusClient,
+    SV: SystemServiceClient,
+    TR: SystemTraceClient,
+    P: SystemPackageClient,
+    L: SystemLlmClient,
+    M: SystemMemoryClient,
+    C: SystemContextClient,
+{
+    /// Create a facade with all current Route C capability clients installed.
+    ///
+    /// This constructor is the explicit composition point for serviceized
+    /// runtimes.  It keeps SDK dependency injection visible and prevents the
+    /// facade from constructing provider/backends internally.
+    pub fn with_route_c_clients(
+        task_board: T,
+        status: S,
+        service: SV,
+        trace: TR,
+        package: P,
+        llm: L,
+        memory: M,
+        context: C,
+    ) -> Self {
+        Self {
+            task_board,
+            status,
+            service,
+            trace,
+            package,
+            llm,
+            memory,
+            context,
         }
     }
 
@@ -193,6 +257,42 @@ where
             "system facade package inspection started"
         );
         self.package.inspect_packages(&command).await
+    }
+
+    /// Dispatch a typed LLM chat command through the focused LLM client.
+    pub async fn llm_chat(
+        &self,
+        command: macaca_llm::LlmChatCommand,
+    ) -> MacacaResult<macaca_llm::LlmChatResult> {
+        info!(
+            trace_id = %command.trace.trace_id,
+            "system facade llm chat started"
+        );
+        self.llm.chat(command).await
+    }
+
+    /// Recall scoped memory through the focused Memory client.
+    pub async fn memory_recall(
+        &self,
+        command: macaca_memory::MemoryRecallCommand,
+    ) -> MacacaResult<macaca_memory::MemoryRecallResult> {
+        info!(
+            trace_id = %command.trace.trace_id,
+            "system facade memory recall started"
+        );
+        self.memory.recall(command).await
+    }
+
+    /// Assemble model context through the focused Context client.
+    pub async fn assemble_context(
+        &self,
+        command: macaca_context::ContextAssembleCommand,
+    ) -> MacacaResult<macaca_context::ContextAssembleServiceResult> {
+        info!(
+            trace_id = %command.trace.trace_id,
+            "system facade context assembly started"
+        );
+        self.context.assemble(command).await
     }
 }
 
