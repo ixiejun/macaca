@@ -116,6 +116,18 @@ S10 已建立 Payment / A2A 的 provider-neutral DTO、runtime-host service prov
 | `macaca-kernel` A2A compatibility | 旧 kernel A2A coordinator/facade/adapter 保留但已 deprecated，用于测试和迁移检索。 | 后续上层消费必须迁到 `SystemPaymentClient`；当 GitNexus 和 `rg` 证明没有 production direct caller 后，旧接口可进入删除提案。 |
 | Payment provider strategy | Runtime-host 新增 `PaymentAdapterStrategy` 与 local simulated adapter，这是 service provider ownership，不属于 kernel/presentation。 | 真实支付、远程 agent 交易、Web3 proof 或 EVM settlement 必须作为 adapter strategy / optional module 接入，不得回写 kernel 或 Web。 |
 
+## 4.6 S11 Web3 / EVM Optional Module 迁移状态
+
+S11 已建立 Web3 / EVM 的 provider-neutral service DTO、runtime-host optional service provider wrapper、SDK focused clients，并在 Web startup 注册和启动默认 unavailable Web3/EVM Services。旧 `macaca-kernel::Web3Facade` / `UnavailableWeb3Adapter` / `MockWeb3Adapter` / `EvmFacade` / `UnavailableEvmAdapter` / `MockEvmAdapter` 已标记为 deprecated compatibility anchor，便于后续消费迁移检索；新生产路径必须优先使用 `Web3SystemServiceProvider` / `EvmSystemServiceProvider` + `SystemWeb3Client` / `SystemEvmClient`。
+
+| Edge | Current S11 status | Remaining debt |
+| --- | --- | --- |
+| `macaca-web -> macaca-runtime-host` | Web startup 注册 built-in unavailable Web3/EVM providers，并通过 runtime-backed `SystemWeb3Client` / `SystemEvmClient` 访问服务。 | Web 仍是当前 composition root。过期条件：S12 或后续 host composition 把 provider registration 移到 shared runtime bootstrap，Web 只接收 `SystemFacade`。 |
+| `macaca-sdk -> Web3/EVM provider` | SDK 没有 runtime-host/web/provider concrete dependency，只通过 `SystemServiceClient` 分发 provider-neutral Web3/EVM commands。 | 目标状态已达成；后续 SDK 不得引入 wallet、RPC、chain、EVM engine 或 provider concrete dependency。 |
+| `macaca-kernel` Web3/EVM compatibility | 旧 kernel Web3/EVM facades/adapters 保留但已 deprecated，用于测试和迁移检索。 | 后续上层消费必须迁到 `SystemWeb3Client` / `SystemEvmClient`；当 GitNexus 和 `rg` 证明没有 production direct caller 后，旧接口可进入删除提案。 |
+| Web3/EVM provider strategy | Runtime-host 新增 unavailable/mock Web3/EVM providers，这是 optional service provider ownership，不属于 kernel/presentation。 | 真实 chain/RPC/wallet/EVM adapter 必须作为 optional module strategy/plugin 接入，不得回写 kernel 或 Web。 |
+| Payment/Web3/EVM integration | S11 不实现链上 payment settlement，也不把 Web3/EVM 作为 Payment provider。 | 后续 integration 必须通过 Payment Service adapter 或 explicit optional module proposal，不得让 Web3/EVM 直接拥有 payment lifecycle。 |
+
 ## 5. 新增例外流程
 
 1. 创建或更新 OpenSpec change，解释为什么短期不能立即迁移。

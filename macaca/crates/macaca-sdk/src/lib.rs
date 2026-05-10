@@ -12,6 +12,7 @@ pub mod context_client;
 pub mod driver_client;
 pub mod entitlement_client;
 pub mod evm;
+pub mod evm_client;
 pub mod facade;
 pub mod llm_client;
 pub mod mcp_client;
@@ -31,6 +32,7 @@ pub mod system_facade;
 pub mod task_client;
 pub mod trace_client;
 pub mod validation;
+pub mod web3_client;
 
 pub use application::{
     service_call_command, trace_emit_command, ApplicationAbiBuilder, ApplicationHostCommandBuilder,
@@ -50,6 +52,7 @@ pub use entitlement_client::{
     ServiceBackedEntitlementClient, SystemEntitlementClient, UnavailableSystemEntitlementClient,
 };
 pub use evm::MacacaEvmSdk;
+pub use evm_client::{ServiceBackedEvmClient, SystemEvmClient, UnavailableSystemEvmClient};
 pub use facade::{AgentRegistryApi, KernelAgentRegistry, KernelPrimitiveSdk, MacacaSdk};
 pub use llm_client::{ServiceBackedLlmClient, SystemLlmClient, UnavailableSystemLlmClient};
 pub use macaca_task::{TaskServiceSnapshot, TaskServiceSnapshotCommand};
@@ -85,3 +88,4 @@ pub use system_facade::{
 };
 pub use task_client::{TaskServiceClient, UnavailableTaskServiceClient};
 pub use validation::{SdkValidationChain, SdkValidator};
+pub use web3_client::{ServiceBackedWeb3Client, SystemWeb3Client, UnavailableSystemWeb3Client};

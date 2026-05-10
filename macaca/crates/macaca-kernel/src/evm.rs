@@ -136,6 +136,9 @@ pub trait EvmAdapter: Send + Sync {
 }
 
 /// Runtime-facing EVM facade.
+#[deprecated(
+    note = "Use SystemEvmClient through ServiceRuntime-backed SystemFacade for new EVM paths"
+)]
 pub struct EvmFacade {
     adapter: Arc<dyn EvmAdapter>,
     policy: Arc<dyn EvmPolicyEngine>,

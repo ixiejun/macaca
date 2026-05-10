@@ -208,7 +208,23 @@ Web/CLI/Frontend 只能是 shell 和 adapter，不得定义核心 session、task
 - Payment logs、audit pages 和 snapshots 只能包含 service id、command、trace id、requester/provider/capability ids、intent/receipt/proof ids、state、reason code、counts、timestamps 和 sanitized diagnostics；不得泄露 wallet private key、API key、provider credential、raw prompt body、raw tool payload、raw package bytes、license secret 或链上签名原文。
 - S10 不实现 S11 Web3 node、EVM 合约执行或真实支付 provider。未来 Web3/EVM/Payment provider 必须作为 optional module / adapter strategy 接入 Payment Service，不能回写到 kernel 或 presentation shell。
 
-## 16. 审查清单
+## 16. Web3 / EVM Optional Module Service Ownership
+
+路线 C S11 将 Web3 / EVM 从 optional skeleton 推进为可替换 optional system service，而不是 kernel、Web、CLI、Application Framework、Payment 或 Store/Entitlement 各自拥有链、钱包、RPC 或合约语义：
+
+- Web3 Service 只拥有 availability、wallet list、signing request admission、transaction preparation、chain query 和 snapshot 这类 provider-neutral command，不拥有真实钱包私钥、真实 RPC provider、真实交易广播、payment settlement、application workflow 或 marketplace 逻辑。
+- EVM Service 只拥有 availability、contract deploy/call/read admission、gas estimate、receipt query、event subscription admission 和 snapshot 这类 provider-neutral command，不拥有自研 EVM、Substrate/Frontier adapter、真实 chain execution、payment settlement 或 DApp marketplace 逻辑。
+- `macaca-proto` 拥有 Web3/EVM service ids、command names、command/result DTO、provider descriptor、mock/dev diagnostics 和 sanitized snapshot，因为 SDK、runtime-host、Web、CLI、gateway、application 都必须共享同一 provider-neutral contract。
+- `macaca-runtime-host` 拥有 Web3/EVM `SystemService` provider wrapper、unavailable/null provider、mock/dev provider、service lifecycle、trace-required dispatch、policy/decorator admission、sanitized logging 和 snapshot emission。真实 chain/RPC/wallet/EVM provider 只能作为后续 adapter strategy 或 plugin 接入，不得进入 kernel 或 presentation shell。
+- `macaca-sdk` 拥有 `SystemWeb3Client`、`SystemEvmClient`、service-backed clients、unavailable/null clients 和 `SystemFacade` accessors。SDK 不得构造 runtime-host provider、kernel facade、wallet client、RPC client、chain client、EVM engine、Web state 或 CLI state。
+- Web、CLI、Gateway、Application 只能作为 shell/adapter：启动时可以注册 built-in unavailable Web3/EVM providers，但任何 Web3/EVM route、status、command、agent-facing tool 或 application capability call 都必须通过 `SystemWeb3Client` / `SystemEvmClient` / `SystemFacade` / service client。Presentation shell 不得定义 chain、wallet、gas、signing、RPC、contract 或 provider-selection semantics。
+- 旧 `macaca-kernel::Web3Facade`、`UnavailableWeb3Adapter`、`MockWeb3Adapter`、`EvmFacade`、`UnavailableEvmAdapter` 和 `MockEvmAdapter` 只能作为 deprecated compatibility anchor 保留；新生产代码不得调用它们。新增调用点必须迁到 Web3/EVM Services。
+- Web3/EVM mutating command 必须携带 trace，缺失 trace 时 fail closed。Provider unavailable、disabled、policy denied、capability missing、mock/dev provider mismatch 或 redaction violation 都必须返回结构化 unavailable/deny，不得静默 allow。
+- Mock/dev provider 必须在 descriptor、logs、snapshot、result diagnostics 和 trace/audit 中明确标记 `mock_only`、`development_only`、`real_chain=false`，不得被解释为真实链签名、交易广播、合约执行、settlement 或 proof。
+- Web3/EVM logs、audit pages 和 snapshots 只能包含 service id、command、trace id、capability ids、provider class、operation、state、reason code、counts、timestamps、artifact digest/reference 和 sanitized diagnostics；不得泄露 private key、mnemonic、wallet secret、raw signature、raw signed transaction、RPC credential、provider credential、raw ABI、raw bytecode、prompt body、raw package bytes、encrypted payload 或 unbounded provider response。
+- S11 不实现 S10 payment settlement，也不实现真实 Web3 node 或真实 EVM execution。未来 Web3/EVM/Payment integration 必须通过 adapter strategy / optional module / service client 接入，不能回写到 kernel 或 presentation shell。
+
+## 17. 审查清单
 
 任何 Route C OpenSpec 都必须回答：
 

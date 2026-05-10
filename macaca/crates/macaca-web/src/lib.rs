@@ -539,6 +539,30 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
         .await
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
     service_runtime
+        .register_provider(
+            &macaca_runtime_host::StaticServiceProviderFactory::new(
+                macaca_runtime_host::ServiceProviderInstance::new(
+                    macaca_runtime_host::web3_service_descriptor(),
+                    Arc::new(macaca_runtime_host::Web3SystemServiceProvider::unavailable()),
+                ),
+            ),
+            macaca_runtime_host::ServiceProviderFactoryContext::new(),
+        )
+        .await
+        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+    service_runtime
+        .register_provider(
+            &macaca_runtime_host::StaticServiceProviderFactory::new(
+                macaca_runtime_host::ServiceProviderInstance::new(
+                    macaca_runtime_host::evm_service_descriptor(),
+                    Arc::new(macaca_runtime_host::EvmSystemServiceProvider::unavailable()),
+                ),
+            ),
+            macaca_runtime_host::ServiceProviderFactoryContext::new(),
+        )
+        .await
+        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+    service_runtime
         .start(
             &KernelServiceId::new(macaca_proto::ENTITLEMENT_SERVICE_ID),
             TraceContext::new("web-startup-entitlement-service"),
@@ -556,6 +580,20 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
         .start(
             &KernelServiceId::new(macaca_proto::PAYMENT_SERVICE_ID),
             TraceContext::new("web-startup-payment-service"),
+        )
+        .await
+        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+    service_runtime
+        .start(
+            &KernelServiceId::new(macaca_proto::WEB3_SERVICE_ID),
+            TraceContext::new("web-startup-web3-service"),
+        )
+        .await
+        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+    service_runtime
+        .start(
+            &KernelServiceId::new(macaca_proto::EVM_SERVICE_ID),
+            TraceContext::new("web-startup-evm-service"),
         )
         .await
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
@@ -590,6 +628,12 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
     let payment_client: Arc<dyn macaca_sdk::SystemPaymentClient> = Arc::new(
         macaca_sdk::ServiceBackedPaymentClient::new(Arc::clone(&generic_service_client)),
     );
+    let web3_client: Arc<dyn macaca_sdk::SystemWeb3Client> = Arc::new(
+        macaca_sdk::ServiceBackedWeb3Client::new(Arc::clone(&generic_service_client)),
+    );
+    let evm_client: Arc<dyn macaca_sdk::SystemEvmClient> = Arc::new(
+        macaca_sdk::ServiceBackedEvmClient::new(Arc::clone(&generic_service_client)),
+    );
 
     // 10. Build shared state.
     let state = Arc::new_cyclic(|weak_state| {
@@ -613,6 +657,8 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
             store_client: Arc::clone(&store_client),
             entitlement_client: Arc::clone(&entitlement_client),
             payment_client: Arc::clone(&payment_client),
+            web3_client: Arc::clone(&web3_client),
+            evm_client: Arc::clone(&evm_client),
             llm: llm.clone(),
             llm_router: llm_router.clone(),
             tools,

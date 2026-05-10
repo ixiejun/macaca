@@ -21,6 +21,7 @@ use macaca_proto::{
 use crate::evm::EvmAdapter;
 
 /// Null Object adapter used when EVM is not installed.
+#[deprecated(note = "Use EvmSystemServiceProvider plus SystemEvmClient for new EVM service paths")]
 #[derive(Debug, Default)]
 pub struct UnavailableEvmAdapter;
 
@@ -83,6 +84,9 @@ impl EvmAdapter for UnavailableEvmAdapter {
 }
 
 /// Deterministic no-network adapter used for tests and contract semantics.
+#[deprecated(
+    note = "Use MockEvmProvider through EvmSystemServiceProvider for new development/test paths"
+)]
 #[derive(Debug, Default)]
 pub struct MockEvmAdapter;
 

@@ -7,6 +7,7 @@ pub mod config;
 pub mod entitlement_service;
 pub mod error;
 pub mod evm;
+pub mod evm_service;
 pub mod kernel;
 pub mod mcp_service;
 pub mod orchestration;
@@ -19,6 +20,7 @@ pub mod store_service;
 pub mod types;
 pub mod ui;
 pub mod web3;
+pub mod web3_service;
 
 #[cfg(test)]
 mod a2a_tests;
@@ -36,6 +38,7 @@ pub use config::{LlmProviderConfigBuilder, MacacaConfigBuilder};
 pub use entitlement_service::*;
 pub use error::*;
 pub use evm::*;
+pub use evm_service::*;
 pub use kernel::*;
 pub use mcp_service::*;
 pub use orchestration::*;
@@ -48,3 +51,4 @@ pub use store_service::*;
 pub use types::*;
 pub use ui::*;
 pub use web3::*;
+pub use web3_service::*;

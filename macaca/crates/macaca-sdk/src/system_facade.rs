@@ -15,6 +15,7 @@ pub use crate::application_client::{SystemApplicationClient, UnavailableSystemAp
 pub use crate::context_client::{SystemContextClient, UnavailableSystemContextClient};
 pub use crate::driver_client::{SystemDriverClient, UnavailableSystemDriverClient};
 pub use crate::entitlement_client::{SystemEntitlementClient, UnavailableSystemEntitlementClient};
+pub use crate::evm_client::{SystemEvmClient, UnavailableSystemEvmClient};
 pub use crate::llm_client::{SystemLlmClient, UnavailableSystemLlmClient};
 pub use crate::mcp_client::{SystemMcpClient, UnavailableSystemMcpClient};
 pub use crate::memory_client::{SystemMemoryClient, UnavailableSystemMemoryClient};
@@ -41,6 +42,7 @@ pub use crate::trace_client::{
     EmptySystemTraceClient, SessionEventQueryCommand, SystemTraceClient, TraceQueryResult,
     TraceTailCommand,
 };
+pub use crate::web3_client::{SystemWeb3Client, UnavailableSystemWeb3Client};
 
 /// Policy-ready approval command produced by Web/CLI confirmation surfaces.
 ///
@@ -76,6 +78,8 @@ pub struct SystemFacade<
     ST = UnavailableSystemStoreClient,
     E = UnavailableSystemEntitlementClient,
     PMT = UnavailableSystemPaymentClient,
+    W3 = UnavailableSystemWeb3Client,
+    EVM = UnavailableSystemEvmClient,
 > {
     task_board: T,
     status: S,
@@ -92,6 +96,8 @@ pub struct SystemFacade<
     store: ST,
     entitlement: E,
     payment: PMT,
+    web3: W3,
+    evm: EVM,
 }
 
 impl<T, S> SystemFacade<T, S>
@@ -121,6 +127,8 @@ where
             store: UnavailableSystemStoreClient,
             entitlement: UnavailableSystemEntitlementClient,
             payment: UnavailableSystemPaymentClient,
+            web3: UnavailableSystemWeb3Client,
+            evm: UnavailableSystemEvmClient,
         }
     }
 }
@@ -142,6 +150,8 @@ impl<T, S, SV, TR, P>
         UnavailableSystemStoreClient,
         UnavailableSystemEntitlementClient,
         UnavailableSystemPaymentClient,
+        UnavailableSystemWeb3Client,
+        UnavailableSystemEvmClient,
     >
 where
     T: SystemTaskClient,
@@ -172,12 +182,14 @@ where
             store: UnavailableSystemStoreClient,
             entitlement: UnavailableSystemEntitlementClient,
             payment: UnavailableSystemPaymentClient,
+            web3: UnavailableSystemWeb3Client,
+            evm: UnavailableSystemEvmClient,
         }
     }
 }
 
-impl<T, S, SV, TR, P, L, M, C, D, SK, MCP, A, ST, E, PMT>
-    SystemFacade<T, S, SV, TR, P, L, M, C, D, SK, MCP, A, ST, E, PMT>
+impl<T, S, SV, TR, P, L, M, C, D, SK, MCP, A, ST, E, PMT, W3, EVM>
+    SystemFacade<T, S, SV, TR, P, L, M, C, D, SK, MCP, A, ST, E, PMT, W3, EVM>
 where
     T: SystemTaskClient,
     S: SystemStatusClient,
@@ -194,6 +206,8 @@ where
     ST: SystemStoreClient,
     E: SystemEntitlementClient,
     PMT: SystemPaymentClient,
+    W3: SystemWeb3Client,
+    EVM: SystemEvmClient,
 {
     /// Create a facade with all current Route C capability clients installed.
     ///
@@ -216,6 +230,8 @@ where
         store: ST,
         entitlement: E,
         payment: PMT,
+        web3: W3,
+        evm: EVM,
     ) -> Self {
         Self {
             task_board,
@@ -233,7 +249,19 @@ where
             store,
             entitlement,
             payment,
+            web3,
+            evm,
         }
+    }
+
+    /// Borrow the focused Web3 Service client.
+    pub fn web3_client(&self) -> &W3 {
+        &self.web3
+    }
+
+    /// Borrow the focused EVM Service client.
+    pub fn evm_client(&self) -> &EVM {
+        &self.evm
     }
 
     /// Borrow the focused Payment Service client.

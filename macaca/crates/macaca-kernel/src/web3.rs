@@ -116,6 +116,9 @@ pub trait Web3Adapter: Send + Sync {
 }
 
 /// Null Object adapter used when Web3 is not installed.
+#[deprecated(
+    note = "Use Web3SystemServiceProvider plus SystemWeb3Client for new Web3 service paths"
+)]
 #[derive(Debug, Default)]
 pub struct UnavailableWeb3Adapter;
 
@@ -159,6 +162,9 @@ impl Web3Adapter for UnavailableWeb3Adapter {
 }
 
 /// Deterministic no-network mock adapter used for policy and trace tests.
+#[deprecated(
+    note = "Use MockWeb3Provider through Web3SystemServiceProvider for new development/test paths"
+)]
 #[derive(Debug, Default)]
 pub struct MockWeb3Adapter;
 
@@ -224,6 +230,9 @@ impl Web3Adapter for MockWeb3Adapter {
 }
 
 /// Runtime-facing Web3 facade.
+#[deprecated(
+    note = "Use SystemWeb3Client through ServiceRuntime-backed SystemFacade for new Web3 paths"
+)]
 pub struct Web3Facade {
     adapter: Arc<dyn Web3Adapter>,
     policy: Arc<dyn Web3PolicyEngine>,

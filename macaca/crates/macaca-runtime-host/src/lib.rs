@@ -19,6 +19,7 @@ pub mod driver_service_provider;
 pub mod entitlement;
 pub mod entitlement_service_provider;
 pub mod env_bridge;
+pub mod evm_service_provider;
 pub mod factory;
 pub mod lease;
 pub mod llm_service_provider;
@@ -39,6 +40,7 @@ pub mod skill_service_provider;
 pub mod store_entitlement_admission;
 pub mod store_service_provider;
 pub mod transport;
+pub mod web3_service_provider;
 
 pub use application_service_provider::ApplicationSystemServiceProvider;
 pub use context_service_provider::ContextSystemServiceProvider;
@@ -49,6 +51,10 @@ pub use entitlement_service_provider::{
 };
 #[allow(deprecated)]
 pub use env_bridge::{apply_mcp_env, McpEnvApplyOutcome};
+pub use evm_service_provider::{
+    evm_service_descriptor, EvmProviderStrategy, EvmSystemServiceProvider, MockEvmProvider,
+    UnavailableEvmProvider,
+};
 pub use factory::{McpServerFactory, RuntimeEnvBuilder};
 pub use lease::McpSessionLease;
 pub use llm_service_provider::LlmSystemServiceProvider;
@@ -87,3 +93,7 @@ pub use service_runtime_event::{
 pub use skill_service_provider::SkillSystemServiceProvider;
 pub use store_service_provider::{store_service_descriptor, StoreSystemServiceProvider};
 pub use transport::{ConfigBackedMcpTransport, McpTransport};
+pub use web3_service_provider::{
+    web3_service_descriptor, MockWeb3Provider, UnavailableWeb3Provider, Web3ProviderStrategy,
+    Web3SystemServiceProvider,
+};
