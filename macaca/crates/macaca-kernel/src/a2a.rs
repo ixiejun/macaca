@@ -6,6 +6,8 @@
 //! simulator that exercises the same state, audit, and receipt path required
 //! by future replaceable payment services.
 
+#![allow(deprecated)]
+
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -29,6 +31,9 @@ use crate::payment_policy::{DefaultPaymentPolicyEngine, PaymentPolicyEngine};
 /// remain behind policy evaluation. Phase 09 ships only local simulation so
 /// tests can run without network, wallet, chain, or billing provider access.
 #[async_trait]
+#[deprecated(
+    note = "Use PaymentSystemServiceProvider plus SystemPaymentClient for new Payment/A2A call paths"
+)]
 pub trait A2AProtocolAdapter: Send + Sync {
     /// Return whether this adapter is configured for execution.
     fn is_configured(&self) -> bool;
@@ -48,6 +53,9 @@ pub trait A2AProtocolAdapter: Send + Sync {
 /// The adapter produces synthetic quote/receipt/proof identifiers and never
 /// performs network I/O. It is still policy-gated by the coordinator so future
 /// real adapters can reuse the same execution contract.
+#[deprecated(
+    note = "Use LocalSimulatedPaymentAdapter behind PaymentSystemServiceProvider for new Payment/A2A call paths"
+)]
 pub struct LocalSimulatedA2AAdapter {
     terms: PaymentTerms,
 }
@@ -64,6 +72,7 @@ impl LocalSimulatedA2AAdapter {
 }
 
 #[async_trait]
+#[allow(deprecated)]
 impl A2AProtocolAdapter for LocalSimulatedA2AAdapter {
     fn is_configured(&self) -> bool {
         true
@@ -125,6 +134,7 @@ impl A2AProtocolAdapter for LocalSimulatedA2AAdapter {
 
 /// Runtime-facing facade for quote, intent, policy, execution, and receipt.
 #[async_trait]
+#[deprecated(note = "Use SystemPaymentClient for new Payment/A2A call paths")]
 pub trait A2APaymentFacade: Send + Sync {
     /// Execute the full Phase 09 local pipeline and return a receipt.
     async fn request_and_pay(
@@ -136,6 +146,9 @@ pub trait A2APaymentFacade: Send + Sync {
 }
 
 /// Concrete coordinator that composes adapter, policy, and persistence.
+#[deprecated(
+    note = "Use PaymentSystemServiceProvider plus SystemPaymentClient for new Payment/A2A call paths"
+)]
 pub struct A2ACoordinator {
     adapter: Arc<dyn A2AProtocolAdapter>,
     policy: Arc<dyn PaymentPolicyEngine>,
@@ -143,6 +156,7 @@ pub struct A2ACoordinator {
     event_sink: Arc<dyn A2APaymentEventSink>,
 }
 
+#[allow(deprecated)]
 impl A2ACoordinator {
     /// Create a coordinator with explicit strategy dependencies.
     pub fn new(
@@ -253,6 +267,7 @@ impl A2ACoordinator {
 }
 
 #[async_trait]
+#[allow(deprecated)]
 impl A2APaymentFacade for A2ACoordinator {
     async fn request_and_pay(
         &self,

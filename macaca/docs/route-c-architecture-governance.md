@@ -193,7 +193,22 @@ Web/CLI/Frontend 只能是 shell 和 adapter，不得定义核心 session、task
 - Store/Entitlement logs、audit pages 和 snapshots 只能包含 service id、command、trace id、package id、developer id、operation、state、reason code、counts、timestamps 和 sanitized diagnostics；不得泄露 raw package bytes、raw manifest body、encrypted payload、license secrets、credentials、API keys、private keys、prompt bodies 或 raw tool payload。
 - S9 不实现 S10 payment settlement，也不实现 S11 Web3/EVM entitlement verification。未来 payment/Web3/EVM 只能作为 strategy/provider/module 接入 Store/Entitlement boundary，不能回写到 kernel 或 presentation shell。
 
-## 15. 审查清单
+## 15. Payment / A2A Service Ownership
+
+路线 C S10 将 Payment / A2A 收敛为可替换 system service，而不是 kernel、application、Web、CLI 或 gateway 各自拥有支付/交易逻辑：
+
+- Payment Service 只拥有 quote、intent create、policy evaluate、approve、settle、receipt/proof/transition query 和 snapshot 这类 provider-neutral command，不拥有 Store marketplace、entitlement lifecycle、Web3 node、EVM execution、gateway transport 或 application workflow。
+- `macaca-proto` 拥有 Payment/A2A service ids、command names、command/result DTO、receipt/proof/transition view 和 sanitized snapshot，因为 SDK、runtime-host、Web、CLI、gateway、application 都必须共享同一 provider-neutral contract。
+- `macaca-runtime-host` 拥有 Payment `SystemService` provider wrapper、adapter Strategy、service lifecycle、trace-required dispatch、policy/decorator admission、sanitized logging 和 snapshot emission。它可以托管 local-simulated bootstrap adapter，但不得把真实支付 provider、chain、gateway、app 或 business workflow 写死在控制流里。
+- `macaca-sdk` 拥有 `SystemPaymentClient`、service-backed client、unavailable/null client 和 `SystemFacade::payment_client()` accessor。SDK 不得构造 runtime-host provider、payment repository、kernel A2A coordinator、Web state、CLI state、wallet、chain client 或 marketplace implementation。
+- Web、CLI、Gateway、Application 只能作为 shell/adapter：启动时可以注册 built-in Payment provider，但任何 payment route、command、agent-facing tool 或 A2A interaction 都必须通过 `SystemPaymentClient` / `SystemFacade` / service client。Presentation shell 不得定义 payment lifecycle、budget policy、approval policy 或 settlement semantics。
+- 旧 `macaca-kernel::A2ACoordinator`、`A2APaymentFacade`、`A2AProtocolAdapter` 和 `LocalSimulatedA2AAdapter` 只能作为 deprecated compatibility anchor 保留；新生产代码不得调用它们。新增调用点必须迁到 Payment Service。
+- Payment lifecycle 必须以 State pattern 表达并持久记录 transition Memento。任何 quote、intent、policy、approval、settlement、receipt、proof 操作必须携带 trace，缺失 trace 时 fail closed。
+- Payment policy 必须是 Strategy，可以被预算、显式审批、地域合规、entitlement、optional module availability、远程 agent 信用策略替换。不得用 provider/app/agent 名称 hardcode 判断支付行为。
+- Payment logs、audit pages 和 snapshots 只能包含 service id、command、trace id、requester/provider/capability ids、intent/receipt/proof ids、state、reason code、counts、timestamps 和 sanitized diagnostics；不得泄露 wallet private key、API key、provider credential、raw prompt body、raw tool payload、raw package bytes、license secret 或链上签名原文。
+- S10 不实现 S11 Web3 node、EVM 合约执行或真实支付 provider。未来 Web3/EVM/Payment provider 必须作为 optional module / adapter strategy 接入 Payment Service，不能回写到 kernel 或 presentation shell。
+
+## 16. 审查清单
 
 任何 Route C OpenSpec 都必须回答：
 

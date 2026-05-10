@@ -24,7 +24,8 @@ use macaca_persist::{EventLog, PersistBackend};
 use macaca_proto::{config::ContextConfig, ApplicationId, ForkId, LlmMessage};
 use macaca_sdk::{
     SystemApplicationClient, SystemContextClient, SystemDriverClient, SystemEntitlementClient,
-    SystemLlmClient, SystemMcpClient, SystemMemoryClient, SystemSkillClient, SystemStoreClient,
+    SystemLlmClient, SystemMcpClient, SystemMemoryClient, SystemPaymentClient, SystemSkillClient,
+    SystemStoreClient,
 };
 use macaca_skill::SkillCatalog;
 use macaca_task::TodoStore;
@@ -309,6 +310,8 @@ pub struct AppState {
     pub store_client: Arc<dyn SystemStoreClient>,
     /// The serviceized Entitlement client used by package authorization/audit paths.
     pub entitlement_client: Arc<dyn SystemEntitlementClient>,
+    /// The serviceized Payment client used by A2A payment and settlement paths.
+    pub payment_client: Arc<dyn SystemPaymentClient>,
     /// The LLM provider (DashScope by default).
     #[deprecated(note = "Use AppState::llm_client for new LLM call paths")]
     pub llm: Arc<dyn LlmProvider>,

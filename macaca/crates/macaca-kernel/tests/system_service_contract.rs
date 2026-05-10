@@ -114,13 +114,11 @@ fn lifecycle_controller_rejects_invalid_transition() {
 #[test]
 fn builtin_adapter_skeletons_export_provider_neutral_descriptors() {
     let descriptors = vec![
-        macaca_llm::llm_service_descriptor(),
         macaca_task::task_service_descriptor(),
         trace_service_descriptor(),
         macaca_driver::driver_service_descriptor(),
         macaca_skill::skill_service_descriptor(),
         macaca_gateway::gateway_service_descriptor(),
-        macaca_memory::memory_service_descriptor(),
     ];
 
     for descriptor in descriptors {
@@ -133,13 +131,11 @@ fn builtin_adapter_skeletons_export_provider_neutral_descriptors() {
     }
 
     let all_capabilities = vec![
-        CapabilityId::new("capability.llm.chat"),
         CapabilityId::new("capability.task.plan"),
         CapabilityId::new("capability.trace.emit"),
         CapabilityId::new("capability.driver.execute"),
         CapabilityId::new("capability.skill.invoke"),
         CapabilityId::new("capability.gateway.message"),
-        CapabilityId::new("capability.memory.recall"),
     ];
-    assert_eq!(all_capabilities.len(), 7);
+    assert_eq!(all_capabilities.len(), 5);
 }

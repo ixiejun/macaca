@@ -18,6 +18,7 @@ pub mod mcp_client;
 pub mod memory_client;
 pub mod package_client;
 pub mod package_fixtures;
+pub mod payment_client;
 pub mod persona;
 pub mod persona_prototype;
 pub mod registry_api;
@@ -61,6 +62,9 @@ pub use package_fixtures::{
     genui_app_fixture, invalid_missing_required_service_fixture, invalid_missing_runtime_fixture,
     paid_skill_fixture, wasm_stub_app_fixture, web3_optional_fixture, yaml_app_fixture,
     EcosystemPackageFixtureBuilder,
+};
+pub use payment_client::{
+    ServiceBackedPaymentClient, SystemPaymentClient, UnavailableSystemPaymentClient,
 };
 pub use persona::AgentPersona;
 pub use persona_prototype::{PersonaOverrides, PersonaPrototype};

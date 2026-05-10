@@ -82,7 +82,10 @@ pub use web3_event::{
     InMemoryWeb3TraceEventSink, NoopWeb3TraceEventSink, Web3TraceEvent, Web3TraceEventSink,
 };
 
-// Re-export executor types
+// Re-export executor types.  The A2A symbols are deliberately kept as
+// deprecated compatibility anchors so downstream migrations can locate the old
+// kernel-owned payment path; the re-export itself should not produce warnings.
+#[allow(deprecated)]
 pub use a2a::{
     local_simulated_terms, A2ACoordinator, A2APaymentFacade, A2AProtocolAdapter,
     LocalSimulatedA2AAdapter,

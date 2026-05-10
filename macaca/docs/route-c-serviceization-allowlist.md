@@ -104,6 +104,18 @@ S9 已建立 Store / Entitlement 的 provider-neutral DTO、runtime-host service
 | `macaca-skill` encrypted package hook | `EncryptedPackageLoader` 通过 `EncryptedPackageAuthorizer` trait seam 授权，deny/unavailable 时不会进入 decrypt hook。 | 需要在后续 skill package runtime 中注入 service-backed authorizer，当前 hook 本身保持 provider-neutral。 |
 | package manager Web/CLI surfaces | 当前代码库没有独立 Store marketplace UI；Web 已持有 serviceized clients 供后续 route 使用。 | 当 package inspect/install/status API 或 CLI command 增加时，必须使用 `SystemStoreClient` / `SystemEntitlementClient`，禁止新增 direct helper path。 |
 
+## 4.5 S10 Payment / A2A 迁移状态
+
+S10 已建立 Payment / A2A 的 provider-neutral DTO、runtime-host service provider wrapper、SDK focused client，并在 Web startup 注册和启动 Payment Service。旧 `macaca-kernel::A2ACoordinator` / `A2APaymentFacade` / `A2AProtocolAdapter` / `LocalSimulatedA2AAdapter` 已标记为 deprecated compatibility anchor，便于后续消费迁移检索；新生产路径必须优先使用 `PaymentSystemServiceProvider` + `SystemPaymentClient`。
+
+| Edge | Current S10 status | Remaining debt |
+| --- | --- | --- |
+| `macaca-web -> macaca-runtime-host` | Web startup 注册 built-in local-simulated Payment provider，并通过 runtime-backed `SystemPaymentClient` 访问服务。 | Web 仍是当前 composition root。过期条件：S12 或后续 host composition 把 provider registration 移到 shared runtime bootstrap，Web 只接收 `SystemFacade`。 |
+| `macaca-web -> macaca-persist` | Payment Service 当前使用 Web-owned in-memory payment store 作为 bootstrap repository，保持无网络、无真实钱包、无链依赖。 | Payment repository 应迁到 Payment Service-owned repository factory 或 Persistence Service；生产 payment provider 不应由 Web 直接构造。 |
+| `macaca-sdk -> Payment provider` | SDK 没有 runtime-host/web/provider concrete dependency，只通过 `SystemServiceClient` 分发 provider-neutral Payment commands。 | 目标状态已达成；后续 SDK 不得引入 payment provider concrete dependency。 |
+| `macaca-kernel` A2A compatibility | 旧 kernel A2A coordinator/facade/adapter 保留但已 deprecated，用于测试和迁移检索。 | 后续上层消费必须迁到 `SystemPaymentClient`；当 GitNexus 和 `rg` 证明没有 production direct caller 后，旧接口可进入删除提案。 |
+| Payment provider strategy | Runtime-host 新增 `PaymentAdapterStrategy` 与 local simulated adapter，这是 service provider ownership，不属于 kernel/presentation。 | 真实支付、远程 agent 交易、Web3 proof 或 EVM settlement 必须作为 adapter strategy / optional module 接入，不得回写 kernel 或 Web。 |
+
 ## 5. 新增例外流程
 
 1. 创建或更新 OpenSpec change，解释为什么短期不能立即迁移。

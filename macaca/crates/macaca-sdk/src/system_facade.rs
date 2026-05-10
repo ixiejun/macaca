@@ -22,6 +22,7 @@ pub use crate::package_client::{
     EmptySystemPackageClient, PackageInspectionCommand, PackageInspectionResult,
     SystemPackageClient,
 };
+pub use crate::payment_client::{SystemPaymentClient, UnavailableSystemPaymentClient};
 pub use crate::service_client::{
     ServiceCallCommand, ServiceCallResult, ServiceInspectionCommand, ServiceInspectionResult,
     SystemServiceClient, UnavailableSystemServiceClient,
@@ -74,6 +75,7 @@ pub struct SystemFacade<
     A = UnavailableSystemApplicationClient,
     ST = UnavailableSystemStoreClient,
     E = UnavailableSystemEntitlementClient,
+    PMT = UnavailableSystemPaymentClient,
 > {
     task_board: T,
     status: S,
@@ -89,6 +91,7 @@ pub struct SystemFacade<
     application: A,
     store: ST,
     entitlement: E,
+    payment: PMT,
 }
 
 impl<T, S> SystemFacade<T, S>
@@ -117,6 +120,7 @@ where
             application: UnavailableSystemApplicationClient,
             store: UnavailableSystemStoreClient,
             entitlement: UnavailableSystemEntitlementClient,
+            payment: UnavailableSystemPaymentClient,
         }
     }
 }
@@ -137,6 +141,7 @@ impl<T, S, SV, TR, P>
         UnavailableSystemApplicationClient,
         UnavailableSystemStoreClient,
         UnavailableSystemEntitlementClient,
+        UnavailableSystemPaymentClient,
     >
 where
     T: SystemTaskClient,
@@ -166,12 +171,13 @@ where
             application: UnavailableSystemApplicationClient,
             store: UnavailableSystemStoreClient,
             entitlement: UnavailableSystemEntitlementClient,
+            payment: UnavailableSystemPaymentClient,
         }
     }
 }
 
-impl<T, S, SV, TR, P, L, M, C, D, SK, MCP, A, ST, E>
-    SystemFacade<T, S, SV, TR, P, L, M, C, D, SK, MCP, A, ST, E>
+impl<T, S, SV, TR, P, L, M, C, D, SK, MCP, A, ST, E, PMT>
+    SystemFacade<T, S, SV, TR, P, L, M, C, D, SK, MCP, A, ST, E, PMT>
 where
     T: SystemTaskClient,
     S: SystemStatusClient,
@@ -187,6 +193,7 @@ where
     A: SystemApplicationClient,
     ST: SystemStoreClient,
     E: SystemEntitlementClient,
+    PMT: SystemPaymentClient,
 {
     /// Create a facade with all current Route C capability clients installed.
     ///
@@ -208,6 +215,7 @@ where
         application: A,
         store: ST,
         entitlement: E,
+        payment: PMT,
     ) -> Self {
         Self {
             task_board,
@@ -224,7 +232,13 @@ where
             application,
             store,
             entitlement,
+            payment,
         }
+    }
+
+    /// Borrow the focused Payment Service client.
+    pub fn payment_client(&self) -> &PMT {
+        &self.payment
     }
 
     /// Borrow the focused Store Service client.

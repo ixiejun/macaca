@@ -26,6 +26,9 @@ pub mod mcp_runtime;
 pub mod mcp_service_provider;
 pub mod memory_service_provider;
 pub mod package;
+pub mod payment_adapter;
+pub mod payment_admission;
+pub mod payment_service_provider;
 pub mod plugin;
 pub mod service_decorator;
 pub mod service_provider;
@@ -58,6 +61,8 @@ pub use mcp_runtime::{
 pub use mcp_service_provider::{mcp_service_descriptor, McpSystemServiceProvider};
 pub use memory_service_provider::MemorySystemServiceProvider;
 pub use package::{runtime_host_mcp_package_descriptor, RuntimeHostPackageRequirement};
+pub use payment_adapter::{LocalSimulatedPaymentAdapter, PaymentAdapterStrategy};
+pub use payment_service_provider::{payment_service_descriptor, PaymentSystemServiceProvider};
 pub use plugin::{
     plugin_failure_event, DescriptorPluginHost, PluginHost, PluginHostFactory,
     PluginLifecycleController, PluginManifestValidator, PluginRuntimeFacade, PluginRuntimeGuard,
