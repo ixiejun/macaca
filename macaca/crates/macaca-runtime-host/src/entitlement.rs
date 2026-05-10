@@ -121,6 +121,9 @@ impl CapabilityCallContext {
 /// isolated in small predicate methods, and every decision is persisted as an
 /// audit record. When an EventLog is supplied, paid capability calls also emit
 /// a session-scoped metering event compatible with existing trace replay.
+#[deprecated(
+    note = "Use EntitlementSystemServiceProvider plus SystemEntitlementClient for new Store/Entitlement call paths"
+)]
 pub struct EntitlementRuntimeFacade {
     store: Arc<dyn EntitlementStore>,
     event_log: Option<Arc<EventLog>>,

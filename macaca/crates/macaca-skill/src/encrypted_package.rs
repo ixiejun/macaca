@@ -52,6 +52,50 @@ pub trait EncryptedPackageAuthorizer: Send + Sync {
     ) -> Result<EntitlementDecision, CommerceError>;
 }
 
+/// Minimal service-backed entitlement client seam for encrypted packages.
+///
+/// `macaca-skill` must not depend on SDK, Web, runtime-host, or concrete Store
+/// implementations.  Hosts that own a real Entitlement Service client can
+/// implement this tiny Adapter seam and inject it into
+/// [`ServiceBackedEncryptedPackageAuthorizer`].  That keeps encrypted package
+/// authorization service-first without turning the skill crate into a
+/// presentation or runtime composition layer.
+#[async_trait]
+pub trait EncryptedPackageEntitlementClient: Send + Sync {
+    async fn authorize_encrypted_package_start(
+        &self,
+        manifest: &PackageManifest,
+    ) -> Result<EntitlementDecision, CommerceError>;
+}
+
+/// Authorizer Adapter that delegates encrypted package authorization to a
+/// service-backed client supplied by the host.
+pub struct ServiceBackedEncryptedPackageAuthorizer<C> {
+    client: C,
+}
+
+impl<C> ServiceBackedEncryptedPackageAuthorizer<C> {
+    /// Create an encrypted package authorizer from a host-supplied client.
+    pub fn new(client: C) -> Self {
+        Self { client }
+    }
+}
+
+#[async_trait]
+impl<C> EncryptedPackageAuthorizer for ServiceBackedEncryptedPackageAuthorizer<C>
+where
+    C: EncryptedPackageEntitlementClient,
+{
+    async fn authorize_decrypt(
+        &self,
+        manifest: &PackageManifest,
+    ) -> Result<EntitlementDecision, CommerceError> {
+        self.client
+            .authorize_encrypted_package_start(manifest)
+            .await
+    }
+}
+
 /// Proxy that gates decrypt/load behind entitlement authorization.
 pub struct EncryptedPackageLoader<A, D> {
     authorizer: A,
@@ -148,6 +192,23 @@ mod tests {
         decision: EntitlementDecision,
     }
 
+    struct ServiceClientAuthorizer;
+
+    #[async_trait]
+    impl EncryptedPackageEntitlementClient for ServiceClientAuthorizer {
+        async fn authorize_encrypted_package_start(
+            &self,
+            manifest: &PackageManifest,
+        ) -> Result<EntitlementDecision, CommerceError> {
+            Ok(EntitlementDecision::allow(
+                manifest.id.clone(),
+                manifest.developer.clone(),
+                "start",
+                EntitlementState::valid(),
+            ))
+        }
+    }
+
     #[async_trait]
     impl EncryptedPackageAuthorizer for StaticAuthorizer {
         async fn authorize_decrypt(
@@ -225,6 +286,22 @@ mod tests {
                     EntitlementState::valid(),
                 ),
             },
+            CountingDecryptor {
+                calls: Arc::clone(&calls),
+            },
+        );
+
+        let decrypted = loader.load(&manifest(), b"abc").await.unwrap().unwrap();
+
+        assert_eq!(decrypted.bytes, b"cba");
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn service_backed_encrypted_authorizer_can_drive_loader() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let loader = EncryptedPackageLoader::new(
+            ServiceBackedEncryptedPackageAuthorizer::new(ServiceClientAuthorizer),
             CountingDecryptor {
                 calls: Arc::clone(&calls),
             },

@@ -10,6 +10,7 @@ pub mod builder;
 pub mod config;
 pub mod context_client;
 pub mod driver_client;
+pub mod entitlement_client;
 pub mod evm;
 pub mod facade;
 pub mod llm_client;
@@ -24,6 +25,7 @@ pub mod service_client;
 pub mod skill_client;
 pub mod spec;
 pub mod status_client;
+pub mod store_client;
 pub mod system_facade;
 pub mod task_client;
 pub mod trace_client;
@@ -42,6 +44,9 @@ pub use context_client::{
 };
 pub use driver_client::{
     ServiceBackedDriverClient, SystemDriverClient, UnavailableSystemDriverClient,
+};
+pub use entitlement_client::{
+    ServiceBackedEntitlementClient, SystemEntitlementClient, UnavailableSystemEntitlementClient,
 };
 pub use evm::MacacaEvmSdk;
 pub use facade::{AgentRegistryApi, KernelAgentRegistry, KernelPrimitiveSdk, MacacaSdk};
@@ -64,6 +69,7 @@ pub use registry_api::{register_from_config, register_from_file};
 pub use service_client::{ServiceCallCommand, ServiceCallResult, ServiceInspectionResult};
 pub use skill_client::{ServiceBackedSkillClient, SystemSkillClient, UnavailableSystemSkillClient};
 pub use spec::{AgentSpec, AgentSpecBuilder, TracePolicy};
+pub use store_client::{ServiceBackedStoreClient, SystemStoreClient, UnavailableSystemStoreClient};
 pub use system_facade::{
     kernel_status_snapshot, ApprovalDecisionCommand, EmptySystemPackageClient,
     EmptySystemTraceClient, PackageInspectionCommand, PackageInspectionResult,

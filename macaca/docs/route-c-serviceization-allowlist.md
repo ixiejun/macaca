@@ -91,6 +91,19 @@ S7 已建立 Application Service provider-neutral DTO、runtime-host provider wr
 | `macaca-app -> macaca-runtime-host` | S7 移除了 app crate 对 runtime-host entitlement facade 的直接依赖，改为本地 authorizer trait。 | 目标状态已达成；后续 app crate 不得反向依赖 runtime-host、Web 或 SDK runtime composition。 |
 | Web framework manifest fallback | Chat coordinator、framework runner、toolkit、loop manager、skill MCP 仍有 direct manifest reads。 | 这些路径用于 prompt semantics、context overrides、MCP overlay、tool policy、task decomposition compatibility。过期条件：Application Service 或 dedicated Application Metadata Service 提供 sanitized semantics views 后，Web 不再读取 raw manifest。 |
 
+## 4.4 S9 Store / Entitlement 迁移状态
+
+S9 已建立 Store / Entitlement 的 provider-neutral DTO、runtime-host service provider wrapper、SDK focused clients，并在 Web startup 注册和启动 Store/Entitlement services。`macaca-app` 与 `macaca-skill` 的商业授权入口仍通过本地 authorizer trait 保持 Dependency Inversion；direct Phase 08 helper/facade path 保留为 deprecated compatibility anchor，直到 S12 thin shell 与后续 package manager 迁移证明不再需要。
+
+| Edge | Current S9 status | Remaining debt |
+| --- | --- | --- |
+| `macaca-web -> macaca-runtime-host` | Web startup 注册 Store/Entitlement built-in providers，并通过 runtime-backed `SystemStoreClient` / `SystemEntitlementClient` 访问服务。 | Web 仍是当前 composition root。过期条件：S12 或后续 host composition 把 provider registration 移到 shared runtime bootstrap，Web 只接收 `SystemFacade`。 |
+| `macaca-web -> macaca-persist` | Entitlement service provider 复用当前 Web-owned `EventLog` 和 in-memory entitlement store 进行 audit/metering 兼容。 | Store/Entitlement persistence 应迁到 Store/Entitlement service-owned repository factory 或 Persistence Service。 |
+| `macaca-sdk -> Store/Entitlement provider` | SDK 没有 runtime-host/app/skill/web/cli direct dependency，只通过 `SystemServiceClient` 分发 provider-neutral commands。 | 目标状态已达成；后续 SDK 不得引入 provider concrete dependency。 |
+| `macaca-app` commercial guard | `CommercialPackageGuard` 通过 `ApplicationEntitlementAuthorizer` trait seam 授权，free/open fast path 保持不变。 | 需要在后续消费迁移中注入 service-backed authorizer 作为默认生产 authorizer，并逐步减少 direct Phase 08 facade 使用。 |
+| `macaca-skill` encrypted package hook | `EncryptedPackageLoader` 通过 `EncryptedPackageAuthorizer` trait seam 授权，deny/unavailable 时不会进入 decrypt hook。 | 需要在后续 skill package runtime 中注入 service-backed authorizer，当前 hook 本身保持 provider-neutral。 |
+| package manager Web/CLI surfaces | 当前代码库没有独立 Store marketplace UI；Web 已持有 serviceized clients 供后续 route 使用。 | 当 package inspect/install/status API 或 CLI command 增加时，必须使用 `SystemStoreClient` / `SystemEntitlementClient`，禁止新增 direct helper path。 |
+
 ## 5. 新增例外流程
 
 1. 创建或更新 OpenSpec change，解释为什么短期不能立即迁移。

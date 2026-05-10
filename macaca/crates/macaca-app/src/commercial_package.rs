@@ -4,7 +4,12 @@
 //! entitlement policy. The guard delegates paid install/start/call decisions
 //! to `macaca-runtime-host` while preserving free/open package compatibility.
 
-use macaca_proto::{CommerceError, EntitlementDecision, EntitlementState, PackageManifest};
+use macaca_proto::{
+    CommerceError, EntitlementAuthorizeCallCommand, EntitlementAuthorizeInstallCommand,
+    EntitlementAuthorizeResult, EntitlementAuthorizeStartCommand, EntitlementDecision,
+    EntitlementServiceScope, EntitlementState, PackageManifest, TraceContext,
+};
+use macaca_sdk::SystemEntitlementClient;
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
@@ -111,6 +116,102 @@ impl<'a> CommercialPackageGuard<'a> {
     }
 }
 
+/// Service-backed application entitlement authorizer.
+///
+/// This Adapter lets application package guards call the Route C Entitlement
+/// Service through the SDK focused client instead of depending on
+/// `macaca-runtime-host::EntitlementRuntimeFacade`.  The application crate
+/// still owns package semantics through [`ApplicationEntitlementAuthorizer`],
+/// while service dispatch, lifecycle, trace, and audit stay behind
+/// `SystemEntitlementClient`.
+pub struct ServiceBackedApplicationEntitlementAuthorizer<C> {
+    client: C,
+    trace_prefix: String,
+}
+
+impl<C> ServiceBackedApplicationEntitlementAuthorizer<C> {
+    /// Create an authorizer from any SDK Entitlement client implementation.
+    pub fn new(client: C) -> Self {
+        Self {
+            client,
+            trace_prefix: "app-commercial-entitlement".into(),
+        }
+    }
+
+    fn trace(&self, manifest: &PackageManifest, operation: &str) -> TraceContext {
+        TraceContext::new(format!("{}-{}-{operation}", self.trace_prefix, manifest.id))
+    }
+
+    fn scope(manifest: &PackageManifest) -> EntitlementServiceScope {
+        EntitlementServiceScope::package(manifest.id.clone(), manifest.developer.clone())
+    }
+}
+
+#[async_trait::async_trait]
+impl<C> ApplicationEntitlementAuthorizer for ServiceBackedApplicationEntitlementAuthorizer<C>
+where
+    C: SystemEntitlementClient,
+{
+    async fn authorize_install(
+        &self,
+        manifest: &PackageManifest,
+    ) -> Result<EntitlementDecision, CommerceError> {
+        let view = self
+            .client
+            .authorize_install(EntitlementAuthorizeInstallCommand {
+                trace: self.trace(manifest, "install"),
+                scope: Self::scope(manifest),
+                commerce: manifest.commerce.clone(),
+            })
+            .await
+            .map_err(service_error)?;
+        Ok(decision_from_view(view))
+    }
+
+    async fn authorize_start(
+        &self,
+        manifest: &PackageManifest,
+    ) -> Result<EntitlementDecision, CommerceError> {
+        let view = self
+            .client
+            .authorize_start(EntitlementAuthorizeStartCommand {
+                trace: self.trace(manifest, "start"),
+                scope: Self::scope(manifest),
+                commerce: manifest.commerce.clone(),
+            })
+            .await
+            .map_err(service_error)?;
+        Ok(decision_from_view(view))
+    }
+
+    async fn authorize_capability_call(
+        &self,
+        manifest: &PackageManifest,
+        context: AppCapabilityCallContext,
+    ) -> Result<EntitlementDecision, CommerceError> {
+        let mut scope = Self::scope(manifest);
+        scope.application_id = context.app_id;
+        scope.session_id = context.session_id;
+        scope.capability_id = context.capability_id.map(macaca_proto::CapabilityId::new);
+        let view = self
+            .client
+            .authorize_call(EntitlementAuthorizeCallCommand {
+                trace: self.trace(manifest, "call"),
+                scope,
+                commerce: manifest.commerce.clone(),
+                quantity: context.quantity.max(1),
+                unit: if context.unit.trim().is_empty() {
+                    "unit".into()
+                } else {
+                    context.unit
+                },
+            })
+            .await
+            .map_err(service_error)?;
+        Ok(decision_from_view(view))
+    }
+}
+
 /// Return whether a package requires Store/Entitlement checks.
 pub fn is_commercial_package(manifest: &PackageManifest) -> bool {
     manifest.commerce.store_required || manifest.commerce.license_type.is_paid_family()
@@ -125,6 +226,24 @@ fn free_decision(manifest: &PackageManifest, operation: &str) -> EntitlementDeci
     )
 }
 
+fn decision_from_view(view: EntitlementAuthorizeResult) -> EntitlementDecision {
+    EntitlementDecision {
+        entitlement_id: view.entitlement_id,
+        package_id: view.package_id,
+        developer_id: view.developer_id,
+        operation: view.operation,
+        state: EntitlementState::new(view.state),
+        allowed: view.allowed,
+        reason: view.reason,
+        decided_at: view.decided_at,
+        metadata: Default::default(),
+    }
+}
+
+fn service_error(error: impl std::fmt::Display) -> CommerceError {
+    CommerceError::PolicyUnavailable(format!("Entitlement service call failed: {error}"))
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
@@ -132,9 +251,15 @@ mod tests {
     use async_trait::async_trait;
     use chrono::Utc;
     use macaca_proto::{
-        DeveloperId, EntitlementId, EntitlementRecord, LicenseType, PackageId, PackageManifest,
-        PackageRuntime, PackageRuntimeKind, PackageType,
+        DeveloperId, EntitlementAuditPage, EntitlementAuditQueryCommand,
+        EntitlementAuthorizeCallCommand, EntitlementAuthorizeInstallCommand,
+        EntitlementAuthorizeStartCommand, EntitlementDecisionView, EntitlementId,
+        EntitlementMeteringRecordCommand, EntitlementQueryCommand, EntitlementQueryResult,
+        EntitlementRecord, EntitlementServiceSnapshot, EntitlementSnapshotCommand,
+        EntitlementUpsertCommand, LicenseType, MacacaResult, MeteringEvent, PackageId,
+        PackageManifest, PackageRuntime, PackageRuntimeKind, PackageType,
     };
+    use macaca_sdk::SystemEntitlementClient;
 
     use super::*;
 
@@ -246,5 +371,107 @@ mod tests {
             decision.entitlement_id.as_ref().unwrap().as_str(),
             "entitlement.app"
         );
+    }
+
+    struct MockSystemEntitlementClient;
+
+    #[async_trait]
+    impl SystemEntitlementClient for MockSystemEntitlementClient {
+        async fn query(
+            &self,
+            _command: EntitlementQueryCommand,
+        ) -> MacacaResult<EntitlementQueryResult> {
+            Ok(None)
+        }
+
+        async fn upsert(
+            &self,
+            command: EntitlementUpsertCommand,
+        ) -> MacacaResult<EntitlementRecord> {
+            Ok(command.record)
+        }
+
+        async fn revoke(
+            &self,
+            _command: macaca_proto::EntitlementRevokeCommand,
+        ) -> MacacaResult<EntitlementRecord> {
+            Ok(record())
+        }
+
+        async fn authorize_install(
+            &self,
+            command: EntitlementAuthorizeInstallCommand,
+        ) -> MacacaResult<EntitlementDecisionView> {
+            Ok(EntitlementDecisionView::from(EntitlementDecision::allow(
+                command.scope.package_id.unwrap(),
+                command.scope.developer_id.unwrap(),
+                "install",
+                EntitlementState::valid(),
+            )))
+        }
+
+        async fn authorize_start(
+            &self,
+            command: EntitlementAuthorizeStartCommand,
+        ) -> MacacaResult<EntitlementDecisionView> {
+            Ok(EntitlementDecisionView::from(EntitlementDecision::allow(
+                command.scope.package_id.unwrap(),
+                command.scope.developer_id.unwrap(),
+                "start",
+                EntitlementState::valid(),
+            )))
+        }
+
+        async fn authorize_call(
+            &self,
+            command: EntitlementAuthorizeCallCommand,
+        ) -> MacacaResult<EntitlementDecisionView> {
+            Ok(EntitlementDecisionView::from(EntitlementDecision::allow(
+                command.scope.package_id.unwrap(),
+                command.scope.developer_id.unwrap(),
+                "call",
+                EntitlementState::valid(),
+            )))
+        }
+
+        async fn audit(
+            &self,
+            command: EntitlementAuditQueryCommand,
+        ) -> MacacaResult<EntitlementAuditPage> {
+            Ok(EntitlementAuditPage {
+                package_id: command.scope.package_id,
+                decisions: Vec::new(),
+                next_offset: None,
+            })
+        }
+
+        async fn record_metering(
+            &self,
+            command: EntitlementMeteringRecordCommand,
+        ) -> MacacaResult<MeteringEvent> {
+            Ok(command.event)
+        }
+
+        async fn snapshot(
+            &self,
+            _command: EntitlementSnapshotCommand,
+        ) -> MacacaResult<EntitlementServiceSnapshot> {
+            Ok(EntitlementServiceSnapshot::healthy(0, 0, 0))
+        }
+    }
+
+    #[tokio::test]
+    async fn service_backed_authorizer_uses_entitlement_client() {
+        let authorizer =
+            ServiceBackedApplicationEntitlementAuthorizer::new(MockSystemEntitlementClient);
+        let guard = CommercialPackageGuard::new(&authorizer);
+
+        let decision = guard
+            .authorize_start(&manifest(LicenseType::subscription()))
+            .await
+            .unwrap();
+
+        assert!(decision.allowed);
+        assert_eq!(decision.operation, "start");
     }
 }

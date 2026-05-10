@@ -178,7 +178,22 @@ Web/CLI/Frontend 只能是 shell 和 adapter，不得定义核心 session、task
 - WASM/package application 在 S7 只能 metadata-only admission；执行缺失必须返回 structured unavailable，不得 panic、阻塞等待或假装启动成功。
 - `/api/chat/v2` 在 S7 只迁移 entry-agent/status/session envelope preflight。Coordinator execution、PlanLoop、WorkerLoop、EventLog persistence、RunTracer、resume signal 和 SSE shape 仍由既有路径保持兼容，不能被 Application Service 吸收。
 
-## 14. 审查清单
+## 14. Store / Entitlement Service Ownership
+
+路线 C S9 将 Store / Entitlement 收敛为可替换 system service，而不是 application、skill、Web、CLI 或 runtime helper 各自拥有商业授权逻辑：
+
+- Store Service 只拥有 package inspect、resolve、install、status、snapshot 这类 provider-neutral package lifecycle command，不拥有支付结算、市场推荐、业务运营、driver/skill/MCP/application 执行或 Web3/EVM 证明逻辑。
+- Entitlement Service 只拥有 entitlement query、upsert、revoke、install/start/call authorization、audit query、metering record 和 snapshot，不拥有具体 Store vendor、payment provider、application workflow 或 encrypted payload 解密实现。
+- `macaca-proto` 拥有 Store/Entitlement command/result DTO、service ids、command names 和 sanitized views，因为 SDK、runtime-host、Web、CLI、app、skill 都必须共享同一 provider-neutral contract。
+- `macaca-runtime-host` 拥有 Store/Entitlement `SystemService` provider wrapper、service lifecycle、trace-required dispatch、policy/decorator admission、sanitized logging 和 snapshot emission。它只能适配 Phase 08 facade/store/guard seam，不得把 commerce 规则写成 provider/app/workflow special case。
+- `macaca-sdk` 拥有 `SystemStoreClient`、`SystemEntitlementClient`、service-backed clients、unavailable/null clients 和 `SystemFacade` accessor。SDK 不得构造 runtime-host providers、entitlement repositories、application runtime、skill runtime、Web state 或 CLI state。
+- `macaca-app` 和 `macaca-skill` 只能通过 authorizer trait seam 调用 entitlement decisions。Direct Phase 08 facade/helper path 必须保留为 deprecated compatibility anchor；新生产路径应优先使用 service-backed authorizer/client。
+- Web 和 CLI 只能作为 shell adapter：启动时可以注册 built-in Store/Entitlement providers，但 package/entitlement route 或 command 必须通过 `SystemFacade` / focused clients。Web/CLI 不得定义 license precedence、paid policy、metering policy 或 encrypted package authorization semantics。
+- 免费/开源 package 在 Store Service 缺失时必须保持本地兼容路径；付费、订阅、metered、encrypted package 在 entitlement missing/expired/revoked/region_blocked/usage_exceeded/service_unavailable 时必须返回结构化 deny/unavailable，不得静默 allow。
+- Store/Entitlement logs、audit pages 和 snapshots 只能包含 service id、command、trace id、package id、developer id、operation、state、reason code、counts、timestamps 和 sanitized diagnostics；不得泄露 raw package bytes、raw manifest body、encrypted payload、license secrets、credentials、API keys、private keys、prompt bodies 或 raw tool payload。
+- S9 不实现 S10 payment settlement，也不实现 S11 Web3/EVM entitlement verification。未来 payment/Web3/EVM 只能作为 strategy/provider/module 接入 Store/Entitlement boundary，不能回写到 kernel 或 presentation shell。
+
+## 15. 审查清单
 
 任何 Route C OpenSpec 都必须回答：
 

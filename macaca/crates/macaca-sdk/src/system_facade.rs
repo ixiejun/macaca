@@ -14,6 +14,7 @@ use macaca_proto::MacacaResult;
 pub use crate::application_client::{SystemApplicationClient, UnavailableSystemApplicationClient};
 pub use crate::context_client::{SystemContextClient, UnavailableSystemContextClient};
 pub use crate::driver_client::{SystemDriverClient, UnavailableSystemDriverClient};
+pub use crate::entitlement_client::{SystemEntitlementClient, UnavailableSystemEntitlementClient};
 pub use crate::llm_client::{SystemLlmClient, UnavailableSystemLlmClient};
 pub use crate::mcp_client::{SystemMcpClient, UnavailableSystemMcpClient};
 pub use crate::memory_client::{SystemMemoryClient, UnavailableSystemMemoryClient};
@@ -30,6 +31,7 @@ pub use crate::status_client::{
     kernel_status_snapshot, StaticSystemStatusDataSource, SystemStatusClient,
     SystemStatusDataSource, SystemStatusSnapshot,
 };
+pub use crate::store_client::{SystemStoreClient, UnavailableSystemStoreClient};
 pub use crate::task_client::{
     SystemTaskClient, TaskBoardDataSource, TaskBoardQueryCommand, TaskBoardQueryResult,
     TodoStoreTaskBoardDataSource,
@@ -70,6 +72,8 @@ pub struct SystemFacade<
     SK = UnavailableSystemSkillClient,
     MCP = UnavailableSystemMcpClient,
     A = UnavailableSystemApplicationClient,
+    ST = UnavailableSystemStoreClient,
+    E = UnavailableSystemEntitlementClient,
 > {
     task_board: T,
     status: S,
@@ -83,6 +87,8 @@ pub struct SystemFacade<
     skill: SK,
     mcp: MCP,
     application: A,
+    store: ST,
+    entitlement: E,
 }
 
 impl<T, S> SystemFacade<T, S>
@@ -109,6 +115,8 @@ where
             skill: UnavailableSystemSkillClient,
             mcp: UnavailableSystemMcpClient,
             application: UnavailableSystemApplicationClient,
+            store: UnavailableSystemStoreClient,
+            entitlement: UnavailableSystemEntitlementClient,
         }
     }
 }
@@ -127,6 +135,8 @@ impl<T, S, SV, TR, P>
         UnavailableSystemSkillClient,
         UnavailableSystemMcpClient,
         UnavailableSystemApplicationClient,
+        UnavailableSystemStoreClient,
+        UnavailableSystemEntitlementClient,
     >
 where
     T: SystemTaskClient,
@@ -154,11 +164,14 @@ where
             skill: UnavailableSystemSkillClient,
             mcp: UnavailableSystemMcpClient,
             application: UnavailableSystemApplicationClient,
+            store: UnavailableSystemStoreClient,
+            entitlement: UnavailableSystemEntitlementClient,
         }
     }
 }
 
-impl<T, S, SV, TR, P, L, M, C, D, SK, MCP, A> SystemFacade<T, S, SV, TR, P, L, M, C, D, SK, MCP, A>
+impl<T, S, SV, TR, P, L, M, C, D, SK, MCP, A, ST, E>
+    SystemFacade<T, S, SV, TR, P, L, M, C, D, SK, MCP, A, ST, E>
 where
     T: SystemTaskClient,
     S: SystemStatusClient,
@@ -172,6 +185,8 @@ where
     SK: SystemSkillClient,
     MCP: SystemMcpClient,
     A: SystemApplicationClient,
+    ST: SystemStoreClient,
+    E: SystemEntitlementClient,
 {
     /// Create a facade with all current Route C capability clients installed.
     ///
@@ -191,6 +206,8 @@ where
         skill: SK,
         mcp: MCP,
         application: A,
+        store: ST,
+        entitlement: E,
     ) -> Self {
         Self {
             task_board,
@@ -205,7 +222,19 @@ where
             skill,
             mcp,
             application,
+            store,
+            entitlement,
         }
+    }
+
+    /// Borrow the focused Store Service client.
+    pub fn store_client(&self) -> &ST {
+        &self.store
+    }
+
+    /// Borrow the focused Entitlement Service client.
+    pub fn entitlement_client(&self) -> &E {
+        &self.entitlement
     }
 
     /// Borrow the focused Application Service client.

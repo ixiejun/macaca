@@ -306,6 +306,14 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
     let event_log = Arc::new(macaca_persist::EventLog::new(Arc::clone(
         &session_store_impl,
     )));
+    let entitlement_store: Arc<dyn macaca_persist::EntitlementStore> =
+        Arc::new(macaca_persist::InMemoryEntitlementStore::new());
+    let entitlement_facade = Arc::new(
+        macaca_runtime_host::EntitlementRuntimeFacade::with_event_log(
+            Arc::clone(&entitlement_store),
+            Arc::clone(&event_log),
+        ),
+    );
     let run_tracer = Arc::new(crate::run_trace::RunTracer::new(Arc::clone(&event_log)));
     info!(path = %session_db_path.display(), "Session store initialized");
 
@@ -482,6 +490,49 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
         )
         .await
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+    service_runtime
+        .register_provider(
+            &macaca_runtime_host::StaticServiceProviderFactory::new(
+                macaca_runtime_host::ServiceProviderInstance::new(
+                    macaca_runtime_host::entitlement_service_descriptor(),
+                    Arc::new(macaca_runtime_host::EntitlementSystemServiceProvider::new(
+                        Arc::clone(&entitlement_store),
+                        Arc::clone(&entitlement_facade),
+                    )),
+                ),
+            ),
+            macaca_runtime_host::ServiceProviderFactoryContext::new(),
+        )
+        .await
+        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+    service_runtime
+        .register_provider(
+            &macaca_runtime_host::StaticServiceProviderFactory::new(
+                macaca_runtime_host::ServiceProviderInstance::new(
+                    macaca_runtime_host::store_service_descriptor(),
+                    Arc::new(macaca_runtime_host::StoreSystemServiceProvider::new(
+                        Arc::clone(&entitlement_facade),
+                    )),
+                ),
+            ),
+            macaca_runtime_host::ServiceProviderFactoryContext::new(),
+        )
+        .await
+        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+    service_runtime
+        .start(
+            &KernelServiceId::new(macaca_proto::ENTITLEMENT_SERVICE_ID),
+            TraceContext::new("web-startup-entitlement-service"),
+        )
+        .await
+        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+    service_runtime
+        .start(
+            &KernelServiceId::new(macaca_proto::STORE_SERVICE_ID),
+            TraceContext::new("web-startup-store-service"),
+        )
+        .await
+        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
     let llm_client: Arc<dyn macaca_sdk::SystemLlmClient> = Arc::new(
         macaca_sdk::ServiceBackedLlmClient::new(Arc::clone(&generic_service_client)),
     );
@@ -504,6 +555,12 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
     let mcp_client: Arc<dyn macaca_sdk::SystemMcpClient> = Arc::new(
         macaca_sdk::ServiceBackedMcpClient::new(Arc::clone(&generic_service_client)),
     );
+    let store_client: Arc<dyn macaca_sdk::SystemStoreClient> = Arc::new(
+        macaca_sdk::ServiceBackedStoreClient::new(Arc::clone(&generic_service_client)),
+    );
+    let entitlement_client: Arc<dyn macaca_sdk::SystemEntitlementClient> = Arc::new(
+        macaca_sdk::ServiceBackedEntitlementClient::new(Arc::clone(&generic_service_client)),
+    );
 
     // 10. Build shared state.
     let state = Arc::new_cyclic(|weak_state| {
@@ -524,6 +581,8 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
             driver_client: Arc::clone(&driver_client),
             skill_client: Arc::clone(&skill_client),
             mcp_client: Arc::clone(&mcp_client),
+            store_client: Arc::clone(&store_client),
+            entitlement_client: Arc::clone(&entitlement_client),
             llm: llm.clone(),
             llm_router: llm_router.clone(),
             tools,

@@ -17,6 +17,7 @@ pub mod compat;
 pub mod context_service_provider;
 pub mod driver_service_provider;
 pub mod entitlement;
+pub mod entitlement_service_provider;
 pub mod env_bridge;
 pub mod factory;
 pub mod lease;
@@ -32,12 +33,17 @@ pub mod service_runtime;
 pub mod service_runtime_error;
 pub mod service_runtime_event;
 pub mod skill_service_provider;
+pub mod store_entitlement_admission;
+pub mod store_service_provider;
 pub mod transport;
 
 pub use application_service_provider::ApplicationSystemServiceProvider;
 pub use context_service_provider::ContextSystemServiceProvider;
 pub use driver_service_provider::DriverSystemServiceProvider;
 pub use entitlement::{CapabilityCallContext, EntitlementOperation, EntitlementRuntimeFacade};
+pub use entitlement_service_provider::{
+    entitlement_service_descriptor, EntitlementSystemServiceProvider,
+};
 #[allow(deprecated)]
 pub use env_bridge::{apply_mcp_env, McpEnvApplyOutcome};
 pub use factory::{McpServerFactory, RuntimeEnvBuilder};
@@ -74,4 +80,5 @@ pub use service_runtime_event::{
     ServiceRuntimeServiceSnapshot, ServiceRuntimeSnapshot,
 };
 pub use skill_service_provider::SkillSystemServiceProvider;
+pub use store_service_provider::{store_service_descriptor, StoreSystemServiceProvider};
 pub use transport::{ConfigBackedMcpTransport, McpTransport};
