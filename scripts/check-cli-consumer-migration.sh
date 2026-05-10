@@ -32,7 +32,7 @@ fi
 
 unexpected_manifest_refs="$(
   rg -n 'macaca-cli[[:space:]]*=' macaca -g 'Cargo.toml' \
-    | awk -F: '$1 != "macaca/Cargo.toml" && $1 != "macaca/crates/macaca-cli/Cargo.toml" { print }'
+    | awk -F: '$1 != "macaca/Cargo.toml" && $1 != "macaca/crates/shells/macaca-cli/Cargo.toml" { print }'
 )"
 
 if [[ -n "$unexpected_manifest_refs" ]]; then

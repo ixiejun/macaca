@@ -18,7 +18,7 @@ macaca-driver = { workspace = true }
 macaca-persist = { workspace = true }
 macaca-memory = { workspace = true }
 macaca-task = { workspace = true }
-macaca-framework = { path = "../macaca-framework", features = ["macaca-compat", "service-clients"] }
+macaca-framework = { path = "../../runtime/macaca-framework", features = ["macaca-compat", "service-clients"] }
 macaca-agent = { workspace = true }
 async-trait = { workspace = true }
 axum = "0.8"

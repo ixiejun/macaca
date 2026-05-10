@@ -6,13 +6,19 @@
 
 Allowlist 不是架构批准。它只是当前迁移状态的 Memento：说明哪条依赖违反 Route C 微内核边界、为什么还存在、未来应该迁到哪个 service/facade、在哪个阶段过期。
 
-新增例外必须先更新 OpenSpec，并同步更新 `macaca/crates/macaca-integration-tests/tests/route_c_dependency_boundaries.rs` 中的测试内 allowlist。禁止只改代码或只改文档。
+新增例外必须先更新 OpenSpec，并同步更新 `macaca/crates/tests/macaca-integration-tests/tests/route_c_dependency_boundaries.rs` 中的测试内 allowlist。禁止只改代码或只改文档。
 
 ## 2. 执行门禁
 
 可执行门禁位于：
 
-- `macaca/crates/macaca-integration-tests/tests/route_c_dependency_boundaries.rs`
+- `macaca/crates/tests/macaca-integration-tests/tests/route_c_dependency_boundaries.rs`
+
+Workspace topology 另有独立门禁：
+
+- `macaca/crates/tests/macaca-integration-tests/tests/route_c_workspace_topology.rs`
+
+Topology 门禁只校验 crate 是否位于正确的 Route C filesystem layer，不代表依赖边已经被允许或迁移完成。
 
 运行方式：
 

@@ -127,11 +127,15 @@ struct Violation {
 }
 
 fn workspace_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .ancestors()
-        .nth(2)
-        .expect("integration test crate should live under macaca/crates")
-        .to_path_buf()
+    for ancestor in Path::new(env!("CARGO_MANIFEST_DIR")).ancestors() {
+        let cargo_toml = ancestor.join("Cargo.toml");
+        if let Ok(content) = std::fs::read_to_string(&cargo_toml) {
+            if content.contains("[workspace]") {
+                return ancestor.to_path_buf();
+            }
+        }
+    }
+    panic!("failed to locate Macaca workspace root from CARGO_MANIFEST_DIR")
 }
 
 fn classify_crate(crate_name: &str) -> Option<Layer> {

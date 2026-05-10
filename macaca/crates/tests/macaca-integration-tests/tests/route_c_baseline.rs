@@ -9,11 +9,18 @@ use std::path::{Path, PathBuf};
 use macaca_integration_tests::pipeline_dry_run;
 
 fn repo_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .ancestors()
-        .nth(3)
-        .expect("integration test crate should live under macaca/crates")
-        .to_path_buf()
+    for ancestor in Path::new(env!("CARGO_MANIFEST_DIR")).ancestors() {
+        let cargo_toml = ancestor.join("Cargo.toml");
+        if let Ok(content) = std::fs::read_to_string(&cargo_toml) {
+            if content.contains("[workspace]") {
+                return ancestor
+                    .parent()
+                    .expect("workspace root should have a repository parent")
+                    .to_path_buf();
+            }
+        }
+    }
+    panic!("failed to locate repository root from CARGO_MANIFEST_DIR")
 }
 
 fn read_repo_file(relative_path: &str) -> String {

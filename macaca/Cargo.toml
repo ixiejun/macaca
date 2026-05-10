@@ -1,27 +1,27 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/macaca-proto",
-    "crates/macaca-llm",
-    "crates/macaca-memory",
-    "crates/macaca-ipc",
-    "crates/macaca-tools",
-    "crates/macaca-persist",
-    "crates/macaca-agent",
-    "crates/macaca-task",
-    "crates/macaca-app",
-    "crates/macaca-kernel",
-    "crates/macaca-sdk",
-    "crates/macaca-gateway",
-    "crates/macaca-cli",
-    "crates/macaca-driver",
-    "crates/macaca-runtime",
-    "crates/macaca-context",
-    "crates/macaca-skill",
-    "crates/macaca-web",
-    "crates/macaca-framework",
-    "crates/macaca-runtime-host",
-    "crates/macaca-integration-tests",
+    "crates/foundation/macaca-proto",
+    "crates/foundation/macaca-ipc",
+    "crates/foundation/macaca-persist",
+    "crates/kernel/macaca-kernel",
+    "crates/services/macaca-task",
+    "crates/services/macaca-llm",
+    "crates/services/macaca-memory",
+    "crates/services/macaca-context",
+    "crates/services/macaca-driver",
+    "crates/services/macaca-skill",
+    "crates/services/macaca-gateway",
+    "crates/services/macaca-tools",
+    "crates/runtime/macaca-runtime",
+    "crates/runtime/macaca-runtime-host",
+    "crates/runtime/macaca-framework",
+    "crates/application/macaca-agent",
+    "crates/application/macaca-app",
+    "crates/facade/macaca-sdk",
+    "crates/shells/macaca-web",
+    "crates/shells/macaca-cli",
+    "crates/tests/macaca-integration-tests",
 ]
 
 [workspace.package]
@@ -68,23 +68,23 @@ uuid = { version = "1", features = ["v4", "v5", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 
 # Internal crates
-macaca-proto = { path = "crates/macaca-proto" }
-macaca-llm = { path = "crates/macaca-llm" }
-macaca-memory = { path = "crates/macaca-memory" }
-macaca-ipc = { path = "crates/macaca-ipc" }
-macaca-tools = { path = "crates/macaca-tools" }
-macaca-persist = { path = "crates/macaca-persist" }
-macaca-agent = { path = "crates/macaca-agent" }
-macaca-task = { path = "crates/macaca-task" }
-macaca-app = { path = "crates/macaca-app" }
-macaca-kernel = { path = "crates/macaca-kernel" }
-macaca-sdk = { path = "crates/macaca-sdk" }
-macaca-gateway = { path = "crates/macaca-gateway" }
-macaca-cli = { path = "crates/macaca-cli" }
-macaca-driver = { path = "crates/macaca-driver" }
-macaca-runtime = { path = "crates/macaca-runtime" }
-macaca-context = { path = "crates/macaca-context" }
-macaca-skill = { path = "crates/macaca-skill" }
-macaca-web = { path = "crates/macaca-web" }
-macaca-framework = { path = "crates/macaca-framework" }
-macaca-runtime-host = { path = "crates/macaca-runtime-host" }
+macaca-proto = { path = "crates/foundation/macaca-proto" }
+macaca-llm = { path = "crates/services/macaca-llm" }
+macaca-memory = { path = "crates/services/macaca-memory" }
+macaca-ipc = { path = "crates/foundation/macaca-ipc" }
+macaca-tools = { path = "crates/services/macaca-tools" }
+macaca-persist = { path = "crates/foundation/macaca-persist" }
+macaca-agent = { path = "crates/application/macaca-agent" }
+macaca-task = { path = "crates/services/macaca-task" }
+macaca-app = { path = "crates/application/macaca-app" }
+macaca-kernel = { path = "crates/kernel/macaca-kernel" }
+macaca-sdk = { path = "crates/facade/macaca-sdk" }
+macaca-gateway = { path = "crates/services/macaca-gateway" }
+macaca-cli = { path = "crates/shells/macaca-cli" }
+macaca-driver = { path = "crates/services/macaca-driver" }
+macaca-runtime = { path = "crates/runtime/macaca-runtime" }
+macaca-context = { path = "crates/services/macaca-context" }
+macaca-skill = { path = "crates/services/macaca-skill" }
+macaca-web = { path = "crates/shells/macaca-web" }
+macaca-framework = { path = "crates/runtime/macaca-framework" }
+macaca-runtime-host = { path = "crates/runtime/macaca-runtime-host" }

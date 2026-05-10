@@ -123,24 +123,28 @@ Application Framework 不得直接实现 kernel policy、driver provider、payme
 
 ## 10. 当前 crate 归属表
 
-| crate | 当前角色 | 路线 C 目标归属 |
-| --- | --- | --- |
-| `macaca-proto` | 共享类型 | protocol / ABI / package / service / trace 类型底座 |
-| `macaca-kernel` | 内核与协调 | microkernel facade 与系统不变量 |
-| `macaca-ipc` | IPC | service bus / transport bridge |
-| `macaca-persist` | 持久化 | persistence service contract |
-| `macaca-task` | 任务系统 | task service |
-| `macaca-llm` | LLM 抽象 | LLM service |
-| `macaca-memory` | 记忆 | memory/context service |
-| `macaca-driver` | 驱动 | driver service/plugin runtime |
-| `macaca-skill` | skill | skill service / package runtime |
-| `macaca-gateway` | 外部入口 | gateway service/plugin adapter |
-| `macaca-agent` | agent 原语 | agent framework primitive |
-| `macaca-framework` | framework | traced agent / middleware / MCP primitive |
-| `macaca-runtime` | agentic runtime | runtime service primitive |
-| `macaca-runtime-host` | 宿主 | plugin/skill/MCP host facade |
-| `macaca-app` | application runtime | Application Framework |
-| `macaca-sdk` | SDK | system facade / developer API |
-| `macaca-web` | Web 入口 | thin shell / GenUI shell / trace viewer |
-| `macaca-cli` | CLI 入口 | command shell / service inspector |
+Route C 的 Rust workspace 目录拓扑位于 `macaca/crates/README.md`。文件系统 layer 用来表达所有权边界，但不等于依赖许可；依赖许可仍由 Route C dependency gate 和 allowlist 判定。
 
+| crate | 当前路径 | 当前角色 | 路线 C 目标归属 |
+| --- | --- | --- | --- |
+| `macaca-proto` | `crates/foundation/macaca-proto` | 共享类型 | protocol / ABI / package / service / trace 类型底座 |
+| `macaca-ipc` | `crates/foundation/macaca-ipc` | IPC | service bus / transport bridge |
+| `macaca-persist` | `crates/foundation/macaca-persist` | 持久化 | persistence service contract |
+| `macaca-kernel` | `crates/kernel/macaca-kernel` | 内核与协调 | microkernel facade 与系统不变量 |
+| `macaca-task` | `crates/services/macaca-task` | 任务系统 | task service |
+| `macaca-llm` | `crates/services/macaca-llm` | LLM 抽象 | LLM service |
+| `macaca-memory` | `crates/services/macaca-memory` | 记忆 | memory/context service |
+| `macaca-context` | `crates/services/macaca-context` | 上下文 | context service |
+| `macaca-driver` | `crates/services/macaca-driver` | 驱动 | driver service/plugin runtime |
+| `macaca-skill` | `crates/services/macaca-skill` | skill | skill service / package runtime |
+| `macaca-gateway` | `crates/services/macaca-gateway` | 外部入口 | gateway service/plugin adapter |
+| `macaca-tools` | `crates/services/macaca-tools` | 工具能力 | tool/skill service compatibility surface |
+| `macaca-runtime` | `crates/runtime/macaca-runtime` | agentic runtime | runtime service primitive |
+| `macaca-runtime-host` | `crates/runtime/macaca-runtime-host` | 宿主 | plugin/skill/MCP host facade |
+| `macaca-framework` | `crates/runtime/macaca-framework` | framework | traced agent / middleware / MCP primitive |
+| `macaca-agent` | `crates/application/macaca-agent` | agent 原语 | agent framework primitive |
+| `macaca-app` | `crates/application/macaca-app` | application runtime | Application Framework |
+| `macaca-sdk` | `crates/facade/macaca-sdk` | SDK | system facade / developer API |
+| `macaca-web` | `crates/shells/macaca-web` | Web 入口 | thin shell / GenUI shell / trace viewer |
+| `macaca-cli` | `crates/shells/macaca-cli` | CLI 入口 | command shell / service inspector |
+| `macaca-integration-tests` | `crates/tests/macaca-integration-tests` | 集成测试 | cross-layer governance / regression |

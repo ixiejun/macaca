@@ -12,19 +12,19 @@ struct ForbiddenPattern {
 
 const TARGETS: &[AuditTarget] = &[
     AuditTarget {
-        relative_path: "crates/macaca-tools/src/todo.rs",
+        relative_path: "crates/services/macaca-tools/src/todo.rs",
     },
     AuditTarget {
-        relative_path: "crates/macaca-web/src/framework_toolkit.rs",
+        relative_path: "crates/shells/macaca-web/src/framework_toolkit.rs",
     },
     AuditTarget {
-        relative_path: "crates/macaca-web/src/loop_manager.rs",
+        relative_path: "crates/shells/macaca-web/src/loop_manager.rs",
     },
     AuditTarget {
-        relative_path: "crates/macaca-web/src/routes.rs",
+        relative_path: "crates/shells/macaca-web/src/routes.rs",
     },
     AuditTarget {
-        relative_path: "crates/macaca-integration-tests/src/pipeline_dry_run.rs",
+        relative_path: "crates/tests/macaca-integration-tests/src/pipeline_dry_run.rs",
     },
 ];
 
@@ -80,12 +80,15 @@ const FORBIDDEN_PATTERNS: &[ForbiddenPattern] = &[
 ];
 
 fn macaca_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("integration-tests crate should be inside crates/")
-        .parent()
-        .expect("macaca workspace root should exist")
-        .to_path_buf()
+    for ancestor in Path::new(env!("CARGO_MANIFEST_DIR")).ancestors() {
+        let cargo_toml = ancestor.join("Cargo.toml");
+        if let Ok(content) = fs::read_to_string(&cargo_toml) {
+            if content.contains("[workspace]") {
+                return ancestor.to_path_buf();
+            }
+        }
+    }
+    panic!("failed to locate Macaca workspace root from CARGO_MANIFEST_DIR")
 }
 
 fn strip_strings_and_comments(source: &str) -> String {

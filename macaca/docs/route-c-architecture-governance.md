@@ -88,7 +88,7 @@ Web/CLI/Frontend 只能是 shell 和 adapter，不得定义核心 session、task
 
 路线 C S0 引入可执行依赖边界门禁：
 
-- 测试文件：`macaca/crates/macaca-integration-tests/tests/route_c_dependency_boundaries.rs`
+- 测试文件：`macaca/crates/tests/macaca-integration-tests/tests/route_c_dependency_boundaries.rs`
 - Allowlist 文档：`macaca/docs/route-c-serviceization-allowlist.md`
 - 运行命令：`cargo test -p macaca-integration-tests route_c_dependency_boundaries`
 
@@ -103,6 +103,27 @@ Web/CLI/Frontend 只能是 shell 和 adapter，不得定义核心 session、task
 当前仍存在的宏内核式依赖必须显式写入 allowlist。Allowlist 不是架构批准，只是迁移债务快照；每一行都必须包含 rule id、from crate、to crate、当前原因、替代 service/facade path、目标迁移阶段、过期条件和 owner/status。
 
 新增例外必须先走 OpenSpec，并同步更新 allowlist 文档和测试内 allowlist。禁止只在代码中静默放行新增依赖。
+
+## 7.1 Workspace Topology 门禁
+
+Route C workspace 目录必须体现微内核和非内核能力服务化/模块化后的所有权分层：
+
+- `crates/foundation/`：protocol、IPC/service bus、persistence foundation。
+- `crates/kernel/`：microkernel invariants。
+- `crates/services/`：replaceable system service domains。
+- `crates/runtime/`：runtime、runtime-host、framework execution seam。
+- `crates/application/`：agent/application framework。
+- `crates/facade/`：SDK/SystemFacade。
+- `crates/shells/`：Web/CLI thin shells。
+- `crates/tests/`：cross-layer governance 和 regression。
+
+拓扑门禁位于 `macaca/crates/tests/macaca-integration-tests/tests/route_c_workspace_topology.rs`，运行命令为：
+
+```bash
+cargo test -p macaca-integration-tests route_c_workspace_topology
+```
+
+该门禁使用 `cargo metadata --no-deps --format-version 1` 校验每个 workspace package 的 manifest path。它只判断 crate 是否位于正确的 filesystem layer；它不授予依赖权限。依赖权限仍由 `route_c_dependency_boundaries` 和 allowlist 判定。未来新增 crate 必须先通过 OpenSpec 明确 Route C layer，并同步更新 topology guard。
 
 ## 8. ServiceRuntime 治理
 

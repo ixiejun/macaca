@@ -34,13 +34,13 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "str
 axum = { version = "0.8", optional = true }
 
 # Macaca ecosystem
-macaca-proto = { path = "../macaca-proto" }
-macaca-context = { path = "../macaca-context" }
-macaca-agent = { path = "../macaca-agent" }
-macaca-persist = { path = "../macaca-persist", optional = true }
-macaca-sdk = { path = "../macaca-sdk", optional = true }
-macaca-llm = { path = "../macaca-llm", optional = true }
-macaca-tools = { path = "../macaca-tools", optional = true }
+macaca-proto = { path = "../../foundation/macaca-proto" }
+macaca-context = { path = "../../services/macaca-context" }
+macaca-agent = { path = "../../application/macaca-agent" }
+macaca-persist = { path = "../../foundation/macaca-persist", optional = true }
+macaca-sdk = { path = "../../facade/macaca-sdk", optional = true }
+macaca-llm = { path = "../../services/macaca-llm", optional = true }
+macaca-tools = { path = "../../services/macaca-tools", optional = true }
 
 [features]
 default = []
