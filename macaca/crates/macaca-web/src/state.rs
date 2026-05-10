@@ -23,8 +23,8 @@ use macaca_llm::{LlmProvider, LlmRouter};
 use macaca_persist::{EventLog, PersistBackend};
 use macaca_proto::{config::ContextConfig, ApplicationId, ForkId, LlmMessage};
 use macaca_sdk::{
-    SystemContextClient, SystemDriverClient, SystemLlmClient, SystemMcpClient, SystemMemoryClient,
-    SystemSkillClient,
+    SystemApplicationClient, SystemContextClient, SystemDriverClient, SystemLlmClient,
+    SystemMcpClient, SystemMemoryClient, SystemSkillClient,
 };
 use macaca_skill::SkillCatalog;
 use macaca_task::TodoStore;
@@ -277,9 +277,22 @@ pub struct AppState {
     /// The kernel managing all agents.
     pub kernel: Arc<Kernel>,
     /// Application runtime managing app lifecycle.
-    pub runtime: AppRuntime,
+    ///
+    /// Deprecated compatibility anchor: new Web call paths should use
+    /// [`Self::application_client`] so application lifecycle behavior crosses
+    /// the same traceable service boundary as other Route C capabilities.
+    #[deprecated(note = "Use AppState::application_client for new application lifecycle paths")]
+    pub runtime: Arc<AppRuntime>,
     /// Application registry for discovering apps.
-    pub registry: RwLock<AppRegistry>,
+    ///
+    /// Deprecated compatibility anchor retained so older route helpers and
+    /// tests can still inspect manifests during the gradual migration.  The
+    /// service provider receives the same shared registry handle, which keeps
+    /// direct fallback reads consistent with service-backed snapshots.
+    #[deprecated(note = "Use AppState::application_client for new application discovery paths")]
+    pub registry: Arc<RwLock<AppRegistry>>,
+    /// The serviceized Application client used by new Route C call paths.
+    pub application_client: Arc<dyn SystemApplicationClient>,
     /// The serviceized LLM client used by new Route C call paths.
     pub llm_client: Arc<dyn SystemLlmClient>,
     /// The serviceized Memory client used by new Route C call paths.

@@ -19,6 +19,8 @@ pub mod package_loader;
 pub mod registry;
 pub mod runtime;
 pub mod runtime_guard;
+pub mod service_adapter;
+pub mod service_admission;
 pub mod skills;
 pub mod web3_capability;
 pub mod workflow;
@@ -28,7 +30,10 @@ pub use abi::{
     ApplicationAbiDescriptor, ApplicationAbiInstance, ApplicationAbiLoadResult,
     MetadataOnlyApplicationAbiInstance, WasmApplicationAbiAdapter, YamlApplicationAbiAdapter,
 };
-pub use commercial_package::{is_commercial_package, CommercialPackageGuard};
+pub use commercial_package::{
+    is_commercial_package, AppCapabilityCallContext, ApplicationEntitlementAuthorizer,
+    CommercialPackageGuard,
+};
 pub use compatibility_checker::{
     CompatibilityDiagnostic, CompatibilityHostContext, CompatibilityReport, CompatibilitySeverity,
     CompatibilityStatus, CompatibilityTraceEvent, PackageCompatibilityChecker,
@@ -65,6 +70,11 @@ pub use runtime::{
 };
 pub use runtime_guard::{
     package_requires_wasm_runtime, PackageGuardContext, PackageGuardTraceEvent, PackageRuntimeGuard,
+};
+pub use service_adapter::application_service_descriptor;
+pub use service_admission::{
+    app_status_from_lifecycle, lifecycle_from_app_status, ApplicationManifestSpec,
+    ApplicationRuntimeKindSpec, ApplicationScopeSpec, ApplicationTraceSpec,
 };
 pub use skills::{global_skills_dir, SkillLoader};
 pub use web3_capability::AppWeb3CapabilityRequest;

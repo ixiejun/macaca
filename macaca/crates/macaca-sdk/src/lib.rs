@@ -5,6 +5,7 @@
 //! the kernel from declarative config files.
 
 pub mod application;
+pub mod application_client;
 pub mod builder;
 pub mod config;
 pub mod context_client;
@@ -30,6 +31,9 @@ pub mod validation;
 
 pub use application::{
     service_call_command, trace_emit_command, ApplicationAbiBuilder, ApplicationHostCommandBuilder,
+};
+pub use application_client::{
+    ServiceBackedApplicationClient, SystemApplicationClient, UnavailableSystemApplicationClient,
 };
 pub use builder::{AgentBuilder, DeclarativeAgent};
 pub use config::AgentConfig;

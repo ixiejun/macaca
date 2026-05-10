@@ -99,6 +99,9 @@ impl AppRuntime {
     }
 
     /// Load and start a declarative (L3) application from a manifest file.
+    #[deprecated(
+        note = "Use Application Service start command for new application lifecycle paths"
+    )]
     pub async fn start_app_from_file(
         &self,
         manifest_path: impl AsRef<Path>,
@@ -113,6 +116,9 @@ impl AppRuntime {
     }
 
     /// Load and start an app from a parsed manifest.
+    #[deprecated(
+        note = "Use Application Service start command for new application lifecycle paths"
+    )]
     pub async fn start_app(
         &self,
         manifest: AppManifest,

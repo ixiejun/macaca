@@ -165,7 +165,20 @@ Web/CLI/Frontend 只能是 shell 和 adapter，不得定义核心 session、task
 - 缺少 Driver/Skill/MCP runtime-backed service 时必须返回结构化 unavailable 或空 inventory，不得 panic、阻塞等待或静默构造 provider。
 - 任何新增 Driver/Skill/MCP 调用路径必须记录 trace id、application/session/agent scope、command、completion/failure 和 snapshot/event，不得泄露 env、headers、API key、provider credentials、raw command secrets 或未脱敏 tool payload。
 
-## 13. 审查清单
+## 13. Application Framework Service Ownership
+
+路线 C S7 将 Application Framework 生命周期收敛为可替换 system service，而不是 Web/CLI presentation shell 内部编排：
+
+- `macaca-app` 仍拥有 application manifest、registry、runtime assembly、ApplicationHost、ABI metadata、lifecycle projection、GenUI validation 和 admission Specification。Application Service DTO 只描述 provider-neutral command/result，不把 application 语义迁入 Web、SDK 或 runtime-host。
+- `macaca-runtime-host` 拥有 `ApplicationSystemServiceProvider` wrapper、service lifecycle、trace-required dispatch、policy/decorator chain、snapshot emission 和 structured unavailable，不得拥有业务 workflow、application name special case、prompt assembly、task planning、LLM execution、Driver/Skill/MCP execution。
+- `macaca-sdk` 只提供 `SystemApplicationClient` 和 `SystemFacade::application_client()` 这类 shell-facing Facade/Strategy client，不构造 `AppRuntime`、`AppRegistry`、`Kernel`、Web state、provider 或 application workflow。
+- Web、CLI、Gateway 只能作为 adapter：Web 负责 HTTP/SSE/UI 映射、现有 chat coordinator 兼容执行和 host-local toolkit 组装；新 application discover/start/status/session/GenUI 查询路径必须优先通过 Application Service。
+- 旧 `AppRuntime` startup APIs、Web `runtime`/`registry` fields 和直接 manifest reads 必须保留为 deprecated 搜索锚点，直到所有消费者迁移且 dependency gate 证明 Cargo direct edge 可以删除。保留旧代码不等于允许新增默认 direct path。
+- Application Service logs 和 snapshots 只能包含 ids、names、counts、runtime kind、lifecycle status、trace id、safe directory metadata 和 diagnostics；不得泄露 prompt body、raw manifest body、raw agent config、env、API key、secret 或 raw host payload。
+- WASM/package application 在 S7 只能 metadata-only admission；执行缺失必须返回 structured unavailable，不得 panic、阻塞等待或假装启动成功。
+- `/api/chat/v2` 在 S7 只迁移 entry-agent/status/session envelope preflight。Coordinator execution、PlanLoop、WorkerLoop、EventLog persistence、RunTracer、resume signal 和 SSE shape 仍由既有路径保持兼容，不能被 Application Service 吸收。
+
+## 14. 审查清单
 
 任何 Route C OpenSpec 都必须回答：
 

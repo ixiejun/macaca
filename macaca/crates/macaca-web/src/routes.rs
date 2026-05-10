@@ -26,8 +26,9 @@ use macaca_context::{
 use macaca_driver::{DriverInventoryCommand, DriverLoadServiceCommand, DriverServiceScope};
 use macaca_persist::{AppendEventCommand, EventLogQuery, SessionLineageStore};
 use macaca_proto::{
-    ApplicationId, MacacaError, McpProbeCommand, McpRuntimeStatusView, McpToolPolicySnapshot,
-    ProtoErrorAdapter, TraceContext,
+    ApplicationDiscoverCommand, ApplicationId, ApplicationServiceAppView, ApplicationServiceScope,
+    ApplicationStatusCommand, MacacaError, McpProbeCommand, McpRuntimeStatusView,
+    McpToolPolicySnapshot, ProtoErrorAdapter, TraceContext,
 };
 use macaca_skill::{SkillPolicy, SkillRuntimeFacade, SkillSnapshotRequest};
 
@@ -126,12 +127,20 @@ pub struct StatusResponse {
 
 pub async fn get_status(State(state): State<Arc<AppState>>) -> Json<StatusResponse> {
     let agent_count = state.kernel.agent_count().await;
-    let apps = state.runtime.list_apps().await;
+    let app_count = if let Some(views) = service_status_views(&state, "web-route-status-apps").await
+    {
+        views.len()
+    } else {
+        #[allow(deprecated)]
+        {
+            state.runtime.list_apps().await.len()
+        }
+    };
 
     Json(StatusResponse {
         version: env!("CARGO_PKG_VERSION").into(),
         agent_count,
-        app_count: apps.len(),
+        app_count,
         llm_provider: state.llm.name().into(),
     })
 }
@@ -150,9 +159,50 @@ pub struct AppInfo {
     pub icon: String,
 }
 
+fn app_info_from_service_view(view: &ApplicationServiceAppView) -> AppInfo {
+    AppInfo {
+        id: view.id.0.to_string(),
+        name: view.name.clone(),
+        status: view.runtime.compatibility_status.clone(),
+        agent_count: view.agents.len(),
+        description: view
+            .description
+            .clone()
+            .unwrap_or_else(|| "An Agent OS application.".to_string()),
+        icon: "cube".to_string(),
+    }
+}
+
+async fn service_status_views(
+    state: &Arc<AppState>,
+    trace_id: &'static str,
+) -> Option<Vec<ApplicationServiceAppView>> {
+    let command = ApplicationStatusCommand {
+        trace: TraceContext::new(trace_id),
+        scope: ApplicationServiceScope::default(),
+    };
+    match state.application_client.status(command).await {
+        Ok(views) => Some(views),
+        Err(error) => {
+            tracing::warn!(error = %error, trace_id, "Application Service status failed; falling back to legacy runtime");
+            None
+        }
+    }
+}
+
 pub async fn get_apps(State(state): State<Arc<AppState>>) -> Json<Vec<AppInfo>> {
+    if let Some(views) = service_status_views(&state, "web-route-apps-status").await {
+        tracing::info!(
+            count = views.len(),
+            "Application list served from Application Service"
+        );
+        return Json(views.iter().map(app_info_from_service_view).collect());
+    }
+
+    #[allow(deprecated)]
     let apps = state.runtime.list_apps().await;
     let agent_count = state.kernel.agent_count().await;
+    #[allow(deprecated)]
     let registry = state.registry.read().await;
 
     let infos = apps
@@ -202,8 +252,19 @@ pub async fn get_app(
     })?;
     let app_id = macaca_proto::ApplicationId(app_uuid);
 
+    if let Some(views) = service_status_views(&state, "web-route-app-detail-status").await {
+        if let Some(view) = views.iter().find(|view| view.id == app_id) {
+            tracing::info!(
+                app_id = %app_id,
+                "Application detail served from Application Service"
+            );
+            return Ok(Json(app_info_from_service_view(view)));
+        }
+    }
+
     // Get description from registry
     let description = {
+        #[allow(deprecated)]
         let registry = state.registry.read().await;
         registry
             .get_app(&app_id)
@@ -217,6 +278,7 @@ pub async fn get_app(
     };
     let icon = "cube".to_string();
 
+    #[allow(deprecated)]
     let apps = state.runtime.list_apps().await;
     for (id, name, status) in apps {
         if id == app_id {
@@ -309,15 +371,39 @@ pub async fn get_app_agents(
     })?;
     let app_id = macaca_proto::ApplicationId(app_uuid);
 
-    // Get agent IDs for this app
-    let agent_ids = state.runtime.app_agents(&app_id).await.map_err(|e| {
-        (
-            StatusCode::NOT_FOUND,
-            Json(ErrorResponse {
-                error: e.to_string(),
-            }),
-        )
-    })?;
+    let service_view = service_status_views(&state, "web-route-app-agents-status")
+        .await
+        .and_then(|views| views.into_iter().find(|view| view.id == app_id));
+    let service_agent_names = service_view.as_ref().map(|view| {
+        view.agents
+            .iter()
+            .map(|agent| agent.name.clone())
+            .collect::<std::collections::HashSet<_>>()
+    });
+
+    // Get agent IDs for this app.  The service view is the preferred source
+    // for app-scoped agent names; the legacy runtime id lookup remains the
+    // compatibility fallback needed by existing kernel status APIs.
+    #[allow(deprecated)]
+    let agent_ids = match state.runtime.app_agents(&app_id).await {
+        Ok(ids) => ids,
+        Err(error) if service_agent_names.is_some() => {
+            tracing::warn!(
+                app_id = %app_id,
+                error = %error,
+                "legacy app agent id lookup failed; using Application Service agent names"
+            );
+            Vec::new()
+        }
+        Err(e) => {
+            return Err((
+                StatusCode::NOT_FOUND,
+                Json(ErrorResponse {
+                    error: e.to_string(),
+                }),
+            ));
+        }
+    };
 
     // Get manifests from kernel
     let manifests = state.kernel.list_agents().await;
@@ -334,7 +420,13 @@ pub async fn get_app_agents(
 
     let agents: Vec<AgentInfo> = manifests
         .into_iter()
-        .filter(|m| agent_ids.contains(&m.id))
+        .filter(|m| {
+            if let Some(names) = service_agent_names.as_ref() {
+                names.contains(&m.name)
+            } else {
+                agent_ids.contains(&m.id)
+            }
+        })
         .map(|m| {
             let id_str = m.id.0.to_string();
             let (raw_activity, current_task) = status_map
@@ -399,8 +491,19 @@ pub async fn stream_agent_status(
 
         loop {
             // Get agent IDs for this app
+            let service_view = service_status_views(&state_clone, "web-route-app-agent-stream-status")
+                .await
+                .and_then(|views| views.into_iter().find(|view| view.id == app_id));
+            let service_agent_names = service_view.as_ref().map(|view| {
+                view.agents
+                    .iter()
+                    .map(|agent| agent.name.clone())
+                    .collect::<std::collections::HashSet<_>>()
+            });
+            #[allow(deprecated)]
             let agent_ids = match state_clone.runtime.app_agents(&app_id).await {
                 Ok(ids) => ids,
+                Err(_) if service_agent_names.is_some() => Vec::new(),
                 Err(_) => {
                     yield Ok(Event::default()
                         .event("error")
@@ -423,7 +526,13 @@ pub async fn stream_agent_status(
             // Build simplified status
             let agents: Vec<SimpleAgentStatus> = manifests
                 .into_iter()
-                .filter(|m| agent_ids.contains(&m.id))
+                .filter(|m| {
+                    if let Some(names) = service_agent_names.as_ref() {
+                        names.contains(&m.name)
+                    } else {
+                        agent_ids.contains(&m.id)
+                    }
+                })
                 .map(|m| {
                     let id_str = m.id.0.to_string();
                     let raw_activity = status_map.get(&id_str)
@@ -476,18 +585,55 @@ pub async fn reload_apps(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<ReloadResponse>, (StatusCode, Json<ErrorResponse>)> {
     // Reload the registry
-    let mut registry = state.registry.write().await;
-    let discovered = registry.reload().map_err(|e| {
-        err(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to reload apps: {e}"),
+    let discovered_count = match state
+        .application_client
+        .discover(
+            ApplicationDiscoverCommand::new(TraceContext::new("web-route-apps-reload"))
+                .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
         )
-    })?;
+        .await
+    {
+        Ok(discovered) => {
+            tracing::info!(
+                count = discovered.len(),
+                "Application reload discovery served through Application Service"
+            );
+            discovered.len()
+        }
+        Err(error) => {
+            tracing::warn!(
+                error = %error,
+                "Application Service reload failed; falling back to legacy registry"
+            );
+            #[allow(deprecated)]
+            {
+                let mut registry = state.registry.write().await;
+                registry
+                    .reload()
+                    .map_err(|e| {
+                        err(
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            format!("Failed to reload apps: {e}"),
+                        )
+                    })?
+                    .len()
+            }
+        }
+    };
 
     // Build app info from discovered apps
+    if let Some(views) = service_status_views(&state, "web-route-apps-reload-status").await {
+        return Ok(Json(ReloadResponse {
+            discovered_count,
+            apps: views.iter().map(app_info_from_service_view).collect(),
+        }));
+    }
+
+    #[allow(deprecated)]
     let apps = state.runtime.list_apps().await;
     let agent_count = state.kernel.agent_count().await;
 
+    #[allow(deprecated)]
     let registry = state.registry.read().await;
     let app_infos: Vec<AppInfo> = apps
         .into_iter()
@@ -516,7 +662,7 @@ pub async fn reload_apps(
     drop(registry);
 
     Ok(Json(ReloadResponse {
-        discovered_count: discovered.len(),
+        discovered_count,
         apps: app_infos,
     }))
 }

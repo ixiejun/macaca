@@ -52,7 +52,7 @@ use std::sync::Arc;
 
 use tracing::{error, info};
 
-use macaca_app::{AppLoader, AppRegistry, AppRuntime};
+use macaca_app::{AppRegistry, AppRuntime};
 use macaca_framework::session::{
     InMemorySessionStore as FrameworkInMemorySessionStore, SessionStore as FrameworkSessionStore,
 };
@@ -62,7 +62,7 @@ use macaca_kernel::{
 use macaca_llm::{LlmProvider, LlmRouter};
 use macaca_persist::RedbStore;
 use macaca_proto::config::{KernelConfig, MacacaConfig};
-use macaca_proto::{KernelServiceId, MacacaResult, TraceContext};
+use macaca_proto::{ApplicationStartCommand, KernelServiceId, MacacaResult, TraceContext};
 use macaca_skill::{ExecutableSkillToolSet, SkillCatalog};
 use macaca_tools::{DefaultToolSet, Tool};
 
@@ -127,46 +127,94 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
     );
 
     // 5. Start the runtime and load ALL discovered apps.
-    let runtime = AppRuntime::new();
+    let runtime = Arc::new(AppRuntime::new());
+    let registry = Arc::new(tokio::sync::RwLock::new(registry));
     let mut app_dirs = HashMap::new();
     let mut skills_dirs = Vec::new();
     let mut started_apps: Vec<(macaca_proto::ApplicationId, String, Vec<String>)> = Vec::new();
+    let service_runtime = Arc::new(macaca_runtime_host::ServiceRuntime::new(
+        macaca_runtime_host::ServiceRuntimeConfig::default(),
+    ));
+    service_runtime
+        .register_provider(
+            &macaca_runtime_host::StaticServiceProviderFactory::new(
+                macaca_runtime_host::ServiceProviderInstance::new(
+                    macaca_app::application_service_descriptor(),
+                    Arc::new(macaca_runtime_host::ApplicationSystemServiceProvider::new(
+                        Arc::clone(&registry),
+                        Arc::clone(&runtime),
+                        Arc::clone(&kernel),
+                    )),
+                ),
+            ),
+            macaca_runtime_host::ServiceProviderFactoryContext::new(),
+        )
+        .await
+        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+    service_runtime
+        .start(
+            &KernelServiceId::new(macaca_proto::APPLICATION_SERVICE_ID),
+            TraceContext::new("web-startup-application-service"),
+        )
+        .await
+        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+    let generic_service_client: Arc<dyn macaca_sdk::SystemServiceClient> = Arc::new(
+        crate::service_runtime_client::WebRuntimeSystemServiceClient::new(
+            Arc::clone(&service_runtime),
+            "macaca.web",
+        ),
+    );
+    let application_client: Arc<dyn macaca_sdk::SystemApplicationClient> = Arc::new(
+        macaca_sdk::ServiceBackedApplicationClient::new(Arc::clone(&generic_service_client)),
+    );
 
-    // Auto-start all discovered apps
+    // Auto-start all discovered apps through the service boundary.  The
+    // Application Service provider still delegates to the legacy runtime
+    // implementation internally, but Web now observes startup through typed,
+    // traceable service commands and sanitized result views before loading
+    // app-local skills from the returned runtime metadata.
     for app in &discovered {
         let manifest_path = app.manifest_path.clone();
         if manifest_path.exists() {
-            match runtime.start_app_from_file(&manifest_path, &kernel).await {
-                Ok(app_id) => {
+            let trace = TraceContext::new(format!("web-startup-application-{}", app.id));
+            let command = ApplicationStartCommand {
+                trace: trace.clone(),
+                manifest_path: Some(manifest_path.display().to_string()),
+                manifest: None,
+                app_dir: Some(app.path.display().to_string()),
+                policy: Default::default(),
+            };
+            match application_client.start(command).await {
+                Ok(view) => {
                     let agent_count = kernel.agent_count().await;
-                    app_dirs.insert(app_id, app.path.clone());
-                    skills_dirs.push(app.path.join("skills"));
-                    let app_agent_names =
-                        AppLoader::resolve_agent_configs(&app.manifest, &app.path)
-                            .map(|configs| {
-                                configs
-                                    .into_iter()
-                                    .map(|config| config.name)
-                                    .collect::<Vec<_>>()
-                            })
-                            .unwrap_or_else(|error| {
-                                tracing::warn!(
-                                    app_name = %app.name,
-                                    error = %error,
-                                    "Failed to resolve app agent names for executor registration"
-                                );
-                                Vec::new()
-                            });
-                    started_apps.push((app_id.clone(), app.name.clone(), app_agent_names));
+                    if let Some(app_dir) = view.runtime.app_dir.as_deref() {
+                        app_dirs.insert(view.id, PathBuf::from(app_dir));
+                    } else {
+                        app_dirs.insert(view.id, app.path.clone());
+                    }
+                    if let Some(skills_dir) = view.runtime.skills_dir.as_deref() {
+                        skills_dirs.push(PathBuf::from(skills_dir));
+                    } else {
+                        skills_dirs.push(app.path.join("skills"));
+                    }
+                    let app_agent_names: Vec<String> =
+                        view.agents.iter().map(|agent| agent.name.clone()).collect();
+                    started_apps.push((view.id, view.name.clone(), app_agent_names));
                     info!(
-                        app_id = %app_id.0,
-                        app_name = %app.name,
+                        app_id = %view.id,
+                        app_name = %view.name,
                         agents = agent_count,
-                        "App started"
+                        trace_id = %trace.trace_id,
+                        "App started through Application Service"
                     );
                 }
                 Err(e) => {
-                    tracing::warn!(app_name = %app.name, error = %e, "Failed to start app");
+                    tracing::warn!(
+                        app_name = %app.name,
+                        error = %e,
+                        trace_id = %trace.trace_id,
+                        "Application Service failed to start app; continuing Web startup"
+                    );
                 }
             }
         }
@@ -295,9 +343,6 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
     let memory_runtime = workspace_memory.as_ref().map(|memory| {
         Arc::new(crate::memory_runtime::WebMemoryRuntime::from_workspace_memory(Arc::clone(memory)))
     });
-    let service_runtime = Arc::new(macaca_runtime_host::ServiceRuntime::new(
-        macaca_runtime_host::ServiceRuntimeConfig::default(),
-    ));
     service_runtime
         .register_provider(
             &macaca_runtime_host::StaticServiceProviderFactory::new(
@@ -437,12 +482,6 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
         )
         .await
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
-    let generic_service_client: Arc<dyn macaca_sdk::SystemServiceClient> = Arc::new(
-        crate::service_runtime_client::WebRuntimeSystemServiceClient::new(
-            Arc::clone(&service_runtime),
-            "macaca.web",
-        ),
-    );
     let llm_client: Arc<dyn macaca_sdk::SystemLlmClient> = Arc::new(
         macaca_sdk::ServiceBackedLlmClient::new(Arc::clone(&generic_service_client)),
     );
@@ -477,7 +516,8 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
         AppState {
             kernel: kernel.clone(),
             runtime: runtime.clone(),
-            registry: tokio::sync::RwLock::new(registry),
+            registry: Arc::clone(&registry),
+            application_client: Arc::clone(&application_client),
             llm_client: Arc::clone(&llm_client),
             memory_client: Arc::clone(&memory_client),
             context_client: Arc::clone(&context_client),

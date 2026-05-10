@@ -79,6 +79,18 @@ S6 已建立 Driver、Skill、MCP 的 provider-neutral service contract、runtim
 | `macaca-runtime-host -> macaca-skill` | Runtime-host 新增 `SkillSystemServiceProvider` 与 MCP skill-backed definition conversion，属于 service provider ownership。 | 属于 S6 目标架构边。 |
 | MCP host-local Toolkit attach | MCP Service 已支持 register/probe/catalog/status/snapshot/cleanup DTO 与 provider。 | Framework `Toolkit` 是 host-local 可变对象，global MCP 与 skill-backed MCP attach 仍通过 deprecated `McpRuntimeFacade::register_definitions`。过期条件：实现 service-owned toolkit handle/proxy registry 后，Web 不再直接调用 MCP runtime attach。 |
 
+## 4.3 S7 Application Framework 迁移状态
+
+S7 已建立 Application Service provider-neutral DTO、runtime-host provider wrapper、SDK focused client 和 Web runtime-backed service client。Web startup 会注册并启动 Application Service；application discover/start/status/session envelope 和 GenUI surface 查询已优先走 `SystemApplicationClient`。旧 `AppRuntime` startup API、Web `runtime`/`registry` 字段和部分 manifest fallback 保留为 deprecated 搜索锚点。
+
+| Edge | Current S7 status | Remaining debt |
+| --- | --- | --- |
+| `macaca-web -> macaca-app` | Web application startup、app list/detail/reload、chat entry-agent preflight、session envelope 和 GenUI surface query 已通过 Application Service 优先路径。 | Web 仍需要 `macaca-app` DTO/registry fallback、framework prompt/tool policy manifest reads、skill/MCP overlay reads 和 compatibility fields；Cargo direct edge 仍存在，allowlist 不可删除。 |
+| `macaca-runtime-host -> macaca-app` | Runtime-host 新增 `ApplicationSystemServiceProvider`，这是 Application Service provider ownership。 | 属于 S7 目标架构边，不应作为 presentation/kernel allowlist 债务；后续如引入 remote Application Service，可替换为 provider factory。 |
+| `macaca-sdk -> macaca-app` | SDK Application client 不依赖 `macaca-app`，只依赖 `macaca-proto` Application Service DTO。 | 目标状态已达成；后续新增 SDK helper 不得重新引入 `macaca-app` direct dependency。 |
+| `macaca-app -> macaca-runtime-host` | S7 移除了 app crate 对 runtime-host entitlement facade 的直接依赖，改为本地 authorizer trait。 | 目标状态已达成；后续 app crate 不得反向依赖 runtime-host、Web 或 SDK runtime composition。 |
+| Web framework manifest fallback | Chat coordinator、framework runner、toolkit、loop manager、skill MCP 仍有 direct manifest reads。 | 这些路径用于 prompt semantics、context overrides、MCP overlay、tool policy、task decomposition compatibility。过期条件：Application Service 或 dedicated Application Metadata Service 提供 sanitized semantics views 后，Web 不再读取 raw manifest。 |
+
 ## 5. 新增例外流程
 
 1. 创建或更新 OpenSpec change，解释为什么短期不能立即迁移。

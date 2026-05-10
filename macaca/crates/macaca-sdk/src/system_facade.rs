@@ -11,6 +11,7 @@ use tracing::info;
 
 use macaca_proto::MacacaResult;
 
+pub use crate::application_client::{SystemApplicationClient, UnavailableSystemApplicationClient};
 pub use crate::context_client::{SystemContextClient, UnavailableSystemContextClient};
 pub use crate::driver_client::{SystemDriverClient, UnavailableSystemDriverClient};
 pub use crate::llm_client::{SystemLlmClient, UnavailableSystemLlmClient};
@@ -68,6 +69,7 @@ pub struct SystemFacade<
     D = UnavailableSystemDriverClient,
     SK = UnavailableSystemSkillClient,
     MCP = UnavailableSystemMcpClient,
+    A = UnavailableSystemApplicationClient,
 > {
     task_board: T,
     status: S,
@@ -80,6 +82,7 @@ pub struct SystemFacade<
     driver: D,
     skill: SK,
     mcp: MCP,
+    application: A,
 }
 
 impl<T, S> SystemFacade<T, S>
@@ -105,6 +108,7 @@ where
             driver: UnavailableSystemDriverClient,
             skill: UnavailableSystemSkillClient,
             mcp: UnavailableSystemMcpClient,
+            application: UnavailableSystemApplicationClient,
         }
     }
 }
@@ -122,6 +126,7 @@ impl<T, S, SV, TR, P>
         UnavailableSystemDriverClient,
         UnavailableSystemSkillClient,
         UnavailableSystemMcpClient,
+        UnavailableSystemApplicationClient,
     >
 where
     T: SystemTaskClient,
@@ -148,11 +153,12 @@ where
             driver: UnavailableSystemDriverClient,
             skill: UnavailableSystemSkillClient,
             mcp: UnavailableSystemMcpClient,
+            application: UnavailableSystemApplicationClient,
         }
     }
 }
 
-impl<T, S, SV, TR, P, L, M, C, D, SK, MCP> SystemFacade<T, S, SV, TR, P, L, M, C, D, SK, MCP>
+impl<T, S, SV, TR, P, L, M, C, D, SK, MCP, A> SystemFacade<T, S, SV, TR, P, L, M, C, D, SK, MCP, A>
 where
     T: SystemTaskClient,
     S: SystemStatusClient,
@@ -165,6 +171,7 @@ where
     D: SystemDriverClient,
     SK: SystemSkillClient,
     MCP: SystemMcpClient,
+    A: SystemApplicationClient,
 {
     /// Create a facade with all current Route C capability clients installed.
     ///
@@ -183,6 +190,7 @@ where
         driver: D,
         skill: SK,
         mcp: MCP,
+        application: A,
     ) -> Self {
         Self {
             task_board,
@@ -196,7 +204,13 @@ where
             driver,
             skill,
             mcp,
+            application,
         }
+    }
+
+    /// Borrow the focused Application Service client.
+    pub fn application_client(&self) -> &A {
+        &self.application
     }
 
     /// Borrow the focused Driver Service client.

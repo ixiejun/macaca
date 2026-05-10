@@ -17,6 +17,41 @@ use macaca_proto::{
 };
 use tracing::{info, warn};
 
+#[async_trait::async_trait]
+impl macaca_app::ApplicationEntitlementAuthorizer for EntitlementRuntimeFacade {
+    async fn authorize_install(
+        &self,
+        manifest: &PackageManifest,
+    ) -> Result<EntitlementDecision, CommerceError> {
+        EntitlementRuntimeFacade::authorize_install(self, manifest).await
+    }
+
+    async fn authorize_start(
+        &self,
+        manifest: &PackageManifest,
+    ) -> Result<EntitlementDecision, CommerceError> {
+        EntitlementRuntimeFacade::authorize_start(self, manifest).await
+    }
+
+    async fn authorize_capability_call(
+        &self,
+        manifest: &PackageManifest,
+        context: macaca_app::AppCapabilityCallContext,
+    ) -> Result<EntitlementDecision, CommerceError> {
+        let mut runtime_context = CapabilityCallContext {
+            app_id: context.app_id,
+            session_id: context.session_id,
+            capability_id: context.capability_id.map(CapabilityId::new),
+            quantity: context.quantity,
+            unit: context.unit,
+        };
+        if runtime_context.quantity == 0 {
+            runtime_context.quantity = 1;
+        }
+        EntitlementRuntimeFacade::authorize_capability_call(self, manifest, runtime_context).await
+    }
+}
+
 /// Runtime operation protected by the entitlement facade.
 ///
 /// A closed operation enum keeps the public facade readable while the emitted

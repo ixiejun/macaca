@@ -18,8 +18,10 @@ use macaca_app::{app_entry_agent_name, AppLoader};
 use macaca_framework::execution::ExecutionContext;
 use macaca_framework::session::{load_module_state, save_module_state};
 use macaca_kernel::AgentInfo;
-use macaca_persist::PersistStore;
-use macaca_proto::ApplicationId;
+use macaca_proto::{
+    ApplicationId, ApplicationServiceScope, ApplicationSessionStartCommand,
+    ApplicationSessionStopCommand, ApplicationStatusCommand, TraceContext,
+};
 
 use crate::event_persistence::spawn_session_event_collector;
 use crate::routes::{default_model, err, ErrorResponse};
@@ -153,23 +155,48 @@ async fn ensure_app_executor(state: &Arc<AppState>, app_id: &ApplicationId) {
         return;
     }
 
-    let (app_name, app_agent_names) = {
-        let registry = state.registry.read().await;
-        if let Some(app) = registry.get_app(app_id).cloned() {
-            let names = AppLoader::resolve_agent_configs(&app.manifest, &app.path)
-                .map(|configs| configs.into_iter().map(|config| config.name).collect())
-                .unwrap_or_else(|error| {
-                    tracing::warn!(
-                        app_id = %app_id,
-                        error = %error,
-                        "Failed to resolve app agent names while ensuring executor"
-                    );
-                    Vec::new()
-                });
-            (app.name, names)
-        } else {
-            (app_id.0.to_string(), Vec::new())
+    let (app_name, app_agent_names) = match state
+        .application_client
+        .status(ApplicationStatusCommand {
+            trace: TraceContext::new("web-chat-ensure-executor-status"),
+            scope: ApplicationServiceScope::application(*app_id),
+        })
+        .await
+    {
+        Ok(views) => views
+            .into_iter()
+            .find(|view| view.id == *app_id)
+            .map(|view| {
+                (
+                    view.name,
+                    view.agents
+                        .into_iter()
+                        .map(|agent| agent.name)
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .unwrap_or_else(|| (app_id.0.to_string(), Vec::new())),
+        Err(error) => {
+            tracing::warn!(
+                app_id = %app_id,
+                error = %error,
+                "Application Service status failed while ensuring executor; using legacy registry fallback"
+            );
+            #[allow(deprecated)]
+            legacy_executor_metadata(state, app_id).await
         }
+    };
+
+    let (app_name, app_agent_names) = if app_agent_names.is_empty() {
+        #[allow(deprecated)]
+        let legacy = legacy_executor_metadata(state, app_id).await;
+        if legacy.1.is_empty() {
+            (app_name, app_agent_names)
+        } else {
+            legacy
+        }
+    } else {
+        (app_name, app_agent_names)
     };
 
     let all_agents = state.kernel.list_agents().await;
@@ -196,6 +223,115 @@ async fn ensure_app_executor(state: &Arc<AppState>, app_id: &ApplicationId) {
         .executor_registry
         .register_application(app_id.clone(), app_name, app_agents)
         .await;
+}
+
+async fn legacy_executor_metadata(
+    state: &Arc<AppState>,
+    app_id: &ApplicationId,
+) -> (String, Vec<String>) {
+    #[allow(deprecated)]
+    {
+        let registry = state.registry.read().await;
+        if let Some(app) = registry.get_app(app_id).cloned() {
+            let names = AppLoader::resolve_agent_configs(&app.manifest, &app.path)
+                .map(|configs| configs.into_iter().map(|config| config.name).collect())
+                .unwrap_or_else(|error| {
+                    tracing::warn!(
+                        app_id = %app_id,
+                        error = %error,
+                        "Failed to resolve app agent names while ensuring executor"
+                    );
+                    Vec::new()
+                });
+            (app.name, names)
+        } else {
+            (app_id.0.to_string(), Vec::new())
+        }
+    }
+}
+
+async fn service_entry_agent_name(state: &Arc<AppState>, app_id: &ApplicationId) -> Option<String> {
+    match state
+        .application_client
+        .status(ApplicationStatusCommand {
+            trace: TraceContext::new("web-chat-entry-agent-status"),
+            scope: ApplicationServiceScope::application(*app_id),
+        })
+        .await
+    {
+        Ok(views) => views
+            .into_iter()
+            .find(|view| view.id == *app_id)
+            .and_then(|view| view.entry_agent),
+        Err(error) => {
+            tracing::warn!(
+                app_id = %app_id,
+                error = %error,
+                "Application Service status failed while resolving entry agent"
+            );
+            None
+        }
+    }
+}
+
+async fn notify_application_session_start(
+    state: &Arc<AppState>,
+    app_id: &ApplicationId,
+    session_id: &str,
+    entry_agent_name: &str,
+) {
+    let scope = ApplicationServiceScope {
+        application_id: Some(*app_id),
+        application_name: None,
+        session_id: Some(session_id.to_string()),
+        agent_name: Some(entry_agent_name.to_string()),
+    };
+    let command = ApplicationSessionStartCommand {
+        trace: TraceContext::new("web-chat-session-start"),
+        scope,
+    };
+    match state.application_client.session_start(command).await {
+        Ok(view) => tracing::info!(
+            app_id = %view.application_id,
+            session_id = %view.session_id,
+            status = %view.status,
+            "Application Service session envelope started"
+        ),
+        Err(error) => tracing::warn!(
+            app_id = %app_id,
+            session_id,
+            error = %error,
+            "Application Service session start failed; continuing coordinator path"
+        ),
+    }
+}
+
+async fn notify_application_session_stop(
+    state: &Arc<AppState>,
+    app_id: &ApplicationId,
+    session_id: &str,
+    entry_agent_name: &str,
+    reason: &str,
+) {
+    let scope = ApplicationServiceScope {
+        application_id: Some(*app_id),
+        application_name: None,
+        session_id: Some(session_id.to_string()),
+        agent_name: Some(entry_agent_name.to_string()),
+    };
+    let command = ApplicationSessionStopCommand {
+        trace: TraceContext::new("web-chat-session-stop"),
+        scope,
+        reason: Some(reason.to_string()),
+    };
+    if let Err(error) = state.application_client.session_stop(command).await {
+        tracing::warn!(
+            app_id = %app_id,
+            session_id,
+            error = %error,
+            "Application Service session stop failed after coordinator completion"
+        );
+    }
 }
 
 /// POST /api/chat/stop — terminate all running processes for an application.
@@ -310,16 +446,21 @@ pub(crate) async fn post_chat_v2(
     let app_id = ApplicationId(app_uuid);
 
     // Determine entry agent
-    let entry_agent_name = {
-        let registry = state.registry.read().await;
-        registry
-            .get_app(&app_id)
-            .map(|app| {
-                app_entry_agent_name(&app.manifest)
-                    .unwrap_or("coordinator")
-                    .to_string()
-            })
-            .unwrap_or_else(|| "coordinator".to_string())
+    let entry_agent_name = if let Some(name) = service_entry_agent_name(&state, &app_id).await {
+        name
+    } else {
+        #[allow(deprecated)]
+        {
+            let registry = state.registry.read().await;
+            registry
+                .get_app(&app_id)
+                .map(|app| {
+                    app_entry_agent_name(&app.manifest)
+                        .unwrap_or("coordinator")
+                        .to_string()
+                })
+                .unwrap_or_else(|| "coordinator".to_string())
+        }
     };
 
     // Session key
@@ -327,6 +468,7 @@ pub(crate) async fn post_chat_v2(
     let session_key = req
         .session_id
         .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+    notify_application_session_start(&state, &app_id, &session_key, &entry_agent_name).await;
 
     // Clean up previous state when creating a new session
     if is_new_session {
@@ -608,6 +750,14 @@ pub(crate) async fn post_chat_v2(
         }
 
         // Cleanup
+        notify_application_session_stop(
+            &state_for_task,
+            &app_id,
+            &session_key_for_task,
+            &entry_agent_name,
+            status,
+        )
+        .await;
         let _ = state_for_task
             .mcp_runtime
             .cleanup_session(&session_key_for_task)

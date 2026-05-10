@@ -5,17 +5,56 @@
 //! to `macaca-runtime-host` while preserving free/open package compatibility.
 
 use macaca_proto::{CommerceError, EntitlementDecision, EntitlementState, PackageManifest};
-use macaca_runtime_host::{CapabilityCallContext, EntitlementRuntimeFacade};
+use serde::{Deserialize, Serialize};
 use tracing::info;
+
+/// Provider-neutral capability-call context used by application package guards.
+///
+/// The struct intentionally mirrors the runtime-host entitlement facade context
+/// without depending on `macaca-runtime-host`.  This keeps `macaca-app` as the
+/// owner of application/package semantics and allows runtime-host to depend on
+/// `macaca-app` for Application Service providers without a Cargo cycle.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AppCapabilityCallContext {
+    pub app_id: Option<String>,
+    pub session_id: Option<String>,
+    pub capability_id: Option<String>,
+    pub quantity: u64,
+    pub unit: String,
+}
+
+/// Minimal entitlement facade required by application package guards.
+///
+/// This trait is a Dependency Inversion seam.  Runtime-host can implement it
+/// for its entitlement facade, tests can provide a mock, and `macaca-app` no
+/// longer needs to know which concrete Store/Entitlement service is installed.
+#[async_trait::async_trait]
+pub trait ApplicationEntitlementAuthorizer: Send + Sync {
+    async fn authorize_install(
+        &self,
+        manifest: &PackageManifest,
+    ) -> Result<EntitlementDecision, CommerceError>;
+
+    async fn authorize_start(
+        &self,
+        manifest: &PackageManifest,
+    ) -> Result<EntitlementDecision, CommerceError>;
+
+    async fn authorize_capability_call(
+        &self,
+        manifest: &PackageManifest,
+        context: AppCapabilityCallContext,
+    ) -> Result<EntitlementDecision, CommerceError>;
+}
 
 /// Guard facade used by application/package loaders before commercial actions.
 pub struct CommercialPackageGuard<'a> {
-    entitlement: &'a EntitlementRuntimeFacade,
+    entitlement: &'a dyn ApplicationEntitlementAuthorizer,
 }
 
 impl<'a> CommercialPackageGuard<'a> {
-    /// Create a guard around the canonical runtime-host entitlement facade.
-    pub fn new(entitlement: &'a EntitlementRuntimeFacade) -> Self {
+    /// Create a guard around any entitlement authorizer implementation.
+    pub fn new(entitlement: &'a dyn ApplicationEntitlementAuthorizer) -> Self {
         Self { entitlement }
     }
 
@@ -39,7 +78,7 @@ impl<'a> CommercialPackageGuard<'a> {
     pub async fn authorize_capability_call(
         &self,
         manifest: &PackageManifest,
-        context: CapabilityCallContext,
+        context: AppCapabilityCallContext,
     ) -> Result<EntitlementDecision, CommerceError> {
         if !is_commercial_package(manifest) {
             return Ok(free_decision(manifest, "call"));
@@ -89,10 +128,9 @@ fn free_decision(manifest: &PackageManifest, operation: &str) -> EntitlementDeci
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
-    use std::sync::Arc;
 
+    use async_trait::async_trait;
     use chrono::Utc;
-    use macaca_persist::{EntitlementStore, InMemoryEntitlementStore};
     use macaca_proto::{
         DeveloperId, EntitlementId, EntitlementRecord, LicenseType, PackageId, PackageManifest,
         PackageRuntime, PackageRuntimeKind, PackageType,
@@ -127,10 +165,59 @@ mod tests {
         }
     }
 
+    struct MockEntitlementAuthorizer {
+        record: Option<EntitlementRecord>,
+    }
+
+    #[async_trait]
+    impl ApplicationEntitlementAuthorizer for MockEntitlementAuthorizer {
+        async fn authorize_install(
+            &self,
+            manifest: &PackageManifest,
+        ) -> Result<EntitlementDecision, CommerceError> {
+            self.decision(manifest, "install")
+        }
+
+        async fn authorize_start(
+            &self,
+            manifest: &PackageManifest,
+        ) -> Result<EntitlementDecision, CommerceError> {
+            self.decision(manifest, "start")
+        }
+
+        async fn authorize_capability_call(
+            &self,
+            manifest: &PackageManifest,
+            _context: AppCapabilityCallContext,
+        ) -> Result<EntitlementDecision, CommerceError> {
+            self.decision(manifest, "call")
+        }
+    }
+
+    impl MockEntitlementAuthorizer {
+        fn decision(
+            &self,
+            manifest: &PackageManifest,
+            operation: &str,
+        ) -> Result<EntitlementDecision, CommerceError> {
+            if let Some(record) = &self.record {
+                let mut decision = EntitlementDecision::allow(
+                    manifest.id.clone(),
+                    manifest.developer.clone(),
+                    operation,
+                    record.state.clone(),
+                );
+                decision.entitlement_id = Some(record.entitlement_id.clone());
+                Ok(decision)
+            } else {
+                Err(CommerceError::EntitlementRejected("missing".into()))
+            }
+        }
+    }
+
     #[tokio::test]
     async fn free_package_start_does_not_require_store_record() {
-        let store = Arc::new(InMemoryEntitlementStore::new());
-        let facade = EntitlementRuntimeFacade::new(store);
+        let facade = MockEntitlementAuthorizer { record: None };
         let guard = CommercialPackageGuard::new(&facade);
 
         let decision = guard
@@ -144,9 +231,9 @@ mod tests {
 
     #[tokio::test]
     async fn paid_package_install_uses_entitlement_facade() {
-        let store = Arc::new(InMemoryEntitlementStore::new());
-        store.upsert_record(record()).await.unwrap();
-        let facade = EntitlementRuntimeFacade::new(store);
+        let facade = MockEntitlementAuthorizer {
+            record: Some(record()),
+        };
         let guard = CommercialPackageGuard::new(&facade);
 
         let decision = guard

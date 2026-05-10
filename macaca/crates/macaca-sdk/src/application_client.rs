@@ -1,0 +1,356 @@
+//! SDK Application client facade for Route C S7.
+//!
+//! The SDK exposes a focused Application Service client for Web, CLI, Gateway,
+//! and future shells.  It never constructs `AppRuntime`, `AppRegistry`,
+//! `Kernel`, or runtime-host providers; it only translates typed commands into
+//! the generic service-client boundary or returns explicit unavailable results.
+
+use std::sync::Arc;
+
+use async_trait::async_trait;
+use macaca_proto::{
+    ApplicationDiscoverCommand, ApplicationDiscoverResult, ApplicationGenUiSurfaceCommand,
+    ApplicationHostDispatchResult, ApplicationHostDispatchServiceCommand, ApplicationRemoveCommand,
+    ApplicationServiceSnapshot, ApplicationServiceUnavailable, ApplicationSessionResult,
+    ApplicationSessionResumeCommand, ApplicationSessionStartCommand, ApplicationSessionStopCommand,
+    ApplicationSnapshotCommand, ApplicationStartCommand, ApplicationStartResult,
+    ApplicationStatusCommand, ApplicationStatusResult, ApplicationStopCommand, MacacaError,
+    MacacaResult, APPLICATION_DISCOVER_COMMAND, APPLICATION_GENUI_SURFACE_COMMAND,
+    APPLICATION_HOST_DISPATCH_COMMAND, APPLICATION_REMOVE_COMMAND, APPLICATION_SERVICE_ID,
+    APPLICATION_SESSION_RESUME_COMMAND, APPLICATION_SESSION_START_COMMAND,
+    APPLICATION_SESSION_STOP_COMMAND, APPLICATION_SNAPSHOT_COMMAND, APPLICATION_START_COMMAND,
+    APPLICATION_STATUS_COMMAND, APPLICATION_STOP_COMMAND,
+};
+use tracing::{info, warn};
+
+use crate::service_client::{ServiceCallCommand, SystemServiceClient};
+
+/// Focused Application client consumed by shells and adapters.
+#[async_trait]
+pub trait SystemApplicationClient: Send + Sync {
+    async fn discover(
+        &self,
+        command: ApplicationDiscoverCommand,
+    ) -> MacacaResult<ApplicationDiscoverResult>;
+    async fn start(&self, command: ApplicationStartCommand)
+        -> MacacaResult<ApplicationStartResult>;
+    async fn stop(&self, command: ApplicationStopCommand) -> MacacaResult<serde_json::Value>;
+    async fn remove(&self, command: ApplicationRemoveCommand) -> MacacaResult<serde_json::Value>;
+    async fn status(
+        &self,
+        command: ApplicationStatusCommand,
+    ) -> MacacaResult<ApplicationStatusResult>;
+    async fn snapshot(
+        &self,
+        command: ApplicationSnapshotCommand,
+    ) -> MacacaResult<ApplicationServiceSnapshot>;
+    async fn session_start(
+        &self,
+        command: ApplicationSessionStartCommand,
+    ) -> MacacaResult<ApplicationSessionResult>;
+    async fn session_resume(
+        &self,
+        command: ApplicationSessionResumeCommand,
+    ) -> MacacaResult<ApplicationSessionResult>;
+    async fn session_stop(
+        &self,
+        command: ApplicationSessionStopCommand,
+    ) -> MacacaResult<ApplicationSessionResult>;
+    async fn host_dispatch(
+        &self,
+        command: ApplicationHostDispatchServiceCommand,
+    ) -> MacacaResult<ApplicationHostDispatchResult>;
+    async fn genui_surface(
+        &self,
+        command: ApplicationGenUiSurfaceCommand,
+    ) -> MacacaResult<ApplicationServiceUnavailable>;
+}
+
+/// Null-object Application client used when the service is not installed.
+#[derive(Debug, Clone, Default)]
+pub struct UnavailableSystemApplicationClient;
+
+#[async_trait]
+impl SystemApplicationClient for UnavailableSystemApplicationClient {
+    async fn discover(
+        &self,
+        command: ApplicationDiscoverCommand,
+    ) -> MacacaResult<ApplicationDiscoverResult> {
+        info!(trace_id = %command.trace.trace_id, "sdk application client returning empty discovery");
+        Ok(Vec::new())
+    }
+
+    async fn start(
+        &self,
+        command: ApplicationStartCommand,
+    ) -> MacacaResult<ApplicationStartResult> {
+        warn!(trace_id = %command.trace.trace_id, "sdk application client unavailable for start");
+        Err(MacacaError::Config(
+            "Application service is unavailable".into(),
+        ))
+    }
+
+    async fn stop(&self, command: ApplicationStopCommand) -> MacacaResult<serde_json::Value> {
+        warn!(trace_id = %command.trace.trace_id, "sdk application client unavailable for stop");
+        Err(MacacaError::Config(
+            "Application service is unavailable".into(),
+        ))
+    }
+
+    async fn remove(&self, command: ApplicationRemoveCommand) -> MacacaResult<serde_json::Value> {
+        warn!(trace_id = %command.trace.trace_id, "sdk application client unavailable for remove");
+        Err(MacacaError::Config(
+            "Application service is unavailable".into(),
+        ))
+    }
+
+    async fn status(
+        &self,
+        command: ApplicationStatusCommand,
+    ) -> MacacaResult<ApplicationStatusResult> {
+        info!(trace_id = %command.trace.trace_id, "sdk application client returning empty status");
+        Ok(Vec::new())
+    }
+
+    async fn snapshot(
+        &self,
+        command: ApplicationSnapshotCommand,
+    ) -> MacacaResult<ApplicationServiceSnapshot> {
+        info!(trace_id = %command.trace.trace_id, "sdk application client returning unavailable snapshot");
+        Ok(ApplicationServiceSnapshot::unavailable(
+            "runtime-backed Application service is not installed",
+        ))
+    }
+
+    async fn session_start(
+        &self,
+        command: ApplicationSessionStartCommand,
+    ) -> MacacaResult<ApplicationSessionResult> {
+        warn!(trace_id = %command.trace.trace_id, "sdk application client unavailable for session start");
+        Err(MacacaError::Config(
+            "Application service is unavailable".into(),
+        ))
+    }
+
+    async fn session_resume(
+        &self,
+        command: ApplicationSessionResumeCommand,
+    ) -> MacacaResult<ApplicationSessionResult> {
+        warn!(trace_id = %command.trace.trace_id, "sdk application client unavailable for session resume");
+        Err(MacacaError::Config(
+            "Application service is unavailable".into(),
+        ))
+    }
+
+    async fn session_stop(
+        &self,
+        command: ApplicationSessionStopCommand,
+    ) -> MacacaResult<ApplicationSessionResult> {
+        warn!(trace_id = %command.trace.trace_id, "sdk application client unavailable for session stop");
+        Err(MacacaError::Config(
+            "Application service is unavailable".into(),
+        ))
+    }
+
+    async fn host_dispatch(
+        &self,
+        command: ApplicationHostDispatchServiceCommand,
+    ) -> MacacaResult<ApplicationHostDispatchResult> {
+        warn!(trace_id = %command.trace.trace_id, "sdk application client unavailable for host dispatch");
+        Err(MacacaError::Config(
+            "Application service is unavailable".into(),
+        ))
+    }
+
+    async fn genui_surface(
+        &self,
+        command: ApplicationGenUiSurfaceCommand,
+    ) -> MacacaResult<ApplicationServiceUnavailable> {
+        Ok(ApplicationServiceUnavailable::new(
+            APPLICATION_GENUI_SURFACE_COMMAND,
+            "Application service is unavailable",
+            Some(&command.trace),
+        ))
+    }
+}
+
+/// Runtime-backed Application client implemented over generic service calls.
+#[derive(Clone)]
+pub struct ServiceBackedApplicationClient {
+    service: Arc<dyn SystemServiceClient>,
+}
+
+impl ServiceBackedApplicationClient {
+    /// Create a service-backed client from an existing generic service client.
+    pub fn new(service: Arc<dyn SystemServiceClient>) -> Self {
+        Self { service }
+    }
+}
+
+#[async_trait]
+impl SystemApplicationClient for ServiceBackedApplicationClient {
+    async fn discover(
+        &self,
+        command: ApplicationDiscoverCommand,
+    ) -> MacacaResult<ApplicationDiscoverResult> {
+        call(
+            &self.service,
+            APPLICATION_DISCOVER_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn start(
+        &self,
+        command: ApplicationStartCommand,
+    ) -> MacacaResult<ApplicationStartResult> {
+        call(
+            &self.service,
+            APPLICATION_START_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn stop(&self, command: ApplicationStopCommand) -> MacacaResult<serde_json::Value> {
+        call(
+            &self.service,
+            APPLICATION_STOP_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn remove(&self, command: ApplicationRemoveCommand) -> MacacaResult<serde_json::Value> {
+        call(
+            &self.service,
+            APPLICATION_REMOVE_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn status(
+        &self,
+        command: ApplicationStatusCommand,
+    ) -> MacacaResult<ApplicationStatusResult> {
+        call(
+            &self.service,
+            APPLICATION_STATUS_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn snapshot(
+        &self,
+        command: ApplicationSnapshotCommand,
+    ) -> MacacaResult<ApplicationServiceSnapshot> {
+        call(
+            &self.service,
+            APPLICATION_SNAPSHOT_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn session_start(
+        &self,
+        command: ApplicationSessionStartCommand,
+    ) -> MacacaResult<ApplicationSessionResult> {
+        call(
+            &self.service,
+            APPLICATION_SESSION_START_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn session_resume(
+        &self,
+        command: ApplicationSessionResumeCommand,
+    ) -> MacacaResult<ApplicationSessionResult> {
+        call(
+            &self.service,
+            APPLICATION_SESSION_RESUME_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn session_stop(
+        &self,
+        command: ApplicationSessionStopCommand,
+    ) -> MacacaResult<ApplicationSessionResult> {
+        call(
+            &self.service,
+            APPLICATION_SESSION_STOP_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn host_dispatch(
+        &self,
+        command: ApplicationHostDispatchServiceCommand,
+    ) -> MacacaResult<ApplicationHostDispatchResult> {
+        call(
+            &self.service,
+            APPLICATION_HOST_DISPATCH_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn genui_surface(
+        &self,
+        command: ApplicationGenUiSurfaceCommand,
+    ) -> MacacaResult<ApplicationServiceUnavailable> {
+        call(
+            &self.service,
+            APPLICATION_GENUI_SURFACE_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+}
+
+async fn call<T, R>(
+    service: &Arc<dyn SystemServiceClient>,
+    command_name: &str,
+    trace: macaca_proto::TraceContext,
+    payload: T,
+) -> MacacaResult<R>
+where
+    T: serde::Serialize,
+    R: serde::de::DeserializeOwned,
+{
+    let service_command = ServiceCallCommand::new(
+        APPLICATION_SERVICE_ID,
+        command_name,
+        serde_json::to_value(payload)?,
+    )?
+    .with_trace(trace.clone());
+    info!(
+        service_id = APPLICATION_SERVICE_ID,
+        command = command_name,
+        trace_id = %trace.trace_id,
+        "sdk application client dispatching service command"
+    );
+    let result = service.call_service(&service_command).await?;
+    serde_json::from_value(result.output).map_err(|error| {
+        MacacaError::Config(format!("invalid Application service result: {error}"))
+    })
+}

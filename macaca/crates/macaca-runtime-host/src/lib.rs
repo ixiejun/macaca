@@ -12,6 +12,7 @@
 //! provides the Agent OS-level registry, policy, status and toolkit
 //! registration layered on top.
 
+pub mod application_service_provider;
 pub mod compat;
 pub mod context_service_provider;
 pub mod driver_service_provider;
@@ -33,6 +34,7 @@ pub mod service_runtime_event;
 pub mod skill_service_provider;
 pub mod transport;
 
+pub use application_service_provider::ApplicationSystemServiceProvider;
 pub use context_service_provider::ContextSystemServiceProvider;
 pub use driver_service_provider::DriverSystemServiceProvider;
 pub use entitlement::{CapabilityCallContext, EntitlementOperation, EntitlementRuntimeFacade};

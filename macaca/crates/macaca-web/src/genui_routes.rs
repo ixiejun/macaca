@@ -13,7 +13,8 @@ use axum::http::StatusCode;
 use axum::Json;
 use macaca_persist::{AppendEventCommand, EventLog};
 use macaca_proto::{
-    TraceContext, UiAction, UiEvent, UiEventCommand, UiIntent, UiRenderError, UiRenderSurface,
+    ApplicationGenUiSurfaceCommand, ApplicationServiceScope, TraceContext, UiAction, UiEvent,
+    UiEventCommand, UiIntent, UiRenderError, UiRenderSurface,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -52,11 +53,43 @@ pub struct GenUiEventResponse {
 
 /// GET /api/apps/{app_id}/genui/surface?session_id=...
 pub async fn get_genui_surface(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Path(app_id): Path<String>,
     Query(query): Query<GenUiSurfaceQuery>,
 ) -> Result<Json<Option<UiIntent>>, (StatusCode, Json<ErrorResponse>)> {
     let session_id = required_scope(&app_id, query.session_id.as_deref())?;
+    let application_id = parse_application_id(&app_id)?;
+    let trace = trace_for_genui(&session_id, "genui-surface");
+    let command = ApplicationGenUiSurfaceCommand {
+        trace: trace.clone(),
+        scope: ApplicationServiceScope {
+            application_id: Some(application_id),
+            application_name: None,
+            session_id: Some(session_id.clone()),
+            agent_name: None,
+        },
+        surface_id: None,
+    };
+    match state.application_client.genui_surface(command).await {
+        Ok(unavailable) => {
+            info!(
+                app_id = %app_id,
+                session_id = %session_id,
+                trace_id = %trace.trace_id,
+                reason = %unavailable.reason,
+                "GenUI surface query completed through Application Service fallback"
+            );
+        }
+        Err(error) => {
+            warn!(
+                app_id = %app_id,
+                session_id = %session_id,
+                trace_id = %trace.trace_id,
+                error = %error,
+                "Application Service GenUI surface query failed; returning v0 no-surface fallback"
+            );
+        }
+    }
     info!(
         app_id = %app_id,
         session_id = %session_id,
@@ -169,6 +202,18 @@ fn required_scope(
         ));
     };
     Ok(session_id.to_string())
+}
+
+fn parse_application_id(
+    app_id: &str,
+) -> Result<macaca_proto::ApplicationId, (StatusCode, Json<ErrorResponse>)> {
+    let parsed = Uuid::parse_str(app_id).map_err(|_| {
+        err(
+            StatusCode::BAD_REQUEST,
+            "app_id must be a valid application UUID".into(),
+        )
+    })?;
+    Ok(macaca_proto::ApplicationId(parsed))
 }
 
 /// Create a trace context for shell-created GenUI route commands.
