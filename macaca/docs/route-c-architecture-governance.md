@@ -224,7 +224,19 @@ Web/CLI/Frontend 只能是 shell 和 adapter，不得定义核心 session、task
 - Web3/EVM logs、audit pages 和 snapshots 只能包含 service id、command、trace id、capability ids、provider class、operation、state、reason code、counts、timestamps、artifact digest/reference 和 sanitized diagnostics；不得泄露 private key、mnemonic、wallet secret、raw signature、raw signed transaction、RPC credential、provider credential、raw ABI、raw bytecode、prompt body、raw package bytes、encrypted payload 或 unbounded provider response。
 - S11 不实现 S10 payment settlement，也不实现真实 Web3 node 或真实 EVM execution。未来 Web3/EVM/Payment integration 必须通过 adapter strategy / optional module / service client 接入，不能回写到 kernel 或 presentation shell。
 
-## 17. 审查清单
+## 17. Web / CLI Thin Shell Completion Ownership
+
+路线 C S12 将 Web / CLI 从 service composition hub 收敛为 presentation shell：
+
+- `macaca-runtime-host` 拥有 host bootstrap boundary、service provider registration/startup、service lifecycle diagnostics 和 sanitized startup logs。Bootstrap 可以接收 typed repository/facade handles，但不得读取 Web `AppState` 或 CLI state。
+- `macaca-sdk` 拥有 shell-facing `SystemFacade` 和 focused clients。SDK 不得构造 runtime-host providers、repositories、Web state、CLI state 或 provider-specific implementations。
+- Web 只能作为 HTTP/SSE/GenUI/approval adapter：Web 可以传入当前本地 handles 以保持兼容，但 provider lifecycle semantics 必须迁入 runtime-host bootstrap 或 focused service clients。低风险 system/status/optional-module route 应通过 Web-local `WebSystemFacadeBundle` 或 focused SDK clients 进入系统语义，不能直接读取 provider/runtime 字段。
+- CLI 只能作为 terminal parser/formatter/process launcher：read-only inspection commands 应使用 SDK facade/focused clients；Web server launch edge 必须保持 public server-start-only adapter seam，不得把 Web runtime/provider/session/service composition 复制进 CLI。
+- Deprecated Web provider/runtime fields and direct CLI helpers are migration anchors only. New production paths must not use them unless the OpenSpec task explicitly documents a high-risk compatibility reason and a future expiry condition.
+- S12 bootstrap、Web shell adapter、CLI command adapter 的关键节点必须有 structured logs：operation、service id、command、trace id、scope、status、reason code。日志不得泄露 secrets、provider credentials、prompt bodies、raw package bytes、private keys、wallet secrets、raw signatures、raw signed transactions、raw ABI/bytecode、raw tool payload 或 unbounded user input。
+- Allowlist rows can only be removed after `cargo metadata` and `route_c_dependency_boundaries` prove the direct edge disappeared. Narrowed runtime behavior without dependency-edge removal must be documented as remaining debt, not marked complete.
+
+## 18. 审查清单
 
 任何 Route C OpenSpec 都必须回答：
 

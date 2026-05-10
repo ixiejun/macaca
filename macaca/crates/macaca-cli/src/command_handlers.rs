@@ -67,6 +67,13 @@ impl CliCommandHandler for VersionCommandHandler {
 }
 
 /// Handler for the `web` command.
+///
+/// This handler is intentionally a terminal adapter and process-lifecycle
+/// boundary only.  It may select the listen port, notify the service manager,
+/// and call the public Web server-start seam, but it must not duplicate Web
+/// provider bootstrap, route composition, session, trace, or service semantics
+/// inside CLI.  The remaining `macaca-cli -> macaca-web` dependency is therefore
+/// server-start-only compatibility debt tracked by Route C S12 governance.
 #[derive(Debug)]
 pub struct WebCommandHandler {
     port: u16,
@@ -82,6 +89,10 @@ impl WebCommandHandler {
 #[async_trait(?Send)]
 impl CliCommandHandler for WebCommandHandler {
     async fn run(&self) -> MacacaResult<()> {
+        tracing::info!(
+            port = self.port,
+            "cli web command delegating to public web server-start seam"
+        );
         notify_systemd_ready();
         macaca_web::WebServerBuilder::new()
             .port(self.port)
@@ -126,5 +137,19 @@ mod tests {
             .run()
             .await
             .unwrap();
+    }
+
+    #[test]
+    fn web_command_uses_only_public_server_start_seam() {
+        let source = include_str!("command_handlers.rs");
+        assert!(
+            source.contains("macaca_web::WebServerBuilder::new()"),
+            "CLI web command must enter Web through the public server-start builder seam"
+        );
+        assert!(
+            !source.contains(&format!("{}{}", "macaca_web::serve_", "web_server"))
+                && !source.contains(&format!("{}{}", "macaca_web::start_", "server")),
+            "CLI web command must not call deprecated or crate-internal Web startup helpers"
+        );
     }
 }

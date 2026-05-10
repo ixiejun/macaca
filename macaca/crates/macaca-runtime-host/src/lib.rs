@@ -31,6 +31,7 @@ pub mod payment_adapter;
 pub mod payment_admission;
 pub mod payment_service_provider;
 pub mod plugin;
+pub mod route_c_bootstrap;
 pub mod service_decorator;
 pub mod service_provider;
 pub mod service_runtime;
@@ -73,6 +74,10 @@ pub use plugin::{
     plugin_failure_event, DescriptorPluginHost, PluginHost, PluginHostFactory,
     PluginLifecycleController, PluginManifestValidator, PluginRuntimeFacade, PluginRuntimeGuard,
     PluginRuntimeResult,
+};
+pub use route_c_bootstrap::{
+    bootstrap_route_c_optional_services, RouteCBootstrapDiagnostic, RouteCHostRuntimeBundle,
+    RouteCOptionalServicesBootstrap, RouteCOptionalServicesBootstrapInputs,
 };
 pub use service_decorator::{
     AllowAllServiceRuntimePolicy, DenyAllServiceRuntimePolicy, EntitlementRuntimeDecorator,

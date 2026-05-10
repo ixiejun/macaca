@@ -121,7 +121,7 @@ pub fn entries() -> Vec<AllowlistEntry> {
             "macaca-cli",
             "macaca-web",
             "S12",
-            "shared shell facade in macaca-sdk",
+            "public Web server-start seam only",
         ),
     ]
 }

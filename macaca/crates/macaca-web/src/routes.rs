@@ -126,6 +126,25 @@ pub struct StatusResponse {
 }
 
 pub async fn get_status(State(state): State<Arc<AppState>>) -> Json<StatusResponse> {
+    tracing::info!("web status route entering thin system facade boundary");
+    match state
+        .system_facade
+        .service_client()
+        .inspect_services(
+            &macaca_sdk::ServiceInspectionCommand::new("web-route-status-services")
+                .expect("static service inspection scope is non-empty"),
+        )
+        .await
+    {
+        Ok(snapshot) => tracing::info!(
+            services = snapshot.services.len(),
+            "web status route inspected service runtime through facade bundle"
+        ),
+        Err(error) => tracing::warn!(
+            error = %error,
+            "web status route service inspection failed; preserving legacy response"
+        ),
+    }
     let agent_count = state.kernel.agent_count().await;
     let app_count = if let Some(views) = service_status_views(&state, "web-route-status-apps").await
     {

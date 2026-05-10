@@ -32,6 +32,7 @@ use macaca_task::TodoStore;
 use macaca_tools::ToolCatalog;
 
 use crate::runtime_resume::RuntimeResumeSignal;
+use crate::shell::WebSystemFacadeBundle;
 use crate::workspace::AppWorkspace;
 
 /// Operator-visible installation record for one external adapter engine.
@@ -316,6 +317,13 @@ pub struct AppState {
     pub web3_client: Arc<dyn SystemWeb3Client>,
     /// The serviceized EVM client used by optional EVM shell/status paths.
     pub evm_client: Arc<dyn SystemEvmClient>,
+    /// Primary Web-local facade bundle for low-risk system route adapters.
+    ///
+    /// New status, optional-module, package, entitlement, and payment routes
+    /// should enter system semantics through this bundle or the focused SDK
+    /// clients above. Deprecated lower-level fields remain only for high-risk
+    /// chat/session/framework compatibility paths that are still being migrated.
+    pub system_facade: WebSystemFacadeBundle,
     /// The LLM provider (DashScope by default).
     #[deprecated(note = "Use AppState::llm_client for new LLM call paths")]
     pub llm: Arc<dyn LlmProvider>,

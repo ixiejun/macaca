@@ -492,111 +492,25 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
         )
         .await
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
-    service_runtime
-        .register_provider(
-            &macaca_runtime_host::StaticServiceProviderFactory::new(
-                macaca_runtime_host::ServiceProviderInstance::new(
-                    macaca_runtime_host::entitlement_service_descriptor(),
-                    Arc::new(macaca_runtime_host::EntitlementSystemServiceProvider::new(
-                        Arc::clone(&entitlement_store),
-                        Arc::clone(&entitlement_facade),
-                    )),
-                ),
-            ),
-            macaca_runtime_host::ServiceProviderFactoryContext::new(),
-        )
-        .await
-        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
-    service_runtime
-        .register_provider(
-            &macaca_runtime_host::StaticServiceProviderFactory::new(
-                macaca_runtime_host::ServiceProviderInstance::new(
-                    macaca_runtime_host::store_service_descriptor(),
-                    Arc::new(macaca_runtime_host::StoreSystemServiceProvider::new(
-                        Arc::clone(&entitlement_facade),
-                    )),
-                ),
-            ),
-            macaca_runtime_host::ServiceProviderFactoryContext::new(),
-        )
-        .await
-        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
-    service_runtime
-        .register_provider(
-            &macaca_runtime_host::StaticServiceProviderFactory::new(
-                macaca_runtime_host::ServiceProviderInstance::new(
-                    macaca_runtime_host::payment_service_descriptor(),
-                    Arc::new(
-                        macaca_runtime_host::PaymentSystemServiceProvider::local_simulated(
-                            Arc::clone(&payment_store),
-                            macaca_kernel::local_simulated_terms("1", "UNIT"),
-                        ),
-                    ),
-                ),
-            ),
-            macaca_runtime_host::ServiceProviderFactoryContext::new(),
-        )
-        .await
-        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
-    service_runtime
-        .register_provider(
-            &macaca_runtime_host::StaticServiceProviderFactory::new(
-                macaca_runtime_host::ServiceProviderInstance::new(
-                    macaca_runtime_host::web3_service_descriptor(),
-                    Arc::new(macaca_runtime_host::Web3SystemServiceProvider::unavailable()),
-                ),
-            ),
-            macaca_runtime_host::ServiceProviderFactoryContext::new(),
-        )
-        .await
-        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
-    service_runtime
-        .register_provider(
-            &macaca_runtime_host::StaticServiceProviderFactory::new(
-                macaca_runtime_host::ServiceProviderInstance::new(
-                    macaca_runtime_host::evm_service_descriptor(),
-                    Arc::new(macaca_runtime_host::EvmSystemServiceProvider::unavailable()),
-                ),
-            ),
-            macaca_runtime_host::ServiceProviderFactoryContext::new(),
-        )
-        .await
-        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
-    service_runtime
-        .start(
-            &KernelServiceId::new(macaca_proto::ENTITLEMENT_SERVICE_ID),
-            TraceContext::new("web-startup-entitlement-service"),
-        )
-        .await
-        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
-    service_runtime
-        .start(
-            &KernelServiceId::new(macaca_proto::STORE_SERVICE_ID),
-            TraceContext::new("web-startup-store-service"),
-        )
-        .await
-        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
-    service_runtime
-        .start(
-            &KernelServiceId::new(macaca_proto::PAYMENT_SERVICE_ID),
-            TraceContext::new("web-startup-payment-service"),
-        )
-        .await
-        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
-    service_runtime
-        .start(
-            &KernelServiceId::new(macaca_proto::WEB3_SERVICE_ID),
-            TraceContext::new("web-startup-web3-service"),
-        )
-        .await
-        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
-    service_runtime
-        .start(
-            &KernelServiceId::new(macaca_proto::EVM_SERVICE_ID),
-            TraceContext::new("web-startup-evm-service"),
-        )
-        .await
-        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+    // S12 thin-shell completion moves S9-S11 service lifecycle ownership into
+    // `macaca-runtime-host`.  Web still provides the existing local stores and
+    // facade handles, but provider registration/start semantics now cross a
+    // typed host bootstrap boundary instead of living in presentation startup.
+    let route_c_optional_services = macaca_runtime_host::bootstrap_route_c_optional_services(
+        Arc::clone(&service_runtime),
+        macaca_runtime_host::RouteCOptionalServicesBootstrapInputs::new(
+            Arc::clone(&entitlement_store),
+            Arc::clone(&entitlement_facade),
+            Arc::clone(&payment_store),
+            macaca_kernel::local_simulated_terms("1", "UNIT"),
+        ),
+        "web-startup",
+    )
+    .await?;
+    info!(
+        services = route_c_optional_services.started_services.len(),
+        "Route C optional services bootstrapped through runtime-host"
+    );
     let llm_client: Arc<dyn macaca_sdk::SystemLlmClient> = Arc::new(
         macaca_sdk::ServiceBackedLlmClient::new(Arc::clone(&generic_service_client)),
     );
@@ -634,6 +548,11 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
     let evm_client: Arc<dyn macaca_sdk::SystemEvmClient> = Arc::new(
         macaca_sdk::ServiceBackedEvmClient::new(Arc::clone(&generic_service_client)),
     );
+    let system_facade = crate::shell::WebSystemFacadeBundle::new(
+        Arc::clone(&generic_service_client),
+        Arc::clone(&web3_client),
+        Arc::clone(&evm_client),
+    );
 
     // 10. Build shared state.
     let state = Arc::new_cyclic(|weak_state| {
@@ -659,6 +578,7 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
             payment_client: Arc::clone(&payment_client),
             web3_client: Arc::clone(&web3_client),
             evm_client: Arc::clone(&evm_client),
+            system_facade: system_facade.clone(),
             llm: llm.clone(),
             llm_router: llm_router.clone(),
             tools,

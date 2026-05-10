@@ -10,12 +10,86 @@ use std::sync::Arc;
 use serde_json::json;
 use tracing::info;
 
-use macaca_proto::{ApplicationId, MacacaError, MacacaResult};
+use macaca_proto::{
+    ApplicationId, EvmAvailability, EvmAvailabilityCommand, MacacaError, MacacaResult,
+    TraceContext, Web3Availability, Web3AvailabilityCommand,
+};
 use macaca_sdk::{
-    StaticSystemStatusDataSource, SystemFacade, SystemStatusSnapshot, TaskBoardQueryCommand,
-    TodoStoreTaskBoardDataSource,
+    StaticSystemStatusDataSource, SystemEvmClient, SystemFacade, SystemServiceClient,
+    SystemStatusSnapshot, SystemWeb3Client, TaskBoardQueryCommand, TodoStoreTaskBoardDataSource,
 };
 use macaca_task::TodoStore;
+
+/// Route-safe facade bundle for Web system surfaces.
+///
+/// This Adapter gives routes a single primary seam for serviceized system
+/// capabilities without forcing `AppState` to expose provider construction or
+/// concrete runtime-host types.  The bundle deliberately stores focused SDK
+/// clients, not lower-layer providers, so Web remains responsible only for HTTP
+/// validation, response projection, and audit logging.
+#[derive(Clone)]
+pub struct WebSystemFacadeBundle {
+    service: Arc<dyn SystemServiceClient>,
+    web3: Arc<dyn SystemWeb3Client>,
+    evm: Arc<dyn SystemEvmClient>,
+}
+
+impl WebSystemFacadeBundle {
+    /// Build a route-safe bundle from runtime-backed SDK clients.
+    ///
+    /// The constructor is the Web-local Facade composition point required by
+    /// S12.  It does not register providers or start services; those lifecycle
+    /// responsibilities belong to `macaca-runtime-host` bootstrap code.
+    pub fn new(
+        service: Arc<dyn SystemServiceClient>,
+        web3: Arc<dyn SystemWeb3Client>,
+        evm: Arc<dyn SystemEvmClient>,
+    ) -> Self {
+        Self { service, web3, evm }
+    }
+
+    /// Borrow the generic service-inspection client for low-risk status routes.
+    pub fn service_client(&self) -> Arc<dyn SystemServiceClient> {
+        Arc::clone(&self.service)
+    }
+
+    /// Query optional Web3 availability through the focused SDK client.
+    ///
+    /// Optional-module unavailability is returned as data by the service layer.
+    /// If the service call itself fails, Web still fails closed with a regular
+    /// `MacacaError` instead of inventing provider semantics in the route.
+    pub async fn web3_availability(
+        &self,
+        trace_id: impl Into<String>,
+    ) -> MacacaResult<Web3Availability> {
+        let trace = TraceContext::new(trace_id);
+        info!(
+            trace_id = %trace.trace_id,
+            "web system facade querying web3 availability"
+        );
+        self.web3
+            .availability(Web3AvailabilityCommand { trace })
+            .await
+    }
+
+    /// Query optional EVM availability through the focused SDK client.
+    ///
+    /// This mirrors the Web3 path and keeps EVM provider, RPC, wallet, ABI, and
+    /// transaction semantics outside the Web presentation shell.
+    pub async fn evm_availability(
+        &self,
+        trace_id: impl Into<String>,
+    ) -> MacacaResult<EvmAvailability> {
+        let trace = TraceContext::new(trace_id);
+        info!(
+            trace_id = %trace.trace_id,
+            "web system facade querying evm availability"
+        );
+        self.evm
+            .availability(EvmAvailabilityCommand { trace })
+            .await
+    }
+}
 
 /// Thin Web Shell facade specialized for current Web runtime dependencies.
 pub struct WebShellFacade {
@@ -69,7 +143,150 @@ impl WebShellFacade {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use async_trait::async_trait;
     use macaca_persist::RedbStore;
+    use macaca_proto::{
+        EvmAvailability, EvmAvailabilityCommand, EvmCallAdmission, EvmContractCallCommand,
+        EvmContractDeployCommand, EvmContractReadCommand, EvmDeployAdmission,
+        EvmEventSubscribeCommand, EvmEventSubscriptionAdmission, EvmGasEstimateCommand,
+        EvmReadAdmission, EvmReceiptGetCommand, EvmServiceSnapshot, EvmSnapshotCommand,
+        EvmTransactionReceipt, GasEstimate, Web3Availability, Web3AvailabilityCommand,
+        Web3ChainQueryCommand, Web3ServiceSnapshot, Web3SigningAdmission,
+        Web3SigningRequestCommand, Web3SnapshotCommand, Web3TransactionPreparation,
+        Web3TransactionPrepareCommand, Web3UnavailableReason, Web3WalletListCommand,
+        Web3WalletView,
+    };
+    use macaca_sdk::{
+        ServiceCallCommand, ServiceCallResult, ServiceInspectionCommand, ServiceInspectionResult,
+        SystemEvmClient, SystemServiceClient, SystemWeb3Client,
+    };
+
+    #[derive(Debug, Default)]
+    struct EmptyServiceClient;
+
+    #[async_trait]
+    impl SystemServiceClient for EmptyServiceClient {
+        async fn inspect_services(
+            &self,
+            command: &ServiceInspectionCommand,
+        ) -> MacacaResult<ServiceInspectionResult> {
+            Ok(ServiceInspectionResult {
+                scope: command.scope.clone(),
+                services: Vec::new(),
+            })
+        }
+
+        async fn call_service(
+            &self,
+            command: &ServiceCallCommand,
+        ) -> MacacaResult<ServiceCallResult> {
+            Err(MacacaError::Config(format!(
+                "test service client has no dispatcher for {}",
+                command.service_id
+            )))
+        }
+    }
+
+    #[derive(Debug, Default)]
+    struct UnavailableWeb3Client;
+
+    #[async_trait]
+    impl SystemWeb3Client for UnavailableWeb3Client {
+        async fn availability(
+            &self,
+            _command: Web3AvailabilityCommand,
+        ) -> MacacaResult<Web3Availability> {
+            Ok(Web3Availability::unavailable(Web3UnavailableReason::new(
+                "missing",
+                "not installed",
+            )))
+        }
+
+        async fn wallets(
+            &self,
+            _command: Web3WalletListCommand,
+        ) -> MacacaResult<Vec<Web3WalletView>> {
+            Ok(Vec::new())
+        }
+
+        async fn request_signing(
+            &self,
+            _command: Web3SigningRequestCommand,
+        ) -> MacacaResult<Web3SigningAdmission> {
+            Err(MacacaError::Config("web3 unavailable".into()))
+        }
+
+        async fn prepare_transaction(
+            &self,
+            _command: Web3TransactionPrepareCommand,
+        ) -> MacacaResult<Web3TransactionPreparation> {
+            Err(MacacaError::Config("web3 unavailable".into()))
+        }
+
+        async fn query_chain(
+            &self,
+            _command: Web3ChainQueryCommand,
+        ) -> MacacaResult<macaca_proto::ChainQueryResponse> {
+            Err(MacacaError::Config("web3 unavailable".into()))
+        }
+
+        async fn snapshot(
+            &self,
+            _command: Web3SnapshotCommand,
+        ) -> MacacaResult<Web3ServiceSnapshot> {
+            Ok(Web3ServiceSnapshot::unavailable("not installed"))
+        }
+    }
+
+    #[derive(Debug, Default)]
+    struct UnavailableEvmClient;
+
+    #[async_trait]
+    impl SystemEvmClient for UnavailableEvmClient {
+        async fn availability(
+            &self,
+            _command: EvmAvailabilityCommand,
+        ) -> MacacaResult<EvmAvailability> {
+            Ok(EvmAvailability::unavailable("missing", "not installed"))
+        }
+
+        async fn deploy(
+            &self,
+            _command: EvmContractDeployCommand,
+        ) -> MacacaResult<EvmDeployAdmission> {
+            Err(MacacaError::Config("evm unavailable".into()))
+        }
+
+        async fn call(&self, _command: EvmContractCallCommand) -> MacacaResult<EvmCallAdmission> {
+            Err(MacacaError::Config("evm unavailable".into()))
+        }
+
+        async fn read(&self, _command: EvmContractReadCommand) -> MacacaResult<EvmReadAdmission> {
+            Err(MacacaError::Config("evm unavailable".into()))
+        }
+
+        async fn estimate_gas(&self, _command: EvmGasEstimateCommand) -> MacacaResult<GasEstimate> {
+            Err(MacacaError::Config("evm unavailable".into()))
+        }
+
+        async fn receipt(
+            &self,
+            _command: EvmReceiptGetCommand,
+        ) -> MacacaResult<EvmTransactionReceipt> {
+            Err(MacacaError::Config("evm unavailable".into()))
+        }
+
+        async fn subscribe(
+            &self,
+            _command: EvmEventSubscribeCommand,
+        ) -> MacacaResult<EvmEventSubscriptionAdmission> {
+            Err(MacacaError::Config("evm unavailable".into()))
+        }
+
+        async fn snapshot(&self, _command: EvmSnapshotCommand) -> MacacaResult<EvmServiceSnapshot> {
+            Ok(EvmServiceSnapshot::unavailable("not installed"))
+        }
+    }
 
     #[tokio::test]
     async fn web_shell_task_board_preserves_legacy_json_shape() {
@@ -83,5 +300,25 @@ mod tests {
             .unwrap();
         assert!(response.get("todos").unwrap().is_array());
         assert_eq!(response.get("count").unwrap().as_u64(), Some(0));
+    }
+
+    #[tokio::test]
+    async fn web_system_facade_preserves_optional_module_unavailable_as_data() {
+        let facade = WebSystemFacadeBundle::new(
+            Arc::new(EmptyServiceClient),
+            Arc::new(UnavailableWeb3Client),
+            Arc::new(UnavailableEvmClient),
+        );
+
+        let web3 = facade.web3_availability("test-web3").await.unwrap();
+        let evm = facade.evm_availability("test-evm").await.unwrap();
+
+        assert_eq!(web3.state, "unavailable");
+        assert_eq!(
+            web3.reason.as_ref().map(|reason| reason.code.as_str()),
+            Some("missing")
+        );
+        assert_eq!(evm.state, "unavailable");
+        assert_eq!(evm.reason_code.as_deref(), Some("missing"));
     }
 }

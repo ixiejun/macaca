@@ -54,7 +54,7 @@ cargo test -p macaca-integration-tests route_c_dependency_boundaries
 | `presentation-no-provider-construction-hub` | `macaca-web` | `macaca-skill` | Web 当前仍直接处理 skill/MCP 展示和调用兼容路径。 | Skill/MCP Service client | S6 | Web 只展示 Skill/MCP service state 和 trace。 | Route C / active debt |
 | `presentation-no-provider-construction-hub` | `macaca-web` | `macaca-task` | Web 当前仍直接访问 task board/session task 状态。 | Task Service client | S4 | Task board 通过 Task Service 分页 API 获取。 | Route C / active debt |
 | `presentation-no-provider-construction-hub` | `macaca-web` | `macaca-tools` | Web 当前仍直接依赖 tools 兼容能力。 | Tool/Skill Service client | S6 | Web 工具相关展示通过 Skill/Tool Service view model。 | Route C / active debt |
-| `cli-no-web-internals` | `macaca-cli` | `macaca-web` | CLI 当前复用 Web server startup 兼容路径。 | shared shell facade in `macaca-sdk` | S12 | Web/CLI thin shell 完成后，CLI 不再依赖 Web crate。 | Route C / active debt |
+| `cli-no-web-internals` | `macaca-cli` | `macaca-web` | CLI 当前复用 Web server startup 兼容路径。 | public Web server-start seam only | S12 | Web server-start seam 抽到 runtime-host 或独立 host facade 后，CLI 不再依赖 Web crate。 | Route C / active debt |
 
 ## 4.1 S5 LLM / Memory / Context 迁移状态
 
@@ -127,6 +127,17 @@ S11 已建立 Web3 / EVM 的 provider-neutral service DTO、runtime-host optiona
 | `macaca-kernel` Web3/EVM compatibility | 旧 kernel Web3/EVM facades/adapters 保留但已 deprecated，用于测试和迁移检索。 | 后续上层消费必须迁到 `SystemWeb3Client` / `SystemEvmClient`；当 GitNexus 和 `rg` 证明没有 production direct caller 后，旧接口可进入删除提案。 |
 | Web3/EVM provider strategy | Runtime-host 新增 unavailable/mock Web3/EVM providers，这是 optional service provider ownership，不属于 kernel/presentation。 | 真实 chain/RPC/wallet/EVM adapter 必须作为 optional module strategy/plugin 接入，不得回写 kernel 或 Web。 |
 | Payment/Web3/EVM integration | S11 不实现链上 payment settlement，也不把 Web3/EVM 作为 Payment provider。 | 后续 integration 必须通过 Payment Service adapter 或 explicit optional module proposal，不得让 Web3/EVM 直接拥有 payment lifecycle。 |
+
+## 4.7 S12 Web / CLI Thin Shell Completion 迁移状态
+
+S12 completion 已引入 runtime-host owned `RouteCOptionalServicesBootstrap`，把 S9-S11 service families（Store/Entitlement、Payment/A2A、Web3/EVM）的 provider registration/startup 从 Web procedural startup 抽到 runtime-host bootstrap boundary。Web 仍提供当前本地 repository/facade handles，并继续通过 runtime-backed SDK clients 访问服务；这一步没有删除 Cargo direct edges，因此 allowlist rows 只能标记为 narrowed，不能删除。
+
+| Edge | Current S12 status | Remaining debt |
+| --- | --- | --- |
+| `macaca-web -> macaca-runtime-host` | Web 不再直接逐个注册/启动 S9-S11 providers；它调用 `bootstrap_route_c_optional_services` 并接收 sanitized diagnostics。 | Web 仍拥有 overall host composition 和 S5-S8 provider startup inputs。过期条件：Application/LLM/Memory/Context/Driver/Skill/MCP startup 也迁入 typed host bootstrap，Web 只接收 service clients/facade。 |
+| `macaca-web -> macaca-persist` | S9/S10 repositories 仍由 Web startup 创建并传入 runtime-host bootstrap，保持现有 storage behavior。 | Persistence Service 或 service-owned repository factory 尚未完成；直接边不可删除。 |
+| `macaca-cli -> macaca-web` | CLI `web` command 现在只调用公开 `WebServerBuilder` server-start seam，并用注释和日志明确禁止复制 Web runtime/provider/session/service 语义。 | 该 Cargo edge 仍存在，只能标记为 server-start-only narrowed debt。过期条件：Web server-start seam 抽到 runtime-host 或独立 host facade 后删除 direct edge。 |
+| Deprecated Web provider/runtime fields | 本次切片未删除 `AppState` deprecated compatibility anchors。 | 后续 route/toolkit/session slices 需要逐项迁到 SDK focused clients，并用 guard 防止新增 direct callers。 |
 
 ## 5. 新增例外流程
 
