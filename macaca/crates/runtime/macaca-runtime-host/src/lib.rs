@@ -31,6 +31,8 @@ pub mod payment_adapter;
 pub mod payment_admission;
 pub mod payment_service_provider;
 pub mod plugin;
+pub mod plugin_capability;
+pub mod plugin_capability_service_provider;
 pub mod plugin_control;
 pub mod plugin_control_service_provider;
 pub mod route_c_bootstrap;
@@ -76,6 +78,18 @@ pub use plugin::{
     plugin_failure_event, DescriptorPluginHost, PluginHost, PluginHostFactory,
     PluginLifecycleController, PluginManifestValidator, PluginRuntimeFacade, PluginRuntimeGuard,
     PluginRuntimeResult,
+};
+pub use plugin_capability::{
+    built_in_service_capability, detect_slot_conflict, discover_manifest_capabilities,
+    CapabilityCallAdmissionChain, CapabilityCallAdmissionCheck, CapabilityCallAdmissionContext,
+    CapabilityCallAdmissionDecision, CapabilityHintAdmissionCheck,
+    CapabilityOwnershipAdmissionCheck, FailClosedSlotConflictPolicy,
+    PluginCapabilityConflictPolicy, PluginCapabilityRegistry, PluginCapabilityRegistryBuilder,
+    PluginCapabilityService, PluginCapabilityServiceBuilder,
+};
+pub use plugin_capability_service_provider::{
+    plugin_capability_service_command, plugin_capability_service_descriptor,
+    PluginCapabilitySystemServiceProvider,
 };
 pub use plugin_control::{
     AdmissionCheck, AdmissionContext, AdmissionDecision, CompatibilityAdmissionCheck,

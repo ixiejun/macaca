@@ -14,6 +14,7 @@ pub mod orchestration;
 pub mod package;
 pub mod payment_service;
 pub mod plugin;
+pub mod plugin_capability;
 pub mod plugin_control;
 pub mod service;
 pub mod service_bus;
@@ -27,6 +28,8 @@ pub mod web3_service;
 mod a2a_tests;
 #[cfg(test)]
 mod evm_tests;
+#[cfg(test)]
+mod plugin_capability_tests;
 #[cfg(test)]
 mod web3_tests;
 
@@ -46,6 +49,7 @@ pub use orchestration::*;
 pub use package::*;
 pub use payment_service::*;
 pub use plugin::*;
+pub use plugin_capability::*;
 pub use plugin_control::*;
 pub use service::*;
 pub use service_bus::*;

@@ -178,6 +178,27 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
         )
         .await
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+    service_runtime
+        .register_provider(
+            &macaca_runtime_host::StaticServiceProviderFactory::new(
+                macaca_runtime_host::ServiceProviderInstance::new(
+                    macaca_runtime_host::plugin_capability_service_descriptor(),
+                    Arc::new(
+                        macaca_runtime_host::PluginCapabilitySystemServiceProvider::in_memory(),
+                    ),
+                ),
+            ),
+            macaca_runtime_host::ServiceProviderFactoryContext::new(),
+        )
+        .await
+        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+    service_runtime
+        .start(
+            &macaca_proto::plugin_capability_registry_service_id(),
+            TraceContext::new("web-startup-plugin-capability-service"),
+        )
+        .await
+        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
     let generic_service_client: Arc<dyn macaca_sdk::SystemServiceClient> = Arc::new(
         crate::service_runtime_client::WebRuntimeSystemServiceClient::new(
             Arc::clone(&service_runtime),
@@ -571,11 +592,15 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
     let plugin_control_client: Arc<dyn macaca_sdk::SystemPluginControlClient> = Arc::new(
         macaca_sdk::ServiceBackedPluginControlClient::new(Arc::clone(&generic_service_client)),
     );
+    let plugin_capability_client: Arc<dyn macaca_sdk::SystemPluginCapabilityClient> = Arc::new(
+        macaca_sdk::ServiceBackedPluginCapabilityClient::new(Arc::clone(&generic_service_client)),
+    );
     let system_facade = crate::shell::WebSystemFacadeBundle::new(
         Arc::clone(&generic_service_client),
         Arc::clone(&web3_client),
         Arc::clone(&evm_client),
         Arc::clone(&plugin_control_client),
+        Arc::clone(&plugin_capability_client),
     );
 
     // 10. Build shared state.
@@ -603,6 +628,7 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
             web3_client: Arc::clone(&web3_client),
             evm_client: Arc::clone(&evm_client),
             plugin_control_client: Arc::clone(&plugin_control_client),
+            plugin_capability_client: Arc::clone(&plugin_capability_client),
             system_facade: system_facade.clone(),
             llm: llm.clone(),
             llm_router: llm_router.clone(),

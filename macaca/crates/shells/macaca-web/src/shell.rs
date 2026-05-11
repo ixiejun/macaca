@@ -15,9 +15,9 @@ use macaca_proto::{
     TraceContext, Web3Availability, Web3AvailabilityCommand,
 };
 use macaca_sdk::{
-    StaticSystemStatusDataSource, SystemEvmClient, SystemFacade, SystemPluginControlClient,
-    SystemServiceClient, SystemStatusSnapshot, SystemWeb3Client, TaskBoardQueryCommand,
-    TodoStoreTaskBoardDataSource,
+    StaticSystemStatusDataSource, SystemEvmClient, SystemFacade, SystemPluginCapabilityClient,
+    SystemPluginControlClient, SystemServiceClient, SystemStatusSnapshot, SystemWeb3Client,
+    TaskBoardQueryCommand, TodoStoreTaskBoardDataSource,
 };
 use macaca_task::TodoStore;
 
@@ -34,6 +34,7 @@ pub struct WebSystemFacadeBundle {
     web3: Arc<dyn SystemWeb3Client>,
     evm: Arc<dyn SystemEvmClient>,
     plugin_control: Arc<dyn SystemPluginControlClient>,
+    plugin_capability: Arc<dyn SystemPluginCapabilityClient>,
 }
 
 impl WebSystemFacadeBundle {
@@ -47,12 +48,14 @@ impl WebSystemFacadeBundle {
         web3: Arc<dyn SystemWeb3Client>,
         evm: Arc<dyn SystemEvmClient>,
         plugin_control: Arc<dyn SystemPluginControlClient>,
+        plugin_capability: Arc<dyn SystemPluginCapabilityClient>,
     ) -> Self {
         Self {
             service,
             web3,
             evm,
             plugin_control,
+            plugin_capability,
         }
     }
 
@@ -64,6 +67,11 @@ impl WebSystemFacadeBundle {
     /// Borrow the focused Plugin Control client for Web plugin routes.
     pub fn plugin_control_client(&self) -> Arc<dyn SystemPluginControlClient> {
         Arc::clone(&self.plugin_control)
+    }
+
+    /// Borrow the focused Plugin Capability client for capability routes.
+    pub fn plugin_capability_client(&self) -> Arc<dyn SystemPluginCapabilityClient> {
+        Arc::clone(&self.plugin_capability)
     }
 
     /// Query optional Web3 availability through the focused SDK client.

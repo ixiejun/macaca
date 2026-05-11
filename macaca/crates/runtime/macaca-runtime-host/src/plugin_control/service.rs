@@ -11,15 +11,19 @@ use std::sync::Arc;
 use chrono::Utc;
 use macaca_kernel::PluginRegistry;
 use macaca_proto::{
-    PluginActivationState, PluginConfigRequirement, PluginControlEvent, PluginControlRecord,
-    PluginDiagnostics, PluginError, PluginHealth, PluginHealthSnapshot, PluginId,
-    PluginInstallRequest, PluginInstallResult, PluginLifecycleState, PluginListCommand,
-    PluginSecretRequirement, PluginTargetCommand,
+    PluginActivationState, PluginControlEvent, PluginControlRecord, PluginDiagnostics, PluginError,
+    PluginHealth, PluginHealthSnapshot, PluginId, PluginInstallRequest, PluginInstallResult,
+    PluginLifecycleState, PluginListCommand, PluginTargetCommand,
 };
 use tracing::{info, warn};
 
 use crate::plugin::PluginRuntimeFacade;
+use crate::plugin_capability::discovery::discover_manifest_capabilities;
+use crate::plugin_capability::PluginCapabilityService;
 use crate::plugin_control::admission::{AdmissionContext, PluginAdmissionChain};
+use crate::plugin_control::metadata::{
+    config_requirements, sanitized_metadata, secret_requirements,
+};
 use crate::plugin_control::repository::{InMemoryPluginRepository, PluginRepository};
 
 /// Builder for the control service.
@@ -31,6 +35,7 @@ pub struct PluginControlServiceBuilder {
     repository: Option<Arc<dyn PluginRepository>>,
     admission: Option<PluginAdmissionChain>,
     runtime: Option<Arc<PluginRuntimeFacade>>,
+    capability_service: Option<Arc<PluginCapabilityService>>,
     project_local_enabled: bool,
 }
 
@@ -40,6 +45,7 @@ impl Default for PluginControlServiceBuilder {
             repository: None,
             admission: None,
             runtime: None,
+            capability_service: None,
             project_local_enabled: false,
         }
     }
@@ -64,6 +70,12 @@ impl PluginControlServiceBuilder {
         self
     }
 
+    /// Use a Plugin Capability Registry service for capability ownership sync.
+    pub fn capability_service(mut self, capability_service: Arc<PluginCapabilityService>) -> Self {
+        self.capability_service = Some(capability_service);
+        self
+    }
+
     /// Enable project-local plugin installs for explicit development hosts.
     pub fn allow_project_local(mut self) -> Self {
         self.project_local_enabled = true;
@@ -81,6 +93,7 @@ impl PluginControlServiceBuilder {
                 .unwrap_or_else(|| Arc::new(InMemoryPluginRepository::default())),
             admission: self.admission.unwrap_or_default(),
             runtime,
+            capability_service: self.capability_service,
             project_local_enabled: self.project_local_enabled,
         }
     }
@@ -91,6 +104,7 @@ pub struct PluginControlService {
     repository: Arc<dyn PluginRepository>,
     admission: PluginAdmissionChain,
     runtime: Arc<PluginRuntimeFacade>,
+    capability_service: Option<Arc<PluginCapabilityService>>,
     project_local_enabled: bool,
 }
 
@@ -226,6 +240,12 @@ impl PluginControlService {
         record.enabled = false;
         record.activation_state = PluginActivationState::Disabled;
         record.updated_at = Utc::now();
+        self.deactivate_capabilities(
+            &record.plugin_id,
+            command.trace.clone(),
+            "plugin disabled by control plane",
+        )
+        .await?;
         self.repository.put(record.clone(), "disable").await?;
         Ok(record)
     }
@@ -292,6 +312,12 @@ impl PluginControlService {
                 "plugin control uninstall skipped runtime cleanup because lifecycle is not stopped"
             );
         }
+        self.deactivate_capabilities(
+            &record.plugin_id,
+            command.trace.clone(),
+            "plugin uninstalled by control plane",
+        )
+        .await?;
         self.repository.remove(&record.plugin_id).await?;
         Ok(PluginControlEvent::new(
             Some(record.plugin_id),
@@ -349,12 +375,13 @@ impl PluginControlService {
         );
         let events = self
             .runtime
-            .install_and_register(record.manifest.clone(), Some(trace))
+            .install_and_register(record.manifest.clone(), Some(trace.clone()))
             .await?;
         let next = events
             .last()
             .map(|event| event.next_state.clone())
             .unwrap_or(PluginLifecycleState::Registered);
+        self.register_capabilities(&record, trace.clone()).await?;
         record.enabled = true;
         record.lifecycle_state = next.clone();
         record.activation_state = PluginActivationState::from_lifecycle(&next);
@@ -371,59 +398,57 @@ impl PluginControlService {
             .await?
             .ok_or_else(|| PluginError::Unavailable(format!("plugin not found: {plugin_id}")))
     }
-}
 
-fn sanitized_metadata(
-    metadata: &std::collections::BTreeMap<String, String>,
-) -> std::collections::BTreeMap<String, String> {
-    metadata
-        .iter()
-        .filter(|(key, _)| !key.to_ascii_lowercase().contains("secret"))
-        .filter(|(key, _)| !key.to_ascii_lowercase().contains("token"))
-        .map(|(key, value)| (key.clone(), value.clone()))
-        .collect()
-}
+    async fn register_capabilities(
+        &self,
+        record: &PluginControlRecord,
+        trace: macaca_proto::TraceContext,
+    ) -> Result<(), PluginError> {
+        let Some(capability_service) = &self.capability_service else {
+            return Ok(());
+        };
+        let descriptors = discover_manifest_capabilities(&record.manifest);
+        if descriptors.is_empty() {
+            return Ok(());
+        }
+        info!(
+            trace_id = %trace.trace_id,
+            plugin_id = %record.plugin_id,
+            descriptors = descriptors.len(),
+            "plugin control syncing capability descriptors"
+        );
+        capability_service
+            .register(macaca_proto::PluginCapabilityRegisterCommand {
+                plugin_id: record.plugin_id.clone(),
+                descriptors,
+                trace,
+                metadata: Default::default(),
+            })
+            .await?;
+        Ok(())
+    }
 
-fn config_requirements(
-    metadata: &std::collections::BTreeMap<String, String>,
-) -> Vec<PluginConfigRequirement> {
-    metadata
-        .get("required_config")
-        .map(|value| {
-            value
-                .split(',')
-                .filter_map(|key| {
-                    let key = key.trim();
-                    (!key.is_empty()).then(|| PluginConfigRequirement {
-                        key: key.into(),
-                        required: true,
-                        present: false,
-                        description: "Declared by plugin package metadata".into(),
-                    })
-                })
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-fn secret_requirements(
-    metadata: &std::collections::BTreeMap<String, String>,
-) -> Vec<PluginSecretRequirement> {
-    metadata
-        .get("required_secrets")
-        .map(|value| {
-            value
-                .split(',')
-                .filter_map(|name| {
-                    let name = name.trim();
-                    (!name.is_empty()).then(|| PluginSecretRequirement {
-                        name: name.into(),
-                        required: true,
-                        present: false,
-                        source_hint: Some("env_or_secret_provider".into()),
-                    })
-                })
-                .collect()
-        })
-        .unwrap_or_default()
+    async fn deactivate_capabilities(
+        &self,
+        plugin_id: &PluginId,
+        trace: macaca_proto::TraceContext,
+        reason: &str,
+    ) -> Result<(), PluginError> {
+        let Some(capability_service) = &self.capability_service else {
+            return Ok(());
+        };
+        let events = capability_service
+            .deactivate(macaca_proto::PluginCapabilityDeactivateCommand {
+                plugin_id: plugin_id.clone(),
+                trace,
+                reason: reason.into(),
+            })
+            .await?;
+        info!(
+            plugin_id = %plugin_id,
+            deactivated = events.len(),
+            "plugin control synced capability deactivation"
+        );
+        Ok(())
+    }
 }

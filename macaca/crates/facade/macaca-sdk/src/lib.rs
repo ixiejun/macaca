@@ -22,6 +22,7 @@ pub mod package_fixtures;
 pub mod payment_client;
 pub mod persona;
 pub mod persona_prototype;
+pub mod plugin_capability_client;
 pub mod plugin_client;
 pub mod registry_api;
 pub mod service_client;
@@ -72,6 +73,10 @@ pub use payment_client::{
 };
 pub use persona::AgentPersona;
 pub use persona_prototype::{PersonaOverrides, PersonaPrototype};
+pub use plugin_capability_client::{
+    ServiceBackedPluginCapabilityClient, SystemPluginCapabilityClient,
+    UnavailableSystemPluginCapabilityClient,
+};
 pub use plugin_client::{
     ServiceBackedPluginControlClient, SystemPluginControlClient,
     UnavailableSystemPluginControlClient,

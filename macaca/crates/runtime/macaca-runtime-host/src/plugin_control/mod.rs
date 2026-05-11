@@ -7,6 +7,7 @@
 //! phases, which keeps this module focused on deterministic control state.
 
 mod admission;
+mod metadata;
 mod repository;
 mod service;
 
