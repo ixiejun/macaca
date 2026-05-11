@@ -25,8 +25,8 @@ use macaca_proto::{config::ContextConfig, ApplicationId, ForkId, LlmMessage};
 use macaca_sdk::{
     SystemApplicationClient, SystemContextClient, SystemDriverClient, SystemEntitlementClient,
     SystemEvmClient, SystemLlmClient, SystemMcpClient, SystemMemoryClient, SystemPaymentClient,
-    SystemPluginCapabilityClient, SystemPluginControlClient, SystemSkillClient, SystemStoreClient,
-    SystemWeb3Client,
+    SystemPluginCapabilityClient, SystemPluginControlClient, SystemPluginHookClient,
+    SystemSkillClient, SystemStoreClient, SystemWeb3Client,
 };
 use macaca_skill::SkillCatalog;
 use macaca_task::TodoStore;
@@ -322,6 +322,8 @@ pub struct AppState {
     pub plugin_control_client: Arc<dyn SystemPluginControlClient>,
     /// The serviceized Plugin Capability client used by capability-plane routes.
     pub plugin_capability_client: Arc<dyn SystemPluginCapabilityClient>,
+    /// The serviceized Plugin Hook client used by hook-plane routes and adapters.
+    pub plugin_hook_client: Arc<dyn SystemPluginHookClient>,
     /// Primary Web-local facade bundle for low-risk system route adapters.
     ///
     /// New status, optional-module, package, entitlement, and payment routes

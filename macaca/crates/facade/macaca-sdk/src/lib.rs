@@ -24,6 +24,7 @@ pub mod persona;
 pub mod persona_prototype;
 pub mod plugin_capability_client;
 pub mod plugin_client;
+pub mod plugin_hook_client;
 pub mod registry_api;
 pub mod service_client;
 pub mod skill_client;
@@ -80,6 +81,9 @@ pub use plugin_capability_client::{
 pub use plugin_client::{
     ServiceBackedPluginControlClient, SystemPluginControlClient,
     UnavailableSystemPluginControlClient,
+};
+pub use plugin_hook_client::{
+    ServiceBackedPluginHookClient, SystemPluginHookClient, UnavailableSystemPluginHookClient,
 };
 #[allow(deprecated)]
 pub use registry_api::{register_from_config, register_from_file};

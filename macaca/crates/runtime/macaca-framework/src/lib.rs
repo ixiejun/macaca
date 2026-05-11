@@ -30,6 +30,7 @@ pub mod model;
 pub mod model_impls;
 pub mod pipeline;
 pub mod plan;
+pub mod plugin_hooks;
 pub mod react_agent;
 pub mod session;
 pub mod state;

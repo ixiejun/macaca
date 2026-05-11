@@ -1481,6 +1481,7 @@ dependencies = [
  "macaca-persist",
  "macaca-proto",
  "macaca-runtime",
+ "macaca-runtime-host",
  "macaca-sdk",
  "macaca-skill",
  "macaca-task",

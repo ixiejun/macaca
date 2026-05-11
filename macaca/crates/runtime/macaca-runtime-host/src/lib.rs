@@ -35,6 +35,8 @@ pub mod plugin_capability;
 pub mod plugin_capability_service_provider;
 pub mod plugin_control;
 pub mod plugin_control_service_provider;
+pub mod plugin_hook;
+pub mod plugin_hook_service_provider;
 pub mod route_c_bootstrap;
 pub mod service_decorator;
 pub mod service_provider;
@@ -100,6 +102,15 @@ pub use plugin_control::{
 pub use plugin_control_service_provider::{
     plugin_control_service_command, plugin_control_service_descriptor,
     PluginControlSystemServiceProvider,
+};
+pub use plugin_hook::{
+    DefaultPluginHookFailureStrategy, DefaultPluginHookTimeoutStrategy,
+    DescriptorOnlyPluginHookExecutor, PluginHookBus, PluginHookBusBuilder, PluginHookExecutor,
+    PluginHookFailureStrategy, PluginHookRegistry, PluginHookRegistryBuilder, PluginHookRunner,
+    PluginHookTimeoutStrategy,
+};
+pub use plugin_hook_service_provider::{
+    plugin_hook_service_command, plugin_hook_service_descriptor, PluginHookSystemServiceProvider,
 };
 pub use route_c_bootstrap::{
     bootstrap_route_c_optional_services, RouteCBootstrapDiagnostic, RouteCHostRuntimeBundle,

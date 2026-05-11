@@ -16,6 +16,7 @@ pub mod payment_service;
 pub mod plugin;
 pub mod plugin_capability;
 pub mod plugin_control;
+pub mod plugin_hook;
 pub mod service;
 pub mod service_bus;
 pub mod store_service;
@@ -30,6 +31,8 @@ mod a2a_tests;
 mod evm_tests;
 #[cfg(test)]
 mod plugin_capability_tests;
+#[cfg(test)]
+mod plugin_hook_tests;
 #[cfg(test)]
 mod web3_tests;
 
@@ -51,6 +54,7 @@ pub use payment_service::*;
 pub use plugin::*;
 pub use plugin_capability::*;
 pub use plugin_control::*;
+pub use plugin_hook::*;
 pub use service::*;
 pub use service_bus::*;
 pub use store_service::*;
