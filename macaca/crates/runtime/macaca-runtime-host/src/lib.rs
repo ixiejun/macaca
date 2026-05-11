@@ -37,6 +37,7 @@ pub mod plugin_control;
 pub mod plugin_control_service_provider;
 pub mod plugin_hook;
 pub mod plugin_hook_service_provider;
+pub mod plugin_hosts;
 pub mod route_c_bootstrap;
 pub mod service_decorator;
 pub mod service_provider;
@@ -111,6 +112,11 @@ pub use plugin_hook::{
 };
 pub use plugin_hook_service_provider::{
     plugin_hook_service_command, plugin_hook_service_descriptor, PluginHookSystemServiceProvider,
+};
+pub use plugin_hosts::{
+    BuiltInAdapterPluginRuntimeHost, DescriptorPluginRuntimeHost, PluginHostLifecycleSupervisor,
+    PluginHostRuntime, PluginHostRuntimeFactory, PluginHostRuntimeResult, ProcessPluginRuntimeHost,
+    RemoteProxyPluginRuntimeHost, UnavailablePluginRuntimeHost, WasmPluginRuntimeHost,
 };
 pub use route_c_bootstrap::{
     bootstrap_route_c_optional_services, RouteCBootstrapDiagnostic, RouteCHostRuntimeBundle,

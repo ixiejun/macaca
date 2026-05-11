@@ -79,3 +79,77 @@ cargo test -p macaca-integration-tests package_certification
 ```
 
 Certification validates metadata and unavailable-safe behavior without naming or requiring a real provider.
+
+## Plugin SDK And Hosts V1
+
+Plugin SDK / ABI / Hosts V1 adds the developer-facing facade and host boundary used by future real execution runtimes. Plugin authors should build manifests, capabilities, hooks, config requirements, secret requirements, and host descriptors through `macaca-sdk`; they should not import kernel, runtime-host, web, CLI, or service implementation crates.
+
+### Minimal Descriptor Plugin
+
+```rust
+use macaca_proto::{DeveloperId, PluginId, PluginRuntimeKind, PluginVersion};
+use macaca_sdk::PluginSdk;
+
+let sdk = PluginSdk::new();
+let manifest = sdk
+    .manifest()
+    .plugin_id(PluginId::new("plugin.example.descriptor"))
+    .version(PluginVersion::new("1.0.0"))
+    .developer_id(DeveloperId::new("developer.example"))
+    .runtime(PluginRuntimeKind::DescriptorOnly)
+    .permission("permission.example", "Explain why this permission is required")
+    .resource("resource.example", "workspace", "Explain the bounded resource scope")
+    .signature_fixture()
+    .build()?;
+```
+
+Descriptor plugins are metadata-only. The descriptor host accepts lifecycle commands without executing plugin code, loading dynamic libraries, spawning processes, or opening network transports.
+
+### Built-In Adapter Plugin
+
+A built-in adapter plugin uses the same manifest and capability contracts as third-party plugins, but the implementation already exists inside a compiled OS service. Runtime-host exposes this through a canonical built-in adapter host. Adapter manifests must still declare permissions, resources, health, and trace metadata so ownership, uninstall cleanup, and diagnostics remain uniform.
+
+### Capability And Hook Plugins
+
+SDK builders produce protocol DTOs accepted by Plugin Capability Registry and Plugin Hook Bus:
+
+```rust
+use macaca_proto::{CapabilityId, PluginCapabilityKind, PluginHookName, TraceSchemaRef};
+use macaca_sdk::{PluginCapabilityBuilder, PluginHookBuilder};
+
+let capability = PluginCapabilityBuilder::new(
+    CapabilityId::new("capability.example"),
+    manifest.plugin_id.clone(),
+    PluginCapabilityKind::Tool,
+    "example-tool",
+    TraceSchemaRef::new("trace.example.tool"),
+)
+.permission_hint("permission.example", true, "Required for tool invocation")
+.build();
+
+let hook = PluginHookBuilder::observer(
+    manifest.plugin_id.clone(),
+    PluginHookName::BeforeToolCall,
+    100,
+    TraceSchemaRef::new("trace.example.hook"),
+)
+.build();
+```
+
+Hook payloads remain bounded metadata. Plugins must not expect raw secrets, private keys, unbounded prompts, raw memory bodies, package bytes, or internal runtime objects.
+
+### WASM, Process, And Remote Proxy Skeletons
+
+`PluginRuntimeKind::Wasm`, `PluginRuntimeKind::Process`, and `PluginRuntimeKind::RemoteProxy` are supported as host descriptors and contract-test targets, but they are unavailable-safe skeletons in V1. Runtime-host returns `plugin_host_unavailable` instead of executing WASM bytes, spawning processes, or contacting remote endpoints. This preserves the future ABI surface without pretending unsafe execution is production-ready.
+
+### Contract Tests
+
+Run SDK and integration contract tests with:
+
+```bash
+cargo test -p macaca-sdk plugin
+cargo test -p macaca-runtime-host plugin_hosts
+cargo test -p macaca-integration-tests plugin_contract
+```
+
+The contract test kit validates manifest shape, capability ownership, hook ownership, config/secret requirement shape, unavailable-safe host results, and Route C boundary compliance.
