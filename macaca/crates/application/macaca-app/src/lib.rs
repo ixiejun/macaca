@@ -73,8 +73,10 @@ pub use runtime_guard::{
 };
 pub use service_adapter::application_service_descriptor;
 pub use service_admission::{
-    app_status_from_lifecycle, lifecycle_from_app_status, ApplicationManifestSpec,
-    ApplicationRuntimeKindSpec, ApplicationScopeSpec, ApplicationTraceSpec,
+    app_status_from_lifecycle, lifecycle_from_app_status, ApplicationAbilitySpec,
+    ApplicationAdmissionDiagnostic, ApplicationAdmissionReport, ApplicationManifestSpec,
+    ApplicationManifestV1Spec, ApplicationRuntimeKindSpec, ApplicationScopeSpec,
+    ApplicationTraceSpec,
 };
 pub use skills::{global_skills_dir, SkillLoader};
 pub use web3_capability::AppWeb3CapabilityRequest;

@@ -4,8 +4,11 @@
 //! and registration helpers to construct and register agents with
 //! the kernel from declarative config files.
 
+pub mod ability_kit;
 pub mod application;
 pub mod application_client;
+pub mod application_kit;
+pub mod application_testkit;
 pub mod builder;
 pub mod config;
 pub mod context_client;
@@ -38,11 +41,16 @@ pub mod trace_client;
 pub mod validation;
 pub mod web3_client;
 
+pub use ability_kit::{AbilityDescriptorBuilder, AbilityKit};
 pub use application::{
     service_call_command, trace_emit_command, ApplicationAbiBuilder, ApplicationHostCommandBuilder,
 };
 pub use application_client::{
     ServiceBackedApplicationClient, SystemApplicationClient, UnavailableSystemApplicationClient,
+};
+pub use application_kit::{ApplicationKit, ApplicationManifestBuilder};
+pub use application_testkit::{
+    ApplicationContractDiagnostic, ApplicationContractReport, ApplicationContractTestKit,
 };
 pub use builder::{AgentBuilder, DeclarativeAgent};
 pub use config::AgentConfig;

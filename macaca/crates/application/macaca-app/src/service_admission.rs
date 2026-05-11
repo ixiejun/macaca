@@ -6,7 +6,8 @@
 //! branches as the Application Service grows.
 
 use macaca_proto::{
-    ApplicationLifecycleState, MacacaError, MacacaResult, PackageRuntimeKind, TraceContext,
+    ApplicationAbilityDescriptor, ApplicationLifecycleState, ApplicationManifestV1, MacacaError,
+    MacacaResult, PackageRuntimeKind, TraceContext,
 };
 
 use crate::model::{AppLayer, AppManifest, AppStatus};
@@ -82,6 +83,125 @@ impl ApplicationRuntimeKindSpec {
     }
 }
 
+/// Sanitized diagnostic emitted by Manifest v1 and Ability admission.
+///
+/// The diagnostic deliberately stores identifiers, kinds, and reason codes
+/// only.  It must never embed raw manifest bodies, prompt content, secrets, env
+/// values, API keys, or host payloads because admission reports are safe to log
+/// and may later be shown in developer tooling.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ApplicationAdmissionDiagnostic {
+    pub code: String,
+    pub subject: String,
+    pub message: String,
+}
+
+impl ApplicationAdmissionDiagnostic {
+    pub fn new(
+        code: impl Into<String>,
+        subject: impl Into<String>,
+        message: impl Into<String>,
+    ) -> Self {
+        Self {
+            code: code.into(),
+            subject: subject.into(),
+            message: message.into(),
+        }
+    }
+}
+
+/// Memento-style validation report for Application Platform admission.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ApplicationAdmissionReport {
+    pub diagnostics: Vec<ApplicationAdmissionDiagnostic>,
+}
+
+impl ApplicationAdmissionReport {
+    pub fn is_success(&self) -> bool {
+        self.diagnostics.is_empty()
+    }
+
+    pub fn push(&mut self, diagnostic: ApplicationAdmissionDiagnostic) {
+        self.diagnostics.push(diagnostic);
+    }
+}
+
+/// Specification for Application Manifest v1 declarations.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct ApplicationManifestV1Spec;
+
+impl ApplicationManifestV1Spec {
+    /// Validate the Manifest v1 shape without executing the application.
+    pub fn validate(&self, manifest: &ApplicationManifestV1) -> ApplicationAdmissionReport {
+        let mut report = ApplicationAdmissionReport::default();
+        if manifest.name.trim().is_empty() {
+            report.push(ApplicationAdmissionDiagnostic::new(
+                "missing_application_name",
+                manifest.package_id.as_str(),
+                "Application Manifest v1 requires a non-empty application name",
+            ));
+        }
+        if manifest.abilities.is_empty() {
+            report.push(ApplicationAdmissionDiagnostic::new(
+                "missing_ability",
+                manifest.package_id.as_str(),
+                "Application Manifest v1 requires at least one ability descriptor",
+            ));
+        }
+        for ability in &manifest.abilities {
+            merge_report(&mut report, ApplicationAbilitySpec.validate(ability));
+        }
+        tracing::info!(
+            package_id = %manifest.package_id,
+            ability_count = manifest.abilities.len(),
+            diagnostic_count = report.diagnostics.len(),
+            "application manifest v1 admission evaluated"
+        );
+        report
+    }
+}
+
+/// Specification for individual ability descriptors.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct ApplicationAbilitySpec;
+
+impl ApplicationAbilitySpec {
+    /// Validate ability declarations while preserving provider-neutrality.
+    pub fn validate(&self, ability: &ApplicationAbilityDescriptor) -> ApplicationAdmissionReport {
+        let mut report = ApplicationAdmissionReport::default();
+        if ability.id.trim().is_empty() {
+            report.push(ApplicationAdmissionDiagnostic::new(
+                "missing_ability_id",
+                format!("{:?}", ability.kind),
+                "Ability descriptor requires a stable id",
+            ));
+        }
+        for service in &ability.services {
+            if service.reason.trim().is_empty() {
+                report.push(ApplicationAdmissionDiagnostic::new(
+                    "missing_service_reason",
+                    service.service.as_str(),
+                    "Ability service requirements must explain why the service is needed",
+                ));
+            }
+        }
+        for permission in &ability.permissions {
+            if permission.reason.trim().is_empty() {
+                report.push(ApplicationAdmissionDiagnostic::new(
+                    "missing_permission_reason",
+                    &permission.name,
+                    "Ability permissions must explain why the permission is needed",
+                ));
+            }
+        }
+        report
+    }
+}
+
+fn merge_report(target: &mut ApplicationAdmissionReport, source: ApplicationAdmissionReport) {
+    target.diagnostics.extend(source.diagnostics);
+}
+
 /// Project the legacy `AppStatus` view into the ABI lifecycle vocabulary.
 pub fn lifecycle_from_app_status(status: AppStatus) -> ApplicationLifecycleState {
     match status {
@@ -127,5 +247,27 @@ mod tests {
             .validate(&TraceContext::new(" "))
             .expect_err("blank trace id must be rejected");
         assert!(error.to_string().contains("trace"));
+    }
+
+    #[test]
+    fn manifest_v1_spec_rejects_missing_ability() {
+        let manifest = ApplicationManifestV1::new(
+            macaca_proto::PackageId::new("application.invalid"),
+            macaca_proto::DeveloperId::new("developer.invalid"),
+            "Invalid",
+            "1.0.0",
+            macaca_proto::ApplicationRuntimeProfile::new(
+                macaca_proto::PackageRuntimeKind::Yaml,
+                "1",
+            ),
+            macaca_proto::ApplicationCompatibilityDeclaration::new("0.1.0"),
+        );
+
+        let report = ApplicationManifestV1Spec.validate(&manifest);
+        assert!(!report.is_success());
+        assert!(report
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == "missing_ability"));
     }
 }

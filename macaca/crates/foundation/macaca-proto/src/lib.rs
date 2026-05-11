@@ -1,5 +1,7 @@
 pub mod a2a;
 pub mod application_abi;
+pub mod application_ability;
+pub mod application_manifest;
 pub mod application_service;
 pub mod capability_tool;
 pub mod commerce;
@@ -41,6 +43,8 @@ mod web3_tests;
 
 pub use a2a::*;
 pub use application_abi::*;
+pub use application_ability::*;
+pub use application_manifest::*;
 pub use application_service::*;
 pub use capability_tool::*;
 pub use commerce::*;
