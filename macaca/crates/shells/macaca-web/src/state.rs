@@ -25,7 +25,7 @@ use macaca_proto::{config::ContextConfig, ApplicationId, ForkId, LlmMessage};
 use macaca_sdk::{
     SystemApplicationClient, SystemContextClient, SystemDriverClient, SystemEntitlementClient,
     SystemEvmClient, SystemLlmClient, SystemMcpClient, SystemMemoryClient, SystemPaymentClient,
-    SystemSkillClient, SystemStoreClient, SystemWeb3Client,
+    SystemPluginControlClient, SystemSkillClient, SystemStoreClient, SystemWeb3Client,
 };
 use macaca_skill::SkillCatalog;
 use macaca_task::TodoStore;
@@ -317,6 +317,8 @@ pub struct AppState {
     pub web3_client: Arc<dyn SystemWeb3Client>,
     /// The serviceized EVM client used by optional EVM shell/status paths.
     pub evm_client: Arc<dyn SystemEvmClient>,
+    /// The serviceized Plugin Control client used by plugin management routes.
+    pub plugin_control_client: Arc<dyn SystemPluginControlClient>,
     /// Primary Web-local facade bundle for low-risk system route adapters.
     ///
     /// New status, optional-module, package, entitlement, and payment routes

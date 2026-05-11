@@ -45,6 +45,21 @@ impl CliCommandHandler for StatusCommandHandler {
     }
 }
 
+/// Handler for read-only plugin management commands.
+///
+/// CLI remains a thin shell: the handler delegates to SDK Plugin Control
+/// client functions and never reads plugin repositories or runtime-host state
+/// directly.
+#[derive(Debug, Default)]
+pub struct PluginListCommandHandler;
+
+#[async_trait(?Send)]
+impl CliCommandHandler for PluginListCommandHandler {
+    async fn run(&self) -> MacacaResult<()> {
+        commands::execute_list_plugins().await
+    }
+}
+
 /// Handler for the `version` command.
 #[derive(Debug)]
 pub struct VersionCommandHandler {
@@ -137,6 +152,11 @@ mod tests {
             .run()
             .await
             .unwrap();
+    }
+
+    #[tokio::test]
+    async fn plugin_list_handler_runs() {
+        PluginListCommandHandler.run().await.unwrap();
     }
 
     #[test]

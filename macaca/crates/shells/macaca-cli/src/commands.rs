@@ -14,7 +14,8 @@ use macaca_proto::error::MacacaResult;
 use macaca_proto::types::{LlmMessage, LlmOptions, LlmResponse, TokenUsage};
 use macaca_sdk::{
     kernel_status_snapshot, ServiceInspectionCommand, StaticSystemStatusDataSource, SystemFacade,
-    SystemTaskClient, TaskBoardQueryCommand, TaskBoardQueryResult,
+    SystemPluginControlClient, SystemTaskClient, TaskBoardQueryCommand, TaskBoardQueryResult,
+    UnavailableSystemPluginControlClient,
 };
 use macaca_tools::{DefaultToolSet, ToolCatalog};
 
@@ -195,6 +196,37 @@ pub async fn execute_show_status() -> MacacaResult<()> {
         }
     }
 
+    Ok(())
+}
+
+/// List plugins through the SDK Plugin Control boundary.
+///
+/// This command intentionally uses the SDK Null Object client until a concrete
+/// service-backed dispatcher is injected into CLI.  The shape prevents CLI from
+/// growing repository or runtime-host semantics while giving operators a stable
+/// command surface that later hosts can wire to real Plugin Control Service.
+pub async fn execute_list_plugins() -> MacacaResult<()> {
+    let client = UnavailableSystemPluginControlClient;
+    let records = client
+        .list(macaca_proto::PluginListCommand {
+            repository_id: None,
+            include_disabled: true,
+            trace: macaca_proto::TraceContext::new("cli-plugin-list"),
+        })
+        .await?;
+
+    if records.is_empty() {
+        println!("No plugins reported by Plugin Control Service.");
+    } else {
+        println!("{:<40} {:<12} {:<12}", "PLUGIN", "VERSION", "STATE");
+        println!("{}", "-".repeat(72));
+        for record in records {
+            println!(
+                "{:<40} {:<12} {:?}",
+                record.plugin_id, record.version, record.activation_state
+            );
+        }
+    }
     Ok(())
 }
 

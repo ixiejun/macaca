@@ -31,6 +31,8 @@ pub mod payment_adapter;
 pub mod payment_admission;
 pub mod payment_service_provider;
 pub mod plugin;
+pub mod plugin_control;
+pub mod plugin_control_service_provider;
 pub mod route_c_bootstrap;
 pub mod service_decorator;
 pub mod service_provider;
@@ -74,6 +76,16 @@ pub use plugin::{
     plugin_failure_event, DescriptorPluginHost, PluginHost, PluginHostFactory,
     PluginLifecycleController, PluginManifestValidator, PluginRuntimeFacade, PluginRuntimeGuard,
     PluginRuntimeResult,
+};
+pub use plugin_control::{
+    AdmissionCheck, AdmissionContext, AdmissionDecision, CompatibilityAdmissionCheck,
+    InMemoryPluginRepository, ManifestShapeAdmissionCheck, PluginAdmissionChain,
+    PluginControlService, PluginControlServiceBuilder, PluginRepository, PluginRepositoryMutation,
+    PluginRepositorySnapshot, SourcePolicyAdmissionCheck,
+};
+pub use plugin_control_service_provider::{
+    plugin_control_service_command, plugin_control_service_descriptor,
+    PluginControlSystemServiceProvider,
 };
 pub use route_c_bootstrap::{
     bootstrap_route_c_optional_services, RouteCBootstrapDiagnostic, RouteCHostRuntimeBundle,

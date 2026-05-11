@@ -4,8 +4,8 @@
 
 use clap::{Parser, Subcommand};
 use macaca_cli::command_handlers::{
-    AgentsCommandHandler, CliCommandHandler, RunCommandHandler, StatusCommandHandler,
-    VersionCommandHandler, WebCommandHandler,
+    AgentsCommandHandler, CliCommandHandler, PluginListCommandHandler, RunCommandHandler,
+    StatusCommandHandler, VersionCommandHandler, WebCommandHandler,
 };
 use macaca_proto::config::MacacaConfig;
 
@@ -26,6 +26,11 @@ enum Commands {
     Agents,
     /// Show system status.
     Status,
+    /// Plugin Control management commands.
+    Plugin {
+        #[command(subcommand)]
+        command: PluginCommands,
+    },
     /// Print version information.
     Version,
     /// Start the web UI server.
@@ -34,6 +39,13 @@ enum Commands {
         #[arg(long, default_value_t = 3001)]
         port: u16,
     },
+}
+
+/// Plugin management subcommands.
+#[derive(Subcommand)]
+enum PluginCommands {
+    /// List plugins through Plugin Control Service.
+    List,
 }
 
 #[tokio::main]
@@ -56,6 +68,9 @@ async fn main() {
         Commands::Run => RunCommandHandler.run().await,
         Commands::Agents => AgentsCommandHandler.run().await,
         Commands::Status => StatusCommandHandler.run().await,
+        Commands::Plugin { command } => match command {
+            PluginCommands::List => PluginListCommandHandler.run().await,
+        },
         Commands::Version => {
             VersionCommandHandler::new(env!("CARGO_PKG_VERSION"))
                 .run()

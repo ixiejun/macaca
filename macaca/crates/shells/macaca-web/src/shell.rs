@@ -15,8 +15,9 @@ use macaca_proto::{
     TraceContext, Web3Availability, Web3AvailabilityCommand,
 };
 use macaca_sdk::{
-    StaticSystemStatusDataSource, SystemEvmClient, SystemFacade, SystemServiceClient,
-    SystemStatusSnapshot, SystemWeb3Client, TaskBoardQueryCommand, TodoStoreTaskBoardDataSource,
+    StaticSystemStatusDataSource, SystemEvmClient, SystemFacade, SystemPluginControlClient,
+    SystemServiceClient, SystemStatusSnapshot, SystemWeb3Client, TaskBoardQueryCommand,
+    TodoStoreTaskBoardDataSource,
 };
 use macaca_task::TodoStore;
 
@@ -32,6 +33,7 @@ pub struct WebSystemFacadeBundle {
     service: Arc<dyn SystemServiceClient>,
     web3: Arc<dyn SystemWeb3Client>,
     evm: Arc<dyn SystemEvmClient>,
+    plugin_control: Arc<dyn SystemPluginControlClient>,
 }
 
 impl WebSystemFacadeBundle {
@@ -44,13 +46,24 @@ impl WebSystemFacadeBundle {
         service: Arc<dyn SystemServiceClient>,
         web3: Arc<dyn SystemWeb3Client>,
         evm: Arc<dyn SystemEvmClient>,
+        plugin_control: Arc<dyn SystemPluginControlClient>,
     ) -> Self {
-        Self { service, web3, evm }
+        Self {
+            service,
+            web3,
+            evm,
+            plugin_control,
+        }
     }
 
     /// Borrow the generic service-inspection client for low-risk status routes.
     pub fn service_client(&self) -> Arc<dyn SystemServiceClient> {
         Arc::clone(&self.service)
+    }
+
+    /// Borrow the focused Plugin Control client for Web plugin routes.
+    pub fn plugin_control_client(&self) -> Arc<dyn SystemPluginControlClient> {
+        Arc::clone(&self.plugin_control)
     }
 
     /// Query optional Web3 availability through the focused SDK client.
@@ -308,6 +321,7 @@ mod tests {
             Arc::new(EmptyServiceClient),
             Arc::new(UnavailableWeb3Client),
             Arc::new(UnavailableEvmClient),
+            Arc::new(macaca_sdk::UnavailableSystemPluginControlClient),
         );
 
         let web3 = facade.web3_availability("test-web3").await.unwrap();

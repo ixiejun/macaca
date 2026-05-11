@@ -9,7 +9,9 @@ use tower_http::cors::{Any, CorsLayer};
 use macaca_proto::MacacaResult;
 
 use crate::state::AppState;
-use crate::{chat_orchestrator, genui_routes, loop_manager, metrics, routes, session};
+use crate::{
+    chat_orchestrator, genui_routes, loop_manager, metrics, plugin_routes, routes, session,
+};
 
 /// Canonical builder for starting the web server.
 #[derive(Debug, Clone)]
@@ -74,6 +76,12 @@ impl WebRuntimeFacade {
             .route("/api/apps/{id}/sessions", get(session::list_app_sessions))
             .route("/api/apps/reload", post(routes::reload_apps))
             .route("/api/mcp", get(routes::get_mcp_status))
+            .route("/api/plugins", get(plugin_routes::list_plugins))
+            .route("/api/plugins/{id}", get(plugin_routes::inspect_plugin))
+            .route(
+                "/api/plugins/{id}/diagnostics",
+                get(plugin_routes::plugin_diagnostics),
+            )
             .route(
                 "/api/context/provider-runtime",
                 get(routes::get_context_provider_runtime),
