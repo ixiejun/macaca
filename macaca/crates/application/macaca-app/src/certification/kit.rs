@@ -13,6 +13,7 @@ use super::types::{
     ApplicationCertificationContext, ApplicationCertificationFixture,
     ApplicationCertificationReport,
 };
+use super::wasm_admission::{WasmPackageAdmissionSpec, WasmPackageAdmissionStatus};
 
 /// Facade for Application Platform certification.
 #[derive(Debug, Clone, Default)]
@@ -37,6 +38,31 @@ impl ApplicationCertificationKit {
                 fixture.manifest.package_id.as_str(),
                 "WASM component fixtures must include ABI metadata before execution",
             );
+        }
+        if fixture.manifest.runtime.kind == PackageRuntimeKind::WasmComponent {
+            let wasm_report = WasmPackageAdmissionSpec::default().evaluate(fixture, context);
+            match wasm_report.status {
+                WasmPackageAdmissionStatus::Accepted => {}
+                WasmPackageAdmissionStatus::Unavailable => {
+                    for code in &wasm_report.reason_codes {
+                        report.unavailable(
+                            code.clone(),
+                            fixture.manifest.package_id.as_str(),
+                            "WASM package admission reported unavailable runtime capability",
+                        );
+                    }
+                }
+                WasmPackageAdmissionStatus::Rejected => {
+                    for code in &wasm_report.reason_codes {
+                        report.fail(
+                            code.clone(),
+                            fixture.manifest.package_id.as_str(),
+                            "WASM package admission rejected the fixture",
+                        );
+                    }
+                }
+            }
+            report.wasm_admission = Some(wasm_report);
         }
         tracing::info!(
             fixture_id = %report.fixture_id,

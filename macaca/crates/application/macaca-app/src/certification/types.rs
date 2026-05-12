@@ -8,7 +8,10 @@ use std::collections::BTreeSet;
 
 use macaca_proto::{
     ApplicationAbiDeclaration, ApplicationManifestV1, KernelServiceId, PackageRuntimeKind,
+    WasmComponentArtifactDescriptor, WasmEngineCapabilities,
 };
+
+use super::wasm_admission::{WasmPackageAdmissionReport, WasmPackageAdmissionStatus};
 
 /// Status for an application platform certification report.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -64,6 +67,7 @@ pub struct ApplicationCertificationReport {
     pub reason_codes: Vec<String>,
     pub trace_id: Option<String>,
     pub diagnostics: Vec<ApplicationCertificationDiagnostic>,
+    pub wasm_admission: Option<WasmPackageAdmissionReport>,
 }
 
 impl ApplicationCertificationReport {
@@ -79,12 +83,20 @@ impl ApplicationCertificationReport {
             reason_codes: Vec::new(),
             trace_id: None,
             diagnostics: Vec::new(),
+            wasm_admission: None,
         }
     }
 
     /// Report whether certification completed without fail-closed diagnostics.
     pub fn is_success(&self) -> bool {
-        self.status == ApplicationCertificationStatus::Passed && self.diagnostics.is_empty()
+        let wasm_ok = self
+            .wasm_admission
+            .as_ref()
+            .map(|report| report.status == WasmPackageAdmissionStatus::Accepted)
+            .unwrap_or(true);
+        self.status == ApplicationCertificationStatus::Passed
+            && self.diagnostics.is_empty()
+            && wasm_ok
     }
 
     pub(crate) fn fail(
@@ -132,6 +144,8 @@ pub struct ApplicationCertificationContext {
     pub(crate) available_services: BTreeSet<KernelServiceId>,
     pub(crate) available_plugins: BTreeSet<String>,
     pub(crate) available_runtimes: BTreeSet<PackageRuntimeKind>,
+    pub(crate) supported_wasm_abi_versions: BTreeSet<String>,
+    pub(crate) wasm_runtime_capabilities: Option<WasmEngineCapabilities>,
 }
 
 impl ApplicationCertificationContext {
@@ -164,6 +178,22 @@ impl ApplicationCertificationContext {
         self.available_runtimes.insert(runtime);
         self
     }
+
+    /// Declare the provider-neutral runtime capability snapshot used for WASM
+    /// package admission.  The context stores capabilities as data so
+    /// certification can compare requirements without constructing a runtime
+    /// provider or loading component bytes.
+    pub fn wasm_runtime_capabilities(mut self, capabilities: WasmEngineCapabilities) -> Self {
+        self.wasm_runtime_capabilities = Some(capabilities);
+        self
+    }
+
+    /// Declare one supported WASM ABI version for negotiation tests.
+    pub fn supported_wasm_abi_version(mut self, version: impl Into<String>) -> Self {
+        self.supported_wasm_abi_versions
+            .insert(version.into().trim().to_string());
+        self
+    }
 }
 
 /// Data-only certification fixture consumed by the certification facade.
@@ -172,6 +202,7 @@ pub struct ApplicationCertificationFixture {
     pub fixture_id: String,
     pub manifest: ApplicationManifestV1,
     pub abi: Option<ApplicationAbiDeclaration>,
+    pub wasm_artifact: Option<WasmComponentArtifactDescriptor>,
 }
 
 impl ApplicationCertificationFixture {
@@ -181,12 +212,24 @@ impl ApplicationCertificationFixture {
             fixture_id: fixture_id.into(),
             manifest,
             abi: None,
+            wasm_artifact: None,
         }
     }
 
     /// Attach ABI metadata for WASM or host-import certification checks.
     pub fn abi(mut self, abi: ApplicationAbiDeclaration) -> Self {
         self.abi = Some(abi);
+        self
+    }
+
+    /// Attach metadata-only WASM artifact admission data.
+    ///
+    /// The descriptor contains artifact references and digests, not component
+    /// bytes.  This keeps certification deterministic and safe for audit
+    /// reports while allowing future package stores and runtimes to use the
+    /// same data contract.
+    pub fn wasm_artifact(mut self, artifact: WasmComponentArtifactDescriptor) -> Self {
+        self.wasm_artifact = Some(artifact);
         self
     }
 }

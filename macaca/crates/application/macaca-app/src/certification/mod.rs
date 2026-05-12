@@ -12,10 +12,14 @@
 
 mod kit;
 mod types;
+mod wasm_admission;
 
 pub use kit::ApplicationCertificationKit;
 pub use types::{
     ApplicationCertificationContext, ApplicationCertificationDiagnostic,
     ApplicationCertificationFixture, ApplicationCertificationReport,
     ApplicationCertificationStatus,
+};
+pub use wasm_admission::{
+    WasmPackageAdmissionReport, WasmPackageAdmissionSpec, WasmPackageAdmissionStatus,
 };

@@ -15,6 +15,7 @@ use macaca_proto::{
 use tracing::{info, warn};
 
 use crate::abi::{ApplicationAbiAdapter, ApplicationAbiDescriptor, WasmApplicationAbiAdapter};
+use crate::certification::WasmPackageAdmissionReport;
 
 /// Metadata-only descriptor for one WASM component application package.
 ///
@@ -29,6 +30,7 @@ pub struct WasmComponentApplicationDescriptor {
     pub entry_component: Option<String>,
     pub diagnostics: Vec<String>,
     pub metadata: BTreeMap<String, String>,
+    pub admission_report: WasmPackageAdmissionReport,
 }
 
 impl WasmComponentApplicationDescriptor {
@@ -43,6 +45,7 @@ impl WasmComponentApplicationDescriptor {
             return Err("package runtime is not wasm_component".into());
         }
         let package_id = package.manifest.id.clone();
+        let admission_report = WasmPackageAdmissionReport::legacy_metadata_only(&package, None);
         let load = WasmApplicationAbiAdapter::new(package)
             .load()
             .map_err(|error| error.to_string())?;
@@ -65,6 +68,7 @@ impl WasmComponentApplicationDescriptor {
                 "wasm_component_runtime_unavailable_until_real_runtime_proposal".into(),
             ],
             metadata,
+            admission_report,
         })
     }
 
@@ -140,6 +144,10 @@ mod tests {
         assert!(descriptor
             .diagnostics
             .contains(&"wasm_component_runtime_unavailable_until_real_runtime_proposal".into()));
+        assert!(descriptor
+            .admission_report
+            .reason_codes
+            .contains(&"metadata_only_runtime_unavailable".into()));
     }
 
     #[test]

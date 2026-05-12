@@ -7,6 +7,7 @@
 
 use macaca_proto::{
     ApplicationAbiDeclaration, ApplicationHostCommand, ApplicationManifestV1, PackageRuntimeKind,
+    WasmAbiNegotiationResult, WasmComponentArtifactDescriptor, WasmEngineCapabilities,
 };
 
 /// Safe diagnostic returned by SDK-side contract tests.
@@ -169,6 +170,101 @@ impl ApplicationContractTestKit {
         report
     }
 
+    /// Validate WASM artifact metadata and ABI negotiation inputs.
+    ///
+    /// This SDK-side Specification mirrors the Application Framework
+    /// admission contract without depending on `macaca-app` or a runtime-host
+    /// provider.  It checks only metadata DTOs: artifact id/reference, digest,
+    /// ABI version compatibility, required import permissions, and runtime
+    /// capability flags.  Diagnostics are intentionally bounded to reason
+    /// codes and identifiers so SDK tooling never exposes raw WASM bytes, raw
+    /// manifests, host payloads, secrets, environment values, API keys, prompts,
+    /// private keys, or provider output.
+    pub fn validate_wasm_artifact_admission(
+        &self,
+        manifest: &ApplicationManifestV1,
+        artifact: &WasmComponentArtifactDescriptor,
+        supported_versions: Vec<String>,
+        capabilities: WasmEngineCapabilities,
+    ) -> ApplicationContractReport {
+        let mut report = ApplicationContractReport::default();
+        if artifact.artifact_id.trim().is_empty() || artifact.artifact_ref.is_empty() {
+            report.push(ApplicationContractDiagnostic::new(
+                "artifact_reference_missing",
+                manifest.package_id.as_str(),
+                "WASM artifacts must declare a stable id and metadata-only reference",
+            ));
+        }
+        if !artifact.digest.is_present() {
+            report.push(ApplicationContractDiagnostic::new(
+                "artifact_digest_missing",
+                artifact.artifact_id.as_str(),
+                "WASM artifacts must declare digest metadata before admission",
+            ));
+        }
+
+        let negotiation = WasmAbiNegotiationResult::negotiate(
+            artifact.abi.clone(),
+            supported_versions,
+            capabilities,
+        );
+        for code in negotiation.reason_codes {
+            report.push(ApplicationContractDiagnostic::new(
+                code,
+                artifact.artifact_id.as_str(),
+                "WASM ABI negotiation failed closed",
+            ));
+        }
+
+        let declared_permissions: std::collections::BTreeSet<String> = manifest
+            .permissions
+            .iter()
+            .map(|permission| permission.name.clone())
+            .chain(
+                manifest
+                    .abilities
+                    .iter()
+                    .flat_map(|ability| ability.permissions.iter())
+                    .map(|permission| permission.name.clone()),
+            )
+            .collect();
+        for import in &artifact.required_imports {
+            if import.optional {
+                continue;
+            }
+            if let Some(permission) = &import.permission {
+                if !declared_permissions.contains(permission) {
+                    report.push(ApplicationContractDiagnostic::new(
+                        "import_permission_missing",
+                        import.import.to_string(),
+                        "Required WASM host import permission is not declared",
+                    ));
+                }
+            }
+        }
+
+        for key in artifact.metadata.keys() {
+            let lower = key.to_ascii_lowercase();
+            if SDK_FORBIDDEN_WASM_METADATA_KEYS
+                .iter()
+                .any(|marker| lower.contains(marker))
+            {
+                report.push(ApplicationContractDiagnostic::new(
+                    "unsafe_wasm_metadata",
+                    artifact.artifact_id.as_str(),
+                    "Unsafe WASM artifact metadata category is not allowed in SDK diagnostics",
+                ));
+            }
+        }
+        tracing::info!(
+            package_id = %manifest.package_id,
+            artifact_id = %artifact.artifact_id,
+            diagnostic_count = report.diagnostics.len(),
+            "application contract test kit validated WASM artifact admission"
+        );
+        report
+    }
+
     /// Validate one host command that must carry trace context.
     ///
     /// Application host commands can be assembled by package tests before any
@@ -207,12 +303,28 @@ impl ApplicationContractTestKit {
     }
 }
 
+const SDK_FORBIDDEN_WASM_METADATA_KEYS: &[&str] = &[
+    "raw wasm",
+    "raw_manifest",
+    "raw manifest",
+    "raw payload",
+    "secret",
+    "api_key",
+    "apikey",
+    "private key",
+    "env",
+    "prompt",
+];
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::application::ApplicationHostCommandBuilder;
     use crate::application_kit::ApplicationKit;
-    use macaca_proto::ApplicationImport;
+    use macaca_proto::{
+        ApplicationImport, WasmAbiRequirement, WasmArtifactDigest, WasmComponentArtifactDescriptor,
+        WasmEngineCapabilities, WasmImportRequirement, WasmRuntimeArtifactRef,
+    };
 
     #[test]
     fn testkit_rejects_missing_ability() {
@@ -261,5 +373,39 @@ mod tests {
             .validate_wasm_component_fixture(&fixture.manifest, &fixture.abi);
 
         assert!(report.is_success());
+    }
+
+    #[test]
+    fn testkit_validates_wasm_artifact_and_abi_negotiation() {
+        let fixture = crate::application_kit::WasmComponentApplicationScaffold::new(
+            "fixture.application.wasm",
+            "developer.fixture",
+            "WASM Fixture",
+            "1.0.0",
+        )
+        .build();
+        let mut capabilities = WasmEngineCapabilities::unavailable();
+        capabilities.can_execute = true;
+        capabilities.supports_component_model = true;
+        capabilities.supports_host_import_bridge = true;
+        let artifact = WasmComponentArtifactDescriptor::new(
+            "artifact.fixture",
+            WasmRuntimeArtifactRef::new("pkg://fixture/component.wasm"),
+            WasmArtifactDigest::sha256("abc123"),
+        )
+        .abi(WasmAbiRequirement::new("0"))
+        .required_import(WasmImportRequirement::permissioned(
+            ApplicationImport::ServiceCall,
+            "service.call",
+        ));
+
+        let report = ApplicationContractTestKit.validate_wasm_artifact_admission(
+            &fixture.manifest,
+            &artifact,
+            vec!["0".into()],
+            capabilities,
+        );
+
+        assert!(report.is_success(), "{report:?}");
     }
 }
