@@ -48,7 +48,10 @@ pub use application::{
 pub use application_client::{
     ServiceBackedApplicationClient, SystemApplicationClient, UnavailableSystemApplicationClient,
 };
-pub use application_kit::{ApplicationKit, ApplicationManifestBuilder};
+pub use application_kit::{
+    ApplicationKit, ApplicationManifestBuilder, WasmComponentApplicationDescriptor,
+    WasmComponentApplicationScaffold,
+};
 pub use application_testkit::{
     ApplicationContractDiagnostic, ApplicationContractReport, ApplicationContractTestKit,
 };

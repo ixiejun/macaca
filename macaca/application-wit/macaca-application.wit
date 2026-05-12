@@ -1,0 +1,73 @@
+package macaca:application;
+
+/// Macaca Application Component ABI v0.
+///
+/// This WIT file is intentionally a schema skeleton.  It documents the stable
+/// guest/host boundary for future WASM component applications, but the current
+/// Macaca runtime host does not execute guest WASM bytes.  The comments below
+/// carry the canonical Rust ABI names so drift tests can compare this schema
+/// with `ApplicationImport` and `ApplicationExport` without teaching WIT about
+/// Macaca's provider-neutral string labels.
+world application-v0 {
+  /// canonical-export: app:init
+  export init: func(trace-id: string) -> host-result;
+
+  /// canonical-export: app:start
+  export start: func(trace-id: string) -> host-result;
+
+  /// canonical-export: app:handle_event
+  export handle-event: func(trace-id: string, event-json: string) -> host-result;
+
+  /// canonical-export: app:render
+  export render: func(trace-id: string, request-json: string) -> host-result;
+
+  /// canonical-export: app:pause
+  export pause: func(trace-id: string) -> host-result;
+
+  /// canonical-export: app:resume
+  export resume: func(trace-id: string) -> host-result;
+
+  /// canonical-export: app:shutdown
+  export shutdown: func(trace-id: string) -> host-result;
+
+  /// canonical-export: app:upgrade
+  export upgrade: func(trace-id: string, target-version: string) -> host-result;
+
+  /// canonical-import: macaca:capability/request
+  import capability-request: func(trace-id: string, request-json: string) -> host-result;
+
+  /// canonical-import: macaca:task/create_goal
+  import task-create-goal: func(trace-id: string, goal-json: string) -> host-result;
+
+  /// canonical-import: macaca:task/query
+  import task-query: func(trace-id: string, query-json: string) -> host-result;
+
+  /// canonical-import: macaca:trace/emit
+  import trace-emit: func(trace-id: string, event-json: string) -> host-result;
+
+  /// canonical-import: macaca:ui/render
+  import ui-render: func(trace-id: string, intent-json: string) -> host-result;
+
+  /// canonical-import: macaca:storage/get
+  import storage-get: func(trace-id: string, key: string) -> host-result;
+
+  /// canonical-import: macaca:storage/set
+  import storage-set: func(trace-id: string, key: string, value-json: string) -> host-result;
+
+  /// canonical-import: macaca:payment/create_intent
+  import payment-create-intent: func(trace-id: string, request-json: string) -> host-result;
+
+  /// canonical-import: macaca:service/call
+  import service-call: func(trace-id: string, command-json: string) -> host-result;
+}
+
+/// Structured host result encoded as bounded JSON by the future component SDK.
+///
+/// The JSON body must be sanitized by the host.  It must never contain prompt
+/// bodies, raw manifests, secrets, environment values, API keys, private keys,
+/// raw host payloads, or unbounded provider output.
+record host-result {
+  status: string,
+  reason-code: option<string>,
+  output-json: option<string>,
+}

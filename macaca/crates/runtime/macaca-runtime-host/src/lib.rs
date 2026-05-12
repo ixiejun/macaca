@@ -12,6 +12,7 @@
 //! provides the Agent OS-level registry, policy, status and toolkit
 //! registration layered on top.
 
+pub mod application_hosts;
 pub mod application_service_provider;
 pub mod compat;
 pub mod context_service_provider;
@@ -50,6 +51,10 @@ pub mod store_service_provider;
 pub mod transport;
 pub mod web3_service_provider;
 
+pub use application_hosts::{
+    is_application_runtime_unavailable, ApplicationHostRuntime, UnavailableApplicationRuntimeHost,
+    UnavailableWasmApplicationHost, WasmApplicationHostFactory,
+};
 pub use application_service_provider::ApplicationSystemServiceProvider;
 pub use context_service_provider::ContextSystemServiceProvider;
 pub use driver_service_provider::DriverSystemServiceProvider;

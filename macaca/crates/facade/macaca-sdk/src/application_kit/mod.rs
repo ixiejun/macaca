@@ -4,6 +4,8 @@
 //! contracts.  It returns protocol DTOs only; it never constructs `AppRuntime`,
 //! `Kernel`, `ServiceRuntime`, Web state, or runtime-host providers.
 
+pub mod wasm;
+
 use macaca_proto::{
     ApplicationAbilityDescriptor, ApplicationCommerceDeclaration,
     ApplicationCompatibilityDeclaration, ApplicationManifestV1, ApplicationPermissionDeclaration,
@@ -16,6 +18,7 @@ use macaca_proto::{
 pub struct ApplicationKit;
 
 impl ApplicationKit {
+    /// Start a Manifest v1 builder for provider-neutral applications.
     pub fn manifest(
         package_id: impl Into<String>,
         developer_id: impl Into<String>,
@@ -25,6 +28,8 @@ impl ApplicationKit {
         ApplicationManifestBuilder::new(package_id, developer_id, name, version)
     }
 }
+
+pub use wasm::{WasmComponentApplicationDescriptor, WasmComponentApplicationScaffold};
 
 /// Fluent Manifest v1 builder for application authors.
 pub struct ApplicationManifestBuilder {
