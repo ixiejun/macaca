@@ -9,10 +9,47 @@
 //! 13 needs to certify.
 
 use macaca_proto::{
-    CapabilityId, DeveloperId, EntitlementId, KernelServiceId, LicenseType, PackageCapability,
-    PackageDescriptor, PackageEntry, PackageId, PackageManifest, PackagePermission, PackageRuntime,
-    PackageRuntimeKind, PackageServiceRequirement, PackageType,
+    ApplicationAbiDeclaration, ApplicationCommerceDeclaration, ApplicationManifestV1,
+    ApplicationPluginDependency, CapabilityId, DeveloperId, EntitlementId, KernelServiceId,
+    LicenseType, PackageCapability, PackageDescriptor, PackageEntry, PackageId, PackageManifest,
+    PackagePermission, PackageRuntime, PackageRuntimeKind, PackageServiceRequirement, PackageType,
 };
+
+use crate::ability_kit::AbilityKit;
+use crate::application_kit::{ApplicationKit, WasmComponentApplicationScaffold};
+
+/// Data-only Application Platform fixture used by certification tests.
+///
+/// This type is separate from `PackageDescriptor` fixtures because Application
+/// Platform certification targets Manifest v1 and ability descriptors, while
+/// package compatibility tests target the lower-level Package Manifest v0
+/// contract.  Keeping the shapes separate prevents YAML/package compatibility
+/// fixtures from becoming privileged application-platform examples.
+#[derive(Debug, Clone)]
+pub struct ApplicationPlatformFixture {
+    pub fixture_id: String,
+    pub manifest: ApplicationManifestV1,
+    pub abi: Option<ApplicationAbiDeclaration>,
+}
+
+impl ApplicationPlatformFixture {
+    /// Create a fixture with Manifest v1 data and no ABI declaration.
+    pub fn new(fixture_id: impl Into<String>, manifest: ApplicationManifestV1) -> Self {
+        Self {
+            fixture_id: fixture_id.into(),
+            manifest,
+            abi: None,
+        }
+    }
+
+    /// Attach optional ABI metadata.  This is used by WASM skeleton fixtures
+    /// where the SDK can certify ABI metadata without executing component
+    /// bytes or constructing a runtime host.
+    pub fn abi(mut self, abi: ApplicationAbiDeclaration) -> Self {
+        self.abi = Some(abi);
+        self
+    }
+}
 
 /// Builder for generic ecosystem package fixtures.
 ///
@@ -270,4 +307,167 @@ pub fn invalid_missing_required_service_fixture() -> PackageDescriptor {
     .required_service("service.unavailable.required")
     .metadata("application.abi.version", "1")
     .build()
+}
+
+/// Return a Manifest v1 declarative AgentAbility fixture.
+pub fn application_platform_agent_fixture() -> ApplicationPlatformFixture {
+    let manifest = ApplicationKit::manifest(
+        "fixture.application.platform.agent",
+        "developer.fixture",
+        "Application Platform Agent Fixture",
+        "1.0.0",
+    )
+    .runtime(PackageRuntimeKind::Yaml, "1")
+    .ability(
+        AbilityKit::agent("ability.fixture.platform.agent")
+            .activation("session", "entry.agent")
+            .permission(
+                "permission.fixture.trace",
+                "Agent fixture emits trace events",
+            )
+            .service(
+                KernelServiceId::new("service.fixture.task"),
+                "Agent fixture depends on task orchestration service",
+            )
+            .capability(
+                CapabilityId::new("capability.fixture.agent"),
+                "Agent fixture capability",
+            )
+            .build(),
+    )
+    .permission("permission.fixture.trace", "Top-level trace permission")
+    .build();
+    ApplicationPlatformFixture::new("fixture.platform.agent", manifest)
+}
+
+/// Return a Manifest v1 GenUI fixture.
+pub fn application_platform_genui_fixture() -> ApplicationPlatformFixture {
+    let manifest = ApplicationKit::manifest(
+        "fixture.application.platform.genui",
+        "developer.fixture",
+        "Application Platform GenUI Fixture",
+        "1.0.0",
+    )
+    .runtime(PackageRuntimeKind::Yaml, "1")
+    .genui("surface.fixture.genui")
+    .ability(
+        AbilityKit::ui("ability.fixture.platform.genui")
+            .activation("ui", "surface.fixture.genui")
+            .permission(
+                "permission.fixture.ui",
+                "GenUI fixture renders safe surfaces",
+            )
+            .service(
+                KernelServiceId::new("service.fixture.ui"),
+                "GenUI fixture depends on UI service",
+            )
+            .capability(
+                CapabilityId::new("capability.fixture.ui"),
+                "GenUI fixture capability",
+            )
+            .ui_surface("surface.fixture.genui", "schema.fixture.genui")
+            .build(),
+    )
+    .permission("permission.fixture.ui", "Top-level UI permission")
+    .build();
+    ApplicationPlatformFixture::new("fixture.platform.genui", manifest)
+}
+
+/// Return a Manifest v1 headless fixture.
+pub fn application_platform_headless_fixture() -> ApplicationPlatformFixture {
+    let manifest = ApplicationKit::manifest(
+        "fixture.application.platform.headless",
+        "developer.fixture",
+        "Application Platform Headless Fixture",
+        "1.0.0",
+    )
+    .runtime(PackageRuntimeKind::Yaml, "1")
+    .ability(
+        AbilityKit::headless("ability.fixture.platform.headless")
+            .activation("event", "entry.headless")
+            .service(
+                KernelServiceId::new("service.fixture.task"),
+                "Headless fixture depends on task service",
+            )
+            .capability(
+                CapabilityId::new("capability.fixture.headless"),
+                "Headless fixture capability",
+            )
+            .build(),
+    )
+    .build();
+    ApplicationPlatformFixture::new("fixture.platform.headless", manifest)
+}
+
+/// Return a Manifest v1 Store-entitled fixture.
+pub fn application_platform_store_entitled_fixture() -> ApplicationPlatformFixture {
+    let mut commerce = ApplicationCommerceDeclaration::free();
+    commerce.license = "subscription".into();
+    commerce.store_required = true;
+    commerce.metering.push("meter.fixture.usage".into());
+    let manifest = ApplicationKit::manifest(
+        "fixture.application.platform.store",
+        "developer.fixture",
+        "Application Platform Store Fixture",
+        "1.0.0",
+    )
+    .runtime(PackageRuntimeKind::Yaml, "1")
+    .commerce(commerce)
+    .ability(
+        AbilityKit::agent("ability.fixture.platform.store")
+            .activation("session", "entry.store")
+            .service(
+                KernelServiceId::new("service.fixture.entitlement"),
+                "Store fixture depends on entitlement service",
+            )
+            .capability(
+                CapabilityId::new("capability.fixture.store"),
+                "Store-entitled fixture capability",
+            )
+            .build(),
+    )
+    .build();
+    ApplicationPlatformFixture::new("fixture.platform.store", manifest)
+}
+
+/// Return a Manifest v1 Plugin-enhanced fixture.
+pub fn application_platform_plugin_enhanced_fixture() -> ApplicationPlatformFixture {
+    let manifest = ApplicationKit::manifest(
+        "fixture.application.platform.plugin",
+        "developer.fixture",
+        "Application Platform Plugin Fixture",
+        "1.0.0",
+    )
+    .runtime(PackageRuntimeKind::Yaml, "1")
+    .plugin_dependency(ApplicationPluginDependency::required(
+        "plugin.fixture.platform",
+        "Plugin fixture depends on an explicitly declared plugin capability",
+    ))
+    .ability(
+        AbilityKit::extension("ability.fixture.platform.plugin")
+            .activation("extension", "entry.plugin")
+            .service(
+                KernelServiceId::new("service.fixture.plugin"),
+                "Plugin fixture depends on plugin service",
+            )
+            .capability(
+                CapabilityId::new("capability.fixture.plugin"),
+                "Plugin-enhanced fixture capability",
+            )
+            .build(),
+    )
+    .build();
+    ApplicationPlatformFixture::new("fixture.platform.plugin", manifest)
+}
+
+/// Return a Manifest v1 WASM skeleton fixture with ABI metadata.
+pub fn application_platform_wasm_skeleton_fixture() -> ApplicationPlatformFixture {
+    let fixture = WasmComponentApplicationScaffold::new(
+        "fixture.application.platform.wasm",
+        "developer.fixture",
+        "Application Platform WASM Fixture",
+        "1.0.0",
+    )
+    .build();
+    ApplicationPlatformFixture::new("fixture.platform.wasm", fixture.manifest).abi(fixture.abi)
 }

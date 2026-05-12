@@ -4,6 +4,7 @@
 //! layers. Apps are loaded from manifest files and managed by the [`AppRuntime`].
 
 pub mod abi;
+pub mod certification;
 pub mod commercial_package;
 pub mod compatibility_checker;
 pub mod consumption;
@@ -33,6 +34,11 @@ pub use abi::{
     app_manifest_to_abi_descriptor, is_runtime_unavailable, ApplicationAbiAdapter,
     ApplicationAbiDescriptor, ApplicationAbiInstance, ApplicationAbiLoadResult,
     MetadataOnlyApplicationAbiInstance, WasmApplicationAbiAdapter, YamlApplicationAbiAdapter,
+};
+pub use certification::{
+    ApplicationCertificationContext, ApplicationCertificationDiagnostic,
+    ApplicationCertificationFixture, ApplicationCertificationKit, ApplicationCertificationReport,
+    ApplicationCertificationStatus,
 };
 pub use commercial_package::{
     is_commercial_package, AppCapabilityCallContext, ApplicationEntitlementAuthorizer,

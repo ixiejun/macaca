@@ -76,10 +76,13 @@ pub use memory_client::{
     ServiceBackedMemoryClient, SystemMemoryClient, UnavailableSystemMemoryClient,
 };
 pub use package_fixtures::{
+    application_platform_agent_fixture, application_platform_genui_fixture,
+    application_platform_headless_fixture, application_platform_plugin_enhanced_fixture,
+    application_platform_store_entitled_fixture, application_platform_wasm_skeleton_fixture,
     driver_plugin_fixture, evm_optional_fixture, free_skill_fixture, gateway_plugin_fixture,
     genui_app_fixture, invalid_missing_required_service_fixture, invalid_missing_runtime_fixture,
     paid_skill_fixture, wasm_stub_app_fixture, web3_optional_fixture, yaml_app_fixture,
-    EcosystemPackageFixtureBuilder,
+    ApplicationPlatformFixture, EcosystemPackageFixtureBuilder,
 };
 pub use payment_client::{
     ServiceBackedPaymentClient, SystemPaymentClient, UnavailableSystemPaymentClient,
