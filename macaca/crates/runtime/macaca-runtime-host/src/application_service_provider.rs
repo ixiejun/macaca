@@ -12,26 +12,27 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use macaca_app::{
-    app_entry_agent_name, app_status_from_lifecycle, application_service_descriptor,
-    lifecycle_from_app_status, AppLoader, AppRegistry, AppRuntime, ApplicationHost,
-    ApplicationRuntimeKindSpec, DiscoveredApp, UnavailableApplicationHostBackend,
+    app_manifest_to_metadata_view, app_manifest_to_service_app_view,
+    application_service_descriptor, AppLoader, AppRegistry, AppRuntime, AppStatus, ApplicationHost,
+    DiscoveredApp, UnavailableApplicationHostBackend,
 };
 use macaca_kernel::{Kernel, SystemService};
 use macaca_proto::{
     ApplicationDiscoverCommand, ApplicationDiscoverResult, ApplicationGenUiSurfaceCommand,
     ApplicationHostDispatchResult, ApplicationHostDispatchServiceCommand, ApplicationId,
-    ApplicationLoadCommand, ApplicationRemoveCommand, ApplicationServiceAgentView,
-    ApplicationServiceAppView, ApplicationServiceRuntimeView, ApplicationServiceSessionView,
-    ApplicationServiceSnapshot, ApplicationServiceUnavailable, ApplicationSessionResumeCommand,
-    ApplicationSessionStartCommand, ApplicationSessionStopCommand, ApplicationSnapshotCommand,
-    ApplicationStartCommand, ApplicationStatusCommand, ApplicationStatusResult,
-    ApplicationStopCommand, CleanupPolicy, PackageRuntimeKind, ServiceCallResult, ServiceCommand,
-    ServiceError, ServiceHealth, ServiceResult, TraceContext, APPLICATION_DISCOVER_COMMAND,
-    APPLICATION_GENUI_SURFACE_COMMAND, APPLICATION_HOST_DISPATCH_COMMAND, APPLICATION_LOAD_COMMAND,
-    APPLICATION_REMOVE_COMMAND, APPLICATION_SESSION_RESUME_COMMAND,
-    APPLICATION_SESSION_START_COMMAND, APPLICATION_SESSION_STOP_COMMAND,
-    APPLICATION_SNAPSHOT_COMMAND, APPLICATION_START_COMMAND, APPLICATION_STATUS_COMMAND,
-    APPLICATION_STOP_COMMAND,
+    ApplicationLoadCommand, ApplicationMetadataQueryCommand, ApplicationMetadataResult,
+    ApplicationRemoveCommand, ApplicationServiceAppView, ApplicationServiceRuntimeView,
+    ApplicationServiceSessionView, ApplicationServiceSnapshot, ApplicationServiceUnavailable,
+    ApplicationSessionResumeCommand, ApplicationSessionStartCommand, ApplicationSessionStopCommand,
+    ApplicationSnapshotCommand, ApplicationStartCommand, ApplicationStatusCommand,
+    ApplicationStatusResult, ApplicationStopCommand, CleanupPolicy, PackageRuntimeKind,
+    ServiceCallResult, ServiceCommand, ServiceError, ServiceHealth, ServiceResult, TraceContext,
+    APPLICATION_DISCOVER_COMMAND, APPLICATION_GENUI_SURFACE_COMMAND,
+    APPLICATION_HOST_DISPATCH_COMMAND, APPLICATION_LOAD_COMMAND,
+    APPLICATION_METADATA_QUERY_COMMAND, APPLICATION_REMOVE_COMMAND,
+    APPLICATION_SESSION_RESUME_COMMAND, APPLICATION_SESSION_START_COMMAND,
+    APPLICATION_SESSION_STOP_COMMAND, APPLICATION_SNAPSHOT_COMMAND, APPLICATION_START_COMMAND,
+    APPLICATION_STATUS_COMMAND, APPLICATION_STOP_COMMAND,
 };
 use tokio::sync::RwLock;
 
@@ -132,15 +133,10 @@ impl ApplicationSystemServiceProvider {
             } else {
                 None
             };
-            let mut view = discovered
+            let view = discovered
                 .as_ref()
-                .map(discovered_view)
-                .unwrap_or_else(|| minimal_running_view(id, name));
-            view.runtime.lifecycle_state = lifecycle_from_app_status(status);
-            view.runtime.compatibility_status = format!(
-                "{:?}",
-                app_status_from_lifecycle(&view.runtime.lifecycle_state)
-            );
+                .map(|app| app_manifest_to_service_app_view(&app.manifest, Some(&app.path), status))
+                .unwrap_or_else(|| minimal_running_view(id, name, status));
             views.push(view);
         }
         Ok(views)
@@ -218,6 +214,39 @@ impl SystemService for ApplicationSystemServiceProvider {
                 let result: ApplicationStatusResult =
                     Self::running_views(&runtime, self.registry.as_ref()).await?;
                 Ok(Self::service_result(to_value(result)?, typed.trace))
+            }
+            APPLICATION_METADATA_QUERY_COMMAND => {
+                let typed: ApplicationMetadataQueryCommand = decode(command.payload)?;
+                let registry = self.registry()?;
+                let app_id = typed.scope.application_id.ok_or_else(|| {
+                    ServiceError::AdapterFailure(
+                        "application.metadata.query requires application_id".into(),
+                    )
+                })?;
+                let discovered = {
+                    let guard = registry.read().await;
+                    guard.get_app(&app_id).cloned()
+                }
+                .ok_or_else(|| {
+                    ServiceError::AdapterFailure(format!("application {app_id} not found"))
+                })?;
+                let status = running_status_for(self.runtime.as_ref(), &app_id).await;
+                let view: ApplicationMetadataResult = app_manifest_to_metadata_view(
+                    &discovered.manifest,
+                    Some(&discovered.path),
+                    status,
+                    typed.include_abilities,
+                    typed.include_policy,
+                    typed.include_overlay,
+                    typed.include_digest,
+                );
+                tracing::info!(
+                    trace_id = %typed.trace.trace_id,
+                    app_id = %app_id,
+                    ability_count = view.abilities.len(),
+                    "application service metadata query completed"
+                );
+                Ok(Self::service_result(to_value(view)?, typed.trace))
             }
             APPLICATION_SNAPSHOT_COMMAND => {
                 let typed: ApplicationSnapshotCommand = decode(command.payload)?;
@@ -363,7 +392,7 @@ impl SystemService for ApplicationSystemServiceProvider {
 }
 
 fn discovered_view(app: &DiscoveredApp) -> ApplicationServiceAppView {
-    manifest_view(&app.manifest, Some(&app.path), false)
+    app_manifest_to_service_app_view(&app.manifest, Some(&app.path), AppStatus::Loaded)
 }
 
 fn manifest_view(
@@ -371,55 +400,19 @@ fn manifest_view(
     app_dir: Option<&Path>,
     running: bool,
 ) -> ApplicationServiceAppView {
-    let runtime_kind = match manifest.layer {
-        macaca_app::AppLayer::L2Wasm => Some(PackageRuntimeKind::WasmComponent),
-        _ => Some(PackageRuntimeKind::Yaml),
-    };
-    let runtime_spec = ApplicationRuntimeKindSpec;
-    let execution_available = runtime_spec.execution_available_for_runtime(runtime_kind.as_ref());
-    let lifecycle_state = if running {
-        macaca_proto::ApplicationLifecycleState::Started
-    } else if execution_available {
-        macaca_proto::ApplicationLifecycleState::Initialized
+    let status = if running {
+        AppStatus::Running
     } else {
-        macaca_proto::ApplicationLifecycleState::Failed {
-            reason: "runtime unavailable".into(),
-        }
+        AppStatus::Loaded
     };
-    let diagnostics = if execution_available {
-        Vec::new()
-    } else {
-        vec!["runtime unavailable".into()]
-    };
-    ApplicationServiceAppView {
-        id: manifest.id,
-        name: manifest.name.clone(),
-        version: manifest.version.clone(),
-        description: manifest.description.clone(),
-        entry_agent: app_entry_agent_name(manifest).map(str::to_string),
-        agents: manifest
-            .agents
-            .iter()
-            .map(|agent| ApplicationServiceAgentView {
-                name: match agent {
-                    macaca_app::model::AgentSource::Inline(inline) => inline.name.clone(),
-                    macaca_app::model::AgentSource::FilePath(path) => path.clone(),
-                },
-                capability_names: Vec::new(),
-            })
-            .collect(),
-        runtime: ApplicationServiceRuntimeView {
-            runtime_kind,
-            lifecycle_state,
-            compatibility_status: if running { "Running" } else { "Loaded" }.into(),
-            app_dir: app_dir.map(|path| path.display().to_string()),
-            skills_dir: app_dir.map(|path| path.join("skills").display().to_string()),
-        },
-        diagnostics,
-    }
+    app_manifest_to_service_app_view(manifest, app_dir, status)
 }
 
-fn minimal_running_view(id: ApplicationId, name: String) -> ApplicationServiceAppView {
+fn minimal_running_view(
+    id: ApplicationId,
+    name: String,
+    status: AppStatus,
+) -> ApplicationServiceAppView {
     ApplicationServiceAppView {
         id,
         name,
@@ -429,13 +422,27 @@ fn minimal_running_view(id: ApplicationId, name: String) -> ApplicationServiceAp
         agents: Vec::new(),
         runtime: ApplicationServiceRuntimeView {
             runtime_kind: Some(PackageRuntimeKind::Yaml),
-            lifecycle_state: macaca_proto::ApplicationLifecycleState::Started,
-            compatibility_status: "Running".into(),
+            lifecycle_state: macaca_app::lifecycle_from_app_status(status),
+            compatibility_status: format!("{status:?}"),
             app_dir: None,
             skills_dir: None,
         },
         diagnostics: Vec::new(),
     }
+}
+
+async fn running_status_for(
+    runtime: Option<&Arc<AppRuntime>>,
+    app_id: &ApplicationId,
+) -> AppStatus {
+    if let Some(runtime) = runtime {
+        for (id, _, status) in runtime.list_apps().await {
+            if id == *app_id {
+                return status;
+            }
+        }
+    }
+    AppStatus::Loaded
 }
 
 fn session_view(

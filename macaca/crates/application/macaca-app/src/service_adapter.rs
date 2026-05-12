@@ -38,6 +38,10 @@ pub fn application_service_descriptor() -> ServiceDescriptor {
             CapabilityId::new("capability.application.genui"),
             "Reports application-owned GenUI surface metadata without binding to Web renderer internals.",
         ),
+        ServiceCapability::new(
+            CapabilityId::new("capability.application.metadata"),
+            "Projects sanitized application metadata views without exposing raw manifests or provider payloads.",
+        ),
     ];
     descriptor.health = ServiceHealth::Healthy;
     descriptor.supported_scopes = vec![
@@ -51,6 +55,7 @@ pub fn application_service_descriptor() -> ServiceDescriptor {
         "application.session".into(),
         "application.host".into(),
         "application.genui".into(),
+        "application.metadata".into(),
     ];
     descriptor.cleanup_policy = CleanupPolicy::OnStop;
     descriptor
@@ -64,9 +69,16 @@ mod tests {
     fn application_descriptor_exports_contract_shape() {
         let descriptor = application_service_descriptor();
         assert_eq!(descriptor.service_type.as_str(), "application");
-        assert_eq!(descriptor.capabilities.len(), 5);
+        assert_eq!(descriptor.capabilities.len(), 6);
+        assert!(descriptor
+            .capabilities
+            .iter()
+            .any(|capability| capability.id.as_str() == "capability.application.metadata"));
         assert!(descriptor
             .required_permissions
             .contains(&"application.lifecycle".into()));
+        assert!(descriptor
+            .required_permissions
+            .contains(&"application.metadata".into()));
     }
 }

@@ -32,6 +32,7 @@ pub const APPLICATION_SESSION_RESUME_COMMAND: &str = "application.session.resume
 pub const APPLICATION_SESSION_STOP_COMMAND: &str = "application.session.stop";
 pub const APPLICATION_HOST_DISPATCH_COMMAND: &str = "application.host.dispatch";
 pub const APPLICATION_GENUI_SURFACE_COMMAND: &str = "application.genui.surface";
+pub const APPLICATION_METADATA_QUERY_COMMAND: &str = "application.metadata.query";
 
 /// Explicit scope for Application Service commands.
 ///
@@ -187,6 +188,38 @@ pub struct ApplicationGenUiSurfaceCommand {
     pub surface_id: Option<String>,
 }
 
+/// Query sanitized application-owned metadata through Application Service.
+///
+/// The command uses the Command pattern so shells can ask for metadata through
+/// the same traced service boundary used by lifecycle operations.  It carries
+/// only scope and view-selection flags; providers must not attach raw manifest
+/// bodies, raw agent configs, prompt templates, secrets, environment values, or
+/// host payloads to the payload or logs.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApplicationMetadataQueryCommand {
+    pub trace: TraceContext,
+    pub scope: ApplicationServiceScope,
+    pub include_abilities: bool,
+    pub include_policy: bool,
+    pub include_overlay: bool,
+    pub include_digest: bool,
+}
+
+impl ApplicationMetadataQueryCommand {
+    /// Build a fail-closed application metadata query.
+    pub fn application(trace: TraceContext, application_id: ApplicationId) -> MacacaResult<Self> {
+        validate_trace(&trace, "application metadata query requires trace_id")?;
+        Ok(Self {
+            trace,
+            scope: ApplicationServiceScope::application(application_id),
+            include_abilities: true,
+            include_policy: true,
+            include_overlay: true,
+            include_digest: true,
+        })
+    }
+}
+
 /// Sanitized agent view returned by Application Service.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ApplicationServiceAgentView {
@@ -225,6 +258,79 @@ pub struct ApplicationServiceSessionView {
     pub entry_agent: Option<String>,
     pub status: String,
     pub updated_at: DateTime<Utc>,
+}
+
+/// Sanitized ability view returned by Application metadata queries.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApplicationAbilityMetadataView {
+    pub id: String,
+    pub name: String,
+    pub kind: String,
+    pub implementation: String,
+    pub is_entry: bool,
+    pub activation_modes: Vec<String>,
+    pub capability_names: Vec<String>,
+    pub required_services: Vec<String>,
+    pub permission_names: Vec<String>,
+}
+
+/// Sanitized entry metadata for shells that need routing hints.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApplicationEntryMetadataView {
+    pub agent_name: Option<String>,
+    pub entry_kind: Option<String>,
+    pub activation_mode: Option<String>,
+}
+
+/// Sanitized tool policy metadata.  It exposes declared names and counts only.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApplicationToolPolicyMetadataView {
+    pub declared_tool_names: Vec<String>,
+    pub execution_tool_count: usize,
+}
+
+/// Sanitized context policy metadata.  It reports presence, not config bodies.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApplicationContextPolicyMetadataView {
+    pub context_config_present: bool,
+    pub context_engine_declared: bool,
+}
+
+/// Sanitized AgentSkills metadata.  It reports policy presence and agent names.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApplicationSkillPolicyMetadataView {
+    pub agents_with_skill_policy: Vec<String>,
+}
+
+/// Sanitized MCP overlay metadata.  It reports overlay presence only.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApplicationMcpOverlayMetadataView {
+    pub overlay_declared: bool,
+    pub agents_with_overlay: Vec<String>,
+}
+
+/// Manifest digest metadata for cache keys and audit without raw manifest data.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApplicationManifestDigestView {
+    pub algorithm: String,
+    pub digest: String,
+    pub source_format: String,
+    pub ability_count: usize,
+    pub agent_count: usize,
+}
+
+/// Complete sanitized metadata view for Web, CLI, Gateway, and adapters.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApplicationMetadataView {
+    pub application: ApplicationServiceAppView,
+    pub entry: ApplicationEntryMetadataView,
+    pub abilities: Vec<ApplicationAbilityMetadataView>,
+    pub tool_policy: ApplicationToolPolicyMetadataView,
+    pub context_policy: ApplicationContextPolicyMetadataView,
+    pub skill_policy: ApplicationSkillPolicyMetadataView,
+    pub mcp_overlay: ApplicationMcpOverlayMetadataView,
+    pub manifest_digest: Option<ApplicationManifestDigestView>,
+    pub diagnostics: Vec<String>,
 }
 
 impl ApplicationServiceSessionView {
@@ -326,6 +432,7 @@ pub type ApplicationStartResult = ApplicationServiceAppView;
 pub type ApplicationStatusResult = Vec<ApplicationServiceAppView>;
 pub type ApplicationSessionResult = ApplicationServiceSessionView;
 pub type ApplicationHostDispatchResult = ApplicationHostCommandResult;
+pub type ApplicationMetadataResult = ApplicationMetadataView;
 
 fn validate_trace(trace: &TraceContext, message: &'static str) -> MacacaResult<()> {
     if trace.trace_id.trim().is_empty() {

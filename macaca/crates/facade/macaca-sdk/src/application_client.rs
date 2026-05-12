@@ -10,16 +10,18 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use macaca_proto::{
     ApplicationDiscoverCommand, ApplicationDiscoverResult, ApplicationGenUiSurfaceCommand,
-    ApplicationHostDispatchResult, ApplicationHostDispatchServiceCommand, ApplicationRemoveCommand,
+    ApplicationHostDispatchResult, ApplicationHostDispatchServiceCommand,
+    ApplicationMetadataQueryCommand, ApplicationMetadataResult, ApplicationRemoveCommand,
     ApplicationServiceSnapshot, ApplicationServiceUnavailable, ApplicationSessionResult,
     ApplicationSessionResumeCommand, ApplicationSessionStartCommand, ApplicationSessionStopCommand,
     ApplicationSnapshotCommand, ApplicationStartCommand, ApplicationStartResult,
     ApplicationStatusCommand, ApplicationStatusResult, ApplicationStopCommand, MacacaError,
     MacacaResult, APPLICATION_DISCOVER_COMMAND, APPLICATION_GENUI_SURFACE_COMMAND,
-    APPLICATION_HOST_DISPATCH_COMMAND, APPLICATION_REMOVE_COMMAND, APPLICATION_SERVICE_ID,
-    APPLICATION_SESSION_RESUME_COMMAND, APPLICATION_SESSION_START_COMMAND,
-    APPLICATION_SESSION_STOP_COMMAND, APPLICATION_SNAPSHOT_COMMAND, APPLICATION_START_COMMAND,
-    APPLICATION_STATUS_COMMAND, APPLICATION_STOP_COMMAND,
+    APPLICATION_HOST_DISPATCH_COMMAND, APPLICATION_METADATA_QUERY_COMMAND,
+    APPLICATION_REMOVE_COMMAND, APPLICATION_SERVICE_ID, APPLICATION_SESSION_RESUME_COMMAND,
+    APPLICATION_SESSION_START_COMMAND, APPLICATION_SESSION_STOP_COMMAND,
+    APPLICATION_SNAPSHOT_COMMAND, APPLICATION_START_COMMAND, APPLICATION_STATUS_COMMAND,
+    APPLICATION_STOP_COMMAND,
 };
 use tracing::{info, warn};
 
@@ -64,6 +66,10 @@ pub trait SystemApplicationClient: Send + Sync {
         &self,
         command: ApplicationGenUiSurfaceCommand,
     ) -> MacacaResult<ApplicationServiceUnavailable>;
+    async fn metadata(
+        &self,
+        command: ApplicationMetadataQueryCommand,
+    ) -> MacacaResult<ApplicationMetadataResult>;
 }
 
 /// Null-object Application client used when the service is not installed.
@@ -170,6 +176,16 @@ impl SystemApplicationClient for UnavailableSystemApplicationClient {
             APPLICATION_GENUI_SURFACE_COMMAND,
             "Application service is unavailable",
             Some(&command.trace),
+        ))
+    }
+
+    async fn metadata(
+        &self,
+        command: ApplicationMetadataQueryCommand,
+    ) -> MacacaResult<ApplicationMetadataResult> {
+        warn!(trace_id = %command.trace.trace_id, "sdk application client unavailable for metadata query");
+        Err(MacacaError::Config(
+            "Application service is unavailable".into(),
         ))
     }
 }
@@ -320,6 +336,19 @@ impl SystemApplicationClient for ServiceBackedApplicationClient {
         call(
             &self.service,
             APPLICATION_GENUI_SURFACE_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn metadata(
+        &self,
+        command: ApplicationMetadataQueryCommand,
+    ) -> MacacaResult<ApplicationMetadataResult> {
+        call(
+            &self.service,
+            APPLICATION_METADATA_QUERY_COMMAND,
             command.trace.clone(),
             command,
         )

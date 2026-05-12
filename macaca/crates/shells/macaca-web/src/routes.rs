@@ -26,7 +26,8 @@ use macaca_context::{
 use macaca_driver::{DriverInventoryCommand, DriverLoadServiceCommand, DriverServiceScope};
 use macaca_persist::{AppendEventCommand, EventLogQuery, SessionLineageStore};
 use macaca_proto::{
-    ApplicationDiscoverCommand, ApplicationId, ApplicationServiceAppView, ApplicationServiceScope,
+    ApplicationDiscoverCommand, ApplicationId, ApplicationMetadataQueryCommand,
+    ApplicationMetadataView, ApplicationServiceAppView, ApplicationServiceScope,
     ApplicationStatusCommand, MacacaError, McpProbeCommand, McpRuntimeStatusView,
     McpToolPolicySnapshot, ProtoErrorAdapter, TraceContext,
 };
@@ -89,6 +90,28 @@ async fn app_has_active_session(
 }
 
 async fn app_entry_agent_name(state: &Arc<AppState>, app_id: &ApplicationId) -> Option<String> {
+    match ApplicationMetadataQueryCommand::application(
+        TraceContext::new("web-route-entry-agent-metadata"),
+        *app_id,
+    ) {
+        Ok(command) => match state.application_client.metadata(command).await {
+            Ok(view) => return view.entry.agent_name,
+            Err(error) => tracing::warn!(
+                app_id = %app_id,
+                error = %error,
+                "Application metadata query failed; using deprecated raw manifest fallback"
+            ),
+        },
+        Err(error) => tracing::warn!(
+            app_id = %app_id,
+            error = %error,
+            "Application metadata query rejected before dispatch"
+        ),
+    }
+    // Deprecated compatibility fallback: only kept for migration of existing
+    // Web routes. New production behavior must use Application Service
+    // metadata views rather than reading raw application manifests.
+    #[allow(deprecated)]
     let registry = state.registry.read().await;
     registry
         .get_app(app_id)
@@ -192,6 +215,10 @@ fn app_info_from_service_view(view: &ApplicationServiceAppView) -> AppInfo {
     }
 }
 
+fn app_info_from_metadata_view(view: &ApplicationMetadataView) -> AppInfo {
+    app_info_from_service_view(&view.application)
+}
+
 async fn service_status_views(
     state: &Arc<AppState>,
     trace_id: &'static str,
@@ -204,6 +231,32 @@ async fn service_status_views(
         Ok(views) => Some(views),
         Err(error) => {
             tracing::warn!(error = %error, trace_id, "Application Service status failed; falling back to legacy runtime");
+            None
+        }
+    }
+}
+
+async fn service_metadata_view(
+    state: &Arc<AppState>,
+    app_id: ApplicationId,
+    trace_id: &'static str,
+) -> Option<ApplicationMetadataView> {
+    let command =
+        match ApplicationMetadataQueryCommand::application(TraceContext::new(trace_id), app_id) {
+            Ok(command) => command,
+            Err(error) => {
+                tracing::warn!(error = %error, trace_id, "Application metadata command rejected");
+                return None;
+            }
+        };
+    match state.application_client.metadata(command).await {
+        Ok(view) => Some(view),
+        Err(error) => {
+            tracing::warn!(
+                error = %error,
+                trace_id,
+                "Application metadata query failed; preserving deprecated fallback"
+            );
             None
         }
     }
@@ -271,12 +324,18 @@ pub async fn get_app(
     })?;
     let app_id = macaca_proto::ApplicationId(app_uuid);
 
+    if let Some(view) = service_metadata_view(&state, app_id, "web-route-app-detail-metadata").await
+    {
+        tracing::info!(
+            app_id = %app_id,
+            "Application detail served from sanitized metadata view"
+        );
+        return Ok(Json(app_info_from_metadata_view(&view)));
+    }
+
     if let Some(views) = service_status_views(&state, "web-route-app-detail-status").await {
         if let Some(view) = views.iter().find(|view| view.id == app_id) {
-            tracing::info!(
-                app_id = %app_id,
-                "Application detail served from Application Service"
-            );
+            tracing::info!(app_id = %app_id, "Application detail served from Application Service status");
             return Ok(Json(app_info_from_service_view(view)));
         }
     }
@@ -390,9 +449,15 @@ pub async fn get_app_agents(
     })?;
     let app_id = macaca_proto::ApplicationId(app_uuid);
 
-    let service_view = service_status_views(&state, "web-route-app-agents-status")
-        .await
-        .and_then(|views| views.into_iter().find(|view| view.id == app_id));
+    let metadata_view =
+        service_metadata_view(&state, app_id, "web-route-app-agents-metadata").await;
+    let service_view = if let Some(view) = metadata_view.as_ref() {
+        Some(view.application.clone())
+    } else {
+        service_status_views(&state, "web-route-app-agents-status")
+            .await
+            .and_then(|views| views.into_iter().find(|view| view.id == app_id))
+    };
     let service_agent_names = service_view.as_ref().map(|view| {
         view.agents
             .iter()

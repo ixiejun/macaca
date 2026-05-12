@@ -19,8 +19,9 @@ use macaca_framework::execution::ExecutionContext;
 use macaca_framework::session::{load_module_state, save_module_state};
 use macaca_kernel::AgentInfo;
 use macaca_proto::{
-    ApplicationId, ApplicationServiceScope, ApplicationSessionStartCommand,
-    ApplicationSessionStopCommand, ApplicationStatusCommand, TraceContext,
+    ApplicationId, ApplicationMetadataQueryCommand, ApplicationServiceScope,
+    ApplicationSessionStartCommand, ApplicationSessionStopCommand, ApplicationStatusCommand,
+    TraceContext,
 };
 
 use crate::event_persistence::spawn_session_event_collector;
@@ -155,35 +156,36 @@ async fn ensure_app_executor(state: &Arc<AppState>, app_id: &ApplicationId) {
         return;
     }
 
-    let (app_name, app_agent_names) = match state
-        .application_client
-        .status(ApplicationStatusCommand {
-            trace: TraceContext::new("web-chat-ensure-executor-status"),
-            scope: ApplicationServiceScope::application(*app_id),
-        })
-        .await
-    {
-        Ok(views) => views
-            .into_iter()
-            .find(|view| view.id == *app_id)
-            .map(|view| {
-                (
-                    view.name,
-                    view.agents
-                        .into_iter()
-                        .map(|agent| agent.name)
-                        .collect::<Vec<_>>(),
-                )
-            })
-            .unwrap_or_else(|| (app_id.0.to_string(), Vec::new())),
+    let metadata_command = ApplicationMetadataQueryCommand::application(
+        TraceContext::new("web-chat-ensure-executor-metadata"),
+        *app_id,
+    );
+    let (app_name, app_agent_names) = match metadata_command {
+        Ok(command) => match state.application_client.metadata(command).await {
+            Ok(view) => (
+                view.application.name,
+                view.application
+                    .agents
+                    .into_iter()
+                    .map(|agent| agent.name)
+                    .collect::<Vec<_>>(),
+            ),
+            Err(error) => {
+                tracing::warn!(
+                    app_id = %app_id,
+                    error = %error,
+                    "Application metadata query failed while ensuring executor; using status fallback"
+                );
+                service_executor_metadata(state, app_id).await
+            }
+        },
         Err(error) => {
             tracing::warn!(
                 app_id = %app_id,
                 error = %error,
-                "Application Service status failed while ensuring executor; using legacy registry fallback"
+                "Application metadata command rejected while ensuring executor; using status fallback"
             );
-            #[allow(deprecated)]
-            legacy_executor_metadata(state, app_id).await
+            service_executor_metadata(state, app_id).await
         }
     };
 
@@ -225,6 +227,43 @@ async fn ensure_app_executor(state: &Arc<AppState>, app_id: &ApplicationId) {
         .await;
 }
 
+async fn service_executor_metadata(
+    state: &Arc<AppState>,
+    app_id: &ApplicationId,
+) -> (String, Vec<String>) {
+    match state
+        .application_client
+        .status(ApplicationStatusCommand {
+            trace: TraceContext::new("web-chat-ensure-executor-status"),
+            scope: ApplicationServiceScope::application(*app_id),
+        })
+        .await
+    {
+        Ok(views) => views
+            .into_iter()
+            .find(|view| view.id == *app_id)
+            .map(|view| {
+                (
+                    view.name,
+                    view.agents
+                        .into_iter()
+                        .map(|agent| agent.name)
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .unwrap_or_else(|| (app_id.0.to_string(), Vec::new())),
+        Err(error) => {
+            tracing::warn!(
+                app_id = %app_id,
+                error = %error,
+                "Application Service status failed while ensuring executor; using legacy registry fallback"
+            );
+            #[allow(deprecated)]
+            legacy_executor_metadata(state, app_id).await
+        }
+    }
+}
+
 async fn legacy_executor_metadata(
     state: &Arc<AppState>,
     app_id: &ApplicationId,
@@ -251,6 +290,25 @@ async fn legacy_executor_metadata(
 }
 
 async fn service_entry_agent_name(state: &Arc<AppState>, app_id: &ApplicationId) -> Option<String> {
+    match ApplicationMetadataQueryCommand::application(
+        TraceContext::new("web-chat-entry-agent-metadata"),
+        *app_id,
+    ) {
+        Ok(command) => match state.application_client.metadata(command).await {
+            Ok(view) => return view.entry.agent_name,
+            Err(error) => tracing::warn!(
+                app_id = %app_id,
+                error = %error,
+                "Application metadata query failed while resolving entry agent; using status fallback"
+            ),
+        },
+        Err(error) => tracing::warn!(
+            app_id = %app_id,
+            error = %error,
+            "Application metadata query rejected while resolving entry agent"
+        ),
+    }
+
     match state
         .application_client
         .status(ApplicationStatusCommand {
