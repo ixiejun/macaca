@@ -49,6 +49,7 @@ pub mod skill_service_provider;
 pub mod store_entitlement_admission;
 pub mod store_service_provider;
 pub mod transport;
+pub mod wasm_runtime_provider;
 pub mod web3_service_provider;
 
 pub use application_hosts::{
@@ -146,6 +147,9 @@ pub use service_runtime_event::{
 pub use skill_service_provider::SkillSystemServiceProvider;
 pub use store_service_provider::{store_service_descriptor, StoreSystemServiceProvider};
 pub use transport::{ConfigBackedMcpTransport, McpTransport};
+pub use wasm_runtime_provider::{
+    UnavailableWasmRuntimeProvider, WasmApplicationRuntimeProvider, WasmExecutionSession,
+};
 pub use web3_service_provider::{
     web3_service_descriptor, MockWeb3Provider, UnavailableWeb3Provider, Web3ProviderStrategy,
     Web3SystemServiceProvider,

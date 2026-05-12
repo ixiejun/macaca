@@ -26,6 +26,7 @@ pub mod service_bus;
 pub mod store_service;
 pub mod types;
 pub mod ui;
+pub mod wasm_runtime_provider;
 pub mod web3;
 pub mod web3_service;
 
@@ -70,5 +71,6 @@ pub use service_bus::*;
 pub use store_service::*;
 pub use types::*;
 pub use ui::*;
+pub use wasm_runtime_provider::*;
 pub use web3::*;
 pub use web3_service::*;
