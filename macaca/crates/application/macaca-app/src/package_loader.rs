@@ -106,7 +106,7 @@ mod tests {
 
     fn first_example_app() -> std::path::PathBuf {
         let examples_dir =
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/apps");
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/apps");
         let mut paths = std::fs::read_dir(examples_dir)
             .unwrap()
             .filter_map(Result::ok)

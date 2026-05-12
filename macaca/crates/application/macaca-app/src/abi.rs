@@ -15,6 +15,7 @@ use macaca_proto::{
 use tracing::{info, warn};
 
 use crate::model::{AgentSource, AppManifest};
+use crate::package::application_manifest_v1_to_package_descriptor;
 
 /// Normalized Application ABI descriptor.
 #[derive(Debug, Clone, PartialEq)]
@@ -106,33 +107,46 @@ impl YamlApplicationAbiAdapter {
 
 impl ApplicationAbiAdapter for YamlApplicationAbiAdapter {
     fn load(&self) -> Result<ApplicationAbiLoadResult, ApplicationAbiError> {
-        let application_id = self.manifest.id.to_string();
+        let projection =
+            crate::manifest_v1::YamlApplicationManifestAdapter::new(self.manifest.clone())
+                .project();
+        let projected_package = self
+            .package
+            .clone()
+            .unwrap_or_else(|| application_manifest_v1_to_package_descriptor(&projection.manifest));
+        let application_id = projection
+            .manifest
+            .metadata
+            .get("application.id")
+            .cloned()
+            .unwrap_or_else(|| self.manifest.id.to_string());
         let mut declaration = ApplicationAbiDeclaration::v0(application_id.clone());
-        if let Some(package) = &self.package {
-            declaration.package_id = Some(package.manifest.id.clone());
-            declaration.permissions = package
-                .manifest
-                .permissions
-                .iter()
-                .map(|permission| permission.name.clone())
-                .collect();
-        }
+        declaration.package_id = Some(projected_package.manifest.id.clone());
+        declaration.permissions = projected_package
+            .manifest
+            .permissions
+            .iter()
+            .map(|permission| permission.name.clone())
+            .collect();
         declaration
             .metadata
-            .insert("application.name".into(), self.manifest.name.clone());
-        declaration
-            .metadata
-            .insert("application.version".into(), self.manifest.version.clone());
+            .insert("application.name".into(), projection.manifest.name.clone());
+        declaration.metadata.insert(
+            "application.version".into(),
+            projection.manifest.version.clone(),
+        );
         declaration
             .metadata
             .insert("runtime.adapter".into(), "yaml".into());
+        declaration
+            .metadata
+            .insert("manifest.version".into(), "1".into());
+        declaration.metadata.insert(
+            "ability.count".into(),
+            projection.manifest.abilities.len().to_string(),
+        );
 
-        let entry = self.manifest.entry_agent.clone().or_else(|| {
-            self.manifest
-                .entrypoint
-                .as_ref()
-                .map(|entry| entry.name.clone())
-        });
+        let entry = projection.manifest.runtime.entry.clone();
         let mut metadata = BTreeMap::new();
         metadata.insert("agent.count".into(), self.manifest.agents.len().to_string());
         metadata.insert(
@@ -147,20 +161,33 @@ impl ApplicationAbiAdapter for YamlApplicationAbiAdapter {
         if let Some(entry) = &entry {
             metadata.insert("entry".into(), entry.clone());
         }
+        metadata.insert(
+            "manifest.version".into(),
+            projection.manifest.manifest_version.as_str().into(),
+        );
+        metadata.insert(
+            "ability.count".into(),
+            projection.manifest.abilities.len().to_string(),
+        );
 
         info!(
             application_id = %application_id,
-            "YAML application adapted to Application ABI v0 descriptor"
+            package_id = %projected_package.manifest.id,
+            ability_count = projection.manifest.abilities.len(),
+            "YAML application projected through Manifest v1 for Application ABI v0 descriptor"
         );
         Ok(ApplicationAbiLoadResult {
             descriptor: ApplicationAbiDescriptor {
                 declaration,
-                package: self.package.clone(),
+                package: Some(projected_package),
                 runtime_kind: Some(PackageRuntimeKind::Yaml),
                 entry,
                 metadata,
             },
-            trace_events: vec!["application_abi.yaml_adapter.loaded".into()],
+            trace_events: vec![
+                "application_abi.yaml_manifest_v1_projection.loaded".into(),
+                "application_abi.yaml_adapter.loaded".into(),
+            ],
         })
     }
 }
@@ -224,6 +251,10 @@ impl ApplicationAbiAdapter for WasmApplicationAbiAdapter {
 }
 
 /// Build an ABI descriptor from an app manifest without executing the app.
+#[deprecated(
+    since = "0.1.0",
+    note = "use YamlApplicationManifestAdapter and YamlApplicationAbiAdapter for Manifest v1-backed descriptors"
+)]
 pub fn app_manifest_to_abi_descriptor(
     manifest: &AppManifest,
 ) -> Result<ApplicationAbiDescriptor, ApplicationAbiError> {
@@ -252,7 +283,7 @@ mod tests {
 
     fn first_example_app() -> std::path::PathBuf {
         let examples_dir =
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/apps");
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/apps");
         let mut paths = std::fs::read_dir(examples_dir)
             .unwrap()
             .filter_map(Result::ok)
@@ -282,6 +313,35 @@ mod tests {
             .declaration
             .imports
             .contains(&ApplicationImport::TaskCreateGoal));
+    }
+
+    #[test]
+    fn application_abi_yaml_projection_preserves_key_fields() {
+        let manifest = AppLoader::load_manifest(first_example_app()).unwrap();
+        let load = YamlApplicationAbiAdapter::new(manifest.clone())
+            .load()
+            .unwrap();
+        let descriptor = load.descriptor;
+
+        assert_eq!(
+            descriptor.declaration.application_id,
+            manifest.id.to_string()
+        );
+        assert_eq!(descriptor.runtime_kind, Some(PackageRuntimeKind::Yaml));
+        assert!(descriptor.declaration.package_id.is_some());
+        assert_eq!(
+            descriptor
+                .declaration
+                .metadata
+                .get("manifest.version")
+                .map(String::as_str),
+            Some("1")
+        );
+        let expected_ability_count = manifest.agents.len().to_string();
+        assert_eq!(
+            descriptor.metadata.get("ability.count").map(String::as_str),
+            Some(expected_ability_count.as_str())
+        );
     }
 
     #[test]

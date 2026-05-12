@@ -8,14 +8,14 @@
 use std::path::Path;
 
 use macaca_proto::{
-    CapabilityId, DeveloperId, KernelServiceId, MacacaResult, PackageCapability, PackageDescriptor,
-    PackageEntry, PackageId, PackageManifest, PackagePermission, PackageRuntime,
-    PackageRuntimeKind, PackageServiceRequirement, PackageType,
+    ApplicationManifestV1, MacacaResult, PackageCapability, PackageDescriptor, PackageEntry,
+    PackageManifest, PackagePermission, PackageRuntime, PackageServiceRequirement,
 };
 use macaca_sdk::AgentConfig;
 
 use crate::loader::AppLoader;
-use crate::model::{AgentSource, AppManifest, EntrypointType};
+use crate::manifest_v1::YamlApplicationManifestAdapter;
+use crate::model::AppManifest;
 
 /// Builder for application package descriptors.
 ///
@@ -44,33 +44,92 @@ impl AppPackageDescriptorBuilder {
 
     /// Build the canonical package descriptor.
     pub fn build(self) -> PackageDescriptor {
-        let mut package = PackageManifest::new(
-            PackageId::new(format!("application.{}", self.manifest.id)),
-            PackageType::Application,
-            self.manifest.version.clone(),
-            DeveloperId::new("local.application"),
-            PackageRuntime::new(PackageRuntimeKind::Yaml, "1"),
-        );
-        package.entry = app_entry(&self.manifest);
-        package
-            .metadata
-            .insert("application.name".into(), self.manifest.name.clone());
-        package
-            .metadata
-            .insert("application.id".into(), self.manifest.id.to_string());
-        package
-            .metadata
-            .insert("agent.count".into(), self.manifest.agents.len().to_string());
-        package.permissions = app_permissions(&self.resolved_agents);
-        package.provides = app_capabilities(&self.manifest, &self.resolved_agents);
-        package.required_services = app_required_services(&self.resolved_agents);
-        PackageDescriptor::new(package)
+        let projection = YamlApplicationManifestAdapter::new(self.manifest)
+            .with_resolved_agents(self.resolved_agents)
+            .project();
+        let mut descriptor = application_manifest_v1_to_package_descriptor(&projection.manifest);
+        descriptor
+            .trace_events
+            .push("application_package.yaml_manifest_v1_projection.loaded".into());
+        descriptor
     }
 }
 
 /// Convert a parsed YAML app manifest into a package descriptor.
+#[deprecated(
+    since = "0.1.0",
+    note = "use YamlApplicationManifestAdapter plus application_manifest_v1_to_package_descriptor"
+)]
 pub fn app_manifest_to_package_descriptor(manifest: &AppManifest) -> PackageDescriptor {
     AppPackageDescriptorBuilder::new(manifest.clone()).build()
+}
+
+/// Convert Application Manifest v1 into the canonical Package Descriptor.
+///
+/// Package generation now depends on Manifest v1 facts instead of YAML-only
+/// fields.  This keeps YAML first-class while making future manifest authors,
+/// WASM packages, and generated SDK packages share the same package projection
+/// contract.
+pub fn application_manifest_v1_to_package_descriptor(
+    manifest: &ApplicationManifestV1,
+) -> PackageDescriptor {
+    let mut package = PackageManifest::new(
+        manifest.package_id.clone(),
+        manifest.package_type.clone(),
+        manifest.version.clone(),
+        manifest.developer_id.clone(),
+        PackageRuntime::new(
+            manifest.runtime.kind.clone(),
+            manifest.runtime.abi_version.clone(),
+        ),
+    );
+    package.entry = manifest.runtime.entry.as_ref().map(|entry| PackageEntry {
+        kind: manifest
+            .runtime
+            .metadata
+            .get("entry.kind")
+            .cloned()
+            .unwrap_or_else(|| "agent".into()),
+        value: entry.clone(),
+    });
+    package
+        .metadata
+        .insert("application.name".into(), manifest.name.clone());
+    package.metadata.extend(manifest.metadata.clone());
+    package.permissions = manifest
+        .permissions
+        .iter()
+        .filter(|permission| !permission.optional)
+        .map(|permission| PackagePermission {
+            name: permission.name.clone(),
+            reason: permission.reason.clone(),
+        })
+        .collect();
+    package.required_services = manifest
+        .abilities
+        .iter()
+        .flat_map(|ability| ability.services.iter())
+        .filter(|service| !service.optional)
+        .map(|service| PackageServiceRequirement {
+            service: service.service.clone(),
+            capability: service.capability.clone(),
+            reason: service.reason.clone(),
+        })
+        .collect();
+    package.provides = manifest
+        .abilities
+        .iter()
+        .flat_map(|ability| ability.capabilities.iter())
+        .map(|capability| PackageCapability {
+            id: capability.id.clone(),
+            description: capability.description.clone(),
+        })
+        .collect();
+    package
+        .provides
+        .sort_by(|a, b| a.id.as_str().cmp(b.id.as_str()));
+    package.provides.dedup_by(|a, b| a.id == b.id);
+    PackageDescriptor::new(package)
 }
 
 /// Load a YAML app manifest and convert it into a package descriptor.
@@ -84,96 +143,15 @@ pub fn load_yaml_app_package_descriptor(path: impl AsRef<Path>) -> MacacaResult<
         .build())
 }
 
-fn app_entry(manifest: &AppManifest) -> Option<PackageEntry> {
-    if let Some(entry_agent) = &manifest.entry_agent {
-        return Some(PackageEntry {
-            kind: "agent".into(),
-            value: entry_agent.clone(),
-        });
-    }
-    manifest.entrypoint.as_ref().map(|entrypoint| PackageEntry {
-        kind: match entrypoint.type_ {
-            EntrypointType::Workflow => "workflow",
-            EntrypointType::Agent => "agent",
-            EntrypointType::Custom => "custom",
-        }
-        .into(),
-        value: entrypoint.name.clone(),
-    })
-}
-
-fn app_permissions(agents: &[AgentConfig]) -> Vec<PackagePermission> {
-    let mut permissions = Vec::new();
-    if agents.iter().any(|agent| agent.network_access) {
-        permissions.push(PackagePermission {
-            name: "network.access".into(),
-            reason: "At least one application agent declares network access".into(),
-        });
-    }
-    if agents.iter().any(|agent| !agent.allowed_paths.is_empty()) {
-        permissions.push(PackagePermission {
-            name: "filesystem.scoped".into(),
-            reason: "At least one application agent declares allowed paths".into(),
-        });
-    }
-    permissions
-}
-
-fn app_capabilities(manifest: &AppManifest, agents: &[AgentConfig]) -> Vec<PackageCapability> {
-    let mut capabilities = Vec::new();
-    for source in &manifest.agents {
-        if let AgentSource::Inline(inline) = source {
-            for capability in &inline.capabilities {
-                capabilities.push(PackageCapability {
-                    id: CapabilityId::new(format!("agent.{}.{}", inline.name, capability.name)),
-                    description: capability.description.clone(),
-                });
-            }
-            for tool in &inline.allowed_tools {
-                capabilities.push(PackageCapability {
-                    id: CapabilityId::new(format!("tool.{tool}")),
-                    description: format!("Allowed tool declared by agent {}", inline.name),
-                });
-            }
-        }
-    }
-    for agent in agents {
-        for capability in &agent.capabilities {
-            capabilities.push(PackageCapability {
-                id: CapabilityId::new(format!("agent.{}.{}", agent.name, capability.name)),
-                description: capability.description.clone(),
-            });
-        }
-        for tool in &agent.allowed_tools {
-            capabilities.push(PackageCapability {
-                id: CapabilityId::new(format!("tool.{tool}")),
-                description: format!("Allowed tool declared by agent {}", agent.name),
-            });
-        }
-    }
-    capabilities.sort_by(|a, b| a.id.as_str().cmp(b.id.as_str()));
-    capabilities.dedup_by(|a, b| a.id == b.id);
-    capabilities
-}
-
-fn app_required_services(agents: &[AgentConfig]) -> Vec<PackageServiceRequirement> {
-    if agents.is_empty() {
-        return Vec::new();
-    }
-    vec![PackageServiceRequirement {
-        service: KernelServiceId::new("service.agent.runtime"),
-        capability: Some(CapabilityId::new("capability.agent.execute")),
-        reason: "YAML application declares agents that need an agent runtime".into(),
-    }]
-}
-
 #[cfg(test)]
 mod tests {
+    use macaca_proto::{PackageRuntimeKind, PackageType};
+
     use super::*;
 
     fn example_app_paths() -> Vec<std::path::PathBuf> {
         let examples_dir =
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/apps");
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/apps");
         let mut paths = std::fs::read_dir(examples_dir)
             .unwrap()
             .filter_map(Result::ok)

@@ -13,6 +13,7 @@ pub mod host;
 pub mod lifecycle;
 pub mod llm_proxy;
 pub mod loader;
+pub mod manifest_v1;
 pub mod model;
 pub mod package;
 pub mod package_loader;
@@ -25,6 +26,7 @@ pub mod skills;
 pub mod web3_capability;
 pub mod workflow;
 
+#[allow(deprecated)]
 pub use abi::{
     app_manifest_to_abi_descriptor, is_runtime_unavailable, ApplicationAbiAdapter,
     ApplicationAbiDescriptor, ApplicationAbiInstance, ApplicationAbiLoadResult,
@@ -55,13 +57,18 @@ pub use host::{
 pub use lifecycle::ApplicationLifecycle;
 pub use llm_proxy::{LlmProxy, UserLlmOverride};
 pub use loader::AppLoader;
+pub use manifest_v1::{
+    LegacyAppManifestProjection, YamlApplicationManifestAdapter, YamlProjectionDiagnostic,
+    YamlToApplicationManifestV1Report,
+};
 pub use model::{
     AppCapabilityNode, AppCapabilitySet, AppCapabilitySource, AppLayer, AppLlmConfig, AppManifest,
     AppStatus,
 };
+#[allow(deprecated)]
 pub use package::{
-    app_manifest_to_package_descriptor, load_yaml_app_package_descriptor,
-    AppPackageDescriptorBuilder,
+    app_manifest_to_package_descriptor, application_manifest_v1_to_package_descriptor,
+    load_yaml_app_package_descriptor, AppPackageDescriptorBuilder,
 };
 pub use package_loader::{PackageLoaderFactory, PackageLoaderKind};
 pub use registry::{AppRegistry, DiscoveredApp, DEFAULT_APP, STANDARD_APP_DIRS};

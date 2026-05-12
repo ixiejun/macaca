@@ -1,11 +1,12 @@
 use macaca_app::{
-    load_yaml_app_package_descriptor, PackageGuardContext, PackageLoaderFactory,
-    PackageRuntimeGuard,
+    application_manifest_v1_to_package_descriptor, load_yaml_app_package_descriptor, AppLoader,
+    PackageGuardContext, PackageLoaderFactory, PackageRuntimeGuard, YamlApplicationManifestAdapter,
 };
-use macaca_proto::{KernelServiceId, PackageGuardDecision};
+use macaca_proto::{KernelServiceId, PackageGuardDecision, PackageRuntimeKind};
 
 fn example_apps() -> Vec<std::path::PathBuf> {
-    let examples_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/apps");
+    let examples_dir =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/apps");
     let mut paths = std::fs::read_dir(examples_dir)
         .unwrap()
         .filter_map(Result::ok)
@@ -14,6 +15,36 @@ fn example_apps() -> Vec<std::path::PathBuf> {
         .collect::<Vec<_>>();
     paths.sort();
     paths
+}
+
+#[test]
+fn package_manifest_v1_projection_preserves_legacy_key_fields() {
+    let app_path = example_apps().into_iter().next().unwrap();
+    let legacy_descriptor = load_yaml_app_package_descriptor(&app_path).unwrap();
+    let manifest = AppLoader::load_manifest(&app_path).unwrap();
+    let projection = YamlApplicationManifestAdapter::new(manifest).project();
+    let projected_descriptor = application_manifest_v1_to_package_descriptor(&projection.manifest);
+
+    assert_eq!(
+        legacy_descriptor.manifest.id,
+        projected_descriptor.manifest.id
+    );
+    assert_eq!(
+        legacy_descriptor.manifest.runtime.kind,
+        Some(PackageRuntimeKind::Yaml)
+    );
+    assert_eq!(
+        legacy_descriptor.manifest.runtime.kind,
+        projected_descriptor.manifest.runtime.kind
+    );
+    assert_eq!(
+        legacy_descriptor.manifest.entry,
+        projected_descriptor.manifest.entry
+    );
+    assert_eq!(
+        legacy_descriptor.manifest.provides.len(),
+        projected_descriptor.manifest.provides.len()
+    );
 }
 
 #[test]
