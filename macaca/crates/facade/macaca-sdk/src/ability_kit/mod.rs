@@ -43,6 +43,48 @@ impl AbilityKit {
         )
     }
 
+    /// Create a builder for a scheduled ability.
+    ///
+    /// Scheduled abilities are still declarative contracts at the SDK layer.
+    /// The SDK records the ability kind and leaves timer interpretation to the
+    /// Application Framework admission/runtime path so application packages do
+    /// not depend on any concrete scheduler implementation.
+    pub fn scheduled(id: impl Into<String>) -> AbilityDescriptorBuilder {
+        AbilityDescriptorBuilder::new(
+            id,
+            ApplicationAbilityKind::Scheduled,
+            AbilityImplementationKind::Declarative,
+        )
+    }
+
+    /// Create a builder for a gateway ability.
+    ///
+    /// Gateway abilities describe an application-owned ingress contract.  The
+    /// descriptor is intentionally provider-neutral: shells and gateway hosts
+    /// can route by declared services/capabilities without the SDK knowing the
+    /// gateway implementation type.
+    pub fn gateway(id: impl Into<String>) -> AbilityDescriptorBuilder {
+        AbilityDescriptorBuilder::new(
+            id,
+            ApplicationAbilityKind::Gateway,
+            AbilityImplementationKind::Declarative,
+        )
+    }
+
+    /// Create a builder for an extension ability.
+    ///
+    /// Extension abilities let an application add integration points without
+    /// hardcoding a specific Plugin, MCP, Driver, Skill, or provider backend in
+    /// the SDK.  Concrete wiring is resolved later by service/capability
+    /// registries under policy and trace governance.
+    pub fn extension(id: impl Into<String>) -> AbilityDescriptorBuilder {
+        AbilityDescriptorBuilder::new(
+            id,
+            ApplicationAbilityKind::Extension,
+            AbilityImplementationKind::Declarative,
+        )
+    }
+
     /// Create a builder for a WASM-backed ability.
     pub fn wasm(id: impl Into<String>, kind: ApplicationAbilityKind) -> AbilityDescriptorBuilder {
         AbilityDescriptorBuilder::new(id, kind, AbilityImplementationKind::WasmComponent)
@@ -144,5 +186,28 @@ mod tests {
         assert_eq!(ability.kind, ApplicationAbilityKind::Agent);
         assert_eq!(ability.permissions.len(), 1);
         assert_eq!(ability.services.len(), 1);
+    }
+
+    #[test]
+    fn ability_kit_builds_all_first_class_ability_kinds() {
+        let scheduled = AbilityKit::scheduled("ability.fixture.scheduled").build();
+        let gateway = AbilityKit::gateway("ability.fixture.gateway").build();
+        let extension = AbilityKit::extension("ability.fixture.extension").build();
+
+        assert_eq!(scheduled.kind, ApplicationAbilityKind::Scheduled);
+        assert_eq!(gateway.kind, ApplicationAbilityKind::Gateway);
+        assert_eq!(extension.kind, ApplicationAbilityKind::Extension);
+        assert_eq!(
+            scheduled.implementation,
+            AbilityImplementationKind::Declarative
+        );
+        assert_eq!(
+            gateway.implementation,
+            AbilityImplementationKind::Declarative
+        );
+        assert_eq!(
+            extension.implementation,
+            AbilityImplementationKind::Declarative
+        );
     }
 }

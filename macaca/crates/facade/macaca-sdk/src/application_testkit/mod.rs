@@ -5,7 +5,7 @@
 //! objects.  This keeps developer validation fast, deterministic, and safe for
 //! Store/certification tooling.
 
-use macaca_proto::ApplicationManifestV1;
+use macaca_proto::{ApplicationHostCommand, ApplicationManifestV1};
 
 /// Safe diagnostic returned by SDK-side contract tests.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -95,12 +95,51 @@ impl ApplicationContractTestKit {
         );
         report
     }
+
+    /// Validate one host command that must carry trace context.
+    ///
+    /// Application host commands can be assembled by package tests before any
+    /// runtime exists.  This check implements the Specification pattern for the
+    /// Route C trace invariant: every host operation that crosses the
+    /// application boundary must either include a trace context or fail closed
+    /// before execution.  The diagnostic intentionally reports only the import
+    /// label and safe reason code; it never includes raw payloads, prompt
+    /// bodies, environment values, or other unbounded application data.
+    pub fn validate_trace_required_command(
+        &self,
+        fixture_id: impl AsRef<str>,
+        command: &ApplicationHostCommand,
+    ) -> ApplicationContractReport {
+        let mut report = ApplicationContractReport::default();
+        let fixture_id = fixture_id.as_ref();
+        if command
+            .trace
+            .as_ref()
+            .map(|trace| trace.trace_id.trim().is_empty())
+            .unwrap_or(true)
+        {
+            report.push(ApplicationContractDiagnostic::new(
+                "missing_trace",
+                fixture_id,
+                "Trace-required application host commands must include a non-empty trace id",
+            ));
+        }
+        tracing::info!(
+            fixture_id = %fixture_id,
+            import = ?command.import,
+            diagnostic_count = report.diagnostics.len(),
+            "application contract test kit validated trace-required command"
+        );
+        report
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::application::ApplicationHostCommandBuilder;
     use crate::application_kit::ApplicationKit;
+    use macaca_proto::ApplicationImport;
 
     #[test]
     fn testkit_rejects_missing_ability() {
@@ -118,5 +157,20 @@ mod tests {
             .diagnostics
             .iter()
             .any(|diagnostic| diagnostic.code == "missing_ability"));
+    }
+
+    #[test]
+    fn testkit_rejects_missing_trace_required_command() {
+        let command = ApplicationHostCommandBuilder::new(ApplicationImport::ServiceCall).build();
+
+        let report = ApplicationContractTestKit
+            .validate_trace_required_command("fixture.trace.required", &command);
+
+        assert!(!report.is_success());
+        assert!(report
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == "missing_trace"
+                && diagnostic.subject == "fixture.trace.required"));
     }
 }

@@ -12,7 +12,7 @@
 ## 3. Validation
 - [x] 3.1 Add unit tests for deterministic builder output.
 - [x] 3.2 Add tests rejecting missing permissions, services, trace, and ability entries.
-- [ ] 3.3 Run `cargo test -p macaca-sdk application_kit`.
-- [ ] 3.4 Run `cargo test -p macaca-sdk application_testkit`.
-- [ ] 3.5 Run `cargo check -p macaca-sdk`.
-- [ ] 3.6 Run Route C dependency boundary tests.
+- [x] 3.3 Run `cargo test -p macaca-sdk application_kit`.
+- [x] 3.4 Run `cargo test -p macaca-sdk application_testkit`.
+- [x] 3.5 Run `cargo check -p macaca-sdk`.
+- [x] 3.6 Run Route C dependency boundary tests.
