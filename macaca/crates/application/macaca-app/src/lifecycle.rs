@@ -134,4 +134,21 @@ mod tests {
         ));
         assert_eq!(lifecycle.state(), &ApplicationLifecycleState::Declared);
     }
+
+    #[test]
+    fn wasm_lifecycle_app_lifecycle_checkpoint_path_reaches_paused_state() {
+        let mut lifecycle = ApplicationLifecycle::declared("app.wasm.lifecycle");
+
+        lifecycle
+            .transition_to(ApplicationLifecycleState::Initialized, None)
+            .unwrap();
+        lifecycle
+            .transition_to(ApplicationLifecycleState::Started, None)
+            .unwrap();
+        lifecycle
+            .transition_to(ApplicationLifecycleState::Paused, None)
+            .unwrap();
+
+        assert_eq!(lifecycle.state(), &ApplicationLifecycleState::Paused);
+    }
 }

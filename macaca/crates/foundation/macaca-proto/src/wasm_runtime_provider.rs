@@ -18,6 +18,7 @@ use crate::{ApplicationAbiError, ApplicationAbiVersion, PackageRuntimeKind, Trac
 
 mod compile_cache;
 mod host_import;
+mod lifecycle;
 mod resource_policy;
 mod runtime_errors;
 #[cfg(test)]
@@ -25,6 +26,7 @@ mod tests;
 
 pub use compile_cache::*;
 pub use host_import::*;
+pub use lifecycle::*;
 pub use resource_policy::*;
 pub use runtime_errors::*;
 

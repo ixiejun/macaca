@@ -8,8 +8,10 @@
 use async_trait::async_trait;
 use macaca_proto::{
     ApplicationAbiError, ApplicationHostCommand, ApplicationHostCommandResult, TraceContext,
+    WasmCheckpointMemento, WasmLifecycleCommand, WasmLifecycleState, WasmLifecycleTransitionResult,
+    WasmRestoreReport, WasmRestoreRequest, WasmRollbackReport, WasmRollbackRequest,
     WasmRuntimeAvailability, WasmRuntimeDiagnostics, WasmRuntimeProviderDescriptor,
-    WasmRuntimeSessionRequest,
+    WasmRuntimeSessionRequest, WasmUpgradeReport, WasmUpgradeRequest,
 };
 
 /// Strategy plus Abstract Factory boundary implemented by WASM providers.
@@ -45,4 +47,50 @@ pub trait WasmExecutionSession: Send + Sync + std::fmt::Debug {
         &self,
         command: ApplicationHostCommand,
     ) -> Result<ApplicationHostCommandResult, ApplicationAbiError>;
+
+    /// Return the current provider-owned lifecycle state for this session.
+    ///
+    /// The lifecycle state is exposed as provider-neutral data so callers can
+    /// audit long-running application behavior without depending on a concrete
+    /// engine handle or process model.
+    fn lifecycle_state(&self) -> WasmLifecycleState;
+
+    /// Execute one typed lifecycle transition command.
+    ///
+    /// Implementations must fail closed for missing trace, unsupported engine
+    /// operations, invalid transitions, and runtime failures.  The default
+    /// provider maps supported operations to Application ABI exports, while
+    /// unavailable providers return structured unavailable transition results.
+    async fn transition_lifecycle(
+        &self,
+        command: WasmLifecycleCommand,
+    ) -> Result<WasmLifecycleTransitionResult, ApplicationAbiError>;
+
+    /// Create a sanitized checkpoint memento for the current session.
+    ///
+    /// Checkpoints are metadata mementos only.  They must not contain raw guest
+    /// memory, raw command payloads, environment variables, prompts, secrets, or
+    /// provider-specific engine handles.
+    async fn checkpoint(
+        &self,
+        command: WasmLifecycleCommand,
+    ) -> Result<WasmCheckpointMemento, ApplicationAbiError>;
+
+    /// Restore session lifecycle metadata from a compatible checkpoint memento.
+    async fn restore(
+        &self,
+        request: WasmRestoreRequest,
+    ) -> Result<WasmRestoreReport, ApplicationAbiError>;
+
+    /// Evaluate an upgrade request against artifact and ABI compatibility metadata.
+    async fn upgrade(
+        &self,
+        request: WasmUpgradeRequest,
+    ) -> Result<WasmUpgradeReport, ApplicationAbiError>;
+
+    /// Evaluate a rollback request against checkpoint and ABI compatibility metadata.
+    async fn rollback(
+        &self,
+        request: WasmRollbackRequest,
+    ) -> Result<WasmRollbackReport, ApplicationAbiError>;
 }

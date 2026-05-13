@@ -14,6 +14,7 @@ mod diagnostics;
 mod engine_adapter;
 mod errors;
 mod host_import_bridge;
+mod lifecycle_support;
 mod registry;
 mod sandbox_guard;
 mod traits;
@@ -27,5 +28,7 @@ pub use unavailable::{UnavailableWasmExecutionSession, UnavailableWasmRuntimePro
 
 #[cfg(test)]
 mod host_import_tests;
+#[cfg(test)]
+mod lifecycle_tests;
 #[cfg(test)]
 mod tests;

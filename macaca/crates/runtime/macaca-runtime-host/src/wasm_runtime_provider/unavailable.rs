@@ -6,9 +6,13 @@
 
 use async_trait::async_trait;
 use macaca_proto::{
-    ApplicationAbiError, ApplicationHostCommand, ApplicationHostCommandResult, PackageRuntimeKind,
-    WasmRuntimeAvailability, WasmRuntimeDiagnostics, WasmRuntimeProviderDescriptor,
-    WasmRuntimeSessionRequest, WasmRuntimeUnavailableReason,
+    sanitize_wasm_lifecycle_metadata, ApplicationAbiError, ApplicationHostCommand,
+    ApplicationHostCommandResult, PackageRuntimeKind, WasmCheckpointMemento, WasmLifecycleCommand,
+    WasmLifecycleOperationStatus, WasmLifecycleReasonCode, WasmLifecycleState,
+    WasmLifecycleTransitionResult, WasmRestoreReport, WasmRestoreRequest, WasmRollbackReport,
+    WasmRollbackRequest, WasmRuntimeAvailability, WasmRuntimeDiagnostics,
+    WasmRuntimeProviderDescriptor, WasmRuntimeSessionRequest, WasmRuntimeUnavailableReason,
+    WasmUpgradeReport, WasmUpgradeRequest,
 };
 use tracing::{info, warn};
 
@@ -168,5 +172,108 @@ impl WasmExecutionSession for UnavailableWasmExecutionSession {
             .metadata
             .insert("ability_id".into(), self.request.ability_id.clone());
         Ok(result)
+    }
+
+    fn lifecycle_state(&self) -> WasmLifecycleState {
+        WasmLifecycleState::Failed
+    }
+
+    async fn transition_lifecycle(
+        &self,
+        command: WasmLifecycleCommand,
+    ) -> Result<WasmLifecycleTransitionResult, ApplicationAbiError> {
+        let trace = match command.require_trace() {
+            Ok(trace) => Some(trace),
+            Err(_) => return Err(ApplicationAbiError::MissingTraceContext),
+        };
+        warn!(
+            session_id = %self.session_id,
+            trace_id = trace.as_ref().map(|value| value.trace_id.as_str()).unwrap_or("none"),
+            application_id = %self.request.application_id,
+            ability_id = %self.request.ability_id,
+            operation = %command.operation.as_code(),
+            reason_code = %self.reason.code,
+            "WASM unavailable session rejected lifecycle transition"
+        );
+        let mut metadata = command.metadata;
+        metadata.insert("runtime_kind".into(), self.runtime_kind().to_string());
+        metadata.insert("session_id".into(), self.session_id.clone());
+        Ok(WasmLifecycleTransitionResult::rejected(
+            command.operation,
+            WasmLifecycleState::Failed,
+            WasmLifecycleReasonCode::Unavailable,
+            trace,
+            metadata,
+        ))
+    }
+
+    async fn checkpoint(
+        &self,
+        command: WasmLifecycleCommand,
+    ) -> Result<WasmCheckpointMemento, ApplicationAbiError> {
+        command
+            .require_trace()
+            .map_err(|_| ApplicationAbiError::MissingTraceContext)?;
+        Err(ApplicationAbiError::RuntimeUnavailable(
+            self.reason.message.clone(),
+        ))
+    }
+
+    async fn restore(
+        &self,
+        request: WasmRestoreRequest,
+    ) -> Result<WasmRestoreReport, ApplicationAbiError> {
+        let trace = request
+            .trace
+            .ok_or(ApplicationAbiError::MissingTraceContext)?;
+        Ok(WasmRestoreReport {
+            status: WasmLifecycleOperationStatus::Unavailable,
+            reason_code: WasmLifecycleReasonCode::Unavailable.as_code().into(),
+            checkpoint_id: request.checkpoint.checkpoint_id,
+            lifecycle_state: WasmLifecycleState::Failed,
+            trace: Some(trace),
+            metadata: sanitize_wasm_lifecycle_metadata(request.metadata),
+        })
+    }
+
+    async fn upgrade(
+        &self,
+        request: WasmUpgradeRequest,
+    ) -> Result<WasmUpgradeReport, ApplicationAbiError> {
+        let trace = request
+            .trace
+            .ok_or(ApplicationAbiError::MissingTraceContext)?;
+        Ok(WasmUpgradeReport {
+            status: WasmLifecycleOperationStatus::Unavailable,
+            reason_code: WasmLifecycleReasonCode::Unavailable.as_code().into(),
+            source_artifact: self.request.artifact.clone(),
+            source_artifact_digest_prefix: String::new(),
+            target_artifact: request.target_artifact,
+            target_artifact_digest_prefix: request
+                .target_artifact_digest
+                .chars()
+                .take(12)
+                .collect(),
+            abi_compatible: false,
+            trace: Some(trace),
+            metadata: sanitize_wasm_lifecycle_metadata(request.metadata),
+        })
+    }
+
+    async fn rollback(
+        &self,
+        request: WasmRollbackRequest,
+    ) -> Result<WasmRollbackReport, ApplicationAbiError> {
+        let trace = request
+            .trace
+            .ok_or(ApplicationAbiError::MissingTraceContext)?;
+        Ok(WasmRollbackReport {
+            status: WasmLifecycleOperationStatus::Unavailable,
+            reason_code: WasmLifecycleReasonCode::Unavailable.as_code().into(),
+            checkpoint_id: request.checkpoint.checkpoint_id,
+            restored_lifecycle_state: WasmLifecycleState::Failed,
+            trace: Some(trace),
+            metadata: sanitize_wasm_lifecycle_metadata(request.metadata),
+        })
     }
 }

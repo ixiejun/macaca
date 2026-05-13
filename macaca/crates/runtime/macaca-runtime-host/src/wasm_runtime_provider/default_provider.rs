@@ -8,14 +8,17 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use macaca_proto::{
     ApplicationAbiError, ApplicationHostCommand, ApplicationHostCommandResult, ApplicationImport,
-    PackageRuntimeKind, TraceContext, WasmEngineCapabilities, WasmExecutionProfile,
-    WasmRuntimeAvailability, WasmRuntimeDiagnostics, WasmRuntimeErrorKind,
-    WasmRuntimeProviderDescriptor, WasmRuntimeSessionRequest,
+    PackageRuntimeKind, TraceContext, WasmCheckpointMemento, WasmEngineCapabilities,
+    WasmExecutionProfile, WasmLifecycleAuditEvent, WasmLifecycleCommand, WasmLifecycleState,
+    WasmLifecycleStateMachine, WasmLifecycleTransitionResult, WasmRestoreReport,
+    WasmRestoreRequest, WasmRollbackReport, WasmRollbackRequest, WasmRuntimeAvailability,
+    WasmRuntimeDiagnostics, WasmRuntimeErrorKind, WasmRuntimeProviderDescriptor,
+    WasmRuntimeSessionRequest, WasmUpgradeReport, WasmUpgradeRequest,
 };
 use serde_json::json;
 use tracing::{info, warn};
@@ -173,6 +176,8 @@ impl WasmApplicationRuntimeProvider for DefaultInProcessWasmRuntimeProvider {
             instance,
             sandbox_guard: self.sandbox_guard.clone(),
             host_import_bridge: self.host_import_bridge.clone(),
+            lifecycle: Mutex::new(WasmLifecycleStateMachine::instantiated()),
+            audit_events: Mutex::new(Vec::new()),
             _permit: permit,
             cache_state: format!("{:?}", cache_report.state).to_ascii_lowercase(),
             artifact_digest: cache_report.key.digest_value,
@@ -182,16 +187,18 @@ impl WasmApplicationRuntimeProvider for DefaultInProcessWasmRuntimeProvider {
 
 /// Execution session for the default in-process provider.
 #[derive(Debug)]
-struct DefaultInProcessWasmExecutionSession {
-    session_id: String,
-    request: WasmRuntimeSessionRequest,
-    module: Arc<CompiledWasmModule>,
-    instance: InProcessWasmInstance,
-    sandbox_guard: WasmSandboxGuard,
-    host_import_bridge: Option<Arc<WasmHostImportBridge>>,
-    _permit: WasmSessionPermit,
-    cache_state: String,
-    artifact_digest: String,
+pub(super) struct DefaultInProcessWasmExecutionSession {
+    pub(super) session_id: String,
+    pub(super) request: WasmRuntimeSessionRequest,
+    pub(super) module: Arc<CompiledWasmModule>,
+    pub(super) instance: InProcessWasmInstance,
+    pub(super) sandbox_guard: WasmSandboxGuard,
+    pub(super) host_import_bridge: Option<Arc<WasmHostImportBridge>>,
+    pub(super) lifecycle: Mutex<WasmLifecycleStateMachine>,
+    pub(super) audit_events: Mutex<Vec<WasmLifecycleAuditEvent>>,
+    pub(super) _permit: WasmSessionPermit,
+    pub(super) cache_state: String,
+    pub(super) artifact_digest: String,
 }
 
 #[async_trait]
@@ -277,6 +284,48 @@ impl WasmExecutionSession for DefaultInProcessWasmExecutionSession {
             }
             Err(error) => Ok(self.error_result(error, Some(trace))),
         }
+    }
+
+    fn lifecycle_state(&self) -> WasmLifecycleState {
+        self.lifecycle
+            .lock()
+            .expect("wasm lifecycle mutex poisoned")
+            .state()
+    }
+
+    async fn transition_lifecycle(
+        &self,
+        command: WasmLifecycleCommand,
+    ) -> Result<WasmLifecycleTransitionResult, ApplicationAbiError> {
+        super::lifecycle_support::transition_lifecycle(self, command)
+    }
+
+    async fn checkpoint(
+        &self,
+        command: WasmLifecycleCommand,
+    ) -> Result<WasmCheckpointMemento, ApplicationAbiError> {
+        super::lifecycle_support::checkpoint(self, command)
+    }
+
+    async fn restore(
+        &self,
+        request: WasmRestoreRequest,
+    ) -> Result<WasmRestoreReport, ApplicationAbiError> {
+        super::lifecycle_support::restore(self, request)
+    }
+
+    async fn upgrade(
+        &self,
+        request: WasmUpgradeRequest,
+    ) -> Result<WasmUpgradeReport, ApplicationAbiError> {
+        super::lifecycle_support::upgrade(self, request)
+    }
+
+    async fn rollback(
+        &self,
+        request: WasmRollbackRequest,
+    ) -> Result<WasmRollbackReport, ApplicationAbiError> {
+        super::lifecycle_support::rollback(self, request)
     }
 }
 
