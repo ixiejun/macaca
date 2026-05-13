@@ -149,7 +149,9 @@ pub use store_service_provider::{store_service_descriptor, StoreSystemServicePro
 pub use transport::{ConfigBackedMcpTransport, McpTransport};
 pub use wasm_runtime_provider::{
     DefaultInProcessWasmRuntimeProvider, UnavailableWasmRuntimeProvider,
-    WasmApplicationRuntimeProvider, WasmExecutionSession, WasmRuntimeProviderRegistry,
+    WasmApplicationRuntimeProvider, WasmExampleFixtureKind, WasmExecutionSession,
+    WasmGuestHarnessFixture, WasmGuestHarnessReport, WasmGuestRuntimeHarness, WasmMockHostOutcome,
+    WasmRuntimeProviderRegistry, WasmToolchainFixtureReport,
 };
 pub use web3_service_provider::{
     web3_service_descriptor, MockWeb3Provider, UnavailableWeb3Provider, Web3ProviderStrategy,

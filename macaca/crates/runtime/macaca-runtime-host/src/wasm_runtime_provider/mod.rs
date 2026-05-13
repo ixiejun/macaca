@@ -13,6 +13,8 @@ mod default_provider;
 mod diagnostics;
 mod engine_adapter;
 mod errors;
+mod guest_harness;
+mod guest_harness_support;
 mod host_import_bridge;
 mod lifecycle_support;
 mod registry;
@@ -21,11 +23,17 @@ mod traits;
 mod unavailable;
 
 pub use default_provider::DefaultInProcessWasmRuntimeProvider;
+pub use guest_harness::{
+    WasmExampleFixtureKind, WasmGuestHarnessFixture, WasmGuestHarnessReport,
+    WasmGuestRuntimeHarness, WasmMockHostOutcome, WasmToolchainFixtureReport,
+};
 pub use host_import_bridge::{WasmHostImportBridge, WasmHostImportBridgeConfig};
 pub use registry::WasmRuntimeProviderRegistry;
 pub use traits::{WasmApplicationRuntimeProvider, WasmExecutionSession};
 pub use unavailable::{UnavailableWasmExecutionSession, UnavailableWasmRuntimeProvider};
 
+#[cfg(test)]
+mod guest_harness_tests;
 #[cfg(test)]
 mod host_import_tests;
 #[cfg(test)]
