@@ -8,6 +8,8 @@
 //! concrete engine detail leaks into `macaca-proto`, the SDK, or application
 //! framework call sites.
 
+mod certification;
+mod certification_hardened;
 mod compile_cache;
 mod default_provider;
 mod diagnostics;
@@ -22,6 +24,13 @@ mod sandbox_guard;
 mod traits;
 mod unavailable;
 
+pub use certification::{
+    WasmCertificationFixtureSet, WasmCertificationHarness, WasmCertificationProfile,
+    WasmCertificationReport, WasmCertificationStatus, WasmConformanceFixtureKind,
+};
+pub use certification_hardened::{
+    WasmHardenedProviderEnvelope, WasmHardenedProviderMockAdapter, WasmHardenedProviderResponse,
+};
 pub use default_provider::DefaultInProcessWasmRuntimeProvider;
 pub use guest_harness::{
     WasmExampleFixtureKind, WasmGuestHarnessFixture, WasmGuestHarnessReport,
@@ -32,6 +41,8 @@ pub use registry::WasmRuntimeProviderRegistry;
 pub use traits::{WasmApplicationRuntimeProvider, WasmExecutionSession};
 pub use unavailable::{UnavailableWasmExecutionSession, UnavailableWasmRuntimeProvider};
 
+#[cfg(test)]
+mod certification_tests;
 #[cfg(test)]
 mod guest_harness_tests;
 #[cfg(test)]

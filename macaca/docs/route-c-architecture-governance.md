@@ -199,6 +199,14 @@ cargo test -p macaca-integration-tests route_c_workspace_topology
 - WASM/package application 在 S7 只能 metadata-only admission；执行缺失必须返回 structured unavailable，不得 panic、阻塞等待或假装启动成功。
 - `/api/chat/v2` 在 S7 只迁移 entry-agent/status/session envelope preflight。Coordinator execution、PlanLoop、WorkerLoop、EventLog persistence、RunTracer、resume signal 和 SSE shape 仍由既有路径保持兼容，不能被 Application Service 吸收。
 
+## 13.1 WASM Certification / Hardened Provider Ownership
+
+- WASM certification/conformance 归属 `macaca-runtime-host`，因为它验证 runtime provider、host import、resource、lifecycle、observability 和 hardened deployment profile 的组合契约。
+- Certification runner 必须复用 `macaca-app` 的 provider-neutral certification DTO/Kit，不得在 runtime-host 内发明第二套 application 认证语义。
+- Certification report 必须是 sanitized Memento，只能包含 fixture id、profile、trace id、reason codes、计数和安全 diagnostics；不得包含 raw WASM bytes、raw manifest、raw guest payload、secret、env、API key、private key、prompt。
+- Hardened out-of-process provider 是 deployment profile，不是新的 Application ABI 语义；它必须通过 provider-neutral envelope/response Adapter 与 default/unavailable provider 共享 conformance tests。
+- 没有通过 hardened certification 的 WASM package 不得被标记为 industrial-ready。
+
 ## 14. Store / Entitlement Service Ownership
 
 路线 C S9 将 Store / Entitlement 收敛为可替换 system service，而不是 application、skill、Web、CLI 或 runtime helper 各自拥有商业授权逻辑：
