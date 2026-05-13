@@ -11,6 +11,8 @@
 mod certification;
 mod certification_hardened;
 mod compile_cache;
+mod component_model;
+mod component_model_adapter;
 mod default_provider;
 mod diagnostics;
 mod engine_adapter;
@@ -31,6 +33,7 @@ pub use certification::{
 pub use certification_hardened::{
     WasmHardenedProviderEnvelope, WasmHardenedProviderMockAdapter, WasmHardenedProviderResponse,
 };
+pub use component_model::ComponentModelWasmRuntimeProvider;
 pub use default_provider::DefaultInProcessWasmRuntimeProvider;
 pub use guest_harness::{
     WasmExampleFixtureKind, WasmGuestHarnessFixture, WasmGuestHarnessReport,
@@ -41,6 +44,8 @@ pub use registry::WasmRuntimeProviderRegistry;
 pub use traits::{WasmApplicationRuntimeProvider, WasmExecutionSession};
 pub use unavailable::{UnavailableWasmExecutionSession, UnavailableWasmRuntimeProvider};
 
+#[cfg(test)]
+mod component_model_tests;
 #[cfg(test)]
 mod certification_tests;
 #[cfg(test)]

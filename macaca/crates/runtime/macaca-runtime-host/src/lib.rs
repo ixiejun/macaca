@@ -148,13 +148,14 @@ pub use skill_service_provider::SkillSystemServiceProvider;
 pub use store_service_provider::{store_service_descriptor, StoreSystemServiceProvider};
 pub use transport::{ConfigBackedMcpTransport, McpTransport};
 pub use wasm_runtime_provider::{
-    DefaultInProcessWasmRuntimeProvider, UnavailableWasmRuntimeProvider,
-    WasmApplicationRuntimeProvider, WasmCertificationFixtureSet, WasmCertificationHarness,
-    WasmCertificationProfile, WasmCertificationReport, WasmCertificationStatus,
-    WasmConformanceFixtureKind, WasmExampleFixtureKind, WasmExecutionSession,
-    WasmGuestHarnessFixture, WasmGuestHarnessReport, WasmGuestRuntimeHarness,
-    WasmHardenedProviderEnvelope, WasmHardenedProviderMockAdapter, WasmHardenedProviderResponse,
-    WasmMockHostOutcome, WasmRuntimeProviderRegistry, WasmToolchainFixtureReport,
+    ComponentModelWasmRuntimeProvider, DefaultInProcessWasmRuntimeProvider,
+    UnavailableWasmRuntimeProvider, WasmApplicationRuntimeProvider, WasmCertificationFixtureSet,
+    WasmCertificationHarness, WasmCertificationProfile, WasmCertificationReport,
+    WasmCertificationStatus, WasmConformanceFixtureKind, WasmExampleFixtureKind,
+    WasmExecutionSession, WasmGuestHarnessFixture, WasmGuestHarnessReport,
+    WasmGuestRuntimeHarness, WasmHardenedProviderEnvelope, WasmHardenedProviderMockAdapter,
+    WasmHardenedProviderResponse, WasmMockHostOutcome, WasmRuntimeProviderRegistry,
+    WasmToolchainFixtureReport,
 };
 pub use web3_service_provider::{
     web3_service_descriptor, MockWeb3Provider, UnavailableWeb3Provider, Web3ProviderStrategy,
