@@ -16,6 +16,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::{ApplicationAbiError, ApplicationAbiVersion, PackageRuntimeKind, TraceContext};
 
+mod compile_cache;
+mod runtime_errors;
+#[cfg(test)]
+mod tests;
+
+pub use compile_cache::*;
+pub use runtime_errors::*;
+
 /// String-backed reference to a WASM artifact known to package/runtime layers.
 ///
 /// The reference is a handle, not bytes.  It lets a package manager or future
@@ -364,92 +372,11 @@ const FORBIDDEN_DIAGNOSTIC_MARKERS: &[&str] = &[
     "prompt",
 ];
 
-fn sanitize_diagnostic_text(value: impl Into<String>) -> String {
+pub(crate) fn sanitize_diagnostic_text(value: impl Into<String>) -> String {
     let mut sanitized = value.into();
     for marker in FORBIDDEN_DIAGNOSTIC_MARKERS {
         sanitized = sanitized.replace(marker, "[redacted]");
         sanitized = sanitized.replace(&marker.to_uppercase(), "[redacted]");
     }
     sanitized
-}
-
-#[cfg(test)]
-mod tests {
-    use serde_json::json;
-
-    use crate::{
-        PackageRuntimeKind, TraceContext, WasmEngineCapabilities, WasmExecutionProfile,
-        WasmRuntimeArtifactRef, WasmRuntimeDiagnostics, WasmRuntimeProviderDescriptor,
-        WasmRuntimeSessionRequest, WasmRuntimeUnavailableReason,
-    };
-
-    #[test]
-    fn wasm_runtime_descriptor_serializes_deterministically() {
-        let descriptor = WasmRuntimeProviderDescriptor::unavailable_default();
-
-        let encoded = serde_json::to_value(&descriptor).unwrap();
-
-        assert_eq!(encoded["runtime_kind"], json!("wasm_component"));
-        assert_eq!(encoded["provider_class"], json!("unavailable"));
-        assert_eq!(encoded["capabilities"]["can_execute"], json!(false));
-    }
-
-    #[test]
-    fn wasm_runtime_diagnostics_redacts_forbidden_material() {
-        let diagnostics = WasmRuntimeDiagnostics::new(
-            PackageRuntimeKind::WasmComponent,
-            "runtime_unavailable",
-            "raw wasm bytes and API_KEY should be redacted",
-            Some(TraceContext::new("trace-wasm-diagnostics")),
-        );
-
-        assert!(diagnostics.is_sanitized());
-        assert!(!diagnostics.message.to_lowercase().contains("api_key"));
-        assert!(!diagnostics.message.to_lowercase().contains("raw wasm"));
-    }
-
-    #[test]
-    fn wasm_runtime_session_request_requires_trace_and_identity() {
-        let profile = WasmExecutionProfile::default_wasm_component();
-        let artifact = WasmRuntimeArtifactRef::new("pkg://fixture/component.wasm");
-        let valid = WasmRuntimeSessionRequest::new(
-            TraceContext::new("trace-session"),
-            "fixture.application",
-            "main",
-            artifact,
-            profile,
-        )
-        .unwrap();
-
-        assert_eq!(valid.runtime_kind(), PackageRuntimeKind::WasmComponent);
-
-        let missing_trace = WasmRuntimeSessionRequest {
-            trace: None,
-            application_id: "fixture.application".into(),
-            ability_id: "main".into(),
-            artifact: WasmRuntimeArtifactRef::new("pkg://fixture/component.wasm"),
-            profile: WasmExecutionProfile::default_wasm_component(),
-            metadata: Default::default(),
-        };
-
-        assert!(missing_trace.validate().is_err());
-    }
-
-    #[test]
-    fn wasm_runtime_unavailable_reason_is_structured() {
-        let reason = WasmRuntimeUnavailableReason::provider_missing("no runtime provider");
-
-        assert_eq!(reason.code, "provider_missing");
-        assert_eq!(reason.message, "no runtime provider");
-    }
-
-    #[test]
-    fn wasm_runtime_engine_capabilities_are_provider_neutral() {
-        let capabilities = WasmEngineCapabilities::unavailable();
-
-        assert!(!capabilities.can_compile);
-        assert!(!capabilities.can_instantiate);
-        assert!(!capabilities.can_execute);
-        assert!(capabilities.engine_features.is_empty());
-    }
 }

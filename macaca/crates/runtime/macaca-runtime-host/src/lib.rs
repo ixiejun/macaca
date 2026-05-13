@@ -148,7 +148,8 @@ pub use skill_service_provider::SkillSystemServiceProvider;
 pub use store_service_provider::{store_service_descriptor, StoreSystemServiceProvider};
 pub use transport::{ConfigBackedMcpTransport, McpTransport};
 pub use wasm_runtime_provider::{
-    UnavailableWasmRuntimeProvider, WasmApplicationRuntimeProvider, WasmExecutionSession,
+    DefaultInProcessWasmRuntimeProvider, UnavailableWasmRuntimeProvider,
+    WasmApplicationRuntimeProvider, WasmExecutionSession, WasmRuntimeProviderRegistry,
 };
 pub use web3_service_provider::{
     web3_service_descriptor, MockWeb3Provider, UnavailableWeb3Provider, Web3ProviderStrategy,

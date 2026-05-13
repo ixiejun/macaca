@@ -13,10 +13,14 @@ use macaca_proto::{
     ApplicationPluginDependency, CapabilityId, DeveloperId, EntitlementId, KernelServiceId,
     LicenseType, PackageCapability, PackageDescriptor, PackageEntry, PackageId, PackageManifest,
     PackagePermission, PackageRuntime, PackageRuntimeKind, PackageServiceRequirement, PackageType,
+    WasmComponentArtifactDescriptor,
 };
 
 use crate::ability_kit::AbilityKit;
-use crate::application_kit::{ApplicationKit, WasmComponentApplicationScaffold};
+use crate::application_kit::ApplicationKit;
+
+mod application_platform_wasm;
+pub use application_platform_wasm::application_platform_wasm_skeleton_fixture;
 
 /// Data-only Application Platform fixture used by certification tests.
 ///
@@ -30,6 +34,7 @@ pub struct ApplicationPlatformFixture {
     pub fixture_id: String,
     pub manifest: ApplicationManifestV1,
     pub abi: Option<ApplicationAbiDeclaration>,
+    pub wasm_artifact: Option<WasmComponentArtifactDescriptor>,
 }
 
 impl ApplicationPlatformFixture {
@@ -39,6 +44,7 @@ impl ApplicationPlatformFixture {
             fixture_id: fixture_id.into(),
             manifest,
             abi: None,
+            wasm_artifact: None,
         }
     }
 
@@ -47,6 +53,17 @@ impl ApplicationPlatformFixture {
     /// bytes or constructing a runtime host.
     pub fn abi(mut self, abi: ApplicationAbiDeclaration) -> Self {
         self.abi = Some(abi);
+        self
+    }
+
+    /// Attach metadata-only WASM artifact admission data.
+    ///
+    /// The descriptor records artifact identity, digest, ABI, imports, and
+    /// exports without storing component bytes.  Certification can therefore
+    /// validate WASM application shape while keeping runtime execution behind
+    /// the runtime-host provider boundary.
+    pub fn wasm_artifact(mut self, artifact: WasmComponentArtifactDescriptor) -> Self {
+        self.wasm_artifact = Some(artifact);
         self
     }
 }
@@ -458,16 +475,4 @@ pub fn application_platform_plugin_enhanced_fixture() -> ApplicationPlatformFixt
     )
     .build();
     ApplicationPlatformFixture::new("fixture.platform.plugin", manifest)
-}
-
-/// Return a Manifest v1 WASM skeleton fixture with ABI metadata.
-pub fn application_platform_wasm_skeleton_fixture() -> ApplicationPlatformFixture {
-    let fixture = WasmComponentApplicationScaffold::new(
-        "fixture.application.platform.wasm",
-        "developer.fixture",
-        "Application Platform WASM Fixture",
-        "1.0.0",
-    )
-    .build();
-    ApplicationPlatformFixture::new("fixture.platform.wasm", fixture.manifest).abi(fixture.abi)
 }

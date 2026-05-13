@@ -9,7 +9,7 @@ use macaca_app::{
     ApplicationCertificationContext, ApplicationCertificationFixture, ApplicationCertificationKit,
     ApplicationCertificationStatus,
 };
-use macaca_proto::{KernelServiceId, PackageRuntimeKind};
+use macaca_proto::{KernelServiceId, PackageRuntimeKind, WasmEngineCapabilities};
 use macaca_sdk::{
     application_platform_agent_fixture, application_platform_genui_fixture,
     application_platform_headless_fixture, application_platform_plugin_enhanced_fixture,
@@ -22,6 +22,7 @@ fn available_context() -> ApplicationCertificationContext {
         .trace_id("trace-application-platform-certification")
         .runtime(PackageRuntimeKind::Yaml)
         .runtime(PackageRuntimeKind::WasmComponent)
+        .wasm_runtime_capabilities(executable_wasm_capabilities())
         .service(KernelServiceId::new("service.fixture.task"))
         .service(KernelServiceId::new("service.fixture.ui"))
         .service(KernelServiceId::new("service.fixture.entitlement"))
@@ -37,7 +38,20 @@ fn to_certification_fixture(
     if let Some(abi) = fixture.abi {
         certification = certification.abi(abi);
     }
+    if let Some(artifact) = fixture.wasm_artifact {
+        certification = certification.wasm_artifact(artifact);
+    }
     certification
+}
+
+fn executable_wasm_capabilities() -> WasmEngineCapabilities {
+    let mut capabilities = WasmEngineCapabilities::unavailable();
+    capabilities.can_compile = true;
+    capabilities.can_instantiate = true;
+    capabilities.can_execute = true;
+    capabilities.supports_component_model = true;
+    capabilities.supports_host_import_bridge = true;
+    capabilities
 }
 
 #[test]
