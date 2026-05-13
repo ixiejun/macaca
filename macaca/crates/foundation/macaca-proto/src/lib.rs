@@ -28,6 +28,7 @@ pub mod types;
 pub mod ui;
 pub mod wasm_package_admission;
 pub mod wasm_runtime_provider;
+pub mod wasm_supply_chain;
 pub mod web3;
 pub mod web3_service;
 
@@ -74,5 +75,6 @@ pub use types::*;
 pub use ui::*;
 pub use wasm_package_admission::*;
 pub use wasm_runtime_provider::*;
+pub use wasm_supply_chain::*;
 pub use web3::*;
 pub use web3_service::*;

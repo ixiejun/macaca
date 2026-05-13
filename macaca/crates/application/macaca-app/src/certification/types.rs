@@ -8,7 +8,7 @@ use std::collections::BTreeSet;
 
 use macaca_proto::{
     ApplicationAbiDeclaration, ApplicationManifestV1, KernelServiceId, PackageRuntimeKind,
-    WasmComponentArtifactDescriptor, WasmEngineCapabilities,
+    WasmComponentArtifactDescriptor, WasmEngineCapabilities, WasmSupplyChainTrustPolicy,
 };
 
 use super::wasm_admission::{WasmPackageAdmissionReport, WasmPackageAdmissionStatus};
@@ -146,6 +146,7 @@ pub struct ApplicationCertificationContext {
     pub(crate) available_runtimes: BTreeSet<PackageRuntimeKind>,
     pub(crate) supported_wasm_abi_versions: BTreeSet<String>,
     pub(crate) wasm_runtime_capabilities: Option<WasmEngineCapabilities>,
+    pub(crate) wasm_supply_chain_policy: Option<WasmSupplyChainTrustPolicy>,
 }
 
 impl ApplicationCertificationContext {
@@ -192,6 +193,15 @@ impl ApplicationCertificationContext {
     pub fn supported_wasm_abi_version(mut self, version: impl Into<String>) -> Self {
         self.supported_wasm_abi_versions
             .insert(version.into().trim().to_string());
+        self
+    }
+
+    /// Attach the provider-neutral supply-chain trust policy used by WASM
+    /// package admission.  The policy is optional so development and legacy
+    /// fixtures remain evaluable; industrial profiles provide a policy to make
+    /// signature, provenance, origin, and certification checks fail closed.
+    pub fn wasm_supply_chain_policy(mut self, policy: WasmSupplyChainTrustPolicy) -> Self {
+        self.wasm_supply_chain_policy = Some(policy);
         self
     }
 }

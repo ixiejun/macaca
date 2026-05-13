@@ -13,6 +13,7 @@
 mod kit;
 mod types;
 mod wasm_admission;
+mod wasm_supply_chain;
 
 pub use kit::ApplicationCertificationKit;
 pub use types::{
@@ -23,3 +24,4 @@ pub use types::{
 pub use wasm_admission::{
     WasmPackageAdmissionReport, WasmPackageAdmissionSpec, WasmPackageAdmissionStatus,
 };
+pub use wasm_supply_chain::WasmSupplyChainAdmissionSpec;

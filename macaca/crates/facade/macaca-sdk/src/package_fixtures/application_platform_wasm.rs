@@ -6,8 +6,9 @@
 
 use macaca_proto::{
     ApplicationExport, ApplicationImport, WasmAbiRequirement, WasmArtifactDigest,
-    WasmComponentArtifactDescriptor, WasmExportDeclaration, WasmImportRequirement,
-    WasmRuntimeArtifactRef,
+    WasmArtifactSignature, WasmBuildProvenance, WasmComponentArtifactDescriptor,
+    WasmExportDeclaration, WasmImportRequirement, WasmRuntimeArtifactRef,
+    WasmSupplyChainAttestation,
 };
 
 use crate::application_kit::WasmComponentApplicationScaffold;
@@ -23,13 +24,32 @@ pub fn application_platform_wasm_skeleton_fixture() -> ApplicationPlatformFixtur
     )
     .build();
     let ability_id = format!("{}.component", fixture.manifest.package_id);
+    let digest = WasmArtifactDigest::sha256("fixture-platform-wasm-digest");
     let artifact = WasmComponentArtifactDescriptor::new(
         format!("{}.artifact", fixture.manifest.package_id),
         WasmRuntimeArtifactRef::new(format!(
             "pkg://{}/component.wasm",
             fixture.manifest.package_id
         )),
-        WasmArtifactDigest::sha256("fixture-platform-wasm-digest"),
+        digest.clone(),
+    )
+    .supply_chain(
+        WasmSupplyChainAttestation::new(
+            digest,
+            WasmArtifactSignature::detached(
+                "sigstore",
+                "fixture.application-platform.signer",
+                "sig://fixture/application-platform-wasm",
+            ),
+            WasmBuildProvenance::new(
+                "fixture.application-platform.builder",
+                "fixture.application-platform.origin",
+                "fixture.application-platform.build",
+                1_776_800_000,
+            )
+            .expires_at(1_780_000_000),
+        )
+        .certification_report("fixture.application-platform.certification"),
     )
     .abi(WasmAbiRequirement::new("0"))
     .required_import(WasmImportRequirement::permissioned(

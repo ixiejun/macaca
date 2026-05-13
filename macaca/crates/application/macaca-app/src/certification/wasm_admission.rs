@@ -12,10 +12,12 @@ use std::collections::BTreeSet;
 
 use macaca_proto::{
     ApplicationManifestV1, PackageDescriptor, PackageRuntimeKind, WasmAbiNegotiationResult,
-    WasmComponentArtifactDescriptor, WasmEngineCapabilities,
+    WasmComponentArtifactDescriptor, WasmEngineCapabilities, WasmSupplyChainVerificationReport,
+    WasmSupplyChainVerificationStatus,
 };
 
 use super::types::{ApplicationCertificationContext, ApplicationCertificationFixture};
+use super::wasm_supply_chain::WasmSupplyChainAdmissionSpec;
 
 /// Final status for a WASM package admission report.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -58,6 +60,7 @@ pub struct WasmPackageAdmissionReport {
     pub status: WasmPackageAdmissionStatus,
     pub reason_codes: Vec<String>,
     pub trace_id: Option<String>,
+    pub supply_chain: Option<WasmSupplyChainVerificationReport>,
     pub diagnostics: Vec<WasmPackageAdmissionDiagnostic>,
 }
 
@@ -71,6 +74,7 @@ impl WasmPackageAdmissionReport {
             status: WasmPackageAdmissionStatus::Accepted,
             reason_codes: Vec::new(),
             trace_id,
+            supply_chain: None,
             diagnostics: Vec::new(),
         }
     }
@@ -147,6 +151,7 @@ impl WasmPackageAdmissionReport {
             status: WasmPackageAdmissionStatus::Unavailable,
             reason_codes: vec!["metadata_only_runtime_unavailable".into()],
             trace_id,
+            supply_chain: None,
             diagnostics: Vec::new(),
         };
         report.diagnostics.push(WasmPackageAdmissionDiagnostic::new(
@@ -196,6 +201,7 @@ impl WasmPackageAdmissionSpec {
         };
         report.artifact_id = Some(artifact.artifact_id.clone());
         self.check_artifact(artifact, &mut report);
+        self.check_supply_chain(artifact, context, &mut report);
         self.check_abi(artifact, context, &mut report);
         self.check_import_permissions(&fixture.manifest, artifact, &mut report);
         self.check_report_sanitization(artifact, &mut report);
@@ -222,6 +228,32 @@ impl WasmPackageAdmissionSpec {
                 "WASM artifact digest metadata is required",
             );
         }
+    }
+
+    fn check_supply_chain(
+        &self,
+        artifact: &WasmComponentArtifactDescriptor,
+        context: &ApplicationCertificationContext,
+        report: &mut WasmPackageAdmissionReport,
+    ) {
+        let Some(policy) = &context.wasm_supply_chain_policy else {
+            tracing::debug!(
+                artifact_id = %artifact.artifact_id,
+                "WASM supply-chain policy not provided; verification skipped for non-industrial profile"
+            );
+            return;
+        };
+        let supply_chain = WasmSupplyChainAdmissionSpec.verify(artifact, policy);
+        if supply_chain.status != WasmSupplyChainVerificationStatus::Verified {
+            for code in &supply_chain.reason_codes {
+                report.reject(
+                    code.clone(),
+                    artifact.artifact_id.clone(),
+                    "WASM artifact supply-chain verification failed",
+                );
+            }
+        }
+        report.supply_chain = Some(supply_chain);
     }
 
     fn check_abi(

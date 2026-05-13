@@ -4,14 +4,17 @@
 //! application packages.  It deliberately stores artifact references, digests,
 //! ABI requirements, import requirements, export declarations, and negotiation
 //! outcomes as data only.  It never stores raw WASM bytes, raw WIT bodies, raw
-//! manifests, signatures, secrets, environment values, API keys, prompts, or
-//! host payloads.  Runtime execution remains behind `wasm_runtime_provider`.
+//! manifests, raw signatures, secrets, environment values, API keys, prompts,
+//! or host payloads.  Runtime execution remains behind `wasm_runtime_provider`.
 
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{ApplicationExport, ApplicationImport, WasmEngineCapabilities, WasmRuntimeArtifactRef};
+use crate::{
+    ApplicationExport, ApplicationImport, WasmEngineCapabilities, WasmRuntimeArtifactRef,
+    WasmSupplyChainAttestation,
+};
 
 /// Stable artifact digest metadata used during WASM package admission.
 ///
@@ -151,6 +154,7 @@ pub struct WasmComponentArtifactDescriptor {
     pub digest: WasmArtifactDigest,
     pub signature_algorithm: Option<String>,
     pub signature_ref: Option<String>,
+    pub supply_chain: Option<WasmSupplyChainAttestation>,
     pub abi: WasmAbiRequirement,
     pub required_imports: Vec<WasmImportRequirement>,
     pub exports: Vec<WasmExportDeclaration>,
@@ -170,6 +174,7 @@ impl WasmComponentArtifactDescriptor {
             digest,
             signature_algorithm: None,
             signature_ref: None,
+            supply_chain: None,
             abi: WasmAbiRequirement::new("0"),
             required_imports: Vec::new(),
             exports: Vec::new(),
@@ -185,6 +190,16 @@ impl WasmComponentArtifactDescriptor {
     ) -> Self {
         self.signature_algorithm = Some(algorithm.into().trim().to_string());
         self.signature_ref = Some(signature_ref.into().trim().to_string());
+        self
+    }
+
+    /// Attach provider-neutral supply-chain proof metadata.
+    ///
+    /// The attestation stores detached proof references and provenance labels,
+    /// not raw signatures or key material. Admission can therefore enforce
+    /// industrial trust policy while preserving safe manifest/report contents.
+    pub fn supply_chain(mut self, attestation: WasmSupplyChainAttestation) -> Self {
+        self.supply_chain = Some(attestation);
         self
     }
 
