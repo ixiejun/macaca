@@ -5,6 +5,7 @@
 //! `Kernel`, `ServiceRuntime`, Web state, or runtime-host providers.
 
 pub mod wasm;
+pub mod wasm_bindgen;
 
 use macaca_proto::{
     ApplicationAbilityDescriptor, ApplicationCommerceDeclaration,
@@ -30,6 +31,11 @@ impl ApplicationKit {
 }
 
 pub use wasm::{WasmComponentApplicationDescriptor, WasmComponentApplicationScaffold};
+pub use wasm_bindgen::{
+    generate_wasm_guest_bindings, RustWasmBindgenBackend, WasmBindgenBackend,
+    WasmBindgenDiagnostic, WasmBindgenInput, WasmBindgenOutput, WasmGuestBindingPlan,
+    WasmMockHostImportBinding,
+};
 
 /// Fluent Manifest v1 builder for application authors.
 pub struct ApplicationManifestBuilder {

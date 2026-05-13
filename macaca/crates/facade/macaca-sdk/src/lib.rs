@@ -49,8 +49,10 @@ pub use application_client::{
     ServiceBackedApplicationClient, SystemApplicationClient, UnavailableSystemApplicationClient,
 };
 pub use application_kit::{
-    ApplicationKit, ApplicationManifestBuilder, WasmComponentApplicationDescriptor,
-    WasmComponentApplicationScaffold,
+    generate_wasm_guest_bindings, ApplicationKit, ApplicationManifestBuilder,
+    RustWasmBindgenBackend, WasmBindgenBackend, WasmBindgenDiagnostic, WasmBindgenInput,
+    WasmBindgenOutput, WasmComponentApplicationDescriptor, WasmComponentApplicationScaffold,
+    WasmGuestBindingPlan, WasmMockHostImportBinding,
 };
 pub use application_testkit::{
     ApplicationContractDiagnostic, ApplicationContractReport, ApplicationContractTestKit,
