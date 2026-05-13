@@ -19,6 +19,8 @@ mod engine_adapter;
 mod errors;
 mod guest_harness;
 mod guest_harness_support;
+mod hardened_provider;
+mod hardened_transport;
 mod host_import_bridge;
 mod lifecycle_support;
 mod registry;
@@ -39,6 +41,7 @@ pub use guest_harness::{
     WasmExampleFixtureKind, WasmGuestHarnessFixture, WasmGuestHarnessReport,
     WasmGuestRuntimeHarness, WasmMockHostOutcome, WasmToolchainFixtureReport,
 };
+pub use hardened_provider::HardenedOutOfProcessWasmRuntimeProvider;
 pub use host_import_bridge::{WasmHostImportBridge, WasmHostImportBridgeConfig};
 pub use registry::WasmRuntimeProviderRegistry;
 pub use traits::{WasmApplicationRuntimeProvider, WasmExecutionSession};
@@ -50,6 +53,8 @@ mod component_model_tests;
 mod certification_tests;
 #[cfg(test)]
 mod guest_harness_tests;
+#[cfg(test)]
+mod hardened_provider_tests;
 #[cfg(test)]
 mod host_import_tests;
 #[cfg(test)]
