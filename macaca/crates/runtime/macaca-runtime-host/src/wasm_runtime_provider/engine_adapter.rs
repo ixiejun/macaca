@@ -9,12 +9,13 @@
 
 use std::collections::BTreeMap;
 
-use macaca_proto::WasmRuntimeErrorKind;
+use macaca_proto::{WasmResourcePolicy, WasmRuntimeErrorKind};
 
 use super::errors::WasmRuntimeHostError;
 
 const WASM_MAGIC: &[u8; 4] = b"\0asm";
 const WASM_VERSION: &[u8; 4] = &[0x01, 0x00, 0x00, 0x00];
+const WASM_PAGE_BYTES: u64 = 64 * 1024;
 const OP_END: u8 = 0x0b;
 const OP_UNREACHABLE: u8 = 0x00;
 
@@ -22,6 +23,7 @@ const OP_UNREACHABLE: u8 = 0x00;
 #[derive(Debug, Clone)]
 pub(crate) struct CompiledWasmModule {
     exports: BTreeMap<String, FunctionBody>,
+    resource_profile: CompiledWasmResourceProfile,
 }
 
 impl CompiledWasmModule {
@@ -29,6 +31,52 @@ impl CompiledWasmModule {
     pub(crate) fn has_export(&self, export_name: &str) -> bool {
         self.exports.contains_key(export_name)
     }
+
+    /// Validate compile-time module resource declarations against policy.
+    ///
+    /// The minimal in-process adapter cannot enforce every future engine
+    /// feature, but it can safely inspect declared memory/table bounds and an
+    /// instruction-budget estimate before instantiation.  This keeps the
+    /// current provider fail-closed for the resource dimensions it can prove
+    /// without leaking raw module bytes into diagnostics.
+    pub(crate) fn validate_resource_policy(
+        &self,
+        policy: &WasmResourcePolicy,
+    ) -> Result<(), WasmRuntimeHostError> {
+        if let Some(limit) = policy.max_memory_bytes {
+            if self.resource_profile.declared_memory_bytes > limit {
+                return Err(WasmRuntimeHostError::new(
+                    WasmRuntimeErrorKind::ResourceExhausted,
+                    "WASM module declared memory exceeds the sandbox policy limit",
+                ));
+            }
+        }
+        if let Some(limit) = policy.max_table_elements {
+            if self.resource_profile.declared_table_elements > limit {
+                return Err(WasmRuntimeHostError::new(
+                    WasmRuntimeErrorKind::ResourceExhausted,
+                    "WASM module declared table elements exceed the sandbox policy limit",
+                ));
+            }
+        }
+        if let Some(limit) = policy.max_fuel {
+            if self.resource_profile.estimated_fuel > limit {
+                return Err(WasmRuntimeHostError::new(
+                    WasmRuntimeErrorKind::ResourceExhausted,
+                    "WASM module estimated fuel exceeds the sandbox policy limit",
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Static resource profile extracted from a compiled module.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct CompiledWasmResourceProfile {
+    declared_memory_bytes: u64,
+    declared_table_elements: u64,
+    estimated_fuel: u64,
 }
 
 /// Instantiated module handle.
@@ -74,6 +122,8 @@ struct ParsedModule {
     function_type_indices: Vec<u32>,
     exported_functions: BTreeMap<String, u32>,
     bodies: Vec<FunctionBody>,
+    declared_memory_bytes: u64,
+    declared_table_elements: u64,
 }
 
 impl ParsedModule {
@@ -89,6 +139,8 @@ impl ParsedModule {
             function_type_indices: Vec::new(),
             exported_functions: BTreeMap::new(),
             bodies: Vec::new(),
+            declared_memory_bytes: 0,
+            declared_table_elements: 0,
         };
         while !reader.is_empty() {
             let section_id = reader.read_u8()?;
@@ -112,6 +164,8 @@ impl ParsedModule {
     ) -> Result<(), WasmRuntimeHostError> {
         match section_id {
             3 => self.parse_function_section(section),
+            4 => self.parse_table_section(section),
+            5 => self.parse_memory_section(section),
             7 => self.parse_export_section(section),
             10 => self.parse_code_section(section),
             _ => Ok(()),
@@ -123,6 +177,31 @@ impl ParsedModule {
         let count = reader.read_leb_u32()?;
         for _ in 0..count {
             self.function_type_indices.push(reader.read_leb_u32()?);
+        }
+        reader.expect_empty()
+    }
+
+    fn parse_table_section(&mut self, section: &[u8]) -> Result<(), WasmRuntimeHostError> {
+        let mut reader = ByteReader::new(section);
+        let count = reader.read_leb_u32()?;
+        for _ in 0..count {
+            let _element_type = reader.read_u8()?;
+            let limits = Limits::parse(&mut reader)?;
+            self.declared_table_elements = self
+                .declared_table_elements
+                .saturating_add(limits.maximum_or_minimum());
+        }
+        reader.expect_empty()
+    }
+
+    fn parse_memory_section(&mut self, section: &[u8]) -> Result<(), WasmRuntimeHostError> {
+        let mut reader = ByteReader::new(section);
+        let count = reader.read_leb_u32()?;
+        for _ in 0..count {
+            let limits = Limits::parse(&mut reader)?;
+            self.declared_memory_bytes = self
+                .declared_memory_bytes
+                .saturating_add(limits.maximum_or_minimum().saturating_mul(WASM_PAGE_BYTES));
         }
         reader.expect_empty()
     }
@@ -159,13 +238,26 @@ impl ParsedModule {
                 exports.insert(name, body.clone());
             }
         }
-        CompiledWasmModule { exports }
+        let estimated_fuel = self
+            .bodies
+            .iter()
+            .map(|body| body.estimated_fuel)
+            .sum::<u64>();
+        CompiledWasmModule {
+            exports,
+            resource_profile: CompiledWasmResourceProfile {
+                declared_memory_bytes: self.declared_memory_bytes,
+                declared_table_elements: self.declared_table_elements,
+                estimated_fuel,
+            },
+        }
     }
 }
 
 #[derive(Debug, Clone)]
 struct FunctionBody {
     traps: bool,
+    estimated_fuel: u64,
 }
 
 impl FunctionBody {
@@ -185,6 +277,7 @@ impl FunctionBody {
         }
         Ok(Self {
             traps: instructions.first().copied() == Some(OP_UNREACHABLE),
+            estimated_fuel: instructions.len() as u64,
         })
     }
 
@@ -197,6 +290,29 @@ impl FunctionBody {
         } else {
             Ok(())
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct Limits {
+    minimum: u64,
+    maximum: Option<u64>,
+}
+
+impl Limits {
+    fn parse(reader: &mut ByteReader<'_>) -> Result<Self, WasmRuntimeHostError> {
+        let flags = reader.read_leb_u32()?;
+        let minimum = reader.read_leb_u32()? as u64;
+        let maximum = if flags & 0x01 == 0x01 {
+            Some(reader.read_leb_u32()? as u64)
+        } else {
+            None
+        };
+        Ok(Self { minimum, maximum })
+    }
+
+    fn maximum_or_minimum(self) -> u64 {
+        self.maximum.unwrap_or(self.minimum)
     }
 }
 

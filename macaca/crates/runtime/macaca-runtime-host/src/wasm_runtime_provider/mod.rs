@@ -14,6 +14,7 @@ mod diagnostics;
 mod engine_adapter;
 mod errors;
 mod registry;
+mod sandbox_guard;
 mod traits;
 mod unavailable;
 

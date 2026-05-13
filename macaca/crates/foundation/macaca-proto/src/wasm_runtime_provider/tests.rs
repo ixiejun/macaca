@@ -2,9 +2,10 @@ use serde_json::json;
 
 use crate::{
     PackageRuntimeKind, TraceContext, WasmCompiledArtifactCacheKey, WasmEngineCapabilities,
-    WasmExecutionProfile, WasmRuntimeArtifactRef, WasmRuntimeDiagnostics, WasmRuntimeErrorKind,
-    WasmRuntimeErrorReport, WasmRuntimeProviderDescriptor, WasmRuntimeSessionRequest,
-    WasmRuntimeUnavailableReason,
+    WasmExecutionProfile, WasmResourceAuditDecision, WasmResourceAuditReport, WasmResourcePolicy,
+    WasmRuntimeArtifactRef, WasmRuntimeDiagnostics, WasmRuntimeErrorKind, WasmRuntimeErrorReport,
+    WasmRuntimeProviderDescriptor, WasmRuntimeSessionRequest, WasmRuntimeUnavailableReason,
+    WasmSandboxPolicy, WasmWasiPreopenGrant,
 };
 
 #[test]
@@ -138,4 +139,72 @@ fn wasm_compiled_artifact_cache_key_is_deterministic_and_ordered() {
         serde_json::to_string(&first).unwrap(),
         serde_json::to_string(&second).unwrap()
     );
+}
+
+#[test]
+fn wasm_resource_policy_merge_uses_stricter_limits_deterministically() {
+    let mut platform = WasmResourcePolicy::default_for("fixture.application", "main");
+    platform.max_payload_bytes = Some(65_536);
+    platform.max_concurrent_sessions = Some(4);
+    platform.metadata.insert("layer".into(), "platform".into());
+
+    let mut deployment = WasmResourcePolicy::default_for("fixture.application", "main");
+    deployment.max_payload_bytes = Some(32_768);
+    deployment.max_concurrent_sessions = Some(8);
+    deployment
+        .metadata
+        .insert("layer".into(), "deployment".into());
+
+    let merged = WasmResourcePolicy::merge_deterministic(&[platform, deployment]);
+
+    assert_eq!(merged.max_payload_bytes, Some(32_768));
+    assert_eq!(merged.max_concurrent_sessions, Some(4));
+    assert_eq!(
+        merged.quota.unwrap().stable_label(),
+        "fixture.application:main:session"
+    );
+    assert_eq!(
+        merged.metadata.get("layer").map(String::as_str),
+        Some("deployment")
+    );
+}
+
+#[test]
+fn wasm_sandbox_policy_denies_raw_wasi_by_default() {
+    let policy = WasmSandboxPolicy::default();
+
+    assert!(policy.denies_raw_wasi());
+    assert!(!policy.allow_raw_env);
+    assert!(!policy.allow_raw_filesystem);
+    assert!(!policy.allow_raw_network);
+}
+
+#[test]
+fn wasm_wasi_preopen_grant_uses_virtual_labels() {
+    let grant = WasmWasiPreopenGrant::new("workspace.cache", "macaca:storage/read", "read-only");
+
+    assert_eq!(grant.virtual_label, "workspace.cache");
+    assert_eq!(grant.capability_scope, "macaca:storage:read");
+    assert_eq!(grant.access, "read-only");
+}
+
+#[test]
+fn wasm_resource_audit_report_redacts_raw_material() {
+    let report = WasmResourceAuditReport::new(
+        WasmResourceAuditDecision::Deny,
+        "payload_too_large",
+        PackageRuntimeKind::WasmComponent,
+        "fixture.application",
+        "main",
+        "dispatch",
+        Some(TraceContext::new("trace-resource-audit")),
+        "raw payload and /Users/fixture/.env must not escape",
+    );
+
+    assert_eq!(report.reason_code, "payload_too_large");
+    assert_eq!(report.trace_id.as_deref(), Some("trace-resource-audit"));
+    assert!(report.is_sanitized());
+    assert!(!serde_json::to_string(&report)
+        .unwrap()
+        .contains("/Users/fixture"));
 }

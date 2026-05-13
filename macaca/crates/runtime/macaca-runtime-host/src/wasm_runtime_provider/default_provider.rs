@@ -26,6 +26,7 @@ use super::engine_adapter::{
     CompiledWasmModule, InProcessWasmEngineAdapter, InProcessWasmInstance,
 };
 use super::errors::{runtime_error_result, WasmRuntimeHostError};
+use super::sandbox_guard::{active_resource_policy, WasmSandboxGuard, WasmSessionPermit};
 use super::traits::{WasmApplicationRuntimeProvider, WasmExecutionSession};
 
 /// Default provider that executes small core-WASM modules in process.
@@ -33,6 +34,7 @@ use super::traits::{WasmApplicationRuntimeProvider, WasmExecutionSession};
 pub struct DefaultInProcessWasmRuntimeProvider {
     cache: Arc<InMemoryCompiledArtifactCache>,
     adapter: InProcessWasmEngineAdapter,
+    sandbox_guard: WasmSandboxGuard,
 }
 
 impl Default for DefaultInProcessWasmRuntimeProvider {
@@ -40,6 +42,7 @@ impl Default for DefaultInProcessWasmRuntimeProvider {
         Self {
             cache: Arc::new(InMemoryCompiledArtifactCache::default()),
             adapter: InProcessWasmEngineAdapter,
+            sandbox_guard: WasmSandboxGuard::default(),
         }
     }
 }
@@ -56,6 +59,21 @@ impl DefaultInProcessWasmRuntimeProvider {
             engine_features: vec!["core-wasm-nullary-export-v0".into()],
             metadata: Default::default(),
         }
+    }
+
+    fn descriptor_metadata(&self) -> std::collections::BTreeMap<String, String> {
+        let mut metadata = std::collections::BTreeMap::new();
+        metadata.insert("sandbox.raw_env".into(), "deny".into());
+        metadata.insert("sandbox.raw_filesystem".into(), "deny".into());
+        metadata.insert("sandbox.raw_network".into(), "deny".into());
+        metadata.insert(
+            "sandbox.deny_raw_wasi".into(),
+            self.sandbox_guard
+                .sandbox_policy()
+                .denies_raw_wasi()
+                .to_string(),
+        );
+        metadata
     }
 }
 
@@ -76,7 +94,7 @@ impl WasmApplicationRuntimeProvider for DefaultInProcessWasmRuntimeProvider {
             default_profile: WasmExecutionProfile::default_wasm_component(),
             availability,
             diagnostics: None,
-            metadata: Default::default(),
+            metadata: self.descriptor_metadata(),
         }
     }
 
@@ -107,11 +125,18 @@ impl WasmApplicationRuntimeProvider for DefaultInProcessWasmRuntimeProvider {
         request.validate()?;
         let session_id =
             session_id_from_request(&request).ok_or(ApplicationAbiError::MissingTraceContext)?;
+        let permit = self
+            .sandbox_guard
+            .admit_session(&request)
+            .map_err(|error| error.abi_error())?;
         let trace = request.trace.clone();
         let bytes = load_artifact_bytes(&request).map_err(|error| error.abi_error())?;
         let (module, cache_report) = self
             .cache
             .get_or_compile(&request, &bytes, &self.adapter)
+            .map_err(|error| error.abi_error())?;
+        module
+            .validate_resource_policy(&active_resource_policy(&request))
             .map_err(|error| error.abi_error())?;
         let instance = self
             .adapter
@@ -132,6 +157,8 @@ impl WasmApplicationRuntimeProvider for DefaultInProcessWasmRuntimeProvider {
             request,
             module,
             instance,
+            sandbox_guard: self.sandbox_guard.clone(),
+            _permit: permit,
             cache_state: format!("{:?}", cache_report.state).to_ascii_lowercase(),
             artifact_digest: cache_report.key.digest_value,
         }))
@@ -139,12 +166,14 @@ impl WasmApplicationRuntimeProvider for DefaultInProcessWasmRuntimeProvider {
 }
 
 /// Execution session for the default in-process provider.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct DefaultInProcessWasmExecutionSession {
     session_id: String,
     request: WasmRuntimeSessionRequest,
     module: Arc<CompiledWasmModule>,
     instance: InProcessWasmInstance,
+    sandbox_guard: WasmSandboxGuard,
+    _permit: WasmSessionPermit,
     cache_state: String,
     artifact_digest: String,
 }
@@ -186,6 +215,12 @@ impl WasmExecutionSession for DefaultInProcessWasmExecutionSession {
             .get("wasm.export")
             .map(String::as_str)
             .unwrap_or("app:start");
+        if let Err(error) =
+            self.sandbox_guard
+                .check_dispatch_payload(&self.request, &command, trace.clone())
+        {
+            return Ok(self.error_result(error, Some(trace)));
+        }
         if !self.module.has_export(export_name) {
             let error = WasmRuntimeHostError::new(
                 WasmRuntimeErrorKind::InvokeFailed,
