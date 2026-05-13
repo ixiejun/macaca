@@ -12,10 +12,10 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use macaca_proto::{
-    ApplicationAbiError, ApplicationHostCommand, ApplicationHostCommandResult, PackageRuntimeKind,
-    TraceContext, WasmEngineCapabilities, WasmExecutionProfile, WasmRuntimeAvailability,
-    WasmRuntimeDiagnostics, WasmRuntimeErrorKind, WasmRuntimeProviderDescriptor,
-    WasmRuntimeSessionRequest,
+    ApplicationAbiError, ApplicationHostCommand, ApplicationHostCommandResult, ApplicationImport,
+    PackageRuntimeKind, TraceContext, WasmEngineCapabilities, WasmExecutionProfile,
+    WasmRuntimeAvailability, WasmRuntimeDiagnostics, WasmRuntimeErrorKind,
+    WasmRuntimeProviderDescriptor, WasmRuntimeSessionRequest,
 };
 use serde_json::json;
 use tracing::{info, warn};
@@ -26,6 +26,7 @@ use super::engine_adapter::{
     CompiledWasmModule, InProcessWasmEngineAdapter, InProcessWasmInstance,
 };
 use super::errors::{runtime_error_result, WasmRuntimeHostError};
+use super::host_import_bridge::WasmHostImportBridge;
 use super::sandbox_guard::{active_resource_policy, WasmSandboxGuard, WasmSessionPermit};
 use super::traits::{WasmApplicationRuntimeProvider, WasmExecutionSession};
 
@@ -35,6 +36,7 @@ pub struct DefaultInProcessWasmRuntimeProvider {
     cache: Arc<InMemoryCompiledArtifactCache>,
     adapter: InProcessWasmEngineAdapter,
     sandbox_guard: WasmSandboxGuard,
+    host_import_bridge: Option<Arc<WasmHostImportBridge>>,
 }
 
 impl Default for DefaultInProcessWasmRuntimeProvider {
@@ -43,18 +45,30 @@ impl Default for DefaultInProcessWasmRuntimeProvider {
             cache: Arc::new(InMemoryCompiledArtifactCache::default()),
             adapter: InProcessWasmEngineAdapter,
             sandbox_guard: WasmSandboxGuard::default(),
+            host_import_bridge: None,
         }
     }
 }
 
 impl DefaultInProcessWasmRuntimeProvider {
-    fn capabilities() -> WasmEngineCapabilities {
+    /// Return a provider clone with a ServiceRuntime-backed host import bridge.
+    ///
+    /// The bridge is optional so the default provider remains usable in
+    /// minimal deployments.  When omitted, service imports fail closed with a
+    /// structured unavailable result instead of falling through to guest export
+    /// invocation or bypassing ServiceRuntime.
+    pub fn with_host_import_bridge(mut self, bridge: Arc<WasmHostImportBridge>) -> Self {
+        self.host_import_bridge = Some(bridge);
+        self
+    }
+
+    fn capabilities(&self) -> WasmEngineCapabilities {
         WasmEngineCapabilities {
             can_compile: true,
             can_instantiate: true,
             can_execute: true,
             supports_component_model: false,
-            supports_host_import_bridge: false,
+            supports_host_import_bridge: self.host_import_bridge.is_some(),
             supports_wasi: false,
             engine_features: vec!["core-wasm-nullary-export-v0".into()],
             metadata: Default::default(),
@@ -83,14 +97,14 @@ impl WasmApplicationRuntimeProvider for DefaultInProcessWasmRuntimeProvider {
         let availability = WasmRuntimeAvailability {
             state: "available".into(),
             reason: None,
-            capabilities: Self::capabilities(),
+            capabilities: self.capabilities(),
             diagnostics: None,
             metadata: Default::default(),
         };
         WasmRuntimeProviderDescriptor {
             runtime_kind: PackageRuntimeKind::WasmComponent,
             provider_class: "default_in_process".into(),
-            capabilities: Self::capabilities(),
+            capabilities: self.capabilities(),
             default_profile: WasmExecutionProfile::default_wasm_component(),
             availability,
             diagnostics: None,
@@ -112,7 +126,7 @@ impl WasmApplicationRuntimeProvider for DefaultInProcessWasmRuntimeProvider {
         WasmRuntimeAvailability {
             state: "available".into(),
             reason: None,
-            capabilities: Self::capabilities(),
+            capabilities: self.capabilities(),
             diagnostics: None,
             metadata: Default::default(),
         }
@@ -158,6 +172,7 @@ impl WasmApplicationRuntimeProvider for DefaultInProcessWasmRuntimeProvider {
             module,
             instance,
             sandbox_guard: self.sandbox_guard.clone(),
+            host_import_bridge: self.host_import_bridge.clone(),
             _permit: permit,
             cache_state: format!("{:?}", cache_report.state).to_ascii_lowercase(),
             artifact_digest: cache_report.key.digest_value,
@@ -173,6 +188,7 @@ struct DefaultInProcessWasmExecutionSession {
     module: Arc<CompiledWasmModule>,
     instance: InProcessWasmInstance,
     sandbox_guard: WasmSandboxGuard,
+    host_import_bridge: Option<Arc<WasmHostImportBridge>>,
     _permit: WasmSessionPermit,
     cache_state: String,
     artifact_digest: String,
@@ -221,6 +237,22 @@ impl WasmExecutionSession for DefaultInProcessWasmExecutionSession {
         {
             return Ok(self.error_result(error, Some(trace)));
         }
+        if !is_wasm_export_invoke(&command) {
+            if let Some(bridge) = &self.host_import_bridge {
+                let mut result = bridge.dispatch(command, trace).await;
+                self.attach_common_metadata(&mut result, "");
+                return Ok(result);
+            }
+            let mut result = ApplicationHostCommandResult::unavailable(
+                "WASM host import bridge is not installed",
+                Some(trace),
+            );
+            result
+                .metadata
+                .insert("reason_code".into(), "host_import_bridge_missing".into());
+            self.attach_common_metadata(&mut result, "");
+            return Ok(result);
+        }
         if !self.module.has_export(export_name) {
             let error = WasmRuntimeHostError::new(
                 WasmRuntimeErrorKind::InvokeFailed,
@@ -246,6 +278,14 @@ impl WasmExecutionSession for DefaultInProcessWasmExecutionSession {
             Err(error) => Ok(self.error_result(error, Some(trace))),
         }
     }
+}
+
+fn is_wasm_export_invoke(command: &ApplicationHostCommand) -> bool {
+    command.metadata.contains_key("wasm.export")
+        || matches!(
+            &command.import,
+            ApplicationImport::Custom(value) if value == "macaca:wasm/invoke"
+        )
 }
 
 impl DefaultInProcessWasmExecutionSession {

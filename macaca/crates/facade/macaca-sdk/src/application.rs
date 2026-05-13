@@ -123,6 +123,72 @@ pub fn service_call_command(payload: Value, trace: TraceContext) -> ApplicationH
         .build()
 }
 
+/// Build a WASM guest service-call import command.
+///
+/// This helper is a Proxy-facing SDK convenience: guest scaffolds describe the
+/// desired service id, operation, bounded JSON payload, and capability label,
+/// while the runtime host remains responsible for trace validation, capability
+/// checks, policy, ServiceRuntime routing, and result redaction.  The function
+/// deliberately writes only provider-neutral metadata keys so it does not bind
+/// a guest application to a concrete service implementation or backend.
+pub fn wasm_guest_service_call_command(
+    service_id: impl Into<String>,
+    operation: impl Into<String>,
+    payload: Value,
+    capability: impl Into<String>,
+    trace: TraceContext,
+) -> ApplicationHostCommand {
+    let mut command = service_call_command(payload, trace);
+    command
+        .metadata
+        .insert("service.id".into(), service_id.into().trim().to_string());
+    command.metadata.insert(
+        "service.operation".into(),
+        operation.into().trim().to_string(),
+    );
+    command
+        .metadata
+        .insert("capability".into(), capability.into().trim().to_string());
+    command
+}
+
+#[cfg(test)]
+mod wasm_guest_import_contract_tests {
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn wasm_guest_import_contract_builds_typed_service_call_metadata() {
+        let command = wasm_guest_service_call_command(
+            "service.runtime.fixture",
+            "invoke",
+            json!({"bounded": true}),
+            "service.call",
+            TraceContext::new("trace-wasm-guest-import"),
+        );
+
+        assert_eq!(command.import, ApplicationImport::ServiceCall);
+        assert_eq!(
+            command.metadata.get("service.id").map(String::as_str),
+            Some("service.runtime.fixture")
+        );
+        assert_eq!(
+            command
+                .metadata
+                .get("service.operation")
+                .map(String::as_str),
+            Some("invoke")
+        );
+        assert_eq!(
+            command.metadata.get("capability").map(String::as_str),
+            Some("service.call")
+        );
+        assert!(command.trace.is_some());
+        assert_eq!(command.payload["bounded"], json!(true));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::json;

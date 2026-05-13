@@ -13,15 +13,19 @@ mod default_provider;
 mod diagnostics;
 mod engine_adapter;
 mod errors;
+mod host_import_bridge;
 mod registry;
 mod sandbox_guard;
 mod traits;
 mod unavailable;
 
 pub use default_provider::DefaultInProcessWasmRuntimeProvider;
+pub use host_import_bridge::{WasmHostImportBridge, WasmHostImportBridgeConfig};
 pub use registry::WasmRuntimeProviderRegistry;
 pub use traits::{WasmApplicationRuntimeProvider, WasmExecutionSession};
 pub use unavailable::{UnavailableWasmExecutionSession, UnavailableWasmRuntimeProvider};
 
+#[cfg(test)]
+mod host_import_tests;
 #[cfg(test)]
 mod tests;

@@ -17,12 +17,14 @@ use serde::{Deserialize, Serialize};
 use crate::{ApplicationAbiError, ApplicationAbiVersion, PackageRuntimeKind, TraceContext};
 
 mod compile_cache;
+mod host_import;
 mod resource_policy;
 mod runtime_errors;
 #[cfg(test)]
 mod tests;
 
 pub use compile_cache::*;
+pub use host_import::*;
 pub use resource_policy::*;
 pub use runtime_errors::*;
 
