@@ -152,10 +152,10 @@ pub use wasm_runtime_provider::{
     UnavailableWasmRuntimeProvider, WasmApplicationRuntimeProvider, WasmCertificationFixtureSet,
     WasmCertificationHarness, WasmCertificationProfile, WasmCertificationReport,
     WasmCertificationStatus, WasmConformanceFixtureKind, WasmExampleFixtureKind,
-    WasmExecutionSession, WasmGuestHarnessFixture, WasmGuestHarnessReport,
-    WasmGuestRuntimeHarness, WasmHardenedProviderEnvelope, WasmHardenedProviderMockAdapter,
-    WasmHardenedProviderResponse, WasmMockHostOutcome, WasmRuntimeProviderRegistry,
-    WasmToolchainFixtureReport,
+    WasmExecutionSession, WasmGuestHarnessFixture, WasmGuestHarnessReport, WasmGuestRuntimeHarness,
+    WasmHardenedProviderEnvelope, WasmHardenedProviderMockAdapter, WasmHardenedProviderResponse,
+    WasmMockHostOutcome, WasmRuntimeProviderRegistry, WasmTelemetryEvent, WasmTelemetrySink,
+    WasmTelemetrySinkRef, WasmTelemetryStage, WasmToolchainFixtureReport,
 };
 pub use web3_service_provider::{
     web3_service_descriptor, MockWeb3Provider, UnavailableWeb3Provider, Web3ProviderStrategy,

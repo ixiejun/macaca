@@ -32,16 +32,15 @@ async fn hardened_provider_fails_closed_when_daemon_unavailable() {
 
 #[tokio::test]
 async fn hardened_provider_rejects_malformed_daemon_response() {
-    let transport = InMemoryHardenedTransport::healthy().with_response(
-        WasmHardenedProviderResponse {
+    let transport =
+        InMemoryHardenedTransport::healthy().with_response(WasmHardenedProviderResponse {
             trace_id: String::new(),
             request_id: "wrong-request".into(),
             status: ApplicationHostCommandStatus::Ok,
             reason_code: "malformed".into(),
             metadata: Default::default(),
             diagnostics: vec!["raw_payload secret should stay out".into()],
-        },
-    );
+        });
     let provider = HardenedOutOfProcessWasmRuntimeProvider::new(Arc::new(transport));
     let session = provider
         .create_session(traced_request("trace-hardened-malformed"))

@@ -18,6 +18,9 @@ use macaca_proto::{
 use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 
+use super::telemetry::{
+    emit_wasm_telemetry, WasmTelemetryEvent, WasmTelemetrySinkRef, WasmTelemetryStage,
+};
 use super::{WasmExampleFixtureKind, WasmGuestRuntimeHarness};
 
 /// Certification strictness profile selected by callers.
@@ -244,6 +247,7 @@ impl WasmCertificationReport {
 #[derive(Debug, Clone)]
 pub struct WasmCertificationHarness {
     fixture_id: String,
+    telemetry: Option<WasmTelemetrySinkRef>,
 }
 
 impl WasmCertificationHarness {
@@ -251,7 +255,14 @@ impl WasmCertificationHarness {
     pub fn new(fixture_id: impl Into<String>) -> Self {
         Self {
             fixture_id: sanitize_label(fixture_id.into()),
+            telemetry: None,
         }
+    }
+
+    /// Return a harness clone that emits sanitized certification telemetry.
+    pub fn with_telemetry_sink(mut self, sink: WasmTelemetrySinkRef) -> Self {
+        self.telemetry = Some(sink);
+        self
     }
 
     /// Execute one certification profile against a fixture bundle.
@@ -268,6 +279,17 @@ impl WasmCertificationHarness {
             trace_id = %trace_id,
             fixture_count = fixtures.fixtures.len(),
             "WASM certification profile started"
+        );
+        emit_wasm_telemetry(
+            self.telemetry.as_ref(),
+            WasmTelemetryEvent::new(
+                WasmTelemetryStage::Certification,
+                "started",
+                "certification",
+            )
+            .trace_id(trace_id.clone())
+            .metadata("profile", profile.as_str())
+            .metadata("fixture_count", fixtures.fixtures.len().to_string()),
         );
         for fixture in &fixtures.fixtures {
             self.visit_fixture(profile, fixture, &mut report);
@@ -290,6 +312,17 @@ impl WasmCertificationHarness {
             evaluated_fixtures = report.evaluated_fixtures,
             reason_count = report.reason_codes.len(),
             "WASM certification profile completed"
+        );
+        emit_wasm_telemetry(
+            self.telemetry.as_ref(),
+            WasmTelemetryEvent::new(
+                WasmTelemetryStage::Certification,
+                "completed",
+                "certification",
+            )
+            .trace_id(trace_id)
+            .metadata("profile", profile.as_str())
+            .metadata("industrial_ready", report.industrial_ready.to_string()),
         );
         report
     }
@@ -314,6 +347,16 @@ impl WasmCertificationHarness {
                     "{} rejected by hardened security specification",
                     fixture.safe_subject
                 ),
+            );
+            emit_wasm_telemetry(
+                self.telemetry.as_ref(),
+                WasmTelemetryEvent::new(
+                    WasmTelemetryStage::Certification,
+                    "rejected",
+                    "certification",
+                )
+                .reason_code(fixture.kind.reason_code())
+                .metadata("fixture", fixture.kind.as_name()),
             );
             return;
         }

@@ -25,6 +25,7 @@ mod host_import_bridge;
 mod lifecycle_support;
 mod registry;
 mod sandbox_guard;
+mod telemetry;
 mod traits;
 mod unavailable;
 
@@ -44,13 +45,17 @@ pub use guest_harness::{
 pub use hardened_provider::HardenedOutOfProcessWasmRuntimeProvider;
 pub use host_import_bridge::{WasmHostImportBridge, WasmHostImportBridgeConfig};
 pub use registry::WasmRuntimeProviderRegistry;
+pub use telemetry::{
+    InMemoryWasmTelemetrySink, TracingWasmTelemetrySink, WasmTelemetryEvent, WasmTelemetrySink,
+    WasmTelemetrySinkRef, WasmTelemetryStage,
+};
 pub use traits::{WasmApplicationRuntimeProvider, WasmExecutionSession};
 pub use unavailable::{UnavailableWasmExecutionSession, UnavailableWasmRuntimeProvider};
 
 #[cfg(test)]
-mod component_model_tests;
-#[cfg(test)]
 mod certification_tests;
+#[cfg(test)]
+mod component_model_tests;
 #[cfg(test)]
 mod guest_harness_tests;
 #[cfg(test)]
@@ -59,5 +64,7 @@ mod hardened_provider_tests;
 mod host_import_tests;
 #[cfg(test)]
 mod lifecycle_tests;
+#[cfg(test)]
+mod telemetry_tests;
 #[cfg(test)]
 mod tests;

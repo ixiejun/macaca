@@ -20,6 +20,8 @@
 | RC-WASM-CERT-001 | WASM certification gate | dev/default/hardened certification profiles | sanitized report、reason codes、industrial-ready flag | hardened profile 通过才可标记 industrial-ready | runtime-host `wasm_certification` |
 | RC-WASM-CERT-002 | WASM negative security fixtures | raw env/filesystem/network、missing trace/capability、oversized payload、timeout/resource exhaustion | fail-closed reason codes | 所有 negative case 在执行前拒绝且报告不泄露 raw payload/secret/env/API key | runtime-host `wasm_certification` |
 | RC-WASM-PROVIDER-001 | hardened provider contract mock | trace、timeout、cancellation、backpressure、diagnostics envelope | provider-neutral response metadata | out-of-process profile 共享 WASM runtime provider 语义，不新增 application ABI | runtime-host `wasm_certification` |
+| RC-WASM-OBS-001 | WASM runtime production telemetry | availability、session、invoke、host import、daemon、lifecycle、certification、supply-chain event | sanitized Observer sink events | sink 只接收 reason code / trace id / safe metadata，不记录 raw payload、secret、env、API key，且 sink 缺失不改变 runtime 结果 | runtime-host `wasm_telemetry` |
+| RC-WASM-OBS-002 | WASM telemetry redaction | telemetry event with sensitive marker metadata | in-memory sink snapshot、tracing sink output | unsafe markers are redacted or dropped before sink storage | runtime-host `wasm_telemetry` |
 | RC-RECOVERY-001 | frontend/backend 重启后 session 恢复 | 重启后打开 session | EventLog replay + live increment | 历史加载，增量继续推送 | 手工 + 后续自动化 |
 | RC-PIPE-001 | 无网络 LLM pipeline dry run | scripted LLM | TaskSpace/TaskBoard/AgenticLoop | 全链路无外部依赖通过 | 阶段 0 自动化 |
 
@@ -39,7 +41,7 @@
 | 阶段 10 Web3 | RC-APP-001、RC-TRACE-001 |
 | 阶段 11 EVM | RC-APP-001、RC-TRACE-001 |
 | 阶段 12 Web/CLI Thin Shell | RC-CHAT-001、RC-CHAT-002、RC-TRACE-001、RC-TRACE-002、RC-TASK-001 |
-| 阶段 13 生态硬化 | 全部，且必须包含 RC-WASM-CERT-001、RC-WASM-CERT-002、RC-WASM-PROVIDER-001 |
+| 阶段 13 生态硬化 | 全部，且必须包含 RC-WASM-CERT-001、RC-WASM-CERT-002、RC-WASM-PROVIDER-001、RC-WASM-OBS-001、RC-WASM-OBS-002 |
 
 ## 4. 失败判定
 

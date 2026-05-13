@@ -27,7 +27,8 @@ const WIT_PREFIX: &str = "wit=";
 /// dependencies.
 pub(crate) trait WasmComponentEngineAdapter: Send + Sync + std::fmt::Debug {
     /// Validate bytes and return a provider-private module memento.
-    fn validate_component(&self, bytes: &[u8]) -> Result<WasmComponentModule, WasmRuntimeHostError>;
+    fn validate_component(&self, bytes: &[u8])
+        -> Result<WasmComponentModule, WasmRuntimeHostError>;
 
     /// Instantiate a validated module into an invocation handle.
     fn instantiate(
@@ -46,14 +47,20 @@ pub(crate) trait WasmComponentEngineAdapter: Send + Sync + std::fmt::Debug {
 pub(crate) struct PortableComponentModelAdapter;
 
 impl WasmComponentEngineAdapter for PortableComponentModelAdapter {
-    fn validate_component(&self, bytes: &[u8]) -> Result<WasmComponentModule, WasmRuntimeHostError> {
+    fn validate_component(
+        &self,
+        bytes: &[u8],
+    ) -> Result<WasmComponentModule, WasmRuntimeHostError> {
         if bytes.len() < 8 || &bytes[0..4] != WASM_MAGIC {
             return Err(WasmRuntimeHostError::new(
                 WasmRuntimeErrorKind::CompileFailed,
                 "WASM component has an invalid module header",
             ));
         }
-        if !bytes.windows(COMPONENT_MARKER.len()).any(|window| window == COMPONENT_MARKER) {
+        if !bytes
+            .windows(COMPONENT_MARKER.len())
+            .any(|window| window == COMPONENT_MARKER)
+        {
             return Err(WasmRuntimeHostError::new(
                 WasmRuntimeErrorKind::AbiMismatch,
                 "WASM component metadata is missing the Component Model marker",

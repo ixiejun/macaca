@@ -32,6 +32,9 @@ use super::diagnostics::{non_empty_trace, session_id_from_request};
 use super::errors::{runtime_error_result, WasmRuntimeHostError};
 use super::host_import_bridge::WasmHostImportBridge;
 use super::sandbox_guard::{active_resource_policy, WasmSandboxGuard, WasmSessionPermit};
+use super::telemetry::{
+    emit_wasm_telemetry, WasmTelemetryEvent, WasmTelemetrySinkRef, WasmTelemetryStage,
+};
 use super::traits::{WasmApplicationRuntimeProvider, WasmExecutionSession};
 
 /// Runtime-host-owned Component Model provider Strategy.
@@ -40,6 +43,7 @@ pub struct ComponentModelWasmRuntimeProvider {
     adapter: Arc<dyn WasmComponentEngineAdapter>,
     sandbox_guard: WasmSandboxGuard,
     host_import_bridge: Option<Arc<WasmHostImportBridge>>,
+    telemetry: Option<WasmTelemetrySinkRef>,
 }
 
 impl Default for ComponentModelWasmRuntimeProvider {
@@ -48,6 +52,7 @@ impl Default for ComponentModelWasmRuntimeProvider {
             adapter: Arc::new(PortableComponentModelAdapter),
             sandbox_guard: WasmSandboxGuard::default(),
             host_import_bridge: None,
+            telemetry: None,
         }
     }
 }
@@ -56,6 +61,12 @@ impl ComponentModelWasmRuntimeProvider {
     /// Return a provider clone with a ServiceRuntime-backed host import bridge.
     pub fn with_host_import_bridge(mut self, bridge: Arc<WasmHostImportBridge>) -> Self {
         self.host_import_bridge = Some(bridge);
+        self
+    }
+
+    /// Return a provider clone that emits sanitized Component Model telemetry.
+    pub fn with_telemetry_sink(mut self, sink: WasmTelemetrySinkRef) -> Self {
+        self.telemetry = Some(sink);
         self
     }
 
@@ -78,7 +89,10 @@ impl ComponentModelWasmRuntimeProvider {
     fn descriptor_metadata(&self) -> std::collections::BTreeMap<String, String> {
         let mut metadata = std::collections::BTreeMap::new();
         metadata.insert("governance.owner".into(), "runtime-host".into());
-        metadata.insert("governance.kernel_engine_dependency".into(), "forbidden".into());
+        metadata.insert(
+            "governance.kernel_engine_dependency".into(),
+            "forbidden".into(),
+        );
         metadata.insert("adapter.visibility".into(), "private".into());
         metadata.insert("sandbox.raw_env".into(), "deny".into());
         metadata.insert("sandbox.raw_filesystem".into(), "deny".into());
@@ -115,6 +129,20 @@ impl WasmApplicationRuntimeProvider for ComponentModelWasmRuntimeProvider {
             runtime_kind = %PackageRuntimeKind::WasmComponent,
             "WASM Component Model provider reported available"
         );
+        emit_wasm_telemetry(
+            self.telemetry.as_ref(),
+            WasmTelemetryEvent::new(
+                WasmTelemetryStage::Availability,
+                "available",
+                "component_model",
+            )
+            .trace_id(
+                trace
+                    .as_ref()
+                    .map(|value| value.trace_id.as_str())
+                    .unwrap_or("none"),
+            ),
+        );
         WasmRuntimeAvailability {
             state: "available".into(),
             reason: None,
@@ -140,6 +168,18 @@ impl WasmApplicationRuntimeProvider for ComponentModelWasmRuntimeProvider {
             .adapter
             .validate_component(&bytes)
             .map_err(|error| error.abi_error())?;
+        emit_wasm_telemetry(
+            self.telemetry.as_ref(),
+            WasmTelemetryEvent::new(WasmTelemetryStage::Compile, "validated", "component_model")
+                .trace_id(
+                    request
+                        .trace
+                        .as_ref()
+                        .map(|value| value.trace_id.as_str())
+                        .unwrap_or("none"),
+                )
+                .session_id(session_id.clone()),
+        );
         module
             .validate_resource_policy(&active_resource_policy(&request))
             .map_err(|error| error.abi_error())?;
@@ -147,6 +187,22 @@ impl WasmApplicationRuntimeProvider for ComponentModelWasmRuntimeProvider {
             .adapter
             .instantiate(module.clone())
             .map_err(|error| error.abi_error())?;
+        emit_wasm_telemetry(
+            self.telemetry.as_ref(),
+            WasmTelemetryEvent::new(
+                WasmTelemetryStage::Instantiate,
+                "completed",
+                "component_model",
+            )
+            .trace_id(
+                request
+                    .trace
+                    .as_ref()
+                    .map(|value| value.trace_id.as_str())
+                    .unwrap_or("none"),
+            )
+            .session_id(session_id.clone()),
+        );
         let artifact_digest = component_digest(&bytes);
         info!(
             session_id = %session_id,
@@ -164,6 +220,7 @@ impl WasmApplicationRuntimeProvider for ComponentModelWasmRuntimeProvider {
             instance,
             sandbox_guard: self.sandbox_guard.clone(),
             host_import_bridge: self.host_import_bridge.clone(),
+            telemetry: self.telemetry.clone(),
             lifecycle: Mutex::new(WasmLifecycleStateMachine::instantiated()),
             artifact_digest,
             _permit: permit,
@@ -180,6 +237,7 @@ struct ComponentModelWasmExecutionSession {
     instance: WasmComponentInstance,
     sandbox_guard: WasmSandboxGuard,
     host_import_bridge: Option<Arc<WasmHostImportBridge>>,
+    telemetry: Option<WasmTelemetrySinkRef>,
     lifecycle: Mutex<WasmLifecycleStateMachine>,
     artifact_digest: String,
     _permit: WasmSessionPermit,
@@ -214,6 +272,12 @@ impl WasmExecutionSession for ComponentModelWasmExecutionSession {
                 reason_code = "missing_trace",
                 "WASM Component Model session rejected untraceable command"
             );
+            emit_wasm_telemetry(
+                self.telemetry.as_ref(),
+                WasmTelemetryEvent::new(WasmTelemetryStage::Invoke, "rejected", "component_model")
+                    .session_id(self.session_id.clone())
+                    .reason_code("missing_trace"),
+            );
             return Err(ApplicationAbiError::MissingTraceContext);
         };
         if let Err(error) =
@@ -240,6 +304,17 @@ impl WasmExecutionSession for ComponentModelWasmExecutionSession {
                     wasm_export = export_name,
                     wit = %self.module.wit_label(),
                     "WASM Component Model session invoked export"
+                );
+                emit_wasm_telemetry(
+                    self.telemetry.as_ref(),
+                    WasmTelemetryEvent::new(
+                        WasmTelemetryStage::Invoke,
+                        "completed",
+                        "component_model",
+                    )
+                    .trace_id(trace.trace_id.clone())
+                    .session_id(self.session_id.clone())
+                    .metadata("wasm.export", export_name),
                 );
                 let mut result =
                     ApplicationHostCommandResult::ok(json!({ "export": export_name }), Some(trace));
@@ -272,6 +347,16 @@ impl WasmExecutionSession for ComponentModelWasmExecutionSession {
             status = ?result.status,
             reason_code = %result.reason_code,
             "WASM Component Model lifecycle transition evaluated"
+        );
+        emit_wasm_telemetry(
+            self.telemetry.as_ref(),
+            WasmTelemetryEvent::new(
+                WasmTelemetryStage::Lifecycle,
+                "evaluated",
+                "component_model",
+            )
+            .session_id(self.session_id.clone())
+            .reason_code(result.reason_code.clone()),
         );
         Ok(result)
     }
@@ -309,7 +394,12 @@ impl WasmExecutionSession for ComponentModelWasmExecutionSession {
             } else {
                 WasmLifecycleOperationStatus::Rejected
             },
-            reason_code: if compatible { "completed" } else { "abi_mismatch" }.into(),
+            reason_code: if compatible {
+                "completed"
+            } else {
+                "abi_mismatch"
+            }
+            .into(),
             checkpoint_id: request.checkpoint.checkpoint_id,
             lifecycle_state: self.lifecycle_state(),
             trace: request.trace,
@@ -328,11 +418,20 @@ impl WasmExecutionSession for ComponentModelWasmExecutionSession {
             } else {
                 WasmLifecycleOperationStatus::Rejected
             },
-            reason_code: if compatible { "completed" } else { "abi_mismatch" }.into(),
+            reason_code: if compatible {
+                "completed"
+            } else {
+                "abi_mismatch"
+            }
+            .into(),
             source_artifact: self.request.artifact.clone(),
             source_artifact_digest_prefix: self.artifact_digest.chars().take(12).collect(),
             target_artifact: request.target_artifact,
-            target_artifact_digest_prefix: request.target_artifact_digest.chars().take(12).collect(),
+            target_artifact_digest_prefix: request
+                .target_artifact_digest
+                .chars()
+                .take(12)
+                .collect(),
             abi_compatible: compatible,
             trace: request.trace,
             metadata: Default::default(),
@@ -361,6 +460,16 @@ impl ComponentModelWasmExecutionSession {
         trace: TraceContext,
     ) -> Result<ApplicationHostCommandResult, ApplicationAbiError> {
         if let Some(bridge) = &self.host_import_bridge {
+            emit_wasm_telemetry(
+                self.telemetry.as_ref(),
+                WasmTelemetryEvent::new(
+                    WasmTelemetryStage::HostImport,
+                    "dispatching",
+                    "component_model",
+                )
+                .trace_id(trace.trace_id.clone())
+                .session_id(self.session_id.clone()),
+            );
             let mut result = bridge.dispatch(command, trace).await;
             self.attach_common_metadata(&mut result, "");
             return Ok(result);
@@ -387,6 +496,18 @@ impl ComponentModelWasmExecutionSession {
             trace_id = report.trace_id.as_deref().unwrap_or("none"),
             reason_code = %report.reason_code,
             "WASM Component Model session returned runtime error"
+        );
+        let stage = if report.reason_code == "resource_exhausted" {
+            WasmTelemetryStage::Resource
+        } else {
+            WasmTelemetryStage::Invoke
+        };
+        emit_wasm_telemetry(
+            self.telemetry.as_ref(),
+            WasmTelemetryEvent::new(stage, "failed", "component_model")
+                .trace_id(report.trace_id.as_deref().unwrap_or("none"))
+                .session_id(self.session_id.clone())
+                .reason_code(report.reason_code.clone()),
         );
         let mut result = runtime_error_result(report, trace);
         self.attach_common_metadata(&mut result, "");
@@ -465,8 +586,8 @@ fn artifact_path(reference: &str) -> Result<PathBuf, WasmRuntimeHostError> {
 }
 
 fn component_digest(bytes: &[u8]) -> String {
-    let sum = bytes
-        .iter()
-        .fold(0u64, |accumulator, byte| accumulator.wrapping_add(*byte as u64));
+    let sum = bytes.iter().fold(0u64, |accumulator, byte| {
+        accumulator.wrapping_add(*byte as u64)
+    });
     format!("portable-component-{sum:016x}")
 }

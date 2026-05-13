@@ -78,7 +78,10 @@ async fn component_model_provider_rejects_missing_export_without_raw_payload() {
     let artifact_path = write_fixture_component("missing-export", component_fixture_bytes());
     let provider = ComponentModelWasmRuntimeProvider::default();
     let session = provider
-        .create_session(traced_request("trace-component-missing-export", &artifact_path))
+        .create_session(traced_request(
+            "trace-component-missing-export",
+            &artifact_path,
+        ))
         .await
         .unwrap();
     let mut command = ApplicationHostCommand::with_trace(
@@ -115,7 +118,10 @@ async fn component_model_provider_routes_host_imports_through_service_portal() {
     let artifact_path = write_fixture_component("host-import", component_fixture_bytes());
     let provider = ComponentModelWasmRuntimeProvider::default().with_host_import_bridge(bridge);
     let session = provider
-        .create_session(traced_request("trace-component-host-import-provider", &artifact_path))
+        .create_session(traced_request(
+            "trace-component-host-import-provider",
+            &artifact_path,
+        ))
         .await
         .unwrap();
     let mut command = ApplicationHostCommand::with_trace(
@@ -200,16 +206,16 @@ async fn register_mock_service(runtime: &ServiceRuntime, service_id: &str) -> Ke
         .await
         .unwrap();
     runtime
-        .start(&service_id, TraceContext::new("trace-component-service-start"))
+        .start(
+            &service_id,
+            TraceContext::new("trace-component-service-start"),
+        )
         .await
         .unwrap();
     service_id
 }
 
-fn traced_request(
-    trace_id: &str,
-    artifact_path: &std::path::Path,
-) -> WasmRuntimeSessionRequest {
+fn traced_request(trace_id: &str, artifact_path: &std::path::Path) -> WasmRuntimeSessionRequest {
     WasmRuntimeSessionRequest::new(
         TraceContext::new(trace_id),
         "fixture.application",

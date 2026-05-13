@@ -17,19 +17,32 @@ use macaca_proto::{
 use tracing::{info, warn};
 
 use super::diagnostics::{non_empty_trace, session_id_from_request};
+use super::telemetry::{
+    emit_wasm_telemetry, WasmTelemetryEvent, WasmTelemetrySinkRef, WasmTelemetryStage,
+};
 use super::traits::{WasmApplicationRuntimeProvider, WasmExecutionSession};
 
 /// Null Object provider returned when the optional WASM runtime is absent.
 #[derive(Debug, Clone)]
 pub struct UnavailableWasmRuntimeProvider {
     reason: String,
+    telemetry: Option<WasmTelemetrySinkRef>,
 }
 
 impl UnavailableWasmRuntimeProvider {
     /// Create an unavailable provider with a bounded diagnostic reason.
     pub fn new(reason: impl Into<String>) -> Self {
         let reason = WasmRuntimeUnavailableReason::provider_missing(reason).message;
-        Self { reason }
+        Self {
+            reason,
+            telemetry: None,
+        }
+    }
+
+    /// Return a provider clone that emits sanitized Observer telemetry.
+    pub fn with_telemetry_sink(mut self, sink: WasmTelemetrySinkRef) -> Self {
+        self.telemetry = Some(sink);
+        self
     }
 
     fn unavailable_reason(&self) -> WasmRuntimeUnavailableReason {
@@ -60,6 +73,16 @@ impl WasmApplicationRuntimeProvider for UnavailableWasmRuntimeProvider {
             reason_code = "provider_missing",
             "WASM runtime provider reported unavailable availability"
         );
+        emit_wasm_telemetry(
+            self.telemetry.as_ref(),
+            WasmTelemetryEvent::new(
+                WasmTelemetryStage::Availability,
+                "unavailable",
+                "unavailable",
+            )
+            .trace_id(trace_id.unwrap_or("none"))
+            .reason_code("provider_missing"),
+        );
         WasmRuntimeAvailability::unavailable(
             PackageRuntimeKind::WasmComponent,
             self.unavailable_reason(),
@@ -87,10 +110,18 @@ impl WasmApplicationRuntimeProvider for UnavailableWasmRuntimeProvider {
             reason_code = "provider_missing",
             "WASM runtime session created as unavailable Null Object"
         );
+        emit_wasm_telemetry(
+            self.telemetry.as_ref(),
+            WasmTelemetryEvent::new(WasmTelemetryStage::Session, "created", "unavailable")
+                .trace_id(trace_id)
+                .session_id(session_id.clone())
+                .reason_code("provider_missing"),
+        );
         Ok(Box::new(UnavailableWasmExecutionSession {
             session_id,
             request,
             reason: self.unavailable_reason(),
+            telemetry: self.telemetry.clone(),
         }))
     }
 }
@@ -101,6 +132,7 @@ pub struct UnavailableWasmExecutionSession {
     session_id: String,
     request: WasmRuntimeSessionRequest,
     reason: WasmRuntimeUnavailableReason,
+    telemetry: Option<WasmTelemetrySinkRef>,
 }
 
 impl UnavailableWasmExecutionSession {
@@ -140,6 +172,12 @@ impl WasmExecutionSession for UnavailableWasmExecutionSession {
                 reason_code = "missing_trace",
                 "WASM runtime session rejected untraceable host command"
             );
+            emit_wasm_telemetry(
+                self.telemetry.as_ref(),
+                WasmTelemetryEvent::new(WasmTelemetryStage::Invoke, "rejected", "unavailable")
+                    .session_id(self.session_id.clone())
+                    .reason_code("missing_trace"),
+            );
             return Err(ApplicationAbiError::MissingTraceContext);
         };
         info!(
@@ -151,6 +189,13 @@ impl WasmExecutionSession for UnavailableWasmExecutionSession {
             runtime_kind = %self.runtime_kind(),
             reason_code = %self.reason.code,
             "WASM runtime unavailable session returned fail-closed command result"
+        );
+        emit_wasm_telemetry(
+            self.telemetry.as_ref(),
+            WasmTelemetryEvent::new(WasmTelemetryStage::Invoke, "unavailable", "unavailable")
+                .trace_id(trace.trace_id.clone())
+                .session_id(self.session_id.clone())
+                .reason_code(self.reason.code.clone()),
         );
         let mut result = ApplicationHostCommandResult::runtime_unavailable(
             self.reason.message.clone(),
@@ -194,6 +239,18 @@ impl WasmExecutionSession for UnavailableWasmExecutionSession {
             operation = %command.operation.as_code(),
             reason_code = %self.reason.code,
             "WASM unavailable session rejected lifecycle transition"
+        );
+        emit_wasm_telemetry(
+            self.telemetry.as_ref(),
+            WasmTelemetryEvent::new(WasmTelemetryStage::Lifecycle, "rejected", "unavailable")
+                .trace_id(
+                    trace
+                        .as_ref()
+                        .map(|value| value.trace_id.as_str())
+                        .unwrap_or("none"),
+                )
+                .session_id(self.session_id.clone())
+                .reason_code(self.reason.code.clone()),
         );
         let mut metadata = command.metadata;
         metadata.insert("runtime_kind".into(), self.runtime_kind().to_string());

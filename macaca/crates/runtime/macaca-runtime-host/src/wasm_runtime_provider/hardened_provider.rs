@@ -27,6 +27,9 @@ use super::diagnostics::non_empty_trace;
 use super::hardened_transport::{
     sanitize_hardened_text, sanitize_label, WasmHardenedHealth, WasmHardenedTransport,
 };
+use super::telemetry::{
+    emit_wasm_telemetry, WasmTelemetryEvent, WasmTelemetrySinkRef, WasmTelemetryStage,
+};
 use super::traits::{WasmApplicationRuntimeProvider, WasmExecutionSession};
 use super::{WasmHardenedProviderEnvelope, WasmHardenedProviderResponse};
 
@@ -34,6 +37,7 @@ use super::{WasmHardenedProviderEnvelope, WasmHardenedProviderResponse};
 #[derive(Debug, Clone)]
 pub struct HardenedOutOfProcessWasmRuntimeProvider {
     transport: Arc<dyn WasmHardenedTransport>,
+    telemetry: Option<WasmTelemetrySinkRef>,
 }
 
 impl HardenedOutOfProcessWasmRuntimeProvider {
@@ -44,7 +48,17 @@ impl HardenedOutOfProcessWasmRuntimeProvider {
     /// the public `WasmApplicationRuntimeProvider` contract.
     #[allow(dead_code)]
     pub(crate) fn new(transport: Arc<dyn WasmHardenedTransport>) -> Self {
-        Self { transport }
+        Self {
+            transport,
+            telemetry: None,
+        }
+    }
+
+    /// Return a provider clone that emits sanitized daemon/runtime telemetry.
+    #[allow(dead_code)]
+    pub(crate) fn with_telemetry_sink(mut self, sink: WasmTelemetrySinkRef) -> Self {
+        self.telemetry = Some(sink);
+        self
     }
 
     fn capabilities(&self) -> WasmEngineCapabilities {
@@ -107,6 +121,15 @@ impl WasmApplicationRuntimeProvider for HardenedOutOfProcessWasmRuntimeProvider 
                     provider_class = "hardened_out_of_process",
                     "WASM hardened provider reported healthy availability"
                 );
+                emit_wasm_telemetry(
+                    self.telemetry.as_ref(),
+                    WasmTelemetryEvent::new(
+                        WasmTelemetryStage::Daemon,
+                        "healthy",
+                        "hardened_out_of_process",
+                    )
+                    .trace_id(trace.trace_id.clone()),
+                );
                 WasmRuntimeAvailability {
                     state: "available".into(),
                     reason: None,
@@ -115,11 +138,23 @@ impl WasmApplicationRuntimeProvider for HardenedOutOfProcessWasmRuntimeProvider 
                     metadata: Default::default(),
                 }
             }
-            health => WasmRuntimeAvailability::unavailable(
-                PackageRuntimeKind::WasmComponent,
-                WasmRuntimeUnavailableReason::provider_missing(health.safe_reason()),
-                Some(trace),
-            ),
+            health => {
+                emit_wasm_telemetry(
+                    self.telemetry.as_ref(),
+                    WasmTelemetryEvent::new(
+                        WasmTelemetryStage::Daemon,
+                        "unavailable",
+                        "hardened_out_of_process",
+                    )
+                    .trace_id(trace.trace_id.clone())
+                    .reason_code(health.reason_code()),
+                );
+                WasmRuntimeAvailability::unavailable(
+                    PackageRuntimeKind::WasmComponent,
+                    WasmRuntimeUnavailableReason::provider_missing(health.safe_reason()),
+                    Some(trace),
+                )
+            }
         }
     }
 
@@ -132,7 +167,10 @@ impl WasmApplicationRuntimeProvider for HardenedOutOfProcessWasmRuntimeProvider 
             .trace
             .clone()
             .ok_or(ApplicationAbiError::MissingTraceContext)?;
-        let session_id = format!("hardened-session-{}", sanitize_label(trace.trace_id.clone()));
+        let session_id = format!(
+            "hardened-session-{}",
+            sanitize_label(trace.trace_id.clone())
+        );
         match self.transport.health(trace.clone()).await {
             WasmHardenedHealth::Healthy => {
                 info!(
@@ -143,10 +181,21 @@ impl WasmApplicationRuntimeProvider for HardenedOutOfProcessWasmRuntimeProvider 
                     provider_class = "hardened_out_of_process",
                     "WASM hardened provider created execution session"
                 );
+                emit_wasm_telemetry(
+                    self.telemetry.as_ref(),
+                    WasmTelemetryEvent::new(
+                        WasmTelemetryStage::Session,
+                        "created",
+                        "hardened_out_of_process",
+                    )
+                    .trace_id(trace.trace_id.clone())
+                    .session_id(session_id.clone()),
+                );
                 Ok(Box::new(HardenedOutOfProcessWasmExecutionSession {
                     session_id,
                     request,
                     transport: Arc::clone(&self.transport),
+                    telemetry: self.telemetry.clone(),
                 }))
             }
             health => {
@@ -156,7 +205,19 @@ impl WasmApplicationRuntimeProvider for HardenedOutOfProcessWasmRuntimeProvider 
                     reason_code = %health.reason_code(),
                     "WASM hardened provider refused session creation"
                 );
-                Err(ApplicationAbiError::RuntimeUnavailable(health.safe_reason()))
+                emit_wasm_telemetry(
+                    self.telemetry.as_ref(),
+                    WasmTelemetryEvent::new(
+                        WasmTelemetryStage::Daemon,
+                        "rejected",
+                        "hardened_out_of_process",
+                    )
+                    .trace_id(trace.trace_id.clone())
+                    .reason_code(health.reason_code()),
+                );
+                Err(ApplicationAbiError::RuntimeUnavailable(
+                    health.safe_reason(),
+                ))
             }
         }
     }
@@ -168,6 +229,7 @@ struct HardenedOutOfProcessWasmExecutionSession {
     session_id: String,
     request: WasmRuntimeSessionRequest,
     transport: Arc<dyn WasmHardenedTransport>,
+    telemetry: Option<WasmTelemetrySinkRef>,
 }
 
 #[async_trait]
@@ -182,6 +244,7 @@ impl WasmExecutionSession for HardenedOutOfProcessWasmExecutionSession {
             reason: None,
             capabilities: HardenedOutOfProcessWasmRuntimeProvider {
                 transport: Arc::clone(&self.transport),
+                telemetry: self.telemetry.clone(),
             }
             .capabilities(),
             diagnostics: None,
@@ -218,9 +281,30 @@ impl WasmExecutionSession for HardenedOutOfProcessWasmExecutionSession {
                 reason_code = "missing_trace",
                 "WASM hardened provider rejected untraceable command"
             );
+            emit_wasm_telemetry(
+                self.telemetry.as_ref(),
+                WasmTelemetryEvent::new(
+                    WasmTelemetryStage::Daemon,
+                    "rejected",
+                    "hardened_out_of_process",
+                )
+                .session_id(self.session_id.clone())
+                .reason_code("missing_trace"),
+            );
             return Err(ApplicationAbiError::MissingTraceContext);
         };
         if self.request.profile.resources.max_wall_time_ms == Some(0) {
+            emit_wasm_telemetry(
+                self.telemetry.as_ref(),
+                WasmTelemetryEvent::new(
+                    WasmTelemetryStage::Daemon,
+                    "timeout",
+                    "hardened_out_of_process",
+                )
+                .trace_id(trace.trace_id.clone())
+                .session_id(self.session_id.clone())
+                .reason_code("timeout"),
+            );
             return Ok(self.fail_closed_result(
                 "timeout",
                 "hardened daemon dispatch timed out before execution",
@@ -247,6 +331,16 @@ impl WasmExecutionSession for HardenedOutOfProcessWasmExecutionSession {
             trace_id = %trace.trace_id,
             provider_class = "hardened_out_of_process",
             "WASM hardened provider dispatching daemon envelope"
+        );
+        emit_wasm_telemetry(
+            self.telemetry.as_ref(),
+            WasmTelemetryEvent::new(
+                WasmTelemetryStage::Daemon,
+                "dispatching",
+                "hardened_out_of_process",
+            )
+            .trace_id(trace.trace_id.clone())
+            .session_id(self.session_id.clone()),
         );
         let response = self.transport.dispatch(envelope).await;
         Ok(self.map_response(response, trace))
@@ -375,6 +469,17 @@ impl HardenedOutOfProcessWasmExecutionSession {
                 reason_code = "malformed_response",
                 "WASM hardened provider rejected malformed daemon response"
             );
+            emit_wasm_telemetry(
+                self.telemetry.as_ref(),
+                WasmTelemetryEvent::new(
+                    WasmTelemetryStage::Daemon,
+                    "malformed_response",
+                    "hardened_out_of_process",
+                )
+                .trace_id(trace.trace_id.clone())
+                .session_id(self.session_id.clone())
+                .reason_code("malformed_response"),
+            );
             return self.fail_closed_result(
                 "malformed_response",
                 "hardened daemon returned malformed response",
@@ -406,6 +511,29 @@ impl HardenedOutOfProcessWasmExecutionSession {
         result
             .metadata
             .insert("session_id".into(), self.session_id.clone());
+        emit_wasm_telemetry(
+            self.telemetry.as_ref(),
+            WasmTelemetryEvent::new(
+                WasmTelemetryStage::Daemon,
+                "completed",
+                "hardened_out_of_process",
+            )
+            .trace_id(
+                result
+                    .trace
+                    .as_ref()
+                    .map(|value| value.trace_id.as_str())
+                    .unwrap_or("none"),
+            )
+            .session_id(self.session_id.clone())
+            .reason_code(
+                result
+                    .metadata
+                    .get("reason_code")
+                    .cloned()
+                    .unwrap_or_else(|| "completed".into()),
+            ),
+        );
         if !response.diagnostics.is_empty() {
             result.metadata.insert(
                 "diagnostics".into(),

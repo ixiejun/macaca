@@ -58,7 +58,10 @@ pub(crate) trait WasmHardenedTransport: Send + Sync + std::fmt::Debug {
     async fn health(&self, trace: TraceContext) -> WasmHardenedHealth;
 
     /// Dispatch one sanitized execution envelope to the backing daemon.
-    async fn dispatch(&self, envelope: WasmHardenedProviderEnvelope) -> WasmHardenedProviderResponse;
+    async fn dispatch(
+        &self,
+        envelope: WasmHardenedProviderEnvelope,
+    ) -> WasmHardenedProviderResponse;
 }
 
 /// Deterministic transport used by tests and local certification fixtures.

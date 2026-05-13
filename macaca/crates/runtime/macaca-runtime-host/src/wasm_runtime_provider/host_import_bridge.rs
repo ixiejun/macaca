@@ -21,6 +21,10 @@ use tracing::{info, warn};
 
 use crate::{ServiceRuntime, ServiceRuntimeError};
 
+use super::telemetry::{
+    emit_wasm_telemetry, WasmTelemetryEvent, WasmTelemetrySinkRef, WasmTelemetryStage,
+};
+
 /// Runtime configuration for the host import bridge.
 #[derive(Clone)]
 pub struct WasmHostImportBridgeConfig {
@@ -44,6 +48,7 @@ impl Default for WasmHostImportBridgeConfig {
 pub struct WasmHostImportBridge {
     runtime: Arc<ServiceRuntime>,
     config: WasmHostImportBridgeConfig,
+    telemetry: Option<WasmTelemetrySinkRef>,
 }
 
 impl fmt::Debug for WasmHostImportBridge {
@@ -59,7 +64,17 @@ impl fmt::Debug for WasmHostImportBridge {
 impl WasmHostImportBridge {
     /// Create a bridge over an existing host-owned `ServiceRuntime`.
     pub fn new(runtime: Arc<ServiceRuntime>, config: WasmHostImportBridgeConfig) -> Self {
-        Self { runtime, config }
+        Self {
+            runtime,
+            config,
+            telemetry: None,
+        }
+    }
+
+    /// Return a bridge clone that emits sanitized host-import telemetry.
+    pub fn with_telemetry_sink(mut self, sink: WasmTelemetrySinkRef) -> Self {
+        self.telemetry = Some(sink);
+        self
     }
 
     /// Dispatch one Application ABI command through the controlled service portal.
@@ -87,6 +102,17 @@ impl WasmHostImportBridge {
             payload_bytes = audit.payload_bytes,
             reason_code = %audit.reason_code,
             "WASM host import bridge admitted command"
+        );
+        emit_wasm_telemetry(
+            self.telemetry.as_ref(),
+            WasmTelemetryEvent::new(
+                WasmTelemetryStage::HostImport,
+                "admitted",
+                "host_import_bridge",
+            )
+            .trace_id(audit.trace_id.as_deref().unwrap_or("none"))
+            .reason_code(audit.reason_code.clone())
+            .metadata("import_name", audit.import_name.clone()),
         );
 
         let Some(service_id) = guest_command.target_service.clone() else {
@@ -136,6 +162,23 @@ impl WasmHostImportBridge {
                     service_id = %service_id,
                     reason_code = "import_completed",
                     "WASM host import bridge completed service call"
+                );
+                emit_wasm_telemetry(
+                    self.telemetry.as_ref(),
+                    WasmTelemetryEvent::new(
+                        WasmTelemetryStage::HostImport,
+                        "completed",
+                        "host_import_bridge",
+                    )
+                    .trace_id(
+                        result
+                            .trace
+                            .as_ref()
+                            .map(|value| value.trace_id.as_str())
+                            .unwrap_or("none"),
+                    )
+                    .reason_code("import_completed")
+                    .metadata("service_id", service_id.to_string()),
                 );
                 result
             }
@@ -236,6 +279,17 @@ impl WasmHostImportBridge {
             reason_code = %audit.reason_code,
             payload_bytes = audit.payload_bytes,
             "WASM host import bridge denied command"
+        );
+        emit_wasm_telemetry(
+            self.telemetry.as_ref(),
+            WasmTelemetryEvent::new(
+                WasmTelemetryStage::HostImport,
+                "denied",
+                "host_import_bridge",
+            )
+            .trace_id(audit.trace_id.as_deref().unwrap_or("none"))
+            .reason_code(audit.reason_code.clone())
+            .metadata("import_name", audit.import_name.clone()),
         );
         let status = match kind {
             WasmHostImportErrorKind::ServiceUnavailable => {

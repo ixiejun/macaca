@@ -31,6 +31,9 @@ use super::engine_adapter::{
 use super::errors::{runtime_error_result, WasmRuntimeHostError};
 use super::host_import_bridge::WasmHostImportBridge;
 use super::sandbox_guard::{active_resource_policy, WasmSandboxGuard, WasmSessionPermit};
+use super::telemetry::{
+    emit_wasm_telemetry, WasmTelemetryEvent, WasmTelemetrySinkRef, WasmTelemetryStage,
+};
 use super::traits::{WasmApplicationRuntimeProvider, WasmExecutionSession};
 
 /// Default provider that executes small core-WASM modules in process.
@@ -40,6 +43,7 @@ pub struct DefaultInProcessWasmRuntimeProvider {
     adapter: InProcessWasmEngineAdapter,
     sandbox_guard: WasmSandboxGuard,
     host_import_bridge: Option<Arc<WasmHostImportBridge>>,
+    telemetry: Option<WasmTelemetrySinkRef>,
 }
 
 impl Default for DefaultInProcessWasmRuntimeProvider {
@@ -49,6 +53,7 @@ impl Default for DefaultInProcessWasmRuntimeProvider {
             adapter: InProcessWasmEngineAdapter,
             sandbox_guard: WasmSandboxGuard::default(),
             host_import_bridge: None,
+            telemetry: None,
         }
     }
 }
@@ -62,6 +67,16 @@ impl DefaultInProcessWasmRuntimeProvider {
     /// invocation or bypassing ServiceRuntime.
     pub fn with_host_import_bridge(mut self, bridge: Arc<WasmHostImportBridge>) -> Self {
         self.host_import_bridge = Some(bridge);
+        self
+    }
+
+    /// Return a provider clone that emits sanitized Observer telemetry.
+    ///
+    /// The sink is optional and best-effort.  Runtime behavior stays identical
+    /// when no sink is configured, which lets deployments enable telemetry
+    /// without changing provider contracts or error handling.
+    pub fn with_telemetry_sink(mut self, sink: WasmTelemetrySinkRef) -> Self {
+        self.telemetry = Some(sink);
         self
     }
 
@@ -126,6 +141,15 @@ impl WasmApplicationRuntimeProvider for DefaultInProcessWasmRuntimeProvider {
             provider_class = "default_in_process",
             "WASM default in-process provider reported available"
         );
+        emit_wasm_telemetry(
+            self.telemetry.as_ref(),
+            WasmTelemetryEvent::new(
+                WasmTelemetryStage::Availability,
+                "available",
+                "default_in_process",
+            )
+            .trace_id(trace_id),
+        );
         WasmRuntimeAvailability {
             state: "available".into(),
             reason: None,
@@ -152,6 +176,23 @@ impl WasmApplicationRuntimeProvider for DefaultInProcessWasmRuntimeProvider {
             .cache
             .get_or_compile(&request, &bytes, &self.adapter)
             .map_err(|error| error.abi_error())?;
+        emit_wasm_telemetry(
+            self.telemetry.as_ref(),
+            WasmTelemetryEvent::new(
+                WasmTelemetryStage::Compile,
+                "completed",
+                "default_in_process",
+            )
+            .trace_id(
+                request
+                    .trace
+                    .as_ref()
+                    .map(|value| value.trace_id.as_str())
+                    .unwrap_or("none"),
+            )
+            .session_id(session_id.clone())
+            .metadata("cache_state", format!("{:?}", cache_report.state)),
+        );
         module
             .validate_resource_policy(&active_resource_policy(&request))
             .map_err(|error| error.abi_error())?;
@@ -159,6 +200,22 @@ impl WasmApplicationRuntimeProvider for DefaultInProcessWasmRuntimeProvider {
             .adapter
             .instantiate((*module).clone())
             .map_err(|error| error.abi_error())?;
+        emit_wasm_telemetry(
+            self.telemetry.as_ref(),
+            WasmTelemetryEvent::new(
+                WasmTelemetryStage::Instantiate,
+                "completed",
+                "default_in_process",
+            )
+            .trace_id(
+                request
+                    .trace
+                    .as_ref()
+                    .map(|value| value.trace_id.as_str())
+                    .unwrap_or("none"),
+            )
+            .session_id(session_id.clone()),
+        );
         info!(
             session_id = %session_id,
             trace_id = trace.as_ref().map(|value| value.trace_id.as_str()).unwrap_or("none"),
@@ -169,6 +226,18 @@ impl WasmApplicationRuntimeProvider for DefaultInProcessWasmRuntimeProvider {
             artifact_digest_prefix = %cache_report.key.digest_value.chars().take(12).collect::<String>(),
             "WASM default in-process session created"
         );
+        emit_wasm_telemetry(
+            self.telemetry.as_ref(),
+            WasmTelemetryEvent::new(WasmTelemetryStage::Session, "created", "default_in_process")
+                .trace_id(
+                    trace
+                        .as_ref()
+                        .map(|value| value.trace_id.as_str())
+                        .unwrap_or("none"),
+                )
+                .session_id(session_id.clone())
+                .metadata("cache_state", format!("{:?}", cache_report.state)),
+        );
         Ok(Box::new(DefaultInProcessWasmExecutionSession {
             session_id,
             request,
@@ -176,6 +245,7 @@ impl WasmApplicationRuntimeProvider for DefaultInProcessWasmRuntimeProvider {
             instance,
             sandbox_guard: self.sandbox_guard.clone(),
             host_import_bridge: self.host_import_bridge.clone(),
+            telemetry: self.telemetry.clone(),
             lifecycle: Mutex::new(WasmLifecycleStateMachine::instantiated()),
             audit_events: Mutex::new(Vec::new()),
             _permit: permit,
@@ -194,6 +264,7 @@ pub(super) struct DefaultInProcessWasmExecutionSession {
     pub(super) instance: InProcessWasmInstance,
     pub(super) sandbox_guard: WasmSandboxGuard,
     pub(super) host_import_bridge: Option<Arc<WasmHostImportBridge>>,
+    pub(super) telemetry: Option<WasmTelemetrySinkRef>,
     pub(super) lifecycle: Mutex<WasmLifecycleStateMachine>,
     pub(super) audit_events: Mutex<Vec<WasmLifecycleAuditEvent>>,
     pub(super) _permit: WasmSessionPermit,
@@ -231,6 +302,16 @@ impl WasmExecutionSession for DefaultInProcessWasmExecutionSession {
                 reason_code = "missing_trace",
                 "WASM default in-process session rejected untraceable command"
             );
+            emit_wasm_telemetry(
+                self.telemetry.as_ref(),
+                WasmTelemetryEvent::new(
+                    WasmTelemetryStage::Invoke,
+                    "rejected",
+                    "default_in_process",
+                )
+                .session_id(self.session_id.clone())
+                .reason_code("missing_trace"),
+            );
             return Err(ApplicationAbiError::MissingTraceContext);
         };
         let export_name = command
@@ -246,6 +327,16 @@ impl WasmExecutionSession for DefaultInProcessWasmExecutionSession {
         }
         if !is_wasm_export_invoke(&command) {
             if let Some(bridge) = &self.host_import_bridge {
+                emit_wasm_telemetry(
+                    self.telemetry.as_ref(),
+                    WasmTelemetryEvent::new(
+                        WasmTelemetryStage::HostImport,
+                        "dispatching",
+                        "default_in_process",
+                    )
+                    .trace_id(trace.trace_id.clone())
+                    .session_id(self.session_id.clone()),
+                );
                 let mut result = bridge.dispatch(command, trace).await;
                 self.attach_common_metadata(&mut result, "");
                 return Ok(result);
@@ -276,6 +367,17 @@ impl WasmExecutionSession for DefaultInProcessWasmExecutionSession {
                     ability_id = %self.request.ability_id,
                     wasm_export = export_name,
                     "WASM default in-process session invoked exported function"
+                );
+                emit_wasm_telemetry(
+                    self.telemetry.as_ref(),
+                    WasmTelemetryEvent::new(
+                        WasmTelemetryStage::Invoke,
+                        "completed",
+                        "default_in_process",
+                    )
+                    .trace_id(trace.trace_id.clone())
+                    .session_id(self.session_id.clone())
+                    .metadata("wasm.export", export_name),
                 );
                 let mut result =
                     ApplicationHostCommandResult::ok(json!({ "export": export_name }), Some(trace));
@@ -351,6 +453,18 @@ impl DefaultInProcessWasmExecutionSession {
             ability_id = %self.request.ability_id,
             reason_code = %report.reason_code,
             "WASM default in-process session returned runtime error"
+        );
+        let stage = if report.reason_code == "resource_exhausted" {
+            WasmTelemetryStage::Resource
+        } else {
+            WasmTelemetryStage::Invoke
+        };
+        emit_wasm_telemetry(
+            self.telemetry.as_ref(),
+            WasmTelemetryEvent::new(stage, "failed", "default_in_process")
+                .trace_id(report.trace_id.as_deref().unwrap_or("none"))
+                .session_id(self.session_id.clone())
+                .reason_code(report.reason_code.clone()),
         );
         let mut result = runtime_error_result(report, trace);
         self.attach_common_metadata(&mut result, "");
