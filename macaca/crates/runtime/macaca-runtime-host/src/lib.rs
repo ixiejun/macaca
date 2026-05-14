@@ -70,7 +70,9 @@ pub use application_hosts::{
     is_application_runtime_unavailable, ApplicationHostRuntime, UnavailableApplicationRuntimeHost,
     UnavailableWasmApplicationHost, WasmApplicationHostFactory,
 };
-pub use application_service_provider::ApplicationSystemServiceProvider;
+pub use application_service_provider::{
+    ApplicationOrchestrationBackend, ApplicationSystemServiceProvider,
+};
 pub use context_service_provider::ContextSystemServiceProvider;
 pub use domain_pack_service_provider::{
     bootstrap_builtin_domain_pack_services, DomainPackRuntimeBundle,

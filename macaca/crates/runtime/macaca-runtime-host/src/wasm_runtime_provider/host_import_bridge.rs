@@ -14,8 +14,9 @@ use macaca_proto::{
     ApplicationHostCommand, ApplicationHostCommandResult, ApplicationHostCommandStatus,
     ApplicationImport, KernelServiceId, ServiceBusSource, ServiceCommandName, TraceContext,
     UiIntent, WasmHostImportAuditReport, WasmHostImportCategory, WasmHostImportCommand,
-    WasmHostImportErrorKind, DEFAULT_WASM_MAX_PAYLOAD_BYTES, WASM_HOST_IMPORT_CAPABILITY,
-    WASM_HOST_IMPORT_OPERATION, WASM_HOST_IMPORT_SERVICE_ID,
+    WasmHostImportErrorKind, APPLICATION_AGENT_DELEGATE_COMMAND, APPLICATION_SERVICE_ID,
+    DEFAULT_WASM_MAX_PAYLOAD_BYTES, WASM_HOST_IMPORT_CAPABILITY, WASM_HOST_IMPORT_OPERATION,
+    WASM_HOST_IMPORT_SERVICE_ID,
 };
 use serde_json::{Map, Value};
 use tracing::{info, warn};
@@ -30,6 +31,10 @@ use crate::{
 use super::telemetry::{
     emit_wasm_telemetry, WasmTelemetryEvent, WasmTelemetrySinkRef, WasmTelemetryStage,
 };
+
+const TASK_SERVICE_ID: &str = "service.task";
+const TASK_CREATE_GOAL_OPERATION: &str = "task.create_goal";
+const TASK_QUERY_OPERATION: &str = "task.query";
 
 /// Runtime configuration for the host import bridge.
 #[derive(Clone)]
@@ -173,6 +178,26 @@ impl WasmHostImportBridge {
             .metadata("import_name", audit.import_name.clone()),
         );
 
+        if guest_command.import_name == ApplicationImport::TraceEmit.as_name() {
+            let mut result = ApplicationHostCommandResult::ok(
+                serde_json::json!({ "emitted": true }),
+                Some(trace),
+            );
+            result
+                .metadata
+                .insert("reason_code".into(), "trace_emit_recorded".into());
+            self.attach_common_metadata(&guest_command, &mut result);
+            info!(
+                trace_id = result
+                    .trace
+                    .as_ref()
+                    .map(|value| value.trace_id.as_str())
+                    .unwrap_or("none"),
+                "WASM trace.emit recorded by host import bridge"
+            );
+            return result;
+        }
+
         if guest_command.import_name == ApplicationImport::UiRender.as_name() {
             return self.dispatch_ui_render(guest_command, trace).await;
         }
@@ -200,7 +225,7 @@ impl WasmHostImportBridge {
                 session_id: guest_command.metadata.get("session.id").cloned(),
                 service_id: service_id.clone(),
                 operation,
-                payload: guest_command.payload.clone(),
+                payload: hydrate_orchestration_service_payload(&guest_command, &trace),
                 metadata: guest_command.metadata.clone(),
                 trace: trace.clone(),
             })
@@ -423,10 +448,7 @@ impl WasmHostImportBridge {
     ) -> Result<WasmHostImportCommand, ApplicationHostCommandResult> {
         let import_name = command.import.as_name().to_string();
         let category = WasmHostImportCategory::from_application_import(&command.import);
-        if !matches!(
-            command.import,
-            ApplicationImport::ServiceCall | ApplicationImport::UiRender
-        ) {
+        if !is_supported_portal_import(&command.import) {
             let guest_command = self.command_shell(command, trace, category, import_name, 0);
             return Err(self.denied_result(
                 &guest_command,
@@ -448,6 +470,18 @@ impl WasmHostImportBridge {
         }
         if guest_command.import_name == ApplicationImport::UiRender.as_name() {
             return Ok(guest_command);
+        }
+        if guest_command.import_name == ApplicationImport::TraceEmit.as_name() {
+            return Ok(guest_command);
+        }
+        if is_orchestration_import_name(&guest_command.import_name)
+            && !has_non_empty_scope(&guest_command.metadata)
+        {
+            return Err(self.denied_result(
+                &guest_command,
+                WasmHostImportErrorKind::ScopeMissing,
+                "WASM orchestration import requires app and session scope",
+            ));
         }
         if guest_command
             .capability
@@ -473,16 +507,20 @@ impl WasmHostImportBridge {
         import_name: String,
         payload_bytes: u64,
     ) -> WasmHostImportCommand {
+        let default_target_service = default_service_for_import(&command.import);
+        let default_operation = default_operation_for_import(&command.import);
         let target_service = command
             .metadata
             .get(WASM_HOST_IMPORT_SERVICE_ID)
             .filter(|value| !value.trim().is_empty())
-            .map(KernelServiceId::new);
+            .map(KernelServiceId::new)
+            .or_else(|| default_target_service.map(KernelServiceId::new));
         let operation = command
             .metadata
             .get(WASM_HOST_IMPORT_OPERATION)
             .filter(|value| !value.trim().is_empty())
-            .map(ServiceCommandName::new);
+            .map(ServiceCommandName::new)
+            .or_else(|| default_operation.map(ServiceCommandName::new));
         let capability = command
             .metadata
             .get(WASM_HOST_IMPORT_CAPABILITY)
@@ -643,6 +681,95 @@ fn hydrate_ui_render_scope(
     if intent.trace.is_none() {
         intent.trace = Some(trace.clone());
     }
+}
+
+fn is_supported_portal_import(import: &ApplicationImport) -> bool {
+    matches!(
+        import,
+        ApplicationImport::ServiceCall
+            | ApplicationImport::TraceEmit
+            | ApplicationImport::UiRender
+            | ApplicationImport::TaskCreateGoal
+            | ApplicationImport::TaskQuery
+            | ApplicationImport::AgentDelegate
+    )
+}
+
+fn is_orchestration_import_name(import_name: &str) -> bool {
+    import_name == ApplicationImport::TaskCreateGoal.as_name()
+        || import_name == ApplicationImport::TaskQuery.as_name()
+        || import_name == ApplicationImport::AgentDelegate.as_name()
+}
+
+fn has_non_empty_scope(metadata: &std::collections::BTreeMap<String, String>) -> bool {
+    metadata
+        .get("app.id")
+        .map(|value| !value.trim().is_empty())
+        .unwrap_or(false)
+        && metadata
+            .get("session.id")
+            .map(|value| !value.trim().is_empty())
+            .unwrap_or(false)
+}
+
+fn default_service_for_import(import: &ApplicationImport) -> Option<&'static str> {
+    match import {
+        ApplicationImport::TaskCreateGoal | ApplicationImport::TaskQuery => Some(TASK_SERVICE_ID),
+        ApplicationImport::AgentDelegate => Some(APPLICATION_SERVICE_ID),
+        _ => None,
+    }
+}
+
+fn default_operation_for_import(import: &ApplicationImport) -> Option<&'static str> {
+    match import {
+        ApplicationImport::TaskCreateGoal => Some(TASK_CREATE_GOAL_OPERATION),
+        ApplicationImport::TaskQuery => Some(TASK_QUERY_OPERATION),
+        ApplicationImport::AgentDelegate => Some(APPLICATION_AGENT_DELEGATE_COMMAND),
+        _ => None,
+    }
+}
+
+/// Convert compact guest orchestration payloads into typed service commands.
+///
+/// Declarative WASM metadata should not need to know host-owned app/session
+/// identity or trace shapes.  For `macaca:agent/delegate`, the guest declares
+/// only the work intent (`target_agent`, `prompt`, and bounded `context`), and
+/// the bridge injects the Application Service envelope from trusted metadata.
+fn hydrate_orchestration_service_payload(
+    command: &WasmHostImportCommand,
+    trace: &TraceContext,
+) -> Value {
+    if command.import_name != ApplicationImport::AgentDelegate.as_name() {
+        return command.payload.clone();
+    }
+    if command.payload.get("trace").is_some() && command.payload.get("scope").is_some() {
+        return command.payload.clone();
+    }
+    let app_id = command.metadata.get("app.id").cloned().unwrap_or_default();
+    let session_id = command
+        .metadata
+        .get("session.id")
+        .cloned()
+        .or_else(|| trace.session_id.clone())
+        .unwrap_or_default();
+    let agent_name = command
+        .metadata
+        .get("agent.name")
+        .cloned()
+        .unwrap_or_else(|| "wasm-guest".into());
+    serde_json::json!({
+        "trace": trace,
+        "scope": {
+            "application_id": app_id,
+            "application_name": null,
+            "session_id": session_id,
+            "agent_name": agent_name
+        },
+        "target_agent": command.payload.get("target_agent").cloned().unwrap_or(Value::Null),
+        "prompt": command.payload.get("prompt").cloned().unwrap_or(Value::Null),
+        "context": command.payload.get("context").cloned().unwrap_or_else(|| serde_json::json!({})),
+        "metadata": command.metadata
+    })
 }
 
 fn sanitize_json(value: Value) -> Value {

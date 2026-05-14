@@ -41,6 +41,7 @@ mod source_artifact;
 pub mod sse;
 pub mod state;
 pub mod trace_events;
+mod wasm_orchestration_backend;
 pub mod web3_status;
 pub mod workspace;
 mod workspace_knowledge_digest_capability;
@@ -73,6 +74,7 @@ pub use crate::bootstrap::{WebRuntimeFacade, WebServerBuilder};
 use crate::external_context_adapter::install_external_adapters_from_config;
 use crate::orchestration_tools::build_web_tools;
 use crate::state::{AppConfig, AppState, LoopState, PersistenceState, SessionState};
+use crate::wasm_orchestration_backend::WebApplicationOrchestrationBackend;
 
 /// Start the Macaca OS web server.
 #[deprecated(note = "Use WebServerBuilder::new().port(port).serve() instead")]
@@ -135,6 +137,10 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
     // 5. Start the runtime and load ALL discovered apps.
     let runtime = Arc::new(AppRuntime::new());
     let registry = Arc::new(tokio::sync::RwLock::new(registry));
+    let application_orchestration_registry_ref = Arc::new(tokio::sync::RwLock::new(None));
+    let orchestration_backend = Arc::new(WebApplicationOrchestrationBackend::new(Arc::clone(
+        &application_orchestration_registry_ref,
+    )));
     let mut app_dirs = HashMap::new();
     let mut skills_dirs = Vec::new();
     let mut started_apps: Vec<(macaca_proto::ApplicationId, String, Vec<String>)> = Vec::new();
@@ -162,6 +168,7 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
                         Arc::clone(&kernel),
                         wasm_host_import_bridge.policy_engine(),
                         wasm_host_import_bridge.clone(),
+                        Some(orchestration_backend),
                     )),
                 ),
             ),
@@ -753,7 +760,11 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
     // 10a. Set the executor registry reference for the delegate tool
     {
         let mut guard = executor_registry_ref.write().await;
-        *guard = Some(state.executor_registry.clone());
+        *guard = Some(Arc::clone(&state.executor_registry));
+    }
+    {
+        let mut guard = application_orchestration_registry_ref.write().await;
+        *guard = Some(Arc::clone(&state.executor_registry));
     }
 
     // 10b. Register all started apps to the executor registry and create workspaces

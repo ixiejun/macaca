@@ -447,7 +447,7 @@ async fn wasm_chat_dispatch_command(
     let metadata = state.application_client.metadata(command).await.ok()?;
     let is_wasm_runtime =
         metadata.application.runtime.runtime_kind == Some(PackageRuntimeKind::WasmComponent);
-    if !is_wasm_runtime || !metadata.application.agents.is_empty() {
+    if !is_wasm_runtime {
         return None;
     }
     let has_wasm_ability = metadata.abilities.iter().any(|ability| {
@@ -473,6 +473,52 @@ async fn wasm_chat_dispatch_command(
         scope: ApplicationServiceScope::application(*app_id),
         host_command,
     })
+}
+
+/// Return whether the application declares app-scoped agents.
+///
+/// WASM applications with declared agents still execute through the WASM
+/// runtime.  The agents are prepared as OS capabilities for task/delegation
+/// imports, not as a replacement coordinator path.
+async fn application_declares_agents(state: &Arc<AppState>, app_id: &ApplicationId) -> bool {
+    let Some(command) = ApplicationMetadataQueryCommand::application(
+        TraceContext::new("web-chat-agent-scope"),
+        *app_id,
+    )
+    .ok() else {
+        return false;
+    };
+    state
+        .application_client
+        .metadata(command)
+        .await
+        .map(|metadata| !metadata.application.agents.is_empty())
+        .unwrap_or(false)
+}
+
+/// New-session preparation branch selected before chat execution starts.
+///
+/// The value is intentionally small and pure so Web tests can lock the routing
+/// contract without constructing an entire `AppState`.  WASM applications are
+/// always executed by the WASM host-dispatch path; declared agents only decide
+/// whether OS orchestration services must be prepared for guest imports such as
+/// `macaca:agent/delegate`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum NewSessionPreparation {
+    WasmOrchestrationExecutor,
+    FrameworkExecutor,
+    WasmHostDispatchOnly,
+}
+
+fn new_session_preparation_for_chat(
+    has_wasm_dispatch: bool,
+    declares_agents: bool,
+) -> NewSessionPreparation {
+    match (has_wasm_dispatch, declares_agents) {
+        (true, true) => NewSessionPreparation::WasmOrchestrationExecutor,
+        (true, false) => NewSessionPreparation::WasmHostDispatchOnly,
+        (false, _) => NewSessionPreparation::FrameworkExecutor,
+    }
 }
 
 /// Compatibility fallback for installations where metadata runtime-kind view is
@@ -694,38 +740,67 @@ pub(crate) async fn post_chat_v2(
     .await;
     if is_new_session {
         cleanup_app_state(&state, &app_id).await;
-        if wasm_dispatch.is_none() {
-            match ensure_app_executor(&state, &app_id).await {
-                Ok(()) => {}
-                Err(error) if is_registry_wasm_layer_app(&state, &app_id).await => {
-                    tracing::info!(
-                        app_id = %app_id,
-                        error = %error,
-                        "Executor preparation denied for agentless app; switching to WASM host-dispatch path"
-                    );
-                    wasm_dispatch = Some(ApplicationHostDispatchServiceCommand {
-                        trace: TraceContext::new("web-chat-wasm-dispatch-fallback"),
-                        scope: ApplicationServiceScope::application(app_id),
-                        host_command: {
-                            let mut command = ApplicationHostCommand::with_trace(
-                                ApplicationImport::TraceEmit,
-                                serde_json::json!({ "input": req.prompt, "channel": "chat" }),
-                                TraceContext::new("web-chat-wasm-dispatch-fallback-command"),
-                            );
-                            command
-                                .metadata
-                                .insert("wasm.export".into(), "app:start".into());
-                            command
-                        },
-                    });
-                }
-                Err(error) => {
-                    return Err(err(
-                        StatusCode::FAILED_DEPENDENCY,
-                        format!("Failed to prepare application executor: {error}"),
-                    ));
+        let declares_wasm_agents = if wasm_dispatch.is_some() {
+            application_declares_agents(&state, &app_id).await
+        } else {
+            false
+        };
+        match new_session_preparation_for_chat(wasm_dispatch.is_some(), declares_wasm_agents) {
+            NewSessionPreparation::WasmOrchestrationExecutor => {
+                ensure_app_executor(&state, &app_id)
+                    .await
+                    .map_err(|error| {
+                        err(
+                            StatusCode::FAILED_DEPENDENCY,
+                            format!("Failed to prepare WASM orchestration executor: {error}"),
+                        )
+                    })?;
+                crate::loop_manager::ensure_plan_and_worker_loops(
+                    &state,
+                    &app_id,
+                    Some(session_key.clone()),
+                )
+                .await;
+                tracing::info!(
+                    app_id = %app_id,
+                    session_id = %session_key,
+                    "Prepared app-scoped executor and loops for WASM orchestration session"
+                );
+            }
+            NewSessionPreparation::FrameworkExecutor => {
+                match ensure_app_executor(&state, &app_id).await {
+                    Ok(()) => {}
+                    Err(error) if is_registry_wasm_layer_app(&state, &app_id).await => {
+                        tracing::info!(
+                            app_id = %app_id,
+                            error = %error,
+                            "Executor preparation denied for agentless app; switching to WASM host-dispatch path"
+                        );
+                        wasm_dispatch = Some(ApplicationHostDispatchServiceCommand {
+                            trace: TraceContext::new("web-chat-wasm-dispatch-fallback"),
+                            scope: ApplicationServiceScope::application(app_id),
+                            host_command: {
+                                let mut command = ApplicationHostCommand::with_trace(
+                                    ApplicationImport::TraceEmit,
+                                    serde_json::json!({ "input": req.prompt, "channel": "chat" }),
+                                    TraceContext::new("web-chat-wasm-dispatch-fallback-command"),
+                                );
+                                command
+                                    .metadata
+                                    .insert("wasm.export".into(), "app:start".into());
+                                command
+                            },
+                        });
+                    }
+                    Err(error) => {
+                        return Err(err(
+                            StatusCode::FAILED_DEPENDENCY,
+                            format!("Failed to prepare application executor: {error}"),
+                        ));
+                    }
                 }
             }
+            NewSessionPreparation::WasmHostDispatchOnly => {}
         }
         tracing::info!(app_id = %app_id, session_id = %session_key, "New session: cleaned up previous tasks, goals, agents and loops");
     }
@@ -1165,4 +1240,37 @@ pub(crate) async fn post_chat_v2(
     }
 
     Ok(build_chat_sse(session_key, stream_rx))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{new_session_preparation_for_chat, NewSessionPreparation};
+
+    #[test]
+    fn wasm_with_declared_agents_prepares_orchestration_executor() {
+        assert_eq!(
+            new_session_preparation_for_chat(true, true),
+            NewSessionPreparation::WasmOrchestrationExecutor
+        );
+    }
+
+    #[test]
+    fn agentless_wasm_keeps_host_dispatch_only() {
+        assert_eq!(
+            new_session_preparation_for_chat(true, false),
+            NewSessionPreparation::WasmHostDispatchOnly
+        );
+    }
+
+    #[test]
+    fn non_wasm_chat_uses_framework_executor() {
+        assert_eq!(
+            new_session_preparation_for_chat(false, true),
+            NewSessionPreparation::FrameworkExecutor
+        );
+        assert_eq!(
+            new_session_preparation_for_chat(false, false),
+            NewSessionPreparation::FrameworkExecutor
+        );
+    }
 }

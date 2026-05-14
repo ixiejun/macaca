@@ -19,16 +19,17 @@ use macaca_app::{
 };
 use macaca_kernel::{Kernel, SystemService};
 use macaca_proto::{
-    ApplicationDiscoverCommand, ApplicationDiscoverResult, ApplicationGenUiSurfaceCommand,
-    ApplicationHostDispatchResult, ApplicationHostDispatchServiceCommand, ApplicationId,
-    ApplicationLoadCommand, ApplicationMetadataQueryCommand, ApplicationMetadataResult,
-    ApplicationRemoveCommand, ApplicationServiceAppView, ApplicationServiceRuntimeView,
-    ApplicationServiceSessionView, ApplicationServiceSnapshot, ApplicationServiceUnavailable,
-    ApplicationSessionResumeCommand, ApplicationSessionStartCommand, ApplicationSessionStopCommand,
-    ApplicationSnapshotCommand, ApplicationStartCommand, ApplicationStatusCommand,
-    ApplicationStatusResult, ApplicationStopCommand, CleanupPolicy, PackageRuntimeKind,
-    ServiceCallResult, ServiceCommand, ServiceError, ServiceHealth, ServiceResult, TraceContext,
-    UiIntent, WasmExecutionProfile, WasmRuntimeArtifactRef, WasmRuntimeSessionRequest,
+    ApplicationAgentDelegateCommand, ApplicationAgentDelegateResult, ApplicationDiscoverCommand,
+    ApplicationDiscoverResult, ApplicationGenUiSurfaceCommand, ApplicationHostDispatchResult,
+    ApplicationHostDispatchServiceCommand, ApplicationId, ApplicationLoadCommand,
+    ApplicationMetadataQueryCommand, ApplicationMetadataResult, ApplicationRemoveCommand,
+    ApplicationServiceAppView, ApplicationServiceRuntimeView, ApplicationServiceSessionView,
+    ApplicationServiceSnapshot, ApplicationServiceUnavailable, ApplicationSessionResumeCommand,
+    ApplicationSessionStartCommand, ApplicationSessionStopCommand, ApplicationSnapshotCommand,
+    ApplicationStartCommand, ApplicationStatusCommand, ApplicationStatusResult,
+    ApplicationStopCommand, CleanupPolicy, PackageRuntimeKind, ServiceCallResult, ServiceCommand,
+    ServiceError, ServiceHealth, ServiceResult, TraceContext, UiIntent, WasmExecutionProfile,
+    WasmRuntimeArtifactRef, WasmRuntimeSessionRequest, APPLICATION_AGENT_DELEGATE_COMMAND,
     APPLICATION_DISCOVER_COMMAND, APPLICATION_GENUI_SURFACE_COMMAND,
     APPLICATION_HOST_DISPATCH_COMMAND, APPLICATION_LOAD_COMMAND,
     APPLICATION_METADATA_QUERY_COMMAND, APPLICATION_REMOVE_COMMAND,
@@ -44,6 +45,26 @@ use crate::wasm_runtime_provider::{
 };
 use crate::{ApplicationGenUiSurfaceStore, InMemoryServicePolicyEngine, ServicePolicyLayer};
 
+/// Runtime-host owned bridge for application-scoped orchestration.
+///
+/// This trait is the stable Adapter boundary between Application Service and
+/// shell/runtime composition roots.  Application Service owns the provider-
+/// neutral command contract, while Web or future hosts own the concrete
+/// executor registry and loop lifecycle.  Keeping this interface in
+/// `macaca-runtime-host` prevents the service provider from importing Web state
+/// or concrete shell types while still allowing WASM guests to request
+/// app-scoped agent work through ServiceRuntime.
+#[async_trait]
+pub trait ApplicationOrchestrationBackend: Send + Sync {
+    /// Delegate work to an app-scoped agent and return a bounded replayable
+    /// result.  Implementations must validate app/session/agent scope before
+    /// starting any worker-side effect.
+    async fn delegate_agent(
+        &self,
+        command: ApplicationAgentDelegateCommand,
+    ) -> ServiceResult<ApplicationAgentDelegateResult>;
+}
+
 /// Host-owned Application Service provider backed by existing app primitives.
 pub struct ApplicationSystemServiceProvider {
     descriptor: macaca_proto::ServiceDescriptor,
@@ -52,6 +73,7 @@ pub struct ApplicationSystemServiceProvider {
     kernel: Option<Arc<Kernel>>,
     wasm_policy_engine: Option<Arc<InMemoryServicePolicyEngine>>,
     wasm_runtime_provider: Option<Arc<dyn WasmApplicationRuntimeProvider>>,
+    orchestration_backend: Option<Arc<dyn ApplicationOrchestrationBackend>>,
     sessions: Arc<RwLock<HashMap<String, ApplicationServiceSessionView>>>,
     wasm_sessions: Arc<RwLock<HashMap<ApplicationId, Arc<dyn WasmExecutionSession>>>>,
     genui_surfaces: ApplicationGenUiSurfaceStore,
@@ -65,6 +87,7 @@ impl ApplicationSystemServiceProvider {
         kernel: Arc<Kernel>,
         wasm_policy_engine: Arc<InMemoryServicePolicyEngine>,
         wasm_host_import_bridge: WasmHostImportBridge,
+        orchestration_backend: Option<Arc<dyn ApplicationOrchestrationBackend>>,
     ) -> Self {
         let genui_surfaces = ApplicationGenUiSurfaceStore::default();
         let wasm_host_import_bridge =
@@ -80,6 +103,7 @@ impl ApplicationSystemServiceProvider {
             kernel: Some(kernel),
             wasm_policy_engine: Some(wasm_policy_engine),
             wasm_runtime_provider: Some(wasm_runtime_provider),
+            orchestration_backend,
             sessions: Arc::new(RwLock::new(HashMap::new())),
             wasm_sessions: Arc::new(RwLock::new(HashMap::new())),
             genui_surfaces,
@@ -95,10 +119,25 @@ impl ApplicationSystemServiceProvider {
             kernel: None,
             wasm_policy_engine: None,
             wasm_runtime_provider: None,
+            orchestration_backend: None,
             sessions: Arc::new(RwLock::new(HashMap::new())),
             wasm_sessions: Arc::new(RwLock::new(HashMap::new())),
             genui_surfaces: ApplicationGenUiSurfaceStore::default(),
         }
+    }
+
+    /// Attach an orchestration backend to an existing provider.
+    ///
+    /// Tests and alternate host composition roots use this builder-style hook
+    /// to prove that Application Service stays generic: the service provider
+    /// owns command validation and result shaping, while the backend owns the
+    /// concrete executor or remote orchestration transport.
+    pub fn with_orchestration_backend(
+        mut self,
+        backend: Arc<dyn ApplicationOrchestrationBackend>,
+    ) -> Self {
+        self.orchestration_backend = Some(backend);
+        self
     }
 
     fn registry(&self) -> ServiceResult<Arc<RwLock<AppRegistry>>> {
@@ -530,6 +569,62 @@ impl SystemService for ApplicationSystemServiceProvider {
                 };
                 Ok(Self::service_result(to_value(result)?, typed.trace))
             }
+            APPLICATION_AGENT_DELEGATE_COMMAND => {
+                let typed: ApplicationAgentDelegateCommand = decode(command.payload)?;
+                let result_trace = typed.trace.clone();
+                let app_id = typed.scope.application_id.ok_or_else(|| {
+                    ServiceError::AdapterFailure(
+                        "application.agent.delegate requires application_id".into(),
+                    )
+                })?;
+                let session_id = typed
+                    .scope
+                    .session_id
+                    .as_deref()
+                    .filter(|value| !value.trim().is_empty())
+                    .ok_or_else(|| {
+                        ServiceError::AdapterFailure(
+                            "application.agent.delegate requires session_id".into(),
+                        )
+                    })?;
+                if typed.target_agent.trim().is_empty() {
+                    return Err(ServiceError::AdapterFailure(
+                        "application.agent.delegate requires target_agent".into(),
+                    ));
+                }
+                if typed.prompt.trim().is_empty() {
+                    return Err(ServiceError::AdapterFailure(
+                        "application.agent.delegate requires prompt".into(),
+                    ));
+                }
+                tracing::info!(
+                    trace_id = %typed.trace.trace_id,
+                    app_id = %app_id,
+                    session_id,
+                    target_agent = %typed.target_agent,
+                    "application service accepted app-scoped agent delegation"
+                );
+                let result = if let Some(backend) = &self.orchestration_backend {
+                    backend.delegate_agent(typed).await?
+                } else {
+                    ApplicationAgentDelegateResult {
+                        application_id: app_id,
+                        session_id: session_id.to_string(),
+                        target_agent: typed.target_agent,
+                        task_id: None,
+                        success: false,
+                        output: serde_json::json!({
+                            "reason": "application orchestration backend is not configured"
+                        }),
+                        status: "unavailable".into(),
+                        metadata: BTreeMap::from([(
+                            "reason_code".into(),
+                            "orchestration_backend_unavailable".into(),
+                        )]),
+                    }
+                };
+                Ok(Self::service_result(to_value(result)?, result_trace))
+            }
             APPLICATION_GENUI_SURFACE_COMMAND => {
                 let typed: ApplicationGenUiSurfaceCommand = decode(command.payload)?;
                 let surface = self.get_genui_surface(&typed).await?;
@@ -650,15 +745,38 @@ fn minimal_running_view(
 
 #[cfg(test)]
 mod tests {
+    use async_trait::async_trait;
     use macaca_kernel::SystemService;
     use macaca_proto::{
+        ApplicationAgentDelegateCommand, ApplicationAgentDelegateResult,
         ApplicationGenUiSurfaceCommand, ApplicationServiceScope, ServiceCommand,
         ServiceCommandName, TraceContext, UiComponent, UiComponentKind, UiComponentTree, UiIntent,
-        UiRenderSurface, APPLICATION_GENUI_SURFACE_COMMAND,
+        UiRenderSurface, APPLICATION_AGENT_DELEGATE_COMMAND, APPLICATION_GENUI_SURFACE_COMMAND,
     };
     use serde_json::json;
 
     use super::*;
+
+    struct FakeOrchestrationBackend;
+
+    #[async_trait]
+    impl ApplicationOrchestrationBackend for FakeOrchestrationBackend {
+        async fn delegate_agent(
+            &self,
+            command: ApplicationAgentDelegateCommand,
+        ) -> ServiceResult<ApplicationAgentDelegateResult> {
+            Ok(ApplicationAgentDelegateResult {
+                application_id: command.scope.application_id.unwrap(),
+                session_id: command.scope.session_id.unwrap(),
+                target_agent: command.target_agent,
+                task_id: Some("task-from-fake-backend".into()),
+                success: true,
+                output: json!({"status": "queued"}),
+                status: "queued".into(),
+                metadata: BTreeMap::from([("reason_code".into(), "delegate_queued".into())]),
+            })
+        }
+    }
 
     fn card_intent(app_id: ApplicationId, session_id: &str, surface_id: &str) -> UiIntent {
         let trace = TraceContext::new("test-genui-render");
@@ -755,6 +873,78 @@ mod tests {
         let decoded: Option<UiIntent> = serde_json::from_value(result.output).unwrap();
 
         assert_eq!(decoded, Some(intent));
+    }
+
+    #[tokio::test]
+    async fn agent_delegate_without_backend_returns_structured_unavailable() {
+        let provider = ApplicationSystemServiceProvider::unavailable();
+        let app_id = ApplicationId::new();
+        let command = ApplicationAgentDelegateCommand {
+            trace: TraceContext::new("test-agent-delegate-unavailable"),
+            scope: ApplicationServiceScope {
+                application_id: Some(app_id),
+                application_name: None,
+                session_id: Some("session-agent-unavailable".into()),
+                agent_name: Some("wasm-guest".into()),
+            },
+            target_agent: "analyst".into(),
+            prompt: "Analyze BTC".into(),
+            context: json!({"symbol": "BTC"}),
+            metadata: BTreeMap::new(),
+        };
+
+        let result = provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new(APPLICATION_AGENT_DELEGATE_COMMAND),
+                serde_json::to_value(command).unwrap(),
+                TraceContext::new("test-agent-delegate-unavailable"),
+            ))
+            .await
+            .unwrap();
+        let decoded: ApplicationAgentDelegateResult =
+            serde_json::from_value(result.output).unwrap();
+
+        assert!(!decoded.success);
+        assert_eq!(decoded.status, "unavailable");
+        assert_eq!(
+            decoded.metadata.get("reason_code").map(String::as_str),
+            Some("orchestration_backend_unavailable")
+        );
+    }
+
+    #[tokio::test]
+    async fn agent_delegate_uses_injected_backend() {
+        let provider = ApplicationSystemServiceProvider::unavailable()
+            .with_orchestration_backend(Arc::new(FakeOrchestrationBackend));
+        let app_id = ApplicationId::new();
+        let command = ApplicationAgentDelegateCommand {
+            trace: TraceContext::new("test-agent-delegate-backend"),
+            scope: ApplicationServiceScope {
+                application_id: Some(app_id),
+                application_name: None,
+                session_id: Some("session-agent-backend".into()),
+                agent_name: Some("wasm-guest".into()),
+            },
+            target_agent: "analyst".into(),
+            prompt: "Analyze BTC".into(),
+            context: json!({"symbol": "BTC"}),
+            metadata: BTreeMap::new(),
+        };
+
+        let result = provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new(APPLICATION_AGENT_DELEGATE_COMMAND),
+                serde_json::to_value(command).unwrap(),
+                TraceContext::new("test-agent-delegate-backend"),
+            ))
+            .await
+            .unwrap();
+        let decoded: ApplicationAgentDelegateResult =
+            serde_json::from_value(result.output).unwrap();
+
+        assert!(decoded.success);
+        assert_eq!(decoded.task_id.as_deref(), Some("task-from-fake-backend"));
+        assert_eq!(decoded.status, "queued");
     }
 }
 

@@ -108,6 +108,7 @@ impl fmt::Display for ApplicationExport {
 #[serde(rename_all = "snake_case")]
 pub enum ApplicationImport {
     CapabilityRequest,
+    AgentDelegate,
     TaskCreateGoal,
     TaskQuery,
     TraceEmit,
@@ -124,6 +125,7 @@ impl ApplicationImport {
     pub fn as_name(&self) -> &str {
         match self {
             Self::CapabilityRequest => "macaca:capability/request",
+            Self::AgentDelegate => "macaca:agent/delegate",
             Self::TaskCreateGoal => "macaca:task/create_goal",
             Self::TaskQuery => "macaca:task/query",
             Self::TraceEmit => "macaca:trace/emit",
@@ -140,6 +142,7 @@ impl ApplicationImport {
     pub fn v0() -> Vec<Self> {
         vec![
             Self::CapabilityRequest,
+            Self::AgentDelegate,
             Self::TaskCreateGoal,
             Self::TaskQuery,
             Self::TraceEmit,

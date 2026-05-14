@@ -46,7 +46,9 @@ impl WasmHostImportCategory {
             ApplicationImport::TraceEmit => Self::TraceEmit,
             ApplicationImport::StorageGet | ApplicationImport::StorageSet => Self::Storage,
             ApplicationImport::CapabilityRequest => Self::Context,
-            ApplicationImport::TaskCreateGoal | ApplicationImport::TaskQuery => Self::Task,
+            ApplicationImport::AgentDelegate
+            | ApplicationImport::TaskCreateGoal
+            | ApplicationImport::TaskQuery => Self::Task,
             ApplicationImport::UiRender => Self::Custom,
             ApplicationImport::PaymentCreateIntent => Self::Payment,
             ApplicationImport::Custom(_) => Self::Custom,
@@ -79,6 +81,7 @@ pub enum WasmHostImportErrorKind {
     ServiceUnavailable,
     ServiceFailed,
     UnsupportedImport,
+    ScopeMissing,
 }
 
 impl WasmHostImportErrorKind {
@@ -92,6 +95,7 @@ impl WasmHostImportErrorKind {
             Self::ServiceUnavailable => "service_unavailable",
             Self::ServiceFailed => "service_failed",
             Self::UnsupportedImport => "unsupported_import",
+            Self::ScopeMissing => "scope_missing",
         }
     }
 }

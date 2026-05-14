@@ -41,6 +41,9 @@ impl ApplicationHostBackend for UnavailableApplicationHostBackend {
     ) -> Result<ApplicationHostCommandResult, ApplicationAbiError> {
         let trace = command.trace.clone();
         let reason = match command.import {
+            ApplicationImport::AgentDelegate => {
+                "agent delegation backend is not wired for this ApplicationHost"
+            }
             ApplicationImport::TaskCreateGoal => {
                 "task create-goal backend is not wired for this ApplicationHost"
             }

@@ -33,6 +33,7 @@ pub const APPLICATION_SESSION_STOP_COMMAND: &str = "application.session.stop";
 pub const APPLICATION_HOST_DISPATCH_COMMAND: &str = "application.host.dispatch";
 pub const APPLICATION_GENUI_SURFACE_COMMAND: &str = "application.genui.surface";
 pub const APPLICATION_METADATA_QUERY_COMMAND: &str = "application.metadata.query";
+pub const APPLICATION_AGENT_DELEGATE_COMMAND: &str = "application.agent.delegate";
 
 /// Explicit scope for Application Service commands.
 ///
@@ -178,6 +179,39 @@ pub struct ApplicationHostDispatchServiceCommand {
     pub trace: TraceContext,
     pub scope: ApplicationServiceScope,
     pub host_command: ApplicationHostCommand,
+}
+
+/// Request app-scoped agent work through the Application Service.
+///
+/// This command is intentionally provider-neutral.  It carries only app,
+/// session, agent, prompt, trace, and bounded JSON context so WASM runtimes,
+/// Web, CLI, or future remote hosts can request delegated work without holding
+/// `ApplicationExecutor`, Web state, Toolkit, or concrete provider handles.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApplicationAgentDelegateCommand {
+    pub trace: TraceContext,
+    pub scope: ApplicationServiceScope,
+    pub target_agent: String,
+    pub prompt: String,
+    pub context: serde_json::Value,
+    pub metadata: BTreeMap<String, String>,
+}
+
+/// Provider-neutral result for app-scoped agent delegation.
+///
+/// The result is a Memento-friendly summary rather than a raw worker runtime
+/// object.  Hosts can persist or replay it alongside trace/audit events without
+/// exposing agent internals, tool payload secrets, or presentation-shell state.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApplicationAgentDelegateResult {
+    pub application_id: ApplicationId,
+    pub session_id: String,
+    pub target_agent: String,
+    pub task_id: Option<String>,
+    pub success: bool,
+    pub output: serde_json::Value,
+    pub status: String,
+    pub metadata: BTreeMap<String, String>,
 }
 
 /// Query one application-owned GenUI surface.
