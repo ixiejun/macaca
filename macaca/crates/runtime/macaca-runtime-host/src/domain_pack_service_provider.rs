@@ -11,17 +11,23 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use chrono::Utc;
 use macaca_kernel::SystemService;
 use macaca_llm::LlmProvider;
 use macaca_proto::{
-    CleanupPolicy, KernelServiceId, LlmMessage, LlmOptions, MacacaError, MacacaResult,
-    ServiceCallResult, ServiceCommand, ServiceDescriptor, ServiceError, ServiceHealth,
-    ServiceResult, ServiceType, TraceContext, TraceSchemaRef,
+    CleanupPolicy, KernelServiceId, MacacaError, MacacaResult, ServiceCallResult, ServiceCommand,
+    ServiceDescriptor, ServiceError, ServiceHealth, ServiceResult, ServiceType, TraceContext,
+    TraceSchemaRef,
 };
 use serde_json::{json, Value};
 use tracing::{info, warn};
 
 use crate::{
+    finance_live_data::{
+        build_finance_http_client, crypto_market_output_from_binance, crypto_news_items_from_rss,
+        crypto_spot_pair, BinanceTicker24h, CRYPTO_NEWS_RSS_URL,
+    },
+    finance_llm_analysis_provider::FinanceLlmAnalysisSystemServiceProvider,
     ServiceProviderFactoryContext, ServiceProviderInstance, ServiceRuntime,
     StaticServiceProviderFactory,
 };
@@ -45,7 +51,7 @@ pub const FINANCE_ANALYZE_COMMAND: &str = "finance.analyze";
 /// Keeping result construction in one helper makes metadata and cleanup
 /// semantics consistent across services.  The metadata is intentionally
 /// generic and audit-friendly; it never includes application names or secrets.
-fn service_result(
+pub(crate) fn service_result(
     output: Value,
     trace: TraceContext,
     provider_class: &'static str,
@@ -63,7 +69,7 @@ fn service_result(
 }
 
 /// Extract a trace context or fail before provider logic runs.
-fn command_trace(command: &ServiceCommand) -> ServiceResult<TraceContext> {
+pub(crate) fn command_trace(command: &ServiceCommand) -> ServiceResult<TraceContext> {
     command
         .trace
         .clone()
@@ -75,7 +81,7 @@ fn command_trace(command: &ServiceCommand) -> ServiceResult<TraceContext> {
 /// The guest SDK remains responsible for strict validation.  Host-side domain
 /// services still normalize inputs defensively because malformed requests can
 /// arrive from old applications, direct SDK callers, or future IPC bridges.
-fn extract_symbol(payload: &Value) -> String {
+pub(crate) fn extract_symbol(payload: &Value) -> String {
     let candidate = payload
         .get("ticker")
         .or_else(|| payload.get("symbol"))
@@ -90,8 +96,21 @@ fn extract_symbol(payload: &Value) -> String {
         .to_ascii_uppercase()
 }
 
+/// Return whether the caller is requesting crypto-shaped finance data.
+///
+/// Crypto remains part of the finance domain pack; this helper only selects a
+/// live market-data adapter for generic `asset_class: crypto` requests.  It
+/// does not bind the OS to any application, symbol, workflow, or UI surface.
+fn is_crypto_asset(payload: &Value) -> bool {
+    payload
+        .get("asset_class")
+        .and_then(Value::as_str)
+        .map(|value| value.eq_ignore_ascii_case("crypto"))
+        .unwrap_or(false)
+}
+
 /// Build a generic descriptor for one domain-pack service.
-fn finance_descriptor(service_id: &str, service_kind: &str) -> ServiceDescriptor {
+pub(crate) fn finance_descriptor(service_id: &str, service_kind: &str) -> ServiceDescriptor {
     let mut descriptor = ServiceDescriptor::new(
         KernelServiceId::new(service_id),
         ServiceType::new(service_kind),
@@ -115,6 +134,7 @@ fn finance_descriptor(service_id: &str, service_kind: &str) -> ServiceDescriptor
 pub struct FinanceDataSystemServiceProvider {
     descriptor: ServiceDescriptor,
     service_kind: &'static str,
+    http_client: reqwest::Client,
 }
 
 impl FinanceDataSystemServiceProvider {
@@ -137,21 +157,40 @@ impl FinanceDataSystemServiceProvider {
         Self {
             descriptor: finance_descriptor(service_id, service_kind),
             service_kind,
+            http_client: build_finance_http_client(),
         }
     }
 
-    fn output_for(&self, symbol: &str, payload: &Value) -> Value {
+    async fn output_for(&self, symbol: &str, payload: &Value) -> ServiceResult<Value> {
         match self.service_kind {
-            "finance.market_data" => json!({
+            "finance.market_data" if is_crypto_asset(payload) => {
+                self.live_crypto_market_data(symbol, payload).await
+            }
+            "finance.market_data" => Ok(json!({
                 "symbol": symbol,
+                "asset_class": "equity",
                 "currency": "USD",
                 "price": 197.23,
                 "day_change_percent": 0.84,
+                "volume_24h_usd": 5_280_000_000_f64,
+                "moving_averages": {
+                    "ma_20": 194.10,
+                    "ma_50": 189.80,
+                    "ma_200": 181.40
+                },
+                "technicals": {
+                    "rsi_14": 55.4,
+                    "trend": "up",
+                    "volatility": "low",
+                    "liquidity": "deep",
+                    "support": 190.0,
+                    "resistance": 205.0
+                },
                 "as_of": "fixture.realtime",
                 "source": "domain_pack.finance.v1.local_fixture",
                 "input": payload,
-            }),
-            "finance.financials" => json!({
+            })),
+            "finance.financials" => Ok(json!({
                 "symbol": symbol,
                 "revenue_growth_yoy_percent": 6.1,
                 "gross_margin_percent": 46.6,
@@ -159,10 +198,15 @@ impl FinanceDataSystemServiceProvider {
                 "debt_risk": "low",
                 "source": "domain_pack.finance.v1.local_fixture",
                 "input": payload,
-            }),
-            _ => json!({
+            })),
+            "finance.news_digest" if is_crypto_asset(payload) => {
+                self.live_crypto_news_digest(symbol, payload).await
+            }
+            _ => Ok(json!({
                 "symbol": symbol,
+                "asset_class": "equity",
                 "sentiment": "mixed_positive",
+                "risk_level": "medium",
                 "items": [
                     "Product demand remains a monitored driver.",
                     "Macro rates and valuation sensitivity remain key risks.",
@@ -170,8 +214,89 @@ impl FinanceDataSystemServiceProvider {
                 ],
                 "source": "domain_pack.finance.v1.local_fixture",
                 "input": payload,
-            }),
+            })),
         }
+    }
+
+    /// Fetch live crypto market data through the generic finance-pack provider.
+    ///
+    /// The method intentionally fails closed instead of silently falling back to
+    /// fixture data.  A failed quote should be visible in the host-command trace
+    /// as `service_unavailable`; otherwise users could mistake stale synthetic
+    /// evidence for a real market snapshot.
+    async fn live_crypto_market_data(&self, symbol: &str, payload: &Value) -> ServiceResult<Value> {
+        let pair_symbol = crypto_spot_pair(symbol);
+        let response = self
+            .http_client
+            .get("https://api.binance.com/api/v3/ticker/24hr")
+            .query(&[("symbol", pair_symbol.as_str())])
+            .send()
+            .await
+            .map_err(|error| {
+                ServiceError::ServiceUnavailable(format!(
+                    "live crypto market data request failed for {pair_symbol}: {error}"
+                ))
+            })?;
+
+        if !response.status().is_success() {
+            return Err(ServiceError::ServiceUnavailable(format!(
+                "live crypto market data request failed for {pair_symbol}: HTTP {}",
+                response.status()
+            )));
+        }
+
+        let ticker = response.json::<BinanceTicker24h>().await.map_err(|error| {
+            ServiceError::ServiceUnavailable(format!(
+                "live crypto market data response could not be decoded for {pair_symbol}: {error}"
+            ))
+        })?;
+
+        Ok(crypto_market_output_from_binance(symbol, payload, ticker))
+    }
+
+    /// Fetch a live crypto news digest from a public RSS source.
+    ///
+    /// The output stays within the existing finance-pack `news_digest` shape so
+    /// WASM applications do not need to know which publication or wire format
+    /// the host used.  When the source is unavailable the service reports an
+    /// outage instead of mixing live market data with synthetic headlines.
+    async fn live_crypto_news_digest(&self, symbol: &str, payload: &Value) -> ServiceResult<Value> {
+        let response = self
+            .http_client
+            .get(CRYPTO_NEWS_RSS_URL)
+            .send()
+            .await
+            .map_err(|error| {
+                ServiceError::ServiceUnavailable(format!(
+                    "live crypto news request failed for {symbol}: {error}"
+                ))
+            })?;
+
+        if !response.status().is_success() {
+            return Err(ServiceError::ServiceUnavailable(format!(
+                "live crypto news request failed for {symbol}: HTTP {}",
+                response.status()
+            )));
+        }
+
+        let fetched_at = Utc::now().to_rfc3339();
+        let feed = response.text().await.map_err(|error| {
+            ServiceError::ServiceUnavailable(format!(
+                "live crypto news response could not be read for {symbol}: {error}"
+            ))
+        })?;
+        let items = crypto_news_items_from_rss(symbol, &feed)?;
+
+        Ok(json!({
+            "symbol": symbol,
+            "asset_class": "crypto",
+            "sentiment": "news_driven",
+            "risk_level": "medium",
+            "items": items,
+            "as_of": fetched_at,
+            "source": "coindesk.public.rss",
+            "input": payload,
+        }))
     }
 }
 
@@ -210,7 +335,7 @@ impl SystemService for FinanceDataSystemServiceProvider {
             return Err(ServiceError::UnsupportedCommand(command.name.to_string()));
         }
         Ok(service_result(
-            self.output_for(&symbol, &command.payload),
+            self.output_for(&symbol, &command.payload).await?,
             trace,
             "finance_domain_pack_data",
         ))
@@ -230,120 +355,6 @@ impl SystemService for FinanceDataSystemServiceProvider {
             service_id = %self.descriptor.id,
             service_kind = self.service_kind,
             "finance domain-pack data service cleaned up"
-        );
-        Ok(())
-    }
-
-    async fn health(&self) -> ServiceResult<ServiceHealth> {
-        Ok(ServiceHealth::Healthy)
-    }
-}
-
-/// LLM-backed analysis adapter for the finance domain pack.
-///
-/// This provider is intentionally a Bridge: WASM applications call the generic
-/// `service.llm.analysis` contract, while the adapter delegates model execution
-/// to the host's configured `LlmProvider`.  The application never receives API
-/// keys and Macaca never learns application-specific workflow names.
-pub struct FinanceLlmAnalysisSystemServiceProvider {
-    descriptor: ServiceDescriptor,
-    llm: Arc<dyn LlmProvider>,
-}
-
-impl FinanceLlmAnalysisSystemServiceProvider {
-    /// Create an analysis provider over the host-selected LLM strategy.
-    pub fn new(llm: Arc<dyn LlmProvider>) -> Self {
-        Self {
-            descriptor: finance_descriptor(FINANCE_LLM_ANALYSIS_SERVICE_ID, "finance.llm_analysis"),
-            llm,
-        }
-    }
-
-    fn prompt(symbol: &str, payload: &Value) -> Vec<LlmMessage> {
-        vec![
-            LlmMessage::system(
-                "You are a finance analysis service inside an application runtime. \
-                 Produce concise, non-advisory analysis from the provided structured payload. \
-                 Do not claim to have live market access beyond the supplied data.",
-            ),
-            LlmMessage::user(format!(
-                "Analyze symbol {symbol}. Use this JSON payload as the complete evidence set: {payload}",
-            )),
-        ]
-    }
-}
-
-#[async_trait]
-impl SystemService for FinanceLlmAnalysisSystemServiceProvider {
-    fn descriptor(&self) -> ServiceDescriptor {
-        self.descriptor.clone()
-    }
-
-    async fn start(&self) -> ServiceResult<()> {
-        info!(
-            service_id = %self.descriptor.id,
-            llm_provider = self.llm.name(),
-            "finance domain-pack llm analysis service started"
-        );
-        Ok(())
-    }
-
-    async fn call(&self, command: ServiceCommand) -> ServiceResult<ServiceCallResult> {
-        let trace = command_trace(&command)?;
-        let symbol = extract_symbol(&command.payload);
-        info!(
-            service_id = %self.descriptor.id,
-            command = %command.name,
-            trace_id = %trace.trace_id,
-            symbol = %symbol,
-            "finance domain-pack llm analysis accepted command"
-        );
-        if command.name.as_str() != FINANCE_ANALYZE_COMMAND {
-            warn!(
-                service_id = %self.descriptor.id,
-                command = %command.name,
-                trace_id = %trace.trace_id,
-                "finance domain-pack llm analysis rejected unsupported command"
-            );
-            return Err(ServiceError::UnsupportedCommand(command.name.to_string()));
-        }
-        let options = LlmOptions {
-            max_tokens: Some(900),
-            temperature: Some(0.2),
-            ..LlmOptions::default()
-        };
-        let response = self
-            .llm
-            .chat(Self::prompt(&symbol, &command.payload), &options)
-            .await
-            .map_err(service_adapter_error)?;
-        Ok(service_result(
-            json!({
-                "symbol": symbol,
-                "analysis": response.content,
-                "model": response.model,
-                "finish_reason": response.finish_reason,
-                "usage": response.usage,
-            }),
-            trace,
-            "finance_domain_pack_llm",
-        ))
-    }
-
-    async fn stop(&self) -> ServiceResult<()> {
-        info!(
-            service_id = %self.descriptor.id,
-            llm_provider = self.llm.name(),
-            "finance domain-pack llm analysis service stopped"
-        );
-        Ok(())
-    }
-
-    async fn cleanup(&self) -> ServiceResult<()> {
-        info!(
-            service_id = %self.descriptor.id,
-            llm_provider = self.llm.name(),
-            "finance domain-pack llm analysis service cleaned up"
         );
         Ok(())
     }
@@ -424,7 +435,7 @@ pub async fn bootstrap_builtin_domain_pack_services(
     Ok(bundle)
 }
 
-fn service_adapter_error(error: MacacaError) -> ServiceError {
+pub(crate) fn service_adapter_error(error: MacacaError) -> ServiceError {
     ServiceError::ServiceUnavailable(error.to_string())
 }
 

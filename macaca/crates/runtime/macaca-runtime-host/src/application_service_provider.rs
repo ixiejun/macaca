@@ -28,7 +28,7 @@ use macaca_proto::{
     ApplicationSnapshotCommand, ApplicationStartCommand, ApplicationStatusCommand,
     ApplicationStatusResult, ApplicationStopCommand, CleanupPolicy, PackageRuntimeKind,
     ServiceCallResult, ServiceCommand, ServiceError, ServiceHealth, ServiceResult, TraceContext,
-    WasmExecutionProfile, WasmRuntimeArtifactRef, WasmRuntimeSessionRequest,
+    UiIntent, WasmExecutionProfile, WasmRuntimeArtifactRef, WasmRuntimeSessionRequest,
     APPLICATION_DISCOVER_COMMAND, APPLICATION_GENUI_SURFACE_COMMAND,
     APPLICATION_HOST_DISPATCH_COMMAND, APPLICATION_LOAD_COMMAND,
     APPLICATION_METADATA_QUERY_COMMAND, APPLICATION_REMOVE_COMMAND,
@@ -42,7 +42,7 @@ use crate::wasm_runtime_provider::{
     ComponentModelWasmRuntimeProvider, WasmApplicationRuntimeProvider, WasmExecutionSession,
     WasmHostImportBridge,
 };
-use crate::{InMemoryServicePolicyEngine, ServicePolicyLayer};
+use crate::{ApplicationGenUiSurfaceStore, InMemoryServicePolicyEngine, ServicePolicyLayer};
 
 /// Host-owned Application Service provider backed by existing app primitives.
 pub struct ApplicationSystemServiceProvider {
@@ -54,6 +54,7 @@ pub struct ApplicationSystemServiceProvider {
     wasm_runtime_provider: Option<Arc<dyn WasmApplicationRuntimeProvider>>,
     sessions: Arc<RwLock<HashMap<String, ApplicationServiceSessionView>>>,
     wasm_sessions: Arc<RwLock<HashMap<ApplicationId, Arc<dyn WasmExecutionSession>>>>,
+    genui_surfaces: ApplicationGenUiSurfaceStore,
 }
 
 impl ApplicationSystemServiceProvider {
@@ -65,6 +66,9 @@ impl ApplicationSystemServiceProvider {
         wasm_policy_engine: Arc<InMemoryServicePolicyEngine>,
         wasm_host_import_bridge: WasmHostImportBridge,
     ) -> Self {
+        let genui_surfaces = ApplicationGenUiSurfaceStore::default();
+        let wasm_host_import_bridge =
+            wasm_host_import_bridge.with_genui_surface_store(genui_surfaces.clone());
         let wasm_runtime_provider = Arc::new(
             ComponentModelWasmRuntimeProvider::default()
                 .with_host_import_bridge(Arc::new(wasm_host_import_bridge)),
@@ -78,6 +82,7 @@ impl ApplicationSystemServiceProvider {
             wasm_runtime_provider: Some(wasm_runtime_provider),
             sessions: Arc::new(RwLock::new(HashMap::new())),
             wasm_sessions: Arc::new(RwLock::new(HashMap::new())),
+            genui_surfaces,
         }
     }
 
@@ -92,6 +97,7 @@ impl ApplicationSystemServiceProvider {
             wasm_runtime_provider: None,
             sessions: Arc::new(RwLock::new(HashMap::new())),
             wasm_sessions: Arc::new(RwLock::new(HashMap::new())),
+            genui_surfaces: ApplicationGenUiSurfaceStore::default(),
         }
     }
 
@@ -242,6 +248,67 @@ impl ApplicationSystemServiceProvider {
             metadata: BTreeMap::new(),
             cleanup_hint: Some(CleanupPolicy::None),
         }
+    }
+
+    /// Store the latest validated GenUI intent for one app/session/surface.
+    ///
+    /// This is a host-owned Repository/Memento boundary.  WASM guests and
+    /// future application runtimes emit declarative UI intent data, while
+    /// Application Service owns the replayable lookup surface consumed by Web,
+    /// Desktop, CLI inspectors, or audit tooling.  Keeping this store here
+    /// prevents presentation shells from inventing application-specific state
+    /// maps and keeps render queries traceable through the same service facade
+    /// used for lifecycle and host dispatch commands.
+    #[cfg(test)]
+    async fn store_genui_surface(&self, intent: UiIntent) -> ServiceResult<()> {
+        tracing::info!(
+            app_id = %intent.app_id,
+            session_id = %intent.session_id,
+            surface_id = %intent.surface_id,
+            trace_id = intent.trace.as_ref().map(|trace| trace.trace_id.as_str()).unwrap_or("none"),
+            root_component = %intent.tree.root.id,
+            "application service stored GenUI session surface"
+        );
+        self.genui_surfaces.store(intent).await
+    }
+
+    /// Query the latest GenUI intent for one app/session/surface.
+    ///
+    /// A missing value is a first-class `None`, not an error.  That preserves
+    /// the existing chat shell fallback for applications that have not emitted
+    /// a declarative surface yet.
+    async fn get_genui_surface(
+        &self,
+        command: &ApplicationGenUiSurfaceCommand,
+    ) -> ServiceResult<Option<UiIntent>> {
+        let app_id = command.scope.application_id.ok_or_else(|| {
+            ServiceError::AdapterFailure("application.genui.surface requires application_id".into())
+        })?;
+        let session_id = command
+            .scope
+            .session_id
+            .as_deref()
+            .filter(|value| !value.trim().is_empty())
+            .ok_or_else(|| {
+                ServiceError::AdapterFailure("application.genui.surface requires session_id".into())
+            })?;
+        let surface_id = command
+            .surface_id
+            .as_deref()
+            .filter(|value| !value.trim().is_empty());
+        let surface = self
+            .genui_surfaces
+            .get(&app_id.to_string(), session_id, surface_id)
+            .await?;
+        tracing::info!(
+            trace_id = %command.trace.trace_id,
+            app_id = %app_id,
+            session_id,
+            surface_id = surface_id.unwrap_or("default"),
+            found = surface.is_some(),
+            "application service queried GenUI session surface"
+        );
+        Ok(surface)
     }
 
     async fn discovered_views(
@@ -465,12 +532,8 @@ impl SystemService for ApplicationSystemServiceProvider {
             }
             APPLICATION_GENUI_SURFACE_COMMAND => {
                 let typed: ApplicationGenUiSurfaceCommand = decode(command.payload)?;
-                let unavailable = ApplicationServiceUnavailable::new(
-                    APPLICATION_GENUI_SURFACE_COMMAND,
-                    "application-provided GenUI surface is unavailable in S7 provider",
-                    Some(&typed.trace),
-                );
-                Ok(Self::service_result(to_value(unavailable)?, typed.trace))
+                let surface = self.get_genui_surface(&typed).await?;
+                Ok(Self::service_result(to_value(surface)?, typed.trace))
             }
             APPLICATION_LOAD_COMMAND => {
                 let typed: ApplicationLoadCommand = decode(command.payload)?;
@@ -528,6 +591,7 @@ impl SystemService for ApplicationSystemServiceProvider {
     async fn cleanup(&self) -> ServiceResult<()> {
         self.sessions.write().await.clear();
         self.wasm_sessions.write().await.clear();
+        self.genui_surfaces.clear().await;
         tracing::info!(service_id = %self.descriptor.id, "application service provider cleanup completed");
         Ok(())
     }
@@ -581,6 +645,116 @@ fn minimal_running_view(
         },
         ui: None,
         diagnostics: Vec::new(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use macaca_kernel::SystemService;
+    use macaca_proto::{
+        ApplicationGenUiSurfaceCommand, ApplicationServiceScope, ServiceCommand,
+        ServiceCommandName, TraceContext, UiComponent, UiComponentKind, UiComponentTree, UiIntent,
+        UiRenderSurface, APPLICATION_GENUI_SURFACE_COMMAND,
+    };
+    use serde_json::json;
+
+    use super::*;
+
+    fn card_intent(app_id: ApplicationId, session_id: &str, surface_id: &str) -> UiIntent {
+        let trace = TraceContext::new("test-genui-render");
+        UiIntent {
+            app_id: app_id.to_string(),
+            session_id: session_id.to_string(),
+            surface_id: UiRenderSurface::new(surface_id),
+            tree: UiComponentTree {
+                root: UiComponent::new(
+                    "session-card",
+                    UiComponentKind::Card,
+                    json!({
+                        "title": "Session Surface",
+                        "body": "Schema-defined session card"
+                    }),
+                ),
+                trace_markers: Vec::new(),
+                metadata: Default::default(),
+            },
+            permission_prompts: Vec::new(),
+            approval_prompts: Vec::new(),
+            trace: Some(trace),
+            metadata: Default::default(),
+        }
+    }
+
+    #[tokio::test]
+    async fn genui_surface_query_returns_stored_session_surface() {
+        let provider = ApplicationSystemServiceProvider::unavailable();
+        let app_id = ApplicationId::new();
+        let session_id = "session-genui-test";
+        let surface_id = "session-surface";
+        let intent = card_intent(app_id, session_id, surface_id);
+
+        provider
+            .store_genui_surface(intent.clone())
+            .await
+            .expect("test intent should store");
+
+        let command = ApplicationGenUiSurfaceCommand {
+            trace: TraceContext::new("test-genui-query"),
+            scope: ApplicationServiceScope {
+                application_id: Some(app_id),
+                application_name: None,
+                session_id: Some(session_id.to_string()),
+                agent_name: None,
+            },
+            surface_id: Some(surface_id.to_string()),
+        };
+        let result = provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new(APPLICATION_GENUI_SURFACE_COMMAND),
+                serde_json::to_value(command).unwrap(),
+                TraceContext::new("test-genui-query"),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(result.trace.trace_id, "test-genui-query");
+        let decoded: Option<UiIntent> = serde_json::from_value(result.output).unwrap();
+
+        assert_eq!(decoded, Some(intent));
+    }
+
+    #[tokio::test]
+    async fn genui_surface_query_without_surface_id_returns_latest_session_surface() {
+        let provider = ApplicationSystemServiceProvider::unavailable();
+        let app_id = ApplicationId::new();
+        let session_id = "session-genui-default-test";
+        let intent = card_intent(app_id, session_id, "non-default-surface");
+
+        provider
+            .store_genui_surface(intent.clone())
+            .await
+            .expect("test intent should store");
+
+        let command = ApplicationGenUiSurfaceCommand {
+            trace: TraceContext::new("test-genui-default-query"),
+            scope: ApplicationServiceScope {
+                application_id: Some(app_id),
+                application_name: None,
+                session_id: Some(session_id.to_string()),
+                agent_name: None,
+            },
+            surface_id: None,
+        };
+        let result = provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new(APPLICATION_GENUI_SURFACE_COMMAND),
+                serde_json::to_value(command).unwrap(),
+                TraceContext::new("test-genui-default-query"),
+            ))
+            .await
+            .unwrap();
+        let decoded: Option<UiIntent> = serde_json::from_value(result.output).unwrap();
+
+        assert_eq!(decoded, Some(intent));
     }
 }
 

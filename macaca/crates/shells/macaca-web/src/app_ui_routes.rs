@@ -278,7 +278,7 @@ fn normalize_package_path(value: &str) -> Result<PathBuf, RouteError> {
 
 fn ensure_declared_asset(ui: &AppUiRuntimeConfig, asset_path: &Path) -> Result<(), RouteError> {
     let requested = path_to_slash(asset_path);
-    if requested == ui.entry {
+    if ui.entry.as_deref() == Some(requested.as_str()) {
         return Ok(());
     }
     let allowed = ui.assets.iter().any(|pattern| {
@@ -401,8 +401,8 @@ fn rejected_bridge_result(
 #[cfg(test)]
 mod tests {
     use macaca_app::ui_runtime::{
-        AppUiBridgeConfig, AppUiRuntimeConfig, AppUiRuntimeKind, AppUiSandboxConfig,
-        AppUiSurfaceConfig, AppUiThemeConfig,
+        AppUiBridgeConfig, AppUiPresentationConfig, AppUiRuntimeConfig, AppUiRuntimeKind,
+        AppUiSandboxConfig, AppUiSurfaceConfig, AppUiThemeConfig,
     };
 
     use super::*;
@@ -412,13 +412,14 @@ mod tests {
             runtime: AppUiRuntimeKind::WebBundle,
             surface: AppUiSurfaceConfig::default(),
             framework: None,
-            entry: "dist/ui/index.html".into(),
+            entry: Some("dist/ui/index.html".into()),
             assets: vec!["dist/ui/assets/**".into()],
             sandbox: AppUiSandboxConfig::default(),
             bridge: AppUiBridgeConfig {
                 required: vec!["service.call".into()],
                 optional: vec!["trace.emit".into()],
             },
+            presentation: AppUiPresentationConfig::default(),
             theme: AppUiThemeConfig::default(),
         }
     }

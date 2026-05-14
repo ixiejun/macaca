@@ -1,0 +1,28 @@
+# Ralph progress — context integration completion
+
+## Completed implementation (2026-05-06)
+
+### OpenSpec
+- Added `openspec/changes/integrate-context-memory-skills-mcp/` with proposal, design, tasks, `integration-acceptance` spec; `openspec validate --strict` PASS.
+
+### macaca-context
+- `CompiledContext` alias, `CapabilityCandidate` alias, `composer/candidate_fingerprint.rs` + fields on `ComposerPlanSummary`.
+- Profile loader: YAML frontmatter strip, NUL + `profile_max_content_lines` scan, `ProfileSkipReason::ContentRejected`, `load_notes`; tests for heartbeat gate, frontmatter, line cap.
+- `knowledge_digest/composition_tests.rs`: tombstone trim + digest-vs-raw + stale path.
+- `external_boundary` docs + unit test for validation → candidate construction.
+- Crate `README.md`; `docs/context-facade-call-sites.md` inventory.
+
+### macaca-memory
+- `MergedTombstoneIndex` + union/dedup test.
+
+### macaca-web
+- `WorkspaceMemoryRecallSource`: optional `TombstoneIndex`; `ContextReportingChatModel` wires registry into recall; tombstone integration test.
+
+### macaca-proto
+- `AgentProfileContextConfig.profile_max_content_lines` (default 0 = disabled).
+
+### Verification
+- `cargo check --workspace`
+- `cargo test -p macaca-context --lib` (73 tests)
+- `cargo test -p macaca-memory --lib`
+- `cargo test -p macaca-web --lib`

@@ -1,0 +1,97 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - link "Google 财经 Beta 版 Beta 版" [ref=e4] [cursor=pointer]:
+      - /url: ./
+      - generic [ref=e5]:
+        - img [ref=e6]
+        - heading "Google 财经 Beta 版" [level=1] [ref=e8]: 财经
+        - generic [ref=e9]: Beta 版
+    - search [ref=e10]:
+      - button "搜索股票、ETF 等" [ref=e12]:
+        - generic [ref=e16]: search_spark
+    - generic [ref=e17]:
+      - generic [ref=e21]:
+        - button "设置" [ref=e22] [cursor=pointer]:
+          - generic [ref=e24]: settings
+        - tooltip [ref=e26]: 设置
+      - generic [ref=e27]:
+        - generic [ref=e28] [cursor=pointer]:
+          - generic [ref=e30]: feedback
+          - generic "发送反馈" [ref=e31]
+        - tooltip [ref=e32]: 发送反馈
+      - link "登录" [ref=e38] [cursor=pointer]:
+        - /url: https://accounts.google.com/ServiceLogin?passive=1209600&continue=https://www.google.com/finance/beta/quote/AAPL:NASDAQ&followup=https://www.google.com/finance/beta/quote/AAPL:NASDAQ&ec=GAZA4AU
+  - generic:
+    - generic:
+      - region "列表":
+        - generic [ref=e40]:
+          - generic [ref=e42]
+          - table "股票板块" [ref=e51]
+  - generic [ref=e139]:
+    - generic "AAPL:NASDAQ" [ref=e142]
+    - generic [ref=e144]:
+      - button "添加到列表" [disabled]:
+        - generic:
+          - generic: check_indeterminate_small
+        - generic: 添加到列表
+        - generic:
+          - img
+    - generic [ref=e148]:
+      - generic [ref=e150]:
+        - generic [ref=e152]: 苹果
+        - generic [ref=e154]:
+          - generic [ref=e155]
+          - generic [ref=e166]: 5月13日, GMT-4 14:03:17 · USD
+      - generic [ref=e167]:
+        - generic [ref=e169]:
+          - button "选择图表类型 - 已选择面积图" [ref=e173] [cursor=pointer]
+          - button "与金融实体进行比较" [ref=e186] [cursor=pointer]
+          - button "选择技术指标" [ref=e198] [cursor=pointer]
+        - tablist "股票图表标签页" [ref=e216]:
+          - tab "1 天" [selected] [ref=e217] [cursor=pointer]
+          - tab "5 天" [ref=e218] [cursor=pointer]
+          - tab "1 个月" [ref=e219] [cursor=pointer]
+          - tab "6 个月" [ref=e220] [cursor=pointer]
+          - tab "年初至今" [ref=e221] [cursor=pointer]
+          - tab "1 年" [ref=e222] [cursor=pointer]
+          - tab "5 年" [ref=e223] [cursor=pointer]
+          - tab "最大" [ref=e224] [cursor=pointer]
+    - generic [ref=e227]:
+      - tablist [ref=e228]:
+        - generic [ref=e232]:
+          - tab "概览" [selected] [ref=e233] [cursor=pointer]
+          - tab "财报" [ref=e234] [cursor=pointer]
+          - tab "财务" [ref=e235] [cursor=pointer]
+      - tabpanel "概览" [ref=e236]:
+        - generic [ref=e238]:
+          - generic [ref=e242]
+          - generic [ref=e249]
+          - generic [ref=e302]
+          - generic [ref=e366]
+          - generic [ref=e450]
+  - generic:
+    - region "“研究”面板":
+      - generic [ref=e481]:
+        - generic [ref=e484]:
+          - heading "研究" [level=2] [ref=e485]
+          - generic [ref=e486]
+          - generic [ref=e493]
+          - tooltip [ref=e499]: 收起
+          - generic [ref=e500]
+        - search [ref=e510]:
+          - button "搜索股票、ETF 等" [ref=e512]
+  - generic [ref=e535]:
+    - generic [ref=e536]:
+      - text: AI 内容可能包含错误。
+      - link "了解详情" [ref=e537] [cursor=pointer]:
+        - /url: https://support.google.com/websearch?p=googlefinancebeta
+    - generic [ref=e538]:
+      - link "帮助" [ref=e539] [cursor=pointer]:
+        - /url: https://support.google.com/websearch?p=googlefinancebeta
+      - generic [ref=e540] [cursor=pointer]: 发送反馈
+      - link "隐私权" [ref=e541] [cursor=pointer]:
+        - /url: https://policies.google.com/privacy
+      - link "条款" [ref=e542] [cursor=pointer]:
+        - /url: https://policies.google.com/terms
+      - link "免责声明" [ref=e543] [cursor=pointer]:
+        - /url: https://www.google.com/googlefinance/disclaimer/

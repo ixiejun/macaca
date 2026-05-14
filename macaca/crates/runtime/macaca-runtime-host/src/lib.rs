@@ -23,6 +23,9 @@ pub mod entitlement_service_provider;
 pub mod env_bridge;
 pub mod evm_service_provider;
 pub mod factory;
+pub(crate) mod finance_live_data;
+pub mod finance_llm_analysis_provider;
+pub mod genui_surface_store;
 pub mod lease;
 pub mod llm_service_provider;
 pub mod mcp_runtime;
@@ -71,9 +74,9 @@ pub use application_service_provider::ApplicationSystemServiceProvider;
 pub use context_service_provider::ContextSystemServiceProvider;
 pub use domain_pack_service_provider::{
     bootstrap_builtin_domain_pack_services, DomainPackRuntimeBundle,
-    FinanceDataSystemServiceProvider, FinanceLlmAnalysisSystemServiceProvider,
-    FINANCE_ANALYZE_COMMAND, FINANCE_FINANCIALS_SERVICE_ID, FINANCE_LLM_ANALYSIS_SERVICE_ID,
-    FINANCE_LOOKUP_COMMAND, FINANCE_MARKET_DATA_SERVICE_ID, FINANCE_NEWS_DIGEST_SERVICE_ID,
+    FinanceDataSystemServiceProvider, FINANCE_ANALYZE_COMMAND, FINANCE_FINANCIALS_SERVICE_ID,
+    FINANCE_LLM_ANALYSIS_SERVICE_ID, FINANCE_LOOKUP_COMMAND, FINANCE_MARKET_DATA_SERVICE_ID,
+    FINANCE_NEWS_DIGEST_SERVICE_ID,
 };
 pub use driver_service_provider::DriverSystemServiceProvider;
 pub use entitlement::{CapabilityCallContext, EntitlementOperation, EntitlementRuntimeFacade};
@@ -87,6 +90,8 @@ pub use evm_service_provider::{
     UnavailableEvmProvider,
 };
 pub use factory::{McpServerFactory, RuntimeEnvBuilder};
+pub use finance_llm_analysis_provider::FinanceLlmAnalysisSystemServiceProvider;
+pub use genui_surface_store::ApplicationGenUiSurfaceStore;
 pub use lease::McpSessionLease;
 pub use llm_service_provider::LlmSystemServiceProvider;
 #[allow(deprecated)]

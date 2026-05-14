@@ -1,0 +1,59 @@
+{
+  "title": "Complete 2026-05-05 context integration phases (Superpowers plan)",
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "OpenSpec umbrella integrate-context-memory-skills-mcp validates strict",
+      "passes": true,
+      "acceptanceCriteria": [
+        "Directory openspec/changes/integrate-context-memory-skills-mcp exists with proposal.md, design.md, tasks.md",
+        "Spec delta specs/integration-acceptance/spec.md has ADDED requirements with Scenario blocks",
+        "Command `npx openspec validate integrate-context-memory-skills-mcp --strict` exits 0"
+      ]
+    },
+    {
+      "id": "US-002",
+      "title": "CompiledContext alias + composer fingerprint + capability alias",
+      "passes": true,
+      "acceptanceCriteria": [
+        "macaca-context exports `pub type CompiledContext = CompiledPrompt` (or equivalent) from public API",
+        "`ComposerPlanSummary` includes stable and dynamic candidate fingerprint fields populated from selected candidates",
+        "`pub type CapabilityCandidate = ContextCandidate` in composer/candidate.rs",
+        "Unit test: same stable candidates + different dynamic recall body => equal stable fingerprint, unequal dynamic fingerprint"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Profile frontmatter strip + content scan + heartbeat test",
+      "passes": true,
+      "acceptanceCriteria": [
+        "Profile loader strips leading --- YAML --- frontmatter when well-formed",
+        "Loader rejects or skips pathological content per scan (e.g. NUL, line cap) with ProfileSkipReason",
+        "Test: inject_heartbeat=false => no HEARTBEAT.md candidate from ProfileFileContextProvider"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Workspace recall filters tombstoned memory ids",
+      "passes": true,
+      "acceptanceCriteria": [
+        "WorkspaceMemoryRecallSource accepts optional Arc<dyn TombstoneIndex> and filters entries whose id is tombstoned",
+        "ContextReportingChatModel wires same tombstone registry as digest/forget into recall source",
+        "macaca-memory provides MergedTombstoneIndex for combining multiple TombstoneIndex",
+        "Tests pass: macaca-web workspace_memory_recall_source + macaca-memory"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Digest+tombstone+selection test + external boundary test + docs",
+      "passes": true,
+      "acceptanceCriteria": [
+        "macaca-context unit test covers digest evidence stripped by tombstones while stale selection behavior unchanged",
+        "macaca-context tests validate OpaqueExternalPayload -> candidate conversion path",
+        "macaca-context README or external_boundary documents in-process port / remote adapter rule",
+        "CALL_SITES document lists non-web ContextFacade/Legacy engine occurrences",
+        "cargo check --workspace && cargo test -p macaca-context --lib && cargo test -p macaca-memory --lib && cargo test -p macaca-web --lib succeed"
+      ]
+    }
+  ]
+}

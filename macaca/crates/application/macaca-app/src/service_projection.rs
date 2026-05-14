@@ -163,7 +163,11 @@ fn manifest_v1_to_service_app_view(
 
 fn ui_runtime_view(legacy: &AppManifest) -> Option<ApplicationUiRuntimeView> {
     let ui = legacy.ui.as_ref()?;
-    let entry_url = format!("/api/apps/{}/ui/assets/{}", legacy.id, ui.entry);
+    let entry_url = ui
+        .entry
+        .as_ref()
+        .map(|entry| format!("/api/apps/{}/ui/assets/{entry}", legacy.id))
+        .unwrap_or_default();
     tracing::info!(
         app_id = %legacy.id,
         ui_runtime = %ui_runtime_kind_label(ui.runtime),
@@ -199,6 +203,7 @@ fn ui_runtime_view(legacy: &AppManifest) -> Option<ApplicationUiRuntimeView> {
 fn ui_runtime_kind_label(kind: AppUiRuntimeKind) -> &'static str {
     match kind {
         AppUiRuntimeKind::WebBundle => "web_bundle",
+        AppUiRuntimeKind::BuiltinKit => "builtin_kit",
     }
 }
 

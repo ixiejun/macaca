@@ -209,13 +209,12 @@ fn parse_host_commands(
         if !seen_commands.insert(encoded.to_string()) {
             continue;
         }
-        let command =
-            serde_json::from_str::<ApplicationHostCommand>(encoded).map_err(|error| {
-                WasmRuntimeHostError::new(
-                    WasmRuntimeErrorKind::AbiMismatch,
-                    format!("WASM component host-command metadata is invalid: {error}"),
-                )
-            })?;
+        let command = serde_json::from_str::<ApplicationHostCommand>(encoded).map_err(|error| {
+            WasmRuntimeHostError::new(
+                WasmRuntimeErrorKind::AbiMismatch,
+                format!("WASM component host-command metadata is invalid: {error}"),
+            )
+        })?;
         commands.push(command);
     }
     Ok(commands)

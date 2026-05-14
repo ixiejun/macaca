@@ -9,16 +9,18 @@
 use std::fmt;
 use std::sync::Arc;
 
+use macaca_app::UiIntentValidator;
 use macaca_proto::{
     ApplicationHostCommand, ApplicationHostCommandResult, ApplicationHostCommandStatus,
     ApplicationImport, KernelServiceId, ServiceBusSource, ServiceCommandName, TraceContext,
-    WasmHostImportAuditReport, WasmHostImportCategory, WasmHostImportCommand,
+    UiIntent, WasmHostImportAuditReport, WasmHostImportCategory, WasmHostImportCommand,
     WasmHostImportErrorKind, DEFAULT_WASM_MAX_PAYLOAD_BYTES, WASM_HOST_IMPORT_CAPABILITY,
     WASM_HOST_IMPORT_OPERATION, WASM_HOST_IMPORT_SERVICE_ID,
 };
 use serde_json::{Map, Value};
 use tracing::{info, warn};
 
+use crate::ApplicationGenUiSurfaceStore;
 use crate::{
     InMemoryServiceCallAuditSink, InMemoryServiceContractRegistry, InMemoryServicePolicyEngine,
     ServiceCallAuditEvent, ServiceCallAuditSink, ServicePolicyEngine, ServicePolicyLayer,
@@ -55,6 +57,7 @@ pub struct WasmHostImportBridge {
     audit_sink: Arc<dyn ServiceCallAuditSink>,
     config: WasmHostImportBridgeConfig,
     telemetry: Option<WasmTelemetrySinkRef>,
+    genui_surface_store: Option<ApplicationGenUiSurfaceStore>,
 }
 
 impl fmt::Debug for WasmHostImportBridge {
@@ -102,7 +105,18 @@ impl WasmHostImportBridge {
             audit_sink,
             config,
             telemetry: None,
+            genui_surface_store: None,
         }
+    }
+
+    /// Return a bridge clone that stores declarative `ui.render` intents.
+    ///
+    /// This applies the Repository pattern at the host-import boundary.  The
+    /// bridge still owns import validation and audit metadata, while the shared
+    /// store owns app/session/surface lookup for Application Service queries.
+    pub fn with_genui_surface_store(mut self, store: ApplicationGenUiSurfaceStore) -> Self {
+        self.genui_surface_store = Some(store);
+        self
     }
 
     /// Return a bridge clone that emits sanitized host-import telemetry.
@@ -158,6 +172,10 @@ impl WasmHostImportBridge {
             .reason_code(audit.reason_code.clone())
             .metadata("import_name", audit.import_name.clone()),
         );
+
+        if guest_command.import_name == ApplicationImport::UiRender.as_name() {
+            return self.dispatch_ui_render(guest_command, trace).await;
+        }
 
         let Some(service_id) = guest_command.target_service.clone() else {
             return self.denied_result(
@@ -237,6 +255,83 @@ impl WasmHostImportBridge {
             }
             Err(error) => self.error_result(&guest_command, error),
         }
+    }
+
+    /// Store a declarative GenUI render intent without routing through services.
+    ///
+    /// `ui.render` is a presentation import, not a data/service import.  The
+    /// bridge validates the schema and writes it to the shared repository so the
+    /// shell can query it later through the Application Service.  This keeps UI
+    /// rendering generic, traceable, and independent from application-specific
+    /// code paths.
+    async fn dispatch_ui_render(
+        &self,
+        guest_command: WasmHostImportCommand,
+        trace: TraceContext,
+    ) -> ApplicationHostCommandResult {
+        let Some(store) = self.genui_surface_store.as_ref() else {
+            return self.denied_result(
+                &guest_command,
+                WasmHostImportErrorKind::ServiceUnavailable,
+                "WASM ui.render store is unavailable",
+            );
+        };
+        let mut intent = match serde_json::from_value::<UiIntent>(guest_command.payload.clone()) {
+            Ok(intent) => intent,
+            Err(error) => {
+                warn!(
+                    trace_id = %trace.trace_id,
+                    error = %error,
+                    "WASM ui.render payload failed to decode"
+                );
+                return self.denied_result(
+                    &guest_command,
+                    WasmHostImportErrorKind::PolicyDenied,
+                    "WASM ui.render payload is invalid",
+                );
+            }
+        };
+        hydrate_ui_render_scope(&mut intent, &guest_command, &trace);
+        if let Err(error) = UiIntentValidator.validate_intent(&intent) {
+            warn!(
+                trace_id = %trace.trace_id,
+                error = %error,
+                "WASM ui.render intent failed validation"
+            );
+            return self.denied_result(
+                &guest_command,
+                WasmHostImportErrorKind::PolicyDenied,
+                "WASM ui.render intent failed validation",
+            );
+        }
+        if let Err(error) = store.store(intent.clone()).await {
+            warn!(
+                trace_id = %trace.trace_id,
+                error = %error,
+                "WASM ui.render intent failed to store"
+            );
+            return self.denied_result(
+                &guest_command,
+                WasmHostImportErrorKind::ServiceFailed,
+                "WASM ui.render store failed",
+            );
+        }
+        let mut result =
+            ApplicationHostCommandResult::ok(serde_json::json!({ "stored": true }), Some(trace));
+        result
+            .metadata
+            .insert("reason_code".into(), "ui_render_stored".into());
+        result
+            .metadata
+            .insert("surface_id".into(), intent.surface_id.to_string());
+        self.attach_common_metadata(&guest_command, &mut result);
+        info!(
+            app_id = %intent.app_id,
+            session_id = %intent.session_id,
+            surface_id = %intent.surface_id,
+            "WASM ui.render intent stored"
+        );
+        result
     }
 
     /// Replay service-call audit evidence chain by trace id.
@@ -328,7 +423,10 @@ impl WasmHostImportBridge {
     ) -> Result<WasmHostImportCommand, ApplicationHostCommandResult> {
         let import_name = command.import.as_name().to_string();
         let category = WasmHostImportCategory::from_application_import(&command.import);
-        if command.import != ApplicationImport::ServiceCall {
+        if !matches!(
+            command.import,
+            ApplicationImport::ServiceCall | ApplicationImport::UiRender
+        ) {
             let guest_command = self.command_shell(command, trace, category, import_name, 0);
             return Err(self.denied_result(
                 &guest_command,
@@ -347,6 +445,9 @@ impl WasmHostImportBridge {
                 WasmHostImportErrorKind::PayloadTooLarge,
                 "WASM host import payload exceeded the bridge limit",
             ));
+        }
+        if guest_command.import_name == ApplicationImport::UiRender.as_name() {
+            return Ok(guest_command);
         }
         if guest_command
             .capability
@@ -510,6 +611,37 @@ impl WasmHostImportBridge {
         result
             .metadata
             .insert("payload_bytes".into(), command.payload_bytes.to_string());
+    }
+}
+
+/// Hydrate host-owned scope fields on a declarative UI intent.
+///
+/// Guests often cannot know the concrete application id or session id before
+/// the host creates an execution session.  Web shells attach the user-visible
+/// session id to the trace, while lower-level component sessions also attach an
+/// internal runtime id to metadata.  The bridge prefers the trace session for UI
+/// surfaces so frontend queries and `ui.render` storage use the same key, then
+/// falls back to metadata for non-web hosts.  This keeps WASM artifacts
+/// portable and prevents application code from hardcoding runtime identities.
+fn hydrate_ui_render_scope(
+    intent: &mut UiIntent,
+    command: &WasmHostImportCommand,
+    trace: &TraceContext,
+) {
+    if intent.app_id.trim().is_empty() || intent.app_id == "${app.id}" {
+        if let Some(app_id) = command.metadata.get("app.id") {
+            intent.app_id = app_id.clone();
+        }
+    }
+    if intent.session_id.trim().is_empty() || intent.session_id == "${session.id}" {
+        if let Some(session_id) = trace.session_id.as_ref() {
+            intent.session_id = session_id.clone();
+        } else if let Some(session_id) = command.metadata.get("session.id") {
+            intent.session_id = session_id.clone();
+        }
+    }
+    if intent.trace.is_none() {
+        intent.trace = Some(trace.clone());
     }
 }
 

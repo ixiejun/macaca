@@ -4,8 +4,8 @@ use macaca_kernel::MockSystemService;
 use macaca_proto::{
     ApplicationHostCommand, ApplicationHostCommandStatus, ApplicationImport, KernelServiceId,
     ServiceCommandName, ServiceDescriptor, ServiceHealth, ServiceLifecycleState, ServiceType,
-    TraceContext, TraceSchemaRef, WasmExecutionProfile, WasmRuntimeArtifactRef,
-    WasmRuntimeSessionRequest,
+    TraceContext, TraceSchemaRef, UiComponent, UiComponentKind, UiComponentTree, UiIntent,
+    UiRenderSurface, WasmExecutionProfile, WasmRuntimeArtifactRef, WasmRuntimeSessionRequest,
 };
 use serde_json::json;
 
@@ -14,7 +14,8 @@ use super::{
     WasmHostImportBridgeConfig,
 };
 use crate::{
-    ServiceProviderInstance, ServiceRuntime, ServiceRuntimeConfig, StaticServiceProviderFactory,
+    ApplicationGenUiSurfaceStore, ServiceProviderInstance, ServiceRuntime, ServiceRuntimeConfig,
+    StaticServiceProviderFactory,
 };
 
 #[tokio::test]
@@ -87,6 +88,48 @@ async fn wasm_host_import_bridge_replays_service_call_audit_chain() {
         .replay_service_call_audit_by_session_id("session-host-import-audit")
         .unwrap();
     assert!(!session_replay.is_empty());
+}
+
+#[tokio::test]
+async fn wasm_host_import_ui_render_stores_declared_genui_surface() {
+    let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
+    let store = ApplicationGenUiSurfaceStore::default();
+    let bridge =
+        WasmHostImportBridge::new(Arc::clone(&runtime), WasmHostImportBridgeConfig::default())
+            .with_genui_surface_store(store.clone());
+    let trace = TraceContext::new("trace-host-import-ui-render");
+    let intent = UiIntent {
+        app_id: "app-ui-render".into(),
+        session_id: "session-ui-render".into(),
+        surface_id: UiRenderSurface::new("main"),
+        tree: UiComponentTree {
+            root: UiComponent::new("root", UiComponentKind::Card, json!({"title": "Signal"})),
+            trace_markers: Vec::new(),
+            metadata: Default::default(),
+        },
+        permission_prompts: Vec::new(),
+        approval_prompts: Vec::new(),
+        trace: Some(trace.clone()),
+        metadata: Default::default(),
+    };
+    let command = ApplicationHostCommand::with_trace(
+        ApplicationImport::UiRender,
+        serde_json::to_value(&intent).unwrap(),
+        trace.clone(),
+    );
+
+    let result = bridge.dispatch(command, trace).await;
+    let stored = store
+        .get("app-ui-render", "session-ui-render", Some("main"))
+        .await
+        .unwrap();
+
+    assert!(matches!(result.status, ApplicationHostCommandStatus::Ok));
+    assert_eq!(
+        result.metadata.get("reason_code").map(String::as_str),
+        Some("ui_render_stored")
+    );
+    assert_eq!(stored.unwrap().tree.root.id, "root");
 }
 
 #[tokio::test]

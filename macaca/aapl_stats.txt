@@ -1,0 +1,28 @@
+- generic [ref=e2]:
+  - link "Skip to navigation":
+    - /url: "#navigation-container"
+  - link "Skip to main content":
+    - /url: "#nimbus-app"
+  - link "Skip to right column":
+    - /url: "#right-rail"
+  - banner [ref=e3]:
+    - generic [ref=e4]:
+      - banner [ref=e5]:
+        - generic [ref=e6]
+      - navigation "Navigation" [ref=e46]:
+        - menubar "Navigation menubar" [ref=e47]
+        - button "Network" [ref=e67] [cursor=pointer]
+  - generic [ref=e76]:
+    - complementary [ref=e77]:
+      - generic [ref=e79]:
+        - generic [ref=e80]
+        - generic [ref=e96]
+      - generic [ref=e304]:
+        - generic
+    - main [ref=e305]:
+      - generic [ref=e307]:
+        - complementary "Left navigation" [ref=e308]
+        - generic [ref=e334]
+      - complementary "Dock" [ref=e949]:
+        - dialog "Dock" [ref=e950]
+      - complementary

@@ -1,0 +1,554 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - link "Google 财经 Beta 版 Beta 版" [ref=e4] [cursor=pointer]:
+      - /url: ./
+      - generic [ref=e5]:
+        - img [ref=e6]
+        - heading "Google 财经 Beta 版" [level=1] [ref=e8]: 财经
+        - generic [ref=e9]: Beta 版
+    - search [ref=e10]:
+      - generic [ref=e11]:
+        - group "资产类别过滤条件" [ref=e594]:
+          - generic [ref=e598]:
+            - button "全部" [ref=e600] [cursor=pointer]:
+              - generic [ref=e602]: 全部
+            - button "股票" [ref=e604] [cursor=pointer]:
+              - generic [ref=e606]: 股票
+            - button "指数" [ref=e608] [cursor=pointer]:
+              - generic [ref=e610]: 指数
+            - button "共同基金" [ref=e612] [cursor=pointer]:
+              - generic [ref=e614]: 共同基金
+            - button "货币" [ref=e616] [cursor=pointer]:
+              - generic [ref=e618]: 货币
+            - button "期货" [ref=e620] [cursor=pointer]:
+              - generic [ref=e622]: 期货
+        - listbox "建议" [ref=e623]:
+          - option "NVDA 英伟达 · NASDAQ (US) $226.63 +2.65%" [ref=e624] [cursor=pointer]:
+            - generic:
+              - generic: NVDA
+              - generic: 英伟达 · NASDAQ (US)
+            - generic [ref=e625]:
+              - generic [ref=e627]: $226.63
+              - generic [ref=e628]:
+                - generic [ref=e629]: +2.65%
+                - generic [ref=e631]: arrow_upward
+          - option "TSLA 特斯拉汽车 · NASDAQ (US) $449.68 +3.74%" [ref=e632] [cursor=pointer]:
+            - generic:
+              - generic: TSLA
+              - generic: 特斯拉汽车 · NASDAQ (US)
+            - generic [ref=e633]:
+              - generic [ref=e635]: $449.68
+              - generic [ref=e636]:
+                - generic [ref=e637]: +3.74%
+                - generic [ref=e639]: arrow_upward
+        - group [ref=e640]:
+          - heading "热门问题" [level=3] [ref=e641]
+          - group "热门问题" [ref=e642]:
+            - button "今日市场行情如何？" [ref=e643] [cursor=pointer]:
+              - generic [ref=e644]: prompt_suggestion
+              - generic [ref=e645]: 今日市场行情如何？
+            - button "对比标普 500 指数与道琼斯工业平均指数" [ref=e646] [cursor=pointer]:
+              - generic [ref=e647]: prompt_suggestion
+              - generic [ref=e648]: 对比标普 500 指数与道琼斯工业平均指数
+        - button "搜索股票、ETF 等" [ref=e12]:
+          - generic [ref=e14]:
+            - generic [ref=e16]: search_spark
+            - generic [ref=e649]:
+              - generic [ref=e1314]: 今
+              - generic [ref=e1315]: 日
+              - generic [ref=e1316]: 市
+              - generic [ref=e1317]: 场
+              - generic [ref=e1318]: 行
+              - generic [ref=e1319]: 情
+              - generic [ref=e1320]: 如
+              - generic [ref=e1321]: 何
+              - generic [ref=e1322]: ？
+    - generic [ref=e17]:
+      - generic [ref=e21]:
+        - button "设置" [ref=e22] [cursor=pointer]:
+          - generic [ref=e24]: settings
+        - tooltip [ref=e26]: 设置
+      - generic [ref=e27]:
+        - generic [ref=e28] [cursor=pointer]:
+          - generic [ref=e30]: feedback
+          - generic "发送反馈" [ref=e31]
+        - tooltip [ref=e32]: 发送反馈
+      - link "登录" [ref=e38] [cursor=pointer]:
+        - /url: https://accounts.google.com/ServiceLogin?passive=1209600&continue=https://www.google.com/finance/beta/quote/AAPL:NASDAQ&followup=https://www.google.com/finance/beta/quote/AAPL:NASDAQ&ec=GAZA4AU
+  - generic:
+    - generic:
+      - region "列表":
+        - generic [ref=e40] [cursor=pointer]:
+          - generic [ref=e42]:
+            - heading "列表" [level=2] [ref=e44]
+            - tooltip [ref=e45]: 新建列表
+            - tooltip [ref=e46]: 展开
+          - table "股票板块" [ref=e51]:
+            - rowgroup
+            - rowgroup [ref=e52]:
+              - row "SIXB +0.02%" [ref=e53]:
+                - cell "SIXB +0.02%" [ref=e54]:
+                  - generic [ref=e55]: SIXB
+                  - generic [ref=e56]:
+                    - generic [ref=e57]: +0.02%
+                    - generic [ref=e59]: arrow_upward
+              - row "SIXC +0.78%" [ref=e1323]:
+                - cell "SIXC +0.78%" [ref=e1324]:
+                  - generic [ref=e62]: SIXC
+                  - generic [ref=e63]:
+                    - generic [ref=e64]: +0.78%
+                    - generic [ref=e66]: arrow_upward
+              - row "SIXE -0.19%" [ref=e1325]:
+                - cell "SIXE -0.19%" [ref=e1326]:
+                  - generic [ref=e69]: SIXE
+                  - generic [ref=e70]:
+                    - generic [ref=e71]: "-0.19%"
+                    - generic [ref=e73]: arrow_downward
+              - row "SIXI -0.39%" [ref=e1327]:
+                - cell "SIXI -0.39%" [ref=e1328]:
+                  - generic [ref=e76]: SIXI
+                  - generic [ref=e77]:
+                    - generic [ref=e78]: "-0.39%"
+                    - generic [ref=e80]: arrow_downward
+              - row "SIXM -0.92%" [ref=e81]:
+                - cell "SIXM -0.92%" [ref=e82]:
+                  - generic [ref=e83]: SIXM
+                  - generic [ref=e84]:
+                    - generic [ref=e85]: "-0.92%"
+                    - generic [ref=e87]: arrow_downward
+              - row "SIXR -0.12%" [ref=e1329]:
+                - cell "SIXR -0.12%" [ref=e1330]:
+                  - generic [ref=e90]: SIXR
+                  - generic [ref=e91]:
+                    - generic [ref=e92]: "-0.12%"
+                    - generic [ref=e94]: arrow_downward
+              - row "SIXRE -0.79%" [ref=e1331]:
+                - cell "SIXRE -0.79%" [ref=e1332]:
+                  - generic [ref=e97]: SIXRE
+                  - generic [ref=e98]:
+                    - generic [ref=e99]: "-0.79%"
+                    - generic [ref=e101]: arrow_downward
+              - row "SIXT +1.02%" [ref=e1333]:
+                - cell "SIXT +1.02%" [ref=e1334]:
+                  - generic [ref=e104]: SIXT
+                  - generic [ref=e105]:
+                    - generic [ref=e106]: +1.02%
+                    - generic [ref=e108]: arrow_upward
+              - row "SIXU -1.09%" [ref=e1335]:
+                - cell "SIXU -1.09%" [ref=e1336]:
+                  - generic [ref=e111]: SIXU
+                  - generic [ref=e112]:
+                    - generic [ref=e113]: "-1.09%"
+                    - generic [ref=e115]: arrow_downward
+              - row "SIXV +0.57%" [ref=e116]:
+                - cell "SIXV +0.57%" [ref=e117]:
+                  - generic [ref=e118]: SIXV
+                  - generic [ref=e119]:
+                    - generic [ref=e120]: +0.57%
+                    - generic [ref=e122]: arrow_upward
+              - row "SIXY +0.51%" [ref=e1337]:
+                - cell "SIXY +0.51%" [ref=e1338]:
+                  - generic [ref=e125]: SIXY
+                  - generic [ref=e126]:
+                    - generic [ref=e127]: +0.51%
+                    - generic [ref=e129]: arrow_upward
+  - generic [ref=e139]:
+    - generic [ref=e141]:
+      - link "首页" [ref=e660] [cursor=pointer]:
+        - /url: ./
+        - generic [ref=e661]: arrow_back
+        - generic [ref=e662]: 首页
+      - generic [ref=e663]: "|"
+      - generic "AAPL:NASDAQ" [ref=e142]
+    - button "添加到列表" [ref=e664] [cursor=pointer]:
+      - generic [ref=e667]: add
+      - generic [ref=e668]: 添加到列表
+      - img [ref=e670]
+    - generic [ref=e148]:
+      - generic [ref=e150]:
+        - generic [ref=e152]: 苹果
+        - generic [ref=e154]:
+          - generic [ref=e155]:
+            - generic [ref=e157]: $299.93
+            - generic [ref=e158]:
+              - generic [ref=e160]: arrow_upward
+              - generic [ref=e161]: +1.74%
+              - generic [ref=e164]:
+                - text: (
+                - generic [ref=e165]: "+5.13"
+                - text: ) 今天
+          - generic [ref=e166]: 5月13日, UTC-4 14:11:17 · USD
+      - generic [ref=e167]:
+        - generic [ref=e169]:
+          - button "选择图表类型 - 已选择面积图" [ref=e173] [cursor=pointer]:
+            - generic [ref=e176]: area_chart
+            - generic [ref=e177]: 面积图
+            - img [ref=e179]
+          - button "与金融实体进行比较" [ref=e186] [cursor=pointer]:
+            - generic [ref=e189]: stacked_line_chart
+            - generic [ref=e190]: 比较
+            - img [ref=e192]
+          - button "选择技术指标" [ref=e198] [cursor=pointer]:
+            - generic [ref=e201]: monitoring
+            - generic [ref=e202]: 指标
+            - img [ref=e204]
+        - generic [ref=e209]:
+          - img [ref=e673]:
+            - generic [ref=e674]:
+              - generic [ref=e676]:
+                - generic [ref=e678]: "292"
+                - generic [ref=e680]: "294"
+                - generic [ref=e682]: "296"
+                - generic [ref=e684]: "298"
+                - generic [ref=e686]: "300"
+                - generic [ref=e688]: "302"
+              - generic [ref=e690]:
+                - generic [ref=e693]: 10:00
+                - generic [ref=e695]: 12:00
+                - generic [ref=e697]: 14:00
+                - generic [ref=e699]: 16:00
+          - generic [ref=e1271]: 昨收：$294.80
+        - tablist "股票图表标签页" [ref=e216]:
+          - tab "1 天" [selected] [ref=e217] [cursor=pointer]
+          - tab "5 天" [ref=e218] [cursor=pointer]
+          - tab "1 个月" [ref=e219] [cursor=pointer]
+          - tab "6 个月" [ref=e220] [cursor=pointer]
+          - tab "年初至今" [ref=e221] [cursor=pointer]
+          - tab "1 年" [ref=e222] [cursor=pointer]
+          - tab "5 年" [ref=e223] [cursor=pointer]
+          - tab "最大" [ref=e224] [cursor=pointer]
+    - generic [ref=e227]:
+      - tablist [ref=e228]:
+        - generic [ref=e232]:
+          - tab "概览" [selected] [ref=e233] [cursor=pointer]:
+            - generic:
+              - generic: 概览
+          - tab "财报" [ref=e234] [cursor=pointer]:
+            - generic:
+              - generic: 财报
+          - tab "财务" [ref=e235] [cursor=pointer]:
+            - generic:
+              - generic: 财务
+      - tabpanel "概览" [ref=e236]:
+        - generic [ref=e238]:
+          - generic [ref=e545]:
+            - generic [ref=e546]:
+              - generic [ref=e547]:
+                - generic [ref=e549]: insights_auto
+                - generic [ref=e552]: Apple在过去一个月内大幅反弹并创下历史新高。强劲的第二财季业绩和创纪录的1000亿美元回购授权是主要催化剂。分析师预计，受AI驱动的升级周期和利润丰厚的主营服务业务支撑，下季度将维持积极态势。
+              - button "收起" [ref=e554] [cursor=pointer]:
+                - generic [ref=e556]: keyboard_arrow_down
+            - generic [ref=e559]: Apple在过去一个月内大幅反弹并创下历史新高。强劲的第二财季业绩和创纪录的1000亿美元回购授权是主要催化剂。分析师预计，受AI驱动的升级周期和利润丰厚的主营服务业务支撑，下季度将维持积极态势。
+            - generic [ref=e560]:
+              - generic [ref=e561]:
+                - generic [ref=e562]:
+                  - generic [ref=e564]: trending_up
+                  - text: 看涨观点
+                - list [ref=e566]:
+                  - listitem [ref=e567]:
+                    - generic [ref=e568]:
+                      - generic "借助 AI 深入探索" [ref=e570] [cursor=pointer]: "创纪录的资本回报计划:"
+                      - text: 董事会已授权额外1000亿美元的股票回购，并将季度股息提高4%至每股0.27美元。这种激进的资本分配策略继续巩固了其作为顶级总回报资产的地位，在同行加大资本支出之际优先考虑股东收益。
+                  - listitem [ref=e571]:
+                    - generic [ref=e572]:
+                      - generic "借助 AI 深入探索" [ref=e574] [cursor=pointer]: "第二财季业绩全面超预期:"
+                      - text: 公司报告营收达1112亿美元，同比增长17%，稀释后每股收益为2.01美元，均超过市场预期。iPhone 17系列的强劲需求及服务业务营收创下历史新高，推动毛利率扩张至约49.3%。
+                  - listitem [ref=e575]:
+                    - generic [ref=e576]:
+                      - generic "借助 AI 深入探索" [ref=e578] [cursor=pointer]: "AI转型与CEO平稳更替:"
+                      - text: 市场对即将到来的AI路线图表现出极高热情，分析师预测iPhone将进入AI驱动的升级周期。此外，虽然Tim Cook将于2026年9月卸任，但继任者John Ternus的确定为长期战略连续性提供了稳定性。
+              - generic [ref=e579]:
+                - generic [ref=e580]:
+                  - generic [ref=e582]: trending_down
+                  - text: 看跌观点
+                - list [ref=e584]:
+                  - listitem [ref=e585]:
+                    - generic [ref=e586]:
+                      - generic "借助 AI 深入探索" [ref=e588] [cursor=pointer]: "利润率面临组件成本压力:"
+                      - text: 管理层警告称，由于存储器价格预计在2026财年下半年大幅上涨，成本压力将逐步显现。如果毛利率降至约47%以下，目前约33倍的高前瞻市盈率可能面临倍数压缩的风险。
+                  - listitem [ref=e589]:
+                    - generic [ref=e590]:
+                      - generic "借助 AI 深入探索" [ref=e592] [cursor=pointer]: "持续的监管与法律逆风:"
+                      - text: 公司面临多项法律挑战，包括美国司法部的反垄断诉讼及关于App Store做法的70亿美元集体诉讼。虽然在欧洲采取了合规措施，但全球范围内对“围墙花园”生态系统的审查依然是主要的长期不确定因素。
+          - generic [ref=e249]:
+            - generic [ref=e250]:
+              - generic [ref=e251]:
+                - generic [ref=e252]: 开盘价
+                - generic [ref=e253]: $293.50
+              - generic [ref=e254]:
+                - generic [ref=e255]: 最高价
+                - generic [ref=e256]: $300.92
+              - generic [ref=e257]:
+                - generic [ref=e258]: 最低价
+                - generic [ref=e259]: $293.50
+              - generic [ref=e260]:
+                - generic [ref=e261]: 市值
+                - generic [ref=e262]: 4.36万亿
+              - generic [ref=e263]:
+                - generic [ref=e264]: 平均成交量
+                - generic [ref=e265]: 4,590.94万
+              - generic [ref=e266]:
+                - generic [ref=e267]: 成交量
+                - generic [ref=e268]: 2,867.06万
+            - generic [ref=e269]:
+              - generic [ref=e270]:
+                - generic [ref=e271]: 股息
+                - generic [ref=e272]: 0.36%
+              - generic [ref=e273]:
+                - generic [ref=e274]: 季度股息
+                - generic [ref=e275]: $0.27
+              - generic [ref=e276]:
+                - generic [ref=e277]: 除息日
+                - generic [ref=e278]: 2026年5月11日
+              - generic [ref=e279]:
+                - generic [ref=e280]: 市盈率
+                - generic [ref=e281]: "36.28"
+              - generic [ref=e282]:
+                - generic [ref=e283]: 52 周最高价
+                - generic [ref=e284]: $300.92
+              - generic [ref=e285]:
+                - generic [ref=e286]: 52 周最低价
+                - generic [ref=e287]: $193.46
+            - generic [ref=e288]:
+              - generic [ref=e289]:
+                - generic [ref=e290]: 每股收益
+                - generic [ref=e291]: $8.27
+              - generic [ref=e292]:
+                - generic [ref=e293]: Beta 版
+                - generic [ref=e294]: "1.06"
+              - generic [ref=e295]:
+                - generic [ref=e296]: 流通股数
+                - generic [ref=e297]: 146.87亿
+              - generic [ref=e298]:
+                - generic [ref=e299]: 员工人数
+                - generic [ref=e300]: 17万
+          - generic [ref=e302]:
+            - generic [ref=e303]: 相关股票
+            - generic [ref=e304]:
+              - link "AMZN 亚马逊 $269.64 +1.44%" [ref=e1339] [cursor=pointer]:
+                - /url: ./quote/AMZN:NASDAQ
+                - generic [ref=e307]:
+                  - generic [ref=e308]:
+                    - generic [ref=e309]: AMZN
+                    - generic [ref=e311]: 亚马逊
+                    - generic [ref=e312]: $269.64
+                  - generic [ref=e313]:
+                    - generic [ref=e315]: +1.44%
+                    - generic [ref=e317]: arrow_upward
+                - img [ref=e1340]
+              - link "MSFT 微軟 $404.29 -0.85%" [ref=e1343] [cursor=pointer]:
+                - /url: ./quote/MSFT:NASDAQ
+                - generic [ref=e322]:
+                  - generic [ref=e323]:
+                    - generic [ref=e324]: MSFT
+                    - generic [ref=e326]: 微軟
+                    - generic [ref=e327]: $404.29
+                  - generic [ref=e328]:
+                    - generic [ref=e330]: "-0.85%"
+                    - generic [ref=e332]: arrow_downward
+                - img [ref=e1344]
+              - link "TSLA 特斯拉汽车 $449.68 +3.74%" [ref=e1347] [cursor=pointer]:
+                - /url: ./quote/TSLA:NASDAQ
+                - generic [ref=e337]:
+                  - generic [ref=e338]:
+                    - generic [ref=e339]: TSLA
+                    - generic [ref=e341]: 特斯拉汽车
+                    - generic [ref=e342]: $449.68
+                  - generic [ref=e343]:
+                    - generic [ref=e345]: +3.74%
+                    - generic [ref=e347]: arrow_upward
+                - img [ref=e1348]
+              - link "NVDA 英伟达 $226.63 +2.65%" [ref=e1351] [cursor=pointer]:
+                - /url: ./quote/NVDA:NASDAQ
+                - generic [ref=e352]:
+                  - generic [ref=e353]:
+                    - generic [ref=e354]: NVDA
+                    - generic [ref=e356]: 英伟达
+                    - generic [ref=e357]: $226.63
+                  - generic [ref=e358]:
+                    - generic [ref=e360]: +2.65%
+                    - generic [ref=e362]: arrow_upward
+                - img [ref=e1352]
+          - generic [ref=e366]:
+            - generic [ref=e367]: 新闻报道
+            - generic [ref=e368]: 来自全网
+            - generic [ref=e369]:
+              - generic [ref=e370]:
+                - generic [ref=e371]:
+                  - generic [ref=e372]:
+                    - generic [ref=e373]:
+                      - img "Deadline" [ref=e375]
+                      - generic [ref=e376]: Deadline
+                      - generic [ref=e377]: ·
+                      - generic [ref=e378]: 13分钟前
+                    - link "Morgan Wandell Leaving As Apple TV Head Of International Development To Launch Kismet Production Company" [ref=e379] [cursor=pointer]:
+                      - /url: https://deadline.com/2026/05/morgan-wandell-leaving-apple-tv-kismet-production-company-1236901470/
+                      - generic [ref=e380]: Morgan Wandell Leaving As Apple TV Head Of International Development To Launch Kismet Production Company
+                  - generic [ref=e381]:
+                    - generic [ref=e382]:
+                      - img "Yahoo Finance" [ref=e384]
+                      - generic [ref=e385]: Yahoo Finance
+                      - generic [ref=e386]: ·
+                      - generic [ref=e387]: 20分钟前
+                    - link "Apple stock on track for record close as tech rebounds" [ref=e388] [cursor=pointer]:
+                      - /url: https://finance.yahoo.com/markets/article/apple-stock-on-track-for-record-close-as-tech-rebounds-175112315.html
+                      - generic [ref=e389]: Apple stock on track for record close as tech rebounds
+                - generic [ref=e390]:
+                  - generic [ref=e391]:
+                    - generic [ref=e392]:
+                      - img "The Motley Fool" [ref=e394]
+                      - generic [ref=e395]: The Motley Fool
+                      - generic [ref=e396]: ·
+                      - generic [ref=e397]: 1小时前
+                    - link "Soaring iPhone Sales Have Supercharged This Under-the-Radar Stock That's Outperforming Apple. Buy It Before It Soars Another 59%" [ref=e398] [cursor=pointer]:
+                      - /url: https://www.fool.com/investing/2026/05/13/soaring-iphone-sales-have-supercharged-this-under/
+                      - generic [ref=e399]: Soaring iPhone Sales Have Supercharged This Under-the-Radar Stock That's Outperforming Apple. Buy It Before It Soars Another 59%
+                  - generic [ref=e400]:
+                    - generic [ref=e401]:
+                      - img "24/7 Wall St." [ref=e403]
+                      - generic [ref=e404]: 24/7 Wall St.
+                      - generic [ref=e405]: ·
+                      - generic [ref=e406]: 4小时前
+                    - link "Tim Cook Just Sold Apple Stock Near All Time Highs. Here Is Why One Analyst Says Alphabet Is the Smarter Trade" [ref=e407] [cursor=pointer]:
+                      - /url: https://247wallst.com/investing/2026/05/13/tim-cook-just-sold-apple-stock-near-all-time-highs-here-is-why-one-analyst-says-alphabet-is-the-smarter-trade/
+                      - generic [ref=e408]: Tim Cook Just Sold Apple Stock Near All Time Highs. Here Is Why One Analyst Says Alphabet Is the Smarter Trade
+                - generic [ref=e409]:
+                  - generic [ref=e410]:
+                    - generic [ref=e411]:
+                      - img "CNBC" [ref=e413]
+                      - generic [ref=e414]: CNBC
+                      - generic [ref=e415]: ·
+                      - generic [ref=e416]: 5小时前
+                    - 'link "Here are Wednesday''s biggest analyst calls: Nvidia, Apple, Micron, Amazon, AMD, Johnson & Johnson & more" [ref=e417] [cursor=pointer]':
+                      - /url: https://www.cnbc.com/2026/05/13/wednesdays-big-stock-calls-by-wall-street-analysts-include-nvidia-apple.html
+                      - generic [ref=e418]: "Here are Wednesday's biggest analyst calls: Nvidia, Apple, Micron, Amazon, AMD, Johnson & Johnson & more"
+                  - generic [ref=e419]:
+                    - generic [ref=e420]:
+                      - img "Benzinga" [ref=e422]
+                      - generic [ref=e423]: Benzinga
+                      - generic [ref=e424]: ·
+                      - generic [ref=e425]: 5小时前
+                    - link "Apple, ServiceNow, Netflix And An Energy Stock On CNBC's 'Final Trades' - Apple (NASDAQ:AAPL), Intel (NAS" [ref=e426] [cursor=pointer]:
+                      - /url: https://www.benzinga.com/trading-ideas/long-ideas/26/05/52519705/apple-servicenow-netflix-and-an-energy-stock-on-cnbcs-final-trades
+                      - generic [ref=e427]: Apple, ServiceNow, Netflix And An Energy Stock On CNBC's 'Final Trades' - Apple (NASDAQ:AAPL), Intel (NAS
+                - generic [ref=e428]:
+                  - generic [ref=e429]:
+                    - generic [ref=e430]:
+                      - img "Morningstar Canada" [ref=e432]
+                      - generic [ref=e433]: Morningstar Canada
+                      - generic [ref=e434]: ·
+                      - generic [ref=e435]: 8小时前
+                    - 'link "Alphabet vs. Amazon vs. Apple: Which is the Best Stock to Invest In?" [ref=e436] [cursor=pointer]':
+                      - /url: https://global.morningstar.com/en-ca/stocks/alphabet-vs-amazon-vs-apple-which-is-best-stock-invest
+                      - generic [ref=e437]: "Alphabet vs. Amazon vs. Apple: Which is the Best Stock to Invest In?"
+                  - generic [ref=e438]:
+                    - generic [ref=e439]:
+                      - img "Stratechery by Ben Thompson" [ref=e441]
+                      - generic [ref=e442]: Stratechery by Ben Thompson
+                      - generic [ref=e443]: ·
+                      - generic [ref=e444]: 8小时前
+                    - link "The Deployment Company, Back to the 70s, Apple and Intel" [ref=e445] [cursor=pointer]:
+                      - /url: https://stratechery.com/2026/the-deployment-company-back-to-the-70s-apple-and-intel/
+                      - generic [ref=e446]: The Deployment Company, Back to the 70s, Apple and Intel
+              - button "显示更多内容" [ref=e447] [cursor=pointer]:
+                - text: 显示更多内容
+                - generic [ref=e448]: keyboard_arrow_down
+          - generic [ref=e450]:
+            - generic [ref=e451]: 资料
+            - generic [ref=e454]:
+              - text: 苹果公司，原称苹果电脑公司，是源自美国的跨国科技公司，总部位于美国加州的库比蒂诺，与亚马逊、谷歌、微软、Meta并行为五大科技巨擘。目前的业务包括设计、研发、手机通信和销售消费电子、计算机软件、在线服务和个人计算机。
+              - link "Wikipedia" [ref=e455] [cursor=pointer]:
+                - /url: https://zh.wikipedia.org/zh-cn/%E8%98%8B%E6%9E%9C%E5%85%AC%E5%8F%B8
+            - generic [ref=e457]:
+              - generic [ref=e458]: 苹果简介
+              - generic [ref=e459]:
+                - generic [ref=e460]:
+                  - generic [ref=e461]:
+                    - generic [ref=e462]: 首席执行官
+                    - generic [ref=e463]: 蒂姆·库克
+                  - generic [ref=e464]:
+                    - generic [ref=e465]: 员工人数
+                    - generic [ref=e466]: 16.6万
+                  - generic [ref=e467]:
+                    - generic [ref=e468]: 创立日期
+                    - generic [ref=e469]: 1976年4月1日
+                - generic [ref=e470]:
+                  - generic [ref=e471]:
+                    - generic [ref=e472]: 总部
+                    - generic [ref=e473]: 库比蒂诺, 加利福尼亚, 美国
+                  - generic [ref=e474]:
+                    - generic [ref=e475]: 板块
+                    - generic [ref=e476]: Computers, Peripherals, and Software
+                  - generic [ref=e477]:
+                    - generic [ref=e478]: 网站
+                    - generic [ref=e479]: "-"
+  - generic:
+    - region "“研究”面板":
+      - generic [ref=e481]:
+        - generic [ref=e484]:
+          - heading "研究" [level=2] [ref=e485]
+          - generic [ref=e486]:
+            - button "发起新消息串" [ref=e487] [cursor=pointer]:
+              - generic [ref=e489]: edit_square
+            - tooltip [ref=e491]: 发起新消息串
+          - generic [ref=e493]:
+            - button "会话历史记录" [ref=e494] [cursor=pointer]:
+              - generic [ref=e496]: schedule_auto
+            - tooltip [ref=e498]: 会话历史记录
+          - tooltip [ref=e499]: 收起
+          - generic [ref=e500]:
+            - button "展开 研究" [ref=e501] [cursor=pointer]:
+              - generic [ref=e503]: expand_content
+            - tooltip [ref=e505]: 展开
+        - generic [ref=e506]:
+          - generic [ref=e1288]:
+            - generic [ref=e1289]: 想聊点什么？
+            - generic [ref=e1290]:
+              - generic [ref=e1292] [cursor=pointer]:
+                - generic [ref=e1293]: 简要介绍一下AAPL
+                - generic [ref=e1295]: search_spark
+              - generic [ref=e1296] [cursor=pointer]:
+                - generic [ref=e1297]: AAPL最近的财报业绩表现如何？
+                - generic [ref=e1299]: search_spark
+              - generic [ref=e1300] [cursor=pointer]:
+                - generic [ref=e1301]: 比较AAPL与微软(MSFT)近一年的股价走势。
+                - generic [ref=e1303]: search_spark
+            - generic [ref=e1304]:
+              - generic [ref=e1305]: 探索可能性
+              - generic [ref=e1306]:
+                - generic [ref=e1307] [cursor=pointer]:
+                  - generic [ref=e1308]: travel_explore
+                  - generic [ref=e1309]: 深度搜索
+                - generic [ref=e1310] [cursor=pointer]:
+                  - generic [ref=e1311]: search_spark
+                  - generic [ref=e1312]: 搜索或询问任意内容
+          - search [ref=e510]:
+            - button "搜索股票、ETF 等" [ref=e512]:
+              - generic [ref=e513]:
+                - combobox [expanded] [ref=e514]:
+                  - textbox "提出任何问题" [ref=e515]
+                - generic [ref=e516]:
+                  - generic [ref=e521]:
+                    - button "添加工具" [ref=e522] [cursor=pointer]:
+                      - generic [ref=e524]: add
+                    - tooltip [ref=e526]: 添加工具
+                  - generic [ref=e528]:
+                    - button "问问 AI" [disabled] [ref=e529]:
+                      - generic [ref=e531]: arrow_upward
+                    - tooltip [ref=e533]: 问问 AI
+  - generic [ref=e535]:
+    - generic [ref=e536]:
+      - text: AI 内容可能包含错误。
+      - link "了解详情" [ref=e593] [cursor=pointer]:
+        - /url: https://support.google.com/websearch?p=googlefinancebeta
+    - generic [ref=e538]:
+      - link "帮助" [ref=e539] [cursor=pointer]:
+        - /url: https://support.google.com/websearch?p=googlefinancebeta
+      - generic [ref=e540] [cursor=pointer]: 发送反馈
+      - link "隐私权" [ref=e541] [cursor=pointer]:
+        - /url: https://policies.google.com/privacy
+      - link "条款" [ref=e542] [cursor=pointer]:
+        - /url: https://policies.google.com/terms
+      - link "免责声明" [ref=e543] [cursor=pointer]:
+        - /url: https://www.google.com/googlefinance/disclaimer/
+  - generic [ref=e1313]: 已就绪

@@ -71,14 +71,15 @@ pub async fn get_genui_surface(
         surface_id: None,
     };
     match state.application_client.genui_surface(command).await {
-        Ok(unavailable) => {
+        Ok(surface) => {
             info!(
                 app_id = %app_id,
                 session_id = %session_id,
                 trace_id = %trace.trace_id,
-                reason = %unavailable.reason,
-                "GenUI surface query completed through Application Service fallback"
+                found = surface.is_some(),
+                "GenUI surface query completed through Application Service"
             );
+            return Ok(Json(surface));
         }
         Err(error) => {
             warn!(
@@ -93,7 +94,7 @@ pub async fn get_genui_surface(
     info!(
         app_id = %app_id,
         session_id = %session_id,
-        "GenUI surface requested; no application-provided surface is available in v0 fallback path"
+        "GenUI surface requested; returning empty shell fallback after Application Service error"
     );
     Ok(Json(None))
 }

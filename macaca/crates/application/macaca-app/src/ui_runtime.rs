@@ -13,11 +13,17 @@ use std::path::{Component, Path};
 use macaca_proto::{MacacaError, MacacaResult};
 use serde::{Deserialize, Serialize};
 
-/// Manifest declaration for an application-owned UI bundle.
+/// Manifest declaration for an application UI runtime.
+///
+/// The declaration is deliberately data-only.  It can describe either an
+/// application-owned web bundle or a host-owned built-in kit surface.  Runtime
+/// hosts and presentation shells consume this strategy value through sanitized
+/// projections, which keeps Macaca from branching on application names or
+/// business domains.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AppUiRuntimeConfig {
-    /// UI runtime strategy. The first supported strategy is a static web bundle
-    /// hosted in an iframe/WebView and connected through the Macaca bridge.
+    /// UI runtime strategy.  The strategy selects how UI is produced, while
+    /// `surface` selects where it belongs in the host shell.
     pub runtime: AppUiRuntimeKind,
     /// Shell placement strategy for the loaded UI runtime.
     ///
@@ -32,7 +38,13 @@ pub struct AppUiRuntimeConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub framework: Option<AppUiFramework>,
     /// Package-relative HTML entry point, for example `dist/ui/index.html`.
-    pub entry: String,
+    ///
+    /// This is required only for `web_bundle`.  `builtin_kit` applications do
+    /// not ship executable UI assets; they emit controlled GenUI intent data
+    /// that the host renderer turns into cards, tables, lists, and related
+    /// declarative components.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entry: Option<String>,
     /// Package-relative asset allowlist. Globs are preserved as declarations;
     /// host routes still normalize every requested file before serving it.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -43,6 +55,13 @@ pub struct AppUiRuntimeConfig {
     /// Host bridge capabilities requested by the application-owned UI.
     #[serde(default)]
     pub bridge: AppUiBridgeConfig,
+    /// Declarative presentation preferences for host-owned renderers.
+    ///
+    /// These values are hints for tooling and shell diagnostics, not a license
+    /// for app-specific renderer branching.  A shell may use them to verify
+    /// whether a built-in kit can satisfy the app's requested component family.
+    #[serde(default)]
+    pub presentation: AppUiPresentationConfig,
     /// Theme ownership declaration. The first slice treats this as metadata so
     /// app-owned brands are not constrained by the host shell.
     #[serde(default)]
@@ -55,6 +74,36 @@ pub struct AppUiRuntimeConfig {
 pub enum AppUiRuntimeKind {
     /// Static web bundle loaded by Web iframe or Desktop WebView hosts.
     WebBundle,
+    /// Host-owned declarative UI kit backed by controlled GenUI component data.
+    BuiltinKit,
+}
+
+/// Declarative presentation preferences for `builtin_kit` applications.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AppUiPresentationConfig {
+    /// Schema label expected by the application output.  The current renderer
+    /// understands GenUI-compatible component trees; future schemas can be
+    /// added as data-driven strategies rather than application-specific code.
+    #[serde(default = "default_presentation_schema")]
+    pub schema: String,
+    /// Ordered list of component families the app prefers.  The host treats
+    /// this as bounded metadata for diagnostics and admission, while actual
+    /// rendering still dispatches by component kind.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub preferred_components: Vec<String>,
+}
+
+impl Default for AppUiPresentationConfig {
+    fn default() -> Self {
+        Self {
+            schema: default_presentation_schema(),
+            preferred_components: Vec::new(),
+        }
+    }
+}
+
+fn default_presentation_schema() -> String {
+    "genui.v1".into()
 }
 
 /// Framework metadata for diagnostics and scaffolding.
@@ -244,7 +293,21 @@ pub fn validate_ui_runtime_config(config: Option<&AppUiRuntimeConfig>) -> Macaca
     let Some(config) = config else {
         return Ok(());
     };
-    validate_package_relative_path("ui.entry", &config.entry)?;
+    match config.runtime {
+        AppUiRuntimeKind::WebBundle => {
+            let entry = config.entry.as_deref().ok_or_else(|| {
+                MacacaError::Config("ui.entry is required for web_bundle UI runtime".into())
+            })?;
+            validate_package_relative_path("ui.entry", entry)?;
+        }
+        AppUiRuntimeKind::BuiltinKit => {
+            if config.surface.mode != AppUiSurfaceMode::Session {
+                return Err(MacacaError::Config(
+                    "builtin_kit UI runtime requires ui.surface.mode: session".into(),
+                ));
+            }
+        }
+    }
     for asset in &config.assets {
         validate_package_relative_path("ui.assets", asset.trim_end_matches("/**"))?;
     }
@@ -263,10 +326,11 @@ pub fn validate_ui_runtime_config(config: Option<&AppUiRuntimeConfig>) -> Macaca
     tracing::info!(
         ui_runtime = ?config.runtime,
         framework = ?config.framework,
-        entry = %config.entry,
+        entry = config.entry.as_deref().unwrap_or("none"),
+        presentation_schema = %config.presentation.schema,
         required_bridge_count = config.bridge.required.len(),
         optional_bridge_count = config.bridge.optional.len(),
-        "application-owned UI runtime declaration admitted"
+        "application UI runtime declaration admitted"
     );
     Ok(())
 }
@@ -307,13 +371,14 @@ mod tests {
             runtime: AppUiRuntimeKind::WebBundle,
             surface: AppUiSurfaceConfig::default(),
             framework: Some(AppUiFramework::React),
-            entry: "dist/ui/index.html".into(),
+            entry: Some("dist/ui/index.html".into()),
             assets: vec!["dist/ui/assets/**".into()],
             sandbox: AppUiSandboxConfig::default(),
             bridge: AppUiBridgeConfig {
                 required: vec!["service.call".into()],
                 optional: vec!["trace.emit".into()],
             },
+            presentation: AppUiPresentationConfig::default(),
             theme: AppUiThemeConfig::default(),
         }
     }
@@ -326,7 +391,7 @@ mod tests {
     #[test]
     fn ui_runtime_rejects_entry_path_escape() {
         let mut config = valid_config();
-        config.entry = "../escape.html".into();
+        config.entry = Some("../escape.html".into());
         let error = validate_ui_runtime_config(Some(&config)).unwrap_err();
         assert!(error.to_string().contains("package"));
     }
@@ -362,6 +427,32 @@ entry: dist/ui/index.html
         let config: AppUiRuntimeConfig = serde_yaml::from_str(yaml).unwrap();
         assert_eq!(config.surface.mode, AppUiSurfaceMode::Application);
         assert_eq!(config.surface.chrome, AppUiSurfaceChrome::AppOwned);
+        validate_ui_runtime_config(Some(&config)).unwrap();
+    }
+
+    #[test]
+    fn ui_runtime_accepts_builtin_kit_session_surface() {
+        let yaml = r#"
+runtime: builtin_kit
+surface:
+  mode: session
+  chrome: host
+presentation:
+  schema: genui.v1
+  preferred_components:
+    - card
+    - table
+    - list
+"#;
+        let config: AppUiRuntimeConfig = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(config.runtime, AppUiRuntimeKind::BuiltinKit);
+        assert_eq!(config.surface.mode, AppUiSurfaceMode::Session);
+        assert_eq!(config.surface.chrome, AppUiSurfaceChrome::Host);
+        assert_eq!(config.presentation.schema, "genui.v1");
+        assert_eq!(
+            config.presentation.preferred_components,
+            vec!["card".to_string(), "table".to_string(), "list".to_string()]
+        );
         validate_ui_runtime_config(Some(&config)).unwrap();
     }
 }

@@ -28,8 +28,8 @@ use macaca_proto::{
 use crate::event_persistence::spawn_session_event_collector;
 use crate::routes::{default_model, err, ErrorResponse};
 use crate::session::{
-    AgentTraceCollector, SessionMeta, StoredSession, StoredTurn, APP_SESSIONS_PREFIX,
-    SESSION_PREFIX,
+    persist_session_snapshot, AgentTraceCollector, SessionMeta, StoredSession, StoredTurn,
+    APP_SESSIONS_PREFIX, SESSION_PREFIX,
 };
 use crate::sse::convert_executor_event_to_sse;
 use crate::state::AppState;
@@ -62,6 +62,60 @@ async fn persist_execution_context(state: &Arc<AppState>, context: &ExecutionCon
         context,
     )
     .await;
+}
+
+/// Persist the user-visible chat session envelope before any execution branch
+/// starts producing SSE events.
+///
+/// Framework sessions and agentless WASM sessions both appear in the same
+/// "Session Logs" surface, so the web shell must write the shared session
+/// record and app-session index before branching into framework or WASM
+/// execution. Keeping this helper at the route boundary avoids duplicating
+/// persistence details inside engine-specific code paths.
+async fn persist_initial_chat_session(
+    state: &Arc<AppState>,
+    app_id: &ApplicationId,
+    session_key: &str,
+    prompt: &str,
+) {
+    let now = Utc::now();
+    let title = prompt.chars().take(50).collect::<String>();
+    let session_key_db = format!("{}{}", SESSION_PREFIX, session_key);
+    let initial_stored = StoredSession {
+        meta: SessionMeta {
+            session_id: session_key.to_string(),
+            app_id: app_id.0.to_string(),
+            created_at: now,
+            updated_at: now,
+            message_count: 1,
+            title: Some(title),
+            status: "running".to_string(),
+        },
+        turns: vec![StoredTurn {
+            role: "user".into(),
+            content: prompt.to_string(),
+            status: None,
+            trace_steps: Vec::new(),
+            meta: None,
+            agent_traces: HashMap::new(),
+        }],
+        messages: vec![],
+    };
+    if let Ok(data) = serde_json::to_vec(&initial_stored) {
+        let _ = state
+            .persist
+            .session_store
+            .set(&session_key_db, &data)
+            .await;
+    }
+
+    // Maintain the per-app reverse index used by the left sidebar session log.
+    let app_index_key = format!("{}{}/{}", APP_SESSIONS_PREFIX, app_id.0, session_key);
+    let _ = state
+        .persist
+        .session_store
+        .set(&app_index_key, session_key.as_bytes())
+        .await;
 }
 
 // ---------------------------------------------------------------------------
@@ -391,14 +445,14 @@ async fn wasm_chat_dispatch_command(
 ) -> Option<ApplicationHostDispatchServiceCommand> {
     let command = ApplicationMetadataQueryCommand::application(trace.clone(), *app_id).ok()?;
     let metadata = state.application_client.metadata(command).await.ok()?;
-    let is_wasm_runtime = metadata.application.runtime.runtime_kind == Some(PackageRuntimeKind::WasmComponent);
+    let is_wasm_runtime =
+        metadata.application.runtime.runtime_kind == Some(PackageRuntimeKind::WasmComponent);
     if !is_wasm_runtime || !metadata.application.agents.is_empty() {
         return None;
     }
-    let has_wasm_ability = metadata
-        .abilities
-        .iter()
-        .any(|ability| ability.id == "ability.runtime.wasm" || ability.implementation.contains("wasm"));
+    let has_wasm_ability = metadata.abilities.iter().any(|ability| {
+        ability.id == "ability.runtime.wasm" || ability.implementation.contains("wasm")
+    });
     if !has_wasm_ability {
         return None;
     }
@@ -658,7 +712,9 @@ pub(crate) async fn post_chat_v2(
                                 serde_json::json!({ "input": req.prompt, "channel": "chat" }),
                                 TraceContext::new("web-chat-wasm-dispatch-fallback-command"),
                             );
-                            command.metadata.insert("wasm.export".into(), "app:start".into());
+                            command
+                                .metadata
+                                .insert("wasm.export".into(), "app:start".into());
                             command
                         },
                     });
@@ -718,11 +774,27 @@ pub(crate) async fn post_chat_v2(
         );
     }
 
+    persist_initial_chat_session(&state, &app_id, &session_key, &req.prompt).await;
+
     // Agentless WASM fast-path:
     // - do NOT bootstrap framework coordinator/executor loops,
     // - do NOT create MCP agent-session noise,
     // - stream deterministic trace stages directly for frontend trace panels.
-    if let Some(dispatch) = wasm_dispatch {
+    if let Some(mut dispatch) = wasm_dispatch {
+        // The Web Shell owns the user-visible session id, while portable WASM
+        // artifacts only know template values such as `${session.id}`.  Bind
+        // the real session to the host-dispatch command here so downstream
+        // imports like `ui.render` store surfaces under the same key that the
+        // chat page will later query.
+        dispatch.trace.session_id = Some(session_key.clone());
+        dispatch.scope.session_id = Some(session_key.clone());
+        if let Some(trace) = dispatch.host_command.trace.as_mut() {
+            trace.session_id = Some(session_key.clone());
+        }
+        dispatch
+            .host_command
+            .metadata
+            .insert("session.id".into(), session_key.clone());
         let session_key_for_task = session_key.clone();
         let app_id_for_task = app_id;
         let state_for_task = Arc::clone(&state);
@@ -742,7 +814,11 @@ pub(crate) async fn post_chat_v2(
                 app_id = %app_id_for_task,
                 "Starting WASM chat dispatch path (agentless runtime)"
             );
-            match state_for_task.application_client.host_dispatch(dispatch).await {
+            match state_for_task
+                .application_client
+                .host_dispatch(dispatch)
+                .await
+            {
                 Ok(output) => {
                     let summary = match output.status {
                         ApplicationHostCommandStatus::Ok => "WASM execution completed",
@@ -760,10 +836,25 @@ pub(crate) async fn post_chat_v2(
                         }
                         ApplicationHostCommandStatus::Rejected { .. } => "WASM execution rejected",
                     };
+                    let content = format!(
+                        "{summary}\n{}",
+                        serde_json::to_string(&output).unwrap_or_else(|_| "{}".to_string())
+                    );
+                    persist_session_snapshot(
+                        &state_for_task.persist.session_store,
+                        &session_key_for_task,
+                        &app_id_for_task,
+                        Some("completed"),
+                        Some(content.clone()),
+                        None,
+                        None,
+                        None,
+                    )
+                    .await;
                     let _ = tx_for_task
                         .send(Ok(Event::default().event("assistant").data(
                             serde_json::json!({
-                                "content": format!("{summary}\n{}", serde_json::to_string(&output).unwrap_or_else(|_| "{}".to_string())),
+                                "content": content,
                             })
                             .to_string(),
                         )))
@@ -779,10 +870,22 @@ pub(crate) async fn post_chat_v2(
                         .await;
                 }
                 Err(error) => {
+                    let error_msg = format!("WASM host dispatch failed: {error}");
+                    persist_session_snapshot(
+                        &state_for_task.persist.session_store,
+                        &session_key_for_task,
+                        &app_id_for_task,
+                        Some("error"),
+                        Some(error_msg.clone()),
+                        None,
+                        None,
+                        None,
+                    )
+                    .await;
                     let _ = tx_for_task
                         .send(Ok(Event::default().event("error").data(
                             serde_json::json!({
-                                "error": format!("WASM host dispatch failed: {error}"),
+                                "error": error_msg,
                             })
                             .to_string(),
                         )))
@@ -852,45 +955,6 @@ pub(crate) async fn post_chat_v2(
             ));
         }
     };
-
-    // Create initial session (status: running)
-    let now = Utc::now();
-    let title = req.prompt.chars().take(50).collect::<String>();
-    let session_key_db = format!("{}{}", SESSION_PREFIX, &session_key);
-    let initial_stored = StoredSession {
-        meta: SessionMeta {
-            session_id: session_key.clone(),
-            app_id: app_id.0.to_string(),
-            created_at: now,
-            updated_at: now,
-            message_count: 1,
-            title: Some(title.clone()),
-            status: "running".to_string(),
-        },
-        turns: vec![StoredTurn {
-            role: "user".into(),
-            content: req.prompt.clone(),
-            status: None,
-            trace_steps: Vec::new(),
-            meta: None,
-            agent_traces: HashMap::new(),
-        }],
-        messages: vec![],
-    };
-    if let Ok(data) = serde_json::to_vec(&initial_stored) {
-        let _ = state
-            .persist
-            .session_store
-            .set(&session_key_db, &data)
-            .await;
-    }
-    // Add to app sessions index (per-session key format, matching post_chat convention)
-    let app_index_key = format!("{}{}/{}", APP_SESSIONS_PREFIX, app_id.0, session_key);
-    let _ = state
-        .persist
-        .session_store
-        .set(&app_index_key, session_key.as_bytes())
-        .await;
 
     // Persist framework-level execution context for session/trace/resume.
     let mut execution_context = ExecutionContext::new(

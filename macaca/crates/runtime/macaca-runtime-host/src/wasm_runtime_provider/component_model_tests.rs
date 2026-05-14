@@ -198,7 +198,10 @@ async fn component_model_provider_dispatches_declared_host_command_plan() {
 
     assert!(matches!(result.status, ApplicationHostCommandStatus::Ok));
     assert_eq!(result.output["export"], json!("app:start"));
-    assert_eq!(result.output["host_command_results"][0]["status"], json!("Ok"));
+    assert_eq!(
+        result.output["host_command_results"][0]["status"],
+        json!("Ok")
+    );
     assert_eq!(
         result.output["host_command_results"][0]["output"]["input"],
         json!("AAPL")
@@ -253,10 +256,92 @@ async fn component_model_provider_deduplicates_repeated_declared_host_commands()
     // portable adapter must execute the declared service call once so audit
     // counts match the app contract rather than linker layout details.
     assert!(matches!(result.status, ApplicationHostCommandStatus::Ok));
-    assert_eq!(result.output["host_command_results"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        result.output["host_command_results"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
     assert_eq!(
         result.output["host_command_results"][0]["output"]["input"],
         json!("AAPL")
+    );
+}
+
+#[tokio::test]
+async fn component_model_provider_chains_declared_host_command_results() {
+    let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
+    let service_id = register_mock_service(&runtime, "wasm.component.service.chain").await;
+    let bridge = Arc::new(WasmHostImportBridge::new(
+        Arc::clone(&runtime),
+        WasmHostImportBridgeConfig::default(),
+    ));
+    let mut first_command = ApplicationHostCommand::with_trace(
+        ApplicationImport::ServiceCall,
+        json!({"symbol": "${chat.input}", "price": 100}),
+        TraceContext::new("trace-placeholder-replaced-by-runtime"),
+    );
+    first_command
+        .metadata
+        .insert("service.id".into(), service_id.to_string());
+    first_command
+        .metadata
+        .insert("service.operation".into(), "lookup".into());
+    first_command
+        .metadata
+        .insert("capability".into(), "service.call".into());
+    let mut second_command = ApplicationHostCommand::with_trace(
+        ApplicationImport::ServiceCall,
+        json!({
+            "market_data": "${host.results.0.output}",
+            "market_symbol": "${host.results.0.output.symbol}",
+            "missing_reference": "${host.results.9.output}"
+        }),
+        TraceContext::new("trace-placeholder-replaced-by-runtime"),
+    );
+    second_command
+        .metadata
+        .insert("service.id".into(), service_id.to_string());
+    second_command
+        .metadata
+        .insert("service.operation".into(), "analyze".into());
+    second_command
+        .metadata
+        .insert("capability".into(), "service.call".into());
+    let fixture = component_fixture_bytes_with_host_commands(&[first_command, second_command]);
+    let artifact_path = write_fixture_component("declared-host-plan-chain", &fixture);
+    let provider = ComponentModelWasmRuntimeProvider::default().with_host_import_bridge(bridge);
+    let session = provider
+        .create_session(traced_request(
+            "trace-component-declared-plan-chain-provider",
+            &artifact_path,
+        ))
+        .await
+        .unwrap();
+    let mut command = ApplicationHostCommand::with_trace(
+        ApplicationImport::Custom("macaca:wasm/invoke".into()),
+        json!({"input": "BTC"}),
+        TraceContext::new("trace-component-declared-plan-chain-command"),
+    );
+    command
+        .metadata
+        .insert("wasm.export".into(), "app:start".into());
+
+    let result = session.dispatch(command).await.unwrap();
+
+    assert!(matches!(result.status, ApplicationHostCommandStatus::Ok));
+    assert_eq!(
+        result.output["host_command_results"][1]["output"]["market_data"]["symbol"],
+        json!("BTC")
+    );
+    assert_eq!(
+        result.output["host_command_results"][1]["output"]["market_symbol"],
+        json!("BTC")
+    );
+    assert_eq!(
+        result.output["host_command_results"][1]["output"]["missing_reference"],
+        json!("${host.results.9.output}")
     );
 }
 
@@ -356,10 +441,24 @@ fn component_fixture_bytes_with_host_command(command: &ApplicationHostCommand) -
     .into_bytes()
 }
 
-fn component_fixture_bytes_with_duplicate_host_command(command: &ApplicationHostCommand) -> Vec<u8> {
+fn component_fixture_bytes_with_duplicate_host_command(
+    command: &ApplicationHostCommand,
+) -> Vec<u8> {
     let encoded = serde_json::to_string(command).unwrap();
     format!(
         "\0asm\x01\0\0\0macaca:component-model:v1\0export=app:start\0wit=macaca:application/runtime@1\0host-command={encoded}\0.rodata.macaca_component\0host-command={encoded}\0"
+    )
+    .into_bytes()
+}
+
+fn component_fixture_bytes_with_host_commands(commands: &[ApplicationHostCommand]) -> Vec<u8> {
+    let encoded = commands
+        .iter()
+        .map(|command| format!("host-command={}", serde_json::to_string(command).unwrap()))
+        .collect::<Vec<_>>()
+        .join("\0");
+    format!(
+        "\0asm\x01\0\0\0macaca:component-model:v1\0export=app:start\0wit=macaca:application/runtime@1\0{encoded}\0"
     )
     .into_bytes()
 }

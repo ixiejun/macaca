@@ -12,11 +12,11 @@ use macaca_proto::{
     ApplicationDiscoverCommand, ApplicationDiscoverResult, ApplicationGenUiSurfaceCommand,
     ApplicationHostDispatchResult, ApplicationHostDispatchServiceCommand,
     ApplicationMetadataQueryCommand, ApplicationMetadataResult, ApplicationRemoveCommand,
-    ApplicationServiceSnapshot, ApplicationServiceUnavailable, ApplicationSessionResult,
-    ApplicationSessionResumeCommand, ApplicationSessionStartCommand, ApplicationSessionStopCommand,
-    ApplicationSnapshotCommand, ApplicationStartCommand, ApplicationStartResult,
-    ApplicationStatusCommand, ApplicationStatusResult, ApplicationStopCommand, MacacaError,
-    MacacaResult, APPLICATION_DISCOVER_COMMAND, APPLICATION_GENUI_SURFACE_COMMAND,
+    ApplicationServiceSnapshot, ApplicationSessionResult, ApplicationSessionResumeCommand,
+    ApplicationSessionStartCommand, ApplicationSessionStopCommand, ApplicationSnapshotCommand,
+    ApplicationStartCommand, ApplicationStartResult, ApplicationStatusCommand,
+    ApplicationStatusResult, ApplicationStopCommand, MacacaError, MacacaResult, UiIntent,
+    APPLICATION_DISCOVER_COMMAND, APPLICATION_GENUI_SURFACE_COMMAND,
     APPLICATION_HOST_DISPATCH_COMMAND, APPLICATION_METADATA_QUERY_COMMAND,
     APPLICATION_REMOVE_COMMAND, APPLICATION_SERVICE_ID, APPLICATION_SESSION_RESUME_COMMAND,
     APPLICATION_SESSION_START_COMMAND, APPLICATION_SESSION_STOP_COMMAND,
@@ -62,10 +62,18 @@ pub trait SystemApplicationClient: Send + Sync {
         &self,
         command: ApplicationHostDispatchServiceCommand,
     ) -> MacacaResult<ApplicationHostDispatchResult>;
+    /// Query the latest schema-defined GenUI surface for an app/session.
+    ///
+    /// The SDK returns an optional protocol intent rather than a shell-specific
+    /// fallback object so every shell can make the same generic rendering
+    /// decision: `Some(intent)` means the Application Service has stored a
+    /// schema surface, while `None` means the session simply has no current
+    /// surface.  No application names, workflow names, or renderer-specific
+    /// assumptions are encoded at this boundary.
     async fn genui_surface(
         &self,
         command: ApplicationGenUiSurfaceCommand,
-    ) -> MacacaResult<ApplicationServiceUnavailable>;
+    ) -> MacacaResult<Option<UiIntent>>;
     async fn metadata(
         &self,
         command: ApplicationMetadataQueryCommand,
@@ -171,12 +179,12 @@ impl SystemApplicationClient for UnavailableSystemApplicationClient {
     async fn genui_surface(
         &self,
         command: ApplicationGenUiSurfaceCommand,
-    ) -> MacacaResult<ApplicationServiceUnavailable> {
-        Ok(ApplicationServiceUnavailable::new(
-            APPLICATION_GENUI_SURFACE_COMMAND,
-            "Application service is unavailable",
-            Some(&command.trace),
-        ))
+    ) -> MacacaResult<Option<UiIntent>> {
+        info!(
+            trace_id = %command.trace.trace_id,
+            "sdk application client returning empty GenUI surface because Application service is unavailable"
+        );
+        Ok(None)
     }
 
     async fn metadata(
@@ -332,7 +340,7 @@ impl SystemApplicationClient for ServiceBackedApplicationClient {
     async fn genui_surface(
         &self,
         command: ApplicationGenUiSurfaceCommand,
-    ) -> MacacaResult<ApplicationServiceUnavailable> {
+    ) -> MacacaResult<Option<UiIntent>> {
         call(
             &self.service,
             APPLICATION_GENUI_SURFACE_COMMAND,

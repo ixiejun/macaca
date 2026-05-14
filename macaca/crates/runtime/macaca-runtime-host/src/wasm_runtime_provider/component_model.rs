@@ -296,9 +296,8 @@ impl WasmExecutionSession for ComponentModelWasmExecutionSession {
             .unwrap_or("app:start");
         match self.instance.invoke_export(export_name) {
             Ok(()) => {
-                let host_command_results = self
-                    .dispatch_declared_host_commands(&command, &trace)
-                    .await;
+                let host_command_results =
+                    self.dispatch_declared_host_commands(&command, &trace).await;
                 info!(
                     session_id = %self.session_id,
                     trace_id = %trace.trace_id,
@@ -470,17 +469,26 @@ impl ComponentModelWasmExecutionSession {
         let mut results = Vec::new();
         for (index, template) in self.module.host_commands().iter().enumerate() {
             let mut command = template.clone();
-            let trace = TraceContext::new(format!(
+            let mut trace = TraceContext::new(format!(
                 "{}:host-command:{}",
                 parent_trace.trace_id,
                 index + 1
             ));
+            // Declared host commands are child operations of the export
+            // dispatch.  Preserve the parent session link so UI imports,
+            // service audit, and Web-shell follow-up queries all share the
+            // same user-visible correlation key instead of falling back to the
+            // provider-private component session id.
+            trace.session_id = parent_trace.session_id.clone();
             command.trace = Some(trace.clone());
-            command.metadata.insert("app.id".into(), self.request.application_id.clone());
+            command
+                .metadata
+                .insert("app.id".into(), self.request.application_id.clone());
             command
                 .metadata
                 .insert("session.id".into(), self.session_id.clone());
-            command.payload = apply_host_command_template(command.payload, &export_command.payload);
+            command.payload =
+                apply_host_command_template(command.payload, &export_command.payload, &results);
             info!(
                 session_id = %self.session_id,
                 trace_id = %trace.trace_id,
@@ -606,25 +614,63 @@ impl ComponentModelWasmExecutionSession {
 fn apply_host_command_template(
     value: serde_json::Value,
     export_payload: &serde_json::Value,
+    host_results: &[serde_json::Value],
 ) -> serde_json::Value {
     match value {
         serde_json::Value::String(text) if text == "${chat.input}" => export_payload
             .get("input")
             .cloned()
             .unwrap_or(serde_json::Value::Null),
+        serde_json::Value::String(text) => resolve_host_result_template(&text, host_results)
+            .unwrap_or(serde_json::Value::String(text)),
         serde_json::Value::Array(items) => serde_json::Value::Array(
             items
                 .into_iter()
-                .map(|item| apply_host_command_template(item, export_payload))
+                .map(|item| apply_host_command_template(item, export_payload, host_results))
                 .collect(),
         ),
         serde_json::Value::Object(map) => serde_json::Value::Object(
             map.into_iter()
-                .map(|(key, item)| (key, apply_host_command_template(item, export_payload)))
+                .map(|(key, item)| {
+                    (
+                        key,
+                        apply_host_command_template(item, export_payload, host_results),
+                    )
+                })
                 .collect(),
         ),
         other => other,
     }
+}
+
+/// Resolve a full-value placeholder against prior declared host-command results.
+///
+/// The portable Component Model adapter cannot yet execute guest bytecode, so
+/// it models guest orchestration through declarative host-command metadata.  A
+/// later command may reference a prior command result with a bounded JSON path
+/// such as `${host.results.0.output}` or `${host.results.2.output.analysis}`.
+/// The runtime resolves only exact full-value placeholders; it deliberately
+/// avoids string interpolation so payload types remain JSON-native and audit
+/// output stays predictable.
+fn resolve_host_result_template(
+    text: &str,
+    host_results: &[serde_json::Value],
+) -> Option<serde_json::Value> {
+    let path = text.strip_prefix("${host.results.")?.strip_suffix('}')?;
+    let mut parts = path.split('.');
+    let index = parts.next()?.parse::<usize>().ok()?;
+    let mut current = host_results.get(index)?.clone();
+    for part in parts {
+        current = match current {
+            serde_json::Value::Object(map) => map.get(part)?.clone(),
+            serde_json::Value::Array(items) => {
+                let item_index = part.parse::<usize>().ok()?;
+                items.get(item_index)?.clone()
+            }
+            _ => return None,
+        };
+    }
+    Some(current)
 }
 
 fn is_component_export_invoke(command: &ApplicationHostCommand) -> bool {
