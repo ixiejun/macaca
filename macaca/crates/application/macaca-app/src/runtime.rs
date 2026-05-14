@@ -12,6 +12,7 @@ use macaca_sdk::MacacaSdk;
 
 use crate::loader::AppLoader;
 use crate::model::{AppLayer, AppManifest, AppStatus, LoadedApp};
+use crate::service_capability::{expand_service_capabilities, InMemoryDomainPackCatalog};
 
 /// Builder that incrementally validates and assembles application runtime
 /// inputs before registration into [`AppRuntime`].
@@ -38,11 +39,6 @@ impl AppRuntimeBuilder {
 
     pub fn validate(&self) -> MacacaResult<()> {
         AppLoader::validate_manifest(&self.manifest)?;
-        if self.manifest.layer == AppLayer::L2Wasm {
-            return Err(MacacaError::Config(
-                "L2 WASM apps are not yet supported".into(),
-            ));
-        }
         Ok(())
     }
 
@@ -141,6 +137,24 @@ impl AppRuntime {
         }
 
         let configs = builder.resolve_agent_configs()?;
+        let capabilities = expand_service_capabilities(
+            builder.manifest().service_contract.as_ref(),
+            &InMemoryDomainPackCatalog::with_builtin_defaults(),
+        );
+        tracing::info!(
+            app = %builder.manifest().name,
+            resolved_pack_count = capabilities.resolved_packs.len(),
+            unresolved_pack_count = capabilities.unresolved_packs.len(),
+            effective_service_count = capabilities.services.len(),
+            capabilities_hash = %capabilities.capabilities_hash,
+            "Resolved application effective service capabilities"
+        );
+        if builder.manifest().layer == AppLayer::L2Wasm {
+            tracing::info!(
+                app = %builder.manifest().name,
+                "Starting L2 WASM app in discovery-only mode (no declarative agents registered)"
+            );
+        }
 
         let mut agent_ids = Vec::new();
         let sdk = MacacaSdk::for_kernel(kernel);
@@ -327,6 +341,7 @@ mod tests {
             workflows: None,
             resources: None,
             context: None,
+            service_contract: None,
         }
     }
 
@@ -433,7 +448,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn wasm_app_not_supported() {
+    async fn wasm_app_can_start_without_declarative_agents() {
         let runtime = AppRuntime::new();
         let kernel = make_kernel();
         let manifest = AppManifest {
@@ -450,9 +465,12 @@ mod tests {
             workflows: None,
             resources: None,
             context: None,
+            service_contract: None,
         };
-        let err = runtime.start_app(manifest, ".", &kernel).await.unwrap_err();
-        assert!(err.to_string().contains("WASM"));
+        let app_id = runtime.start_app(manifest, ".", &kernel).await.unwrap();
+        let agents = runtime.app_agents(&app_id).await.unwrap();
+        assert!(agents.is_empty());
+        assert_eq!(kernel.agent_count().await, 0);
     }
 
     #[tokio::test]
@@ -515,6 +533,7 @@ agents:
             workflows: None,
             resources: None,
             context: None,
+            service_contract: None,
         };
         let app_id = runtime.start_app(manifest, ".", &kernel).await.unwrap();
         let agents = runtime.app_agents(&app_id).await.unwrap();

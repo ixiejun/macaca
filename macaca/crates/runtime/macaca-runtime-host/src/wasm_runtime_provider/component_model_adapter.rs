@@ -7,15 +7,16 @@
 //! implementation used by tests and governance flows until a concrete engine
 //! backend is wired behind the same trait.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 
-use macaca_proto::{WasmResourcePolicy, WasmRuntimeErrorKind};
+use macaca_proto::{ApplicationHostCommand, WasmResourcePolicy, WasmRuntimeErrorKind};
 
 use super::errors::WasmRuntimeHostError;
 
 const WASM_MAGIC: &[u8; 4] = b"\0asm";
 const COMPONENT_MARKER: &[u8] = b"macaca:component-model:v1";
 const EXPORT_PREFIX: &str = "export=";
+const HOST_COMMAND_PREFIX: &str = "host-command=";
 const WIT_PREFIX: &str = "wit=";
 
 /// Engine-neutral Adapter trait for Component Model execution.
@@ -69,6 +70,7 @@ impl WasmComponentEngineAdapter for PortableComponentModelAdapter {
 
         let metadata = String::from_utf8_lossy(bytes);
         let exports = parse_metadata_values(&metadata, EXPORT_PREFIX);
+        let host_commands = parse_host_commands(&metadata)?;
         let wit_packages = parse_metadata_values(&metadata, WIT_PREFIX);
         if exports.is_empty() {
             return Err(WasmRuntimeHostError::new(
@@ -85,6 +87,7 @@ impl WasmComponentEngineAdapter for PortableComponentModelAdapter {
 
         Ok(WasmComponentModule {
             exports,
+            host_commands,
             wit_packages,
             estimated_fuel: bytes.len() as u64,
         })
@@ -102,6 +105,7 @@ impl WasmComponentEngineAdapter for PortableComponentModelAdapter {
 #[derive(Debug, Clone)]
 pub(crate) struct WasmComponentModule {
     exports: BTreeSet<String>,
+    host_commands: Vec<ApplicationHostCommand>,
     wit_packages: BTreeSet<String>,
     estimated_fuel: u64,
 }
@@ -119,6 +123,17 @@ impl WasmComponentModule {
             .next()
             .cloned()
             .unwrap_or_else(|| "unknown".into())
+    }
+
+    /// Return the app-declared host-command plan embedded in component bytes.
+    ///
+    /// The portable adapter cannot execute guest WebAssembly bytecode.  It
+    /// therefore supports a deterministic fixture envelope where guest tooling
+    /// embeds the host-import commands it would emit.  Runtime code still routes
+    /// those commands through the same `service.call` bridge, policy engine, and
+    /// audit sink used by real engines.
+    pub(crate) fn host_commands(&self) -> &[ApplicationHostCommand] {
+        &self.host_commands
     }
 
     /// Validate static component resource estimates against the active policy.
@@ -171,4 +186,37 @@ fn parse_metadata_values(metadata: &str, prefix: &str) -> BTreeSet<String> {
         .filter(|value| !value.is_empty())
         .map(ToOwned::to_owned)
         .collect()
+}
+
+fn parse_host_commands(
+    metadata: &str,
+) -> Result<Vec<ApplicationHostCommand>, WasmRuntimeHostError> {
+    let mut commands = Vec::new();
+    let mut seen_commands = HashSet::new();
+    for encoded in metadata
+        .split(|ch| ch == '\0' || ch == '\n' || ch == '\r')
+        .filter_map(|part| part.strip_prefix(HOST_COMMAND_PREFIX))
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        // WASM toolchains may retain the same static metadata in more than one
+        // read-only segment, especially when `#[used]` data is also referenced
+        // by relocation/debug metadata.  The host-command plan is declarative
+        // and idempotent, so the portable adapter deduplicates exact encoded
+        // commands while preserving first-seen order.  This keeps Web sessions
+        // auditable and prevents duplicated service calls without making the
+        // host aware of any application-specific workflow.
+        if !seen_commands.insert(encoded.to_string()) {
+            continue;
+        }
+        let command =
+            serde_json::from_str::<ApplicationHostCommand>(encoded).map_err(|error| {
+                WasmRuntimeHostError::new(
+                    WasmRuntimeErrorKind::AbiMismatch,
+                    format!("WASM component host-command metadata is invalid: {error}"),
+                )
+            })?;
+        commands.push(command);
+    }
+    Ok(commands)
 }

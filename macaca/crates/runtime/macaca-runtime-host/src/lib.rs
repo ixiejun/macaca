@@ -16,6 +16,7 @@ pub mod application_hosts;
 pub mod application_service_provider;
 pub mod compat;
 pub mod context_service_provider;
+pub mod domain_pack_service_provider;
 pub mod driver_service_provider;
 pub mod entitlement;
 pub mod entitlement_service_provider;
@@ -40,8 +41,15 @@ pub mod plugin_hook;
 pub mod plugin_hook_service_provider;
 pub mod plugin_hosts;
 pub mod route_c_bootstrap;
+pub mod service_audit_runtime_bundle;
+pub mod service_call_audit;
+pub mod service_call_audit_service_provider;
+pub mod service_contract_registry;
 pub mod service_decorator;
+pub mod service_policy_engine;
 pub mod service_provider;
+pub mod service_provider_selector;
+pub mod service_router;
 pub mod service_runtime;
 pub mod service_runtime_error;
 pub mod service_runtime_event;
@@ -52,12 +60,21 @@ pub mod transport;
 pub mod wasm_runtime_provider;
 pub mod web3_service_provider;
 
+#[cfg(test)]
+mod service_router_tests;
+
 pub use application_hosts::{
     is_application_runtime_unavailable, ApplicationHostRuntime, UnavailableApplicationRuntimeHost,
     UnavailableWasmApplicationHost, WasmApplicationHostFactory,
 };
 pub use application_service_provider::ApplicationSystemServiceProvider;
 pub use context_service_provider::ContextSystemServiceProvider;
+pub use domain_pack_service_provider::{
+    bootstrap_builtin_domain_pack_services, DomainPackRuntimeBundle,
+    FinanceDataSystemServiceProvider, FinanceLlmAnalysisSystemServiceProvider,
+    FINANCE_ANALYZE_COMMAND, FINANCE_FINANCIALS_SERVICE_ID, FINANCE_LLM_ANALYSIS_SERVICE_ID,
+    FINANCE_LOOKUP_COMMAND, FINANCE_MARKET_DATA_SERVICE_ID, FINANCE_NEWS_DIGEST_SERVICE_ID,
+};
 pub use driver_service_provider::DriverSystemServiceProvider;
 pub use entitlement::{CapabilityCallContext, EntitlementOperation, EntitlementRuntimeFacade};
 pub use entitlement_service_provider::{
@@ -128,16 +145,38 @@ pub use route_c_bootstrap::{
     bootstrap_route_c_optional_services, RouteCBootstrapDiagnostic, RouteCHostRuntimeBundle,
     RouteCOptionalServicesBootstrap, RouteCOptionalServicesBootstrapInputs,
 };
+pub use service_audit_runtime_bundle::ServiceAuditRuntimeBundle;
+pub use service_call_audit::{
+    InMemoryServiceCallAuditSink, ServiceCallAuditEvent, ServiceCallAuditSink,
+};
+pub use service_call_audit_service_provider::{
+    service_call_audit_replay_session_command, service_call_audit_replay_trace_command,
+    service_call_audit_service_descriptor, ServiceCallAuditReplayResult,
+    ServiceCallAuditReplaySessionCommand, ServiceCallAuditReplayTraceCommand,
+    ServiceCallAuditSystemServiceProvider, SERVICE_CALL_AUDIT_REPLAY_SESSION_COMMAND,
+    SERVICE_CALL_AUDIT_REPLAY_TRACE_COMMAND, SERVICE_CALL_AUDIT_SERVICE_ID,
+};
+pub use service_contract_registry::{
+    InMemoryServiceContractRegistry, ServiceContractDescriptor, ServiceContractRegistry,
+};
 pub use service_decorator::{
     AllowAllServiceRuntimePolicy, DenyAllServiceRuntimePolicy, EntitlementRuntimeDecorator,
     MeteringRuntimeDecorator, PolicyRuntimeDecorator, ResourceRuntimeDecorator,
     ServiceRuntimeCallContext, ServiceRuntimeDecorator, ServiceRuntimePolicy,
     ServiceRuntimePolicyDecision, TraceRequiredRuntimeDecorator,
 };
+pub use service_policy_engine::{
+    InMemoryServicePolicyEngine, ServicePolicyDecision, ServicePolicyEngine, ServicePolicyInput,
+    ServicePolicyLayer,
+};
 pub use service_provider::{
     ServiceProviderFactory, ServiceProviderFactoryContext, ServiceProviderInstance,
     StaticServiceProviderFactory,
 };
+pub use service_provider_selector::{
+    ProviderSelectionStrategy, ProviderSelector, ProviderSnapshot,
+};
+pub use service_router::{ServiceRouteRequest, ServiceRouteResponse, ServiceRouter};
 pub use service_runtime::ServiceRuntime;
 pub use service_runtime_error::{ServiceRuntimeConfig, ServiceRuntimeError};
 pub use service_runtime_event::{

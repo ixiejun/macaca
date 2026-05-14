@@ -11,9 +11,8 @@ use crate::model::AppManifest;
 
 /// Standard directories where applications are discovered.
 pub const STANDARD_APP_DIRS: &[&str] = &[
-    "examples/apps", // Development: examples/apps/<app-name>/
-    "apps",          // Project-local: apps/<app-name>/
-    "../apps",       // Relative to build directory
+    "apps",    // Project-local: apps/<app-name>/
+    "../apps", // Relative to build directory
 ];
 
 /// Default application to auto-start if no app is specified.
@@ -68,12 +67,14 @@ impl AppRegistry {
         self.scan_dirs.push(dir);
     }
 
-    /// Get the user's home data directory for macaca apps.
-    pub fn user_apps_dir() -> PathBuf {
-        dirs::data_local_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join("macaca")
-            .join("apps")
+    /// Build a deterministic app installation directory under the configured
+    /// workspace root.
+    ///
+    /// Industrial deployment expects application discovery to live under
+    /// `{workspace.root_dir}/apps` so install and runtime locations are
+    /// centrally managed by one configuration root.
+    pub fn workspace_apps_dir(workspace_root: impl AsRef<std::path::Path>) -> PathBuf {
+        workspace_root.as_ref().join("apps")
     }
 
     /// Discover all apps from scan directories.
@@ -83,14 +84,12 @@ impl AppRegistry {
     pub fn discover_apps(&mut self) -> MacacaResult<Vec<DiscoveredApp>> {
         let mut found = Vec::new();
 
-        // Also scan user apps directory
-        let user_dir = Self::user_apps_dir();
-        let mut all_dirs = self.scan_dirs.clone();
-        if user_dir.exists() {
-            all_dirs.push(user_dir);
-        }
+        tracing::info!(
+            scan_dirs = ?self.scan_dirs,
+            "Scanning configured application directories"
+        );
 
-        for scan_dir in &all_dirs {
+        for scan_dir in &self.scan_dirs {
             if !scan_dir.exists() {
                 continue;
             }
@@ -191,10 +190,12 @@ impl AppRegistry {
             }
         }
 
-        // Check user apps directory
-        let user_app = Self::user_apps_dir().join(name);
-        if user_app.join("app.yaml").exists() {
-            return Some(user_app);
+        // Check configured workspace-root apps directory from environment.
+        if let Ok(workspace_root) = std::env::var("MACACA_WORKSPACE_ROOT") {
+            let workspace_app = Self::workspace_apps_dir(workspace_root).join(name);
+            if workspace_app.join("app.yaml").exists() {
+                return Some(workspace_app);
+            }
         }
 
         None

@@ -26,6 +26,7 @@ use tracing::info;
 use crate::consumption::app_entry_agent_name;
 use crate::manifest_v1::{LegacyAppManifestProjection, YamlApplicationManifestAdapter};
 use crate::model::{AgentSource, AppManifest, AppStatus};
+use crate::service_capability::{expand_service_capabilities, InMemoryDomainPackCatalog};
 use crate::ApplicationRuntimeKindSpec;
 
 /// Project an application manifest into the legacy app summary view.
@@ -127,6 +128,13 @@ fn manifest_v1_to_service_app_view(
     app_dir: Option<&Path>,
     status: AppStatus,
 ) -> ApplicationServiceAppView {
+    // Resolve effective service capabilities for metadata projection only.
+    // This keeps app discovery and UI surfaces deterministic without invoking
+    // any runtime providers or executing any service calls.
+    let capabilities = expand_service_capabilities(
+        legacy.service_contract.as_ref(),
+        &InMemoryDomainPackCatalog::with_builtin_defaults(),
+    );
     let runtime_kind = Some(manifest_v1.runtime.kind.clone());
     let lifecycle_state = crate::lifecycle_from_app_status(status);
     ApplicationServiceAppView {
@@ -143,7 +151,7 @@ fn manifest_v1_to_service_app_view(
             app_dir: app_dir.map(|path| path.display().to_string()),
             skills_dir: skills_dir(app_dir, legacy),
         },
-        diagnostics: runtime_diagnostics(legacy, &manifest_v1.runtime.kind),
+        diagnostics: runtime_diagnostics(legacy, &manifest_v1.runtime.kind, &capabilities),
     }
 }
 
@@ -319,12 +327,33 @@ fn digest_view(
     }
 }
 
-fn runtime_diagnostics(legacy: &AppManifest, runtime_kind: &PackageRuntimeKind) -> Vec<String> {
+fn runtime_diagnostics(
+    legacy: &AppManifest,
+    runtime_kind: &PackageRuntimeKind,
+    capabilities: &crate::service_capability::EffectiveServiceCapabilities,
+) -> Vec<String> {
+    // Diagnostics are intentionally bounded plain strings. They should help
+    // operators debug admission/runtime readiness without leaking payload data.
+    let mut diagnostics = vec![format!(
+        "effective_service_capabilities_hash={}",
+        capabilities.capabilities_hash
+    )];
+    diagnostics.push(format!(
+        "effective_service_count={}",
+        capabilities.services.len()
+    ));
+    if !capabilities.unresolved_packs.is_empty() {
+        diagnostics.push(format!(
+            "unresolved_domain_packs={}",
+            capabilities.unresolved_packs.join(",")
+        ));
+    }
     let spec = ApplicationRuntimeKindSpec;
     if spec.execution_available_for_runtime(Some(runtime_kind)) {
-        Vec::new()
+        diagnostics
     } else {
-        vec![format!("runtime unavailable for {:?}", legacy.layer)]
+        diagnostics.push(format!("runtime unavailable for {:?}", legacy.layer));
+        diagnostics
     }
 }
 
@@ -393,6 +422,7 @@ mod tests {
             workflows: None,
             resources: None,
             context: Some(Default::default()),
+            service_contract: None,
         }
     }
 
@@ -427,5 +457,25 @@ mod tests {
             .capability_names
             .iter()
             .any(|capability| capability.contains("plan")));
+    }
+
+    #[test]
+    fn service_app_view_contains_effective_service_diagnostics() {
+        let mut manifest = fixture_manifest();
+        manifest.service_contract = Some(crate::service_capability::AppServiceContractConfig {
+            use_packs: vec!["pack.finance.v1".into()],
+            required_services: vec!["service.custom.required".into()],
+            optional_services: vec![],
+            service_policy_overrides: Default::default(),
+        });
+        let view = app_manifest_to_service_app_view(&manifest, None, AppStatus::Loaded);
+        assert!(view
+            .diagnostics
+            .iter()
+            .any(|line| line.starts_with("effective_service_capabilities_hash=")));
+        assert!(view
+            .diagnostics
+            .iter()
+            .any(|line| line == "effective_service_count=5"));
     }
 }

@@ -36,12 +36,6 @@ impl AppLoader {
             ));
         }
 
-        if manifest.layer == AppLayer::L2Wasm {
-            return Err(MacacaError::Config(
-                "L2 WASM apps are not yet supported".into(),
-            ));
-        }
-
         Ok(())
     }
 
@@ -50,16 +44,22 @@ impl AppLoader {
     /// - `FilePath` sources are loaded from disk relative to `base_dir`.
     /// - `Inline` sources are converted directly.
     /// - L1 native apps return an empty vec (agents are registered programmatically).
-    /// - L2 WASM returns an error.
+    /// - L2 WASM currently resolves to an empty agent set so the application
+    ///   can be discovered and projected in control-plane surfaces while
+    ///   runtime execution remains explicitly gated elsewhere.
     pub fn resolve_agent_configs(
         manifest: &AppManifest,
         base_dir: impl AsRef<Path>,
     ) -> MacacaResult<Vec<AgentConfig>> {
         match manifest.layer {
             AppLayer::L1Native => Ok(vec![]),
-            AppLayer::L2Wasm => Err(MacacaError::Config(
-                "L2 WASM apps are not yet supported".into(),
-            )),
+            AppLayer::L2Wasm => {
+                tracing::info!(
+                    app = %manifest.name,
+                    "L2 WASM manifest admitted for discovery; no declarative agents are resolved"
+                );
+                Ok(vec![])
+            }
             AppLayer::L3Declarative => {
                 let base = base_dir.as_ref();
                 let mut configs = Vec::new();
@@ -144,13 +144,13 @@ layer: L3Declarative
     }
 
     #[test]
-    fn l2_wasm_not_supported() {
+    fn l2_wasm_manifest_is_admitted() {
         let yaml = r#"
 name: wasm-app
 layer: L2Wasm
 "#;
-        let err = AppLoader::parse_manifest_yaml(yaml).unwrap_err();
-        assert!(err.to_string().contains("WASM"));
+        let manifest = AppLoader::parse_manifest_yaml(yaml).unwrap();
+        assert_eq!(manifest.layer, AppLayer::L2Wasm);
     }
 
     #[test]
@@ -169,13 +169,14 @@ layer: L2Wasm
             workflows: None,
             resources: None,
             context: None,
+            service_contract: None,
         };
         let configs = AppLoader::resolve_agent_configs(&manifest, ".").unwrap();
         assert!(configs.is_empty());
     }
 
     #[test]
-    fn resolve_l2_errors() {
+    fn resolve_l2_returns_empty() {
         let manifest = AppManifest {
             id: macaca_proto::ApplicationId::new(),
             name: "wasm".into(),
@@ -190,9 +191,10 @@ layer: L2Wasm
             workflows: None,
             resources: None,
             context: None,
+            service_contract: None,
         };
-        let err = AppLoader::resolve_agent_configs(&manifest, ".").unwrap_err();
-        assert!(err.to_string().contains("WASM"));
+        let configs = AppLoader::resolve_agent_configs(&manifest, ".").unwrap();
+        assert!(configs.is_empty());
     }
 
     #[test]
@@ -225,6 +227,7 @@ layer: L2Wasm
             workflows: None,
             resources: None,
             context: None,
+            service_contract: None,
         };
         let configs = AppLoader::resolve_agent_configs(&manifest, ".").unwrap();
         assert_eq!(configs.len(), 1);
@@ -261,11 +264,42 @@ capabilities:
             workflows: None,
             resources: None,
             context: None,
+            service_contract: None,
         };
         let configs = AppLoader::resolve_agent_configs(&manifest, &dir).unwrap();
         assert_eq!(configs.len(), 1);
         assert_eq!(configs[0].name, "file-loaded-agent");
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn parse_manifest_with_service_contract_block() {
+        let yaml = r#"
+name: service-declared-app
+layer: L2Wasm
+service_contract:
+  use_packs: ["pack.finance.v1"]
+  required_services: ["service.market_data"]
+  optional_services: ["service.news_digest"]
+  service_policy_overrides:
+    service.market_data:
+      timeout_ms: 5000
+      max_retries: 1
+"#;
+        let manifest = AppLoader::parse_manifest_yaml(yaml).unwrap();
+        let contract = manifest
+            .service_contract
+            .expect("service contract must parse");
+        assert_eq!(contract.use_packs, vec!["pack.finance.v1"]);
+        assert_eq!(contract.required_services, vec!["service.market_data"]);
+        assert_eq!(contract.optional_services, vec!["service.news_digest"]);
+        assert_eq!(
+            contract
+                .service_policy_overrides
+                .get("service.market_data")
+                .and_then(|policy| policy.timeout_ms),
+            Some(5000)
+        );
     }
 }

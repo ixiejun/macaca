@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::service_capability::AppServiceContractConfig;
 use macaca_proto::{AgentId, ApplicationId};
 
 /// The execution layer of an application.
@@ -263,6 +264,9 @@ pub struct AppManifest {
     /// Optional context engine configuration for this application.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub context: Option<AppContextConfig>,
+    /// Optional generic service declaration block for contract-driven routing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub service_contract: Option<AppServiceContractConfig>,
 }
 
 /// UI type for frontend rendering.
@@ -446,6 +450,7 @@ agents:
                 workflows: None,
                 resources: None,
                 context: None,
+                service_contract: None,
             },
             agent_ids: vec![],
             status: AppStatus::Loaded,

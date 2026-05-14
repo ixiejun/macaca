@@ -100,6 +100,7 @@ fn inline_manifest(name: &str, agent_count: usize) -> AppManifest {
         workflows: None,
         resources: None,
         context: None,
+        service_contract: None,
     }
 }
 

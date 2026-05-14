@@ -275,6 +275,7 @@ mod tests {
             workflows: None,
             resources: None,
             context: None,
+            service_contract: None,
         }
     }
 

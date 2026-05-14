@@ -119,12 +119,16 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
         .build(),
     );
 
-    // 4. Initialize app registry and discover apps.
-    let mut registry = AppRegistry::new();
+    // 4. Initialize app registry and discover apps from the configured
+    // workspace install root. This keeps app installation/discovery under one
+    // industrial-grade control point: `{workspace.root_dir}/apps`.
+    let app_scan_dir = AppRegistry::workspace_apps_dir(&config.workspace.root_dir);
+    let mut registry = AppRegistry::with_dirs(vec![app_scan_dir.clone()]);
     let discovered = registry.discover_apps()?;
     info!(
         count = discovered.len(),
-        "Apps discovered from standard directories"
+        app_scan_dir = %app_scan_dir.display(),
+        "Apps discovered from workspace application directory"
     );
 
     // 5. Start the runtime and load ALL discovered apps.
@@ -136,6 +140,16 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
     let service_runtime = Arc::new(macaca_runtime_host::ServiceRuntime::new(
         macaca_runtime_host::ServiceRuntimeConfig::default(),
     ));
+    // Compose one shared audit bundle so replay commands and WASM host-import
+    // routing can observe the same service-call evidence chain.
+    let service_audit_bundle = macaca_runtime_host::ServiceAuditRuntimeBundle::in_memory();
+    // Host runtime wiring point for future production WASM runtime enablement.
+    // Keeping this bridge bound to the shared sink guarantees audit continuity
+    // once L2 WASM execution path is enabled in this host.
+    let wasm_host_import_bridge = service_audit_bundle.wasm_host_import_bridge(
+        Arc::clone(&service_runtime),
+        macaca_runtime_host::wasm_runtime_provider::WasmHostImportBridgeConfig::default(),
+    );
     service_runtime
         .register_provider(
             &macaca_runtime_host::StaticServiceProviderFactory::new(
@@ -145,6 +159,8 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
                         Arc::clone(&registry),
                         Arc::clone(&runtime),
                         Arc::clone(&kernel),
+                        wasm_host_import_bridge.policy_engine(),
+                        wasm_host_import_bridge.clone(),
                     )),
                 ),
             ),
@@ -156,6 +172,22 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
         .start(
             &KernelServiceId::new(macaca_proto::APPLICATION_SERVICE_ID),
             TraceContext::new("web-startup-application-service"),
+        )
+        .await
+        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+    service_runtime
+        .register_provider(
+            &macaca_runtime_host::StaticServiceProviderFactory::new(
+                service_audit_bundle.audit_service_provider_instance(),
+            ),
+            macaca_runtime_host::ServiceProviderFactoryContext::new(),
+        )
+        .await
+        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+    service_runtime
+        .start(
+            &KernelServiceId::new(macaca_runtime_host::SERVICE_CALL_AUDIT_SERVICE_ID),
+            TraceContext::new("web-startup-service-call-audit-service"),
         )
         .await
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
@@ -552,6 +584,20 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
         )
         .await
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+    // Built-in domain-pack services are registered at the generic service
+    // boundary, not in any individual application path.  WASM applications
+    // declare packs and service ids in their manifest; the host simply makes a
+    // reusable service surface available for every contract-driven app.
+    let domain_pack_services = macaca_runtime_host::bootstrap_builtin_domain_pack_services(
+        Arc::clone(&service_runtime),
+        Arc::clone(&llm),
+        "web-startup-domain-pack",
+    )
+    .await?;
+    info!(
+        services = domain_pack_services.started_services.len(),
+        "Built-in domain-pack services bootstrapped through runtime-host"
+    );
     // S12 thin-shell completion moves S9-S11 service lifecycle ownership into
     // `macaca-runtime-host`.  Web still provides the existing local stores and
     // facade handles, but provider registration/start semantics now cross a
@@ -739,22 +785,21 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
                     })
                     .collect();
                 if app_agents.is_empty() {
+                    // Security boundary enforcement:
+                    // Never fall back to global agents when an application has no
+                    // app-scoped runtime identity. Falling back would let one app
+                    // execute through another app's agents/tools, which breaks
+                    // isolation and violates the generic multi-tenant OS contract.
+                    //
+                    // We keep the app discoverable/listed at control-plane level,
+                    // but skip executor registration so request handling cannot
+                    // accidentally route into unrelated global workers.
                     tracing::warn!(
                         app_id = %app_id.0,
                         app_name = %app_name,
-                        "No app-scoped agents resolved; falling back to all registered agents"
+                        "No app-scoped agents resolved; skipping executor registration to preserve app isolation"
                     );
-                    app_agents = all_agents
-                        .iter()
-                        .map(|m| AgentInfo {
-                            id: m.id.0.to_string(),
-                            name: m.name.clone(),
-                            capabilities: m.capabilities.iter().map(|c| c.name.clone()).collect(),
-                            current_load: 0,
-                            max_load: 4,
-                            available: true,
-                        })
-                        .collect();
+                    continue;
                 }
                 let workspace_agent_names: Vec<String> =
                     app_agents.iter().map(|agent| agent.name.clone()).collect();

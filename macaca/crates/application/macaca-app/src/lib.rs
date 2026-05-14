@@ -23,6 +23,7 @@ pub mod runtime;
 pub mod runtime_guard;
 pub mod service_adapter;
 pub mod service_admission;
+pub mod service_capability;
 pub mod service_projection;
 pub mod skills;
 pub mod wasm;
@@ -92,6 +93,11 @@ pub use service_admission::{
     ApplicationAdmissionDiagnostic, ApplicationAdmissionReport, ApplicationManifestSpec,
     ApplicationManifestV1Spec, ApplicationRuntimeKindSpec, ApplicationScopeSpec,
     ApplicationTraceSpec,
+};
+pub use service_capability::{
+    expand_service_capabilities, AppServiceContractConfig, AppServicePolicyOverride,
+    DomainPackCatalog, DomainPackDefinition, EffectiveServiceCapabilities,
+    InMemoryDomainPackCatalog,
 };
 pub use service_projection::{app_manifest_to_metadata_view, app_manifest_to_service_app_view};
 pub use skills::{global_skills_dir, SkillLoader};

@@ -53,6 +53,43 @@ async fn wasm_host_import_service_call_routes_through_service_runtime() {
 }
 
 #[tokio::test]
+async fn wasm_host_import_bridge_replays_service_call_audit_chain() {
+    let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
+    let service_id = register_mock_service(&runtime, "wasm.host.service.audit.replay").await;
+    let bridge =
+        WasmHostImportBridge::new(Arc::clone(&runtime), WasmHostImportBridgeConfig::default());
+    let mut command = host_import_command(
+        "trace-host-import-audit",
+        &service_id,
+        "invoke",
+        json!({"input": true}),
+        "service.call",
+    );
+    command
+        .metadata
+        .insert("session.id".into(), "session-host-import-audit".into());
+
+    let result = bridge
+        .dispatch(command, TraceContext::new("trace-host-import-audit"))
+        .await;
+    assert!(matches!(result.status, ApplicationHostCommandStatus::Ok));
+
+    let replay = bridge
+        .replay_service_call_audit_by_trace_id("trace-host-import-audit")
+        .unwrap();
+    assert!(replay
+        .iter()
+        .any(|event| event.stage == "service_call_requested"));
+    assert!(replay
+        .iter()
+        .any(|event| event.stage == "service_call_succeeded"));
+    let session_replay = bridge
+        .replay_service_call_audit_by_session_id("session-host-import-audit")
+        .unwrap();
+    assert!(!session_replay.is_empty());
+}
+
+#[tokio::test]
 async fn wasm_host_import_missing_trace_is_denied_before_service_runtime() {
     let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
     let service_id = register_mock_service(&runtime, "wasm.host.service.trace").await;
@@ -188,6 +225,45 @@ async fn wasm_host_import_unknown_service_is_structured_unavailable() {
     assert_eq!(
         result.metadata.get("reason_code").map(String::as_str),
         Some("service_unavailable")
+    );
+}
+
+#[tokio::test]
+async fn wasm_host_import_applies_app_scoped_policy_override_and_denies_service() {
+    let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
+    let service_id = register_mock_service(&runtime, "wasm.host.service.policy.denied").await;
+    let bridge = Arc::new(WasmHostImportBridge::new(
+        Arc::clone(&runtime),
+        WasmHostImportBridgeConfig::default(),
+    ));
+    let provider = DefaultInProcessWasmRuntimeProvider::default().with_host_import_bridge(bridge);
+    let session = provider
+        .create_session(traced_request("trace-host-import-provider"))
+        .await
+        .unwrap();
+    let mut command = host_import_command(
+        "trace-host-import-policy-override",
+        &service_id,
+        "invoke",
+        json!({"input": true}),
+        "service.call",
+    );
+    command
+        .metadata
+        .insert("app.id".into(), "app-policy-a".into());
+    command
+        .metadata
+        .insert("policy.deny_services".into(), service_id.to_string());
+
+    let result = session.dispatch(command).await.unwrap();
+
+    assert!(matches!(
+        result.status,
+        ApplicationHostCommandStatus::DisabledByPolicy { .. }
+    ));
+    assert_eq!(
+        result.metadata.get("reason_code").map(String::as_str),
+        Some("policy_denied")
     );
 }
 

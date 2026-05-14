@@ -6,15 +6,16 @@
 //! structured unavailable behavior; `macaca-app` remains the owner of manifests,
 //! runtime assembly, ApplicationHost, ABI metadata, and lifecycle semantics.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use macaca_app::{
     app_manifest_to_metadata_view, app_manifest_to_service_app_view,
-    application_service_descriptor, AppLoader, AppRegistry, AppRuntime, AppStatus, ApplicationHost,
-    DiscoveredApp, UnavailableApplicationHostBackend,
+    application_service_descriptor, expand_service_capabilities, AppLoader, AppRegistry,
+    AppRuntime, AppStatus, ApplicationHost, DiscoveredApp, InMemoryDomainPackCatalog,
+    UnavailableApplicationHostBackend,
 };
 use macaca_kernel::{Kernel, SystemService};
 use macaca_proto::{
@@ -27,6 +28,7 @@ use macaca_proto::{
     ApplicationSnapshotCommand, ApplicationStartCommand, ApplicationStatusCommand,
     ApplicationStatusResult, ApplicationStopCommand, CleanupPolicy, PackageRuntimeKind,
     ServiceCallResult, ServiceCommand, ServiceError, ServiceHealth, ServiceResult, TraceContext,
+    WasmExecutionProfile, WasmRuntimeArtifactRef, WasmRuntimeSessionRequest,
     APPLICATION_DISCOVER_COMMAND, APPLICATION_GENUI_SURFACE_COMMAND,
     APPLICATION_HOST_DISPATCH_COMMAND, APPLICATION_LOAD_COMMAND,
     APPLICATION_METADATA_QUERY_COMMAND, APPLICATION_REMOVE_COMMAND,
@@ -36,13 +38,22 @@ use macaca_proto::{
 };
 use tokio::sync::RwLock;
 
+use crate::wasm_runtime_provider::{
+    ComponentModelWasmRuntimeProvider, WasmApplicationRuntimeProvider, WasmExecutionSession,
+    WasmHostImportBridge,
+};
+use crate::{InMemoryServicePolicyEngine, ServicePolicyLayer};
+
 /// Host-owned Application Service provider backed by existing app primitives.
 pub struct ApplicationSystemServiceProvider {
     descriptor: macaca_proto::ServiceDescriptor,
     registry: Option<Arc<RwLock<AppRegistry>>>,
     runtime: Option<Arc<AppRuntime>>,
     kernel: Option<Arc<Kernel>>,
+    wasm_policy_engine: Option<Arc<InMemoryServicePolicyEngine>>,
+    wasm_runtime_provider: Option<Arc<dyn WasmApplicationRuntimeProvider>>,
     sessions: Arc<RwLock<HashMap<String, ApplicationServiceSessionView>>>,
+    wasm_sessions: Arc<RwLock<HashMap<ApplicationId, Arc<dyn WasmExecutionSession>>>>,
 }
 
 impl ApplicationSystemServiceProvider {
@@ -51,13 +62,22 @@ impl ApplicationSystemServiceProvider {
         registry: Arc<RwLock<AppRegistry>>,
         runtime: Arc<AppRuntime>,
         kernel: Arc<Kernel>,
+        wasm_policy_engine: Arc<InMemoryServicePolicyEngine>,
+        wasm_host_import_bridge: WasmHostImportBridge,
     ) -> Self {
+        let wasm_runtime_provider = Arc::new(
+            ComponentModelWasmRuntimeProvider::default()
+                .with_host_import_bridge(Arc::new(wasm_host_import_bridge)),
+        );
         Self {
             descriptor: application_service_descriptor(),
             registry: Some(registry),
             runtime: Some(runtime),
             kernel: Some(kernel),
+            wasm_policy_engine: Some(wasm_policy_engine),
+            wasm_runtime_provider: Some(wasm_runtime_provider),
             sessions: Arc::new(RwLock::new(HashMap::new())),
+            wasm_sessions: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -68,7 +88,10 @@ impl ApplicationSystemServiceProvider {
             registry: None,
             runtime: None,
             kernel: None,
+            wasm_policy_engine: None,
+            wasm_runtime_provider: None,
             sessions: Arc::new(RwLock::new(HashMap::new())),
+            wasm_sessions: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -90,6 +113,118 @@ impl ApplicationSystemServiceProvider {
                 "application kernel compatibility handle is not configured".into(),
             )
         })
+    }
+
+    /// Resolve one app-scoped WASM execution session, creating it lazily.
+    ///
+    /// The session key is `application_id` and the setup is completely generic:
+    /// - ability id comes from sanitized metadata projection (`ability.runtime.wasm` fallback),
+    /// - artifact path uses the discovered app install root (`component.wasm`),
+    /// - runtime profile is provider default (`wasm_component`).
+    ///
+    /// This keeps host dispatch app-agnostic and prevents any application-
+    /// specific business logic from leaking into the infrastructure layer.
+    async fn ensure_wasm_session(
+        &self,
+        app_id: ApplicationId,
+        trace: TraceContext,
+    ) -> ServiceResult<Option<Arc<dyn WasmExecutionSession>>> {
+        let Some(provider) = self.wasm_runtime_provider.as_ref() else {
+            return Ok(None);
+        };
+        if let Some(existing) = self.wasm_sessions.read().await.get(&app_id).cloned() {
+            return Ok(Some(existing));
+        }
+
+        let registry = self.registry()?;
+        let discovered = {
+            let guard = registry.read().await;
+            guard.get_app(&app_id).cloned()
+        };
+        let Some(discovered) = discovered else {
+            return Ok(None);
+        };
+        if discovered.manifest.layer != macaca_app::AppLayer::L2Wasm {
+            return Ok(None);
+        }
+
+        // The manifest v1 YAML adapter synthesizes one runtime ability with a
+        // stable id (`ability.runtime.wasm`) for L2 WASM apps. We use that
+        // neutral contract id directly so session creation stays deterministic
+        // and does not depend on optional metadata-view projection arguments.
+        let ability_id = "ability.runtime.wasm".to_string();
+        let artifact_path = discovered.path.join("component.wasm");
+        let request = WasmRuntimeSessionRequest::new(
+            trace.clone(),
+            app_id.to_string(),
+            ability_id.clone(),
+            WasmRuntimeArtifactRef::new(format!("file://{}", artifact_path.display())),
+            WasmExecutionProfile::default_wasm_component(),
+        )
+        .map_err(service_adapter_error)?;
+        let session = Arc::from(
+            provider
+                .create_session(request)
+                .await
+                .map_err(service_adapter_error)?,
+        );
+        tracing::info!(
+            trace_id = %trace.trace_id,
+            app_id = %app_id,
+            ability_id = %ability_id,
+            artifact = %artifact_path.display(),
+            "Created app-scoped WASM execution session for application host dispatch"
+        );
+        self.wasm_sessions
+            .write()
+            .await
+            .insert(app_id, Arc::clone(&session));
+        Ok(Some(session))
+    }
+
+    /// Install app-scoped WASM service-call allowlist from manifest contract.
+    ///
+    /// This is a generic mapping layer:
+    /// - input: app `service_contract` declaration (+ domain packs),
+    /// - output: policy engine app override (`allow_services`) consumed by host
+    ///   import `service.call` router.
+    ///
+    /// The mapping is app-agnostic and deny-by-default for undeclared services.
+    async fn sync_wasm_service_policy_for_app(&self, app_id: &ApplicationId) -> ServiceResult<()> {
+        let Some(engine) = self.wasm_policy_engine.as_ref() else {
+            return Ok(());
+        };
+        let Some(registry) = self.registry.as_ref() else {
+            return Ok(());
+        };
+        let discovered = {
+            let guard = registry.read().await;
+            guard.get_app(app_id).cloned()
+        };
+        let Some(discovered) = discovered else {
+            tracing::warn!(app_id = %app_id, "Skipping WASM policy sync because app is not discovered");
+            return Ok(());
+        };
+        let catalog = InMemoryDomainPackCatalog::with_builtin_defaults();
+        let expanded =
+            expand_service_capabilities(discovered.manifest.service_contract.as_ref(), &catalog);
+        engine.set_app_override(
+            app_id.to_string(),
+            ServicePolicyLayer {
+                allow_services: BTreeSet::from_iter(expanded.services.iter().cloned()),
+                deny_services: BTreeSet::new(),
+                timeout_ms: None,
+                max_retries: None,
+            },
+        );
+        tracing::info!(
+            app_id = %app_id,
+            service_count = expanded.services.len(),
+            capabilities_hash = %expanded.capabilities_hash,
+            unresolved_pack_count = expanded.unresolved_packs.len(),
+            "Synchronized app-scoped WASM service policy from manifest contract"
+        );
+        Ok(())
     }
 
     fn trace(command: &ServiceCommand) -> ServiceResult<TraceContext> {
@@ -276,6 +411,8 @@ impl SystemService for ApplicationSystemServiceProvider {
             APPLICATION_SESSION_START_COMMAND => {
                 let typed: ApplicationSessionStartCommand = decode(command.payload)?;
                 let view = session_view(&typed.scope, "running")?;
+                self.sync_wasm_service_policy_for_app(&view.application_id)
+                    .await?;
                 self.sessions
                     .write()
                     .await
@@ -305,11 +442,25 @@ impl SystemService for ApplicationSystemServiceProvider {
             }
             APPLICATION_HOST_DISPATCH_COMMAND => {
                 let typed: ApplicationHostDispatchServiceCommand = decode(command.payload)?;
-                let host = ApplicationHost::new(UnavailableApplicationHostBackend);
-                let result: ApplicationHostDispatchResult = host
-                    .dispatch(typed.host_command)
-                    .await
-                    .map_err(service_adapter_error)?;
+                let app_id = typed.scope.application_id.ok_or_else(|| {
+                    ServiceError::AdapterFailure(
+                        "application.host.dispatch requires application_id".into(),
+                    )
+                })?;
+                let result: ApplicationHostDispatchResult = if let Some(session) = self
+                    .ensure_wasm_session(app_id, typed.trace.clone())
+                    .await?
+                {
+                    session
+                        .dispatch(typed.host_command)
+                        .await
+                        .map_err(service_adapter_error)?
+                } else {
+                    let host = ApplicationHost::new(UnavailableApplicationHostBackend);
+                    host.dispatch(typed.host_command)
+                        .await
+                        .map_err(service_adapter_error)?
+                };
                 Ok(Self::service_result(to_value(result)?, typed.trace))
             }
             APPLICATION_GENUI_SURFACE_COMMAND => {
@@ -376,6 +527,7 @@ impl SystemService for ApplicationSystemServiceProvider {
 
     async fn cleanup(&self) -> ServiceResult<()> {
         self.sessions.write().await.clear();
+        self.wasm_sessions.write().await.clear();
         tracing::info!(service_id = %self.descriptor.id, "application service provider cleanup completed");
         Ok(())
     }

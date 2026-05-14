@@ -11,15 +11,19 @@ use std::sync::Arc;
 
 use macaca_proto::{
     ApplicationHostCommand, ApplicationHostCommandResult, ApplicationHostCommandStatus,
-    ApplicationImport, KernelServiceId, ServiceBusSource, ServiceCommand, ServiceCommandName,
-    TraceContext, WasmHostImportAuditReport, WasmHostImportCategory, WasmHostImportCommand,
+    ApplicationImport, KernelServiceId, ServiceBusSource, ServiceCommandName, TraceContext,
+    WasmHostImportAuditReport, WasmHostImportCategory, WasmHostImportCommand,
     WasmHostImportErrorKind, DEFAULT_WASM_MAX_PAYLOAD_BYTES, WASM_HOST_IMPORT_CAPABILITY,
     WASM_HOST_IMPORT_OPERATION, WASM_HOST_IMPORT_SERVICE_ID,
 };
 use serde_json::{Map, Value};
 use tracing::{info, warn};
 
-use crate::{ServiceRuntime, ServiceRuntimeError};
+use crate::{
+    InMemoryServiceCallAuditSink, InMemoryServiceContractRegistry, InMemoryServicePolicyEngine,
+    ServiceCallAuditEvent, ServiceCallAuditSink, ServicePolicyEngine, ServicePolicyLayer,
+    ServiceRouteRequest, ServiceRouter, ServiceRuntime, ServiceRuntimeError,
+};
 
 use super::telemetry::{
     emit_wasm_telemetry, WasmTelemetryEvent, WasmTelemetrySinkRef, WasmTelemetryStage,
@@ -46,7 +50,9 @@ impl Default for WasmHostImportBridgeConfig {
 /// Bridge that validates and routes WASM host imports through `ServiceRuntime`.
 #[derive(Clone)]
 pub struct WasmHostImportBridge {
-    runtime: Arc<ServiceRuntime>,
+    router: Arc<ServiceRouter>,
+    policy_engine: Arc<InMemoryServicePolicyEngine>,
+    audit_sink: Arc<dyn ServiceCallAuditSink>,
     config: WasmHostImportBridgeConfig,
     telemetry: Option<WasmTelemetrySinkRef>,
 }
@@ -64,8 +70,36 @@ impl fmt::Debug for WasmHostImportBridge {
 impl WasmHostImportBridge {
     /// Create a bridge over an existing host-owned `ServiceRuntime`.
     pub fn new(runtime: Arc<ServiceRuntime>, config: WasmHostImportBridgeConfig) -> Self {
+        let audit_sink: Arc<dyn ServiceCallAuditSink> =
+            Arc::new(InMemoryServiceCallAuditSink::new());
+        Self::new_with_audit_sink(runtime, config, audit_sink)
+    }
+
+    /// Create a bridge with an externally provided audit sink.
+    ///
+    /// Host composition layers can inject a shared sink so audit replay remains
+    /// generic and consistent across runtime boundaries without any
+    /// application-specific coupling.
+    pub fn new_with_audit_sink(
+        runtime: Arc<ServiceRuntime>,
+        config: WasmHostImportBridgeConfig,
+        audit_sink: Arc<dyn ServiceCallAuditSink>,
+    ) -> Self {
+        let policy_engine = Arc::new(InMemoryServicePolicyEngine::new());
+        let policy_engine_trait: Arc<dyn ServicePolicyEngine> = policy_engine.clone();
+        let router = Arc::new(
+            ServiceRouter::new(
+                runtime,
+                config.source.clone(),
+                Arc::new(InMemoryServiceContractRegistry::new()),
+                policy_engine_trait,
+            )
+            .with_audit_sink(audit_sink.clone()),
+        );
         Self {
-            runtime,
+            router,
+            policy_engine,
+            audit_sink,
             config,
             telemetry: None,
         }
@@ -75,6 +109,16 @@ impl WasmHostImportBridge {
     pub fn with_telemetry_sink(mut self, sink: WasmTelemetrySinkRef) -> Self {
         self.telemetry = Some(sink);
         self
+    }
+
+    /// Return the shared in-memory policy engine used by this bridge.
+    ///
+    /// Host composition can use this handle to install app-scoped allow/deny
+    /// layers from manifest contracts during session/bootstrap phases. The
+    /// bridge keeps ownership of routing; callers only provide data-driven
+    /// policy layers.
+    pub fn policy_engine(&self) -> Arc<InMemoryServicePolicyEngine> {
+        Arc::clone(&self.policy_engine)
     }
 
     /// Dispatch one Application ABI command through the controlled service portal.
@@ -129,19 +173,23 @@ impl WasmHostImportBridge {
                 "WASM host import requires a service operation",
             );
         };
-        let mut service_command =
-            ServiceCommand::with_trace(operation, guest_command.payload.clone(), trace.clone());
-        service_command.metadata = guest_command.metadata.clone();
+        self.apply_policy_overrides(&guest_command);
         match self
-            .runtime
-            .call(&service_id, self.config.source.clone(), service_command)
+            .router
+            .route(ServiceRouteRequest {
+                app_id: guest_command.metadata.get("app.id").cloned(),
+                tenant_id: guest_command.metadata.get("tenant.id").cloned(),
+                session_id: guest_command.metadata.get("session.id").cloned(),
+                service_id: service_id.clone(),
+                operation,
+                payload: guest_command.payload.clone(),
+                metadata: guest_command.metadata.clone(),
+                trace: trace.clone(),
+            })
             .await
         {
             Ok(reply) => {
-                let output = bound_json(
-                    sanitize_json(reply.output.unwrap_or(Value::Null)),
-                    self.config.max_output_bytes,
-                );
+                let output = bound_json(sanitize_json(reply.output), self.config.max_output_bytes);
                 let mut result = ApplicationHostCommandResult::ok(output, Some(trace));
                 result
                     .metadata
@@ -152,6 +200,11 @@ impl WasmHostImportBridge {
                 result
                     .metadata
                     .insert("service_status".into(), sanitize_label(reply.status));
+                for (key, value) in reply.metadata {
+                    if is_safe_metadata_key(&key) {
+                        result.metadata.insert(key, sanitize_label(value));
+                    }
+                }
                 self.attach_common_metadata(&guest_command, &mut result);
                 info!(
                     trace_id = result
@@ -184,6 +237,88 @@ impl WasmHostImportBridge {
             }
             Err(error) => self.error_result(&guest_command, error),
         }
+    }
+
+    /// Replay service-call audit evidence chain by trace id.
+    pub fn replay_service_call_audit_by_trace_id(
+        &self,
+        trace_id: &str,
+    ) -> Result<Vec<ServiceCallAuditEvent>, ServiceRuntimeError> {
+        self.router.replay_audit_by_trace_id(trace_id)
+    }
+
+    /// Replay service-call audit evidence chain by session id.
+    pub fn replay_service_call_audit_by_session_id(
+        &self,
+        session_id: &str,
+    ) -> Result<Vec<ServiceCallAuditEvent>, ServiceRuntimeError> {
+        self.router.replay_audit_by_session_id(session_id)
+    }
+
+    /// Return the audit sink bound to this bridge.
+    ///
+    /// Runtime hosts can re-use this sink in system-service providers so all
+    /// query surfaces replay the same trace evidence chain.
+    pub fn service_call_audit_sink(&self) -> Arc<dyn ServiceCallAuditSink> {
+        self.audit_sink.clone()
+    }
+
+    /// Apply optional app-scoped policy overrides carried by trusted host-side
+    /// metadata. The bridge intentionally supports only bounded primitives:
+    /// allow-list, deny-list, timeout, and retry count.
+    ///
+    /// Metadata contract:
+    /// - `app.id`: required to scope policy.
+    /// - `policy.allow_services`: comma-separated service ids.
+    /// - `policy.deny_services`: comma-separated service ids.
+    /// - `policy.timeout_ms`: u64.
+    /// - `policy.max_retries`: u32.
+    fn apply_policy_overrides(&self, command: &WasmHostImportCommand) {
+        let Some(app_id) = command.metadata.get("app.id").map(String::as_str) else {
+            return;
+        };
+        let allow_services = parse_csv_services(
+            command
+                .metadata
+                .get("policy.allow_services")
+                .map(String::as_str),
+        );
+        let deny_services = parse_csv_services(
+            command
+                .metadata
+                .get("policy.deny_services")
+                .map(String::as_str),
+        );
+        let timeout_ms = command
+            .metadata
+            .get("policy.timeout_ms")
+            .and_then(|value| value.parse::<u64>().ok());
+        let max_retries = command
+            .metadata
+            .get("policy.max_retries")
+            .and_then(|value| value.parse::<u32>().ok());
+        if allow_services.is_empty()
+            && deny_services.is_empty()
+            && timeout_ms.is_none()
+            && max_retries.is_none()
+        {
+            return;
+        }
+        self.policy_engine.set_app_override(
+            app_id.to_string(),
+            ServicePolicyLayer {
+                allow_services,
+                deny_services,
+                timeout_ms,
+                max_retries,
+            },
+        );
+        info!(
+            app_id,
+            timeout_ms = timeout_ms.unwrap_or_default(),
+            max_retries = max_retries.unwrap_or_default(),
+            "WASM host import applied app-scoped policy override"
+        );
     }
 
     fn validate(
@@ -406,6 +541,24 @@ fn sanitize_json(value: Value) -> Value {
         }
         other => other,
     }
+}
+
+fn is_safe_metadata_key(key: &str) -> bool {
+    let lower = key.to_ascii_lowercase();
+    !(lower.contains("token")
+        || lower.contains("secret")
+        || lower.contains("password")
+        || lower.contains("credential"))
+}
+
+fn parse_csv_services(value: Option<&str>) -> std::collections::BTreeSet<String> {
+    value
+        .unwrap_or_default()
+        .split(',')
+        .map(str::trim)
+        .filter(|entry| !entry.is_empty())
+        .map(str::to_string)
+        .collect()
 }
 
 fn bound_json(value: Value, max_bytes: u64) -> Value {

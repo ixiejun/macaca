@@ -154,6 +154,113 @@ async fn component_model_provider_routes_host_imports_through_service_portal() {
 }
 
 #[tokio::test]
+async fn component_model_provider_dispatches_declared_host_command_plan() {
+    let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
+    let service_id = register_mock_service(&runtime, "wasm.component.service.plan").await;
+    let bridge = Arc::new(WasmHostImportBridge::new(
+        Arc::clone(&runtime),
+        WasmHostImportBridgeConfig::default(),
+    ));
+    let mut host_command = ApplicationHostCommand::with_trace(
+        ApplicationImport::ServiceCall,
+        json!({"input": "${chat.input}"}),
+        TraceContext::new("trace-placeholder-replaced-by-runtime"),
+    );
+    host_command
+        .metadata
+        .insert("service.id".into(), service_id.to_string());
+    host_command
+        .metadata
+        .insert("service.operation".into(), "invoke".into());
+    host_command
+        .metadata
+        .insert("capability".into(), "service.call".into());
+    let fixture = component_fixture_bytes_with_host_command(&host_command);
+    let artifact_path = write_fixture_component("declared-host-plan", &fixture);
+    let provider = ComponentModelWasmRuntimeProvider::default().with_host_import_bridge(bridge);
+    let session = provider
+        .create_session(traced_request(
+            "trace-component-declared-plan-provider",
+            &artifact_path,
+        ))
+        .await
+        .unwrap();
+    let mut command = ApplicationHostCommand::with_trace(
+        ApplicationImport::Custom("macaca:wasm/invoke".into()),
+        json!({"input": "AAPL"}),
+        TraceContext::new("trace-component-declared-plan-command"),
+    );
+    command
+        .metadata
+        .insert("wasm.export".into(), "app:start".into());
+
+    let result = session.dispatch(command).await.unwrap();
+
+    assert!(matches!(result.status, ApplicationHostCommandStatus::Ok));
+    assert_eq!(result.output["export"], json!("app:start"));
+    assert_eq!(result.output["host_command_results"][0]["status"], json!("Ok"));
+    assert_eq!(
+        result.output["host_command_results"][0]["output"]["input"],
+        json!("AAPL")
+    );
+}
+
+#[tokio::test]
+async fn component_model_provider_deduplicates_repeated_declared_host_commands() {
+    let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
+    let service_id = register_mock_service(&runtime, "wasm.component.service.dedup").await;
+    let bridge = Arc::new(WasmHostImportBridge::new(
+        Arc::clone(&runtime),
+        WasmHostImportBridgeConfig::default(),
+    ));
+    let mut host_command = ApplicationHostCommand::with_trace(
+        ApplicationImport::ServiceCall,
+        json!({"input": "${chat.input}"}),
+        TraceContext::new("trace-placeholder-replaced-by-runtime"),
+    );
+    host_command
+        .metadata
+        .insert("service.id".into(), service_id.to_string());
+    host_command
+        .metadata
+        .insert("service.operation".into(), "invoke".into());
+    host_command
+        .metadata
+        .insert("capability".into(), "service.call".into());
+    let fixture = component_fixture_bytes_with_duplicate_host_command(&host_command);
+    let artifact_path = write_fixture_component("declared-host-plan-dedup", &fixture);
+    let provider = ComponentModelWasmRuntimeProvider::default().with_host_import_bridge(bridge);
+    let session = provider
+        .create_session(traced_request(
+            "trace-component-declared-plan-dedup-provider",
+            &artifact_path,
+        ))
+        .await
+        .unwrap();
+    let mut command = ApplicationHostCommand::with_trace(
+        ApplicationImport::Custom("macaca:wasm/invoke".into()),
+        json!({"input": "AAPL"}),
+        TraceContext::new("trace-component-declared-plan-dedup-command"),
+    );
+    command
+        .metadata
+        .insert("wasm.export".into(), "app:start".into());
+
+    let result = session.dispatch(command).await.unwrap();
+
+    // The fixture encodes the same host-command twice to mirror release WASM
+    // binaries that retain metadata in multiple read-only segments.  The
+    // portable adapter must execute the declared service call once so audit
+    // counts match the app contract rather than linker layout details.
+    assert!(matches!(result.status, ApplicationHostCommandStatus::Ok));
+    assert_eq!(result.output["host_command_results"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        result.output["host_command_results"][0]["output"]["input"],
+        json!("AAPL")
+    );
+}
+
+#[tokio::test]
 async fn component_model_provider_reports_timeout_without_invoking_export() {
     let artifact_path = write_fixture_component("timeout", component_fixture_bytes());
     let provider = ComponentModelWasmRuntimeProvider::default();
@@ -239,4 +346,20 @@ fn write_fixture_component(name: &str, bytes: &[u8]) -> std::path::PathBuf {
 
 fn component_fixture_bytes() -> &'static [u8] {
     b"\0asm\x01\0\0\0macaca:component-model:v1\0export=app:start\0wit=macaca:application/runtime@1"
+}
+
+fn component_fixture_bytes_with_host_command(command: &ApplicationHostCommand) -> Vec<u8> {
+    let encoded = serde_json::to_string(command).unwrap();
+    format!(
+        "\0asm\x01\0\0\0macaca:component-model:v1\0export=app:start\0wit=macaca:application/runtime@1\0host-command={encoded}\0"
+    )
+    .into_bytes()
+}
+
+fn component_fixture_bytes_with_duplicate_host_command(command: &ApplicationHostCommand) -> Vec<u8> {
+    let encoded = serde_json::to_string(command).unwrap();
+    format!(
+        "\0asm\x01\0\0\0macaca:component-model:v1\0export=app:start\0wit=macaca:application/runtime@1\0host-command={encoded}\0.rodata.macaca_component\0host-command={encoded}\0"
+    )
+    .into_bytes()
 }

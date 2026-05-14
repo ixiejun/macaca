@@ -19,9 +19,10 @@ use macaca_framework::execution::ExecutionContext;
 use macaca_framework::session::{load_module_state, save_module_state};
 use macaca_kernel::AgentInfo;
 use macaca_proto::{
-    ApplicationId, ApplicationMetadataQueryCommand, ApplicationServiceScope,
+    ApplicationHostCommand, ApplicationHostCommandStatus, ApplicationHostDispatchServiceCommand,
+    ApplicationId, ApplicationImport, ApplicationMetadataQueryCommand, ApplicationServiceScope,
     ApplicationSessionStartCommand, ApplicationSessionStopCommand, ApplicationStatusCommand,
-    TraceContext,
+    PackageRuntimeKind, TraceContext,
 };
 
 use crate::event_persistence::spawn_session_event_collector;
@@ -32,6 +33,27 @@ use crate::session::{
 };
 use crate::sse::convert_executor_event_to_sse;
 use crate::state::AppState;
+
+/// Build the normalized SSE response shape used by all chat execution paths.
+///
+/// Keeping one constructor avoids divergent stream concrete types between
+/// framework and WASM fast-path branches and guarantees a stable first
+/// `session_id` event for the frontend.
+fn build_chat_sse(
+    session_key: String,
+    stream_rx: tokio::sync::mpsc::Receiver<Result<Event, Infallible>>,
+) -> Sse<impl futures::stream::Stream<Item = Result<Event, Infallible>>> {
+    let stream = async_stream::stream! {
+        let mut stream_rx = stream_rx;
+        yield Ok(Event::default()
+            .event("session_id")
+            .data(serde_json::json!({"session_id": session_key}).to_string()));
+        while let Some(event) = stream_rx.recv().await {
+            yield event;
+        }
+    };
+    Sse::new(stream).keep_alive(KeepAlive::default())
+}
 
 async fn persist_execution_context(state: &Arc<AppState>, context: &ExecutionContext) {
     let _ = save_module_state(
@@ -151,9 +173,18 @@ async fn cleanup_app_state(state: &Arc<AppState>, app_id: &ApplicationId) {
     tracing::info!(app_id = %app_id, "Application state cleaned up: loops stopped, agents idle, tasks cancelled");
 }
 
-async fn ensure_app_executor(state: &Arc<AppState>, app_id: &ApplicationId) {
+/// Ensure one executor exists for the target application and that the executor
+/// is scoped to application-declared agents only.
+///
+/// Why fail-closed:
+/// - This API path is used by end-user chat entrypoints.
+/// - If an application does not declare executable agents, silently falling
+///   back to global coordinator agents would couple shell behavior to unrelated
+///   framework internals and produce non-auditable execution chains.
+/// - Returning an explicit error keeps behavior deterministic and debuggable.
+async fn ensure_app_executor(state: &Arc<AppState>, app_id: &ApplicationId) -> Result<(), String> {
     if state.executor_registry.get(app_id).await.is_some() {
-        return;
+        return Ok(());
     }
 
     let metadata_command = ApplicationMetadataQueryCommand::application(
@@ -214,17 +245,31 @@ async fn ensure_app_executor(state: &Arc<AppState>, app_id: &ApplicationId) {
             available: true,
         })
         .collect();
+    if app_agent_names.is_empty() {
+        tracing::warn!(
+            app_id = %app_id,
+            "Application metadata exposed no app-scoped agents; refusing executor fallback"
+        );
+        return Err(format!(
+            "application {app_id} has no executable app-scoped agents; chat execution is denied"
+        ));
+    }
     if app_agents.is_empty() {
         tracing::warn!(
             app_id = %app_id,
-            "No app-scoped agents resolved while ensuring executor"
+            declared_agent_count = app_agent_names.len(),
+            "Application declared agents but none are currently available in kernel registry"
         );
+        return Err(format!(
+            "application {app_id} declared agents but none are available in kernel registry"
+        ));
     }
 
     let _ = state
         .executor_registry
         .register_application(app_id.clone(), app_name, app_agents)
         .await;
+    Ok(())
 }
 
 async fn service_executor_metadata(
@@ -329,6 +374,63 @@ async fn service_entry_agent_name(state: &Arc<AppState>, app_id: &ApplicationId)
             );
             None
         }
+    }
+}
+
+/// Build a generic WASM host-dispatch command when the application is WASM-first.
+///
+/// This helper keeps routing app-agnostic:
+/// - it relies only on sanitized metadata (`runtime_kind`, `abilities`, `agents`),
+/// - it never checks app name or business identifiers,
+/// - it maps chat input into neutral payload metadata for the guest export.
+async fn wasm_chat_dispatch_command(
+    state: &Arc<AppState>,
+    app_id: &ApplicationId,
+    trace: TraceContext,
+    prompt: &str,
+) -> Option<ApplicationHostDispatchServiceCommand> {
+    let command = ApplicationMetadataQueryCommand::application(trace.clone(), *app_id).ok()?;
+    let metadata = state.application_client.metadata(command).await.ok()?;
+    let is_wasm_runtime = metadata.application.runtime.runtime_kind == Some(PackageRuntimeKind::WasmComponent);
+    if !is_wasm_runtime || !metadata.application.agents.is_empty() {
+        return None;
+    }
+    let has_wasm_ability = metadata
+        .abilities
+        .iter()
+        .any(|ability| ability.id == "ability.runtime.wasm" || ability.implementation.contains("wasm"));
+    if !has_wasm_ability {
+        return None;
+    }
+
+    let mut host_command = ApplicationHostCommand::with_trace(
+        ApplicationImport::TraceEmit,
+        serde_json::json!({
+            "input": prompt,
+            "channel": "chat",
+        }),
+        trace.clone(),
+    );
+    host_command
+        .metadata
+        .insert("wasm.export".into(), "app:start".into());
+    Some(ApplicationHostDispatchServiceCommand {
+        trace,
+        scope: ApplicationServiceScope::application(*app_id),
+        host_command,
+    })
+}
+
+/// Compatibility fallback for installations where metadata runtime-kind view is
+/// not yet populated but the discovered manifest layer is authoritative.
+async fn is_registry_wasm_layer_app(state: &Arc<AppState>, app_id: &ApplicationId) -> bool {
+    #[allow(deprecated)]
+    {
+        let registry = state.registry.read().await;
+        registry
+            .get_app(app_id)
+            .map(|app| app.manifest.layer == macaca_app::AppLayer::L2Wasm)
+            .unwrap_or(false)
     }
 }
 
@@ -529,9 +631,46 @@ pub(crate) async fn post_chat_v2(
     notify_application_session_start(&state, &app_id, &session_key, &entry_agent_name).await;
 
     // Clean up previous state when creating a new session
+    let mut wasm_dispatch = wasm_chat_dispatch_command(
+        &state,
+        &app_id,
+        TraceContext::new("web-chat-wasm-dispatch"),
+        &req.prompt,
+    )
+    .await;
     if is_new_session {
         cleanup_app_state(&state, &app_id).await;
-        ensure_app_executor(&state, &app_id).await;
+        if wasm_dispatch.is_none() {
+            match ensure_app_executor(&state, &app_id).await {
+                Ok(()) => {}
+                Err(error) if is_registry_wasm_layer_app(&state, &app_id).await => {
+                    tracing::info!(
+                        app_id = %app_id,
+                        error = %error,
+                        "Executor preparation denied for agentless app; switching to WASM host-dispatch path"
+                    );
+                    wasm_dispatch = Some(ApplicationHostDispatchServiceCommand {
+                        trace: TraceContext::new("web-chat-wasm-dispatch-fallback"),
+                        scope: ApplicationServiceScope::application(app_id),
+                        host_command: {
+                            let mut command = ApplicationHostCommand::with_trace(
+                                ApplicationImport::TraceEmit,
+                                serde_json::json!({ "input": req.prompt, "channel": "chat" }),
+                                TraceContext::new("web-chat-wasm-dispatch-fallback-command"),
+                            );
+                            command.metadata.insert("wasm.export".into(), "app:start".into());
+                            command
+                        },
+                    });
+                }
+                Err(error) => {
+                    return Err(err(
+                        StatusCode::FAILED_DEPENDENCY,
+                        format!("Failed to prepare application executor: {error}"),
+                    ));
+                }
+            }
+        }
         tracing::info!(app_id = %app_id, session_id = %session_key, "New session: cleaned up previous tasks, goals, agents and loops");
     }
 
@@ -577,6 +716,93 @@ pub(crate) async fn post_chat_v2(
                 forwarder_stop: Arc::clone(&forwarder_stop),
             },
         );
+    }
+
+    // Agentless WASM fast-path:
+    // - do NOT bootstrap framework coordinator/executor loops,
+    // - do NOT create MCP agent-session noise,
+    // - stream deterministic trace stages directly for frontend trace panels.
+    if let Some(dispatch) = wasm_dispatch {
+        let session_key_for_task = session_key.clone();
+        let app_id_for_task = app_id;
+        let state_for_task = Arc::clone(&state);
+        let tx_for_task = tx.clone();
+        tokio::spawn(async move {
+            let _ = tx_for_task
+                .send(Ok(Event::default().event("thinking").data(
+                    serde_json::json!({
+                        "iteration": 1,
+                        "phase": "wasm_host_dispatch",
+                    })
+                    .to_string(),
+                )))
+                .await;
+            tracing::info!(
+                session_id = %session_key_for_task,
+                app_id = %app_id_for_task,
+                "Starting WASM chat dispatch path (agentless runtime)"
+            );
+            match state_for_task.application_client.host_dispatch(dispatch).await {
+                Ok(output) => {
+                    let summary = match output.status {
+                        ApplicationHostCommandStatus::Ok => "WASM execution completed",
+                        ApplicationHostCommandStatus::Unavailable { .. } => {
+                            "WASM execution unavailable"
+                        }
+                        ApplicationHostCommandStatus::DisabledByPolicy { .. } => {
+                            "WASM execution denied by policy"
+                        }
+                        ApplicationHostCommandStatus::Unsupported { .. } => {
+                            "WASM execution unsupported"
+                        }
+                        ApplicationHostCommandStatus::RuntimeUnavailable { .. } => {
+                            "WASM runtime unavailable"
+                        }
+                        ApplicationHostCommandStatus::Rejected { .. } => "WASM execution rejected",
+                    };
+                    let _ = tx_for_task
+                        .send(Ok(Event::default().event("assistant").data(
+                            serde_json::json!({
+                                "content": format!("{summary}\n{}", serde_json::to_string(&output).unwrap_or_else(|_| "{}".to_string())),
+                            })
+                            .to_string(),
+                        )))
+                        .await;
+                    let _ = tx_for_task
+                        .send(Ok(Event::default().event("done").data(
+                            serde_json::json!({
+                                "status":"completed",
+                                "mode":"wasm_agentless_dispatch",
+                            })
+                            .to_string(),
+                        )))
+                        .await;
+                }
+                Err(error) => {
+                    let _ = tx_for_task
+                        .send(Ok(Event::default().event("error").data(
+                            serde_json::json!({
+                                "error": format!("WASM host dispatch failed: {error}"),
+                            })
+                            .to_string(),
+                        )))
+                        .await;
+                }
+            }
+        });
+
+        // Bridge task: forward producer events (rx) -> hot-swappable sse_tx -> stream_rx
+        let sse_tx_for_bridge = Arc::clone(&sse_tx);
+        tokio::spawn(async move {
+            while let Some(event) = rx.recv().await {
+                let sender = sse_tx_for_bridge.read().await;
+                if sender.send(event).await.is_err() {
+                    break;
+                }
+            }
+        });
+
+        return Ok(build_chat_sse(session_key, stream_rx));
     }
 
     // Subscribe to executor events for delegated agent tracking
@@ -678,7 +904,6 @@ pub(crate) async fn post_chat_v2(
     let prompt = req.prompt.clone();
     let session_key_for_task = session_key.clone();
     let state_for_task = Arc::clone(&state);
-
     // Spawn the coordinator task
     tokio::spawn(async move {
         tracing::info!(
@@ -875,17 +1100,5 @@ pub(crate) async fn post_chat_v2(
         });
     }
 
-    let stream = async_stream::stream! {
-        let mut stream_rx = stream_rx;
-        // Emit session_id as the first event
-        yield Ok(Event::default()
-            .event("session_id")
-            .data(serde_json::json!({"session_id": session_key}).to_string()));
-
-        while let Some(event) = stream_rx.recv().await {
-            yield event;
-        }
-    };
-
-    Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
+    Ok(build_chat_sse(session_key, stream_rx))
 }

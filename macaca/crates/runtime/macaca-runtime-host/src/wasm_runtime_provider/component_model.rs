@@ -296,6 +296,9 @@ impl WasmExecutionSession for ComponentModelWasmExecutionSession {
             .unwrap_or("app:start");
         match self.instance.invoke_export(export_name) {
             Ok(()) => {
+                let host_command_results = self
+                    .dispatch_declared_host_commands(&command, &trace)
+                    .await;
                 info!(
                     session_id = %self.session_id,
                     trace_id = %trace.trace_id,
@@ -316,8 +319,13 @@ impl WasmExecutionSession for ComponentModelWasmExecutionSession {
                     .session_id(self.session_id.clone())
                     .metadata("wasm.export", export_name),
                 );
-                let mut result =
-                    ApplicationHostCommandResult::ok(json!({ "export": export_name }), Some(trace));
+                let mut result = ApplicationHostCommandResult::ok(
+                    json!({
+                        "export": export_name,
+                        "host_command_results": host_command_results,
+                    }),
+                    Some(trace),
+                );
                 self.attach_common_metadata(&mut result, export_name);
                 Ok(result)
             }
@@ -454,6 +462,55 @@ impl WasmExecutionSession for ComponentModelWasmExecutionSession {
 }
 
 impl ComponentModelWasmExecutionSession {
+    async fn dispatch_declared_host_commands(
+        &self,
+        export_command: &ApplicationHostCommand,
+        parent_trace: &TraceContext,
+    ) -> Vec<serde_json::Value> {
+        let mut results = Vec::new();
+        for (index, template) in self.module.host_commands().iter().enumerate() {
+            let mut command = template.clone();
+            let trace = TraceContext::new(format!(
+                "{}:host-command:{}",
+                parent_trace.trace_id,
+                index + 1
+            ));
+            command.trace = Some(trace.clone());
+            command.metadata.insert("app.id".into(), self.request.application_id.clone());
+            command
+                .metadata
+                .insert("session.id".into(), self.session_id.clone());
+            command.payload = apply_host_command_template(command.payload, &export_command.payload);
+            info!(
+                session_id = %self.session_id,
+                trace_id = %trace.trace_id,
+                import = %command.import,
+                service_id = command.metadata.get("service.id").map(String::as_str).unwrap_or("none"),
+                operation = command.metadata.get("service.operation").map(String::as_str).unwrap_or("none"),
+                "WASM Component Model dispatching declared host command"
+            );
+            match self.dispatch_host_import(command, trace).await {
+                Ok(result) => {
+                    results.push(json!({
+                        "index": index,
+                        "status": result.status,
+                        "output": result.output,
+                        "metadata": result.metadata,
+                        "trace": result.trace,
+                    }));
+                }
+                Err(error) => {
+                    results.push(json!({
+                        "index": index,
+                        "status": "error",
+                        "error": error.to_string(),
+                    }));
+                }
+            }
+        }
+        results
+    }
+
     async fn dispatch_host_import(
         &self,
         command: ApplicationHostCommand,
@@ -543,6 +600,30 @@ impl ComponentModelWasmExecutionSession {
                 .metadata
                 .insert("wasm.export".into(), export_name.to_string());
         }
+    }
+}
+
+fn apply_host_command_template(
+    value: serde_json::Value,
+    export_payload: &serde_json::Value,
+) -> serde_json::Value {
+    match value {
+        serde_json::Value::String(text) if text == "${chat.input}" => export_payload
+            .get("input")
+            .cloned()
+            .unwrap_or(serde_json::Value::Null),
+        serde_json::Value::Array(items) => serde_json::Value::Array(
+            items
+                .into_iter()
+                .map(|item| apply_host_command_template(item, export_payload))
+                .collect(),
+        ),
+        serde_json::Value::Object(map) => serde_json::Value::Object(
+            map.into_iter()
+                .map(|(key, item)| (key, apply_host_command_template(item, export_payload)))
+                .collect(),
+        ),
+        other => other,
     }
 }
 

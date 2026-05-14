@@ -57,10 +57,27 @@ impl ApplicationManifestSpec {
                 "application manifest name must not be empty".into(),
             ));
         }
+        if let Some(service_contract) = &manifest.service_contract {
+            for service in &service_contract.required_services {
+                if service.trim().is_empty() {
+                    return Err(MacacaError::Config(
+                        "service_contract.required_services contains an empty identifier".into(),
+                    ));
+                }
+            }
+            for service in &service_contract.optional_services {
+                if service.trim().is_empty() {
+                    return Err(MacacaError::Config(
+                        "service_contract.optional_services contains an empty identifier".into(),
+                    ));
+                }
+            }
+        }
         tracing::info!(
             app_id = %manifest.id,
             app_name = %manifest.name,
             layer = ?manifest.layer,
+            service_contract_declared = manifest.service_contract.is_some(),
             "application manifest admitted by service specification"
         );
         Ok(())
@@ -233,6 +250,7 @@ pub fn app_status_from_lifecycle(state: &ApplicationLifecycleState) -> AppStatus
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::service_capability::AppServiceContractConfig;
 
     #[test]
     fn lifecycle_projection_preserves_running_status() {
@@ -269,5 +287,32 @@ mod tests {
             .diagnostics
             .iter()
             .any(|diagnostic| diagnostic.code == "missing_ability"));
+    }
+
+    #[test]
+    fn manifest_spec_rejects_empty_declared_service_identifier() {
+        let manifest = AppManifest {
+            id: macaca_proto::ApplicationId::new(),
+            name: "service-invalid".into(),
+            description: None,
+            version: "1.0.0".into(),
+            layer: AppLayer::L2Wasm,
+            ui_type: None,
+            agents: vec![],
+            llm_config: None,
+            entry_agent: None,
+            entrypoint: None,
+            workflows: None,
+            resources: None,
+            context: None,
+            service_contract: Some(AppServiceContractConfig {
+                use_packs: vec![],
+                required_services: vec!["".into()],
+                optional_services: vec![],
+                service_policy_overrides: Default::default(),
+            }),
+        };
+        let error = ApplicationManifestSpec.validate(&manifest).unwrap_err();
+        assert!(error.to_string().contains("required_services"));
     }
 }

@@ -20,6 +20,7 @@ use macaca_sdk::AgentConfig;
 use tracing::info;
 
 use crate::model::{AgentSource, AppManifest, EntrypointType, InlineAgentConfig};
+use crate::service_capability::{expand_service_capabilities, InMemoryDomainPackCatalog};
 
 /// Safe diagnostic emitted while projecting YAML data into Manifest v1.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -194,7 +195,7 @@ impl YamlApplicationManifestAdapter {
         for permission in application_permissions(&self.resolved_agents) {
             projected = projected.permission(permission);
         }
-        for ability in self.agent_abilities(&entry) {
+        for ability in self.projected_abilities(&entry) {
             projected = projected.ability(ability);
         }
         report.ability_count = projected.abilities.len();
@@ -214,7 +215,14 @@ impl YamlApplicationManifestAdapter {
         }
     }
 
-    fn agent_abilities(&self, entry: &Option<String>) -> Vec<ApplicationAbilityDescriptor> {
+    /// Build all projected abilities from a legacy YAML manifest.
+    ///
+    /// The adapter always projects declared YAML agents, and for L2 WASM
+    /// applications with a declared service contract it synthesizes one generic
+    /// headless WASM execution ability. This keeps runtime admission and
+    /// metadata query surfaces auditable without introducing app-specific
+    /// host-side logic.
+    fn projected_abilities(&self, entry: &Option<String>) -> Vec<ApplicationAbilityDescriptor> {
         let mut abilities = Vec::new();
         for source in &self.manifest.agents {
             match source {
@@ -225,9 +233,64 @@ impl YamlApplicationManifestAdapter {
         for agent in &self.resolved_agents {
             abilities.push(resolved_agent_ability(agent, entry));
         }
+        if let Some(wasm_ability) = self.wasm_runtime_ability() {
+            abilities.push(wasm_ability);
+        }
         abilities.sort_by(|a, b| a.id.cmp(&b.id));
         abilities.dedup_by(|a, b| a.id == b.id);
         abilities
+    }
+
+    /// Synthesize one generic WASM runtime ability from service contract
+    /// declarations. The synthesized descriptor is intentionally data-only:
+    /// it declares runtime intent and service dependencies but does not embed
+    /// provider internals, app names, or workflow-specific behavior.
+    fn wasm_runtime_ability(&self) -> Option<ApplicationAbilityDescriptor> {
+        if !matches!(self.manifest.layer, crate::model::AppLayer::L2Wasm) {
+            return None;
+        }
+        let contract = self.manifest.service_contract.as_ref()?;
+        let catalog = InMemoryDomainPackCatalog::with_builtin_defaults();
+        let capabilities = expand_service_capabilities(Some(contract), &catalog);
+        let mut ability = ApplicationAbilityDescriptor::new(
+            "ability.runtime.wasm".to_string(),
+            ApplicationAbilityKind::Headless,
+            AbilityImplementationKind::WasmComponent,
+        )
+        .activation(
+            AbilityActivation::new("wasm")
+                .entry("service.call")
+                .metadata("host.import", "service.call"),
+        )
+        .service(
+            AbilityServiceRequirement::required(
+                KernelServiceId::new("service.application.host"),
+                "WASM runtime ability requires host command dispatch surface",
+            )
+            .capability(CapabilityId::new(
+                "capability.wasm.host_import.service_call",
+            )),
+        );
+        for service_id in &capabilities.services {
+            ability = ability.service(
+                AbilityServiceRequirement::required(
+                    KernelServiceId::new(service_id.clone()),
+                    "Declared by service contract or expanded domain pack",
+                )
+                .capability(CapabilityId::new(format!(
+                    "capability.service.call.{service_id}"
+                ))),
+            );
+        }
+        ability.metadata.insert(
+            "service_contract_hash".into(),
+            capabilities.capabilities_hash,
+        );
+        ability.metadata.insert(
+            "service_contract_count".into(),
+            capabilities.services.len().to_string(),
+        );
+        Some(ability)
     }
 }
 
@@ -441,6 +504,7 @@ mod tests {
             workflows: None,
             resources: None,
             context: None,
+            service_contract: None,
         };
 
         let projection = YamlApplicationManifestAdapter::new(manifest).project();
@@ -459,5 +523,50 @@ mod tests {
             .metadata
             .values()
             .any(|value| value.contains("never serialized")));
+    }
+
+    #[test]
+    fn yaml_projection_synthesizes_wasm_runtime_ability_from_service_contract() {
+        let manifest = AppManifest {
+            id: macaca_proto::ApplicationId::new(),
+            name: "wasm-fixture".into(),
+            description: None,
+            version: "1.0.0".into(),
+            layer: AppLayer::L2Wasm,
+            ui_type: None,
+            agents: Vec::new(),
+            llm_config: None,
+            entry_agent: None,
+            entrypoint: None,
+            workflows: None,
+            resources: None,
+            context: None,
+            service_contract: Some(crate::service_capability::AppServiceContractConfig {
+                use_packs: vec!["pack.finance.v1".into()],
+                required_services: vec!["service.custom.required".into()],
+                optional_services: Vec::new(),
+                service_policy_overrides: Default::default(),
+            }),
+        };
+        let projection = YamlApplicationManifestAdapter::new(manifest).project();
+        let ability = projection
+            .manifest
+            .abilities
+            .iter()
+            .find(|ability| ability.id == "ability.runtime.wasm")
+            .expect("expected synthesized wasm runtime ability");
+        assert_eq!(ability.kind, ApplicationAbilityKind::Headless);
+        assert_eq!(
+            ability.implementation,
+            AbilityImplementationKind::WasmComponent
+        );
+        assert!(ability
+            .services
+            .iter()
+            .any(|service| service.service.as_str() == "service.market_data"));
+        assert!(ability
+            .services
+            .iter()
+            .any(|service| service.service.as_str() == "service.custom.required"));
     }
 }
