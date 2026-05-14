@@ -197,6 +197,10 @@ pub struct AppInfo {
     pub name: String,
     pub status: String,
     pub agent_count: usize,
+    /// Manifest-declared entry agent.  Workspace clients treat this identity
+    /// as the main thread and can hide it from delegated-agent tabs without
+    /// hard-coding application-specific coordinator names.
+    pub entry_agent: Option<String>,
     pub description: String,
     pub icon: String,
     pub ui: Option<ApplicationUiRuntimeView>,
@@ -208,6 +212,7 @@ fn app_info_from_service_view(view: &ApplicationServiceAppView) -> AppInfo {
         name: view.name.clone(),
         status: view.runtime.compatibility_status.clone(),
         agent_count: view.agents.len(),
+        entry_agent: view.entry_agent.clone(),
         description: view
             .description
             .clone()
@@ -300,6 +305,7 @@ pub async fn get_apps(State(state): State<Arc<AppState>>) -> Json<Vec<AppInfo>> 
                 name,
                 status: format!("{:?}", status),
                 agent_count,
+                entry_agent: None,
                 description,
                 icon,
                 ui: None,
@@ -368,6 +374,7 @@ pub async fn get_app(
                 name,
                 status: format!("{:?}", status),
                 agent_count: state.kernel.agent_count().await,
+                entry_agent: None,
                 description,
                 icon,
                 ui: None,
@@ -742,6 +749,7 @@ pub async fn reload_apps(
                 name,
                 status: format!("{:?}", status),
                 agent_count,
+                entry_agent: None,
                 description,
                 icon,
                 ui: None,

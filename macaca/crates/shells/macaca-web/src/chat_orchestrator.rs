@@ -871,6 +871,51 @@ pub(crate) async fn post_chat_v2(
             .host_command
             .metadata
             .insert("session.id".into(), session_key.clone());
+        // WASM host dispatch can still delegate to app-scoped agents through
+        // `macaca:agent/delegate`.  The fast path returns before the framework
+        // coordinator setup below, so it must install the same executor event
+        // bridges here; otherwise delegated tabs have only the final host
+        // command summary and miss the detailed agent trace stream that YAML
+        // apps already expose.
+        if let Some(executor) = state.executor_registry.get(&app_id).await {
+            spawn_session_event_collector(
+                Arc::clone(&executor),
+                Arc::clone(&state.persist.event_log),
+                Arc::clone(&state.persist.run_tracer),
+                session_key.clone(),
+                AgentTraceCollector::new(),
+            );
+            let mut exec_rx = executor.subscribe_to_events();
+            let sse_tx_for_exec = Arc::clone(&sse_tx);
+            let forwarder_stop_flag = Arc::clone(&forwarder_stop);
+            tokio::spawn(async move {
+                loop {
+                    match exec_rx.recv().await {
+                        Ok(exec_event) => {
+                            if forwarder_stop_flag.load(std::sync::atomic::Ordering::Relaxed) {
+                                tracing::debug!(
+                                    "WASM executor event forwarder stopped (superseded)"
+                                );
+                                break;
+                            }
+                            let sse_event = convert_executor_event_to_sse(exec_event);
+                            let sender = sse_tx_for_exec.read().await;
+                            if sender.send(sse_event).await.is_err() {
+                                break;
+                            }
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                            tracing::warn!(
+                                "WASM executor event forwarder lagged by {} messages, continuing",
+                                n
+                            );
+                            continue;
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                    }
+                }
+            });
+        }
         let session_key_for_task = session_key.clone();
         let app_id_for_task = app_id;
         let state_for_task = Arc::clone(&state);
