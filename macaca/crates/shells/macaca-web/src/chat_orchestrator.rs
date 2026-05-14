@@ -445,15 +445,16 @@ async fn wasm_chat_dispatch_command(
 ) -> Option<ApplicationHostDispatchServiceCommand> {
     let command = ApplicationMetadataQueryCommand::application(trace.clone(), *app_id).ok()?;
     let metadata = state.application_client.metadata(command).await.ok()?;
-    let is_wasm_runtime =
-        metadata.application.runtime.runtime_kind == Some(PackageRuntimeKind::WasmComponent);
+    let is_registry_wasm_runtime = is_registry_wasm_layer_app(state, app_id).await;
+    let is_wasm_runtime = is_registry_wasm_runtime
+        || metadata.application.runtime.runtime_kind == Some(PackageRuntimeKind::WasmComponent);
     if !is_wasm_runtime {
         return None;
     }
     let has_wasm_ability = metadata.abilities.iter().any(|ability| {
         ability.id == "ability.runtime.wasm" || ability.implementation.contains("wasm")
     });
-    if !has_wasm_ability {
+    if !has_wasm_ability && !is_registry_wasm_runtime {
         return None;
     }
 

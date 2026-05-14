@@ -90,11 +90,12 @@ impl ApplicationOrchestrationBackend for WebApplicationOrchestrationBackend {
             artifacts: Vec::new(),
             env: std::collections::HashMap::new(),
         };
+        let delegated_prompt = delegate_prompt_with_context(&command.prompt, &command.context);
         let task_id = executor
             .delegate_task(
                 from_agent,
                 &command.target_agent,
-                command.prompt,
+                delegated_prompt,
                 priority,
                 parallel,
                 Some(context),
@@ -165,4 +166,21 @@ impl ApplicationOrchestrationBackend for WebApplicationOrchestrationBackend {
             )]),
         })
     }
+}
+
+/// Render the provider-neutral delegate command into the concrete worker
+/// prompt used by the Web executor.  The Application Service contract carries
+/// `context` as structured JSON; workers currently receive a prompt string, so
+/// this adapter appends the bounded evidence verbatim instead of relying on
+/// hidden executor state.  That keeps WASM app orchestration generic while
+/// making every child-agent decision reproducible from the persisted task text.
+fn delegate_prompt_with_context(prompt: &str, context: &serde_json::Value) -> String {
+    if context.is_null() {
+        return prompt.to_string();
+    }
+    let rendered_context =
+        serde_json::to_string_pretty(context).unwrap_or_else(|_| context.to_string());
+    format!(
+        "{prompt}\n\nStructured evidence context for this delegated task:\n```json\n{rendered_context}\n```"
+    )
 }

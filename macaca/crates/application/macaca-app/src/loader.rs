@@ -45,24 +45,20 @@ impl AppLoader {
     ///
     /// - `FilePath` sources are loaded from disk relative to `base_dir`.
     /// - `Inline` sources are converted directly.
-    /// - L1 native apps return an empty vec (agents are registered programmatically).
-    /// - L2 WASM currently resolves to an empty agent set so the application
-    ///   can be discovered and projected in control-plane surfaces while
-    ///   runtime execution remains explicitly gated elsewhere.
+    /// - L1 native apps return an empty vec because those agents are
+    ///   registered programmatically by the native application.
+    /// - L2 WASM and L3 declarative apps both use manifest-declared agents.
+    ///   The WASM guest still owns flexible orchestration, while Macaca
+    ///   registers these app-scoped agent identities so host imports such as
+    ///   `macaca:agent/delegate` can route without falling back to global
+    ///   workers.
     pub fn resolve_agent_configs(
         manifest: &AppManifest,
         base_dir: impl AsRef<Path>,
     ) -> MacacaResult<Vec<AgentConfig>> {
         match manifest.layer {
             AppLayer::L1Native => Ok(vec![]),
-            AppLayer::L2Wasm => {
-                tracing::info!(
-                    app = %manifest.name,
-                    "L2 WASM manifest admitted for discovery; no declarative agents are resolved"
-                );
-                Ok(vec![])
-            }
-            AppLayer::L3Declarative => {
+            AppLayer::L2Wasm | AppLayer::L3Declarative => {
                 let base = base_dir.as_ref();
                 let mut configs = Vec::new();
                 for source in &manifest.agents {
@@ -222,7 +218,7 @@ ui:
     }
 
     #[test]
-    fn resolve_l2_returns_empty() {
+    fn resolve_l2_without_manifest_agents_returns_empty() {
         let manifest = AppManifest {
             id: macaca_proto::ApplicationId::new(),
             name: "wasm".into(),
@@ -242,6 +238,45 @@ ui:
         };
         let configs = AppLoader::resolve_agent_configs(&manifest, ".").unwrap();
         assert!(configs.is_empty());
+    }
+
+    #[test]
+    fn resolve_l2_inline_agents_for_wasm_orchestration() {
+        let manifest = AppManifest {
+            id: macaca_proto::ApplicationId::new(),
+            name: "wasm-agent-app".into(),
+            description: None,
+            version: "0.1.0".into(),
+            layer: AppLayer::L2Wasm,
+            ui_type: None,
+            agents: vec![AgentSource::Inline(InlineAgentConfig {
+                name: "technical_analyst".into(),
+                capabilities: vec![crate::model::CapabilityRef {
+                    name: "technical_signal_analysis".into(),
+                    description: "Analyze market evidence for a WASM app.".into(),
+                }],
+                prompt_template: "Use only provided evidence.".into(),
+                model: "mock".into(),
+                permission_level: "user".into(),
+                allowed_tools: vec![],
+                max_tokens: None,
+                temperature: None,
+                skills: None,
+                context_engine: None,
+            })],
+            llm_config: None,
+            entry_agent: None,
+            entrypoint: None,
+            workflows: None,
+            resources: None,
+            context: None,
+            service_contract: None,
+            ui: None,
+        };
+        let configs = AppLoader::resolve_agent_configs(&manifest, ".").unwrap();
+        assert_eq!(configs.len(), 1);
+        assert_eq!(configs[0].name, "technical_analyst");
+        assert_eq!(configs[0].capabilities[0].name, "technical_signal_analysis");
     }
 
     #[test]

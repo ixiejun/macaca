@@ -11,7 +11,7 @@ use macaca_sdk::AgentConfig;
 use macaca_sdk::MacacaSdk;
 
 use crate::loader::AppLoader;
-use crate::model::{AppLayer, AppManifest, AppStatus, LoadedApp};
+use crate::model::{AppManifest, AppStatus, LoadedApp};
 use crate::service_capability::{expand_service_capabilities, InMemoryDomainPackCatalog};
 
 /// Builder that incrementally validates and assembles application runtime
@@ -149,13 +149,6 @@ impl AppRuntime {
             capabilities_hash = %capabilities.capabilities_hash,
             "Resolved application effective service capabilities"
         );
-        if builder.manifest().layer == AppLayer::L2Wasm {
-            tracing::info!(
-                app = %builder.manifest().name,
-                "Starting L2 WASM app in discovery-only mode (no declarative agents registered)"
-            );
-        }
-
         let mut agent_ids = Vec::new();
         let sdk = MacacaSdk::for_kernel(kernel);
         for config in configs {
@@ -269,7 +262,7 @@ mod tests {
     use macaca_proto::{LlmMessage, LlmOptions, LlmResponse, MacacaResult as Res, TokenUsage};
     use macaca_tools::DefaultToolSet;
 
-    use crate::model::{AgentSource, CapabilityRef, InlineAgentConfig};
+    use crate::model::{AgentSource, AppLayer, CapabilityRef, InlineAgentConfig};
 
     struct MockLlm;
 
@@ -473,6 +466,20 @@ mod tests {
         let agents = runtime.app_agents(&app_id).await.unwrap();
         assert!(agents.is_empty());
         assert_eq!(kernel.agent_count().await, 0);
+    }
+
+    #[tokio::test]
+    async fn wasm_app_with_declared_agents_registers_app_scoped_agents() {
+        let runtime = AppRuntime::new();
+        let kernel = make_kernel();
+        let mut manifest = inline_manifest("wasm-agent-app");
+        manifest.layer = AppLayer::L2Wasm;
+
+        let app_id = runtime.start_app(manifest, ".", &kernel).await.unwrap();
+        let agents = runtime.app_agents(&app_id).await.unwrap();
+
+        assert_eq!(agents.len(), 1);
+        assert_eq!(kernel.agent_count().await, 1);
     }
 
     #[tokio::test]

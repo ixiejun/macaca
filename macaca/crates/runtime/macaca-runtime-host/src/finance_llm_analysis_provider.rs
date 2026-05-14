@@ -43,15 +43,28 @@ impl FinanceLlmAnalysisSystemServiceProvider {
     /// hidden market access. This keeps traces honest: the host fetches data,
     /// then the LLM explains only that evidence.
     fn prompt(symbol: &str, payload: &Value) -> Vec<LlmMessage> {
+        let signal_mode = payload
+            .get("analysis_type")
+            .and_then(Value::as_str)
+            .map(|value| value.eq_ignore_ascii_case("signal"))
+            .unwrap_or(false);
+        let output_contract = if signal_mode {
+            "Because analysis_type is signal, start with a compact signal block: \
+             Signal: BUY, SELL, or HOLD; Confidence: low, medium, or high; \
+             Buy/entry zone; Sell/take-profit zone; Stop/invalidation; \
+             Evidence. Use only the supplied market data, news, and delegated \
+             agent outputs. Keep it non-advisory and make uncertainty explicit."
+        } else {
+            "Summarize trend, risk, support/resistance context, and possible \
+             watch zones without issuing personalized financial advice."
+        };
         vec![
-            LlmMessage::system(
+            LlmMessage::system(format!(
                 "You are a finance analysis service inside an application runtime. \
                  Produce concise, non-advisory analysis from the provided structured payload. \
                  Do not claim to have live market access beyond the supplied data. \
-                 When market data, news, and technical fields are present, summarize trend, \
-                 risk, support/resistance context, and possible watch zones without issuing \
-                 personalized financial advice.",
-            ),
+                 {output_contract}",
+            )),
             LlmMessage::user(format!(
                 "Analyze symbol {symbol}. Use this JSON payload as the complete evidence set: {payload}",
             )),
