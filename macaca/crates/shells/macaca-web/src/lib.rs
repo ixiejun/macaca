@@ -4,6 +4,7 @@
 //! with Macaca OS applications. Uses axum for the HTTP layer.
 
 pub mod agent_runner;
+pub mod app_ui_routes;
 pub mod bootstrap;
 mod capability_catalog;
 pub mod chat_mediator;

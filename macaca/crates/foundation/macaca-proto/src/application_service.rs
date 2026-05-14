@@ -237,6 +237,86 @@ pub struct ApplicationServiceRuntimeView {
     pub skills_dir: Option<String>,
 }
 
+/// Sanitized application-owned UI runtime view.
+///
+/// This DTO is intentionally presentation-shell safe.  It carries only bounded
+/// manifest declarations and host URLs that Web/Desktop shells can interpret
+/// generically.  It never exposes raw host filesystem handles, secrets,
+/// provider configuration, prompt text, or domain-specific service knowledge.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApplicationUiRuntimeView {
+    pub runtime: String,
+    pub framework: Option<String>,
+    pub entry_url: String,
+    pub sandbox: ApplicationUiSandboxView,
+    pub bridge: ApplicationUiBridgeView,
+    pub theme: ApplicationUiThemeView,
+}
+
+/// Bounded sandbox metadata for an application-owned UI surface.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApplicationUiSandboxView {
+    pub isolation: String,
+    pub csp: String,
+    pub network: String,
+}
+
+/// Declared bridge capabilities for an application-owned UI surface.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApplicationUiBridgeView {
+    pub required: Vec<String>,
+    pub optional: Vec<String>,
+}
+
+impl ApplicationUiBridgeView {
+    /// Check whether a capability was explicitly declared by the application.
+    ///
+    /// The bridge route uses this fail-closed helper before dispatching any
+    /// request to host services.  Keeping it on the DTO makes Web/Desktop
+    /// shells share the same policy vocabulary without app-specific branches.
+    pub fn declares(&self, capability: &str) -> bool {
+        self.required.iter().any(|item| item == capability)
+            || self.optional.iter().any(|item| item == capability)
+    }
+}
+
+/// Theme ownership metadata for application-owned UI surfaces.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApplicationUiThemeView {
+    pub mode: String,
+}
+
+/// Generic command sent by an application-owned UI surface to the host bridge.
+///
+/// The shape is deliberately capability-oriented instead of framework,
+/// application, or domain oriented.  React, Vue, Svelte, WebView, and future
+/// desktop shells can all send the same envelope while policy and routing stay
+/// centralized in the host.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ApplicationUiBridgeRequest {
+    pub bridge_version: String,
+    pub session_id: Option<String>,
+    pub surface_id: Option<String>,
+    pub trace_id: Option<String>,
+    pub command_id: String,
+    pub capability: String,
+    pub service_id: Option<String>,
+    pub operation: Option<String>,
+    pub payload: serde_json::Value,
+}
+
+/// Generic bridge response returned to application-owned UI surfaces.
+///
+/// Results are transported as data so the host can preserve trace, policy, and
+/// audit metadata without giving UI bundles direct access to runtime internals.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ApplicationUiBridgeResponse {
+    pub bridge_version: String,
+    pub command_id: String,
+    pub accepted: bool,
+    pub result: ApplicationHostCommandResult,
+}
+
 /// Sanitized application view used by Web, CLI, and diagnostics.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ApplicationServiceAppView {
@@ -247,6 +327,7 @@ pub struct ApplicationServiceAppView {
     pub entry_agent: Option<String>,
     pub agents: Vec<ApplicationServiceAgentView>,
     pub runtime: ApplicationServiceRuntimeView,
+    pub ui: Option<ApplicationUiRuntimeView>,
     pub diagnostics: Vec<String>,
 }
 

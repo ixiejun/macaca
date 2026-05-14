@@ -579,6 +579,7 @@ fn minimal_running_view(
             app_dir: None,
             skills_dir: None,
         },
+        ui: None,
         diagnostics: Vec::new(),
     }
 }

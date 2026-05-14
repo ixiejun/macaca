@@ -247,6 +247,7 @@ impl WorkflowEngine {
                 resources: None,
                 context: None,
                 service_contract: None,
+                ui: None,
             },
             workflow_name: DEFAULT_WORKFLOW.into(),
             coordinator: DEFAULT_COORDINATOR.into(),
@@ -272,6 +273,7 @@ impl WorkflowEngine {
                 resources: None,
                 context: None,
                 service_contract: None,
+                ui: None,
             },
             workflow_name: DEFAULT_WORKFLOW.into(),
             coordinator: DEFAULT_COORDINATOR.into(),
@@ -487,6 +489,7 @@ mod tests {
             resources: None,
             context: None,
             service_contract: None,
+            ui: None,
         }
     }
 

@@ -10,7 +10,8 @@ use macaca_proto::MacacaResult;
 
 use crate::state::AppState;
 use crate::{
-    chat_orchestrator, genui_routes, loop_manager, metrics, plugin_routes, routes, session,
+    app_ui_routes, chat_orchestrator, genui_routes, loop_manager, metrics, plugin_routes, routes,
+    session,
 };
 
 /// Canonical builder for starting the web server.
@@ -67,6 +68,14 @@ impl WebRuntimeFacade {
             .route("/api/status", get(routes::get_status))
             .route("/api/apps", get(routes::get_apps))
             .route("/api/apps/{id}", get(routes::get_app))
+            .route(
+                "/api/apps/{app_id}/ui/assets/{*asset_path}",
+                get(app_ui_routes::get_app_ui_asset),
+            )
+            .route(
+                "/api/apps/{app_id}/ui/bridge",
+                post(app_ui_routes::post_app_ui_bridge),
+            )
             .route("/api/apps/{id}/agents", get(routes::get_app_agents))
             .route("/api/apps/{id}/skills", get(routes::get_app_skills))
             .route(

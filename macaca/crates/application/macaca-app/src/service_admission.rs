@@ -11,6 +11,7 @@ use macaca_proto::{
 };
 
 use crate::model::{AppLayer, AppManifest, AppStatus};
+use crate::ui_runtime::validate_ui_runtime_config;
 
 /// Specification that enforces Route C trace requirements.
 #[derive(Debug, Default, Clone, Copy)]
@@ -73,11 +74,13 @@ impl ApplicationManifestSpec {
                 }
             }
         }
+        validate_ui_runtime_config(manifest.ui.as_ref())?;
         tracing::info!(
             app_id = %manifest.id,
             app_name = %manifest.name,
             layer = ?manifest.layer,
             service_contract_declared = manifest.service_contract.is_some(),
+            ui_runtime_declared = manifest.ui.is_some(),
             "application manifest admitted by service specification"
         );
         Ok(())
@@ -311,6 +314,7 @@ mod tests {
                 optional_services: vec![],
                 service_policy_overrides: Default::default(),
             }),
+            ui: None,
         };
         let error = ApplicationManifestSpec.validate(&manifest).unwrap_err();
         assert!(error.to_string().contains("required_services"));

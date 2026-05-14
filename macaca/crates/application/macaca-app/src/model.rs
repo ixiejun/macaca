@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::service_capability::AppServiceContractConfig;
+use crate::ui_runtime::AppUiRuntimeConfig;
 use macaca_proto::{AgentId, ApplicationId};
 
 /// The execution layer of an application.
@@ -267,6 +268,14 @@ pub struct AppManifest {
     /// Optional generic service declaration block for contract-driven routing.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub service_contract: Option<AppServiceContractConfig>,
+    /// Optional application-owned UI runtime declaration.
+    ///
+    /// The declaration points to UI artifacts inside the application package
+    /// and lists host bridge capabilities. It is data-only so Web/Desktop
+    /// shells can host app-owned UI without learning app-specific business
+    /// logic or rendering rules.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ui: Option<AppUiRuntimeConfig>,
 }
 
 /// UI type for frontend rendering.
@@ -451,6 +460,7 @@ agents:
                 resources: None,
                 context: None,
                 service_contract: None,
+                ui: None,
             },
             agent_ids: vec![],
             status: AppStatus::Loaded,

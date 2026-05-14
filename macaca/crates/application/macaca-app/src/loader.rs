@@ -7,6 +7,7 @@ use macaca_sdk::config::CapabilityDef;
 use macaca_sdk::AgentConfig;
 
 use crate::model::{AgentSource, AppLayer, AppManifest, InlineAgentConfig};
+use crate::ui_runtime::validate_ui_runtime_config;
 
 /// Loads and validates application manifests.
 pub struct AppLoader;
@@ -35,6 +36,7 @@ impl AppLoader {
                 "App manifest 'name' must not be empty".into(),
             ));
         }
+        validate_ui_runtime_config(manifest.ui.as_ref())?;
 
         Ok(())
     }
@@ -154,6 +156,49 @@ layer: L2Wasm
     }
 
     #[test]
+    fn parse_manifest_with_ui_runtime_block() {
+        let yaml = r#"
+name: ui-app
+layer: L2Wasm
+ui:
+  runtime: web_bundle
+  framework: react
+  entry: dist/ui/index.html
+  assets:
+    - dist/ui/assets/**
+  sandbox:
+    isolation: iframe
+    csp: strict
+    network: declared
+  bridge:
+    required:
+      - service.call
+      - trace.emit
+    optional:
+      - session.read
+  theme:
+    mode: app_owned
+"#;
+        let manifest = AppLoader::parse_manifest_yaml(yaml).unwrap();
+        let ui = manifest.ui.expect("ui runtime declaration must parse");
+        assert_eq!(ui.runtime, crate::ui_runtime::AppUiRuntimeKind::WebBundle);
+        assert!(ui.bridge.declares("service.call"));
+    }
+
+    #[test]
+    fn parse_manifest_rejects_escaping_ui_entry() {
+        let yaml = r#"
+name: ui-app
+layer: L2Wasm
+ui:
+  runtime: web_bundle
+  entry: ../escape.html
+"#;
+        let error = AppLoader::parse_manifest_yaml(yaml).unwrap_err();
+        assert!(error.to_string().contains("package"));
+    }
+
+    #[test]
     fn resolve_l1_returns_empty() {
         let manifest = AppManifest {
             id: macaca_proto::ApplicationId::new(),
@@ -170,6 +215,7 @@ layer: L2Wasm
             resources: None,
             context: None,
             service_contract: None,
+            ui: None,
         };
         let configs = AppLoader::resolve_agent_configs(&manifest, ".").unwrap();
         assert!(configs.is_empty());
@@ -192,6 +238,7 @@ layer: L2Wasm
             resources: None,
             context: None,
             service_contract: None,
+            ui: None,
         };
         let configs = AppLoader::resolve_agent_configs(&manifest, ".").unwrap();
         assert!(configs.is_empty());
@@ -228,6 +275,7 @@ layer: L2Wasm
             resources: None,
             context: None,
             service_contract: None,
+            ui: None,
         };
         let configs = AppLoader::resolve_agent_configs(&manifest, ".").unwrap();
         assert_eq!(configs.len(), 1);
@@ -265,6 +313,7 @@ capabilities:
             resources: None,
             context: None,
             service_contract: None,
+            ui: None,
         };
         let configs = AppLoader::resolve_agent_configs(&manifest, &dir).unwrap();
         assert_eq!(configs.len(), 1);

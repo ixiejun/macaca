@@ -19,7 +19,8 @@ use macaca_proto::{
     ApplicationManifestDigestView, ApplicationManifestV1, ApplicationMcpOverlayMetadataView,
     ApplicationMetadataView, ApplicationServiceAgentView, ApplicationServiceAppView,
     ApplicationServiceRuntimeView, ApplicationSkillPolicyMetadataView,
-    ApplicationToolPolicyMetadataView, PackageRuntimeKind,
+    ApplicationToolPolicyMetadataView, ApplicationUiBridgeView, ApplicationUiRuntimeView,
+    ApplicationUiSandboxView, ApplicationUiThemeView, PackageRuntimeKind,
 };
 use tracing::info;
 
@@ -27,6 +28,10 @@ use crate::consumption::app_entry_agent_name;
 use crate::manifest_v1::{LegacyAppManifestProjection, YamlApplicationManifestAdapter};
 use crate::model::{AgentSource, AppManifest, AppStatus};
 use crate::service_capability::{expand_service_capabilities, InMemoryDomainPackCatalog};
+use crate::ui_runtime::{
+    AppUiCspMode, AppUiFramework, AppUiNetworkPolicy, AppUiRuntimeKind, AppUiSandboxIsolation,
+    AppUiThemeMode,
+};
 use crate::ApplicationRuntimeKindSpec;
 
 /// Project an application manifest into the legacy app summary view.
@@ -151,7 +156,79 @@ fn manifest_v1_to_service_app_view(
             app_dir: app_dir.map(|path| path.display().to_string()),
             skills_dir: skills_dir(app_dir, legacy),
         },
+        ui: ui_runtime_view(legacy),
         diagnostics: runtime_diagnostics(legacy, &manifest_v1.runtime.kind, &capabilities),
+    }
+}
+
+fn ui_runtime_view(legacy: &AppManifest) -> Option<ApplicationUiRuntimeView> {
+    let ui = legacy.ui.as_ref()?;
+    let entry_url = format!("/api/apps/{}/ui/assets/{}", legacy.id, ui.entry);
+    tracing::info!(
+        app_id = %legacy.id,
+        ui_runtime = %ui_runtime_kind_label(ui.runtime),
+        bridge_required = ui.bridge.required.len(),
+        bridge_optional = ui.bridge.optional.len(),
+        "projected sanitized application-owned UI metadata"
+    );
+    Some(ApplicationUiRuntimeView {
+        runtime: ui_runtime_kind_label(ui.runtime).to_string(),
+        framework: ui.framework.map(ui_framework_label).map(str::to_string),
+        entry_url,
+        sandbox: ApplicationUiSandboxView {
+            isolation: ui_sandbox_isolation_label(ui.sandbox.isolation).to_string(),
+            csp: ui_csp_label(ui.sandbox.csp).to_string(),
+            network: ui_network_label(ui.sandbox.network).to_string(),
+        },
+        bridge: ApplicationUiBridgeView {
+            required: ui.bridge.required.clone(),
+            optional: ui.bridge.optional.clone(),
+        },
+        theme: ApplicationUiThemeView {
+            mode: ui_theme_label(ui.theme.mode).to_string(),
+        },
+    })
+}
+
+fn ui_runtime_kind_label(kind: AppUiRuntimeKind) -> &'static str {
+    match kind {
+        AppUiRuntimeKind::WebBundle => "web_bundle",
+    }
+}
+
+fn ui_framework_label(framework: AppUiFramework) -> &'static str {
+    match framework {
+        AppUiFramework::React => "react",
+        AppUiFramework::Vue => "vue",
+        AppUiFramework::Svelte => "svelte",
+        AppUiFramework::Vanilla => "vanilla",
+        AppUiFramework::Other => "other",
+    }
+}
+
+fn ui_sandbox_isolation_label(isolation: AppUiSandboxIsolation) -> &'static str {
+    match isolation {
+        AppUiSandboxIsolation::Iframe => "iframe",
+    }
+}
+
+fn ui_csp_label(csp: AppUiCspMode) -> &'static str {
+    match csp {
+        AppUiCspMode::Strict => "strict",
+    }
+}
+
+fn ui_network_label(network: AppUiNetworkPolicy) -> &'static str {
+    match network {
+        AppUiNetworkPolicy::Denied => "denied",
+        AppUiNetworkPolicy::Declared => "declared",
+    }
+}
+
+fn ui_theme_label(mode: AppUiThemeMode) -> &'static str {
+    match mode {
+        AppUiThemeMode::AppOwned => "app_owned",
+        AppUiThemeMode::HostAdaptive => "host_adaptive",
     }
 }
 
@@ -423,6 +500,7 @@ mod tests {
             resources: None,
             context: Some(Default::default()),
             service_contract: None,
+            ui: None,
         }
     }
 

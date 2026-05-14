@@ -338,6 +338,8 @@ mod tests {
             Arc::new(UnavailableWeb3Client),
             Arc::new(UnavailableEvmClient),
             Arc::new(macaca_sdk::UnavailableSystemPluginControlClient),
+            Arc::new(macaca_sdk::UnavailableSystemPluginCapabilityClient),
+            Arc::new(macaca_sdk::UnavailableSystemPluginHookClient),
         );
 
         let web3 = facade.web3_availability("test-web3").await.unwrap();

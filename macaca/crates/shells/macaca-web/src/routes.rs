@@ -28,8 +28,8 @@ use macaca_persist::{AppendEventCommand, EventLogQuery, SessionLineageStore};
 use macaca_proto::{
     ApplicationDiscoverCommand, ApplicationId, ApplicationMetadataQueryCommand,
     ApplicationMetadataView, ApplicationServiceAppView, ApplicationServiceScope,
-    ApplicationStatusCommand, MacacaError, McpProbeCommand, McpRuntimeStatusView,
-    McpToolPolicySnapshot, ProtoErrorAdapter, TraceContext,
+    ApplicationStatusCommand, ApplicationUiRuntimeView, MacacaError, McpProbeCommand,
+    McpRuntimeStatusView, McpToolPolicySnapshot, ProtoErrorAdapter, TraceContext,
 };
 use macaca_skill::{SkillPolicy, SkillRuntimeFacade, SkillSnapshotRequest};
 
@@ -199,6 +199,7 @@ pub struct AppInfo {
     pub agent_count: usize,
     pub description: String,
     pub icon: String,
+    pub ui: Option<ApplicationUiRuntimeView>,
 }
 
 fn app_info_from_service_view(view: &ApplicationServiceAppView) -> AppInfo {
@@ -212,6 +213,7 @@ fn app_info_from_service_view(view: &ApplicationServiceAppView) -> AppInfo {
             .clone()
             .unwrap_or_else(|| "An Agent OS application.".to_string()),
         icon: "cube".to_string(),
+        ui: view.ui.clone(),
     }
 }
 
@@ -300,6 +302,7 @@ pub async fn get_apps(State(state): State<Arc<AppState>>) -> Json<Vec<AppInfo>> 
                 agent_count,
                 description,
                 icon,
+                ui: None,
             }
         })
         .collect();
@@ -367,6 +370,7 @@ pub async fn get_app(
                 agent_count: state.kernel.agent_count().await,
                 description,
                 icon,
+                ui: None,
             }));
         }
     }
@@ -740,6 +744,7 @@ pub async fn reload_apps(
                 agent_count,
                 description,
                 icon,
+                ui: None,
             }
         })
         .collect();

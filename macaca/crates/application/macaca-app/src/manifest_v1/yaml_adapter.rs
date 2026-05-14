@@ -505,6 +505,7 @@ mod tests {
             resources: None,
             context: None,
             service_contract: None,
+            ui: None,
         };
 
         let projection = YamlApplicationManifestAdapter::new(manifest).project();
@@ -547,6 +548,7 @@ mod tests {
                 optional_services: Vec::new(),
                 service_policy_overrides: Default::default(),
             }),
+            ui: None,
         };
         let projection = YamlApplicationManifestAdapter::new(manifest).project();
         let ability = projection
