@@ -402,7 +402,7 @@ fn rejected_bridge_result(
 mod tests {
     use macaca_app::ui_runtime::{
         AppUiBridgeConfig, AppUiRuntimeConfig, AppUiRuntimeKind, AppUiSandboxConfig,
-        AppUiThemeConfig,
+        AppUiSurfaceConfig, AppUiThemeConfig,
     };
 
     use super::*;
@@ -410,6 +410,7 @@ mod tests {
     fn ui_config() -> AppUiRuntimeConfig {
         AppUiRuntimeConfig {
             runtime: AppUiRuntimeKind::WebBundle,
+            surface: AppUiSurfaceConfig::default(),
             framework: None,
             entry: "dist/ui/index.html".into(),
             assets: vec!["dist/ui/assets/**".into()],

@@ -19,6 +19,14 @@ pub struct AppUiRuntimeConfig {
     /// UI runtime strategy. The first supported strategy is a static web bundle
     /// hosted in an iframe/WebView and connected through the Macaca bridge.
     pub runtime: AppUiRuntimeKind,
+    /// Shell placement strategy for the loaded UI runtime.
+    ///
+    /// `runtime` answers how the UI is loaded. `surface` answers where that UI
+    /// belongs in the host shell. Keeping the two axes separate lets Macaca
+    /// route full product-like applications away from the chat workspace while
+    /// keeping chat-first applications on the existing session shell.
+    #[serde(default)]
+    pub surface: AppUiSurfaceConfig,
     /// Developer-facing framework metadata. The host never switches behavior
     /// based on this value; it is for diagnostics, templates, and tooling.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -58,6 +66,63 @@ pub enum AppUiFramework {
     Svelte,
     Vanilla,
     Other,
+}
+
+/// Placement contract for an application-owned UI declaration.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AppUiSurfaceConfig {
+    /// Workspace strategy requested by the application.
+    #[serde(default)]
+    pub mode: AppUiSurfaceMode,
+    /// Chrome ownership requested by the application.
+    #[serde(default)]
+    pub chrome: AppUiSurfaceChrome,
+}
+
+impl Default for AppUiSurfaceConfig {
+    fn default() -> Self {
+        Self {
+            mode: AppUiSurfaceMode::Session,
+            chrome: AppUiSurfaceChrome::Host,
+        }
+    }
+}
+
+/// Supported workspace placement strategies.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AppUiSurfaceMode {
+    /// The application owns the full workspace area. Host shells should keep
+    /// global navigation but avoid rendering chat-thread widgets inside the
+    /// app-owned workspace.
+    Application,
+    /// The host chat/session shell remains primary, and app UI may extend
+    /// declared shell slots in later phases.
+    Session,
+}
+
+impl Default for AppUiSurfaceMode {
+    fn default() -> Self {
+        Self::Session
+    }
+}
+
+/// Supported workspace chrome ownership strategies.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AppUiSurfaceChrome {
+    /// The application bundle owns workspace-local navigation, headers, and
+    /// action chrome.
+    AppOwned,
+    /// The host shell owns workspace chrome, which is the compatibility default
+    /// for chat-first applications.
+    Host,
+}
+
+impl Default for AppUiSurfaceChrome {
+    fn default() -> Self {
+        Self::Host
+    }
 }
 
 /// Sandboxing policy for a UI bundle.
@@ -240,6 +305,7 @@ mod tests {
     fn valid_config() -> AppUiRuntimeConfig {
         AppUiRuntimeConfig {
             runtime: AppUiRuntimeKind::WebBundle,
+            surface: AppUiSurfaceConfig::default(),
             framework: Some(AppUiFramework::React),
             entry: "dist/ui/index.html".into(),
             assets: vec!["dist/ui/assets/**".into()],
@@ -271,5 +337,31 @@ mod tests {
         config.bridge.required.push(" ".into());
         let error = validate_ui_runtime_config(Some(&config)).unwrap_err();
         assert!(error.to_string().contains("bridge"));
+    }
+
+    #[test]
+    fn ui_runtime_defaults_to_session_surface_for_compatibility() {
+        let yaml = r#"
+runtime: web_bundle
+entry: dist/ui/index.html
+"#;
+        let config: AppUiRuntimeConfig = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(config.surface.mode, AppUiSurfaceMode::Session);
+        assert_eq!(config.surface.chrome, AppUiSurfaceChrome::Host);
+    }
+
+    #[test]
+    fn ui_runtime_accepts_application_surface_declaration() {
+        let yaml = r#"
+runtime: web_bundle
+surface:
+  mode: application
+  chrome: app_owned
+entry: dist/ui/index.html
+"#;
+        let config: AppUiRuntimeConfig = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(config.surface.mode, AppUiSurfaceMode::Application);
+        assert_eq!(config.surface.chrome, AppUiSurfaceChrome::AppOwned);
+        validate_ui_runtime_config(Some(&config)).unwrap();
     }
 }

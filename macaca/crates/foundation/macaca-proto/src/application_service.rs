@@ -246,11 +246,24 @@ pub struct ApplicationServiceRuntimeView {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ApplicationUiRuntimeView {
     pub runtime: String,
+    pub surface: ApplicationUiSurfaceView,
     pub framework: Option<String>,
     pub entry_url: String,
     pub sandbox: ApplicationUiSandboxView,
     pub bridge: ApplicationUiBridgeView,
     pub theme: ApplicationUiThemeView,
+}
+
+/// Sanitized placement metadata for an application-owned UI surface.
+///
+/// Shells use this strategy value to decide whether the loaded UI replaces the
+/// workspace or augments the existing chat/session shell. It is intentionally a
+/// small string DTO so Web and Desktop hosts share the same protocol without
+/// importing application-manifest internals.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApplicationUiSurfaceView {
+    pub mode: String,
+    pub chrome: String,
 }
 
 /// Bounded sandbox metadata for an application-owned UI surface.

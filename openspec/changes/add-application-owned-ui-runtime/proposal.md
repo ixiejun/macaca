@@ -16,6 +16,9 @@ capability policy, lifecycle, trace, and audit.
 - Expose application UI metadata through shell-facing app/session APIs.
 - Add a generic Web iframe host surface that loads app UI bundles without
   app-specific rendering code.
+- Add manifest-declared surface modes so full application UI can replace the
+  chat workspace, while session-mode UI continues to augment the existing chat
+  shell.
 - Add a message-based host bridge for `service.call`, `trace.emit`,
   `session.read`, and future declared capabilities.
 - Record audit events for UI admission, surface lifecycle, bridge handshake,
@@ -34,4 +37,3 @@ capability policy, lifecycle, trace, and audit.
   - `frontend/components`
   - `frontend/lib`
   - `/Users/quantum/Code/dev/wasm-stock-agent-app`
-

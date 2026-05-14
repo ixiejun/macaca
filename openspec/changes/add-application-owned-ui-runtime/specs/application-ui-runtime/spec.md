@@ -16,6 +16,42 @@ bundle as the primary interactive UI surface.
 - **AND** the shell does not branch on application id, service id, domain pack,
   workflow name, or business data.
 
+### Requirement: Application surface modes
+
+Macaca SHALL support manifest-declared UI surface modes that separate complete
+application workspaces from chat/session shell extensions.
+
+#### Scenario: App declares application center surface
+
+- **GIVEN** an installed application manifest declares `ui.runtime` as
+  `web_bundle`
+- **AND** it declares `ui.surface.mode` as `application`
+- **WHEN** the application is opened in a shell
+- **THEN** the shell loads the declared bundle as the center interaction
+  surface
+- **AND** the shell keeps global navigation, page header, and the universal
+  right-side AgentPanel
+- **AND** the shell does not render main-thread chat tabs, conversation turns,
+  or a bottom chat composer inside that center surface.
+
+#### Scenario: App omits surface declaration
+
+- **GIVEN** an installed application manifest declares `ui.runtime` as
+  `web_bundle`
+- **AND** it omits `ui.surface`
+- **WHEN** the application is opened in a shell
+- **THEN** Macaca treats the application as `ui.surface.mode: session`
+- **AND** existing chat/session shell behavior remains available.
+
+#### Scenario: App declares session surface
+
+- **GIVEN** an installed application manifest declares `ui.surface.mode` as
+  `session`
+- **WHEN** the application is opened in a shell
+- **THEN** the shell keeps the chat/session workspace as the primary interface
+- **AND** any app-owned UI is mounted only through generic session extension
+  points, not app-specific shell branches.
+
 ### Requirement: UI bundle sandbox admission
 
 Macaca SHALL validate UI bundle declarations before exposing them to shells.
@@ -76,4 +112,3 @@ the primary application UI runtime.
 - **WHEN** the shell renders the failure state
 - **THEN** it may use a generic fallback renderer for the error and audit data
 - **AND** it records the fallback reason in audit metadata.
-

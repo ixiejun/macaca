@@ -20,7 +20,7 @@ use macaca_proto::{
     ApplicationMetadataView, ApplicationServiceAgentView, ApplicationServiceAppView,
     ApplicationServiceRuntimeView, ApplicationSkillPolicyMetadataView,
     ApplicationToolPolicyMetadataView, ApplicationUiBridgeView, ApplicationUiRuntimeView,
-    ApplicationUiSandboxView, ApplicationUiThemeView, PackageRuntimeKind,
+    ApplicationUiSandboxView, ApplicationUiSurfaceView, ApplicationUiThemeView, PackageRuntimeKind,
 };
 use tracing::info;
 
@@ -30,7 +30,7 @@ use crate::model::{AgentSource, AppManifest, AppStatus};
 use crate::service_capability::{expand_service_capabilities, InMemoryDomainPackCatalog};
 use crate::ui_runtime::{
     AppUiCspMode, AppUiFramework, AppUiNetworkPolicy, AppUiRuntimeKind, AppUiSandboxIsolation,
-    AppUiThemeMode,
+    AppUiSurfaceChrome, AppUiSurfaceMode, AppUiThemeMode,
 };
 use crate::ApplicationRuntimeKindSpec;
 
@@ -167,12 +167,18 @@ fn ui_runtime_view(legacy: &AppManifest) -> Option<ApplicationUiRuntimeView> {
     tracing::info!(
         app_id = %legacy.id,
         ui_runtime = %ui_runtime_kind_label(ui.runtime),
+        surface_mode = %ui_surface_mode_label(ui.surface.mode),
+        surface_chrome = %ui_surface_chrome_label(ui.surface.chrome),
         bridge_required = ui.bridge.required.len(),
         bridge_optional = ui.bridge.optional.len(),
         "projected sanitized application-owned UI metadata"
     );
     Some(ApplicationUiRuntimeView {
         runtime: ui_runtime_kind_label(ui.runtime).to_string(),
+        surface: ApplicationUiSurfaceView {
+            mode: ui_surface_mode_label(ui.surface.mode).to_string(),
+            chrome: ui_surface_chrome_label(ui.surface.chrome).to_string(),
+        },
         framework: ui.framework.map(ui_framework_label).map(str::to_string),
         entry_url,
         sandbox: ApplicationUiSandboxView {
@@ -203,6 +209,20 @@ fn ui_framework_label(framework: AppUiFramework) -> &'static str {
         AppUiFramework::Svelte => "svelte",
         AppUiFramework::Vanilla => "vanilla",
         AppUiFramework::Other => "other",
+    }
+}
+
+fn ui_surface_mode_label(mode: AppUiSurfaceMode) -> &'static str {
+    match mode {
+        AppUiSurfaceMode::Application => "application",
+        AppUiSurfaceMode::Session => "session",
+    }
+}
+
+fn ui_surface_chrome_label(chrome: AppUiSurfaceChrome) -> &'static str {
+    match chrome {
+        AppUiSurfaceChrome::AppOwned => "app_owned",
+        AppUiSurfaceChrome::Host => "host",
     }
 }
 

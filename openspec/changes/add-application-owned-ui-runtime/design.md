@@ -67,6 +67,9 @@ Rationale: This keeps useful generic diagnostics while avoiding a custom UI DSL.
 ```yaml
 ui:
   runtime: web_bundle
+  surface:
+    mode: application
+    chrome: app_owned
   framework: react
   entry: dist/ui/index.html
   assets:
@@ -86,6 +89,20 @@ ui:
   theme:
     mode: app_owned
 ```
+
+`runtime` describes the loading adapter. `surface` describes where that loaded
+UI belongs in the host shell. Keeping those responsibilities separate prevents
+the Web shell from treating every web bundle as a chat attachment.
+
+`surface.mode: application` means the application owns the center interaction
+column. The shell keeps global navigation, page header, and the universal
+right-side AgentPanel, but it SHALL NOT render main-thread tabs, conversation
+turns, or the bottom chat composer inside that center column.
+
+`surface.mode: session` means the host chat/session shell remains primary and
+the application may later customize declared slots through app-owned bundles or
+optional UI Kit components. Missing `surface` defaults to `session` with
+`chrome: host` for compatibility.
 
 ## Bridge Message Envelope
 
@@ -129,4 +146,3 @@ The runtime must log:
 Existing chat-only applications continue to work. Applications without `ui`
 fall back to the current chat/result surfaces. WASM applications can add `ui`
 incrementally without changing their service contract.
-
