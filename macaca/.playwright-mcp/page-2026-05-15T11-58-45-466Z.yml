@@ -1,0 +1,2239 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - link "Google News" [ref=e7] [cursor=pointer]:
+        - /url: ./?hl=en-US&gl=US&ceid=US%3Aen
+        - generic [ref=e9]: News
+      - generic [ref=e10]:
+        - search [ref=e12]:
+          - generic [ref=e18]:
+            - textbox [disabled] [ref=e19]: Search for topics, locations & sources
+            - combobox "Search for topics, locations & sources" [ref=e20]
+          - button "Advanced search" [ref=e21] [cursor=pointer]:
+            - generic [ref=e22]:
+              - generic "Advanced search" [ref=e23]:
+                - img [ref=e24]
+              - tooltip [ref=e26]: Advanced search
+          - button "Search" [ref=e27] [cursor=pointer]:
+            - img [ref=e28]
+        - generic [ref=e31]:
+          - generic [ref=e36]:
+            - button "Help" [ref=e37] [cursor=pointer]:
+              - img [ref=e39]
+            - tooltip [ref=e41]: Help
+          - generic [ref=e46]:
+            - button "Settings" [ref=e47] [cursor=pointer]:
+              - img [ref=e49]
+            - tooltip [ref=e52]: Settings
+      - generic [ref=e54]:
+        - button "Google apps" [ref=e58] [cursor=pointer]:
+          - img [ref=e59]
+        - link "Sign in" [ref=e62] [cursor=pointer]:
+          - /url: https://accounts.google.com/ServiceLogin?passive=1209600&continue=https://news.google.com/search?q%3Dbitcoin%2Bcrypto%26hl%3Den-US%26gl%3DUS%26ceid%3DUS:en&followup=https://news.google.com/search?q%3Dbitcoin%2Bcrypto%26hl%3Den-US%26gl%3DUS%26ceid%3DUS:en&hl=en-US&ec=GAZAqgM
+    - navigation [ref=e65]:
+      - tablist [ref=e66]:
+        - tab "Home" [ref=e67] [cursor=pointer]:
+          - tab "Home" [ref=e68]
+        - tab "For you" [ref=e69] [cursor=pointer]:
+          - tab "For you" [ref=e70]
+        - tab "Following" [ref=e71] [cursor=pointer]:
+          - tab "Following" [ref=e72]
+        - tab "U.S." [ref=e75] [cursor=pointer]:
+          - tab "U.S." [ref=e76]
+        - tab "World" [ref=e77] [cursor=pointer]:
+          - tab "World" [ref=e78]
+        - tab "Local" [ref=e79] [cursor=pointer]:
+          - tab "Local" [ref=e80]
+        - tab "Business" [ref=e81] [cursor=pointer]:
+          - tab "Business" [ref=e82]
+        - tab "Technology" [ref=e83] [cursor=pointer]:
+          - tab "Technology" [ref=e84]
+        - tab "Entertainment" [ref=e85] [cursor=pointer]:
+          - tab "Entertainment" [ref=e86]
+        - tab "Sports" [ref=e87] [cursor=pointer]:
+          - tab "Sports" [ref=e88]
+        - tab "Science" [ref=e89] [cursor=pointer]:
+          - tab "Science" [ref=e90]
+        - tab "Health" [ref=e91] [cursor=pointer]:
+          - tab "Health" [ref=e92]
+  - main [ref=e96]:
+    - generic [ref=e98]:
+      - generic [ref=e100]:
+        - link "Senate Banking Committee advances Clarity Act for crypto" [ref=e101] [cursor=pointer]:
+          - /url: stories/CAAqNggKIjBDQklTSGpvSmMzUnZjbmt0TXpZd1NoRUtEd2lNa05HUkVSSGotQ2xQaXNVQ3dDZ0FQAQ?hl=en-US&gl=US&ceid=US%3Aen
+          - heading "Senate Banking Committee advances Clarity Act for crypto" [level=3] [ref=e102]
+          - img [ref=e103]
+        - separator [ref=e105]
+        - generic [ref=e106]:
+          - generic [ref=e107]:
+            - generic [ref=e109]:
+              - generic [ref=e110]:
+                - link [ref=e112] [cursor=pointer]:
+                  - /url: ./read/CBMioAFBVV95cUxQVGNRajZNdF9YVS0tRmRYVzM3S0FMMk5zT0w5ZldKaEJKMFdIQW13TDJmU3dwMy1FU0dLQktCcFpBOFRyUmcyY2NybWtNNVdORE1TMmVOVXVKaFdzd2Y4YXJUTFVnXzcwTURkY3VxZ3VHSl9aejVZTDZScnNOc3RadWwzM21GMVpHT1ZIRjhmRDdhSU54a0stNjQ1X3dfeDMy?hl=en-US&gl=US&ceid=US%3Aen
+                - generic [ref=e114]:
+                  - generic [ref=e115]:
+                    - generic [ref=e118]: Yahoo Finance
+                    - generic [ref=e122]:
+                      - generic:
+                        - 'button "More - Bitcoin, Ethereum, XRP, Dogecoin Jump After Crypto Act Passes Key Senate Vote: Analyst Says BTC ''Positioned'' For A Rebound Toward $86,000" [ref=e123] [cursor=pointer]':
+                          - img [ref=e125]
+                        - tooltip [ref=e127]: More
+                  - 'link "Bitcoin, Ethereum, XRP, Dogecoin Jump After Crypto Act Passes Key Senate Vote: Analyst Says BTC ''Positioned'' For A Rebound Toward $86,000 - Yahoo Finance - 10 hours ago - By Aniket Verma" [ref=e128] [cursor=pointer]':
+                    - /url: ./read/CBMioAFBVV95cUxQVGNRajZNdF9YVS0tRmRYVzM3S0FMMk5zT0w5ZldKaEJKMFdIQW13TDJmU3dwMy1FU0dLQktCcFpBOFRyUmcyY2NybWtNNVdORE1TMmVOVXVKaFdzd2Y4YXJUTFVnXzcwTURkY3VxZ3VHSl9aejVZTDZScnNOc3RadWwzM21GMVpHT1ZIRjhmRDdhSU54a0stNjQ1X3dfeDMy?hl=en-US&gl=US&ceid=US%3Aen
+                    - text: "Bitcoin, Ethereum, XRP, Dogecoin Jump After Crypto Act Passes Key Senate Vote: Analyst Says BTC 'Positioned' For A Rebound Toward $86,000"
+                - figure [ref=e129]
+              - generic [ref=e130]:
+                - time [ref=e131]: 10 hours ago
+                - separator [ref=e132]
+                - generic [ref=e133]: By Aniket Verma
+            - separator [ref=e134]
+          - generic [ref=e137]:
+            - generic [ref=e138]:
+              - link [ref=e140] [cursor=pointer]:
+                - /url: ./read/CBMixgFBVV95cUxQaWtxR1pnTjJpLVducTRvQ2FFODZhcllaOE9KRU1SZnpIMEpORmJMN1UyWS1CelBLNnhIaDBGX2JUMzhNQWNEUTg1Skk1RGVIaUVrM2g1bUNzSElNQlMxWm9iSmZyTmhNWjNTUFdsclNZckRZS3VGcnZlZlhNLVhNcE4xenUzQUFJOHFpamFETFZnX2pMZmVaS1NnQUMtNWczX0FheWJoeGtDSDJQUXN6VlVyS004QnFhTEtOXzZzdVhZckNnZkE?hl=en-US&gl=US&ceid=US%3Aen
+              - generic [ref=e142]:
+                - generic [ref=e143]:
+                  - generic [ref=e146]: CoinDesk
+                  - generic [ref=e150]:
+                    - generic:
+                      - button "More - XRP, DOGE surge 5%, bitcoin above $81,000 as Clarity Act clears Senate banking panel" [ref=e151] [cursor=pointer]:
+                        - img [ref=e153]
+                      - tooltip [ref=e155]: More
+                - link "XRP, DOGE surge 5%, bitcoin above $81,000 as Clarity Act clears Senate banking panel - CoinDesk - 7 hours ago - By Shaurya Malwa" [ref=e156] [cursor=pointer]:
+                  - /url: ./read/CBMixgFBVV95cUxQaWtxR1pnTjJpLVducTRvQ2FFODZhcllaOE9KRU1SZnpIMEpORmJMN1UyWS1CelBLNnhIaDBGX2JUMzhNQWNEUTg1Skk1RGVIaUVrM2g1bUNzSElNQlMxWm9iSmZyTmhNWjNTUFdsclNZckRZS3VGcnZlZlhNLVhNcE4xenUzQUFJOHFpamFETFZnX2pMZmVaS1NnQUMtNWczX0FheWJoeGtDSDJQUXN6VlVyS004QnFhTEtOXzZzdVhZckNnZkE?hl=en-US&gl=US&ceid=US%3Aen
+                  - text: XRP, DOGE surge 5%, bitcoin above $81,000 as Clarity Act clears Senate banking panel
+              - figure [ref=e157]
+            - generic [ref=e158]:
+              - time [ref=e159]: 7 hours ago
+              - separator [ref=e160]
+              - generic [ref=e161]: By Shaurya Malwa
+          - generic [ref=e164]:
+            - generic [ref=e165]:
+              - link [ref=e167] [cursor=pointer]:
+                - /url: ./read/CBMiugFBVV95cUxOck5sSTR3MEhWMC1ydmZQSG1vMEdBdmpxT2lLUkY1Q0hoeDZTLVA5ajQyVUkzUDRJb0lUZ3JOYWhRV2oxWHNtb1dUaVlMYllTX2N6OTZSLVUwOGxfTlFsWUppS0hxMVRwNUxpR2x5MTg0dllRS0dQT2VMb1NvVGRzM1ZIZ3h2QlVjQUs2VGtyQW1wM3A0RjVEUjZ2RTY3NVZlSm56RFBIbmlzVUVIX1ZSNWN0SU83Y013Qnc?hl=en-US&gl=US&ceid=US%3Aen
+              - generic [ref=e169]:
+                - generic [ref=e170]:
+                  - generic [ref=e173]: Reuters
+                  - generic [ref=e177]:
+                    - generic:
+                      - button "More - US Senate committee advances crypto bill in milestone for digital assets" [ref=e178] [cursor=pointer]:
+                        - img [ref=e180]
+                      - tooltip [ref=e182]: More
+                - link "US Senate committee advances crypto bill in milestone for digital assets - Reuters - 18 hours ago - By Hannah Erin Lang" [ref=e183] [cursor=pointer]:
+                  - /url: ./read/CBMiugFBVV95cUxOck5sSTR3MEhWMC1ydmZQSG1vMEdBdmpxT2lLUkY1Q0hoeDZTLVA5ajQyVUkzUDRJb0lUZ3JOYWhRV2oxWHNtb1dUaVlMYllTX2N6OTZSLVUwOGxfTlFsWUppS0hxMVRwNUxpR2x5MTg0dllRS0dQT2VMb1NvVGRzM1ZIZ3h2QlVjQUs2VGtyQW1wM3A0RjVEUjZ2RTY3NVZlSm56RFBIbmlzVUVIX1ZSNWN0SU83Y013Qnc?hl=en-US&gl=US&ceid=US%3Aen
+                  - text: US Senate committee advances crypto bill in milestone for digital assets
+              - figure [ref=e184]
+            - generic [ref=e185]:
+              - time [ref=e186]: 18 hours ago
+              - separator [ref=e187]
+              - generic [ref=e188]: By Hannah Erin Lang
+      - generic [ref=e192]:
+        - generic [ref=e193]:
+          - link [ref=e195] [cursor=pointer]:
+            - /url: ./read/CBMi9gFBVV95cUxPQ1p6N3BfY3N6WS01RFRSRTdnOE1uWnNOVl9ISWdvLU9Vd0JmcG9BY1JsUDZ1Z2FIcDZUM2VVeFdveEdlcEphbzFYUDhvSmI1SlBZYVJ3YmpRTTJlMFZNTDAxbmZOaXdVMDBsNWJ2cjZYbXZnOGN6ODBpTlF3SWtKVE1fZFFyUjBZdm4zMkp5aS11MWliaHQzMFVLVVduQjZUdldDeGpmUTRUZ29jdHluMmZwMFlVQXZrYlprMEMyRTU4LWVtcDI5YUNDVGpKWDJKb3V0bU1rRmQ5NXVzMDdWNHRoa1U0a0xXaTUxSWJLME1ZcC1EN3c?hl=en-US&gl=US&ceid=US%3Aen
+          - generic [ref=e197]:
+            - generic [ref=e198]:
+              - generic [ref=e201]: Forbes
+              - generic [ref=e205]:
+                - generic:
+                  - button "More - ‘Like Bitcoin In 2013’—Sudden 1,000% Price Surge Has Billionaires Betting On A Surprise $1.6 Trillion Crypto Flip" [ref=e206] [cursor=pointer]:
+                    - img [ref=e208]
+                  - tooltip [ref=e210]: More
+            - link "‘Like Bitcoin In 2013’—Sudden 1,000% Price Surge Has Billionaires Betting On A Surprise $1.6 Trillion Crypto Flip - Forbes - 23 hours ago - By Billy Bambrough" [ref=e211] [cursor=pointer]:
+              - /url: ./read/CBMi9gFBVV95cUxPQ1p6N3BfY3N6WS01RFRSRTdnOE1uWnNOVl9ISWdvLU9Vd0JmcG9BY1JsUDZ1Z2FIcDZUM2VVeFdveEdlcEphbzFYUDhvSmI1SlBZYVJ3YmpRTTJlMFZNTDAxbmZOaXdVMDBsNWJ2cjZYbXZnOGN6ODBpTlF3SWtKVE1fZFFyUjBZdm4zMkp5aS11MWliaHQzMFVLVVduQjZUdldDeGpmUTRUZ29jdHluMmZwMFlVQXZrYlprMEMyRTU4LWVtcDI5YUNDVGpKWDJKb3V0bU1rRmQ5NXVzMDdWNHRoa1U0a0xXaTUxSWJLME1ZcC1EN3c?hl=en-US&gl=US&ceid=US%3Aen
+              - text: ‘Like Bitcoin In 2013’—Sudden 1,000% Price Surge Has Billionaires Betting On A Surprise $1.6 Trillion Crypto Flip
+          - figure [ref=e212]
+        - generic [ref=e213]:
+          - time [ref=e214]: 23 hours ago
+          - separator [ref=e215]
+          - generic [ref=e216]: By Billy Bambrough
+      - generic [ref=e217]:
+        - separator [ref=e219]
+        - generic [ref=e221]:
+          - generic [ref=e222]:
+            - link [ref=e224] [cursor=pointer]:
+              - /url: ./read/CBMiugFBVV95cUxQOHF6dzZTQXl0WnRHQ253S2dBYThlaURCOXpkYlFWZ3BsR25xN2ItSHZBSkdlOGQ2R1owN3ZEbEtxYWNsY1R6QnJVNEhnQXVOX3E1ZC1Bci0zSDdXLTFId01QZzBRajJXWGFxb3F1SWdDVUx2MGQyOHRYTXNjR3hZWGpRTkJSeXBUTWdxV1VhYktDRnA3UzB0alpmdU1uTU5HTlF0c1Foa1lHaXZZWnVOeWFDU1FqMHdEdEHSAb8BQVVfeXFMTWZwdFI3SWlWMHZRRk81UWNvRjZXbHU3NFpZeVlFVGl2T3VKcEIwaXpRRVNqcnVPVDc2c21mTzVDUlFGVDNWSTViLW03NmNMVnVkZWVnb2F1MEdzMUZXZUtfY1Z6RHZSMlF0S09MbG45UGxyVlQtQ0RBMHkxZFN4U2ZzalhpUmlrbm54VTk4VHJkMmFqeXE3QmZ6MVVpTU03REtqUXRUWnVMVGtMVTk2TldiSWVpQ0JhN0FsczI4dnc?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e226]:
+              - generic [ref=e227]:
+                - generic [ref=e230]: CNBC
+                - generic [ref=e234]:
+                  - generic:
+                    - button "More - Gemini surges after Winklevoss Capital Fund invests $100 million in the crypto exchange" [ref=e235] [cursor=pointer]:
+                      - img [ref=e237]
+                    - tooltip [ref=e239]: More
+              - link "Gemini surges after Winklevoss Capital Fund invests $100 million in the crypto exchange - CNBC - 13 hours ago - By Tanaya Macheel" [ref=e240] [cursor=pointer]:
+                - /url: ./read/CBMiugFBVV95cUxQOHF6dzZTQXl0WnRHQ253S2dBYThlaURCOXpkYlFWZ3BsR25xN2ItSHZBSkdlOGQ2R1owN3ZEbEtxYWNsY1R6QnJVNEhnQXVOX3E1ZC1Bci0zSDdXLTFId01QZzBRajJXWGFxb3F1SWdDVUx2MGQyOHRYTXNjR3hZWGpRTkJSeXBUTWdxV1VhYktDRnA3UzB0alpmdU1uTU5HTlF0c1Foa1lHaXZZWnVOeWFDU1FqMHdEdEHSAb8BQVVfeXFMTWZwdFI3SWlWMHZRRk81UWNvRjZXbHU3NFpZeVlFVGl2T3VKcEIwaXpRRVNqcnVPVDc2c21mTzVDUlFGVDNWSTViLW03NmNMVnVkZWVnb2F1MEdzMUZXZUtfY1Z6RHZSMlF0S09MbG45UGxyVlQtQ0RBMHkxZFN4U2ZzalhpUmlrbm54VTk4VHJkMmFqeXE3QmZ6MVVpTU03REtqUXRUWnVMVGtMVTk2TldiSWVpQ0JhN0FsczI4dnc?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Gemini surges after Winklevoss Capital Fund invests $100 million in the crypto exchange
+            - figure [ref=e241]
+          - generic [ref=e242]:
+            - time [ref=e243]: 13 hours ago
+            - separator [ref=e244]
+            - generic [ref=e245]: By Tanaya Macheel
+      - generic [ref=e246]:
+        - separator [ref=e248]
+        - generic [ref=e250]:
+          - generic [ref=e251]:
+            - link [ref=e253] [cursor=pointer]:
+              - /url: ./read/CBMif0FVX3lxTE9jd2cwdGdaNVk0NEZuZWdMeFY2c1NabkVnTHlJRzA5M3ZHWWxDX1c4S2VOaGVaZlJJVW54bHZoRjMtQmIyTmxTajdNWlI3WHlTRHFiYl9jdS03WjBqdzdReEcyVENkRk9NTjNscGdDNllSeVgwRkFzZW9RdWdEQU0?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e255]:
+              - generic [ref=e256]:
+                - generic [ref=e259]: The Block
+                - generic [ref=e263]:
+                  - generic:
+                    - button "More - JPMorgan says ether and altcoins could keep underperforming bitcoin without stronger activity" [ref=e264] [cursor=pointer]:
+                      - img [ref=e266]
+                    - tooltip [ref=e268]: More
+              - link "JPMorgan says ether and altcoins could keep underperforming bitcoin without stronger activity - The Block - 18 hours ago - By Yogita Khatri" [ref=e269] [cursor=pointer]:
+                - /url: ./read/CBMif0FVX3lxTE9jd2cwdGdaNVk0NEZuZWdMeFY2c1NabkVnTHlJRzA5M3ZHWWxDX1c4S2VOaGVaZlJJVW54bHZoRjMtQmIyTmxTajdNWlI3WHlTRHFiYl9jdS03WjBqdzdReEcyVENkRk9NTjNscGdDNllSeVgwRkFzZW9RdWdEQU0?hl=en-US&gl=US&ceid=US%3Aen
+                - text: JPMorgan says ether and altcoins could keep underperforming bitcoin without stronger activity
+            - figure [ref=e270]
+          - generic [ref=e271]:
+            - time [ref=e272]: 18 hours ago
+            - separator [ref=e273]
+            - generic [ref=e274]: By Yogita Khatri
+      - generic [ref=e275]:
+        - separator [ref=e277]
+        - generic [ref=e279]:
+          - generic [ref=e280]:
+            - link [ref=e282] [cursor=pointer]:
+              - /url: ./read/CBMiiwFBVV95cUxNZ2pDMGhkbkZVTTh3UEdzU1BRcnNVekNjX3BqLWpKUWVSbDZCTm50Yi1KN3JrQzJWbEItM1VXeHVVcDd6RjZoem1wblNnS0oxVkxiUHRHbUlmY2lNOGE5Q1BkOFJ2SDVmdVdiUno2ZThYbWVPY2U4MXpGVHB6QWMyTV9ZNjRvVEpzYjJr0gGTAUFVX3lxTFBoWHlYYkpnMW9KdXhqZ19US1JBanFKZzlyaldHQVF4em5zWDgtWUQ1QjBMaHZvc2RxTDhwS1g3dzh3NEEwbnhpS3ktRUhiZE9xNVlJVkx1aWZoR0xwRzZWUXlmTmJRMm40RzFoWDFxak40LWFSSlVvR2ZjUTFEQzRpNk50V3VMQWtLamhoanJSb0I0UQ?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e284]:
+              - generic [ref=e285]:
+                - generic [ref=e288]: Decrypt
+                - generic [ref=e292]:
+                  - generic:
+                    - button "More - Kraken to Migrate Wrapped Bitcoin Tech to Chainlink as LayerZero Exodus Expands" [ref=e293] [cursor=pointer]:
+                      - img [ref=e295]
+                    - tooltip [ref=e297]: More
+              - link "Kraken to Migrate Wrapped Bitcoin Tech to Chainlink as LayerZero Exodus Expands - Decrypt - 17 hours ago - By Logan Hitchcock" [ref=e298] [cursor=pointer]:
+                - /url: ./read/CBMiiwFBVV95cUxNZ2pDMGhkbkZVTTh3UEdzU1BRcnNVekNjX3BqLWpKUWVSbDZCTm50Yi1KN3JrQzJWbEItM1VXeHVVcDd6RjZoem1wblNnS0oxVkxiUHRHbUlmY2lNOGE5Q1BkOFJ2SDVmdVdiUno2ZThYbWVPY2U4MXpGVHB6QWMyTV9ZNjRvVEpzYjJr0gGTAUFVX3lxTFBoWHlYYkpnMW9KdXhqZ19US1JBanFKZzlyaldHQVF4em5zWDgtWUQ1QjBMaHZvc2RxTDhwS1g3dzh3NEEwbnhpS3ktRUhiZE9xNVlJVkx1aWZoR0xwRzZWUXlmTmJRMm40RzFoWDFxak40LWFSSlVvR2ZjUTFEQzRpNk50V3VMQWtLamhoanJSb0I0UQ?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Kraken to Migrate Wrapped Bitcoin Tech to Chainlink as LayerZero Exodus Expands
+            - figure [ref=e299]
+          - generic [ref=e300]:
+            - time [ref=e301]: 17 hours ago
+            - separator [ref=e302]
+            - generic [ref=e303]: By Logan Hitchcock
+      - generic [ref=e304]:
+        - separator [ref=e306]
+        - generic [ref=e308]:
+          - generic [ref=e309]:
+            - link [ref=e311] [cursor=pointer]:
+              - /url: ./read/CBMilgFBVV95cUxOZWZ1OUxsVXBUdnJYQTFpdWZ0cmQwT3ZWYTBQV0RNSHNjdG9pWHJUX2pDZ0dZV1VGbEpkeFZFQUx1bmJKcXVEdVBrTURLMVlqWlN6bEpvSVctOHR3ZFM0Q01DaDZwNTA4bFRiMGMtWVpxeV9ndWV1emFRNE1BMjd0azNpSkFpYkRVbEhhZlB6RnNjV1RtQnc?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e313]:
+              - generic [ref=e314]:
+                - generic [ref=e317]: thestreet.com
+                - generic [ref=e321]:
+                  - generic:
+                    - button "More - JPMorgan sees one clear winner in crypto right now" [ref=e322] [cursor=pointer]:
+                      - img [ref=e324]
+                    - tooltip [ref=e326]: More
+              - link "JPMorgan sees one clear winner in crypto right now - thestreet.com - 15 hours ago" [ref=e327] [cursor=pointer]:
+                - /url: ./read/CBMilgFBVV95cUxOZWZ1OUxsVXBUdnJYQTFpdWZ0cmQwT3ZWYTBQV0RNSHNjdG9pWHJUX2pDZ0dZV1VGbEpkeFZFQUx1bmJKcXVEdVBrTURLMVlqWlN6bEpvSVctOHR3ZFM0Q01DaDZwNTA4bFRiMGMtWVpxeV9ndWV1emFRNE1BMjd0azNpSkFpYkRVbEhhZlB6RnNjV1RtQnc?hl=en-US&gl=US&ceid=US%3Aen
+                - text: JPMorgan sees one clear winner in crypto right now
+            - figure [ref=e328]
+          - time [ref=e330]: 15 hours ago
+      - generic [ref=e331]:
+        - separator [ref=e333]
+        - generic [ref=e335]:
+          - generic [ref=e336]:
+            - link [ref=e338] [cursor=pointer]:
+              - /url: ./read/CBMinwFBVV95cUxOa3N0TTdBcG16VTdIVWZUblJoSUhGVkFnUkN3enN6X3ZFS2lGVFFKWGUwaUxRTGVHLUlSWXkwaDNRVlh1cHQ0WE93QmZkTW1KSlllajVEM1NpX1NjeVhUcmFJdC1lbWtqNmp1VndrOGZNeG13enVtQ0dtemFrRGVPWHU0czVTYWoyZ19yUzFFMnB1a3l0bTh3SmpucS1vemM?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e340]:
+              - generic [ref=e341]:
+                - generic [ref=e344]: 24/7 Wall St.
+                - generic [ref=e348]:
+                  - generic:
+                    - button "More - Where Will Bitcoin Be in 5 Years? BTC Forecast for 2031" [ref=e349] [cursor=pointer]:
+                      - img [ref=e351]
+                    - tooltip [ref=e353]: More
+              - link "Where Will Bitcoin Be in 5 Years? BTC Forecast for 2031 - 24/7 Wall St. - Yesterday - By Sam Daodu" [ref=e354] [cursor=pointer]:
+                - /url: ./read/CBMinwFBVV95cUxOa3N0TTdBcG16VTdIVWZUblJoSUhGVkFnUkN3enN6X3ZFS2lGVFFKWGUwaUxRTGVHLUlSWXkwaDNRVlh1cHQ0WE93QmZkTW1KSlllajVEM1NpX1NjeVhUcmFJdC1lbWtqNmp1VndrOGZNeG13enVtQ0dtemFrRGVPWHU0czVTYWoyZ19yUzFFMnB1a3l0bTh3SmpucS1vemM?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Where Will Bitcoin Be in 5 Years? BTC Forecast for 2031
+            - figure [ref=e355]
+          - generic [ref=e356]:
+            - time [ref=e357]: Yesterday
+            - separator [ref=e358]
+            - generic [ref=e359]: By Sam Daodu
+      - generic [ref=e360]:
+        - separator [ref=e362]
+        - generic [ref=e364]:
+          - generic [ref=e365]:
+            - link [ref=e367] [cursor=pointer]:
+              - /url: ./read/CBMiZ0FVX3lxTE90QTZ3OGFUaU9tcUFGSXFZSXREUm9hVVZGWVBwTVVObHBKaFpmc0FuY2VWNGpNMlpabUNsN1U1eUtqZWN3S19BZkc1NlZreFc3ekMxcGtwNWx5NV91X2tjY3hIS2V0YVE?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e369]:
+              - generic [ref=e370]:
+                - generic [ref=e373]: Fortune
+                - generic [ref=e377]:
+                  - generic:
+                    - button "More - Current price of Bitcoin for May 13, 2026" [ref=e378] [cursor=pointer]:
+                      - img [ref=e380]
+                    - tooltip [ref=e382]: More
+              - link "Current price of Bitcoin for May 13, 2026 - Fortune - 2 days ago - By Joseph Hostetler" [ref=e383] [cursor=pointer]:
+                - /url: ./read/CBMiZ0FVX3lxTE90QTZ3OGFUaU9tcUFGSXFZSXREUm9hVVZGWVBwTVVObHBKaFpmc0FuY2VWNGpNMlpabUNsN1U1eUtqZWN3S19BZkc1NlZreFc3ekMxcGtwNWx5NV91X2tjY3hIS2V0YVE?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Current price of Bitcoin for May 13, 2026
+            - figure [ref=e384]
+          - generic [ref=e385]:
+            - time [ref=e386]: 2 days ago
+            - separator [ref=e387]
+            - generic [ref=e388]: By Joseph Hostetler
+      - generic [ref=e389]:
+        - separator [ref=e391]
+        - generic [ref=e393]:
+          - generic [ref=e394]:
+            - link [ref=e396] [cursor=pointer]:
+              - /url: ./read/CBMivgFBVV95cUxPSm9pUzdSOGQ0ZUEyVXZicG5MY1NLVEdPQjE0Ymh2Q2FTdG9FeWVjd1U4WDNRTHJFQkZ1RUtXMHgzVXJMZlZoUy1NRTdaMmoxVkZmYi0xQlN2QVhRYXNKSC0xMm5aOFU3WlA3REpELTlZYnZibXdMcm44alUxZ3VIaGtlV2ozbU1fTE9wUXNCamxrLVZOaEdVTE9NRmhNSWJ4VEx6SmxQT3YxNkVoZWhwdnFlN3BKd1p4cklUaEVB?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e398]:
+              - generic [ref=e399]:
+                - generic [ref=e402]: MarketWatch
+                - generic [ref=e406]:
+                  - generic:
+                    - button "More - The ‘godfather of crypto’ predicts $1 million bitcoin, but it’s going to fall first" [ref=e407] [cursor=pointer]:
+                      - img [ref=e409]
+                    - tooltip [ref=e411]: More
+              - link "The ‘godfather of crypto’ predicts $1 million bitcoin, but it’s going to fall first - MarketWatch - 3 days ago" [ref=e412] [cursor=pointer]:
+                - /url: ./read/CBMivgFBVV95cUxPSm9pUzdSOGQ0ZUEyVXZicG5MY1NLVEdPQjE0Ymh2Q2FTdG9FeWVjd1U4WDNRTHJFQkZ1RUtXMHgzVXJMZlZoUy1NRTdaMmoxVkZmYi0xQlN2QVhRYXNKSC0xMm5aOFU3WlA3REpELTlZYnZibXdMcm44alUxZ3VIaGtlV2ozbU1fTE9wUXNCamxrLVZOaEdVTE9NRmhNSWJ4VEx6SmxQT3YxNkVoZWhwdnFlN3BKd1p4cklUaEVB?hl=en-US&gl=US&ceid=US%3Aen
+                - text: The ‘godfather of crypto’ predicts $1 million bitcoin, but it’s going to fall first
+            - figure [ref=e413]
+          - time [ref=e415]: 3 days ago
+      - generic [ref=e416]:
+        - separator [ref=e418]
+        - generic [ref=e420]:
+          - generic [ref=e421]:
+            - link [ref=e423] [cursor=pointer]:
+              - /url: ./read/CBMisgFBVV95cUxQQ0R6bHpLU2dCNWJXWEQyRnd0ZlVmY3FGVFRWZVVtT0FITGJqeDc3V0lMbjdEV2w4RnVLeXhxUmt4eFBqbll3SE5XN2dEcTJrbG1na0ExbFhwYnNoUTA4SDNmLXBLVm1VZUtyd1hlR2VTdHVGOVNUMW9oSmI2NVE1X0JSNHlvbUl6dmlENGlSUVZob21QN0xKZjVGQzhHbDk2b0EwcnBodXZMS2ZHN1loNEFB0gG3AUFVX3lxTFBUdjVSeGtZdWp2dEEtV1RVeWh0NmpnNGVZZGJHX2pzdy1jc2NmZ2JneHRTaWpsR3N2N20yUnp3ckhMbE9XT2Mtd19jWTVlbTBUaGpEWnRYVFBWNEl6MF85TVNMNkY5d0tFczNPUGNodkVqek9tTWtXVV96YXVsNEtVQk53Vi1ITjlIWm55ZVJyRGdQMnd4OElHNEIwTGRVUmVJT0c3ODFsczQwX3dkSnBoLWdLZWltVQ?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e425]:
+              - generic [ref=e426]:
+                - generic [ref=e429]: Coinpedia
+                - generic [ref=e433]:
+                  - generic:
+                    - button "More - XRP Leads Major Altcoins Higher as CLARITY Act Triggers Payment-Focused Crypto Rally" [ref=e434] [cursor=pointer]:
+                      - img [ref=e436]
+                    - tooltip [ref=e438]: More
+              - link "XRP Leads Major Altcoins Higher as CLARITY Act Triggers Payment-Focused Crypto Rally - Coinpedia - 9 hours ago - By Anjali Belgaumkar" [ref=e439] [cursor=pointer]:
+                - /url: ./read/CBMisgFBVV95cUxQQ0R6bHpLU2dCNWJXWEQyRnd0ZlVmY3FGVFRWZVVtT0FITGJqeDc3V0lMbjdEV2w4RnVLeXhxUmt4eFBqbll3SE5XN2dEcTJrbG1na0ExbFhwYnNoUTA4SDNmLXBLVm1VZUtyd1hlR2VTdHVGOVNUMW9oSmI2NVE1X0JSNHlvbUl6dmlENGlSUVZob21QN0xKZjVGQzhHbDk2b0EwcnBodXZMS2ZHN1loNEFB0gG3AUFVX3lxTFBUdjVSeGtZdWp2dEEtV1RVeWh0NmpnNGVZZGJHX2pzdy1jc2NmZ2JneHRTaWpsR3N2N20yUnp3ckhMbE9XT2Mtd19jWTVlbTBUaGpEWnRYVFBWNEl6MF85TVNMNkY5d0tFczNPUGNodkVqek9tTWtXVV96YXVsNEtVQk53Vi1ITjlIWm55ZVJyRGdQMnd4OElHNEIwTGRVUmVJT0c3ODFsczQwX3dkSnBoLWdLZWltVQ?hl=en-US&gl=US&ceid=US%3Aen
+                - text: XRP Leads Major Altcoins Higher as CLARITY Act Triggers Payment-Focused Crypto Rally
+            - figure [ref=e440]
+          - generic [ref=e441]:
+            - time [ref=e442]: 9 hours ago
+            - separator [ref=e443]
+            - generic [ref=e444]: By Anjali Belgaumkar
+      - generic [ref=e445]:
+        - separator [ref=e447]
+        - generic [ref=e449]:
+          - generic [ref=e450]:
+            - link [ref=e452] [cursor=pointer]:
+              - /url: ./read/CBMiwgFBVV95cUxOaEYyeDNLTy1VN3p6dGZSS0lGSU9SbHZId09kM1ZGWWRWY2NFRzR4aWNjYnRtSzYzSFQ0eUZrQW94UHg5TnRJOWJJbWxpcU1ES1lrdkpySG4xVHR0azFBVnRHMTA5ZlZiLW8zV0Y4RVZiZ1g2THJ1cTR3cEdSdk1HV1Zac1o2RlktMGRpVWE0UWJiMWZQSTlad0c3N3ZGT2ZHc3Z2S1BuMHNMOU50V0U4NFc1OGJ3bW4tNVdsUUpRT0JBQQ?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e454]:
+              - generic [ref=e455]:
+                - generic [ref=e458]: CoinDesk
+                - generic [ref=e462]:
+                  - generic:
+                    - button "More - Bitcoin hits $82,000, Coinbase leads crypto stock gains as Clarity Act advances" [ref=e463] [cursor=pointer]:
+                      - img [ref=e465]
+                    - tooltip [ref=e467]: More
+              - link "Bitcoin hits $82,000, Coinbase leads crypto stock gains as Clarity Act advances - CoinDesk - 18 hours ago - By Krisztian Sandor" [ref=e468] [cursor=pointer]:
+                - /url: ./read/CBMiwgFBVV95cUxOaEYyeDNLTy1VN3p6dGZSS0lGSU9SbHZId09kM1ZGWWRWY2NFRzR4aWNjYnRtSzYzSFQ0eUZrQW94UHg5TnRJOWJJbWxpcU1ES1lrdkpySG4xVHR0azFBVnRHMTA5ZlZiLW8zV0Y4RVZiZ1g2THJ1cTR3cEdSdk1HV1Zac1o2RlktMGRpVWE0UWJiMWZQSTlad0c3N3ZGT2ZHc3Z2S1BuMHNMOU50V0U4NFc1OGJ3bW4tNVdsUUpRT0JBQQ?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Bitcoin hits $82,000, Coinbase leads crypto stock gains as Clarity Act advances
+            - figure [ref=e469]
+          - generic [ref=e470]:
+            - time [ref=e471]: 18 hours ago
+            - separator [ref=e472]
+            - generic [ref=e473]: By Krisztian Sandor
+      - generic [ref=e474]:
+        - separator [ref=e476]
+        - generic [ref=e478]:
+          - generic [ref=e479]:
+            - link [ref=e481] [cursor=pointer]:
+              - /url: ./read/CBMimwFBVV95cUxOWDM1YTN0Q3lDbERBdW9ESVFwTzZHc2E3Qk1SWDZNZ1pqVHdIOXMwSFVfcWxfVDFQMk9xdFJfbEttekFoQWJpSFFaU3FZb3BZdExxc2FUaHlvNjhWRzYxMUcxOU5GOGhWSXVDZW02ZU1lQnZyclBERU81WGtzWHo0QlhZTzZMM3d6TTZvQ3ltRVVUWHF6N2JHaG5QSQ?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e483]:
+              - generic [ref=e484]:
+                - generic [ref=e487]: Yahoo Finance
+                - generic [ref=e491]:
+                  - generic:
+                    - button "More - Best Cryptocurrencies to Buy in 2026" [ref=e492] [cursor=pointer]:
+                      - img [ref=e494]
+                    - tooltip [ref=e496]: More
+              - link "Best Cryptocurrencies to Buy in 2026 - Yahoo Finance - 1 hour ago - By Dominic Basulto" [ref=e497] [cursor=pointer]:
+                - /url: ./read/CBMimwFBVV95cUxOWDM1YTN0Q3lDbERBdW9ESVFwTzZHc2E3Qk1SWDZNZ1pqVHdIOXMwSFVfcWxfVDFQMk9xdFJfbEttekFoQWJpSFFaU3FZb3BZdExxc2FUaHlvNjhWRzYxMUcxOU5GOGhWSXVDZW02ZU1lQnZyclBERU81WGtzWHo0QlhZTzZMM3d6TTZvQ3ltRVVUWHF6N2JHaG5QSQ?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Best Cryptocurrencies to Buy in 2026
+            - figure [ref=e498]
+          - generic [ref=e499]:
+            - time [ref=e500]: 1 hour ago
+            - separator [ref=e501]
+            - generic [ref=e502]: By Dominic Basulto
+      - generic [ref=e503]:
+        - separator [ref=e505]
+        - generic [ref=e507]:
+          - generic [ref=e508]:
+            - link [ref=e510] [cursor=pointer]:
+              - /url: ./read/CBMihwFBVV95cUxPLS13Z29idEcxNEVOMHV1Vkk0eVNLZGliRExwZmtuUzBLZjY4dnNsRWlvWWRwZ3g1d19Lc0lHaVl5ZkdtWmV2NUx5bWRhTUlxc0htbnllTDU1ZjV3UmVDVVFaZTBJQ0FvRHdYY0toRFY2Q05TMnc2ZXp2bFpycHR3anlpVVEtNVE?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e512]:
+              - generic [ref=e513]:
+                - generic [ref=e516]: Forbes
+                - generic [ref=e520]:
+                  - generic:
+                    - button "More - Top 10 Cryptocurrencies Of May 13, 2026" [ref=e521] [cursor=pointer]:
+                      - img [ref=e523]
+                    - tooltip [ref=e525]: More
+              - link "Top 10 Cryptocurrencies Of May 13, 2026 - Forbes - 19 hours ago - By Farran Powell" [ref=e526] [cursor=pointer]:
+                - /url: ./read/CBMihwFBVV95cUxPLS13Z29idEcxNEVOMHV1Vkk0eVNLZGliRExwZmtuUzBLZjY4dnNsRWlvWWRwZ3g1d19Lc0lHaVl5ZkdtWmV2NUx5bWRhTUlxc0htbnllTDU1ZjV3UmVDVVFaZTBJQ0FvRHdYY0toRFY2Q05TMnc2ZXp2bFpycHR3anlpVVEtNVE?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Top 10 Cryptocurrencies Of May 13, 2026
+            - figure [ref=e527]
+          - generic [ref=e528]:
+            - time [ref=e529]: 19 hours ago
+            - separator [ref=e530]
+            - generic [ref=e531]: By Farran Powell
+      - generic [ref=e532]:
+        - separator [ref=e534]
+        - generic [ref=e536]:
+          - generic [ref=e537]:
+            - link [ref=e539] [cursor=pointer]:
+              - /url: ./read/CBMiowFBVV95cUxPdWpldHNmb21MNjN5SWpJYjVSbGRDc2pzN3BqYThDMXNaSVg3d2Z4UEh5VEdTLUhzTm0tdVE0UU5lSUdqLXNtNGtITTV6R2tVbkljbnQ0aC1La25lYVU3Y2wxWU93bnM2ZzVkWG9yaE1Jb3NmZmVIazVVSkEzV01EbkROcUJ0b1hvYUMxV3JnMVNyd0ZzangwWHZlajhlUVNIQjdN?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e541]:
+              - generic [ref=e542]:
+                - generic [ref=e545]: PYMNTS.com
+                - generic [ref=e549]:
+                  - generic:
+                    - button "More - Crypto Token ZCash Attracts Nostalgic Bitcoin Enthusiasts" [ref=e550] [cursor=pointer]:
+                      - img [ref=e552]
+                    - tooltip [ref=e554]: More
+              - link "Crypto Token ZCash Attracts Nostalgic Bitcoin Enthusiasts - PYMNTS.com - 20 hours ago" [ref=e555] [cursor=pointer]:
+                - /url: ./read/CBMiowFBVV95cUxPdWpldHNmb21MNjN5SWpJYjVSbGRDc2pzN3BqYThDMXNaSVg3d2Z4UEh5VEdTLUhzTm0tdVE0UU5lSUdqLXNtNGtITTV6R2tVbkljbnQ0aC1La25lYVU3Y2wxWU93bnM2ZzVkWG9yaE1Jb3NmZmVIazVVSkEzV01EbkROcUJ0b1hvYUMxV3JnMVNyd0ZzangwWHZlajhlUVNIQjdN?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Crypto Token ZCash Attracts Nostalgic Bitcoin Enthusiasts
+            - figure [ref=e556]
+          - time [ref=e558]: 20 hours ago
+      - generic [ref=e559]:
+        - separator [ref=e561]
+        - generic [ref=e563]:
+          - generic [ref=e564]:
+            - link [ref=e566] [cursor=pointer]:
+              - /url: ./read/CBMitAFBVV95cUxNZC1SeEprTUhSSUZvUzNUOXlWLWJwQUk1TV9QeDM0SHlyVERkdUtjTWhRb2F3alVjbG05OVVhNUZ3aXRQdlVObnhaRXZjSXBBRllYb0lmM291UVo3RXVyeXhEVER0UXhIbnVHa3k4Y0JKeUlTVmNudURuOWRCYTU5VzJPY2RZODlRbl9OcDRnQkI4TEsxTXc5dlN4eDdkdDZWejFUd0x3a1FlZnFHVWpaWU5yZ3g?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e568]:
+              - generic [ref=e569]:
+                - generic [ref=e572]: Bloomberg.com
+                - generic [ref=e576]:
+                  - generic:
+                    - button "More - Bitcoin Tops $80,000 as Crypto Market Regulation Bill Advances" [ref=e577] [cursor=pointer]:
+                      - img [ref=e579]
+                    - tooltip [ref=e581]: More
+              - link "Bitcoin Tops $80,000 as Crypto Market Regulation Bill Advances - Bloomberg.com - 17 hours ago - By Olga Kharif & Vildana Hajric" [ref=e582] [cursor=pointer]:
+                - /url: ./read/CBMitAFBVV95cUxNZC1SeEprTUhSSUZvUzNUOXlWLWJwQUk1TV9QeDM0SHlyVERkdUtjTWhRb2F3alVjbG05OVVhNUZ3aXRQdlVObnhaRXZjSXBBRllYb0lmM291UVo3RXVyeXhEVER0UXhIbnVHa3k4Y0JKeUlTVmNudURuOWRCYTU5VzJPY2RZODlRbl9OcDRnQkI4TEsxTXc5dlN4eDdkdDZWejFUd0x3a1FlZnFHVWpaWU5yZ3g?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Bitcoin Tops $80,000 as Crypto Market Regulation Bill Advances
+            - figure [ref=e583]
+          - generic [ref=e584]:
+            - time [ref=e585]: 17 hours ago
+            - separator [ref=e586]
+            - generic [ref=e587]: By Olga Kharif & Vildana Hajric
+      - generic [ref=e588]:
+        - separator [ref=e590]
+        - generic [ref=e592]:
+          - generic [ref=e593]:
+            - link [ref=e595] [cursor=pointer]:
+              - /url: ./read/CBMijAFBVV95cUxOYS1SSzJNN2stM2xVRjFWSGRGbjNVb3dzbUQ2eTJoWENfTDM3NWFTRnhlMkJRbG9lRjZBcDdhSUZZcHNKdjhLQkQwa3RMR3RoSUpKYWkwenRDc2RCZXlwcHl3aVlCYzRjNFhIUUswbC1GS0g5UkpOYTNsaEpHWXFxMmFxZzduQWNscE1mVA?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e597]:
+              - generic [ref=e598]:
+                - generic [ref=e601]: The New York Times
+                - generic [ref=e605]:
+                  - generic:
+                    - button "More - Crypto Industry Is Pushing a Bill to Tilt Regulation in Its Favor" [ref=e606] [cursor=pointer]:
+                      - img [ref=e608]
+                    - tooltip [ref=e610]: More
+              - link "Crypto Industry Is Pushing a Bill to Tilt Regulation in Its Favor - The New York Times - Yesterday - By David Yaffe-Bellany" [ref=e611] [cursor=pointer]:
+                - /url: ./read/CBMijAFBVV95cUxOYS1SSzJNN2stM2xVRjFWSGRGbjNVb3dzbUQ2eTJoWENfTDM3NWFTRnhlMkJRbG9lRjZBcDdhSUZZcHNKdjhLQkQwa3RMR3RoSUpKYWkwenRDc2RCZXlwcHl3aVlCYzRjNFhIUUswbC1GS0g5UkpOYTNsaEpHWXFxMmFxZzduQWNscE1mVA?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Crypto Industry Is Pushing a Bill to Tilt Regulation in Its Favor
+            - figure [ref=e612]
+          - generic [ref=e613]:
+            - time [ref=e614]: Yesterday
+            - separator [ref=e615]
+            - generic [ref=e616]: By David Yaffe-Bellany
+      - generic [ref=e617]:
+        - separator [ref=e619]
+        - generic [ref=e621]:
+          - generic [ref=e622]:
+            - link [ref=e624] [cursor=pointer]:
+              - /url: ./read/CBMi4wFBVV95cUxQdmlwVHhYeW9WWmdObWl1QmJoemFrTnRZckpwcWpZU3c3NlpxRng2am0xTkU4aWdTVnBuVXd6eG5fd3BJU081VUxZa0hyTmRoakx3TUloWmRQX0x5Z3E0bFhselRmeXB6XzRFdnVwSnRUYVhRSmlxUEx6S3dBamtDX3ZXRTF5MFh3TFVtMHBublpxVFVKU1ppblNzSmtuN0s0Sjh3cF81R2NGYWtRdzZYbzB0Vk13UzFXLXZoODhiVzdsUDNUX1hfNDBvX0hDSkpPcy00SDktalhDSGJpSUJ2U2NtNA?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e626]:
+              - generic [ref=e627]:
+                - generic [ref=e630]: Finance Magnates
+                - generic [ref=e634]:
+                  - generic:
+                    - button "More - Why Is Crypto Going Up? Clarity Act Pushes XRP Price to 2-Month High as Bitcoin, Dogecoin and Ethereum Follow" [ref=e635] [cursor=pointer]:
+                      - img [ref=e637]
+                    - tooltip [ref=e639]: More
+              - link "Why Is Crypto Going Up? Clarity Act Pushes XRP Price to 2-Month High as Bitcoin, Dogecoin and Ethereum Follow - Finance Magnates - 4 hours ago" [ref=e640] [cursor=pointer]:
+                - /url: ./read/CBMi4wFBVV95cUxQdmlwVHhYeW9WWmdObWl1QmJoemFrTnRZckpwcWpZU3c3NlpxRng2am0xTkU4aWdTVnBuVXd6eG5fd3BJU081VUxZa0hyTmRoakx3TUloWmRQX0x5Z3E0bFhselRmeXB6XzRFdnVwSnRUYVhRSmlxUEx6S3dBamtDX3ZXRTF5MFh3TFVtMHBublpxVFVKU1ppblNzSmtuN0s0Sjh3cF81R2NGYWtRdzZYbzB0Vk13UzFXLXZoODhiVzdsUDNUX1hfNDBvX0hDSkpPcy00SDktalhDSGJpSUJ2U2NtNA?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Why Is Crypto Going Up? Clarity Act Pushes XRP Price to 2-Month High as Bitcoin, Dogecoin and Ethereum Follow
+            - figure [ref=e641]
+          - time [ref=e643]: 4 hours ago
+      - generic [ref=e644]:
+        - separator [ref=e646]
+        - generic [ref=e648]:
+          - generic [ref=e649]:
+            - link [ref=e651] [cursor=pointer]:
+              - /url: ./read/CBMimgFBVV95cUxPWUtfUmpTZ3R2WTN4NFg4UUk0MThLbVl1bG4xcS1iM04yRHlUT0NGT2VSLUFlRTVKT3FFR3dNeUNDYUZndkJicUc0eGRaUG42TWhjLTJaeTk3STV0QjBzUjNQTWlTY0RaOHp0cUhSeFF3UXpVaS1kYmd6MzBVTkx5LW43Tlk1NHN2UU8tcnpQQy1HMmlPOXlmYmln?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e653]:
+              - generic [ref=e654]:
+                - generic [ref=e657]: Mother Jones
+                - generic [ref=e661]:
+                  - generic:
+                    - button "More - How Crypto Billionaires Are Trying to Buy a Senate Seat in Alabama" [ref=e662] [cursor=pointer]:
+                      - img [ref=e664]
+                    - tooltip [ref=e666]: More
+              - link "How Crypto Billionaires Are Trying to Buy a Senate Seat in Alabama - Mother Jones - 14 hours ago - By Noah Lanard" [ref=e667] [cursor=pointer]:
+                - /url: ./read/CBMimgFBVV95cUxPWUtfUmpTZ3R2WTN4NFg4UUk0MThLbVl1bG4xcS1iM04yRHlUT0NGT2VSLUFlRTVKT3FFR3dNeUNDYUZndkJicUc0eGRaUG42TWhjLTJaeTk3STV0QjBzUjNQTWlTY0RaOHp0cUhSeFF3UXpVaS1kYmd6MzBVTkx5LW43Tlk1NHN2UU8tcnpQQy1HMmlPOXlmYmln?hl=en-US&gl=US&ceid=US%3Aen
+                - text: How Crypto Billionaires Are Trying to Buy a Senate Seat in Alabama
+            - figure [ref=e668]
+          - generic [ref=e669]:
+            - time [ref=e670]: 14 hours ago
+            - separator [ref=e671]
+            - generic [ref=e672]: By Noah Lanard
+      - generic [ref=e673]:
+        - separator [ref=e675]
+        - generic [ref=e677]:
+          - generic [ref=e678]:
+            - link [ref=e680] [cursor=pointer]:
+              - /url: ./read/CBMijgFBVV95cUxQWlBxWU5fdzgxRHNGNTRLaXl0M19QZlNCdzhXMDlNalcwQVRNMkN4Tl9TbVZkdndIaGRwbWpiNDJBQWdJN2ZuUXIzaUYxdzBZcnhfbFZ2NUJaNXBVRV9obEw1V1J5VTZyNWxPbFl4Z2xsZDBQeHU3Sk9NMFNSZFAwUTV1RElLWHh4dktMM2t3?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e682]:
+              - generic [ref=e683]:
+                - generic [ref=e686]: Investopedia
+                - generic [ref=e690]:
+                  - generic:
+                    - button "More - 10 Important Cryptocurrencies Other Than Bitcoin" [ref=e691] [cursor=pointer]:
+                      - img [ref=e693]
+                    - tooltip [ref=e695]: More
+              - link "10 Important Cryptocurrencies Other Than Bitcoin - Investopedia - 2 days ago - By Adam Hayes" [ref=e696] [cursor=pointer]:
+                - /url: ./read/CBMijgFBVV95cUxQWlBxWU5fdzgxRHNGNTRLaXl0M19QZlNCdzhXMDlNalcwQVRNMkN4Tl9TbVZkdndIaGRwbWpiNDJBQWdJN2ZuUXIzaUYxdzBZcnhfbFZ2NUJaNXBVRV9obEw1V1J5VTZyNWxPbFl4Z2xsZDBQeHU3Sk9NMFNSZFAwUTV1RElLWHh4dktMM2t3?hl=en-US&gl=US&ceid=US%3Aen
+                - text: 10 Important Cryptocurrencies Other Than Bitcoin
+            - figure [ref=e697]
+          - generic [ref=e698]:
+            - time [ref=e699]: 2 days ago
+            - separator [ref=e700]
+            - generic [ref=e701]: By Adam Hayes
+      - generic [ref=e702]:
+        - separator [ref=e704]
+        - generic [ref=e706]:
+          - generic [ref=e707]:
+            - link [ref=e709] [cursor=pointer]:
+              - /url: ./read/CBMiZEFVX3lxTE9PU3pBdGY0NWJMSWFUTFRDUGx3RklNQlNENWdlQjBiNG9meUo5andqSHFER0lkNlhEaFVwOXpLYWZseVJ1YVZsU2Q4RzBWT1RoeUhTM19YaFljM2ZHcm5yMHYxTlc?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e711]:
+              - generic [ref=e712]:
+                - generic [ref=e715]: Investing News Network
+                - generic [ref=e719]:
+                  - generic:
+                    - 'button "More - Crypto Market Update: CLARITY Act Faces Over 100 Amendments Ahead of Vote" [ref=e720] [cursor=pointer]':
+                      - img [ref=e722]
+                    - tooltip [ref=e724]: More
+              - 'link "Crypto Market Update: CLARITY Act Faces Over 100 Amendments Ahead of Vote - Investing News Network - 3 days ago - By Giann Liguid" [ref=e725] [cursor=pointer]':
+                - /url: ./read/CBMiZEFVX3lxTE9PU3pBdGY0NWJMSWFUTFRDUGx3RklNQlNENWdlQjBiNG9meUo5andqSHFER0lkNlhEaFVwOXpLYWZseVJ1YVZsU2Q4RzBWT1RoeUhTM19YaFljM2ZHcm5yMHYxTlc?hl=en-US&gl=US&ceid=US%3Aen
+                - text: "Crypto Market Update: CLARITY Act Faces Over 100 Amendments Ahead of Vote"
+            - figure [ref=e726]
+          - generic [ref=e727]:
+            - time [ref=e728]: 3 days ago
+            - separator [ref=e729]
+            - generic [ref=e730]: By Giann Liguid
+      - generic [ref=e731]:
+        - separator [ref=e733]
+        - generic [ref=e735]:
+          - generic [ref=e736]:
+            - link [ref=e738] [cursor=pointer]:
+              - /url: ./read/CBMiygJBVV95cUxNRzloUk9PN1B5TmVFMFlBSEFCQ3RXVk1ZLVZjTldVa0lOVGZTYW5UR19qR1BBTll1SUJZLTkzeVl4X1V6R1M1Ulk4X2llLXgwU25XY2steVEta1VjQ05TV2xqc2QxTUhoRmlGSW1YczIyOVBNcmpZY3VadWxCTTJHX1N1T0U5NnNoZXZWM0VxVUt3TmRwUnFLQ0FzU0loMUc0WUtZamExNjdMNHZabG1xX2RPdkNwQUZxOTRuX2pXRlE4WWNXU19GQUp0Vk1MS2hoZUtDTDZMcGxWcW93c2VaNWJ4Wm51RldlcTMwSXhIdzdFT2NQdl9lYlFVNTNXNGs1dlJjYzZKSDVwdEE0blJhenRJWGdiVnc0UEQxUnBja25ibHNoR0RzelJaYnZXWUJSdV9zV3NOWXBIU0VqVS1DdVpFZ2dyb0dpNXfSAc8CQVVfeXFMUGdFeGlVQzZDSHczQ3kxZ0xSbllEVGJTWXRvM2pvRmVGZkRuLUhyU1pzY2lDSW9rVjhvZWlDOGswcHNqRWZveGlweE5vbUtaOGFGTGlQM0xuZEpjLWFaeVl0dWoyTmpLbkxxS3JxeEhQejBGMG9PWFY5ek9vNkU4TlZPVVlpbF9CRnM0TktPM0tITDdSbXowbWJuWVNLelNNc3JucjRZdjFEajRRNko3MGlWNXZJcUdEelZDR3FiWnBrVkE3VE9IT2E4a0VjRmczY2h5aFVWSEhjN0N5ZXk0VE5Vc3UydTRocVpSVDJpbGxJSGI4dWludmJJR3ZiNmJpbFdrRzZheTdNYURHSzM0UGROZHp6M0daRVlhSHdIMEdzdjZ0eTFCQzZWTTBMbGhvLVpoaC1oTjZ5VzJYbVd6MGEyVnFoLUFKTEY3SDdfbHc?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e740]:
+              - generic [ref=e741]:
+                - generic [ref=e744]: The Economic Times
+                - generic [ref=e748]:
+                  - generic:
+                    - button "More - Bitcoin price (BTC USD) surges above $82,000 after major US crypto bill clears senate committee vote - her" [ref=e749] [cursor=pointer]:
+                      - img [ref=e751]
+                    - tooltip [ref=e753]: More
+              - link "Bitcoin price (BTC USD) surges above $82,000 after major US crypto bill clears senate committee vote - her - The Economic Times - 11 hours ago - By Shreya Biswas" [ref=e754] [cursor=pointer]:
+                - /url: ./read/CBMiygJBVV95cUxNRzloUk9PN1B5TmVFMFlBSEFCQ3RXVk1ZLVZjTldVa0lOVGZTYW5UR19qR1BBTll1SUJZLTkzeVl4X1V6R1M1Ulk4X2llLXgwU25XY2steVEta1VjQ05TV2xqc2QxTUhoRmlGSW1YczIyOVBNcmpZY3VadWxCTTJHX1N1T0U5NnNoZXZWM0VxVUt3TmRwUnFLQ0FzU0loMUc0WUtZamExNjdMNHZabG1xX2RPdkNwQUZxOTRuX2pXRlE4WWNXU19GQUp0Vk1MS2hoZUtDTDZMcGxWcW93c2VaNWJ4Wm51RldlcTMwSXhIdzdFT2NQdl9lYlFVNTNXNGs1dlJjYzZKSDVwdEE0blJhenRJWGdiVnc0UEQxUnBja25ibHNoR0RzelJaYnZXWUJSdV9zV3NOWXBIU0VqVS1DdVpFZ2dyb0dpNXfSAc8CQVVfeXFMUGdFeGlVQzZDSHczQ3kxZ0xSbllEVGJTWXRvM2pvRmVGZkRuLUhyU1pzY2lDSW9rVjhvZWlDOGswcHNqRWZveGlweE5vbUtaOGFGTGlQM0xuZEpjLWFaeVl0dWoyTmpLbkxxS3JxeEhQejBGMG9PWFY5ek9vNkU4TlZPVVlpbF9CRnM0TktPM0tITDdSbXowbWJuWVNLelNNc3JucjRZdjFEajRRNko3MGlWNXZJcUdEelZDR3FiWnBrVkE3VE9IT2E4a0VjRmczY2h5aFVWSEhjN0N5ZXk0VE5Vc3UydTRocVpSVDJpbGxJSGI4dWludmJJR3ZiNmJpbFdrRzZheTdNYURHSzM0UGROZHp6M0daRVlhSHdIMEdzdjZ0eTFCQzZWTTBMbGhvLVpoaC1oTjZ5VzJYbVd6MGEyVnFoLUFKTEY3SDdfbHc?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Bitcoin price (BTC USD) surges above $82,000 after major US crypto bill clears senate committee vote - her
+            - figure [ref=e755]
+          - generic [ref=e756]:
+            - time [ref=e757]: 11 hours ago
+            - separator [ref=e758]
+            - generic [ref=e759]: By Shreya Biswas
+      - generic [ref=e760]:
+        - separator [ref=e762]
+        - generic [ref=e764]:
+          - generic [ref=e765]:
+            - link [ref=e767] [cursor=pointer]:
+              - /url: ./read/CBMi0wFBVV95cUxNNjlwMi1LTkd4UXBFMEVQc1VGdEJtUEJnUnFfQ1V2bFVxbGItT25FS0c5bUIxamJ6OEdoOGl3YWFkRm9fNVBDSjg4R3UyZDlTYTZrU01Tc0g4WENLbFlndnhYX1RFZW12alNWZ1VjbkhSN0hLdXFtY043YW9tMFNTV3EyMG9ucElxTnZrQjhsVnRSM2I1b2duSjB3QjVZSVAwdTFtWmNWOFJtLWxRSklMVl9HZW1mMEFUcVhpVVIweEZzRWVwdVdfUThsZWRaUG5ZVlRz?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e769]:
+              - generic [ref=e770]:
+                - generic [ref=e773]: Investing.com
+                - generic [ref=e777]:
+                  - generic:
+                    - button "More - Bitcoin rises past $80k on US regulatory progress; China, Iran uncertainty weighs" [ref=e778] [cursor=pointer]:
+                      - img [ref=e780]
+                    - tooltip [ref=e782]: More
+              - link "Bitcoin rises past $80k on US regulatory progress; China, Iran uncertainty weighs - Investing.com - 5 hours ago - By Ambar Warrick" [ref=e783] [cursor=pointer]:
+                - /url: ./read/CBMi0wFBVV95cUxNNjlwMi1LTkd4UXBFMEVQc1VGdEJtUEJnUnFfQ1V2bFVxbGItT25FS0c5bUIxamJ6OEdoOGl3YWFkRm9fNVBDSjg4R3UyZDlTYTZrU01Tc0g4WENLbFlndnhYX1RFZW12alNWZ1VjbkhSN0hLdXFtY043YW9tMFNTV3EyMG9ucElxTnZrQjhsVnRSM2I1b2duSjB3QjVZSVAwdTFtWmNWOFJtLWxRSklMVl9HZW1mMEFUcVhpVVIweEZzRWVwdVdfUThsZWRaUG5ZVlRz?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Bitcoin rises past $80k on US regulatory progress; China, Iran uncertainty weighs
+            - figure [ref=e784]
+          - generic [ref=e785]:
+            - time [ref=e786]: 5 hours ago
+            - separator [ref=e787]
+            - generic [ref=e788]: By Ambar Warrick
+      - generic [ref=e789]:
+        - separator [ref=e791]
+        - generic [ref=e793]:
+          - generic [ref=e794]:
+            - link [ref=e796] [cursor=pointer]:
+              - /url: ./read/CBMiZ0FVX3lxTE40QXowamFJOEdNZ1gwOEFLdUpvU2c3c0pGSDdyS1E1RUh6emVvTDEwV013U2pOcHM4Tzl0b1hHZ2R5alA4RTlndTZrQ0VjZW9ucjN0RlptUDhfRExTTURuYi1NbzZxMW8?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e798]:
+              - generic [ref=e799]:
+                - generic [ref=e802]: Fortune
+                - generic [ref=e806]:
+                  - generic:
+                    - button "More - Current price of Bitcoin for May 14, 2026" [ref=e807] [cursor=pointer]:
+                      - img [ref=e809]
+                    - tooltip [ref=e811]: More
+              - link "Current price of Bitcoin for May 14, 2026 - Fortune - 23 hours ago - By Joseph Hostetler" [ref=e812] [cursor=pointer]:
+                - /url: ./read/CBMiZ0FVX3lxTE40QXowamFJOEdNZ1gwOEFLdUpvU2c3c0pGSDdyS1E1RUh6emVvTDEwV013U2pOcHM4Tzl0b1hHZ2R5alA4RTlndTZrQ0VjZW9ucjN0RlptUDhfRExTTURuYi1NbzZxMW8?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Current price of Bitcoin for May 14, 2026
+            - figure [ref=e813]
+          - generic [ref=e814]:
+            - time [ref=e815]: 23 hours ago
+            - separator [ref=e816]
+            - generic [ref=e817]: By Joseph Hostetler
+      - generic [ref=e818]:
+        - separator [ref=e820]
+        - generic [ref=e822]:
+          - generic [ref=e823]:
+            - link [ref=e825] [cursor=pointer]:
+              - /url: ./read/CBMi5wFBVV95cUxORFlrX1R1NmFZQV90VEZqc3NqVWVFWTdRRlhseTdMMktjODBYUGRHRFFSdEpLNm5LeGdvX0RrWjNZcWtvXzNpSnVLeWNjcjBXek5HZWJPUmFvdExDbnlJczZiU25TaTBCUXNhQ0xjT1R4dFpwT0h0ejNweEE5SUNuNnlDczZDemtsWTRnR2xBY0xKc2hMOHVzNFhydzZsaE5GOGk5UTJ0QjJKSDNfNVhOVWZSejRHaGRibEZlUGVLeUxLd3VWRUF3M0laVGtkRnFPUTNTeEY4OVY4ajJ6bWpGR3BCc09ua1E?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e827]:
+              - generic [ref=e828]:
+                - generic [ref=e831]: Benzinga
+                - generic [ref=e835]:
+                  - generic:
+                    - button "More - Stock Market Hits New Highs While Bitcoin, Crypto Lag—Analysts Offer Different Explanations" [ref=e836] [cursor=pointer]:
+                      - img [ref=e838]
+                    - tooltip [ref=e840]: More
+              - link "Stock Market Hits New Highs While Bitcoin, Crypto Lag—Analysts Offer Different Explanations - Benzinga - 2 hours ago - By Aniket Verma" [ref=e841] [cursor=pointer]:
+                - /url: ./read/CBMi5wFBVV95cUxORFlrX1R1NmFZQV90VEZqc3NqVWVFWTdRRlhseTdMMktjODBYUGRHRFFSdEpLNm5LeGdvX0RrWjNZcWtvXzNpSnVLeWNjcjBXek5HZWJPUmFvdExDbnlJczZiU25TaTBCUXNhQ0xjT1R4dFpwT0h0ejNweEE5SUNuNnlDczZDemtsWTRnR2xBY0xKc2hMOHVzNFhydzZsaE5GOGk5UTJ0QjJKSDNfNVhOVWZSejRHaGRibEZlUGVLeUxLd3VWRUF3M0laVGtkRnFPUTNTeEY4OVY4ajJ6bWpGR3BCc09ua1E?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Stock Market Hits New Highs While Bitcoin, Crypto Lag—Analysts Offer Different Explanations
+            - figure [ref=e842]
+          - generic [ref=e843]:
+            - time [ref=e844]: 2 hours ago
+            - separator [ref=e845]
+            - generic [ref=e846]: By Aniket Verma
+      - generic [ref=e847]:
+        - separator [ref=e849]
+        - generic [ref=e851]:
+          - generic [ref=e852]:
+            - link [ref=e854] [cursor=pointer]:
+              - /url: ./read/CBMikgFBVV95cUxPRVdfcVZTNzQ0eG94cFlHcDVybEpoSWM4VUVsYnV6eXl2ZjAwc0I3ejJ3YUlSbWRLeDN3QzFBUGFKSHdMU2JGdUZ6eFZPbllXbDRndk9RbG42UkZOUThKdDNhU0p3WVBoUEQ3QVVPMTVxaWx2QVdLQlhMUkRuQ3J4aFI3SmxfcnByUEdQUnZBc3hjZw?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e856]:
+              - generic [ref=e857]:
+                - generic [ref=e860]: Yahoo Finance
+                - generic [ref=e864]:
+                  - generic:
+                    - button "More - $2.6 Billion in Bitcoin, ETH, XRP, Solana Options Expire Today, Experts Raise Concerns" [ref=e865] [cursor=pointer]:
+                      - img [ref=e867]
+                    - tooltip [ref=e869]: More
+              - link "$2.6 Billion in Bitcoin, ETH, XRP, Solana Options Expire Today, Experts Raise Concerns - Yahoo Finance - 2 hours ago - By Varinder Singh" [ref=e870] [cursor=pointer]:
+                - /url: ./read/CBMikgFBVV95cUxPRVdfcVZTNzQ0eG94cFlHcDVybEpoSWM4VUVsYnV6eXl2ZjAwc0I3ejJ3YUlSbWRLeDN3QzFBUGFKSHdMU2JGdUZ6eFZPbllXbDRndk9RbG42UkZOUThKdDNhU0p3WVBoUEQ3QVVPMTVxaWx2QVdLQlhMUkRuQ3J4aFI3SmxfcnByUEdQUnZBc3hjZw?hl=en-US&gl=US&ceid=US%3Aen
+                - text: $2.6 Billion in Bitcoin, ETH, XRP, Solana Options Expire Today, Experts Raise Concerns
+            - figure [ref=e871]
+          - generic [ref=e872]:
+            - time [ref=e873]: 2 hours ago
+            - separator [ref=e874]
+            - generic [ref=e875]: By Varinder Singh
+      - generic [ref=e876]:
+        - separator [ref=e878]
+        - generic [ref=e880]:
+          - generic [ref=e881]:
+            - link [ref=e883] [cursor=pointer]:
+              - /url: ./read/CBMiogFBVV95cUxPbVZGVEk2czh1dW5DTUo1U0VwNGpza3J5c2RIZ2RQX2RLcjExWUZVY0plbEtlZ2JYbW9vcWttcUhBa2FRWHRXNjUza0xLQ2l6Sy1EWGoyS0hWVWxQcUVWVzF0amRWTmxjZHlrY1ZDM0kxQktMeENpbkttc0w0SGhoZGxIUWg2amdUT0R6eVlidnlpa2ZpQXVCS3owU0czRFpxZ3c?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e885]:
+              - generic [ref=e886]:
+                - generic [ref=e889]: CoinDesk
+                - generic [ref=e893]:
+                  - generic:
+                    - button "More - Hyperliquid leads 24-hour gains as altcoins pace bitcoin" [ref=e894] [cursor=pointer]:
+                      - img [ref=e896]
+                    - tooltip [ref=e898]: More
+              - link "Hyperliquid leads 24-hour gains as altcoins pace bitcoin - CoinDesk - 58 minutes ago - By Francisco Rodrigues & omkar godbole" [ref=e899] [cursor=pointer]:
+                - /url: ./read/CBMiogFBVV95cUxPbVZGVEk2czh1dW5DTUo1U0VwNGpza3J5c2RIZ2RQX2RLcjExWUZVY0plbEtlZ2JYbW9vcWttcUhBa2FRWHRXNjUza0xLQ2l6Sy1EWGoyS0hWVWxQcUVWVzF0amRWTmxjZHlrY1ZDM0kxQktMeENpbkttc0w0SGhoZGxIUWg2amdUT0R6eVlidnlpa2ZpQXVCS3owU0czRFpxZ3c?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Hyperliquid leads 24-hour gains as altcoins pace bitcoin
+            - figure [ref=e900]
+          - generic [ref=e901]:
+            - time [ref=e902]: 58 minutes ago
+            - separator [ref=e903]
+            - generic [ref=e904]: By Francisco Rodrigues & omkar godbole
+      - generic [ref=e905]:
+        - separator [ref=e907]
+        - generic [ref=e909]:
+          - generic [ref=e910]:
+            - link [ref=e912] [cursor=pointer]:
+              - /url: ./read/CBMirgFBVV95cUxNSWNQYlVlRFZkcmRGRU83WHRTOUJsMC1GLTdGcnRMQUVFdjByUHpiaHFtYTJheWtjcDlyR0JsX291dzY1SDNBQzR5OVNyTjhfNlM0MHRyX2p1ckptS3hJaXgtNUZGTjA2NHRTUnd1Y2lKYXhjaGhVTUlfeWYwVjJCejVZREdSWHozTW5FN1ZQbE5EV19DdHRaNFE4VXp4V0tOQWZZaWlUZWpWT2VjRUE?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e914]:
+              - generic [ref=e915]:
+                - generic [ref=e918]: CoinDesk
+                - generic [ref=e922]:
+                  - generic:
+                    - 'button "More - Crypto’s regulatory tailwind runs into a Fed interest-rates reset: Crypto Daily" [ref=e923] [cursor=pointer]':
+                      - img [ref=e925]
+                    - tooltip [ref=e927]: More
+              - 'link "Crypto’s regulatory tailwind runs into a Fed interest-rates reset: Crypto Daily - CoinDesk - 3 hours ago - By omkar godbole" [ref=e928] [cursor=pointer]':
+                - /url: ./read/CBMirgFBVV95cUxNSWNQYlVlRFZkcmRGRU83WHRTOUJsMC1GLTdGcnRMQUVFdjByUHpiaHFtYTJheWtjcDlyR0JsX291dzY1SDNBQzR5OVNyTjhfNlM0MHRyX2p1ckptS3hJaXgtNUZGTjA2NHRTUnd1Y2lKYXhjaGhVTUlfeWYwVjJCejVZREdSWHozTW5FN1ZQbE5EV19DdHRaNFE4VXp4V0tOQWZZaWlUZWpWT2VjRUE?hl=en-US&gl=US&ceid=US%3Aen
+                - text: "Crypto’s regulatory tailwind runs into a Fed interest-rates reset: Crypto Daily"
+            - figure [ref=e929]
+          - generic [ref=e930]:
+            - time [ref=e931]: 3 hours ago
+            - separator [ref=e932]
+            - generic [ref=e933]: By omkar godbole
+      - generic [ref=e934]:
+        - separator [ref=e936]
+        - generic [ref=e938]:
+          - generic [ref=e939]:
+            - link [ref=e941] [cursor=pointer]:
+              - /url: ./read/CBMixAFBVV95cUxNMi1CMmNjX05iOGRjamlVbXpTd2VUNEh1LUpLRVZ1WFJsOWtWbDNuOUIxcEVXeXdWQjVKd0JwRE4yWlpZMDNKbFNiZFFoZ3ptdWIxeGxqay1nalQ3ZjFPaFJXcUFvaFpxajlrZ0lEaTFNTnFFdFNzcXk3ZEtTVkZzUDI0YS1TN01oRVZ2RWwwMVp1ZF9XWXQxZ2xxRWU1M0pieXEzcW02cUVRdmFDMk44STBrSVNhVzJqRnRBZDYzTWlFME9y?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e943]:
+              - generic [ref=e944]:
+                - generic [ref=e947]: investingLive
+                - generic [ref=e951]:
+                  - generic:
+                    - button "More - Bitcoin and Ethereum analysis shows that 'sell the news' might have triggered" [ref=e952] [cursor=pointer]:
+                      - img [ref=e954]
+                    - tooltip [ref=e956]: More
+              - link "Bitcoin and Ethereum analysis shows that 'sell the news' might have triggered - investingLive - 3 hours ago - By Itai Levitan" [ref=e957] [cursor=pointer]:
+                - /url: ./read/CBMixAFBVV95cUxNMi1CMmNjX05iOGRjamlVbXpTd2VUNEh1LUpLRVZ1WFJsOWtWbDNuOUIxcEVXeXdWQjVKd0JwRE4yWlpZMDNKbFNiZFFoZ3ptdWIxeGxqay1nalQ3ZjFPaFJXcUFvaFpxajlrZ0lEaTFNTnFFdFNzcXk3ZEtTVkZzUDI0YS1TN01oRVZ2RWwwMVp1ZF9XWXQxZ2xxRWU1M0pieXEzcW02cUVRdmFDMk44STBrSVNhVzJqRnRBZDYzTWlFME9y?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Bitcoin and Ethereum analysis shows that 'sell the news' might have triggered
+            - figure [ref=e958]
+          - generic [ref=e959]:
+            - time [ref=e960]: 3 hours ago
+            - separator [ref=e961]
+            - generic [ref=e962]: By Itai Levitan
+      - generic [ref=e963]:
+        - separator [ref=e965]
+        - generic [ref=e967]:
+          - generic [ref=e968]:
+            - link [ref=e970] [cursor=pointer]:
+              - /url: ./read/CBMizwFBVV95cUxOSnNqdl9hZ19lRmRjX2VnWThoQ3lXVkJQczFaRXQ0dUN2d3kwS2lTbnlLdER5TEtiOVFYd1l5WjZRcHdkdXpPVzRmTmlqQmJodlRzOXF1UkpHYXNfdjl2M1Fadjh5Z2JHX2VFRDIyWjR2OENJRDlMbWFyRVdlOVpmUkZIOXM2bHJ3UngwckRGMUhUS0lUellrQjJoNWdrNWRJaDgwdnJ2a2xrbkV1M1dwcXU4eC1ld2d4dnFnRUxCWXdsZ3NfUU1VSTQxSzNvR2M?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e972]:
+              - generic [ref=e973]:
+                - generic [ref=e976]: InsuranceNewsNet
+                - generic [ref=e980]:
+                  - generic:
+                    - button "More - Is New Fed Chair Warsh Pro Crypto? What His Appointment Could Mean for Bitcoin and Interest Rates" [ref=e981] [cursor=pointer]:
+                      - img [ref=e983]
+                    - tooltip [ref=e985]: More
+              - link "Is New Fed Chair Warsh Pro Crypto? What His Appointment Could Mean for Bitcoin and Interest Rates - InsuranceNewsNet - 1 hour ago" [ref=e986] [cursor=pointer]:
+                - /url: ./read/CBMizwFBVV95cUxOSnNqdl9hZ19lRmRjX2VnWThoQ3lXVkJQczFaRXQ0dUN2d3kwS2lTbnlLdER5TEtiOVFYd1l5WjZRcHdkdXpPVzRmTmlqQmJodlRzOXF1UkpHYXNfdjl2M1Fadjh5Z2JHX2VFRDIyWjR2OENJRDlMbWFyRVdlOVpmUkZIOXM2bHJ3UngwckRGMUhUS0lUellrQjJoNWdrNWRJaDgwdnJ2a2xrbkV1M1dwcXU4eC1ld2d4dnFnRUxCWXdsZ3NfUU1VSTQxSzNvR2M?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Is New Fed Chair Warsh Pro Crypto? What His Appointment Could Mean for Bitcoin and Interest Rates
+            - figure [ref=e987]
+          - time [ref=e989]: 1 hour ago
+      - generic [ref=e990]:
+        - separator [ref=e992]
+        - generic [ref=e994]:
+          - generic [ref=e995]:
+            - link [ref=e997] [cursor=pointer]:
+              - /url: ./read/CBMivwFBVV95cUxQZFJwSDk2OEtuR3F0R3l4VWpnX3J2bzZzMnlIX0lXR2Ztd2RmRlZpcEhRWnZ6LVEzbWhyejgxbnhEUkY0NlNvR1BfT011bHp2b0ZhdVBKa3c4a042YjdQbDRjLXoyVkpsRXVkWTBFSGpRUjNYZkFITFdNS0RDY1Y1NmtWVV90YmJfR2pWQ2lTNHVmclpBUG9IeExwMkMwRXNmVHVXcDJfei04Zlo4MHZXX1Mxam91N25uZnlzeXZiSQ?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e999]:
+              - generic [ref=e1000]:
+                - generic [ref=e1003]: unchainedcrypto.com
+                - generic [ref=e1007]:
+                  - generic:
+                    - button "More - Bitcoin Reclaims $81,000 After CLARITY Vote as JPMorgan Says It's Winning the Institutional Race" [ref=e1008] [cursor=pointer]:
+                      - img [ref=e1010]
+                    - tooltip [ref=e1012]: More
+              - link "Bitcoin Reclaims $81,000 After CLARITY Vote as JPMorgan Says It's Winning the Institutional Race - unchainedcrypto.com - 2 hours ago" [ref=e1013] [cursor=pointer]:
+                - /url: ./read/CBMivwFBVV95cUxQZFJwSDk2OEtuR3F0R3l4VWpnX3J2bzZzMnlIX0lXR2Ztd2RmRlZpcEhRWnZ6LVEzbWhyejgxbnhEUkY0NlNvR1BfT011bHp2b0ZhdVBKa3c4a042YjdQbDRjLXoyVkpsRXVkWTBFSGpRUjNYZkFITFdNS0RDY1Y1NmtWVV90YmJfR2pWQ2lTNHVmclpBUG9IeExwMkMwRXNmVHVXcDJfei04Zlo4MHZXX1Mxam91N25uZnlzeXZiSQ?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Bitcoin Reclaims $81,000 After CLARITY Vote as JPMorgan Says It's Winning the Institutional Race
+            - figure [ref=e1014]
+          - time [ref=e1016]: 2 hours ago
+      - generic [ref=e1017]:
+        - separator [ref=e1019]
+        - generic [ref=e1021]:
+          - generic [ref=e1022]:
+            - link [ref=e1024] [cursor=pointer]:
+              - /url: ./read/CBMipwFBVV95cUxPbG5BZEhlbWxwZXRPaGNKV2YxUnh5dmdPdnpiU201b1k1NE8xbFZjUVVXVVVSQUJod3BUdTVKNk5lQjVOOWZDbEg4YVJjSVhiNVZ3ZUZadXV0YkllNC1PTlVjVGNjdGtsVDdRQzg0TE10QlctUDdSQWh6ZzFuRHY1LUR4eUF3ZlpnZE1yS0l4WXdmUnBrZTJUcjFGR0pzTDk4TnpxVGx6cw?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e1026]:
+              - generic [ref=e1027]:
+                - generic [ref=e1030]: Just Jared
+                - generic [ref=e1034]:
+                  - generic:
+                    - 'button "More - ‘Dust’ Lyrics: Drake References Bitcoin & Crypto on New Song – Listen Now" [ref=e1035] [cursor=pointer]':
+                      - img [ref=e1037]
+                    - tooltip [ref=e1039]: More
+              - 'link "‘Dust’ Lyrics: Drake References Bitcoin & Crypto on New Song – Listen Now - Just Jared - 7 hours ago - By David Niederhoffer" [ref=e1040] [cursor=pointer]':
+                - /url: ./read/CBMipwFBVV95cUxPbG5BZEhlbWxwZXRPaGNKV2YxUnh5dmdPdnpiU201b1k1NE8xbFZjUVVXVVVSQUJod3BUdTVKNk5lQjVOOWZDbEg4YVJjSVhiNVZ3ZUZadXV0YkllNC1PTlVjVGNjdGtsVDdRQzg0TE10QlctUDdSQWh6ZzFuRHY1LUR4eUF3ZlpnZE1yS0l4WXdmUnBrZTJUcjFGR0pzTDk4TnpxVGx6cw?hl=en-US&gl=US&ceid=US%3Aen
+                - text: "‘Dust’ Lyrics: Drake References Bitcoin & Crypto on New Song – Listen Now"
+            - figure [ref=e1041]
+          - generic [ref=e1042]:
+            - time [ref=e1043]: 7 hours ago
+            - separator [ref=e1044]
+            - generic [ref=e1045]: By David Niederhoffer
+      - generic [ref=e1046]:
+        - separator [ref=e1048]
+        - generic [ref=e1050]:
+          - generic [ref=e1051]:
+            - link [ref=e1053] [cursor=pointer]:
+              - /url: ./read/CBMiqwFBVV95cUxOdWktNTdCNnAxWnFWWGZiYS1ZUnFwRi1oeS1zN19rei12VWotS0RoVkNoSGY1Tl9kUlViQmp1cGVpNGZEUk9OYTFtR0ExTzU2MkVmVHNocWJXaVJreldyY0JzTzZmTW9BeHR6MlViVHN6SnNiMnA1ajU0NWxGQUMzdXNtNExGTVJyZWlyS2lzU1hoMFVlczdyUUZTTUE4c0lLY1FleWlLMl83alE?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e1055]:
+              - generic [ref=e1056]:
+                - generic [ref=e1059]: Seeking Alpha
+                - generic [ref=e1063]:
+                  - generic:
+                    - button "More - Republican-led Senate Banking Committee advances crypto bill (BTC-USD:Cryptocurrency)" [ref=e1064] [cursor=pointer]:
+                      - img [ref=e1066]
+                    - tooltip [ref=e1068]: More
+              - link "Republican-led Senate Banking Committee advances crypto bill (BTC-USD:Cryptocurrency) - Seeking Alpha - 17 hours ago - By Mary Christine Joy" [ref=e1069] [cursor=pointer]:
+                - /url: ./read/CBMiqwFBVV95cUxOdWktNTdCNnAxWnFWWGZiYS1ZUnFwRi1oeS1zN19rei12VWotS0RoVkNoSGY1Tl9kUlViQmp1cGVpNGZEUk9OYTFtR0ExTzU2MkVmVHNocWJXaVJreldyY0JzTzZmTW9BeHR6MlViVHN6SnNiMnA1ajU0NWxGQUMzdXNtNExGTVJyZWlyS2lzU1hoMFVlczdyUUZTTUE4c0lLY1FleWlLMl83alE?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Republican-led Senate Banking Committee advances crypto bill (BTC-USD:Cryptocurrency)
+            - figure [ref=e1070]
+          - generic [ref=e1071]:
+            - time [ref=e1072]: 17 hours ago
+            - separator [ref=e1073]
+            - generic [ref=e1074]: By Mary Christine Joy
+      - generic [ref=e1075]:
+        - separator [ref=e1077]
+        - generic [ref=e1079]:
+          - generic [ref=e1080]:
+            - link [ref=e1082] [cursor=pointer]:
+              - /url: ./read/CBMiuwFBVV95cUxOQkJHTWlBWkFpX2h2TUtHSGo1RUpNMWEwWDF2TWVhd0pqVjk2d2ppbDRZd0p1aEkyUlo0ZllKUDNXaHJCTEpwcVVLS01GYWZnRWdmaFJ1YTJ4RUYzTDVkR0J6UFJfZjZlbE80d29OWk42WGl2N0NBVXIwVnhKVWZRVEtKZ3F0Z2hiQXc1UTFFU3VJRF94U25FMWRDeXN5NldsQzZvWEdnN1BrUWt1TFd0dlN0THo4bXlGZGxR?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e1084]:
+              - generic [ref=e1085]:
+                - generic [ref=e1088]: Benzinga
+                - generic [ref=e1092]:
+                  - generic:
+                    - 'button "More - Bitcoin, Ethereum, XRP, Dogecoin Jump After Crypto Act Passes Key Senate Vote: Analyst Says BTC ''Position" [ref=e1093] [cursor=pointer]':
+                      - img [ref=e1095]
+                    - tooltip [ref=e1097]: More
+              - 'link "Bitcoin, Ethereum, XRP, Dogecoin Jump After Crypto Act Passes Key Senate Vote: Analyst Says BTC ''Position - Benzinga - 10 hours ago - By Aniket Verma" [ref=e1098] [cursor=pointer]':
+                - /url: ./read/CBMiuwFBVV95cUxOQkJHTWlBWkFpX2h2TUtHSGo1RUpNMWEwWDF2TWVhd0pqVjk2d2ppbDRZd0p1aEkyUlo0ZllKUDNXaHJCTEpwcVVLS01GYWZnRWdmaFJ1YTJ4RUYzTDVkR0J6UFJfZjZlbE80d29OWk42WGl2N0NBVXIwVnhKVWZRVEtKZ3F0Z2hiQXc1UTFFU3VJRF94U25FMWRDeXN5NldsQzZvWEdnN1BrUWt1TFd0dlN0THo4bXlGZGxR?hl=en-US&gl=US&ceid=US%3Aen
+                - text: "Bitcoin, Ethereum, XRP, Dogecoin Jump After Crypto Act Passes Key Senate Vote: Analyst Says BTC 'Position"
+            - figure [ref=e1099]
+          - generic [ref=e1100]:
+            - time [ref=e1101]: 10 hours ago
+            - separator [ref=e1102]
+            - generic [ref=e1103]: By Aniket Verma
+      - generic [ref=e1104]:
+        - separator [ref=e1106]
+        - generic [ref=e1108]:
+          - generic [ref=e1109]:
+            - link [ref=e1111] [cursor=pointer]:
+              - /url: ./read/CBMikgFBVV95cUxQd3BXaHlOM2xhNHRCNGtEQmVNdHFuME1wdGd2MUlyWDU5NXVsZGdyTzcyYmFpTGl0MGlCNlJhY0RlbDBTZmtMQjhpTU9TS0U2ZmI0SkFyTEx0am81eGY4RE5IdXdxaEkzWjdnMkhBbk1OUWVVUllSMkZ5di1XWE9ueWNjMTFUZllvSUpJLXFpaGJCdw?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e1113]:
+              - generic [ref=e1114]:
+                - generic [ref=e1117]: Yahoo Finance
+                - generic [ref=e1121]:
+                  - generic:
+                    - button "More - Why Is The Crypto Market Up Today?" [ref=e1122] [cursor=pointer]:
+                      - img [ref=e1124]
+                    - tooltip [ref=e1126]: More
+              - link "Why Is The Crypto Market Up Today? - Yahoo Finance - 2 days ago - By Ananda Banerjee" [ref=e1127] [cursor=pointer]:
+                - /url: ./read/CBMikgFBVV95cUxQd3BXaHlOM2xhNHRCNGtEQmVNdHFuME1wdGd2MUlyWDU5NXVsZGdyTzcyYmFpTGl0MGlCNlJhY0RlbDBTZmtMQjhpTU9TS0U2ZmI0SkFyTEx0am81eGY4RE5IdXdxaEkzWjdnMkhBbk1OUWVVUllSMkZ5di1XWE9ueWNjMTFUZllvSUpJLXFpaGJCdw?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Why Is The Crypto Market Up Today?
+            - figure [ref=e1128]
+          - generic [ref=e1129]:
+            - time [ref=e1130]: 2 days ago
+            - separator [ref=e1131]
+            - generic [ref=e1132]: By Ananda Banerjee
+      - generic [ref=e1133]:
+        - separator [ref=e1135]
+        - generic [ref=e1137]:
+          - generic [ref=e1138]:
+            - link [ref=e1140] [cursor=pointer]:
+              - /url: ./read/CBMidEFVX3lxTE9EYXVFZzc2UktZZWN5N3hQd3R1VGhORUFjWjlSUEJ6VjhoNmR6azgtZk9SRHpHc1Q0SmVqSFJDU3lVTktqRVpGRFJRVkFVUGl6LU9QMEFDaVVGdWdsNlM2dndGY09HeHdtOHFXeVhlOVFST2Vs?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e1142]:
+              - generic [ref=e1143]:
+                - generic [ref=e1146]: HousingWire
+                - generic [ref=e1150]:
+                  - generic:
+                    - button "More - Crypto Underwriting Standards Remain Unclear for Mortgage Lenders" [ref=e1151] [cursor=pointer]:
+                      - img [ref=e1153]
+                    - tooltip [ref=e1155]: More
+              - link "Crypto Underwriting Standards Remain Unclear for Mortgage Lenders - HousingWire - 4 hours ago" [ref=e1156] [cursor=pointer]:
+                - /url: ./read/CBMidEFVX3lxTE9EYXVFZzc2UktZZWN5N3hQd3R1VGhORUFjWjlSUEJ6VjhoNmR6azgtZk9SRHpHc1Q0SmVqSFJDU3lVTktqRVpGRFJRVkFVUGl6LU9QMEFDaVVGdWdsNlM2dndGY09HeHdtOHFXeVhlOVFST2Vs?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Crypto Underwriting Standards Remain Unclear for Mortgage Lenders
+            - figure [ref=e1157]
+          - time [ref=e1159]: 4 hours ago
+      - generic [ref=e1160]:
+        - separator [ref=e1162]
+        - generic [ref=e1164]:
+          - generic [ref=e1165]:
+            - link [ref=e1167] [cursor=pointer]:
+              - /url: ./read/CBMijwFBVV95cUxOX1NFNTNWNjhsOVUtVkhkMUxMeldtQ1NpU1BheWxFWkNnd0M5ZWplVjJDQ2lTaWxPN2ZyYVdwQVBhek1MVTZ2M0lFalJreE1jZldGS3Jkb1htYlBwdDZXTVMwMm9GMUw5Szh4eTI0NEdPMUl3eE0wWWFKWWdRWGlEdE42OGsyN2dfeVpkLS1SRQ?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e1169]:
+              - generic [ref=e1170]:
+                - generic [ref=e1173]: thestreet.com
+                - generic [ref=e1177]:
+                  - generic:
+                    - button "More - Struggling crypto stock surges after earnings" [ref=e1178] [cursor=pointer]:
+                      - img [ref=e1180]
+                    - tooltip [ref=e1182]: More
+              - link "Struggling crypto stock surges after earnings - thestreet.com - 14 hours ago - By Anand Sinha" [ref=e1183] [cursor=pointer]:
+                - /url: ./read/CBMijwFBVV95cUxOX1NFNTNWNjhsOVUtVkhkMUxMeldtQ1NpU1BheWxFWkNnd0M5ZWplVjJDQ2lTaWxPN2ZyYVdwQVBhek1MVTZ2M0lFalJreE1jZldGS3Jkb1htYlBwdDZXTVMwMm9GMUw5Szh4eTI0NEdPMUl3eE0wWWFKWWdRWGlEdE42OGsyN2dfeVpkLS1SRQ?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Struggling crypto stock surges after earnings
+            - figure [ref=e1184]
+          - generic [ref=e1185]:
+            - time [ref=e1186]: 14 hours ago
+            - separator [ref=e1187]
+            - generic [ref=e1188]: By Anand Sinha
+      - generic [ref=e1189]:
+        - separator [ref=e1191]
+        - generic [ref=e1193]:
+          - generic [ref=e1194]:
+            - link [ref=e1196] [cursor=pointer]:
+              - /url: ./read/CBMiqgFBVV95cUxNckdRNHQ1NUxOMmo3Yjh1cTFKc0dBN0czR0pEbEt0ZnJ1NldzVWhOamlQaVZXOTJITFhGazhxQXpLSkhuYWtrak5lcjItYWw3OW0zdlBDdXh4SlZKS0w3TWR1NE9yVWVyME9ncDUxR2dIT1FHcldIUUtXQXRtLWVMSzEwc3g5SUEyWmdnMmdnakhGQW9RNFozY3Y1bERETk10dGdSV1Y0TE56UdIBrwFBVV95cUxOYWhBcjdPZC1iTk5vRjVhdGN5STJMbloycEJzQ2tmY3o3YWNYMTRfeFlOdmdMakFrSDBqZXNhc2lKNFN4TUo5VTAyemZLVTQ5cW1sZFJGM0dBbWE1andMSkRqSjRISXJqUDdIaHJFWnV5QTdoakh5b05HbkdZWDRpQkp5MXJvTExaY1diSUVPVmdHSFZLLVcxTUZxQ1J1MkdmeUFRSGtBbExwMWZKUnMw?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e1198]:
+              - generic [ref=e1199]:
+                - generic [ref=e1202]: AMBCrypto
+                - generic [ref=e1206]:
+                  - generic:
+                    - button "More - Looking at why Wells Fargo shifted from Bitcoin ETFs to Ethereum ETFs in early 2026" [ref=e1207] [cursor=pointer]:
+                      - img [ref=e1209]
+                    - tooltip [ref=e1211]: More
+              - link "Looking at why Wells Fargo shifted from Bitcoin ETFs to Ethereum ETFs in early 2026 - AMBCrypto - 6 hours ago - By Ishika Kumari" [ref=e1212] [cursor=pointer]:
+                - /url: ./read/CBMiqgFBVV95cUxNckdRNHQ1NUxOMmo3Yjh1cTFKc0dBN0czR0pEbEt0ZnJ1NldzVWhOamlQaVZXOTJITFhGazhxQXpLSkhuYWtrak5lcjItYWw3OW0zdlBDdXh4SlZKS0w3TWR1NE9yVWVyME9ncDUxR2dIT1FHcldIUUtXQXRtLWVMSzEwc3g5SUEyWmdnMmdnakhGQW9RNFozY3Y1bERETk10dGdSV1Y0TE56UdIBrwFBVV95cUxOYWhBcjdPZC1iTk5vRjVhdGN5STJMbloycEJzQ2tmY3o3YWNYMTRfeFlOdmdMakFrSDBqZXNhc2lKNFN4TUo5VTAyemZLVTQ5cW1sZFJGM0dBbWE1andMSkRqSjRISXJqUDdIaHJFWnV5QTdoakh5b05HbkdZWDRpQkp5MXJvTExaY1diSUVPVmdHSFZLLVcxTUZxQ1J1MkdmeUFRSGtBbExwMWZKUnMw?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Looking at why Wells Fargo shifted from Bitcoin ETFs to Ethereum ETFs in early 2026
+            - figure [ref=e1213]
+          - generic [ref=e1214]:
+            - time [ref=e1215]: 6 hours ago
+            - separator [ref=e1216]
+            - generic [ref=e1217]: By Ishika Kumari
+      - generic [ref=e1218]:
+        - separator [ref=e1220]
+        - generic [ref=e1222]:
+          - generic [ref=e1223]:
+            - link [ref=e1225] [cursor=pointer]:
+              - /url: ./read/CBMiuwFBVV95cUxQQVZmQ1FHTFlqd0NDRU9ZT05RMVRjM2pJbm04N094V2ZoTTZDS1FZdE5YWm1iemZfY3BLd3BIdGROWktDRXY1Zzh3SlZSNExsVnlhdWUzalJxZThfcHUzT0tLd1JDZC1kakxJa0p1Nkl3dGMyQkpvd3FsRTlJN0JiRXYwUVZid29jVGFYZV9YVWtMVzY5bkRrMG1CcDhGVG9RNGJEb2tPRm9kX2o5Rmpkekl6QlY5N2dLTUJB?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e1227]:
+              - generic [ref=e1228]:
+                - generic [ref=e1231]: CoinDesk
+                - generic [ref=e1235]:
+                  - generic:
+                    - button "More - Why is bitcoin price down? BTC at $79,000 as Xi warns Trump on Taiwan conflict" [ref=e1236] [cursor=pointer]:
+                      - img [ref=e1238]
+                    - tooltip [ref=e1240]: More
+              - link "Why is bitcoin price down? BTC at $79,000 as Xi warns Trump on Taiwan conflict - CoinDesk - Yesterday - By Shaurya Malwa" [ref=e1241] [cursor=pointer]:
+                - /url: ./read/CBMiuwFBVV95cUxQQVZmQ1FHTFlqd0NDRU9ZT05RMVRjM2pJbm04N094V2ZoTTZDS1FZdE5YWm1iemZfY3BLd3BIdGROWktDRXY1Zzh3SlZSNExsVnlhdWUzalJxZThfcHUzT0tLd1JDZC1kakxJa0p1Nkl3dGMyQkpvd3FsRTlJN0JiRXYwUVZid29jVGFYZV9YVWtMVzY5bkRrMG1CcDhGVG9RNGJEb2tPRm9kX2o5Rmpkekl6QlY5N2dLTUJB?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Why is bitcoin price down? BTC at $79,000 as Xi warns Trump on Taiwan conflict
+            - figure [ref=e1242]
+          - generic [ref=e1243]:
+            - time [ref=e1244]: Yesterday
+            - separator [ref=e1245]
+            - generic [ref=e1246]: By Shaurya Malwa
+      - generic [ref=e1247]:
+        - separator [ref=e1249]
+        - generic [ref=e1251]:
+          - generic [ref=e1252]:
+            - link [ref=e1254] [cursor=pointer]:
+              - /url: ./read/CBMioAFBVV95cUxNUGM3eEgzMEtMMlMxZmdzZF95dWJlQU5QU280TU9ZdDc3SkI4S1N1T3FUY2lTZjhGLXNZaDZVeE5wcG5vRmVwQmRSbGt1RVF3NE9xOGloQ0ZtTnFSd0pIcHFkR1ZxZWZBSUhlQTRoRGJWLUZ4OW9CQnJLUEpUMHoxWkVjNHFXR29HcUJ1UVk3czBPMWs2cHdZN3M1YTJQc1Z1?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e1256]:
+              - generic [ref=e1257]:
+                - generic [ref=e1260]: Moomoo
+                - generic [ref=e1264]:
+                  - generic:
+                    - button "More - Bitcoin Holds Above US$80,000 As Ethereum Slips Amid Fresh Crypto Volatility" [ref=e1265] [cursor=pointer]:
+                      - img [ref=e1267]
+                    - tooltip [ref=e1269]: More
+              - link "Bitcoin Holds Above US$80,000 As Ethereum Slips Amid Fresh Crypto Volatility - Moomoo - 9 hours ago" [ref=e1270] [cursor=pointer]:
+                - /url: ./read/CBMioAFBVV95cUxNUGM3eEgzMEtMMlMxZmdzZF95dWJlQU5QU280TU9ZdDc3SkI4S1N1T3FUY2lTZjhGLXNZaDZVeE5wcG5vRmVwQmRSbGt1RVF3NE9xOGloQ0ZtTnFSd0pIcHFkR1ZxZWZBSUhlQTRoRGJWLUZ4OW9CQnJLUEpUMHoxWkVjNHFXR29HcUJ1UVk3czBPMWs2cHdZN3M1YTJQc1Z1?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Bitcoin Holds Above US$80,000 As Ethereum Slips Amid Fresh Crypto Volatility
+            - figure [ref=e1271]
+          - time [ref=e1273]: 9 hours ago
+      - generic [ref=e1274]:
+        - separator [ref=e1276]
+        - generic [ref=e1278]:
+          - generic [ref=e1279]:
+            - link [ref=e1281] [cursor=pointer]:
+              - /url: ./read/CBMixwFBVV95cUxOM3BYZEJVR010WGkwd0xOVGRraWhIQTFhSF83MkRGakpPQkJ1bE1QdGJKcTkwSGhPbFg5THJZZ3J3QXdEdUExSXA1eHhiN0FuSkNtYlNmcV9CaGZRTmtVSENCOG82cVJjUGtFX2hCWWR6QjVXSXJhaVl0cWVadE1kX3hPQ1RMS0lyN2ZCWXUxWjlDal9PaEdmdnpWRngtVllaSE9tRUoxa1FUQm42b2p0Yjkxb1AzNVowUzFNQ0tQUElQNkJrTTJN0gHMAUFVX3lxTE9QU05GUHdKREtLT2xWM3NJVnJ3QTZDWXlWUUl1Tkg4czBvbllqN2NhSU1UbHZjY0FzNGhYQUZpbEVtMWRRUFVmWjRkMVA4RlJrVl9rdGJkRE5Za2dxZnplY2JiU0VRUGZhWWNDUVIzSTVQZlZmR2dhdWlEX2pNUHdpVUdqdHRZYW5oaXZna2pRTHV2TElMeldFSURjdVhzT0NZaGxua1ZmTFQ5QmlNQVhMOEJVTHR1VXlCV01NTGhtTE9ZWEpid2QxalNkRg?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e1283]:
+              - generic [ref=e1284]:
+                - generic [ref=e1287]: ABC11 Raleigh-Durham
+                - generic [ref=e1291]:
+                  - generic:
+                    - 'button "More - Cryptocurrency ATM scams: To stop crypto scams that led to NC victims losing thousands AARP joins NC law enforcement" [ref=e1292] [cursor=pointer]':
+                      - img [ref=e1294]
+                    - tooltip [ref=e1296]: More
+              - 'link "Cryptocurrency ATM scams: To stop crypto scams that led to NC victims losing thousands AARP joins NC law enforcement - ABC11 Raleigh-Durham - 2 days ago - By Diane Wilson" [ref=e1297] [cursor=pointer]':
+                - /url: ./read/CBMixwFBVV95cUxOM3BYZEJVR010WGkwd0xOVGRraWhIQTFhSF83MkRGakpPQkJ1bE1QdGJKcTkwSGhPbFg5THJZZ3J3QXdEdUExSXA1eHhiN0FuSkNtYlNmcV9CaGZRTmtVSENCOG82cVJjUGtFX2hCWWR6QjVXSXJhaVl0cWVadE1kX3hPQ1RMS0lyN2ZCWXUxWjlDal9PaEdmdnpWRngtVllaSE9tRUoxa1FUQm42b2p0Yjkxb1AzNVowUzFNQ0tQUElQNkJrTTJN0gHMAUFVX3lxTE9QU05GUHdKREtLT2xWM3NJVnJ3QTZDWXlWUUl1Tkg4czBvbllqN2NhSU1UbHZjY0FzNGhYQUZpbEVtMWRRUFVmWjRkMVA4RlJrVl9rdGJkRE5Za2dxZnplY2JiU0VRUGZhWWNDUVIzSTVQZlZmR2dhdWlEX2pNUHdpVUdqdHRZYW5oaXZna2pRTHV2TElMeldFSURjdVhzT0NZaGxua1ZmTFQ5QmlNQVhMOEJVTHR1VXlCV01NTGhtTE9ZWEpid2QxalNkRg?hl=en-US&gl=US&ceid=US%3Aen
+                - text: "Cryptocurrency ATM scams: To stop crypto scams that led to NC victims losing thousands AARP joins NC law enforcement"
+            - figure [ref=e1298]
+          - generic [ref=e1299]:
+            - time [ref=e1300]: 2 days ago
+            - separator [ref=e1301]
+            - generic [ref=e1302]: By Diane Wilson
+      - generic [ref=e1303]:
+        - separator [ref=e1305]
+        - generic [ref=e1307]:
+          - generic [ref=e1308]:
+            - link [ref=e1310] [cursor=pointer]:
+              - /url: ./read/CBMiwAFBVV95cUxOQXBPTmV5X3VKVEJSVXlmT0FpQTZ4a3pVSWFCZFFxUnVYM3MxaF9FRkFmU1FBNkxGY3hZQkNacjI4emlJWmJhbmYyWUhsTzZtd2pTSWNZaFREZDFTUjhVT1hHYnVpRUpiOW1odUNpWGVxQ3V2WmlKSUJJQ3kweXp2Mm9PZVB6UjF6ajVrRlRGUDJqY2VUS0otRVBOQzVmRGhyN3dnU3V2eTExT0pxTmtaV2gxbGJUbkoydjJMRDJpcHA?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e1312]:
+              - generic [ref=e1313]:
+                - generic [ref=e1316]: Investor's Business Daily
+                - generic [ref=e1320]:
+                  - generic:
+                    - button "More - Clarity Act Passes Senate Banking Committee, Crypto Stocks Rally" [ref=e1321] [cursor=pointer]:
+                      - img [ref=e1323]
+                    - tooltip [ref=e1325]: More
+              - link "Clarity Act Passes Senate Banking Committee, Crypto Stocks Rally - Investor&#39;s Business Daily - 15 hours ago - By Harrison Miller" [ref=e1326] [cursor=pointer]:
+                - /url: ./read/CBMiwAFBVV95cUxOQXBPTmV5X3VKVEJSVXlmT0FpQTZ4a3pVSWFCZFFxUnVYM3MxaF9FRkFmU1FBNkxGY3hZQkNacjI4emlJWmJhbmYyWUhsTzZtd2pTSWNZaFREZDFTUjhVT1hHYnVpRUpiOW1odUNpWGVxQ3V2WmlKSUJJQ3kweXp2Mm9PZVB6UjF6ajVrRlRGUDJqY2VUS0otRVBOQzVmRGhyN3dnU3V2eTExT0pxTmtaV2gxbGJUbkoydjJMRDJpcHA?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Clarity Act Passes Senate Banking Committee, Crypto Stocks Rally
+            - figure [ref=e1327]
+          - generic [ref=e1328]:
+            - time [ref=e1329]: 15 hours ago
+            - separator [ref=e1330]
+            - generic [ref=e1331]: By Harrison Miller
+      - generic [ref=e1332]:
+        - separator [ref=e1334]
+        - generic [ref=e1336]:
+          - generic [ref=e1337]:
+            - link [ref=e1339] [cursor=pointer]:
+              - /url: ./read/CBMickFVX3lxTE12WUplWGFwSDd5eDdmVWtQcEd5VTZvUHc5RFcwT3o0VEVuMXdnbHB2d1U4ZFhvVXEyZzdSWE00UkwwYTRMT2lEcEJseVpNckNfUjRYVzEtdk91Q0o4Y1M1ck9LUmxjRzAtUUpZVFM3NjE5dw?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e1341]:
+              - generic [ref=e1342]:
+                - generic [ref=e1345]: Crypto Briefing
+                - generic [ref=e1349]:
+                  - generic:
+                    - button "More - Blockchain.com rolls out crypto backed loans for Bitcoin, Ethereum, and USDC holders" [ref=e1350] [cursor=pointer]:
+                      - img [ref=e1352]
+                    - tooltip [ref=e1354]: More
+              - link "Blockchain.com rolls out crypto backed loans for Bitcoin, Ethereum, and USDC holders - Crypto Briefing - 17 hours ago - By Estefano Gomez" [ref=e1355] [cursor=pointer]:
+                - /url: ./read/CBMickFVX3lxTE12WUplWGFwSDd5eDdmVWtQcEd5VTZvUHc5RFcwT3o0VEVuMXdnbHB2d1U4ZFhvVXEyZzdSWE00UkwwYTRMT2lEcEJseVpNckNfUjRYVzEtdk91Q0o4Y1M1ck9LUmxjRzAtUUpZVFM3NjE5dw?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Blockchain.com rolls out crypto backed loans for Bitcoin, Ethereum, and USDC holders
+            - figure [ref=e1356]
+          - generic [ref=e1357]:
+            - time [ref=e1358]: 17 hours ago
+            - separator [ref=e1359]
+            - generic [ref=e1360]: By Estefano Gomez
+      - generic [ref=e1361]:
+        - separator [ref=e1363]
+        - generic [ref=e1365]:
+          - generic [ref=e1366]:
+            - link [ref=e1368] [cursor=pointer]:
+              - /url: ./read/CBMizAFBVV95cUxNOHAxakxzMFJGeERHbzdtTTdSMUh5YzUwS0xGcmFwbkpFVTZjM2NnYW5TZkhESkkxY284OWFYbk8wV3JvVG85bTBpSS1pc2U3Uk9FUTdWMy1iTHJ2VDlGMm1Bb2VtVHJ5bE16VjRkNEpZYjU4Rm1tMVY5Z0lPTF85RXQxLWxPa3EtYmFGbWN3Nm9qeWUwQUh5MUVfQXQyY1A5UEMteVZBcjRFX3VsUFEydFNRWmlpbGF0NmpzelE4TXVuT2pBNmJ6Z0NQeks?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e1370]:
+              - generic [ref=e1371]:
+                - generic [ref=e1374]: FXStreet
+                - generic [ref=e1378]:
+                  - generic:
+                    - 'button "More - Crypto Overview: Bitcoin wavers around $80,000 – Hyperliquid and Flare rally" [ref=e1379] [cursor=pointer]':
+                      - img [ref=e1381]
+                    - tooltip [ref=e1383]: More
+              - 'link "Crypto Overview: Bitcoin wavers around $80,000 – Hyperliquid and Flare rally - FXStreet - 7 hours ago - By Vishal Dixit" [ref=e1384] [cursor=pointer]':
+                - /url: ./read/CBMizAFBVV95cUxNOHAxakxzMFJGeERHbzdtTTdSMUh5YzUwS0xGcmFwbkpFVTZjM2NnYW5TZkhESkkxY284OWFYbk8wV3JvVG85bTBpSS1pc2U3Uk9FUTdWMy1iTHJ2VDlGMm1Bb2VtVHJ5bE16VjRkNEpZYjU4Rm1tMVY5Z0lPTF85RXQxLWxPa3EtYmFGbWN3Nm9qeWUwQUh5MUVfQXQyY1A5UEMteVZBcjRFX3VsUFEydFNRWmlpbGF0NmpzelE4TXVuT2pBNmJ6Z0NQeks?hl=en-US&gl=US&ceid=US%3Aen
+                - text: "Crypto Overview: Bitcoin wavers around $80,000 – Hyperliquid and Flare rally"
+            - figure [ref=e1385]
+          - generic [ref=e1386]:
+            - time [ref=e1387]: 7 hours ago
+            - separator [ref=e1388]
+            - generic [ref=e1389]: By Vishal Dixit
+      - generic [ref=e1390]:
+        - separator [ref=e1392]
+        - generic [ref=e1394]:
+          - generic [ref=e1395]:
+            - link [ref=e1397] [cursor=pointer]:
+              - /url: ./read/CBMifkFVX3lxTE5YSmRWVHVEbVRMOGwtSmQ5VTlOeTVHQUQxX1NZMjZIY0l4OUE2R2dHRWdvWVlRUm5BeUlvMTVVS0dtenZYNElQUG9JOTRyaTY3eGx3Y2g3dmZJZzdwb29QWGgzbng2SEhDckM1c2RSbUhsSC1meVJRbzRheERXQQ?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e1399]:
+              - generic [ref=e1400]:
+                - generic [ref=e1403]: CCN.com
+                - generic [ref=e1407]:
+                  - generic:
+                    - button "More - Ethereum To $5,000? Muted Predictions As JPMorgan Claims ETH Will Stay Behind Bitcoin Without Improvements" [ref=e1408] [cursor=pointer]:
+                      - img [ref=e1410]
+                    - tooltip [ref=e1412]: More
+              - link "Ethereum To $5,000? Muted Predictions As JPMorgan Claims ETH Will Stay Behind Bitcoin Without Improvements - CCN.com - 3 hours ago - By Kurt Robson" [ref=e1413] [cursor=pointer]:
+                - /url: ./read/CBMifkFVX3lxTE5YSmRWVHVEbVRMOGwtSmQ5VTlOeTVHQUQxX1NZMjZIY0l4OUE2R2dHRWdvWVlRUm5BeUlvMTVVS0dtenZYNElQUG9JOTRyaTY3eGx3Y2g3dmZJZzdwb29QWGgzbng2SEhDckM1c2RSbUhsSC1meVJRbzRheERXQQ?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Ethereum To $5,000? Muted Predictions As JPMorgan Claims ETH Will Stay Behind Bitcoin Without Improvements
+            - figure [ref=e1414]
+          - generic [ref=e1415]:
+            - time [ref=e1416]: 3 hours ago
+            - separator [ref=e1417]
+            - generic [ref=e1418]: By Kurt Robson
+      - generic [ref=e1419]:
+        - separator [ref=e1421]
+        - generic [ref=e1423]:
+          - generic [ref=e1424]:
+            - link [ref=e1426] [cursor=pointer]:
+              - /url: ./read/CBMioAFBVV95cUxPVm90YnVheXVyb0dRVnhYU1V6Y3dwV3ZPYUQtUEljNmJCU0dUMjNtdXprWUIwRE4tSjlzMWotU0xRcDN1eDdPQ0FsRHplM1ZoQV9tc0xkajg3aTF6dU1GZXcwOGFWOFZaSzNnZDJhMnNzbE5zeGpjaVNGd2w4dGtKZVVuQWdVdGFrd25lXzItVURwS2RldktVQ0d4QTZDVWdT?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e1428]:
+              - generic [ref=e1429]:
+                - generic [ref=e1432]: Yahoo Finance
+                - generic [ref=e1436]:
+                  - generic:
+                    - 'button "More - Bitcoin, Ethereum, XRP Fall, But Dogecoin Gains Ahead Of Crypto Act Markup In Senate: This Analyst Is Bracing For More BTC Pain Ahead" [ref=e1437] [cursor=pointer]':
+                      - img [ref=e1439]
+                    - tooltip [ref=e1441]: More
+              - 'link "Bitcoin, Ethereum, XRP Fall, But Dogecoin Gains Ahead Of Crypto Act Markup In Senate: This Analyst Is Bracing For More BTC Pain Ahead - Yahoo Finance - Yesterday - By Aniket Verma" [ref=e1442] [cursor=pointer]':
+                - /url: ./read/CBMioAFBVV95cUxPVm90YnVheXVyb0dRVnhYU1V6Y3dwV3ZPYUQtUEljNmJCU0dUMjNtdXprWUIwRE4tSjlzMWotU0xRcDN1eDdPQ0FsRHplM1ZoQV9tc0xkajg3aTF6dU1GZXcwOGFWOFZaSzNnZDJhMnNzbE5zeGpjaVNGd2w4dGtKZVVuQWdVdGFrd25lXzItVURwS2RldktVQ0d4QTZDVWdT?hl=en-US&gl=US&ceid=US%3Aen
+                - text: "Bitcoin, Ethereum, XRP Fall, But Dogecoin Gains Ahead Of Crypto Act Markup In Senate: This Analyst Is Bracing For More BTC Pain Ahead"
+            - figure [ref=e1443]
+          - generic [ref=e1444]:
+            - time [ref=e1445]: Yesterday
+            - separator [ref=e1446]
+            - generic [ref=e1447]: By Aniket Verma
+      - generic [ref=e1448]:
+        - separator [ref=e1450]
+        - generic [ref=e1452]:
+          - generic [ref=e1453]:
+            - link [ref=e1455] [cursor=pointer]:
+              - /url: ./read/CBMi3wFBVV95cUxQY21hblBZX0g1RS03ekZGV093Vmo3Sm94eE81cDVWQkItRlcyZG1qU295YmVuM3FjZHlaNWJsMEV4akk3VW9jSDBxTXZ4SjQ0ZG9hellVaDFRLWhTeWo3Mm4tN0RISzgyTkVOZVlHcDRqbzhlY0VFRzk4THJfOHR5TUpyX3RJZWhjeXRsWmxHNS10WklVOGtRSU5QRUc4RFdXY1NPZW90ZTdXemdCbFNiRUJMM0I2dlNNSFJJclNTYWxWX0lRRkFlYURMOWFBd1Zub05ob05MbWwtZEJ4cno0?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e1457]:
+              - generic [ref=e1458]:
+                - generic [ref=e1461]: Forbes
+                - generic [ref=e1465]:
+                  - generic:
+                    - button "More - ‘Full Panic Mode’— $6.6 Trillion Crypto Warning Issued As Bitcoin Braces For Price Shock" [ref=e1466] [cursor=pointer]:
+                      - img [ref=e1468]
+                    - tooltip [ref=e1470]: More
+              - link "‘Full Panic Mode’— $6.6 Trillion Crypto Warning Issued As Bitcoin Braces For Price Shock - Forbes - 3 days ago - By Billy Bambrough" [ref=e1471] [cursor=pointer]:
+                - /url: ./read/CBMi3wFBVV95cUxQY21hblBZX0g1RS03ekZGV093Vmo3Sm94eE81cDVWQkItRlcyZG1qU295YmVuM3FjZHlaNWJsMEV4akk3VW9jSDBxTXZ4SjQ0ZG9hellVaDFRLWhTeWo3Mm4tN0RISzgyTkVOZVlHcDRqbzhlY0VFRzk4THJfOHR5TUpyX3RJZWhjeXRsWmxHNS10WklVOGtRSU5QRUc4RFdXY1NPZW90ZTdXemdCbFNiRUJMM0I2dlNNSFJJclNTYWxWX0lRRkFlYURMOWFBd1Zub05ob05MbWwtZEJ4cno0?hl=en-US&gl=US&ceid=US%3Aen
+                - text: ‘Full Panic Mode’— $6.6 Trillion Crypto Warning Issued As Bitcoin Braces For Price Shock
+            - figure [ref=e1472]
+          - generic [ref=e1473]:
+            - time [ref=e1474]: 3 days ago
+            - separator [ref=e1475]
+            - generic [ref=e1476]: By Billy Bambrough
+      - generic [ref=e1477]:
+        - separator [ref=e1479]
+        - generic [ref=e1481]:
+          - generic [ref=e1482]:
+            - link [ref=e1484] [cursor=pointer]:
+              - /url: ./read/CBMigAJBVV95cUxPSlp0NXZxZkdaZktzODlJMzJhZXNtZmw2Y29ldW9NQS1xNkhEdDg1RURpZkVaSXQ3SkFSVlUxcEFwd2R4WE54Sl9QYzBXTDI2NTBPRjdqX25TckM4WFZvbTNaTms1bnNlSEhtRDdoT185b0NfdVNNbzZTc001eVlsWXJuYzFYQ1BlbkNXckQxZWE3Q1hMRXFITGQ1WWJFZm1jNTZOVnNlQ3RPWkI3S003c0tYd29aVVc3NkhPT1hoRjdCNk5seWtxRDEwVHNJTWR6S1R5NDlMTG5fSW1TZ0EtejVzV3BVU3JIMW1YdUlTRkhNQk9qTzRCajdmc2puRDBZ?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e1486]:
+              - generic [ref=e1487]:
+                - generic [ref=e1490]: markets.businessinsider.com
+                - generic [ref=e1494]:
+                  - generic:
+                    - 'button "More - AriseAlpha Launches Free AI Trading Bot for Bitcoin & Dogecoin: Automated Crypto Trading Tool for Investors in 2026" [ref=e1495] [cursor=pointer]':
+                      - img [ref=e1497]
+                    - tooltip [ref=e1499]: More
+              - 'link "AriseAlpha Launches Free AI Trading Bot for Bitcoin & Dogecoin: Automated Crypto Trading Tool for Investors in 2026 - markets.businessinsider.com - 17 hours ago" [ref=e1500] [cursor=pointer]':
+                - /url: ./read/CBMigAJBVV95cUxPSlp0NXZxZkdaZktzODlJMzJhZXNtZmw2Y29ldW9NQS1xNkhEdDg1RURpZkVaSXQ3SkFSVlUxcEFwd2R4WE54Sl9QYzBXTDI2NTBPRjdqX25TckM4WFZvbTNaTms1bnNlSEhtRDdoT185b0NfdVNNbzZTc001eVlsWXJuYzFYQ1BlbkNXckQxZWE3Q1hMRXFITGQ1WWJFZm1jNTZOVnNlQ3RPWkI3S003c0tYd29aVVc3NkhPT1hoRjdCNk5seWtxRDEwVHNJTWR6S1R5NDlMTG5fSW1TZ0EtejVzV3BVU3JIMW1YdUlTRkhNQk9qTzRCajdmc2puRDBZ?hl=en-US&gl=US&ceid=US%3Aen
+                - text: "AriseAlpha Launches Free AI Trading Bot for Bitcoin & Dogecoin: Automated Crypto Trading Tool for Investors in 2026"
+            - figure [ref=e1501]
+          - time [ref=e1503]: 17 hours ago
+      - generic [ref=e1504]:
+        - separator [ref=e1506]
+        - generic [ref=e1508]:
+          - generic [ref=e1509]:
+            - link [ref=e1511] [cursor=pointer]:
+              - /url: ./read/CBMi8gFBVV95cUxQRklDZDdhdV9hT2NNLUNQMnJLTVpPWlg3VHVzdkdhUC1FRjk3azdJZ2lzR1MxclM1TVJUX0t2QjZoY3ROZ2ZBVlQwNjBLdklrVGxjWGlsczVxbVlYaWplUUVDR3VHRjN1MENVd21zSWgzc20wYW12dG43VUhucXA3eUltb2JPM0RNQU02UGVrNllKYzdueHFHdFhMdHh2NG1ZR19UbGlBT3hWSnVkUmxrOEh4M00xWkQ2ZHd0azNaOFRLRS1sSmtLbEZUdHVQcXh3UzBtMGJzSmpkTmFVVGtJVVJwRm1lMGxkSXlWTnA4Z2Zldw?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e1513]:
+              - generic [ref=e1514]:
+                - generic [ref=e1517]: Benzinga
+                - generic [ref=e1521]:
+                  - generic:
+                    - button "More - Bitcoin Holds $80,000, Ethereum, XRP, Dogecoin Edge Higher As Clarity Act Boosts Institutional Optimism" [ref=e1522] [cursor=pointer]:
+                      - img [ref=e1524]
+                    - tooltip [ref=e1526]: More
+              - link "Bitcoin Holds $80,000, Ethereum, XRP, Dogecoin Edge Higher As Clarity Act Boosts Institutional Optimism - Benzinga - 6 minutes ago - By Khyathi Dalal" [ref=e1527] [cursor=pointer]:
+                - /url: ./read/CBMi8gFBVV95cUxQRklDZDdhdV9hT2NNLUNQMnJLTVpPWlg3VHVzdkdhUC1FRjk3azdJZ2lzR1MxclM1TVJUX0t2QjZoY3ROZ2ZBVlQwNjBLdklrVGxjWGlsczVxbVlYaWplUUVDR3VHRjN1MENVd21zSWgzc20wYW12dG43VUhucXA3eUltb2JPM0RNQU02UGVrNllKYzdueHFHdFhMdHh2NG1ZR19UbGlBT3hWSnVkUmxrOEh4M00xWkQ2ZHd0azNaOFRLRS1sSmtLbEZUdHVQcXh3UzBtMGJzSmpkTmFVVGtJVVJwRm1lMGxkSXlWTnA4Z2Zldw?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Bitcoin Holds $80,000, Ethereum, XRP, Dogecoin Edge Higher As Clarity Act Boosts Institutional Optimism
+            - figure [ref=e1528]
+          - generic [ref=e1529]:
+            - time [ref=e1530]: 6 minutes ago
+            - separator [ref=e1531]
+            - generic [ref=e1532]: By Khyathi Dalal
+      - generic [ref=e1533]:
+        - separator [ref=e1535]
+        - generic [ref=e1537]:
+          - generic [ref=e1538]:
+            - link [ref=e1540] [cursor=pointer]:
+              - /url: ./read/CBMipwFBVV95cUxPQnh4bUt0UUk5M2FjUDIxZzEwTnZmZjZQYlFfZXpFeUJQSGV2cnhGdkZRSGZEVmplUTZLRlFNdjBldTlCNTA5eXJuSmlyZ2VWamx0TUYza21KS2lzVWMzTTRLMmFFc0NzZ0I5bVBJZGp4VmQ0TE9oMGpyYl9obzZMWm1zZHdTY0FnZVc2Mm1mdXZBY3Y3VWhQN1FoN3JmaWd1VGhNM0NQSQ?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e1542]:
+              - generic [ref=e1543]:
+                - generic [ref=e1546]: CCN.com
+                - generic [ref=e1550]:
+                  - generic:
+                    - 'button "More - President Trump’s More Exposed To Crypto Than People Think: Q1 OGE Report" [ref=e1551] [cursor=pointer]':
+                      - img [ref=e1553]
+                    - tooltip [ref=e1555]: More
+              - 'link "President Trump’s More Exposed To Crypto Than People Think: Q1 OGE Report - CCN.com - 1 hour ago - By Prashant Jha" [ref=e1556] [cursor=pointer]':
+                - /url: ./read/CBMipwFBVV95cUxPQnh4bUt0UUk5M2FjUDIxZzEwTnZmZjZQYlFfZXpFeUJQSGV2cnhGdkZRSGZEVmplUTZLRlFNdjBldTlCNTA5eXJuSmlyZ2VWamx0TUYza21KS2lzVWMzTTRLMmFFc0NzZ0I5bVBJZGp4VmQ0TE9oMGpyYl9obzZMWm1zZHdTY0FnZVc2Mm1mdXZBY3Y3VWhQN1FoN3JmaWd1VGhNM0NQSQ?hl=en-US&gl=US&ceid=US%3Aen
+                - text: "President Trump’s More Exposed To Crypto Than People Think: Q1 OGE Report"
+            - figure [ref=e1557]
+          - generic [ref=e1558]:
+            - time [ref=e1559]: 1 hour ago
+            - separator [ref=e1560]
+            - generic [ref=e1561]: By Prashant Jha
+      - generic [ref=e1562]:
+        - separator [ref=e1564]
+        - generic [ref=e1566]:
+          - generic [ref=e1567]:
+            - link [ref=e1569] [cursor=pointer]:
+              - /url: ./read/CBMilAFBVV95cUxNMGs5cHhHWEpaaTBQaXA1Y2RKRDZ4UWh3OXRJQ0gwRkVjekVjdlgyd2o0WTFZVEkybmdRVzF2Z0RGTzM4TEd5TFlWMy1qTXJ4MVN2ZGxOb083Y1docEpXcGs4clpfVUVSRTJ0bUdHQ0poMDh2LW5OOWo5U0Jjd0NkRl9CV0c5Wm5aZUM2WXJBRkZXNDZx?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e1571]:
+              - generic [ref=e1572]:
+                - generic [ref=e1575]: CoinDesk
+                - generic [ref=e1579]:
+                  - generic:
+                    - 'button "More - U.S. Clarity Act markup leaves BTC price unstirred: Crypto Daily" [ref=e1580] [cursor=pointer]':
+                      - img [ref=e1582]
+                    - tooltip [ref=e1584]: More
+              - 'link "U.S. Clarity Act markup leaves BTC price unstirred: Crypto Daily - CoinDesk - Yesterday - By omkar godbole" [ref=e1585] [cursor=pointer]':
+                - /url: ./read/CBMilAFBVV95cUxNMGs5cHhHWEpaaTBQaXA1Y2RKRDZ4UWh3OXRJQ0gwRkVjekVjdlgyd2o0WTFZVEkybmdRVzF2Z0RGTzM4TEd5TFlWMy1qTXJ4MVN2ZGxOb083Y1docEpXcGs4clpfVUVSRTJ0bUdHQ0poMDh2LW5OOWo5U0Jjd0NkRl9CV0c5Wm5aZUM2WXJBRkZXNDZx?hl=en-US&gl=US&ceid=US%3Aen
+                - text: "U.S. Clarity Act markup leaves BTC price unstirred: Crypto Daily"
+            - figure [ref=e1586]
+          - generic [ref=e1587]:
+            - time [ref=e1588]: Yesterday
+            - separator [ref=e1589]
+            - generic [ref=e1590]: By omkar godbole
+      - generic [ref=e1591]:
+        - separator [ref=e1593]
+        - generic [ref=e1595]:
+          - generic [ref=e1596]:
+            - link [ref=e1598] [cursor=pointer]:
+              - /url: ./read/CBMibkFVX3lxTFBSNU5PSFlfN1YzdERxS3VDVmVTazgzZGxZZzFLWXNSREo1NjVLdWRONDRGa1dkdmFURDNIYTk1Qi1qWFc5WW1TX0Y4X24wejFudDVnZjdQb0VsLUkyTmVqYzRSRzEteFlQNGlNOERn?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e1600]:
+              - generic [ref=e1601]:
+                - generic [ref=e1604]: Crypto Briefing
+                - generic [ref=e1608]:
+                  - generic:
+                    - button "More - Tando enables 40 million Kenyans to receive Bitcoin via phone numbers" [ref=e1609] [cursor=pointer]:
+                      - img [ref=e1611]
+                    - tooltip [ref=e1613]: More
+              - link "Tando enables 40 million Kenyans to receive Bitcoin via phone numbers - Crypto Briefing - 7 hours ago" [ref=e1614] [cursor=pointer]:
+                - /url: ./read/CBMibkFVX3lxTFBSNU5PSFlfN1YzdERxS3VDVmVTazgzZGxZZzFLWXNSREo1NjVLdWRONDRGa1dkdmFURDNIYTk1Qi1qWFc5WW1TX0Y4X24wejFudDVnZjdQb0VsLUkyTmVqYzRSRzEteFlQNGlNOERn?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Tando enables 40 million Kenyans to receive Bitcoin via phone numbers
+            - figure [ref=e1615]
+          - time [ref=e1617]: 7 hours ago
+      - generic [ref=e1618]:
+        - separator [ref=e1620]
+        - generic [ref=e1622]:
+          - generic [ref=e1623]:
+            - link [ref=e1625] [cursor=pointer]:
+              - /url: ./read/CBMiyAFBVV95cUxQWUhCd2JJYUpYdmkxeVotR0VzMHNUNkZFTnZ0THdzU2ZVMDlVOEdWYTAwRHZaTS0xTmsyUTBRUVhFV1RJLWgzMDd2NjJUNEk4eXVwZ3JJUzluSHhNN1dKRHJfb3dDdVRJX3hfakFDdEVlX3k2Q3BrNmdUX1lvUFR4ZFh4VzNpMHFVVzRJSTFoaElWaVlRVGt6UUhBS1E1d3Y3R2FfWEtFZ1FkZmstUllxOUZNYm9pR1o0Z2lGYUxsWnAyb2ZFMnhrSw?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e1627]:
+              - generic [ref=e1628]:
+                - generic [ref=e1631]: Benzinga
+                - generic [ref=e1635]:
+                  - generic:
+                    - button "More - How Claude Helped Recover $395,000 In Bitcoin Without Cracking Crypto" [ref=e1636] [cursor=pointer]:
+                      - img [ref=e1638]
+                    - tooltip [ref=e1640]: More
+              - link "How Claude Helped Recover $395,000 In Bitcoin Without Cracking Crypto - Benzinga - 16 hours ago - By Parshwa Turakhiya" [ref=e1641] [cursor=pointer]:
+                - /url: ./read/CBMiyAFBVV95cUxQWUhCd2JJYUpYdmkxeVotR0VzMHNUNkZFTnZ0THdzU2ZVMDlVOEdWYTAwRHZaTS0xTmsyUTBRUVhFV1RJLWgzMDd2NjJUNEk4eXVwZ3JJUzluSHhNN1dKRHJfb3dDdVRJX3hfakFDdEVlX3k2Q3BrNmdUX1lvUFR4ZFh4VzNpMHFVVzRJSTFoaElWaVlRVGt6UUhBS1E1d3Y3R2FfWEtFZ1FkZmstUllxOUZNYm9pR1o0Z2lGYUxsWnAyb2ZFMnhrSw?hl=en-US&gl=US&ceid=US%3Aen
+                - text: How Claude Helped Recover $395,000 In Bitcoin Without Cracking Crypto
+            - figure [ref=e1642]
+          - generic [ref=e1643]:
+            - time [ref=e1644]: 16 hours ago
+            - separator [ref=e1645]
+            - generic [ref=e1646]: By Parshwa Turakhiya
+      - generic [ref=e1647]:
+        - separator [ref=e1649]
+        - generic [ref=e1651]:
+          - generic [ref=e1652]:
+            - link [ref=e1654] [cursor=pointer]:
+              - /url: ./read/CBMihgFBVV95cUxPU1pCNy1sSHZ4bW1RcUpDU3FHOHBZWUQtaHFFUnN0YTMyRF9CUE9XV0dTdHh3VTVQMlM1NUVRSVV0S293MXZKTVFBVGZDbWp6WC1BdUhaMjJsVXpFU0M1dlkxUThNbWJQY09YNzFqMTl0VVFTQThSRk9GcjVDN1hBVlNDcGlvQQ?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e1656]:
+              - generic [ref=e1657]:
+                - generic [ref=e1660]: Crypto Briefing
+                - generic [ref=e1664]:
+                  - generic:
+                    - button "More - Coinbase CEO predicts global Bitcoin legalization after US market structure passage" [ref=e1665] [cursor=pointer]:
+                      - img [ref=e1667]
+                    - tooltip [ref=e1669]: More
+              - link "Coinbase CEO predicts global Bitcoin legalization after US market structure passage - Crypto Briefing - 9 hours ago" [ref=e1670] [cursor=pointer]:
+                - /url: ./read/CBMihgFBVV95cUxPU1pCNy1sSHZ4bW1RcUpDU3FHOHBZWUQtaHFFUnN0YTMyRF9CUE9XV0dTdHh3VTVQMlM1NUVRSVV0S293MXZKTVFBVGZDbWp6WC1BdUhaMjJsVXpFU0M1dlkxUThNbWJQY09YNzFqMTl0VVFTQThSRk9GcjVDN1hBVlNDcGlvQQ?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Coinbase CEO predicts global Bitcoin legalization after US market structure passage
+            - figure [ref=e1671]
+          - time [ref=e1673]: 9 hours ago
+      - generic [ref=e1674]:
+        - separator [ref=e1676]
+        - generic [ref=e1678]:
+          - generic [ref=e1679]:
+            - link [ref=e1681] [cursor=pointer]:
+              - /url: ./read/CBMiqwFBVV95cUxOQTJWQ3JkakdHWVBHTElacTU2VTBxZ3RuX3RMSTgzQXNQNmFVM1NDcDItaGhXQXZVWER5QjFVWlBvTm1XWlQzVXNyVzk1QWhlSzdvUFFJcTlCUFZhYlVSQldBd245LXR1S0syZmMyMHdYNUg1WHNjSEJxOEZSSXY1QklNa3dnNjhRRkhZdlJXaWo0TXVuU2Nyb2RYTmJmaEdhMUF2S0FCTXE2aGs?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e1683]:
+              - generic [ref=e1684]:
+                - generic [ref=e1687]: Bitcoin News
+                - generic [ref=e1691]:
+                  - generic:
+                    - button "More - US and Bolivia Target the 'Modern Pablo Escobar' in Massive Crypto Laundering Probe" [ref=e1692] [cursor=pointer]:
+                      - img [ref=e1694]
+                    - tooltip [ref=e1696]: More
+              - link "US and Bolivia Target the 'Modern Pablo Escobar' in Massive Crypto Laundering Probe - Bitcoin News - 4 hours ago - By Sergio Goschenko" [ref=e1697] [cursor=pointer]:
+                - /url: ./read/CBMiqwFBVV95cUxOQTJWQ3JkakdHWVBHTElacTU2VTBxZ3RuX3RMSTgzQXNQNmFVM1NDcDItaGhXQXZVWER5QjFVWlBvTm1XWlQzVXNyVzk1QWhlSzdvUFFJcTlCUFZhYlVSQldBd245LXR1S0syZmMyMHdYNUg1WHNjSEJxOEZSSXY1QklNa3dnNjhRRkhZdlJXaWo0TXVuU2Nyb2RYTmJmaEdhMUF2S0FCTXE2aGs?hl=en-US&gl=US&ceid=US%3Aen
+                - text: US and Bolivia Target the 'Modern Pablo Escobar' in Massive Crypto Laundering Probe
+            - figure [ref=e1698]
+          - generic [ref=e1699]:
+            - time [ref=e1700]: 4 hours ago
+            - separator [ref=e1701]
+            - generic [ref=e1702]: By Sergio Goschenko
+      - generic [ref=e1703]:
+        - separator [ref=e1705]
+        - generic [ref=e1707]:
+          - generic [ref=e1708]:
+            - link [ref=e1710] [cursor=pointer]:
+              - /url: ./read/CBMie0FVX3lxTE8tWHdOQjRWVTdFcWpjRGprbzc3a2lpOGJrcnNqdzBoOWk3eHlUQzdFRFRiRklyNS16U0ZnRTY4bmkzWDl1cmNpS2J1bm55UFk4WlVNNjNFMVhxU3I1ZFFuZ3ZsNzFEZWRJXzdhQlZtOUtyVjY4VXRDbGxaVQ?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e1712]:
+              - generic [ref=e1713]:
+                - generic [ref=e1716]: Crypto Briefing
+                - generic [ref=e1720]:
+                  - generic:
+                    - button "More - Senate Banking Committee votes on Clarity Act, favoring Bitcoin and Coinbase staking" [ref=e1721] [cursor=pointer]:
+                      - img [ref=e1723]
+                    - tooltip [ref=e1725]: More
+              - link "Senate Banking Committee votes on Clarity Act, favoring Bitcoin and Coinbase staking - Crypto Briefing - 2 hours ago" [ref=e1726] [cursor=pointer]:
+                - /url: ./read/CBMie0FVX3lxTE8tWHdOQjRWVTdFcWpjRGprbzc3a2lpOGJrcnNqdzBoOWk3eHlUQzdFRFRiRklyNS16U0ZnRTY4bmkzWDl1cmNpS2J1bm55UFk4WlVNNjNFMVhxU3I1ZFFuZ3ZsNzFEZWRJXzdhQlZtOUtyVjY4VXRDbGxaVQ?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Senate Banking Committee votes on Clarity Act, favoring Bitcoin and Coinbase staking
+            - figure [ref=e1727]
+          - time [ref=e1729]: 2 hours ago
+      - generic [ref=e1730]:
+        - separator [ref=e1732]
+        - generic [ref=e1734]:
+          - generic [ref=e1735]:
+            - link [ref=e1737] [cursor=pointer]:
+              - /url: ./read/CBMitAFBVV95cUxPVUJOQVQtejk0dW9Bb1BTZmQzSXhDdmtxY3dBRVZhRUtid0RzNjBBQVBxVmJWNmduUFdqazZPSEJubHFldVBxek5KWDVaVEs4S1JYVktpemp6WkVONXJaX2d0a2ZqNDlZUi11RnM3NVB1WGxWX3d1MmNBcHVOUUdWM1VRVEFwWkxhTm1nU01NOG4yTUVuLVlWcHpHT203bFNLd0ZoU29TZGtxckw3X0tOaTZJcks?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e1739]:
+              - generic [ref=e1740]:
+                - generic [ref=e1743]: CoinDesk
+                - generic [ref=e1747]:
+                  - generic:
+                    - button "More - Bitcoin slips below $80,000 as inflation concerns trigger crypto selloff" [ref=e1748] [cursor=pointer]:
+                      - img [ref=e1750]
+                    - tooltip [ref=e1752]: More
+              - link "Bitcoin slips below $80,000 as inflation concerns trigger crypto selloff - CoinDesk - Yesterday - By omkar godbole & Oliver Knight" [ref=e1753] [cursor=pointer]:
+                - /url: ./read/CBMitAFBVV95cUxPVUJOQVQtejk0dW9Bb1BTZmQzSXhDdmtxY3dBRVZhRUtid0RzNjBBQVBxVmJWNmduUFdqazZPSEJubHFldVBxek5KWDVaVEs4S1JYVktpemp6WkVONXJaX2d0a2ZqNDlZUi11RnM3NVB1WGxWX3d1MmNBcHVOUUdWM1VRVEFwWkxhTm1nU01NOG4yTUVuLVlWcHpHT203bFNLd0ZoU29TZGtxckw3X0tOaTZJcks?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Bitcoin slips below $80,000 as inflation concerns trigger crypto selloff
+            - figure [ref=e1754]
+          - generic [ref=e1755]:
+            - time [ref=e1756]: Yesterday
+            - separator [ref=e1757]
+            - generic [ref=e1758]: By omkar godbole & Oliver Knight
+      - generic [ref=e1759]:
+        - separator [ref=e1761]
+        - generic [ref=e1763]:
+          - generic [ref=e1764]:
+            - link [ref=e1766] [cursor=pointer]:
+              - /url: ./read/CBMiW0FVX3lxTE9OYjh4WWhqYkwtejlURGpFTVctcHp3bTZPZ25GWlQ0SFVUWVBnNlJGMlcwbk1QaFE4TklXdVYyZUQ5NjZ1TVFfb0VKWG1WUlY2ekNkcGJuTXZaN28?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e1768]:
+              - generic [ref=e1769]:
+                - generic [ref=e1772]: Cryptonews.net
+                - generic [ref=e1776]:
+                  - generic:
+                    - 'button "More - Bitcoin, Ethereum, XRP, Dogecoin Jump After Crypto Act Passes Key Senate Vote: Analyst Says BTC ''Positioned'' For A Rebound Toward $86,000" [ref=e1777] [cursor=pointer]':
+                      - img [ref=e1779]
+                    - tooltip [ref=e1781]: More
+              - 'link "Bitcoin, Ethereum, XRP, Dogecoin Jump After Crypto Act Passes Key Senate Vote: Analyst Says BTC ''Positioned'' For A Rebound Toward $86,000 - Cryptonews.net - 9 hours ago" [ref=e1782] [cursor=pointer]':
+                - /url: ./read/CBMiW0FVX3lxTE9OYjh4WWhqYkwtejlURGpFTVctcHp3bTZPZ25GWlQ0SFVUWVBnNlJGMlcwbk1QaFE4TklXdVYyZUQ5NjZ1TVFfb0VKWG1WUlY2ekNkcGJuTXZaN28?hl=en-US&gl=US&ceid=US%3Aen
+                - text: "Bitcoin, Ethereum, XRP, Dogecoin Jump After Crypto Act Passes Key Senate Vote: Analyst Says BTC 'Positioned' For A Rebound Toward $86,000"
+            - figure [ref=e1783]
+          - time [ref=e1785]: 9 hours ago
+      - generic [ref=e1786]:
+        - separator [ref=e1788]
+        - generic [ref=e1790]:
+          - generic [ref=e1791]:
+            - link [ref=e1793] [cursor=pointer]:
+              - /url: ./read/CBMiqgFBVV95cUxQMzg2MVhiRDBMQW1wVFNFcUtZV2t6ZTFKeUU3SUNIWDBhTGlfT1hHTXhndlhCd2VoRVNvdUVJZFVoMGo0bElpSW8tX3dTemxuaDJfbXg1RXBCQWxQblRMMGl1Zkh3QXVGc01XZ3JMTUpMNjkzUWc1Q1AzdjhhaU5tTWtmN3JnXzh3RUtMSGpyeTZTQ3NFaFBHYlJ3Y25pSUQ4ZFhXeGxaOEtWQdIBrwFBVV95cUxPdERWdGJPWllJam5Nb3pGZ0RrWkpEWmNQTzY2eXF3a1ZwSXJ1WG50Z3dscVBtczVlNFFwLVNrS2JGOS1GOV80Z2hkeW83STJwM0pfZG9vTzRISTg3Rl92NFA0cmhyNkdHZjdwb3pjU1laMGI5cU1NTVNvWURST3NmeXc0eGFEbnJJV0NfWlp2SlN1bXctNC1DdUJlVFNpcUtLZzU3QnFJRnFKODhWRW1Z?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e1795]:
+              - generic [ref=e1796]:
+                - generic [ref=e1799]: Coinpedia
+                - generic [ref=e1803]:
+                  - generic:
+                    - button "More - Thorchain Exploit Drains $7.4M Across Bitcoin, Ethereum, BSC, and Base" [ref=e1804] [cursor=pointer]:
+                      - img [ref=e1806]
+                    - tooltip [ref=e1808]: More
+              - link "Thorchain Exploit Drains $7.4M Across Bitcoin, Ethereum, BSC, and Base - Coinpedia - 1 hour ago - By Nidhi Kolhapur" [ref=e1809] [cursor=pointer]:
+                - /url: ./read/CBMiqgFBVV95cUxQMzg2MVhiRDBMQW1wVFNFcUtZV2t6ZTFKeUU3SUNIWDBhTGlfT1hHTXhndlhCd2VoRVNvdUVJZFVoMGo0bElpSW8tX3dTemxuaDJfbXg1RXBCQWxQblRMMGl1Zkh3QXVGc01XZ3JMTUpMNjkzUWc1Q1AzdjhhaU5tTWtmN3JnXzh3RUtMSGpyeTZTQ3NFaFBHYlJ3Y25pSUQ4ZFhXeGxaOEtWQdIBrwFBVV95cUxPdERWdGJPWllJam5Nb3pGZ0RrWkpEWmNQTzY2eXF3a1ZwSXJ1WG50Z3dscVBtczVlNFFwLVNrS2JGOS1GOV80Z2hkeW83STJwM0pfZG9vTzRISTg3Rl92NFA0cmhyNkdHZjdwb3pjU1laMGI5cU1NTVNvWURST3NmeXc0eGFEbnJJV0NfWlp2SlN1bXctNC1DdUJlVFNpcUtLZzU3QnFJRnFKODhWRW1Z?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Thorchain Exploit Drains $7.4M Across Bitcoin, Ethereum, BSC, and Base
+            - figure [ref=e1810]
+          - generic [ref=e1811]:
+            - time [ref=e1812]: 1 hour ago
+            - separator [ref=e1813]
+            - generic [ref=e1814]: By Nidhi Kolhapur
+      - generic [ref=e1815]:
+        - separator [ref=e1817]
+        - generic [ref=e1819]:
+          - generic [ref=e1820]:
+            - link [ref=e1822] [cursor=pointer]:
+              - /url: ./read/CBMimgFBVV95cUxPVjdIWTFIdl9SczdIZ1VVMXdMSDdxd3U0RmdaVE1GN0pwdEhCejBWVGpUWXJiWEJCS21RR0FMem94QmlyVGxYLXU4YXhpTC1lUjVsZzZTN1pWb1FIQ2RucEdldGVNMXJicEd5TThTT0ZvdEY3UWx1VWZ3WTUwcFFMcTZJVTJqN25tWTZGdTNxX014TldnMS1mSTln0gGfAUFVX3lxTE5vV21BbGVvdlRUZHlQY3A3MTRlaUxzLXZCc2xzdUhtUkFrZmw2b0tvSFBZMU5QT2dIU2pkN0ktdUFNMGRWbDVSTlBFdGk3WUszeW1GWldKaGhNR3ctckR4NDFxU0N3WVVMZzRWUVdlXzl0MHdEMDR5dlJwLVJ2d08zazVpTl9LX0Jlb3VIc3BzRmpSaDFudkhUMFNtNnlfNA?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e1824]:
+              - generic [ref=e1825]:
+                - generic [ref=e1828]: AMBCrypto
+                - generic [ref=e1832]:
+                  - generic:
+                    - button "More - Top 11 cloud mining platforms every crypto user should know in May 2026" [ref=e1833] [cursor=pointer]:
+                      - img [ref=e1835]
+                    - tooltip [ref=e1837]: More
+              - link "Top 11 cloud mining platforms every crypto user should know in May 2026 - AMBCrypto - 43 minutes ago" [ref=e1838] [cursor=pointer]:
+                - /url: ./read/CBMimgFBVV95cUxPVjdIWTFIdl9SczdIZ1VVMXdMSDdxd3U0RmdaVE1GN0pwdEhCejBWVGpUWXJiWEJCS21RR0FMem94QmlyVGxYLXU4YXhpTC1lUjVsZzZTN1pWb1FIQ2RucEdldGVNMXJicEd5TThTT0ZvdEY3UWx1VWZ3WTUwcFFMcTZJVTJqN25tWTZGdTNxX014TldnMS1mSTln0gGfAUFVX3lxTE5vV21BbGVvdlRUZHlQY3A3MTRlaUxzLXZCc2xzdUhtUkFrZmw2b0tvSFBZMU5QT2dIU2pkN0ktdUFNMGRWbDVSTlBFdGk3WUszeW1GWldKaGhNR3ctckR4NDFxU0N3WVVMZzRWUVdlXzl0MHdEMDR5dlJwLVJ2d08zazVpTl9LX0Jlb3VIc3BzRmpSaDFudkhUMFNtNnlfNA?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Top 11 cloud mining platforms every crypto user should know in May 2026
+            - figure [ref=e1839]
+          - time [ref=e1841]: 43 minutes ago
+      - generic [ref=e1842]:
+        - separator [ref=e1844]
+        - generic [ref=e1846]:
+          - generic [ref=e1847]:
+            - link [ref=e1849] [cursor=pointer]:
+              - /url: ./read/CBMipgFBVV95cUxNb19lTWFjZ0R4VEJpdm4tanBiUmRIcXItQW4zTEIzcUphdlloaFVKSWdQeDhRU1NvR2RGU25MSXI0YlRoVV9teEJtNFBoVDA3UlE2U25mZmJESnJYWW5VdmNJMUNqSkdfRWxfOEpwblV6TUxUQVB2a01BdTVZOUhsbUY5Q2h4QjRlOVVBWmZzM1diTjlYSFh5MWI3Sk5iTnhidWQwRnBn?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e1851]:
+              - generic [ref=e1852]:
+                - generic [ref=e1855]: thestreet.com
+                - generic [ref=e1859]:
+                  - generic:
+                    - button "More - Peter thiel-backed stock suffers after missing earnings report" [ref=e1860] [cursor=pointer]:
+                      - img [ref=e1862]
+                    - tooltip [ref=e1864]: More
+              - link "Peter thiel-backed stock suffers after missing earnings report - thestreet.com - 18 hours ago" [ref=e1865] [cursor=pointer]:
+                - /url: ./read/CBMipgFBVV95cUxNb19lTWFjZ0R4VEJpdm4tanBiUmRIcXItQW4zTEIzcUphdlloaFVKSWdQeDhRU1NvR2RGU25MSXI0YlRoVV9teEJtNFBoVDA3UlE2U25mZmJESnJYWW5VdmNJMUNqSkdfRWxfOEpwblV6TUxUQVB2a01BdTVZOUhsbUY5Q2h4QjRlOVVBWmZzM1diTjlYSFh5MWI3Sk5iTnhidWQwRnBn?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Peter thiel-backed stock suffers after missing earnings report
+            - figure [ref=e1866]
+          - time [ref=e1868]: 18 hours ago
+      - generic [ref=e1869]:
+        - separator [ref=e1871]
+        - generic [ref=e1873]:
+          - generic [ref=e1874]:
+            - link [ref=e1876] [cursor=pointer]:
+              - /url: ./read/CBMikAFBVV95cUxOYVJDNWNPall0a2YwaDhwdG9rZmk5NHk2OTREVHN4RmVpZW55cmllc0o3dHF0ODE1OTNFbW5yN1hnQ29yUmJuNnQ4NmJqTUN3SENmaTVUOE9PME9QVXBjbjJHX3A0eFRQWEpIYVgyMDI3Ykh2YU1UNnJkYTJiU29BMFo4ZW5DcUcxam1tM1REU1Q?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e1878]:
+              - generic [ref=e1879]:
+                - generic [ref=e1882]: thestreet.com
+                - generic [ref=e1886]:
+                  - generic:
+                    - button "More - Coinbase-backed super app shuts down" [ref=e1887] [cursor=pointer]:
+                      - img [ref=e1889]
+                    - tooltip [ref=e1891]: More
+              - link "Coinbase-backed super app shuts down - thestreet.com - 17 hours ago - By Pooja Rajkumari" [ref=e1892] [cursor=pointer]:
+                - /url: ./read/CBMikAFBVV95cUxOYVJDNWNPall0a2YwaDhwdG9rZmk5NHk2OTREVHN4RmVpZW55cmllc0o3dHF0ODE1OTNFbW5yN1hnQ29yUmJuNnQ4NmJqTUN3SENmaTVUOE9PME9QVXBjbjJHX3A0eFRQWEpIYVgyMDI3Ykh2YU1UNnJkYTJiU29BMFo4ZW5DcUcxam1tM1REU1Q?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Coinbase-backed super app shuts down
+            - figure [ref=e1893]
+          - generic [ref=e1894]:
+            - time [ref=e1895]: 17 hours ago
+            - separator [ref=e1896]
+            - generic [ref=e1897]: By Pooja Rajkumari
+      - generic [ref=e1898]:
+        - separator [ref=e1900]
+        - generic [ref=e1902]:
+          - generic [ref=e1903]:
+            - link [ref=e1905] [cursor=pointer]:
+              - /url: ./read/CBMimgFBVV95cUxPNkZfVWx2YWxBdXpFWnNDWHhmNTFNUzgxNkhmRVlPczcwcXNLNUpocG52ME05dHpwNmRBOUtUNm5IM0dUd2lFcEtXbGpNdVI2b1R6OHVNSVBYM0kzdm9OQjdxQjJUU3RRZ1JFbnJlUFNkZ0tpUy1YbWpuSmhkTWtSOFNNQUJreTROMU5rdVp0dU1BVE00RXVQNTdB0gHWAUFVX3lxTE1xSExKZGY3R1VDWVZYeEJyOUhOVDd4NGFVQ1E3aXFhT2pISk9Xa3hjZy0zSjJMSmZhd21GWW1LRkNXNkFybnNfS0NfdU1Zd2RVQUNndVhTM1NFd1hobThfbHFGV1kyZjdZTkFzRzZtWTRHelQ3RUhYb0g1ZzllV1VqZU92cFVQcS1tVWM1UFI2b1VTcWpFMHdGMUxQRkJnbGNzd05FV1JHd25WWTZwalJBcXdodTZ1Wm1xRVBxSXU5UkZURm9Xd1pySDc5a0FpMXVQSFJKY3c?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e1907]:
+              - generic [ref=e1908]:
+                - generic [ref=e1911]: AMBCrypto
+                - generic [ref=e1915]:
+                  - generic:
+                    - button "More - Bitcoin sellers stay quiet as losses peak at 15% – What this means for BTC" [ref=e1916] [cursor=pointer]:
+                      - img [ref=e1918]
+                    - tooltip [ref=e1920]: More
+              - link "Bitcoin sellers stay quiet as losses peak at 15% – What this means for BTC - AMBCrypto - 8 hours ago - By Olayiwola Dolapo" [ref=e1921] [cursor=pointer]:
+                - /url: ./read/CBMimgFBVV95cUxPNkZfVWx2YWxBdXpFWnNDWHhmNTFNUzgxNkhmRVlPczcwcXNLNUpocG52ME05dHpwNmRBOUtUNm5IM0dUd2lFcEtXbGpNdVI2b1R6OHVNSVBYM0kzdm9OQjdxQjJUU3RRZ1JFbnJlUFNkZ0tpUy1YbWpuSmhkTWtSOFNNQUJreTROMU5rdVp0dU1BVE00RXVQNTdB0gHWAUFVX3lxTE1xSExKZGY3R1VDWVZYeEJyOUhOVDd4NGFVQ1E3aXFhT2pISk9Xa3hjZy0zSjJMSmZhd21GWW1LRkNXNkFybnNfS0NfdU1Zd2RVQUNndVhTM1NFd1hobThfbHFGV1kyZjdZTkFzRzZtWTRHelQ3RUhYb0g1ZzllV1VqZU92cFVQcS1tVWM1UFI2b1VTcWpFMHdGMUxQRkJnbGNzd05FV1JHd25WWTZwalJBcXdodTZ1Wm1xRVBxSXU5UkZURm9Xd1pySDc5a0FpMXVQSFJKY3c?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Bitcoin sellers stay quiet as losses peak at 15% – What this means for BTC
+            - figure [ref=e1922]
+          - generic [ref=e1923]:
+            - time [ref=e1924]: 8 hours ago
+            - separator [ref=e1925]
+            - generic [ref=e1926]: By Olayiwola Dolapo
+      - generic [ref=e1927]:
+        - separator [ref=e1929]
+        - generic [ref=e1931]:
+          - generic [ref=e1932]:
+            - link [ref=e1934] [cursor=pointer]:
+              - /url: ./read/CBMilAFBVV95cUxNM2d6UkRfTkNWeWlHUmNkM1NmQW5ILXZGN3RobkJlVmhpblRGYVFfdmt1NUJUNENFMEYyR0QtVzRjcFZBaFRaeWxQUXY5XzdLLVhHamJadHQwVXMwNlB4UFpsam5nSTRYT0UtVHE3OFFsb0JHZnlIbjNmaGdySW52X3RKOTI5ZVAyVURQcTdQYnRHOUJx?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e1936]:
+              - generic [ref=e1937]:
+                - generic [ref=e1940]: CNN
+                - generic [ref=e1944]:
+                  - generic:
+                    - button "More - Cross-country scheme to steal cryptocurrency involved fake food orders and violent break-ins, prosecutors say" [ref=e1945] [cursor=pointer]:
+                      - img [ref=e1947]
+                    - tooltip [ref=e1949]: More
+              - link "Cross-country scheme to steal cryptocurrency involved fake food orders and violent break-ins, prosecutors say - CNN - 21 hours ago - By Andy Rose" [ref=e1950] [cursor=pointer]:
+                - /url: ./read/CBMilAFBVV95cUxNM2d6UkRfTkNWeWlHUmNkM1NmQW5ILXZGN3RobkJlVmhpblRGYVFfdmt1NUJUNENFMEYyR0QtVzRjcFZBaFRaeWxQUXY5XzdLLVhHamJadHQwVXMwNlB4UFpsam5nSTRYT0UtVHE3OFFsb0JHZnlIbjNmaGdySW52X3RKOTI5ZVAyVURQcTdQYnRHOUJx?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Cross-country scheme to steal cryptocurrency involved fake food orders and violent break-ins, prosecutors say
+            - figure [ref=e1951]
+          - generic [ref=e1952]:
+            - time [ref=e1953]: 21 hours ago
+            - separator [ref=e1954]
+            - generic [ref=e1955]: By Andy Rose
+      - generic [ref=e1956]:
+        - separator [ref=e1958]
+        - generic [ref=e1960]:
+          - generic [ref=e1961]:
+            - link [ref=e1963] [cursor=pointer]:
+              - /url: ./read/CBMitwFBVV95cUxON2J5R2pHb2ZOM1ljWEU3Zjd1cGlkMVpENXlnRy02di1jWVJsclB5ZkxtYktrTHpuN1pxWUVRWGVtLUJBVVB4c05iT01tT2l1bGIyb3ZKMVFQR3lXa05jZXd5RDRveGYxY1hzUXoxZGVSSlQxdWxEV3hGYmVYblBKVlo5dWh1NTZlcHRuVW5QamZ0ang2dnJUWGNEbXVueTREQ3ZSUDJCWWFVdjdZMGhfSkRvZnE3WFk?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e1965]:
+              - generic [ref=e1966]:
+                - generic [ref=e1969]: Santiment
+                - generic [ref=e1973]:
+                  - generic:
+                    - 'button "More - THIS WEEK IN CRYPTO: Bitcoin Greed Looking High On Your Feed? Here’s Why!" [ref=e1974] [cursor=pointer]':
+                      - img [ref=e1976]
+                    - tooltip [ref=e1978]: More
+              - 'link "THIS WEEK IN CRYPTO: Bitcoin Greed Looking High On Your Feed? Here’s Why! - Santiment - 8 hours ago" [ref=e1979] [cursor=pointer]':
+                - /url: ./read/CBMitwFBVV95cUxON2J5R2pHb2ZOM1ljWEU3Zjd1cGlkMVpENXlnRy02di1jWVJsclB5ZkxtYktrTHpuN1pxWUVRWGVtLUJBVVB4c05iT01tT2l1bGIyb3ZKMVFQR3lXa05jZXd5RDRveGYxY1hzUXoxZGVSSlQxdWxEV3hGYmVYblBKVlo5dWh1NTZlcHRuVW5QamZ0ang2dnJUWGNEbXVueTREQ3ZSUDJCWWFVdjdZMGhfSkRvZnE3WFk?hl=en-US&gl=US&ceid=US%3Aen
+                - text: "THIS WEEK IN CRYPTO: Bitcoin Greed Looking High On Your Feed? Here’s Why!"
+            - figure [ref=e1980]
+          - time [ref=e1982]: 8 hours ago
+      - generic [ref=e1983]:
+        - separator [ref=e1985]
+        - generic [ref=e1987]:
+          - generic [ref=e1988]:
+            - link [ref=e1990] [cursor=pointer]:
+              - /url: ./read/CBMimwFBVV95cUxPbC1iMXVOdWtYVkpNSk9CQzlIQUU3TEZKSUZHUEc3RTdaMG1zS0IxYVpVYXdfd1Y5VkF2LWFQT0pLZC1INmhEOXY1bHNTM2twSlZYUHAwSnMtU3V1Z1VTV2g3TTR1X2tCUTczNGZQQnE2NFhpQ2FwSm9RamFGMFQycTlDUTRyeThCMU9tY3VQWTdndkxxdUpJVEhRNA?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e1992]:
+              - generic [ref=e1993]:
+                - generic [ref=e1996]: FXStreet
+                - generic [ref=e2000]:
+                  - generic:
+                    - button "More - Sellers are pressing down on crypto" [ref=e2001] [cursor=pointer]:
+                      - img [ref=e2003]
+                    - tooltip [ref=e2005]: More
+              - link "Sellers are pressing down on crypto - FXStreet - 2 hours ago - By Alexander Kuptsikevich" [ref=e2006] [cursor=pointer]:
+                - /url: ./read/CBMimwFBVV95cUxPbC1iMXVOdWtYVkpNSk9CQzlIQUU3TEZKSUZHUEc3RTdaMG1zS0IxYVpVYXdfd1Y5VkF2LWFQT0pLZC1INmhEOXY1bHNTM2twSlZYUHAwSnMtU3V1Z1VTV2g3TTR1X2tCUTczNGZQQnE2NFhpQ2FwSm9RamFGMFQycTlDUTRyeThCMU9tY3VQWTdndkxxdUpJVEhRNA?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Sellers are pressing down on crypto
+            - figure [ref=e2007]
+          - generic [ref=e2008]:
+            - time [ref=e2009]: 2 hours ago
+            - separator [ref=e2010]
+            - generic [ref=e2011]: By Alexander Kuptsikevich
+      - generic [ref=e2012]:
+        - separator [ref=e2014]
+        - generic [ref=e2016]:
+          - generic [ref=e2017]:
+            - link [ref=e2019] [cursor=pointer]:
+              - /url: ./read/CBMiwgFBVV95cUxNeHloQnhqQWdsYnNuVW9rUmNTNVphaHpELUtvTVlZUkxfeDNQMkgySWp2NEI3UDhqQXZncjhNYVdxRWRCNXVTMUduWmwtbEFtYk1zR0RRRVI3SWF3cWJDUjgzMmdTQTlQUFlGVnV6SGZhbFc2aWp1OXhTQlNLaGh6V3pFTFBKUmNNTEpsalZ4Sms2YlZpRzV3VEtRaHYxSl9sQ285OWliZVBrMEdBYVlnQmg5MXluY0NOLTFGTzlDc0JRUQ?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e2021]:
+              - generic [ref=e2022]:
+                - generic [ref=e2025]: CoinDesk
+                - generic [ref=e2029]:
+                  - generic:
+                    - button "More - Lawyer behind Arbitrum crypto seizure fight now targets Tether for $344 million" [ref=e2030] [cursor=pointer]:
+                      - img [ref=e2032]
+                    - tooltip [ref=e2034]: More
+              - link "Lawyer behind Arbitrum crypto seizure fight now targets Tether for $344 million - CoinDesk - 6 hours ago - By Sam Reynolds" [ref=e2035] [cursor=pointer]:
+                - /url: ./read/CBMiwgFBVV95cUxNeHloQnhqQWdsYnNuVW9rUmNTNVphaHpELUtvTVlZUkxfeDNQMkgySWp2NEI3UDhqQXZncjhNYVdxRWRCNXVTMUduWmwtbEFtYk1zR0RRRVI3SWF3cWJDUjgzMmdTQTlQUFlGVnV6SGZhbFc2aWp1OXhTQlNLaGh6V3pFTFBKUmNNTEpsalZ4Sms2YlZpRzV3VEtRaHYxSl9sQ285OWliZVBrMEdBYVlnQmg5MXluY0NOLTFGTzlDc0JRUQ?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Lawyer behind Arbitrum crypto seizure fight now targets Tether for $344 million
+            - figure [ref=e2036]
+          - generic [ref=e2037]:
+            - time [ref=e2038]: 6 hours ago
+            - separator [ref=e2039]
+            - generic [ref=e2040]: By Sam Reynolds
+      - generic [ref=e2041]:
+        - separator [ref=e2043]
+        - generic [ref=e2045]:
+          - generic [ref=e2046]:
+            - link [ref=e2048] [cursor=pointer]:
+              - /url: ./read/CBMinwJBVV95cUxOc3h4OVg4THVEQXFVUTZ4N050TDhLNTdNR1RqV3VjSUJhX2VIVU1ZSGdIUGxsM2xMVHJfVG1BcVhOTkxLckUtc2U5TzFsRzk2SWxPZ2tCd3ZsTGdWYWEzSXEyMWpnZWYwdzR0Y1RlSmlOb0VyYXpUeXpKNFhXdklRZVNjZlBOUnR5WkVaWWhZbXExX2dYM1VVdGRRaWZIai1fa1J4ZE14eW1mYU81bGJLU0EtWlYwRGpsdmh2dERoWno3SFlBOUhnOWczcnBhUVVuel9vRy1OajYxeGM5TEpiUm5vSXdnNDdtLXJ4UThuQ3dVQUJiaFB0eUg5clRxYWRPbDBUR29Mem9uenpqdVplNGl6RG1SZVFkTlRTQXU3dw?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e2050]:
+              - generic [ref=e2051]:
+                - generic [ref=e2054]: TechRadar
+                - generic [ref=e2058]:
+                  - generic:
+                    - button "More - This Bitcoin owner spent years trying trillions of passwords — then Claude AI spotted the one thing he’d missed" [ref=e2059] [cursor=pointer]:
+                      - img [ref=e2061]
+                    - tooltip [ref=e2063]: More
+              - link "This Bitcoin owner spent years trying trillions of passwords — then Claude AI spotted the one thing he’d missed - TechRadar - 3 hours ago - By Eric Hal Schwartz" [ref=e2064] [cursor=pointer]:
+                - /url: ./read/CBMinwJBVV95cUxOc3h4OVg4THVEQXFVUTZ4N050TDhLNTdNR1RqV3VjSUJhX2VIVU1ZSGdIUGxsM2xMVHJfVG1BcVhOTkxLckUtc2U5TzFsRzk2SWxPZ2tCd3ZsTGdWYWEzSXEyMWpnZWYwdzR0Y1RlSmlOb0VyYXpUeXpKNFhXdklRZVNjZlBOUnR5WkVaWWhZbXExX2dYM1VVdGRRaWZIai1fa1J4ZE14eW1mYU81bGJLU0EtWlYwRGpsdmh2dERoWno3SFlBOUhnOWczcnBhUVVuel9vRy1OajYxeGM5TEpiUm5vSXdnNDdtLXJ4UThuQ3dVQUJiaFB0eUg5clRxYWRPbDBUR29Mem9uenpqdVplNGl6RG1SZVFkTlRTQXU3dw?hl=en-US&gl=US&ceid=US%3Aen
+                - text: This Bitcoin owner spent years trying trillions of passwords — then Claude AI spotted the one thing he’d missed
+            - figure [ref=e2065]
+          - generic [ref=e2066]:
+            - time [ref=e2067]: 3 hours ago
+            - separator [ref=e2068]
+            - generic [ref=e2069]: By Eric Hal Schwartz
+      - generic [ref=e2070]:
+        - separator [ref=e2072]
+        - generic [ref=e2074]:
+          - generic [ref=e2075]:
+            - link [ref=e2077] [cursor=pointer]:
+              - /url: ./read/CBMiogFBVV95cUxOaW5xcDNxaHBqcWNpQmc1VGR3eFdNZ3I2S2JNT0N1WE92NXlha1JGZlFJd3czYWVuYlFoVGdWXzVfSTNBMHZGN3JzSlZzV1FNVGdEQ3l5QmtTQWt1NkFLYkNlckJFRUo1THYzeVpJRlI4WWlUeENJTUZOQmlxd1hzVHpIdm1VZmY3VG15V2tpb0pPSVJrN3dTZ1htYkR5c0tPWWc?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e2079]:
+              - generic [ref=e2080]:
+                - generic [ref=e2083]: Yahoo Finance
+                - generic [ref=e2087]:
+                  - generic:
+                    - button "More - Coinbase Spikes 10%, Strategy Rallies 7%, Marathon Rises 6% as Crypto Stocks Catch Regulatory Tailwind" [ref=e2088] [cursor=pointer]:
+                      - img [ref=e2090]
+                    - tooltip [ref=e2092]: More
+              - link "Coinbase Spikes 10%, Strategy Rallies 7%, Marathon Rises 6% as Crypto Stocks Catch Regulatory Tailwind - Yahoo Finance - 18 hours ago - By David Moadel, M.Ed." [ref=e2093] [cursor=pointer]:
+                - /url: ./read/CBMiogFBVV95cUxOaW5xcDNxaHBqcWNpQmc1VGR3eFdNZ3I2S2JNT0N1WE92NXlha1JGZlFJd3czYWVuYlFoVGdWXzVfSTNBMHZGN3JzSlZzV1FNVGdEQ3l5QmtTQWt1NkFLYkNlckJFRUo1THYzeVpJRlI4WWlUeENJTUZOQmlxd1hzVHpIdm1VZmY3VG15V2tpb0pPSVJrN3dTZ1htYkR5c0tPWWc?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Coinbase Spikes 10%, Strategy Rallies 7%, Marathon Rises 6% as Crypto Stocks Catch Regulatory Tailwind
+            - figure [ref=e2094]
+          - generic [ref=e2095]:
+            - time [ref=e2096]: 18 hours ago
+            - separator [ref=e2097]
+            - generic [ref=e2098]: By David Moadel, M.Ed.
+      - generic [ref=e2099]:
+        - separator [ref=e2101]
+        - generic [ref=e2103]:
+          - generic [ref=e2104]:
+            - link [ref=e2106] [cursor=pointer]:
+              - /url: ./read/CBMiigFBVV95cUxNWk12cEpDdUdSbjNTVDVxaVRVT01ZdW1rTElZM0lndjl0R2I0b05KNUZZN2g5WjRweWNmYVpXRkQyR2NDS0JrS25YaHpGNEw2bFBzY0RNNGtmOXptekw0ZmE0Z1dyNXVpejZhNnFIeXRfQU5LS2R6RDZmYWtUVW9MRElWTmtxblJDcVE?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e2108]:
+              - generic [ref=e2109]:
+                - generic [ref=e2112]: Finbold
+                - generic [ref=e2116]:
+                  - generic:
+                    - button "More - Crypto market expert predicts $90k is ‘on the cards’ for Bitcoin" [ref=e2117] [cursor=pointer]:
+                      - img [ref=e2119]
+                    - tooltip [ref=e2121]: More
+              - link "Crypto market expert predicts $90k is ‘on the cards’ for Bitcoin - Finbold - 1 hour ago - By Steve Muchoki" [ref=e2122] [cursor=pointer]:
+                - /url: ./read/CBMiigFBVV95cUxNWk12cEpDdUdSbjNTVDVxaVRVT01ZdW1rTElZM0lndjl0R2I0b05KNUZZN2g5WjRweWNmYVpXRkQyR2NDS0JrS25YaHpGNEw2bFBzY0RNNGtmOXptekw0ZmE0Z1dyNXVpejZhNnFIeXRfQU5LS2R6RDZmYWtUVW9MRElWTmtxblJDcVE?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Crypto market expert predicts $90k is ‘on the cards’ for Bitcoin
+            - figure [ref=e2123]
+          - generic [ref=e2124]:
+            - time [ref=e2125]: 1 hour ago
+            - separator [ref=e2126]
+            - generic [ref=e2127]: By Steve Muchoki
+      - generic [ref=e2128]:
+        - separator [ref=e2130]
+        - generic [ref=e2132]:
+          - generic [ref=e2133]:
+            - link [ref=e2135] [cursor=pointer]:
+              - /url: ./read/CBMiogFBVV95cUxNOHpGNm1kQlc0Wk8tSnVfall6QTBSOVVOaUwteHhndnEwNkVyX3EySlJVOHBNOGk4aEpNWWZMbVd4cXVRZ0Jqam1TeGRBRGpUZzBFWHdqWDFCSTluOUh1MGkzQ1lFb2lxMnI1WElVLXBYOHhTR1RZd0tYaWlDWDRFQlJCa0VnX0tvbkJOZG80QXRna0I2NE9mM0lrUzZMYnE1aVE?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e2137]:
+              - generic [ref=e2138]:
+                - generic [ref=e2141]: Yahoo Finance
+                - generic [ref=e2145]:
+                  - generic:
+                    - button "More - ZachXBT Flags Multi-Chain THORChain Exploit as Stolen Funds Surge Past $10 Million" [ref=e2146] [cursor=pointer]:
+                      - img [ref=e2148]
+                    - tooltip [ref=e2150]: More
+              - link "ZachXBT Flags Multi-Chain THORChain Exploit as Stolen Funds Surge Past $10 Million - Yahoo Finance - 1 hour ago - By Kamina Bashir" [ref=e2151] [cursor=pointer]:
+                - /url: ./read/CBMiogFBVV95cUxNOHpGNm1kQlc0Wk8tSnVfall6QTBSOVVOaUwteHhndnEwNkVyX3EySlJVOHBNOGk4aEpNWWZMbVd4cXVRZ0Jqam1TeGRBRGpUZzBFWHdqWDFCSTluOUh1MGkzQ1lFb2lxMnI1WElVLXBYOHhTR1RZd0tYaWlDWDRFQlJCa0VnX0tvbkJOZG80QXRna0I2NE9mM0lrUzZMYnE1aVE?hl=en-US&gl=US&ceid=US%3Aen
+                - text: ZachXBT Flags Multi-Chain THORChain Exploit as Stolen Funds Surge Past $10 Million
+            - figure [ref=e2152]
+          - generic [ref=e2153]:
+            - time [ref=e2154]: 1 hour ago
+            - separator [ref=e2155]
+            - generic [ref=e2156]: By Kamina Bashir
+      - generic [ref=e2157]:
+        - separator [ref=e2159]
+        - generic [ref=e2161]:
+          - generic [ref=e2162]:
+            - link [ref=e2164] [cursor=pointer]:
+              - /url: ./read/CBMimAFBVV95cUxQcWdWSFpxZ2hxc3h2d2FUWHhzMnB3c1RlVVctbXVkWUwtMXZFZ2U1MWUtNHJJLVBneDFEejVuSW1NVVFwQ21pcklPMFZyX05XU1lyLW9VOFFZeW40TUJucG9Wd2ZYUUNDNVVucVpBdGplS0RPbHNhQU5iOGZhSGRFdTVNZE1xSXRkcXM2NW55SFZPa0ZQc21NNdIBngFBVV95cUxPVzlYSEhya1BlRVFtYzhJOV9pQmVRUkl4MmlnVmcwRHdmTUtENGszNGlCUk9hYXkxNUNDT3pXM1IzMmFMV2I4UkF2aTVLSnp2MGJOWTVjRGpwVUlJRXlMSnpxclJnSXZ0ZUsyb2Qxb2pyQ3VIVndObDVZbGtZWlFEMzJzWlNiUXowMXBVYTZ3ejZZSjBqRXhSelQySkI5QQ?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e2166]:
+              - generic [ref=e2167]:
+                - generic [ref=e2170]: Coinpedia
+                - generic [ref=e2174]:
+                  - generic:
+                    - button "More - JPMorgan Says Bitcoin Will Keep Leading Crypto Market" [ref=e2175] [cursor=pointer]:
+                      - img [ref=e2177]
+                    - tooltip [ref=e2179]: More
+              - link "JPMorgan Says Bitcoin Will Keep Leading Crypto Market - Coinpedia - 4 hours ago - By Nidhi Kolhapur" [ref=e2180] [cursor=pointer]:
+                - /url: ./read/CBMimAFBVV95cUxQcWdWSFpxZ2hxc3h2d2FUWHhzMnB3c1RlVVctbXVkWUwtMXZFZ2U1MWUtNHJJLVBneDFEejVuSW1NVVFwQ21pcklPMFZyX05XU1lyLW9VOFFZeW40TUJucG9Wd2ZYUUNDNVVucVpBdGplS0RPbHNhQU5iOGZhSGRFdTVNZE1xSXRkcXM2NW55SFZPa0ZQc21NNdIBngFBVV95cUxPVzlYSEhya1BlRVFtYzhJOV9pQmVRUkl4MmlnVmcwRHdmTUtENGszNGlCUk9hYXkxNUNDT3pXM1IzMmFMV2I4UkF2aTVLSnp2MGJOWTVjRGpwVUlJRXlMSnpxclJnSXZ0ZUsyb2Qxb2pyQ3VIVndObDVZbGtZWlFEMzJzWlNiUXowMXBVYTZ3ejZZSjBqRXhSelQySkI5QQ?hl=en-US&gl=US&ceid=US%3Aen
+                - text: JPMorgan Says Bitcoin Will Keep Leading Crypto Market
+            - figure [ref=e2181]
+          - generic [ref=e2182]:
+            - time [ref=e2183]: 4 hours ago
+            - separator [ref=e2184]
+            - generic [ref=e2185]: By Nidhi Kolhapur
+      - generic [ref=e2186]:
+        - separator [ref=e2188]
+        - generic [ref=e2190]:
+          - generic [ref=e2191]:
+            - link [ref=e2193] [cursor=pointer]:
+              - /url: ./read/CBMifEFVX3lxTE1UMTctRU1RdXJ5QWRvR3J5WGRyeE1hc1lFNDB6NGFjd0d0ZWZaV2l6MlBPRUtDMmRwbENoWmJzQnhMUU9Pb3JrS002Q0JHckxFWE1tei1EdHdTQ2tjbzdrRG80Y0p2bEZYcTVOTm0xSmd0d3dXVmd0MUswYjQ?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e2195]:
+              - generic [ref=e2196]:
+                - generic [ref=e2199]: crypto.news
+                - generic [ref=e2203]:
+                  - generic:
+                    - button "More - Will Bitcoin price break $100K as golden cross looms?" [ref=e2204] [cursor=pointer]:
+                      - img [ref=e2206]
+                    - tooltip [ref=e2208]: More
+              - link "Will Bitcoin price break $100K as golden cross looms? - crypto.news - 53 minutes ago - By Rony Roy" [ref=e2209] [cursor=pointer]:
+                - /url: ./read/CBMifEFVX3lxTE1UMTctRU1RdXJ5QWRvR3J5WGRyeE1hc1lFNDB6NGFjd0d0ZWZaV2l6MlBPRUtDMmRwbENoWmJzQnhMUU9Pb3JrS002Q0JHckxFWE1tei1EdHdTQ2tjbzdrRG80Y0p2bEZYcTVOTm0xSmd0d3dXVmd0MUswYjQ?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Will Bitcoin price break $100K as golden cross looms?
+            - figure [ref=e2210]
+          - generic [ref=e2211]:
+            - time [ref=e2212]: 53 minutes ago
+            - separator [ref=e2213]
+            - generic [ref=e2214]: By Rony Roy
+      - generic [ref=e2215]:
+        - separator [ref=e2217]
+        - generic [ref=e2219]:
+          - generic [ref=e2220]:
+            - link [ref=e2222] [cursor=pointer]:
+              - /url: ./read/CBMi2wFBVV95cUxQejRrTjZOLWR2a0tlRTc2djhDYkZuUzd2X09uZExiYW9mVFdyRFBubXpPTzViVGtYb3RUWUxydm43anNCeW9hYkxZZTZOSlVITGdhMzhIWkdJN3MxS3BtWVNZNTJRSTVMUHhuNGFLdmZreUk1MW5DcE5hVlZXNlc4WWxZeGZ0OC1kaDRJNFBKSGdYY20xdDh2V0w4a09fMFlkYzJ6RWx5bXNtanZ0MFRSdVBZYkFmMk1KeDVuYnlqbmRfU3NwSnBKZ3E5VmxBbzlPdW5iTzg2ajBZM3c?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e2224]:
+              - generic [ref=e2225]:
+                - generic [ref=e2228]: About Schwab
+                - generic [ref=e2232]:
+                  - generic:
+                    - button "More - Charles Schwab Announces Details of Spot Crypto Trading Launch" [ref=e2233] [cursor=pointer]:
+                      - img [ref=e2235]
+                    - tooltip [ref=e2237]: More
+              - link "Charles Schwab Announces Details of Spot Crypto Trading Launch - About Schwab - Apr 16" [ref=e2238] [cursor=pointer]:
+                - /url: ./read/CBMi2wFBVV95cUxQejRrTjZOLWR2a0tlRTc2djhDYkZuUzd2X09uZExiYW9mVFdyRFBubXpPTzViVGtYb3RUWUxydm43anNCeW9hYkxZZTZOSlVITGdhMzhIWkdJN3MxS3BtWVNZNTJRSTVMUHhuNGFLdmZreUk1MW5DcE5hVlZXNlc4WWxZeGZ0OC1kaDRJNFBKSGdYY20xdDh2V0w4a09fMFlkYzJ6RWx5bXNtanZ0MFRSdVBZYkFmMk1KeDVuYnlqbmRfU3NwSnBKZ3E5VmxBbzlPdW5iTzg2ajBZM3c?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Charles Schwab Announces Details of Spot Crypto Trading Launch
+            - figure [ref=e2239]
+          - time [ref=e2241]: Apr 16
+      - generic [ref=e2242]:
+        - separator [ref=e2244]
+        - generic [ref=e2246]:
+          - generic [ref=e2247]:
+            - link [ref=e2249] [cursor=pointer]:
+              - /url: ./read/CBMimwFBVV95cUxPYUd4MElVVmdWZ2hRNW9nZzBORmtPUnZDMFpnRTlBMzdzeWtTRUNhVWJSMWQ5WnA3cEw3TTd6Q3JVc3BUbmRCT0J3MkQ5N1pOUzRxTzIyQWw4N25yX2pJOTUwanhLNXhTZEx5a0drLUxaSnpBcTQtd2UzWFZrS2JSM19xNVBoMF9INE1fUEVES2FOYWlEU1NIdkpna9IBoAFBVV95cUxPdGtqbVRXb3hNZ0dKSEhXY2Q0eVBPYVVrYUUyN1UzSkZqMXozNEpnWUJKWUZxV2dCWHFESEdaamxuMHFieHo4MHlYUW03SU9mZzA5Zk9Cc3ZtVi1kejFQVlgxbllVLTNTOXJYVmZWUzFKZzhxOTZfX1JrUXFTNDRyREZ2bm1NbDV1Yi1tUjR2MzRpcko1UlNHQ3VzMGhHMndG?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e2251]:
+              - generic [ref=e2252]:
+                - generic [ref=e2255]: AMBCrypto
+                - generic [ref=e2259]:
+                  - generic:
+                    - button "More - CME expands beyond Bitcoin with first market-cap-weighted crypto futures" [ref=e2260] [cursor=pointer]:
+                      - img [ref=e2262]
+                    - tooltip [ref=e2264]: More
+              - link "CME expands beyond Bitcoin with first market-cap-weighted crypto futures - AMBCrypto - 20 hours ago - By Adewale Olarinde" [ref=e2265] [cursor=pointer]:
+                - /url: ./read/CBMimwFBVV95cUxPYUd4MElVVmdWZ2hRNW9nZzBORmtPUnZDMFpnRTlBMzdzeWtTRUNhVWJSMWQ5WnA3cEw3TTd6Q3JVc3BUbmRCT0J3MkQ5N1pOUzRxTzIyQWw4N25yX2pJOTUwanhLNXhTZEx5a0drLUxaSnpBcTQtd2UzWFZrS2JSM19xNVBoMF9INE1fUEVES2FOYWlEU1NIdkpna9IBoAFBVV95cUxPdGtqbVRXb3hNZ0dKSEhXY2Q0eVBPYVVrYUUyN1UzSkZqMXozNEpnWUJKWUZxV2dCWHFESEdaamxuMHFieHo4MHlYUW03SU9mZzA5Zk9Cc3ZtVi1kejFQVlgxbllVLTNTOXJYVmZWUzFKZzhxOTZfX1JrUXFTNDRyREZ2bm1NbDV1Yi1tUjR2MzRpcko1UlNHQ3VzMGhHMndG?hl=en-US&gl=US&ceid=US%3Aen
+                - text: CME expands beyond Bitcoin with first market-cap-weighted crypto futures
+            - figure [ref=e2266]
+          - generic [ref=e2267]:
+            - time [ref=e2268]: 20 hours ago
+            - separator [ref=e2269]
+            - generic [ref=e2270]: By Adewale Olarinde
+      - generic [ref=e2271]:
+        - separator [ref=e2273]
+        - generic [ref=e2275]:
+          - generic [ref=e2276]:
+            - link [ref=e2278] [cursor=pointer]:
+              - /url: ./read/CBMid0FVX3lxTE9kRU80bGVLanAxOHROSTgyZ2h0eGxkMlljSXgzZzk5V3U1UjNOY215ekNRNWZuZHNYQnJVR3IwTXdIcldGMVdOMDYtN2M3WUZ4NmJ2Wm9UaE16UVh3d3V3QUI5bWJMVm9VSkFteGtRWkhweWFSOVRV?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e2280]:
+              - generic [ref=e2281]:
+                - generic [ref=e2284]: CoinDCX
+                - generic [ref=e2288]:
+                  - generic:
+                    - button "More - Top 10 Cryptos To Invest In May 2026 [By Market Cap]" [ref=e2289] [cursor=pointer]:
+                      - img [ref=e2291]
+                    - tooltip [ref=e2293]: More
+              - link "Top 10 Cryptos To Invest In May 2026 [By Market Cap] - CoinDCX - 3 days ago" [ref=e2294] [cursor=pointer]:
+                - /url: ./read/CBMid0FVX3lxTE9kRU80bGVLanAxOHROSTgyZ2h0eGxkMlljSXgzZzk5V3U1UjNOY215ekNRNWZuZHNYQnJVR3IwTXdIcldGMVdOMDYtN2M3WUZ4NmJ2Wm9UaE16UVh3d3V3QUI5bWJMVm9VSkFteGtRWkhweWFSOVRV?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Top 10 Cryptos To Invest In May 2026 [By Market Cap]
+          - time [ref=e2296]: 3 days ago
+      - generic [ref=e2297]:
+        - separator [ref=e2299]
+        - generic [ref=e2301]:
+          - generic [ref=e2302]:
+            - link [ref=e2304] [cursor=pointer]:
+              - /url: ./read/CBMidEFVX3lxTE1uSDJXcE0wRnV4WHJMT1pEVXB0NTc3WXNkcUM0TXhzeXY5MHRRa2MxSTZYdjFYS3RJdjkzczUycXhjUDFUVDdJTFJwMS04SjRSWG1zaFZXNkF4TDZZNDRCY21Pd2Nja0JqcWlsSXRRenhnaDlF?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e2306]:
+              - generic [ref=e2307]:
+                - generic [ref=e2310]: crypto.news
+                - generic [ref=e2314]:
+                  - generic:
+                    - button "More - Clarity Act clears Senate as Bitcoin hits $82K" [ref=e2315] [cursor=pointer]:
+                      - img [ref=e2317]
+                    - tooltip [ref=e2319]: More
+              - link "Clarity Act clears Senate as Bitcoin hits $82K - crypto.news - 12 hours ago - By Dorian Batycka" [ref=e2320] [cursor=pointer]:
+                - /url: ./read/CBMidEFVX3lxTE1uSDJXcE0wRnV4WHJMT1pEVXB0NTc3WXNkcUM0TXhzeXY5MHRRa2MxSTZYdjFYS3RJdjkzczUycXhjUDFUVDdJTFJwMS04SjRSWG1zaFZXNkF4TDZZNDRCY21Pd2Nja0JqcWlsSXRRenhnaDlF?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Clarity Act clears Senate as Bitcoin hits $82K
+            - figure [ref=e2321]
+          - generic [ref=e2322]:
+            - time [ref=e2323]: 12 hours ago
+            - separator [ref=e2324]
+            - generic [ref=e2325]: By Dorian Batycka
+      - generic [ref=e2326]:
+        - separator [ref=e2328]
+        - generic [ref=e2330]:
+          - generic [ref=e2331]:
+            - link [ref=e2333] [cursor=pointer]:
+              - /url: ./read/CBMikgFBVV95cUxQLXRZbVZQWkZGSWhYNlRFUHR1Nmd2dVlvYW5TVkw4cWpxWWJSM2EzbHhIVFNaV0pkRjdjZzg1aGt1a2RXVHZMaFB6Vm1jRklMazB6TXpmbWxpTlF5MzdVclB4V190WEtoczlGRGRNazJQZU1nMjNkcmFVTW9hNEQxZ1AwMzZjdEU4cGFiamZ6SHdUd9IBlwFBVV95cUxPZnpqQmY1YzVsbXR1ZVdtOWl1NGdiNUYzZEpla2tENEFuMW5JZ0dacXoybjJCQ1BOVGFIZmR5RDdVZE5mQUo5a3prN09hSWNvYVlFZHRRYWhRaDlEUC1xX0owbThpTGNRQTR3YU5seUIwdkFQMlRoTm43QU1VMEt5SXJGbmZ3dE12S1pzMnEwYXdVdHN2U19R?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e2335]:
+              - generic [ref=e2336]:
+                - generic [ref=e2339]: AMBCrypto
+                - generic [ref=e2343]:
+                  - generic:
+                    - button "More - ‘Taking longer’ – Can Metaplanet still catch Strategy in Bitcoin race?" [ref=e2344] [cursor=pointer]:
+                      - img [ref=e2346]
+                    - tooltip [ref=e2348]: More
+              - link "‘Taking longer’ – Can Metaplanet still catch Strategy in Bitcoin race? - AMBCrypto - 19 hours ago - By Benjamin Njiri" [ref=e2349] [cursor=pointer]:
+                - /url: ./read/CBMikgFBVV95cUxQLXRZbVZQWkZGSWhYNlRFUHR1Nmd2dVlvYW5TVkw4cWpxWWJSM2EzbHhIVFNaV0pkRjdjZzg1aGt1a2RXVHZMaFB6Vm1jRklMazB6TXpmbWxpTlF5MzdVclB4V190WEtoczlGRGRNazJQZU1nMjNkcmFVTW9hNEQxZ1AwMzZjdEU4cGFiamZ6SHdUd9IBlwFBVV95cUxPZnpqQmY1YzVsbXR1ZVdtOWl1NGdiNUYzZEpla2tENEFuMW5JZ0dacXoybjJCQ1BOVGFIZmR5RDdVZE5mQUo5a3prN09hSWNvYVlFZHRRYWhRaDlEUC1xX0owbThpTGNRQTR3YU5seUIwdkFQMlRoTm43QU1VMEt5SXJGbmZ3dE12S1pzMnEwYXdVdHN2U19R?hl=en-US&gl=US&ceid=US%3Aen
+                - text: ‘Taking longer’ – Can Metaplanet still catch Strategy in Bitcoin race?
+            - figure [ref=e2350]
+          - generic [ref=e2351]:
+            - time [ref=e2352]: 19 hours ago
+            - separator [ref=e2353]
+            - generic [ref=e2354]: By Benjamin Njiri
+      - generic [ref=e2355]:
+        - separator [ref=e2357]
+        - generic [ref=e2359]:
+          - generic [ref=e2360]:
+            - link [ref=e2362] [cursor=pointer]:
+              - /url: ./read/CBMilwFBVV95cUxQMlRHNVZjbFhOQTdVU1lVZlI1RFZmbTM1M3ZzTFBOTndvNzVnbGlZQXNfc0NpV05UQ0M3Yk9zWDNPSWZza1FmblZqOXVmNXNPdVFuV0NIQ3VWQ1pnaGxqY0RZUEFOdDFMcGlieWtiWC04a3hlUEVQaXh2Wl9ldmgzaENKaENkdzRaRFpiaGJELVJvdy1ERlFn?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e2364]:
+              - generic [ref=e2365]:
+                - generic [ref=e2368]: 24/7 Wall St.
+                - generic [ref=e2372]:
+                  - generic:
+                    - button "More - XRP Price Prediction as the CLARITY Act Advances" [ref=e2373] [cursor=pointer]:
+                      - img [ref=e2375]
+                    - tooltip [ref=e2377]: More
+              - link "XRP Price Prediction as the CLARITY Act Advances - 24/7 Wall St. - 3 hours ago - By Sam Daodu" [ref=e2378] [cursor=pointer]:
+                - /url: ./read/CBMilwFBVV95cUxQMlRHNVZjbFhOQTdVU1lVZlI1RFZmbTM1M3ZzTFBOTndvNzVnbGlZQXNfc0NpV05UQ0M3Yk9zWDNPSWZza1FmblZqOXVmNXNPdVFuV0NIQ3VWQ1pnaGxqY0RZUEFOdDFMcGlieWtiWC04a3hlUEVQaXh2Wl9ldmgzaENKaENkdzRaRFpiaGJELVJvdy1ERlFn?hl=en-US&gl=US&ceid=US%3Aen
+                - text: XRP Price Prediction as the CLARITY Act Advances
+            - figure [ref=e2379]
+          - generic [ref=e2380]:
+            - time [ref=e2381]: 3 hours ago
+            - separator [ref=e2382]
+            - generic [ref=e2383]: By Sam Daodu
+      - generic [ref=e2384]:
+        - separator [ref=e2386]
+        - generic [ref=e2388]:
+          - generic [ref=e2389]:
+            - link [ref=e2391] [cursor=pointer]:
+              - /url: ./read/CBMilAFBVV95cUxPTk9JSkduMVFWWGlrNFYtVXdkVW1PSFBsck5QdVNMTVE5R3czbXJiS3JEd21mRXdvSHRlRkszVWVlUFhVeEowcEp0Q2otakE2NUp6NjE5N3lsVVBtWkN3NVNyLTJPNHVQcVJfamwyVkVCUHRGRzJ3NHdwVW1ldE9xc0FBUTk4UE1Ld2FVZTRBT1BuejZN?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e2393]:
+              - generic [ref=e2394]:
+                - generic [ref=e2397]: crypto.news
+                - generic [ref=e2401]:
+                  - generic:
+                    - button "More - Bit Digital posts $146.7m loss as company cuts bitcoin mining exposure" [ref=e2402] [cursor=pointer]:
+                      - img [ref=e2404]
+                    - tooltip [ref=e2406]: More
+              - link "Bit Digital posts $146.7m loss as company cuts bitcoin mining exposure - crypto.news - 3 hours ago - By Rony Roy" [ref=e2407] [cursor=pointer]:
+                - /url: ./read/CBMilAFBVV95cUxPTk9JSkduMVFWWGlrNFYtVXdkVW1PSFBsck5QdVNMTVE5R3czbXJiS3JEd21mRXdvSHRlRkszVWVlUFhVeEowcEp0Q2otakE2NUp6NjE5N3lsVVBtWkN3NVNyLTJPNHVQcVJfamwyVkVCUHRGRzJ3NHdwVW1ldE9xc0FBUTk4UE1Ld2FVZTRBT1BuejZN?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Bit Digital posts $146.7m loss as company cuts bitcoin mining exposure
+            - figure [ref=e2408]
+          - generic [ref=e2409]:
+            - time [ref=e2410]: 3 hours ago
+            - separator [ref=e2411]
+            - generic [ref=e2412]: By Rony Roy
+      - generic [ref=e2413]:
+        - separator [ref=e2415]
+        - generic [ref=e2417]:
+          - generic [ref=e2418]:
+            - link [ref=e2420] [cursor=pointer]:
+              - /url: ./read/CBMimgFBVV95cUxPOGh5alV3TkVjNjZGRjdGQ2VwWVAxSXlyN3dkOXVyYzVuMjNYdmkzNGJsRGZ4c3U5SjdjVzFPTkFJNEQtb0pOSm5LSXgwR1UwNXg5WFViR2xiS3FMcGxDZURUVTYxYXRSTnBoTk90ckJrSjR1NWdfYVFSR2xjcmRSVDkyUWRTcFhCR1VYdzFZSlBQc0ctRHVtbmt3?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e2422]:
+              - generic [ref=e2423]:
+                - generic [ref=e2426]: Yahoo Finance
+                - generic [ref=e2430]:
+                  - generic:
+                    - 'button "More - Bitcoin ETF Outflows Just Hit a 3-Month High of $635 Million: What’s Driving the Exit?" [ref=e2431] [cursor=pointer]':
+                      - img [ref=e2433]
+                    - tooltip [ref=e2435]: More
+              - 'link "Bitcoin ETF Outflows Just Hit a 3-Month High of $635 Million: What’s Driving the Exit? - Yahoo Finance - 20 hours ago - By Sam Daodu" [ref=e2436] [cursor=pointer]':
+                - /url: ./read/CBMimgFBVV95cUxPOGh5alV3TkVjNjZGRjdGQ2VwWVAxSXlyN3dkOXVyYzVuMjNYdmkzNGJsRGZ4c3U5SjdjVzFPTkFJNEQtb0pOSm5LSXgwR1UwNXg5WFViR2xiS3FMcGxDZURUVTYxYXRSTnBoTk90ckJrSjR1NWdfYVFSR2xjcmRSVDkyUWRTcFhCR1VYdzFZSlBQc0ctRHVtbmt3?hl=en-US&gl=US&ceid=US%3Aen
+                - text: "Bitcoin ETF Outflows Just Hit a 3-Month High of $635 Million: What’s Driving the Exit?"
+            - figure [ref=e2437]
+          - generic [ref=e2438]:
+            - time [ref=e2439]: 20 hours ago
+            - separator [ref=e2440]
+            - generic [ref=e2441]: By Sam Daodu
+      - generic [ref=e2442]:
+        - separator [ref=e2444]
+        - generic [ref=e2446]:
+          - generic [ref=e2447]:
+            - link [ref=e2449] [cursor=pointer]:
+              - /url: ./read/CBMiiAFBVV95cUxNakJaUml4bl9lS2hNR0xSbHd3cnZ6NUxhejJ6RUMzNTFoS0l5UmUwbDR2QWJZUGxwTC0xS1VKSnVsTGdmbHdiWFF1am5vZ05BSzAwRndRX3NXOXNxREo0NlZ3Z2ZBZ3hXYzNvWUxPWlQyUlBTZG1yUTRERS1uT0NEMXg4VE5XZUpK0gGQAUFVX3lxTE5lQlJrMl9McDVSVVZhbElPcG5YV0FlTjZGQmFpdnFZUUlzTnptbzJERmUwdERSdjliYW1yejF1bnlUTE9nWVBjSWtVMnJsV0I2V3J3RGM5b2Fwd2FGaGJJaURleHZjVDFRamZoMl9TRkhvTGQzYjhMVGhRc3hFTGRNbVdxcDJNaTBuSFNxSFNVQQ?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e2451]:
+              - generic [ref=e2452]:
+                - generic [ref=e2455]: Decrypt
+                - generic [ref=e2459]:
+                  - generic:
+                    - button "More - Charles Schwab Begins Offering Bitcoin, Ethereum Trading to US Users" [ref=e2460] [cursor=pointer]:
+                      - img [ref=e2462]
+                    - tooltip [ref=e2464]: More
+              - link "Charles Schwab Begins Offering Bitcoin, Ethereum Trading to US Users - Decrypt - Yesterday - By Logan Hitchcock" [ref=e2465] [cursor=pointer]:
+                - /url: ./read/CBMiiAFBVV95cUxNakJaUml4bl9lS2hNR0xSbHd3cnZ6NUxhejJ6RUMzNTFoS0l5UmUwbDR2QWJZUGxwTC0xS1VKSnVsTGdmbHdiWFF1am5vZ05BSzAwRndRX3NXOXNxREo0NlZ3Z2ZBZ3hXYzNvWUxPWlQyUlBTZG1yUTRERS1uT0NEMXg4VE5XZUpK0gGQAUFVX3lxTE5lQlJrMl9McDVSVVZhbElPcG5YV0FlTjZGQmFpdnFZUUlzTnptbzJERmUwdERSdjliYW1yejF1bnlUTE9nWVBjSWtVMnJsV0I2V3J3RGM5b2Fwd2FGaGJJaURleHZjVDFRamZoMl9TRkhvTGQzYjhMVGhRc3hFTGRNbVdxcDJNaTBuSFNxSFNVQQ?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Charles Schwab Begins Offering Bitcoin, Ethereum Trading to US Users
+            - figure [ref=e2466]
+          - generic [ref=e2467]:
+            - time [ref=e2468]: Yesterday
+            - separator [ref=e2469]
+            - generic [ref=e2470]: By Logan Hitchcock
+      - generic [ref=e2471]:
+        - separator [ref=e2473]
+        - generic [ref=e2475]:
+          - generic [ref=e2476]:
+            - link [ref=e2478] [cursor=pointer]:
+              - /url: ./read/CBMifkFVX3lxTE9IelNDQ3dLV3g0YmxuZ0tGYy1EOHBsV1JTS1p0ME42U2plWi1wSlNCMjIwSV9aM1didEVXVzh6WGpkY0FVWVhQTHNhdzBlWGVKanVhU0pqc1hUV2tSMlJ5c2JyVkRMY0tpWHM0MHMteS1MeEpKNS1JRDNlWkZRUQ?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e2480]:
+              - generic [ref=e2481]:
+                - generic [ref=e2484]: Bitcoin Magazine
+                - generic [ref=e2488]:
+                  - generic:
+                    - button "More - Ledger, Consensys Get Cold Feet As Crypto IPO Window Slams Shut" [ref=e2489] [cursor=pointer]:
+                      - img [ref=e2491]
+                    - tooltip [ref=e2493]: More
+              - link "Ledger, Consensys Get Cold Feet As Crypto IPO Window Slams Shut - Bitcoin Magazine - Yesterday - By Micah Vaughn Zimmerman" [ref=e2494] [cursor=pointer]:
+                - /url: ./read/CBMifkFVX3lxTE9IelNDQ3dLV3g0YmxuZ0tGYy1EOHBsV1JTS1p0ME42U2plWi1wSlNCMjIwSV9aM1didEVXVzh6WGpkY0FVWVhQTHNhdzBlWGVKanVhU0pqc1hUV2tSMlJ5c2JyVkRMY0tpWHM0MHMteS1MeEpKNS1JRDNlWkZRUQ?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Ledger, Consensys Get Cold Feet As Crypto IPO Window Slams Shut
+            - figure [ref=e2495]
+          - generic [ref=e2496]:
+            - time [ref=e2497]: Yesterday
+            - separator [ref=e2498]
+            - generic [ref=e2499]: By Micah Vaughn Zimmerman
+      - generic [ref=e2500]:
+        - separator [ref=e2502]
+        - generic [ref=e2504]:
+          - generic [ref=e2505]:
+            - link [ref=e2507] [cursor=pointer]:
+              - /url: ./read/CBMiuwFBVV95cUxQajgxcUNFZ0N4NEhvdVJINlEtc0xnQ2pXeGZZVWFaMDdZZEhWaWRWWkFjcklFY1N0TDlydjBJOUM4eHl2b216VTdXX294U3Q2TzlUdV9OQnlRUTBTZ2cxWFBfRTh4STU2NEhXRllpWTVwOXI2V1NwQjU2MkVpMGRNcVloSWZtdWR5ejljNjJaOXpxOUZwZTlYN3BFUEd2by1FTkVBNXhUTzRpQXZnaUxiRXRiWmZpa3MtNW5r?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e2509]:
+              - generic [ref=e2510]:
+                - generic [ref=e2513]: TipRanks
+                - generic [ref=e2517]:
+                  - generic:
+                    - 'button "More - Bitcoin Behemoth Blinks: Massive Outflow Hits iShares’ Flagship Crypto ETF" [ref=e2518] [cursor=pointer]':
+                      - img [ref=e2520]
+                    - tooltip [ref=e2522]: More
+              - 'link "Bitcoin Behemoth Blinks: Massive Outflow Hits iShares’ Flagship Crypto ETF - TipRanks - 1 hour ago" [ref=e2523] [cursor=pointer]':
+                - /url: ./read/CBMiuwFBVV95cUxQajgxcUNFZ0N4NEhvdVJINlEtc0xnQ2pXeGZZVWFaMDdZZEhWaWRWWkFjcklFY1N0TDlydjBJOUM4eHl2b216VTdXX294U3Q2TzlUdV9OQnlRUTBTZ2cxWFBfRTh4STU2NEhXRllpWTVwOXI2V1NwQjU2MkVpMGRNcVloSWZtdWR5ejljNjJaOXpxOUZwZTlYN3BFUEd2by1FTkVBNXhUTzRpQXZnaUxiRXRiWmZpa3MtNW5r?hl=en-US&gl=US&ceid=US%3Aen
+                - text: "Bitcoin Behemoth Blinks: Massive Outflow Hits iShares’ Flagship Crypto ETF"
+            - figure [ref=e2524]
+          - time [ref=e2526]: 1 hour ago
+      - generic [ref=e2527]:
+        - separator [ref=e2529]
+        - generic [ref=e2531]:
+          - generic [ref=e2532]:
+            - link [ref=e2534] [cursor=pointer]:
+              - /url: ./read/CBMirwFBVV95cUxPSm9NOEVBUllod3hXd1Mya0ttVGJyN2dDUW5yV1o4MnRXQ3N5QmNBdVI3bUNYUFh0QkhZSUh2dmE5YTF2WTVjODRqd2lhTm1JZmtCRDJVOGZ3WU9GREVuaWhvN1hYemhxOXR3eml3V2xSZDcxWUhYTC1fcFFoOUZlTVlfV3pqaXJGWFppS3N3b3F0UjVUVTRCajdGcG1xaE9vN3d6WkpMNHNTQmVvOXJJ?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e2536]:
+              - generic [ref=e2537]:
+                - generic [ref=e2540]: Benzinga
+                - generic [ref=e2544]:
+                  - generic:
+                    - button "More - Crypto Billionaire Changpeng Zhao Revealed In A Podcast He'd Never Sat In A Lamborghini—Then He Got A Surprise" [ref=e2545] [cursor=pointer]:
+                      - img [ref=e2547]
+                    - tooltip [ref=e2549]: More
+              - link "Crypto Billionaire Changpeng Zhao Revealed In A Podcast He'd Never Sat In A Lamborghini—Then He Got A Surprise - Benzinga - 4 hours ago - By Aniket Verma" [ref=e2550] [cursor=pointer]:
+                - /url: ./read/CBMirwFBVV95cUxPSm9NOEVBUllod3hXd1Mya0ttVGJyN2dDUW5yV1o4MnRXQ3N5QmNBdVI3bUNYUFh0QkhZSUh2dmE5YTF2WTVjODRqd2lhTm1JZmtCRDJVOGZ3WU9GREVuaWhvN1hYemhxOXR3eml3V2xSZDcxWUhYTC1fcFFoOUZlTVlfV3pqaXJGWFppS3N3b3F0UjVUVTRCajdGcG1xaE9vN3d6WkpMNHNTQmVvOXJJ?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Crypto Billionaire Changpeng Zhao Revealed In A Podcast He'd Never Sat In A Lamborghini—Then He Got A Surprise
+            - figure [ref=e2551]
+          - generic [ref=e2552]:
+            - time [ref=e2553]: 4 hours ago
+            - separator [ref=e2554]
+            - generic [ref=e2555]: By Aniket Verma
+      - generic [ref=e2556]:
+        - separator [ref=e2558]
+        - generic [ref=e2560]:
+          - generic [ref=e2561]:
+            - link [ref=e2563] [cursor=pointer]:
+              - /url: ./read/CBMiWkFVX3lxTFB2d1NlZnZQeUhsRUxCa2tsbVoweW9uRUxGSFlfaHEtMnQ5bDROTnlrNkVWZ0RPN25oVGdWTzFrTldJSmRadVJzV1RhQ2w1RG1MeFhZc1o3VWNNdw?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e2565]:
+              - generic [ref=e2566]:
+                - generic [ref=e2569]: Cryptonews.net
+                - generic [ref=e2573]:
+                  - generic:
+                    - button "More - Hyperliquid leads 24-hour gains as altcoins pace bitcoin" [ref=e2574] [cursor=pointer]:
+                      - img [ref=e2576]
+                    - tooltip [ref=e2578]: More
+              - link "Hyperliquid leads 24-hour gains as altcoins pace bitcoin - Cryptonews.net - 24 minutes ago" [ref=e2579] [cursor=pointer]:
+                - /url: ./read/CBMiWkFVX3lxTFB2d1NlZnZQeUhsRUxCa2tsbVoweW9uRUxGSFlfaHEtMnQ5bDROTnlrNkVWZ0RPN25oVGdWTzFrTldJSmRadVJzV1RhQ2w1RG1MeFhZc1o3VWNNdw?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Hyperliquid leads 24-hour gains as altcoins pace bitcoin
+            - figure [ref=e2580]
+          - time [ref=e2582]: 24 minutes ago
+      - generic [ref=e2583]:
+        - separator [ref=e2585]
+        - generic [ref=e2587]:
+          - generic [ref=e2588]:
+            - link [ref=e2590] [cursor=pointer]:
+              - /url: ./read/CBMingFBVV95cUxNdTIzQ2RlNTg2XzFMWXQyT1dqWHlLaGNoQUVkM3NmOHJqZkIzTmZ4MzF4QWljWF9xcGFDOHVjdGhDdUZuUk5DVWljSVl4bW1fMWdrRk4wSFllWHA1bzdNRG01RmZCZWJReTM5eS1IaVNVY1Z3QWhHZDAtamhpVk5mN3VWLXJSWHo1WGU1VndqWm5uT2VGQjZuR0d3S3M4dw?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e2592]:
+              - generic [ref=e2593]:
+                - generic [ref=e2596]: thestreet.com
+                - generic [ref=e2600]:
+                  - generic:
+                    - 'button "More - Exclusive: Binance CMO says crypto will be “omnipresent”" [ref=e2601] [cursor=pointer]':
+                      - img [ref=e2603]
+                    - tooltip [ref=e2605]: More
+              - 'link "Exclusive: Binance CMO says crypto will be “omnipresent” - thestreet.com - 19 hours ago" [ref=e2606] [cursor=pointer]':
+                - /url: ./read/CBMingFBVV95cUxNdTIzQ2RlNTg2XzFMWXQyT1dqWHlLaGNoQUVkM3NmOHJqZkIzTmZ4MzF4QWljWF9xcGFDOHVjdGhDdUZuUk5DVWljSVl4bW1fMWdrRk4wSFllWHA1bzdNRG01RmZCZWJReTM5eS1IaVNVY1Z3QWhHZDAtamhpVk5mN3VWLXJSWHo1WGU1VndqWm5uT2VGQjZuR0d3S3M4dw?hl=en-US&gl=US&ceid=US%3Aen
+                - text: "Exclusive: Binance CMO says crypto will be “omnipresent”"
+            - figure [ref=e2607]
+          - time [ref=e2609]: 19 hours ago
+      - generic [ref=e2610]:
+        - separator [ref=e2612]
+        - generic [ref=e2614]:
+          - generic [ref=e2615]:
+            - link [ref=e2617] [cursor=pointer]:
+              - /url: ./read/CBMijgFBVV95cUxQQmNteG9oWG5IYUF4cUE3WlJFMXVUbXd5cVI3QkJmdHZjMEVzdl9OLS1vUjc3dnZmeUtGbkJXekdJb1R0a21pOFZGVklVSUpkTXVDclBhNTFFM1VfMjN6czY2M3RfdFNaNVduS1ZQakp4MDRKb3NtYVR3a1pqTWFxSjJOb3JGLXJ1MUpyS09B?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e2619]:
+              - generic [ref=e2620]:
+                - generic [ref=e2623]: crypto.news
+                - generic [ref=e2627]:
+                  - generic:
+                    - button "More - Ethereum upgrades may not be enough to lift Ether, JPMorgan warns" [ref=e2628] [cursor=pointer]:
+                      - img [ref=e2630]
+                    - tooltip [ref=e2632]: More
+              - link "Ethereum upgrades may not be enough to lift Ether, JPMorgan warns - crypto.news - 5 hours ago - By Rony Roy" [ref=e2633] [cursor=pointer]:
+                - /url: ./read/CBMijgFBVV95cUxQQmNteG9oWG5IYUF4cUE3WlJFMXVUbXd5cVI3QkJmdHZjMEVzdl9OLS1vUjc3dnZmeUtGbkJXekdJb1R0a21pOFZGVklVSUpkTXVDclBhNTFFM1VfMjN6czY2M3RfdFNaNVduS1ZQakp4MDRKb3NtYVR3a1pqTWFxSjJOb3JGLXJ1MUpyS09B?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Ethereum upgrades may not be enough to lift Ether, JPMorgan warns
+            - figure [ref=e2634]
+          - generic [ref=e2635]:
+            - time [ref=e2636]: 5 hours ago
+            - separator [ref=e2637]
+            - generic [ref=e2638]: By Rony Roy
+      - generic [ref=e2639]:
+        - separator [ref=e2641]
+        - generic [ref=e2643]:
+          - generic [ref=e2644]:
+            - link [ref=e2646] [cursor=pointer]:
+              - /url: ./read/CBMikAFBVV95cUxNR2cyZTBxRFoyWEZxMjF5VW9SblYxLWtwNFdoTVZnUE5WdW8yeWhLd3pBS0wwZTJ1T3VGOFU3WjJDNHBGaVpHTVdrNHVJQkhlTzBablltempRQk9JNndoSjFvQnVlMHdvMW9FZkN2U2UyQzRMS0xnWGdtRllTLTY5RjlQZkI5YUY5cjFfU3VWUTU?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e2648]:
+              - generic [ref=e2649]:
+                - generic [ref=e2652]: CoinMarketCap
+                - generic [ref=e2656]:
+                  - generic:
+                    - button "More - Kraken Drops LayerZero for Chainlink After $292M Kelp Exploit" [ref=e2657] [cursor=pointer]:
+                      - img [ref=e2659]
+                    - tooltip [ref=e2661]: More
+              - link "Kraken Drops LayerZero for Chainlink After $292M Kelp Exploit - CoinMarketCap - 6 hours ago" [ref=e2662] [cursor=pointer]:
+                - /url: ./read/CBMikAFBVV95cUxNR2cyZTBxRFoyWEZxMjF5VW9SblYxLWtwNFdoTVZnUE5WdW8yeWhLd3pBS0wwZTJ1T3VGOFU3WjJDNHBGaVpHTVdrNHVJQkhlTzBablltempRQk9JNndoSjFvQnVlMHdvMW9FZkN2U2UyQzRMS0xnWGdtRllTLTY5RjlQZkI5YUY5cjFfU3VWUTU?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Kraken Drops LayerZero for Chainlink After $292M Kelp Exploit
+            - figure [ref=e2663]
+          - time [ref=e2665]: 6 hours ago
+      - generic [ref=e2666]:
+        - separator [ref=e2668]
+        - generic [ref=e2670]:
+          - generic [ref=e2671]:
+            - link [ref=e2673] [cursor=pointer]:
+              - /url: ./read/CBMiiAFBVV95cUxOM2wwemFHQVRxa0RPMFJqejNwQVlGRGc0amt3NWNwZk9zV2dZNFFxam4yUmdxTXJDRk8yR05RRm5aUnAyYlhvVkhqWGhWTlh6WDA1MGtXd0J4dkFpc1hEMktuT2lzV1FmMC02UHI4SnBfOU8xYkpDeTVzM19yZUd3RWZ1bWMtc2lK?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e2675]:
+              - generic [ref=e2676]:
+                - generic [ref=e2679]: Yahoo Finance
+                - generic [ref=e2683]:
+                  - generic:
+                    - button "More - Why Crypto 'Godfather' Michael Terpin Says He's Shorting Bitcoin" [ref=e2684] [cursor=pointer]:
+                      - img [ref=e2686]
+                    - tooltip [ref=e2688]: More
+              - link "Why Crypto 'Godfather' Michael Terpin Says He's Shorting Bitcoin - Yahoo Finance - 2 days ago - By Khyathi Dalal" [ref=e2689] [cursor=pointer]:
+                - /url: ./read/CBMiiAFBVV95cUxOM2wwemFHQVRxa0RPMFJqejNwQVlGRGc0amt3NWNwZk9zV2dZNFFxam4yUmdxTXJDRk8yR05RRm5aUnAyYlhvVkhqWGhWTlh6WDA1MGtXd0J4dkFpc1hEMktuT2lzV1FmMC02UHI4SnBfOU8xYkpDeTVzM19yZUd3RWZ1bWMtc2lK?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Why Crypto 'Godfather' Michael Terpin Says He's Shorting Bitcoin
+            - figure [ref=e2690]
+          - generic [ref=e2691]:
+            - time [ref=e2692]: 2 days ago
+            - separator [ref=e2693]
+            - generic [ref=e2694]: By Khyathi Dalal
+      - generic [ref=e2695]:
+        - separator [ref=e2697]
+        - generic [ref=e2699]:
+          - generic [ref=e2700]:
+            - link [ref=e2702] [cursor=pointer]:
+              - /url: ./read/CBMijwFBVV95cUxPd05QZUJseThUc3NPbTZXeW82b25jTnBMSXowZjFsUk9QOWlqLXAzOGNDcEhZTkJOdkNmRDNjcE1IcDItOE1uUGpJdGNGVUpqcThPcjk2U1IxV21qOVh2ajhyOE9hRHZTcG9IdUNNdUxzcWVPMVQzTENtcjdUb1IyRl9KdTRBbUVsRTF1SnFZZw?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e2704]:
+              - generic [ref=e2705]:
+                - generic [ref=e2708]: Bitcoin News
+                - generic [ref=e2712]:
+                  - generic:
+                    - button "More - CME Launching Nasdaq Crypto Index Futures Led by BTC, ETH, XRP" [ref=e2713] [cursor=pointer]:
+                      - img [ref=e2715]
+                    - tooltip [ref=e2717]: More
+              - link "CME Launching Nasdaq Crypto Index Futures Led by BTC, ETH, XRP - Bitcoin News - 17 hours ago - By Kevin Helms" [ref=e2718] [cursor=pointer]:
+                - /url: ./read/CBMijwFBVV95cUxPd05QZUJseThUc3NPbTZXeW82b25jTnBMSXowZjFsUk9QOWlqLXAzOGNDcEhZTkJOdkNmRDNjcE1IcDItOE1uUGpJdGNGVUpqcThPcjk2U1IxV21qOVh2ajhyOE9hRHZTcG9IdUNNdUxzcWVPMVQzTENtcjdUb1IyRl9KdTRBbUVsRTF1SnFZZw?hl=en-US&gl=US&ceid=US%3Aen
+                - text: CME Launching Nasdaq Crypto Index Futures Led by BTC, ETH, XRP
+            - figure [ref=e2719]
+          - generic [ref=e2720]:
+            - time [ref=e2721]: 17 hours ago
+            - separator [ref=e2722]
+            - generic [ref=e2723]: By Kevin Helms
+      - generic [ref=e2724]:
+        - separator [ref=e2726]
+        - generic [ref=e2728]:
+          - generic [ref=e2729]:
+            - link [ref=e2731] [cursor=pointer]:
+              - /url: ./read/CBMixgFBVV95cUxNY0FYdG1hdENHMmFyS1kwZlk5VWtnLUQ5OExkNHp5c1RmdkE1ZFYxckJ6TDFxWVNud21qa04yQjBRa3RwaXF1REVlNk9EeWZfX2ZUOVVqM0tmc05VdkdVckVyejd0M0FMY2JnTHZKbzFlMi1sMUp5VUhlemNVWGxDS3prV0g0U01xaGh4a0dOZlNVLWVoOGVjVDVFZnd4eUY3ZkJtblV5cndqclpZVnp1TnJCS0R3LW1fcEtYYWEzelZGVWZhQUE?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e2733]:
+              - generic [ref=e2734]:
+                - generic [ref=e2737]: Benzinga
+                - generic [ref=e2741]:
+                  - generic:
+                    - button "More - Bitcoin, Ethereum Up 2%, XRP Skyrockets 6% On Clarity Act Advancement" [ref=e2742] [cursor=pointer]:
+                      - img [ref=e2744]
+                    - tooltip [ref=e2746]: More
+              - link "Bitcoin, Ethereum Up 2%, XRP Skyrockets 6% On Clarity Act Advancement - Benzinga - 17 hours ago - By Khyathi Dalal" [ref=e2747] [cursor=pointer]:
+                - /url: ./read/CBMixgFBVV95cUxNY0FYdG1hdENHMmFyS1kwZlk5VWtnLUQ5OExkNHp5c1RmdkE1ZFYxckJ6TDFxWVNud21qa04yQjBRa3RwaXF1REVlNk9EeWZfX2ZUOVVqM0tmc05VdkdVckVyejd0M0FMY2JnTHZKbzFlMi1sMUp5VUhlemNVWGxDS3prV0g0U01xaGh4a0dOZlNVLWVoOGVjVDVFZnd4eUY3ZkJtblV5cndqclpZVnp1TnJCS0R3LW1fcEtYYWEzelZGVWZhQUE?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Bitcoin, Ethereum Up 2%, XRP Skyrockets 6% On Clarity Act Advancement
+            - figure [ref=e2748]
+          - generic [ref=e2749]:
+            - time [ref=e2750]: 17 hours ago
+            - separator [ref=e2751]
+            - generic [ref=e2752]: By Khyathi Dalal
+      - generic [ref=e2753]:
+        - separator [ref=e2755]
+        - generic [ref=e2757]:
+          - generic [ref=e2758]:
+            - link [ref=e2760] [cursor=pointer]:
+              - /url: ./read/CBMi-AFBVV95cUxNUnBYNXBQTDVqckR6UzNFMG9oT1ljbzVqTnQ0ZXNhbHEtTTM5QmxWMzlpMDIxOVRHLThuUkhtYkgya2FaLWppUEwzTDBRUENCTHFlUmdobUYtQVh3SWE0WXJqLUVsaFBUYUtGdHJTY1NXYnEwNWJ2MEN5aUNXT282T1NBRDVDdHNtVWJTMVZwbzUyVU1nZUhMLS1NNm5pZl95bG5FcEhDVFJuY2ZCaWFFLWc4bWNsMDgxOVJid01jYU00Wlh2c3FrWnJlVHloLXk0VjBYb2VUb0lFblZyc1NWeGRxaFhrSl9BZmItZC1oUjFMWWtLSVg5UQ?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e2762]:
+              - generic [ref=e2763]:
+                - generic [ref=e2766]: StreetInsider
+                - generic [ref=e2770]:
+                  - generic:
+                    - 'button "More - Crypto News Breaks the Pattern: JPMorgan Loaded Bitcoin ETFs While Pepeto Presale Outpaces XRP and DOGE" [ref=e2771] [cursor=pointer]':
+                      - img [ref=e2773]
+                    - tooltip [ref=e2775]: More
+              - 'link "Crypto News Breaks the Pattern: JPMorgan Loaded Bitcoin ETFs While Pepeto Presale Outpaces XRP and DOGE - StreetInsider - 4 hours ago" [ref=e2776] [cursor=pointer]':
+                - /url: ./read/CBMi-AFBVV95cUxNUnBYNXBQTDVqckR6UzNFMG9oT1ljbzVqTnQ0ZXNhbHEtTTM5QmxWMzlpMDIxOVRHLThuUkhtYkgya2FaLWppUEwzTDBRUENCTHFlUmdobUYtQVh3SWE0WXJqLUVsaFBUYUtGdHJTY1NXYnEwNWJ2MEN5aUNXT282T1NBRDVDdHNtVWJTMVZwbzUyVU1nZUhMLS1NNm5pZl95bG5FcEhDVFJuY2ZCaWFFLWc4bWNsMDgxOVJid01jYU00Wlh2c3FrWnJlVHloLXk0VjBYb2VUb0lFblZyc1NWeGRxaFhrSl9BZmItZC1oUjFMWWtLSVg5UQ?hl=en-US&gl=US&ceid=US%3Aen
+                - text: "Crypto News Breaks the Pattern: JPMorgan Loaded Bitcoin ETFs While Pepeto Presale Outpaces XRP and DOGE"
+            - figure [ref=e2777]
+          - time [ref=e2779]: 4 hours ago
+      - generic [ref=e2780]:
+        - separator [ref=e2782]
+        - generic [ref=e2784]:
+          - generic [ref=e2785]:
+            - link [ref=e2787] [cursor=pointer]:
+              - /url: ./read/CBMicEFVX3lxTE8zaWt6aXIyWlBiWjRVc0J3RzBFa1kyTGVXV1NHRF9KUHFiX3RHeFZWc05nYlZpMVBNUEEyRFJEWnR3U0I3QVJ2cEpPX2REdkM1MlgyZVZsVmlUMGVBcjN5OHl0Yzl6TkUyazlEaVdJS3g?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e2789]:
+              - generic [ref=e2790]:
+                - generic [ref=e2793]: Crypto Briefing
+                - generic [ref=e2797]:
+                  - generic:
+                    - button "More - Federal Reserve bids $10B for 10-year notes, and crypto markets should pay attention" [ref=e2798] [cursor=pointer]:
+                      - img [ref=e2800]
+                    - tooltip [ref=e2802]: More
+              - link "Federal Reserve bids $10B for 10-year notes, and crypto markets should pay attention - Crypto Briefing - 3 hours ago" [ref=e2803] [cursor=pointer]:
+                - /url: ./read/CBMicEFVX3lxTE8zaWt6aXIyWlBiWjRVc0J3RzBFa1kyTGVXV1NHRF9KUHFiX3RHeFZWc05nYlZpMVBNUEEyRFJEWnR3U0I3QVJ2cEpPX2REdkM1MlgyZVZsVmlUMGVBcjN5OHl0Yzl6TkUyazlEaVdJS3g?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Federal Reserve bids $10B for 10-year notes, and crypto markets should pay attention
+            - figure [ref=e2804]
+          - time [ref=e2806]: 3 hours ago
+      - generic [ref=e2807]:
+        - separator [ref=e2809]
+        - generic [ref=e2811]:
+          - generic [ref=e2812]:
+            - link [ref=e2814] [cursor=pointer]:
+              - /url: ./read/CBMikgFBVV95cUxOdWVBdGM5QUtkeGNVVlpZcUt5b1BFbGZXQUppd0VKalpMdWplZDRTenotNlR4X2c4MHAxOGdndjBFbHFybzJTRC1mRExuV0tsMl9HbDVxbHM4TkZEdlVDWTExajV4d3RSN0ZVcF91RjF2a2JCT2RRSkxzOFlDb1FHZHlrdVc5c3JGcTMzZnU4NHJlQQ?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e2816]:
+              - generic [ref=e2817]:
+                - generic [ref=e2820]: crypto.news
+                - generic [ref=e2824]:
+                  - generic:
+                    - button "More - Trump family bought Coinbase and Strategy shares amid crypto losses" [ref=e2825] [cursor=pointer]:
+                      - img [ref=e2827]
+                    - tooltip [ref=e2829]: More
+              - link "Trump family bought Coinbase and Strategy shares amid crypto losses - crypto.news - 4 hours ago - By Rony Roy" [ref=e2830] [cursor=pointer]:
+                - /url: ./read/CBMikgFBVV95cUxOdWVBdGM5QUtkeGNVVlpZcUt5b1BFbGZXQUppd0VKalpMdWplZDRTenotNlR4X2c4MHAxOGdndjBFbHFybzJTRC1mRExuV0tsMl9HbDVxbHM4TkZEdlVDWTExajV4d3RSN0ZVcF91RjF2a2JCT2RRSkxzOFlDb1FHZHlrdVc5c3JGcTMzZnU4NHJlQQ?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Trump family bought Coinbase and Strategy shares amid crypto losses
+            - figure [ref=e2831]
+          - generic [ref=e2832]:
+            - time [ref=e2833]: 4 hours ago
+            - separator [ref=e2834]
+            - generic [ref=e2835]: By Rony Roy
+      - generic [ref=e2836]:
+        - separator [ref=e2838]
+        - generic [ref=e2840]:
+          - generic [ref=e2841]:
+            - link [ref=e2843] [cursor=pointer]:
+              - /url: ./read/CBMivgFBVV95cUxOQ1hRc3JLNllsTkxGb1RBYW5vaGJxVWJMNDJjdHo0dG1NQnk1WHd2d2xHdC14T3pPcFJ2TmJxSWFNY3AzaUNUOUxDNjVRcU90TE5hR2MxZDQ5bVhzZ0c3MmNyUDd1RWJhSXRnN2ZoY3dESDhFcTFFOFE5Z2lEMmFNbTBRemF1YXdnRWZUZW5ENzdTN3djNkg3bWZScUxLNUNIUl9ia1dGRTd5OUxfQjd6cGNHTWNEc1gtemYyN3Nn?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e2845]:
+              - generic [ref=e2846]:
+                - generic [ref=e2849]: Benzinga
+                - generic [ref=e2853]:
+                  - generic:
+                    - button "More - Elon Musk's Wealth Eclipsed By Michael Saylor? Bitcoin Maxi Says It Could Happen If BTC Hits This Level" [ref=e2854] [cursor=pointer]:
+                      - img [ref=e2856]
+                    - tooltip [ref=e2858]: More
+              - link "Elon Musk's Wealth Eclipsed By Michael Saylor? Bitcoin Maxi Says It Could Happen If BTC Hits This Level - Benzinga - 6 hours ago - By Aniket Verma" [ref=e2859] [cursor=pointer]:
+                - /url: ./read/CBMivgFBVV95cUxOQ1hRc3JLNllsTkxGb1RBYW5vaGJxVWJMNDJjdHo0dG1NQnk1WHd2d2xHdC14T3pPcFJ2TmJxSWFNY3AzaUNUOUxDNjVRcU90TE5hR2MxZDQ5bVhzZ0c3MmNyUDd1RWJhSXRnN2ZoY3dESDhFcTFFOFE5Z2lEMmFNbTBRemF1YXdnRWZUZW5ENzdTN3djNkg3bWZScUxLNUNIUl9ia1dGRTd5OUxfQjd6cGNHTWNEc1gtemYyN3Nn?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Elon Musk's Wealth Eclipsed By Michael Saylor? Bitcoin Maxi Says It Could Happen If BTC Hits This Level
+            - figure [ref=e2860]
+          - generic [ref=e2861]:
+            - time [ref=e2862]: 6 hours ago
+            - separator [ref=e2863]
+            - generic [ref=e2864]: By Aniket Verma
+      - generic [ref=e2865]:
+        - separator [ref=e2867]
+        - generic [ref=e2869]:
+          - generic [ref=e2870]:
+            - link [ref=e2872] [cursor=pointer]:
+              - /url: ./read/CBMioAFBVV95cUxQV3lDMW41Z010aTg0Nk5vVXhfdGlYRUlBQlVUTnJiT0lEVEtNR09GTWZQM29MbS1hMmt4MkRpY0dZNEV1NnpRY1hlWlhRbkQzd0ZmQTRfN3Y3THFWcGpOOF9CcnoxMjJ4bjNjY1JMTlVQNUtjMjI2dnFVbi0wNDlpYk5mbThUeTVnbDctUkFJcmtwZlpiOHg4VWNLZTU2UmxM?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e2874]:
+              - generic [ref=e2875]:
+                - generic [ref=e2878]: Bitcoin News
+                - generic [ref=e2882]:
+                  - generic:
+                    - button "More - Propy and Milo to Let Bitcoin Holders Buy Homes With $25M Financing Access" [ref=e2883] [cursor=pointer]:
+                      - img [ref=e2885]
+                    - tooltip [ref=e2887]: More
+              - link "Propy and Milo to Let Bitcoin Holders Buy Homes With $25M Financing Access - Bitcoin News - 5 hours ago - By Emmanuel Musa" [ref=e2888] [cursor=pointer]:
+                - /url: ./read/CBMioAFBVV95cUxQV3lDMW41Z010aTg0Nk5vVXhfdGlYRUlBQlVUTnJiT0lEVEtNR09GTWZQM29MbS1hMmt4MkRpY0dZNEV1NnpRY1hlWlhRbkQzd0ZmQTRfN3Y3THFWcGpOOF9CcnoxMjJ4bjNjY1JMTlVQNUtjMjI2dnFVbi0wNDlpYk5mbThUeTVnbDctUkFJcmtwZlpiOHg4VWNLZTU2UmxM?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Propy and Milo to Let Bitcoin Holders Buy Homes With $25M Financing Access
+            - figure [ref=e2889]
+          - generic [ref=e2890]:
+            - time [ref=e2891]: 5 hours ago
+            - separator [ref=e2892]
+            - generic [ref=e2893]: By Emmanuel Musa
+      - generic [ref=e2894]:
+        - separator [ref=e2896]
+        - generic [ref=e2898]:
+          - generic [ref=e2899]:
+            - link [ref=e2901] [cursor=pointer]:
+              - /url: ./read/CBMivAFBVV95cUxQU1loUUw0dkQwcS1xM3FCVHhkYlRRQUJ3RE9HQU1QT1NvNmZIZy1iS2Jhd1V5YTlxZVQ5Q0lUSzViLXBjZ1o4aVNoWEljTG1LVFB6VjZ1QUtNWUJDRXBZdFZHUGJRa0IwYzhERFFrVWZtSEU3ZXZPbVI5RGxfWXMzaWp1dFBDR0psOE9RWWkzdEUwVUp5b0lDUlRoeUZxaXlYU1hOekdhOXIyQnZLdHc5UF8yWUxrczFZcG4yWA?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e2903]:
+              - generic [ref=e2904]:
+                - generic [ref=e2907]: thestreet.com
+                - generic [ref=e2911]:
+                  - generic:
+                    - button "More - Ledn launches new first-of-its-kind Bitcoin-backed ABS with BBB- rating from S&P" [ref=e2912] [cursor=pointer]:
+                      - img [ref=e2914]
+                    - tooltip [ref=e2916]: More
+              - link "Ledn launches new first-of-its-kind Bitcoin-backed ABS with BBB- rating from S&P - thestreet.com - 19 hours ago" [ref=e2917] [cursor=pointer]:
+                - /url: ./read/CBMivAFBVV95cUxQU1loUUw0dkQwcS1xM3FCVHhkYlRRQUJ3RE9HQU1QT1NvNmZIZy1iS2Jhd1V5YTlxZVQ5Q0lUSzViLXBjZ1o4aVNoWEljTG1LVFB6VjZ1QUtNWUJDRXBZdFZHUGJRa0IwYzhERFFrVWZtSEU3ZXZPbVI5RGxfWXMzaWp1dFBDR0psOE9RWWkzdEUwVUp5b0lDUlRoeUZxaXlYU1hOekdhOXIyQnZLdHc5UF8yWUxrczFZcG4yWA?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Ledn launches new first-of-its-kind Bitcoin-backed ABS with BBB- rating from S&P
+            - figure [ref=e2918]
+          - time [ref=e2920]: 19 hours ago
+      - generic [ref=e2921]:
+        - separator [ref=e2923]
+        - generic [ref=e2925]:
+          - generic [ref=e2926]:
+            - link [ref=e2928] [cursor=pointer]:
+              - /url: ./read/CBMipwFBVV95cUxOWFY1X3BKYlpmS0JVNTh2RXJoTXFaOWNIVDNjeEYtdmdUcEdibEdYN1lmUFBSa0lxR2hNOUc1RW9HX0J0TnNndUVaUGEzMERrdUJpeGNyNWtKZ3pyQzZyMks2N3dCNG82d1piSEoyU3NsNWhNOFo0TlBDZ0UxYkNSd25TUHFwUU1yd1IyaGVYRFVoNWdqTGlQU1Z1RldFS0VEX1J0MklMdw?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e2930]:
+              - generic [ref=e2931]:
+                - generic [ref=e2934]: Bitcoin News
+                - generic [ref=e2938]:
+                  - generic:
+                    - button "More - Reform UK’s Nigel Farage Faces Scrutiny After $6.3M Payment From Crypto Investor" [ref=e2939] [cursor=pointer]:
+                      - img [ref=e2941]
+                    - tooltip [ref=e2943]: More
+              - link "Reform UK’s Nigel Farage Faces Scrutiny After $6.3M Payment From Crypto Investor - Bitcoin News - 3 hours ago - By Terence Zimwara" [ref=e2944] [cursor=pointer]:
+                - /url: ./read/CBMipwFBVV95cUxOWFY1X3BKYlpmS0JVNTh2RXJoTXFaOWNIVDNjeEYtdmdUcEdibEdYN1lmUFBSa0lxR2hNOUc1RW9HX0J0TnNndUVaUGEzMERrdUJpeGNyNWtKZ3pyQzZyMks2N3dCNG82d1piSEoyU3NsNWhNOFo0TlBDZ0UxYkNSd25TUHFwUU1yd1IyaGVYRFVoNWdqTGlQU1Z1RldFS0VEX1J0MklMdw?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Reform UK’s Nigel Farage Faces Scrutiny After $6.3M Payment From Crypto Investor
+            - figure [ref=e2945]
+          - generic [ref=e2946]:
+            - time [ref=e2947]: 3 hours ago
+            - separator [ref=e2948]
+            - generic [ref=e2949]: By Terence Zimwara
+      - generic [ref=e2950]:
+        - separator [ref=e2952]
+        - generic [ref=e2954]:
+          - generic [ref=e2955]:
+            - link [ref=e2957] [cursor=pointer]:
+              - /url: ./read/CBMikgFBVV95cUxNckZDOVY4RkFnenZWYThITU9MZlJ5QzFYOXBqNDFFVm8wMzBseF9BWlZ3ejJDYVdzLWsyNkhCRFZVY1JTXzdiWXZTQTFWWW9BMDdZY1hLOHI2R19sdjRCaVc5SGpSMlF1eXoxRklRdzRRRkxpYjh4UnhTMmZ5eEJMdGFLemtDTWdRcWg1R3RPVDE3QQ?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e2959]:
+              - generic [ref=e2960]:
+                - generic [ref=e2963]: MarketForces Africa
+                - generic [ref=e2967]:
+                  - generic:
+                    - button "More - Bitcoin Rises As U.S Names Fed Chair, Boosts Crypto Regulation" [ref=e2968] [cursor=pointer]:
+                      - img [ref=e2970]
+                    - tooltip [ref=e2972]: More
+              - link "Bitcoin Rises As U.S Names Fed Chair, Boosts Crypto Regulation - MarketForces Africa - 14 hours ago - By Julius Alagbe" [ref=e2973] [cursor=pointer]:
+                - /url: ./read/CBMikgFBVV95cUxNckZDOVY4RkFnenZWYThITU9MZlJ5QzFYOXBqNDFFVm8wMzBseF9BWlZ3ejJDYVdzLWsyNkhCRFZVY1JTXzdiWXZTQTFWWW9BMDdZY1hLOHI2R19sdjRCaVc5SGpSMlF1eXoxRklRdzRRRkxpYjh4UnhTMmZ5eEJMdGFLemtDTWdRcWg1R3RPVDE3QQ?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Bitcoin Rises As U.S Names Fed Chair, Boosts Crypto Regulation
+            - figure [ref=e2974]
+          - generic [ref=e2975]:
+            - time [ref=e2976]: 14 hours ago
+            - separator [ref=e2977]
+            - generic [ref=e2978]: By Julius Alagbe
+      - generic [ref=e2979]:
+        - separator [ref=e2981]
+        - generic [ref=e2983]:
+          - generic [ref=e2984]:
+            - link [ref=e2986] [cursor=pointer]:
+              - /url: ./read/CBMikAFBVV95cUxOU0JaSDdHeTVmV290VTd1NE1tczJ6NXFjeUN6a3l6X25oNFNyM2NoRWlsdHZrY1p4cHNMeHhoUEsydURfTWxtS0xob3ZnckZnSktBQ09kckFtTy1RTEpWMFZob1lJcWJncHBHRHZ0VG91NjlyUkZsVjBBMzlmUC1wdFcxYy1BR2gtLVN0ZXlGVXI?hl=en-US&gl=US&ceid=US%3Aen
+            - generic [ref=e2988]:
+              - generic [ref=e2989]:
+                - generic [ref=e2992]: crypto.news
+                - generic [ref=e2996]:
+                  - generic:
+                    - button "More - Dartmouth adds Solana ETF as endowment crypto exposure reaches $14M" [ref=e2997] [cursor=pointer]:
+                      - img [ref=e2999]
+                    - tooltip [ref=e3001]: More
+              - link "Dartmouth adds Solana ETF as endowment crypto exposure reaches $14M - crypto.news - 6 hours ago - By Olivia Stephanie" [ref=e3002] [cursor=pointer]:
+                - /url: ./read/CBMikAFBVV95cUxOU0JaSDdHeTVmV290VTd1NE1tczJ6NXFjeUN6a3l6X25oNFNyM2NoRWlsdHZrY1p4cHNMeHhoUEsydURfTWxtS0xob3ZnckZnSktBQ09kckFtTy1RTEpWMFZob1lJcWJncHBHRHZ0VG91NjlyUkZsVjBBMzlmUC1wdFcxYy1BR2gtLVN0ZXlGVXI?hl=en-US&gl=US&ceid=US%3Aen
+                - text: Dartmouth adds Solana ETF as endowment crypto exposure reaches $14M
+            - figure [ref=e3003]
+          - generic [ref=e3004]:
+            - time [ref=e3005]: 6 hours ago
+            - separator [ref=e3006]
+            - generic [ref=e3007]: By Olivia Stephanie
+    - complementary [ref=e3008]:
+      - generic [ref=e3010]:
+        - generic [ref=e3013]:
+          - heading "bitcoin crypto" [level=2] [ref=e3014]
+          - generic [ref=e3015]: Search results
+        - generic [ref=e3018]:
+          - button "Save this search - bitcoin crypto" [ref=e3020]:
+            - img [ref=e3024]
+            - generic [ref=e3026]: Save
+          - tooltip [ref=e3027]: Save this search

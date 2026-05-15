@@ -111,10 +111,14 @@ pub async fn start_hook_event_consumer(state: Arc<AppState>) {
                                             "Sending resume signal to coordinator"
                                         );
 
-                                        // Clear pause signal
+                                        // Deprecated compatibility boundary:
+                                        // service-backed execution control now owns policy,
+                                        // registration, and traceable state transitions.
+                                        // This direct channel handoff remains only for
+                                        // legacy fork hooks that cannot yet serialize their
+                                        // in-memory receiver through `service.execution_control`.
                                         session.pause_signal.store(false, Ordering::SeqCst);
 
-                                        // Send resume signal
                                         let resume_reason =
                                             RuntimeResumeSignal::DelegateCompleted {
                                                 task_id,
@@ -166,6 +170,10 @@ pub async fn start_hook_event_consumer(state: Arc<AppState>) {
                                     "Sending failure resume signal to coordinator"
                                 );
 
+                                // Deprecated compatibility boundary:
+                                // new pause/resume ownership must enter through
+                                // `service.execution_control`; this branch only adapts
+                                // legacy fork failure hooks into the existing waiting loop.
                                 session.pause_signal.store(false, Ordering::SeqCst);
 
                                 let resume_reason = RuntimeResumeSignal::DelegateFailed {

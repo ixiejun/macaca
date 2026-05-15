@@ -18,7 +18,9 @@ use macaca_proto::{
 };
 
 use crate::service_decorator::{
-    PolicyRuntimeDecorator, ServiceRuntimeCallContext, ServiceRuntimeDecorator,
+    AuditPlaceholderRuntimeDecorator, EntitlementPlaceholderRuntimeDecorator,
+    MeteringPlaceholderRuntimeDecorator, PolicyRuntimeDecorator,
+    ResourcePlaceholderRuntimeDecorator, ServiceRuntimeCallContext, ServiceRuntimeDecorator,
     TraceRequiredRuntimeDecorator,
 };
 use crate::service_provider::{ServiceProviderFactory, ServiceProviderFactoryContext};
@@ -46,7 +48,13 @@ pub struct ServiceRuntime {
 }
 
 impl ServiceRuntime {
-    /// Build a runtime with trace and policy decorators installed first.
+    /// Build a runtime with the full admission decorator chain installed.
+    ///
+    /// The ordering is deliberate and auditable: trace must exist before any
+    /// policy decision, policy must run before extension placeholders, and the
+    /// audit placeholder closes the chain immediately before service-bus
+    /// dispatch.  The placeholder stages are no-op Strategy/Decorator extension
+    /// points for later resource, entitlement, and metering implementations.
     pub fn new(config: ServiceRuntimeConfig) -> Self {
         let transport = Arc::new(LocalServiceTransport::new());
         let mut bus = ServiceBus::new(transport.clone());
@@ -60,6 +68,10 @@ impl ServiceRuntime {
             decorators: vec![
                 Box::new(TraceRequiredRuntimeDecorator),
                 Box::new(PolicyRuntimeDecorator::new(config.policy)),
+                Box::new(ResourcePlaceholderRuntimeDecorator),
+                Box::new(EntitlementPlaceholderRuntimeDecorator),
+                Box::new(MeteringPlaceholderRuntimeDecorator),
+                Box::new(AuditPlaceholderRuntimeDecorator),
             ],
             event_sink: config.event_sink,
         }
@@ -177,11 +189,13 @@ impl ServiceRuntime {
             command: &command,
             descriptor: &descriptor,
         };
+        let mut admission_decorators = Vec::with_capacity(self.decorators.len());
         for decorator in &self.decorators {
             if let Err(err) = decorator.before_dispatch(&context).await {
                 self.emit_rejection(service_id, &command, &err)?;
                 return Err(err);
             }
+            admission_decorators.push(decorator.name());
         }
 
         self.set_lifecycle(service_id, ServiceLifecycleState::Calling)?;
@@ -191,7 +205,10 @@ impl ServiceRuntime {
             ServiceLifecycleState::Calling,
             None,
             trace.as_ref(),
-            serde_json::json!({"command": command.name.to_string()}),
+            serde_json::json!({
+                "command": command.name.to_string(),
+                "admission_decorators": admission_decorators,
+            }),
         )?;
         let envelope = macaca_proto::ServiceEnvelope::new(source, service_id.clone(), command);
         match self.bus.call(envelope).await {

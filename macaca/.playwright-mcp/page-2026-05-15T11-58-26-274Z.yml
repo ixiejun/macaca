@@ -1,0 +1,1921 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - link [ref=e4] [cursor=pointer]:
+      - /url: ""
+    - generic [ref=e5]:
+      - link "8 News" [ref=e6] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e7]: "8"
+        - generic [ref=e8]: News
+      - text: 
+      - generic [ref=e9] [cursor=pointer]:
+        - generic [ref=e10]:
+          - generic [ref=e11]: d
+          - generic [ref=e12]: Region
+          - generic [ref=e13]: O
+        - text: M M M M M M M M M M M M M M
+      - separator [ref=e15]
+      - link "B Get PLUS" [ref=e16] [cursor=pointer]:
+        - /url: /plus/
+        - generic [ref=e17]: B
+        - generic [ref=e18]: Get PLUS
+      - generic [ref=e19]:
+        - link "+ Sign In O" [ref=e20] [cursor=pointer]:
+          - /url: /accounts/login/
+          - generic [ref=e21]: +
+          - text: Sign In
+          - generic [ref=e22]: O
+        - text: L K B
+      - link "T Portfolio" [ref=e23] [cursor=pointer]:
+        - /url: /portfolio
+        - generic [ref=e24]: T
+        - generic [ref=e25]: Portfolio
+      - link " Guides" [ref=e26] [cursor=pointer]:
+        - /url: /guides
+        - generic [ref=e27]: 
+        - generic [ref=e28]: Guides
+      - separator [ref=e30]
+      - link "D Bizz Hub" [ref=e31] [cursor=pointer]:
+        - /url: /partnership-hub
+        - generic [ref=e32]: D
+        - text: Bizz Hub
+      - link "D Advertise" [ref=e33] [cursor=pointer]:
+        - /url: /advertise
+        - generic [ref=e34]: D
+        - text: Advertise
+      - generic [ref=e35] [cursor=pointer]:
+        - generic [ref=e36]: D
+        - text: Collaborate
+      - separator [ref=e38]
+      - link "D Integrate" [ref=e39] [cursor=pointer]:
+        - /url: /developers/
+        - generic [ref=e40]: D
+        - text: Integrate
+    - link "3" [ref=e42] [cursor=pointer]:
+      - /url: ""
+      - generic [ref=e43]: "3"
+  - generic [ref=e44]:
+    - generic [ref=e46]:
+      - generic [ref=e47]:
+        - generic [ref=e48]:
+          - generic [ref=e49]:
+            - generic [ref=e50] [cursor=pointer]:
+              - generic [ref=e51]:
+                - generic [ref=e52]: Top News
+                - generic [ref=e53]: o
+              - text: O
+            - generic [ref=e55] [cursor=pointer]:
+              - generic [ref=e56]: Show All
+              - generic [ref=e57]: o
+          - generic [ref=e59]: e
+          - text: h
+          - generic [ref=e60]:
+            - img [ref=e61]: 
+            - generic:
+              - checkbox
+            - generic [ref=e63]: Panic Score
+          - text: 
+          - generic [ref=e64]:
+            - textbox "Search..." [ref=e66]
+            - text: f
+        - generic [ref=e67]:
+          - generic [ref=e68]:
+            - generic [ref=e69]:
+              - generic [ref=e70]:
+                - link "***" [ref=e71] [cursor=pointer]:
+                  - /url: /news/31925239/BTC-Leads-Market-Recovery-BTCEcosystem-Surges-Generating-9200-in-Daily-RevenueLock-in-Daily-Payouts-with-No-Hidden-Fees
+                - 'link "BTC Leads Market Recovery: BTCEcosystem Surges, Generating $9,200 in Daily Revenue—Lock in Daily Payouts with No Hidden Fees n btcecosystem.com" [ref=e72] [cursor=pointer]':
+                  - /url: /news/31925239/BTC-Leads-Market-Recovery-BTCEcosystem-Surges-Generating-9200-in-Daily-RevenueLock-in-Daily-Payouts-with-No-Hidden-Fees
+                  - generic [ref=e73]:
+                    - text: "BTC Leads Market Recovery: BTCEcosystem Surges, Generating $9,200 in Daily Revenue—Lock in Daily Payouts with No Hidden Fees"
+                    - generic [ref=e74]:
+                      - generic [ref=e75]: "n"
+                      - text: btcecosystem.com
+                - link "f" [ref=e77] [cursor=pointer]:
+                  - /url: ""
+              - text: "n"
+              - link [ref=e78] [cursor=pointer]:
+                - /url: /news/31925239/BTC-Leads-Market-Recovery-BTCEcosystem-Surges-Generating-9200-in-Daily-RevenueLock-in-Daily-Payouts-with-No-Hidden-Fees
+              - link [ref=e79] [cursor=pointer]:
+                - /url: https://btcecosystem.com/
+            - generic [ref=e80]:
+              - generic [ref=e81]:
+                - link "11min" [ref=e82] [cursor=pointer]:
+                  - /url: /news/32495428/post-32495428
+                  - time [ref=e84]: 11min
+                - link "伊朗外长：美方认真才可能重启谈判 n zh.rss.odaily.news" [ref=e85] [cursor=pointer]:
+                  - /url: /news/32495428/post-32495428
+                  - generic [ref=e86]:
+                    - text: 伊朗外长：美方认真才可能重启谈判
+                    - generic [ref=e87]:
+                      - generic [ref=e88]: "n"
+                      - text: zh.rss.odaily.news
+              - text: "n"
+              - link [ref=e89] [cursor=pointer]:
+                - /url: /news/32495428/post-32495428
+            - generic [ref=e90]:
+              - generic [ref=e91]:
+                - link "13min" [ref=e92] [cursor=pointer]:
+                  - /url: /news/32495355/4218
+                  - time [ref=e94]: 13min
+                - link "美股估值逼近互联网泡沫高点，席勒市盈率升至42.18 n zh.panewslab.com" [ref=e95] [cursor=pointer]:
+                  - /url: /news/32495355/4218
+                  - generic [ref=e96]:
+                    - text: 美股估值逼近互联网泡沫高点，席勒市盈率升至42.18
+                    - generic [ref=e97]:
+                      - generic [ref=e98]: "n"
+                      - text: zh.panewslab.com
+              - text: "n"
+              - link [ref=e99] [cursor=pointer]:
+                - /url: /news/32495355/4218
+            - generic [ref=e100]:
+              - generic [ref=e101]:
+                - link "16min" [ref=e102] [cursor=pointer]:
+                  - /url: /news/32495352/Big-Binance-Updates-Ripple-XRP-Price-Predictions-and-More-Bits-Recap-May-15
+                  - time [ref=e104]: 16min
+                - 'link "Big Binance Updates, Ripple (XRP) Price Predictions, and More: Bits Recap May 15 n cryptopotato.com" [ref=e105] [cursor=pointer]':
+                  - /url: /news/32495352/Big-Binance-Updates-Ripple-XRP-Price-Predictions-and-More-Bits-Recap-May-15
+                  - generic [ref=e106]:
+                    - text: "Big Binance Updates, Ripple (XRP) Price Predictions, and More: Bits Recap May 15"
+                    - generic [ref=e107]:
+                      - generic [ref=e108]: "n"
+                      - text: cryptopotato.com
+                - generic [ref=e109]:
+                  - link "XRP" [ref=e110] [cursor=pointer]:
+                    - /url: /news/ripple/
+                  - link "ADA" [ref=e111] [cursor=pointer]:
+                    - /url: /news/cardano/
+              - text: "n"
+              - link [ref=e112] [cursor=pointer]:
+                - /url: /news/32495352/Big-Binance-Updates-Ripple-XRP-Price-Predictions-and-More-Bits-Recap-May-15
+            - generic [ref=e113]:
+              - generic [ref=e114]:
+                - link "16min" [ref=e115] [cursor=pointer]:
+                  - /url: /news/32495340/750
+                  - time [ref=e117]: 16min
+                - link "币安发布一份有趣的报告：涉及价值 750 亿美元的加密货币！ n zh.bitcoinsistemi.com" [ref=e118] [cursor=pointer]:
+                  - /url: /news/32495340/750
+                  - generic [ref=e119]:
+                    - text: 币安发布一份有趣的报告：涉及价值 750 亿美元的加密货币！
+                    - generic [ref=e120]:
+                      - generic [ref=e121]: "n"
+                      - text: zh.bitcoinsistemi.com
+                - link "BTC" [ref=e123] [cursor=pointer]:
+                  - /url: /news/bitcoin/
+              - text: "n"
+              - link [ref=e124] [cursor=pointer]:
+                - /url: /news/32495340/750
+            - generic [ref=e125]:
+              - generic [ref=e126]:
+                - link "18min" [ref=e127] [cursor=pointer]:
+                  - /url: /news/32495348/THORChain1000RUNE10
+                  - time [ref=e129]: 18min
+                - link "THORChain遭1000万美元漏洞攻击，RUNE暴跌10% n cn.cn.zh.spaziocrypto.com" [ref=e130] [cursor=pointer]:
+                  - /url: /news/32495348/THORChain1000RUNE10
+                  - generic [ref=e131]:
+                    - text: THORChain遭1000万美元漏洞攻击，RUNE暴跌10%
+                    - generic [ref=e132]:
+                      - generic [ref=e133]: "n"
+                      - text: cn.cn.zh.spaziocrypto.com
+                - link "DEFI" [ref=e135] [cursor=pointer]:
+                  - /url: /news/de-fi/
+              - text: "n"
+              - link [ref=e136] [cursor=pointer]:
+                - /url: /news/32495348/THORChain1000RUNE10
+            - generic [ref=e137]:
+              - generic [ref=e138]:
+                - link "18min" [ref=e139] [cursor=pointer]:
+                  - /url: /news/32495337/post-32495337
+                  - time [ref=e141]: 18min
+                - link "盈透证券推出统一预测市场交易服务 n zh.rss.odaily.news" [ref=e142] [cursor=pointer]:
+                  - /url: /news/32495337/post-32495337
+                  - generic [ref=e143]:
+                    - text: 盈透证券推出统一预测市场交易服务
+                    - generic [ref=e144]:
+                      - generic [ref=e145]: "n"
+                      - text: zh.rss.odaily.news
+              - text: "n"
+              - link [ref=e146] [cursor=pointer]:
+                - /url: /news/32495337/post-32495337
+            - generic [ref=e147]:
+              - generic [ref=e148]:
+                - link "19min" [ref=e149] [cursor=pointer]:
+                  - /url: /news/32495336/CLARITY
+                  - time [ref=e151]: 19min
+                - link "分析：CLARITY法案推进提振加密监管预期，但通胀与利率压力或压制市场表现 n zh.rss.odaily.news" [ref=e152] [cursor=pointer]:
+                  - /url: /news/32495336/CLARITY
+                  - generic [ref=e153]:
+                    - text: 分析：CLARITY法案推进提振加密监管预期，但通胀与利率压力或压制市场表现
+                    - generic [ref=e154]:
+                      - generic [ref=e155]: "n"
+                      - text: zh.rss.odaily.news
+                - generic [ref=e156]:
+                  - link "BTC" [ref=e157] [cursor=pointer]:
+                    - /url: /news/bitcoin/
+                  - link "ETH" [ref=e158] [cursor=pointer]:
+                    - /url: /news/ethereum/
+                  - link "SOL" [ref=e159] [cursor=pointer]:
+                    - /url: /news/solana/
+                  - text: …
+              - text: "n"
+              - link [ref=e160] [cursor=pointer]:
+                - /url: /news/32495336/CLARITY
+            - generic [ref=e161]:
+              - generic [ref=e162]:
+                - link "20min" [ref=e163] [cursor=pointer]:
+                  - /url: /news/32495319/Nof11500SUI-GroupKaratage
+                  - time [ref=e165]: 20min
+                - link "Nof1披露完成1500万美元融资，SUI Group与Karatage共同领投 n zh.rss.odaily.news" [ref=e166] [cursor=pointer]:
+                  - /url: /news/32495319/Nof11500SUI-GroupKaratage
+                  - generic [ref=e167]:
+                    - text: Nof1披露完成1500万美元融资，SUI Group与Karatage共同领投
+                    - generic [ref=e168]:
+                      - generic [ref=e169]: "n"
+                      - text: zh.rss.odaily.news
+                - link "SUI" [ref=e171] [cursor=pointer]:
+                  - /url: /news/sui/
+              - text: "n"
+              - link [ref=e172] [cursor=pointer]:
+                - /url: /news/32495319/Nof11500SUI-GroupKaratage
+            - generic [ref=e173]:
+              - generic [ref=e174]:
+                - link "21min" [ref=e175] [cursor=pointer]:
+                  - /url: /news/32495333/THORChain-Hit-by-10M-Exploit-RUNE-Drops-10-in-Hours
+                  - time [ref=e177]: 21min
+                - 'link "THORChain Hit by $10M Exploit: RUNE Drops 10% in Hours n spaziocrypto.com" [ref=e178] [cursor=pointer]':
+                  - /url: /news/32495333/THORChain-Hit-by-10M-Exploit-RUNE-Drops-10-in-Hours
+                  - generic [ref=e179]:
+                    - text: "THORChain Hit by $10M Exploit: RUNE Drops 10% in Hours"
+                    - generic [ref=e180]:
+                      - generic [ref=e181]: "n"
+                      - text: spaziocrypto.com
+                - generic [ref=e182]:
+                  - link "BTC" [ref=e183] [cursor=pointer]:
+                    - /url: /news/bitcoin/
+                  - link "ETH" [ref=e184] [cursor=pointer]:
+                    - /url: /news/ethereum/
+                  - link "BNB" [ref=e185] [cursor=pointer]:
+                    - /url: /news/binancecoin/
+                  - text: …
+              - text: "n"
+              - link [ref=e186] [cursor=pointer]:
+                - /url: /news/32495333/THORChain-Hit-by-10M-Exploit-RUNE-Drops-10-in-Hours
+            - generic [ref=e187]:
+              - generic [ref=e188]:
+                - link "23min" [ref=e189] [cursor=pointer]:
+                  - /url: /news/32495338/AI-Nof1-1500-SUI-Group-Karatage
+                  - time [ref=e191]: 23min
+                - link "专注于金融市场的 AI 研究实验室 Nof1 完成 1500 万美元融资，SUI Group 与 Karatage 共同领投 n zh.chaincatcher.com" [ref=e192] [cursor=pointer]:
+                  - /url: /news/32495338/AI-Nof1-1500-SUI-Group-Karatage
+                  - generic [ref=e193]:
+                    - text: 专注于金融市场的 AI 研究实验室 Nof1 完成 1500 万美元融资，SUI Group 与 Karatage 共同领投
+                    - generic [ref=e194]:
+                      - generic [ref=e195]: "n"
+                      - text: zh.chaincatcher.com
+                - link "SUI" [ref=e197] [cursor=pointer]:
+                  - /url: /news/sui/
+              - text: "n"
+              - link [ref=e198] [cursor=pointer]:
+                - /url: /news/32495338/AI-Nof1-1500-SUI-Group-Karatage
+            - generic [ref=e199]:
+              - generic [ref=e200]:
+                - link "24min" [ref=e201] [cursor=pointer]:
+                  - /url: /news/32495320/OKX-USDTUSD
+                  - time [ref=e203]: 24min
+                - link "OKX 将关闭 USDT/USD 现货交易对的统一订单簿功能 n zh.chaincatcher.com" [ref=e204] [cursor=pointer]:
+                  - /url: /news/32495320/OKX-USDTUSD
+                  - generic [ref=e205]:
+                    - text: OKX 将关闭 USDT/USD 现货交易对的统一订单簿功能
+                    - generic [ref=e206]:
+                      - generic [ref=e207]: "n"
+                      - text: zh.chaincatcher.com
+                - generic [ref=e208]:
+                  - link "USDT" [ref=e209] [cursor=pointer]:
+                    - /url: /news/tether/
+                  - link "USDC" [ref=e210] [cursor=pointer]:
+                    - /url: /news/usd-coin/
+                  - link "USDG" [ref=e211] [cursor=pointer]:
+                    - /url: /news/global-dollar/
+                  - text: …
+              - text: "n"
+              - link [ref=e212] [cursor=pointer]:
+                - /url: /news/32495320/OKX-USDTUSD
+            - generic [ref=e213]:
+              - generic [ref=e214]:
+                - link "24min" [ref=e215] [cursor=pointer]:
+                  - /url: /news/32495318/MSX516Pre-IPOAnthropicPolymarket
+                  - time [ref=e217]: 24min
+                - link "MSX将于5月16日上线Pre-IPO第二期，开放Anthropic与Polymarket申购 n zh.rss.odaily.news" [ref=e218] [cursor=pointer]:
+                  - /url: /news/32495318/MSX516Pre-IPOAnthropicPolymarket
+                  - generic [ref=e219]:
+                    - text: MSX将于5月16日上线Pre-IPO第二期，开放Anthropic与Polymarket申购
+                    - generic [ref=e220]:
+                      - generic [ref=e221]: "n"
+                      - text: zh.rss.odaily.news
+                - link "M" [ref=e223] [cursor=pointer]:
+                  - /url: /news/memecore/
+              - text: "n"
+              - link [ref=e224] [cursor=pointer]:
+                - /url: /news/32495318/MSX516Pre-IPOAnthropicPolymarket
+            - generic [ref=e225]:
+              - generic [ref=e226]:
+                - link "27min" [ref=e227] [cursor=pointer]:
+                  - /url: /news/32495305/Jane-Street-Cuts-Q1-Bitcoin-ETF-Holdings-71-JPMorgan-Jumps-174
+                  - time [ref=e229]: 27min
+                - link "Jane Street Cuts Q1 Bitcoin ETF Holdings 71%, JPMorgan Jumps 174% n coincu.com" [ref=e230] [cursor=pointer]:
+                  - /url: /news/32495305/Jane-Street-Cuts-Q1-Bitcoin-ETF-Holdings-71-JPMorgan-Jumps-174
+                  - generic [ref=e231]:
+                    - text: Jane Street Cuts Q1 Bitcoin ETF Holdings 71%, JPMorgan Jumps 174%
+                    - generic [ref=e232]:
+                      - generic [ref=e233]: "n"
+                      - text: coincu.com
+                - link "BTC" [ref=e235] [cursor=pointer]:
+                  - /url: /news/bitcoin/
+              - text: "n"
+              - link [ref=e236] [cursor=pointer]:
+                - /url: /news/32495305/Jane-Street-Cuts-Q1-Bitcoin-ETF-Holdings-71-JPMorgan-Jumps-174
+            - generic [ref=e237]:
+              - generic [ref=e238]:
+                - link "28min" [ref=e239] [cursor=pointer]:
+                  - /url: /news/32495301/Coinbase-Circle-Bring-USDC-to-Hyperliquid-as-Circulation-Hits-5B
+                  - time [ref=e241]: 28min
+                - link "Coinbase, Circle Bring USDC to Hyperliquid as Circulation Hits $5B n ethnews.com" [ref=e242] [cursor=pointer]:
+                  - /url: /news/32495301/Coinbase-Circle-Bring-USDC-to-Hyperliquid-as-Circulation-Hits-5B
+                  - generic [ref=e243]:
+                    - text: Coinbase, Circle Bring USDC to Hyperliquid as Circulation Hits $5B
+                    - generic [ref=e244]:
+                      - generic [ref=e245]: "n"
+                      - text: ethnews.com
+                - generic [ref=e246]:
+                  - link "USDC" [ref=e247] [cursor=pointer]:
+                    - /url: /news/usd-coin/
+                  - link "HYPE" [ref=e248] [cursor=pointer]:
+                    - /url: /news/hyperliquid/
+                  - link "USDH" [ref=e249] [cursor=pointer]:
+                    - /url: /news/usdh-2/
+              - text: "n"
+              - link [ref=e250] [cursor=pointer]:
+                - /url: /news/32495301/Coinbase-Circle-Bring-USDC-to-Hyperliquid-as-Circulation-Hits-5B
+            - generic [ref=e251]:
+              - generic [ref=e252]:
+                - link "28min" [ref=e253] [cursor=pointer]:
+                  - /url: /news/32495484/Cryptos-regulatory-tailwind-runs-into-a-potential-rates-reset
+                  - time [ref=e255]: 28min
+                - link "Crypto’s regulatory tailwind runs into a potential rates reset n coindesk.com" [ref=e256] [cursor=pointer]:
+                  - /url: /news/32495484/Cryptos-regulatory-tailwind-runs-into-a-potential-rates-reset
+                  - generic [ref=e257]:
+                    - text: Crypto’s regulatory tailwind runs into a potential rates reset
+                    - generic [ref=e258]:
+                      - generic [ref=e259]: "n"
+                      - text: coindesk.com
+              - text: "n"
+              - link [ref=e261] [cursor=pointer]:
+                - /url: /news/32495484/Cryptos-regulatory-tailwind-runs-into-a-potential-rates-reset
+            - generic [ref=e262]:
+              - generic [ref=e263]:
+                - link "28min" [ref=e264] [cursor=pointer]:
+                  - /url: /news/32495275/post-32495275
+                  - time [ref=e266]: 28min
+                - link "星球晚讯 n zh.rss.odaily.news" [ref=e267] [cursor=pointer]:
+                  - /url: /news/32495275/post-32495275
+                  - generic [ref=e268]:
+                    - text: 星球晚讯
+                    - generic [ref=e269]:
+                      - generic [ref=e270]: "n"
+                      - text: zh.rss.odaily.news
+                - generic [ref=e271]:
+                  - link "BTC" [ref=e272] [cursor=pointer]:
+                    - /url: /news/bitcoin/
+                  - link "IRYS" [ref=e273] [cursor=pointer]:
+                    - /url: /news/irys/
+                  - link "4" [ref=e274] [cursor=pointer]:
+                    - /url: /news/4-2/
+              - text: "n"
+              - link [ref=e275] [cursor=pointer]:
+                - /url: /news/32495275/post-32495275
+            - generic [ref=e276]:
+              - generic [ref=e277]:
+                - link "28min" [ref=e278] [cursor=pointer]:
+                  - /url: /news/32495345/Hondas-First-Loss-in-70-Years-EV-Bet-Gone-Wrong
+                  - time [ref=e280]: 28min
+                - 'link "Honda’s First Loss in 70 Years: EV Bet Gone Wrong n catenaa.com" [ref=e281] [cursor=pointer]':
+                  - /url: /news/32495345/Hondas-First-Loss-in-70-Years-EV-Bet-Gone-Wrong
+                  - generic [ref=e282]:
+                    - text: "Honda’s First Loss in 70 Years: EV Bet Gone Wrong"
+                    - generic [ref=e283]:
+                      - generic [ref=e284]: "n"
+                      - text: catenaa.com
+                - generic [ref=e285]:
+                  - link "A" [ref=e286] [cursor=pointer]:
+                    - /url: /news/vaulta/
+                  - link "EV" [ref=e287] [cursor=pointer]:
+                    - /url: /news/everything/
+              - text: "n"
+              - link [ref=e288] [cursor=pointer]:
+                - /url: /news/32495345/Hondas-First-Loss-in-70-Years-EV-Bet-Gone-Wrong
+            - generic [ref=e289]:
+              - generic [ref=e290]:
+                - link "28min" [ref=e291] [cursor=pointer]:
+                  - /url: /news/32495483/Wall-Street-is-starting-to-notice-one-of-cryptos-smartest-AI-bets
+                  - time [ref=e293]: 28min
+                - link "Wall Street is starting to notice one of crypto’s smartest AI bets n coindesk.com" [ref=e294] [cursor=pointer]:
+                  - /url: /news/32495483/Wall-Street-is-starting-to-notice-one-of-cryptos-smartest-AI-bets
+                  - generic [ref=e295]:
+                    - text: Wall Street is starting to notice one of crypto’s smartest AI bets
+                    - generic [ref=e296]:
+                      - generic [ref=e297]: "n"
+                      - text: coindesk.com
+                - link "SUI" [ref=e299] [cursor=pointer]:
+                  - /url: /news/sui/
+              - text: "n"
+              - link [ref=e300] [cursor=pointer]:
+                - /url: /news/32495483/Wall-Street-is-starting-to-notice-one-of-cryptos-smartest-AI-bets
+            - generic [ref=e301]:
+              - generic [ref=e302]:
+                - link "29min" [ref=e303] [cursor=pointer]:
+                  - /url: /news/32495280/CLARITY
+                  - time [ref=e305]: 29min
+                - link "CLARITY 法案推进参议院，或重塑美国加密监管格局 n zh.chaincatcher.com" [ref=e306] [cursor=pointer]:
+                  - /url: /news/32495280/CLARITY
+                  - generic [ref=e307]:
+                    - text: CLARITY 法案推进参议院，或重塑美国加密监管格局
+                    - generic [ref=e308]:
+                      - generic [ref=e309]: "n"
+                      - text: zh.chaincatcher.com
+                - link "GENIUS" [ref=e311] [cursor=pointer]:
+                  - /url: /news/genius-3/
+              - text: "n"
+              - link [ref=e312] [cursor=pointer]:
+                - /url: /news/32495280/CLARITY
+            - generic [ref=e313]:
+              - generic [ref=e314]:
+                - link "34min" [ref=e315] [cursor=pointer]:
+                  - /url: /news/32495142/post-32495142
+                  - time [ref=e317]: 34min
+                - link "缅甸法案拟对诈骗处以死刑，对加密货币诈骗处以终身监禁 n zh.rss.odaily.news" [ref=e318] [cursor=pointer]:
+                  - /url: /news/32495142/post-32495142
+                  - generic [ref=e319]:
+                    - text: 缅甸法案拟对诈骗处以死刑，对加密货币诈骗处以终身监禁
+                    - generic [ref=e320]:
+                      - generic [ref=e321]: "n"
+                      - text: zh.rss.odaily.news
+              - text: "n"
+              - link [ref=e322] [cursor=pointer]:
+                - /url: /news/32495142/post-32495142
+            - generic [ref=e323]:
+              - generic [ref=e324]:
+                - link "34min" [ref=e325] [cursor=pointer]:
+                  - /url: /news/32495286/FLARE-SURGES-12-AS-PROTOCOL-UNLOCKS-NATIVE-XRP-LIQUIDITY-FlareNetworks-officially-launches-FAssets-v13-enabling-XRP-holders-to-mint-and-redeem-FXRP-using-native-XRPL-destination-tags-This-protocol-update-utilizes-XRP-escrow-and-multi-sig-infrastructure-to-secure-Core
+                  - time [ref=e327]: 34min
+                - link "FLARE SURGES 12% AS PROTOCOL UNLOCKS NATIVE XRP LIQUIDITY @FlareNetworks officially launches FAssets v1.3, enabling $XRP holders to mint and redeem $FXRP using native XRPL destination tags. This protocol update utilizes $XRP escrow and multi-sig infrastructure to secure Core c @bscnews" [ref=e328] [cursor=pointer]:
+                  - /url: /news/32495286/FLARE-SURGES-12-AS-PROTOCOL-UNLOCKS-NATIVE-XRP-LIQUIDITY-FlareNetworks-officially-launches-FAssets-v13-enabling-XRP-holders-to-mint-and-redeem-FXRP-using-native-XRPL-destination-tags-This-protocol-update-utilizes-XRP-escrow-and-multi-sig-infrastructure-to-secure-Core
+                  - generic [ref=e329]:
+                    - text: FLARE SURGES 12% AS PROTOCOL UNLOCKS NATIVE XRP LIQUIDITY @FlareNetworks officially launches FAssets v1.3, enabling $XRP holders to mint and redeem $FXRP using native XRPL destination tags. This protocol update utilizes $XRP escrow and multi-sig infrastructure to secure Core
+                    - generic [ref=e330]:
+                      - generic [ref=e331]: c
+                      - text: "@bscnews"
+              - text: c
+              - link [ref=e332] [cursor=pointer]:
+                - /url: /news/32495286/FLARE-SURGES-12-AS-PROTOCOL-UNLOCKS-NATIVE-XRP-LIQUIDITY-FlareNetworks-officially-launches-FAssets-v13-enabling-XRP-holders-to-mint-and-redeem-FXRP-using-native-XRPL-destination-tags-This-protocol-update-utilizes-XRP-escrow-and-multi-sig-infrastructure-to-secure-Core
+            - generic [ref=e333]:
+              - generic [ref=e334]:
+                - link "36min" [ref=e335] [cursor=pointer]:
+                  - /url: /news/32495291/CNG-Prices-Rise-in-Delhi-as-Fuel-Costs-Climb-Amid-West-Asia-Crisis
+                  - time [ref=e337]: 36min
+                - link "CNG Prices Rise in Delhi as Fuel Costs Climb Amid West Asia Crisis n sfctoday.com" [ref=e338] [cursor=pointer]:
+                  - /url: /news/32495291/CNG-Prices-Rise-in-Delhi-as-Fuel-Costs-Climb-Amid-West-Asia-Crisis
+                  - generic [ref=e339]:
+                    - text: CNG Prices Rise in Delhi as Fuel Costs Climb Amid West Asia Crisis
+                    - generic [ref=e340]:
+                      - generic [ref=e341]: "n"
+                      - text: sfctoday.com
+              - text: "n"
+              - link [ref=e343] [cursor=pointer]:
+                - /url: /news/32495291/CNG-Prices-Rise-in-Delhi-as-Fuel-Costs-Climb-Amid-West-Asia-Crisis
+            - generic [ref=e344]:
+              - generic [ref=e345]:
+                - link "42min" [ref=e346] [cursor=pointer]:
+                  - /url: /news/32494958/Avenir-Group-ETF
+                  - time [ref=e348]: 42min
+                - link "Avenir Group 稳固亚洲最大比特币 ETF 机构持仓，连续八季位居区域第一 n zh.chaincatcher.com" [ref=e349] [cursor=pointer]:
+                  - /url: /news/32494958/Avenir-Group-ETF
+                  - generic [ref=e350]:
+                    - text: Avenir Group 稳固亚洲最大比特币 ETF 机构持仓，连续八季位居区域第一
+                    - generic [ref=e351]:
+                      - generic [ref=e352]: "n"
+                      - text: zh.chaincatcher.com
+              - text: "n"
+              - link [ref=e353] [cursor=pointer]:
+                - /url: /news/32494958/Avenir-Group-ETF
+            - generic [ref=e354]:
+              - generic [ref=e355]:
+                - link "43min" [ref=e356] [cursor=pointer]:
+                  - /url: /news/32494443/German-economy-to-take-hit-from-Iran-war-during-Q2-ministry-says
+                  - time [ref=e358]: 43min
+                - link "German economy to take hit from Iran war during Q2, ministry says c @reutersbiz" [ref=e359] [cursor=pointer]:
+                  - /url: /news/32494443/German-economy-to-take-hit-from-Iran-war-during-Q2-ministry-says
+                  - generic [ref=e360]:
+                    - text: German economy to take hit from Iran war during Q2, ministry says
+                    - generic [ref=e361]:
+                      - generic [ref=e362]: c
+                      - text: "@reutersbiz"
+              - text: c
+              - link [ref=e363] [cursor=pointer]:
+                - /url: /news/32494443/German-economy-to-take-hit-from-Iran-war-during-Q2-ministry-says
+            - generic [ref=e364]:
+              - generic [ref=e365]:
+                - link "44min" [ref=e366] [cursor=pointer]:
+                  - /url: /news/32494530/Whales-Arent-Selling-XRP-Biggest-Stash-Since-2018-Comes-to-Light-as-150-Target-Looms
+                  - time [ref=e368]: 44min
+                - link "Whales Aren’t Selling XRP — Biggest Stash Since 2018 Comes to Light as $1.50 Target Looms n coinpaper.com" [ref=e369] [cursor=pointer]:
+                  - /url: /news/32494530/Whales-Arent-Selling-XRP-Biggest-Stash-Since-2018-Comes-to-Light-as-150-Target-Looms
+                  - generic [ref=e370]:
+                    - text: Whales Aren’t Selling XRP — Biggest Stash Since 2018 Comes to Light as $1.50 Target Looms
+                    - generic [ref=e371]:
+                      - generic [ref=e372]: "n"
+                      - text: coinpaper.com
+                - link "XRP" [ref=e374] [cursor=pointer]:
+                  - /url: /news/ripple/
+              - text: "n"
+              - link [ref=e375] [cursor=pointer]:
+                - /url: /news/32494530/Whales-Arent-Selling-XRP-Biggest-Stash-Since-2018-Comes-to-Light-as-150-Target-Looms
+            - generic [ref=e376]:
+              - generic [ref=e377]:
+                - link "46min" [ref=e378] [cursor=pointer]:
+                  - /url: /news/32494582/post-32494582
+                  - time [ref=e380]: 46min
+                - link "缅甸拟立法严惩加密诈骗，最高可判死刑 n zh.chaincatcher.com" [ref=e381] [cursor=pointer]:
+                  - /url: /news/32494582/post-32494582
+                  - generic [ref=e382]:
+                    - text: 缅甸拟立法严惩加密诈骗，最高可判死刑
+                    - generic [ref=e383]:
+                      - generic [ref=e384]: "n"
+                      - text: zh.chaincatcher.com
+              - text: "n"
+              - link [ref=e385] [cursor=pointer]:
+                - /url: /news/32494582/post-32494582
+            - generic [ref=e386]:
+              - generic [ref=e387]:
+                - link "46min" [ref=e388] [cursor=pointer]:
+                  - /url: /news/32495285/The-Secret-Ingredient-for-GOOD-Artificial-Intelligence-ensue_ai-co-founder-AustinBaggio-explains-the-importance-of-context-one-of-the-most-impactful-components-in-LLM-effectiveness-during-a-recent-interview-with-RealMissAI-of-The-dealflowpodcast
+                  - time [ref=e390]: 46min
+                - link "The Secret Ingredient for GOOD Artificial Intelligence... @ensue_ai co-founder @AustinBaggio explains the importance of 'context' (one of the most impactful components in LLM effectiveness) during a recent interview with @RealMissAI of The @dealflowpodcast. c @bscnews" [ref=e391] [cursor=pointer]:
+                  - /url: /news/32495285/The-Secret-Ingredient-for-GOOD-Artificial-Intelligence-ensue_ai-co-founder-AustinBaggio-explains-the-importance-of-context-one-of-the-most-impactful-components-in-LLM-effectiveness-during-a-recent-interview-with-RealMissAI-of-The-dealflowpodcast
+                  - generic [ref=e392]:
+                    - text: The Secret Ingredient for GOOD Artificial Intelligence... @ensue_ai co-founder @AustinBaggio explains the importance of 'context' (one of the most impactful components in LLM effectiveness) during a recent interview with @RealMissAI of The @dealflowpodcast.
+                    - generic [ref=e393]:
+                      - generic [ref=e394]: c
+                      - text: "@bscnews"
+              - text: c
+              - link [ref=e395] [cursor=pointer]:
+                - /url: /news/32495285/The-Secret-Ingredient-for-GOOD-Artificial-Intelligence-ensue_ai-co-founder-AustinBaggio-explains-the-importance-of-context-one-of-the-most-impactful-components-in-LLM-effectiveness-during-a-recent-interview-with-RealMissAI-of-The-dealflowpodcast
+            - generic [ref=e396]:
+              - generic [ref=e397]:
+                - link "46min" [ref=e398] [cursor=pointer]:
+                  - /url: /news/32494591/Avenir-Group-maintains-its-position-as-the-largest-institutional-holder-of-Bitcoin-ETFs-in-Asia-ranking-first-in-the-region-for-the-eighth-consecutive-quarter
+                  - time [ref=e400]: 46min
+                - link "Avenir Group maintains its position as the largest institutional holder of Bitcoin ETFs in Asia, ranking first in the region for the eighth consecutive quarter. n zh.panewslab.com" [ref=e401] [cursor=pointer]:
+                  - /url: /news/32494591/Avenir-Group-maintains-its-position-as-the-largest-institutional-holder-of-Bitcoin-ETFs-in-Asia-ranking-first-in-the-region-for-the-eighth-consecutive-quarter
+                  - generic [ref=e402]:
+                    - text: Avenir Group maintains its position as the largest institutional holder of Bitcoin ETFs in Asia, ranking first in the region for the eighth consecutive quarter.
+                    - generic [ref=e403]:
+                      - generic [ref=e404]: "n"
+                      - text: zh.panewslab.com
+                - link "BTC" [ref=e406] [cursor=pointer]:
+                  - /url: /news/bitcoin/
+              - text: "n"
+              - link [ref=e407] [cursor=pointer]:
+                - /url: /news/32494591/Avenir-Group-maintains-its-position-as-the-largest-institutional-holder-of-Bitcoin-ETFs-in-Asia-ranking-first-in-the-region-for-the-eighth-consecutive-quarter
+            - generic [ref=e408]:
+              - generic [ref=e409]:
+                - link "47min" [ref=e410] [cursor=pointer]:
+                  - /url: /news/32494994/Thorchain-Exploited-Trading-Paused-Amid-Risk-of-Enormous-Attack
+                  - time [ref=e412]: 47min
+                - link "Thorchain Exploited? Trading Paused Amid Risk of Enormous Attack n u.today" [ref=e413] [cursor=pointer]:
+                  - /url: /news/32494994/Thorchain-Exploited-Trading-Paused-Amid-Risk-of-Enormous-Attack
+                  - generic [ref=e414]:
+                    - text: Thorchain Exploited? Trading Paused Amid Risk of Enormous Attack
+                    - generic [ref=e415]:
+                      - generic [ref=e416]: "n"
+                      - text: u.today
+              - text: "n"
+              - link [ref=e417] [cursor=pointer]:
+                - /url: /news/32494994/Thorchain-Exploited-Trading-Paused-Amid-Risk-of-Enormous-Attack
+            - generic [ref=e418]:
+              - generic [ref=e419]:
+                - link "48min" [ref=e420] [cursor=pointer]:
+                  - /url: /news/32494243/Myanmar-bill-proposes-death-penalty-for-scam-coercion-life-imprisonment-for-crypto-fraud-report
+                  - time [ref=e422]: 48min
+                - 'link "Myanmar bill proposes death penalty for scam coercion, life imprisonment for crypto fraud: report n theblock.co" [ref=e423] [cursor=pointer]':
+                  - /url: /news/32494243/Myanmar-bill-proposes-death-penalty-for-scam-coercion-life-imprisonment-for-crypto-fraud-report
+                  - generic [ref=e424]:
+                    - text: "Myanmar bill proposes death penalty for scam coercion, life imprisonment for crypto fraud: report"
+                    - generic [ref=e425]:
+                      - generic [ref=e426]: "n"
+                      - text: theblock.co
+                - generic [ref=e427]:
+                  - link "A" [ref=e428] [cursor=pointer]:
+                    - /url: /news/vaulta/
+                  - link "GAL" [ref=e429] [cursor=pointer]:
+                    - /url: /news/project-galaxy/
+              - text: "n"
+              - link [ref=e430] [cursor=pointer]:
+                - /url: /news/32494243/Myanmar-bill-proposes-death-penalty-for-scam-coercion-life-imprisonment-for-crypto-fraud-report
+            - generic [ref=e431]:
+              - generic [ref=e432]:
+                - link "48min" [ref=e433] [cursor=pointer]:
+                  - /url: /news/32494356/Top-5-crypto-presales-worth-paying-attention-to-in-May-2026
+                  - time [ref=e435]: 48min
+                - link "Top 5 crypto presales worth paying attention to in May 2026 n ambcrypto.com" [ref=e436] [cursor=pointer]:
+                  - /url: /news/32494356/Top-5-crypto-presales-worth-paying-attention-to-in-May-2026
+                  - generic [ref=e437]:
+                    - text: Top 5 crypto presales worth paying attention to in May 2026
+                    - generic [ref=e438]:
+                      - generic [ref=e439]: "n"
+                      - text: ambcrypto.com
+              - text: "n"
+              - link [ref=e440] [cursor=pointer]:
+                - /url: /news/32494356/Top-5-crypto-presales-worth-paying-attention-to-in-May-2026
+            - generic [ref=e441]:
+              - generic [ref=e442]:
+                - link "48min" [ref=e443] [cursor=pointer]:
+                  - /url: /news/32494441/The-US-Justice-Department-is-close-to-dropping-criminal-fraud-charges-against-Gautam-Adani-an-Indian-billionaire-who-pledged-to-invest-10-billion-in-the-US-economy-according-to-sources-familiar-with-the-matter
+                  - time [ref=e445]: 48min
+                - link "The US Justice Department is close to dropping criminal fraud charges against Gautam Adani, an Indian billionaire who pledged to invest $10 billion in the US economy, according to sources familiar with the matter c @reutersbiz" [ref=e446] [cursor=pointer]:
+                  - /url: /news/32494441/The-US-Justice-Department-is-close-to-dropping-criminal-fraud-charges-against-Gautam-Adani-an-Indian-billionaire-who-pledged-to-invest-10-billion-in-the-US-economy-according-to-sources-familiar-with-the-matter
+                  - generic [ref=e447]:
+                    - text: The US Justice Department is close to dropping criminal fraud charges against Gautam Adani, an Indian billionaire who pledged to invest $10 billion in the US economy, according to sources familiar with the matter
+                    - generic [ref=e448]:
+                      - generic [ref=e449]: c
+                      - text: "@reutersbiz"
+                - link "US" [ref=e451] [cursor=pointer]:
+                  - /url: /news/talus/
+              - text: c
+              - link [ref=e452] [cursor=pointer]:
+                - /url: /news/32494441/The-US-Justice-Department-is-close-to-dropping-criminal-fraud-charges-against-Gautam-Adani-an-Indian-billionaire-who-pledged-to-invest-10-billion-in-the-US-economy-according-to-sources-familiar-with-the-matter
+            - generic [ref=e453]:
+              - generic [ref=e454]:
+                - link "49min" [ref=e455] [cursor=pointer]:
+                  - /url: /news/32494992/XRP-Burn-Rate-Surges-36-as-Price-Breaks-Key-Resistance
+                  - time [ref=e457]: 49min
+                - link "XRP Burn Rate Surges 36% as Price Breaks Key Resistance n u.today" [ref=e458] [cursor=pointer]:
+                  - /url: /news/32494992/XRP-Burn-Rate-Surges-36-as-Price-Breaks-Key-Resistance
+                  - generic [ref=e459]:
+                    - text: XRP Burn Rate Surges 36% as Price Breaks Key Resistance
+                    - generic [ref=e460]:
+                      - generic [ref=e461]: "n"
+                      - text: u.today
+                - link "XRP" [ref=e463] [cursor=pointer]:
+                  - /url: /news/ripple/
+              - text: "n"
+              - link [ref=e464] [cursor=pointer]:
+                - /url: /news/32494992/XRP-Burn-Rate-Surges-36-as-Price-Breaks-Key-Resistance
+            - generic [ref=e465]:
+              - generic [ref=e466]:
+                - link "50min" [ref=e467] [cursor=pointer]:
+                  - /url: /news/32494139/Hyperliquid-Bitcoin
+                  - time [ref=e469]: 50min
+                - link "Hyperliquid 领涨加密市场，山寨币涨幅跑赢 Bitcoin n zh.chaincatcher.com" [ref=e470] [cursor=pointer]:
+                  - /url: /news/32494139/Hyperliquid-Bitcoin
+                  - generic [ref=e471]:
+                    - text: Hyperliquid 领涨加密市场，山寨币涨幅跑赢 Bitcoin
+                    - generic [ref=e472]:
+                      - generic [ref=e473]: "n"
+                      - text: zh.chaincatcher.com
+                - generic [ref=e474]:
+                  - link "BTC" [ref=e475] [cursor=pointer]:
+                    - /url: /news/bitcoin/
+                  - link "ETH" [ref=e476] [cursor=pointer]:
+                    - /url: /news/ethereum/
+                  - link "HYPE" [ref=e477] [cursor=pointer]:
+                    - /url: /news/hyperliquid/
+              - text: "n"
+              - link [ref=e478] [cursor=pointer]:
+                - /url: /news/32494139/Hyperliquid-Bitcoin
+            - generic [ref=e479]:
+              - generic [ref=e480]:
+                - link "50min" [ref=e481] [cursor=pointer]:
+                  - /url: /news/32494430/NEW-US-stock-valuations-are-approaching-dot-com-bubble-territory-with-the-Shiller-PE-ratio-hitting-4218-just-below-the-4419-peak-seen-in-1999-before-the-SampP-500-crashed-50
+                  - time [ref=e483]: 50min
+                - link "NEW U.S. stock valuations are approaching dot-com bubble territory, with the Shiller P/E ratio hitting 42.18, just below the 44.19 peak seen in 1999 before the S&P 500 crashed 50%. c @coindesk" [ref=e484] [cursor=pointer]:
+                  - /url: /news/32494430/NEW-US-stock-valuations-are-approaching-dot-com-bubble-territory-with-the-Shiller-PE-ratio-hitting-4218-just-below-the-4419-peak-seen-in-1999-before-the-SampP-500-crashed-50
+                  - generic [ref=e485]:
+                    - text: NEW U.S. stock valuations are approaching dot-com bubble territory, with the Shiller P/E ratio hitting 42.18, just below the 44.19 peak seen in 1999 before the S&P 500 crashed 50%.
+                    - generic [ref=e486]:
+                      - generic [ref=e487]: c
+                      - text: "@coindesk"
+              - text: c
+              - link [ref=e488] [cursor=pointer]:
+                - /url: /news/32494430/NEW-US-stock-valuations-are-approaching-dot-com-bubble-territory-with-the-Shiller-PE-ratio-hitting-4218-just-below-the-4419-peak-seen-in-1999-before-the-SampP-500-crashed-50
+            - generic [ref=e489]:
+              - generic [ref=e490]:
+                - link "51min" [ref=e491] [cursor=pointer]:
+                  - /url: /news/32494525/Why-is-Hyperliquids-HYPE-token-price-up-23-in-a-day
+                  - time [ref=e493]: 51min
+                - link "Why is Hyperliquid's HYPE token price up 23% in a day? n cointelegraph.com" [ref=e494] [cursor=pointer]:
+                  - /url: /news/32494525/Why-is-Hyperliquids-HYPE-token-price-up-23-in-a-day
+                  - generic [ref=e495]:
+                    - text: Why is Hyperliquid's HYPE token price up 23% in a day?
+                    - generic [ref=e496]:
+                      - generic [ref=e497]: "n"
+                      - text: cointelegraph.com
+                - link "HYPE" [ref=e499] [cursor=pointer]:
+                  - /url: /news/hyperliquid/
+              - text: "n"
+              - link [ref=e500] [cursor=pointer]:
+                - /url: /news/32494525/Why-is-Hyperliquids-HYPE-token-price-up-23-in-a-day
+            - generic [ref=e501]:
+              - generic [ref=e502]:
+                - link "51min" [ref=e503] [cursor=pointer]:
+                  - /url: /news/32494144/Hyperliquid-leads-the-crypto-market-altcoins-outperform-Bitcoin
+                  - time [ref=e505]: 51min
+                - link "Hyperliquid leads the crypto market, altcoins outperform Bitcoin. n zh.panewslab.com" [ref=e506] [cursor=pointer]:
+                  - /url: /news/32494144/Hyperliquid-leads-the-crypto-market-altcoins-outperform-Bitcoin
+                  - generic [ref=e507]:
+                    - text: Hyperliquid leads the crypto market, altcoins outperform Bitcoin.
+                    - generic [ref=e508]:
+                      - generic [ref=e509]: "n"
+                      - text: zh.panewslab.com
+                - generic [ref=e510]:
+                  - link "BTC" [ref=e511] [cursor=pointer]:
+                    - /url: /news/bitcoin/
+                  - link "ETH" [ref=e512] [cursor=pointer]:
+                    - /url: /news/ethereum/
+                  - link "HYPE" [ref=e513] [cursor=pointer]:
+                    - /url: /news/hyperliquid/
+              - text: "n"
+              - link [ref=e514] [cursor=pointer]:
+                - /url: /news/32494144/Hyperliquid-leads-the-crypto-market-altcoins-outperform-Bitcoin
+            - generic [ref=e515]:
+              - generic [ref=e516]:
+                - link "52min" [ref=e517] [cursor=pointer]:
+                  - /url: /news/32494136/JUST-5-18-GasFree-1-USDT
+                  - time [ref=e519]: 52min
+                - link "JUST 将联合多款钱包于 5 月 18 日开启“GasFree”主题活动，总奖池达 1 万 USDT n zh.chaincatcher.com" [ref=e520] [cursor=pointer]:
+                  - /url: /news/32494136/JUST-5-18-GasFree-1-USDT
+                  - generic [ref=e521]:
+                    - text: JUST 将联合多款钱包于 5 月 18 日开启“GasFree”主题活动，总奖池达 1 万 USDT
+                    - generic [ref=e522]:
+                      - generic [ref=e523]: "n"
+                      - text: zh.chaincatcher.com
+                - generic [ref=e524]:
+                  - link "USDT" [ref=e525] [cursor=pointer]:
+                    - /url: /news/tether/
+                  - link "NOW" [ref=e526] [cursor=pointer]:
+                    - /url: /news/changenow/
+              - text: "n"
+              - link [ref=e527] [cursor=pointer]:
+                - /url: /news/32494136/JUST-5-18-GasFree-1-USDT
+            - generic [ref=e528]:
+              - generic [ref=e529]:
+                - link "53min" [ref=e530] [cursor=pointer]:
+                  - /url: /news/32494025/post-32494025
+                  - time [ref=e532]: 53min
+                - link "曾重金投资该山寨币的美国巨头公司正面临困境：遭受严重损失！ n zh.bitcoinsistemi.com" [ref=e533] [cursor=pointer]:
+                  - /url: /news/32494025/post-32494025
+                  - generic [ref=e534]:
+                    - text: 曾重金投资该山寨币的美国巨头公司正面临困境：遭受严重损失！
+                    - generic [ref=e535]:
+                      - generic [ref=e536]: "n"
+                      - text: zh.bitcoinsistemi.com
+                - link "ETH" [ref=e538] [cursor=pointer]:
+                  - /url: /news/ethereum/
+              - text: "n"
+              - link [ref=e539] [cursor=pointer]:
+                - /url: /news/32494025/post-32494025
+            - generic [ref=e540]:
+              - generic [ref=e541]:
+                - link "55min" [ref=e542] [cursor=pointer]:
+                  - /url: /news/32494522/OKX-reportedly-eyes-Coinone-stake-in-South-Korea-push
+                  - time [ref=e544]: 55min
+                - link "OKX reportedly eyes Coinone stake in South Korea push n cointelegraph.com" [ref=e545] [cursor=pointer]:
+                  - /url: /news/32494522/OKX-reportedly-eyes-Coinone-stake-in-South-Korea-push
+                  - generic [ref=e546]:
+                    - text: OKX reportedly eyes Coinone stake in South Korea push
+                    - generic [ref=e547]:
+                      - generic [ref=e548]: "n"
+                      - text: cointelegraph.com
+              - text: "n"
+              - link [ref=e549] [cursor=pointer]:
+                - /url: /news/32494522/OKX-reportedly-eyes-Coinone-stake-in-South-Korea-push
+            - generic [ref=e550]:
+              - generic [ref=e551]:
+                - link "57min" [ref=e552] [cursor=pointer]:
+                  - /url: /news/32493911/BAI
+                  - time [ref=e554]: 57min
+                - link "B.AI 全面接入国内主流支付体系，微信支付、支付宝及银联上线 n zh.chaincatcher.com" [ref=e555] [cursor=pointer]:
+                  - /url: /news/32493911/BAI
+                  - generic [ref=e556]:
+                    - text: B.AI 全面接入国内主流支付体系，微信支付、支付宝及银联上线
+                    - generic [ref=e557]:
+                      - generic [ref=e558]: "n"
+                      - text: zh.chaincatcher.com
+                - link "B" [ref=e560] [cursor=pointer]:
+                  - /url: /news/build-on/
+              - text: "n"
+              - link [ref=e561] [cursor=pointer]:
+                - /url: /news/32493911/BAI
+            - generic [ref=e562]:
+              - generic [ref=e563]:
+                - link "57min" [ref=e564] [cursor=pointer]:
+                  - /url: /news/32494439/Argentum-AI-signs-25-billion-data-center-deal-with-cloud-real-estate-firms
+                  - time [ref=e566]: 57min
+                - link "Argentum AI signs $2.5 billion data center deal with cloud, real estate firms c @reutersbiz" [ref=e567] [cursor=pointer]:
+                  - /url: /news/32494439/Argentum-AI-signs-25-billion-data-center-deal-with-cloud-real-estate-firms
+                  - generic [ref=e568]:
+                    - text: Argentum AI signs $2.5 billion data center deal with cloud, real estate firms
+                    - generic [ref=e569]:
+                      - generic [ref=e570]: c
+                      - text: "@reutersbiz"
+              - text: c
+              - link [ref=e571] [cursor=pointer]:
+                - /url: /news/32494439/Argentum-AI-signs-25-billion-data-center-deal-with-cloud-real-estate-firms
+            - generic [ref=e572]:
+              - generic [ref=e573]:
+                - link "57min" [ref=e574] [cursor=pointer]:
+                  - /url: /news/32494026/Keynote-Apex-Capital-with-Nuri-Katz-Bitcoin-2026
+                  - time [ref=e576]: 57min
+                - 'link "Keynote: Apex Capital with Nuri Katz | Bitcoin 2026 # BitcoinMagazine" [ref=e577] [cursor=pointer]':
+                  - /url: /news/32494026/Keynote-Apex-Capital-with-Nuri-Katz-Bitcoin-2026
+                  - generic [ref=e578]:
+                    - text: "Keynote: Apex Capital with Nuri Katz | Bitcoin 2026"
+                    - generic [ref=e579]:
+                      - generic [ref=e580]: "#"
+                      - text: BitcoinMagazine
+                - link "BTC" [ref=e582] [cursor=pointer]:
+                  - /url: /news/bitcoin/
+              - text: "#"
+              - link [ref=e583] [cursor=pointer]:
+                - /url: /news/32494026/Keynote-Apex-Capital-with-Nuri-Katz-Bitcoin-2026
+            - generic [ref=e584]:
+              - generic [ref=e585]:
+                - link "57min" [ref=e586] [cursor=pointer]:
+                  - /url: /news/32494448/ETH-Still-struggling-with-this-24K-resistance-Going-to-be-some-decision-time-soon-either-way-as-price-is-compressing-and-trend-lines-are-narrowing-in-on-each-other
+                  - time [ref=e588]: 57min
+                - link "$ETH Still struggling with this $2.4K resistance. Going to be some decision time soon either way, as price is compressing and trend lines are narrowing in on each other. c @daancrypto" [ref=e589] [cursor=pointer]:
+                  - /url: /news/32494448/ETH-Still-struggling-with-this-24K-resistance-Going-to-be-some-decision-time-soon-either-way-as-price-is-compressing-and-trend-lines-are-narrowing-in-on-each-other
+                  - generic [ref=e590]:
+                    - text: $ETH Still struggling with this $2.4K resistance. Going to be some decision time soon either way, as price is compressing and trend lines are narrowing in on each other.
+                    - generic [ref=e591]:
+                      - generic [ref=e592]: c
+                      - text: "@daancrypto"
+              - text: c
+              - link [ref=e593] [cursor=pointer]:
+                - /url: /news/32494448/ETH-Still-struggling-with-this-24K-resistance-Going-to-be-some-decision-time-soon-either-way-as-price-is-compressing-and-trend-lines-are-narrowing-in-on-each-other
+            - generic [ref=e594]:
+              - generic [ref=e595]:
+                - link "57min" [ref=e596] [cursor=pointer]:
+                  - /url: /news/32495290/INTEL-TRUMP-REMARKS-Discussed-Ukraine-with-Xi-Got-a-soybean-deal-with-China-China-will-buy-billions-of-dollars-in-US-soybeans-Last-thing-we-need-right-now-is-a-war-Im-going-to-make-a-decision-over-the-next-few-days-on-lifting-the-sanctions-on-Chinese-oil-companies-that
+                  - time [ref=e598]: 57min
+                - 'link "INTEL: TRUMP REMARKS -Discussed Ukraine with Xi -Got a soybean deal with China, China will buy billions of dollars in US soybeans -Last thing we need right now is a war -I''m going to make a decision over the next few days on lifting the sanctions on Chinese oil companies that c @solidintel_x" [ref=e599] [cursor=pointer]':
+                  - /url: /news/32495290/INTEL-TRUMP-REMARKS-Discussed-Ukraine-with-Xi-Got-a-soybean-deal-with-China-China-will-buy-billions-of-dollars-in-US-soybeans-Last-thing-we-need-right-now-is-a-war-Im-going-to-make-a-decision-over-the-next-few-days-on-lifting-the-sanctions-on-Chinese-oil-companies-that
+                  - generic [ref=e600]:
+                    - text: "INTEL: TRUMP REMARKS -Discussed Ukraine with Xi -Got a soybean deal with China, China will buy billions of dollars in US soybeans -Last thing we need right now is a war -I'm going to make a decision over the next few days on lifting the sanctions on Chinese oil companies that"
+                    - generic [ref=e601]:
+                      - generic [ref=e602]: c
+                      - text: "@solidintel_x"
+                - generic [ref=e603]:
+                  - link "TRUMP" [ref=e604] [cursor=pointer]:
+                    - /url: /news/official-trump/
+                  - link "US" [ref=e605] [cursor=pointer]:
+                    - /url: /news/talus/
+              - text: c
+              - link [ref=e606] [cursor=pointer]:
+                - /url: /news/32495290/INTEL-TRUMP-REMARKS-Discussed-Ukraine-with-Xi-Got-a-soybean-deal-with-China-China-will-buy-billions-of-dollars-in-US-soybeans-Last-thing-we-need-right-now-is-a-war-Im-going-to-make-a-decision-over-the-next-few-days-on-lifting-the-sanctions-on-Chinese-oil-companies-that
+            - generic [ref=e607]:
+              - generic [ref=e608]:
+                - link "58min" [ref=e609] [cursor=pointer]:
+                  - /url: /news/32494434/NEW-AI-powered-crypto-hacks-stole-nearly-600M-in-just-two-attacks-last-month-with-investigators-linking-the-exploits-to-North-Korean-hacking-groups
+                  - time [ref=e611]: 58min
+                - 'link "NEW: AI-powered crypto hacks stole nearly $600M in just two attacks last month, with investigators linking the exploits to North Korean hacking groups. c @cointelegraph" [ref=e612] [cursor=pointer]':
+                  - /url: /news/32494434/NEW-AI-powered-crypto-hacks-stole-nearly-600M-in-just-two-attacks-last-month-with-investigators-linking-the-exploits-to-North-Korean-hacking-groups
+                  - generic [ref=e613]:
+                    - text: "NEW: AI-powered crypto hacks stole nearly $600M in just two attacks last month, with investigators linking the exploits to North Korean hacking groups."
+                    - generic [ref=e614]:
+                      - generic [ref=e615]: c
+                      - text: "@cointelegraph"
+              - text: c
+              - link [ref=e616] [cursor=pointer]:
+                - /url: /news/32494434/NEW-AI-powered-crypto-hacks-stole-nearly-600M-in-just-two-attacks-last-month-with-investigators-linking-the-exploits-to-North-Korean-hacking-groups
+            - generic [ref=e617]:
+              - generic [ref=e618]:
+                - link "58min" [ref=e619] [cursor=pointer]:
+                  - /url: /news/32495283/90-OF-CRYPTO-HOLDERS-PLAN-TO-BUY-MORE-WITHIN-THE-NEXT-YEAR-The-NatCryptoAssoc-just-released-a-new-report-on-US-crypto-adoption-90-of-crypto-holders-plan-to-buy-more-over-the-next-12-months-Adoption-is-still-accelerating-this-industry-is-just-getting-started
+                  - time [ref=e621]: 58min
+                - link "90% OF CRYPTO HOLDERS PLAN TO BUY MORE WITHIN THE NEXT YEAR! The @NatCryptoAssoc just released a new report on US crypto adoption. 90% of crypto holders plan to buy more over the next 12 months! Adoption is still accelerating, this industry is just getting started! c @realallincrypto" [ref=e622] [cursor=pointer]:
+                  - /url: /news/32495283/90-OF-CRYPTO-HOLDERS-PLAN-TO-BUY-MORE-WITHIN-THE-NEXT-YEAR-The-NatCryptoAssoc-just-released-a-new-report-on-US-crypto-adoption-90-of-crypto-holders-plan-to-buy-more-over-the-next-12-months-Adoption-is-still-accelerating-this-industry-is-just-getting-started
+                  - generic [ref=e623]:
+                    - text: 90% OF CRYPTO HOLDERS PLAN TO BUY MORE WITHIN THE NEXT YEAR! The @NatCryptoAssoc just released a new report on US crypto adoption. 90% of crypto holders plan to buy more over the next 12 months! Adoption is still accelerating, this industry is just getting started!
+                    - generic [ref=e624]:
+                      - generic [ref=e625]: c
+                      - text: "@realallincrypto"
+                - generic [ref=e626]:
+                  - link "THE" [ref=e627] [cursor=pointer]:
+                    - /url: /news/thena/
+                  - link "US" [ref=e628] [cursor=pointer]:
+                    - /url: /news/talus/
+                  - link "BUY" [ref=e629] [cursor=pointer]:
+                    - /url: /news/buying/
+              - text: c
+              - link [ref=e630] [cursor=pointer]:
+                - /url: /news/32495283/90-OF-CRYPTO-HOLDERS-PLAN-TO-BUY-MORE-WITHIN-THE-NEXT-YEAR-The-NatCryptoAssoc-just-released-a-new-report-on-US-crypto-adoption-90-of-crypto-holders-plan-to-buy-more-over-the-next-12-months-Adoption-is-still-accelerating-this-industry-is-just-getting-started
+            - generic [ref=e631]:
+              - generic [ref=e632]:
+                - link "58min" [ref=e633] [cursor=pointer]:
+                  - /url: /news/32493907/Catcher-PredictLoLHanwha-Life-Esports-Dplus-KIABO3-LCK-1-2-40
+                  - time [ref=e635]: 58min
+                - link "Catcher Predict：“LoL：Hanwha Life Esports 对 Dplus KIA（BO3）- LCK 第 1-2 轮” “两队均击杀一条龙” 胜率飙升 40% n zh.chaincatcher.com" [ref=e636] [cursor=pointer]:
+                  - /url: /news/32493907/Catcher-PredictLoLHanwha-Life-Esports-Dplus-KIABO3-LCK-1-2-40
+                  - generic [ref=e637]:
+                    - text: Catcher Predict：“LoL：Hanwha Life Esports 对 Dplus KIA（BO3）- LCK 第 1-2 轮” “两队均击杀一条龙” 胜率飙升 40%
+                    - generic [ref=e638]:
+                      - generic [ref=e639]: "n"
+                      - text: zh.chaincatcher.com
+              - text: "n"
+              - link [ref=e640] [cursor=pointer]:
+                - /url: /news/32493907/Catcher-PredictLoLHanwha-Life-Esports-Dplus-KIABO3-LCK-1-2-40
+            - generic [ref=e641]:
+              - generic [ref=e642]:
+                - link "58min" [ref=e643] [cursor=pointer]:
+                  - /url: /news/32494438/WATCH-Samsung-Electronics-South-Korean-labor-union-said-it-remained-committed-to-a-planned-strike-starting-next-week-even-after-the-company-proposed-resuming-pay-talks-without-conditions-sending-shares-down-as-much-as-93
+                  - time [ref=e645]: 58min
+                - 'link "WATCH: Samsung Electronics'' South Korean labor union said it remained committed to a planned strike starting next week, even after the company proposed resuming pay talks without conditions, sending shares down as much as 9.3% c @reutersbiz" [ref=e646] [cursor=pointer]':
+                  - /url: /news/32494438/WATCH-Samsung-Electronics-South-Korean-labor-union-said-it-remained-committed-to-a-planned-strike-starting-next-week-even-after-the-company-proposed-resuming-pay-talks-without-conditions-sending-shares-down-as-much-as-93
+                  - generic [ref=e647]:
+                    - text: "WATCH: Samsung Electronics' South Korean labor union said it remained committed to a planned strike starting next week, even after the company proposed resuming pay talks without conditions, sending shares down as much as 9.3%"
+                    - generic [ref=e648]:
+                      - generic [ref=e649]: c
+                      - text: "@reutersbiz"
+              - text: c
+              - link [ref=e650] [cursor=pointer]:
+                - /url: /news/32494438/WATCH-Samsung-Electronics-South-Korean-labor-union-said-it-remained-committed-to-a-planned-strike-starting-next-week-even-after-the-company-proposed-resuming-pay-talks-without-conditions-sending-shares-down-as-much-as-93
+            - generic [ref=e651]:
+              - generic [ref=e652]:
+                - link "58min" [ref=e653] [cursor=pointer]:
+                  - /url: /news/32495281/Swap-TRONTRX-or-USDTTRC-20-to-XMR-without-KYC
+                  - time [ref=e655]: 58min
+                - link "Swap TRON/TRX or USDT(TRC-20) to XMR without KYC? w r/tronix" [ref=e656] [cursor=pointer]:
+                  - /url: /news/32495281/Swap-TRONTRX-or-USDTTRC-20-to-XMR-without-KYC
+                  - generic [ref=e657]:
+                    - text: Swap TRON/TRX or USDT(TRC-20) to XMR without KYC?
+                    - generic [ref=e658]:
+                      - generic [ref=e659]: w
+                      - text: r/tronix
+                - generic [ref=e660]:
+                  - link "TRX" [ref=e661] [cursor=pointer]:
+                    - /url: /news/tron/
+                  - link "TRX" [ref=e662] [cursor=pointer]:
+                    - /url: /
+                  - link "WTRX" [ref=e663] [cursor=pointer]:
+                    - /url: /
+                  - text: …
+              - text: w
+              - link [ref=e664] [cursor=pointer]:
+                - /url: /news/32495281/Swap-TRONTRX-or-USDTTRC-20-to-XMR-without-KYC
+          - button "Load more" [ref=e666] [cursor=pointer]
+      - generic [ref=e668]:
+        - generic [ref=e669]:
+          - link "Home" [ref=e670] [cursor=pointer]:
+            - /url: /
+          - link "Guides" [ref=e671] [cursor=pointer]:
+            - /url: /guides
+          - link "About" [ref=e672] [cursor=pointer]:
+            - /url: /news/about
+          - text: f
+        - generic [ref=e673]:
+          - generic [ref=e674]:
+            - generic [ref=e675]:
+              - paragraph [ref=e676]: B Introducing CryptoPanic PLUS 🚀 - the upgraded version of our former PLUS membership
+              - paragraph [ref=e677]: We’ve upgraded our former PLUS membership into a more powerful, flexible, and customizable experience. CryptoPanic PLUS is built for users who want faster insights, deeper control, and a cleaner workflow — everything you need to stay ahead of the market with fewer limits and zero distractions.
+              - link "Get PLUS" [ref=e679] [cursor=pointer]:
+                - /url: /plus
+            - generic [ref=e680]:
+              - link "Dismiss" [ref=e681] [cursor=pointer]:
+                - /url: ""
+              - generic [ref=e682]:
+                - strong [ref=e683]: CryptoPanic
+                - text: is a news aggregator platform indicating impact on price and market for traders and cryptocurrency enthusiasts. Now includes
+                - link "Portfolio Tracker" [ref=e684] [cursor=pointer]:
+                  - /url: /portfolio
+                - text: ","
+                - link "Media Feed" [ref=e685] [cursor=pointer]:
+                  - /url: /news/media
+                - text: and
+                - link "Blogs" [ref=e686] [cursor=pointer]:
+                  - /url: /news/blogs
+                - text: .
+              - generic [ref=e687]:
+                - generic [ref=e688]:
+                  - checkbox [ref=e690]
+                  - text: Show Price alerts
+                - generic [ref=e693]:
+                  - checkbox [ref=e695]
+                  - text: Show Following feed in Top News
+            - generic [ref=e698]:
+              - generic [ref=e700]: Trending
+              - generic [ref=e701]:
+                - generic:
+                  - generic:
+                    - generic:
+                      - link "14h":
+                        - /url: /news/32475404/Market-Analyst-Outlines-How-The-XRP-Price-Will-Reach-300-And-What-Everyone-Is-Missing
+                        - generic:
+                          - time: 14h
+                      - link "Market Analyst Outlines How The XRP Price Will Reach $300 And What Everyone Is Missing n newsbtc.com":
+                        - /url: /news/32475404/Market-Analyst-Outlines-How-The-XRP-Price-Will-Reach-300-And-What-Everyone-Is-Missing
+                        - generic:
+                          - text: Market Analyst Outlines How The XRP Price Will Reach $300 And What Everyone Is Missing
+                          - generic:
+                            - generic: "n"
+                            - text: newsbtc.com
+                      - generic:
+                        - link "XRP":
+                          - /url: /news/ripple/
+                        - link "RLUSD":
+                          - /url: /news/ripple-usd/
+                        - link "SN77":
+                          - /url: /news/liquidity/
+                    - text: "n"
+                    - generic:
+                      - generic:
+                        - generic "4 negative votes":
+                          - generic:
+                            - generic: V
+                            - generic: V
+                            - generic: "4"
+                        - generic "6 lol votes":
+                          - generic:
+                            - generic: X
+                            - generic: "6"
+                        - generic "4 dislike votes":
+                          - generic:
+                            - generic: "1"
+                            - generic: "4"
+                    - link:
+                      - /url: /news/32475404/Market-Analyst-Outlines-How-The-XRP-Price-Will-Reach-300-And-What-Everyone-Is-Missing
+                  - generic:
+                    - generic:
+                      - link "19h":
+                        - /url: /news/32467462/Clarity-Act-Passes-Senate-Banking-Committee-15-9-With-2-Democratic-Votes
+                        - generic:
+                          - time: 19h
+                      - link "Clarity Act Passes Senate Banking Committee 15-9 With 2 Democratic Votes n coindoo.com":
+                        - /url: /news/32467462/Clarity-Act-Passes-Senate-Banking-Committee-15-9-With-2-Democratic-Votes
+                        - generic:
+                          - text: Clarity Act Passes Senate Banking Committee 15-9 With 2 Democratic Votes
+                          - generic:
+                            - generic: "n"
+                            - text: coindoo.com
+                    - text: "n"
+                    - generic:
+                      - generic:
+                        - generic "4 positive votes":
+                          - generic:
+                            - generic: W
+                            - generic: W
+                            - generic: "4"
+                        - generic "3 important votes":
+                          - generic:
+                            - generic: E
+                            - generic: "3"
+                        - generic "1 negative votes":
+                          - generic:
+                            - generic: V
+                            - generic: "1"
+                        - generic "3 like votes":
+                          - generic:
+                            - generic: "2"
+                            - generic: "3"
+                    - link:
+                      - /url: /news/32467462/Clarity-Act-Passes-Senate-Banking-Committee-15-9-With-2-Democratic-Votes
+                  - generic:
+                    - generic:
+                      - link "4d":
+                        - /url: /news/32355091/Strategy-Buys-More-Bitcoin-Despite-Signaling-Potential-Sales
+                        - generic:
+                          - time: 4d
+                      - link "Strategy Buys More Bitcoin Despite Signaling Potential Sales n cryptoprowl.com":
+                        - /url: /news/32355091/Strategy-Buys-More-Bitcoin-Despite-Signaling-Potential-Sales
+                        - generic:
+                          - text: Strategy Buys More Bitcoin Despite Signaling Potential Sales
+                          - generic:
+                            - generic: "n"
+                            - text: cryptoprowl.com
+                      - generic:
+                        - link "BTC":
+                          - /url: /news/bitcoin/
+                    - text: "n"
+                    - generic:
+                      - generic:
+                        - generic "6 positive votes":
+                          - generic:
+                            - generic: W
+                            - generic: W
+                            - generic: "6"
+                        - generic "2 important votes":
+                          - generic:
+                            - generic: E
+                            - generic: "2"
+                        - generic "1 negative votes":
+                          - generic:
+                            - generic: V
+                            - generic: "1"
+                        - generic "5 like votes":
+                          - generic:
+                            - generic: "2"
+                            - generic: "5"
+                        - generic "1 lol votes":
+                          - generic:
+                            - generic: X
+                            - generic: "1"
+                    - link:
+                      - /url: /news/32355091/Strategy-Buys-More-Bitcoin-Despite-Signaling-Potential-Sales
+                  - generic:
+                    - generic:
+                      - link "6d":
+                        - /url: /news/32298798/Cardano-Holds-Critical-025-Support-History-Points-To-A-Major-Rally-Setup
+                        - generic:
+                          - time: 6d
+                      - 'link "Cardano Holds Critical $0.25 Support: History Points To A Major Rally Setup n newsbtc.com"':
+                        - /url: /news/32298798/Cardano-Holds-Critical-025-Support-History-Points-To-A-Major-Rally-Setup
+                        - generic:
+                          - text: "Cardano Holds Critical $0.25 Support: History Points To A Major Rally Setup"
+                          - generic:
+                            - generic: "n"
+                            - text: newsbtc.com
+                      - generic:
+                        - link "ADA":
+                          - /url: /news/cardano/
+                        - link "A":
+                          - /url: /news/vaulta/
+                    - text: "n"
+                    - generic:
+                      - generic:
+                        - generic "6 positive votes":
+                          - generic:
+                            - generic: W
+                            - generic: W
+                            - generic: "6"
+                        - generic "4 negative votes":
+                          - generic:
+                            - generic: V
+                            - generic: V
+                            - generic: "4"
+                        - generic "4 important votes":
+                          - generic:
+                            - generic: E
+                            - generic: E
+                            - generic: "4"
+                        - generic "4 like votes":
+                          - generic:
+                            - generic: "2"
+                            - generic: "4"
+                        - generic "3 dislike votes":
+                          - generic:
+                            - generic: "1"
+                            - generic: "3"
+                        - generic "3 lol votes":
+                          - generic:
+                            - generic: X
+                            - generic: "3"
+                    - link:
+                      - /url: /news/32298798/Cardano-Holds-Critical-025-Support-History-Points-To-A-Major-Rally-Setup
+                  - generic:
+                    - generic:
+                      - link "1w":
+                        - /url: /news/32205885/Bitmine-vs-BlackRock-Whos-Accumulating-More-ETH-Right-Now
+                        - generic:
+                          - time: 1w
+                      - 'link "Bitmine vs BlackRock: Who’s Accumulating More ETH Right Now? n techgaged.com"':
+                        - /url: /news/32205885/Bitmine-vs-BlackRock-Whos-Accumulating-More-ETH-Right-Now
+                        - generic:
+                          - text: "Bitmine vs BlackRock: Who’s Accumulating More ETH Right Now?"
+                          - generic:
+                            - generic: "n"
+                            - text: techgaged.com
+                      - generic:
+                        - link "ETH":
+                          - /url: /news/ethereum/
+                    - text: "n"
+                    - generic:
+                      - generic:
+                        - generic "4 positive votes":
+                          - generic:
+                            - generic: W
+                            - generic: W
+                            - generic: "4"
+                        - generic "3 important votes":
+                          - generic:
+                            - generic: E
+                            - generic: "3"
+                        - generic "1 negative votes":
+                          - generic:
+                            - generic: V
+                            - generic: "1"
+                        - generic "1 comments votes":
+                          - generic:
+                            - generic: "!"
+                            - generic: "1"
+                        - generic "4 like votes":
+                          - generic:
+                            - generic: "2"
+                            - generic: "4"
+                        - generic "2 lol votes":
+                          - generic:
+                            - generic: X
+                            - generic: "2"
+                        - generic "1 dislike votes":
+                          - generic:
+                            - generic: "1"
+                            - generic: "1"
+                        - generic "1 save votes":
+                          - generic:
+                            - generic: s
+                            - generic: "1"
+                    - link:
+                      - /url: /news/32205885/Bitmine-vs-BlackRock-Whos-Accumulating-More-ETH-Right-Now
+                  - generic:
+                    - generic:
+                      - link "1w":
+                        - /url: /news/32151361/Cardano-Is-the-Most-Quantum-Prepared-Blockchain-News-Report-Finds
+                        - generic:
+                          - time: 1w
+                      - link "Cardano Is the Most Quantum-Prepared Blockchain, News Report Finds n techgaged.com":
+                        - /url: /news/32151361/Cardano-Is-the-Most-Quantum-Prepared-Blockchain-News-Report-Finds
+                        - generic:
+                          - text: Cardano Is the Most Quantum-Prepared Blockchain, News Report Finds
+                          - generic:
+                            - generic: "n"
+                            - text: techgaged.com
+                      - generic:
+                        - link "BTC":
+                          - /url: /news/bitcoin/
+                        - link "ADA":
+                          - /url: /news/cardano/
+                    - text: "n"
+                    - generic:
+                      - generic:
+                        - generic "19 comments votes":
+                          - generic:
+                            - generic: "!"
+                            - generic: "19"
+                        - generic "8 positive votes":
+                          - generic:
+                            - generic: W
+                            - generic: W
+                            - generic: W
+                            - generic: "8"
+                        - generic "6 important votes":
+                          - generic:
+                            - generic: E
+                            - generic: E
+                            - generic: "6"
+                        - generic "5 negative votes":
+                          - generic:
+                            - generic: V
+                            - generic: V
+                            - generic: "5"
+                        - generic "6 lol votes":
+                          - generic:
+                            - generic: X
+                            - generic: "6"
+                        - generic "5 dislike votes":
+                          - generic:
+                            - generic: "1"
+                            - generic: "5"
+                        - generic "4 like votes":
+                          - generic:
+                            - generic: "2"
+                            - generic: "4"
+                        - generic "2 saves votes":
+                          - generic:
+                            - generic: s
+                            - generic: "2"
+                    - link:
+                      - /url: /news/32151361/Cardano-Is-the-Most-Quantum-Prepared-Blockchain-News-Report-Finds
+                  - generic:
+                    - generic:
+                      - link "2w":
+                        - /url: /news/32111415/6-in-10-Top-Blockchains-Are-Unprepared-for-Quantum-Attacks-Bitcoin-and-Hyperliquid-Most-Exposed-Cardano-Safest
+                        - generic:
+                          - time: 2w
+                      - link "6 in 10 Top Blockchains Are Unprepared for Quantum Attacks; Bitcoin and Hyperliquid Most Exposed, Cardano Safest n techgaged.com":
+                        - /url: /news/32111415/6-in-10-Top-Blockchains-Are-Unprepared-for-Quantum-Attacks-Bitcoin-and-Hyperliquid-Most-Exposed-Cardano-Safest
+                        - generic:
+                          - text: 6 in 10 Top Blockchains Are Unprepared for Quantum Attacks; Bitcoin and Hyperliquid Most Exposed, Cardano Safest
+                          - generic:
+                            - generic: "n"
+                            - text: techgaged.com
+                      - generic:
+                        - link "BTC":
+                          - /url: /news/bitcoin/
+                        - link "BNB":
+                          - /url: /news/binancecoin/
+                        - link "HYPE":
+                          - /url: /news/hyperliquid/
+                        - text: …
+                    - text: "n"
+                    - generic:
+                      - generic:
+                        - generic "11 positive votes":
+                          - generic:
+                            - generic: W
+                            - generic: W
+                            - generic: W
+                            - generic: W
+                            - generic: "11"
+                        - generic "4 comments votes":
+                          - generic:
+                            - generic: "!"
+                            - generic: "4"
+                        - generic "3 important votes":
+                          - generic:
+                            - generic: E
+                            - generic: "3"
+                        - generic "1 negative votes":
+                          - generic:
+                            - generic: V
+                            - generic: "1"
+                        - generic "9 like votes":
+                          - generic:
+                            - generic: "2"
+                            - generic: "9"
+                        - generic "4 lol votes":
+                          - generic:
+                            - generic: X
+                            - generic: "4"
+                        - generic "1 dislike votes":
+                          - generic:
+                            - generic: "1"
+                            - generic: "1"
+                        - generic "1 save votes":
+                          - generic:
+                            - generic: s
+                            - generic: "1"
+                    - link:
+                      - /url: /news/32111415/6-in-10-Top-Blockchains-Are-Unprepared-for-Quantum-Attacks-Bitcoin-and-Hyperliquid-Most-Exposed-Cardano-Safest
+                - link "Want to see what's trending in crypto – Sign Up" [ref=e703] [cursor=pointer]:
+                  - /url: /accounts/login/
+                  - text: Want to see what's trending in crypto –
+                  - strong [ref=e704]: Sign Up
+            - generic [ref=e705]:
+              - link "Recent Comments Show morel" [ref=e706] [cursor=pointer]:
+                - /url: /news?filter=commented
+                - generic [ref=e707]: Recent Comments
+                - generic [ref=e708]:
+                  - text: Show more
+                  - generic [ref=e709]: l
+              - generic [ref=e711]:
+                - generic [ref=e713]:
+                  - time [ref=e715]: 12h
+                  - generic [ref=e716]:
+                    - generic [ref=e717]: TerribleD
+                    - generic [ref=e718]:
+                      - text: Nope.
+                      - text: Won't pass. He's just gaslighting.
+                    - generic [ref=e719]: l
+                    - text: "\"CLARITY IS CLOSER THAN EVER\" SAYS COINBASE CEO In a new post, @Coinbase CEO @brian_armstrong..."
+                  - link [ref=e720] [cursor=pointer]:
+                    - /url: /news/32477911/CLARITY-IS-CLOSER-THAN-EVER-SAYS-COINBASE-CEO-In-a-new-post-Coinbase-CEO-brian_armstrong-shared-his-belief-that-the-notorious-CLARITY-Act-is-now-closer-to-approval-than-ever-before-He-reiterated-a-belief-that-the-bill-will-benefit-the-American-people-by-making-the-US#c364998
+                - generic [ref=e722]:
+                  - time [ref=e724]: 13h
+                  - generic [ref=e725]:
+                    - generic [ref=e726]: Insanity
+                    - generic [ref=e727]:
+                      - text: He lost me when he said “defi is nonsense”
+                      - text: Clearly this fellow doesn’t understand bitcoins limitations when compared to smart contract chains...
+                    - generic [ref=e728]: l
+                    - text: Ethereum stabilizes near $2.3K, but THIS metric keeps institutions cautious
+                  - link [ref=e729] [cursor=pointer]:
+                    - /url: /news/32355706/Ethereum-stabilizes-near-23K-but-THIS-metric-keeps-institutions-cautious#c364997
+                - generic [ref=e731]:
+                  - time [ref=e733]: 17h
+                  - generic [ref=e734]:
+                    - generic [ref=e735]: TerribleD
+                    - generic [ref=e736]:
+                      - text: It looks as though the vote will be along partisan lines which means it will not pass.
+                      - text: My opinion is that lawmakers naturally love shitcoins and...
+                    - generic [ref=e737]: l
+                    - text: The bill now moves to the full Senate where a vote is expected in the weeks ahead. Senators are...
+                  - link [ref=e738] [cursor=pointer]:
+                    - /url: /news/32471886/The-bill-now-moves-to-the-full-Senate-where-a-vote-is-expected-in-the-weeks-ahead-Senators-are-working-to-line-up-the-needed-support-for-passage-Passing-there-would-let-it-move-to-the-House-for-one-last-review-Lawmakers-want-to-finish-before-the-summer-break-so-it-does-not#c364996
+                - generic [ref=e740]:
+                  - time [ref=e742]: 17h
+                  - generic [ref=e743]:
+                    - generic [ref=e744]: dumpage
+                    - text: Crypto guru with 9 'X' followers says blah blah blah.
+                    - generic [ref=e745]: l
+                    - text: Analyst Says Avoid Bitcoin At All Costs; Here’s What To Do Instead As 50% Crash Looms
+                  - link [ref=e746] [cursor=pointer]:
+                    - /url: /news/32469110/Analyst-Says-Avoid-Bitcoin-At-All-Costs-Heres-What-To-Do-Instead-As-50-Crash-Looms#c364995
+                - generic [ref=e748]:
+                  - time [ref=e750]: 18h
+                  - generic [ref=e751]:
+                    - generic [ref=e752]: parrotcoast89
+                    - text: "His privacy side chain had 76 total transactions yesterday. Not kidding: https://midnight.subscan.io/"
+                    - generic [ref=e753]: l
+                    - text: "UPDATE: #Cardano $ADA Founder Charles Hoskinson says \"privacy-enhancing technology is a big field...."
+                  - link [ref=e754] [cursor=pointer]:
+                    - /url: /news/32469264/UPDATE-Cardano-ADA-Founder-Charles-Hoskinson-says-privacy-enhancing-technology-is-a-big-field-BitGo-Fireblocks-have-MPCnone-are-post-quantum-Were-doing-post-quantum-for-ZK-and-folding-MPC-and-other-stuff-Therell-be-natural-collaboration-for-Multi-Party-Computation#c364994
+                - generic [ref=e756]:
+                  - time [ref=e758]: 18h
+                  - generic [ref=e759]:
+                    - generic [ref=e760]: malsocl
+                    - text: Thanks for your FUD-tastic opinon, dude... sigh...
+                    - generic [ref=e761]: l
+                    - text: Analyst Says Avoid Bitcoin At All Costs; Here’s What To Do Instead As 50% Crash Looms
+                  - link [ref=e762] [cursor=pointer]:
+                    - /url: /news/32469110/Analyst-Says-Avoid-Bitcoin-At-All-Costs-Heres-What-To-Do-Instead-As-50-Crash-Looms#c364993
+                - generic [ref=e764]:
+                  - time [ref=e766]: 19h
+                  - generic [ref=e767]:
+                    - generic [ref=e768]: YASUKE_11
+                    - text: Dems being Dems... Nothing to see here
+                    - generic [ref=e769]: l
+                    - text: Democrats Split on Clarity Act as Crypto Bill Passes Key Senate Committee Vote
+                  - link [ref=e770] [cursor=pointer]:
+                    - /url: /news/32467463/Democrats-Split-on-Clarity-Act-as-Crypto-Bill-Passes-Key-Senate-Committee-Vote#c364992
+                - generic [ref=e772]:
+                  - time [ref=e774]: 1d
+                  - generic [ref=e775]:
+                    - generic [ref=e776]: TerribleD
+                    - generic [ref=e777]:
+                      - text: Gee, I don't know.
+                      - text: Is horse dung better than cow manure?
+                    - generic [ref=e778]: l
+                    - text: Ethereum VS XRP – Which Is Better?
+                  - link [ref=e779] [cursor=pointer]:
+                    - /url: /news/32455805/Ethereum-VS-XRP-Which-Is-Better#c364991
+                - generic [ref=e781]:
+                  - time [ref=e783]: 1d
+                  - generic [ref=e784]:
+                    - generic [ref=e785]: nihewo
+                    - text: Most likely, certainly been an endurance race!
+                    - generic [ref=e786]: l
+                    - text: XRP Power Launches Global AI-Powered App, Creating an Intelligent Daily Yield System
+                  - link [ref=e787] [cursor=pointer]:
+                    - /url: /news/32447052/XRP-Power-Launches-Global-AI-Powered-App-Creating-an-Intelligent-Daily-Yield-System#c364990
+                - generic [ref=e789]:
+                  - time [ref=e791]: 1d
+                  - generic [ref=e792]:
+                    - generic [ref=e793]: cryptonaire1
+                    - text: You mean a turtle in the world of rabbits 😋
+                    - generic [ref=e794]: l
+                    - text: XRP Power Launches Global AI-Powered App, Creating an Intelligent Daily Yield System
+                  - link [ref=e795] [cursor=pointer]:
+                    - /url: /news/32447052/XRP-Power-Launches-Global-AI-Powered-App-Creating-an-Intelligent-Daily-Yield-System#c364989
+            - generic [ref=e796]:
+              - generic [ref=e798]: Gainers & Losers (from top 50)
+              - table [ref=e799]:
+                - rowgroup [ref=e800]:
+                  - columnheader "Coin" [ref=e801]
+                  - columnheader "% 24h" [ref=e802]
+                  - columnheader "% 1h" [ref=e803]
+                  - columnheader "Price" [ref=e804]
+                  - columnheader "Volume 24h" [ref=e805]
+                - rowgroup [ref=e806]:
+                  - row "Hyperliquid HYPE 17.54% 0.35% $45.75 $875,845,212" [ref=e807]:
+                    - cell "Hyperliquid HYPE" [ref=e808]:
+                      - link "Hyperliquid" [ref=e809] [cursor=pointer]:
+                        - /url: /news/hyperliquid/
+                      - generic [ref=e810]: HYPE
+                    - cell "17.54%" [ref=e811]
+                    - cell "0.35%" [ref=e812]
+                    - cell "$45.75" [ref=e813]
+                    - cell "$875,845,212" [ref=e814]
+                  - row "Zcash ZEC 3.15% -0.52% $534.91 $730,092,465" [ref=e815]:
+                    - cell "Zcash ZEC" [ref=e816]:
+                      - link "Zcash" [ref=e817] [cursor=pointer]:
+                        - /url: /news/zcash/
+                      - generic [ref=e818]: ZEC
+                    - cell "3.15%" [ref=e819]
+                    - cell "-0.52%" [ref=e820]
+                    - cell "$534.91" [ref=e821]
+                    - cell "$730,092,465" [ref=e822]
+                  - row "Uniswap UNI 2.72% -0.27% $3.68 $273,249,599" [ref=e823]:
+                    - cell "Uniswap UNI" [ref=e824]:
+                      - link "Uniswap" [ref=e825] [cursor=pointer]:
+                        - /url: /news/uniswap/
+                      - generic [ref=e826]: UNI
+                    - cell "2.72%" [ref=e827]
+                    - cell "-0.27%" [ref=e828]
+                    - cell "$3.68" [ref=e829]
+                    - cell "$273,249,599" [ref=e830]
+                  - row "XRP XRP 2.56% -0.38% $1.47 $4,190,818,849" [ref=e831]:
+                    - cell "XRP XRP" [ref=e832]:
+                      - link "XRP" [ref=e833] [cursor=pointer]:
+                        - /url: /news/ripple/
+                      - generic [ref=e834]: XRP
+                    - cell "2.56%" [ref=e835]
+                    - cell "-0.38%" [ref=e836]
+                    - cell "$1.47" [ref=e837]
+                    - cell "$4,190,818,849" [ref=e838]
+                  - row "BNB BNB 2.52% -0.16% $687.89 $1,267,130,039" [ref=e839]:
+                    - cell "BNB BNB" [ref=e840]:
+                      - link "BNB" [ref=e841] [cursor=pointer]:
+                        - /url: /news/binancecoin/
+                      - generic [ref=e842]: BNB
+                    - cell "2.52%" [ref=e843]
+                    - cell "-0.16%" [ref=e844]
+                    - cell "$687.89" [ref=e845]
+                    - cell "$1,267,130,039" [ref=e846]
+                  - row "Litecoin LTC 2.19% -0.22% $58.18 $316,433,472" [ref=e847]:
+                    - cell "Litecoin LTC" [ref=e848]:
+                      - link "Litecoin" [ref=e849] [cursor=pointer]:
+                        - /url: /news/litecoin/
+                      - generic [ref=e850]: LTC
+                    - cell "2.19%" [ref=e851]
+                    - cell "-0.22%" [ref=e852]
+                    - cell "$58.18" [ref=e853]
+                    - cell "$316,433,472" [ref=e854]
+                  - row "Bitcoin BTC 1.76% -0.06% $80,657 $44,978,520,794" [ref=e855]:
+                    - cell "Bitcoin BTC" [ref=e856]:
+                      - link "Bitcoin" [ref=e857] [cursor=pointer]:
+                        - /url: /news/bitcoin/
+                      - generic [ref=e858]: BTC
+                    - cell "1.76%" [ref=e859]
+                    - cell "-0.06%" [ref=e860]
+                    - cell "$80,657" [ref=e861]
+                    - cell "$44,978,520,794" [ref=e862]
+                  - row "OKB OKB 1.74% -0.60% $85.83 $19,964,032" [ref=e863]:
+                    - cell "OKB OKB" [ref=e864]:
+                      - link "OKB" [ref=e865] [cursor=pointer]:
+                        - /url: /news/okb/
+                      - generic [ref=e866]: OKB
+                    - cell "1.74%" [ref=e867]
+                    - cell "-0.60%" [ref=e868]
+                    - cell "$85.83" [ref=e869]
+                    - cell "$19,964,032" [ref=e870]
+                  - row "Bittensor TAO 1.55% -0.11% $301.14 $196,322,396" [ref=e871]:
+                    - cell "Bittensor TAO" [ref=e872]:
+                      - link "Bittensor" [ref=e873] [cursor=pointer]:
+                        - /url: /news/bittensor/
+                      - generic [ref=e874]: TAO
+                    - cell "1.55%" [ref=e875]
+                    - cell "-0.11%" [ref=e876]
+                    - cell "$301.14" [ref=e877]
+                    - cell "$196,322,396" [ref=e878]
+                  - row "WhiteBIT Coin WBT 1.41% 0.00% $59.13 $128,279,180" [ref=e879]:
+                    - cell "WhiteBIT Coin WBT" [ref=e880]:
+                      - link "WhiteBIT Coin" [ref=e881] [cursor=pointer]:
+                        - /url: /news/whitebit/
+                      - generic [ref=e882]: WBT
+                    - cell "1.41%" [ref=e883]
+                    - cell "0.00%" [ref=e884]
+                    - cell "$59.13" [ref=e885]
+                    - cell "$128,279,180" [ref=e886]
+                - rowgroup [ref=e887]:
+                  - row "Sui SUI -4.83% -0.45% $1.13 $727,175,151" [ref=e888]:
+                    - cell "Sui SUI" [ref=e889]:
+                      - link "Sui" [ref=e890] [cursor=pointer]:
+                        - /url: /news/sui/
+                      - generic [ref=e891]: SUI
+                    - cell "-4.83%" [ref=e892]
+                    - cell "-0.45%" [ref=e893]
+                    - cell "$1.13" [ref=e894]
+                    - cell "$727,175,151" [ref=e895]
+                  - row "Tether Gold XAUT -2.87% -0.22% $4557.1 $324,087,341" [ref=e896]:
+                    - cell "Tether Gold XAUT" [ref=e897]:
+                      - link "Tether Gold" [ref=e898] [cursor=pointer]:
+                        - /url: /news/tether-gold/
+                      - generic [ref=e899]: XAUT
+                    - cell "-2.87%" [ref=e900]
+                    - cell "-0.22%" [ref=e901]
+                    - cell "$4557.1" [ref=e902]
+                    - cell "$324,087,341" [ref=e903]
+                  - row "PAX Gold PAXG -2.82% -0.15% $4559.1 $224,528,252" [ref=e904]:
+                    - cell "PAX Gold PAXG" [ref=e905]:
+                      - link "PAX Gold" [ref=e906] [cursor=pointer]:
+                        - /url: /news/pax-gold/
+                      - generic [ref=e907]: PAXG
+                    - cell "-2.82%" [ref=e908]
+                    - cell "-0.15%" [ref=e909]
+                    - cell "$4559.1" [ref=e910]
+                    - cell "$224,528,252" [ref=e911]
+                  - row "MemeCore M -2.78% 0.14% $3.24 $10,103,262" [ref=e912]:
+                    - cell "MemeCore M" [ref=e913]:
+                      - link "MemeCore" [ref=e914] [cursor=pointer]:
+                        - /url: /news/memecore/
+                      - generic [ref=e915]: M
+                    - cell "-2.78%" [ref=e916]
+                    - cell "0.14%" [ref=e917]
+                    - cell "$3.24" [ref=e918]
+                    - cell "$10,103,262" [ref=e919]
+                  - row "Canton CC -2.54% -0.32% $0.161 $20,697,551" [ref=e920]:
+                    - cell "Canton CC" [ref=e921]:
+                      - link "Canton" [ref=e922] [cursor=pointer]:
+                        - /url: /news/canton-network/
+                      - generic [ref=e923]: CC
+                    - cell "-2.54%" [ref=e924]
+                    - cell "-0.32%" [ref=e925]
+                    - cell "$0.161" [ref=e926]
+                    - cell "$20,697,551" [ref=e927]
+                  - row "Rain RAIN -1.16% -0.23% $0.007 $21,550,564" [ref=e928]:
+                    - cell "Rain RAIN" [ref=e929]:
+                      - link "Rain" [ref=e930] [cursor=pointer]:
+                        - /url: /news/rain/
+                      - generic [ref=e931]: RAIN
+                    - cell "-1.16%" [ref=e932]
+                    - cell "-0.23%" [ref=e933]
+                    - cell "$0.007" [ref=e934]
+                    - cell "$21,550,564" [ref=e935]
+                  - row "Monero XMR -0.73% 0.38% $392.44 $142,862,579" [ref=e936]:
+                    - cell "Monero XMR" [ref=e937]:
+                      - link "Monero" [ref=e938] [cursor=pointer]:
+                        - /url: /news/monero/
+                      - generic [ref=e939]: XMR
+                    - cell "-0.73%" [ref=e940]
+                    - cell "0.38%" [ref=e941]
+                    - cell "$392.44" [ref=e942]
+                    - cell "$142,862,579" [ref=e943]
+                  - row "TRON TRX -0.64% 0.06% $0.352 $518,253,747" [ref=e944]:
+                    - cell "TRON TRX" [ref=e945]:
+                      - link "TRON" [ref=e946] [cursor=pointer]:
+                        - /url: /news/tron/
+                      - generic [ref=e947]: TRX
+                    - cell "-0.64%" [ref=e948]
+                    - cell "0.06%" [ref=e949]
+                    - cell "$0.352" [ref=e950]
+                    - cell "$518,253,747" [ref=e951]
+                  - row "Toncoin TON -0.50% 0.44% $2.10 $327,815,651" [ref=e952]:
+                    - cell "Toncoin TON" [ref=e953]:
+                      - link "Toncoin" [ref=e954] [cursor=pointer]:
+                        - /url: /news/the-open-network/
+                      - generic [ref=e955]: TON
+                    - cell "-0.50%" [ref=e956]
+                    - cell "0.44%" [ref=e957]
+                    - cell "$2.10" [ref=e958]
+                    - cell "$327,815,651" [ref=e959]
+                  - row "NEAR Protocol NEAR -0.41% -0.03% $1.56 $206,845,994" [ref=e960]:
+                    - cell "NEAR Protocol NEAR" [ref=e961]:
+                      - link "NEAR Protocol" [ref=e962] [cursor=pointer]:
+                        - /url: /news/near/
+                      - generic [ref=e963]: NEAR
+                    - cell "-0.41%" [ref=e964]
+                    - cell "-0.03%" [ref=e965]
+                    - cell "$1.56" [ref=e966]
+                    - cell "$206,845,994" [ref=e967]
+          - text: B b a i y d
+    - generic [ref=e968]:
+      - generic [ref=e969]:
+        - link "a" [ref=e970] [cursor=pointer]:
+          - /url: https://facebook.com/CryptoPanic
+          - generic [ref=e971]: a
+        - link "c" [ref=e972] [cursor=pointer]:
+          - /url: https://twitter.com/CryptoPanicCom
+          - generic [ref=e973]: c
+        - link "R" [ref=e974] [cursor=pointer]:
+          - /url: /discord/
+          - generic [ref=e975]: R
+        - link "r" [ref=e976] [cursor=pointer]:
+          - /url: https://t.me/CryptoPanicCom
+          - generic [ref=e977]: r
+        - link "]" [ref=e978] [cursor=pointer]:
+          - /url: https://itunes.apple.com/it/app/cryptopanic/id1290506871?l=en&mt=8
+          - generic [ref=e979]: "]"
+        - link "^" [ref=e980] [cursor=pointer]:
+          - /url: https://play.google.com/store/apps/details?id=com.cryptopanic.android
+          - generic [ref=e981]: ^
+      - generic [ref=e982]:
+        - link "Submit Source" [ref=e983] [cursor=pointer]:
+          - /url: /submit-source/
+        - link "Advertise" [ref=e984] [cursor=pointer]:
+          - /url: /advertise/
+        - link "Developers" [ref=e985] [cursor=pointer]:
+          - /url: /developers/
+        - link "About" [ref=e986] [cursor=pointer]:
+          - /url: /about/
+        - link "Contact" [ref=e987] [cursor=pointer]:
+          - /url: /contact/
+        - link "Terms" [ref=e988] [cursor=pointer]:
+          - /url: /terms/
+      - generic [ref=e989]: © 2026 CryptoPanic.com
+    - navigation [ref=e990]:
+      - list [ref=e992]:
+        - listitem [ref=e993]:
+          - generic [ref=e994] [cursor=pointer]:
+            - generic [ref=e995]:
+              - text: d
+              - generic [ref=e996]: Region
+              - generic [ref=e997]: o
+            - text: M M M M M M M M M M M M M M
+        - listitem [ref=e998]:
+          - link "Become PLUS" [ref=e999] [cursor=pointer]:
+            - /url: /plus
+        - listitem [ref=e1000]:
+          - link "Guides" [ref=e1001] [cursor=pointer]:
+            - /url: /guides/
+        - listitem [ref=e1002]:
+          - link "Bizz Hub" [ref=e1003] [cursor=pointer]:
+            - /url: /partnership-hub/
+        - listitem [ref=e1004]:
+          - link "Advertise" [ref=e1005] [cursor=pointer]:
+            - /url: /advertise/
+        - listitem [ref=e1006]:
+          - link "Developers" [ref=e1007] [cursor=pointer]:
+            - /url: /developers/
+        - listitem [ref=e1008]:
+          - link "About" [ref=e1009] [cursor=pointer]:
+            - /url: /about/
+        - listitem [ref=e1010]:
+          - link "Careers" [ref=e1011] [cursor=pointer]:
+            - /url: /careers/
+        - listitem [ref=e1012]:
+          - link "Contact" [ref=e1013] [cursor=pointer]:
+            - /url: /contact/
+        - listitem [ref=e1014]:
+          - link "Terms" [ref=e1015] [cursor=pointer]:
+            - /url: /terms/
+        - listitem [ref=e1016]:
+          - link "Submit Source" [ref=e1017] [cursor=pointer]:
+            - /url: /submit-source/
+        - listitem [ref=e1018]:
+          - link "3" [ref=e1019] [cursor=pointer]:
+            - /url: ""
+            - generic [ref=e1020]: "3"
+      - list [ref=e1021]:
+        - listitem [ref=e1022]:
+          - link "Log in" [ref=e1023] [cursor=pointer]:
+            - /url: /accounts/login/
+        - listitem [ref=e1024]:
+          - link "Sign Up" [ref=e1025] [cursor=pointer]:
+            - /url: /accounts/signup/
+      - link "f" [ref=e1027] [cursor=pointer]:
+        - /url: javascript:;
+        - generic [ref=e1028]: f
+  - generic [ref=e1030]:
+    - generic [ref=e1032]:
+      - generic [ref=e1033] [cursor=pointer]:
+        - generic: G
+      - generic "Reputation" [ref=e1034] [cursor=pointer]:
+        - generic: =
+        - generic: "0"
+    - generic [ref=e1035]:
+      - link "1h" [ref=e1036] [cursor=pointer]:
+        - /url: ""
+      - link "24h" [ref=e1037] [cursor=pointer]:
+        - /url: ""
+      - link "7d" [ref=e1038] [cursor=pointer]:
+        - /url: ""
+    - generic [ref=e1039]:
+      - link "T $ 0.00 % 0" [ref=e1040] [cursor=pointer]:
+        - /url: /portfolio
+        - generic [ref=e1041]:
+          - generic [ref=e1043]: T
+          - generic [ref=e1044]:
+            - generic [ref=e1045]: $
+            - text: "0.00"
+        - generic [ref=e1046]: "%"
+        - generic "Hide value" [ref=e1047]: "0"
+      - link "MC $ 2.77T 1.30%" [ref=e1048] [cursor=pointer]:
+        - /url: /news/market-cap/
+        - generic [ref=e1049]: MC
+        - generic [ref=e1050]:
+          - generic [ref=e1051]: $
+          - text: 2.77T
+        - generic [ref=e1052]: 1.30%
+      - link "BTC $ 80,657 1.76% s" [ref=e1053] [cursor=pointer]:
+        - /url: /news/bitcoin/
+        - generic [ref=e1054]: BTC
+        - generic [ref=e1055]:
+          - generic [ref=e1056]: $
+          - text: 80,657
+        - generic [ref=e1057]: 1.76%
+        - generic "Follow" [ref=e1058]: s
+      - link "ETH $ 2259.6 0.24% s" [ref=e1059] [cursor=pointer]:
+        - /url: /news/ethereum/
+        - generic [ref=e1060]: ETH
+        - generic [ref=e1061]:
+          - generic [ref=e1062]: $
+          - text: "2259.6"
+        - generic [ref=e1063]: 0.24%
+        - generic "Follow" [ref=e1064]: s
+      - link "USDT $ 1.000 0.02% s" [ref=e1065] [cursor=pointer]:
+        - /url: /news/tether/
+        - generic [ref=e1066]: USDT
+        - generic [ref=e1067]:
+          - generic [ref=e1068]: $
+          - text: "1.000"
+        - generic [ref=e1069]: 0.02%
+        - generic "Follow" [ref=e1070]: s
+      - link "BNB $ 687.89 2.52% s" [ref=e1071] [cursor=pointer]:
+        - /url: /news/binancecoin/
+        - generic [ref=e1072]: BNB
+        - generic [ref=e1073]:
+          - generic [ref=e1074]: $
+          - text: "687.89"
+        - generic [ref=e1075]: 2.52%
+        - generic "Follow" [ref=e1076]: s
+      - link "XRP $ 1.47 2.56% s" [ref=e1077] [cursor=pointer]:
+        - /url: /news/ripple/
+        - generic [ref=e1078]: XRP
+        - generic [ref=e1079]:
+          - generic [ref=e1080]: $
+          - text: "1.47"
+        - generic [ref=e1081]: 2.56%
+        - generic "Follow" [ref=e1082]: s
+      - link "USDC $ 1.000 -0.01% s" [ref=e1083] [cursor=pointer]:
+        - /url: /news/usd-coin/
+        - generic [ref=e1084]: USDC
+        - generic [ref=e1085]:
+          - generic [ref=e1086]: $
+          - text: "1.000"
+        - generic [ref=e1087]: "-0.01%"
+        - generic "Follow" [ref=e1088]: s
+      - link "SOL $ 91.28 0.71% s" [ref=e1089] [cursor=pointer]:
+        - /url: /news/solana/
+        - generic [ref=e1090]: SOL
+        - generic [ref=e1091]:
+          - generic [ref=e1092]: $
+          - text: "91.28"
+        - generic [ref=e1093]: 0.71%
+        - generic "Follow" [ref=e1094]: s
+      - link "TRX $ 0.352 -0.64% s" [ref=e1095] [cursor=pointer]:
+        - /url: /news/tron/
+        - generic [ref=e1096]: TRX
+        - generic [ref=e1097]:
+          - generic [ref=e1098]: $
+          - text: "0.352"
+        - generic [ref=e1099]: "-0.64%"
+        - generic "Follow" [ref=e1100]: s
+      - link "FIGR_HELOC $ 1.03 -0.06% s" [ref=e1101] [cursor=pointer]:
+        - /url: /news/figure-heloc/
+        - generic [ref=e1102]: FIGR_HELOC
+        - generic [ref=e1103]:
+          - generic [ref=e1104]: $
+          - text: "1.03"
+        - generic [ref=e1105]: "-0.06%"
+        - generic "Follow" [ref=e1106]: s
+      - link "DOGE $ 0.115 1.19% s" [ref=e1107] [cursor=pointer]:
+        - /url: /news/dogecoin/
+        - generic [ref=e1108]: DOGE
+        - generic [ref=e1109]:
+          - generic [ref=e1110]: $
+          - text: "0.115"
+        - generic [ref=e1111]: 1.19%
+        - generic "Follow" [ref=e1112]: s
+      - link "WBT $ 59.13 1.41% s" [ref=e1113] [cursor=pointer]:
+        - /url: /news/whitebit/
+        - generic [ref=e1114]: WBT
+        - generic [ref=e1115]:
+          - generic [ref=e1116]: $
+          - text: "59.13"
+        - generic [ref=e1117]: 1.41%
+        - generic "Follow" [ref=e1118]: s
+      - link "USDS $ 1.000 0.00% s" [ref=e1119] [cursor=pointer]:
+        - /url: /news/usds/
+        - generic [ref=e1120]: USDS
+        - generic [ref=e1121]:
+          - generic [ref=e1122]: $
+          - text: "1.000"
+        - generic [ref=e1123]: 0.00%
+        - generic "Follow" [ref=e1124]: s
+      - link "HYPE $ 45.75 17.54% s" [ref=e1125] [cursor=pointer]:
+        - /url: /news/hyperliquid/
+        - generic [ref=e1126]: HYPE
+        - generic [ref=e1127]:
+          - generic [ref=e1128]: $
+          - text: "45.75"
+        - generic [ref=e1129]: 17.54%
+        - generic "Follow" [ref=e1130]: s
+      - link "ADA $ 0.267 1.30% s" [ref=e1131] [cursor=pointer]:
+        - /url: /news/cardano/
+        - generic [ref=e1132]: ADA
+        - generic [ref=e1133]:
+          - generic [ref=e1134]: $
+          - text: "0.267"
+        - generic [ref=e1135]: 1.30%
+        - generic "Follow" [ref=e1136]: s
+      - link "LEO $ 10.21 0.47% s" [ref=e1137] [cursor=pointer]:
+        - /url: /news/leo-token/
+        - generic [ref=e1138]: LEO
+        - generic [ref=e1139]:
+          - generic [ref=e1140]: $
+          - text: "10.21"
+        - generic [ref=e1141]: 0.47%
+        - generic "Follow" [ref=e1142]: s
+      - link "ZEC $ 534.91 3.15% s" [ref=e1143] [cursor=pointer]:
+        - /url: /news/zcash/
+        - generic [ref=e1144]: ZEC
+        - generic [ref=e1145]:
+          - generic [ref=e1146]: $
+          - text: "534.91"
+        - generic [ref=e1147]: 3.15%
+        - generic "Follow" [ref=e1148]: s
+      - link "BCH $ 431.58 -0.24% s" [ref=e1149] [cursor=pointer]:
+        - /url: /news/bitcoin-cash/
+        - generic [ref=e1150]: BCH
+        - generic [ref=e1151]:
+          - generic [ref=e1152]: $
+          - text: "431.58"
+        - generic [ref=e1153]: "-0.24%"
+        - generic "Follow" [ref=e1154]: s
+      - link "LINK $ 10.32 0.84% s" [ref=e1155] [cursor=pointer]:
+        - /url: /news/chainlink/
+        - generic [ref=e1156]: LINK
+        - generic [ref=e1157]:
+          - generic [ref=e1158]: $
+          - text: "10.32"
+        - generic [ref=e1159]: 0.84%
+        - generic "Follow" [ref=e1160]: s
+      - generic [ref=e1161]: Use search to follow more currencies

@@ -25,6 +25,10 @@ pub const MCP_STATUS_COMMAND: &str = "mcp.status";
 pub const MCP_SNAPSHOT_COMMAND: &str = "mcp.service.snapshot";
 pub const MCP_CLEANUP_COMMAND: &str = "mcp.cleanup";
 
+pub const MCP_DESCRIPTOR_BACKEND_TOOL_NAME: &str = "mcp.backend_tool_name";
+pub const MCP_DESCRIPTOR_LIFECYCLE_SCOPE: &str = "mcp.lifecycle_scope";
+pub const MCP_DESCRIPTOR_DEFINITION_SOURCE: &str = "mcp.definition_source";
+
 /// Provider-neutral lifecycle scope for MCP resources.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -151,6 +155,40 @@ pub struct McpToolAttachCommand {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct McpToolInvokeCommand {
     pub invocation: CapabilityToolInvocation,
+    #[serde(default)]
+    pub server_id: Option<String>,
+    #[serde(default)]
+    pub backend_tool_name: Option<String>,
+    #[serde(default)]
+    pub lifecycle: Option<McpServiceLifecycleScope>,
+}
+
+impl McpToolInvokeCommand {
+    /// Build an invocation command from explicit descriptor routing metadata.
+    ///
+    /// The visible tool name remains in `invocation.tool_name` because it is
+    /// what the model called.  `server_id` and `backend_tool_name` are the
+    /// service-owned routing facts that prevent production callers from
+    /// guessing server identity by parsing a display name.
+    pub fn routed(
+        invocation: CapabilityToolInvocation,
+        server_id: impl Into<String>,
+        backend_tool_name: impl Into<String>,
+        lifecycle: McpServiceLifecycleScope,
+    ) -> MacacaResult<Self> {
+        Ok(Self {
+            invocation,
+            server_id: Some(non_empty(
+                server_id.into(),
+                "mcp tool invocation requires server_id",
+            )?),
+            backend_tool_name: Some(non_empty(
+                backend_tool_name.into(),
+                "mcp tool invocation requires backend_tool_name",
+            )?),
+            lifecycle: Some(lifecycle),
+        })
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

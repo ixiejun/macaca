@@ -240,3 +240,89 @@ where
     let result = service.call_service(&service_command).await?;
     serde_json::from_value(result.output).map_err(MacacaError::from)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Mutex;
+
+    use macaca_proto::{
+        ApplicationId, CapabilityToolInvocation, CapabilityToolInvocationResult,
+        CapabilityToolInvocationScope, CapabilityToolOriginKind, TraceContext,
+    };
+
+    #[derive(Default)]
+    struct CapturingServiceClient {
+        calls: Mutex<Vec<ServiceCallCommand>>,
+    }
+
+    #[async_trait]
+    impl SystemServiceClient for CapturingServiceClient {
+        async fn inspect_services(
+            &self,
+            command: &crate::service_client::ServiceInspectionCommand,
+        ) -> MacacaResult<crate::service_client::ServiceInspectionResult> {
+            Ok(crate::service_client::ServiceInspectionResult {
+                scope: command.scope.clone(),
+                services: vec![MCP_SERVICE_ID.into()],
+            })
+        }
+
+        async fn call_service(
+            &self,
+            command: &ServiceCallCommand,
+        ) -> MacacaResult<crate::service_client::ServiceCallResult> {
+            self.calls.lock().unwrap().push(command.clone());
+            let trace = command.trace.clone().unwrap();
+            Ok(crate::service_client::ServiceCallResult {
+                service_id: command.service_id.clone(),
+                output: serde_json::to_value(CapabilityToolInvocationResult::ok(
+                    MCP_SERVICE_ID,
+                    CapabilityToolOriginKind::Mcp,
+                    "mcp_lookup",
+                    serde_json::json!({"ok": true}),
+                    trace,
+                ))?,
+            })
+        }
+    }
+
+    fn invocation() -> CapabilityToolInvocation {
+        CapabilityToolInvocation::new(
+            TraceContext::new("trace-sdk-mcp-invoke"),
+            CapabilityToolInvocationScope::new(ApplicationId::new(), "session-a", "agent-a")
+                .unwrap(),
+            "mcp_lookup",
+            serde_json::json!({"query": "value"}),
+        )
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn invoke_tool_dispatches_through_generic_service_client() {
+        let service = Arc::new(CapturingServiceClient::default());
+        let client = ServiceBackedMcpClient::new(service.clone());
+        let result = client
+            .invoke_tool(
+                McpToolInvokeCommand::routed(
+                    invocation(),
+                    "server-a",
+                    "lookup",
+                    macaca_proto::McpServiceLifecycleScope::AgentSession,
+                )
+                .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(result.status, "ok");
+        let calls = service.calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].service_id, MCP_SERVICE_ID);
+        assert_eq!(calls[0].command_name, MCP_TOOL_INVOKE_COMMAND);
+        assert_eq!(
+            calls[0].trace.as_ref().unwrap().trace_id,
+            "trace-sdk-mcp-invoke"
+        );
+    }
+}

@@ -18,15 +18,17 @@ use macaca_framework::adapter::{SingleToolAdapter, ToolSetBridge};
 use macaca_framework::execution::ExecutionContext;
 use macaca_framework::session::{load_module_state, save_module_state};
 use macaca_framework::tool::Toolkit;
-use macaca_proto::ApplicationId;
-use macaca_proto::TraceContext;
+use macaca_proto::{
+    ApplicationId, McpRegisterCommand, McpServicePolicyHints, McpServiceScope,
+    McpToolCatalogCommand, TraceContext,
+};
 use macaca_skill::{SkillServiceScope, SkillToolCatalogCommand};
 
 use crate::runtime_event_bridge::emit_runtime_event;
 use crate::state::AppState;
 use macaca_runtime_host::{
-    McpDefinitionSource, McpRegistryConfig, McpRuntimeContext, McpRuntimeStatus,
-    McpRuntimeStatusState, McpServerDefinition, McpToolPolicy,
+    McpDefinitionSource, McpRegistryConfig, McpRuntimeStatus, McpRuntimeStatusState,
+    McpServerDefinition, McpToolPolicy,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -268,23 +270,20 @@ pub(crate) async fn build_toolkit(
         &assignee_capabilities,
     );
 
-    let mcp_context = McpRuntimeContext::for_agent(app_id, session_id.as_deref(), agent_name);
     let mcp_policy = McpToolPolicy::default();
-    let close_emitter = mcp_close_event_emitter(state, session_id.as_deref(), agent_name);
-
     let mut mcp_definitions = state.mcp_runtime.definitions().await;
     mcp_definitions.extend(load_app_mcp_overlay_definitions(state, app_id).await);
     emit_mcp_starting_events(state, session_id.as_deref(), agent_name, &mcp_definitions).await;
-    let mcp_statuses = state
-        .mcp_runtime
-        .register_definitions(
-            &mut toolkit,
-            mcp_definitions,
-            &mcp_policy,
-            &mcp_context,
-            close_emitter.clone(),
-        )
-        .await;
+    register_mcp_definitions_with_service(
+        state,
+        app_id,
+        session_id.as_deref(),
+        agent_name,
+        &mcp_definitions,
+    )
+    .await;
+    let mcp_statuses =
+        macaca_runtime_host::probe_definition_statuses(mcp_definitions.clone(), &mcp_policy).await;
     emit_mcp_runtime_events(state, session_id.as_deref(), agent_name, &mcp_statuses).await;
 
     if let Some(snapshot) = crate::skill_mcp::load_or_build_skill_snapshot(
@@ -299,22 +298,97 @@ pub(crate) async fn build_toolkit(
             .from_skill_snapshot(&snapshot);
         emit_mcp_starting_events(state, session_id.as_deref(), agent_name, &skill_definitions)
             .await;
-        let skill_statuses = state
-            .mcp_runtime
-            .register_definitions(
-                &mut toolkit,
-                skill_definitions,
-                &mcp_policy,
-                &mcp_context,
-                close_emitter,
-            )
-            .await;
+        register_mcp_definitions_with_service(
+            state,
+            app_id,
+            session_id.as_deref(),
+            agent_name,
+            &skill_definitions,
+        )
+        .await;
+        let skill_statuses =
+            macaca_runtime_host::probe_definition_statuses(skill_definitions, &mcp_policy).await;
         emit_skill_mcp_alias_events(state, session_id.as_deref(), agent_name, &skill_statuses)
             .await;
         emit_mcp_runtime_events(state, session_id.as_deref(), agent_name, &skill_statuses).await;
     }
 
+    let mcp_catalog = state
+        .mcp_client
+        .tool_catalog(McpToolCatalogCommand {
+            trace: TraceContext::new("web-toolkit-mcp-catalog"),
+            scope: McpServiceScope::agent_session(
+                *app_id,
+                session_id.clone().unwrap_or_default(),
+                agent_name,
+            )
+            .unwrap_or_default(),
+            policy: McpServicePolicyHints::default(),
+        })
+        .await;
+    match mcp_catalog {
+        Ok(catalog) => {
+            for descriptor in catalog.tools {
+                if let Some(tool) = crate::service_tool_adapter::service_tool_from_descriptor(
+                    descriptor,
+                    state,
+                    *app_id,
+                    session_id.clone(),
+                    agent_name,
+                ) {
+                    toolkit.register(Box::new(SingleToolAdapter::new(tool)), None);
+                }
+            }
+        }
+        Err(error) => tracing::warn!(
+            error = %error,
+            "MCP Service catalog failed; no direct production MCP toolkit fallback will be used"
+        ),
+    }
+
     toolkit
+}
+
+async fn register_mcp_definitions_with_service(
+    state: &Arc<AppState>,
+    app_id: &ApplicationId,
+    session_id: Option<&str>,
+    agent_name: &str,
+    definitions: &[McpServerDefinition],
+) {
+    if definitions.is_empty() {
+        return;
+    }
+    let payloads = definitions
+        .iter()
+        .filter_map(|definition| match serde_json::to_value(definition) {
+            Ok(value) => Some(value),
+            Err(error) => {
+                tracing::warn!(
+                    server_id = %definition.id,
+                    error = %error,
+                    "failed to serialize MCP definition for service registration"
+                );
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+    if payloads.is_empty() {
+        return;
+    }
+    let command = McpRegisterCommand {
+        trace: TraceContext::new("web-toolkit-mcp-register"),
+        scope: McpServiceScope::agent_session(*app_id, session_id.unwrap_or_default(), agent_name)
+            .unwrap_or_default(),
+        definitions: payloads,
+        policy: McpServicePolicyHints::default(),
+    };
+    if let Err(error) = state.mcp_client.register(command).await {
+        tracing::warn!(
+            error = %error,
+            "MCP Service registration failed during toolkit assembly"
+        );
+    }
 }
 
 async fn load_app_mcp_overlay_definitions(
@@ -354,41 +428,6 @@ async fn load_app_mcp_overlay_definitions(
     }
 }
 
-fn mcp_close_event_emitter(
-    state: &Arc<AppState>,
-    session_id: Option<&str>,
-    agent_name: &str,
-) -> Option<Arc<dyn Fn(McpRuntimeStatus) + Send + Sync>> {
-    let session_id = session_id.map(ToString::to_string)?;
-    let state = Arc::clone(state);
-    let agent_name = agent_name.to_string();
-    Some(Arc::new(move |status: McpRuntimeStatus| {
-        let state = Arc::clone(&state);
-        let session_id = session_id.clone();
-        let agent_name = agent_name.clone();
-        if let Ok(handle) = tokio::runtime::Handle::try_current() {
-            handle.spawn(async move {
-                let payload = serde_json::json!({
-                    "agent": agent_name,
-                    "server_id": status.server_id,
-                    "lifecycle": status.lifecycle,
-                    "session_mode": status.session_mode,
-                    "state": "closed",
-                    "failure_reason": status.failure_reason,
-                });
-                emit_mcp_event(
-                    &state,
-                    &session_id,
-                    "mcp_server_closed",
-                    &agent_name,
-                    &payload,
-                )
-                .await;
-            });
-        }
-    }))
-}
-
 async fn emit_mcp_runtime_events(
     state: &Arc<AppState>,
     session_id: Option<&str>,
@@ -399,6 +438,84 @@ async fn emit_mcp_runtime_events(
         return;
     };
 
+    for plan in mcp_runtime_event_plans(agent_name, statuses) {
+        emit_mcp_event(
+            state,
+            session_id,
+            plan.event_type,
+            agent_name,
+            &plan.payload,
+        )
+        .await;
+    }
+}
+
+async fn emit_skill_mcp_alias_events(
+    state: &Arc<AppState>,
+    session_id: Option<&str>,
+    agent_name: &str,
+    statuses: &[McpRuntimeStatus],
+) {
+    let Some(session_id) = session_id else {
+        return;
+    };
+    for plan in skill_mcp_alias_event_plans(agent_name, statuses) {
+        emit_mcp_event(
+            state,
+            session_id,
+            plan.event_type,
+            agent_name,
+            &plan.payload,
+        )
+        .await;
+    }
+}
+
+async fn emit_mcp_starting_events(
+    state: &Arc<AppState>,
+    session_id: Option<&str>,
+    agent_name: &str,
+    definitions: &[McpServerDefinition],
+) {
+    let Some(session_id) = session_id else {
+        return;
+    };
+    for plan in mcp_starting_event_plans(agent_name, definitions) {
+        emit_mcp_event(
+            state,
+            session_id,
+            plan.event_type,
+            agent_name,
+            &plan.payload,
+        )
+        .await;
+    }
+}
+
+/// A deterministic EventLog/SSE event plan for MCP lifecycle visibility.
+///
+/// `build_toolkit` emits these plans through [`emit_runtime_event`], which
+/// persists to EventLog before forwarding to SSE.  Keeping this as a pure value
+/// object makes the service-backed migration auditable without constructing a
+/// full `AppState` in unit tests, while preserving the existing event names and
+/// payload shape used by the UI.
+#[derive(Debug, Clone, PartialEq)]
+struct McpRuntimeEventPlan {
+    event_type: &'static str,
+    payload: serde_json::Value,
+}
+
+/// Build the legacy MCP runtime events from service-probed statuses.
+///
+/// The event ordering is part of the user-visible runtime trace contract:
+/// every non-disabled status emits `mcp_server_resolved` first, then a terminal
+/// readiness/failure event, and ready servers with exposed tools emit the
+/// `mcp_tools_registered` follow-up.
+fn mcp_runtime_event_plans(
+    agent_name: &str,
+    statuses: &[McpRuntimeStatus],
+) -> Vec<McpRuntimeEventPlan> {
+    let mut plans = Vec::new();
     for status in statuses {
         if matches!(status.state, McpRuntimeStatusState::Disabled) {
             continue;
@@ -415,46 +532,46 @@ async fn emit_mcp_runtime_events(
             "failure_reason": status.failure_reason,
         });
 
-        emit_mcp_event(
-            state,
-            session_id,
-            "mcp_server_resolved",
-            agent_name,
-            &payload,
-        )
-        .await;
-
+        plans.push(McpRuntimeEventPlan {
+            event_type: "mcp_server_resolved",
+            payload: payload.clone(),
+        });
         match status.state {
             McpRuntimeStatusState::Ready => {
-                emit_mcp_event(state, session_id, "mcp_server_ready", agent_name, &payload).await;
+                plans.push(McpRuntimeEventPlan {
+                    event_type: "mcp_server_ready",
+                    payload: payload.clone(),
+                });
                 if !status.exposed_tools.is_empty() {
-                    emit_mcp_event(
-                        state,
-                        session_id,
-                        "mcp_tools_registered",
-                        agent_name,
-                        &payload,
-                    )
-                    .await;
+                    plans.push(McpRuntimeEventPlan {
+                        event_type: "mcp_tools_registered",
+                        payload,
+                    });
                 }
             }
             McpRuntimeStatusState::Failed | McpRuntimeStatusState::DependencyMissing => {
-                emit_mcp_event(state, session_id, "mcp_server_failed", agent_name, &payload).await;
+                plans.push(McpRuntimeEventPlan {
+                    event_type: "mcp_server_failed",
+                    payload,
+                });
             }
             McpRuntimeStatusState::Disabled => {}
         }
     }
+    plans
 }
 
-async fn emit_skill_mcp_alias_events(
-    state: &Arc<AppState>,
-    session_id: Option<&str>,
+/// Build skill-backed MCP alias events without changing service ownership.
+///
+/// Skill alias events are a Web/UI compatibility surface.  The service-backed
+/// runtime still owns registration and invocation, while this planner preserves
+/// the existing alias event stream for users who watch skill-specific MCP
+/// readiness in EventLog/SSE.
+fn skill_mcp_alias_event_plans(
     agent_name: &str,
     statuses: &[McpRuntimeStatus],
-) {
-    let Some(session_id) = session_id else {
-        return;
-    };
+) -> Vec<McpRuntimeEventPlan> {
+    let mut plans = Vec::new();
     for status in statuses
         .iter()
         .filter(|status| status.server_id.starts_with("skill:"))
@@ -473,47 +590,44 @@ async fn emit_skill_mcp_alias_events(
             }
             McpRuntimeStatusState::Disabled => "skill_mcp_disabled",
         };
-        emit_mcp_event(state, session_id, event_type, agent_name, &payload).await;
+        plans.push(McpRuntimeEventPlan {
+            event_type,
+            payload: payload.clone(),
+        });
         if matches!(status.state, McpRuntimeStatusState::Ready) && !status.exposed_tools.is_empty()
         {
-            emit_mcp_event(
-                state,
-                session_id,
-                "skill_mcp_tools_registered",
-                agent_name,
-                &payload,
-            )
-            .await;
+            plans.push(McpRuntimeEventPlan {
+                event_type: "skill_mcp_tools_registered",
+                payload,
+            });
         }
     }
+    plans
 }
 
-async fn emit_mcp_starting_events(
-    state: &Arc<AppState>,
-    session_id: Option<&str>,
+/// Build `mcp_server_starting` events for enabled definitions.
+///
+/// Starting events intentionally happen before the service registration call in
+/// `build_toolkit`, matching the old direct-registration lifecycle narrative
+/// while allowing the actual runtime state to be owned by `service.mcp`.
+fn mcp_starting_event_plans(
     agent_name: &str,
     definitions: &[McpServerDefinition],
-) {
-    let Some(session_id) = session_id else {
-        return;
-    };
-    for definition in definitions.iter().filter(|definition| definition.enabled) {
-        let payload = serde_json::json!({
-            "agent": agent_name,
-            "server_id": definition.id,
-            "lifecycle": definition.lifecycle,
-            "session_mode": definition.session_mode,
-            "state": "starting",
-        });
-        emit_mcp_event(
-            state,
-            session_id,
-            "mcp_server_starting",
-            agent_name,
-            &payload,
-        )
-        .await;
-    }
+) -> Vec<McpRuntimeEventPlan> {
+    definitions
+        .iter()
+        .filter(|definition| definition.enabled)
+        .map(|definition| McpRuntimeEventPlan {
+            event_type: "mcp_server_starting",
+            payload: serde_json::json!({
+                "agent": agent_name,
+                "server_id": definition.id,
+                "lifecycle": definition.lifecycle,
+                "session_mode": definition.session_mode,
+                "state": "starting",
+            }),
+        })
+        .collect()
 }
 
 async fn emit_mcp_event(
@@ -1122,7 +1236,12 @@ impl macaca_tools::Tool for WorkspaceShellTool {
 mod tests {
     use std::path::Path;
 
-    use super::{normalize_tool_input, resolve_workspace_path};
+    use super::{
+        mcp_runtime_event_plans, mcp_starting_event_plans, normalize_tool_input,
+        resolve_workspace_path, skill_mcp_alias_event_plans,
+    };
+    use macaca_framework::mcp::{McpSessionMode, McpTransportConfig};
+    use macaca_runtime_host::{McpLifecycleScope, McpRuntimeStatus, McpRuntimeStatusState};
 
     #[test]
     fn resolve_workspace_path_joins_relative_path_to_workspace_root() {
@@ -1174,5 +1293,142 @@ mod tests {
         let normalized = normalize_tool_input(&input);
 
         assert_eq!(normalized.as_str(), Some("not json"));
+    }
+
+    #[test]
+    fn production_toolkit_assembly_does_not_register_direct_mcp_clients() {
+        let source = include_str!("framework_toolkit.rs");
+        let forbidden = concat!("state.", "mcp_runtime.", "register_definitions");
+
+        assert!(
+            !source.contains(forbidden),
+            "production toolkit assembly must adapt MCP Service descriptors instead of registering host-local MCP clients"
+        );
+        assert!(
+            source.contains("service_tool_from_descriptor"),
+            "production toolkit assembly should expose MCP tools through service-backed adapters"
+        );
+    }
+
+    #[test]
+    fn mcp_runtime_event_plan_preserves_legacy_lifecycle_events() {
+        let statuses = vec![
+            mcp_status(
+                "server-ready",
+                McpRuntimeStatusState::Ready,
+                vec!["lookup".into()],
+                None,
+            ),
+            mcp_status(
+                "server-failed",
+                McpRuntimeStatusState::Failed,
+                Vec::new(),
+                Some("boom".into()),
+            ),
+            mcp_status(
+                "server-disabled",
+                McpRuntimeStatusState::Disabled,
+                Vec::new(),
+                None,
+            ),
+        ];
+
+        let event_types = mcp_runtime_event_plans("agent-a", &statuses)
+            .into_iter()
+            .map(|event| event.event_type)
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            event_types,
+            vec![
+                "mcp_server_resolved",
+                "mcp_server_ready",
+                "mcp_tools_registered",
+                "mcp_server_resolved",
+                "mcp_server_failed",
+            ]
+        );
+    }
+
+    #[test]
+    fn mcp_starting_event_plan_skips_disabled_definitions() {
+        let enabled = mcp_definition("server-enabled", true);
+        let disabled = mcp_definition("server-disabled", false);
+
+        let plans = mcp_starting_event_plans("agent-a", &[enabled, disabled]);
+
+        assert_eq!(plans.len(), 1);
+        assert_eq!(plans[0].event_type, "mcp_server_starting");
+        assert_eq!(
+            plans[0]
+                .payload
+                .get("server_id")
+                .and_then(|value| value.as_str()),
+            Some("server-enabled")
+        );
+    }
+
+    #[test]
+    fn skill_mcp_alias_event_plan_preserves_ready_and_tool_aliases() {
+        let statuses = vec![
+            mcp_status(
+                "skill:browser",
+                McpRuntimeStatusState::Ready,
+                vec!["browser_click".into()],
+                None,
+            ),
+            mcp_status(
+                "global-browser",
+                McpRuntimeStatusState::Ready,
+                vec!["browser_click".into()],
+                None,
+            ),
+        ];
+
+        let event_types = skill_mcp_alias_event_plans("agent-a", &statuses)
+            .into_iter()
+            .map(|event| event.event_type)
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            event_types,
+            vec!["skill_mcp_ready", "skill_mcp_tools_registered"]
+        );
+    }
+
+    fn mcp_definition(id: &str, enabled: bool) -> macaca_runtime_host::McpServerDefinition {
+        macaca_runtime_host::McpServerDefinition {
+            id: id.into(),
+            transport: McpTransportConfig::Stdio {
+                command: "sh".into(),
+                args: Vec::new(),
+                env: Default::default(),
+                cwd: None,
+            },
+            lifecycle: McpLifecycleScope::AgentSession,
+            session_mode: McpSessionMode::Stateful,
+            tool_prefix: None,
+            required_bins: Vec::new(),
+            enabled,
+            source: macaca_runtime_host::McpDefinitionSource::Global,
+            concurrency_isolation: None,
+        }
+    }
+
+    fn mcp_status(
+        server_id: &str,
+        state: McpRuntimeStatusState,
+        exposed_tools: Vec<String>,
+        failure_reason: Option<String>,
+    ) -> McpRuntimeStatus {
+        McpRuntimeStatus {
+            server_id: server_id.into(),
+            transport: "stdio".into(),
+            lifecycle: McpLifecycleScope::AgentSession,
+            session_mode: McpSessionMode::Stateful,
+            state,
+            exposed_tools,
+            failure_reason,
+        }
     }
 }

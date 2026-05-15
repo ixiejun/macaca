@@ -164,6 +164,53 @@ async fn service_runtime_rejects_policy_denial_before_dispatch() {
 }
 
 #[tokio::test]
+async fn service_runtime_records_all_admission_decorators_before_dispatch() {
+    let (runtime, events) = runtime_with_events();
+    let service_id = runtime
+        .register_provider(&factory("service.runtime.admission"), Default::default())
+        .await
+        .unwrap();
+    runtime
+        .start(&service_id, TraceContext::new("trace-start"))
+        .await
+        .unwrap();
+
+    runtime
+        .call(
+            &service_id,
+            macaca_proto::ServiceBusSource::new("test.source"),
+            traced_command("trace-admission"),
+        )
+        .await
+        .unwrap();
+
+    let dispatched = events
+        .events()
+        .unwrap()
+        .into_iter()
+        .find(|event| event.operation == "service_runtime.call.dispatched")
+        .expect("service runtime should emit dispatch event after admission decorators");
+    let decorators = dispatched
+        .payload
+        .get("admission_decorators")
+        .and_then(|value| value.as_array())
+        .expect("dispatch event should list admission decorators");
+    let decorator_names: Vec<&str> = decorators.iter().filter_map(|v| v.as_str()).collect();
+
+    assert_eq!(
+        decorator_names,
+        vec![
+            "trace_required",
+            "policy",
+            "resource_placeholder",
+            "entitlement_placeholder",
+            "metering_placeholder",
+            "audit_placeholder",
+        ]
+    );
+}
+
+#[tokio::test]
 async fn service_runtime_rejects_duplicate_and_unknown_services() {
     let (runtime, _events) = runtime_with_events();
     let first = factory("service.runtime.identity");

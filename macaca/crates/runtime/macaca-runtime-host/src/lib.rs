@@ -33,6 +33,8 @@ pub mod finance_llm_analysis_provider;
 pub mod genui_surface_store;
 pub mod lease;
 pub mod llm_service_provider;
+pub(crate) mod mcp_descriptor_index;
+pub(crate) mod mcp_invocation_registry;
 pub mod mcp_runtime;
 pub mod mcp_service_provider;
 pub mod memory_service_provider;

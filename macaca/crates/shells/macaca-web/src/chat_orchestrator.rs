@@ -979,7 +979,9 @@ pub(crate) async fn post_chat_v2(
         flags.insert(req.app_id.clone(), Arc::clone(&cancel_flag));
     }
 
-    // Pause/resume channel for create_goal coordination
+    // Session-local execution-control resume channel. The selected policy is
+    // registered later by `service.agent_execution`, which swaps this sender for
+    // the concrete run while preserving the browser-visible session handle.
     let pause_signal = Arc::new(AtomicBool::new(false));
     let (resume_tx, _resume_rx) =
         tokio::sync::mpsc::channel::<crate::runtime_resume::RuntimeResumeSignal>(4);

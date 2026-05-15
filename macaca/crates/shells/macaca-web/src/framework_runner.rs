@@ -6,7 +6,7 @@
 //! - Unified tool management via `Toolkit` (with middleware chain)
 //! - Working memory with tag-based filtering
 //! - Hook system for SSE event bridging
-//! - Pause/resume via `ToolMiddleware` for `create_goal` coordination
+//! - Policy-selected execution control via `ToolMiddleware` barriers
 
 use std::collections::HashSet;
 use std::convert::Infallible;
@@ -40,7 +40,9 @@ use macaca_persist::{AppendEventCommand, EventLog};
 use macaca_proto::config::{
     AgentProfileContextConfig, AgentProfileRootKind, ContextConfig, WorkspaceGuideSourcesConfig,
 };
-use macaca_proto::{AgentId, AgentState, ApplicationId, Capability};
+use macaca_proto::{
+    AgentId, AgentState, ApplicationId, Capability, ExecutionControlPolicy, ExecutionControlTrigger,
+};
 use macaca_sdk::AgentPersona;
 use macaca_skill::SkillPolicy;
 
@@ -64,12 +66,44 @@ enum FrameworkRunnerBuildMode {
     },
     Runtime {
         event_tx: Option<mpsc::Sender<macaca_proto::AgentExecutionEvent>>,
+        execution_control: Option<RuntimeExecutionControl>,
     },
     Coordinator {
         sse_tx: mpsc::Sender<Result<Event, Infallible>>,
+        execution_control: RuntimeExecutionControl,
+    },
+}
+
+/// Runtime-agent pause/resume wiring selected by execution-control policy.
+///
+/// The web host owns the local session channel, but the pause trigger comes from
+/// provider-neutral execution-control policy. This keeps runtime execution
+/// generic while preserving the current in-process resume channel until
+/// `service.execution_control` owns the state machine.
+#[derive(Clone)]
+pub(crate) struct RuntimeExecutionControl {
+    pause_signal: Arc<AtomicBool>,
+    resume_rx: Arc<Mutex<mpsc::Receiver<RuntimeResumeSignal>>>,
+    policy: ExecutionControlPolicy,
+    execution_id: String,
+}
+
+impl RuntimeExecutionControl {
+    /// Build an in-process execution-control handle from the session-level pause
+    /// signal and the receiver completed by the selected resume source.
+    pub(crate) fn new(
         pause_signal: Arc<AtomicBool>,
         resume_rx: mpsc::Receiver<RuntimeResumeSignal>,
-    },
+        policy: ExecutionControlPolicy,
+        execution_id: impl Into<String>,
+    ) -> Self {
+        Self {
+            pause_signal,
+            resume_rx: Arc::new(Mutex::new(resume_rx)),
+            policy,
+            execution_id: execution_id.into(),
+        }
+    }
 }
 
 struct WebTracedAgentFactory {
@@ -88,6 +122,7 @@ enum StandardAgentMode {
     },
     Runtime {
         event_tx: Option<mpsc::Sender<macaca_proto::AgentExecutionEvent>>,
+        execution_control: Option<RuntimeExecutionControl>,
     },
 }
 
@@ -120,8 +155,12 @@ impl TracedAgentFactory for WebTracedAgentFactory {
                 self.build_executor_agent(request, Arc::clone(executor))
                     .await
             }
-            FrameworkRunnerBuildMode::Runtime { event_tx } => {
-                self.build_runtime_agent(request, event_tx.clone()).await
+            FrameworkRunnerBuildMode::Runtime {
+                event_tx,
+                execution_control,
+            } => {
+                self.build_runtime_agent(request, event_tx.clone(), execution_control.clone())
+                    .await
             }
             FrameworkRunnerBuildMode::Coordinator { .. } => {
                 Err("Coordinator construction requires owned channels".into())
@@ -328,7 +367,10 @@ impl FrameworkRunner {
         .await?;
         let factory = WebTracedAgentFactory {
             state: Arc::clone(state),
-            build_mode: FrameworkRunnerBuildMode::Runtime { event_tx },
+            build_mode: FrameworkRunnerBuildMode::Runtime {
+                event_tx,
+                execution_control: None,
+            },
         };
         factory.build(request).await
     }
@@ -372,7 +414,58 @@ impl FrameworkRunner {
         .await?;
         let factory = WebTracedAgentFactory {
             state: Arc::clone(state),
-            build_mode: FrameworkRunnerBuildMode::Runtime { event_tx },
+            build_mode: FrameworkRunnerBuildMode::Runtime {
+                event_tx,
+                execution_control: None,
+            },
+        };
+        factory.build(request).await
+    }
+
+    /// Build a runtime agent from an Agent Context snapshot and attach the
+    /// execution-control middleware selected for this run.
+    ///
+    /// This keeps the main-thread coordinator on the serviceized execution path
+    /// while preserving the goal/task contract: after `create_goal`, the entry
+    /// agent waits for PlanLoop/WorkerLoop to finish instead of continuing to
+    /// call implementation tools itself.
+    pub(crate) async fn build_runtime_agent_from_context_snapshot_with_execution_control(
+        state: &Arc<AppState>,
+        context_snapshot: &macaca_proto::AgentContextSnapshot,
+        event_tx: Option<mpsc::Sender<macaca_proto::AgentExecutionEvent>>,
+        execution_control: RuntimeExecutionControl,
+    ) -> Result<HookedAgent<ReActAgent>, String> {
+        let task_id = context_snapshot
+            .task_id
+            .unwrap_or_else(macaca_proto::TaskId::new);
+        let capabilities = Self::resolve_agent_capability_set(
+            state,
+            &context_snapshot.application_id,
+            &context_snapshot.target_agent,
+        )
+        .await;
+        let request = Self::build_request_with_system_prompt(
+            state,
+            &context_snapshot.application_id,
+            &context_snapshot.target_agent,
+            Some(context_snapshot.session_id.clone()),
+            task_id,
+            context_snapshot.task_id,
+            AgentBuildIntent::RuntimeAgent,
+            AgentToolConfig {
+                goal_id: context_snapshot.task_id,
+                ..Default::default()
+            },
+            capabilities,
+            context_snapshot.system_prompt.clone(),
+        )
+        .await?;
+        let factory = WebTracedAgentFactory {
+            state: Arc::clone(state),
+            build_mode: FrameworkRunnerBuildMode::Runtime {
+                event_tx,
+                execution_control: Some(execution_control),
+            },
         };
         factory.build(request).await
     }
@@ -530,17 +623,16 @@ impl FrameworkRunner {
     }
 
     /// Build a coordinator `ReActAgent` wrapped with `HookedAgent` for SSE bridging
-    /// and `PauseOnGoalMiddleware` for pause/resume on `create_goal`.
+    /// and policy-driven execution-control barriers.
     ///
     /// Returns `(HookedAgent<ReActAgent>, CancellationToken)`.
-    pub async fn build_coordinator(
+    pub(crate) async fn build_coordinator(
         state: &Arc<AppState>,
         app_id: &ApplicationId,
         agent_name: &str,
         session_id: Option<String>,
         sse_tx: mpsc::Sender<Result<Event, Infallible>>,
-        pause_signal: Arc<AtomicBool>,
-        resume_rx: mpsc::Receiver<RuntimeResumeSignal>,
+        execution_control: RuntimeExecutionControl,
     ) -> Result<(HookedAgent<ReActAgent>, tokio_util::sync::CancellationToken), String> {
         let request = Self::build_request(
             state,
@@ -557,8 +649,7 @@ impl FrameworkRunner {
             state: Arc::clone(state),
             build_mode: FrameworkRunnerBuildMode::Coordinator {
                 sse_tx,
-                pause_signal,
-                resume_rx,
+                execution_control,
             },
         };
 
@@ -1307,7 +1398,10 @@ impl WebTracedAgentFactory {
                 )
                 .await;
             }
-            StandardAgentMode::Runtime { event_tx } => {
+            StandardAgentMode::Runtime {
+                event_tx,
+                execution_control,
+            } => {
                 if let Some(ref agent_tx) = event_tx {
                     Self::attach_driver_trace_route(
                         toolkit,
@@ -1318,6 +1412,14 @@ impl WebTracedAgentFactory {
                     .await;
                     toolkit.add_middleware(Box::new(ChannelToolMiddleware {
                         tx: agent_tx.clone(),
+                    }));
+                }
+                if let Some(execution_control) = execution_control {
+                    toolkit.add_middleware(Box::new(ExecutionControlMiddleware {
+                        pause_signal: Arc::clone(&execution_control.pause_signal),
+                        resume_rx: Arc::clone(&execution_control.resume_rx),
+                        policy: execution_control.policy.clone(),
+                        execution_id: execution_control.execution_id.clone(),
                     }));
                 }
             }
@@ -1339,7 +1441,7 @@ impl WebTracedAgentFactory {
                     iteration: std::sync::atomic::AtomicUsize::new(0),
                 }));
             }
-            StandardAgentMode::Runtime { event_tx } => {
+            StandardAgentMode::Runtime { event_tx, .. } => {
                 if let Some(tx) = event_tx {
                     hooks.register_instance_hook(Box::new(ChannelEmitterHook {
                         tx,
@@ -1527,9 +1629,16 @@ impl WebTracedAgentFactory {
         &self,
         request: AgentBuildRequest,
         event_tx: Option<mpsc::Sender<macaca_proto::AgentExecutionEvent>>,
+        execution_control: Option<RuntimeExecutionControl>,
     ) -> Result<HookedAgent<ReActAgent>, String> {
-        self.build_standard_agent(request, StandardAgentMode::Runtime { event_tx })
-            .await
+        self.build_standard_agent(
+            request,
+            StandardAgentMode::Runtime {
+                event_tx,
+                execution_control,
+            },
+        )
+        .await
     }
 
     async fn build_coordinator(
@@ -1545,8 +1654,7 @@ impl WebTracedAgentFactory {
 
         let FrameworkRunnerBuildMode::Coordinator {
             sse_tx,
-            pause_signal,
-            resume_rx,
+            execution_control,
         } = self.build_mode
         else {
             return Err("invalid build mode for coordinator".into());
@@ -1569,9 +1677,11 @@ impl WebTracedAgentFactory {
             event_log: Some(Arc::clone(&self.state.persist.event_log)),
             session_id: request.identity.session_id.clone(),
         }));
-        toolkit.add_middleware(Box::new(PauseOnGoalMiddleware {
-            pause_signal,
-            resume_rx: Arc::new(Mutex::new(resume_rx)),
+        toolkit.add_middleware(Box::new(ExecutionControlMiddleware {
+            pause_signal: Arc::clone(&execution_control.pause_signal),
+            resume_rx: Arc::clone(&execution_control.resume_rx),
+            policy: execution_control.policy.clone(),
+            execution_id: execution_control.execution_id.clone(),
         }));
 
         let merged_ctx = FrameworkRunner::resolve_context_config(
@@ -2019,7 +2129,9 @@ impl ToolMiddleware for ExecutorToolMiddleware {
 
 #[cfg(test)]
 mod tests {
-    use super::{tool_response_text, truncate_tool_output, FrameworkRunner};
+    use super::{
+        tool_response_text, truncate_tool_output, ExecutionControlMiddleware, FrameworkRunner,
+    };
     use macaca_app::model::AppContextConfig;
     use macaca_framework::message::{ContentBlock, TextBlock};
     use macaca_framework::tool::ToolResponse;
@@ -2131,37 +2243,95 @@ mod tests {
         assert_eq!(merged.default_engine, base.default_engine);
         assert_eq!(merged.fallback_engine, base.fallback_engine);
     }
+
+    #[test]
+    fn execution_control_middleware_matches_configured_tool_barrier() {
+        let policy = macaca_proto::ExecutionControlPolicy::enabled(
+            vec![macaca_proto::ExecutionControlTrigger::tool_call_barrier(
+                "create_goal",
+            )],
+            vec![macaca_proto::ExecutionControlResumeSource::goal_lifecycle()],
+            macaca_proto::ExecutionControlCheckpointMode::ReferenceOnly,
+        );
+
+        assert!(ExecutionControlMiddleware::policy_pauses_after_tool(
+            &policy,
+            "create_goal"
+        ));
+        assert!(!ExecutionControlMiddleware::policy_pauses_after_tool(
+            &policy,
+            "claude_code_execute"
+        ));
+    }
+
+    #[test]
+    fn coordinator_execution_control_uses_supplied_policy() {
+        let source = include_str!("framework_runner.rs");
+        let coordinator_start = source
+            .find("async fn build_coordinator")
+            .expect("coordinator builder should exist");
+        let coordinator_end = source[coordinator_start..]
+            .find("let merged_ctx")
+            .map(|offset| coordinator_start + offset)
+            .expect("coordinator context section should exist");
+        let coordinator_source = &source[coordinator_start..coordinator_end];
+
+        assert!(coordinator_source.contains("policy: execution_control.policy.clone()"));
+        assert!(!coordinator_source.contains("ExecutionControlPolicy::enabled("));
+        assert!(!coordinator_source.contains("tool_call_barrier(\"create_goal\")"));
+    }
 }
 
 // ---------------------------------------------------------------------------
-// PauseOnGoalMiddleware — pauses coordinator when create_goal is called
+// ExecutionControlMiddleware — pauses runtime executions at configured barriers
 // ---------------------------------------------------------------------------
 
-/// Middleware that blocks after `create_goal` tool execution until the goal
-/// completes (via `resume_rx`). This replaces the `PausableAgenticLoop`'s
-/// external pause signal mechanism with a tool-level block.
-pub struct PauseOnGoalMiddleware {
+/// Middleware that blocks after policy-selected tool barriers until an approved
+/// resume source delivers a signal through the current in-process channel.
+///
+/// This is the stage-1 adapter for execution control. It is intentionally
+/// configured by `ExecutionControlPolicy`, not by application or agent names.
+pub struct ExecutionControlMiddleware {
     pause_signal: Arc<AtomicBool>,
     resume_rx: Arc<Mutex<mpsc::Receiver<RuntimeResumeSignal>>>,
+    policy: ExecutionControlPolicy,
+    execution_id: String,
+}
+
+impl ExecutionControlMiddleware {
+    /// Return whether the policy declares a tool-call barrier for this tool.
+    fn policy_pauses_after_tool(policy: &ExecutionControlPolicy, tool_name: &str) -> bool {
+        policy.triggers.iter().any(|trigger| {
+            matches!(
+                trigger,
+                ExecutionControlTrigger::ToolCallBarrier { tool_name: configured }
+                    if configured == tool_name
+            )
+        })
+    }
 }
 
 #[async_trait]
-impl ToolMiddleware for PauseOnGoalMiddleware {
+impl ToolMiddleware for ExecutionControlMiddleware {
     async fn before(&self, _name: &str, _args: &mut serde_json::Value) -> Result<(), ToolError> {
         Ok(())
     }
 
     async fn after(&self, name: &str, response: &mut ToolResponse) -> Result<(), ToolError> {
-        if name != "create_goal" {
+        if !Self::policy_pauses_after_tool(&self.policy, name) {
             return Ok(());
         }
 
-        tracing::info!("PauseOnGoalMiddleware: create_goal detected, pausing coordinator");
+        tracing::info!(
+            execution_id = %self.execution_id,
+            tool = %name,
+            "execution control barrier reached; pausing runtime execution"
+        );
         self.pause_signal.store(true, Ordering::SeqCst);
 
-        // Wait for the goal to complete (GoalCompleted sends resume signal).
-        // Autonomous goals can legitimately run longer than a fixed HTTP-era
-        // timeout; ending this wait early loses the paused coordinator.
+        // Wait for the configured resume source to complete.  Autonomous goals
+        // and delegated work can legitimately run longer than a fixed HTTP-era
+        // timeout; ending this wait early loses the paused execution.
         let mut rx = self.resume_rx.lock().await;
         match rx.recv().await {
             Some(reason) => {
@@ -2177,11 +2347,19 @@ impl ToolMiddleware for PauseOnGoalMiddleware {
                             text: format!("\n\n[Goal completed: {}]", context),
                         },
                     ));
-                tracing::info!("PauseOnGoalMiddleware: resumed after goal completion");
+                tracing::info!(
+                    execution_id = %self.execution_id,
+                    tool = %name,
+                    "execution control resume signal delivered"
+                );
             }
             None => {
                 self.pause_signal.store(false, Ordering::SeqCst);
-                tracing::warn!("PauseOnGoalMiddleware: resume channel closed");
+                tracing::warn!(
+                    execution_id = %self.execution_id,
+                    tool = %name,
+                    "execution control resume channel closed"
+                );
             }
         }
         Ok(())

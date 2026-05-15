@@ -16,19 +16,36 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use macaca_framework::mcp::{
-    register_mcp_tools_with_options, McpClient, McpSessionMode, McpTimeouts,
+    register_mcp_tools_with_options, McpClient, McpError, McpSessionMode, McpTimeouts,
     McpToolNameConflictPolicy, McpToolRegistrationOptions, McpTransportConfig,
 };
 use macaca_framework::tool::Toolkit;
-use macaca_proto::ApplicationId;
+use macaca_proto::{
+    ApplicationId, CapabilityToolDescriptor, CapabilityToolInvocationResult,
+    CapabilityToolOriginKind, CapabilityToolResourceScope, TraceContext,
+    MCP_DESCRIPTOR_BACKEND_TOOL_NAME, MCP_DESCRIPTOR_DEFINITION_SOURCE,
+    MCP_DESCRIPTOR_LIFECYCLE_SCOPE, MCP_SERVICE_ID,
+};
 use macaca_skill::{SkillMcpServerConfig, SkillSnapshot, SkillSnapshotEntry};
 use serde::{Deserialize, Serialize};
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::RwLock;
 use tokio::time::timeout;
 
 use crate::compat::{default_registry, CompatRegistry};
 use crate::lease::McpSessionLease;
+use crate::mcp_descriptor_index::{McpToolDescriptorIndex, McpToolDescriptorRoute};
+use crate::mcp_invocation_registry::McpInvocationSessionRegistry;
 use crate::transport::{bridge_for_config, McpTransport};
+
+/// Strategy used by runtime-host to create low-level MCP protocol clients.
+///
+/// Production code uses [`bridge_for_config`] so `macaca-framework::mcp`
+/// remains the single protocol implementation.  Tests may inject deterministic
+/// clients through this seam, which lets service-level policy, routing, audit
+/// metadata, cleanup, and timeout behavior be validated without starting
+/// concrete MCP servers.
+type McpClientFactory =
+    dyn Fn(&McpServerDefinition, McpTimeouts) -> Result<Box<dyn McpClient>, McpError> + Send + Sync;
 
 /// Lifecycle scope for Agent OS managed MCP instances.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -272,20 +289,48 @@ pub struct McpRuntimeKey {
     pub agent_name: Option<String>,
 }
 
-#[derive(Debug, Clone)]
-struct RuntimeInstanceRecord {
-    refs: usize,
-    state: McpRuntimeStatusState,
-    last_error: Option<String>,
-    last_used: Instant,
+impl McpRuntimeKey {
+    /// Build the service-owned lifecycle key for an MCP server and caller scope.
+    ///
+    /// This method is the single keying rule used by toolkit registration,
+    /// service-backed invocation, cleanup, and tests.  Keeping it centralized
+    /// prevents shell adapters from accidentally creating different isolation
+    /// semantics for the same MCP lifecycle declaration.
+    pub(crate) fn from_definition(
+        definition: &McpServerDefinition,
+        context: &McpRuntimeContext,
+    ) -> Self {
+        runtime_key(definition, context)
+    }
 }
 
 /// Agent OS MCP runtime manager.
 #[deprecated(note = "Use `McpRuntimeFacade` as the primary host-facing entry point.")]
-#[derive(Debug, Default)]
 pub struct McpRuntimeManager {
     definitions: RwLock<BTreeMap<String, McpServerDefinition>>,
-    instances: Mutex<BTreeMap<McpRuntimeKey, RuntimeInstanceRecord>>,
+    invocation_registry: McpInvocationSessionRegistry,
+    descriptor_index: McpToolDescriptorIndex,
+    client_factory: Arc<McpClientFactory>,
+    timeouts: McpTimeouts,
+}
+
+#[allow(deprecated)]
+impl std::fmt::Debug for McpRuntimeManager {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("McpRuntimeManager")
+            .field("definitions", &self.definitions)
+            .field("invocation_registry", &self.invocation_registry)
+            .field("descriptor_index", &self.descriptor_index)
+            .field("timeouts", &self.timeouts)
+            .finish_non_exhaustive()
+    }
+}
+
+#[allow(deprecated)]
+impl Default for McpRuntimeManager {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// Stable host-facing facade for MCP runtime orchestration.
@@ -328,6 +373,52 @@ impl McpRuntimeFacade {
     #[allow(deprecated)]
     pub async fn probe(&self, policy: &McpToolPolicy) -> Vec<McpRuntimeStatus> {
         self.manager.probe_statuses(policy).await
+    }
+
+    /// Return service-owned MCP descriptors that carry explicit routing
+    /// metadata for later `mcp.tool.invoke` calls.
+    ///
+    /// This is the descriptor-index side of the service boundary.  Shells may
+    /// render or adapt the descriptors, but the backend server/tool mapping is
+    /// emitted here by the runtime-host owner instead of being reconstructed by
+    /// string parsing in Web or framework code.
+    #[allow(deprecated)]
+    pub async fn tool_descriptors(
+        &self,
+        policy: &McpToolPolicy,
+    ) -> Vec<Result<CapabilityToolDescriptor, String>> {
+        self.manager.tool_descriptors(policy).await
+    }
+
+    /// Invoke an MCP tool through the service-owned runtime path.
+    ///
+    /// The method creates a scoped runtime lease before protocol side effects,
+    /// dispatches to the backend MCP tool name carried by the descriptor, and
+    /// releases call-scoped leases immediately after completion.  The current
+    /// implementation uses the existing protocol client factory as the low-level
+    /// Strategy while keeping Agent OS invocation semantics in runtime-host.
+    #[allow(deprecated)]
+    pub async fn invoke_tool(
+        &self,
+        server_id: &str,
+        backend_tool_name: &str,
+        visible_tool_name: &str,
+        input: serde_json::Value,
+        trace: TraceContext,
+        context: &McpRuntimeContext,
+        policy: &McpToolPolicy,
+    ) -> CapabilityToolInvocationResult {
+        self.manager
+            .invoke_tool(
+                server_id,
+                backend_tool_name,
+                visible_tool_name,
+                input,
+                trace,
+                context,
+                policy,
+            )
+            .await
     }
 
     #[allow(deprecated)]
@@ -397,7 +488,30 @@ impl McpRuntimeManager {
     pub fn new() -> Self {
         Self {
             definitions: RwLock::new(BTreeMap::new()),
-            instances: Mutex::new(BTreeMap::new()),
+            invocation_registry: McpInvocationSessionRegistry::default(),
+            descriptor_index: McpToolDescriptorIndex::default(),
+            client_factory: default_mcp_client_factory(),
+            timeouts: McpTimeouts::default(),
+        }
+    }
+
+    /// Build a manager with a deterministic protocol-client strategy for tests.
+    ///
+    /// The constructor is intentionally cfg-gated so production callers cannot
+    /// bypass the standard transport bridge.  It keeps the service layer testable
+    /// while preserving the microkernel boundary: runtime-host owns service
+    /// policy and routing, and macaca-framework owns the concrete protocol.
+    #[cfg(test)]
+    fn new_with_client_factory_for_tests(
+        client_factory: Arc<McpClientFactory>,
+        timeouts: McpTimeouts,
+    ) -> Self {
+        Self {
+            definitions: RwLock::new(BTreeMap::new()),
+            invocation_registry: McpInvocationSessionRegistry::default(),
+            descriptor_index: McpToolDescriptorIndex::default(),
+            client_factory,
+            timeouts,
         }
     }
 
@@ -443,6 +557,302 @@ impl McpRuntimeManager {
     pub async fn probe_statuses(&self, policy: &McpToolPolicy) -> Vec<McpRuntimeStatus> {
         let definitions = self.definitions().await;
         probe_definition_statuses(definitions, policy).await
+    }
+
+    pub async fn tool_descriptors(
+        &self,
+        policy: &McpToolPolicy,
+    ) -> Vec<Result<CapabilityToolDescriptor, String>> {
+        let definitions = self.definitions().await;
+        let mut descriptors = Vec::new();
+        for definition in definitions {
+            descriptors.extend(descriptors_for_definition(&definition, policy).await);
+        }
+        let successful = descriptors
+            .iter()
+            .filter_map(|descriptor| descriptor.as_ref().ok().cloned())
+            .collect::<Vec<_>>();
+        for outcome in self.descriptor_index.upsert_descriptors(&successful).await {
+            if let Err(error) = outcome {
+                tracing::warn!(
+                    error = %error,
+                    "mcp descriptor index rejected descriptor during catalog refresh"
+                );
+            }
+        }
+        descriptors
+    }
+
+    async fn invoke_tool(
+        &self,
+        server_id: &str,
+        backend_tool_name: &str,
+        visible_tool_name: &str,
+        input: serde_json::Value,
+        trace: TraceContext,
+        context: &McpRuntimeContext,
+        policy: &McpToolPolicy,
+    ) -> CapabilityToolInvocationResult {
+        let Some(definition) = self.definitions.read().await.get(server_id).cloned() else {
+            tracing::warn!(
+                trace_id = %trace.trace_id,
+                server_id,
+                tool = visible_tool_name,
+                "mcp service invocation rejected because server is unknown"
+            );
+            return failed_invocation_result(visible_tool_name, "unknown_mcp_server", trace);
+        };
+        let Some(route) = self
+            .descriptor_index
+            .route_for_visible_tool(visible_tool_name)
+            .await
+        else {
+            tracing::warn!(
+                trace_id = %trace.trace_id,
+                server_id,
+                tool = visible_tool_name,
+                "mcp service invocation rejected because descriptor route is unknown"
+            );
+            return failed_invocation_result(
+                visible_tool_name,
+                "mcp_descriptor_route_unknown",
+                trace,
+            );
+        };
+        if route.lifecycle != definition.lifecycle {
+            tracing::warn!(
+                trace_id = %trace.trace_id,
+                server_id,
+                visible_tool = visible_tool_name,
+                route_lifecycle = ?route.lifecycle,
+                definition_lifecycle = ?definition.lifecycle,
+                "mcp service invocation rejected because descriptor lifecycle drifted"
+            );
+            return failed_invocation_result(
+                visible_tool_name,
+                "mcp_descriptor_lifecycle_mismatch",
+                trace,
+            );
+        }
+        if let Some(error) =
+            validate_descriptor_route(&route, server_id, backend_tool_name, visible_tool_name)
+        {
+            tracing::warn!(
+                trace_id = %trace.trace_id,
+                server_id,
+                backend_tool = backend_tool_name,
+                visible_tool = visible_tool_name,
+                reason = %error,
+                "mcp service invocation rejected by descriptor index"
+            );
+            return failed_invocation_result(visible_tool_name, error, trace);
+        }
+        if !definition.enabled || !policy.allows_server(&definition.id) {
+            tracing::warn!(
+                trace_id = %trace.trace_id,
+                server_id = %definition.id,
+                tool = visible_tool_name,
+                "mcp service invocation denied by server policy"
+            );
+            return failed_invocation_result(visible_tool_name, "mcp_server_denied", trace);
+        }
+        if !policy.allows_tool(backend_tool_name) || !policy.allows_tool(visible_tool_name) {
+            tracing::warn!(
+                trace_id = %trace.trace_id,
+                server_id = %definition.id,
+                backend_tool = backend_tool_name,
+                visible_tool = visible_tool_name,
+                "mcp service invocation denied by tool policy"
+            );
+            return failed_invocation_result(visible_tool_name, "mcp_tool_denied", trace);
+        }
+        let expected_visible_name = prefixed_tool_name(&definition, backend_tool_name);
+        if expected_visible_name != visible_tool_name {
+            tracing::warn!(
+                trace_id = %trace.trace_id,
+                server_id = %definition.id,
+                backend_tool = backend_tool_name,
+                visible_tool = visible_tool_name,
+                expected_visible_tool = %expected_visible_name,
+                "mcp service invocation rejected because descriptor routing did not match"
+            );
+            return failed_invocation_result(visible_tool_name, "mcp_descriptor_mismatch", trace);
+        }
+        if let Some(missing) = missing_required_bin(&definition) {
+            tracing::warn!(
+                trace_id = %trace.trace_id,
+                server_id = %definition.id,
+                missing_dependency = %missing,
+                "mcp service invocation unavailable because a required binary is missing"
+            );
+            return failed_invocation_result(
+                visible_tool_name,
+                format!("missing dependency: {missing}"),
+                trace,
+            );
+        }
+
+        let mut client = match self.create_client(&definition) {
+            Ok(client) => client,
+            Err(error) => {
+                tracing::warn!(
+                    trace_id = %trace.trace_id,
+                    server_id = %definition.id,
+                    error = %error,
+                    "mcp service invocation failed to create protocol client"
+                );
+                return failed_invocation_result(visible_tool_name, error.to_string(), trace);
+            }
+        };
+
+        let started = Instant::now();
+        let input_hash = stable_json_hash(&input);
+        let lease = self.acquire_lease(&definition, context).await;
+        tracing::info!(
+            trace_id = %trace.trace_id,
+            server_id = %definition.id,
+            backend_tool = backend_tool_name,
+            visible_tool = visible_tool_name,
+            lifecycle = ?definition.lifecycle,
+            input_hash = %input_hash,
+            "mcp service invocation dispatch started"
+        );
+
+        let outcome = async {
+            timeout(self.timeouts.connect, client.connect())
+                .await
+                .map_err(|_| "connect_timeout".to_string())?
+                .map_err(|error| error.to_string())?;
+            timeout(
+                self.timeouts.call_tool,
+                client.call_tool(backend_tool_name, input),
+            )
+            .await
+            .map_err(|_| "call_tool_timeout".to_string())?
+            .map_err(|error| error.to_string())
+        }
+        .await;
+        let close_result = client.close().await;
+
+        let cleanup_reason = if close_result.is_ok() {
+            "closed"
+        } else {
+            "close_failed"
+        };
+        let force_release = matches!(definition.lifecycle, McpLifecycleScope::Call);
+        let _ = self
+            .release_lease_with_reason(lease, force_release, cleanup_reason)
+            .await;
+        tracing::info!(
+            trace_id = %trace.trace_id,
+            server_id = %definition.id,
+            lifecycle = ?definition.lifecycle,
+            cleanup_status = cleanup_reason,
+            "mcp service invocation cleanup recorded"
+        );
+
+        match outcome {
+            Ok(result) if !result.is_error => {
+                let output = serde_json::json!({
+                    "content": result.content,
+                    "metadata": result.metadata,
+                });
+                let output_hash = stable_json_hash(&output);
+                tracing::info!(
+                    trace_id = %trace.trace_id,
+                    server_id = %definition.id,
+                    backend_tool = backend_tool_name,
+                    visible_tool = visible_tool_name,
+                    latency_ms = started.elapsed().as_millis() as u64,
+                    output_hash = %output_hash,
+                    "mcp service invocation completed"
+                );
+                let mut service_result = CapabilityToolInvocationResult::ok(
+                    MCP_SERVICE_ID,
+                    CapabilityToolOriginKind::Mcp,
+                    visible_tool_name,
+                    output,
+                    trace,
+                );
+                service_result
+                    .metadata
+                    .insert("mcp.server_id".into(), definition.id);
+                service_result.metadata.insert(
+                    MCP_DESCRIPTOR_BACKEND_TOOL_NAME.into(),
+                    backend_tool_name.into(),
+                );
+                service_result
+                    .metadata
+                    .insert("mcp.visible_tool_name".into(), visible_tool_name.into());
+                service_result.metadata.insert(
+                    "mcp.lifecycle_scope".into(),
+                    lifecycle_scope_name(&definition.lifecycle).into(),
+                );
+                service_result
+                    .metadata
+                    .insert("mcp.policy_decision".into(), "allow".into());
+                service_result
+                    .metadata
+                    .insert("mcp.reason_code".into(), "ok".into());
+                service_result
+                    .metadata
+                    .insert("mcp.input_hash".into(), input_hash);
+                service_result
+                    .metadata
+                    .insert("mcp.output_hash".into(), output_hash);
+                service_result.metadata.insert(
+                    "mcp.latency_ms".into(),
+                    (started.elapsed().as_millis() as u64).to_string(),
+                );
+                service_result
+            }
+            Ok(result) => {
+                let summary = serde_json::to_string(&result.content)
+                    .unwrap_or_else(|_| "mcp_tool_error".to_string());
+                let reason = sanitize_error(summary);
+                tracing::warn!(
+                    trace_id = %trace.trace_id,
+                    server_id = %definition.id,
+                    backend_tool = backend_tool_name,
+                    visible_tool = visible_tool_name,
+                    latency_ms = started.elapsed().as_millis() as u64,
+                    reason_code = %reason,
+                    "mcp service invocation returned an MCP error result"
+                );
+                failed_invocation_result_with_metadata(
+                    visible_tool_name,
+                    reason,
+                    trace,
+                    server_id,
+                    backend_tool_name,
+                    &definition.lifecycle,
+                    input_hash,
+                    started.elapsed(),
+                )
+            }
+            Err(error) => {
+                let reason = sanitize_error(error);
+                tracing::warn!(
+                    trace_id = %trace.trace_id,
+                    server_id = %definition.id,
+                    backend_tool = backend_tool_name,
+                    visible_tool = visible_tool_name,
+                    latency_ms = started.elapsed().as_millis() as u64,
+                    reason_code = %reason,
+                    "mcp service invocation failed"
+                );
+                failed_invocation_result_with_metadata(
+                    visible_tool_name,
+                    reason,
+                    trace,
+                    server_id,
+                    backend_tool_name,
+                    &definition.lifecycle,
+                    input_hash,
+                    started.elapsed(),
+                )
+            }
+        }
     }
 
     #[deprecated(note = "Use `McpRuntimeFacade::register` instead.")]
@@ -491,24 +901,18 @@ impl McpRuntimeManager {
         definition: &McpServerDefinition,
         context: &McpRuntimeContext,
     ) -> McpRuntimeKey {
-        let key = runtime_key(definition, context);
-        let mut instances = self.instances.lock().await;
-        let record = instances
-            .entry(key.clone())
-            .or_insert(RuntimeInstanceRecord {
-                refs: 0,
-                state: McpRuntimeStatusState::Ready,
-                last_error: None,
-                last_used: Instant::now(),
-            });
-        record.refs += 1;
-        record.last_used = Instant::now();
-        key
+        self.invocation_registry
+            .acquire(definition, context)
+            .await
+            .into_key()
     }
 
     #[deprecated(note = "Use `release_lease` for explicit runtime ownership release.")]
     pub async fn release_runtime_key(&self, key: &McpRuntimeKey) -> Option<McpRuntimeStatus> {
-        self.release_runtime_record(key, false).await
+        let lease = McpSessionLease::new(key.clone());
+        self.invocation_registry
+            .release(&lease, false, "released")
+            .await
     }
 
     pub async fn acquire_lease(
@@ -516,91 +920,69 @@ impl McpRuntimeManager {
         definition: &McpServerDefinition,
         context: &McpRuntimeContext,
     ) -> McpSessionLease {
-        #[allow(deprecated)]
-        {
-            McpSessionLease::new(self.acquire_runtime_key(definition, context).await)
-        }
+        self.invocation_registry.acquire(definition, context).await
+    }
+
+    /// Create a protocol client through the configured Strategy.
+    ///
+    /// This wrapper keeps all call sites honest: lifecycle/policy/descriptor
+    /// validation happens before this method is reached, and this method is the
+    /// only place where runtime-host crosses into the low-level MCP protocol
+    /// implementation for service-backed invocation.
+    fn create_client(
+        &self,
+        definition: &McpServerDefinition,
+    ) -> Result<Box<dyn McpClient>, McpError> {
+        (self.client_factory)(definition, self.timeouts)
     }
 
     pub async fn release_lease(&self, lease: McpSessionLease) -> Option<McpRuntimeStatus> {
-        #[allow(deprecated)]
-        {
-            self.release_runtime_record(lease.key(), false).await
-        }
+        self.release_lease_with_reason(lease, false, "released")
+            .await
+    }
+
+    async fn release_lease_with_reason(
+        &self,
+        lease: McpSessionLease,
+        force_remove: bool,
+        reason: &str,
+    ) -> Option<McpRuntimeStatus> {
+        self.invocation_registry
+            .release(&lease, force_remove, reason)
+            .await
     }
 
     #[deprecated(note = "Use `McpRuntimeFacade::cleanup_session` instead.")]
     pub async fn cleanup_session(&self, session_id: &str) -> Vec<McpRuntimeStatus> {
-        self.cleanup_matching(|key| key.session_id.as_deref() == Some(session_id))
+        self.invocation_registry
+            .cleanup_matching(
+                |key| key.session_id.as_deref() == Some(session_id),
+                "session_cleanup",
+            )
             .await
     }
 
     #[deprecated(note = "Use `McpRuntimeFacade::cleanup_app` instead.")]
     pub async fn cleanup_app(&self, app_id: &ApplicationId) -> Vec<McpRuntimeStatus> {
         let app = app_id.0.to_string();
-        self.cleanup_matching(|key| key.app_id.as_deref() == Some(app.as_str()))
+        self.invocation_registry
+            .cleanup_matching(
+                |key| key.app_id.as_deref() == Some(app.as_str()),
+                "app_cleanup",
+            )
             .await
     }
 
     #[deprecated(note = "Use `McpRuntimeFacade::cleanup_all` instead.")]
     pub async fn cleanup_all(&self) -> Vec<McpRuntimeStatus> {
-        self.cleanup_matching(|_| true).await
+        self.invocation_registry
+            .cleanup_matching(|_| true, "all_cleanup")
+            .await
     }
 
     #[deprecated(note = "Use `McpRuntimeFacade::cleanup_idle` instead.")]
     pub async fn cleanup_idle(&self, ttl: Duration) -> Vec<McpRuntimeStatus> {
-        let now = Instant::now();
-        let instances = self.instances.lock().await;
-        let keys: Vec<_> = instances
-            .iter()
-            .filter_map(|(key, record)| {
-                (record.refs == 0 && now.duration_since(record.last_used) >= ttl)
-                    .then_some(key.clone())
-            })
-            .collect();
-        drop(instances);
-        let mut statuses = Vec::new();
-        for key in keys {
-            if let Some(status) = self.release_runtime_record(&key, true).await {
-                statuses.push(status);
-            }
-        }
-        statuses
-    }
-
-    async fn cleanup_matching(
-        &self,
-        matches: impl Fn(&McpRuntimeKey) -> bool,
-    ) -> Vec<McpRuntimeStatus> {
-        let instances = self.instances.lock().await;
-        let keys: Vec<_> = instances
-            .keys()
-            .filter(|key| matches(key))
-            .cloned()
-            .collect();
-        drop(instances);
-        let mut statuses = Vec::new();
-        for key in keys {
-            if let Some(status) = self.release_runtime_record(&key, true).await {
-                statuses.push(status);
-            }
-        }
-        statuses
-    }
-
-    async fn release_runtime_record(
-        &self,
-        key: &McpRuntimeKey,
-        force_remove: bool,
-    ) -> Option<McpRuntimeStatus> {
-        let mut instances = self.instances.lock().await;
-        let record = instances.get_mut(key)?;
-        if !force_remove && record.refs > 1 {
-            record.refs -= 1;
-            return None;
-        }
-        let record = instances.remove(key)?;
-        Some(runtime_status_from_record(key, record))
+        self.invocation_registry.cleanup_idle(ttl).await
     }
 }
 
@@ -622,6 +1004,115 @@ pub async fn probe_definition_statuses(
         statuses.push(probe_definition(&definition, policy).await);
     }
     statuses
+}
+
+async fn descriptors_for_definition(
+    definition: &McpServerDefinition,
+    policy: &McpToolPolicy,
+) -> Vec<Result<CapabilityToolDescriptor, String>> {
+    if !definition.enabled || !policy.allows_server(&definition.id) {
+        return Vec::new();
+    }
+    if let Some(missing) = missing_required_bin(definition) {
+        tracing::warn!(
+            server_id = %definition.id,
+            missing_dependency = %missing,
+            "mcp descriptor index skipped unavailable server"
+        );
+        return vec![Err(format!("missing dependency: {missing}"))];
+    }
+
+    let transport = bridge_for_config(definition.transport.clone());
+    let mut client = match transport.create_client(McpTimeouts::default()) {
+        Ok(client) => client,
+        Err(error) => return vec![Err(error.to_string())],
+    };
+    if let Err(error) = timeout(McpTimeouts::default().connect, client.connect())
+        .await
+        .map_err(|_| "connect_timeout".to_string())
+        .and_then(|result| result.map_err(|error| error.to_string()))
+    {
+        let _ = client.close().await;
+        return vec![Err(error)];
+    }
+    let tools = match timeout(McpTimeouts::default().list_tools, client.list_tools()).await {
+        Ok(Ok(tools)) => tools,
+        Ok(Err(error)) => {
+            let _ = client.close().await;
+            return vec![Err(error.to_string())];
+        }
+        Err(_) => {
+            let _ = client.close().await;
+            return vec![Err("tools_list_timeout".to_string())];
+        }
+    };
+    let _ = client.close().await;
+
+    tools
+        .into_iter()
+        .filter(|tool| policy.allows_tool(&tool.name))
+        .filter_map(|tool| {
+            let visible_name = prefixed_tool_name(definition, &tool.name);
+            policy
+                .allows_tool(&visible_name)
+                .then_some((tool, visible_name))
+        })
+        .map(|(tool, visible_name)| descriptor_from_tool(definition, tool, visible_name))
+        .collect()
+}
+
+fn descriptor_from_tool(
+    definition: &McpServerDefinition,
+    tool: macaca_framework::mcp::McpToolDef,
+    visible_name: String,
+) -> Result<CapabilityToolDescriptor, String> {
+    let mut descriptor = CapabilityToolDescriptor::new(
+        MCP_SERVICE_ID,
+        definition.id.clone(),
+        format!("mcp.tool.{}.{}", definition.id, tool.name),
+        visible_name,
+        tool.description,
+        tool.input_schema,
+        CapabilityToolOriginKind::Mcp,
+    )
+    .map_err(|error| error.to_string())?
+    .with_display(Some(tool.name.clone()), definition.tool_prefix.clone())
+    .with_policy_hints(
+        vec!["mcp.tool.invoke".into()],
+        vec![resource_scope_for_lifecycle(&definition.lifecycle)],
+    );
+    descriptor
+        .metadata
+        .insert(MCP_DESCRIPTOR_BACKEND_TOOL_NAME.into(), tool.name);
+    descriptor.metadata.insert(
+        MCP_DESCRIPTOR_LIFECYCLE_SCOPE.into(),
+        lifecycle_scope_name(&definition.lifecycle).into(),
+    );
+    descriptor.metadata.insert(
+        MCP_DESCRIPTOR_DEFINITION_SOURCE.into(),
+        format!("{:?}", definition.source),
+    );
+    Ok(descriptor)
+}
+
+fn resource_scope_for_lifecycle(lifecycle: &McpLifecycleScope) -> CapabilityToolResourceScope {
+    match lifecycle {
+        McpLifecycleScope::Global => CapabilityToolResourceScope::Global,
+        McpLifecycleScope::App => CapabilityToolResourceScope::Application,
+        McpLifecycleScope::Session => CapabilityToolResourceScope::Session,
+        McpLifecycleScope::AgentSession => CapabilityToolResourceScope::AgentSession,
+        McpLifecycleScope::Call => CapabilityToolResourceScope::Call,
+    }
+}
+
+fn lifecycle_scope_name(lifecycle: &McpLifecycleScope) -> &'static str {
+    match lifecycle {
+        McpLifecycleScope::Global => "global",
+        McpLifecycleScope::App => "app",
+        McpLifecycleScope::Session => "session",
+        McpLifecycleScope::AgentSession => "agent_session",
+        McpLifecycleScope::Call => "call",
+    }
 }
 
 impl McpServerConfigEntry {
@@ -911,6 +1402,20 @@ fn command_exists(command: &str) -> bool {
     std::env::split_paths(&path).any(|dir| dir.join(command).is_file())
 }
 
+/// Default Strategy for constructing MCP protocol clients from definitions.
+///
+/// The function captures no application state and performs no policy decisions.
+/// It is deliberately tiny: the runtime manager validates descriptor routing,
+/// lifecycle ownership, policy, and dependency availability before this factory
+/// is called, while `macaca-framework::mcp` remains responsible for speaking
+/// the actual protocol over stdio/SSE/streamable HTTP transports.
+fn default_mcp_client_factory() -> Arc<McpClientFactory> {
+    Arc::new(|definition, timeouts| {
+        let transport = bridge_for_config(definition.transport.clone());
+        transport.create_client(timeouts)
+    })
+}
+
 fn status_for_definition(
     definition: &McpServerDefinition,
     state: McpRuntimeStatusState,
@@ -987,19 +1492,92 @@ fn prefixed_tool_name(definition: &McpServerDefinition, tool_name: &str) -> Stri
         .unwrap_or_else(|| tool_name.to_string())
 }
 
-fn runtime_status_from_record(
-    key: &McpRuntimeKey,
-    record: RuntimeInstanceRecord,
-) -> McpRuntimeStatus {
-    McpRuntimeStatus {
-        server_id: key.server_id.clone(),
-        transport: "runtime".to_string(),
-        lifecycle: key.scope.clone(),
-        session_mode: McpSessionMode::Stateful,
-        state: record.state,
-        exposed_tools: Vec::new(),
-        failure_reason: record.last_error,
+fn failed_invocation_result(
+    visible_tool_name: &str,
+    error_summary: impl Into<String>,
+    trace: TraceContext,
+) -> CapabilityToolInvocationResult {
+    CapabilityToolInvocationResult::failed(
+        MCP_SERVICE_ID,
+        CapabilityToolOriginKind::Mcp,
+        visible_tool_name,
+        sanitize_error(error_summary),
+        trace,
+    )
+}
+
+fn failed_invocation_result_with_metadata(
+    visible_tool_name: &str,
+    error_summary: impl Into<String>,
+    trace: TraceContext,
+    server_id: &str,
+    backend_tool_name: &str,
+    lifecycle: &McpLifecycleScope,
+    input_hash: String,
+    elapsed: Duration,
+) -> CapabilityToolInvocationResult {
+    let reason = sanitize_error(error_summary);
+    let mut result = failed_invocation_result(visible_tool_name, reason.clone(), trace);
+    result
+        .metadata
+        .insert("mcp.server_id".into(), server_id.into());
+    result.metadata.insert(
+        MCP_DESCRIPTOR_BACKEND_TOOL_NAME.into(),
+        backend_tool_name.into(),
+    );
+    result.metadata.insert(
+        "mcp.lifecycle_scope".into(),
+        lifecycle_scope_name(lifecycle).into(),
+    );
+    result
+        .metadata
+        .insert("mcp.policy_decision".into(), "allow".into());
+    result.metadata.insert("mcp.reason_code".into(), reason);
+    result.metadata.insert("mcp.input_hash".into(), input_hash);
+    result.metadata.insert(
+        "mcp.latency_ms".into(),
+        (elapsed.as_millis() as u64).to_string(),
+    );
+    result
+}
+
+fn validate_descriptor_route(
+    route: &McpToolDescriptorRoute,
+    server_id: &str,
+    backend_tool_name: &str,
+    visible_tool_name: &str,
+) -> Option<&'static str> {
+    if route.server_id != server_id {
+        return Some("mcp_descriptor_server_mismatch");
     }
+    if route.backend_tool_name != backend_tool_name {
+        return Some("mcp_descriptor_backend_tool_mismatch");
+    }
+    if route.visible_tool_name != visible_tool_name {
+        return Some("mcp_descriptor_visible_tool_mismatch");
+    }
+    None
+}
+
+fn stable_json_hash(value: &serde_json::Value) -> String {
+    let serialized = serde_json::to_string(value).unwrap_or_else(|_| "unserializable".into());
+    stable_text_hash(&serialized)
+}
+
+fn stable_text_hash(value: &str) -> String {
+    let mut hash = 0xcbf29ce484222325u64;
+    for byte in value.as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    format!("fnv1a64:{hash:016x}")
+}
+
+fn sanitize_error(error: impl Into<String>) -> String {
+    let value = error.into();
+    let mut sanitized = value.replace('\n', " ").replace('\r', " ");
+    sanitized.truncate(240);
+    sanitized
 }
 
 /// Resolve MCP definitions declared by a visible skill snapshot, consulting
@@ -1083,7 +1661,10 @@ fn flatten_timeout_result<T>(
 #[allow(deprecated)]
 mod tests {
     use super::*;
+    use macaca_framework::mcp::{McpCallResult, McpError, McpToolDef};
+    use macaca_framework::message::{ContentBlock, TextBlock};
     use macaca_skill::{SkillInstallSpec, SkillSnapshot, SkillSourceScope};
+    use std::future::pending;
 
     fn stdio_definition(id: &str, command: &str) -> McpServerDefinition {
         McpServerDefinition {
@@ -1102,6 +1683,112 @@ mod tests {
             source: McpDefinitionSource::Compatibility,
             concurrency_isolation: None,
         }
+    }
+
+    async fn seed_descriptor_route(
+        manager: &McpRuntimeManager,
+        definition: &McpServerDefinition,
+        backend_tool_name: &str,
+        visible_tool_name: &str,
+    ) {
+        let tool = macaca_framework::mcp::McpToolDef {
+            name: backend_tool_name.into(),
+            description: "Seeded test tool".into(),
+            input_schema: serde_json::json!({"type": "object"}),
+        };
+        let descriptor = descriptor_from_tool(definition, tool, visible_tool_name.into()).unwrap();
+        let outcomes = manager
+            .descriptor_index
+            .upsert_descriptors(&[descriptor])
+            .await;
+        assert!(outcomes[0].is_ok());
+    }
+
+    #[derive(Clone)]
+    enum TestMcpClientBehavior {
+        Success,
+        ToolError,
+        ConnectFailure,
+        CallFailure,
+        CallTimeout,
+    }
+
+    struct TestMcpClient {
+        behavior: TestMcpClientBehavior,
+        connected: bool,
+    }
+
+    #[async_trait::async_trait]
+    impl McpClient for TestMcpClient {
+        async fn connect(&mut self) -> Result<(), McpError> {
+            if matches!(self.behavior, TestMcpClientBehavior::ConnectFailure) {
+                return Err(McpError::Connection("fixture connect failed".into()));
+            }
+            self.connected = true;
+            Ok(())
+        }
+
+        async fn list_tools(&mut self) -> Result<Vec<McpToolDef>, McpError> {
+            Ok(vec![McpToolDef {
+                name: "lookup".into(),
+                description: "Lookup values".into(),
+                input_schema: serde_json::json!({"type": "object"}),
+            }])
+        }
+
+        async fn call_tool(
+            &mut self,
+            name: &str,
+            args: serde_json::Value,
+        ) -> Result<McpCallResult, McpError> {
+            match self.behavior {
+                TestMcpClientBehavior::Success => Ok(McpCallResult {
+                    content: vec![ContentBlock::Text(TextBlock {
+                        text: format!("called {name} with {}", args["query"]),
+                    })],
+                    is_error: false,
+                    metadata: Some(serde_json::json!({"fixture": true})),
+                }),
+                TestMcpClientBehavior::ToolError => Ok(McpCallResult {
+                    content: vec![ContentBlock::Text(TextBlock {
+                        text: "fixture tool rejected input".into(),
+                    })],
+                    is_error: true,
+                    metadata: None,
+                }),
+                TestMcpClientBehavior::ConnectFailure => {
+                    unreachable!("connect failure should short-circuit before call_tool")
+                }
+                TestMcpClientBehavior::CallFailure => {
+                    Err(McpError::Execution("fixture call failed".into()))
+                }
+                TestMcpClientBehavior::CallTimeout => pending().await,
+            }
+        }
+
+        async fn close(&mut self) -> Result<(), McpError> {
+            self.connected = false;
+            Ok(())
+        }
+
+        fn is_connected(&self) -> bool {
+            self.connected
+        }
+    }
+
+    fn manager_with_fixture_client(
+        behavior: TestMcpClientBehavior,
+        timeouts: McpTimeouts,
+    ) -> Arc<McpRuntimeManager> {
+        Arc::new(McpRuntimeManager::new_with_client_factory_for_tests(
+            Arc::new(move |_definition, _timeouts| {
+                Ok(Box::new(TestMcpClient {
+                    behavior: behavior.clone(),
+                    connected: false,
+                }))
+            }),
+            timeouts,
+        ))
     }
 
     #[test]
@@ -1275,6 +1962,337 @@ mcpServers:
         assert_eq!(statuses.len(), 1);
         assert_eq!(statuses[0].server_id, "disabled");
         assert_eq!(statuses[0].state, McpRuntimeStatusState::Disabled);
+    }
+
+    #[test]
+    fn descriptor_from_tool_carries_sanitized_service_routing_metadata() {
+        let mut definition = stdio_definition("server-a", "server-bin");
+        definition.tool_prefix = Some("mcp_".into());
+        let tool = macaca_framework::mcp::McpToolDef {
+            name: "lookup".into(),
+            description: "Lookup values".into(),
+            input_schema: serde_json::json!({"type": "object"}),
+        };
+
+        let descriptor = descriptor_from_tool(&definition, tool, "mcp_lookup".into()).unwrap();
+
+        assert_eq!(descriptor.service_id, MCP_SERVICE_ID);
+        assert_eq!(descriptor.provider_id, "server-a");
+        assert_eq!(descriptor.tool_name, "mcp_lookup");
+        assert_eq!(
+            descriptor.metadata.get(MCP_DESCRIPTOR_BACKEND_TOOL_NAME),
+            Some(&"lookup".to_string())
+        );
+        assert_eq!(
+            descriptor.metadata.get(MCP_DESCRIPTOR_LIFECYCLE_SCOPE),
+            Some(&"agent_session".to_string())
+        );
+        assert!(
+            !serde_json::to_string(&descriptor)
+                .unwrap()
+                .contains("server-bin"),
+            "descriptors must not expose concrete commands or environment data"
+        );
+    }
+
+    #[tokio::test]
+    async fn service_owned_invocation_returns_structured_failure_for_unknown_server() {
+        let facade = McpRuntimeFacade::new();
+        let result = facade
+            .invoke_tool(
+                "missing",
+                "lookup",
+                "lookup",
+                serde_json::json!({}),
+                TraceContext::new("mcp-test-trace"),
+                &McpRuntimeContext {
+                    app_id: Some(ApplicationId(uuid::Uuid::nil())),
+                    session_id: Some("session-a".into()),
+                    agent_name: Some("agent-a".into()),
+                },
+                &McpToolPolicy::default(),
+            )
+            .await;
+
+        assert_eq!(result.service_id, MCP_SERVICE_ID);
+        assert_eq!(result.origin_kind, CapabilityToolOriginKind::Mcp);
+        assert_eq!(result.status, "failed");
+        assert_eq!(result.error_summary.as_deref(), Some("unknown_mcp_server"));
+    }
+
+    #[tokio::test]
+    async fn service_owned_invocation_rejects_unknown_descriptor_route() {
+        let manager = Arc::new(McpRuntimeManager::new());
+        manager
+            .upsert_definition(stdio_definition("server-a", "server-bin"))
+            .await;
+        let facade = McpRuntimeFacade::from_manager(manager);
+
+        let result = facade
+            .invoke_tool(
+                "server-a",
+                "lookup",
+                "mcp_lookup",
+                serde_json::json!({}),
+                TraceContext::new("mcp-test-trace"),
+                &McpRuntimeContext {
+                    app_id: Some(ApplicationId(uuid::Uuid::nil())),
+                    session_id: Some("session-a".into()),
+                    agent_name: Some("agent-a".into()),
+                },
+                &McpToolPolicy::default(),
+            )
+            .await;
+
+        assert_eq!(
+            result.error_summary.as_deref(),
+            Some("mcp_descriptor_route_unknown")
+        );
+    }
+
+    #[tokio::test]
+    async fn service_owned_invocation_denies_tool_policy_before_client_creation() {
+        let manager = Arc::new(McpRuntimeManager::new());
+        let definition = stdio_definition("server-a", "sh");
+        manager.upsert_definition(definition.clone()).await;
+        seed_descriptor_route(&manager, &definition, "lookup", "lookup").await;
+        let facade = McpRuntimeFacade::from_manager(manager);
+        let mut deny_tools = HashSet::new();
+        deny_tools.insert("lookup".to_string());
+
+        let result = facade
+            .invoke_tool(
+                "server-a",
+                "lookup",
+                "lookup",
+                serde_json::json!({}),
+                TraceContext::new("mcp-test-trace"),
+                &McpRuntimeContext {
+                    app_id: Some(ApplicationId(uuid::Uuid::nil())),
+                    session_id: Some("session-a".into()),
+                    agent_name: Some("agent-a".into()),
+                },
+                &McpToolPolicy {
+                    deny_tools,
+                    ..Default::default()
+                },
+            )
+            .await;
+
+        assert_eq!(result.error_summary.as_deref(), Some("mcp_tool_denied"));
+    }
+
+    #[tokio::test]
+    async fn service_owned_invocation_reports_missing_binary_before_dispatch() {
+        let manager = Arc::new(McpRuntimeManager::new());
+        let definition = stdio_definition("server-a", "definitely-missing-mcp-bin");
+        manager.upsert_definition(definition.clone()).await;
+        seed_descriptor_route(&manager, &definition, "lookup", "lookup").await;
+        let facade = McpRuntimeFacade::from_manager(manager);
+
+        let result = facade
+            .invoke_tool(
+                "server-a",
+                "lookup",
+                "lookup",
+                serde_json::json!({}),
+                TraceContext::new("mcp-test-trace"),
+                &McpRuntimeContext {
+                    app_id: Some(ApplicationId(uuid::Uuid::nil())),
+                    session_id: Some("session-a".into()),
+                    agent_name: Some("agent-a".into()),
+                },
+                &McpToolPolicy::default(),
+            )
+            .await;
+
+        assert_eq!(
+            result.error_summary.as_deref(),
+            Some("missing dependency: definitely-missing-mcp-bin")
+        );
+    }
+
+    #[tokio::test]
+    async fn service_owned_invocation_returns_success_with_sanitized_hash_metadata() {
+        let manager =
+            manager_with_fixture_client(TestMcpClientBehavior::Success, McpTimeouts::default());
+        let mut definition = stdio_definition("server-a", "sh");
+        definition.required_bins.clear();
+        manager.upsert_definition(definition.clone()).await;
+        seed_descriptor_route(&manager, &definition, "lookup", "lookup").await;
+        let facade = McpRuntimeFacade::from_manager(manager);
+
+        let result = facade
+            .invoke_tool(
+                "server-a",
+                "lookup",
+                "lookup",
+                serde_json::json!({"query": "alpha"}),
+                TraceContext::new("mcp-success-trace"),
+                &McpRuntimeContext {
+                    app_id: Some(ApplicationId(uuid::Uuid::nil())),
+                    session_id: Some("session-a".into()),
+                    agent_name: Some("agent-a".into()),
+                },
+                &McpToolPolicy::default(),
+            )
+            .await;
+
+        assert_eq!(result.status, "ok");
+        assert_eq!(result.metadata.get("mcp.reason_code"), Some(&"ok".into()));
+        assert!(result.metadata.contains_key("mcp.input_hash"));
+        assert!(result.metadata.contains_key("mcp.output_hash"));
+        assert!(
+            !serde_json::to_string(&result.metadata)
+                .unwrap()
+                .contains("alpha"),
+            "audit metadata must carry stable hashes instead of raw tool input"
+        );
+    }
+
+    #[tokio::test]
+    async fn service_owned_invocation_reports_protocol_client_failures() {
+        let manager = manager_with_fixture_client(
+            TestMcpClientBehavior::ConnectFailure,
+            McpTimeouts::default(),
+        );
+        let mut definition = stdio_definition("server-a", "sh");
+        definition.required_bins.clear();
+        manager.upsert_definition(definition.clone()).await;
+        seed_descriptor_route(&manager, &definition, "lookup", "lookup").await;
+        let facade = McpRuntimeFacade::from_manager(manager);
+
+        let result = facade
+            .invoke_tool(
+                "server-a",
+                "lookup",
+                "lookup",
+                serde_json::json!({}),
+                TraceContext::new("mcp-client-failure-trace"),
+                &McpRuntimeContext {
+                    app_id: Some(ApplicationId(uuid::Uuid::nil())),
+                    session_id: Some("session-a".into()),
+                    agent_name: Some("agent-a".into()),
+                },
+                &McpToolPolicy::default(),
+            )
+            .await;
+
+        assert_eq!(result.status, "failed");
+        assert_eq!(
+            result.error_summary.as_deref(),
+            Some("Connection error: fixture connect failed")
+        );
+        assert_eq!(
+            result.metadata.get("mcp.reason_code"),
+            Some(&"Connection error: fixture connect failed".into())
+        );
+    }
+
+    #[tokio::test]
+    async fn service_owned_invocation_reports_protocol_call_failures() {
+        let manager =
+            manager_with_fixture_client(TestMcpClientBehavior::CallFailure, McpTimeouts::default());
+        let mut definition = stdio_definition("server-a", "sh");
+        definition.required_bins.clear();
+        manager.upsert_definition(definition.clone()).await;
+        seed_descriptor_route(&manager, &definition, "lookup", "lookup").await;
+        let facade = McpRuntimeFacade::from_manager(manager);
+
+        let result = facade
+            .invoke_tool(
+                "server-a",
+                "lookup",
+                "lookup",
+                serde_json::json!({}),
+                TraceContext::new("mcp-call-failure-trace"),
+                &McpRuntimeContext {
+                    app_id: Some(ApplicationId(uuid::Uuid::nil())),
+                    session_id: Some("session-a".into()),
+                    agent_name: Some("agent-a".into()),
+                },
+                &McpToolPolicy::default(),
+            )
+            .await;
+
+        assert_eq!(result.status, "failed");
+        assert_eq!(
+            result.error_summary.as_deref(),
+            Some("Execution error: fixture call failed")
+        );
+        assert_eq!(
+            result.metadata.get("mcp.reason_code"),
+            Some(&"Execution error: fixture call failed".into())
+        );
+    }
+
+    #[tokio::test]
+    async fn service_owned_invocation_reports_mcp_tool_error_results() {
+        let manager =
+            manager_with_fixture_client(TestMcpClientBehavior::ToolError, McpTimeouts::default());
+        let mut definition = stdio_definition("server-a", "sh");
+        definition.required_bins.clear();
+        manager.upsert_definition(definition.clone()).await;
+        seed_descriptor_route(&manager, &definition, "lookup", "lookup").await;
+        let facade = McpRuntimeFacade::from_manager(manager);
+
+        let result = facade
+            .invoke_tool(
+                "server-a",
+                "lookup",
+                "lookup",
+                serde_json::json!({}),
+                TraceContext::new("mcp-tool-error-trace"),
+                &McpRuntimeContext {
+                    app_id: Some(ApplicationId(uuid::Uuid::nil())),
+                    session_id: Some("session-a".into()),
+                    agent_name: Some("agent-a".into()),
+                },
+                &McpToolPolicy::default(),
+            )
+            .await;
+
+        assert_eq!(result.status, "failed");
+        assert_eq!(
+            result.error_summary.as_deref(),
+            Some(r#"[{"type":"text","text":"fixture tool rejected input"}]"#)
+        );
+    }
+
+    #[tokio::test]
+    async fn service_owned_invocation_reports_call_timeout() {
+        let manager = manager_with_fixture_client(
+            TestMcpClientBehavior::CallTimeout,
+            McpTimeouts {
+                connect: Duration::from_millis(50),
+                list_tools: Duration::from_millis(50),
+                call_tool: Duration::from_millis(1),
+            },
+        );
+        let mut definition = stdio_definition("server-a", "sh");
+        definition.required_bins.clear();
+        manager.upsert_definition(definition.clone()).await;
+        seed_descriptor_route(&manager, &definition, "lookup", "lookup").await;
+        let facade = McpRuntimeFacade::from_manager(manager);
+
+        let result = facade
+            .invoke_tool(
+                "server-a",
+                "lookup",
+                "lookup",
+                serde_json::json!({}),
+                TraceContext::new("mcp-timeout-trace"),
+                &McpRuntimeContext {
+                    app_id: Some(ApplicationId(uuid::Uuid::nil())),
+                    session_id: Some("session-a".into()),
+                    agent_name: Some("agent-a".into()),
+                },
+                &McpToolPolicy::default(),
+            )
+            .await;
+
+        assert_eq!(result.status, "failed");
+        assert_eq!(result.error_summary.as_deref(), Some("call_tool_timeout"));
     }
 
     #[tokio::test]

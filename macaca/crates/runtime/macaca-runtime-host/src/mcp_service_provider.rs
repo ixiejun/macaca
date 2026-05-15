@@ -12,18 +12,19 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use macaca_kernel::SystemService;
 use macaca_proto::{
-    CapabilityToolDescriptor, CapabilityToolOriginKind, CapabilityToolResourceScope, CleanupPolicy,
-    KernelServiceId, McpCleanupCommand, McpProbeCommand, McpRegisterCommand, McpRegisterResult,
-    McpRuntimeStatusView, McpServiceLifecycleScope, McpServiceSnapshot, McpServiceSnapshotCommand,
-    McpStatusCommand, McpStatusResult, McpToolAttachCommand, McpToolAttachResult,
-    McpToolCatalogCommand, McpToolCatalogResult, McpToolInvokeCommand, ServiceCallResult,
-    ServiceCapability, ServiceCommand, ServiceDescriptor, ServiceError, ServiceHealth,
-    ServiceResult, ServiceScope, ServiceType, TraceContext, TraceSchemaRef, MCP_CLEANUP_COMMAND,
-    MCP_PROBE_COMMAND, MCP_REGISTER_COMMAND, MCP_SERVICE_ID, MCP_SNAPSHOT_COMMAND,
-    MCP_STATUS_COMMAND, MCP_TOOL_ATTACH_COMMAND, MCP_TOOL_CATALOG_COMMAND, MCP_TOOL_INVOKE_COMMAND,
+    CapabilityToolInvocationResult, CapabilityToolOriginKind, CapabilityToolPolicyHints,
+    CleanupPolicy, KernelServiceId, McpCleanupCommand, McpProbeCommand, McpRegisterCommand,
+    McpRegisterResult, McpRuntimeStatusView, McpServiceLifecycleScope, McpServiceSnapshot,
+    McpServiceSnapshotCommand, McpStatusCommand, McpStatusResult, McpToolAttachCommand,
+    McpToolAttachResult, McpToolCatalogCommand, McpToolCatalogResult, McpToolInvokeCommand,
+    ServiceCallResult, ServiceCapability, ServiceCommand, ServiceDescriptor, ServiceError,
+    ServiceHealth, ServiceResult, ServiceScope, ServiceType, TraceContext, TraceSchemaRef,
+    MCP_CLEANUP_COMMAND, MCP_PROBE_COMMAND, MCP_REGISTER_COMMAND, MCP_SERVICE_ID,
+    MCP_SNAPSHOT_COMMAND, MCP_STATUS_COMMAND, MCP_TOOL_ATTACH_COMMAND, MCP_TOOL_CATALOG_COMMAND,
+    MCP_TOOL_INVOKE_COMMAND,
 };
 
-use crate::mcp_runtime::{McpRuntimeFacade, McpRuntimeStatus, McpToolPolicy};
+use crate::mcp_runtime::{McpRuntimeContext, McpRuntimeFacade, McpRuntimeStatus, McpToolPolicy};
 
 /// Host-owned MCP service provider backed by an optional facade.
 pub struct McpSystemServiceProvider {
@@ -137,8 +138,17 @@ impl SystemService for McpSystemServiceProvider {
                 let typed: McpToolCatalogCommand = decode(command.payload)?;
                 let facade = self.facade()?;
                 let policy = runtime_policy(typed.policy.tool_policy);
-                let statuses = facade.probe(&policy).await;
-                let descriptors = statuses_to_descriptors(statuses)?;
+                let mut descriptors = Vec::new();
+                for descriptor in facade.tool_descriptors(&policy).await {
+                    match descriptor {
+                        Ok(descriptor) => descriptors.push(descriptor),
+                        Err(error) => tracing::warn!(
+                            trace_id = %typed.trace.trace_id,
+                            error = %error,
+                            "mcp service descriptor index skipped a server"
+                        ),
+                    }
+                }
                 tracing::info!(
                     trace_id = %typed.trace.trace_id,
                     count = descriptors.len(),
@@ -201,10 +211,69 @@ impl SystemService for McpSystemServiceProvider {
             }
             MCP_TOOL_INVOKE_COMMAND => {
                 let typed: McpToolInvokeCommand = decode(command.payload)?;
-                Err(ServiceError::UnsupportedCommand(format!(
-                    "MCP tool '{}' cannot be invoked without a host-local toolkit session",
-                    typed.invocation.tool_name
-                )))
+                if let Some(reason) = validate_invocation_command(&typed) {
+                    tracing::warn!(
+                        trace_id = %typed.invocation.trace.trace_id,
+                        visible_tool = %typed.invocation.tool_name,
+                        reason,
+                        "mcp service tool invocation rejected before side effects"
+                    );
+                    let result = failed_invocation_result(
+                        &typed.invocation.tool_name,
+                        reason,
+                        typed.invocation.trace,
+                    );
+                    return Ok(Self::service_result(to_value(result)?, trace));
+                }
+                if self.facade.is_none() {
+                    tracing::warn!(
+                        trace_id = %typed.invocation.trace.trace_id,
+                        visible_tool = %typed.invocation.tool_name,
+                        "mcp service tool invocation rejected because provider is unavailable"
+                    );
+                    let result = failed_invocation_result(
+                        &typed.invocation.tool_name,
+                        "mcp_provider_unavailable",
+                        typed.invocation.trace,
+                    );
+                    return Ok(Self::service_result(to_value(result)?, trace));
+                }
+                let facade = self.facade()?;
+                let server_id = typed.server_id.as_deref().ok_or_else(|| {
+                    ServiceError::UnsupportedCommand(
+                        "mcp.tool.invoke requires descriptor server_id metadata".into(),
+                    )
+                })?;
+                let backend_tool_name = typed.backend_tool_name.as_deref().ok_or_else(|| {
+                    ServiceError::UnsupportedCommand(
+                        "mcp.tool.invoke requires descriptor backend_tool_name metadata".into(),
+                    )
+                })?;
+                let context = McpRuntimeContext {
+                    app_id: Some(typed.invocation.scope.application_id),
+                    session_id: Some(typed.invocation.scope.session_id.clone()),
+                    agent_name: Some(typed.invocation.scope.agent_name.clone()),
+                };
+                tracing::info!(
+                    trace_id = %typed.invocation.trace.trace_id,
+                    server_id,
+                    backend_tool = backend_tool_name,
+                    visible_tool = %typed.invocation.tool_name,
+                    lifecycle = ?typed.lifecycle,
+                    "mcp service tool invocation accepted"
+                );
+                let result = facade
+                    .invoke_tool(
+                        server_id,
+                        backend_tool_name,
+                        &typed.invocation.tool_name,
+                        typed.invocation.input,
+                        typed.invocation.trace,
+                        &context,
+                        &runtime_policy_from_capability_hints(&typed.invocation.policy),
+                    )
+                    .await;
+                Ok(Self::service_result(to_value(result)?, trace))
             }
             MCP_STATUS_COMMAND => {
                 let typed: McpStatusCommand = decode(command.payload)?;
@@ -293,6 +362,10 @@ pub fn mcp_service_descriptor() -> ServiceDescriptor {
             "Reports sanitized MCP tool metadata.",
         ),
         ServiceCapability::new(
+            macaca_proto::CapabilityId::new("capability.mcp.tool.invoke"),
+            "Invokes MCP tools through descriptor-routed service dispatch.",
+        ),
+        ServiceCapability::new(
             macaca_proto::CapabilityId::new("capability.mcp.cleanup"),
             "Cleans MCP resources through explicit lifecycle scope.",
         ),
@@ -307,36 +380,11 @@ pub fn mcp_service_descriptor() -> ServiceDescriptor {
         "mcp.register".into(),
         "mcp.probe".into(),
         "mcp.tool.catalog".into(),
+        "mcp.tool.invoke".into(),
         "mcp.cleanup".into(),
     ];
     descriptor.cleanup_policy = CleanupPolicy::Always;
     descriptor
-}
-
-fn statuses_to_descriptors(
-    statuses: Vec<McpRuntimeStatus>,
-) -> ServiceResult<Vec<CapabilityToolDescriptor>> {
-    let mut descriptors = Vec::new();
-    for status in statuses {
-        for tool in status.exposed_tools {
-            let descriptor = CapabilityToolDescriptor::new(
-                MCP_SERVICE_ID,
-                status.server_id.clone(),
-                format!("mcp.tool.{}.{}", status.server_id, tool),
-                tool.clone(),
-                format!("MCP tool '{tool}' exposed by server '{}'", status.server_id),
-                serde_json::json!({"type": "object"}),
-                CapabilityToolOriginKind::Mcp,
-            )
-            .map_err(|err| ServiceError::AdapterFailure(err.to_string()))?
-            .with_policy_hints(
-                vec!["mcp.tool.invoke".into()],
-                vec![CapabilityToolResourceScope::AgentSession],
-            );
-            descriptors.push(descriptor);
-        }
-    }
-    Ok(descriptors)
 }
 
 fn status_view(status: McpRuntimeStatus) -> McpRuntimeStatusView {
@@ -353,6 +401,89 @@ fn status_view(status: McpRuntimeStatus) -> McpRuntimeStatusView {
 
 fn status_result(statuses: Vec<McpRuntimeStatus>) -> McpStatusResult {
     McpStatusResult::new(statuses.into_iter().map(status_view).collect())
+}
+
+fn validate_invocation_command(command: &McpToolInvokeCommand) -> Option<&'static str> {
+    if command.invocation.trace.trace_id.trim().is_empty() {
+        return Some("missing_trace");
+    }
+    if command.invocation.scope.session_id.trim().is_empty()
+        || command.invocation.scope.agent_name.trim().is_empty()
+    {
+        return Some("scope_missing");
+    }
+    if command.invocation.tool_name.trim().is_empty() {
+        return Some("tool_missing");
+    }
+    if command
+        .server_id
+        .as_deref()
+        .unwrap_or_default()
+        .trim()
+        .is_empty()
+    {
+        return Some("server_missing");
+    }
+    if command
+        .backend_tool_name
+        .as_deref()
+        .unwrap_or_default()
+        .trim()
+        .is_empty()
+    {
+        return Some("backend_tool_missing");
+    }
+    if command.lifecycle.is_none() {
+        return Some("lifecycle_missing");
+    }
+    None
+}
+
+fn failed_invocation_result(
+    visible_tool_name: &str,
+    reason: impl Into<String>,
+    trace: TraceContext,
+) -> CapabilityToolInvocationResult {
+    let reason = sanitize_reason(reason);
+    let mut result = CapabilityToolInvocationResult::failed(
+        MCP_SERVICE_ID,
+        CapabilityToolOriginKind::Mcp,
+        visible_tool_name,
+        reason.clone(),
+        trace,
+    );
+    result
+        .metadata
+        .insert("mcp.policy_decision".into(), "deny".into());
+    result.metadata.insert("mcp.reason_code".into(), reason);
+    result
+}
+
+fn runtime_policy_from_capability_hints(hints: &CapabilityToolPolicyHints) -> McpToolPolicy {
+    let mut policy = McpToolPolicy::default();
+    if let Some(deny_tools) = hints.metadata.get("mcp.deny_tools") {
+        policy.deny_tools = deny_tools
+            .split(',')
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(ToString::to_string)
+            .collect();
+    }
+    if let Some(deny_servers) = hints.metadata.get("mcp.deny_servers") {
+        policy.deny_servers = deny_servers
+            .split(',')
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(ToString::to_string)
+            .collect();
+    }
+    policy
+}
+
+fn sanitize_reason(reason: impl Into<String>) -> String {
+    let mut value = reason.into().replace('\n', " ").replace('\r', " ");
+    value.truncate(240);
+    value
 }
 
 fn snapshot_from_statuses(
@@ -427,4 +558,111 @@ fn decode<T: serde::de::DeserializeOwned>(value: serde_json::Value) -> ServiceRe
 
 fn to_value<T: serde::Serialize>(value: T) -> ServiceResult<serde_json::Value> {
     serde_json::to_value(value).map_err(|err| ServiceError::AdapterFailure(err.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use macaca_kernel::SystemService;
+    use macaca_proto::{
+        ApplicationId, CapabilityToolInvocation, CapabilityToolInvocationScope, ServiceCommandName,
+    };
+
+    fn scoped_invocation(trace_id: &str, session_id: &str) -> CapabilityToolInvocation {
+        CapabilityToolInvocation {
+            trace: TraceContext::new(trace_id),
+            scope: CapabilityToolInvocationScope {
+                application_id: ApplicationId::new(),
+                session_id: session_id.into(),
+                agent_name: "agent-a".into(),
+            },
+            tool_name: "mcp_lookup".into(),
+            input: serde_json::json!({"query": "value"}),
+            policy: CapabilityToolPolicyHints::default(),
+        }
+    }
+
+    #[tokio::test]
+    async fn invoke_rejects_missing_trace_before_facade_side_effects() {
+        let provider = McpSystemServiceProvider::unavailable();
+        let command = McpToolInvokeCommand {
+            invocation: scoped_invocation("", "session-a"),
+            server_id: Some("server-a".into()),
+            backend_tool_name: Some("lookup".into()),
+            lifecycle: Some(McpServiceLifecycleScope::AgentSession),
+        };
+        let result = provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new(MCP_TOOL_INVOKE_COMMAND),
+                serde_json::to_value(command).unwrap(),
+                TraceContext::new("outer-trace"),
+            ))
+            .await
+            .unwrap();
+        let invocation: CapabilityToolInvocationResult =
+            serde_json::from_value(result.output).unwrap();
+
+        assert_eq!(invocation.status, "failed");
+        assert_eq!(invocation.error_summary.as_deref(), Some("missing_trace"));
+        assert_eq!(
+            invocation.metadata.get("mcp.policy_decision"),
+            Some(&"deny".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn invoke_rejects_missing_scope_before_facade_side_effects() {
+        let provider = McpSystemServiceProvider::unavailable();
+        let command = McpToolInvokeCommand {
+            invocation: scoped_invocation("trace-mcp", ""),
+            server_id: Some("server-a".into()),
+            backend_tool_name: Some("lookup".into()),
+            lifecycle: Some(McpServiceLifecycleScope::AgentSession),
+        };
+        let result = provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new(MCP_TOOL_INVOKE_COMMAND),
+                serde_json::to_value(command).unwrap(),
+                TraceContext::new("outer-trace"),
+            ))
+            .await
+            .unwrap();
+        let invocation: CapabilityToolInvocationResult =
+            serde_json::from_value(result.output).unwrap();
+
+        assert_eq!(invocation.status, "failed");
+        assert_eq!(invocation.error_summary.as_deref(), Some("scope_missing"));
+    }
+
+    #[tokio::test]
+    async fn invoke_returns_structured_failure_when_provider_is_unavailable() {
+        let provider = McpSystemServiceProvider::unavailable();
+        let command = McpToolInvokeCommand {
+            invocation: scoped_invocation("trace-mcp", "session-a"),
+            server_id: Some("server-a".into()),
+            backend_tool_name: Some("lookup".into()),
+            lifecycle: Some(McpServiceLifecycleScope::AgentSession),
+        };
+
+        let result = provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new(MCP_TOOL_INVOKE_COMMAND),
+                serde_json::to_value(command).unwrap(),
+                TraceContext::new("outer-trace"),
+            ))
+            .await
+            .unwrap();
+        let invocation: CapabilityToolInvocationResult =
+            serde_json::from_value(result.output).unwrap();
+
+        assert_eq!(invocation.status, "failed");
+        assert_eq!(
+            invocation.error_summary.as_deref(),
+            Some("mcp_provider_unavailable")
+        );
+        assert_eq!(
+            invocation.metadata.get("mcp.policy_decision"),
+            Some(&"deny".into())
+        );
+    }
 }

@@ -1837,6 +1837,12 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                             success: true,
                                             output: format!("Goal completed: {}", description),
                                         };
+                                        // Deprecated compatibility boundary:
+                                        // the service-backed execution-control path records
+                                        // policy, checkpoint, resume, and query events through
+                                        // typed service commands. This direct channel handoff is
+                                        // retained only for the older plan-loop goal completion
+                                        // adapter until that path can emit the same service calls.
                                         session
                                             .pause_signal
                                             .store(false, std::sync::atomic::Ordering::SeqCst);

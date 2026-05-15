@@ -184,17 +184,24 @@ pub struct ForkSessionMapping {
 }
 
 /// Active session with pausable agentic loop support.
-/// Used to resume coordinator loops when delegated tasks complete.
-/// Also holds a hot-swappable SSE sender so browser refresh can
+///
+/// Deprecated compatibility boundary: new execution-control ownership should
+/// flow through `service.execution_control` and the Web host adapter should only
+/// keep the non-serializable local channel endpoint needed by framework
+/// middleware. The fields below remain public because older hook and plan-loop
+/// adapters still bridge their in-memory completion events into the waiting
+/// runtime loop, but new call paths must not add direct channel ownership.
+///
+/// The session also holds a hot-swappable SSE sender so browser refresh can
 /// reconnect to the same coordinator loop.
 pub struct ActiveSession {
     /// The session ID.
     pub session_id: String,
     /// The application ID.
     pub app_id: ApplicationId,
-    /// Pause signal for the agentic loop.
+    /// Deprecated local pause flag read by the framework middleware.
     pub pause_signal: Arc<AtomicBool>,
-    /// Channel to send resume reason to the waiting loop.
+    /// Deprecated local resume channel used only by approved Web adapters.
     pub resume_tx: mpsc::Sender<RuntimeResumeSignal>,
     /// Hot-swappable SSE event sender. When the browser refreshes,
     /// the stream endpoint replaces this with a new sender so the

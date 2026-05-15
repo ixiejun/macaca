@@ -27,6 +27,14 @@ pub struct ServiceRuntimeCallContext<'a> {
 /// Decorator boundary for ServiceRuntime admission checks.
 #[async_trait]
 pub trait ServiceRuntimeDecorator: Send + Sync {
+    /// Return a stable audit name for this decorator.
+    ///
+    /// The value is intentionally short and static because it is emitted into
+    /// service runtime trace events before provider dispatch.  Operators can
+    /// therefore replay which admission stages ran without serializing
+    /// provider-specific state or raw command payloads.
+    fn name(&self) -> &'static str;
+
     /// Validate or observe a call before it reaches the service bus.
     async fn before_dispatch(
         &self,
@@ -39,6 +47,10 @@ pub struct TraceRequiredRuntimeDecorator;
 
 #[async_trait]
 impl ServiceRuntimeDecorator for TraceRequiredRuntimeDecorator {
+    fn name(&self) -> &'static str {
+        "trace_required"
+    }
+
     async fn before_dispatch(
         &self,
         context: &ServiceRuntimeCallContext<'_>,
@@ -130,6 +142,10 @@ impl PolicyRuntimeDecorator {
 
 #[async_trait]
 impl ServiceRuntimeDecorator for PolicyRuntimeDecorator {
+    fn name(&self) -> &'static str {
+        "policy"
+    }
+
     async fn before_dispatch(
         &self,
         context: &ServiceRuntimeCallContext<'_>,
@@ -166,3 +182,127 @@ pub trait EntitlementRuntimeDecorator: ServiceRuntimeDecorator {}
 
 /// Extension marker for future metering decorators.
 pub trait MeteringRuntimeDecorator: ServiceRuntimeDecorator {}
+
+/// Resource admission placeholder for future shared runtime resource controls.
+///
+/// The decorator follows the Decorator pattern even though S1 does not enforce
+/// concrete resource locks yet.  Keeping it in the admission chain now gives
+/// every service call a stable audit point where later implementations can
+/// reserve CPU, memory, session slots, or external handles without changing
+/// service providers or presentation shells.
+pub struct ResourcePlaceholderRuntimeDecorator;
+
+#[async_trait]
+impl ServiceRuntimeDecorator for ResourcePlaceholderRuntimeDecorator {
+    fn name(&self) -> &'static str {
+        "resource_placeholder"
+    }
+
+    async fn before_dispatch(
+        &self,
+        context: &ServiceRuntimeCallContext<'_>,
+    ) -> Result<(), ServiceRuntimeError> {
+        tracing::debug!(
+            service_id = %context.service_id,
+            source = %context.source,
+            command = %context.command.name,
+            descriptor = %context.descriptor.id,
+            "service runtime resource placeholder admitted call"
+        );
+        Ok(())
+    }
+}
+
+impl ResourceRuntimeDecorator for ResourcePlaceholderRuntimeDecorator {}
+
+/// Entitlement admission placeholder for future shared entitlement checks.
+///
+/// This no-op stage is intentionally provider-neutral.  It records that the
+/// entitlement extension point was evaluated before side effects while avoiding
+/// any application-owned business rules, package names, provider names, or raw
+/// command metadata in logs.
+pub struct EntitlementPlaceholderRuntimeDecorator;
+
+#[async_trait]
+impl ServiceRuntimeDecorator for EntitlementPlaceholderRuntimeDecorator {
+    fn name(&self) -> &'static str {
+        "entitlement_placeholder"
+    }
+
+    async fn before_dispatch(
+        &self,
+        context: &ServiceRuntimeCallContext<'_>,
+    ) -> Result<(), ServiceRuntimeError> {
+        tracing::debug!(
+            service_id = %context.service_id,
+            source = %context.source,
+            command = %context.command.name,
+            descriptor = %context.descriptor.id,
+            "service runtime entitlement placeholder admitted call"
+        );
+        Ok(())
+    }
+}
+
+impl EntitlementRuntimeDecorator for EntitlementPlaceholderRuntimeDecorator {}
+
+/// Metering admission placeholder for future usage and budget accounting.
+///
+/// The placeholder makes metering visible in trace replay before any provider
+/// work begins.  Later phases can replace the no-op body with quota accounting
+/// or token/runtime-cost metering while preserving the same ServiceRuntime
+/// decorator boundary.
+pub struct MeteringPlaceholderRuntimeDecorator;
+
+#[async_trait]
+impl ServiceRuntimeDecorator for MeteringPlaceholderRuntimeDecorator {
+    fn name(&self) -> &'static str {
+        "metering_placeholder"
+    }
+
+    async fn before_dispatch(
+        &self,
+        context: &ServiceRuntimeCallContext<'_>,
+    ) -> Result<(), ServiceRuntimeError> {
+        tracing::debug!(
+            service_id = %context.service_id,
+            source = %context.source,
+            command = %context.command.name,
+            descriptor = %context.descriptor.id,
+            "service runtime metering placeholder admitted call"
+        );
+        Ok(())
+    }
+}
+
+impl MeteringRuntimeDecorator for MeteringPlaceholderRuntimeDecorator {}
+
+/// Audit admission placeholder that marks the final pre-dispatch audit stage.
+///
+/// Audit is modeled as a decorator so it can run after trace, policy, resource,
+/// entitlement, and metering stages but before the service bus performs side
+/// effects.  The stage logs only stable identifiers and leaves durable audit
+/// persistence to the runtime event sink, keeping the microkernel boundary
+/// clean and application-agnostic.
+pub struct AuditPlaceholderRuntimeDecorator;
+
+#[async_trait]
+impl ServiceRuntimeDecorator for AuditPlaceholderRuntimeDecorator {
+    fn name(&self) -> &'static str {
+        "audit_placeholder"
+    }
+
+    async fn before_dispatch(
+        &self,
+        context: &ServiceRuntimeCallContext<'_>,
+    ) -> Result<(), ServiceRuntimeError> {
+        tracing::info!(
+            service_id = %context.service_id,
+            source = %context.source,
+            command = %context.command.name,
+            descriptor = %context.descriptor.id,
+            "service runtime audit placeholder admitted call"
+        );
+        Ok(())
+    }
+}

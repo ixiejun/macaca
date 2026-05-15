@@ -804,6 +804,29 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
         .register_provider(
             &macaca_runtime_host::StaticServiceProviderFactory::new(
                 macaca_runtime_host::ServiceProviderInstance::new(
+                    macaca_runtime_host::execution_control_service_descriptor(),
+                    Arc::new(
+                        macaca_runtime_host::ExecutionControlSystemServiceProvider::new(Arc::new(
+                            macaca_runtime_host::ExecutionControlRuntimeCapability::new(),
+                        )),
+                    ),
+                ),
+            ),
+            macaca_runtime_host::ServiceProviderFactoryContext::new(),
+        )
+        .await
+        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+    service_runtime
+        .start(
+            &KernelServiceId::new(macaca_proto::EXECUTION_CONTROL_SERVICE_ID),
+            TraceContext::new("web-startup-execution-control-service"),
+        )
+        .await
+        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+    service_runtime
+        .register_provider(
+            &macaca_runtime_host::StaticServiceProviderFactory::new(
+                macaca_runtime_host::ServiceProviderInstance::new(
                     macaca_runtime_host::agent_execution_service_descriptor(),
                     Arc::new(
                         macaca_runtime_host::AgentExecutionSystemServiceProvider::new(Arc::new(
