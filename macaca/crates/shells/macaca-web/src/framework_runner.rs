@@ -27,10 +27,9 @@ use macaca_context::{
 use macaca_framework::adapter::ServiceChatModelAdapter;
 use macaca_framework::agent::{Hook, HookRegistry, HookedAgent};
 use macaca_framework::construction::{
-    AgentBuildIntent, AgentBuildRequest, AgentBuildRequestBuilder, AgentExecutionInput,
-    AgentExecutionLauncher, AgentExecutionOutput, AgentIdentity, AgentLifecycleConfig,
-    AgentToolConfig, AgentTraceContext, ApplicationPromptParts, ApplicationSemantics,
-    ApplicationToolPolicy, TracedAgentFactory,
+    AgentBuildIntent, AgentBuildRequest, AgentBuildRequestBuilder, AgentIdentity,
+    AgentLifecycleConfig, AgentToolConfig, AgentTraceContext, ApplicationPromptParts,
+    ApplicationSemantics, ApplicationToolPolicy, TracedAgentFactory,
 };
 use macaca_framework::formatter::OpenAiFormatter;
 use macaca_framework::memory::InMemoryWorkingMemory;
@@ -128,35 +127,6 @@ impl TracedAgentFactory for WebTracedAgentFactory {
                 Err("Coordinator construction requires owned channels".into())
             }
         }
-    }
-}
-
-#[async_trait]
-impl AgentExecutionLauncher for WebTracedAgentFactory {
-    async fn launch(
-        &self,
-        intent: AgentBuildIntent,
-        input: AgentExecutionInput,
-    ) -> Result<AgentExecutionOutput, String> {
-        let request = AgentBuildRequestBuilder::new(input.identity.clone(), intent)
-            .system_prompt(input.prompt)
-            .services(AgentServices::default())
-            .capabilities(AgentCapabilitySet::default())
-            .lifecycle(AgentLifecycleConfig::default())
-            .trace(AgentTraceContext {
-                session_id: input.session_id.clone(),
-                task_id: input.task_id,
-                source_agent: input.identity.agent_name.clone(),
-            })
-            .tools(AgentToolConfig::default())
-            .build()?;
-
-        let _ = <Self as TracedAgentFactory>::build(self, request).await?;
-        Ok(AgentExecutionOutput {
-            agent_name: input.identity.agent_name,
-            session_id: input.session_id,
-            task_id: input.task_id,
-        })
     }
 }
 
@@ -363,6 +333,202 @@ impl FrameworkRunner {
         factory.build(request).await
     }
 
+    /// Build a runtime agent from an Agent Context service snapshot.
+    ///
+    /// This path is used by `service.agent_execution` after it has already
+    /// called `service.agent_context`.  It intentionally does not call
+    /// `build_context_system_prompt` again, so persona, skill snapshot, tool
+    /// policy, and workspace context have exactly one service-owned source of
+    /// truth for the execution.
+    pub(crate) async fn build_runtime_agent_from_context_snapshot(
+        state: &Arc<AppState>,
+        context_snapshot: &macaca_proto::AgentContextSnapshot,
+        event_tx: Option<mpsc::Sender<macaca_proto::AgentExecutionEvent>>,
+    ) -> Result<HookedAgent<ReActAgent>, String> {
+        let task_id = context_snapshot
+            .task_id
+            .unwrap_or_else(macaca_proto::TaskId::new);
+        let capabilities = Self::resolve_agent_capability_set(
+            state,
+            &context_snapshot.application_id,
+            &context_snapshot.target_agent,
+        )
+        .await;
+        let request = Self::build_request_with_system_prompt(
+            state,
+            &context_snapshot.application_id,
+            &context_snapshot.target_agent,
+            Some(context_snapshot.session_id.clone()),
+            task_id,
+            context_snapshot.task_id,
+            AgentBuildIntent::RuntimeAgent,
+            AgentToolConfig {
+                goal_id: context_snapshot.task_id,
+                ..Default::default()
+            },
+            capabilities,
+            context_snapshot.system_prompt.clone(),
+        )
+        .await?;
+        let factory = WebTracedAgentFactory {
+            state: Arc::clone(state),
+            build_mode: FrameworkRunnerBuildMode::Runtime { event_tx },
+        };
+        factory.build(request).await
+    }
+
+    /// Build a replayable system-context snapshot through the same Web
+    /// composition path used by framework-native agents.
+    ///
+    /// Serviceized callers use this as the concrete backend for
+    /// `service.agent_context`, which prevents WASM, YAML, SDK, and future
+    /// gateway execution paths from constructing persona/skill/tool context
+    /// through private shortcuts.
+    pub(crate) async fn build_agent_context_snapshot(
+        state: &Arc<AppState>,
+        command: macaca_proto::AgentContextBuildCommand,
+    ) -> macaca_proto::AgentContextSnapshot {
+        let capabilities = Self::resolve_agent_capability_set(
+            state,
+            &command.application_id,
+            &command.target_agent,
+        )
+        .await;
+        let merged_context = FrameworkRunner::resolve_context_config(
+            state,
+            &command.application_id,
+            &command.target_agent,
+        )
+        .await;
+        let app_dir = {
+            let dirs = state.config.app_dirs.read().await;
+            dirs.iter()
+                .find(|(id, _)| **id == command.application_id)
+                .map(|(_, path)| path.clone())
+        };
+        let workspace_root = {
+            let workspaces = state.config.app_workspaces.read().await;
+            workspaces
+                .get(&command.application_id)
+                .map(|ws| ws.root.clone())
+        };
+        let system_prompt = Self::build_context_system_prompt(
+            state,
+            &command.application_id,
+            &command.target_agent,
+            Some(command.session_id.clone()),
+            &capabilities,
+        )
+        .await;
+        let mut snapshot = macaca_proto::AgentContextSnapshot::minimal(&command, system_prompt);
+        snapshot.sources.push(macaca_proto::AgentContextSource {
+            kind: "persona_or_manifest".into(),
+            name: command.target_agent.clone(),
+            location: app_dir.as_ref().map(|dir| dir.display().to_string()),
+            metadata: std::collections::BTreeMap::from([
+                (
+                    "agent_profile_enabled".into(),
+                    merged_context.agent_profile.enabled.to_string(),
+                ),
+                (
+                    "workspace_guide_entries".into(),
+                    merged_context.workspace_guides.entries.len().to_string(),
+                ),
+            ]),
+        });
+        snapshot.sources.push(macaca_proto::AgentContextSource {
+            kind: "tool_policy".into(),
+            name: command.target_agent.clone(),
+            location: None,
+            metadata: command.policy.metadata.clone(),
+        });
+        snapshot.tool_policy.insert(
+            "capability_scope".into(),
+            serde_json::to_string(&command.policy.capability_scope).unwrap_or_else(|_| "[]".into()),
+        );
+        snapshot.tool_policy.insert(
+            "required_permissions".into(),
+            serde_json::to_string(&command.policy.required_permissions)
+                .unwrap_or_else(|_| "[]".into()),
+        );
+        let skill_policy =
+            resolve_agent_skill_policy(state, &command.application_id, &command.target_agent).await;
+        match crate::capability_catalog::resolve_skill_snapshot_cached(
+            state,
+            &command.application_id,
+            &command.target_agent,
+            Some(&command.session_id),
+            skill_policy,
+            workspace_root,
+            app_dir.clone(),
+        )
+        .await
+        {
+            Ok(skill_snapshot) => {
+                snapshot.visible_skills = skill_snapshot
+                    .skills
+                    .iter()
+                    .map(|skill| skill.name.clone())
+                    .collect();
+                snapshot.filtered_skills = skill_snapshot
+                    .filtered
+                    .iter()
+                    .map(|filtered| filtered.name.clone())
+                    .collect();
+                snapshot.sources.push(macaca_proto::AgentContextSource {
+                    kind: "skill_snapshot".into(),
+                    name: format!("{} skills", command.target_agent),
+                    location: None,
+                    metadata: std::collections::BTreeMap::from([
+                        ("version".into(), skill_snapshot.version.to_string()),
+                        ("truncated".into(), skill_snapshot.truncated.to_string()),
+                        ("compact".into(), skill_snapshot.compact.to_string()),
+                    ]),
+                });
+            }
+            Err(error) => {
+                snapshot.sources.push(macaca_proto::AgentContextSource {
+                    kind: "skill_snapshot_unavailable".into(),
+                    name: command.target_agent.clone(),
+                    location: None,
+                    metadata: std::collections::BTreeMap::from([(
+                        "error".into(),
+                        error.to_string(),
+                    )]),
+                });
+            }
+        }
+        snapshot.metadata.insert(
+            "provider".into(),
+            "macaca.web.framework_runner.context".into(),
+        );
+        snapshot.metadata.insert(
+            "execution_intent".into(),
+            serde_json::to_string(&command.execution_intent).unwrap_or_else(|_| "unknown".into()),
+        );
+        state
+            .persist
+            .event_log
+            .append_command(AppendEventCommand::new(
+                &command.session_id,
+                "agent_context_built",
+                &command.target_agent,
+                serde_json::json!({
+                    "agent": command.target_agent,
+                    "task_id": command.task_id.map(|id| id.0.to_string()),
+                    "execution_intent": command.execution_intent,
+                    "trace_id": command.trace.trace_id,
+                    "system_prompt_chars": snapshot.system_prompt.chars().count(),
+                    "visible_skill_count": snapshot.visible_skills.len(),
+                    "filtered_skill_count": snapshot.filtered_skills.len(),
+                    "source_count": snapshot.sources.len(),
+                    "provider": snapshot.metadata.get("provider").cloned(),
+                }),
+            ))
+            .await;
+        snapshot
+    }
+
     /// Build a coordinator `ReActAgent` wrapped with `HookedAgent` for SSE bridging
     /// and `PauseOnGoalMiddleware` for pause/resume on `create_goal`.
     ///
@@ -413,10 +579,6 @@ impl FrameworkRunner {
         intent: AgentBuildIntent,
         tools: AgentToolConfig,
     ) -> Result<AgentBuildRequest, String> {
-        let app_manifest = {
-            let registry = state.registry.read().await;
-            registry.get_app(app_id).map(|app| app.manifest.clone())
-        };
         let capabilities = Self::resolve_agent_capability_set(state, app_id, agent_name).await;
         let system_prompt = Self::build_context_system_prompt(
             state,
@@ -426,6 +588,37 @@ impl FrameworkRunner {
             &capabilities,
         )
         .await;
+        Self::build_request_with_system_prompt(
+            state,
+            app_id,
+            agent_name,
+            session_id,
+            task_id,
+            goal_id,
+            intent,
+            tools,
+            capabilities,
+            system_prompt,
+        )
+        .await
+    }
+
+    async fn build_request_with_system_prompt(
+        state: &Arc<AppState>,
+        app_id: &ApplicationId,
+        agent_name: &str,
+        session_id: Option<String>,
+        task_id: macaca_proto::TaskId,
+        goal_id: Option<macaca_proto::TaskId>,
+        intent: AgentBuildIntent,
+        tools: AgentToolConfig,
+        capabilities: AgentCapabilitySet,
+        system_prompt: String,
+    ) -> Result<AgentBuildRequest, String> {
+        let app_manifest = {
+            let registry = state.registry.read().await;
+            registry.get_app(app_id).map(|app| app.manifest.clone())
+        };
         let application = app_manifest.as_ref().map(|manifest| {
             let semantics = app_agent_prompt_semantics(manifest, agent_name);
             ApplicationSemantics {
@@ -1890,6 +2083,17 @@ mod tests {
             !source.contains(forbidden),
             "production path should call build_context_system_prompt directly"
         );
+    }
+
+    #[test]
+    fn agent_context_snapshot_records_replayable_skill_and_policy_evidence() {
+        let source = include_str!("framework_runner.rs");
+
+        assert!(source.contains("snapshot.visible_skills"));
+        assert!(source.contains("snapshot.filtered_skills"));
+        assert!(source.contains("skill_snapshot_unavailable"));
+        assert!(source.contains("snapshot.tool_policy"));
+        assert!(source.contains("agent_context_built"));
     }
 
     #[test]

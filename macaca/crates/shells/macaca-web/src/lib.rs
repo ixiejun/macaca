@@ -3,6 +3,8 @@
 //! Provides an HTTP server with a single-page web interface for interacting
 //! with Macaca OS applications. Uses axum for the HTTP layer.
 
+mod agent_context_backend;
+mod agent_execution_backend;
 pub mod agent_runner;
 pub mod app_ui_routes;
 pub mod bootstrap;
@@ -69,6 +71,8 @@ use macaca_proto::{ApplicationStartCommand, KernelServiceId, MacacaResult, Trace
 use macaca_skill::{ExecutableSkillToolSet, SkillCatalog};
 use macaca_tools::{DefaultToolSet, Tool};
 
+use crate::agent_context_backend::WebAgentContextBackend;
+use crate::agent_execution_backend::WebAgentExecutionBackend;
 use crate::agent_runner::WebAgentRunner;
 pub use crate::bootstrap::{WebRuntimeFacade, WebServerBuilder};
 use crate::external_context_adapter::install_external_adapters_from_config;
@@ -137,16 +141,17 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
     // 5. Start the runtime and load ALL discovered apps.
     let runtime = Arc::new(AppRuntime::new());
     let registry = Arc::new(tokio::sync::RwLock::new(registry));
-    let application_orchestration_registry_ref = Arc::new(tokio::sync::RwLock::new(None));
-    let orchestration_backend = Arc::new(WebApplicationOrchestrationBackend::new(Arc::clone(
-        &application_orchestration_registry_ref,
-    )));
-    let mut app_dirs = HashMap::new();
-    let mut skills_dirs = Vec::new();
-    let mut started_apps: Vec<(macaca_proto::ApplicationId, String, Vec<String>)> = Vec::new();
     let service_runtime = Arc::new(macaca_runtime_host::ServiceRuntime::new(
         macaca_runtime_host::ServiceRuntimeConfig::default(),
     ));
+    let application_orchestration_registry_ref = Arc::new(tokio::sync::RwLock::new(None));
+    let orchestration_backend = Arc::new(WebApplicationOrchestrationBackend::new(
+        Arc::clone(&application_orchestration_registry_ref),
+        Arc::clone(&service_runtime),
+    ));
+    let mut app_dirs = HashMap::new();
+    let mut skills_dirs = Vec::new();
+    let mut started_apps: Vec<(macaca_proto::ApplicationId, String, Vec<String>)> = Vec::new();
     // Compose one shared audit bundle so replay commands and WASM host-import
     // routing can observe the same service-call evidence chain.
     let service_audit_bundle = macaca_runtime_host::ServiceAuditRuntimeBundle::in_memory();
@@ -708,6 +713,7 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
             plugin_capability_client: Arc::clone(&plugin_capability_client),
             plugin_hook_client: Arc::clone(&plugin_hook_client),
             system_facade: system_facade.clone(),
+            service_runtime: Arc::clone(&service_runtime),
             llm: llm.clone(),
             llm_router: llm_router.clone(),
             tools,
@@ -766,6 +772,59 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
         let mut guard = application_orchestration_registry_ref.write().await;
         *guard = Some(Arc::clone(&state.executor_registry));
     }
+
+    // Register the unified Agent Context and Agent Execution services after
+    // `AppState` exists because Web is the composition root for personas,
+    // skills, tools, workspaces, and executor event broadcasts.  Application
+    // runtimes, including WASM guests, call these services instead of reaching
+    // into Web executor internals directly.
+    service_runtime
+        .register_provider(
+            &macaca_runtime_host::StaticServiceProviderFactory::new(
+                macaca_runtime_host::ServiceProviderInstance::new(
+                    macaca_runtime_host::agent_context_service_descriptor(),
+                    Arc::new(macaca_runtime_host::AgentContextSystemServiceProvider::new(
+                        Arc::new(WebAgentContextBackend::new(Arc::clone(&state))),
+                    )),
+                ),
+            ),
+            macaca_runtime_host::ServiceProviderFactoryContext::new(),
+        )
+        .await
+        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+    service_runtime
+        .start(
+            &KernelServiceId::new(macaca_proto::AGENT_CONTEXT_SERVICE_ID),
+            TraceContext::new("web-startup-agent-context-service"),
+        )
+        .await
+        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+    service_runtime
+        .register_provider(
+            &macaca_runtime_host::StaticServiceProviderFactory::new(
+                macaca_runtime_host::ServiceProviderInstance::new(
+                    macaca_runtime_host::agent_execution_service_descriptor(),
+                    Arc::new(
+                        macaca_runtime_host::AgentExecutionSystemServiceProvider::new(Arc::new(
+                            WebAgentExecutionBackend::new(
+                                Arc::clone(&state),
+                                Arc::clone(&service_runtime),
+                            ),
+                        )),
+                    ),
+                ),
+            ),
+            macaca_runtime_host::ServiceProviderFactoryContext::new(),
+        )
+        .await
+        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+    service_runtime
+        .start(
+            &KernelServiceId::new(macaca_proto::AGENT_EXECUTION_SERVICE_ID),
+            TraceContext::new("web-startup-agent-execution-service"),
+        )
+        .await
+        .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
 
     // 10b. Register all started apps to the executor registry and create workspaces
     {

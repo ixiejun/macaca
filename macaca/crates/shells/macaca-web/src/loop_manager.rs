@@ -5,15 +5,12 @@
 //! with their event consumers that handle task decomposition, review,
 //! delegation, and anomaly detection.
 
-use std::panic::AssertUnwindSafe;
 use std::sync::Arc;
 
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::sse::Event;
 use axum::Json;
-use futures::FutureExt;
-
 use macaca_app::{app_entry_agent_name, app_task_planning_contract, AppPlanningAgentProfile};
 use macaca_framework::execution::ExecutionContext;
 use macaca_framework::plan::PlanNotebook;
@@ -21,7 +18,11 @@ use macaca_framework::session::{load_module_state, save_module_state};
 use macaca_kernel::executor::{ApplicationExecutor, ExecutorEvent, ExecutorEventFactory};
 use macaca_kernel::AgentInfo;
 use macaca_persist::AppendEventCommand;
-use macaca_proto::ApplicationId;
+use macaca_proto::{
+    AgentExecutionCommand, AgentExecutionIntent, AgentExecutionResult, AgentExecutionStatus,
+    ApplicationId, KernelServiceId, ServiceBusSource, TaskId, TraceContext,
+    AGENT_EXECUTION_SERVICE_ID,
+};
 
 use crate::routes::{err, ErrorResponse};
 use crate::sse::{broadcast_to_app_sessions, save_plan_decision, PlanDecisionEvent};
@@ -245,6 +246,95 @@ impl PlannerFrameworkCallKind {
     }
 }
 
+/// Dispatch one task/goal/planner execution through the Agent Execution
+/// service boundary while preserving the surrounding loop-owned lifecycle.
+///
+/// PlanLoop and WorkerLoop still own scheduling, retry decisions, TodoStore
+/// state, and user-facing progress events.  The trusted context build, agent
+/// runtime construction, model/tool execution, and sanitized diagnostics are
+/// delegated to `service.agent_execution`, which prevents these loops from
+/// becoming independent semantic owners of agent construction.
+async fn run_loop_agent_execution_service_call(
+    state: &Arc<AppState>,
+    app_id: &ApplicationId,
+    agent_name: &str,
+    session_id: Option<String>,
+    task_id: TaskId,
+    prompt: String,
+    intent: AgentExecutionIntent,
+    source: &'static str,
+    timeout: std::time::Duration,
+    delegated_context: serde_json::Value,
+) -> Result<String, String> {
+    let resolved_session_id = session_id.unwrap_or_else(|| format!("loop-task:{}", task_id.0));
+    let mut trace = TraceContext::new(format!(
+        "{source}:{}:{}:{}",
+        app_id.0, agent_name, task_id.0
+    ));
+    trace.session_id = Some(resolved_session_id.clone());
+    trace.task_id = Some(task_id.0.to_string());
+    trace.agent = Some(agent_name.to_string());
+
+    let mut command = AgentExecutionCommand::new(
+        *app_id,
+        resolved_session_id,
+        agent_name,
+        intent,
+        prompt,
+        trace,
+    )
+    .map_err(|error| error.to_string())?
+    .with_delegated_context(delegated_context);
+    command.task_id = Some(task_id);
+    command
+        .metadata
+        .insert("entrypoint".into(), source.to_string());
+    command
+        .metadata
+        .insert("suppress_executor_lifecycle".into(), "true".into());
+
+    let service_command = command
+        .into_service_command()
+        .map_err(|error| error.to_string())?;
+    let reply = tokio::time::timeout(
+        timeout,
+        state.service_runtime.call(
+            &KernelServiceId::new(AGENT_EXECUTION_SERVICE_ID),
+            ServiceBusSource::new(source),
+            service_command,
+        ),
+    )
+    .await
+    .map_err(|_| {
+        format!(
+            "agent execution service timed out after {}s",
+            timeout.as_secs()
+        )
+    })?
+    .map_err(|error| error.to_string())?;
+
+    let output = reply
+        .output
+        .ok_or_else(|| "agent execution service returned no output".to_string())?;
+    let result: AgentExecutionResult =
+        serde_json::from_value(output).map_err(|error| error.to_string())?;
+
+    match result.status {
+        AgentExecutionStatus::Completed => Ok(result
+            .output
+            .get("output")
+            .and_then(|value| value.as_str())
+            .map(ToOwned::to_owned)
+            .unwrap_or_else(|| result.output.to_string())),
+        status => Err(result
+            .output
+            .get("error")
+            .and_then(|value| value.as_str())
+            .map(ToOwned::to_owned)
+            .unwrap_or_else(|| format!("agent execution service returned {}", status.as_str()))),
+    }
+}
+
 async fn run_planner_framework_call(
     state: &Arc<AppState>,
     app_id: &ApplicationId,
@@ -272,90 +362,51 @@ async fn run_planner_framework_call(
     executor.broadcast_event(executor_task_started(task_id, plan_agent_name));
 
     let intent = match kind {
-        PlannerFrameworkCallKind::DecomposeGoal => {
-            macaca_framework::construction::AgentBuildIntent::PlannerDecomposition {
-                goal_id: kind.goal_context(task_id),
-            }
-        }
-        PlannerFrameworkCallKind::Review => {
-            macaca_framework::construction::AgentBuildIntent::PlannerReview { task_id }
-        }
-        PlannerFrameworkCallKind::FollowUp => {
-            macaca_framework::construction::AgentBuildIntent::PlannerFollowUp {
-                goal_id: kind.goal_context(task_id),
-            }
-        }
-        PlannerFrameworkCallKind::GoalEvaluation => {
-            macaca_framework::construction::AgentBuildIntent::GoalEvaluation {
-                goal_id: kind.goal_context(task_id),
-            }
+        PlannerFrameworkCallKind::Review => AgentExecutionIntent::Reviewer,
+        PlannerFrameworkCallKind::DecomposeGoal => AgentExecutionIntent::Planner,
+        PlannerFrameworkCallKind::FollowUp | PlannerFrameworkCallKind::GoalEvaluation => {
+            AgentExecutionIntent::GoalWorker
         }
     };
 
-    let build_result = crate::framework_runner::FrameworkRunner::build_for_intent(
+    let result = run_loop_agent_execution_service_call(
         state,
         app_id,
         plan_agent_name,
         session_id,
         task_id,
-        Arc::clone(&executor),
+        prompt,
         intent,
+        "macaca.web.plan_loop",
+        kind.timeout(),
+        serde_json::json!({
+            "planner_call_kind": format!("{kind:?}"),
+            "goal_context": kind.goal_context(task_id).map(|id| id.0.to_string()),
+        }),
     )
     .await;
-
-    let result = match build_result {
-        Ok(agent) => {
-            use macaca_framework::agent::Agent;
-
-            let msg = macaca_framework::message::Msg::user("plan_loop", prompt.as_str());
-            let timeout = kind.timeout();
-            match tokio::time::timeout(timeout, agent.reply(msg)).await {
-                Ok(Ok(reply)) => {
-                    let output = reply.get_text();
-                    executor.broadcast_event(executor_task_completed(
-                        task_id,
-                        plan_agent_name,
-                        output.clone(),
-                    ));
-                    tracing::info!(
-                        "{}: {}",
-                        kind.success_log_prefix(),
-                        output.chars().take(100).collect::<String>()
-                    );
-                    Ok(output)
-                }
-                Ok(Err(e)) => {
-                    let error = e.to_string();
-                    executor.broadcast_event(executor_task_failed(
-                        task_id,
-                        plan_agent_name,
-                        error.clone(),
-                    ));
-                    tracing::error!("{}: {}", kind.reply_error_log_prefix(), error);
-                    Err(error)
-                }
-                Err(_) => {
-                    let error = format!(
-                        "{} timed out after {}s",
-                        kind.reply_error_log_prefix(),
-                        timeout.as_secs()
-                    );
-                    executor.broadcast_event(executor_task_failed(
-                        task_id,
-                        plan_agent_name,
-                        error.clone(),
-                    ));
-                    tracing::error!("{}", error);
-                    Err(error)
-                }
-            }
+    match &result {
+        Ok(output) => {
+            executor.broadcast_event(executor_task_completed(
+                task_id,
+                plan_agent_name,
+                output.clone(),
+            ));
+            tracing::info!(
+                "{}: {}",
+                kind.success_log_prefix(),
+                output.chars().take(100).collect::<String>()
+            );
         }
-        Err(e) => {
-            executor.broadcast_event(executor_task_failed(task_id, plan_agent_name, e.clone()));
-            tracing::error!("{}: {}", kind.build_error_log_prefix(), e);
-            Err(e)
+        Err(error) => {
+            executor.broadcast_event(executor_task_failed(
+                task_id,
+                plan_agent_name,
+                error.clone(),
+            ));
+            tracing::error!("{}: {}", kind.reply_error_log_prefix(), error);
         }
-    };
+    }
 
     update_agent_activity_by_name(state, plan_agent_name, macaca_proto::AgentActivity::Idle).await;
     result
@@ -820,6 +871,63 @@ async fn handle_worker_execution_timeout(
     let error = mode.timeout_error();
     board.fail_task(&task_id, error.into()).await;
     executor.broadcast_event(executor_task_failed(task_id, agent_name, error));
+}
+
+/// Execute one WorkerLoop-owned task through `service.agent_execution`.
+///
+/// The worker loop remains responsible for task ordering, retry status, and
+/// review submission.  The service owns the agent runtime boundary, keeping
+/// worker execution aligned with WASM, YAML, and planner service traces.
+async fn execute_worker_task_via_agent_service(
+    state: &Arc<AppState>,
+    board: &macaca_task::TaskBoard,
+    executor: &ApplicationExecutor,
+    app_id: &ApplicationId,
+    session_id: Option<&str>,
+    task_id: macaca_proto::TaskId,
+    agent_name: &str,
+    title: &str,
+    prompt: String,
+    mode: WorkerExecutionMode,
+) {
+    executor.broadcast_event(executor_task_started(task_id, agent_name));
+    let result = run_loop_agent_execution_service_call(
+        state,
+        app_id,
+        agent_name,
+        session_id.map(str::to_string),
+        task_id,
+        prompt,
+        AgentExecutionIntent::TaskWorker,
+        "macaca.web.worker_loop",
+        std::time::Duration::from_secs(30 * 60),
+        serde_json::json!({
+            "worker_execution_mode": format!("{mode:?}"),
+            "title": title,
+        }),
+    )
+    .await;
+
+    match result {
+        Ok(output) => {
+            handle_worker_execution_success(
+                state, board, executor, app_id, session_id, task_id, agent_name, title, output,
+                mode,
+            )
+            .await;
+        }
+        Err(error) if error.contains("timed out") => {
+            handle_worker_execution_timeout(board, executor, task_id, agent_name, mode).await;
+        }
+        Err(error) => {
+            handle_worker_execution_failure(
+                state, board, executor, app_id, session_id, task_id, agent_name, error,
+            )
+            .await;
+        }
+    }
+
+    update_agent_activity_by_name(state, agent_name, macaca_proto::AgentActivity::Idle).await;
 }
 
 /// Ensure PlanLoop and WorkerLoops are running for an application.
@@ -1992,126 +2100,19 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                             )
                                             .await;
                                     }
-                                    // Use ReActAgent with executor hooks for trace events
-                                    // Emit TaskStarted event for SSE/EventLog
-                                    executor_clone.broadcast_event(executor_task_started(
-                                        task_id,
-                                        &agent_name_clone,
-                                    ));
-                                    match crate::framework_runner::FrameworkRunner::build_for_intent(
+                                    execute_worker_task_via_agent_service(
                                         &state_for_worker,
+                                        &board_clone,
+                                        &executor_clone,
                                         &app_id_for_worker,
-                                        &agent_name_clone,
-                                        task_session.clone(),
+                                        task_session.as_deref(),
                                         task_id,
-                                        Arc::clone(&executor_clone),
-                                        macaca_framework::construction::AgentBuildIntent::WorkerTask { task_id },
-                                    ).await {
-                                        Ok(agent) => {
-                                            use macaca_framework::agent::Agent;
-                                            let msg = macaca_framework::message::Msg::user("worker_loop", prompt.as_str());
-                                            match tokio::time::timeout(
-                                                std::time::Duration::from_secs(30 * 60),
-                                                AssertUnwindSafe(agent.reply(msg)).catch_unwind(),
-                                            ).await {
-                                                Ok(Ok(Ok(reply))) => {
-                                                    let output = reply.get_text();
-                                                    handle_worker_execution_success(
-                                                        &state_for_worker,
-                                                        &board_clone,
-                                                        &executor_clone,
-                                                        &app_id_for_worker,
-                                                        task_session.as_deref(),
-                                                        task_id,
-                                                        &agent_name_clone,
-                                                        &title,
-                                                        output,
-                                                        WorkerExecutionMode::TaskClaimed,
-                                                    )
-                                                    .await;
-                                                }
-                                                Ok(Ok(Err(e))) => {
-                                                    let error = e.to_string();
-                                                    handle_worker_execution_failure(
-                                                        &state_for_worker,
-                                                        &board_clone,
-                                                        &executor_clone,
-                                                        &app_id_for_worker,
-                                                        task_session.as_deref(),
-                                                        task_id,
-                                                        &agent_name_clone,
-                                                        error,
-                                                    )
-                                                    .await;
-                                                    tracing::error!(agent = %agent_name_clone, "Task execution failed: {}", e);
-                                                }
-                                                Ok(Err(_panic)) => {
-                                                    let error = WorkerExecutionMode::TaskClaimed
-                                                        .panic_error()
-                                                        .to_string();
-                                                    handle_worker_execution_failure(
-                                                        &state_for_worker,
-                                                        &board_clone,
-                                                        &executor_clone,
-                                                        &app_id_for_worker,
-                                                        task_session.as_deref(),
-                                                        task_id,
-                                                        &agent_name_clone,
-                                                        error,
-                                                    )
-                                                    .await;
-                                                    tracing::error!(agent = %agent_name_clone, task_id = %task_id, "Task execution panicked");
-                                                }
-                                                Err(_) => {
-                                                    tracing::error!(agent = %agent_name_clone, "Task execution timeout after 30min");
-                                                    handle_worker_execution_timeout(
-                                                        &board_clone,
-                                                        &executor_clone,
-                                                        task_id,
-                                                        &agent_name_clone,
-                                                        WorkerExecutionMode::TaskClaimed,
-                                                    )
-                                                    .await;
-                                                }
-                                            }
-                                            // Reset agent status to Idle
-                                            if let Some(agent_manifest) = state_for_worker.kernel.list_agents().await.iter().find(|a| a.name == agent_name_clone) {
-                                                state_for_worker.kernel.update_agent_activity(
-                                                    &agent_manifest.id,
-                                                    macaca_proto::AgentActivity::Idle,
-                                                ).await;
-                                            }
-                                        }
-                                        Err(e) => {
-                                            tracing::error!(agent = %agent_name_clone, error = %e, "Failed to build agent");
-                                            // Emit TaskFailed since TaskStarted was already sent
-                                            executor_clone.broadcast_event(executor_task_failed(
-                                                task_id,
-                                                &agent_name_clone,
-                                                e.clone(),
-                                            ));
-                                            crate::run_trace::emit_for_scope(
-                                                &state_for_worker.persist.run_tracer,
-                                                task_session.as_deref(),
-                                                &app_id_for_worker,
-                                                crate::run_trace::phase::WORKER_DELEGATE_ERROR,
-                                                "worker_loop",
-                                                crate::run_trace::status::ERROR,
-                                                Some(e.clone()),
-                                                Some(task_id.to_string()),
-                                                None,
-                                                None,
-                                            ).await;
-                                            // Reset to Pending for retry
-                                            if let Some(mut task) = board_clone.current_task().await {
-                                                if task.id == task_id {
-                                                    task.status = macaca_proto::TodoStatus::Pending;
-                                                    task.updated_at = chrono::Utc::now();
-                                                    state_for_worker.persist.todo_store.save_todo(&task).await;
-                                                }
-                                            }
-                                        }
-                                    }
+                                        &agent_name_clone,
+                                        &title,
+                                        prompt,
+                                        WorkerExecutionMode::TaskClaimed,
+                                    )
+                                    .await;
                                 }
                                 macaca_task::WorkerEvent::RetryTask {
                                     task_id,
@@ -2151,109 +2152,19 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                         None,
                                     )
                                     .await;
-                                    // Use ReActAgent with executor hooks for trace events (retry)
-                                    // Emit TaskStarted event for SSE/EventLog (retry)
-                                    executor_clone.broadcast_event(executor_task_started(
-                                        task_id,
-                                        &agent_name_clone,
-                                    ));
-                                    match crate::framework_runner::FrameworkRunner::build_for_intent(
+                                    execute_worker_task_via_agent_service(
                                         &state_for_worker,
+                                        &board_clone,
+                                        &executor_clone,
                                         &app_id_for_worker,
-                                        &agent_name_clone,
-                                        task_session.clone(),
+                                        task_session.as_deref(),
                                         task_id,
-                                        Arc::clone(&executor_clone),
-                                        macaca_framework::construction::AgentBuildIntent::WorkerTask { task_id },
-                                    ).await {
-                                        Ok(agent) => {
-                                            use macaca_framework::agent::Agent;
-                                            let msg = macaca_framework::message::Msg::user("worker_loop", prompt.as_str());
-                                            match tokio::time::timeout(
-                                                std::time::Duration::from_secs(30 * 60),
-                                                AssertUnwindSafe(agent.reply(msg)).catch_unwind(),
-                                            ).await {
-                                                Ok(Ok(Ok(reply))) => {
-                                                    let output = reply.get_text();
-                                                    handle_worker_execution_success(
-                                                        &state_for_worker,
-                                                        &board_clone,
-                                                        &executor_clone,
-                                                        &app_id_for_worker,
-                                                        task_session.as_deref(),
-                                                        task_id,
-                                                        &agent_name_clone,
-                                                        &title,
-                                                        output,
-                                                        WorkerExecutionMode::Retry,
-                                                    )
-                                                    .await;
-                                                }
-                                                Ok(Ok(Err(e))) => {
-                                                    let error = e.to_string();
-                                                    handle_worker_execution_failure(
-                                                        &state_for_worker,
-                                                        &board_clone,
-                                                        &executor_clone,
-                                                        &app_id_for_worker,
-                                                        task_session.as_deref(),
-                                                        task_id,
-                                                        &agent_name_clone,
-                                                        error,
-                                                    )
-                                                    .await;
-                                                }
-                                                Ok(Err(_panic)) => {
-                                                    let error = WorkerExecutionMode::Retry
-                                                        .panic_error()
-                                                        .to_string();
-                                                    handle_worker_execution_failure(
-                                                        &state_for_worker,
-                                                        &board_clone,
-                                                        &executor_clone,
-                                                        &app_id_for_worker,
-                                                        task_session.as_deref(),
-                                                        task_id,
-                                                        &agent_name_clone,
-                                                        error,
-                                                    )
-                                                    .await;
-                                                }
-                                                Err(_) => {
-                                                    handle_worker_execution_timeout(
-                                                        &board_clone,
-                                                        &executor_clone,
-                                                        task_id,
-                                                        &agent_name_clone,
-                                                        WorkerExecutionMode::Retry,
-                                                    )
-                                                    .await;
-                                                }
-                                            }
-                                        }
-                                        Err(e) => {
-                                            crate::run_trace::emit_for_scope(
-                                                &state_for_worker.persist.run_tracer,
-                                                task_session.as_deref(),
-                                                &app_id_for_worker,
-                                                crate::run_trace::phase::WORKER_DELEGATE_ERROR,
-                                                "worker_loop",
-                                                crate::run_trace::status::ERROR,
-                                                Some(e.clone()),
-                                                Some(task_id.to_string()),
-                                                None,
-                                                None,
-                                            ).await;
-                                            tracing::warn!(agent = %agent_name_clone, error = %e, "Retry build_agent failed, resetting task to Pending");
-                                            if let Some(mut task) = board_clone.current_task().await {
-                                                if task.id == task_id {
-                                                    task.status = macaca_proto::TodoStatus::Pending;
-                                                    task.updated_at = chrono::Utc::now();
-                                                    state_for_worker.persist.todo_store.save_todo(&task).await;
-                                                }
-                                            }
-                                        }
-                                    }
+                                        &agent_name_clone,
+                                        &title,
+                                        prompt,
+                                        WorkerExecutionMode::Retry,
+                                    )
+                                    .await;
                                 }
                                 macaca_task::WorkerEvent::Idle => {}
                             }
@@ -2330,10 +2241,10 @@ mod tests {
         planner_scope_session_id, select_entry_and_plan_agents, worker_success_summary,
         PlannerFrameworkCallKind, WorkerExecutionMode,
     };
-    use macaca_framework::construction::AgentBuildIntent;
     use macaca_framework::plan::{PlanNotebook, PlanState, SubTaskState};
     use macaca_kernel::executor::ExecutorEvent;
     use macaca_kernel::AgentInfo;
+    use macaca_proto::AgentExecutionIntent;
 
     fn agent(name: &str, capabilities: &[&str]) -> AgentInfo {
         AgentInfo {
@@ -2543,40 +2454,26 @@ mod tests {
     }
 
     #[test]
-    fn planner_framework_call_uses_goal_scoped_intents() {
+    fn planner_framework_call_uses_service_execution_intents() {
         let goal_id = macaca_proto::TaskId::new();
 
-        assert_eq!(
-            AgentBuildIntent::PlannerDecomposition {
-                goal_id: PlannerFrameworkCallKind::DecomposeGoal.goal_context(goal_id),
-            },
-            AgentBuildIntent::PlannerDecomposition {
-                goal_id: Some(goal_id)
-            }
-        );
+        let source = include_str!("loop_manager.rs");
+        let legacy_builder = ["FrameworkRunner::build_", "for_intent"].concat();
+        assert!(source.contains("AGENT_EXECUTION_SERVICE_ID"));
+        assert!(source.contains("AgentExecutionCommand::new"));
+        assert!(!source.contains(&legacy_builder));
+        assert_eq!(AgentExecutionIntent::Planner, AgentExecutionIntent::Planner);
         assert_eq!(
             PlannerFrameworkCallKind::DecomposeGoal.goal_context(goal_id),
             Some(goal_id)
         );
         assert_eq!(
-            AgentBuildIntent::PlannerFollowUp {
-                goal_id: PlannerFrameworkCallKind::FollowUp.goal_context(goal_id),
-            },
-            AgentBuildIntent::PlannerFollowUp {
-                goal_id: Some(goal_id)
-            }
+            AgentExecutionIntent::GoalWorker,
+            AgentExecutionIntent::GoalWorker
         );
         assert_eq!(
             PlannerFrameworkCallKind::FollowUp.goal_context(goal_id),
             Some(goal_id)
-        );
-        assert_eq!(
-            AgentBuildIntent::GoalEvaluation {
-                goal_id: PlannerFrameworkCallKind::GoalEvaluation.goal_context(goal_id),
-            },
-            AgentBuildIntent::GoalEvaluation {
-                goal_id: Some(goal_id)
-            }
         );
         assert_eq!(
             PlannerFrameworkCallKind::GoalEvaluation.goal_context(goal_id),
@@ -2588,19 +2485,13 @@ mod tests {
     fn planner_framework_call_uses_review_intent_for_review() {
         let task_id = macaca_proto::TaskId::new();
         let intent = match PlannerFrameworkCallKind::Review {
-            PlannerFrameworkCallKind::DecomposeGoal => AgentBuildIntent::PlannerDecomposition {
-                goal_id: Some(task_id),
-            },
-            PlannerFrameworkCallKind::Review => AgentBuildIntent::PlannerReview { task_id },
-            PlannerFrameworkCallKind::FollowUp => AgentBuildIntent::PlannerFollowUp {
-                goal_id: Some(task_id),
-            },
-            PlannerFrameworkCallKind::GoalEvaluation => AgentBuildIntent::GoalEvaluation {
-                goal_id: Some(task_id),
-            },
+            PlannerFrameworkCallKind::DecomposeGoal => AgentExecutionIntent::Planner,
+            PlannerFrameworkCallKind::Review => AgentExecutionIntent::Reviewer,
+            PlannerFrameworkCallKind::FollowUp => AgentExecutionIntent::GoalWorker,
+            PlannerFrameworkCallKind::GoalEvaluation => AgentExecutionIntent::GoalWorker,
         };
 
-        assert_eq!(intent, AgentBuildIntent::PlannerReview { task_id });
+        assert_eq!(intent, AgentExecutionIntent::Reviewer);
         assert_eq!(PlannerFrameworkCallKind::Review.goal_context(task_id), None);
     }
 

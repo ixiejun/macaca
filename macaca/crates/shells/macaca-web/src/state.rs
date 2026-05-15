@@ -22,6 +22,7 @@ use macaca_kernel::{ApplicationExecutorRegistry, Kernel};
 use macaca_llm::{LlmProvider, LlmRouter};
 use macaca_persist::{EventLog, PersistBackend};
 use macaca_proto::{config::ContextConfig, ApplicationId, ForkId, LlmMessage};
+use macaca_runtime_host::ServiceRuntime;
 use macaca_sdk::{
     SystemApplicationClient, SystemContextClient, SystemDriverClient, SystemEntitlementClient,
     SystemEvmClient, SystemLlmClient, SystemMcpClient, SystemMemoryClient, SystemPaymentClient,
@@ -331,6 +332,9 @@ pub struct AppState {
     /// clients above. Deprecated lower-level fields remain only for high-risk
     /// chat/session/framework compatibility paths that are still being migrated.
     pub system_facade: WebSystemFacadeBundle,
+    /// Shared service runtime used by Web-local compatibility adapters that
+    /// must enter new system semantics through service boundaries.
+    pub service_runtime: Arc<ServiceRuntime>,
     /// The LLM provider (DashScope by default).
     #[deprecated(note = "Use AppState::llm_client for new LLM call paths")]
     pub llm: Arc<dyn LlmProvider>,

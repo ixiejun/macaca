@@ -484,9 +484,19 @@ impl ComponentModelWasmExecutionSession {
             command
                 .metadata
                 .insert("app.id".into(), self.request.application_id.clone());
+            // The user-visible Web session is carried by the parent trace.
+            // Use that id for child host-import metadata as well; imports such
+            // as `macaca:agent/delegate` hydrate their service envelope from
+            // metadata before consulting trace fields.  Falling back to the
+            // provider-private component session would split skill snapshots,
+            // delegate traces, and UI follow-up queries across two sessions.
+            let command_session_id = parent_trace
+                .session_id
+                .clone()
+                .unwrap_or_else(|| self.session_id.clone());
             command
                 .metadata
-                .insert("session.id".into(), self.session_id.clone());
+                .insert("session.id".into(), command_session_id);
             command.payload =
                 apply_host_command_template(command.payload, &export_command.payload, &results);
             info!(

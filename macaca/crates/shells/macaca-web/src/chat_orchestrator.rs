@@ -19,10 +19,12 @@ use macaca_framework::execution::ExecutionContext;
 use macaca_framework::session::{load_module_state, save_module_state};
 use macaca_kernel::AgentInfo;
 use macaca_proto::{
+    AgentExecutionCommand, AgentExecutionIntent, AgentExecutionResult, AgentExecutionStatus,
     ApplicationHostCommand, ApplicationHostCommandStatus, ApplicationHostDispatchServiceCommand,
     ApplicationId, ApplicationImport, ApplicationMetadataQueryCommand, ApplicationServiceScope,
     ApplicationSessionStartCommand, ApplicationSessionStopCommand, ApplicationStatusCommand,
-    PackageRuntimeKind, TraceContext,
+    KernelServiceId, PackageRuntimeKind, ServiceBusSource, TraceContext,
+    AGENT_EXECUTION_SERVICE_ID,
 };
 
 use crate::event_persistence::spawn_session_event_collector;
@@ -62,6 +64,72 @@ async fn persist_execution_context(state: &Arc<AppState>, context: &ExecutionCon
         context,
     )
     .await;
+}
+
+/// Execute the visible chat entry agent through `service.agent_execution`.
+///
+/// Chat orchestration owns browser session setup, SSE stream lifetime, and
+/// session persistence.  The service owns trusted context construction and
+/// model/tool runtime execution, so the Web shell no longer builds a separate
+/// main-thread agent for non-WASM chat sessions.
+async fn run_chat_main_thread_via_agent_service(
+    state: &Arc<AppState>,
+    app_id: &ApplicationId,
+    session_id: &str,
+    entry_agent_name: &str,
+    prompt: String,
+) -> Result<String, String> {
+    let mut trace = TraceContext::new(format!(
+        "chat-main-thread:{}:{}:{}",
+        app_id.0, entry_agent_name, session_id
+    ));
+    trace.session_id = Some(session_id.to_string());
+    trace.agent = Some(entry_agent_name.to_string());
+
+    let mut command = AgentExecutionCommand::new(
+        *app_id,
+        session_id.to_string(),
+        entry_agent_name,
+        AgentExecutionIntent::ChatMainThread,
+        prompt,
+        trace,
+    )
+    .map_err(|error| error.to_string())?;
+    command
+        .metadata
+        .insert("entrypoint".into(), "macaca.web.chat_orchestrator".into());
+
+    let reply = state
+        .service_runtime
+        .call(
+            &KernelServiceId::new(AGENT_EXECUTION_SERVICE_ID),
+            ServiceBusSource::new("macaca.web.chat_orchestrator"),
+            command
+                .into_service_command()
+                .map_err(|error| error.to_string())?,
+        )
+        .await
+        .map_err(|error| error.to_string())?;
+    let output = reply
+        .output
+        .ok_or_else(|| "agent execution service returned no chat output".to_string())?;
+    let result: AgentExecutionResult =
+        serde_json::from_value(output).map_err(|error| error.to_string())?;
+
+    match result.status {
+        AgentExecutionStatus::Completed => Ok(result
+            .output
+            .get("output")
+            .and_then(|value| value.as_str())
+            .map(ToOwned::to_owned)
+            .unwrap_or_else(|| result.output.to_string())),
+        status => Err(result
+            .output
+            .get("error")
+            .and_then(|value| value.as_str())
+            .map(ToOwned::to_owned)
+            .unwrap_or_else(|| format!("agent execution service returned {}", status.as_str()))),
+    }
 }
 
 /// Persist the user-visible chat session envelope before any execution branch
@@ -697,9 +765,6 @@ pub(crate) async fn post_chat_v2(
     Sse<impl futures::stream::Stream<Item = Result<Event, Infallible>>>,
     (StatusCode, Json<ErrorResponse>),
 > {
-    use macaca_framework::agent::Agent;
-    use macaca_framework::message::Msg;
-
     let app_uuid: uuid::Uuid = req
         .app_id
         .parse()
@@ -826,7 +891,7 @@ pub(crate) async fn post_chat_v2(
 
     // Pause/resume channel for create_goal coordination
     let pause_signal = Arc::new(AtomicBool::new(false));
-    let (resume_tx, resume_rx) =
+    let (resume_tx, _resume_rx) =
         tokio::sync::mpsc::channel::<crate::runtime_resume::RuntimeResumeSignal>(4);
 
     // Stop old forwarder if re-entering the same session
@@ -1055,28 +1120,6 @@ pub(crate) async fn post_chat_v2(
     crate::loop_manager::ensure_plan_and_worker_loops(&state, &app_id, Some(session_key.clone()))
         .await;
 
-    // Build the framework coordinator agent
-    let coordinator_result = crate::framework_runner::FrameworkRunner::build_coordinator(
-        &state,
-        &app_id,
-        &entry_agent_name,
-        Some(session_key.clone()),
-        tx.clone(),
-        pause_signal,
-        resume_rx,
-    )
-    .await;
-
-    let (coordinator, cancel_token) = match coordinator_result {
-        Ok(c) => c,
-        Err(e) => {
-            return Err(err(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to build coordinator: {e}"),
-            ));
-        }
-    };
-
     // Persist framework-level execution context for session/trace/resume.
     let mut execution_context = ExecutionContext::new(
         session_key.clone(),
@@ -1128,17 +1171,22 @@ pub(crate) async fn post_chat_v2(
                 .await;
         }
 
-        let user_msg = Msg::user("user", prompt.as_str());
-        let result = coordinator.reply(user_msg).await;
+        let result = run_chat_main_thread_via_agent_service(
+            &state_for_task,
+            &app_id,
+            &session_key_for_task,
+            &entry_agent_name,
+            prompt,
+        )
+        .await;
 
         // Process result
         let (final_content, status) = match result {
-            Ok(reply) => {
-                let text = reply.get_text();
+            Ok(text) => {
                 tracing::info!(
-                    engine = "framework",
+                    engine = "service.agent_execution",
                     output_len = text.len(),
-                    "Framework coordinator completed"
+                    "Chat main-thread service execution completed"
                 );
                 exec_ctx.mark_completed(Some("coordinator_completed".into()));
                 persist_execution_context(&state_for_task, &exec_ctx).await;
@@ -1146,7 +1194,7 @@ pub(crate) async fn post_chat_v2(
             }
             Err(e) => {
                 let error_msg = format!("Agent error: {e}");
-                tracing::error!(engine = "framework", error = %e, "Framework coordinator failed");
+                tracing::error!(engine = "service.agent_execution", error = %e, "Chat main-thread service execution failed");
                 if let Some(manifest) = state_for_task
                     .kernel
                     .get_agent_by_name(&entry_agent_name)
@@ -1173,6 +1221,23 @@ pub(crate) async fn post_chat_v2(
                 (error_msg, "error")
             }
         };
+
+        if status != "error" {
+            let _ = tx
+                .send(Ok(Event::default().event("assistant").data(
+                    serde_json::json!({ "content": final_content.clone() }).to_string(),
+                )))
+                .await;
+            let _ = tx
+                .send(Ok(Event::default().event("done").data(
+                    serde_json::json!({
+                        "status": "completed",
+                        "mode": "service_agent_execution",
+                    })
+                    .to_string(),
+                )))
+                .await;
+        }
 
         // Update session with final result
         let now = Utc::now();
@@ -1318,5 +1383,16 @@ mod tests {
             new_session_preparation_for_chat(false, false),
             NewSessionPreparation::FrameworkExecutor
         );
+    }
+
+    #[test]
+    fn chat_main_thread_enters_agent_execution_service_boundary() {
+        let source = include_str!("chat_orchestrator.rs");
+        let legacy_builder = ["FrameworkRunner::build_", "coordinator"].concat();
+
+        assert!(source.contains("run_chat_main_thread_via_agent_service"));
+        assert!(source.contains("AgentExecutionIntent::ChatMainThread"));
+        assert!(source.contains("AGENT_EXECUTION_SERVICE_ID"));
+        assert!(!source.contains(&legacy_builder));
     }
 }

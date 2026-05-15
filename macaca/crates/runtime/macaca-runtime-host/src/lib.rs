@@ -12,6 +12,8 @@
 //! provides the Agent OS-level registry, policy, status and toolkit
 //! registration layered on top.
 
+pub mod agent_context_service_provider;
+pub mod agent_execution_service_provider;
 pub mod application_hosts;
 pub mod application_service_provider;
 pub mod compat;
@@ -66,6 +68,12 @@ pub mod web3_service_provider;
 #[cfg(test)]
 mod service_router_tests;
 
+pub use agent_context_service_provider::{
+    agent_context_service_descriptor, AgentContextBackend, AgentContextSystemServiceProvider,
+};
+pub use agent_execution_service_provider::{
+    agent_execution_service_descriptor, AgentExecutionBackend, AgentExecutionSystemServiceProvider,
+};
 pub use application_hosts::{
     is_application_runtime_unavailable, ApplicationHostRuntime, UnavailableApplicationRuntimeHost,
     UnavailableWasmApplicationHost, WasmApplicationHostFactory,

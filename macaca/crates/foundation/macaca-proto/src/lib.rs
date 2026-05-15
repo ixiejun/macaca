@@ -1,4 +1,5 @@
 pub mod a2a;
+pub mod agent_execution_service;
 pub mod application_abi;
 pub mod application_ability;
 pub mod application_manifest;
@@ -46,6 +47,7 @@ mod plugin_host_tests;
 mod web3_tests;
 
 pub use a2a::*;
+pub use agent_execution_service::*;
 pub use application_abi::*;
 pub use application_ability::*;
 pub use application_manifest::*;
