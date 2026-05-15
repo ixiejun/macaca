@@ -11,8 +11,8 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ApplicationId, MacacaError, MacacaResult, ServiceCommand, ServiceCommandName, TaskId,
-    TraceContext,
+    ApplicationId, ExecutionControlPolicyOverride, MacacaError, MacacaResult, ServiceCommand,
+    ServiceCommandName, TaskId, TraceContext,
 };
 
 /// Stable service id for the unified Agent Execution service.
@@ -63,6 +63,8 @@ pub struct AgentExecutionCommand {
     pub delegated_context: serde_json::Value,
     pub trace: TraceContext,
     pub policy: AgentExecutionPolicyContext,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution_control_override: Option<ExecutionControlPolicyOverride>,
     pub metadata: BTreeMap<String, String>,
 }
 
@@ -94,6 +96,7 @@ impl AgentExecutionCommand {
             delegated_context: serde_json::json!({}),
             trace,
             policy: AgentExecutionPolicyContext::default(),
+            execution_control_override: None,
             metadata: BTreeMap::new(),
         })
     }
@@ -102,6 +105,19 @@ impl AgentExecutionCommand {
     /// ownership.
     pub fn with_delegated_context(mut self, context: serde_json::Value) -> Self {
         self.delegated_context = context;
+        self
+    }
+
+    /// Attach a per-run execution-control override.
+    ///
+    /// The command only records the request. Runtime policy resolution still
+    /// verifies that this override is allowed by the application declaration
+    /// before any pause/resume side effects are installed.
+    pub fn with_execution_control_override(
+        mut self,
+        override_policy: ExecutionControlPolicyOverride,
+    ) -> Self {
+        self.execution_control_override = Some(override_policy);
         self
     }
 
@@ -275,6 +291,10 @@ fn non_empty(value: String, message: &str) -> MacacaResult<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{
+        ExecutionControlCheckpointMode, ExecutionControlPolicyOverride,
+        ExecutionControlResumeSource, ExecutionControlTrigger,
+    };
 
     #[test]
     fn execution_command_round_trips_through_service_command() {
@@ -337,5 +357,34 @@ mod tests {
         .unwrap_err();
 
         assert!(err.to_string().contains("session_id"));
+    }
+
+    #[test]
+    fn execution_command_roundtrips_execution_control_override() {
+        let command = AgentExecutionCommand::new(
+            ApplicationId::from_name("demo"),
+            "session-a",
+            "worker",
+            AgentExecutionIntent::TaskWorker,
+            "pause after delegated work reaches a barrier",
+            TraceContext::new("trace-execution-control-override"),
+        )
+        .unwrap()
+        .with_execution_control_override(ExecutionControlPolicyOverride::enable_for_run(
+            vec![ExecutionControlTrigger::tool_call_barrier("create_goal")],
+            vec![ExecutionControlResumeSource::goal_lifecycle()],
+            ExecutionControlCheckpointMode::ReferenceOnly,
+        ));
+
+        let encoded = serde_json::to_string(&command).unwrap();
+        let decoded: AgentExecutionCommand = serde_json::from_str(&encoded).unwrap();
+        let override_policy = decoded.execution_control_override.unwrap();
+
+        assert_eq!(override_policy.triggers.len(), 1);
+        assert_eq!(override_policy.resume_sources.len(), 1);
+        assert_eq!(
+            override_policy.checkpoint_mode,
+            ExecutionControlCheckpointMode::ReferenceOnly
+        );
     }
 }

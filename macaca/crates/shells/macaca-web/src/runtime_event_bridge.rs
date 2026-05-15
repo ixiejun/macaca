@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use axum::response::sse::Event;
 use macaca_persist::AppendEventCommand;
+use macaca_proto::ExecutionControlEvent;
 use macaca_skill::SkillSnapshot;
 use serde_json::json;
 use tokio::sync::{mpsc, RwLock};
@@ -115,6 +116,50 @@ pub(crate) async fn emit_host_command_result_events(
         )
         .await;
     }
+}
+
+/// Emit replayable execution-control events for a session.
+///
+/// Execution-control state changes are produced by the runtime-host service,
+/// not by the Web shell.  This adapter only maps the already-sanitized service
+/// event into the session EventLog/SSE channel.  It deliberately reuses
+/// `emit_runtime_event` so the durable EventLog append happens before any live
+/// UI delivery, preserving the audit-before-diagnostics invariant.
+pub(crate) async fn emit_execution_control_events(
+    state: &Arc<AppState>,
+    session_id: &str,
+    source: &str,
+    events: &[ExecutionControlEvent],
+) {
+    for event in events {
+        emit_runtime_event(
+            state,
+            session_id,
+            "execution_control",
+            source,
+            None,
+            build_execution_control_event_payload(event),
+        )
+        .await;
+    }
+}
+
+/// Build the bounded session-visible payload for one execution-control event.
+///
+/// The runtime-host service already sanitizes event metadata.  The Web bridge
+/// keeps only identifiers, state, reason, trace id, and sanitized metadata so
+/// replay has enough evidence without persisting raw prompts, manifests,
+/// package bytes, provider payloads, or application-specific business fields.
+pub(crate) fn build_execution_control_event_payload(
+    event: &ExecutionControlEvent,
+) -> serde_json::Value {
+    json!({
+        "execution_id": event.execution_id,
+        "state": format!("{:?}", event.state),
+        "reason_code": event.reason_code,
+        "trace_id": event.trace.trace_id,
+        "metadata": event.metadata,
+    })
 }
 
 /// Emit a compact skill snapshot lifecycle event for a session.
@@ -262,5 +307,29 @@ mod tests {
         assert_eq!(payload["sources"].as_array().unwrap().len(), 1);
         assert!(payload.get("prompt").is_none());
         assert!(payload.get("skills").is_none());
+    }
+
+    #[test]
+    fn execution_control_event_payload_is_bounded_and_sanitized() {
+        let event = ExecutionControlEvent {
+            execution_id: "execution-a".into(),
+            state: macaca_proto::ExecutionControlState::Paused,
+            reason_code: "execution_control.pause_entered".into(),
+            trace: macaca_proto::TraceContext::new("trace-execution-control"),
+            metadata: std::collections::BTreeMap::from([(
+                "safe".to_string(),
+                "visible".to_string(),
+            )]),
+        };
+
+        let payload = build_execution_control_event_payload(&event);
+
+        assert_eq!(payload["execution_id"], "execution-a");
+        assert_eq!(payload["state"], "Paused");
+        assert_eq!(payload["reason_code"], "execution_control.pause_entered");
+        assert_eq!(payload["trace_id"], "trace-execution-control");
+        assert_eq!(payload["metadata"]["safe"], "visible");
+        assert!(payload.get("prompt").is_none());
+        assert!(payload.get("manifest").is_none());
     }
 }

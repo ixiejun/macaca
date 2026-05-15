@@ -24,6 +24,8 @@ The following capabilities must exist as system services:
 - Store, package index, entitlement, license, metering.
 - Payment, quotes, receipts, settlement, A2A transactions.
 - Gateway ingress, external message entrypoints, external event bridges.
+- Execution control for pause, resume, checkpoint identity, state queries, and
+  replayable resume diagnostics.
 - Web3, EVM, wallets, chain clients.
 - Any third-party provider adapter.
 

@@ -24,6 +24,9 @@ pub mod entitlement;
 pub mod entitlement_service_provider;
 pub mod env_bridge;
 pub mod evm_service_provider;
+pub mod execution_control;
+pub mod execution_control_runtime;
+pub mod execution_control_service_provider;
 pub mod factory;
 pub(crate) mod finance_live_data;
 pub mod finance_llm_analysis_provider;
@@ -98,6 +101,14 @@ pub use env_bridge::{apply_mcp_env, McpEnvApplyOutcome};
 pub use evm_service_provider::{
     evm_service_descriptor, EvmProviderStrategy, EvmSystemServiceProvider, MockEvmProvider,
     UnavailableEvmProvider,
+};
+pub use execution_control::ExecutionControlPolicyResolver;
+pub use execution_control_runtime::{
+    ExecutionControlExecutionSnapshot, ExecutionControlObserver, ExecutionControlRuntimeCapability,
+    ExecutionControlRuntimeSnapshot, NoopExecutionControlObserver,
+};
+pub use execution_control_service_provider::{
+    execution_control_service_descriptor, ExecutionControlSystemServiceProvider,
 };
 pub use factory::{McpServerFactory, RuntimeEnvBuilder};
 pub use finance_llm_analysis_provider::FinanceLlmAnalysisSystemServiceProvider;

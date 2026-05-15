@@ -67,12 +67,16 @@ fn make_kernel() -> Kernel {
 
 fn app_dir() -> std::path::PathBuf {
     let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    manifest_dir
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .join("examples/apps/fullstack-autodev")
+    for ancestor in manifest_dir.ancestors() {
+        let candidate = ancestor.join("examples/apps/fullstack-autodev");
+        if candidate.join("app.yaml").exists() {
+            return candidate;
+        }
+    }
+    panic!(
+        "failed to locate examples/apps/fullstack-autodev from {}",
+        manifest_dir.display()
+    )
 }
 
 // ---------------------------------------------------------------------------

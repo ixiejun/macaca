@@ -494,9 +494,20 @@ mod tests {
     }
 
     fn example_app_dir(name: &str) -> PathBuf {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../examples/apps")
-            .join(name)
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        for ancestor in manifest_dir.ancestors() {
+            // Walk upward until the repository-level examples directory is found.
+            // This keeps fixture tests stable when crates move inside the workspace
+            // without teaching production workflow code any application-specific path.
+            let candidate = ancestor.join("examples/apps").join(name);
+            if candidate.join("app.yaml").exists() {
+                return candidate;
+            }
+        }
+        panic!(
+            "failed to locate examples/apps/{name} from {}",
+            manifest_dir.display()
+        )
     }
 
     #[test]

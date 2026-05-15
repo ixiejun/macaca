@@ -49,48 +49,51 @@ async fn route_c_baseline_no_network_pipeline_still_passes() {
 
 #[test]
 fn route_c_governance_docs_cover_required_boundaries() {
-    let boundaries = read_repo_file("macaca/docs/agent-os-microkernel-boundaries.md");
+    let boundaries = read_repo_file("macaca/docs/macaca-os-microkernel-boundaries.md");
     assert_contains_all(
-        "agent-os-microkernel-boundaries.md",
+        "macaca-os-microkernel-boundaries.md",
         &boundaries,
         &[
             "Identity",
-            "Scheduler",
-            "Capability Registry",
-            "Service Registry",
-            "IPC / Service Call Facade",
-            "Policy Engine Facade",
-            "Trace / Audit Bus",
-            "Resource Manager Facade",
-            "Session Primitive",
-            "Task Primitive",
-            "Package Runtime Guard",
-            "LLM Service",
-            "Driver Service",
-            "Skill Service",
-            "MCP Service",
-            "Gateway Service",
-            "Store Service",
-            "Payment Service",
-            "Web3 Node Module",
-            "EVM / DApp Module",
-            "application-specific",
-            "thin shell",
+            "Scheduler primitive",
+            "Capability registry",
+            "Service registry",
+            "IPC and service-call facade",
+            "Policy facade",
+            "Trace and audit bus",
+            "Resource manager facade",
+            "Session primitive",
+            "Task primitive",
+            "Package runtime guard",
+            "LLM providers",
+            "Driver runtimes",
+            "Skill runtimes",
+            "MCP protocol runtimes",
+            "Gateway adapters",
+            "Store",
+            "Payment",
+            "Web3, wallets, chain RPC, EVM, DApp execution",
+            "Application-specific",
+            "thin shells",
         ],
     );
 
-    let governance = read_repo_file("macaca/docs/route-c-architecture-governance.md");
+    let governance = read_repo_file("macaca/docs/macaca-os-architecture-governance.md");
     assert_contains_all(
-        "route-c-architecture-governance.md",
+        "macaca-os-architecture-governance.md",
         &governance,
         &[
-            "Kernel Rule",
-            "Service Rule",
-            "Plugin Rule",
-            "Optional Module Rule",
-            "Presentation Rule",
-            "无 trace，不执行",
-            "无权限，不调用",
+            "Microkernel + Service Runtime + Application ABI + Plugin/Module Ecosystem",
+            "Required Design Patterns",
+            "Acceptance Gates",
+            "Service Rules",
+            "SDK/SystemFacade Rules",
+            "Runtime Host Rules",
+            "Application Rules",
+            "Shell Rules",
+            "Security And Audit Rules",
+            "Trace must exist",
+            "Policy must run",
         ],
     );
 }

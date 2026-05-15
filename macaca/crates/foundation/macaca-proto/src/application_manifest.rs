@@ -11,7 +11,8 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ApplicationAbilityDescriptor, DeveloperId, PackageId, PackageRuntimeKind, PackageType,
+    ApplicationAbilityDescriptor, DeveloperId, ExecutionControlPolicy, PackageId,
+    PackageRuntimeKind, PackageType,
 };
 
 /// Version of the Application Manifest schema.
@@ -178,6 +179,8 @@ pub struct ApplicationManifestV1 {
     pub commerce: Option<ApplicationCommerceDeclaration>,
     pub plugin_dependencies: Vec<ApplicationPluginDependency>,
     pub compatibility: ApplicationCompatibilityDeclaration,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution_control: Option<ExecutionControlPolicy>,
     pub metadata: BTreeMap<String, String>,
 }
 
@@ -206,6 +209,7 @@ impl ApplicationManifestV1 {
             commerce: None,
             plugin_dependencies: Vec::new(),
             compatibility,
+            execution_control: None,
             metadata: BTreeMap::new(),
         }
     }
@@ -234,12 +238,21 @@ impl ApplicationManifestV1 {
         self.plugin_dependencies.push(dependency);
         self
     }
+
+    pub fn execution_control(mut self, policy: ExecutionControlPolicy) -> Self {
+        self.execution_control = Some(policy);
+        self
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{AbilityImplementationKind, ApplicationAbilityKind};
+    use crate::{
+        AbilityImplementationKind, ApplicationAbilityKind, ExecutionControlCheckpointMode,
+        ExecutionControlMode, ExecutionControlPolicy, ExecutionControlResumeSource,
+        ExecutionControlTrigger,
+    };
 
     #[test]
     fn application_manifest_v1_roundtrips() {
@@ -264,5 +277,34 @@ mod tests {
         let encoded = serde_json::to_string(&manifest).unwrap();
         let decoded: ApplicationManifestV1 = serde_json::from_str(&encoded).unwrap();
         assert_eq!(decoded, manifest);
+    }
+
+    #[test]
+    fn application_manifest_v1_roundtrips_execution_control_policy() {
+        let policy = ExecutionControlPolicy::enabled(
+            vec![ExecutionControlTrigger::tool_call_barrier("create_goal")],
+            vec![ExecutionControlResumeSource::goal_lifecycle()],
+            ExecutionControlCheckpointMode::ReferenceOnly,
+        )
+        .allow_command_overrides(true);
+
+        let manifest = ApplicationManifestV1::new(
+            PackageId::new("application.execution-control"),
+            DeveloperId::new("developer.fixture"),
+            "Execution Control Application",
+            "1.0.0",
+            ApplicationRuntimeProfile::new(PackageRuntimeKind::Yaml, "1"),
+            ApplicationCompatibilityDeclaration::new("0.1.0"),
+        )
+        .execution_control(policy);
+
+        let encoded = serde_json::to_string(&manifest).unwrap();
+        let decoded: ApplicationManifestV1 = serde_json::from_str(&encoded).unwrap();
+        let decoded_policy = decoded.execution_control.unwrap();
+
+        assert_eq!(decoded_policy.mode, ExecutionControlMode::Enabled);
+        assert!(decoded_policy.allow_command_overrides);
+        assert_eq!(decoded_policy.triggers.len(), 1);
+        assert_eq!(decoded_policy.resume_sources.len(), 1);
     }
 }
