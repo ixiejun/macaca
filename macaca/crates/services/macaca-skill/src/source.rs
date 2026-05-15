@@ -22,6 +22,10 @@ pub struct SkillSourceSet {
 
 impl SkillSourceSet {
     pub fn from_options(options: &SkillRuntimeOptions) -> Self {
+        Self::from_options_with_home(options, home_dir())
+    }
+
+    fn from_options_with_home(options: &SkillRuntimeOptions, home: Option<PathBuf>) -> Self {
         let mut sources = Vec::new();
         if let Some(workspace) = &options.workspace_dir {
             sources.push(SkillSource {
@@ -42,17 +46,29 @@ impl SkillSourceSet {
                 label: "application".into(),
             });
         }
-        if let Some(home) = home_dir() {
-            sources.push(SkillSource {
-                root: home.join(".agents").join("skills"),
-                scope: SkillSourceScope::UserAgents,
-                label: "user_agents".into(),
-            });
+        if let Some(home) = home {
+            // Macaca-owned skills are the platform source of truth for Agent OS
+            // runtimes.  Generic and client-specific stores remain supported as
+            // fallback sources so Macaca can consume skills authored for other
+            // agent clients without letting those clients shadow OS-managed
+            // skills with the same declared name.
             sources.push(SkillSource {
                 root: home.join(".macaca").join("skills"),
                 scope: SkillSourceScope::MacacaCentral,
                 label: "macaca_central".into(),
             });
+            sources.push(SkillSource {
+                root: home.join(".agent").join("skills"),
+                scope: SkillSourceScope::UserAgentGeneric,
+                label: "user_agent_generic".into(),
+            });
+            for client in ["claude", "codex", "hermes", "openclaw"] {
+                sources.push(SkillSource {
+                    root: home.join(format!(".{client}")).join("skills"),
+                    scope: SkillSourceScope::UserClient,
+                    label: format!("user_client_{client}"),
+                });
+            }
         }
         if let Some(bundled) = &options.bundled_dir {
             sources.push(SkillSource {
@@ -86,4 +102,27 @@ impl SkillSourceSet {
 
 fn home_dir() -> Option<PathBuf> {
     env::var_os("HOME").map(PathBuf::from)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn user_global_sources_follow_macaca_first_fallback_order() {
+        let home = PathBuf::from("/tmp/macaca-home");
+        let set =
+            SkillSourceSet::from_options_with_home(&SkillRuntimeOptions::default(), Some(home));
+        let roots: Vec<_> = set
+            .iter()
+            .map(|source| source.root.display().to_string())
+            .collect();
+
+        assert_eq!(roots[0], "/tmp/macaca-home/.macaca/skills");
+        assert_eq!(roots[1], "/tmp/macaca-home/.agent/skills");
+        assert_eq!(roots[2], "/tmp/macaca-home/.claude/skills");
+        assert_eq!(roots[3], "/tmp/macaca-home/.codex/skills");
+        assert_eq!(roots[4], "/tmp/macaca-home/.hermes/skills");
+        assert_eq!(roots[5], "/tmp/macaca-home/.openclaw/skills");
+    }
 }

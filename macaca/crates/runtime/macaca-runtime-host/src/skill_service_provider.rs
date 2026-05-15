@@ -110,9 +110,13 @@ impl SystemService for SkillSystemServiceProvider {
                 let typed: SkillSnapshotServiceCommand = decode(command.payload)?;
                 let facade = self.facade()?;
                 let mut builder = SkillSnapshotRequest::builder(typed.agent_name);
+                if let Some(workspace_dir) = typed.workspace_dir {
+                    builder = builder.workspace_dir(Some(workspace_dir));
+                }
                 if let Some(app_dir) = typed.app_dir {
                     builder = builder.app_dir(Some(app_dir));
                 }
+                builder = builder.policy(typed.exposure_policy);
                 let snapshot = facade
                     .build_snapshot(builder.build())
                     .await

@@ -89,7 +89,7 @@ impl SystemService for FinanceLlmAnalysisSystemServiceProvider {
 
     async fn call(&self, command: ServiceCommand) -> ServiceResult<ServiceCallResult> {
         let trace = command_trace(&command)?;
-        let symbol = extract_symbol(&command.payload);
+        let symbol = extract_symbol(&command.payload)?;
         info!(
             service_id = %self.descriptor.id,
             command = %command.name,
@@ -107,7 +107,12 @@ impl SystemService for FinanceLlmAnalysisSystemServiceProvider {
             return Err(ServiceError::UnsupportedCommand(command.name.to_string()));
         }
         let options = LlmOptions {
-            max_tokens: Some(900),
+            // Finance signal aggregation receives market data, news, and
+            // delegated agent evidence.  A 900-token cap truncated the final
+            // analysis before the non-advisory signal block could close, so the
+            // service reserves enough output room while still keeping the domain
+            // pack bounded and predictable.
+            max_tokens: Some(1800),
             temperature: Some(0.2),
             ..LlmOptions::default()
         };

@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use crate::runtime::SkillSnapshot;
+use crate::runtime::{SkillPolicy, SkillSnapshot};
 use crate::snapshot::SkillRegistrySnapshot;
 
 /// Stable service id used by runtime-host registration and SDK clients.
@@ -83,8 +83,10 @@ pub struct SkillSnapshotServiceCommand {
     pub trace: TraceContext,
     pub scope: SkillServiceScope,
     pub agent_name: String,
+    pub workspace_dir: Option<PathBuf>,
     pub app_dir: Option<PathBuf>,
     pub include_instructions: bool,
+    pub exposure_policy: SkillPolicy,
     pub policy: SkillServicePolicyHints,
 }
 

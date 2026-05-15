@@ -1205,6 +1205,8 @@ mcpServers:
             skills: vec![SkillSnapshotEntry {
                 name: "playwright-mcp".into(),
                 description: "Browser".into(),
+                source_location: PathBuf::from("/tmp/playwright/SKILL.md"),
+                source_base_dir: PathBuf::from("/tmp/playwright"),
                 location: PathBuf::from("/tmp/playwright/SKILL.md"),
                 base_dir: PathBuf::from("/tmp/playwright"),
                 source: "test".into(),

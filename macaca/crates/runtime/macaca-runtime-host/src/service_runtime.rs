@@ -207,12 +207,32 @@ impl ServiceRuntime {
                 )?;
                 Ok(reply)
             }
-            Err(err) => self.fail_with_result(
-                service_id,
-                "service_runtime.call.failed",
-                trace.as_ref(),
-                err.to_string(),
-            ),
+            Err(err) => {
+                let runtime_error = ServiceRuntimeError::from(err);
+                if let ServiceRuntimeError::InvalidArgument(reason) = runtime_error {
+                    self.set_state(
+                        service_id,
+                        ServiceLifecycleState::Running,
+                        ServiceHealth::Healthy,
+                        None,
+                    )?;
+                    self.emit(
+                        service_id,
+                        "service_runtime.call.rejected",
+                        ServiceLifecycleState::Running,
+                        Some(ServiceHealth::Healthy),
+                        trace.as_ref(),
+                        serde_json::json!({"error": reason, "reason_code": "invalid_argument"}),
+                    )?;
+                    return Err(ServiceRuntimeError::InvalidArgument(reason));
+                }
+                self.fail_with_result(
+                    service_id,
+                    "service_runtime.call.failed",
+                    trace.as_ref(),
+                    runtime_error.to_string(),
+                )
+            }
         }
     }
 

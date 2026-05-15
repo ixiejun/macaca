@@ -78,6 +78,10 @@ pub struct SkillRuntimeOptions {
 pub struct SkillSnapshotEntry {
     pub name: String,
     pub description: String,
+    #[serde(default)]
+    pub source_location: PathBuf,
+    #[serde(default)]
+    pub source_base_dir: PathBuf,
     pub location: PathBuf,
     pub base_dir: PathBuf,
     pub source: String,
@@ -122,7 +126,7 @@ impl SkillRuntime {
         let agent = agent.into();
         let entries = discover_skill_entries(&options).await?;
         let (visible, filtered) = filter_entries(entries, &options);
-        let (prompt, prompt_entries, truncated, compact) = build_prompt(&visible, &options.limits);
+        let (prompt, prompt_entries, truncated, compact) = build_prompt(&visible, &options).await?;
 
         Ok(SkillSnapshot {
             agent,
@@ -132,6 +136,8 @@ impl SkillRuntime {
                 .map(|entry| SkillSnapshotEntry {
                     name: entry.skill.name.clone(),
                     description: entry.skill.description.clone(),
+                    source_location: entry.skill.canonical_location.clone(),
+                    source_base_dir: entry.skill.canonical_base_dir.clone(),
                     location: entry.skill.location.clone(),
                     base_dir: entry.skill.base_dir.clone(),
                     source: entry.skill.source.clone(),
@@ -306,10 +312,11 @@ fn filter_entries(
     (visible, filtered)
 }
 
-fn build_prompt(
+async fn build_prompt(
     visible: &[SkillEntry],
-    limits: &SkillRuntimeLimits,
-) -> (String, Vec<SkillEntry>, bool, bool) {
+    options: &SkillRuntimeOptions,
+) -> MacacaResult<(String, Vec<SkillEntry>, bool, bool)> {
+    let limits = &options.limits;
     let mut prompt_entries: Vec<SkillEntry> = visible
         .iter()
         .take(limits.max_skills_in_prompt)
@@ -317,6 +324,10 @@ fn build_prompt(
         .collect();
     let mut truncated = visible.len() > prompt_entries.len();
     let mut compact = false;
+
+    if let Some(workspace_dir) = &options.workspace_dir {
+        project_prompt_entries(&mut prompt_entries, workspace_dir).await?;
+    }
 
     let mut prompt = format_full_prompt(&prompt_entries);
     if prompt.len() > limits.max_skills_prompt_chars {
@@ -328,7 +339,97 @@ fn build_prompt(
         truncated = true;
         prompt = format_compact_prompt(&prompt_entries);
     }
-    (prompt, prompt_entries, truncated, compact)
+    Ok((prompt, prompt_entries, truncated, compact))
+}
+
+async fn project_prompt_entries(
+    entries: &mut [SkillEntry],
+    workspace_dir: &Path,
+) -> MacacaResult<()> {
+    if entries.is_empty() {
+        return Ok(());
+    }
+
+    let projection_root = workspace_dir.join("available_skills");
+    tokio::fs::create_dir_all(&projection_root).await?;
+    let mut used_slugs: HashMap<String, usize> = HashMap::new();
+
+    for entry in entries {
+        let base_slug = stable_skill_slug(&entry.skill.name);
+        let counter = used_slugs.entry(base_slug.clone()).or_insert(0);
+        let slug = if *counter == 0 {
+            base_slug
+        } else {
+            format!("{base_slug}_{counter}")
+        };
+        *counter += 1;
+
+        let target_dir = projection_root.join(slug);
+        if target_dir.exists() {
+            tokio::fs::remove_dir_all(&target_dir).await?;
+        }
+        copy_skill_dir_without_symlinks(&entry.skill.canonical_base_dir, &target_dir).await?;
+
+        // The projected path is the model-facing contract.  The canonical
+        // source fields remain untouched so audit and file-policy code can
+        // still reason about the original installation path.
+        entry.skill.location = target_dir.join("SKILL.md");
+        entry.skill.base_dir = target_dir;
+    }
+
+    Ok(())
+}
+
+fn stable_skill_slug(name: &str) -> String {
+    let mut slug = String::new();
+    let mut previous_was_separator = false;
+    for ch in name.chars().flat_map(char::to_lowercase) {
+        if ch.is_ascii_alphanumeric() {
+            slug.push(ch);
+            previous_was_separator = false;
+        } else if !previous_was_separator && !slug.is_empty() {
+            slug.push('_');
+            previous_was_separator = true;
+        }
+    }
+    while slug.ends_with('_') {
+        slug.pop();
+    }
+    if slug.is_empty() {
+        "skill".into()
+    } else {
+        slug
+    }
+}
+
+async fn copy_skill_dir_without_symlinks(source: &Path, target: &Path) -> MacacaResult<()> {
+    tokio::fs::create_dir_all(target).await?;
+    let mut stack = vec![(source.to_path_buf(), target.to_path_buf())];
+
+    while let Some((from_dir, to_dir)) = stack.pop() {
+        tokio::fs::create_dir_all(&to_dir).await?;
+        let mut children = tokio::fs::read_dir(&from_dir).await?;
+        while let Some(child) = children.next_entry().await? {
+            let from_path = child.path();
+            let file_type = tokio::fs::symlink_metadata(&from_path).await?.file_type();
+            if file_type.is_symlink() {
+                tracing::warn!(
+                    path = %from_path.display(),
+                    "skipping symlink while projecting skill directory"
+                );
+                continue;
+            }
+
+            let to_path = to_dir.join(child.file_name());
+            if file_type.is_dir() {
+                stack.push((from_path, to_path));
+            } else if file_type.is_file() {
+                tokio::fs::copy(&from_path, &to_path).await?;
+            }
+        }
+    }
+
+    Ok(())
 }
 
 fn format_full_prompt(entries: &[SkillEntry]) -> String {
@@ -406,7 +507,15 @@ pub fn path_belongs_to_snapshot_skill(snapshot: &SkillSnapshot, path: &Path) -> 
     snapshot.skills.iter().any(|skill| {
         let base =
             std::fs::canonicalize(&skill.base_dir).unwrap_or_else(|_| skill.base_dir.clone());
-        canonical.starts_with(base)
+        let matches_projected = canonical.starts_with(base);
+        let matches_source = if skill.source_base_dir.as_os_str().is_empty() {
+            false
+        } else {
+            let source_base = std::fs::canonicalize(&skill.source_base_dir)
+                .unwrap_or_else(|_| skill.source_base_dir.clone());
+            canonical.starts_with(source_base)
+        };
+        matches_projected || matches_source
     })
 }
 
@@ -525,5 +634,59 @@ mod tests {
             .unwrap();
         assert_eq!(snapshot.skills.len(), 1);
         assert_eq!(snapshot.skills[0].name, "b");
+    }
+
+    #[tokio::test]
+    async fn snapshot_projects_visible_skill_into_workspace_available_skills() {
+        let app = tempfile::tempdir().unwrap();
+        let ws = tempfile::tempdir().unwrap();
+        write_skill(
+            app.path(),
+            "skills/crypto-market",
+            "---\nname: Crypto Market\ndescription: market data\n---\nUse scripts/crypto.py.",
+        )
+        .await;
+        let script_dir = app.path().join("skills/crypto-market/scripts");
+        tokio::fs::create_dir_all(&script_dir).await.unwrap();
+        tokio::fs::write(script_dir.join("crypto.py"), "print('ticker')\n")
+            .await
+            .unwrap();
+
+        let snapshot = SkillRuntime
+            .build_snapshot(
+                "technical_analyst",
+                SkillRuntimeOptions {
+                    workspace_dir: Some(ws.path().to_path_buf()),
+                    app_dir: Some(app.path().to_path_buf()),
+                    policy: SkillPolicy {
+                        allow: Some(vec!["Crypto Market".into()]),
+                        deny: Vec::new(),
+                    },
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+
+        let entry = &snapshot.skills[0];
+        let projected_skill = ws.path().join("available_skills/crypto_market/SKILL.md");
+        let projected_script = ws
+            .path()
+            .join("available_skills/crypto_market/scripts/crypto.py");
+
+        assert_eq!(entry.location, projected_skill);
+        assert!(entry
+            .source_location
+            .ends_with("skills/crypto-market/SKILL.md"));
+        assert!(projected_skill.exists());
+        assert!(projected_script.exists());
+        assert!(snapshot
+            .prompt
+            .contains("available_skills/crypto_market/SKILL.md"));
+        assert!(path_belongs_to_snapshot_skill(&snapshot, &projected_script));
+        assert!(path_belongs_to_snapshot_skill(
+            &snapshot,
+            &entry.source_base_dir.join("SKILL.md")
+        ));
     }
 }

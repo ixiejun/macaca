@@ -1,9 +1,10 @@
 //! Skill discovery — scan directories for `SKILL.md` files.
 //!
-//! Implements the agentskills.io discovery spec: scan multiple directory
-//! scopes (user-level, project-level) for subdirectories containing
-//! `SKILL.md` files. Project-level skills override user-level on name
-//! collision.
+//! Implements Agent OS skill discovery by scanning multiple directory scopes
+//! for subdirectories containing `SKILL.md` files. Project-level skills remain
+//! available for local development, while user-global discovery prefers
+//! Macaca-managed skills before falling back to generic and client-owned
+//! stores.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -37,12 +38,12 @@ pub enum SkillScope {
     ProjectClient = 0,
     /// Project-level cross-client (.agents/skills/).
     ProjectCrossClient = 1,
-    /// User-level client-specific (e.g., ~/.claude/skills/).
-    UserClient = 2,
-    /// User-level cross-client (~/.agents/skills/).
-    UserCrossClient = 3,
     /// Agent OS central store (~/.macaca/skills/).
-    AgentOsCentral = 4,
+    AgentOsCentral = 2,
+    /// Generic user-level Agent skills (~/.agent/skills/).
+    UserAgentGeneric = 3,
+    /// User-level client-specific (e.g., ~/.claude/skills/).
+    UserClient = 4,
 }
 
 /// A discovered skill with its scope for precedence resolution.
@@ -79,15 +80,17 @@ pub async fn discover_skills(
         scan_targets.push((proj.join(".agents/skills"), SkillScope::ProjectCrossClient));
     }
 
-    // User-level scopes.
+    // User-level scopes. Macaca central skills win global collisions, then the
+    // generic Agent directory, then common client-specific stores. This mirrors
+    // the runtime snapshot source factory so every skill-facing API reports the
+    // same precedence model.
     if let Some(home) = home_dir() {
-        if let Some(client) = client_name {
+        scan_targets.push((home.join(".macaca/skills"), SkillScope::AgentOsCentral));
+        scan_targets.push((home.join(".agent/skills"), SkillScope::UserAgentGeneric));
+        for client in common_skill_clients(client_name) {
             let client_dir = home.join(format!(".{client}/skills"));
             scan_targets.push((client_dir, SkillScope::UserClient));
         }
-        scan_targets.push((home.join(".agents/skills"), SkillScope::UserCrossClient));
-        // Agent OS central store.
-        scan_targets.push((home.join(".macaca/skills"), SkillScope::AgentOsCentral));
     }
 
     // Extra directories.
@@ -218,6 +221,19 @@ pub async fn scan_skills_directory(dir: &Path) -> MacacaResult<Vec<AgentSkill>> 
 
 fn home_dir() -> Option<PathBuf> {
     std::env::var("HOME").ok().map(PathBuf::from)
+}
+
+fn common_skill_clients(preferred: Option<&str>) -> Vec<String> {
+    let mut clients = Vec::new();
+    if let Some(client) = preferred {
+        clients.push(client.to_string());
+    }
+    for client in ["claude", "codex", "hermes", "openclaw"] {
+        if !clients.iter().any(|existing| existing == client) {
+            clients.push(client.to_string());
+        }
+    }
+    clients
 }
 
 #[cfg(test)]

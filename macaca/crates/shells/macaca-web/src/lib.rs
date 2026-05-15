@@ -32,6 +32,7 @@ pub mod proto_event_visitors;
 pub mod route_command;
 pub mod routes;
 pub mod run_trace;
+pub mod runtime_event_bridge;
 pub mod runtime_resume;
 mod service_runtime_client;
 mod service_tool_adapter;

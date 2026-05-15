@@ -209,6 +209,126 @@ async fn component_model_provider_dispatches_declared_host_command_plan() {
 }
 
 #[tokio::test]
+async fn component_model_provider_resolves_typed_chat_payload_fields() {
+    let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
+    let service_id = register_mock_service(&runtime, "wasm.component.service.typed-chat").await;
+    let bridge = Arc::new(WasmHostImportBridge::new(
+        Arc::clone(&runtime),
+        WasmHostImportBridgeConfig::default(),
+    ));
+    let mut host_command = ApplicationHostCommand::with_trace(
+        ApplicationImport::ServiceCall,
+        json!({
+            "input": "${chat.input}",
+            "symbol": "${chat.symbol}"
+        }),
+        TraceContext::new("trace-placeholder-replaced-by-runtime"),
+    );
+    host_command
+        .metadata
+        .insert("service.id".into(), service_id.to_string());
+    host_command
+        .metadata
+        .insert("service.operation".into(), "invoke".into());
+    host_command
+        .metadata
+        .insert("capability".into(), "service.call".into());
+    let fixture = component_fixture_bytes_with_host_command(&host_command);
+    let artifact_path = write_fixture_component("declared-host-plan-typed-chat", &fixture);
+    let provider = ComponentModelWasmRuntimeProvider::default().with_host_import_bridge(bridge);
+    let session = provider
+        .create_session(traced_request(
+            "trace-component-declared-plan-typed-chat-provider",
+            &artifact_path,
+        ))
+        .await
+        .unwrap();
+    let mut command = ApplicationHostCommand::with_trace(
+        ApplicationImport::Custom("macaca:wasm/invoke".into()),
+        json!({
+            "input": "Analyze BTC/USDT now",
+            "symbol": "BTC"
+        }),
+        TraceContext::new("trace-component-declared-plan-typed-chat-command"),
+    );
+    command
+        .metadata
+        .insert("wasm.export".into(), "app:start".into());
+
+    let result = session.dispatch(command).await.unwrap();
+
+    assert!(matches!(result.status, ApplicationHostCommandStatus::Ok));
+    assert_eq!(
+        result.output["host_command_results"][0]["output"]["input"],
+        json!("Analyze BTC/USDT now")
+    );
+    assert_eq!(
+        result.output["host_command_results"][0]["output"]["symbol"],
+        json!("BTC")
+    );
+}
+
+#[tokio::test]
+async fn component_model_provider_interpolates_embedded_display_placeholders() {
+    let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
+    let service_id = register_mock_service(&runtime, "wasm.component.service.display-chat").await;
+    let bridge = Arc::new(WasmHostImportBridge::new(
+        Arc::clone(&runtime),
+        WasmHostImportBridgeConfig::default(),
+    ));
+    let mut host_command = ApplicationHostCommand::with_trace(
+        ApplicationImport::ServiceCall,
+        json!({
+            "title": "${chat.symbol} Signal Analysis",
+            "native_symbol": "${chat.symbol}"
+        }),
+        TraceContext::new("trace-display-placeholder-replaced-by-runtime"),
+    );
+    host_command
+        .metadata
+        .insert("service.id".into(), service_id.to_string());
+    host_command
+        .metadata
+        .insert("service.operation".into(), "invoke".into());
+    host_command
+        .metadata
+        .insert("capability".into(), "service.call".into());
+    let fixture = component_fixture_bytes_with_host_command(&host_command);
+    let artifact_path = write_fixture_component("declared-host-plan-display-chat", &fixture);
+    let provider = ComponentModelWasmRuntimeProvider::default().with_host_import_bridge(bridge);
+    let session = provider
+        .create_session(traced_request(
+            "trace-component-declared-plan-display-chat-provider",
+            &artifact_path,
+        ))
+        .await
+        .unwrap();
+    let mut command = ApplicationHostCommand::with_trace(
+        ApplicationImport::Custom("macaca:wasm/invoke".into()),
+        json!({
+            "input": "Analyze ETH/USDT now",
+            "symbol": "ETH"
+        }),
+        TraceContext::new("trace-component-declared-plan-display-chat-command"),
+    );
+    command
+        .metadata
+        .insert("wasm.export".into(), "app:start".into());
+
+    let result = session.dispatch(command).await.unwrap();
+
+    assert!(matches!(result.status, ApplicationHostCommandStatus::Ok));
+    assert_eq!(
+        result.output["host_command_results"][0]["output"]["title"],
+        json!("ETH Signal Analysis")
+    );
+    assert_eq!(
+        result.output["host_command_results"][0]["output"]["native_symbol"],
+        json!("ETH")
+    );
+}
+
+#[tokio::test]
 async fn component_model_provider_deduplicates_repeated_declared_host_commands() {
     let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
     let service_id = register_mock_service(&runtime, "wasm.component.service.dedup").await;

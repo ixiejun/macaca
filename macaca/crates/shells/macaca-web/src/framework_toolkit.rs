@@ -5,13 +5,11 @@
 
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
-use std::convert::Infallible;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use axum::response::sse::Event;
 use tokio::{fs, process::Command, time::timeout};
 
 use macaca_app::{app_agent_manifest_view, discovered_app_agent_names};
@@ -20,11 +18,11 @@ use macaca_framework::adapter::{SingleToolAdapter, ToolSetBridge};
 use macaca_framework::execution::ExecutionContext;
 use macaca_framework::session::{load_module_state, save_module_state};
 use macaca_framework::tool::Toolkit;
-use macaca_persist::AppendEventCommand;
 use macaca_proto::ApplicationId;
 use macaca_proto::TraceContext;
 use macaca_skill::{SkillServiceScope, SkillToolCatalogCommand};
 
+use crate::runtime_event_bridge::emit_runtime_event;
 use crate::state::AppState;
 use macaca_runtime_host::{
     McpDefinitionSource, McpRegistryConfig, McpRuntimeContext, McpRuntimeStatus,
@@ -370,12 +368,6 @@ fn mcp_close_event_emitter(
         let agent_name = agent_name.clone();
         if let Ok(handle) = tokio::runtime::Handle::try_current() {
             handle.spawn(async move {
-                let sse_tx = {
-                    let active_sessions = state.sessions.active_sessions.read().await;
-                    active_sessions
-                        .get(&session_id)
-                        .map(|session| Arc::clone(&session.sse_tx))
-                };
                 let payload = serde_json::json!({
                     "agent": agent_name,
                     "server_id": status.server_id,
@@ -387,7 +379,6 @@ fn mcp_close_event_emitter(
                 emit_mcp_event(
                     &state,
                     &session_id,
-                    &sse_tx,
                     "mcp_server_closed",
                     &agent_name,
                     &payload,
@@ -406,13 +397,6 @@ async fn emit_mcp_runtime_events(
 ) {
     let Some(session_id) = session_id else {
         return;
-    };
-
-    let sse_tx = {
-        let active_sessions = state.sessions.active_sessions.read().await;
-        active_sessions
-            .get(session_id)
-            .map(|session| Arc::clone(&session.sse_tx))
     };
 
     for status in statuses {
@@ -434,7 +418,6 @@ async fn emit_mcp_runtime_events(
         emit_mcp_event(
             state,
             session_id,
-            &sse_tx,
             "mcp_server_resolved",
             agent_name,
             &payload,
@@ -443,20 +426,11 @@ async fn emit_mcp_runtime_events(
 
         match status.state {
             McpRuntimeStatusState::Ready => {
-                emit_mcp_event(
-                    state,
-                    session_id,
-                    &sse_tx,
-                    "mcp_server_ready",
-                    agent_name,
-                    &payload,
-                )
-                .await;
+                emit_mcp_event(state, session_id, "mcp_server_ready", agent_name, &payload).await;
                 if !status.exposed_tools.is_empty() {
                     emit_mcp_event(
                         state,
                         session_id,
-                        &sse_tx,
                         "mcp_tools_registered",
                         agent_name,
                         &payload,
@@ -465,15 +439,7 @@ async fn emit_mcp_runtime_events(
                 }
             }
             McpRuntimeStatusState::Failed | McpRuntimeStatusState::DependencyMissing => {
-                emit_mcp_event(
-                    state,
-                    session_id,
-                    &sse_tx,
-                    "mcp_server_failed",
-                    agent_name,
-                    &payload,
-                )
-                .await;
+                emit_mcp_event(state, session_id, "mcp_server_failed", agent_name, &payload).await;
             }
             McpRuntimeStatusState::Disabled => {}
         }
@@ -489,13 +455,6 @@ async fn emit_skill_mcp_alias_events(
     let Some(session_id) = session_id else {
         return;
     };
-    let sse_tx = {
-        let active_sessions = state.sessions.active_sessions.read().await;
-        active_sessions
-            .get(session_id)
-            .map(|session| Arc::clone(&session.sse_tx))
-    };
-
     for status in statuses
         .iter()
         .filter(|status| status.server_id.starts_with("skill:"))
@@ -514,13 +473,12 @@ async fn emit_skill_mcp_alias_events(
             }
             McpRuntimeStatusState::Disabled => "skill_mcp_disabled",
         };
-        emit_mcp_event(state, session_id, &sse_tx, event_type, agent_name, &payload).await;
+        emit_mcp_event(state, session_id, event_type, agent_name, &payload).await;
         if matches!(status.state, McpRuntimeStatusState::Ready) && !status.exposed_tools.is_empty()
         {
             emit_mcp_event(
                 state,
                 session_id,
-                &sse_tx,
                 "skill_mcp_tools_registered",
                 agent_name,
                 &payload,
@@ -539,13 +497,6 @@ async fn emit_mcp_starting_events(
     let Some(session_id) = session_id else {
         return;
     };
-    let sse_tx = {
-        let active_sessions = state.sessions.active_sessions.read().await;
-        active_sessions
-            .get(session_id)
-            .map(|session| Arc::clone(&session.sse_tx))
-    };
-
     for definition in definitions.iter().filter(|definition| definition.enabled) {
         let payload = serde_json::json!({
             "agent": agent_name,
@@ -557,7 +508,6 @@ async fn emit_mcp_starting_events(
         emit_mcp_event(
             state,
             session_id,
-            &sse_tx,
             "mcp_server_starting",
             agent_name,
             &payload,
@@ -569,30 +519,19 @@ async fn emit_mcp_starting_events(
 async fn emit_mcp_event(
     state: &Arc<AppState>,
     session_id: &str,
-    sse_tx: &Option<Arc<tokio::sync::RwLock<tokio::sync::mpsc::Sender<Result<Event, Infallible>>>>>,
     event_type: &str,
     source: &str,
     payload: &serde_json::Value,
 ) {
-    state
-        .persist
-        .event_log
-        .append_command(AppendEventCommand::new(
-            session_id,
-            event_type,
-            source,
-            payload.clone(),
-        ))
-        .await;
-
-    if let Some(sse_tx) = sse_tx {
-        let sender = sse_tx.read().await;
-        let _ = sender
-            .send(Ok(Event::default()
-                .event(event_type)
-                .data(payload.to_string())))
-            .await;
-    }
+    emit_runtime_event(
+        state,
+        session_id,
+        event_type,
+        source,
+        payload.get("agent").and_then(|value| value.as_str()),
+        payload.clone(),
+    )
+    .await;
 }
 
 async fn app_agent_names(state: &Arc<AppState>, app_id: &ApplicationId) -> Option<HashSet<String>> {

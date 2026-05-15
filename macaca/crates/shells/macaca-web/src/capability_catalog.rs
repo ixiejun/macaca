@@ -164,9 +164,9 @@ pub async fn resolve_skill_snapshot_cached(
         Some(snapshot) => Ok(snapshot),
         None => {
             let request = SkillSnapshotRequest::builder(agent_name)
-                .workspace_dir(workspace_root)
+                .workspace_dir(workspace_root.clone())
                 .app_dir(app_dir.clone())
-                .policy(skill_policy)
+                .policy(skill_policy.clone())
                 .build();
             let snapshot = match state
                 .skill_client
@@ -179,8 +179,16 @@ pub async fn resolve_skill_snapshot_cached(
                     )
                     .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?,
                     agent_name: agent_name.to_string(),
+                    workspace_dir: workspace_root,
                     app_dir: app_dir.clone(),
                     include_instructions: true,
+                    // Preserve the application/agent exposure policy across
+                    // the serviceized skill boundary. The deprecated facade
+                    // fallback below already receives this policy through the
+                    // request builder; omitting it here made the primary
+                    // service path report an empty visible catalog for agents
+                    // that allowlist skills in app.yaml.
+                    exposure_policy: skill_policy,
                     policy: Default::default(),
                 })
                 .await
@@ -286,6 +294,8 @@ mod tests {
             skills: vec![SkillSnapshotEntry {
                 name: "figma-mcp".into(),
                 description: "Figma context".into(),
+                source_location: PathBuf::from("/app/skills/figma-mcp/SKILL.md"),
+                source_base_dir: PathBuf::from("/app/skills/figma-mcp"),
                 location: PathBuf::from("/app/skills/figma-mcp/SKILL.md"),
                 base_dir: PathBuf::from("/app/skills/figma-mcp"),
                 source: "app".into(),

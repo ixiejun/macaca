@@ -566,16 +566,18 @@ impl WasmHostImportBridge {
             .metadata("import_name", audit.import_name.clone()),
         );
         let status = match kind {
-            WasmHostImportErrorKind::ServiceUnavailable => {
-                ApplicationHostCommandStatus::Unavailable {
-                    reason: "WASM host import service unavailable".into(),
-                }
-            }
+            WasmHostImportErrorKind::ServiceUnavailable
+            | WasmHostImportErrorKind::ServiceFailed => ApplicationHostCommandStatus::Unavailable {
+                reason: "WASM host import service unavailable".into(),
+            },
             WasmHostImportErrorKind::UnsupportedImport => {
                 ApplicationHostCommandStatus::Unsupported {
                     reason: "WASM host import unsupported".into(),
                 }
             }
+            WasmHostImportErrorKind::InvalidArgument => ApplicationHostCommandStatus::Rejected {
+                reason: "WASM host import payload is invalid".into(),
+            },
             _ => ApplicationHostCommandStatus::DisabledByPolicy {
                 reason: "WASM host import denied by policy".into(),
             },
@@ -609,6 +611,11 @@ impl WasmHostImportBridge {
                 command,
                 WasmHostImportErrorKind::PolicyDenied,
                 "WASM host import was denied by ServiceRuntime policy",
+            ),
+            ServiceRuntimeError::InvalidArgument(_) => self.denied_result(
+                command,
+                WasmHostImportErrorKind::InvalidArgument,
+                "WASM host import payload is invalid",
             ),
             ServiceRuntimeError::MissingTraceContext => self.denied_result(
                 command,

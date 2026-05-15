@@ -39,7 +39,10 @@ The system SHALL expose session-scoped EventLog reads that can be filtered by ge
 #### Scenario: Main thread trace is loaded
 
 - **WHEN** the frontend needs coordinator trace for a selected session
-- **THEN** it SHALL fetch events for that session with a coordinator source filter
+- **THEN** it SHALL fetch events for that session and render the manifest entry-agent source as the main thread
+- **AND** executor-sourced delegated events for the manifest entry agent SHALL render in the main thread instead of being lost when that entry agent is hidden from delegated tabs
+- **AND** entry-agent context, skill, and MCP lifecycle events SHALL render as bounded trace details
+- **AND** it SHALL preserve legacy generic coordinator-source events for older sessions without hardcoding application-specific agent names
 
 #### Scenario: Delegated tab trace is loaded
 

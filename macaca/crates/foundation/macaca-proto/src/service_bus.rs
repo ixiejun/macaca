@@ -290,6 +290,9 @@ pub enum ServiceBusError {
     #[error("policy denied: {0}")]
     PolicyDenied(String),
 
+    #[error("invalid argument: {0}")]
+    InvalidArgument(String),
+
     #[error("dispatch failed: {0}")]
     DispatchFailed(String),
 

@@ -17,7 +17,7 @@ use tokio::sync::RwLock;
 use macaca_app::{app_entry_agent_name, AppLoader};
 use macaca_framework::execution::ExecutionContext;
 use macaca_framework::session::{load_module_state, save_module_state};
-use macaca_kernel::AgentInfo;
+use macaca_kernel::{executor::ExecutorEvent, AgentInfo};
 use macaca_proto::{
     AgentExecutionCommand, AgentExecutionIntent, AgentExecutionResult, AgentExecutionStatus,
     ApplicationHostCommand, ApplicationHostCommandStatus, ApplicationHostDispatchServiceCommand,
@@ -29,6 +29,7 @@ use macaca_proto::{
 
 use crate::event_persistence::spawn_session_event_collector;
 use crate::routes::{default_model, err, ErrorResponse};
+use crate::runtime_event_bridge::emit_host_command_result_events;
 use crate::session::{
     persist_session_snapshot, AgentTraceCollector, SessionMeta, StoredSession, StoredTurn,
     APP_SESSIONS_PREFIX, SESSION_PREFIX,
@@ -64,6 +65,77 @@ async fn persist_execution_context(state: &Arc<AppState>, context: &ExecutionCon
         context,
     )
     .await;
+}
+
+/// Synchronize visible agent activity with a chat lifecycle edge.
+///
+/// The kernel status tracker remains the semantic owner of agent activity.  The
+/// Web chat route only knows that it is starting or finishing a session, so this
+/// adapter updates an app-declared agent by identity without inspecting any
+/// application-specific payload, provider name, or business-domain data.
+async fn update_agent_activity_by_name(
+    state: &Arc<AppState>,
+    agent_name: &str,
+    activity: macaca_proto::AgentActivity,
+) {
+    if let Some(manifest) = state.kernel.get_agent_by_name(agent_name).await {
+        state
+            .kernel
+            .update_agent_activity(&manifest.id, activity)
+            .await;
+    }
+}
+
+/// Project delegated executor lifecycle events into the kernel status tracker.
+///
+/// Delegated worker details are already persisted through EventLog and streamed
+/// through SSE.  This helper keeps the coarse agent status panel consistent with
+/// those same generic executor events, including WASM `macaca:agent/delegate`
+/// paths that do not pass through the framework worker loop.
+async fn sync_delegated_agent_activity_from_executor_event(
+    state: &Arc<AppState>,
+    event: &ExecutorEvent,
+) {
+    match event {
+        ExecutorEvent::TaskStarted { task_id, agent } => {
+            update_agent_activity_by_name(
+                state,
+                agent,
+                macaca_proto::AgentActivity::Working {
+                    context: format!("Executing delegated task {}", task_id),
+                },
+            )
+            .await;
+        }
+        ExecutorEvent::TaskCompleted { agent, result, .. } if result.success => {
+            update_agent_activity_by_name(state, agent, macaca_proto::AgentActivity::Idle).await;
+        }
+        ExecutorEvent::TaskCompleted { agent, result, .. } => {
+            update_agent_activity_by_name(
+                state,
+                agent,
+                macaca_proto::AgentActivity::Error {
+                    message: result.output.clone(),
+                },
+            )
+            .await;
+        }
+        ExecutorEvent::TaskFailed { agent, error, .. } => {
+            update_agent_activity_by_name(
+                state,
+                agent,
+                macaca_proto::AgentActivity::Error {
+                    message: error.clone(),
+                },
+            )
+            .await;
+        }
+        ExecutorEvent::AgentEvent { .. }
+        | ExecutorEvent::TaskCancelled { .. }
+        | ExecutorEvent::TaskProgress { .. }
+        | ExecutorEvent::HookEvent { .. }
+        | ExecutorEvent::Shutdown => {}
+    }
 }
 
 /// Execute the visible chat entry agent through `service.agent_execution`.
@@ -528,10 +600,7 @@ async fn wasm_chat_dispatch_command(
 
     let mut host_command = ApplicationHostCommand::with_trace(
         ApplicationImport::TraceEmit,
-        serde_json::json!({
-            "input": prompt,
-            "channel": "chat",
-        }),
+        wasm_chat_export_payload(prompt),
         trace.clone(),
     );
     host_command
@@ -542,6 +611,27 @@ async fn wasm_chat_dispatch_command(
         scope: ApplicationServiceScope::application(*app_id),
         host_command,
     })
+}
+
+/// Build the payload passed to a WASM application export from chat text.
+///
+/// This is intentionally schema-generic. If an app-owned coordinator supplies a
+/// JSON object, the runtime preserves those typed fields for declarative
+/// placeholders such as `${chat.symbol}`. Plain chat text remains plain
+/// `input`; Macaca does not infer domain fields from prose.
+fn wasm_chat_export_payload(prompt: &str) -> serde_json::Value {
+    match serde_json::from_str::<serde_json::Value>(prompt) {
+        Ok(serde_json::Value::Object(mut object)) => {
+            object
+                .entry("channel")
+                .or_insert_with(|| serde_json::Value::String("chat".into()));
+            serde_json::Value::Object(object)
+        }
+        _ => serde_json::json!({
+            "input": prompt,
+            "channel": "chat",
+        }),
+    }
 }
 
 /// Return whether the application declares app-scoped agents.
@@ -848,7 +938,7 @@ pub(crate) async fn post_chat_v2(
                             host_command: {
                                 let mut command = ApplicationHostCommand::with_trace(
                                     ApplicationImport::TraceEmit,
-                                    serde_json::json!({ "input": req.prompt, "channel": "chat" }),
+                                    wasm_chat_export_payload(&req.prompt),
                                     TraceContext::new("web-chat-wasm-dispatch-fallback-command"),
                                 );
                                 command
@@ -953,6 +1043,7 @@ pub(crate) async fn post_chat_v2(
             let mut exec_rx = executor.subscribe_to_events();
             let sse_tx_for_exec = Arc::clone(&sse_tx);
             let forwarder_stop_flag = Arc::clone(&forwarder_stop);
+            let state_for_exec = Arc::clone(&state);
             tokio::spawn(async move {
                 loop {
                     match exec_rx.recv().await {
@@ -963,6 +1054,11 @@ pub(crate) async fn post_chat_v2(
                                 );
                                 break;
                             }
+                            sync_delegated_agent_activity_from_executor_event(
+                                &state_for_exec,
+                                &exec_event,
+                            )
+                            .await;
                             let sse_event = convert_executor_event_to_sse(exec_event);
                             let sender = sse_tx_for_exec.read().await;
                             if sender.send(sse_event).await.is_err() {
@@ -983,9 +1079,19 @@ pub(crate) async fn post_chat_v2(
         }
         let session_key_for_task = session_key.clone();
         let app_id_for_task = app_id;
+        let entry_agent_name_for_task = entry_agent_name.clone();
         let state_for_task = Arc::clone(&state);
         let tx_for_task = tx.clone();
+        let forwarder_stop_for_task = Arc::clone(&forwarder_stop);
         tokio::spawn(async move {
+            update_agent_activity_by_name(
+                &state_for_task,
+                &entry_agent_name_for_task,
+                macaca_proto::AgentActivity::Working {
+                    context: format!("Handling WASM session {}", session_key_for_task),
+                },
+            )
+            .await;
             let _ = tx_for_task
                 .send(Ok(Event::default().event("thinking").data(
                     serde_json::json!({
@@ -1006,6 +1112,13 @@ pub(crate) async fn post_chat_v2(
                 .await
             {
                 Ok(output) => {
+                    emit_host_command_result_events(
+                        &state_for_task,
+                        &session_key_for_task,
+                        "wasm_host_dispatch",
+                        &output.output,
+                    )
+                    .await;
                     let summary = match output.status {
                         ApplicationHostCommandStatus::Ok => "WASM execution completed",
                         ApplicationHostCommandStatus::Unavailable { .. } => {
@@ -1054,6 +1167,12 @@ pub(crate) async fn post_chat_v2(
                             .to_string(),
                         )))
                         .await;
+                    update_agent_activity_by_name(
+                        &state_for_task,
+                        &entry_agent_name_for_task,
+                        macaca_proto::AgentActivity::Idle,
+                    )
+                    .await;
                 }
                 Err(error) => {
                     let error_msg = format!("WASM host dispatch failed: {error}");
@@ -1071,12 +1190,32 @@ pub(crate) async fn post_chat_v2(
                     let _ = tx_for_task
                         .send(Ok(Event::default().event("error").data(
                             serde_json::json!({
-                                "error": error_msg,
+                                "error": error_msg.clone(),
                             })
                             .to_string(),
                         )))
                         .await;
+                    update_agent_activity_by_name(
+                        &state_for_task,
+                        &entry_agent_name_for_task,
+                        macaca_proto::AgentActivity::Error { message: error_msg },
+                    )
+                    .await;
                 }
+            }
+            // The agentless WASM path owns its own stream lifecycle.  Once the
+            // terminal SSE event has been sent, remove the active session and
+            // stop the executor forwarder so the last `stream_tx` clone drops;
+            // otherwise Axum keep-alive continues writing empty heartbeats even
+            // though business execution is already complete.
+            forwarder_stop_for_task.store(true, std::sync::atomic::Ordering::Relaxed);
+            {
+                let mut sessions = state_for_task.sessions.active_sessions.write().await;
+                sessions.remove(&session_key_for_task);
+            }
+            {
+                let mut flags = state_for_task.sessions.cancel_flags.write().await;
+                flags.remove(&app_id_for_task.0.to_string());
             }
         });
 
@@ -1321,6 +1460,7 @@ pub(crate) async fn post_chat_v2(
     if let Some(mut exec_rx) = executor_events_rx {
         let sse_tx_for_exec = Arc::clone(&sse_tx);
         let forwarder_stop_flag = Arc::clone(&forwarder_stop);
+        let state_for_exec = Arc::clone(&state);
         tokio::spawn(async move {
             loop {
                 match exec_rx.recv().await {
@@ -1330,7 +1470,12 @@ pub(crate) async fn post_chat_v2(
                             tracing::debug!("Executor event forwarder stopped (superseded)");
                             break;
                         }
-                        // Forward to SSE only
+                        sync_delegated_agent_activity_from_executor_event(
+                            &state_for_exec,
+                            &exec_event,
+                        )
+                        .await;
+                        // Forward to SSE after status synchronization.
                         let sse_event = convert_executor_event_to_sse(exec_event);
                         let sender = sse_tx_for_exec.read().await;
                         if sender.send(sse_event).await.is_err() {
@@ -1355,7 +1500,11 @@ pub(crate) async fn post_chat_v2(
 
 #[cfg(test)]
 mod tests {
-    use super::{new_session_preparation_for_chat, NewSessionPreparation};
+    use serde_json::json;
+
+    use super::{
+        new_session_preparation_for_chat, wasm_chat_export_payload, NewSessionPreparation,
+    };
 
     #[test]
     fn wasm_with_declared_agents_prepares_orchestration_executor() {
@@ -1374,6 +1523,20 @@ mod tests {
     }
 
     #[test]
+    fn agentless_wasm_updates_entry_agent_activity_without_app_specific_branch() {
+        let source = include_str!("chat_orchestrator.rs");
+
+        assert!(source.contains("update_agent_activity_by_name"));
+        assert!(source.contains("sync_delegated_agent_activity_from_executor_event"));
+        assert!(source.contains("Handling WASM session"));
+        assert!(source.contains("macaca_proto::AgentActivity::Working"));
+        assert!(source.contains("macaca_proto::AgentActivity::Idle"));
+        assert!(source.contains("macaca_proto::AgentActivity::Error"));
+        let app_specific_name = ["wasm-crypto", "-signal-app"].concat();
+        assert!(!source.contains(&app_specific_name));
+    }
+
+    #[test]
     fn non_wasm_chat_uses_framework_executor() {
         assert_eq!(
             new_session_preparation_for_chat(false, true),
@@ -1383,6 +1546,24 @@ mod tests {
             new_session_preparation_for_chat(false, false),
             NewSessionPreparation::FrameworkExecutor
         );
+    }
+
+    #[test]
+    fn wasm_chat_payload_preserves_app_owned_typed_fields() {
+        let payload = wasm_chat_export_payload(r#"{"input":"Analyze BTC/USDT","symbol":"BTC"}"#);
+
+        assert_eq!(payload["input"], json!("Analyze BTC/USDT"));
+        assert_eq!(payload["symbol"], json!("BTC"));
+        assert_eq!(payload["channel"], json!("chat"));
+    }
+
+    #[test]
+    fn wasm_chat_payload_keeps_plain_prompt_untyped() {
+        let payload = wasm_chat_export_payload("Analyze BTC/USDT");
+
+        assert_eq!(payload["input"], json!("Analyze BTC/USDT"));
+        assert!(payload.get("symbol").is_none());
+        assert_eq!(payload["channel"], json!("chat"));
     }
 
     #[test]

@@ -24,8 +24,9 @@ use tracing::{info, warn};
 
 use crate::{
     finance_live_data::{
-        build_finance_http_client, crypto_market_output_from_binance, crypto_news_items_from_rss,
-        crypto_spot_pair, BinanceTicker24h, CRYPTO_NEWS_RSS_URL,
+        build_finance_http_client, crypto_market_output_from_binance,
+        crypto_market_output_from_okx, crypto_news_items_from_rss, crypto_okx_instrument,
+        crypto_spot_pair, BinanceTicker24h, OkxTickerEnvelope, CRYPTO_NEWS_RSS_URL,
     },
     finance_llm_analysis_provider::FinanceLlmAnalysisSystemServiceProvider,
     ServiceProviderFactoryContext, ServiceProviderInstance, ServiceRuntime,
@@ -76,24 +77,33 @@ pub(crate) fn command_trace(command: &ServiceCommand) -> ServiceResult<TraceCont
         .ok_or(ServiceError::MissingTraceContext)
 }
 
-/// Best-effort symbol parser shared by finance pack services.
+/// Extract an already-typed finance symbol from a service payload.
 ///
-/// The guest SDK remains responsible for strict validation.  Host-side domain
-/// services still normalize inputs defensively because malformed requests can
-/// arrive from old applications, direct SDK callers, or future IPC bridges.
-pub(crate) fn extract_symbol(payload: &Value) -> String {
-    let candidate = payload
-        .get("ticker")
-        .or_else(|| payload.get("symbol"))
-        .or_else(|| payload.get("input"))
-        .and_then(Value::as_str)
-        .unwrap_or_default();
-    candidate
-        .split(|ch: char| !ch.is_ascii_alphanumeric() && ch != '.' && ch != '-')
-        .find(|part| part.chars().any(|ch| ch.is_ascii_alphabetic()))
-        .unwrap_or(candidate)
-        .trim_matches(|ch: char| !ch.is_ascii_alphanumeric() && ch != '.' && ch != '-')
-        .to_ascii_uppercase()
+/// Macaca deliberately treats symbol extraction as schema validation, not
+/// natural-language understanding. Applications, guests, skills, or app-owned
+/// coordinators must normalize prompts into typed service arguments before the
+/// request crosses the OS service boundary.
+pub(crate) fn extract_symbol(payload: &Value) -> ServiceResult<String> {
+    let Some((field, raw_symbol)) = ["ticker", "symbol"].into_iter().find_map(|field| {
+        payload
+            .get(field)
+            .and_then(Value::as_str)
+            .map(|value| (field, value))
+    }) else {
+        return Err(ServiceError::InvalidArgument(
+            "finance service requires typed `symbol` or `ticker` argument".into(),
+        ));
+    };
+    let symbol = raw_symbol.trim().to_ascii_uppercase();
+    if symbol.is_empty()
+        || !(1..=12).contains(&symbol.len())
+        || !symbol.chars().all(|ch| ch.is_ascii_alphanumeric())
+    {
+        return Err(ServiceError::InvalidArgument(format!(
+            "finance service `{field}` must be a typed alphanumeric symbol, not a prompt"
+        )));
+    }
+    Ok(symbol)
 }
 
 /// Return whether the caller is requesting crypto-shaped finance data.
@@ -226,32 +236,86 @@ impl FinanceDataSystemServiceProvider {
     /// evidence for a real market snapshot.
     async fn live_crypto_market_data(&self, symbol: &str, payload: &Value) -> ServiceResult<Value> {
         let pair_symbol = crypto_spot_pair(symbol);
-        let response = self
+        let primary_result = self
             .http_client
             .get("https://api.binance.com/api/v3/ticker/24hr")
             .query(&[("symbol", pair_symbol.as_str())])
             .send()
+            .await;
+
+        match primary_result {
+            Ok(response) if response.status().is_success() => {
+                let ticker = response.json::<BinanceTicker24h>().await.map_err(|error| {
+                    ServiceError::ServiceUnavailable(format!(
+                        "live crypto market data response could not be decoded for {pair_symbol}: {error}"
+                    ))
+                })?;
+                Ok(crypto_market_output_from_binance(symbol, payload, ticker))
+            }
+            Ok(response) => {
+                let primary_error =
+                    format!("binance {pair_symbol} returned HTTP {}", response.status());
+                self.live_crypto_market_data_from_okx(symbol, payload, primary_error)
+                    .await
+            }
+            Err(error) => {
+                let primary_error = format!("binance {pair_symbol} request failed: {error}");
+                self.live_crypto_market_data_from_okx(symbol, payload, primary_error)
+                    .await
+            }
+        }
+    }
+
+    /// Fetch live crypto market data from OKX when the primary no-key quote
+    /// source is unavailable.
+    ///
+    /// This keeps the finance domain pack fail-closed while avoiding a single
+    /// exchange as a hard dependency.  If both sources fail, the returned error
+    /// includes both causes so audit traces explain why no market snapshot was
+    /// available.
+    async fn live_crypto_market_data_from_okx(
+        &self,
+        symbol: &str,
+        payload: &Value,
+        primary_error: String,
+    ) -> ServiceResult<Value> {
+        let instrument = crypto_okx_instrument(symbol);
+        let response = self
+            .http_client
+            .get("https://www.okx.com/api/v5/market/ticker")
+            .query(&[("instId", instrument.as_str())])
+            .send()
             .await
             .map_err(|error| {
                 ServiceError::ServiceUnavailable(format!(
-                    "live crypto market data request failed for {pair_symbol}: {error}"
+                    "live crypto market data failed; primary={primary_error}; fallback okx {instrument} request failed: {error}"
                 ))
             })?;
 
         if !response.status().is_success() {
             return Err(ServiceError::ServiceUnavailable(format!(
-                "live crypto market data request failed for {pair_symbol}: HTTP {}",
+                "live crypto market data failed; primary={primary_error}; fallback okx {instrument} returned HTTP {}",
                 response.status()
             )));
         }
 
-        let ticker = response.json::<BinanceTicker24h>().await.map_err(|error| {
+        let envelope = response.json::<OkxTickerEnvelope>().await.map_err(|error| {
             ServiceError::ServiceUnavailable(format!(
-                "live crypto market data response could not be decoded for {pair_symbol}: {error}"
+                "live crypto market data failed; primary={primary_error}; fallback okx {instrument} response could not be decoded: {error}"
             ))
         })?;
-
-        Ok(crypto_market_output_from_binance(symbol, payload, ticker))
+        if envelope.code != "0" {
+            return Err(ServiceError::ServiceUnavailable(format!(
+                "live crypto market data failed; primary={primary_error}; fallback okx {instrument} returned code {}",
+                envelope.code
+            )));
+        }
+        let Some(ticker) = envelope.data.into_iter().next() else {
+            return Err(ServiceError::ServiceUnavailable(format!(
+                "live crypto market data failed; primary={primary_error}; fallback okx {instrument} returned no ticker data"
+            )));
+        };
+        Ok(crypto_market_output_from_okx(symbol, payload, ticker))
     }
 
     /// Fetch a live crypto news digest from a public RSS source.
@@ -317,7 +381,7 @@ impl SystemService for FinanceDataSystemServiceProvider {
 
     async fn call(&self, command: ServiceCommand) -> ServiceResult<ServiceCallResult> {
         let trace = command_trace(&command)?;
-        let symbol = extract_symbol(&command.payload);
+        let symbol = extract_symbol(&command.payload)?;
         info!(
             service_id = %self.descriptor.id,
             command = %command.name,
@@ -441,4 +505,56 @@ pub(crate) fn service_adapter_error(error: MacacaError) -> ServiceError {
 
 fn runtime_error(error: crate::ServiceRuntimeError) -> MacacaError {
     MacacaError::Config(error.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use macaca_proto::ServiceError;
+    use serde_json::json;
+
+    use super::extract_symbol;
+
+    #[test]
+    fn extract_symbol_accepts_typed_symbol_field() {
+        let payload = json!({
+            "asset_class": "crypto",
+            "symbol": "BTC"
+        });
+
+        assert_eq!(extract_symbol(&payload).unwrap(), "BTC");
+    }
+
+    #[test]
+    fn extract_symbol_rejects_prompt_shaped_symbol_field() {
+        let payload = json!({
+            "asset_class": "crypto",
+            "symbol": "Analyze BTC/USDT now with available skills",
+            "input": "ignored"
+        });
+
+        assert!(matches!(
+            extract_symbol(&payload),
+            Err(ServiceError::InvalidArgument(message)) if message.contains("symbol")
+        ));
+    }
+
+    #[test]
+    fn extract_symbol_rejects_untyped_chat_input() {
+        let payload = json!({
+            "asset_class": "crypto",
+            "input": "Analyze SOL signal"
+        });
+
+        assert!(matches!(
+            extract_symbol(&payload),
+            Err(ServiceError::InvalidArgument(message)) if message.contains("symbol")
+        ));
+    }
+
+    #[test]
+    fn extract_symbol_accepts_ticker_alias_as_typed_field() {
+        let payload = json!({ "ticker": "AAPL" });
+
+        assert_eq!(extract_symbol(&payload).unwrap(), "AAPL");
+    }
 }

@@ -47,6 +47,43 @@ pub(crate) struct BinanceTicker24h {
     pub(crate) close_time_millis: i64,
 }
 
+/// OKX ticker response used as a secondary no-key quote source.
+///
+/// The finance-pack adapter treats exchange schemas as private DTOs.  Keeping
+/// this type beside the Binance DTO makes the failover path explicit without
+/// allowing exchange-specific field names to leak into application payloads.
+#[derive(Debug, Deserialize)]
+pub(crate) struct OkxTickerEnvelope {
+    pub(crate) code: String,
+    #[serde(default)]
+    pub(crate) data: Vec<OkxTicker>,
+}
+
+/// One OKX ticker row from `/api/v5/market/ticker`.
+#[derive(Debug, Deserialize)]
+pub(crate) struct OkxTicker {
+    #[serde(rename = "instId")]
+    pub(crate) instrument_id: String,
+    #[serde(rename = "last")]
+    pub(crate) last_price: String,
+    #[serde(rename = "open24h")]
+    pub(crate) open_24h: String,
+    #[serde(rename = "high24h")]
+    pub(crate) high_24h: String,
+    #[serde(rename = "low24h")]
+    pub(crate) low_24h: String,
+    #[serde(rename = "vol24h")]
+    pub(crate) base_volume_24h: String,
+    #[serde(rename = "volCcy24h")]
+    pub(crate) quote_volume_24h: String,
+    #[serde(rename = "bidPx")]
+    pub(crate) bid_price: String,
+    #[serde(rename = "askPx")]
+    pub(crate) ask_price: String,
+    #[serde(rename = "ts")]
+    pub(crate) timestamp_millis: String,
+}
+
 /// Build the reusable HTTP client used by live finance-pack adapters.
 ///
 /// Market-data endpoints are public internet resources, so the client honors
@@ -75,6 +112,12 @@ pub(crate) fn crypto_spot_pair(symbol: &str) -> String {
     } else {
         format!("{normalized}USDT")
     }
+}
+
+/// Convert a generic finance symbol into the OKX spot instrument id.
+pub(crate) fn crypto_okx_instrument(symbol: &str) -> String {
+    let normalized = symbol.trim().to_ascii_uppercase();
+    format!("{normalized}-USDT")
 }
 
 /// Build the stable finance-pack crypto market snapshot from live exchange data.
@@ -110,6 +153,50 @@ pub(crate) fn crypto_market_output_from_binance(
         },
         "as_of": exchange_timestamp(ticker.close_time_millis),
         "source": "binance.spot.public.24hr",
+        "input": payload,
+    })
+}
+
+/// Build the stable finance-pack crypto market snapshot from OKX ticker data.
+pub(crate) fn crypto_market_output_from_okx(
+    symbol: &str,
+    payload: &Value,
+    ticker: OkxTicker,
+) -> Value {
+    let price = parse_exchange_f64(&ticker.last_price);
+    let open_24h = parse_exchange_f64(&ticker.open_24h);
+    let day_change_percent = match (price, open_24h) {
+        (Some(last), Some(open)) if open != 0.0 => Some(((last - open) / open) * 100.0),
+        _ => None,
+    };
+    let support = parse_exchange_f64(&ticker.low_24h);
+    let resistance = parse_exchange_f64(&ticker.high_24h);
+    let base_volume = parse_exchange_f64(&ticker.base_volume_24h);
+    let quote_volume = parse_exchange_f64(&ticker.quote_volume_24h);
+    let bid = parse_exchange_f64(&ticker.bid_price);
+    let ask = parse_exchange_f64(&ticker.ask_price);
+    let close_time_millis = ticker.timestamp_millis.parse::<i64>().unwrap_or_default();
+
+    json!({
+        "symbol": symbol,
+        "asset_class": "crypto",
+        "currency": "USD",
+        "quote_symbol": "USDT",
+        "exchange_pair": ticker.instrument_id,
+        "price": price,
+        "day_change_percent": day_change_percent,
+        "volume_24h": base_volume,
+        "volume_24h_usd": quote_volume,
+        "bid": bid,
+        "ask": ask,
+        "technicals": {
+            "trend": crypto_trend(day_change_percent),
+            "volatility": crypto_volatility(day_change_percent),
+            "support": support,
+            "resistance": resistance
+        },
+        "as_of": exchange_timestamp(close_time_millis),
+        "source": "okx.spot.public.ticker",
         "input": payload,
     })
 }
@@ -198,7 +285,10 @@ fn exchange_timestamp(close_time_millis: i64) -> String {
 mod tests {
     use serde_json::json;
 
-    use super::{crypto_market_output_from_binance, crypto_news_items_from_rss, BinanceTicker24h};
+    use super::{
+        crypto_market_output_from_binance, crypto_market_output_from_okx,
+        crypto_news_items_from_rss, crypto_okx_instrument, BinanceTicker24h, OkxTicker,
+    };
 
     #[test]
     fn finance_market_data_maps_live_crypto_exchange_payload() {
@@ -233,6 +323,46 @@ mod tests {
         assert_eq!(output["technicals"]["volatility"], json!("medium"));
         assert_eq!(output["technicals"]["support"], json!(78754.65));
         assert_eq!(output["technicals"]["resistance"], json!(81152.0));
+    }
+
+    #[test]
+    fn finance_market_data_maps_okx_fallback_payload() {
+        let payload = json!({
+            "symbol": "BTC",
+            "asset_class": "crypto",
+            "lookup": "market_snapshot"
+        });
+        let output = crypto_market_output_from_okx(
+            "BTC",
+            &payload,
+            OkxTicker {
+                instrument_id: "BTC-USDT".into(),
+                last_price: "80977.8".into(),
+                open_24h: "79000.8".into(),
+                high_24h: "82048.1".into(),
+                low_24h: "79000.8".into(),
+                base_volume_24h: "7832.76".into(),
+                quote_volume_24h: "634331986.0".into(),
+                bid_price: "80977.0".into(),
+                ask_price: "80977.1".into(),
+                timestamp_millis: "1778827200000".into(),
+            },
+        );
+
+        assert_eq!(output["symbol"], json!("BTC"));
+        assert_eq!(output["source"], json!("okx.spot.public.ticker"));
+        assert_eq!(output["exchange_pair"], json!("BTC-USDT"));
+        assert_eq!(output["price"], json!(80977.8));
+        let day_change_percent = output["day_change_percent"].as_f64().unwrap();
+        assert!((day_change_percent - 2.502506303733633).abs() < f64::EPSILON);
+        assert_eq!(output["bid"], json!(80977.0));
+        assert_eq!(output["ask"], json!(80977.1));
+        assert_eq!(output["technicals"]["trend"], json!("up"));
+    }
+
+    #[test]
+    fn okx_instrument_uses_typed_base_symbol_without_pair_parsing() {
+        assert_eq!(crypto_okx_instrument("BTC"), "BTC-USDT");
     }
 
     #[test]

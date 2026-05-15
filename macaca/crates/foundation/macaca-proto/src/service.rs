@@ -265,6 +265,9 @@ pub enum ServiceError {
     #[error("service disabled by policy: {0}")]
     DisabledByPolicy(String),
 
+    #[error("invalid argument: {0}")]
+    InvalidArgument(String),
+
     #[error("unsupported command: {0}")]
     UnsupportedCommand(String),
 

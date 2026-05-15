@@ -228,6 +228,8 @@ mod tests {
         SkillSnapshotEntry {
             name: "skill".into(),
             description: "d".into(),
+            source_location: PathBuf::from("/tmp/SKILL.md"),
+            source_base_dir: PathBuf::from("/tmp"),
             location: PathBuf::from("/tmp/SKILL.md"),
             base_dir: PathBuf::from("/tmp"),
             source: "t".into(),

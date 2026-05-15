@@ -26,14 +26,16 @@ pub enum SkillSourceScope {
     ProjectAgents = 1,
     /// Application `skills/`.
     Application = 2,
-    /// User `~/.agents/skills/`.
-    UserAgents = 3,
     /// Macaca central store `~/.macaca/skills/`.
-    MacacaCentral = 4,
+    MacacaCentral = 3,
+    /// Generic user skill store `~/.agent/skills/`.
+    UserAgentGeneric = 4,
+    /// Client-specific user stores such as `~/.claude/skills/`.
+    UserClient = 5,
     /// Bundled skills shipped with Macaca.
-    Bundled = 5,
+    Bundled = 6,
     /// Extra configured directories.
-    Extra = 6,
+    Extra = 7,
 }
 
 impl SkillSourceScope {
@@ -43,8 +45,9 @@ impl SkillSourceScope {
             Self::Workspace => "workspace",
             Self::ProjectAgents => "project_agents",
             Self::Application => "application",
-            Self::UserAgents => "user_agents",
             Self::MacacaCentral => "macaca_central",
+            Self::UserAgentGeneric => "user_agent_generic",
+            Self::UserClient => "user_client",
             Self::Bundled => "bundled",
             Self::Extra => "extra",
         }

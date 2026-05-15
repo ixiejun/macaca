@@ -627,12 +627,15 @@ fn apply_host_command_template(
     host_results: &[serde_json::Value],
 ) -> serde_json::Value {
     match value {
-        serde_json::Value::String(text) if text == "${chat.input}" => export_payload
-            .get("input")
-            .cloned()
-            .unwrap_or(serde_json::Value::Null),
-        serde_json::Value::String(text) => resolve_host_result_template(&text, host_results)
-            .unwrap_or(serde_json::Value::String(text)),
+        serde_json::Value::String(text) => resolve_chat_payload_template(&text, export_payload)
+            .or_else(|| resolve_host_result_template(&text, host_results))
+            .unwrap_or_else(|| {
+                serde_json::Value::String(interpolate_host_command_template(
+                    &text,
+                    export_payload,
+                    host_results,
+                ))
+            }),
         serde_json::Value::Array(items) => serde_json::Value::Array(
             items
                 .into_iter()
@@ -651,6 +654,82 @@ fn apply_host_command_template(
         ),
         other => other,
     }
+}
+
+/// Interpolate embedded placeholders inside human-facing strings.
+///
+/// Exact placeholders are still resolved by `resolve_*_template` first so JSON
+/// payload fields keep their native value type.  This helper is only for mixed
+/// text such as `"${chat.symbol} Signal Analysis"`, where a string result is
+/// already the correct output type for GenUI labels, Markdown, or display text.
+fn interpolate_host_command_template(
+    text: &str,
+    export_payload: &serde_json::Value,
+    host_results: &[serde_json::Value],
+) -> String {
+    let mut rendered = String::with_capacity(text.len());
+    let mut remainder = text;
+    while let Some(start) = remainder.find("${") {
+        rendered.push_str(&remainder[..start]);
+        let after_start = &remainder[start..];
+        let Some(end) = after_start.find('}') else {
+            rendered.push_str(after_start);
+            return rendered;
+        };
+        let placeholder = &after_start[..=end];
+        if let Some(value) = resolve_chat_payload_template(placeholder, export_payload)
+            .or_else(|| resolve_host_result_template(placeholder, host_results))
+        {
+            rendered.push_str(&template_value_to_display_text(&value));
+        } else {
+            rendered.push_str(placeholder);
+        }
+        remainder = &after_start[end + 1..];
+    }
+    rendered.push_str(remainder);
+    rendered
+}
+
+/// Convert an interpolated JSON value into stable display text.
+///
+/// Scalar values render without JSON quotes so labels stay clean; structured
+/// values use compact JSON so audit text remains deterministic if an app embeds
+/// a non-scalar placeholder in a display string.
+fn template_value_to_display_text(value: &serde_json::Value) -> String {
+    match value {
+        serde_json::Value::Null => String::new(),
+        serde_json::Value::String(value) => value.clone(),
+        serde_json::Value::Bool(value) => value.to_string(),
+        serde_json::Value::Number(value) => value.to_string(),
+        serde_json::Value::Array(_) | serde_json::Value::Object(_) => {
+            serde_json::to_string(value).unwrap_or_else(|_| value.to_string())
+        }
+    }
+}
+
+/// Resolve an exact chat-payload placeholder without interpreting its content.
+///
+/// This is intentionally a structural lookup only.  `${chat.symbol}` means the
+/// app/coordinator already supplied a typed `symbol` field in the export
+/// payload; the runtime must never parse `${chat.input}` or infer domain data
+/// from free-form prose.
+fn resolve_chat_payload_template(
+    text: &str,
+    export_payload: &serde_json::Value,
+) -> Option<serde_json::Value> {
+    let path = text.strip_prefix("${chat.")?.strip_suffix('}')?;
+    let mut current = export_payload.clone();
+    for part in path.split('.') {
+        current = match current {
+            serde_json::Value::Object(map) => map.get(part)?.clone(),
+            serde_json::Value::Array(items) => {
+                let item_index = part.parse::<usize>().ok()?;
+                items.get(item_index)?.clone()
+            }
+            _ => return None,
+        };
+    }
+    Some(current)
 }
 
 /// Resolve a full-value placeholder against prior declared host-command results.

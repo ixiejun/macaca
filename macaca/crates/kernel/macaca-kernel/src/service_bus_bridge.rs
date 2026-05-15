@@ -99,6 +99,9 @@ where
                     macaca_proto::ServiceError::MissingTraceContext => {
                         ServiceBusError::MissingTraceContext
                     }
+                    macaca_proto::ServiceError::InvalidArgument(reason) => {
+                        ServiceBusError::InvalidArgument(reason)
+                    }
                     other => ServiceBusError::ServiceError(other.to_string()),
                 })
             }

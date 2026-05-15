@@ -7,10 +7,8 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use axum::response::sse::Event;
 use macaca_app::AppLoader;
 use macaca_framework::tool::Toolkit;
-use macaca_persist::AppendEventCommand;
 use macaca_proto::{ApplicationId, TraceContext};
 use macaca_runtime_host::compat::default_registry;
 use macaca_runtime_host::{
@@ -23,6 +21,7 @@ use macaca_skill::{
 };
 use serde::Serialize;
 
+use crate::runtime_event_bridge::{emit_runtime_event, emit_skill_snapshot_event};
 use crate::state::AppState;
 
 #[derive(Debug, Clone)]
@@ -120,6 +119,7 @@ pub(crate) async fn load_or_build_skill_snapshot(
     agent_name: &str,
     session_id: Option<&str>,
 ) -> Option<SkillSnapshot> {
+    const TRACE_ID: &str = "web-skill-mcp-snapshot";
     let snapshot_module = format!("skill_snapshot/{agent_name}");
     if let Some(session_id) = session_id {
         if let Ok(Some(value)) = state
@@ -129,6 +129,15 @@ pub(crate) async fn load_or_build_skill_snapshot(
             .await
         {
             if let Ok(snapshot) = serde_json::from_value::<SkillSnapshot>(value) {
+                emit_skill_snapshot_event(
+                    state,
+                    session_id,
+                    agent_name,
+                    "skill_snapshot_cache_hit",
+                    &snapshot,
+                    TRACE_ID,
+                )
+                .await;
                 return Some(snapshot);
             }
         }
@@ -145,14 +154,29 @@ pub(crate) async fn load_or_build_skill_snapshot(
     let policy = resolve_agent_skill_policy(state, app_id, agent_name).await;
     let app_dir = app.path.clone();
     let request = SkillSnapshotRequest::builder(agent_name)
-        .workspace_dir(workspace_dir)
+        .workspace_dir(workspace_dir.clone())
         .app_dir(Some(app_dir.clone()))
-        .policy(policy)
+        .policy(policy.clone())
         .build();
+    if let Some(session_id) = session_id {
+        emit_runtime_event(
+            state,
+            session_id,
+            "skill_snapshot_build_started",
+            agent_name,
+            Some(agent_name),
+            serde_json::json!({
+                "agent": agent_name,
+                "trace_id": TRACE_ID,
+                "workspace_projected": workspace_dir.is_some(),
+            }),
+        )
+        .await;
+    }
     let snapshot = match state
         .skill_client
         .snapshot(SkillSnapshotServiceCommand {
-            trace: TraceContext::new("web-skill-mcp-snapshot"),
+            trace: TraceContext::new(TRACE_ID),
             scope: SkillServiceScope::agent(
                 *app_id,
                 session_id.unwrap_or("no-session"),
@@ -160,8 +184,10 @@ pub(crate) async fn load_or_build_skill_snapshot(
             )
             .ok()?,
             agent_name: agent_name.to_string(),
+            workspace_dir,
             app_dir: Some(app_dir),
             include_instructions: true,
+            exposure_policy: policy,
             policy: Default::default(),
         })
         .await
@@ -173,6 +199,21 @@ pub(crate) async fn load_or_build_skill_snapshot(
                 agent = %agent_name,
                 "Skill Service snapshot failed; using deprecated SkillRuntimeFacade fallback"
             );
+            if let Some(session_id) = session_id {
+                emit_runtime_event(
+                    state,
+                    session_id,
+                    "skill_snapshot_failed",
+                    agent_name,
+                    Some(agent_name),
+                    serde_json::json!({
+                        "agent": agent_name,
+                        "trace_id": TRACE_ID,
+                        "error": error.to_string(),
+                    }),
+                )
+                .await;
+            }
             #[allow(deprecated)]
             SkillRuntimeFacade::new()
                 .build_snapshot(request)
@@ -181,12 +222,32 @@ pub(crate) async fn load_or_build_skill_snapshot(
         }
     };
     if let Some(session_id) = session_id {
+        emit_skill_snapshot_event(
+            state,
+            session_id,
+            agent_name,
+            "skill_snapshot_ready",
+            &snapshot,
+            TRACE_ID,
+        )
+        .await;
+    }
+    if let Some(session_id) = session_id {
         if let Ok(value) = serde_json::to_value(&snapshot) {
             let _ = state
                 .sessions
                 .framework_session_store
                 .save(session_id, &snapshot_module, value)
                 .await;
+            emit_skill_snapshot_event(
+                state,
+                session_id,
+                agent_name,
+                "skill_snapshot_cached",
+                &snapshot,
+                TRACE_ID,
+            )
+            .await;
         }
     }
     Some(snapshot)
@@ -318,31 +379,15 @@ async fn emit_skill_mcp_event(
             target.insert(key.clone(), value.clone());
         }
     }
-    state
-        .persist
-        .event_log
-        .append_command(AppendEventCommand::new(
-            session_id,
-            event_type,
-            agent_name,
-            payload.clone(),
-        ))
-        .await;
-
-    let sse_tx = {
-        let active_sessions = state.sessions.active_sessions.read().await;
-        active_sessions
-            .get(session_id)
-            .map(|session| Arc::clone(&session.sse_tx))
-    };
-    if let Some(sse_tx) = sse_tx {
-        let sender = sse_tx.read().await;
-        let _ = sender
-            .send(Ok(Event::default()
-                .event(event_type)
-                .data(payload.to_string())))
-            .await;
-    }
+    emit_runtime_event(
+        state,
+        session_id,
+        event_type,
+        agent_name,
+        Some(agent_name),
+        payload,
+    )
+    .await;
 }
 
 #[cfg(test)]
@@ -366,6 +411,8 @@ mod tests {
         SkillSnapshotEntry {
             name: "playwright-mcp".into(),
             description: "Browser".into(),
+            source_location: std::path::PathBuf::from("/tmp/SKILL.md"),
+            source_base_dir: std::path::PathBuf::from("/tmp"),
             location: std::path::PathBuf::from("/tmp/SKILL.md"),
             base_dir: std::path::PathBuf::from("/tmp"),
             source: "test".into(),

@@ -412,6 +412,40 @@ async fn wasm_host_import_unknown_service_is_structured_unavailable() {
 }
 
 #[tokio::test]
+async fn wasm_host_import_service_failure_is_structured_unavailable_not_policy_denied() {
+    let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
+    let service_id =
+        register_mock_service_with_failure(&runtime, "wasm.host.service.failing", true).await;
+    let bridge = Arc::new(WasmHostImportBridge::new(
+        Arc::clone(&runtime),
+        WasmHostImportBridgeConfig::default(),
+    ));
+    let provider = DefaultInProcessWasmRuntimeProvider::default().with_host_import_bridge(bridge);
+    let session = provider
+        .create_session(traced_request("trace-host-import-provider"))
+        .await
+        .unwrap();
+    let command = host_import_command(
+        "trace-host-import-service-failure",
+        &service_id,
+        "invoke",
+        json!({"input": true}),
+        "service.call",
+    );
+
+    let result = session.dispatch(command).await.unwrap();
+
+    assert!(matches!(
+        result.status,
+        ApplicationHostCommandStatus::Unavailable { .. }
+    ));
+    assert_eq!(
+        result.metadata.get("reason_code").map(String::as_str),
+        Some("service_failed")
+    );
+}
+
+#[tokio::test]
 async fn wasm_host_import_applies_app_scoped_policy_override_and_denies_service() {
     let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
     let service_id = register_mock_service(&runtime, "wasm.host.service.policy.denied").await;
@@ -480,16 +514,29 @@ async fn wasm_host_import_sanitizes_service_result_metadata() {
 }
 
 async fn register_mock_service(runtime: &ServiceRuntime, service_id: &str) -> KernelServiceId {
+    register_mock_service_with_failure(runtime, service_id, false).await
+}
+
+async fn register_mock_service_with_failure(
+    runtime: &ServiceRuntime,
+    service_id: &str,
+    fail_calls: bool,
+) -> KernelServiceId {
     let descriptor = ServiceDescriptor::new(
         KernelServiceId::new(service_id),
         ServiceType::new("test.service"),
         TraceSchemaRef::new("trace.test.service.v1"),
     );
+    let service: Arc<dyn macaca_kernel::SystemService> = if fail_calls {
+        Arc::new(MockSystemService::failing(descriptor.clone()))
+    } else {
+        Arc::new(MockSystemService::new(descriptor.clone()))
+    };
     let service_id = runtime
         .register_provider(
             &StaticServiceProviderFactory::new(ServiceProviderInstance::new(
                 descriptor.clone(),
-                Arc::new(MockSystemService::new(descriptor)),
+                service,
             )),
             Default::default(),
         )

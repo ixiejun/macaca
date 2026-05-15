@@ -28,6 +28,9 @@ pub enum ServiceRuntimeError {
     #[error("policy denied: {0}")]
     PolicyDenied(String),
 
+    #[error("invalid argument: {0}")]
+    InvalidArgument(String),
+
     #[error("service bus error: {0}")]
     Bus(String),
 
@@ -43,6 +46,7 @@ impl From<ServiceBusError> for ServiceRuntimeError {
         match value {
             ServiceBusError::MissingTraceContext => Self::MissingTraceContext,
             ServiceBusError::PolicyDenied(reason) => Self::PolicyDenied(reason),
+            ServiceBusError::InvalidArgument(reason) => Self::InvalidArgument(reason),
             other => Self::Bus(other.to_string()),
         }
     }

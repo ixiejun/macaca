@@ -219,7 +219,10 @@ pub async fn start_hook_event_consumer(state: Arc<AppState>) {
                     }
 
                     Err(tokio::sync::broadcast::error::TryRecvError::Closed) => {
-                        warn!(app_id = %app_id, "Hook broadcast channel closed, will re-subscribe");
+                        tracing::debug!(
+                            app_id = %app_id,
+                            "Hook broadcast channel closed during normal receiver churn; re-subscribing"
+                        );
                         // Remove this receiver so we re-subscribe next iteration
                         break;
                     }
