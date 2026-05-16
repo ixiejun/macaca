@@ -145,6 +145,46 @@ enum DriverTraceRoute {
     },
 }
 
+impl DriverTraceRoute {
+    /// Return a bounded route label for structured diagnostics.
+    ///
+    /// The label is intentionally static and provider-neutral. It is used only
+    /// when trace routing suppresses a framework wrapper event that is already
+    /// represented by a semantic agent-execution tool event.
+    fn label(&self) -> &'static str {
+        match self {
+            DriverTraceRoute::Executor { .. } => "executor",
+            DriverTraceRoute::Runtime { .. } => "runtime",
+            DriverTraceRoute::Coordinator { .. } => "coordinator",
+        }
+    }
+}
+
+/// Return whether a tool trace is only the framework's generic wrapper event.
+///
+/// Macaca emits semantic `AgentExecutionEvent::ToolCall` and
+/// `AgentExecutionEvent::ToolResult` events at the agent-execution layer. The
+/// lower tool-command pipeline also emits `TraceEvent` values for the same
+/// call/result lifecycle when a concrete driver does not provide its own trace
+/// identity. Those no-driver wrapper traces are useful as a fallback in raw
+/// tool pipelines, but forwarding them as `DriverTrace` inside agent execution
+/// would persist the same logical operation twice. Concrete driver/provider
+/// traces still pass through because they carry a real `driver_id` or a richer
+/// diagnostic event type.
+fn is_framework_tool_wrapper_trace(trace: &macaca_tools::TraceEvent) -> bool {
+    trace.driver_id.is_none() && matches!(trace.event_type.as_str(), "tool_call" | "tool_result")
+}
+
+/// Decide whether a trace event should be forwarded as a driver trace.
+///
+/// This small Specification keeps Executor, Runtime, and Coordinator routing in
+/// sync. It avoids frontend-only hiding and keeps EventLog replay faithful:
+/// semantic tool events remain durable, while redundant framework wrappers are
+/// suppressed before they become driver-trace events.
+fn should_forward_driver_trace(trace: &macaca_tools::TraceEvent) -> bool {
+    !is_framework_tool_wrapper_trace(trace)
+}
+
 #[async_trait]
 impl TracedAgentFactory for WebTracedAgentFactory {
     type Output = HookedAgent<ReActAgent>;
@@ -1541,8 +1581,16 @@ impl WebTracedAgentFactory {
 
         tokio::spawn(async move {
             while let Some(trace) = trace_rx.recv().await {
-                let framework_tool_wrapper = trace.driver_id.is_none()
-                    && matches!(trace.event_type.as_str(), "tool_call" | "tool_result");
+                if !should_forward_driver_trace(&trace) {
+                    tracing::debug!(
+                        route = route.label(),
+                        event_type = %trace.event_type,
+                        tool_name = trace.tool_name.as_deref().unwrap_or(""),
+                        correlation_id = trace.correlation_id.as_deref().unwrap_or(""),
+                        "suppressed framework wrapper trace already represented by semantic tool event"
+                    );
+                    continue;
+                }
                 let driver_name = trace
                     .driver_id
                     .clone()
@@ -1556,10 +1604,6 @@ impl WebTracedAgentFactory {
                         agent_name,
                         ..
                     } => {
-                        if framework_tool_wrapper {
-                            continue;
-                        }
-
                         // Executor routes publish through the executor broadcast channel only.
                         // post_chat_v2 owns the SSE forwarding for that channel; sending here
                         // as well would duplicate delegated_driver_trace events in the live UI.
@@ -1588,10 +1632,6 @@ impl WebTracedAgentFactory {
                         agent_name,
                         session_id,
                     } => {
-                        if framework_tool_wrapper {
-                            continue;
-                        }
-
                         if let Some(sid) = session_id {
                             event_log
                                 .append_command(AppendEventCommand::new(
@@ -2130,12 +2170,14 @@ impl ToolMiddleware for ExecutorToolMiddleware {
 #[cfg(test)]
 mod tests {
     use super::{
-        tool_response_text, truncate_tool_output, ExecutionControlMiddleware, FrameworkRunner,
+        is_framework_tool_wrapper_trace, should_forward_driver_trace, tool_response_text,
+        truncate_tool_output, ExecutionControlMiddleware, FrameworkRunner,
     };
     use macaca_app::model::AppContextConfig;
     use macaca_framework::message::{ContentBlock, TextBlock};
     use macaca_framework::tool::ToolResponse;
     use macaca_proto::config::{AgentProfileContextConfig, ContextConfig};
+    use macaca_tools::TraceEvent;
 
     #[test]
     fn truncate_tool_output_respects_utf8_boundaries() {
@@ -2206,6 +2248,81 @@ mod tests {
         assert!(source.contains("skill_snapshot_unavailable"));
         assert!(source.contains("snapshot.tool_policy"));
         assert!(source.contains("agent_context_built"));
+    }
+
+    #[test]
+    fn framework_tool_wrapper_trace_is_suppressed_without_driver_identity() {
+        let call_trace = TraceEvent {
+            event_type: "tool_call".into(),
+            tool_name: Some("browser_run_code".into()),
+            ..Default::default()
+        };
+        let result_trace = TraceEvent {
+            event_type: "tool_result".into(),
+            tool_name: Some("browser_run_code".into()),
+            ..Default::default()
+        };
+
+        assert!(is_framework_tool_wrapper_trace(&call_trace));
+        assert!(is_framework_tool_wrapper_trace(&result_trace));
+        assert!(!should_forward_driver_trace(&call_trace));
+        assert!(!should_forward_driver_trace(&result_trace));
+    }
+
+    #[test]
+    fn non_wrapper_driver_traces_are_preserved_for_diagnostics() {
+        let no_driver_diagnostic = TraceEvent {
+            event_type: "thinking".into(),
+            tool_name: Some("browser_run_code".into()),
+            ..Default::default()
+        };
+        let concrete_driver_call = TraceEvent {
+            event_type: "tool_call".into(),
+            driver_id: Some("browser-driver".into()),
+            tool_name: Some("browser_run_code".into()),
+            ..Default::default()
+        };
+        let concrete_driver_result = TraceEvent {
+            event_type: "tool_result".into(),
+            driver_id: Some("browser-driver".into()),
+            tool_name: Some("browser_run_code".into()),
+            ..Default::default()
+        };
+
+        assert!(!is_framework_tool_wrapper_trace(&no_driver_diagnostic));
+        assert!(should_forward_driver_trace(&no_driver_diagnostic));
+        assert!(!is_framework_tool_wrapper_trace(&concrete_driver_call));
+        assert!(should_forward_driver_trace(&concrete_driver_call));
+        assert!(!is_framework_tool_wrapper_trace(&concrete_driver_result));
+        assert!(should_forward_driver_trace(&concrete_driver_result));
+    }
+
+    #[test]
+    fn runtime_driver_trace_route_uses_shared_wrapper_suppression() {
+        let source = include_str!("framework_runner.rs");
+        let attach_start = source
+            .find("async fn attach_driver_trace_route")
+            .expect("driver trace route attachment should exist");
+        let attach_end = source[attach_start..]
+            .find("fn build_executor_agent")
+            .map(|offset| attach_start + offset)
+            .expect("driver trace route attachment should end before executor builder");
+        let attach_source = &source[attach_start..attach_end];
+        let guard_position = attach_source
+            .find("if !should_forward_driver_trace(&trace)")
+            .expect("driver trace routing should use shared suppression guard");
+        let runtime_position = attach_source
+            .find("DriverTraceRoute::Runtime")
+            .expect("runtime driver trace route should exist");
+
+        assert!(
+            guard_position < runtime_position,
+            "runtime route must pass through the shared wrapper suppression guard before forwarding"
+        );
+        assert!(
+            !attach_source.contains("framework_tool_wrapper"),
+            "route-specific wrapper predicates would let Runtime drift from Executor again"
+        );
     }
 
     #[test]
