@@ -262,6 +262,15 @@ pub struct McpServiceSnapshot {
     pub service_id: String,
     pub healthy: bool,
     pub registered_definitions: usize,
+    /// Optional sanitized server-definition payloads requested by clients that
+    /// need to mirror registration state across a service boundary.
+    ///
+    /// The MCP service keeps this field as JSON values rather than depending on
+    /// runtime-host concrete structs in `macaca-proto`.  That preserves the
+    /// Command/DTO boundary: callers may deserialize into their local adapter
+    /// type when they intentionally bridge compatibility behavior, while the
+    /// shared contract remains provider-neutral and auditable.
+    pub definitions: Vec<serde_json::Value>,
     pub ready: usize,
     pub failed: usize,
     pub dependency_missing: usize,
@@ -278,6 +287,7 @@ impl McpServiceSnapshot {
             service_id: MCP_SERVICE_ID.into(),
             healthy: false,
             registered_definitions: 0,
+            definitions: Vec::new(),
             ready: 0,
             failed: 0,
             dependency_missing: 0,

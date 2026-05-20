@@ -1,14 +1,13 @@
-//! Kernel — the central orchestrator that ties agents, LLM, tools, and services together.
+//! Kernel — the central orchestrator for agent identity, status, and execution dispatch.
 
 use std::sync::Arc;
 
-use macaca_agent::AgentServices;
+use macaca_agent::AgentExecutionPort;
 use macaca_proto::config::KernelConfig;
 use macaca_proto::{
     AgentActivity, AgentId, AgentManifest, AgentOutput, AgentState, MacacaError, MacacaResult,
 };
 
-use crate::provider_compat::KernelProviderCompat;
 use crate::registry::AgentRegistry;
 use crate::scheduler::Scheduler;
 use crate::status::AgentStatusTracker;
@@ -18,24 +17,24 @@ pub struct Kernel {
     registry: AgentRegistry,
     scheduler: Box<dyn Scheduler>,
     status_tracker: AgentStatusTracker,
-    providers: KernelProviderCompat,
+    execution_port: Arc<dyn AgentExecutionPort>,
 }
 
 impl Kernel {
     pub(crate) fn from_parts(
         config: KernelConfig,
-        providers: KernelProviderCompat,
+        execution_port: Arc<dyn AgentExecutionPort>,
         scheduler: Box<dyn Scheduler>,
     ) -> Self {
         tracing::info!(
             max_agents = config.max_agents,
-            "kernel created through provider compatibility boundary"
+            "kernel created with provider-neutral execution port"
         );
         Self {
             registry: AgentRegistry::new(config.max_agents),
             scheduler,
             status_tracker: AgentStatusTracker::new(),
-            providers,
+            execution_port,
         }
     }
 
@@ -79,13 +78,15 @@ impl Kernel {
 
     /// Execute a registered agent by ID.
     ///
-    /// Builds an `AgentServices` bundle (empty for now — real injection in Phase 4+)
-    /// and invokes `agent.run()`.
+    /// The kernel owns lookup, status transitions, and audit-friendly logs. The
+    /// replaceable execution mechanics are delegated to `AgentExecutionPort`,
+    /// which allows service-client execution, legacy adapters, or test doubles
+    /// to be swapped without moving provider logic into the kernel.
     pub async fn execute_agent(&self, agent_id: &AgentId) -> MacacaResult<AgentOutput> {
         tracing::info!(agent_id = %agent_id.0, "kernel agent execution started");
-        let services = AgentServices::builder().build();
 
-        // Mark as thinking
+        // Status tracking remains a kernel invariant because shells and service
+        // clients depend on these lifecycle observations for diagnostics.
         self.status_tracker
             .set_thinking(agent_id, "executing agent")
             .await;
@@ -94,14 +95,28 @@ impl Kernel {
         let entry = map
             .get(agent_id)
             .ok_or_else(|| MacacaError::NotFound(format!("Agent {} not found", agent_id.0)))?;
-        let output = entry
-            .agent
-            .run(self.providers.llm(), self.providers.tools(), &services)
+        let output = self
+            .execution_port
+            .execute_registered_agent(agent_id, entry.agent.as_ref())
             .await;
 
-        // Mark as idle after execution
+        // The current compatibility behavior marks agents idle after the
+        // delegate returns, even when the delegate reports an error. Preserve
+        // that observable transition while the execution service is introduced.
         self.status_tracker.set_idle(agent_id).await;
-        tracing::info!(agent_id = %agent_id.0, "kernel agent execution finished");
+        match &output {
+            Ok(result) => tracing::info!(
+                agent_id = %agent_id.0,
+                artifacts = result.artifacts.len(),
+                total_tokens = result.tokens_used.total_tokens,
+                "kernel agent execution finished"
+            ),
+            Err(error) => tracing::warn!(
+                agent_id = %agent_id.0,
+                error = %error,
+                "kernel agent execution failed"
+            ),
+        }
 
         output
     }
@@ -173,12 +188,11 @@ mod tests {
     use super::*;
     use async_trait::async_trait;
     use chrono::Utc;
-    use macaca_agent::Agent;
+    use macaca_agent::{Agent, AgentServices};
     use macaca_proto::{
         AgentState, Capability, LlmMessage, LlmOptions, LlmResponse, Permission, PermissionLevel,
         TokenUsage,
     };
-    use macaca_tools::DefaultToolSet;
 
     struct MockLlm;
 
@@ -245,9 +259,12 @@ mod tests {
             agent_timeout_ms: 30000,
         };
         let llm: Arc<dyn crate::LegacyLlmProvider> = Arc::new(MockLlm);
-        crate::KernelBuilder::from_compat(
+        crate::KernelBuilder::from_service_clients(
             config,
-            crate::KernelProviderCompat::new(llm, Box::new(DefaultToolSet::new())),
+            crate::KernelServiceClientCompat::from_agent_provider_boxed_tools(
+                llm,
+                Box::new(macaca_tools::DefaultToolSet::new()),
+            ),
         )
         .build()
     }

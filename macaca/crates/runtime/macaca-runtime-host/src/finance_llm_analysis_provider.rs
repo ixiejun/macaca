@@ -18,8 +18,12 @@ use serde_json::{json, Value};
 use tracing::{info, warn};
 
 use crate::domain_pack_service_provider::{
-    command_trace, extract_symbol, finance_descriptor, service_adapter_error, service_result,
-    FINANCE_ANALYZE_COMMAND, FINANCE_LLM_ANALYSIS_SERVICE_ID,
+    command_trace,
+    finance_fixture::{
+        extract_symbol, finance_descriptor, FINANCE_ANALYZE_COMMAND,
+        FINANCE_LLM_ANALYSIS_SERVICE_ID,
+    },
+    service_adapter_error, service_result,
 };
 
 /// LLM-backed analysis adapter for the finance domain pack.

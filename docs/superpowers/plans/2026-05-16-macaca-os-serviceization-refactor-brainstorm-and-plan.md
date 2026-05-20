@@ -288,15 +288,15 @@ OpenSpec baseline track:
 - Modify: `macaca/crates/shells/macaca-cli/src/command_handlers.rs`
 - Add if required: small public bootstrap facade outside Web internals.
 
-- [ ] Step 1: Run GitNexus impact for CLI command handlers that construct kernel, gateway, tools, or Web server state.
+- [x] Step 1: Run GitNexus impact for CLI command handlers that construct kernel, gateway, tools, or Web server state.
 
-- [ ] Step 2: Replace status/run provider construction with SDK/runtime service inspector clients.
+- [x] Step 2: Replace status/run provider construction with SDK/runtime service inspector clients.
 
-- [ ] Step 3: Remove `macaca-cli -> macaca-web` as a direct internal dependency.
+- [x] Step 3: Remove `macaca-cli -> macaca-web` as a direct internal dependency.
 
   If `macaca web` still needs to start a server, expose only a tiny public bootstrap contract or binary entrypoint facade. CLI must not import Web internals.
 
-- [ ] Step 4: Validate:
+- [x] Step 4: Validate:
 
   ```bash
   cargo tree -e normal -p macaca-cli --depth 1
@@ -311,17 +311,17 @@ OpenSpec baseline track:
 - Modify: `macaca/crates/runtime/macaca-runtime-host/src/finance_live_data.rs`
 - Add later: plugin/package domain-pack provider fixture outside base runtime-host.
 
-- [ ] Step 1: Run GitNexus impact for domain-pack provider symbols.
+- [x] Step 1: Run GitNexus impact for domain-pack provider symbols.
 
-- [ ] Step 2: Split generic registration mechanics from finance/crypto behavior.
+- [x] Step 2: Split generic registration mechanics from finance/crypto behavior.
 
   Runtime-host may keep provider factory and service registration mechanics. It must not own finance/crypto business rules as base behavior.
 
-- [ ] Step 3: Move fixed service IDs and exchange/RSS adapters into plugin/package provider metadata.
+- [x] Step 3: Move fixed service IDs and exchange/RSS adapters into plugin/package provider metadata.
 
-- [ ] Step 4: Keep deterministic fixtures in tests only.
+- [x] Step 4: Keep deterministic fixtures in tests only.
 
-- [ ] Step 5: Validate optional absence.
+- [x] Step 5: Validate optional absence.
 
   Missing domain-pack providers must return structured unavailable/disabled states, not crash, hang, silent fallback, or fake success.
 
@@ -333,13 +333,13 @@ OpenSpec baseline track:
 - Modify: `macaca/crates/services/macaca-llm/src/resolver.rs`
 - Add tests under `macaca/crates/services/macaca-llm/`.
 
-- [ ] Step 1: Run GitNexus impact for router and resolver symbols.
+- [x] Step 1: Run GitNexus impact for router and resolver symbols.
 
-- [ ] Step 2: Move built-in provider/model prefix rules into descriptors or resolver-chain configuration.
+- [x] Step 2: Move built-in provider/model prefix rules into descriptors or resolver-chain configuration.
 
-- [ ] Step 3: Keep default resolver behavior compatible, but make it data-driven.
+- [x] Step 3: Keep default resolver behavior compatible, but make it data-driven.
 
-- [ ] Step 4: Add audit tests proving kernel/Web/CLI do not branch on provider or model names.
+- [x] Step 4: Add audit tests proving kernel/Web/CLI do not branch on provider or model names.
 
 ## Task 8: Align OpenSpec Baseline
 
@@ -348,18 +348,23 @@ OpenSpec baseline track:
 - Modify: `openspec/specs/**`
 - Archive completed changes under `openspec/changes/archive/**`
 
-- [ ] Step 1: Archive baseline governance changes first.
+- [x] Step 1: Archive baseline governance changes first.
 
-  Start with service runtime, dependency gate, SDK/SystemFacade, Web/CLI thin shell, application service, and execution-control service.
+  Archived the completed service runtime, dependency gate, SDK/SystemFacade,
+  Web/CLI thin shell, execution-control service, and serviceization
+  escape-hatch changes. The application framework service change remains active
+  because its checklist is not complete, so it was not promoted into baseline
+  truth.
 
-- [ ] Step 2: Add or update baseline specs.
+- [x] Step 2: Add or update baseline specs.
 
-  Baseline specs must describe current stable contracts, not historical task lists.
+  Baseline specs now describe stable contracts for the archived serviceization
+  governance batch rather than historical task lists.
 
-- [ ] Step 3: Validate after each batch:
+- [x] Step 3: Validate after each batch:
 
   ```bash
-  openspec validate --strict
+  openspec validate --all --strict
   ```
 
 ## Global Verification Gates

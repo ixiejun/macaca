@@ -1,12 +1,17 @@
-//! Security audit log system — records structured audit events to RedbStore
-//! and provides a query API with filtering support.
+//! Security audit log system.
+//!
+//! Audit records are stored through the kernel persistence port rather than a
+//! concrete database crate.  This keeps the microkernel responsible for the
+//! audit contract and lets service/runtime composition choose the durable
+//! backend.
 
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use macaca_persist::PersistBackend;
 use macaca_proto::ApplicationId;
 use serde::{Deserialize, Serialize};
+
+use crate::persistence::KernelPersistencePort;
 
 /// Types of auditable events.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -89,14 +94,23 @@ pub struct AuditQuery {
 
 const AUDIT_PREFIX: &str = "audit/";
 
-/// Persistent audit logger backed by RedbStore.
+/// Persistent audit logger backed by a provider-neutral kernel port.
 #[derive(Clone)]
 pub struct AuditLogger {
-    store: Arc<dyn PersistBackend>,
+    store: Arc<dyn KernelPersistencePort>,
 }
 
 impl AuditLogger {
-    pub fn new(store: Arc<dyn PersistBackend>) -> Self {
+    /// Create an audit logger over a replaceable persistence repository.
+    ///
+    /// The logger only depends on key-value semantics: serialize the audit
+    /// memento, write it under a stable prefix, and replay by listing that
+    /// prefix.  Concrete database selection happens outside the kernel.
+    pub fn new(store: Arc<dyn KernelPersistencePort>) -> Self {
+        tracing::info!(
+            backend = store.backend_name(),
+            "audit logger initialized with kernel persistence port"
+        );
         Self { store }
     }
 
@@ -112,9 +126,21 @@ impl AuditLogger {
     pub async fn record(&self, event: AuditEvent) {
         let key = Self::event_key(&event.app_id, &event.id);
         match serde_json::to_vec(&event) {
-            Ok(data) => {
-                let _ = self.store.set(&key, &data).await;
-            }
+            Ok(data) => match self.store.set(&key, &data).await {
+                Ok(()) => tracing::debug!(
+                    key,
+                    event_id = %event.id,
+                    app_id = %event.app_id,
+                    "audit event persisted"
+                ),
+                Err(error) => tracing::error!(
+                    key,
+                    event_id = %event.id,
+                    app_id = %event.app_id,
+                    error = %error,
+                    "failed to persist audit event"
+                ),
+            },
             Err(e) => tracing::error!("Failed to serialize audit event: {}", e),
         }
     }
@@ -189,14 +215,55 @@ mod tests {
     use std::sync::Arc;
 
     use chrono::Duration;
+    use macaca_proto::MacacaResult;
     use tempfile::tempdir;
+    use tokio::sync::RwLock;
 
     use super::*;
 
+    #[derive(Default)]
+    struct TestPersistencePort {
+        values: RwLock<std::collections::BTreeMap<String, Vec<u8>>>,
+    }
+
+    #[async_trait::async_trait]
+    impl KernelPersistencePort for TestPersistencePort {
+        async fn get(&self, key: &str) -> MacacaResult<Option<Vec<u8>>> {
+            Ok(self.values.read().await.get(key).cloned())
+        }
+
+        async fn set(&self, key: &str, value: &[u8]) -> MacacaResult<()> {
+            self.values
+                .write()
+                .await
+                .insert(key.to_string(), value.to_vec());
+            Ok(())
+        }
+
+        async fn delete(&self, key: &str) -> MacacaResult<()> {
+            self.values.write().await.remove(key);
+            Ok(())
+        }
+
+        async fn list_keys(&self, prefix: &str) -> MacacaResult<Vec<String>> {
+            Ok(self
+                .values
+                .read()
+                .await
+                .keys()
+                .filter(|key| key.starts_with(prefix))
+                .cloned()
+                .collect())
+        }
+
+        fn backend_name(&self) -> &'static str {
+            "test-audit-memory"
+        }
+    }
+
     fn make_logger() -> (AuditLogger, tempfile::TempDir) {
         let dir = tempdir().expect("tempdir");
-        let path = dir.path().join("audit_test.db");
-        let store = Arc::new(macaca_persist::RedbStore::open(path).expect("open store"));
+        let store = Arc::new(TestPersistencePort::default());
         (AuditLogger::new(store), dir)
     }
 

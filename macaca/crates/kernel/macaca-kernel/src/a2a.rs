@@ -13,7 +13,6 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use chrono::Utc;
-use macaca_persist::{PaymentStateTransition, PaymentStore};
 use macaca_proto::{
     A2AError, ApprovalPolicy, BudgetPolicy, ExecutionProof, ExecutionProofId, PaymentIntent,
     PaymentIntentId, PaymentIntentState, PaymentRail, PaymentReceipt, PaymentReceiptId,
@@ -24,6 +23,7 @@ use uuid::Uuid;
 
 use crate::a2a_event::{A2APaymentEvent, A2APaymentEventSink, NoopA2APaymentEventSink};
 use crate::payment_policy::{DefaultPaymentPolicyEngine, PaymentPolicyEngine};
+use crate::persistence::{KernelPaymentStateTransition, KernelPaymentStorePort};
 
 /// Strategy boundary for A2A/payment adapters.
 ///
@@ -152,7 +152,7 @@ pub trait A2APaymentFacade: Send + Sync {
 pub struct A2ACoordinator {
     adapter: Arc<dyn A2AProtocolAdapter>,
     policy: Arc<dyn PaymentPolicyEngine>,
-    store: Arc<dyn PaymentStore>,
+    store: Arc<dyn KernelPaymentStorePort>,
     event_sink: Arc<dyn A2APaymentEventSink>,
 }
 
@@ -162,8 +162,9 @@ impl A2ACoordinator {
     pub fn new(
         adapter: Arc<dyn A2AProtocolAdapter>,
         policy: Arc<dyn PaymentPolicyEngine>,
-        store: Arc<dyn PaymentStore>,
+        store: Arc<dyn KernelPaymentStorePort>,
     ) -> Self {
+        info!("deprecated kernel A2A coordinator initialized with provider-neutral store port");
         Self {
             adapter,
             policy,
@@ -175,7 +176,7 @@ impl A2ACoordinator {
     /// Create a coordinator using the default conservative policy.
     pub fn with_default_policy(
         adapter: Arc<dyn A2AProtocolAdapter>,
-        store: Arc<dyn PaymentStore>,
+        store: Arc<dyn KernelPaymentStorePort>,
     ) -> Self {
         Self::new(adapter, Arc::new(DefaultPaymentPolicyEngine::new()), store)
     }
@@ -226,7 +227,7 @@ impl A2ACoordinator {
         intent.state = next.clone();
         intent.updated_at = Utc::now();
         self.store
-            .append_transition(PaymentStateTransition::new(
+            .append_transition(KernelPaymentStateTransition::new(
                 intent.intent_id.clone(),
                 Some(previous),
                 next.clone(),
@@ -304,7 +305,7 @@ impl A2APaymentFacade for A2ACoordinator {
         self.store.put_quote(quote.clone()).await?;
         let mut intent = Self::new_intent_from_quote(&quote);
         self.store
-            .append_transition(PaymentStateTransition::new(
+            .append_transition(KernelPaymentStateTransition::new(
                 intent.intent_id.clone(),
                 None,
                 PaymentIntentState::created(),
@@ -391,7 +392,7 @@ pub fn local_simulated_terms(
 mod tests {
     use super::*;
     use crate::a2a_event::InMemoryA2APaymentEventSink;
-    use macaca_persist::InMemoryPaymentStore;
+    use crate::persistence::InMemoryKernelPaymentStore;
     use macaca_proto::{
         AgentIdentity, CapabilityId, PaymentAmount, PaymentAsset, RemoteCapabilityDescriptor,
     };
@@ -441,7 +442,7 @@ mod tests {
 
     #[tokio::test]
     async fn a2a_payment_local_simulation_produces_receipt() {
-        let store = Arc::new(InMemoryPaymentStore::new());
+        let store = Arc::new(InMemoryKernelPaymentStore::new());
         let coordinator = A2ACoordinator::with_default_policy(
             Arc::new(LocalSimulatedA2AAdapter::new(local_simulated_terms(
                 "1", "UNIT",
@@ -466,7 +467,7 @@ mod tests {
 
     #[tokio::test]
     async fn a2a_payment_events_are_trace_audit_compatible() {
-        let store = Arc::new(InMemoryPaymentStore::new());
+        let store = Arc::new(InMemoryKernelPaymentStore::new());
         let sink = Arc::new(InMemoryA2APaymentEventSink::new());
         let coordinator = A2ACoordinator::with_default_policy(
             Arc::new(LocalSimulatedA2AAdapter::new(local_simulated_terms(
@@ -493,7 +494,7 @@ mod tests {
 
     #[tokio::test]
     async fn invalid_transition_is_rejected_without_mutating_state() {
-        let store = Arc::new(InMemoryPaymentStore::new());
+        let store = Arc::new(InMemoryKernelPaymentStore::new());
         let coordinator = A2ACoordinator::with_default_policy(
             Arc::new(LocalSimulatedA2AAdapter::new(local_simulated_terms(
                 "1", "UNIT",

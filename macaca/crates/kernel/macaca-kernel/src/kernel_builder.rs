@@ -2,9 +2,10 @@
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
+use macaca_agent::{
+    AgentExecutionPort, LegacyAgentExecutionAdapter, UnavailableAgentExecutionPort,
+};
 use macaca_proto::config::KernelConfig;
-use macaca_proto::{LlmMessage, LlmOptions, LlmResponse, MacacaError, MacacaResult};
 
 use crate::{
     Kernel, KernelProviderCompat, LegacyLlmProvider, LegacyToolCatalog, SchedulerFactory,
@@ -14,7 +15,7 @@ use crate::{
 /// Builder for constructing a [`Kernel`] from explicit runtime dependencies.
 pub struct KernelBuilder {
     config: KernelConfig,
-    providers: KernelProviderCompat,
+    execution_port: Arc<dyn AgentExecutionPort>,
     scheduler_kind: SchedulerKind,
 }
 
@@ -25,25 +26,18 @@ pub struct KernelBuilder {
 /// execution itself is serviceized. New callers can depend on this struct
 /// instead of constructing `KernelProviderCompat` directly.
 pub struct KernelServiceClientCompat {
-    llm: Arc<dyn LegacyLlmProvider>,
-    tools: Arc<dyn LegacyToolCatalog>,
+    execution_port: Arc<dyn AgentExecutionPort>,
 }
 
 impl KernelServiceClientCompat {
     /// Create a bundle from shared tool catalog handles.
-    pub fn new(tools: Arc<dyn LegacyToolCatalog>) -> Self {
-        Self {
-            llm: Arc::new(UnavailableKernelLlmProvider),
-            tools,
-        }
+    pub fn new(_tools: Arc<dyn LegacyToolCatalog>) -> Self {
+        Self::unavailable("service-client construction has no legacy execution bridge")
     }
 
     /// Create a bundle from boxed tool catalog handles.
-    pub fn from_boxed_tools(tools: Box<dyn LegacyToolCatalog>) -> Self {
-        Self {
-            llm: Arc::new(UnavailableKernelLlmProvider),
-            tools: Arc::from(tools),
-        }
+    pub fn from_boxed_tools(_tools: Box<dyn LegacyToolCatalog>) -> Self {
+        Self::unavailable("service-client construction has no legacy execution bridge")
     }
 
     /// Create a bundle with an agent-level LLM bridge for legacy `Agent::run` execution.
@@ -57,7 +51,9 @@ impl KernelServiceClientCompat {
         llm: Arc<dyn LegacyLlmProvider>,
         tools: Arc<dyn LegacyToolCatalog>,
     ) -> Self {
-        Self { llm, tools }
+        Self {
+            execution_port: Arc::new(LegacyAgentExecutionAdapter::new(llm, tools)),
+        }
     }
 
     /// Create a bundle with an agent-level LLM bridge and boxed tool catalog.
@@ -68,34 +64,26 @@ impl KernelServiceClientCompat {
         Self::from_agent_provider(llm, Arc::from(tools))
     }
 
-    /// Convert to the deprecated compatibility bundle in one isolated place.
-    #[allow(deprecated)]
-    fn into_provider_compat(self) -> KernelProviderCompat {
-        KernelProviderCompat::from_shared(self.llm, self.tools)
-    }
-}
-
-/// Internal null-object provider used only by the service-client construction seam.
-///
-/// It preserves the previous CLI/status behavior: if legacy execution is
-/// accidentally invoked without a real LLM service bridge, callers receive a
-/// structured unavailable error instead of a fake model response.
-struct UnavailableKernelLlmProvider;
-
-#[async_trait]
-impl LegacyLlmProvider for UnavailableKernelLlmProvider {
-    fn name(&self) -> &str {
-        "kernel-service-client-unavailable-llm"
+    /// Create a bundle from an already provider-neutral execution port.
+    ///
+    /// This is the preferred service-era entry point. Runtime-host or service
+    /// clients can provide their own command-dispatch implementation while the
+    /// kernel builder remains unchanged.
+    pub fn from_execution_port(execution_port: Arc<dyn AgentExecutionPort>) -> Self {
+        tracing::info!("kernel service-client compatibility created from execution port");
+        Self { execution_port }
     }
 
-    async fn chat(
-        &self,
-        _messages: Vec<LlmMessage>,
-        _options: &LlmOptions,
-    ) -> MacacaResult<LlmResponse> {
-        Err(MacacaError::Llm(
-            "Kernel service-client construction has no legacy LLM provider".into(),
-        ))
+    /// Create a bundle that fails explicitly until an execution bridge exists.
+    fn unavailable(reason: &'static str) -> Self {
+        Self {
+            execution_port: Arc::new(UnavailableAgentExecutionPort::new(reason)),
+        }
+    }
+
+    /// Consume the bundle and return the execution port used by the kernel.
+    fn into_execution_port(self) -> Arc<dyn AgentExecutionPort> {
+        self.execution_port
     }
 }
 
@@ -122,7 +110,7 @@ impl KernelBuilder {
     pub fn from_compat(config: KernelConfig, providers: KernelProviderCompat) -> Self {
         Self {
             config,
-            providers,
+            execution_port: providers.into_execution_port(),
             scheduler_kind: SchedulerKind::default(),
         }
     }
@@ -133,7 +121,11 @@ impl KernelBuilder {
     /// not require callers to import or instantiate `LegacyLlmProvider`. The
     /// old provider bundle stays available as a deprecated migration memento.
     pub fn from_service_clients(config: KernelConfig, compat: KernelServiceClientCompat) -> Self {
-        Self::from_compat(config, compat.into_provider_compat())
+        Self {
+            config,
+            execution_port: compat.into_execution_port(),
+            scheduler_kind: SchedulerKind::default(),
+        }
     }
 
     /// Override the scheduler strategy.
@@ -148,11 +140,11 @@ impl KernelBuilder {
         tracing::info!(
             max_agents = config.max_agents,
             scheduler_kind = ?self.scheduler_kind,
-            "building kernel through provider compatibility bundle"
+            "building kernel through execution port"
         );
         Kernel::from_parts(
             config,
-            self.providers,
+            self.execution_port,
             SchedulerFactory::build(self.scheduler_kind),
         )
     }

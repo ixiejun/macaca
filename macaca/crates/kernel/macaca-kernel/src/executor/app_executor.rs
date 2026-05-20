@@ -2,6 +2,10 @@
 //!
 //! This module provides an isolated execution environment for one application,
 //! containing all the components needed for agent-to-agent task delegation.
+//!
+//! Persistence is injected as a kernel port.  The executor owns scheduling,
+//! restart, and fork recovery semantics; service/runtime composition owns the
+//! concrete repository implementation.
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering as AtomicOrdering};
@@ -10,6 +14,8 @@ use std::time::Instant;
 
 use tokio::sync::{mpsc, RwLock};
 use tracing::{debug, error, info, warn};
+
+use crate::persistence::KernelPersistencePort;
 
 /// Worker state for tracking worker health.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -251,15 +257,22 @@ impl ApplicationExecutor {
     /// Create a new ApplicationExecutor with persistence support.
     ///
     /// Restores any previously persisted queue entries and fork states before
-    /// starting the worker supervisor.
+    /// starting the worker supervisor.  The store is a provider-neutral port,
+    /// so the kernel can recover durable execution mementos without importing
+    /// a concrete database backend.
     pub async fn new_with_store(
         application_id: ApplicationId,
         application_name: String,
         agents: Vec<AgentInfo>,
         runner: Arc<dyn AgentRunner>,
         config: ApplicationExecutorConfig,
-        store: Arc<macaca_persist::RedbStore>,
+        store: Arc<dyn KernelPersistencePort>,
     ) -> Self {
+        info!(
+            app_id = %application_id,
+            backend = store.backend_name(),
+            "application executor persistence restore started"
+        );
         let agents = Arc::new(RwLock::new(agents));
 
         // Build queue with persistence

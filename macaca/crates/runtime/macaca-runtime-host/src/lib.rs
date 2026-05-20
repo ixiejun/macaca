@@ -28,7 +28,9 @@ pub mod execution_control;
 pub mod execution_control_runtime;
 pub mod execution_control_service_provider;
 pub mod factory;
+#[cfg(test)]
 pub(crate) mod finance_live_data;
+#[cfg(test)]
 pub mod finance_llm_analysis_provider;
 pub mod genui_surface_store;
 pub mod lease;
@@ -87,11 +89,10 @@ pub use application_service_provider::{
     ApplicationOrchestrationBackend, ApplicationSystemServiceProvider,
 };
 pub use context_service_provider::ContextSystemServiceProvider;
+#[allow(deprecated)]
 pub use domain_pack_service_provider::{
-    bootstrap_builtin_domain_pack_services, DomainPackRuntimeBundle,
-    FinanceDataSystemServiceProvider, FINANCE_ANALYZE_COMMAND, FINANCE_FINANCIALS_SERVICE_ID,
-    FINANCE_LLM_ANALYSIS_SERVICE_ID, FINANCE_LOOKUP_COMMAND, FINANCE_MARKET_DATA_SERVICE_ID,
-    FINANCE_NEWS_DIGEST_SERVICE_ID,
+    bootstrap_builtin_domain_pack_services, bootstrap_domain_pack_services,
+    DomainPackProviderRegistration, DomainPackRuntimeBundle,
 };
 pub use driver_service_provider::DriverSystemServiceProvider;
 pub use entitlement::{CapabilityCallContext, EntitlementOperation, EntitlementRuntimeFacade};
@@ -113,6 +114,7 @@ pub use execution_control_service_provider::{
     execution_control_service_descriptor, ExecutionControlSystemServiceProvider,
 };
 pub use factory::{McpServerFactory, RuntimeEnvBuilder};
+#[cfg(test)]
 pub use finance_llm_analysis_provider::FinanceLlmAnalysisSystemServiceProvider;
 pub use genui_surface_store::ApplicationGenUiSurfaceStore;
 pub use lease::McpSessionLease;

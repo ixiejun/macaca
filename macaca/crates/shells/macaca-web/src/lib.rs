@@ -27,6 +27,7 @@ pub mod loop_manager;
 mod memory_runtime;
 pub mod metrics;
 pub mod orchestration_tools;
+mod persistence_adapter;
 pub mod plugin_routes;
 pub mod proto_event_visitors;
 pub mod route_command;
@@ -78,6 +79,7 @@ use crate::agent_runner::WebAgentRunner;
 pub use crate::bootstrap::{WebRuntimeFacade, WebServerBuilder};
 use crate::external_context_adapter::install_external_adapters_from_config;
 use crate::orchestration_tools::build_web_tools;
+use crate::persistence_adapter::RedbKernelPersistenceAdapter;
 use crate::state::{AppConfig, AppState, LoopState, PersistenceState, SessionState};
 use crate::wasm_orchestration_backend::WebApplicationOrchestrationBackend;
 
@@ -426,9 +428,10 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
     info!(path = %session_db_path.display(), "Session store initialized");
 
     // 9a. Initialize audit logger and alert manager.
-    let audit_logger = Arc::new(macaca_kernel::audit::AuditLogger::new(Arc::clone(
-        &session_store_shared,
+    let kernel_persistence = Arc::new(RedbKernelPersistenceAdapter::new(Arc::clone(
+        &session_store_impl,
     )));
+    let audit_logger = Arc::new(macaca_kernel::audit::AuditLogger::new(kernel_persistence));
     let session_store = session_store_shared;
     let alert_config = macaca_kernel::alert::AlertConfig::default();
     let alert_manager = Arc::new(macaca_kernel::alert::AlertManager::new(alert_config));

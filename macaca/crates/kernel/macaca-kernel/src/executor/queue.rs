@@ -1,4 +1,9 @@
 //! Execution Queue - Priority-based task queue for agent execution.
+//!
+//! Optional durability is expressed through `KernelPersistencePort` so the
+//! queue can checkpoint pending work without depending on a concrete database
+//! crate.  This keeps execution scheduling in the kernel and backend selection
+//! in service/runtime composition.
 
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -8,8 +13,9 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, RwLock};
 
 use super::{DelegatedTask, TaskId, TaskResult, TaskStatus};
-use macaca_persist::PersistStore;
 use macaca_proto::ApplicationId;
+
+use crate::persistence::KernelPersistencePort;
 
 /// Maximum number of tasks that can be queued.
 const DEFAULT_MAX_QUEUE_SIZE: usize = 100;
@@ -74,8 +80,8 @@ pub struct ExecutionQueue {
     max_queue_size: usize,
     /// Sender for task completion events.
     completion_tx: Option<mpsc::Sender<TaskResult>>,
-    /// Optional persistence store for durability across restarts.
-    store: Option<Arc<macaca_persist::RedbStore>>,
+    /// Optional persistence port for durability across restarts.
+    store: Option<Arc<dyn KernelPersistencePort>>,
     /// Application ID used for key namespacing in the store.
     app_id: ApplicationId,
 }
@@ -99,9 +105,16 @@ impl ExecutionQueue {
     pub fn new_with_store(
         max_parallel: usize,
         max_queue_size: usize,
-        store: Option<Arc<macaca_persist::RedbStore>>,
+        store: Option<Arc<dyn KernelPersistencePort>>,
         app_id: ApplicationId,
     ) -> Self {
+        if let Some(store) = &store {
+            tracing::info!(
+                app_id = %app_id,
+                backend = store.backend_name(),
+                "execution queue persistence enabled"
+            );
+        }
         Self {
             pending: Arc::new(RwLock::new(Vec::new())),
             running: Arc::new(RwLock::new(HashMap::new())),
@@ -143,7 +156,9 @@ impl ExecutionQueue {
 
         let prioritized = PrioritizedTask::new(task);
 
-        // Persist before inserting into memory
+        // Persist before inserting into memory.  This ordering gives restart
+        // recovery a chance to replay the task if the process exits between
+        // the durable write and the in-memory queue update.
         if let Some(ref store) = self.store {
             let key = format!("exec_queue/{}/{}", self.app_id.0, task_id.0);
             match serde_json::to_vec(&prioritized) {
@@ -193,7 +208,9 @@ impl ExecutionQueue {
         let task = pending.pop().map(|p| p.task).take()?;
         let task_id = task.id;
 
-        // Remove from persistent store (task is now running, tracked in memory)
+        // Remove from persistent store.  The queued memento represents pending
+        // work only; once the task is running the worker owns completion and
+        // failure observation through executor events.
         if let Some(ref store) = self.store {
             let key = format!("exec_queue/{}/{}", self.app_id.0, task_id.0);
             if let Err(e) = store.delete(&key).await {

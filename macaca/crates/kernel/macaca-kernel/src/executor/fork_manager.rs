@@ -6,6 +6,10 @@
 //! - Resuming forks when delegate tasks complete via hooks
 //! - Validating fork results against acceptance criteria
 //! - Merging completed forks back to parent
+//!
+//! Fork durability is expressed through `KernelPersistencePort`, which lets the
+//! kernel own restart/replay semantics without importing a concrete persistence
+//! provider.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -17,9 +21,8 @@ use tokio::sync::{mpsc, RwLock};
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
-use macaca_persist::PersistStore;
-
 use crate::logging::{log_hook_event, log_state_transition, LogContext};
+use crate::persistence::KernelPersistencePort;
 use macaca_proto::{
     AcceptanceCriteria, ApplicationId, ForkId, ForkState, LlmMessage, TaskId, ValidationResult,
 };
@@ -193,8 +196,8 @@ pub struct ForkManager {
     hook_tx: mpsc::Sender<HookEvent>,
     /// Broadcast sender for hook events (multiple subscribers).
     hook_broadcast: tokio::sync::broadcast::Sender<HookEvent>,
-    /// Optional persistence store for durability across restarts.
-    store: Option<Arc<macaca_persist::RedbStore>>,
+    /// Optional persistence port for durability across restarts.
+    store: Option<Arc<dyn KernelPersistencePort>>,
     /// Application ID used for key namespacing in the store.
     app_id: macaca_proto::ApplicationId,
 }
@@ -216,11 +219,18 @@ impl ForkManager {
 
     /// Create a new ForkManager with optional persistence.
     pub fn new_with_store(
-        store: Option<Arc<macaca_persist::RedbStore>>,
+        store: Option<Arc<dyn KernelPersistencePort>>,
         app_id: macaca_proto::ApplicationId,
     ) -> Self {
         let (hook_tx, _hook_rx) = mpsc::channel(100);
         let (hook_broadcast, _) = tokio::sync::broadcast::channel(256);
+        if let Some(store) = &store {
+            info!(
+                app_id = %app_id,
+                backend = store.backend_name(),
+                "[FORK] Persistence enabled"
+            );
+        }
         Self {
             forks: Arc::new(RwLock::new(HashMap::new())),
             max_parallel_forks: MAX_PARALLEL_FORKS,

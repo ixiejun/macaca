@@ -290,8 +290,18 @@ impl SystemService for McpSystemServiceProvider {
                 let facade = self.facade()?;
                 let definitions = facade.definitions().await;
                 let statuses = facade.probe(&McpToolPolicy::default()).await;
-                let snapshot = snapshot_from_statuses(definitions.len(), statuses);
-                tracing::info!(trace_id = %typed.trace.trace_id, "mcp service snapshot emitted");
+                let snapshot = snapshot_from_statuses(
+                    definitions.len(),
+                    service_definition_payloads(typed.include_definitions, definitions),
+                    statuses,
+                );
+                tracing::info!(
+                    trace_id = %typed.trace.trace_id,
+                    include_definitions = typed.include_definitions,
+                    registered_definitions = snapshot.registered_definitions,
+                    emitted_definitions = snapshot.definitions.len(),
+                    "mcp service snapshot emitted"
+                );
                 Ok(Self::service_result(to_value(snapshot)?, typed.trace))
             }
             MCP_CLEANUP_COMMAND => {
@@ -488,6 +498,7 @@ fn sanitize_reason(reason: impl Into<String>) -> String {
 
 fn snapshot_from_statuses(
     registered_definitions: usize,
+    definitions: Vec<serde_json::Value>,
     statuses: Vec<McpRuntimeStatus>,
 ) -> McpServiceSnapshot {
     let mut ready = 0usize;
@@ -516,6 +527,7 @@ fn snapshot_from_statuses(
         service_id: MCP_SERVICE_ID.into(),
         healthy: failed == 0,
         registered_definitions,
+        definitions,
         ready,
         failed,
         dependency_missing,
@@ -525,6 +537,37 @@ fn snapshot_from_statuses(
         failure_reasons,
         captured_at: chrono::Utc::now(),
     }
+}
+
+/// Convert runtime-owned server definitions into snapshot DTO payloads.
+///
+/// The provider deliberately serializes definitions at the service edge instead
+/// of exposing `McpRuntimeFacade` to Web.  Serialization failures are logged and
+/// skipped so one malformed extension cannot block the entire diagnostic
+/// snapshot; the registered count still reports the full runtime inventory for
+/// operator visibility.
+fn service_definition_payloads(
+    include_definitions: bool,
+    definitions: Vec<crate::McpServerDefinition>,
+) -> Vec<serde_json::Value> {
+    if !include_definitions {
+        return Vec::new();
+    }
+
+    definitions
+        .into_iter()
+        .filter_map(|definition| match serde_json::to_value(&definition) {
+            Ok(value) => Some(value),
+            Err(error) => {
+                tracing::warn!(
+                    server_id = %definition.id,
+                    error = %error,
+                    "mcp service snapshot skipped unserializable definition"
+                );
+                None
+            }
+        })
+        .collect()
 }
 
 fn service_lifecycle(lifecycle: crate::mcp_runtime::McpLifecycleScope) -> McpServiceLifecycleScope {
@@ -563,6 +606,7 @@ fn to_value<T: serde::Serialize>(value: T) -> ServiceResult<serde_json::Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use macaca_framework::mcp::McpTransportConfig;
     use macaca_kernel::SystemService;
     use macaca_proto::{
         ApplicationId, CapabilityToolInvocation, CapabilityToolInvocationScope, ServiceCommandName,
@@ -663,6 +707,45 @@ mod tests {
         assert_eq!(
             invocation.metadata.get("mcp.policy_decision"),
             Some(&"deny".into())
+        );
+    }
+
+    #[test]
+    fn snapshot_definition_payloads_are_explicitly_requested() {
+        let definition = crate::McpServerDefinition {
+            id: "server-a".into(),
+            transport: McpTransportConfig::Stdio {
+                command: "service-binary".into(),
+                args: vec!["--stdio".into()],
+                env: std::collections::BTreeMap::new(),
+                cwd: None,
+            },
+            lifecycle: crate::mcp_runtime::McpLifecycleScope::AgentSession,
+            session_mode: macaca_framework::mcp::McpSessionMode::Stateful,
+            tool_prefix: Some("sample".into()),
+            required_bins: Vec::new(),
+            enabled: true,
+            source: crate::McpDefinitionSource::Global,
+            concurrency_isolation: None,
+        };
+
+        // The snapshot contract uses a Command-style flag because most callers
+        // only need counts and health.  Toolkit assembly opts into the payloads
+        // during migration, while status dashboards can keep the cheaper and
+        // less detailed default view.
+        assert!(service_definition_payloads(false, vec![definition.clone()]).is_empty());
+
+        let payloads = service_definition_payloads(true, vec![definition]);
+        assert_eq!(payloads.len(), 1);
+        assert_eq!(
+            payloads[0].get("id").and_then(|value| value.as_str()),
+            Some("server-a")
+        );
+        assert_eq!(
+            payloads[0]
+                .get("transport")
+                .and_then(|value| value.as_str()),
+            Some("stdio")
         );
     }
 }

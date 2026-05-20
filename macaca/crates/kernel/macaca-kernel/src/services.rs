@@ -1,7 +1,9 @@
 //! Service adapters — bridge kernel-owned infrastructure to the `AgentServices` traits.
 //!
 //! Each adapter wraps a concrete implementation from another crate and
-//! implements the corresponding trait from `aos-agent`.
+//! implements the corresponding trait from `aos-agent`.  The persistence
+//! adapter depends on a kernel-owned port, so the kernel exposes the agent
+//! service contract without naming a database provider.
 
 use std::sync::Arc;
 
@@ -9,8 +11,9 @@ use async_trait::async_trait;
 
 use macaca_agent::{IpcService, PersistService};
 use macaca_ipc::DynMessageSender;
-use macaca_persist::store::PersistStore;
 use macaca_proto::{IpcMessage, MacacaResult};
+
+use crate::persistence::KernelPersistencePort;
 
 // ── IpcServiceAdapter ────────────────────────────────────────────────────────
 
@@ -34,17 +37,26 @@ impl IpcService for IpcServiceAdapter {
 
 // ── PersistServiceAdapter ────────────────────────────────────────────────────
 
-/// Wraps a `PersistStore` as an `AgentServices::PersistService`.
+/// Wraps a `KernelPersistencePort` as an `AgentServices::PersistService`.
 ///
 /// Keys are scoped to the agent by prefixing with `agent/{agent_id}/`.
 pub struct PersistServiceAdapter {
-    store: Arc<dyn PersistStore>,
+    store: Arc<dyn KernelPersistencePort>,
     key_prefix: String,
 }
 
 impl PersistServiceAdapter {
     /// Create with a key prefix for agent isolation.
-    pub fn new(store: Arc<dyn PersistStore>, agent_id: &macaca_proto::AgentId) -> Self {
+    ///
+    /// The adapter is intentionally a small Bridge: application agents still
+    /// speak the legacy `PersistService` trait, while kernel composition only
+    /// needs the provider-neutral persistence port.
+    pub fn new(store: Arc<dyn KernelPersistencePort>, agent_id: &macaca_proto::AgentId) -> Self {
+        tracing::info!(
+            agent_id = %agent_id,
+            backend = store.backend_name(),
+            "agent persistence service adapter initialized"
+        );
         Self {
             store,
             key_prefix: format!("agent/{}/", agent_id),
@@ -71,7 +83,48 @@ impl PersistService for PersistServiceAdapter {
 mod tests {
     use super::*;
     use chrono::Utc;
-    use macaca_proto::AgentId;
+    use macaca_proto::{AgentId, MacacaResult};
+    use tokio::sync::RwLock;
+
+    #[derive(Default)]
+    struct TestPersistencePort {
+        values: RwLock<std::collections::BTreeMap<String, Vec<u8>>>,
+    }
+
+    #[async_trait]
+    impl KernelPersistencePort for TestPersistencePort {
+        async fn get(&self, key: &str) -> MacacaResult<Option<Vec<u8>>> {
+            Ok(self.values.read().await.get(key).cloned())
+        }
+
+        async fn set(&self, key: &str, value: &[u8]) -> MacacaResult<()> {
+            self.values
+                .write()
+                .await
+                .insert(key.to_string(), value.to_vec());
+            Ok(())
+        }
+
+        async fn delete(&self, key: &str) -> MacacaResult<()> {
+            self.values.write().await.remove(key);
+            Ok(())
+        }
+
+        async fn list_keys(&self, prefix: &str) -> MacacaResult<Vec<String>> {
+            Ok(self
+                .values
+                .read()
+                .await
+                .keys()
+                .filter(|key| key.starts_with(prefix))
+                .cloned()
+                .collect())
+        }
+
+        fn backend_name(&self) -> &'static str {
+            "test-agent-persistence-memory"
+        }
+    }
 
     #[tokio::test]
     async fn ipc_service_adapter() {
@@ -94,10 +147,7 @@ mod tests {
 
     #[tokio::test]
     async fn persist_service_adapter() {
-        let dir = tempfile::tempdir().unwrap();
-        let db_path = dir.path().join("test.db");
-        let store = macaca_persist::RedbStore::open(db_path).unwrap();
-        let store: Arc<dyn PersistStore> = Arc::new(store);
+        let store: Arc<dyn KernelPersistencePort> = Arc::new(TestPersistencePort::default());
 
         let agent_id = AgentId::new();
         let adapter = PersistServiceAdapter::new(store, &agent_id);
@@ -113,10 +163,7 @@ mod tests {
 
     #[tokio::test]
     async fn persist_adapter_key_scoping() {
-        let dir = tempfile::tempdir().unwrap();
-        let db_path = dir.path().join("test.db");
-        let store = macaca_persist::RedbStore::open(db_path).unwrap();
-        let store: Arc<dyn PersistStore> = Arc::new(store);
+        let store: Arc<dyn KernelPersistencePort> = Arc::new(TestPersistencePort::default());
 
         let agent_a = AgentId::new();
         let agent_b = AgentId::new();

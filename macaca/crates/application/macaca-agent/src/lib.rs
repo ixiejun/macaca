@@ -6,6 +6,7 @@
 pub mod agent;
 pub mod basic;
 pub mod capability;
+pub mod execution;
 pub mod lifecycle;
 pub mod services;
 pub mod shutdown;
@@ -14,11 +15,15 @@ pub mod state_machine;
 pub use agent::Agent;
 pub use basic::{BasicAgent, BasicAgentBuilder};
 pub use capability::{AgentCapabilityNode, AgentCapabilitySet, CapabilitySource};
+pub use execution::{
+    AgentExecutionPort, LegacyAgentExecutionAdapter, UnavailableAgentExecutionPort,
+};
 pub use lifecycle::{
     AgentLifecyclePolicy, AgentLifecycleTransition, AgentTransitionReason,
     DefaultAgentLifecyclePolicy,
 };
 pub use macaca_llm::LlmProvider;
+pub use macaca_tools::ToolCatalog;
 pub use services::{
     AgentServices, AgentServicesBuilder, IpcService, MemoryService, NoopIpcService,
     NoopMemoryService, NoopPersistService, PersistService,

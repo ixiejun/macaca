@@ -17,6 +17,7 @@ pub mod kernel_builder;
 pub mod logging;
 pub mod orchestrator;
 pub mod payment_policy;
+pub mod persistence;
 pub mod plugin_registry;
 pub mod policy;
 pub mod provider_compat;
@@ -51,13 +52,21 @@ pub use kernel::Kernel;
 pub use kernel_builder::{KernelBuilder, KernelServiceClientCompat};
 pub use orchestrator::AgentOrchestrator;
 pub use payment_policy::{DefaultPaymentPolicyEngine, PaymentPolicyDecision, PaymentPolicyEngine};
+#[allow(deprecated)]
+pub use persistence::{
+    InMemoryKernelPaymentStore, KernelPaymentStateTransition, KernelPaymentStorePort,
+    KernelPersistencePort, UnavailableKernelPersistencePort,
+};
 pub use plugin_registry::{
     is_valid_transition as is_valid_plugin_lifecycle_transition, PluginRegistry,
     PluginRegistryEntry, PluginRegistrySnapshot,
 };
 pub use policy::{DefaultAllowPolicyEngine, PolicyEngine, StaticDenyPolicyEngine};
 #[allow(deprecated)]
-pub use provider_compat::{KernelProviderCompat, LegacyLlmProvider, LegacyToolCatalog};
+pub use provider_compat::{
+    AgentExecutionPort, KernelProviderCompat, LegacyLlmProvider, LegacyToolCatalog,
+    UnavailableAgentExecutionPort,
+};
 pub use registry::{AgentEntry, AgentRegistry};
 pub use resource::{InMemoryResourceManager, ResourceManager};
 #[allow(deprecated)]

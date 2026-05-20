@@ -56,6 +56,42 @@ struct DependencyEdge {
     to: String,
 }
 
+/// Cargo dependency kind as exposed by `cargo metadata`.
+///
+/// The Route C boundary gate audits production dependency ownership. Dev-only
+/// edges are allowed to point at fixtures and provider crates because tests
+/// often need concrete doubles to exercise contracts. Keeping kind explicit in
+/// the parsed edge model makes that policy auditable and prevents future test
+/// dependencies from being mistaken for production architecture.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum DependencyKind {
+    Normal,
+    Build,
+    Dev,
+}
+
+impl DependencyKind {
+    /// Convert Cargo's nullable dependency `kind` field into a stable enum.
+    ///
+    /// `cargo metadata` represents normal dependencies with `null`, while
+    /// build and dev dependencies use string values. Unknown strings fail fast
+    /// so a future Cargo format or target-specific edge cannot silently bypass
+    /// the executable architecture specification.
+    fn from_metadata(kind: &Value) -> Self {
+        match kind.as_str() {
+            None => Self::Normal,
+            Some("build") => Self::Build,
+            Some("dev") => Self::Dev,
+            Some(other) => panic!("unsupported cargo dependency kind: {other}"),
+        }
+    }
+
+    /// Return whether this edge participates in production dependency rules.
+    fn is_production(self) -> bool {
+        matches!(self, Self::Normal | Self::Build)
+    }
+}
+
 /// A forbidden-edge specification.
 ///
 /// `matches` is a function pointer to keep rule evaluation extensible without a
@@ -82,7 +118,7 @@ struct ClassifiedEdge<'a> {
 
 /// A temporary migration exception for known Route C debt.
 ///
-/// The allowlist is duplicated in `macaca/docs/route-c-serviceization-allowlist.md`
+/// The allowlist is duplicated in `macaca/docs/macaca-os-serviceization-allowlist.md`
 /// for human review. The test-local copy makes the gate deterministic and avoids
 /// markdown parsing becoming the source of truth for executable architecture.
 #[derive(Clone, Copy)]
@@ -90,26 +126,40 @@ pub struct AllowlistEntry {
     pub rule_id: &'static str,
     pub from: &'static str,
     pub to: &'static str,
+    pub owner_track: &'static str,
+    pub current_caller: &'static str,
     pub target_phase: &'static str,
     pub replacement: &'static str,
+    pub validation_command: &'static str,
 }
 
 impl AllowlistEntry {
     /// Builds one migration-debt entry with all fields needed for deterministic
     /// rule matching and audit logging.
+    ///
+    /// The extra metadata is intentionally part of the executable gate instead
+    /// of markdown-only documentation. It keeps each exception traceable to an
+    /// owner track, current caller evidence, target replacement, expiry phase,
+    /// and validation command before any future worker can add or retain debt.
     pub const fn new(
         rule_id: &'static str,
         from: &'static str,
         to: &'static str,
+        owner_track: &'static str,
+        current_caller: &'static str,
         target_phase: &'static str,
         replacement: &'static str,
+        validation_command: &'static str,
     ) -> Self {
         Self {
             rule_id,
             from,
             to,
+            owner_track,
+            current_caller,
             target_phase,
             replacement,
+            validation_command,
         }
     }
 }
@@ -274,6 +324,14 @@ fn workspace_dependency_edges(metadata: &Value) -> Vec<DependencyEdge> {
             let to = dependency["name"]
                 .as_str()
                 .expect("dependency name should be a string");
+            let kind = DependencyKind::from_metadata(&dependency["kind"]);
+            if !kind.is_production() {
+                eprintln!(
+                    "route_c_dependency_gate event=skip_dev_edge from={} to={}",
+                    from, to
+                );
+                continue;
+            }
             if workspace_names.contains(to) {
                 edges.push(DependencyEdge {
                     from: from.to_owned(),
@@ -340,8 +398,15 @@ fn evaluate_edges(edges: &[DependencyEdge]) -> Vec<Violation> {
             }
             if let Some(entry) = allowed.get(&(rule.id, classified.from, classified.to)) {
                 eprintln!(
-                    "route_c_dependency_gate event=allowlisted rule={} from={} to={} phase={} replacement={}",
-                    entry.rule_id, entry.from, entry.to, entry.target_phase, entry.replacement
+                    "route_c_dependency_gate event=allowlisted rule={} from={} to={} owner_track={} current_caller={} phase={} replacement={} validation_command={}",
+                    entry.rule_id,
+                    entry.from,
+                    entry.to,
+                    entry.owner_track,
+                    entry.current_caller,
+                    entry.target_phase,
+                    entry.replacement,
+                    entry.validation_command
                 );
                 continue;
             }
@@ -366,7 +431,7 @@ fn render_violations(violations: &[Violation]) -> String {
         .iter()
         .map(|violation| {
             format!(
-                "\nrule={}\nfrom={} ({})\nto={} ({})\nrationale={}\nreplacement={}\nprocess=New exceptions require OpenSpec plus macaca/docs/route-c-serviceization-allowlist.md update.\n",
+                "\nrule={}\nfrom={} ({})\nto={} ({})\nrationale={}\nreplacement={}\nprocess=New exceptions require OpenSpec plus macaca/docs/macaca-os-serviceization-allowlist.md update.\n",
                 violation.rule_id,
                 violation.from,
                 violation.from_layer,

@@ -51,7 +51,10 @@ pub use openai_compatible::OpenAiCompatibleProvider;
 pub use provider::LlmProvider;
 pub use rate_limit::RateLimiter;
 pub use resilient::{ResilientConfig, ResilientLlmWrapper};
-pub use resolver::{PrefixProviderResolver, ProviderResolver, ResolverChain};
+pub use resolver::{
+    default_model_route_descriptors, ModelRouteDescriptor, ModelRouteMatcher,
+    PrefixProviderResolver, ProviderResolver, ResolverChain,
+};
 pub use router::{LlmRouter, ModelSelection, ModelSelectionRequest, ModelTarget};
 pub use service_adapter::llm_service_descriptor;
 pub use service_contract::{

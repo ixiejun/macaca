@@ -1,7 +1,11 @@
 //! Command handler primitives for CLI subcommand dispatch.
 
+use std::path::{Path, PathBuf};
+use std::process::Stdio;
+
 use async_trait::async_trait;
-use macaca_proto::error::MacacaResult;
+use macaca_proto::error::{MacacaError, MacacaResult};
+use tokio::process::Command;
 
 use crate::commands;
 
@@ -84,11 +88,8 @@ impl CliCommandHandler for VersionCommandHandler {
 /// Handler for the `web` command.
 ///
 /// This handler is intentionally a terminal adapter and process-lifecycle
-/// boundary only.  It may select the listen port, notify the service manager,
-/// and call the public Web server-start seam, but it must not duplicate Web
-/// provider bootstrap, route composition, session, trace, or service semantics
-/// inside CLI.  The remaining `macaca-cli -> macaca-web` dependency is therefore
-/// server-start-only compatibility debt tracked by Route C S12 governance.
+/// boundary only. It selects the listen port, notifies the service manager, and
+/// starts the standalone Web shell process without linking CLI to Web internals.
 #[derive(Debug)]
 pub struct WebCommandHandler {
     port: u16,
@@ -106,14 +107,88 @@ impl CliCommandHandler for WebCommandHandler {
     async fn run(&self) -> MacacaResult<()> {
         tracing::info!(
             port = self.port,
-            "cli web command delegating to public web server-start seam"
+            "cli web command launching standalone web shell process"
         );
         notify_systemd_ready();
-        macaca_web::WebServerBuilder::new()
-            .port(self.port)
-            .serve()
-            .await
+        WebServerProcessLauncher::default().serve(self.port).await
     }
+}
+
+/// Process launcher for the Web shell binary.
+///
+/// The Strategy is deliberately small: prefer an installed sibling binary for
+/// packaged deployments, then fall back to `cargo run` in development
+/// workspaces. CLI owns only process supervision; Web owns bootstrap semantics.
+#[derive(Debug, Default)]
+struct WebServerProcessLauncher;
+
+impl WebServerProcessLauncher {
+    async fn serve(&self, port: u16) -> MacacaResult<()> {
+        let mut command = self.command(port)?;
+        let status = command.status().await?;
+        if status.success() {
+            return Ok(());
+        }
+        Err(MacacaError::Config(format!(
+            "macaca-web-server exited with status {status}"
+        )))
+    }
+
+    fn command(&self, port: u16) -> MacacaResult<Command> {
+        if let Some(binary) = sibling_web_server_binary()? {
+            let mut command = Command::new(binary);
+            command.arg("--port").arg(port.to_string());
+            inherit_stdio(&mut command);
+            return Ok(command);
+        }
+
+        let workspace = workspace_root()?;
+        let mut command = Command::new("cargo");
+        command
+            .current_dir(workspace)
+            .args([
+                "run",
+                "-p",
+                "macaca-web",
+                "--bin",
+                "macaca-web-server",
+                "--",
+                "--port",
+                &port.to_string(),
+            ]);
+        inherit_stdio(&mut command);
+        Ok(command)
+    }
+}
+
+fn inherit_stdio(command: &mut Command) {
+    command
+        .stdin(Stdio::inherit())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit());
+}
+
+fn sibling_web_server_binary() -> MacacaResult<Option<PathBuf>> {
+    let current = std::env::current_exe()?;
+    let Some(parent) = current.parent() else {
+        return Ok(None);
+    };
+    let candidate = parent.join(format!("macaca-web-server{}", std::env::consts::EXE_SUFFIX));
+    Ok(candidate.is_file().then_some(candidate))
+}
+
+fn workspace_root() -> MacacaResult<PathBuf> {
+    for ancestor in Path::new(env!("CARGO_MANIFEST_DIR")).ancestors() {
+        let cargo_toml = ancestor.join("Cargo.toml");
+        if let Ok(content) = std::fs::read_to_string(&cargo_toml) {
+            if content.contains("[workspace]") {
+                return Ok(ancestor.to_path_buf());
+            }
+        }
+    }
+    Err(MacacaError::Config(
+        "failed to locate Cargo workspace for macaca-web-server fallback".into(),
+    ))
 }
 
 #[cfg(feature = "systemd")]
@@ -163,13 +238,12 @@ mod tests {
     fn web_command_uses_only_public_server_start_seam() {
         let source = include_str!("command_handlers.rs");
         assert!(
-            source.contains("macaca_web::WebServerBuilder::new()"),
-            "CLI web command must enter Web through the public server-start builder seam"
+            source.contains("macaca-web-server"),
+            "CLI web command must launch the standalone Web shell process"
         );
         assert!(
-            !source.contains(&format!("{}{}", "macaca_web::serve_", "web_server"))
-                && !source.contains(&format!("{}{}", "macaca_web::start_", "server")),
-            "CLI web command must not call deprecated or crate-internal Web startup helpers"
+            !source.contains(&format!("{}{}", "macaca_", "web::")),
+            "CLI web command must not link against Web crate internals"
         );
     }
 }

@@ -20,7 +20,7 @@ use macaca_framework::session::{load_module_state, save_module_state};
 use macaca_framework::tool::Toolkit;
 use macaca_proto::{
     ApplicationId, McpRegisterCommand, McpServicePolicyHints, McpServiceScope,
-    McpToolCatalogCommand, TraceContext,
+    McpServiceSnapshotCommand, McpToolCatalogCommand, TraceContext,
 };
 use macaca_skill::{SkillServiceScope, SkillToolCatalogCommand};
 
@@ -68,9 +68,12 @@ pub(crate) async fn build_toolkit(
     // state.tools is Arc<dyn ToolCatalog>, which ToolSetBridge accepts directly.
     let mut toolkit = ToolSetBridge::from_tool_set(Arc::clone(&state.tools));
 
-    // Dynamically aggregate driver tools through Driver Service.  The direct
-    // runtime path remains as a deprecated fallback so S6 can be rolled back
-    // without changing user-visible tool availability.
+    // Dynamically aggregate driver tools through Driver Service.  Driver
+    // discovery is intentionally fail-closed at the shell boundary: if the
+    // focused service client is unavailable, Web records an auditable
+    // diagnostic and continues without manufacturing tools from runtime
+    // internals.  This keeps the Toolkit Builder as a Facade/Command consumer
+    // rather than a second driver runtime owner.
     let driver_catalog = state
         .driver_client
         .tool_catalog(DriverToolCatalogCommand {
@@ -101,13 +104,18 @@ pub(crate) async fn build_toolkit(
         Err(error) => {
             tracing::warn!(
                 error = %error,
-                "Driver Service catalog failed; using deprecated direct driver runtime fallback"
+                app_id = %app_id,
+                session_id = session_id.as_deref().unwrap_or_default(),
+                agent = agent_name,
+                "Driver Service catalog unavailable during toolkit assembly"
             );
-            #[allow(deprecated)]
-            let driver_tools = state.driver_runtime.collect_tools().await;
-            for tool in driver_tools {
-                toolkit.register(Box::new(SingleToolAdapter::new(tool)), None);
-            }
+            emit_driver_catalog_unavailable(
+                state,
+                session_id.as_deref(),
+                agent_name,
+                error.to_string(),
+            )
+            .await;
         }
     }
 
@@ -271,7 +279,9 @@ pub(crate) async fn build_toolkit(
     );
 
     let mcp_policy = McpToolPolicy::default();
-    let mut mcp_definitions = state.mcp_runtime.definitions().await;
+    let mut mcp_definitions =
+        load_service_mcp_snapshot_definitions(state, app_id, session_id.as_deref(), agent_name)
+            .await;
     mcp_definitions.extend(load_app_mcp_overlay_definitions(state, app_id).await);
     emit_mcp_starting_events(state, session_id.as_deref(), agent_name, &mcp_definitions).await;
     register_mcp_definitions_with_service(
@@ -388,6 +398,101 @@ async fn register_mcp_definitions_with_service(
             error = %error,
             "MCP Service registration failed during toolkit assembly"
         );
+    }
+}
+
+async fn emit_driver_catalog_unavailable(
+    state: &Arc<AppState>,
+    session_id: Option<&str>,
+    agent_name: &str,
+    reason: String,
+) {
+    let Some(session_id) = session_id else {
+        return;
+    };
+
+    // This event is a compact audit Memento: it preserves the service boundary
+    // failure, traceable actor, and policy decision without leaking provider
+    // internals or trying to emulate Driver Service behavior in Web.
+    emit_runtime_event(
+        state,
+        session_id,
+        "driver_catalog_unavailable",
+        agent_name,
+        Some(agent_name),
+        serde_json::json!({
+            "agent": agent_name,
+            "service": "driver",
+            "stage": "toolkit_catalog",
+            "policy_decision": "unavailable",
+            "reason": bounded_diagnostic_reason(reason),
+        }),
+    )
+    .await;
+}
+
+fn bounded_diagnostic_reason(reason: String) -> String {
+    let mut value = reason.replace('\n', " ").replace('\r', " ");
+    value.truncate(240);
+    value
+}
+
+async fn load_service_mcp_snapshot_definitions(
+    state: &Arc<AppState>,
+    app_id: &ApplicationId,
+    session_id: Option<&str>,
+    agent_name: &str,
+) -> Vec<McpServerDefinition> {
+    let command = McpServiceSnapshotCommand {
+        trace: TraceContext::new("web-toolkit-mcp-snapshot"),
+        scope: McpServiceScope::agent_session(*app_id, session_id.unwrap_or_default(), agent_name)
+            .unwrap_or_default(),
+        include_definitions: true,
+    };
+
+    // The MCP service snapshot is the typed command boundary for definition
+    // visibility.  Web deserializes the optional payloads only to preserve the
+    // existing registration/probe bridge during migration; ownership of the
+    // canonical runtime inventory remains with the MCP service provider.
+    match state.mcp_client.snapshot(command).await {
+        Ok(snapshot) => {
+            tracing::info!(
+                app_id = %app_id,
+                session_id = session_id.unwrap_or_default(),
+                agent = agent_name,
+                registered_definitions = snapshot.registered_definitions,
+                emitted_definitions = snapshot.definitions.len(),
+                "MCP Service snapshot loaded for toolkit assembly"
+            );
+            snapshot
+                .definitions
+                .into_iter()
+                .filter_map(|payload| {
+                    match serde_json::from_value::<McpServerDefinition>(payload) {
+                        Ok(definition) => Some(definition),
+                        Err(error) => {
+                            tracing::warn!(
+                                app_id = %app_id,
+                                agent = agent_name,
+                                error = %error,
+                                "MCP Service snapshot contained an unreadable definition payload"
+                            );
+                            None
+                        }
+                    }
+                })
+                .collect()
+        }
+        Err(error) => {
+            tracing::warn!(
+                app_id = %app_id,
+                session_id = session_id.unwrap_or_default(),
+                agent = agent_name,
+                error = %error,
+                "MCP Service snapshot unavailable during toolkit assembly"
+            );
+            Vec::new()
+        }
     }
 }
 

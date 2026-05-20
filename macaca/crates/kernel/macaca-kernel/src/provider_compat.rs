@@ -1,14 +1,18 @@
-//! Temporary compatibility boundary for legacy kernel provider construction.
+//! Temporary compatibility boundary for legacy provider construction.
 //!
-//! Route C wants the kernel to own invariants and facades, not provider
-//! construction. This module isolates the remaining migration-era provider
-//! handles behind a narrow bundle so kernel composition can gradually move
-//! toward provider-neutral and service-runtime-based entry points.
+//! Route C wants the production kernel to own invariants and facades, not
+//! provider construction. This module now converts the remaining migration-era
+//! provider handles into an `AgentExecutionPort`, keeping the provider-shaped
+//! bridge outside `Kernel` storage while callers migrate toward service-runtime
+//! execution clients.
 
 use std::sync::Arc;
 
+pub use macaca_agent::AgentExecutionPort;
+use macaca_agent::LegacyAgentExecutionAdapter;
 pub use macaca_agent::LlmProvider as LegacyLlmProvider;
-pub use macaca_tools::ToolCatalog as LegacyToolCatalog;
+pub use macaca_agent::ToolCatalog as LegacyToolCatalog;
+pub use macaca_agent::UnavailableAgentExecutionPort;
 
 /// Migration bundle that groups the legacy provider handles still required by
 /// the kernel compatibility path.
@@ -52,13 +56,17 @@ impl KernelProviderCompat {
         Self { llm, tools }
     }
 
-    /// Return the legacy LLM provider handle for the existing agent execution path.
-    pub fn llm(&self) -> &dyn LegacyLlmProvider {
-        self.llm.as_ref()
-    }
-
-    /// Return the legacy tool catalog handle for the existing agent execution path.
-    pub fn tools(&self) -> &dyn LegacyToolCatalog {
-        self.tools.as_ref()
+    /// Convert legacy handles into the provider-neutral execution port.
+    ///
+    /// The kernel consumes only the resulting port. This method is intentionally
+    /// the only bridge that knows about both legacy provider traits, which makes
+    /// the remaining compatibility debt searchable and easy to delete when the
+    /// service execution client becomes the sole implementation.
+    pub fn into_execution_port(self) -> Arc<dyn AgentExecutionPort> {
+        tracing::info!(
+            llm_provider = %self.llm.name(),
+            "kernel provider compatibility converted into execution port"
+        );
+        Arc::new(LegacyAgentExecutionAdapter::new(self.llm, self.tools))
     }
 }
