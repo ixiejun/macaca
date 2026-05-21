@@ -68,7 +68,7 @@ use macaca_kernel::{
 };
 use macaca_llm::{LlmProvider, LlmRouter};
 use macaca_persist::RedbStore;
-use macaca_proto::config::{KernelConfig, MacacaConfig};
+use macaca_proto::config::{AutonomyConfig, KernelConfig, MacacaConfig};
 use macaca_proto::{ApplicationStartCommand, KernelServiceId, MacacaResult, TraceContext};
 use macaca_skill::{ExecutableSkillToolSet, SkillCatalog};
 use macaca_tools::{DefaultToolSet, Tool};
@@ -147,6 +147,18 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
     let service_runtime = Arc::new(macaca_runtime_host::ServiceRuntime::new(
         macaca_runtime_host::ServiceRuntimeConfig::default(),
     ));
+    let autonomy_runtime = macaca_runtime_host::bootstrap_autonomy_services(
+        Arc::clone(&service_runtime),
+        "web-startup-autonomy",
+        autonomy_runtime_config_from_web_config(&config.autonomy),
+    )
+    .await?;
+    info!(
+        provider_mode = %autonomy_runtime.provider_mode,
+        services = autonomy_runtime.started_services.len(),
+        supervisor_present = autonomy_runtime.supervisor.is_some(),
+        "Autonomy runtime bootstrapped through runtime-host"
+    );
     let application_orchestration_registry_ref = Arc::new(tokio::sync::RwLock::new(None));
     let orchestration_backend = Arc::new(WebApplicationOrchestrationBackend::new(
         Arc::clone(&application_orchestration_registry_ref),
@@ -665,6 +677,9 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
     let payment_client: Arc<dyn macaca_sdk::SystemPaymentClient> = Arc::new(
         macaca_sdk::ServiceBackedPaymentClient::new(Arc::clone(&generic_service_client)),
     );
+    let scheduler_client: Arc<dyn macaca_sdk::SystemSchedulerClient> = Arc::new(
+        macaca_sdk::ServiceBackedSchedulerClient::new(Arc::clone(&generic_service_client)),
+    );
     let web3_client: Arc<dyn macaca_sdk::SystemWeb3Client> = Arc::new(
         macaca_sdk::ServiceBackedWeb3Client::new(Arc::clone(&generic_service_client)),
     );
@@ -711,6 +726,7 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
             store_client: Arc::clone(&store_client),
             entitlement_client: Arc::clone(&entitlement_client),
             payment_client: Arc::clone(&payment_client),
+            scheduler_client: Arc::clone(&scheduler_client),
             web3_client: Arc::clone(&web3_client),
             evm_client: Arc::clone(&evm_client),
             plugin_control_client: Arc::clone(&plugin_control_client),
@@ -718,6 +734,7 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
             plugin_hook_client: Arc::clone(&plugin_hook_client),
             system_facade: system_facade.clone(),
             service_runtime: Arc::clone(&service_runtime),
+            autonomy_runtime: autonomy_runtime.clone(),
             llm: llm.clone(),
             llm_router: llm_router.clone(),
             tools,
@@ -975,4 +992,30 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
         .map_err(|e| macaca_proto::MacacaError::Io(e))?;
 
     Ok(())
+}
+
+/// Translate provider-neutral web configuration into runtime-host activation.
+///
+/// This Adapter keeps `macaca-proto` free of runtime-host concrete enum types
+/// while still making local web startup explicit and auditable. Unknown modes
+/// deliberately fall back to unavailable instead of trying to infer a provider;
+/// that fail-closed behavior is part of the serviceization constitution.
+fn autonomy_runtime_config_from_web_config(
+    config: &AutonomyConfig,
+) -> macaca_runtime_host::AutonomyRuntimeConfig {
+    let provider_mode = match config.provider_mode.trim().to_ascii_lowercase().as_str() {
+        "local" => macaca_runtime_host::AutonomyProviderMode::Local,
+        _ => macaca_runtime_host::AutonomyProviderMode::Unavailable,
+    };
+    macaca_runtime_host::AutonomyRuntimeConfig {
+        provider_mode,
+        supervisor_enabled: config.supervisor_enabled,
+        scheduler_tick_interval_ms: config.scheduler_tick_interval_ms,
+        heartbeat_tick_interval_ms: config.heartbeat_tick_interval_ms,
+        max_leases_per_tick: config.max_leases_per_tick,
+        dispatch_timeout_ms: config.dispatch_timeout_ms,
+        shutdown_grace_ms: config.shutdown_grace_ms,
+        recovery_wake_enabled: config.recovery_wake_enabled,
+        safe_retention_limit: config.safe_retention_limit,
+    }
 }

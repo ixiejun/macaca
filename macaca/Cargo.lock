@@ -1551,6 +1551,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "macaca-heartbeat"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "macaca-proto",
+ "tracing",
+]
+
+[[package]]
 name = "macaca-integration-tests"
 version = "0.1.0"
 dependencies = [
@@ -1569,6 +1579,7 @@ dependencies = [
  "macaca-proto",
  "macaca-runtime",
  "macaca-runtime-host",
+ "macaca-scheduler",
  "macaca-sdk",
  "macaca-skill",
  "macaca-task",
@@ -1714,12 +1725,14 @@ dependencies = [
  "macaca-context",
  "macaca-driver",
  "macaca-framework",
+ "macaca-heartbeat",
  "macaca-ipc",
  "macaca-kernel",
  "macaca-llm",
  "macaca-memory",
  "macaca-persist",
  "macaca-proto",
+ "macaca-scheduler",
  "macaca-skill",
  "macaca-tools",
  "reqwest",
@@ -1733,6 +1746,16 @@ dependencies = [
  "toml",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "macaca-scheduler"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "macaca-proto",
+ "tracing",
 ]
 
 [[package]]

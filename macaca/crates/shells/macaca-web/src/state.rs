@@ -27,7 +27,7 @@ use macaca_sdk::{
     SystemApplicationClient, SystemContextClient, SystemDriverClient, SystemEntitlementClient,
     SystemEvmClient, SystemLlmClient, SystemMcpClient, SystemMemoryClient, SystemPaymentClient,
     SystemPluginCapabilityClient, SystemPluginControlClient, SystemPluginHookClient,
-    SystemSkillClient, SystemStoreClient, SystemWeb3Client,
+    SystemSchedulerClient, SystemSkillClient, SystemStoreClient, SystemWeb3Client,
 };
 use macaca_skill::SkillCatalog;
 use macaca_task::TodoStore;
@@ -322,6 +322,13 @@ pub struct AppState {
     pub entitlement_client: Arc<dyn SystemEntitlementClient>,
     /// The serviceized Payment client used by A2A payment and settlement paths.
     pub payment_client: Arc<dyn SystemPaymentClient>,
+    /// The serviceized Scheduler client used by application-scoped autonomy routes.
+    ///
+    /// Web stores only the SDK facade. Provider construction, lease state, and
+    /// daemon lifecycle stay in `macaca-runtime-host`, which preserves the
+    /// microkernel/serviceization boundary while letting applications request
+    /// recurring work through declared service capability paths.
+    pub scheduler_client: Arc<dyn SystemSchedulerClient>,
     /// The serviceized Web3 client used by optional Web3 shell/status paths.
     pub web3_client: Arc<dyn SystemWeb3Client>,
     /// The serviceized EVM client used by optional EVM shell/status paths.
@@ -342,6 +349,12 @@ pub struct AppState {
     /// Shared service runtime used by Web-local compatibility adapters that
     /// must enter new system semantics through service boundaries.
     pub service_runtime: Arc<ServiceRuntime>,
+    /// Host-owned autonomy runtime bundle retained for supervisor lifecycle.
+    ///
+    /// Dropping this bundle would drop the only handle the web host has for
+    /// deterministic shutdown and operator diagnostics. The actual background
+    /// work remains inside the supervisor task and service providers.
+    pub autonomy_runtime: macaca_runtime_host::AutonomyRuntimeBundle,
     /// The LLM provider (DashScope by default).
     #[deprecated(note = "Use AppState::llm_client for new LLM call paths")]
     pub llm: Arc<dyn LlmProvider>,

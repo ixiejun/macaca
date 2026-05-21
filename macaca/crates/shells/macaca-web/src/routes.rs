@@ -8,7 +8,7 @@
 //! - [`crate::loop_manager`] — PlanLoop / WorkerLoop lifecycle
 //! - [`crate::sse`] — SSE event conversion, broadcasting, plan decisions
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::convert::Infallible;
 use std::sync::Arc;
 
@@ -28,8 +28,11 @@ use macaca_persist::{AppendEventCommand, EventLogQuery, SessionLineageStore};
 use macaca_proto::{
     ApplicationDiscoverCommand, ApplicationId, ApplicationMetadataQueryCommand,
     ApplicationMetadataView, ApplicationServiceAppView, ApplicationServiceScope,
-    ApplicationStatusCommand, ApplicationUiRuntimeView, MacacaError, McpProbeCommand,
-    McpRuntimeStatusView, McpToolPolicySnapshot, ProtoErrorAdapter, TraceContext,
+    ApplicationStatusCommand, ApplicationUiRuntimeView, AutonomyScope, HeartbeatWakeTargetCommand,
+    KernelServiceId, MacacaError, McpProbeCommand, McpRuntimeStatusView, McpToolPolicySnapshot,
+    ProtoErrorAdapter, SchedulerJobDefinition, SchedulerQueryCommand, SchedulerRegisterJobCommand,
+    SchedulerRunSummary, SchedulerScheduleSpec, SchedulerTargetCommand, ServiceCommandName,
+    ServiceTargetCommand, TraceContext, HEARTBEAT_SERVICE_ID, HEARTBEAT_WAKE_COMMAND,
 };
 use macaca_skill::{SkillPolicy, SkillRuntimeFacade, SkillSnapshotRequest};
 
@@ -1313,6 +1316,199 @@ pub async fn toggle_schedule(
     } else {
         Err(err(StatusCode::NOT_FOUND, "Schedule not found".into()))
     }
+}
+
+// ---------------------------------------------------------------------------
+// Serviceized application autonomy schedule routes
+// POST /api/apps/{app_id}/autonomy/schedules
+// GET  /api/apps/{app_id}/autonomy/scheduler/runs
+// ---------------------------------------------------------------------------
+
+/// Request body for application-scoped serviceized autonomy schedule creation.
+///
+/// The route accepts only provider-neutral scheduling and target data. When no
+/// target is supplied, the schedule emits a generic Heartbeat wake command so
+/// operators can prove the 24/7 runner path without embedding application
+/// business logic in the Web shell.
+#[derive(Debug, Deserialize)]
+pub struct CreateAutonomyScheduleRequest {
+    pub name: Option<String>,
+    pub interval_secs: Option<u64>,
+    pub target: Option<AutonomyScheduleTargetRequest>,
+    #[serde(default)]
+    pub metadata: BTreeMap<String, String>,
+}
+
+/// Generic target accepted by the Web route before conversion to Scheduler DTOs.
+#[derive(Debug, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum AutonomyScheduleTargetRequest {
+    Service {
+        service_id: String,
+        command_name: String,
+        #[serde(default)]
+        metadata: BTreeMap<String, String>,
+    },
+    HeartbeatWake {
+        wake_scope_key: Option<String>,
+        wake_reason_code: Option<String>,
+        #[serde(default)]
+        metadata: BTreeMap<String, String>,
+    },
+}
+
+#[derive(Debug, Deserialize, Default)]
+pub struct AutonomyRunsQuery {
+    pub limit: Option<usize>,
+}
+
+/// POST /api/apps/{app_id}/autonomy/schedules — register a serviceized Scheduler job.
+pub async fn create_autonomy_schedule(
+    State(state): State<Arc<AppState>>,
+    Path(app_id): Path<String>,
+    Json(body): Json<CreateAutonomyScheduleRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponse>)> {
+    let app_id = parse_application_id(&app_id)?;
+    let trace = TraceContext::new(format!("web-autonomy-schedule-register-{}", app_id.0));
+    let mut definition = SchedulerJobDefinition::new(
+        AutonomyScope::application(app_id),
+        SchedulerScheduleSpec::Every {
+            interval_ms: body.interval_secs.unwrap_or(60).max(1) * 1_000,
+            anchor: None,
+        },
+        autonomy_target_from_request(app_id, body.target),
+    )
+    .map_err(|error| proto_err(StatusCode::BAD_REQUEST, &error))?;
+    definition.metadata = body.metadata;
+    if let Some(name) = body.name.filter(|name| !name.trim().is_empty()) {
+        definition.metadata.insert("schedule.name".into(), name);
+    }
+
+    tracing::info!(
+        app_id = %app_id.0,
+        trace_id = %trace.trace_id,
+        "web route registering application autonomy schedule through Scheduler service"
+    );
+    let result = state
+        .scheduler_client
+        .register_job(
+            SchedulerRegisterJobCommand::new(trace.clone(), definition)
+                .map_err(|error| proto_err(StatusCode::BAD_REQUEST, &error))?,
+        )
+        .await
+        .map_err(|error| proto_err(StatusCode::BAD_GATEWAY, &error))?;
+    Ok(Json(serde_json::json!({
+        "accepted": result.accepted,
+        "job_id": result.job_id.as_ref().map(|id| id.as_str()),
+        "run_id": result.run_id.as_ref().map(|id| id.as_str()),
+        "lifecycle": result.lifecycle,
+        "run_state": result.run_state,
+        "audit_id": result.audit_id,
+        "trace_id": result.trace.trace_id,
+        "metadata": result.metadata,
+    })))
+}
+
+/// GET /api/apps/{app_id}/autonomy/scheduler/runs — monitor serviceized runs.
+pub async fn list_autonomy_scheduler_runs(
+    State(state): State<Arc<AppState>>,
+    Path(app_id): Path<String>,
+    Query(query): Query<AutonomyRunsQuery>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponse>)> {
+    let app_id = parse_application_id(&app_id)?;
+    let trace = TraceContext::new(format!("web-autonomy-scheduler-runs-{}", app_id.0));
+    tracing::info!(
+        app_id = %app_id.0,
+        trace_id = %trace.trace_id,
+        "web route querying application autonomy scheduler runs"
+    );
+    let runs = state
+        .scheduler_client
+        .list_runs(SchedulerQueryCommand {
+            trace: trace.clone(),
+            scope: AutonomyScope::application(app_id),
+            job_id: None,
+            run_id: None,
+            limit: query.limit.or(Some(20)),
+        })
+        .await
+        .map_err(|error| proto_err(StatusCode::BAD_GATEWAY, &error))?;
+    let count = runs.len();
+    Ok(Json(serde_json::json!({
+        "runs": sanitized_scheduler_runs(runs),
+        "count": count,
+        "trace_id": trace.trace_id,
+    })))
+}
+
+fn parse_application_id(
+    app_id: &str,
+) -> Result<ApplicationId, (StatusCode, Json<ErrorResponse>)> {
+    uuid::Uuid::parse_str(app_id)
+        .map(ApplicationId)
+        .map_err(|_| err(StatusCode::BAD_REQUEST, "Invalid app_id".into()))
+}
+
+fn autonomy_target_from_request(
+    app_id: ApplicationId,
+    target: Option<AutonomyScheduleTargetRequest>,
+) -> SchedulerTargetCommand {
+    match target.unwrap_or(AutonomyScheduleTargetRequest::HeartbeatWake {
+        wake_scope_key: None,
+        wake_reason_code: None,
+        metadata: BTreeMap::new(),
+    }) {
+        AutonomyScheduleTargetRequest::Service {
+            service_id,
+            command_name,
+            metadata,
+        } => SchedulerTargetCommand::Service(ServiceTargetCommand {
+            service_id: KernelServiceId::new(service_id),
+            command_name: ServiceCommandName::new(command_name),
+            payload_ref: None,
+            metadata,
+        }),
+        AutonomyScheduleTargetRequest::HeartbeatWake {
+            wake_scope_key,
+            wake_reason_code,
+            metadata,
+        } => SchedulerTargetCommand::HeartbeatWake(HeartbeatWakeTargetCommand {
+            wake_scope_key: wake_scope_key
+                .filter(|value| !value.trim().is_empty())
+                .unwrap_or_else(|| format!("application.{}", app_id.0)),
+            wake_reason_code: wake_reason_code
+                .filter(|value| !value.trim().is_empty())
+                .unwrap_or_else(|| "application_scheduled_tick".into()),
+            payload_ref: None,
+            metadata: metadata
+                .into_iter()
+                .chain([
+                    ("service_id".into(), HEARTBEAT_SERVICE_ID.into()),
+                    ("command_name".into(), HEARTBEAT_WAKE_COMMAND.into()),
+                ])
+                .collect(),
+        }),
+    }
+}
+
+fn sanitized_scheduler_runs(runs: Vec<SchedulerRunSummary>) -> Vec<serde_json::Value> {
+    runs.into_iter()
+        .map(|run| {
+            serde_json::json!({
+                "run_id": run.run_id.as_str(),
+                "job_id": run.job_id.as_str(),
+                "state": run.state,
+                "scheduled_for": run.scheduled_for,
+                "started_at": run.started_at,
+                "finished_at": run.finished_at,
+                "attempt": run.attempt,
+                "trace_id": run.trace_id,
+                "audit_id": run.audit_id,
+                "safe_status": run.safe_status,
+                "metadata": run.metadata,
+            })
+        })
+        .collect()
 }
 
 // ---------------------------------------------------------------------------

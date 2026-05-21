@@ -36,6 +36,9 @@ world application-v0 {
   /// canonical-import: macaca:capability/request
   import capability-request: func(trace-id: string, request-json: string) -> host-result;
 
+  /// canonical-import: macaca:agent/delegate
+  import agent-delegate: func(trace-id: string, delegation-json: string) -> host-result;
+
   /// canonical-import: macaca:task/create_goal
   import task-create-goal: func(trace-id: string, goal-json: string) -> host-result;
 

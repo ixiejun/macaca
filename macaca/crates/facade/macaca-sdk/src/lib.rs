@@ -17,6 +17,7 @@ pub mod entitlement_client;
 pub mod evm;
 pub mod evm_client;
 pub mod facade;
+pub mod heartbeat_client;
 pub mod llm_client;
 pub mod mcp_client;
 pub mod memory_client;
@@ -31,6 +32,7 @@ pub mod plugin_hook_client;
 pub mod plugin_sdk;
 pub mod registry_api;
 pub mod service_client;
+pub mod scheduler_client;
 pub mod skill_client;
 pub mod spec;
 pub mod status_client;
@@ -71,6 +73,9 @@ pub use entitlement_client::{
 pub use evm::MacacaEvmSdk;
 pub use evm_client::{ServiceBackedEvmClient, SystemEvmClient, UnavailableSystemEvmClient};
 pub use facade::{AgentRegistryApi, KernelAgentRegistry, KernelPrimitiveSdk, MacacaSdk};
+pub use heartbeat_client::{
+    ServiceBackedHeartbeatClient, SystemHeartbeatClient, UnavailableSystemHeartbeatClient,
+};
 pub use llm_client::{ServiceBackedLlmClient, SystemLlmClient, UnavailableSystemLlmClient};
 pub use macaca_task::{TaskServiceSnapshot, TaskServiceSnapshotCommand};
 pub use mcp_client::{ServiceBackedMcpClient, SystemMcpClient, UnavailableSystemMcpClient};
@@ -110,6 +115,9 @@ pub use plugin_sdk::{
 #[allow(deprecated)]
 pub use registry_api::{register_from_config, register_from_file};
 pub use service_client::{ServiceCallCommand, ServiceCallResult, ServiceInspectionResult};
+pub use scheduler_client::{
+    ServiceBackedSchedulerClient, SystemSchedulerClient, UnavailableSystemSchedulerClient,
+};
 pub use skill_client::{ServiceBackedSkillClient, SystemSkillClient, UnavailableSystemSkillClient};
 pub use spec::{AgentSpec, AgentSpecBuilder, TracePolicy};
 pub use store_client::{ServiceBackedStoreClient, SystemStoreClient, UnavailableSystemStoreClient};

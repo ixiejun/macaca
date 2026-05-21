@@ -130,6 +130,24 @@ retention_days = 10
 compress = true
 
 # ---------------------------------------------------------------------------
+# Autonomy runtime
+# ---------------------------------------------------------------------------
+#
+# Explicitly activate the local Scheduler + Heartbeat providers and the
+# runtime-host-owned supervisor. Rust defaults remain fail-closed; this file is
+# the operator-level opt-in used by the local Macaca web host.
+[autonomy]
+provider_mode = "local"
+supervisor_enabled = true
+scheduler_tick_interval_ms = 5000
+heartbeat_tick_interval_ms = 5000
+max_leases_per_tick = 8
+dispatch_timeout_ms = 30000
+shutdown_grace_ms = 5000
+recovery_wake_enabled = true
+safe_retention_limit = 128
+
+# ---------------------------------------------------------------------------
 # MCP (Model Context Protocol) runtime configuration
 # ---------------------------------------------------------------------------
 #

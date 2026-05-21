@@ -1,0 +1,10 @@
+[package]
+name = "macaca-heartbeat"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+async-trait = { workspace = true }
+chrono = { workspace = true }
+macaca-proto = { workspace = true }
+tracing = { workspace = true }

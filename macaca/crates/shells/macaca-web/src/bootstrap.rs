@@ -145,6 +145,14 @@ impl WebRuntimeFacade {
                 "/api/apps/{app_id}/schedules/{id}/toggle",
                 axum::routing::put(routes::toggle_schedule),
             )
+            .route(
+                "/api/apps/{app_id}/autonomy/schedules",
+                post(routes::create_autonomy_schedule),
+            )
+            .route(
+                "/api/apps/{app_id}/autonomy/scheduler/runs",
+                get(routes::list_autonomy_scheduler_runs),
+            )
             .route("/api/sessions/{id}/events", get(routes::get_session_events))
             .route(
                 "/api/sessions/{id}/source-artifact",

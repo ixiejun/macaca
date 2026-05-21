@@ -16,6 +16,7 @@ pub use crate::context_client::{SystemContextClient, UnavailableSystemContextCli
 pub use crate::driver_client::{SystemDriverClient, UnavailableSystemDriverClient};
 pub use crate::entitlement_client::{SystemEntitlementClient, UnavailableSystemEntitlementClient};
 pub use crate::evm_client::{SystemEvmClient, UnavailableSystemEvmClient};
+pub use crate::heartbeat_client::{SystemHeartbeatClient, UnavailableSystemHeartbeatClient};
 pub use crate::llm_client::{SystemLlmClient, UnavailableSystemLlmClient};
 pub use crate::mcp_client::{SystemMcpClient, UnavailableSystemMcpClient};
 pub use crate::memory_client::{SystemMemoryClient, UnavailableSystemMemoryClient};
@@ -24,6 +25,7 @@ pub use crate::package_client::{
     SystemPackageClient,
 };
 pub use crate::payment_client::{SystemPaymentClient, UnavailableSystemPaymentClient};
+pub use crate::scheduler_client::{SystemSchedulerClient, UnavailableSystemSchedulerClient};
 pub use crate::service_client::{
     ServiceCallCommand, ServiceCallResult, ServiceInspectionCommand, ServiceInspectionResult,
     SystemServiceClient, UnavailableSystemServiceClient,
@@ -80,6 +82,8 @@ pub struct SystemFacade<
     PMT = UnavailableSystemPaymentClient,
     W3 = UnavailableSystemWeb3Client,
     EVM = UnavailableSystemEvmClient,
+    SCH = UnavailableSystemSchedulerClient,
+    HB = UnavailableSystemHeartbeatClient,
 > {
     task_board: T,
     status: S,
@@ -98,6 +102,8 @@ pub struct SystemFacade<
     payment: PMT,
     web3: W3,
     evm: EVM,
+    scheduler: SCH,
+    heartbeat: HB,
 }
 
 impl<T, S> SystemFacade<T, S>
@@ -129,6 +135,8 @@ where
             payment: UnavailableSystemPaymentClient,
             web3: UnavailableSystemWeb3Client,
             evm: UnavailableSystemEvmClient,
+            scheduler: UnavailableSystemSchedulerClient,
+            heartbeat: UnavailableSystemHeartbeatClient,
         }
     }
 }
@@ -152,6 +160,8 @@ impl<T, S, SV, TR, P>
         UnavailableSystemPaymentClient,
         UnavailableSystemWeb3Client,
         UnavailableSystemEvmClient,
+        UnavailableSystemSchedulerClient,
+        UnavailableSystemHeartbeatClient,
     >
 where
     T: SystemTaskClient,
@@ -184,12 +194,14 @@ where
             payment: UnavailableSystemPaymentClient,
             web3: UnavailableSystemWeb3Client,
             evm: UnavailableSystemEvmClient,
+            scheduler: UnavailableSystemSchedulerClient,
+            heartbeat: UnavailableSystemHeartbeatClient,
         }
     }
 }
 
-impl<T, S, SV, TR, P, L, M, C, D, SK, MCP, A, ST, E, PMT, W3, EVM>
-    SystemFacade<T, S, SV, TR, P, L, M, C, D, SK, MCP, A, ST, E, PMT, W3, EVM>
+impl<T, S, SV, TR, P, L, M, C, D, SK, MCP, A, ST, E, PMT, W3, EVM, SCH, HB>
+    SystemFacade<T, S, SV, TR, P, L, M, C, D, SK, MCP, A, ST, E, PMT, W3, EVM, SCH, HB>
 where
     T: SystemTaskClient,
     S: SystemStatusClient,
@@ -208,6 +220,8 @@ where
     PMT: SystemPaymentClient,
     W3: SystemWeb3Client,
     EVM: SystemEvmClient,
+    SCH: SystemSchedulerClient,
+    HB: SystemHeartbeatClient,
 {
     /// Create a facade with all current Route C capability clients installed.
     ///
@@ -232,6 +246,95 @@ where
         payment: PMT,
         web3: W3,
         evm: EVM,
+    ) -> SystemFacade<
+        T,
+        S,
+        SV,
+        TR,
+        P,
+        L,
+        M,
+        C,
+        D,
+        SK,
+        MCP,
+        A,
+        ST,
+        E,
+        PMT,
+        W3,
+        EVM,
+        UnavailableSystemSchedulerClient,
+        UnavailableSystemHeartbeatClient,
+    > {
+        SystemFacade::<
+            T,
+            S,
+            SV,
+            TR,
+            P,
+            L,
+            M,
+            C,
+            D,
+            SK,
+            MCP,
+            A,
+            ST,
+            E,
+            PMT,
+            W3,
+            EVM,
+            UnavailableSystemSchedulerClient,
+            UnavailableSystemHeartbeatClient,
+        > {
+            task_board,
+            status,
+            service,
+            trace,
+            package,
+            llm,
+            memory,
+            context,
+            driver,
+            skill,
+            mcp,
+            application,
+            store,
+            entitlement,
+            payment,
+            web3,
+            evm,
+            scheduler: UnavailableSystemSchedulerClient,
+            heartbeat: UnavailableSystemHeartbeatClient,
+        }
+    }
+
+    /// Create a facade with Route C capability clients plus autonomy clients.
+    ///
+    /// This constructor keeps Scheduler and Heartbeat composition explicit.
+    /// The facade receives clients as Strategy objects and never constructs
+    /// providers, timers, stores, queues, or application-specific workflows.
+    pub fn with_route_c_and_autonomy_clients(
+        task_board: T,
+        status: S,
+        service: SV,
+        trace: TR,
+        package: P,
+        llm: L,
+        memory: M,
+        context: C,
+        driver: D,
+        skill: SK,
+        mcp: MCP,
+        application: A,
+        store: ST,
+        entitlement: E,
+        payment: PMT,
+        web3: W3,
+        evm: EVM,
+        scheduler: SCH,
+        heartbeat: HB,
     ) -> Self {
         Self {
             task_board,
@@ -251,6 +354,8 @@ where
             payment,
             web3,
             evm,
+            scheduler,
+            heartbeat,
         }
     }
 
@@ -262,6 +367,16 @@ where
     /// Borrow the focused EVM Service client.
     pub fn evm_client(&self) -> &EVM {
         &self.evm
+    }
+
+    /// Borrow the focused Scheduler Service client.
+    pub fn scheduler_client(&self) -> &SCH {
+        &self.scheduler
+    }
+
+    /// Borrow the focused Heartbeat Service client.
+    pub fn heartbeat_client(&self) -> &HB {
+        &self.heartbeat
     }
 
     /// Borrow the focused Payment Service client.

@@ -13,6 +13,8 @@ macaca-llm = { workspace = true }
 macaca-memory = { workspace = true }
 macaca-context = { workspace = true }
 macaca-driver = { workspace = true }
+macaca-scheduler = { workspace = true }
+macaca-heartbeat = { workspace = true }
 macaca-skill = { workspace = true }
 macaca-app = { workspace = true }
 macaca-tools = { workspace = true }

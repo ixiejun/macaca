@@ -155,6 +155,56 @@ fn forbidden_tokens() -> Vec<ForbiddenToken> {
             token: "\"minimax-",
             rationale: "model-family routing prefixes must be descriptor data inside the LLM service",
         },
+        ForbiddenToken {
+            family: "autonomy-service-boundary",
+            token: "SchedulerSystemServiceProvider",
+            rationale: "scheduler providers must be constructed only by runtime-host autonomy composition",
+        },
+        ForbiddenToken {
+            family: "autonomy-service-boundary",
+            token: "HeartbeatSystemServiceProvider",
+            rationale: "heartbeat providers must be constructed only by runtime-host autonomy composition",
+        },
+        ForbiddenToken {
+            family: "autonomy-service-boundary",
+            token: "LocalSchedulerProvider",
+            rationale: "local scheduler engines must remain replaceable service providers",
+        },
+        ForbiddenToken {
+            family: "autonomy-service-boundary",
+            token: "LocalHeartbeatProvider",
+            rationale: "local heartbeat engines must remain replaceable service providers",
+        },
+        ForbiddenToken {
+            family: "autonomy-service-boundary",
+            token: "AutonomySupervisor",
+            rationale: "autonomy loops must remain lifecycle-managed runtime-host infrastructure",
+        },
+        ForbiddenToken {
+            family: "autonomy-loop-boundary",
+            token: "run_scheduler_tick_once",
+            rationale: "scheduler ticks must be owned by runtime-host autonomy supervisor",
+        },
+        ForbiddenToken {
+            family: "autonomy-loop-boundary",
+            token: "run_heartbeat_tick_once",
+            rationale: "heartbeat ticks must be owned by runtime-host autonomy supervisor",
+        },
+        ForbiddenToken {
+            family: "autonomy-loop-boundary",
+            token: "run_recovery_wake_once",
+            rationale: "recovery wake loops must be owned by runtime-host autonomy supervisor",
+        },
+        ForbiddenToken {
+            family: "autonomy-service-boundary",
+            token: "\"service.scheduler\"",
+            rationale: "scheduler service ids must flow through protocol DTOs, SDK clients, or runtime-host service registration",
+        },
+        ForbiddenToken {
+            family: "autonomy-service-boundary",
+            token: "\"service.heartbeat\"",
+            rationale: "heartbeat service ids must flow through protocol DTOs, SDK clients, or runtime-host service registration",
+        },
     ]
 }
 
@@ -271,6 +321,21 @@ fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> bool
                 || relative.starts_with("crates/shells/macaca-web/")
                 || relative.starts_with("crates/shells/macaca-cli/"))
                 || relative.starts_with("crates/services/macaca-llm/src/")
+        }
+        "autonomy-service-boundary" => {
+            relative.starts_with("crates/foundation/macaca-proto/src/")
+                || relative.starts_with("crates/services/macaca-scheduler/src/")
+                || relative.starts_with("crates/services/macaca-heartbeat/src/")
+                || relative == "crates/runtime/macaca-runtime-host/src/autonomy_dispatch.rs"
+                || relative == "crates/runtime/macaca-runtime-host/src/autonomy_runtime_config.rs"
+                || relative == "crates/runtime/macaca-runtime-host/src/autonomy_service_provider.rs"
+                || relative == "crates/runtime/macaca-runtime-host/src/autonomy_supervisor.rs"
+                || relative == "crates/runtime/macaca-runtime-host/src/lib.rs"
+                || relative.starts_with("crates/facade/macaca-sdk/src/")
+        }
+        "autonomy-loop-boundary" => {
+            relative == "crates/runtime/macaca-runtime-host/src/autonomy_service_provider.rs"
+                || relative == "crates/runtime/macaca-runtime-host/src/autonomy_supervisor.rs"
         }
         _ => false,
     }
