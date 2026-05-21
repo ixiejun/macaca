@@ -37,6 +37,7 @@ pub enum AgentExecutionIntent {
     GoalWorker,
     Planner,
     Reviewer,
+    Heartbeat,
     SdkInvocation,
     GatewayInvocation,
     Custom(String),
@@ -225,6 +226,7 @@ pub enum AgentExecutionStatus {
     Denied,
     Unavailable,
     Unsupported,
+    Skipped,
 }
 
 impl AgentExecutionStatus {
@@ -235,6 +237,7 @@ impl AgentExecutionStatus {
             Self::Denied => "denied",
             Self::Unavailable => "unavailable",
             Self::Unsupported => "unsupported",
+            Self::Skipped => "skipped",
         }
     }
 }
@@ -266,6 +269,33 @@ impl AgentExecutionResult {
             context_snapshot: None,
             trace: command.trace.clone(),
             metadata: BTreeMap::new(),
+        }
+    }
+
+    /// Build a structured skip result for policy or context preconditions.
+    ///
+    /// Skips are successful service replies with a non-completed status. The
+    /// output and metadata carry only bounded reason codes so callers can audit
+    /// why no model/tool invocation happened without leaking prompts or raw
+    /// context bodies.
+    pub fn skipped(
+        command: &AgentExecutionCommand,
+        reason_code: impl Into<String>,
+        context_snapshot: Option<AgentContextSnapshot>,
+    ) -> Self {
+        let reason_code = reason_code.into();
+        let mut metadata = BTreeMap::new();
+        metadata.insert("reason_code".into(), reason_code.clone());
+        Self {
+            application_id: command.application_id,
+            session_id: command.session_id.clone(),
+            task_id: command.task_id,
+            target_agent: command.target_agent.clone(),
+            status: AgentExecutionStatus::Skipped,
+            output: serde_json::json!({ "reason_code": reason_code }),
+            context_snapshot,
+            trace: command.trace.clone(),
+            metadata,
         }
     }
 }

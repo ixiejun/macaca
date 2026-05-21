@@ -18,6 +18,10 @@ use crate::{
     ServiceCommandName, TaskId, TraceContext,
 };
 
+pub mod job_management;
+
+pub use job_management::*;
+
 /// Stable service id used by runtime-host registration and SDK clients.
 pub const SCHEDULER_SERVICE_ID: &str = "service.scheduler";
 
@@ -42,7 +46,10 @@ pub struct SchedulerJobId(String);
 impl SchedulerJobId {
     /// Create a job id from provider-assigned or imported durable state.
     pub fn new(value: impl Into<String>) -> MacacaResult<Self> {
-        Ok(Self(non_empty(value.into(), "scheduler job id is required")?))
+        Ok(Self(non_empty(
+            value.into(),
+            "scheduler job id is required",
+        )?))
     }
 
     /// Return the raw identifier string for persistence adapters.
@@ -58,7 +65,10 @@ pub struct SchedulerRunId(String);
 impl SchedulerRunId {
     /// Create a run id from provider-assigned durable state.
     pub fn new(value: impl Into<String>) -> MacacaResult<Self> {
-        Ok(Self(non_empty(value.into(), "scheduler run id is required")?))
+        Ok(Self(non_empty(
+            value.into(),
+            "scheduler run id is required",
+        )?))
     }
 
     /// Return the raw identifier string for persistence adapters.
@@ -220,7 +230,12 @@ pub struct AgentExecutionTargetCommand {
     pub metadata: BTreeMap<String, String>,
 }
 
-/// Heartbeat wake target emitted by scheduler jobs.
+/// Compatibility heartbeat wake target emitted by internal Scheduler jobs.
+///
+/// Native Heartbeat cadence is owned by `service.heartbeat`, not Scheduler.
+/// This target is retained only so migration/runtime compatibility paths can
+/// request a typed wake through Heartbeat. Application-facing schedule
+/// management surfaces must not present it as normal recurring work.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HeartbeatWakeTargetCommand {
     pub wake_scope_key: String,

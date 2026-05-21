@@ -1557,6 +1557,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "macaca-proto",
+ "tokio",
  "tracing",
 ]
 
@@ -1755,6 +1756,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "macaca-proto",
+ "tokio",
  "tracing",
 ]
 
@@ -1873,6 +1875,7 @@ dependencies = [
  "tokio-util",
  "tower-http",
  "tracing",
+ "tracing-subscriber",
  "uuid",
 ]
 

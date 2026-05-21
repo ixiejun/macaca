@@ -14,11 +14,12 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use macaca_proto::{
     AutonomyAuditCorrelation, AutonomyServiceErrorKind, AutonomyStructuredError,
-    SchedulerCommandResult, SchedulerJobCommand, SchedulerJobDefinition, SchedulerJobId,
-    SchedulerJobLifecycleState, SchedulerQueryCommand, SchedulerRegisterJobCommand,
-    SchedulerRunId, SchedulerRunState, SchedulerRunSummary, SchedulerServiceSnapshot,
-    SchedulerTargetCommand, ServiceDescriptor, ServiceHealth,
-    ServiceLifecycleState, TraceContext, SCHEDULER_SERVICE_ID,
+    SchedulerCommandResult, SchedulerDeleteJobCommand, SchedulerGetJobCommand, SchedulerJobCommand,
+    SchedulerJobDefinition, SchedulerJobId, SchedulerJobLifecycleState, SchedulerJobSummary,
+    SchedulerLifecycleJobCommand, SchedulerListJobsCommand, SchedulerQueryCommand,
+    SchedulerRegisterJobCommand, SchedulerRunId, SchedulerRunState, SchedulerRunSummary,
+    SchedulerServiceSnapshot, SchedulerTargetCommand, SchedulerUpdateJobCommand, ServiceDescriptor,
+    ServiceHealth, ServiceLifecycleState, TraceContext, SCHEDULER_SERVICE_ID,
 };
 use tracing::{debug, info, warn};
 
@@ -230,13 +231,7 @@ impl LocalSchedulerProvider {
                 .take(25)
                 .map(|run| run.summary.clone())
                 .collect();
-            let last_audit_ids = state
-                .audit_ids
-                .iter()
-                .rev()
-                .take(25)
-                .cloned()
-                .collect();
+            let last_audit_ids = state.audit_ids.iter().rev().take(25).cloned().collect();
             SchedulerServiceSnapshot {
                 service_id: SCHEDULER_SERVICE_ID.into(),
                 provider_id: LOCAL_PROVIDER_ID.into(),
@@ -266,7 +261,10 @@ impl SchedulerService for LocalSchedulerProvider {
         self.descriptor.clone()
     }
 
-    async fn health(&self, trace: TraceContext) -> macaca_proto::MacacaResult<SchedulerServiceSnapshot> {
+    async fn health(
+        &self,
+        trace: TraceContext,
+    ) -> macaca_proto::MacacaResult<SchedulerServiceSnapshot> {
         info!(
             service_id = SCHEDULER_SERVICE_ID,
             provider_id = LOCAL_PROVIDER_ID,
@@ -326,18 +324,58 @@ impl SchedulerService for LocalSchedulerProvider {
 
     async fn update_job(
         &self,
-        command: SchedulerJobCommand,
+        command: SchedulerUpdateJobCommand,
     ) -> macaca_proto::MacacaResult<SchedulerCommandResult> {
-        self.mutate_job(command, "updated", |job, reason| {
-            job.definition
-                .metadata
-                .insert("last_update_reason".into(), reason.into());
-        })
+        let trace = command.trace.clone();
+        Ok(self.store.write(|state| {
+            let Some(job) = state.jobs.get_mut(&command.job_id) else {
+                warn!(
+                    service_id = SCHEDULER_SERVICE_ID,
+                    provider_id = LOCAL_PROVIDER_ID,
+                    job_id = command.job_id.as_str(),
+                    trace_id = trace.trace_id.as_str(),
+                    "local scheduler job update rejected because job is unknown"
+                );
+                return self.error_result(
+                    trace,
+                    AutonomyServiceErrorKind::InvalidRequest,
+                    "job_not_found",
+                    "scheduler job was not found",
+                );
+            };
+            if job.definition.scope != command.scope {
+                return self.error_result(
+                    trace,
+                    AutonomyServiceErrorKind::Denied,
+                    "scope_mismatch",
+                    "scheduler job does not belong to the requested scope",
+                );
+            }
+            let mut definition = command.definition;
+            definition.job_id = Some(command.job_id.clone());
+            definition.scope = job.definition.scope.clone();
+            job.definition = definition;
+            job.updated_at = Utc::now();
+            let lifecycle = job.definition.lifecycle.clone();
+            let audit_id = state.record_audit("job.updated");
+            info!(
+                service_id = SCHEDULER_SERVICE_ID,
+                provider_id = LOCAL_PROVIDER_ID,
+                job_id = command.job_id.as_str(),
+                audit_id = audit_id.as_str(),
+                trace_id = trace.trace_id.as_str(),
+                reason_code = command.reason_code.as_str(),
+                "local scheduler job update completed"
+            );
+            let mut result = self.result(trace, Some(command.job_id), None, Some(lifecycle), None);
+            result.audit_id = Some(audit_id);
+            result
+        }))
     }
 
     async fn pause_job(
         &self,
-        command: SchedulerJobCommand,
+        command: SchedulerLifecycleJobCommand,
     ) -> macaca_proto::MacacaResult<SchedulerCommandResult> {
         self.mutate_job(command, "paused", |job, _| {
             job.definition.lifecycle = SchedulerJobLifecycleState::Paused;
@@ -346,7 +384,7 @@ impl SchedulerService for LocalSchedulerProvider {
 
     async fn resume_job(
         &self,
-        command: SchedulerJobCommand,
+        command: SchedulerLifecycleJobCommand,
     ) -> macaca_proto::MacacaResult<SchedulerCommandResult> {
         self.mutate_job(command, "resumed", |job, _| {
             job.definition.lifecycle = SchedulerJobLifecycleState::Active;
@@ -355,11 +393,54 @@ impl SchedulerService for LocalSchedulerProvider {
 
     async fn delete_job(
         &self,
-        command: SchedulerJobCommand,
+        command: SchedulerDeleteJobCommand,
     ) -> macaca_proto::MacacaResult<SchedulerCommandResult> {
-        self.mutate_job(command, "deleted", |job, _| {
-            job.definition.lifecycle = SchedulerJobLifecycleState::Deleted;
-        })
+        let trace = command.trace.clone();
+        Ok(self.store.write(|state| {
+            let Some(job) = state.jobs.get(&command.job_id) else {
+                warn!(
+                    service_id = SCHEDULER_SERVICE_ID,
+                    provider_id = LOCAL_PROVIDER_ID,
+                    job_id = command.job_id.as_str(),
+                    trace_id = trace.trace_id.as_str(),
+                    "local scheduler job delete rejected because job is unknown"
+                );
+                return self.error_result(
+                    trace,
+                    AutonomyServiceErrorKind::InvalidRequest,
+                    "job_not_found",
+                    "scheduler job was not found",
+                );
+            };
+            if job.definition.scope != command.scope {
+                return self.error_result(
+                    trace,
+                    AutonomyServiceErrorKind::Denied,
+                    "scope_mismatch",
+                    "scheduler job does not belong to the requested scope",
+                );
+            }
+            state.jobs.remove(&command.job_id);
+            let audit_id = state.record_audit("job.deleted");
+            info!(
+                service_id = SCHEDULER_SERVICE_ID,
+                provider_id = LOCAL_PROVIDER_ID,
+                job_id = command.job_id.as_str(),
+                audit_id = audit_id.as_str(),
+                trace_id = trace.trace_id.as_str(),
+                reason_code = command.reason_code.as_str(),
+                "local scheduler job deleted"
+            );
+            let mut result = self.result(
+                trace,
+                Some(command.job_id),
+                None,
+                Some(SchedulerJobLifecycleState::Deleted),
+                None,
+            );
+            result.audit_id = Some(audit_id);
+            result
+        }))
     }
 
     async fn trigger_job(
@@ -431,56 +512,38 @@ impl SchedulerService for LocalSchedulerProvider {
 
     async fn get_job(
         &self,
-        command: SchedulerQueryCommand,
-    ) -> macaca_proto::MacacaResult<SchedulerCommandResult> {
+        command: SchedulerGetJobCommand,
+    ) -> macaca_proto::MacacaResult<Option<SchedulerJobSummary>> {
         let trace = command.trace.clone();
-        let Some(job_id) = command.job_id else {
-            return Ok(self.error_result(
-                trace,
-                AutonomyServiceErrorKind::InvalidRequest,
-                "missing_job_id",
-                "scheduler get_job requires job_id",
-            ));
-        };
-        let result = self.store.read(|state| {
-            state.jobs.get(&job_id).map(|job| {
-                self.result(
-                    trace.clone(),
-                    Some(job_id.clone()),
-                    None,
-                    Some(job.definition.lifecycle.clone()),
-                    None,
-                )
-            })
-        });
-        Ok(result.unwrap_or_else(|| {
-            self.error_result(
-                trace,
-                AutonomyServiceErrorKind::InvalidRequest,
-                "job_not_found",
-                "scheduler job was not found",
-            )
+        info!(
+            service_id = SCHEDULER_SERVICE_ID,
+            provider_id = LOCAL_PROVIDER_ID,
+            job_id = command.job_id.as_str(),
+            trace_id = trace.trace_id.as_str(),
+            "local scheduler job summary requested"
+        );
+        Ok(self.store.read(|state| {
+            state
+                .jobs
+                .get(&command.job_id)
+                .filter(|job| job.definition.scope == command.scope)
+                .map(|job| job.summary(command.job_id.clone(), Some(trace.trace_id.clone()), None))
         }))
     }
 
     async fn list_jobs(
         &self,
-        command: SchedulerQueryCommand,
-    ) -> macaca_proto::MacacaResult<Vec<SchedulerCommandResult>> {
+        command: SchedulerListJobsCommand,
+    ) -> macaca_proto::MacacaResult<Vec<SchedulerJobSummary>> {
         self.refresh_due_runs(&command.trace);
         Ok(self.store.read(|state| {
             state
                 .jobs
                 .iter()
-                .take(command.limit.unwrap_or(100))
+                .filter(|(_, job)| job.definition.scope == command.scope)
+                .take(command.limit)
                 .map(|(job_id, job)| {
-                    self.result(
-                        command.trace.clone(),
-                        Some(job_id.clone()),
-                        None,
-                        Some(job.definition.lifecycle.clone()),
-                        None,
-                    )
+                    job.summary(job_id.clone(), Some(command.trace.trace_id.clone()), None)
                 })
                 .collect()
         }))
@@ -531,11 +594,16 @@ impl SchedulerService for LocalSchedulerProvider {
                 .values()
                 .rev()
                 .filter(|run| {
-                    command
-                        .job_id
-                        .as_ref()
-                        .map(|job_id| &run.summary.job_id == job_id)
-                        .unwrap_or(true)
+                    state
+                        .jobs
+                        .get(&run.summary.job_id)
+                        .map(|job| job.definition.scope == command.scope)
+                        .unwrap_or(false)
+                        && command
+                            .job_id
+                            .as_ref()
+                            .map(|job_id| &run.summary.job_id == job_id)
+                            .unwrap_or(true)
                 })
                 .take(command.limit.unwrap_or(100))
                 .map(|run| run.summary.clone())
@@ -547,7 +615,7 @@ impl SchedulerService for LocalSchedulerProvider {
 impl LocalSchedulerProvider {
     fn mutate_job<F>(
         &self,
-        command: SchedulerJobCommand,
+        command: SchedulerLifecycleJobCommand,
         action: &'static str,
         mutate: F,
     ) -> macaca_proto::MacacaResult<SchedulerCommandResult>
@@ -571,6 +639,14 @@ impl LocalSchedulerProvider {
                     "scheduler job was not found",
                 );
             };
+            if job.definition.scope != command.scope {
+                return self.error_result(
+                    trace,
+                    AutonomyServiceErrorKind::Denied,
+                    "scope_mismatch",
+                    "scheduler job does not belong to the requested scope",
+                );
+            }
             mutate(job, &command.reason_code);
             job.updated_at = Utc::now();
             let lifecycle = job.definition.lifecycle.clone();
@@ -590,13 +666,7 @@ impl LocalSchedulerProvider {
                 trace_id = trace.trace_id.as_str(),
                 "local scheduler job lifecycle mutation completed"
             );
-            let mut result = self.result(
-                trace,
-                Some(command.job_id),
-                None,
-                Some(lifecycle),
-                None,
-            );
+            let mut result = self.result(trace, Some(command.job_id), None, Some(lifecycle), None);
             result.audit_id = Some(audit_id);
             result
         }))
@@ -683,8 +753,103 @@ impl StoredJob {
             last_scheduled_at: None,
         }
     }
+
+    /// Convert provider-owned job state into the sanitized read model used by
+    /// SDK and shell clients.
+    fn summary(
+        &self,
+        job_id: SchedulerJobId,
+        trace_id: Option<String>,
+        audit_id: Option<String>,
+    ) -> SchedulerJobSummary {
+        SchedulerJobSummary {
+            job_id,
+            scope: self.definition.scope.clone(),
+            schedule: self.definition.schedule.clone(),
+            target: self.definition.target.clone(),
+            lifecycle: self.definition.lifecycle.clone(),
+            metadata: self.definition.metadata.clone(),
+            created_at: self.created_at,
+            updated_at: self.updated_at,
+            last_scheduled_at: self.last_scheduled_at,
+            trace_id,
+            audit_id,
+        }
+    }
 }
 
 struct StoredRun {
     summary: SchedulerRunSummary,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Duration;
+    use macaca_proto::{
+        AutonomyScope, KernelServiceId, SchedulerRegisterJobCommand, SchedulerScheduleSpec,
+        ServiceCommandName, ServiceTargetCommand,
+    };
+
+    fn trace() -> TraceContext {
+        TraceContext::new("trace-local-scheduler-boundary-test")
+    }
+
+    fn service_target() -> SchedulerTargetCommand {
+        SchedulerTargetCommand::Service(ServiceTargetCommand {
+            service_id: KernelServiceId::new("service.boundary.test"),
+            command_name: ServiceCommandName::new("boundary.test.command"),
+            payload_ref: None,
+            metadata: BTreeMap::new(),
+        })
+    }
+
+    #[tokio::test]
+    async fn scheduler_does_not_materialize_native_heartbeat_cadence() {
+        let provider = LocalSchedulerProvider::new();
+        let definition = SchedulerJobDefinition::new(
+            AutonomyScope::global(),
+            SchedulerScheduleSpec::Every {
+                interval_ms: 1_000,
+                anchor: Some(Utc::now() - Duration::seconds(2)),
+            },
+            service_target(),
+        )
+        .unwrap();
+        provider
+            .register_job(SchedulerRegisterJobCommand::new(trace(), definition).unwrap())
+            .await
+            .unwrap();
+
+        let snapshot = provider.snapshot_inner();
+
+        assert!(snapshot.recent_runs.iter().all(|run| {
+            run.safe_status != "native heartbeat cadence accepted"
+                && run.safe_status != "native heartbeat cadence gated"
+        }));
+    }
+
+    #[tokio::test]
+    async fn scheduler_preserves_generic_service_target_dispatch() {
+        let provider = LocalSchedulerProvider::new();
+        let definition = SchedulerJobDefinition::new(
+            AutonomyScope::global(),
+            SchedulerScheduleSpec::At {
+                run_at: Utc::now() - Duration::seconds(1),
+            },
+            service_target(),
+        )
+        .unwrap();
+        provider
+            .register_job(SchedulerRegisterJobCommand::new(trace(), definition).unwrap())
+            .await
+            .unwrap();
+
+        let leased = provider
+            .acquire_next_run_lease_with_target(trace(), "scheduler.boundary.test")
+            .unwrap()
+            .expect("due service target should lease");
+
+        assert!(matches!(leased.target, SchedulerTargetCommand::Service(_)));
+    }
 }

@@ -330,12 +330,16 @@ fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> bool
                 || relative == "crates/runtime/macaca-runtime-host/src/autonomy_runtime_config.rs"
                 || relative == "crates/runtime/macaca-runtime-host/src/autonomy_service_provider.rs"
                 || relative == "crates/runtime/macaca-runtime-host/src/autonomy_supervisor.rs"
+                || relative
+                    .starts_with("crates/runtime/macaca-runtime-host/src/autonomy_supervisor/")
                 || relative == "crates/runtime/macaca-runtime-host/src/lib.rs"
                 || relative.starts_with("crates/facade/macaca-sdk/src/")
         }
         "autonomy-loop-boundary" => {
             relative == "crates/runtime/macaca-runtime-host/src/autonomy_service_provider.rs"
                 || relative == "crates/runtime/macaca-runtime-host/src/autonomy_supervisor.rs"
+                || relative
+                    .starts_with("crates/runtime/macaca-runtime-host/src/autonomy_supervisor/")
         }
         _ => false,
     }
@@ -466,5 +470,52 @@ fn serviceization_escape_hatches_reject_new_production_references() {
         violations.is_empty(),
         "Serviceization escape-hatch freeze violations were found:{}",
         render_violations(&violations)
+    );
+}
+
+#[test]
+fn autonomy_schedule_management_uses_serviceized_paths_only() {
+    let root = workspace_root();
+    let frontend_facade = root
+        .parent()
+        .expect("workspace has repository parent")
+        .join("frontend/lib/autonomy.ts");
+    let facade = std::fs::read_to_string(&frontend_facade)
+        .unwrap_or_else(|error| panic!("failed to read {}: {error}", frontend_facade.display()));
+    assert!(
+        facade.contains("/autonomy"),
+        "frontend autonomy facade must call the serviceized /autonomy namespace"
+    );
+    assert!(
+        !facade.contains("/api/apps/${encodeURIComponent(appId)}/schedules"),
+        "frontend autonomy facade must not call the legacy direct schedule namespace"
+    );
+    assert!(
+        !facade.contains("heartbeat_wake"),
+        "frontend schedule mutations must not expose heartbeat native cadence as a Scheduler target"
+    );
+    let schedule_editor = std::fs::read_to_string(
+        root.parent()
+            .expect("workspace has repository parent")
+            .join("frontend/components/autonomy/ScheduleEditorDrawer.tsx"),
+    )
+    .expect("schedule editor should be readable");
+    assert!(
+        !schedule_editor.contains("Heartbeat wake")
+            && !schedule_editor.contains("wake_scope_key")
+            && !schedule_editor.contains("wake_reason_code"),
+        "application schedule editor must not expose heartbeat native cadence fields"
+    );
+
+    let routes = std::fs::read_to_string(root.join("crates/shells/macaca-web/src/routes.rs"))
+        .expect("routes.rs should be readable");
+    let serviceized_section = routes
+        .split("// Serviceized application autonomy schedule routes")
+        .nth(1)
+        .and_then(|tail| tail.split("// Event Log API").next())
+        .expect("serviceized autonomy schedule section should exist");
+    assert!(
+        !serviceized_section.contains("macaca_task::TaskScheduler"),
+        "serviceized autonomy routes must use Scheduler service clients, not legacy TaskScheduler construction"
     );
 }

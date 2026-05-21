@@ -8,3 +8,6 @@ async-trait = { workspace = true }
 chrono = { workspace = true }
 macaca-proto = { workspace = true }
 tracing = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

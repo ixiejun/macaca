@@ -247,6 +247,7 @@ impl WorkflowEngine {
                 resources: None,
                 context: None,
                 service_contract: None,
+                autonomy: None,
                 ui: None,
             },
             workflow_name: DEFAULT_WORKFLOW.into(),
@@ -273,6 +274,7 @@ impl WorkflowEngine {
                 resources: None,
                 context: None,
                 service_contract: None,
+                autonomy: None,
                 ui: None,
             },
             workflow_name: DEFAULT_WORKFLOW.into(),
@@ -489,6 +491,7 @@ mod tests {
             resources: None,
             context: None,
             service_contract: None,
+            autonomy: None,
             ui: None,
         }
     }

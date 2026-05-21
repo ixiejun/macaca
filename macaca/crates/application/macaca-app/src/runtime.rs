@@ -335,6 +335,7 @@ mod tests {
             resources: None,
             context: None,
             service_contract: None,
+            autonomy: None,
             ui: None,
         }
     }
@@ -460,6 +461,7 @@ mod tests {
             resources: None,
             context: None,
             service_contract: None,
+            autonomy: None,
             ui: None,
         };
         let app_id = runtime.start_app(manifest, ".", &kernel).await.unwrap();
@@ -543,6 +545,7 @@ agents:
             resources: None,
             context: None,
             service_contract: None,
+            autonomy: None,
             ui: None,
         };
         let app_id = runtime.start_app(manifest, ".", &kernel).await.unwrap();

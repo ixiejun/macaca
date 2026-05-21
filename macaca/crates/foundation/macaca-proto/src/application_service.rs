@@ -33,6 +33,7 @@ pub const APPLICATION_SESSION_STOP_COMMAND: &str = "application.session.stop";
 pub const APPLICATION_HOST_DISPATCH_COMMAND: &str = "application.host.dispatch";
 pub const APPLICATION_GENUI_SURFACE_COMMAND: &str = "application.genui.surface";
 pub const APPLICATION_METADATA_QUERY_COMMAND: &str = "application.metadata.query";
+pub const APPLICATION_HEARTBEAT_AGENTS_QUERY_COMMAND: &str = "application.heartbeat.agents.query";
 pub const APPLICATION_AGENT_DELEGATE_COMMAND: &str = "application.agent.delegate";
 
 /// Explicit scope for Application Service commands.
@@ -252,6 +253,56 @@ impl ApplicationMetadataQueryCommand {
             include_digest: true,
         })
     }
+}
+
+/// Query manifest-declared heartbeat agents through Application Service.
+///
+/// The command uses the Command pattern instead of exposing manifests directly.
+/// Runtime-host callers provide only trace and application scope; providers own
+/// manifest lookup, validation, sanitization, and bounded diagnostics.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApplicationHeartbeatAgentsQueryCommand {
+    pub trace: TraceContext,
+    pub scope: ApplicationServiceScope,
+}
+
+impl ApplicationHeartbeatAgentsQueryCommand {
+    /// Build an application-scoped heartbeat declaration query.
+    pub fn application(trace: TraceContext, application_id: ApplicationId) -> MacacaResult<Self> {
+        validate_trace(
+            &trace,
+            "application heartbeat agents query requires trace_id",
+        )?;
+        Ok(Self {
+            trace,
+            scope: ApplicationServiceScope::application(application_id),
+        })
+    }
+
+    /// Convert this typed query into the generic service command envelope.
+    pub fn into_service_command(self) -> MacacaResult<crate::ServiceCommand> {
+        let trace = self.trace.clone();
+        Ok(crate::ServiceCommand::with_trace(
+            crate::ServiceCommandName::new(APPLICATION_HEARTBEAT_AGENTS_QUERY_COMMAND),
+            serde_json::to_value(self)?,
+            trace,
+        ))
+    }
+}
+
+/// Sanitized heartbeat agent declaration returned by Application Service.
+///
+/// This view intentionally carries declaration metadata only. It must never
+/// contain raw manifest text, prompt templates, HEARTBEAT.md content, secrets,
+/// provider payloads, package bytes, or host filesystem handles.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApplicationHeartbeatAgentView {
+    pub application_id: ApplicationId,
+    pub agent_name: String,
+    pub enabled: bool,
+    pub profile_id: String,
+    pub metadata: BTreeMap<String, String>,
+    pub diagnostics: Vec<String>,
 }
 
 /// Sanitized agent view returned by Application Service.
@@ -561,6 +612,7 @@ pub type ApplicationStatusResult = Vec<ApplicationServiceAppView>;
 pub type ApplicationSessionResult = ApplicationServiceSessionView;
 pub type ApplicationHostDispatchResult = ApplicationHostCommandResult;
 pub type ApplicationMetadataResult = ApplicationMetadataView;
+pub type ApplicationHeartbeatAgentsResult = Vec<ApplicationHeartbeatAgentView>;
 
 fn validate_trace(trace: &TraceContext, message: &'static str) -> MacacaResult<()> {
     if trace.trace_id.trim().is_empty() {

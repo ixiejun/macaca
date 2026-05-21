@@ -569,6 +569,35 @@ impl FrameworkRunner {
                 ),
             ]),
         });
+        if merged_context.agent_profile.enabled && merged_context.agent_profile.inject_heartbeat {
+            if let Some(profile_root) = Self::resolve_agent_profile_root(
+                state,
+                &command.application_id,
+                &command.target_agent,
+                &merged_context.agent_profile,
+            )
+            .await
+            {
+                let heartbeat_path = profile_root.join("HEARTBEAT.md");
+                if heartbeat_path.is_file() {
+                    // Record source evidence for heartbeat-intent execution.
+                    // The Agent Context composer remains responsible for the
+                    // actual profile-file content injection. This evidence row
+                    // gives Agent Execution a fail-closed, auditable proof that
+                    // HEARTBEAT.md participated in the trusted profile source
+                    // set without reading or duplicating prompt text here.
+                    snapshot.sources.push(macaca_proto::AgentContextSource {
+                        kind: "profile_file".into(),
+                        name: "HEARTBEAT.md".into(),
+                        location: Some(heartbeat_path.display().to_string()),
+                        metadata: std::collections::BTreeMap::from([(
+                            "source_owner".into(),
+                            "agent_context".into(),
+                        )]),
+                    });
+                }
+            }
+        }
         snapshot.sources.push(macaca_proto::AgentContextSource {
             kind: "tool_policy".into(),
             name: command.target_agent.clone(),

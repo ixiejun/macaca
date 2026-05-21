@@ -194,15 +194,8 @@ fn classify_crate(crate_name: &str) -> Option<Layer> {
         "macaca-kernel" => Some(Layer::Kernel),
         "macaca-ipc" => Some(Layer::IpcServiceBus),
         "macaca-context" => Some(Layer::ServiceContract),
-        "macaca-llm"
-        | "macaca-memory"
-        | "macaca-task"
-        | "macaca-driver"
-        | "macaca-skill"
-        | "macaca-gateway"
-        | "macaca-persist"
-        | "macaca-tools"
-        | "macaca-scheduler"
+        "macaca-llm" | "macaca-memory" | "macaca-task" | "macaca-driver" | "macaca-skill"
+        | "macaca-gateway" | "macaca-persist" | "macaca-tools" | "macaca-scheduler"
         | "macaca-heartbeat" => Some(Layer::ServiceProvider),
         "macaca-runtime" | "macaca-runtime-host" => Some(Layer::RuntimeHost),
         "macaca-agent" | "macaca-framework" | "macaca-app" | "macaca-sdk" => {

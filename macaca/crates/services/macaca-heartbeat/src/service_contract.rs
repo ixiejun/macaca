@@ -7,14 +7,14 @@
 
 use async_trait::async_trait;
 use macaca_proto::{
-    AutonomyStructuredError, CapabilityId, CleanupPolicy, HEARTBEAT_CANCEL_WAKE_COMMAND,
-    HEARTBEAT_GET_RUN_COMMAND, HEARTBEAT_HEALTH_COMMAND, HEARTBEAT_LIST_RUNS_COMMAND,
-    HEARTBEAT_SERVICE_ID, HEARTBEAT_SNAPSHOT_COMMAND, HEARTBEAT_WAKE_COMMAND,
-    HeartbeatCancelWakeCommand, HeartbeatCommandResult, HeartbeatQueryCommand, HeartbeatRunId,
-    HeartbeatRunState, HeartbeatRunSummary, HeartbeatServiceSnapshot, HeartbeatWakeCommand,
-    HeartbeatWakeDisposition, KernelServiceId, MacacaResult, ServiceCapability,
-    ServiceDescriptor, ServiceHealth, ServiceLifecycleState, ServiceScope, ServiceType,
-    TraceContext, TraceSchemaRef,
+    AutonomyStructuredError, CapabilityId, CleanupPolicy, HeartbeatCancelWakeCommand,
+    HeartbeatCommandResult, HeartbeatQueryCommand, HeartbeatRunId, HeartbeatRunState,
+    HeartbeatRunSummary, HeartbeatServiceSnapshot, HeartbeatWakeCommand, HeartbeatWakeDisposition,
+    KernelServiceId, MacacaResult, ServiceCapability, ServiceDescriptor, ServiceHealth,
+    ServiceLifecycleState, ServiceScope, ServiceType, TraceContext, TraceSchemaRef,
+    HEARTBEAT_CANCEL_WAKE_COMMAND, HEARTBEAT_GET_RUN_COMMAND, HEARTBEAT_HEALTH_COMMAND,
+    HEARTBEAT_LIST_RUNS_COMMAND, HEARTBEAT_SERVICE_ID, HEARTBEAT_SNAPSHOT_COMMAND,
+    HEARTBEAT_WAKE_COMMAND,
 };
 use tracing::{info, warn};
 
@@ -48,10 +48,8 @@ pub trait HeartbeatService: Send + Sync {
     ) -> MacacaResult<HeartbeatCommandResult>;
 
     /// Read one heartbeat run if the provider supports lookup.
-    async fn get_run(
-        &self,
-        command: HeartbeatQueryCommand,
-    ) -> MacacaResult<HeartbeatCommandResult>;
+    async fn get_run(&self, command: HeartbeatQueryCommand)
+        -> MacacaResult<HeartbeatCommandResult>;
 
     /// List bounded heartbeat history for diagnostics and audit replay.
     async fn list_runs(

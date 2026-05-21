@@ -100,7 +100,10 @@ pub use service_capability::{
     DomainPackCatalog, DomainPackDefinition, EffectiveServiceCapabilities,
     InMemoryDomainPackCatalog,
 };
-pub use service_projection::{app_manifest_to_metadata_view, app_manifest_to_service_app_view};
+pub use service_projection::{
+    app_manifest_to_heartbeat_agent_views, app_manifest_to_metadata_view,
+    app_manifest_to_service_app_view,
+};
 pub use skills::{global_skills_dir, SkillLoader};
 pub use ui_runtime::*;
 pub use wasm::WasmComponentApplicationDescriptor;

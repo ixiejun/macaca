@@ -11,12 +11,15 @@ use std::sync::Arc;
 use chrono::{Duration, Utc};
 use macaca_kernel::MockSystemService;
 use macaca_proto::{
-    AutonomyScope, HeartbeatQueryCommand, KernelServiceId, SchedulerJobDefinition,
-    SchedulerMissedRunPolicy, SchedulerQueryCommand, SchedulerRunState,
-    SchedulerScheduleSpec, SchedulerServiceSnapshot, SchedulerTargetCommand, ServiceBusSource,
-    ServiceCapability, ServiceCommand, ServiceCommandName, ServiceDescriptor, ServiceHealth,
-    ServiceScope, ServiceTargetCommand, ServiceType, TraceContext, TraceSchemaRef,
-    HEARTBEAT_SERVICE_ID, SCHEDULER_SERVICE_ID, SCHEDULER_SNAPSHOT_COMMAND,
+    ApplicationId, AutonomyScope, HeartbeatQueryCommand, KernelServiceId,
+    SchedulerDeleteJobCommand, SchedulerGetJobCommand, SchedulerJobDefinition,
+    SchedulerJobLifecycleCommand, SchedulerJobLifecycleState, SchedulerLifecycleJobCommand,
+    SchedulerListJobsCommand, SchedulerMissedRunPolicy, SchedulerQueryCommand, SchedulerRunState,
+    SchedulerScheduleSpec, SchedulerServiceSnapshot, SchedulerTargetCommand,
+    SchedulerUpdateJobCommand, ServiceBusSource, ServiceCapability, ServiceCommand,
+    ServiceCommandName, ServiceDescriptor, ServiceHealth, ServiceScope, ServiceTargetCommand,
+    ServiceType, TraceContext, TraceSchemaRef, HEARTBEAT_SERVICE_ID, SCHEDULER_SERVICE_ID,
+    SCHEDULER_SNAPSHOT_COMMAND,
 };
 use macaca_runtime_host::{
     bootstrap_autonomy_services, bootstrap_autonomy_unavailable_services, AutonomyProviderMode,
@@ -265,6 +268,147 @@ async fn supervisor_tick_dispatches_generic_service_command() {
 }
 
 #[tokio::test]
+async fn supervisor_runs_scheduler_lane_without_heartbeat_cadence() {
+    let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
+    register_mock_service(Arc::clone(&runtime)).await;
+    let bundle = bootstrap_autonomy_services(
+        Arc::clone(&runtime),
+        "trace-autonomy-scheduler-lane",
+        AutonomyRuntimeConfig {
+            provider_mode: AutonomyProviderMode::Local,
+            supervisor_enabled: false,
+            recovery_wake_enabled: false,
+            max_leases_per_tick: 2,
+            ..AutonomyRuntimeConfig::local_manual()
+        },
+    )
+    .await
+    .unwrap();
+    let supervisor = bundle.supervisor.expect("local mode returns supervisor");
+    let definition = SchedulerJobDefinition::new(
+        AutonomyScope::global(),
+        SchedulerScheduleSpec::At {
+            run_at: Utc::now() - Duration::seconds(1),
+        },
+        SchedulerTargetCommand::Service(ServiceTargetCommand {
+            service_id: KernelServiceId::new("service.autonomy.mock"),
+            command_name: ServiceCommandName::new("autonomy.mock.echo"),
+            payload_ref: None,
+            metadata: BTreeMap::new(),
+        }),
+    )
+    .unwrap();
+    runtime
+        .call(
+            &KernelServiceId::new(SCHEDULER_SERVICE_ID),
+            ServiceBusSource::new("integration.autonomy"),
+            macaca_proto::SchedulerRegisterJobCommand::new(
+                TraceContext::new("trace-autonomy-scheduler-lane-register"),
+                definition,
+            )
+            .unwrap()
+            .into_service_command()
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    let dispatched = supervisor
+        .run_scheduler_tick_once(TraceContext::new("trace-autonomy-scheduler-lane-tick"))
+        .await
+        .unwrap();
+
+    assert_eq!(dispatched, 1);
+}
+
+#[tokio::test]
+async fn supervisor_runs_heartbeat_lane_without_scheduler_due_runs() {
+    let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
+    let bundle = bootstrap_autonomy_services(
+        Arc::clone(&runtime),
+        "trace-autonomy-heartbeat-lane",
+        AutonomyRuntimeConfig {
+            provider_mode: AutonomyProviderMode::Local,
+            supervisor_enabled: false,
+            recovery_wake_enabled: false,
+            ..AutonomyRuntimeConfig::local_manual()
+        },
+    )
+    .await
+    .unwrap();
+    let supervisor = bundle.supervisor.expect("local mode returns supervisor");
+
+    let accepted = supervisor
+        .run_heartbeat_tick_once(TraceContext::new("trace-autonomy-heartbeat-lane-tick"))
+        .await
+        .unwrap();
+
+    assert!(accepted);
+    let trace = TraceContext::new("trace-autonomy-heartbeat-lane-snapshot");
+    let reply = runtime
+        .call(
+            &KernelServiceId::new(HEARTBEAT_SERVICE_ID),
+            ServiceBusSource::new("integration.autonomy"),
+            ServiceCommand::with_trace(
+                ServiceCommandName::new(macaca_proto::HEARTBEAT_SNAPSHOT_COMMAND),
+                serde_json::to_value(HeartbeatQueryCommand {
+                    trace: trace.clone(),
+                    scope: AutonomyScope::global(),
+                    run_id: None,
+                    wake_scope_key: None,
+                    limit: Some(10),
+                })
+                .unwrap(),
+                trace,
+            ),
+        )
+        .await
+        .unwrap();
+    let snapshot: macaca_proto::HeartbeatServiceSnapshot =
+        serde_json::from_value(reply.output.unwrap()).unwrap();
+    assert!(snapshot.native_profiles_active >= 1);
+    assert!(!snapshot.recent_runs.is_empty());
+}
+
+#[tokio::test]
+async fn supervisor_reports_structured_lane_degradation() {
+    let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
+    let bundle = bootstrap_autonomy_services(
+        Arc::clone(&runtime),
+        "trace-autonomy-lane-degradation",
+        AutonomyRuntimeConfig::default(),
+    )
+    .await
+    .unwrap();
+
+    assert!(bundle.supervisor.is_none());
+    let trace = TraceContext::new("trace-autonomy-lane-degradation-snapshot");
+    let reply = runtime
+        .call(
+            &KernelServiceId::new(HEARTBEAT_SERVICE_ID),
+            ServiceBusSource::new("integration.autonomy"),
+            ServiceCommand::with_trace(
+                ServiceCommandName::new(macaca_proto::HEARTBEAT_SNAPSHOT_COMMAND),
+                serde_json::to_value(HeartbeatQueryCommand {
+                    trace: trace.clone(),
+                    scope: AutonomyScope::global(),
+                    run_id: None,
+                    wake_scope_key: None,
+                    limit: Some(10),
+                })
+                .unwrap(),
+                trace,
+            ),
+        )
+        .await
+        .unwrap();
+    let snapshot: macaca_proto::HeartbeatServiceSnapshot =
+        serde_json::from_value(reply.output.unwrap()).unwrap();
+    assert!(!snapshot.healthy);
+    assert_eq!(snapshot.provider_id, "unavailable");
+}
+
+#[tokio::test]
 async fn supervisor_emits_heartbeat_scheduled_and_recovery_wakes() {
     let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
     let bundle = bootstrap_autonomy_services(
@@ -361,11 +505,9 @@ async fn local_scheduler_cron_timezone_snapshot_contains_sanitized_audit() {
     definition.missed_run_policy = SchedulerMissedRunPolicy::Skip;
 
     let registered = provider
-        .register_job(macaca_proto::SchedulerRegisterJobCommand::new(
-            trace.clone(),
-            definition,
+        .register_job(
+            macaca_proto::SchedulerRegisterJobCommand::new(trace.clone(), definition).unwrap(),
         )
-        .unwrap())
         .await
         .unwrap();
     assert!(registered.accepted);
@@ -388,8 +530,165 @@ async fn local_scheduler_cron_timezone_snapshot_contains_sanitized_audit() {
         .last_audit_ids
         .iter()
         .all(|audit_id| audit_id.starts_with("audit.scheduler.")));
-    assert!(snapshot
-        .recent_runs
-        .iter()
-        .all(|run| run.audit_id.as_deref().unwrap_or("").starts_with("audit.scheduler.")));
+    assert!(snapshot.recent_runs.iter().all(|run| run
+        .audit_id
+        .as_deref()
+        .unwrap_or("")
+        .starts_with("audit.scheduler.")));
+}
+
+#[tokio::test]
+async fn local_scheduler_job_management_is_application_scoped_and_lifecycle_aware() {
+    let provider = LocalSchedulerProvider::new();
+    let app_one = ApplicationId(uuid::Uuid::new_v4());
+    let app_two = ApplicationId(uuid::Uuid::new_v4());
+    let trace = TraceContext::new("trace-local-scheduler-job-management");
+    let first = provider
+        .register_job(
+            macaca_proto::SchedulerRegisterJobCommand::new(
+                trace.clone(),
+                SchedulerJobDefinition::new(
+                    AutonomyScope::application(app_one),
+                    SchedulerScheduleSpec::Every {
+                        interval_ms: 60_000,
+                        anchor: None,
+                    },
+                    generic_target(),
+                )
+                .unwrap(),
+            )
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+    provider
+        .register_job(
+            macaca_proto::SchedulerRegisterJobCommand::new(
+                TraceContext::new("trace-local-scheduler-other-app"),
+                SchedulerJobDefinition::new(
+                    AutonomyScope::application(app_two),
+                    SchedulerScheduleSpec::Every {
+                        interval_ms: 60_000,
+                        anchor: None,
+                    },
+                    generic_target(),
+                )
+                .unwrap(),
+            )
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+    let job_id = first.job_id.clone().expect("registered job id");
+
+    let app_one_jobs = provider
+        .list_jobs(
+            SchedulerListJobsCommand::new(
+                trace.clone(),
+                AutonomyScope::application(app_one),
+                Some(10),
+            )
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(app_one_jobs.len(), 1);
+    assert_eq!(app_one_jobs[0].job_id, job_id);
+
+    let mut replacement = SchedulerJobDefinition::new(
+        AutonomyScope::application(app_one),
+        SchedulerScheduleSpec::Every {
+            interval_ms: 120_000,
+            anchor: None,
+        },
+        generic_target(),
+    )
+    .unwrap();
+    replacement
+        .metadata
+        .insert("schedule.name".into(), "generic test schedule".into());
+    let updated = provider
+        .update_job(
+            SchedulerUpdateJobCommand::new(
+                trace.clone(),
+                AutonomyScope::application(app_one),
+                job_id.clone(),
+                replacement,
+                "integration_update",
+            )
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert!(updated.accepted);
+
+    let paused = provider
+        .pause_job(
+            SchedulerLifecycleJobCommand::new(
+                trace.clone(),
+                AutonomyScope::application(app_one),
+                job_id.clone(),
+                SchedulerJobLifecycleCommand::Pause,
+                "integration_pause",
+            )
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(paused.lifecycle, Some(SchedulerJobLifecycleState::Paused));
+
+    let resumed = provider
+        .resume_job(
+            SchedulerLifecycleJobCommand::new(
+                trace.clone(),
+                AutonomyScope::application(app_one),
+                job_id.clone(),
+                SchedulerJobLifecycleCommand::Resume,
+                "integration_resume",
+            )
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resumed.lifecycle, Some(SchedulerJobLifecycleState::Active));
+
+    let summary = provider
+        .get_job(
+            SchedulerGetJobCommand::new(
+                trace.clone(),
+                AutonomyScope::application(app_one),
+                job_id.clone(),
+            )
+            .unwrap(),
+        )
+        .await
+        .unwrap()
+        .expect("job summary after update");
+    assert_eq!(
+        summary.metadata.get("schedule.name").map(String::as_str),
+        Some("generic test schedule")
+    );
+
+    let deleted = provider
+        .delete_job(
+            SchedulerDeleteJobCommand::new(
+                trace.clone(),
+                AutonomyScope::application(app_one),
+                job_id.clone(),
+                "integration_delete",
+            )
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(deleted.lifecycle, Some(SchedulerJobLifecycleState::Deleted));
+
+    let remaining = provider
+        .list_jobs(
+            SchedulerListJobsCommand::new(trace, AutonomyScope::application(app_one), Some(10))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert!(remaining.is_empty());
 }

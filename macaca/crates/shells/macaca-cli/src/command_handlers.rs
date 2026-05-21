@@ -144,18 +144,16 @@ impl WebServerProcessLauncher {
 
         let workspace = workspace_root()?;
         let mut command = Command::new("cargo");
-        command
-            .current_dir(workspace)
-            .args([
-                "run",
-                "-p",
-                "macaca-web",
-                "--bin",
-                "macaca-web-server",
-                "--",
-                "--port",
-                &port.to_string(),
-            ]);
+        command.current_dir(workspace).args([
+            "run",
+            "-p",
+            "macaca-web",
+            "--bin",
+            "macaca-web-server",
+            "--",
+            "--port",
+            &port.to_string(),
+        ]);
         inherit_stdio(&mut command);
         Ok(command)
     }

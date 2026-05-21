@@ -10,10 +10,11 @@
 use async_trait::async_trait;
 use macaca_proto::{
     AutonomyStructuredError, CapabilityId, CleanupPolicy, KernelServiceId, MacacaResult,
-    SchedulerCommandResult, SchedulerJobCommand, SchedulerJobId, SchedulerQueryCommand,
-    SchedulerRegisterJobCommand, SchedulerRunId, SchedulerRunSummary, SchedulerServiceSnapshot,
-    ServiceCapability, ServiceDescriptor, ServiceHealth,
-    ServiceLifecycleState, ServiceScope, ServiceType, TraceContext, TraceSchemaRef,
+    SchedulerCommandResult, SchedulerDeleteJobCommand, SchedulerGetJobCommand, SchedulerJobCommand,
+    SchedulerJobId, SchedulerJobSummary, SchedulerLifecycleJobCommand, SchedulerListJobsCommand,
+    SchedulerQueryCommand, SchedulerRegisterJobCommand, SchedulerRunId, SchedulerRunSummary,
+    SchedulerServiceSnapshot, SchedulerUpdateJobCommand, ServiceCapability, ServiceDescriptor,
+    ServiceHealth, ServiceLifecycleState, ServiceScope, ServiceType, TraceContext, TraceSchemaRef,
     SCHEDULER_DELETE_JOB_COMMAND, SCHEDULER_GET_JOB_COMMAND, SCHEDULER_GET_RUN_COMMAND,
     SCHEDULER_HEALTH_COMMAND, SCHEDULER_LIST_JOBS_COMMAND, SCHEDULER_LIST_RUNS_COMMAND,
     SCHEDULER_PAUSE_JOB_COMMAND, SCHEDULER_REGISTER_JOB_COMMAND, SCHEDULER_RESUME_JOB_COMMAND,
@@ -53,25 +54,25 @@ pub trait SchedulerService: Send + Sync {
     /// Update an existing job definition or provider-neutral metadata.
     async fn update_job(
         &self,
-        command: SchedulerJobCommand,
+        command: SchedulerUpdateJobCommand,
     ) -> MacacaResult<SchedulerCommandResult>;
 
     /// Pause a job so due-run materialization stops without deleting history.
     async fn pause_job(
         &self,
-        command: SchedulerJobCommand,
+        command: SchedulerLifecycleJobCommand,
     ) -> MacacaResult<SchedulerCommandResult>;
 
     /// Resume a paused job after policy and provider checks pass.
     async fn resume_job(
         &self,
-        command: SchedulerJobCommand,
+        command: SchedulerLifecycleJobCommand,
     ) -> MacacaResult<SchedulerCommandResult>;
 
     /// Tombstone a job while preserving audit and run-history evidence.
     async fn delete_job(
         &self,
-        command: SchedulerJobCommand,
+        command: SchedulerDeleteJobCommand,
     ) -> MacacaResult<SchedulerCommandResult>;
 
     /// Materialize a manual run request through scheduler semantics.
@@ -83,20 +84,18 @@ pub trait SchedulerService: Send + Sync {
     /// Read one durable job definition if the provider supports lookup.
     async fn get_job(
         &self,
-        command: SchedulerQueryCommand,
-    ) -> MacacaResult<SchedulerCommandResult>;
+        command: SchedulerGetJobCommand,
+    ) -> MacacaResult<Option<SchedulerJobSummary>>;
 
     /// List jobs within a provider-neutral scope.
     async fn list_jobs(
         &self,
-        command: SchedulerQueryCommand,
-    ) -> MacacaResult<Vec<SchedulerCommandResult>>;
+        command: SchedulerListJobsCommand,
+    ) -> MacacaResult<Vec<SchedulerJobSummary>>;
 
     /// Read one materialized run if the provider supports lookup.
-    async fn get_run(
-        &self,
-        command: SchedulerQueryCommand,
-    ) -> MacacaResult<SchedulerCommandResult>;
+    async fn get_run(&self, command: SchedulerQueryCommand)
+        -> MacacaResult<SchedulerCommandResult>;
 
     /// List bounded run history for diagnostics and audit replay.
     async fn list_runs(
@@ -229,7 +228,7 @@ impl SchedulerService for UnavailableSchedulerProvider {
 
     async fn update_job(
         &self,
-        command: SchedulerJobCommand,
+        command: SchedulerUpdateJobCommand,
     ) -> MacacaResult<SchedulerCommandResult> {
         self.unavailable_result(
             SCHEDULER_UPDATE_JOB_COMMAND,
@@ -241,7 +240,7 @@ impl SchedulerService for UnavailableSchedulerProvider {
 
     async fn pause_job(
         &self,
-        command: SchedulerJobCommand,
+        command: SchedulerLifecycleJobCommand,
     ) -> MacacaResult<SchedulerCommandResult> {
         self.unavailable_result(
             SCHEDULER_PAUSE_JOB_COMMAND,
@@ -253,7 +252,7 @@ impl SchedulerService for UnavailableSchedulerProvider {
 
     async fn resume_job(
         &self,
-        command: SchedulerJobCommand,
+        command: SchedulerLifecycleJobCommand,
     ) -> MacacaResult<SchedulerCommandResult> {
         self.unavailable_result(
             SCHEDULER_RESUME_JOB_COMMAND,
@@ -265,7 +264,7 @@ impl SchedulerService for UnavailableSchedulerProvider {
 
     async fn delete_job(
         &self,
-        command: SchedulerJobCommand,
+        command: SchedulerDeleteJobCommand,
     ) -> MacacaResult<SchedulerCommandResult> {
         self.unavailable_result(
             SCHEDULER_DELETE_JOB_COMMAND,
@@ -289,28 +288,42 @@ impl SchedulerService for UnavailableSchedulerProvider {
 
     async fn get_job(
         &self,
-        command: SchedulerQueryCommand,
-    ) -> MacacaResult<SchedulerCommandResult> {
-        self.unavailable_result(SCHEDULER_GET_JOB_COMMAND, command.trace, command.job_id, None)
+        command: SchedulerGetJobCommand,
+    ) -> MacacaResult<Option<SchedulerJobSummary>> {
+        warn!(
+            service_id = SCHEDULER_SERVICE_ID,
+            provider_id = self.provider_id.as_str(),
+            command = SCHEDULER_GET_JOB_COMMAND,
+            trace_id = command.trace.trace_id.as_str(),
+            "scheduler job requested but no scheduler provider is available"
+        );
+        Ok(None)
     }
 
     async fn list_jobs(
         &self,
-        command: SchedulerQueryCommand,
-    ) -> MacacaResult<Vec<SchedulerCommandResult>> {
-        Ok(vec![self.unavailable_result(
-            SCHEDULER_LIST_JOBS_COMMAND,
-            command.trace,
-            None,
-            None,
-        )?])
+        command: SchedulerListJobsCommand,
+    ) -> MacacaResult<Vec<SchedulerJobSummary>> {
+        warn!(
+            service_id = SCHEDULER_SERVICE_ID,
+            provider_id = self.provider_id.as_str(),
+            command = SCHEDULER_LIST_JOBS_COMMAND,
+            trace_id = command.trace.trace_id.as_str(),
+            "scheduler job list requested but no scheduler provider is available"
+        );
+        Ok(Vec::new())
     }
 
     async fn get_run(
         &self,
         command: SchedulerQueryCommand,
     ) -> MacacaResult<SchedulerCommandResult> {
-        self.unavailable_result(SCHEDULER_GET_RUN_COMMAND, command.trace, command.job_id, command.run_id)
+        self.unavailable_result(
+            SCHEDULER_GET_RUN_COMMAND,
+            command.trace,
+            command.job_id,
+            command.run_id,
+        )
     }
 
     async fn list_runs(

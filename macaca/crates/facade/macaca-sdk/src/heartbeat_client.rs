@@ -111,39 +111,75 @@ impl ServiceBackedHeartbeatClient {
 #[async_trait]
 impl SystemHeartbeatClient for ServiceBackedHeartbeatClient {
     async fn wake(&self, command: HeartbeatWakeCommand) -> MacacaResult<HeartbeatCommandResult> {
-        call(&self.service, HEARTBEAT_WAKE_COMMAND, command.trace.clone(), command).await
+        call(
+            &self.service,
+            HEARTBEAT_WAKE_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
     }
 
     async fn cancel_wake(
         &self,
         command: HeartbeatCancelWakeCommand,
     ) -> MacacaResult<HeartbeatCommandResult> {
-        call(&self.service, HEARTBEAT_CANCEL_WAKE_COMMAND, command.trace.clone(), command).await
+        call(
+            &self.service,
+            HEARTBEAT_CANCEL_WAKE_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
     }
 
     async fn get_run(
         &self,
         command: HeartbeatQueryCommand,
     ) -> MacacaResult<Option<HeartbeatRunSummary>> {
-        call(&self.service, HEARTBEAT_GET_RUN_COMMAND, command.trace.clone(), command).await
+        call(
+            &self.service,
+            HEARTBEAT_GET_RUN_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
     }
 
     async fn list_runs(
         &self,
         command: HeartbeatQueryCommand,
     ) -> MacacaResult<Vec<HeartbeatRunSummary>> {
-        call(&self.service, HEARTBEAT_LIST_RUNS_COMMAND, command.trace.clone(), command).await
+        call(
+            &self.service,
+            HEARTBEAT_LIST_RUNS_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
     }
 
     async fn health(&self, trace: TraceContext) -> MacacaResult<HeartbeatServiceSnapshot> {
-        call(&self.service, HEARTBEAT_HEALTH_COMMAND, trace.clone(), serde_json::json!({})).await
+        call(
+            &self.service,
+            HEARTBEAT_HEALTH_COMMAND,
+            trace.clone(),
+            serde_json::json!({}),
+        )
+        .await
     }
 
     async fn snapshot(
         &self,
         command: HeartbeatQueryCommand,
     ) -> MacacaResult<HeartbeatServiceSnapshot> {
-        call(&self.service, HEARTBEAT_SNAPSHOT_COMMAND, command.trace.clone(), command).await
+        call(
+            &self.service,
+            HEARTBEAT_SNAPSHOT_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
     }
 }
 

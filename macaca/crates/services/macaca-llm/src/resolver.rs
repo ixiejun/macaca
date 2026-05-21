@@ -60,10 +60,7 @@ impl ModelRouteDescriptor {
     }
 
     /// Create a descriptor for a case-insensitive model prefix.
-    pub fn case_insensitive_prefix(
-        prefix: impl Into<String>,
-        provider: impl Into<String>,
-    ) -> Self {
+    pub fn case_insensitive_prefix(prefix: impl Into<String>, provider: impl Into<String>) -> Self {
         Self {
             matcher: ModelRouteMatcher::CaseInsensitivePrefix(prefix.into()),
             provider: provider.into(),

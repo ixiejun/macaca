@@ -130,10 +130,16 @@ impl LocalSchedulerProvider {
         trace: TraceContext,
         run_id: SchedulerRunId,
     ) -> MacacaResult<SchedulerCommandResult> {
-        self.transition_run(trace, run_id, SchedulerRunState::Running, "running", |run, now| {
-            run.summary.started_at.get_or_insert(now);
-            run.summary.safe_status = "dispatch boundary entered by local scheduler".into();
-        })
+        self.transition_run(
+            trace,
+            run_id,
+            SchedulerRunState::Running,
+            "running",
+            |run, now| {
+                run.summary.started_at.get_or_insert(now);
+                run.summary.safe_status = "dispatch boundary entered by local scheduler".into();
+            },
+        )
     }
 
     /// Mark a run as completed successfully and clear lease metadata.
@@ -142,11 +148,17 @@ impl LocalSchedulerProvider {
         trace: TraceContext,
         run_id: SchedulerRunId,
     ) -> MacacaResult<SchedulerCommandResult> {
-        self.transition_run(trace, run_id, SchedulerRunState::Succeeded, "succeeded", |run, now| {
-            run.summary.finished_at = Some(now);
-            run.summary.safe_status = "completed by local scheduler run control".into();
-            clear_lease_metadata(&mut run.summary.metadata);
-        })
+        self.transition_run(
+            trace,
+            run_id,
+            SchedulerRunState::Succeeded,
+            "succeeded",
+            |run, now| {
+                run.summary.finished_at = Some(now);
+                run.summary.safe_status = "completed by local scheduler run control".into();
+                clear_lease_metadata(&mut run.summary.metadata);
+            },
+        )
     }
 
     /// Mark a run as failed and optionally queue a bounded retry memento.
@@ -161,7 +173,8 @@ impl LocalSchedulerProvider {
         retryable: bool,
         reason_code: impl Into<String>,
     ) -> MacacaResult<SchedulerCommandResult> {
-        let reason_code = normalize_label(reason_code.into(), "scheduler failure reason is required")?;
+        let reason_code =
+            normalize_label(reason_code.into(), "scheduler failure reason is required")?;
         Ok(self.store.write(|state| {
             let now = Utc::now();
             let failure_audit_id = state.record_audit("run.failed");
@@ -242,7 +255,13 @@ impl LocalSchedulerProvider {
                 trace_id = trace.trace_id.as_str(),
                 "local scheduler marked run failed without retry"
             );
-            let mut result = self.result(trace, None, Some(run_id), None, Some(SchedulerRunState::Failed));
+            let mut result = self.result(
+                trace,
+                None,
+                Some(run_id),
+                None,
+                Some(SchedulerRunState::Failed),
+            );
             result.audit_id = Some(failure_audit_id);
             result
         }))
@@ -255,20 +274,29 @@ impl LocalSchedulerProvider {
         run_id: SchedulerRunId,
         reason_code: impl Into<String>,
     ) -> MacacaResult<SchedulerCommandResult> {
-        let reason_code = normalize_label(reason_code.into(), "scheduler cancel reason is required")?;
-        self.transition_run(trace, run_id, SchedulerRunState::Cancelled, "cancelled", |run, now| {
-            run.summary.finished_at = Some(now);
-            run.summary.safe_status = "cancelled by local scheduler run control".into();
-            run.summary
-                .metadata
-                .insert(RUN_REASON_CODE_KEY.into(), reason_code.clone());
-            clear_lease_metadata(&mut run.summary.metadata);
-        })
+        let reason_code =
+            normalize_label(reason_code.into(), "scheduler cancel reason is required")?;
+        self.transition_run(
+            trace,
+            run_id,
+            SchedulerRunState::Cancelled,
+            "cancelled",
+            |run, now| {
+                run.summary.finished_at = Some(now);
+                run.summary.safe_status = "cancelled by local scheduler run control".into();
+                run.summary
+                    .metadata
+                    .insert(RUN_REASON_CODE_KEY.into(), reason_code.clone());
+                clear_lease_metadata(&mut run.summary.metadata);
+            },
+        )
     }
 
     /// Expire all leases whose timeout has elapsed.
     pub fn expire_leases(&self, trace: TraceContext) -> MacacaResult<usize> {
-        Ok(self.store.write(|state| expire_locked(state, Utc::now(), &trace)))
+        Ok(self
+            .store
+            .write(|state| expire_locked(state, Utc::now(), &trace)))
     }
 
     fn transition_run<F>(
@@ -347,7 +375,11 @@ fn next_lease_candidate(state: &LocalSchedulerState) -> Option<(SchedulerRunId, 
     })
 }
 
-fn expire_locked(state: &mut LocalSchedulerState, now: DateTime<Utc>, trace: &TraceContext) -> usize {
+fn expire_locked(
+    state: &mut LocalSchedulerState,
+    now: DateTime<Utc>,
+    trace: &TraceContext,
+) -> usize {
     let mut expired = 0;
     for run in state.runs.values_mut() {
         if !matches!(

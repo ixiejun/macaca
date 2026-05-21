@@ -29,6 +29,7 @@ async-trait = { workspace = true }
 tracing = { workspace = true }
 chrono = { workspace = true }
 thiserror = { workspace = true }
+uuid = { workspace = true }
 dirs = "5"
 reqwest = { version = "0.12", features = ["json"] }
 rss = "2"
@@ -36,5 +37,4 @@ rss = "2"
 [dev-dependencies]
 tokio = { workspace = true }
 toml = { workspace = true }
-uuid = { workspace = true }
 tempfile = "3"

@@ -12,25 +12,27 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use macaca_app::{
-    app_manifest_to_metadata_view, app_manifest_to_service_app_view,
-    application_service_descriptor, expand_service_capabilities, AppLoader, AppRegistry,
-    AppRuntime, AppStatus, ApplicationHost, DiscoveredApp, InMemoryDomainPackCatalog,
-    UnavailableApplicationHostBackend,
+    app_manifest_to_heartbeat_agent_views, app_manifest_to_metadata_view,
+    app_manifest_to_service_app_view, application_service_descriptor, expand_service_capabilities,
+    AppLoader, AppRegistry, AppRuntime, AppStatus, ApplicationHost, DiscoveredApp,
+    InMemoryDomainPackCatalog, UnavailableApplicationHostBackend,
 };
 use macaca_kernel::{Kernel, SystemService};
 use macaca_proto::{
     ApplicationAgentDelegateCommand, ApplicationAgentDelegateResult, ApplicationDiscoverCommand,
-    ApplicationDiscoverResult, ApplicationGenUiSurfaceCommand, ApplicationHostDispatchResult,
-    ApplicationHostDispatchServiceCommand, ApplicationId, ApplicationLoadCommand,
-    ApplicationMetadataQueryCommand, ApplicationMetadataResult, ApplicationRemoveCommand,
-    ApplicationServiceAppView, ApplicationServiceRuntimeView, ApplicationServiceSessionView,
-    ApplicationServiceSnapshot, ApplicationServiceUnavailable, ApplicationSessionResumeCommand,
-    ApplicationSessionStartCommand, ApplicationSessionStopCommand, ApplicationSnapshotCommand,
-    ApplicationStartCommand, ApplicationStatusCommand, ApplicationStatusResult,
-    ApplicationStopCommand, CleanupPolicy, PackageRuntimeKind, ServiceCallResult, ServiceCommand,
-    ServiceError, ServiceHealth, ServiceResult, TraceContext, UiIntent, WasmExecutionProfile,
-    WasmRuntimeArtifactRef, WasmRuntimeSessionRequest, APPLICATION_AGENT_DELEGATE_COMMAND,
-    APPLICATION_DISCOVER_COMMAND, APPLICATION_GENUI_SURFACE_COMMAND,
+    ApplicationDiscoverResult, ApplicationGenUiSurfaceCommand,
+    ApplicationHeartbeatAgentsQueryCommand, ApplicationHeartbeatAgentsResult,
+    ApplicationHostDispatchResult, ApplicationHostDispatchServiceCommand, ApplicationId,
+    ApplicationLoadCommand, ApplicationMetadataQueryCommand, ApplicationMetadataResult,
+    ApplicationRemoveCommand, ApplicationServiceAppView, ApplicationServiceRuntimeView,
+    ApplicationServiceSessionView, ApplicationServiceSnapshot, ApplicationServiceUnavailable,
+    ApplicationSessionResumeCommand, ApplicationSessionStartCommand, ApplicationSessionStopCommand,
+    ApplicationSnapshotCommand, ApplicationStartCommand, ApplicationStatusCommand,
+    ApplicationStatusResult, ApplicationStopCommand, CleanupPolicy, PackageRuntimeKind,
+    ServiceCallResult, ServiceCommand, ServiceError, ServiceHealth, ServiceResult, TraceContext,
+    UiIntent, WasmExecutionProfile, WasmRuntimeArtifactRef, WasmRuntimeSessionRequest,
+    APPLICATION_AGENT_DELEGATE_COMMAND, APPLICATION_DISCOVER_COMMAND,
+    APPLICATION_GENUI_SURFACE_COMMAND, APPLICATION_HEARTBEAT_AGENTS_QUERY_COMMAND,
     APPLICATION_HOST_DISPATCH_COMMAND, APPLICATION_LOAD_COMMAND,
     APPLICATION_METADATA_QUERY_COMMAND, APPLICATION_REMOVE_COMMAND,
     APPLICATION_SESSION_RESUME_COMMAND, APPLICATION_SESSION_START_COMMAND,
@@ -488,6 +490,33 @@ impl SystemService for ApplicationSystemServiceProvider {
                     "application service metadata query completed"
                 );
                 Ok(Self::service_result(to_value(view)?, typed.trace))
+            }
+            APPLICATION_HEARTBEAT_AGENTS_QUERY_COMMAND => {
+                let typed: ApplicationHeartbeatAgentsQueryCommand = decode(command.payload)?;
+                let registry = self.registry()?;
+                let app_id = typed.scope.application_id.ok_or_else(|| {
+                    ServiceError::AdapterFailure(
+                        "application.heartbeat.agents.query requires application_id".into(),
+                    )
+                })?;
+                let discovered = {
+                    let guard = registry.read().await;
+                    guard.get_app(&app_id).cloned()
+                }
+                .ok_or_else(|| {
+                    ServiceError::AdapterFailure(format!("application {app_id} not found"))
+                })?;
+                let views: ApplicationHeartbeatAgentsResult =
+                    app_manifest_to_heartbeat_agent_views(&discovered.manifest);
+                tracing::info!(
+                    trace_id = %typed.trace.trace_id,
+                    app_id = %app_id,
+                    declaration_count = views.len(),
+                    enabled_count = views.iter().filter(|view| view.enabled).count(),
+                    invalid_count = views.iter().filter(|view| !view.diagnostics.is_empty()).count(),
+                    "application service heartbeat agent query completed"
+                );
+                Ok(Self::service_result(to_value(views)?, typed.trace))
             }
             APPLICATION_SNAPSHOT_COMMAND => {
                 let typed: ApplicationSnapshotCommand = decode(command.payload)?;

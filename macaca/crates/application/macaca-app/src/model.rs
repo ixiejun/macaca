@@ -102,6 +102,64 @@ pub struct AgentSkillsConfig {
     pub deny: Vec<String>,
 }
 
+/// Application-owned autonomy declarations.
+///
+/// This configuration is intentionally data-only. It declares which generic
+/// autonomy surfaces an application opts into, while runtime-host and system
+/// services still own policy, trace, scheduling, heartbeat, and execution
+/// semantics.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AppAutonomyConfig {
+    /// Optional heartbeat agent participation contract.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub heartbeat: Option<AppHeartbeatConfig>,
+}
+
+/// Application-owned heartbeat participation contract.
+///
+/// The presence of this block does not execute anything by itself. Runtime-host
+/// must query the sanitized Application Service projection and then dispatch
+/// through Agent Execution, so app packages cannot bypass policy or service
+/// audit boundaries.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AppHeartbeatConfig {
+    /// Disable all heartbeat agent dispatch while preserving declarations.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// Manifest-declared agents that may receive heartbeat execution intent.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub agents: Vec<AppHeartbeatAgentConfig>,
+}
+
+/// One manifest-declared heartbeat agent.
+///
+/// `profile_id` is a provider-neutral extension point. The first runtime bridge
+/// records it for traceability without adding application-specific profile
+/// behavior.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppHeartbeatAgentConfig {
+    /// Agent name as declared in this application's manifest.
+    pub name: String,
+    /// Per-agent enable switch for staged rollout and package defaults.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// Provider-neutral profile selector recorded in sanitized dispatch views.
+    #[serde(default = "default_profile_id")]
+    pub profile_id: String,
+    /// Bounded declaration metadata. Projection code sanitizes values before
+    /// they cross service boundaries.
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub metadata: std::collections::BTreeMap<String, String>,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_profile_id() -> String {
+    "default".into()
+}
+
 /// A capability reference in inline config.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CapabilityRef {
@@ -268,6 +326,9 @@ pub struct AppManifest {
     /// Optional generic service declaration block for contract-driven routing.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub service_contract: Option<AppServiceContractConfig>,
+    /// Optional application-owned autonomy declaration block.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub autonomy: Option<AppAutonomyConfig>,
     /// Optional application-owned UI runtime declaration.
     ///
     /// The declaration points to UI artifacts inside the application package
@@ -460,6 +521,7 @@ agents:
                 resources: None,
                 context: None,
                 service_contract: None,
+                autonomy: None,
                 ui: None,
             },
             agent_ids: vec![],

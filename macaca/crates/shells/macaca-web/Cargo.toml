@@ -29,6 +29,7 @@ tokio = { workspace = true }
 futures = { workspace = true }
 tower-http = { version = "0.6", features = ["cors"] }
 tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 uuid = { workspace = true }
 dirs = "5"
 chrono = { workspace = true }

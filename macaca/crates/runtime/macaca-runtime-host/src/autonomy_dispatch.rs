@@ -79,7 +79,8 @@ impl<'a> AutonomyDispatchStrategies<'a> {
     ) -> MacacaResult<AutonomyDispatchOutcome> {
         match target {
             SchedulerTargetCommand::Service(command) => {
-                self.dispatch_service(trace, command.service_id, command.command_name).await
+                self.dispatch_service(trace, command.service_id, command.command_name)
+                    .await
             }
             SchedulerTargetCommand::HeartbeatWake(command) => {
                 let mut wake = HeartbeatWakeCommand::new(
@@ -148,9 +149,13 @@ impl<'a> AutonomyDispatchStrategies<'a> {
                     error = %error,
                     "autonomy supervisor service dispatch failed"
                 );
-                Ok(AutonomyDispatchOutcome::retryable("service_dispatch_failed"))
+                Ok(AutonomyDispatchOutcome::retryable(
+                    "service_dispatch_failed",
+                ))
             }
-            Err(_) => Ok(AutonomyDispatchOutcome::retryable("service_dispatch_timeout")),
+            Err(_) => Ok(AutonomyDispatchOutcome::retryable(
+                "service_dispatch_timeout",
+            )),
         }
     }
 
@@ -184,9 +189,13 @@ impl<'a> AutonomyDispatchStrategies<'a> {
                     error = %error,
                     "autonomy supervisor heartbeat dispatch failed"
                 );
-                Ok(AutonomyDispatchOutcome::retryable("heartbeat_dispatch_failed"))
+                Ok(AutonomyDispatchOutcome::retryable(
+                    "heartbeat_dispatch_failed",
+                ))
             }
-            Err(_) => Ok(AutonomyDispatchOutcome::retryable("heartbeat_dispatch_timeout")),
+            Err(_) => Ok(AutonomyDispatchOutcome::retryable(
+                "heartbeat_dispatch_timeout",
+            )),
         }
     }
 }

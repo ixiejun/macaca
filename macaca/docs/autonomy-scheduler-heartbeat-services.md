@@ -3,10 +3,11 @@
 ## Purpose
 
 `service.scheduler` and `service.heartbeat` provide the generic autonomous
-runtime loop capabilities required by a 24/7 Agent OS. They are system services,
-not kernel implementations and not application workflows. Scheduler owns durable
-time-based job intent and run mementos. Heartbeat owns wake-loop coalescing,
-gate evaluation, and wake-run evidence.
+runtime loop capabilities required by a 24/7 Agent OS. They are sibling system
+services, not kernel implementations and not application workflows. Scheduler
+owns durable time-based job intent and run mementos. Heartbeat owns native
+agent/system cadence, wake-loop coalescing, gate evaluation, heartbeat profiles,
+and wake-run evidence.
 
 These services let upper applications request recurring or event-driven
 autonomy without adding application-specific code to Macaca OS.
@@ -23,19 +24,29 @@ effects during ordinary host startup.
 When runtime-host receives explicit provider-neutral local autonomy
 configuration, it may register the built-in local Scheduler and Heartbeat
 providers and create an `AutonomySupervisor`. This supervisor is lifecycle
-managed by runtime-host only. It owns bounded timer-loop coordination, lease
-acquisition, dispatch timeout handling, recovery wake requests, scheduled
-heartbeat ticks, shutdown cancellation, and safe logs. It does not parse cron
-expressions, evaluate heartbeat gates, inspect application payloads, or branch
-on application, workflow, provider, driver, model, gateway, chain, payment, or
-business-domain names.
+managed by runtime-host only. It owns two sibling lanes:
+
+- `SchedulerLane` coordinates Scheduler due-run materialization, lease
+  acquisition, generic scheduled target dispatch, retry outcome mapping, and
+  Scheduler run mementos.
+- `HeartbeatLane` coordinates Heartbeat native cadence ticks, recovery wake
+  requests, heartbeat profile evaluation, and heartbeat run mementos.
+
+The lanes share runtime-host lifecycle and sanitized observability, but they do
+not own each other's semantics. Scheduler does not own heartbeat cadence, and
+Heartbeat does not own scheduled job calculation. Runtime-host does not parse
+cron expressions, evaluate heartbeat gates, inspect application payloads, or
+branch on application, workflow, provider, driver, model, gateway, chain,
+payment, or business-domain names.
 
 The current local dispatch strategy supports generic `ServiceCommand` targets
-through `ServiceRuntime` and `HeartbeatWakeCommand` targets through
-`service.heartbeat`. Agent execution, application capability, and plugin target
-categories remain provider-neutral strategy slots; until their downstream
-service dispatch adapters are activated, the supervisor records explicit
-skipped/unsupported outcomes rather than panicking or faking success.
+through `ServiceRuntime`. Scheduler `HeartbeatWakeCommand` targets are retained
+only as internal/runtime compatibility for migration; application-facing
+schedule management must not present Heartbeat native cadence as a Scheduler
+target. Agent execution, application capability, and plugin target categories
+remain provider-neutral strategy slots; until their downstream service dispatch
+adapters are activated, the supervisor records explicit skipped/unsupported
+outcomes rather than panicking or faking success.
 
 The local Web host now enables this path explicitly through
 `macaca/config/default.toml`:
@@ -51,12 +62,43 @@ namespace without constructing providers:
 
 - `POST /api/apps/{app_id}/autonomy/schedules` registers a serviceized
   Scheduler job through the SDK Scheduler client.
+- `GET /api/apps/{app_id}/autonomy/schedules` lists application-scoped
+  serviceized Scheduler job summaries.
+- `GET /api/apps/{app_id}/autonomy/schedules/{job_id}` returns one sanitized
+  job summary.
+- `PATCH /api/apps/{app_id}/autonomy/schedules/{job_id}` updates a job by
+  submitting a provider-neutral replacement definition through the Scheduler
+  service client.
+- `PUT /api/apps/{app_id}/autonomy/schedules/{job_id}/lifecycle` pauses or
+  resumes a job through Scheduler-owned lifecycle semantics.
+- `DELETE /api/apps/{app_id}/autonomy/schedules/{job_id}` deletes a job through
+  the Scheduler service while preserving bounded run/audit evidence.
 - `GET /api/apps/{app_id}/autonomy/scheduler/runs` returns bounded,
   sanitized run history for monitoring.
 
-If no target is supplied, the route creates a generic Heartbeat wake target.
-That default proves the 24/7 runtime path without embedding application
-business logic in Web or runtime-host.
+If no target is supplied, the route rejects the request with a structured
+adapter error. Heartbeat native cadence is managed by `service.heartbeat`
+profiles through HeartbeatLane, not by default Web-created Scheduler jobs.
+
+## Web Schedule Management Surface
+
+The frontend exposes an application-scoped `AUTONOMY` workspace tab for
+operators. The tab is a presentation shell only: it loads sanitized Scheduler
+job summaries, submits provider-neutral create/update/delete/lifecycle
+commands, renders bounded run mementos, and displays safe trace/audit
+identifiers. It does not construct providers, parse cron semantics, inspect
+application business payloads, or call the legacy `/api/apps/{app_id}/schedules`
+compatibility routes.
+
+The schedule editor intentionally exposes Scheduler-owned generic fields only:
+
+- schedule name metadata;
+- interval seconds;
+- service id and command name for service targets;
+- safe metadata key/value pairs.
+
+This keeps the UI useful for every application while preserving Macaca OS as
+generic infrastructure rather than application-specific automation code.
 
 ## Ownership Diagram
 
@@ -108,6 +150,7 @@ A plugin or remote scheduler provider must:
 
 - `HeartbeatService` is the replaceable provider trait.
 - `HeartbeatWakeCommand` is the generic wake entrypoint.
+- `HeartbeatProfile` is the native cadence/profile contract.
 - `HeartbeatGateDecision` records bounded gate evidence.
 - `HeartbeatRunSummary` is the wake-run memento.
 - `HeartbeatServiceSnapshot` is the sanitized diagnostic view.
@@ -118,7 +161,9 @@ A plugin or remote heartbeat provider must:
 - Gate wakes through generic active-hours, cooldown, busy, resource, budget,
   provider-health, policy, and extension gates.
 - Treat scheduled ticks from `service.scheduler` as typed wake intent, not as
-  a special application workflow.
+  a special application workflow or the owner of native heartbeat cadence.
+- Evaluate native heartbeat cadence from Heartbeat profiles without requiring
+  Scheduler jobs or Scheduler due-run materialization.
 - Log wake accepted, coalesced, gated, delayed, dispatched, failed, skipped, and
   completed events with trace ids and safe reason codes only.
 - Keep raw prompts, manifests, package bytes, provider payloads, credentials,

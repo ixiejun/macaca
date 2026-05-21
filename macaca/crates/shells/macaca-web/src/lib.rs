@@ -59,7 +59,7 @@ use std::sync::Arc;
 
 use tracing::{error, info};
 
-use macaca_app::{AppRegistry, AppRuntime};
+use macaca_app::{AppLoader, AppRegistry, AppRuntime};
 use macaca_framework::session::{
     InMemorySessionStore as FrameworkInMemorySessionStore, SessionStore as FrameworkSessionStore,
 };
@@ -320,6 +320,42 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
                     let app_agent_names: Vec<String> =
                         view.agents.iter().map(|agent| agent.name.clone()).collect();
                     started_apps.push((view.id, view.name.clone(), app_agent_names));
+                    if let Some(supervisor) = autonomy_runtime.supervisor.as_ref() {
+                        match AppLoader::load_manifest(&manifest_path) {
+                            Ok(manifest) => {
+                                let profile_trace = TraceContext::new(format!(
+                                    "web-startup-application-heartbeat-profile-{}",
+                                    view.id
+                                ));
+                                match supervisor.register_application_heartbeat_profile(
+                                    &manifest,
+                                    profile_trace,
+                                ) {
+                                    Ok(registered) => {
+                                        info!(
+                                            app_id = %view.id,
+                                            registered,
+                                            "Application heartbeat profile registration evaluated"
+                                        );
+                                    }
+                                    Err(error) => {
+                                        error!(
+                                            app_id = %view.id,
+                                            error = %error,
+                                            "Application heartbeat profile registration failed"
+                                        );
+                                    }
+                                }
+                            }
+                            Err(error) => {
+                                error!(
+                                    app_id = %view.id,
+                                    error = %error,
+                                    "Application manifest reload failed during heartbeat profile registration"
+                                );
+                            }
+                        }
+                    }
                     info!(
                         app_id = %view.id,
                         app_name = %view.name,

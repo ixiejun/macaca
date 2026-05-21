@@ -92,12 +92,12 @@ pub use application_hosts::{
 pub use application_service_provider::{
     ApplicationOrchestrationBackend, ApplicationSystemServiceProvider,
 };
+pub use autonomy_runtime_config::{AutonomyProviderMode, AutonomyRuntimeConfig};
 pub use autonomy_service_provider::{
     bootstrap_autonomy_local_services, bootstrap_autonomy_services,
-    bootstrap_autonomy_unavailable_services, AutonomyRuntimeBundle,
-    HeartbeatSystemServiceProvider, SchedulerSystemServiceProvider,
+    bootstrap_autonomy_unavailable_services, AutonomyRuntimeBundle, HeartbeatSystemServiceProvider,
+    SchedulerSystemServiceProvider,
 };
-pub use autonomy_runtime_config::{AutonomyProviderMode, AutonomyRuntimeConfig};
 pub use autonomy_supervisor::AutonomySupervisor;
 pub use context_service_provider::ContextSystemServiceProvider;
 #[allow(deprecated)]

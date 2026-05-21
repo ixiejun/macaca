@@ -14,16 +14,17 @@ use macaca_heartbeat::{HeartbeatService, LocalHeartbeatProvider, UnavailableHear
 use macaca_kernel::SystemService;
 use macaca_proto::{
     HeartbeatCancelWakeCommand, HeartbeatQueryCommand, HeartbeatWakeCommand, KernelServiceId,
-    MacacaError, MacacaResult, SchedulerJobCommand, SchedulerQueryCommand,
-    SchedulerRegisterJobCommand, ServiceCallResult, ServiceCommand, ServiceDescriptor,
-    ServiceError, ServiceHealth, ServiceResult, TraceContext, HEARTBEAT_CANCEL_WAKE_COMMAND,
-    HEARTBEAT_GET_RUN_COMMAND, HEARTBEAT_HEALTH_COMMAND, HEARTBEAT_LIST_RUNS_COMMAND,
-    HEARTBEAT_SERVICE_ID, HEARTBEAT_SNAPSHOT_COMMAND, HEARTBEAT_WAKE_COMMAND,
-    SCHEDULER_DELETE_JOB_COMMAND, SCHEDULER_GET_JOB_COMMAND, SCHEDULER_GET_RUN_COMMAND,
-    SCHEDULER_HEALTH_COMMAND, SCHEDULER_LIST_JOBS_COMMAND, SCHEDULER_LIST_RUNS_COMMAND,
-    SCHEDULER_PAUSE_JOB_COMMAND, SCHEDULER_REGISTER_JOB_COMMAND, SCHEDULER_RESUME_JOB_COMMAND,
-    SCHEDULER_SERVICE_ID, SCHEDULER_SNAPSHOT_COMMAND, SCHEDULER_TRIGGER_JOB_COMMAND,
-    SCHEDULER_UPDATE_JOB_COMMAND,
+    MacacaError, MacacaResult, SchedulerDeleteJobCommand, SchedulerGetJobCommand,
+    SchedulerJobCommand, SchedulerLifecycleJobCommand, SchedulerListJobsCommand,
+    SchedulerQueryCommand, SchedulerRegisterJobCommand, SchedulerUpdateJobCommand,
+    ServiceCallResult, ServiceCommand, ServiceDescriptor, ServiceError, ServiceHealth,
+    ServiceResult, TraceContext, HEARTBEAT_CANCEL_WAKE_COMMAND, HEARTBEAT_GET_RUN_COMMAND,
+    HEARTBEAT_HEALTH_COMMAND, HEARTBEAT_LIST_RUNS_COMMAND, HEARTBEAT_SERVICE_ID,
+    HEARTBEAT_SNAPSHOT_COMMAND, HEARTBEAT_WAKE_COMMAND, SCHEDULER_DELETE_JOB_COMMAND,
+    SCHEDULER_GET_JOB_COMMAND, SCHEDULER_GET_RUN_COMMAND, SCHEDULER_HEALTH_COMMAND,
+    SCHEDULER_LIST_JOBS_COMMAND, SCHEDULER_LIST_RUNS_COMMAND, SCHEDULER_PAUSE_JOB_COMMAND,
+    SCHEDULER_REGISTER_JOB_COMMAND, SCHEDULER_RESUME_JOB_COMMAND, SCHEDULER_SERVICE_ID,
+    SCHEDULER_SNAPSHOT_COMMAND, SCHEDULER_TRIGGER_JOB_COMMAND, SCHEDULER_UPDATE_JOB_COMMAND,
 };
 use macaca_scheduler::{LocalSchedulerProvider, SchedulerService, UnavailableSchedulerProvider};
 use tracing::info;
@@ -92,7 +93,7 @@ impl SystemService for SchedulerSystemServiceProvider {
                 )
             }
             SCHEDULER_UPDATE_JOB_COMMAND => {
-                let typed: SchedulerJobCommand = decode(command.payload)?;
+                let typed: SchedulerUpdateJobCommand = decode(command.payload)?;
                 service_result(
                     self.provider
                         .update_job(typed)
@@ -102,7 +103,7 @@ impl SystemService for SchedulerSystemServiceProvider {
                 )
             }
             SCHEDULER_PAUSE_JOB_COMMAND => {
-                let typed: SchedulerJobCommand = decode(command.payload)?;
+                let typed: SchedulerLifecycleJobCommand = decode(command.payload)?;
                 service_result(
                     self.provider
                         .pause_job(typed)
@@ -112,7 +113,7 @@ impl SystemService for SchedulerSystemServiceProvider {
                 )
             }
             SCHEDULER_RESUME_JOB_COMMAND => {
-                let typed: SchedulerJobCommand = decode(command.payload)?;
+                let typed: SchedulerLifecycleJobCommand = decode(command.payload)?;
                 service_result(
                     self.provider
                         .resume_job(typed)
@@ -122,7 +123,7 @@ impl SystemService for SchedulerSystemServiceProvider {
                 )
             }
             SCHEDULER_DELETE_JOB_COMMAND => {
-                let typed: SchedulerJobCommand = decode(command.payload)?;
+                let typed: SchedulerDeleteJobCommand = decode(command.payload)?;
                 service_result(
                     self.provider
                         .delete_job(typed)
@@ -142,7 +143,7 @@ impl SystemService for SchedulerSystemServiceProvider {
                 )
             }
             SCHEDULER_GET_JOB_COMMAND => {
-                let typed: SchedulerQueryCommand = decode(command.payload)?;
+                let typed: SchedulerGetJobCommand = decode(command.payload)?;
                 service_result(
                     self.provider
                         .get_job(typed)
@@ -152,7 +153,7 @@ impl SystemService for SchedulerSystemServiceProvider {
                 )
             }
             SCHEDULER_LIST_JOBS_COMMAND => {
-                let typed: SchedulerQueryCommand = decode(command.payload)?;
+                let typed: SchedulerListJobsCommand = decode(command.payload)?;
                 service_result(
                     self.provider
                         .list_jobs(typed)
@@ -462,7 +463,9 @@ pub async fn bootstrap_autonomy_local_services(
     let supervisor =
         AutonomySupervisor::new(Arc::clone(&runtime), scheduler, heartbeat, config.clone());
     supervisor
-        .start(TraceContext::new(format!("{trace_prefix}-supervisor-start")))
+        .start(TraceContext::new(format!(
+            "{trace_prefix}-supervisor-start"
+        )))
         .await?;
     if config.recovery_wake_enabled {
         supervisor
@@ -494,9 +497,7 @@ async fn register_and_start(
     );
     runtime
         .register_provider(
-            &StaticServiceProviderFactory::new(ServiceProviderInstance::new(
-                descriptor, service,
-            )),
+            &StaticServiceProviderFactory::new(ServiceProviderInstance::new(descriptor, service)),
             ServiceProviderFactoryContext::new(),
         )
         .await

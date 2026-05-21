@@ -314,6 +314,7 @@ mod tests {
                 optional_services: vec![],
                 service_policy_overrides: Default::default(),
             }),
+            autonomy: None,
             ui: None,
         };
         let error = ApplicationManifestSpec.validate(&manifest).unwrap_err();

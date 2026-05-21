@@ -7,8 +7,8 @@
 //! safe for SDK, runtime, tests, and future plugin providers to depend on the
 //! same boundary without importing shell or application-specific code.
 
-pub mod service_contract;
 pub mod local_provider;
+pub mod service_contract;
 
 pub use local_provider::*;
 pub use service_contract::*;

@@ -11,9 +11,11 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use macaca_proto::{
-    MacacaError, MacacaResult, SchedulerCommandResult, SchedulerJobCommand,
-    SchedulerJobDefinition, SchedulerQueryCommand, SchedulerRegisterJobCommand,
-    SchedulerRunSummary, SchedulerServiceSnapshot, TraceContext, SCHEDULER_DELETE_JOB_COMMAND,
+    MacacaError, MacacaResult, SchedulerCommandResult, SchedulerDeleteJobCommand,
+    SchedulerGetJobCommand, SchedulerJobCommand, SchedulerJobLifecycleCommand, SchedulerJobSummary,
+    SchedulerLifecycleJobCommand, SchedulerListJobsCommand, SchedulerQueryCommand,
+    SchedulerRegisterJobCommand, SchedulerRunSummary, SchedulerServiceSnapshot,
+    SchedulerUpdateJobCommand, TraceContext, SCHEDULER_DELETE_JOB_COMMAND,
     SCHEDULER_GET_JOB_COMMAND, SCHEDULER_GET_RUN_COMMAND, SCHEDULER_HEALTH_COMMAND,
     SCHEDULER_LIST_JOBS_COMMAND, SCHEDULER_LIST_RUNS_COMMAND, SCHEDULER_PAUSE_JOB_COMMAND,
     SCHEDULER_REGISTER_JOB_COMMAND, SCHEDULER_RESUME_JOB_COMMAND, SCHEDULER_SERVICE_ID,
@@ -35,16 +37,23 @@ pub trait SystemSchedulerClient: Send + Sync {
         &self,
         command: SchedulerRegisterJobCommand,
     ) -> MacacaResult<SchedulerCommandResult>;
-    async fn update_job(&self, command: SchedulerJobCommand)
+    async fn update_job(
+        &self,
+        command: SchedulerUpdateJobCommand,
+    ) -> MacacaResult<SchedulerCommandResult>;
+    async fn transition_job(
+        &self,
+        command: SchedulerLifecycleJobCommand,
+    ) -> MacacaResult<SchedulerCommandResult>;
+    async fn pause_job(&self, command: SchedulerJobCommand)
         -> MacacaResult<SchedulerCommandResult>;
-    async fn pause_job(&self, command: SchedulerJobCommand) -> MacacaResult<SchedulerCommandResult>;
     async fn resume_job(
         &self,
         command: SchedulerJobCommand,
     ) -> MacacaResult<SchedulerCommandResult>;
     async fn delete_job(
         &self,
-        command: SchedulerJobCommand,
+        command: SchedulerDeleteJobCommand,
     ) -> MacacaResult<SchedulerCommandResult>;
     async fn trigger_job(
         &self,
@@ -52,12 +61,12 @@ pub trait SystemSchedulerClient: Send + Sync {
     ) -> MacacaResult<SchedulerCommandResult>;
     async fn get_job(
         &self,
-        command: SchedulerQueryCommand,
-    ) -> MacacaResult<Option<SchedulerJobDefinition>>;
+        command: SchedulerGetJobCommand,
+    ) -> MacacaResult<Option<SchedulerJobSummary>>;
     async fn list_jobs(
         &self,
-        command: SchedulerQueryCommand,
-    ) -> MacacaResult<Vec<SchedulerJobDefinition>>;
+        command: SchedulerListJobsCommand,
+    ) -> MacacaResult<Vec<SchedulerJobSummary>>;
     async fn get_run(
         &self,
         command: SchedulerQueryCommand,
@@ -71,6 +80,19 @@ pub trait SystemSchedulerClient: Send + Sync {
         &self,
         command: SchedulerQueryCommand,
     ) -> MacacaResult<SchedulerServiceSnapshot>;
+}
+
+/// Legacy-compatible Scheduler client methods retained for older callers.
+///
+/// The schedule-management UI uses `transition_job` and the scoped CRUD
+/// commands above. These helpers remain as compatibility shims for previously
+/// landed runtime-host code paths.
+#[async_trait]
+pub trait LegacySystemSchedulerClient: Send + Sync {
+    async fn update_job_legacy(
+        &self,
+        command: SchedulerJobCommand,
+    ) -> MacacaResult<SchedulerCommandResult>;
 }
 
 /// Null-object Scheduler client used when `service.scheduler` is absent.
@@ -92,13 +114,24 @@ impl SystemSchedulerClient for UnavailableSystemSchedulerClient {
 
     async fn update_job(
         &self,
-        command: SchedulerJobCommand,
+        command: SchedulerUpdateJobCommand,
     ) -> MacacaResult<SchedulerCommandResult> {
         warn!(trace_id = %command.trace.trace_id, "sdk scheduler client unavailable for update_job");
         Err(unavailable_error())
     }
 
-    async fn pause_job(&self, command: SchedulerJobCommand) -> MacacaResult<SchedulerCommandResult> {
+    async fn transition_job(
+        &self,
+        command: SchedulerLifecycleJobCommand,
+    ) -> MacacaResult<SchedulerCommandResult> {
+        warn!(trace_id = %command.trace.trace_id, "sdk scheduler client unavailable for transition_job");
+        Err(unavailable_error())
+    }
+
+    async fn pause_job(
+        &self,
+        command: SchedulerJobCommand,
+    ) -> MacacaResult<SchedulerCommandResult> {
         warn!(trace_id = %command.trace.trace_id, "sdk scheduler client unavailable for pause_job");
         Err(unavailable_error())
     }
@@ -113,7 +146,7 @@ impl SystemSchedulerClient for UnavailableSystemSchedulerClient {
 
     async fn delete_job(
         &self,
-        command: SchedulerJobCommand,
+        command: SchedulerDeleteJobCommand,
     ) -> MacacaResult<SchedulerCommandResult> {
         warn!(trace_id = %command.trace.trace_id, "sdk scheduler client unavailable for delete_job");
         Err(unavailable_error())
@@ -129,16 +162,16 @@ impl SystemSchedulerClient for UnavailableSystemSchedulerClient {
 
     async fn get_job(
         &self,
-        command: SchedulerQueryCommand,
-    ) -> MacacaResult<Option<SchedulerJobDefinition>> {
+        command: SchedulerGetJobCommand,
+    ) -> MacacaResult<Option<SchedulerJobSummary>> {
         info!(trace_id = %command.trace.trace_id, "sdk scheduler client unavailable for get_job");
         Ok(None)
     }
 
     async fn list_jobs(
         &self,
-        command: SchedulerQueryCommand,
-    ) -> MacacaResult<Vec<SchedulerJobDefinition>> {
+        command: SchedulerListJobsCommand,
+    ) -> MacacaResult<Vec<SchedulerJobSummary>> {
         info!(trace_id = %command.trace.trace_id, "sdk scheduler client unavailable for list_jobs");
         Ok(Vec::new())
     }
@@ -196,75 +229,164 @@ impl SystemSchedulerClient for ServiceBackedSchedulerClient {
         &self,
         command: SchedulerRegisterJobCommand,
     ) -> MacacaResult<SchedulerCommandResult> {
-        call(&self.service, SCHEDULER_REGISTER_JOB_COMMAND, command.trace.clone(), command).await
+        call(
+            &self.service,
+            SCHEDULER_REGISTER_JOB_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
     }
 
-    async fn update_job(&self, command: SchedulerJobCommand) -> MacacaResult<SchedulerCommandResult> {
-        call(&self.service, SCHEDULER_UPDATE_JOB_COMMAND, command.trace.clone(), command).await
+    async fn update_job(
+        &self,
+        command: SchedulerUpdateJobCommand,
+    ) -> MacacaResult<SchedulerCommandResult> {
+        call(
+            &self.service,
+            SCHEDULER_UPDATE_JOB_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
     }
 
-    async fn pause_job(&self, command: SchedulerJobCommand) -> MacacaResult<SchedulerCommandResult> {
-        call(&self.service, SCHEDULER_PAUSE_JOB_COMMAND, command.trace.clone(), command).await
+    async fn transition_job(
+        &self,
+        command: SchedulerLifecycleJobCommand,
+    ) -> MacacaResult<SchedulerCommandResult> {
+        let command_name = match command.lifecycle {
+            SchedulerJobLifecycleCommand::Pause => SCHEDULER_PAUSE_JOB_COMMAND,
+            SchedulerJobLifecycleCommand::Resume => SCHEDULER_RESUME_JOB_COMMAND,
+        };
+        call(&self.service, command_name, command.trace.clone(), command).await
+    }
+
+    async fn pause_job(
+        &self,
+        command: SchedulerJobCommand,
+    ) -> MacacaResult<SchedulerCommandResult> {
+        call(
+            &self.service,
+            SCHEDULER_PAUSE_JOB_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
     }
 
     async fn resume_job(
         &self,
         command: SchedulerJobCommand,
     ) -> MacacaResult<SchedulerCommandResult> {
-        call(&self.service, SCHEDULER_RESUME_JOB_COMMAND, command.trace.clone(), command).await
+        call(
+            &self.service,
+            SCHEDULER_RESUME_JOB_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
     }
 
     async fn delete_job(
         &self,
-        command: SchedulerJobCommand,
+        command: SchedulerDeleteJobCommand,
     ) -> MacacaResult<SchedulerCommandResult> {
-        call(&self.service, SCHEDULER_DELETE_JOB_COMMAND, command.trace.clone(), command).await
+        call(
+            &self.service,
+            SCHEDULER_DELETE_JOB_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
     }
 
     async fn trigger_job(
         &self,
         command: SchedulerJobCommand,
     ) -> MacacaResult<SchedulerCommandResult> {
-        call(&self.service, SCHEDULER_TRIGGER_JOB_COMMAND, command.trace.clone(), command).await
+        call(
+            &self.service,
+            SCHEDULER_TRIGGER_JOB_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
     }
 
     async fn get_job(
         &self,
-        command: SchedulerQueryCommand,
-    ) -> MacacaResult<Option<SchedulerJobDefinition>> {
-        call(&self.service, SCHEDULER_GET_JOB_COMMAND, command.trace.clone(), command).await
+        command: SchedulerGetJobCommand,
+    ) -> MacacaResult<Option<SchedulerJobSummary>> {
+        call(
+            &self.service,
+            SCHEDULER_GET_JOB_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
     }
 
     async fn list_jobs(
         &self,
-        command: SchedulerQueryCommand,
-    ) -> MacacaResult<Vec<SchedulerJobDefinition>> {
-        call(&self.service, SCHEDULER_LIST_JOBS_COMMAND, command.trace.clone(), command).await
+        command: SchedulerListJobsCommand,
+    ) -> MacacaResult<Vec<SchedulerJobSummary>> {
+        call(
+            &self.service,
+            SCHEDULER_LIST_JOBS_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
     }
 
     async fn get_run(
         &self,
         command: SchedulerQueryCommand,
     ) -> MacacaResult<Option<SchedulerRunSummary>> {
-        call(&self.service, SCHEDULER_GET_RUN_COMMAND, command.trace.clone(), command).await
+        call(
+            &self.service,
+            SCHEDULER_GET_RUN_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
     }
 
     async fn list_runs(
         &self,
         command: SchedulerQueryCommand,
     ) -> MacacaResult<Vec<SchedulerRunSummary>> {
-        call(&self.service, SCHEDULER_LIST_RUNS_COMMAND, command.trace.clone(), command).await
+        call(
+            &self.service,
+            SCHEDULER_LIST_RUNS_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
     }
 
     async fn health(&self, trace: TraceContext) -> MacacaResult<SchedulerServiceSnapshot> {
-        call(&self.service, SCHEDULER_HEALTH_COMMAND, trace.clone(), serde_json::json!({})).await
+        call(
+            &self.service,
+            SCHEDULER_HEALTH_COMMAND,
+            trace.clone(),
+            serde_json::json!({}),
+        )
+        .await
     }
 
     async fn snapshot(
         &self,
         command: SchedulerQueryCommand,
     ) -> MacacaResult<SchedulerServiceSnapshot> {
-        call(&self.service, SCHEDULER_SNAPSHOT_COMMAND, command.trace.clone(), command).await
+        call(
+            &self.service,
+            SCHEDULER_SNAPSHOT_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
     }
 }
 
@@ -299,8 +421,8 @@ mod tests {
     use async_trait::async_trait;
     use chrono::Utc;
     use macaca_proto::{
-        AutonomyScope, KernelServiceId, SchedulerJobId, SchedulerRunState,
-        SchedulerScheduleSpec, SchedulerTargetCommand, ServiceCommandName, ServiceTargetCommand,
+        AutonomyScope, KernelServiceId, SchedulerJobId, SchedulerRunState, SchedulerScheduleSpec,
+        SchedulerTargetCommand, ServiceCommandName, ServiceTargetCommand,
     };
 
     use super::*;

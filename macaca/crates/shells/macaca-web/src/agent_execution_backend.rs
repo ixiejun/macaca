@@ -97,6 +97,33 @@ impl WebAgentExecutionBackend {
             .unwrap_or(true)
     }
 
+    /// Verify that trusted Agent Context supplied HEARTBEAT.md evidence.
+    ///
+    /// Heartbeat intent is selected by manifest declarations, not by scanning
+    /// profile files. Once selected, execution still requires Agent Context to
+    /// prove that `HEARTBEAT.md` participated in the trusted source set. This
+    /// guard runs before runtime-agent construction, model calls, tool calls,
+    /// and executor lifecycle emission so a missing profile is an auditable
+    /// no-op instead of an accidental generic prompt run.
+    fn has_heartbeat_source_evidence(context_snapshot: &AgentContextSnapshot) -> bool {
+        context_snapshot.sources.iter().any(|source| {
+            source.kind == "profile_file"
+                && (source.name == "HEARTBEAT.md"
+                    || source
+                        .location
+                        .as_deref()
+                        .is_some_and(|location| location.ends_with("/HEARTBEAT.md")))
+        })
+    }
+
+    fn should_skip_heartbeat_without_source(
+        command: &AgentExecutionCommand,
+        context_snapshot: &AgentContextSnapshot,
+    ) -> bool {
+        matches!(command.execution_intent, AgentExecutionIntent::Heartbeat)
+            && !Self::has_heartbeat_source_evidence(context_snapshot)
+    }
+
     /// Resolve execution-control policy for this run through the system service.
     ///
     /// Stage 1 supports the command override as the dynamic app-selected entry
@@ -381,6 +408,22 @@ impl AgentExecutionBackend for WebAgentExecutionBackend {
     async fn execute(&self, command: AgentExecutionCommand) -> ServiceResult<AgentExecutionResult> {
         let task_id = command.task_id.unwrap_or_else(TaskId::new);
         let context_snapshot = self.build_context_snapshot(&command).await?;
+        if Self::should_skip_heartbeat_without_source(&command, &context_snapshot) {
+            tracing::warn!(
+                trace_id = %command.trace.trace_id,
+                app_id = %command.application_id,
+                target_agent = %command.target_agent,
+                "agent execution heartbeat intent skipped because HEARTBEAT.md source evidence is absent"
+            );
+            return Ok(AgentExecutionResult::skipped(
+                &AgentExecutionCommand {
+                    task_id: Some(task_id),
+                    ..command
+                },
+                "heartbeat_profile_missing",
+                Some(context_snapshot),
+            ));
+        }
         let executor = self
             .state
             .executor_registry

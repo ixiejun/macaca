@@ -15,12 +15,13 @@ use std::path::Path;
 
 use macaca_proto::{
     ApplicationAbilityDescriptor, ApplicationAbilityMetadataView,
-    ApplicationContextPolicyMetadataView, ApplicationEntryMetadataView, ApplicationId,
-    ApplicationManifestDigestView, ApplicationManifestV1, ApplicationMcpOverlayMetadataView,
-    ApplicationMetadataView, ApplicationServiceAgentView, ApplicationServiceAppView,
-    ApplicationServiceRuntimeView, ApplicationSkillPolicyMetadataView,
-    ApplicationToolPolicyMetadataView, ApplicationUiBridgeView, ApplicationUiRuntimeView,
-    ApplicationUiSandboxView, ApplicationUiSurfaceView, ApplicationUiThemeView, PackageRuntimeKind,
+    ApplicationContextPolicyMetadataView, ApplicationEntryMetadataView,
+    ApplicationHeartbeatAgentView, ApplicationId, ApplicationManifestDigestView,
+    ApplicationManifestV1, ApplicationMcpOverlayMetadataView, ApplicationMetadataView,
+    ApplicationServiceAgentView, ApplicationServiceAppView, ApplicationServiceRuntimeView,
+    ApplicationSkillPolicyMetadataView, ApplicationToolPolicyMetadataView, ApplicationUiBridgeView,
+    ApplicationUiRuntimeView, ApplicationUiSandboxView, ApplicationUiSurfaceView,
+    ApplicationUiThemeView, PackageRuntimeKind,
 };
 use tracing::info;
 
@@ -125,6 +126,60 @@ pub fn app_manifest_to_metadata_view(
         manifest_digest,
         diagnostics,
     }
+}
+
+/// Project manifest-declared heartbeat agents into sanitized service views.
+///
+/// Application Framework owns this projection because heartbeat participation
+/// is an application manifest contract. The function performs only bounded
+/// validation and metadata copying: it does not scan profile files, read
+/// `HEARTBEAT.md`, instantiate providers, dispatch Scheduler jobs, or execute
+/// agents. Runtime-host and Agent Execution own those later service steps.
+pub fn app_manifest_to_heartbeat_agent_views(
+    manifest: &AppManifest,
+) -> Vec<ApplicationHeartbeatAgentView> {
+    let Some(heartbeat) = manifest
+        .autonomy
+        .as_ref()
+        .and_then(|autonomy| autonomy.heartbeat.as_ref())
+    else {
+        return Vec::new();
+    };
+    if !heartbeat.enabled {
+        info!(
+            app_id = %manifest.id,
+            "application heartbeat agent projection skipped because heartbeat is disabled"
+        );
+        return Vec::new();
+    }
+
+    let declared_agents: BTreeSet<String> = manifest.agents.iter().map(agent_name).collect();
+    let views = heartbeat
+        .agents
+        .iter()
+        .map(|agent| {
+            let mut diagnostics = Vec::new();
+            if !declared_agents.contains(&agent.name) {
+                diagnostics.push("heartbeat_agent_unknown".to_string());
+            }
+            ApplicationHeartbeatAgentView {
+                application_id: manifest.id,
+                agent_name: agent.name.clone(),
+                enabled: agent.enabled,
+                profile_id: agent.profile_id.clone(),
+                metadata: sanitize_heartbeat_agent_metadata(&agent.metadata),
+                diagnostics,
+            }
+        })
+        .collect::<Vec<_>>();
+
+    info!(
+        app_id = %manifest.id,
+        declared_count = views.len(),
+        valid_count = views.iter().filter(|view| view.diagnostics.is_empty()).count(),
+        "projected sanitized application heartbeat agent declarations"
+    );
+    views
 }
 
 fn manifest_v1_to_service_app_view(
@@ -479,6 +534,25 @@ fn agent_name(agent: &AgentSource) -> String {
     }
 }
 
+fn sanitize_heartbeat_agent_metadata(
+    metadata: &std::collections::BTreeMap<String, String>,
+) -> std::collections::BTreeMap<String, String> {
+    metadata
+        .iter()
+        .filter_map(|(key, value)| {
+            let key = key.trim();
+            let value = value.trim();
+            if key.is_empty() || value.is_empty() {
+                return None;
+            }
+            Some((
+                key.chars().take(64).collect(),
+                value.chars().take(256).collect(),
+            ))
+        })
+        .collect()
+}
+
 fn ability_agent_name(ability: &ApplicationAbilityDescriptor) -> Option<String> {
     ability
         .activation
@@ -525,6 +599,7 @@ mod tests {
             resources: None,
             context: Some(Default::default()),
             service_contract: None,
+            autonomy: None,
             ui: None,
         }
     }
@@ -580,5 +655,63 @@ mod tests {
             .diagnostics
             .iter()
             .any(|line| line == "effective_service_count=5"));
+    }
+
+    #[test]
+    fn heartbeat_agent_projection_is_sanitized_and_validates_agent_names() {
+        let mut manifest = fixture_manifest();
+        manifest.autonomy = Some(crate::model::AppAutonomyConfig {
+            heartbeat: Some(crate::model::AppHeartbeatConfig {
+                enabled: true,
+                agents: vec![
+                    crate::model::AppHeartbeatAgentConfig {
+                        name: "coordinator".into(),
+                        enabled: true,
+                        profile_id: "default".into(),
+                        metadata: std::collections::BTreeMap::from([(
+                            "purpose".into(),
+                            "operational_probe".into(),
+                        )]),
+                    },
+                    crate::model::AppHeartbeatAgentConfig {
+                        name: "missing".into(),
+                        enabled: true,
+                        profile_id: "default".into(),
+                        metadata: std::collections::BTreeMap::new(),
+                    },
+                ],
+            }),
+        });
+
+        let views = app_manifest_to_heartbeat_agent_views(&manifest);
+
+        assert_eq!(views.len(), 2);
+        assert_eq!(views[0].agent_name, "coordinator");
+        assert!(views[0].enabled);
+        assert!(views[0].diagnostics.is_empty());
+        assert_eq!(
+            views[0].metadata.get("purpose").map(String::as_str),
+            Some("operational_probe")
+        );
+        assert_eq!(views[1].agent_name, "missing");
+        assert_eq!(views[1].diagnostics, vec!["heartbeat_agent_unknown"]);
+    }
+
+    #[test]
+    fn heartbeat_agent_projection_returns_no_rows_when_disabled() {
+        let mut manifest = fixture_manifest();
+        manifest.autonomy = Some(crate::model::AppAutonomyConfig {
+            heartbeat: Some(crate::model::AppHeartbeatConfig {
+                enabled: false,
+                agents: vec![crate::model::AppHeartbeatAgentConfig {
+                    name: "coordinator".into(),
+                    enabled: true,
+                    profile_id: "default".into(),
+                    metadata: std::collections::BTreeMap::new(),
+                }],
+            }),
+        });
+
+        assert!(app_manifest_to_heartbeat_agent_views(&manifest).is_empty());
     }
 }

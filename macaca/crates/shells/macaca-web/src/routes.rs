@@ -28,11 +28,13 @@ use macaca_persist::{AppendEventCommand, EventLogQuery, SessionLineageStore};
 use macaca_proto::{
     ApplicationDiscoverCommand, ApplicationId, ApplicationMetadataQueryCommand,
     ApplicationMetadataView, ApplicationServiceAppView, ApplicationServiceScope,
-    ApplicationStatusCommand, ApplicationUiRuntimeView, AutonomyScope, HeartbeatWakeTargetCommand,
-    KernelServiceId, MacacaError, McpProbeCommand, McpRuntimeStatusView, McpToolPolicySnapshot,
-    ProtoErrorAdapter, SchedulerJobDefinition, SchedulerQueryCommand, SchedulerRegisterJobCommand,
-    SchedulerRunSummary, SchedulerScheduleSpec, SchedulerTargetCommand, ServiceCommandName,
-    ServiceTargetCommand, TraceContext, HEARTBEAT_SERVICE_ID, HEARTBEAT_WAKE_COMMAND,
+    ApplicationStatusCommand, ApplicationUiRuntimeView, AutonomyScope, KernelServiceId,
+    MacacaError, McpProbeCommand, McpRuntimeStatusView, McpToolPolicySnapshot, ProtoErrorAdapter,
+    SchedulerDeleteJobCommand, SchedulerGetJobCommand, SchedulerJobDefinition, SchedulerJobId,
+    SchedulerJobLifecycleCommand, SchedulerJobSummary, SchedulerLifecycleJobCommand,
+    SchedulerListJobsCommand, SchedulerQueryCommand, SchedulerRegisterJobCommand,
+    SchedulerRunSummary, SchedulerScheduleSpec, SchedulerTargetCommand, SchedulerUpdateJobCommand,
+    ServiceCommandName, ServiceTargetCommand, TraceContext,
 };
 use macaca_skill::{SkillPolicy, SkillRuntimeFacade, SkillSnapshotRequest};
 
@@ -1320,21 +1322,44 @@ pub async fn toggle_schedule(
 
 // ---------------------------------------------------------------------------
 // Serviceized application autonomy schedule routes
-// POST /api/apps/{app_id}/autonomy/schedules
+// GET/POST/PATCH/DELETE /api/apps/{app_id}/autonomy/schedules
 // GET  /api/apps/{app_id}/autonomy/scheduler/runs
 // ---------------------------------------------------------------------------
 
 /// Request body for application-scoped serviceized autonomy schedule creation.
 ///
-/// The route accepts only provider-neutral scheduling and target data. When no
-/// target is supplied, the schedule emits a generic Heartbeat wake command so
-/// operators can prove the 24/7 runner path without embedding application
-/// business logic in the Web shell.
+/// The route accepts only provider-neutral scheduling and target data.
+/// Application-facing schedule creation requires an explicit Scheduler target;
+/// native Heartbeat cadence is managed by `service.heartbeat`, not by default
+/// Web-created Scheduler jobs.
 #[derive(Debug, Deserialize)]
 pub struct CreateAutonomyScheduleRequest {
     pub name: Option<String>,
     pub interval_secs: Option<u64>,
     pub target: Option<AutonomyScheduleTargetRequest>,
+    #[serde(default)]
+    pub metadata: BTreeMap<String, String>,
+}
+
+/// Request body for updating an existing serviceized Scheduler job.
+///
+/// The Web shell still does not own Scheduler semantics. It accepts
+/// provider-neutral form data, rebuilds a typed `SchedulerJobDefinition`, and
+/// delegates all state-machine decisions to `service.scheduler`.
+#[derive(Debug, Deserialize)]
+pub struct UpdateAutonomyScheduleRequest {
+    pub name: Option<String>,
+    pub interval_secs: Option<u64>,
+    pub target: Option<AutonomyScheduleTargetRequest>,
+    #[serde(default)]
+    pub metadata: BTreeMap<String, String>,
+}
+
+/// Request body for pause/resume lifecycle operations.
+#[derive(Debug, Deserialize)]
+pub struct AutonomyScheduleLifecycleRequest {
+    pub lifecycle: String,
+    pub reason_code: Option<String>,
     #[serde(default)]
     pub metadata: BTreeMap<String, String>,
 }
@@ -1349,16 +1374,15 @@ pub enum AutonomyScheduleTargetRequest {
         #[serde(default)]
         metadata: BTreeMap<String, String>,
     },
-    HeartbeatWake {
-        wake_scope_key: Option<String>,
-        wake_reason_code: Option<String>,
-        #[serde(default)]
-        metadata: BTreeMap<String, String>,
-    },
 }
 
 #[derive(Debug, Deserialize, Default)]
 pub struct AutonomyRunsQuery {
+    pub limit: Option<usize>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+pub struct AutonomySchedulesQuery {
     pub limit: Option<usize>,
 }
 
@@ -1370,19 +1394,13 @@ pub async fn create_autonomy_schedule(
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponse>)> {
     let app_id = parse_application_id(&app_id)?;
     let trace = TraceContext::new(format!("web-autonomy-schedule-register-{}", app_id.0));
-    let mut definition = SchedulerJobDefinition::new(
-        AutonomyScope::application(app_id),
-        SchedulerScheduleSpec::Every {
-            interval_ms: body.interval_secs.unwrap_or(60).max(1) * 1_000,
-            anchor: None,
-        },
-        autonomy_target_from_request(app_id, body.target),
-    )
-    .map_err(|error| proto_err(StatusCode::BAD_REQUEST, &error))?;
-    definition.metadata = body.metadata;
-    if let Some(name) = body.name.filter(|name| !name.trim().is_empty()) {
-        definition.metadata.insert("schedule.name".into(), name);
-    }
+    let definition = autonomy_definition_from_request(
+        app_id,
+        body.name,
+        body.interval_secs,
+        body.target,
+        body.metadata,
+    )?;
 
     tracing::info!(
         app_id = %app_id.0,
@@ -1407,6 +1425,151 @@ pub async fn create_autonomy_schedule(
         "trace_id": result.trace.trace_id,
         "metadata": result.metadata,
     })))
+}
+
+/// GET /api/apps/{app_id}/autonomy/schedules — list serviceized Scheduler jobs.
+pub async fn list_autonomy_schedules(
+    State(state): State<Arc<AppState>>,
+    Path(app_id): Path<String>,
+    Query(query): Query<AutonomySchedulesQuery>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponse>)> {
+    let app_id = parse_application_id(&app_id)?;
+    let trace = TraceContext::new(format!("web-autonomy-schedule-list-{}", app_id.0));
+    tracing::info!(
+        app_id = %app_id.0,
+        trace_id = %trace.trace_id,
+        "web route listing application autonomy schedules through Scheduler service"
+    );
+    let jobs = state
+        .scheduler_client
+        .list_jobs(
+            SchedulerListJobsCommand::new(
+                trace.clone(),
+                AutonomyScope::application(app_id),
+                query.limit,
+            )
+            .map_err(|error| proto_err(StatusCode::BAD_REQUEST, &error))?,
+        )
+        .await
+        .map_err(|error| proto_err(StatusCode::BAD_GATEWAY, &error))?;
+    let count = jobs.len();
+    Ok(Json(serde_json::json!({
+        "schedules": sanitized_scheduler_jobs(jobs),
+        "count": count,
+        "trace_id": trace.trace_id,
+    })))
+}
+
+/// GET /api/apps/{app_id}/autonomy/schedules/{job_id} — read one serviceized job.
+pub async fn get_autonomy_schedule(
+    State(state): State<Arc<AppState>>,
+    Path((app_id, job_id)): Path<(String, String)>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponse>)> {
+    let app_id = parse_application_id(&app_id)?;
+    let job_id =
+        SchedulerJobId::new(job_id).map_err(|error| proto_err(StatusCode::BAD_REQUEST, &error))?;
+    let trace = TraceContext::new(format!("web-autonomy-schedule-get-{}", app_id.0));
+    let job = state
+        .scheduler_client
+        .get_job(
+            SchedulerGetJobCommand::new(trace.clone(), AutonomyScope::application(app_id), job_id)
+                .map_err(|error| proto_err(StatusCode::BAD_REQUEST, &error))?,
+        )
+        .await
+        .map_err(|error| proto_err(StatusCode::BAD_GATEWAY, &error))?;
+    Ok(Json(serde_json::json!({
+        "schedule": job.map(sanitized_scheduler_job),
+        "trace_id": trace.trace_id,
+    })))
+}
+
+/// PATCH /api/apps/{app_id}/autonomy/schedules/{job_id} — update one serviceized job.
+pub async fn update_autonomy_schedule(
+    State(state): State<Arc<AppState>>,
+    Path((app_id, job_id)): Path<(String, String)>,
+    Json(body): Json<UpdateAutonomyScheduleRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponse>)> {
+    let app_id = parse_application_id(&app_id)?;
+    let job_id =
+        SchedulerJobId::new(job_id).map_err(|error| proto_err(StatusCode::BAD_REQUEST, &error))?;
+    let trace = TraceContext::new(format!("web-autonomy-schedule-update-{}", app_id.0));
+    let definition = autonomy_definition_from_request(
+        app_id,
+        body.name,
+        body.interval_secs,
+        body.target,
+        body.metadata,
+    )?;
+    let result = state
+        .scheduler_client
+        .update_job(
+            SchedulerUpdateJobCommand::new(
+                trace.clone(),
+                AutonomyScope::application(app_id),
+                job_id,
+                definition,
+                "web_schedule_update",
+            )
+            .map_err(|error| proto_err(StatusCode::BAD_REQUEST, &error))?,
+        )
+        .await
+        .map_err(|error| proto_err(StatusCode::BAD_GATEWAY, &error))?;
+    Ok(Json(sanitized_scheduler_mutation(result)))
+}
+
+/// DELETE /api/apps/{app_id}/autonomy/schedules/{job_id} — delete one serviceized job.
+pub async fn delete_autonomy_schedule(
+    State(state): State<Arc<AppState>>,
+    Path((app_id, job_id)): Path<(String, String)>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponse>)> {
+    let app_id = parse_application_id(&app_id)?;
+    let job_id =
+        SchedulerJobId::new(job_id).map_err(|error| proto_err(StatusCode::BAD_REQUEST, &error))?;
+    let trace = TraceContext::new(format!("web-autonomy-schedule-delete-{}", app_id.0));
+    let result = state
+        .scheduler_client
+        .delete_job(
+            SchedulerDeleteJobCommand::new(
+                trace.clone(),
+                AutonomyScope::application(app_id),
+                job_id,
+                "web_schedule_delete",
+            )
+            .map_err(|error| proto_err(StatusCode::BAD_REQUEST, &error))?,
+        )
+        .await
+        .map_err(|error| proto_err(StatusCode::BAD_GATEWAY, &error))?;
+    Ok(Json(sanitized_scheduler_mutation(result)))
+}
+
+/// PUT /api/apps/{app_id}/autonomy/schedules/{job_id}/lifecycle — pause/resume one job.
+pub async fn transition_autonomy_schedule(
+    State(state): State<Arc<AppState>>,
+    Path((app_id, job_id)): Path<(String, String)>,
+    Json(body): Json<AutonomyScheduleLifecycleRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponse>)> {
+    let app_id = parse_application_id(&app_id)?;
+    let job_id =
+        SchedulerJobId::new(job_id).map_err(|error| proto_err(StatusCode::BAD_REQUEST, &error))?;
+    let trace = TraceContext::new(format!("web-autonomy-schedule-lifecycle-{}", app_id.0));
+    let lifecycle = SchedulerJobLifecycleCommand::parse(&body.lifecycle)
+        .map_err(|error| proto_err(StatusCode::BAD_REQUEST, &error))?;
+    let mut command = SchedulerLifecycleJobCommand::new(
+        trace.clone(),
+        AutonomyScope::application(app_id),
+        job_id,
+        lifecycle,
+        body.reason_code
+            .unwrap_or_else(|| "web_schedule_lifecycle".into()),
+    )
+    .map_err(|error| proto_err(StatusCode::BAD_REQUEST, &error))?;
+    command.metadata = body.metadata;
+    let result = state
+        .scheduler_client
+        .transition_job(command)
+        .await
+        .map_err(|error| proto_err(StatusCode::BAD_GATEWAY, &error))?;
+    Ok(Json(sanitized_scheduler_mutation(result)))
 }
 
 /// GET /api/apps/{app_id}/autonomy/scheduler/runs — monitor serviceized runs.
@@ -1441,23 +1604,46 @@ pub async fn list_autonomy_scheduler_runs(
     })))
 }
 
-fn parse_application_id(
-    app_id: &str,
-) -> Result<ApplicationId, (StatusCode, Json<ErrorResponse>)> {
+fn parse_application_id(app_id: &str) -> Result<ApplicationId, (StatusCode, Json<ErrorResponse>)> {
     uuid::Uuid::parse_str(app_id)
         .map(ApplicationId)
         .map_err(|_| err(StatusCode::BAD_REQUEST, "Invalid app_id".into()))
 }
 
-fn autonomy_target_from_request(
+fn autonomy_definition_from_request(
     app_id: ApplicationId,
+    name: Option<String>,
+    interval_secs: Option<u64>,
     target: Option<AutonomyScheduleTargetRequest>,
-) -> SchedulerTargetCommand {
-    match target.unwrap_or(AutonomyScheduleTargetRequest::HeartbeatWake {
-        wake_scope_key: None,
-        wake_reason_code: None,
-        metadata: BTreeMap::new(),
-    }) {
+    metadata: BTreeMap<String, String>,
+) -> Result<SchedulerJobDefinition, (StatusCode, Json<ErrorResponse>)> {
+    let mut definition = SchedulerJobDefinition::new(
+        AutonomyScope::application(app_id),
+        SchedulerScheduleSpec::Every {
+            interval_ms: interval_secs.unwrap_or(60).max(1) * 1_000,
+            anchor: None,
+        },
+        autonomy_target_from_request(app_id, target)?,
+    )
+    .map_err(|error| proto_err(StatusCode::BAD_REQUEST, &error))?;
+    definition.metadata = metadata;
+    if let Some(name) = name.filter(|value| !value.trim().is_empty()) {
+        definition.metadata.insert("schedule.name".into(), name);
+    }
+    Ok(definition)
+}
+
+fn autonomy_target_from_request(
+    _app_id: ApplicationId,
+    target: Option<AutonomyScheduleTargetRequest>,
+) -> Result<SchedulerTargetCommand, (StatusCode, Json<ErrorResponse>)> {
+    let Some(target) = target else {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            "Scheduler target is required; heartbeat native cadence is managed separately".into(),
+        ));
+    };
+    Ok(match target {
         AutonomyScheduleTargetRequest::Service {
             service_id,
             command_name,
@@ -1468,27 +1654,7 @@ fn autonomy_target_from_request(
             payload_ref: None,
             metadata,
         }),
-        AutonomyScheduleTargetRequest::HeartbeatWake {
-            wake_scope_key,
-            wake_reason_code,
-            metadata,
-        } => SchedulerTargetCommand::HeartbeatWake(HeartbeatWakeTargetCommand {
-            wake_scope_key: wake_scope_key
-                .filter(|value| !value.trim().is_empty())
-                .unwrap_or_else(|| format!("application.{}", app_id.0)),
-            wake_reason_code: wake_reason_code
-                .filter(|value| !value.trim().is_empty())
-                .unwrap_or_else(|| "application_scheduled_tick".into()),
-            payload_ref: None,
-            metadata: metadata
-                .into_iter()
-                .chain([
-                    ("service_id".into(), HEARTBEAT_SERVICE_ID.into()),
-                    ("command_name".into(), HEARTBEAT_WAKE_COMMAND.into()),
-                ])
-                .collect(),
-        }),
-    }
+    })
 }
 
 fn sanitized_scheduler_runs(runs: Vec<SchedulerRunSummary>) -> Vec<serde_json::Value> {
@@ -1509,6 +1675,40 @@ fn sanitized_scheduler_runs(runs: Vec<SchedulerRunSummary>) -> Vec<serde_json::V
             })
         })
         .collect()
+}
+
+fn sanitized_scheduler_jobs(jobs: Vec<SchedulerJobSummary>) -> Vec<serde_json::Value> {
+    jobs.into_iter().map(sanitized_scheduler_job).collect()
+}
+
+fn sanitized_scheduler_job(job: SchedulerJobSummary) -> serde_json::Value {
+    serde_json::json!({
+        "job_id": job.job_id.as_str(),
+        "scope": job.scope,
+        "schedule": job.schedule,
+        "target": job.target,
+        "lifecycle": job.lifecycle,
+        "metadata": job.metadata,
+        "created_at": job.created_at,
+        "updated_at": job.updated_at,
+        "last_scheduled_at": job.last_scheduled_at,
+        "trace_id": job.trace_id,
+        "audit_id": job.audit_id,
+    })
+}
+
+fn sanitized_scheduler_mutation(result: macaca_proto::SchedulerCommandResult) -> serde_json::Value {
+    serde_json::json!({
+        "accepted": result.accepted,
+        "job_id": result.job_id.as_ref().map(|id| id.as_str()),
+        "run_id": result.run_id.as_ref().map(|id| id.as_str()),
+        "lifecycle": result.lifecycle,
+        "run_state": result.run_state,
+        "audit_id": result.audit_id,
+        "trace_id": result.trace.trace_id,
+        "metadata": result.metadata,
+        "error": result.error,
+    })
 }
 
 // ---------------------------------------------------------------------------

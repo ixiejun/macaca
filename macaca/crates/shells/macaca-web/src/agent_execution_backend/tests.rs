@@ -2,6 +2,7 @@ use super::*;
 use std::path::{Path, PathBuf};
 
 use macaca_proto::{
+    AgentContextBuildCommand, AgentContextSnapshot, AgentExecutionIntent,
     ExecutionControlCheckpointMode, ExecutionControlPolicyOverride,
     ExecutionControlResolutionStatus, ExecutionControlResumeSource, ExecutionControlTrigger,
 };
@@ -67,6 +68,63 @@ fn delegated_runtime_execution_with_override_installs_execution_control() {
     let resolution = WebAgentExecutionBackend::resolve_execution_control_policy(&command);
 
     assert_eq!(resolution.status, ExecutionControlResolutionStatus::Enabled);
+}
+
+#[test]
+fn heartbeat_intent_requires_heartbeat_source_evidence() {
+    let command = AgentExecutionCommand::new(
+        macaca_proto::ApplicationId::from_name("demo"),
+        "session-a",
+        "coordinator",
+        AgentExecutionIntent::Heartbeat,
+        "run heartbeat work",
+        macaca_proto::TraceContext::new("trace-heartbeat-missing-profile"),
+    )
+    .unwrap();
+    let context_command = AgentContextBuildCommand::from_execution(&command);
+    let snapshot = AgentContextSnapshot::minimal(&context_command, "trusted context");
+
+    assert!(WebAgentExecutionBackend::should_skip_heartbeat_without_source(&command, &snapshot));
+}
+
+#[test]
+fn heartbeat_intent_runs_when_heartbeat_source_evidence_exists() {
+    let command = AgentExecutionCommand::new(
+        macaca_proto::ApplicationId::from_name("demo"),
+        "session-a",
+        "coordinator",
+        AgentExecutionIntent::Heartbeat,
+        "run heartbeat work",
+        macaca_proto::TraceContext::new("trace-heartbeat-profile-present"),
+    )
+    .unwrap();
+    let context_command = AgentContextBuildCommand::from_execution(&command);
+    let mut snapshot = AgentContextSnapshot::minimal(&context_command, "trusted context");
+    snapshot.sources.push(macaca_proto::AgentContextSource {
+        kind: "profile_file".into(),
+        name: "HEARTBEAT.md".into(),
+        location: Some("personas/coordinator/HEARTBEAT.md".into()),
+        metadata: Default::default(),
+    });
+
+    assert!(!WebAgentExecutionBackend::should_skip_heartbeat_without_source(&command, &snapshot));
+}
+
+#[test]
+fn non_heartbeat_intents_do_not_require_heartbeat_source_evidence() {
+    let command = AgentExecutionCommand::new(
+        macaca_proto::ApplicationId::from_name("demo"),
+        "session-a",
+        "coordinator",
+        AgentExecutionIntent::TaskWorker,
+        "run task work",
+        macaca_proto::TraceContext::new("trace-task-no-heartbeat-profile"),
+    )
+    .unwrap();
+    let context_command = AgentContextBuildCommand::from_execution(&command);
+    let snapshot = AgentContextSnapshot::minimal(&context_command, "trusted context");
+
+    assert!(!WebAgentExecutionBackend::should_skip_heartbeat_without_source(&command, &snapshot));
 }
 
 #[test]

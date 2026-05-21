@@ -11,12 +11,10 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
 use chrono::{DateTime, Datelike, Duration, FixedOffset, NaiveDate, Timelike, Utc};
-use macaca_proto::{
-    SchedulerJobDefinition, SchedulerMissedRunPolicy, SchedulerScheduleSpec,
-};
+use macaca_proto::{SchedulerJobDefinition, SchedulerMissedRunPolicy, SchedulerScheduleSpec};
 use tracing::warn;
 
-use super::{StoredJob, MATERIALIZATION_LIMIT, LOCAL_PROVIDER_ID};
+use super::{StoredJob, LOCAL_PROVIDER_ID, MATERIALIZATION_LIMIT};
 
 /// Default schedule calculator used by the in-memory local provider.
 ///
@@ -34,7 +32,9 @@ impl DefaultScheduleCalculator {
     /// free and easy to test.
     pub(super) fn due_times(&self, job: &StoredJob, now: DateTime<Utc>) -> Vec<DateTime<Utc>> {
         match &job.definition.schedule {
-            SchedulerScheduleSpec::At { run_at } => one_shot_due(*run_at, job.last_scheduled_at, now),
+            SchedulerScheduleSpec::At { run_at } => {
+                one_shot_due(*run_at, job.last_scheduled_at, now)
+            }
             SchedulerScheduleSpec::Every {
                 interval_ms,
                 anchor,
@@ -136,16 +136,14 @@ fn cron_due_times(
     let Some(schedule) = CronSchedule::parse(expression) else {
         warn!(
             provider_id = LOCAL_PROVIDER_ID,
-            expression,
-            "local scheduler rejected unsupported cron expression"
+            expression, "local scheduler rejected unsupported cron expression"
         );
         return Vec::new();
     };
     let Some(offset) = parse_timezone_offset(timezone) else {
         warn!(
             provider_id = LOCAL_PROVIDER_ID,
-            timezone,
-            "local scheduler rejected unsupported cron timezone"
+            timezone, "local scheduler rejected unsupported cron timezone"
         );
         return Vec::new();
     };
@@ -318,7 +316,10 @@ mod tests {
             Utc.with_ymd_and_hms(2026, 5, 21, 1, 31, 0).unwrap(),
             &SchedulerMissedRunPolicy::CatchUp { max_runs: 4 },
         );
-        assert_eq!(due, vec![Utc.with_ymd_and_hms(2026, 5, 21, 1, 30, 0).unwrap()]);
+        assert_eq!(
+            due,
+            vec![Utc.with_ymd_and_hms(2026, 5, 21, 1, 30, 0).unwrap()]
+        );
     }
 
     #[test]
@@ -343,6 +344,9 @@ mod tests {
             max_delay_ms: 10_000,
         });
         let due = vec![Utc.with_ymd_and_hms(2026, 5, 21, 0, 0, 0).unwrap()];
-        assert_eq!(apply_stagger(&definition, due.clone()), apply_stagger(&definition, due));
+        assert_eq!(
+            apply_stagger(&definition, due.clone()),
+            apply_stagger(&definition, due)
+        );
     }
 }

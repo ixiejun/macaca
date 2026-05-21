@@ -1,11 +1,15 @@
 //! Lifecycle-managed local autonomy supervisor.
 //!
 //! The supervisor is intentionally narrow.  It owns timer-loop coordination,
-//! bounded lease acquisition, generic dispatch, heartbeat wake ticks, recovery
-//! wakes, and shutdown cancellation.  Scheduler still owns due-run state and
-//! leases.  Heartbeat still owns wake coalescing and gates.  The supervisor
-//! never branches on application, workflow, provider, driver, model, gateway,
-//! chain, payment, or business-domain names.
+//! bounded Scheduler lane ticks, native Heartbeat lane ticks, recovery wakes,
+//! and shutdown cancellation. Scheduler still owns due-run state and leases.
+//! Heartbeat now owns native cadence, profile evaluation, wake coalescing, and
+//! gates. The supervisor never branches on application, workflow, provider,
+//! driver, model, gateway, chain, payment, or business-domain names.
+
+mod heartbeat_agent_dispatch;
+mod heartbeat_lane;
+mod scheduler_lane;
 
 use std::sync::{
     atomic::{AtomicBool, Ordering},
@@ -13,18 +17,21 @@ use std::sync::{
 };
 use std::time::Duration;
 
-use macaca_heartbeat::{HeartbeatService, LocalHeartbeatProvider};
+use chrono::Utc;
+use heartbeat_lane::HeartbeatLane;
+use macaca_app::AppManifest;
+use macaca_heartbeat::LocalHeartbeatProvider;
 use macaca_proto::{
-    AutonomyScope, HeartbeatWakeCommand, HeartbeatWakeIntent, MacacaResult, SchedulerRunState,
-    TraceContext,
+    AutonomyScope, HeartbeatCadencePolicy, HeartbeatProfile, HeartbeatProfileId,
+    HeartbeatScopeIdentity, MacacaResult, SchedulerRunState, TraceContext,
 };
 use macaca_scheduler::LocalSchedulerProvider;
+use scheduler_lane::SchedulerLane;
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use tracing::{debug, info, warn};
 
-use crate::autonomy_dispatch::AutonomyDispatchStrategies;
 use crate::autonomy_runtime_config::AutonomyRuntimeConfig;
 use crate::ServiceRuntime;
 
@@ -122,109 +129,108 @@ impl AutonomySupervisor {
         self.running.load(Ordering::SeqCst)
     }
 
-    /// Execute one bounded Scheduler tick for deterministic tests and manual wakeups.
-    pub async fn run_scheduler_tick_once(&self, trace: TraceContext) -> MacacaResult<usize> {
-        let mut dispatched = 0usize;
-        self.scheduler.expire_leases(trace.clone())?;
-        for _ in 0..self.config.max_leases_per_tick {
-            let Some(leased) = self.scheduler.acquire_next_run_lease_with_target(
-                trace.clone(),
-                "runtime.autonomy_supervisor",
-            )?
-            else {
-                debug!(
-                    trace_id = trace.trace_id.as_str(),
-                    "autonomy supervisor scheduler tick found no eligible run"
-                );
-                break;
-            };
-            self.scheduler
-                .mark_run_running(trace.clone(), leased.summary.run_id.clone())?;
-            let outcome = AutonomyDispatchStrategies::new(
-                self.runtime.as_ref(),
-                self.config.dispatch_timeout_ms,
-            )
-            .dispatch(trace.clone(), leased.scope, leased.target)
-            .await?;
-            if outcome.succeeded {
-                self.scheduler
-                    .mark_run_succeeded(trace.clone(), leased.summary.run_id)?;
-            } else if outcome.retryable {
-                self.scheduler.mark_run_failed(
-                    trace.clone(),
-                    leased.summary.run_id,
-                    true,
-                    outcome.reason_code,
-                )?;
-            } else {
-                self.scheduler.cancel_run(
-                    trace.clone(),
-                    leased.summary.run_id,
-                    outcome.reason_code,
-                )?;
-            }
-            dispatched += 1;
+    /// Register an application-scoped native Heartbeat profile from manifest policy.
+    ///
+    /// This is a generic Adapter step between Application-owned declarations
+    /// and Heartbeat-owned cadence. The profile only says "this application has
+    /// heartbeat declarations that should be evaluated on the native cadence";
+    /// it does not copy agent prompts, branch on app names, choose models, or
+    /// embed business workflow semantics. Later ticks still query Application
+    /// Service for the sanitized declaration view before dispatching Agent
+    /// Execution commands, preserving the service boundary and audit chain.
+    pub fn register_application_heartbeat_profile(
+        &self,
+        manifest: &AppManifest,
+        trace: TraceContext,
+    ) -> MacacaResult<bool> {
+        let Some(heartbeat) = manifest
+            .autonomy
+            .as_ref()
+            .and_then(|autonomy| autonomy.heartbeat.as_ref())
+        else {
+            return Ok(false);
+        };
+        if !heartbeat.enabled || heartbeat.agents.is_empty() {
+            info!(
+                trace_id = trace.trace_id.as_str(),
+                app_id = %manifest.id,
+                enabled = heartbeat.enabled,
+                declaration_count = heartbeat.agents.len(),
+                "application heartbeat native profile registration skipped by manifest policy"
+            );
+            return Ok(false);
         }
+
+        let profile_id =
+            HeartbeatProfileId::new(format!("profile.application.{}.heartbeat", manifest.id))?;
+        let scope_key = format!("application:{}.heartbeat", manifest.id);
+        let mut profile = HeartbeatProfile::new(
+            profile_id.clone(),
+            HeartbeatScopeIdentity::new(AutonomyScope::application(manifest.id), scope_key)?,
+            HeartbeatCadencePolicy::FixedInterval {
+                interval_ms: self.config.heartbeat_tick_interval_ms,
+                anchor: Some(
+                    Utc::now()
+                        - chrono::Duration::milliseconds(
+                            self.config.heartbeat_tick_interval_ms.min(i64::MAX as u64) as i64,
+                        ),
+                ),
+            },
+        )?;
+        profile.metadata.insert(
+            "declaration_count".into(),
+            heartbeat.agents.len().to_string(),
+        );
+        self.heartbeat.register_native_profile(profile)?;
         info!(
             trace_id = trace.trace_id.as_str(),
-            dispatched,
-            "autonomy supervisor scheduler tick completed"
+            app_id = %manifest.id,
+            profile_id = profile_id.as_str(),
+            declaration_count = heartbeat.agents.len(),
+            "application heartbeat native profile registered from manifest"
         );
-        Ok(dispatched)
+        Ok(true)
     }
 
-    /// Emit one provider-neutral Heartbeat scheduled tick.
+    /// Execute one bounded Scheduler tick for deterministic tests and manual wakeups.
+    pub async fn run_scheduler_tick_once(&self, trace: TraceContext) -> MacacaResult<usize> {
+        SchedulerLane::new(
+            Arc::clone(&self.runtime),
+            Arc::clone(&self.scheduler),
+            self.config.clone(),
+        )
+        .tick_once(trace)
+        .await
+    }
+
+    /// Execute one native Heartbeat cadence tick.
     pub async fn run_heartbeat_tick_once(&self, trace: TraceContext) -> MacacaResult<bool> {
-        let wake = HeartbeatWakeCommand::scheduled_tick(
-            trace.clone(),
-            AutonomyScope::global(),
-            "runtime.autonomy_supervisor",
-        )?;
-        let result = self.heartbeat.wake(wake).await?;
-        if let Some(run_id) = result.run_id.clone() {
-            if result.accepted {
-                self.heartbeat.mark_run_running(trace.clone(), run_id.clone())?;
-                self.heartbeat.mark_run_succeeded(trace.clone(), run_id)?;
-            }
-        }
-        info!(
-            trace_id = trace.trace_id.as_str(),
-            accepted = result.accepted,
-            disposition = ?result.disposition,
-            "autonomy supervisor heartbeat tick completed"
-        );
-        Ok(result.accepted)
+        HeartbeatLane::new(
+            Arc::clone(&self.runtime),
+            Arc::clone(&self.heartbeat),
+            self.config.recovery_wake_enabled,
+        )
+        .tick_once(trace)
+        .await
     }
 
     /// Emit one provider-neutral recovery wake when enabled.
     pub async fn run_recovery_wake_once(&self, trace: TraceContext) -> MacacaResult<bool> {
-        if !self.config.recovery_wake_enabled {
-            info!(
-                trace_id = trace.trace_id.as_str(),
-                "autonomy supervisor recovery wake skipped by config"
-            );
-            return Ok(false);
-        }
-        let wake = HeartbeatWakeCommand::new(
-            trace.clone(),
-            AutonomyScope::global(),
-            "runtime.autonomy_supervisor.recovery",
-            HeartbeatWakeIntent::Recovery {
-                reason_code: "runtime_host_startup".into(),
-            },
-        )?;
-        let result = self.heartbeat.wake(wake).await?;
-        info!(
-            trace_id = trace.trace_id.as_str(),
-            accepted = result.accepted,
-            "autonomy supervisor recovery wake completed"
-        );
-        Ok(result.accepted)
+        HeartbeatLane::new(
+            Arc::clone(&self.runtime),
+            Arc::clone(&self.heartbeat),
+            self.config.recovery_wake_enabled,
+        )
+        .recovery_wake_once(trace)
+        .await
     }
 
     async fn run_loop(self, trace: TraceContext) {
         while self.running.load(Ordering::SeqCst) {
-            sleep(Duration::from_millis(self.config.scheduler_tick_interval_ms)).await;
+            sleep(Duration::from_millis(
+                self.config.scheduler_tick_interval_ms,
+            ))
+            .await;
             if !self.running.load(Ordering::SeqCst) {
                 break;
             }

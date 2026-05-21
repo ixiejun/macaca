@@ -211,6 +211,7 @@ ui:
             resources: None,
             context: None,
             service_contract: None,
+            autonomy: None,
             ui: None,
         };
         let configs = AppLoader::resolve_agent_configs(&manifest, ".").unwrap();
@@ -234,6 +235,7 @@ ui:
             resources: None,
             context: None,
             service_contract: None,
+            autonomy: None,
             ui: None,
         };
         let configs = AppLoader::resolve_agent_configs(&manifest, ".").unwrap();
@@ -271,6 +273,7 @@ ui:
             resources: None,
             context: None,
             service_contract: None,
+            autonomy: None,
             ui: None,
         };
         let configs = AppLoader::resolve_agent_configs(&manifest, ".").unwrap();
@@ -310,6 +313,7 @@ ui:
             resources: None,
             context: None,
             service_contract: None,
+            autonomy: None,
             ui: None,
         };
         let configs = AppLoader::resolve_agent_configs(&manifest, ".").unwrap();
@@ -348,6 +352,7 @@ capabilities:
             resources: None,
             context: None,
             service_contract: None,
+            autonomy: None,
             ui: None,
         };
         let configs = AppLoader::resolve_agent_configs(&manifest, &dir).unwrap();

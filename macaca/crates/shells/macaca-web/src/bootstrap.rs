@@ -147,7 +147,17 @@ impl WebRuntimeFacade {
             )
             .route(
                 "/api/apps/{app_id}/autonomy/schedules",
-                post(routes::create_autonomy_schedule),
+                get(routes::list_autonomy_schedules).post(routes::create_autonomy_schedule),
+            )
+            .route(
+                "/api/apps/{app_id}/autonomy/schedules/{job_id}",
+                get(routes::get_autonomy_schedule)
+                    .patch(routes::update_autonomy_schedule)
+                    .delete(routes::delete_autonomy_schedule),
+            )
+            .route(
+                "/api/apps/{app_id}/autonomy/schedules/{job_id}/lifecycle",
+                axum::routing::put(routes::transition_autonomy_schedule),
             )
             .route(
                 "/api/apps/{app_id}/autonomy/scheduler/runs",
