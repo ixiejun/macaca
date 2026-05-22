@@ -6,11 +6,14 @@ use macaca_skill::{
     SkillAliasKind, SkillAliasRecord, SkillAliasResolveCommand, SkillAliasResolveResult,
     SkillAliasSnapshotCommand, SkillAliasSnapshotResult, SkillAliasUpsertCommand,
     SkillAliasUpsertResult, SkillAuthorKind, SkillCurationAction, SkillCurationDryRunCommand,
-    SkillCurationDryRunResult, SkillGovernanceRecordUsageCommand, SkillGovernanceRecordUsageResult,
+    SkillCurationDryRunResult, SkillEvolutionCandidateClassification, SkillEvolutionProposalAction,
+    SkillExperienceCandidate, SkillExperienceProposalCommand, SkillExperienceProposalResult,
+    SkillGovernanceRecordUsageCommand, SkillGovernanceRecordUsageResult,
     SkillGovernanceSnapshotCommand, SkillGovernanceSnapshotResult, SkillServiceScope,
     SkillUsageEventKind, SkillUsageObservation, SKILL_ALIAS_RESOLVE_COMMAND,
     SKILL_ALIAS_SNAPSHOT_COMMAND, SKILL_ALIAS_UPSERT_COMMAND, SKILL_CURATION_DRY_RUN_COMMAND,
-    SKILL_GOVERNANCE_RECORD_USAGE_COMMAND, SKILL_GOVERNANCE_SNAPSHOT_COMMAND,
+    SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND, SKILL_GOVERNANCE_RECORD_USAGE_COMMAND,
+    SKILL_GOVERNANCE_SNAPSHOT_COMMAND,
 };
 
 use crate::SkillSystemServiceProvider;
@@ -54,6 +57,23 @@ fn alias_record() -> SkillAliasRecord {
         created_at: now,
         updated_at: now,
         evidence_ids: vec!["curation-run-1".into()],
+    }
+}
+
+fn reusable_experience_candidate(evidence_ids: Vec<String>) -> SkillExperienceCandidate {
+    SkillExperienceCandidate {
+        task_id: "task-verified-1".into(),
+        session_id: Some("session-verified-1".into()),
+        application_id: None,
+        agent_name: Some("agent".into()),
+        bounded_summary: "A verified task produced a reusable skill maintenance procedure.".into(),
+        reusable_procedure: "Record governance evidence, propose a draft skill, and keep active skill files unchanged until approval.".into(),
+        classification: SkillEvolutionCandidateClassification::ReusableProcedure,
+        recommended_action: SkillEvolutionProposalAction::CreateDraft,
+        target_skill_id: None,
+        target_skill_name: Some("skill-experience-maintenance".into()),
+        evidence_ids,
+        metadata: BTreeMap::new(),
     }
 }
 
@@ -228,4 +248,83 @@ async fn skill_alias_resolve_without_record_does_not_fake_fallback() {
     assert!(!resolved.resolved);
     assert!(resolved.target_skill_id.is_none());
     assert!(resolved.kind.is_none());
+}
+
+#[tokio::test]
+async fn skill_experience_proposal_creates_draft_without_mutating_governance_records() {
+    let provider = SkillSystemServiceProvider::new();
+    let trace = TraceContext::new("trace-skill-experience-proposal");
+    let command = SkillExperienceProposalCommand {
+        trace: trace.clone(),
+        scope: SkillServiceScope::default(),
+        candidate: reusable_experience_candidate(vec!["artifact-proof-1".into()]),
+    };
+
+    let result = provider
+        .call(traced_command(
+            SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND,
+            command,
+            trace.clone(),
+        ))
+        .await
+        .expect("verified reusable task evidence should create a proposal");
+    let proposal: SkillExperienceProposalResult =
+        serde_json::from_value(result.output).expect("proposal result should decode");
+
+    assert!(!proposal.mutated);
+    assert_eq!(
+        proposal.proposal.recommended_action,
+        SkillEvolutionProposalAction::CreateDraft
+    );
+    assert_eq!(
+        proposal.proposal.classification,
+        SkillEvolutionCandidateClassification::ReusableProcedure
+    );
+    assert_eq!(proposal.proposal.evidence_ids, vec!["artifact-proof-1"]);
+    assert!(proposal.proposal.proposal_id.starts_with("skill-exp-"));
+
+    let snapshot = SkillGovernanceSnapshotCommand {
+        trace: trace.clone(),
+        scope: SkillServiceScope::default(),
+        include_archived: true,
+    };
+    let result = provider
+        .call(traced_command(
+            SKILL_GOVERNANCE_SNAPSHOT_COMMAND,
+            snapshot,
+            trace,
+        ))
+        .await
+        .expect("governance snapshot should remain available");
+    let snapshot: SkillGovernanceSnapshotResult =
+        serde_json::from_value(result.output).expect("snapshot result should decode");
+    assert!(
+        snapshot.records.is_empty(),
+        "draft proposals must not become active governance records"
+    );
+}
+
+#[tokio::test]
+async fn skill_experience_proposal_rejects_missing_evidence() {
+    let provider = SkillSystemServiceProvider::new();
+    let trace = TraceContext::new("trace-skill-experience-missing-evidence");
+    let command = SkillExperienceProposalCommand {
+        trace: trace.clone(),
+        scope: SkillServiceScope::default(),
+        candidate: reusable_experience_candidate(Vec::new()),
+    };
+
+    let err = provider
+        .call(traced_command(
+            SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND,
+            command,
+            trace,
+        ))
+        .await
+        .expect_err("proposal without evidence must be rejected");
+
+    assert!(
+        err.to_string().contains("evidence"),
+        "validation error should explain the missing evidence"
+    );
 }

@@ -11,6 +11,7 @@ use std::collections::BTreeMap;
 use macaca_skill::{
     SkillAliasRecord, SkillAliasResolveCommand, SkillAliasResolveResult, SkillAliasSnapshotResult,
     SkillAliasUpsertResult, SkillCurationDryRunCommand, SkillCurationDryRunResult,
+    SkillExperienceProposalCommand, SkillExperienceProposalRecord, SkillExperienceProposalResult,
     SkillGovernanceRecord, SkillGovernanceRecordUsageResult, SkillGovernanceSnapshotResult,
     SkillLifecycleState, SkillUsageObservation,
 };
@@ -25,6 +26,7 @@ use tokio::sync::Mutex;
 pub(crate) struct SkillProviderGovernanceState {
     records: Mutex<BTreeMap<String, SkillGovernanceRecord>>,
     aliases: Mutex<BTreeMap<String, SkillAliasRecord>>,
+    proposals: Mutex<BTreeMap<String, SkillExperienceProposalRecord>>,
 }
 
 impl SkillProviderGovernanceState {
@@ -131,6 +133,29 @@ impl SkillProviderGovernanceState {
         SkillAliasSnapshotResult {
             aliases,
             captured_at: chrono::Utc::now(),
+        }
+    }
+
+    /// Store a draft-only experience proposal without changing active skills.
+    pub(crate) async fn propose_experience(
+        &self,
+        command: SkillExperienceProposalCommand,
+    ) -> SkillExperienceProposalResult {
+        let captured_at = chrono::Utc::now();
+        let proposal = SkillExperienceProposalRecord::from_candidate(
+            &command.trace,
+            command.candidate,
+            captured_at,
+        );
+        self.proposals
+            .lock()
+            .await
+            .insert(proposal.proposal_id.clone(), proposal.clone());
+
+        SkillExperienceProposalResult {
+            proposal,
+            mutated: false,
+            captured_at,
         }
     }
 }

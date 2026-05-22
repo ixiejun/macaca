@@ -21,6 +21,7 @@ pub mod catalog;
 pub mod definition;
 pub mod discovery;
 pub mod encrypted_package;
+pub mod evolution;
 pub mod facade;
 pub mod governance;
 pub mod handle;
@@ -65,6 +66,7 @@ pub use encrypted_package::{
     encrypted_package_metadata, DecryptedPackage, EncryptedPackageAuthorizer,
     EncryptedPackageDecryptor, EncryptedPackageLoader, EncryptedPackageMetadata,
 };
+pub use evolution::*;
 pub use provisioner::{ClientConfig, SkillProvisioner};
 pub use runtime::{
     path_belongs_to_snapshot_skill, FilteredSkill, SkillPolicy, SkillRuntime, SkillRuntimeLimits,

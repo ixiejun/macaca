@@ -34,6 +34,7 @@ pub const SKILL_CURATION_DRY_RUN_COMMAND: &str = "skill.curation.dry_run";
 pub const SKILL_ALIAS_UPSERT_COMMAND: &str = "skill.alias.upsert";
 pub const SKILL_ALIAS_RESOLVE_COMMAND: &str = "skill.alias.resolve";
 pub const SKILL_ALIAS_SNAPSHOT_COMMAND: &str = "skill.alias.snapshot";
+pub const SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND: &str = "skill.evolution.propose_from_task";
 
 /// Explicit scope for Skill service commands.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
