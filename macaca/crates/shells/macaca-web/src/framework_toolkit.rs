@@ -43,6 +43,7 @@ struct AgentToolPolicy {
     base_allowed_tools: Option<HashSet<String>>,
     todo_policy: TodoToolPolicy,
     disallowed_task_assignees: HashSet<String>,
+    can_create_scheduled_agent_tasks: bool,
 }
 
 impl AgentToolPolicy {
@@ -243,6 +244,34 @@ pub(crate) async fn build_toolkit(
                 None,
             );
         }
+    }
+
+    // Scheduled-agent-task creation is exposed as a thin Adapter over the
+    // focused SDK client. The Web shell contributes only argument projection
+    // into a typed Command; the Scheduled Agent Task service remains the owner
+    // of prompt persistence, Scheduler registration, policy, audit, and
+    // structured unavailable behavior.
+    if policy.can_create_scheduled_agent_tasks
+        && policy.allows_base_tool(
+            crate::scheduled_agent_task_tool::SCHEDULED_AGENT_TASK_CREATE_TOOL_NAME,
+        )
+    {
+        toolkit.register(
+            Box::new(SingleToolAdapter::new(Box::new(
+                crate::scheduled_agent_task_tool::ScheduledAgentTaskCreateTool::new(
+                    Arc::clone(&state.scheduled_agent_task_client),
+                    *app_id,
+                    agent_name,
+                ),
+            ))),
+            Some("autonomy"),
+        );
+        tracing::info!(
+            app_id = %app_id,
+            agent = agent_name,
+            tool = crate::scheduled_agent_task_tool::SCHEDULED_AGENT_TASK_CREATE_TOOL_NAME,
+            "registered service-backed scheduled agent task tool"
+        );
     }
 
     let app_agent_names = app_agent_names(state, app_id).await;
@@ -852,6 +881,8 @@ async fn resolve_tool_policy(
         base_allowed_tools,
         todo_policy,
         disallowed_task_assignees,
+        can_create_scheduled_agent_tasks: is_entry_agent
+            || capabilities.contains("scheduled_agent_task_management"),
     }
 }
 

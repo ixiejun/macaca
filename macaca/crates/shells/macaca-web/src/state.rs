@@ -27,7 +27,8 @@ use macaca_sdk::{
     SystemApplicationClient, SystemContextClient, SystemDriverClient, SystemEntitlementClient,
     SystemEvmClient, SystemLlmClient, SystemMcpClient, SystemMemoryClient, SystemPaymentClient,
     SystemPluginCapabilityClient, SystemPluginControlClient, SystemPluginHookClient,
-    SystemSchedulerClient, SystemSkillClient, SystemStoreClient, SystemWeb3Client,
+    SystemScheduledAgentTaskClient, SystemSchedulerClient, SystemSkillClient, SystemStoreClient,
+    SystemWeb3Client,
 };
 use macaca_skill::SkillCatalog;
 use macaca_task::TodoStore;
@@ -329,6 +330,13 @@ pub struct AppState {
     /// microkernel/serviceization boundary while letting applications request
     /// recurring work through declared service capability paths.
     pub scheduler_client: Arc<dyn SystemSchedulerClient>,
+    /// The serviceized Scheduled Agent Task client used by manual task setup
+    /// routes and future entry-agent tool adapters.
+    ///
+    /// Web keeps this as a focused SDK facade. Prompt payload ownership,
+    /// Scheduler job creation, and Agent Execution dispatch remain in
+    /// service/runtime-host layers rather than presentation code.
+    pub scheduled_agent_task_client: Arc<dyn SystemScheduledAgentTaskClient>,
     /// The serviceized Web3 client used by optional Web3 shell/status paths.
     pub web3_client: Arc<dyn SystemWeb3Client>,
     /// The serviceized EVM client used by optional EVM shell/status paths.

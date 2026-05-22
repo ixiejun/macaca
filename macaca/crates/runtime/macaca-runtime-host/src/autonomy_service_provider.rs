@@ -13,18 +13,28 @@ use async_trait::async_trait;
 use macaca_heartbeat::{HeartbeatService, LocalHeartbeatProvider, UnavailableHeartbeatProvider};
 use macaca_kernel::SystemService;
 use macaca_proto::{
-    HeartbeatCancelWakeCommand, HeartbeatQueryCommand, HeartbeatWakeCommand, KernelServiceId,
-    MacacaError, MacacaResult, SchedulerDeleteJobCommand, SchedulerGetJobCommand,
+    CancelScheduledAgentTaskCommand, CreateScheduledAgentTaskCommand, HeartbeatCancelWakeCommand,
+    HeartbeatQueryCommand, HeartbeatWakeCommand, KernelServiceId, MacacaError, MacacaResult,
+    RecordScheduledAgentTaskResultCommand, ResolveScheduledAgentTaskPayloadCommand,
+    ScheduledAgentTaskQueryCommand, SchedulerDeleteJobCommand, SchedulerGetJobCommand,
     SchedulerJobCommand, SchedulerLifecycleJobCommand, SchedulerListJobsCommand,
     SchedulerQueryCommand, SchedulerRegisterJobCommand, SchedulerUpdateJobCommand,
     ServiceCallResult, ServiceCommand, ServiceDescriptor, ServiceError, ServiceHealth,
     ServiceResult, TraceContext, HEARTBEAT_CANCEL_WAKE_COMMAND, HEARTBEAT_GET_RUN_COMMAND,
     HEARTBEAT_HEALTH_COMMAND, HEARTBEAT_LIST_RUNS_COMMAND, HEARTBEAT_SERVICE_ID,
-    HEARTBEAT_SNAPSHOT_COMMAND, HEARTBEAT_WAKE_COMMAND, SCHEDULER_DELETE_JOB_COMMAND,
-    SCHEDULER_GET_JOB_COMMAND, SCHEDULER_GET_RUN_COMMAND, SCHEDULER_HEALTH_COMMAND,
-    SCHEDULER_LIST_JOBS_COMMAND, SCHEDULER_LIST_RUNS_COMMAND, SCHEDULER_PAUSE_JOB_COMMAND,
-    SCHEDULER_REGISTER_JOB_COMMAND, SCHEDULER_RESUME_JOB_COMMAND, SCHEDULER_SERVICE_ID,
-    SCHEDULER_SNAPSHOT_COMMAND, SCHEDULER_TRIGGER_JOB_COMMAND, SCHEDULER_UPDATE_JOB_COMMAND,
+    HEARTBEAT_SNAPSHOT_COMMAND, HEARTBEAT_WAKE_COMMAND, SCHEDULED_AGENT_TASK_CANCEL_COMMAND,
+    SCHEDULED_AGENT_TASK_CREATE_COMMAND, SCHEDULED_AGENT_TASK_GET_COMMAND,
+    SCHEDULED_AGENT_TASK_HEALTH_COMMAND, SCHEDULED_AGENT_TASK_LIST_COMMAND,
+    SCHEDULED_AGENT_TASK_RECORD_RESULT_COMMAND, SCHEDULED_AGENT_TASK_RESOLVE_PAYLOAD_COMMAND,
+    SCHEDULED_AGENT_TASK_SERVICE_ID, SCHEDULER_DELETE_JOB_COMMAND, SCHEDULER_GET_JOB_COMMAND,
+    SCHEDULER_GET_RUN_COMMAND, SCHEDULER_HEALTH_COMMAND, SCHEDULER_LIST_JOBS_COMMAND,
+    SCHEDULER_LIST_RUNS_COMMAND, SCHEDULER_PAUSE_JOB_COMMAND, SCHEDULER_REGISTER_JOB_COMMAND,
+    SCHEDULER_RESUME_JOB_COMMAND, SCHEDULER_SERVICE_ID, SCHEDULER_SNAPSHOT_COMMAND,
+    SCHEDULER_TRIGGER_JOB_COMMAND, SCHEDULER_UPDATE_JOB_COMMAND,
+};
+use macaca_scheduled_agent_task::{
+    LocalScheduledAgentTaskProvider, ScheduledAgentTaskService,
+    UnavailableScheduledAgentTaskProvider,
 };
 use macaca_scheduler::{LocalSchedulerProvider, SchedulerService, UnavailableSchedulerProvider};
 use tracing::info;
@@ -226,6 +236,147 @@ impl SystemService for SchedulerSystemServiceProvider {
     }
 }
 
+/// Runtime-host adapter for a Scheduled Agent Task service provider.
+///
+/// The adapter is the service-runtime Bridge for scheduled task intent.  It
+/// decodes generic `ServiceCommand` envelopes into typed DTOs and delegates to
+/// the injected provider.  It does not store prompts, compute schedules, or
+/// execute agents; those responsibilities stay in the scheduled-task service,
+/// Scheduler service, and Agent Execution service respectively.
+pub struct ScheduledAgentTaskSystemServiceProvider {
+    provider: Arc<dyn ScheduledAgentTaskService>,
+}
+
+impl ScheduledAgentTaskSystemServiceProvider {
+    /// Wrap a concrete, remote, plugin, mock, or unavailable provider.
+    pub fn new(provider: Arc<dyn ScheduledAgentTaskService>) -> Self {
+        Self { provider }
+    }
+
+    /// Build the fail-closed Null Object provider used by default.
+    pub fn unavailable() -> Self {
+        Self::new(Arc::new(UnavailableScheduledAgentTaskProvider::default()))
+    }
+}
+
+#[async_trait]
+impl SystemService for ScheduledAgentTaskSystemServiceProvider {
+    fn descriptor(&self) -> ServiceDescriptor {
+        self.provider.descriptor()
+    }
+
+    async fn start(&self) -> ServiceResult<()> {
+        let descriptor = self.provider.descriptor();
+        info!(
+            service_id = %descriptor.id,
+            "scheduled agent task system service provider started"
+        );
+        Ok(())
+    }
+
+    async fn call(&self, command: ServiceCommand) -> ServiceResult<ServiceCallResult> {
+        let trace = command_trace(&command)?;
+        info!(
+            service_id = SCHEDULED_AGENT_TASK_SERVICE_ID,
+            command = %command.name,
+            trace_id = %trace.trace_id,
+            "scheduled agent task system service command accepted"
+        );
+        match command.name.as_str() {
+            SCHEDULED_AGENT_TASK_CREATE_COMMAND => {
+                let typed: CreateScheduledAgentTaskCommand = decode(command.payload)?;
+                service_result(
+                    self.provider
+                        .create_task(typed)
+                        .await
+                        .map_err(service_adapter_error)?,
+                    trace,
+                )
+            }
+            SCHEDULED_AGENT_TASK_GET_COMMAND => {
+                let typed: ScheduledAgentTaskQueryCommand = decode(command.payload)?;
+                service_result(
+                    self.provider
+                        .get_task(typed)
+                        .await
+                        .map_err(service_adapter_error)?,
+                    trace,
+                )
+            }
+            SCHEDULED_AGENT_TASK_LIST_COMMAND => {
+                let typed: ScheduledAgentTaskQueryCommand = decode(command.payload)?;
+                service_result(
+                    self.provider
+                        .list_tasks(typed)
+                        .await
+                        .map_err(service_adapter_error)?,
+                    trace,
+                )
+            }
+            SCHEDULED_AGENT_TASK_CANCEL_COMMAND => {
+                let typed: CancelScheduledAgentTaskCommand = decode(command.payload)?;
+                service_result(
+                    self.provider
+                        .cancel_task(typed)
+                        .await
+                        .map_err(service_adapter_error)?,
+                    trace,
+                )
+            }
+            SCHEDULED_AGENT_TASK_RESOLVE_PAYLOAD_COMMAND => {
+                let typed: ResolveScheduledAgentTaskPayloadCommand = decode(command.payload)?;
+                service_result(
+                    self.provider
+                        .resolve_payload(typed)
+                        .await
+                        .map_err(service_adapter_error)?,
+                    trace,
+                )
+            }
+            SCHEDULED_AGENT_TASK_RECORD_RESULT_COMMAND => {
+                let typed: RecordScheduledAgentTaskResultCommand = decode(command.payload)?;
+                service_result(
+                    self.provider
+                        .record_result(typed)
+                        .await
+                        .map_err(service_adapter_error)?,
+                    trace,
+                )
+            }
+            SCHEDULED_AGENT_TASK_HEALTH_COMMAND => service_result(
+                self.provider
+                    .health(trace.clone())
+                    .await
+                    .map_err(service_adapter_error)?,
+                trace,
+            ),
+            other => Err(ServiceError::UnsupportedCommand(format!(
+                "unsupported Scheduled Agent Task service command '{other}'"
+            ))),
+        }
+    }
+
+    async fn stop(&self) -> ServiceResult<()> {
+        info!(
+            service_id = SCHEDULED_AGENT_TASK_SERVICE_ID,
+            "scheduled agent task system service provider stopped"
+        );
+        Ok(())
+    }
+
+    async fn cleanup(&self) -> ServiceResult<()> {
+        info!(
+            service_id = SCHEDULED_AGENT_TASK_SERVICE_ID,
+            "scheduled agent task system service provider cleanup completed"
+        );
+        Ok(())
+    }
+
+    async fn health(&self) -> ServiceResult<ServiceHealth> {
+        Ok(self.provider.descriptor().health)
+    }
+}
+
 /// Runtime-host adapter for a Heartbeat service provider.
 ///
 /// This adapter decodes generic service-runtime commands into typed Heartbeat
@@ -388,6 +539,13 @@ pub async fn bootstrap_autonomy_unavailable_services(
     )
     .await?;
     register_and_start(
+        Arc::clone(&runtime),
+        Arc::new(ScheduledAgentTaskSystemServiceProvider::unavailable()),
+        format!("{trace_prefix}-scheduled-agent-task-service"),
+        &mut bundle,
+    )
+    .await?;
+    register_and_start(
         runtime,
         Arc::new(HeartbeatSystemServiceProvider::unavailable()),
         format!("{trace_prefix}-heartbeat-service"),
@@ -439,6 +597,7 @@ pub async fn bootstrap_autonomy_local_services(
     let trace_prefix = trace_prefix.into();
     let config = config.normalized();
     let scheduler = Arc::new(LocalSchedulerProvider::new());
+    let scheduled_agent_task = Arc::new(LocalScheduledAgentTaskProvider::new(scheduler.clone()));
     let heartbeat = Arc::new(LocalHeartbeatProvider::new());
     let mut bundle = AutonomyRuntimeBundle {
         provider_mode: "local".into(),
@@ -449,6 +608,15 @@ pub async fn bootstrap_autonomy_local_services(
         Arc::clone(&runtime),
         Arc::new(SchedulerSystemServiceProvider::new(scheduler.clone())),
         format!("{trace_prefix}-scheduler-local-service"),
+        &mut bundle,
+    )
+    .await?;
+    register_and_start(
+        Arc::clone(&runtime),
+        Arc::new(ScheduledAgentTaskSystemServiceProvider::new(
+            scheduled_agent_task,
+        )),
+        format!("{trace_prefix}-scheduled-agent-task-local-service"),
         &mut bundle,
     )
     .await?;

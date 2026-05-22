@@ -163,6 +163,14 @@ impl WebRuntimeFacade {
                 "/api/apps/{app_id}/autonomy/scheduler/runs",
                 get(routes::list_autonomy_scheduler_runs),
             )
+            .route(
+                "/api/apps/{app_id}/autonomy/scheduled-agent-tasks",
+                get(routes::list_scheduled_agent_tasks).post(routes::create_scheduled_agent_task),
+            )
+            .route(
+                "/api/apps/{app_id}/autonomy/scheduled-agent-tasks/{task_id}",
+                get(routes::get_scheduled_agent_task).delete(routes::cancel_scheduled_agent_task),
+            )
             .route("/api/sessions/{id}/events", get(routes::get_session_events))
             .route(
                 "/api/sessions/{id}/source-artifact",

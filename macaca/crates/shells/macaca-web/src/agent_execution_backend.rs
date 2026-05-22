@@ -12,7 +12,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use macaca_framework::agent::Agent;
 use macaca_framework::message::Msg;
-use macaca_kernel::executor::{ExecutorEvent, ExecutorEventFactory};
+use macaca_kernel::executor::ExecutorEventFactory;
 use macaca_proto::{
     AgentContextBuildCommand, AgentContextSnapshot, AgentExecutionCommand, AgentExecutionIntent,
     AgentExecutionResult, AgentExecutionStatus, ExecutionControlCheckpointMode,
@@ -28,6 +28,7 @@ use macaca_runtime_host::ExecutionControlPolicyResolver;
 use macaca_runtime_host::{AgentExecutionBackend, ServiceRuntime};
 use tokio::sync::mpsc;
 
+use crate::agent_execution_evidence::{observed_agent_execution_events, stable_agent_output_hash};
 use crate::framework_runner::{FrameworkRunner, RuntimeExecutionControl};
 use crate::runtime_event_bridge::emit_execution_control_events;
 use crate::state::AppState;
@@ -71,16 +72,52 @@ impl WebAgentExecutionBackend {
     }
 
     fn user_prompt_with_context(command: &AgentExecutionCommand) -> String {
-        if command.delegated_context.is_null() || command.delegated_context == serde_json::json!({})
-        {
+        let context = Self::structured_execution_context(command);
+        if context.is_null() || context == serde_json::json!({}) {
             return command.user_prompt.clone();
         }
-        let rendered_context = serde_json::to_string_pretty(&command.delegated_context)
-            .unwrap_or_else(|_| command.delegated_context.to_string());
+        let rendered_context =
+            serde_json::to_string_pretty(&context).unwrap_or_else(|_| context.to_string());
         format!(
             "{}\n\nStructured evidence context for this delegated task:\n```json\n{}\n```",
             command.user_prompt, rendered_context
         )
+    }
+
+    /// Build provider-neutral context that is safe to show to the runtime agent.
+    ///
+    /// `delegated_context` carries source-specific audit facts such as a
+    /// heartbeat run id. `evidence.*` metadata carries generic completion
+    /// requirements such as an expected artifact path. Rendering both in one
+    /// bounded JSON object lets the model use the exact requirement while the
+    /// Runtime Host still validates completion through sanitized result
+    /// metadata, not through prompt parsing or application-specific branches.
+    fn structured_execution_context(command: &AgentExecutionCommand) -> serde_json::Value {
+        let mut context = serde_json::Map::new();
+        if !command.delegated_context.is_null()
+            && command.delegated_context != serde_json::json!({})
+        {
+            context.insert(
+                "delegated_context".into(),
+                command.delegated_context.clone(),
+            );
+        }
+        let evidence_requirements = command
+            .metadata
+            .iter()
+            .filter_map(|(key, value)| {
+                key.strip_prefix("evidence.")
+                    .filter(|_| !value.trim().is_empty())
+                    .map(|name| (name.to_string(), serde_json::Value::String(value.clone())))
+            })
+            .collect::<serde_json::Map<String, serde_json::Value>>();
+        if !evidence_requirements.is_empty() {
+            context.insert(
+                "evidence_requirements".into(),
+                serde_json::Value::Object(evidence_requirements),
+            );
+        }
+        serde_json::Value::Object(context)
     }
 
     /// Some legacy kernel/executor callers already emit task lifecycle events
@@ -438,22 +475,16 @@ impl AgentExecutionBackend for WebAgentExecutionBackend {
             }
         }
 
-        let agent_event_tx = if let Some(executor) = executor.clone() {
-            let (agent_event_tx, mut agent_event_rx) = mpsc::channel(64);
-            let agent = command.target_agent.clone();
-            tokio::spawn(async move {
-                while let Some(event) = agent_event_rx.recv().await {
-                    executor.broadcast_event(ExecutorEvent::AgentEvent {
-                        task_id,
-                        agent: agent.clone(),
-                        event,
-                    });
-                }
-            });
-            Some(agent_event_tx)
-        } else {
-            None
-        };
+        let expected_artifact_path = command
+            .metadata
+            .get("evidence.expected_artifact_path")
+            .map(String::as_str);
+        let (agent_event_tx, evidence_observer) = observed_agent_execution_events(
+            executor.clone(),
+            task_id,
+            command.target_agent.clone(),
+            expected_artifact_path,
+        );
 
         let control_policy = self
             .resolve_execution_control_policy_via_service(&command)
@@ -473,7 +504,7 @@ impl AgentExecutionBackend for WebAgentExecutionBackend {
                 FrameworkRunner::build_runtime_agent_from_context_snapshot_with_execution_control(
                     &self.state,
                     &context_snapshot,
-                    agent_event_tx,
+                    Some(agent_event_tx),
                     execution_control,
                 )
                 .await
@@ -482,7 +513,7 @@ impl AgentExecutionBackend for WebAgentExecutionBackend {
                 FrameworkRunner::build_runtime_agent_from_context_snapshot(
                     &self.state,
                     &context_snapshot,
-                    agent_event_tx,
+                    Some(agent_event_tx),
                 )
                 .await
             }
@@ -502,11 +533,17 @@ impl AgentExecutionBackend for WebAgentExecutionBackend {
                 let mut result = AgentExecutionResult::completed(
                     &AgentExecutionCommand {
                         task_id: Some(task_id),
-                        ..command
+                        ..command.clone()
                     },
                     serde_json::json!({ "output": output }),
                 );
                 result.context_snapshot = Some(context_snapshot);
+                result.metadata.insert(
+                    "result_output_hash".into(),
+                    stable_agent_output_hash(&result.output),
+                );
+                drop(agent);
+                result.metadata.extend(evidence_observer.finish().await);
                 Ok(result)
             }
             Err(error) => {

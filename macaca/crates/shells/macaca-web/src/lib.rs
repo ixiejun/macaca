@@ -5,6 +5,7 @@
 
 mod agent_context_backend;
 mod agent_execution_backend;
+mod agent_execution_evidence;
 pub mod agent_runner;
 pub mod app_ui_routes;
 pub mod bootstrap;
@@ -35,6 +36,7 @@ pub mod routes;
 pub mod run_trace;
 pub mod runtime_event_bridge;
 pub mod runtime_resume;
+mod scheduled_agent_task_tool;
 mod service_runtime_client;
 mod service_tool_adapter;
 pub mod session;
@@ -716,6 +718,9 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
     let scheduler_client: Arc<dyn macaca_sdk::SystemSchedulerClient> = Arc::new(
         macaca_sdk::ServiceBackedSchedulerClient::new(Arc::clone(&generic_service_client)),
     );
+    let scheduled_agent_task_client: Arc<dyn macaca_sdk::SystemScheduledAgentTaskClient> = Arc::new(
+        macaca_sdk::ServiceBackedScheduledAgentTaskClient::new(Arc::clone(&generic_service_client)),
+    );
     let web3_client: Arc<dyn macaca_sdk::SystemWeb3Client> = Arc::new(
         macaca_sdk::ServiceBackedWeb3Client::new(Arc::clone(&generic_service_client)),
     );
@@ -763,6 +768,7 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
             entitlement_client: Arc::clone(&entitlement_client),
             payment_client: Arc::clone(&payment_client),
             scheduler_client: Arc::clone(&scheduler_client),
+            scheduled_agent_task_client: Arc::clone(&scheduled_agent_task_client),
             web3_client: Arc::clone(&web3_client),
             evm_client: Arc::clone(&evm_client),
             plugin_control_client: Arc::clone(&plugin_control_client),

@@ -111,6 +111,36 @@ fn heartbeat_intent_runs_when_heartbeat_source_evidence_exists() {
 }
 
 #[test]
+fn evidence_metadata_is_rendered_as_structured_execution_context() {
+    let mut command = AgentExecutionCommand::new(
+        macaca_proto::ApplicationId::from_name("demo"),
+        "session-a",
+        "coordinator",
+        AgentExecutionIntent::Heartbeat,
+        "run heartbeat work",
+        macaca_proto::TraceContext::new("trace-heartbeat-evidence-context"),
+    )
+    .unwrap();
+    command.delegated_context = serde_json::json!({
+        "heartbeat": {
+            "run_id": "run-a"
+        }
+    });
+    command.metadata.insert(
+        "evidence.expected_artifact_path".into(),
+        "/workspace/agents/a/sentinel.md".into(),
+    );
+
+    let prompt = WebAgentExecutionBackend::user_prompt_with_context(&command);
+
+    assert!(prompt.contains("Structured evidence context"));
+    assert!(prompt.contains("\"delegated_context\""));
+    assert!(prompt.contains("\"evidence_requirements\""));
+    assert!(prompt.contains("\"expected_artifact_path\""));
+    assert!(prompt.contains("/workspace/agents/a/sentinel.md"));
+}
+
+#[test]
 fn non_heartbeat_intents_do_not_require_heartbeat_source_evidence() {
     let command = AgentExecutionCommand::new(
         macaca_proto::ApplicationId::from_name("demo"),

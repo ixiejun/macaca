@@ -8,6 +8,7 @@
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
+use std::time::Duration;
 
 use macaca_proto::{
     AgentExecutionCommand, AgentExecutionIntent, ApplicationHeartbeatAgentView,
@@ -15,9 +16,12 @@ use macaca_proto::{
     HeartbeatCommandResult, KernelServiceId, MacacaError, MacacaResult, ServiceBusSource,
     TraceContext, AGENT_EXECUTE_COMMAND, AGENT_EXECUTION_SERVICE_ID, APPLICATION_SERVICE_ID,
 };
+use macaca_proto::{AgentExecutionResult, AgentExecutionStatus};
+use tokio::time::timeout;
 use tracing::{info, warn};
 use uuid::Uuid;
 
+use crate::autonomy_result_evidence::{AgentExecutionEvidenceDecision, AgentExecutionEvidenceGate};
 use crate::ServiceRuntime;
 
 /// Bounded dispatch summary recorded by HeartbeatLane logs and tests.
@@ -33,12 +37,20 @@ pub(crate) struct HeartbeatAgentDispatchSummary {
 /// Replaceable Strategy for dispatching accepted heartbeat wakes to agents.
 pub(crate) struct HeartbeatAgentDispatchStrategy {
     runtime: Arc<ServiceRuntime>,
+    timeout_ms: u64,
 }
 
 impl HeartbeatAgentDispatchStrategy {
-    /// Create a runtime-host strategy backed by the service runtime facade.
-    pub(crate) fn new(runtime: Arc<ServiceRuntime>) -> Self {
-        Self { runtime }
+    /// Create a strategy with an explicit dispatch timeout.
+    ///
+    /// Heartbeat agent execution is intentionally bounded at the service-call
+    /// handoff.  A timed-out dispatch is logged and counted as failure evidence
+    /// instead of keeping heartbeat or scheduler coordination stuck forever.
+    pub(crate) fn with_timeout(runtime: Arc<ServiceRuntime>, timeout_ms: u64) -> Self {
+        Self {
+            runtime,
+            timeout_ms: timeout_ms.max(1),
+        }
     }
 
     /// Dispatch enabled manifest declarations for one accepted Heartbeat wake.
@@ -154,7 +166,7 @@ impl HeartbeatAgentDispatchStrategy {
             session_id_from_wake(wake, declaration),
             declaration.agent_name.clone(),
             AgentExecutionIntent::Heartbeat,
-            "Execute manifest-declared HEARTBEAT.md instructions from trusted agent context.",
+            "Execute the trusted HEARTBEAT.md task exactly. If the task specifies an exact artifact path, write that exact artifact and do not create an alternate file.",
             wake.trace.clone(),
         )?;
         command.metadata = dispatch_metadata(wake, declaration);
@@ -166,28 +178,51 @@ impl HeartbeatAgentDispatchStrategy {
             }
         });
         let service_command = command.into_service_command()?;
-        let reply = self
-            .runtime
-            .call(
+        let reply = timeout(
+            Duration::from_millis(self.timeout_ms),
+            self.runtime.call(
                 &KernelServiceId::new(AGENT_EXECUTION_SERVICE_ID),
                 ServiceBusSource::new("runtime.heartbeat_agent_dispatch"),
                 service_command,
-            )
-            .await
-            .map_err(|error| MacacaError::Config(error.to_string()))?;
-        if reply.success {
-            info!(
-                trace_id = wake.trace.trace_id.as_str(),
-                command = AGENT_EXECUTE_COMMAND,
-                status = %reply.status,
-                "heartbeat agent execution command accepted"
-            );
-            Ok(())
-        } else {
-            Err(MacacaError::Config(format!(
+            ),
+        )
+        .await
+        .map_err(|_| MacacaError::Config("agent execution timed out".into()))?
+        .map_err(|error| MacacaError::Config(error.to_string()))?;
+        if !reply.success {
+            return Err(MacacaError::Config(format!(
                 "agent execution returned {}",
                 reply.status
-            )))
+            )));
+        }
+        let output = reply.output.ok_or_else(|| {
+            MacacaError::Config("agent execution returned no result output".into())
+        })?;
+        let result: AgentExecutionResult = serde_json::from_value(output)
+            .map_err(|error| MacacaError::Config(error.to_string()))?;
+        if result.status != AgentExecutionStatus::Completed {
+            return Err(MacacaError::Config(format!(
+                "agent execution status {}",
+                result.status.as_str()
+            )));
+        }
+        match AgentExecutionEvidenceGate::evaluate(&result) {
+            AgentExecutionEvidenceDecision::Verified { evidence_key } => {
+                info!(
+                    trace_id = wake.trace.trace_id.as_str(),
+                    command = AGENT_EXECUTE_COMMAND,
+                    status = %reply.status,
+                    evidence_key,
+                    "heartbeat agent execution result evidence verified"
+                );
+                Ok(())
+            }
+            AgentExecutionEvidenceDecision::MissingEvidence => Err(MacacaError::Config(
+                "agent execution completed without result evidence".into(),
+            )),
+            AgentExecutionEvidenceDecision::NotCompleted => Err(MacacaError::Config(
+                "agent execution did not complete".into(),
+            )),
         }
     }
 }
@@ -222,6 +257,11 @@ fn dispatch_metadata(
     }
     if let Some(audit_id) = wake.audit_id.as_ref() {
         metadata.insert("heartbeat_audit_id".into(), audit_id.clone());
+    }
+    for (key, value) in &declaration.metadata {
+        if key.starts_with("evidence.") && !value.trim().is_empty() {
+            metadata.insert(key.clone(), value.clone());
+        }
     }
     metadata
 }
@@ -329,10 +369,13 @@ mod tests {
             command: AgentExecutionCommand,
         ) -> ServiceResult<AgentExecutionResult> {
             self.commands.lock().unwrap().push(command.clone());
-            Ok(AgentExecutionResult::completed(
-                &command,
-                serde_json::json!({"accepted": true}),
-            ))
+            let mut result =
+                AgentExecutionResult::completed(&command, serde_json::json!({"accepted": true}));
+            result.metadata.insert(
+                "result_evidence_ref".into(),
+                "event/heartbeat-result/1".into(),
+            );
+            Ok(result)
         }
     }
 
@@ -376,7 +419,10 @@ mod tests {
             agent_name: "operator".into(),
             enabled: true,
             profile_id: "default".into(),
-            metadata: BTreeMap::new(),
+            metadata: BTreeMap::from([(
+                "evidence.expected_artifact_path".into(),
+                "/workspace/agents/operator/heartbeat.md".into(),
+            )]),
             diagnostics: Vec::new(),
         };
 
@@ -393,7 +439,7 @@ mod tests {
         )
         .await;
 
-        let summary = HeartbeatAgentDispatchStrategy::new(runtime)
+        let summary = HeartbeatAgentDispatchStrategy::with_timeout(runtime, 30_000)
             .dispatch_after_accepted_wake(&accepted_app_wake(application_id))
             .await
             .unwrap();
@@ -420,6 +466,10 @@ mod tests {
             commands[0].metadata["heartbeat_audit_id"],
             "audit-heartbeat"
         );
+        assert_eq!(
+            commands[0].metadata["evidence.expected_artifact_path"],
+            "/workspace/agents/operator/heartbeat.md"
+        );
     }
 
     #[tokio::test]
@@ -433,7 +483,7 @@ mod tests {
         )
         .await;
 
-        let summary = HeartbeatAgentDispatchStrategy::new(runtime)
+        let summary = HeartbeatAgentDispatchStrategy::with_timeout(runtime, 30_000)
             .dispatch_after_accepted_wake(&accepted_app_wake(application_id))
             .await
             .unwrap();
@@ -446,7 +496,7 @@ mod tests {
         let application_id = ApplicationId::from_name("generic-app");
         let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
 
-        let summary = HeartbeatAgentDispatchStrategy::new(runtime)
+        let summary = HeartbeatAgentDispatchStrategy::with_timeout(runtime, 30_000)
             .dispatch_after_accepted_wake(&accepted_app_wake(application_id))
             .await
             .unwrap();
@@ -480,7 +530,7 @@ mod tests {
         )
         .await;
 
-        let summary = HeartbeatAgentDispatchStrategy::new(runtime)
+        let summary = HeartbeatAgentDispatchStrategy::with_timeout(runtime, 30_000)
             .dispatch_after_accepted_wake(&accepted_app_wake(application_id))
             .await
             .unwrap();
@@ -523,7 +573,7 @@ mod tests {
         )
         .await;
 
-        let summary = HeartbeatAgentDispatchStrategy::new(runtime)
+        let summary = HeartbeatAgentDispatchStrategy::with_timeout(runtime, 30_000)
             .dispatch_after_accepted_wake(&accepted_app_wake(application_id))
             .await
             .unwrap();

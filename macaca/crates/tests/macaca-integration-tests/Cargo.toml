@@ -27,6 +27,7 @@ macaca-gateway = { workspace = true }
 macaca-memory = { workspace = true }
 macaca-ipc = { workspace = true }
 macaca-runtime-host = { workspace = true }
+macaca-scheduled-agent-task = { workspace = true }
 chrono = { workspace = true }
 serde = { workspace = true }
 serde_yaml = "0.9"

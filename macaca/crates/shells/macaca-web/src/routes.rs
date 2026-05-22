@@ -28,13 +28,16 @@ use macaca_persist::{AppendEventCommand, EventLogQuery, SessionLineageStore};
 use macaca_proto::{
     ApplicationDiscoverCommand, ApplicationId, ApplicationMetadataQueryCommand,
     ApplicationMetadataView, ApplicationServiceAppView, ApplicationServiceScope,
-    ApplicationStatusCommand, ApplicationUiRuntimeView, AutonomyScope, KernelServiceId,
-    MacacaError, McpProbeCommand, McpRuntimeStatusView, McpToolPolicySnapshot, ProtoErrorAdapter,
-    SchedulerDeleteJobCommand, SchedulerGetJobCommand, SchedulerJobDefinition, SchedulerJobId,
-    SchedulerJobLifecycleCommand, SchedulerJobSummary, SchedulerLifecycleJobCommand,
-    SchedulerListJobsCommand, SchedulerQueryCommand, SchedulerRegisterJobCommand,
-    SchedulerRunSummary, SchedulerScheduleSpec, SchedulerTargetCommand, SchedulerUpdateJobCommand,
-    ServiceCommandName, ServiceTargetCommand, TraceContext,
+    ApplicationStatusCommand, ApplicationUiRuntimeView, AutonomyScope,
+    CancelScheduledAgentTaskCommand, CreateScheduledAgentTaskCommand, KernelServiceId, MacacaError,
+    McpProbeCommand, McpRuntimeStatusView, McpToolPolicySnapshot, ProtoErrorAdapter,
+    ScheduledAgentTaskId, ScheduledAgentTaskQueryCommand, ScheduledAgentTaskSchedule,
+    ScheduledAgentTaskSummary, SchedulerDeleteJobCommand, SchedulerGetJobCommand,
+    SchedulerJobDefinition, SchedulerJobId, SchedulerJobLifecycleCommand, SchedulerJobSummary,
+    SchedulerLifecycleJobCommand, SchedulerListJobsCommand, SchedulerQueryCommand,
+    SchedulerRegisterJobCommand, SchedulerRunSummary, SchedulerScheduleSpec,
+    SchedulerTargetCommand, SchedulerUpdateJobCommand, ServiceCommandName, ServiceTargetCommand,
+    TraceContext,
 };
 use macaca_skill::{SkillPolicy, SkillRuntimeFacade, SkillSnapshotRequest};
 
@@ -1386,6 +1389,23 @@ pub struct AutonomySchedulesQuery {
     pub limit: Option<usize>,
 }
 
+/// Request body for manual scheduled-agent-task creation.
+///
+/// Web accepts the prompt only as inbound command material and immediately
+/// delegates it to `service.scheduled_agent_task`. It never stores the prompt,
+/// renders it in list responses, or registers Scheduler jobs directly.
+#[derive(Debug, Deserialize)]
+pub struct CreateScheduledAgentTaskRequest {
+    pub name: Option<String>,
+    pub target_agent: String,
+    pub task_prompt: String,
+    pub interval_secs: Option<u64>,
+    #[serde(default)]
+    pub metadata: BTreeMap<String, String>,
+    #[serde(default)]
+    pub delegated_context: serde_json::Value,
+}
+
 /// POST /api/apps/{app_id}/autonomy/schedules — register a serviceized Scheduler job.
 pub async fn create_autonomy_schedule(
     State(state): State<Arc<AppState>>,
@@ -1604,6 +1624,127 @@ pub async fn list_autonomy_scheduler_runs(
     })))
 }
 
+/// POST /api/apps/{app_id}/autonomy/scheduled-agent-tasks — create recurring agent intent.
+pub async fn create_scheduled_agent_task(
+    State(state): State<Arc<AppState>>,
+    Path(app_id): Path<String>,
+    Json(body): Json<CreateScheduledAgentTaskRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponse>)> {
+    let app_id = parse_application_id(&app_id)?;
+    let trace = TraceContext::new(format!("web-scheduled-agent-task-create-{}", app_id.0));
+    let mut metadata = body.metadata;
+    if let Some(name) = body.name.filter(|value| !value.trim().is_empty()) {
+        metadata.insert("schedule.name".into(), name);
+    }
+    tracing::info!(
+        app_id = %app_id.0,
+        target_agent = body.target_agent.as_str(),
+        trace_id = %trace.trace_id,
+        "web route creating scheduled agent task through service boundary"
+    );
+    let command = CreateScheduledAgentTaskCommand::new(
+        trace.clone(),
+        AutonomyScope::application(app_id),
+        ScheduledAgentTaskSchedule::Every {
+            interval_ms: body.interval_secs.unwrap_or(60).max(1) * 1_000,
+        },
+        body.target_agent,
+        body.task_prompt,
+    )
+    .map_err(|error| proto_err(StatusCode::BAD_REQUEST, &error))?
+    .with_delegated_context(body.delegated_context)
+    .with_metadata(metadata);
+    let result = state
+        .scheduled_agent_task_client
+        .create_task(command)
+        .await
+        .map_err(|error| proto_err(StatusCode::BAD_GATEWAY, &error))?;
+    Ok(Json(sanitized_scheduled_agent_task_mutation(result)))
+}
+
+/// GET /api/apps/{app_id}/autonomy/scheduled-agent-tasks — list safe summaries.
+pub async fn list_scheduled_agent_tasks(
+    State(state): State<Arc<AppState>>,
+    Path(app_id): Path<String>,
+    Query(query): Query<AutonomySchedulesQuery>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponse>)> {
+    let app_id = parse_application_id(&app_id)?;
+    let trace = TraceContext::new(format!("web-scheduled-agent-task-list-{}", app_id.0));
+    tracing::info!(
+        app_id = %app_id.0,
+        trace_id = %trace.trace_id,
+        "web route listing scheduled agent tasks through service boundary"
+    );
+    let mut command = ScheduledAgentTaskQueryCommand::new(
+        trace.clone(),
+        AutonomyScope::application(app_id),
+        None,
+    )
+    .map_err(|error| proto_err(StatusCode::BAD_REQUEST, &error))?;
+    command.limit = query.limit;
+    let tasks = state
+        .scheduled_agent_task_client
+        .list_tasks(command)
+        .await
+        .map_err(|error| proto_err(StatusCode::BAD_GATEWAY, &error))?;
+    let count = tasks.len();
+    Ok(Json(serde_json::json!({
+        "tasks": sanitized_scheduled_agent_tasks(tasks),
+        "count": count,
+        "trace_id": trace.trace_id,
+    })))
+}
+
+/// GET /api/apps/{app_id}/autonomy/scheduled-agent-tasks/{task_id} — read one safe summary.
+pub async fn get_scheduled_agent_task(
+    State(state): State<Arc<AppState>>,
+    Path((app_id, task_id)): Path<(String, String)>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponse>)> {
+    let app_id = parse_application_id(&app_id)?;
+    let task_id = ScheduledAgentTaskId::new(task_id)
+        .map_err(|error| proto_err(StatusCode::BAD_REQUEST, &error))?;
+    let trace = TraceContext::new(format!("web-scheduled-agent-task-get-{}", app_id.0));
+    let command = ScheduledAgentTaskQueryCommand::new(
+        trace.clone(),
+        AutonomyScope::application(app_id),
+        Some(task_id),
+    )
+    .map_err(|error| proto_err(StatusCode::BAD_REQUEST, &error))?;
+    let task = state
+        .scheduled_agent_task_client
+        .get_task(command)
+        .await
+        .map_err(|error| proto_err(StatusCode::BAD_GATEWAY, &error))?;
+    Ok(Json(serde_json::json!({
+        "task": task.map(sanitized_scheduled_agent_task),
+        "trace_id": trace.trace_id,
+    })))
+}
+
+/// DELETE /api/apps/{app_id}/autonomy/scheduled-agent-tasks/{task_id} — cancel one task.
+pub async fn cancel_scheduled_agent_task(
+    State(state): State<Arc<AppState>>,
+    Path((app_id, task_id)): Path<(String, String)>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponse>)> {
+    let app_id = parse_application_id(&app_id)?;
+    let task_id = ScheduledAgentTaskId::new(task_id)
+        .map_err(|error| proto_err(StatusCode::BAD_REQUEST, &error))?;
+    let trace = TraceContext::new(format!("web-scheduled-agent-task-cancel-{}", app_id.0));
+    let command = CancelScheduledAgentTaskCommand::new(
+        trace.clone(),
+        AutonomyScope::application(app_id),
+        task_id,
+        "web_scheduled_agent_task_cancel",
+    )
+    .map_err(|error| proto_err(StatusCode::BAD_REQUEST, &error))?;
+    let result = state
+        .scheduled_agent_task_client
+        .cancel_task(command)
+        .await
+        .map_err(|error| proto_err(StatusCode::BAD_GATEWAY, &error))?;
+    Ok(Json(sanitized_scheduled_agent_task_mutation(result)))
+}
+
 fn parse_application_id(app_id: &str) -> Result<ApplicationId, (StatusCode, Json<ErrorResponse>)> {
     uuid::Uuid::parse_str(app_id)
         .map(ApplicationId)
@@ -1708,6 +1849,55 @@ fn sanitized_scheduler_mutation(result: macaca_proto::SchedulerCommandResult) ->
         "trace_id": result.trace.trace_id,
         "metadata": result.metadata,
         "error": result.error,
+    })
+}
+
+fn sanitized_scheduled_agent_tasks(
+    tasks: Vec<ScheduledAgentTaskSummary>,
+) -> Vec<serde_json::Value> {
+    tasks
+        .into_iter()
+        .map(sanitized_scheduled_agent_task)
+        .collect()
+}
+
+fn sanitized_scheduled_agent_task(task: ScheduledAgentTaskSummary) -> serde_json::Value {
+    serde_json::json!({
+        "task_id": task.task_id.as_str(),
+        "scope": task.scope,
+        "schedule": task.schedule,
+        "target_agent": task.target_agent,
+        "execution_intent": task.execution_intent,
+        "scheduler_job_id": task.scheduler_job_id.as_ref().map(|id| id.as_str()),
+        "payload_ref": task.payload_ref,
+        "payload_digest": task.payload_digest,
+        "redacted_summary": task.redacted_summary,
+        "lifecycle_state": task.lifecycle_state,
+        "last_run_id": task.last_run_id.as_ref().map(|id| id.as_str()),
+        "last_result_status": task.last_result_status,
+        "trace_id": task.trace_id,
+        "audit_id": task.audit_id,
+        "created_at": task.created_at,
+        "updated_at": task.updated_at,
+        "metadata": task.metadata,
+    })
+}
+
+fn sanitized_scheduled_agent_task_mutation(
+    result: macaca_proto::ScheduledAgentTaskCommandResult,
+) -> serde_json::Value {
+    serde_json::json!({
+        "accepted": result.accepted,
+        "task_id": result.task_id.as_ref().map(|id| id.as_str()),
+        "scheduler_job_id": result.scheduler_job_id.as_ref().map(|id| id.as_str()),
+        "scheduler_run_id": result.scheduler_run_id.as_ref().map(|id| id.as_str()),
+        "payload_ref": result.payload_ref,
+        "payload_digest": result.payload_digest,
+        "trace_id": result.trace.trace_id,
+        "audit_id": result.audit_id,
+        "summary": result.summary.map(sanitized_scheduled_agent_task),
+        "error": result.error,
+        "metadata": result.metadata,
     })
 }
 

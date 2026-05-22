@@ -209,6 +209,7 @@ impl AutonomySupervisor {
             Arc::clone(&self.runtime),
             Arc::clone(&self.heartbeat),
             self.config.recovery_wake_enabled,
+            self.config.dispatch_timeout_ms,
         )
         .tick_once(trace)
         .await
@@ -220,6 +221,7 @@ impl AutonomySupervisor {
             Arc::clone(&self.runtime),
             Arc::clone(&self.heartbeat),
             self.config.recovery_wake_enabled,
+            self.config.dispatch_timeout_ms,
         )
         .recovery_wake_once(trace)
         .await

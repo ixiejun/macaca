@@ -31,6 +31,7 @@ pub mod plugin_client;
 pub mod plugin_hook_client;
 pub mod plugin_sdk;
 pub mod registry_api;
+pub mod scheduled_agent_task_client;
 pub mod scheduler_client;
 pub mod service_client;
 pub mod skill_client;
@@ -114,6 +115,10 @@ pub use plugin_sdk::{
 };
 #[allow(deprecated)]
 pub use registry_api::{register_from_config, register_from_file};
+pub use scheduled_agent_task_client::{
+    ServiceBackedScheduledAgentTaskClient, SystemScheduledAgentTaskClient,
+    UnavailableSystemScheduledAgentTaskClient,
+};
 pub use scheduler_client::{
     ServiceBackedSchedulerClient, SystemSchedulerClient, UnavailableSystemSchedulerClient,
 };

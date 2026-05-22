@@ -13,7 +13,7 @@ use std::sync::RwLock;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use macaca_proto::{
-    AutonomyAuditCorrelation, AutonomyServiceErrorKind, AutonomyStructuredError,
+    AutonomyAuditCorrelation, AutonomyServiceErrorKind, AutonomyStructuredError, MacacaResult,
     SchedulerCommandResult, SchedulerDeleteJobCommand, SchedulerGetJobCommand, SchedulerJobCommand,
     SchedulerJobDefinition, SchedulerJobId, SchedulerJobLifecycleState, SchedulerJobSummary,
     SchedulerLifecycleJobCommand, SchedulerListJobsCommand, SchedulerQueryCommand,
@@ -147,6 +147,20 @@ impl LocalSchedulerProvider {
                 }
             }
         });
+    }
+
+    /// Materialize due runs for a runtime-host dispatch tick.
+    ///
+    /// This is the Scheduler-owned half of the supervisor loop: it converts
+    /// due job definitions into queued run mementos with sanitized audit ids.
+    /// It deliberately does not acquire leases, call services, execute agents,
+    /// inspect payload references, or interpret application-specific behavior.
+    /// Runtime Host calls this before lease acquisition so background ticks can
+    /// advance jobs without depending on a Web list/read request to refresh
+    /// due-time state.
+    pub fn materialize_due_runs_for_dispatch(&self, trace: TraceContext) -> MacacaResult<()> {
+        self.refresh_due_runs(&trace);
+        Ok(())
     }
 
     fn result(

@@ -1580,6 +1580,7 @@ dependencies = [
  "macaca-proto",
  "macaca-runtime",
  "macaca-runtime-host",
+ "macaca-scheduled-agent-task",
  "macaca-scheduler",
  "macaca-sdk",
  "macaca-skill",
@@ -1733,6 +1734,7 @@ dependencies = [
  "macaca-memory",
  "macaca-persist",
  "macaca-proto",
+ "macaca-scheduled-agent-task",
  "macaca-scheduler",
  "macaca-skill",
  "macaca-tools",
@@ -1747,6 +1749,19 @@ dependencies = [
  "toml",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "macaca-scheduled-agent-task"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "macaca-proto",
+ "macaca-scheduler",
+ "serde_json",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
