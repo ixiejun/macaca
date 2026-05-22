@@ -5,13 +5,16 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use macaca_proto::{MacacaError, MacacaResult};
 use macaca_skill::{
-    SkillCleanupCommand, SkillExecutableLoadCommand, SkillExecutableLoadResult,
-    SkillServiceSnapshot, SkillServiceSnapshotCommand, SkillSnapshotServiceCommand,
-    SkillSnapshotServiceResult, SkillStatusCommand, SkillStatusResult, SkillToolCatalogCommand,
-    SkillToolCatalogResult, SkillToolInvokeCommand, SkillToolInvokeResult, SKILL_CLEANUP_COMMAND,
-    SKILL_EXECUTABLE_LOAD_COMMAND, SKILL_SERVICE_ID, SKILL_SERVICE_SNAPSHOT_COMMAND,
-    SKILL_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND, SKILL_TOOL_CATALOG_COMMAND,
-    SKILL_TOOL_INVOKE_COMMAND,
+    SkillCleanupCommand, SkillCurationDryRunCommand, SkillCurationDryRunResult,
+    SkillExecutableLoadCommand, SkillExecutableLoadResult, SkillGovernanceRecordUsageCommand,
+    SkillGovernanceRecordUsageResult, SkillGovernanceSnapshotCommand,
+    SkillGovernanceSnapshotResult, SkillServiceSnapshot, SkillServiceSnapshotCommand,
+    SkillSnapshotServiceCommand, SkillSnapshotServiceResult, SkillStatusCommand, SkillStatusResult,
+    SkillToolCatalogCommand, SkillToolCatalogResult, SkillToolInvokeCommand, SkillToolInvokeResult,
+    SKILL_CLEANUP_COMMAND, SKILL_CURATION_DRY_RUN_COMMAND, SKILL_EXECUTABLE_LOAD_COMMAND,
+    SKILL_GOVERNANCE_RECORD_USAGE_COMMAND, SKILL_GOVERNANCE_SNAPSHOT_COMMAND, SKILL_SERVICE_ID,
+    SKILL_SERVICE_SNAPSHOT_COMMAND, SKILL_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND,
+    SKILL_TOOL_CATALOG_COMMAND, SKILL_TOOL_INVOKE_COMMAND,
 };
 use tracing::{info, warn};
 
@@ -41,6 +44,18 @@ pub trait SystemSkillClient: Send + Sync {
         &self,
         command: SkillServiceSnapshotCommand,
     ) -> MacacaResult<SkillServiceSnapshot>;
+    async fn record_governance_usage(
+        &self,
+        command: SkillGovernanceRecordUsageCommand,
+    ) -> MacacaResult<SkillGovernanceRecordUsageResult>;
+    async fn governance_snapshot(
+        &self,
+        command: SkillGovernanceSnapshotCommand,
+    ) -> MacacaResult<SkillGovernanceSnapshotResult>;
+    async fn curation_dry_run(
+        &self,
+        command: SkillCurationDryRunCommand,
+    ) -> MacacaResult<SkillCurationDryRunResult>;
     async fn cleanup(&self, command: SkillCleanupCommand) -> MacacaResult<serde_json::Value>;
 }
 
@@ -105,6 +120,48 @@ impl SystemSkillClient for UnavailableSystemSkillClient {
         Ok(SkillServiceSnapshot::unavailable(
             "runtime-backed Skill service is not installed",
         ))
+    }
+
+    async fn record_governance_usage(
+        &self,
+        command: SkillGovernanceRecordUsageCommand,
+    ) -> MacacaResult<SkillGovernanceRecordUsageResult> {
+        warn!(
+            trace_id = %command.trace.trace_id,
+            skill_id = %command.observation.skill_id,
+            "sdk skill client unavailable for governance usage recording"
+        );
+        Err(MacacaError::Config("Skill service is unavailable".into()))
+    }
+
+    async fn governance_snapshot(
+        &self,
+        command: SkillGovernanceSnapshotCommand,
+    ) -> MacacaResult<SkillGovernanceSnapshotResult> {
+        info!(
+            trace_id = %command.trace.trace_id,
+            "sdk skill client returning empty governance snapshot"
+        );
+        Ok(SkillGovernanceSnapshotResult {
+            records: Vec::new(),
+            captured_at: chrono::Utc::now(),
+        })
+    }
+
+    async fn curation_dry_run(
+        &self,
+        command: SkillCurationDryRunCommand,
+    ) -> MacacaResult<SkillCurationDryRunResult> {
+        info!(
+            trace_id = %command.trace.trace_id,
+            "sdk skill client returning unavailable curation dry-run"
+        );
+        Ok(SkillCurationDryRunResult {
+            recommendations: Vec::new(),
+            semantic_analysis_status: "unavailable: Skill service is unavailable".into(),
+            mutated: false,
+            captured_at: chrono::Utc::now(),
+        })
     }
 
     async fn cleanup(&self, command: SkillCleanupCommand) -> MacacaResult<serde_json::Value> {
@@ -197,6 +254,45 @@ impl SystemSkillClient for ServiceBackedSkillClient {
         call(
             &self.service,
             SKILL_SERVICE_SNAPSHOT_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn record_governance_usage(
+        &self,
+        command: SkillGovernanceRecordUsageCommand,
+    ) -> MacacaResult<SkillGovernanceRecordUsageResult> {
+        call(
+            &self.service,
+            SKILL_GOVERNANCE_RECORD_USAGE_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn governance_snapshot(
+        &self,
+        command: SkillGovernanceSnapshotCommand,
+    ) -> MacacaResult<SkillGovernanceSnapshotResult> {
+        call(
+            &self.service,
+            SKILL_GOVERNANCE_SNAPSHOT_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn curation_dry_run(
+        &self,
+        command: SkillCurationDryRunCommand,
+    ) -> MacacaResult<SkillCurationDryRunResult> {
+        call(
+            &self.service,
+            SKILL_CURATION_DRY_RUN_COMMAND,
             command.trace.clone(),
             command,
         )

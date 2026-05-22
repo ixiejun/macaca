@@ -35,6 +35,14 @@ pub fn skill_service_descriptor() -> ServiceDescriptor {
             CapabilityId::new("capability.skill.status"),
             "Reports skill service health and package readiness metadata.",
         ),
+        ServiceCapability::new(
+            CapabilityId::new("capability.skill.governance"),
+            "Records sanitized skill lifecycle and usage telemetry.",
+        ),
+        ServiceCapability::new(
+            CapabilityId::new("capability.skill.curation"),
+            "Produces non-destructive skill curation recommendations.",
+        ),
     ];
     descriptor.health = ServiceHealth::Healthy;
     descriptor.supported_scopes = vec![ServiceScope::Global, ServiceScope::Application("*".into())];
@@ -43,6 +51,8 @@ pub fn skill_service_descriptor() -> ServiceDescriptor {
         "skill.invoke".into(),
         "skill.catalog".into(),
         "skill.status".into(),
+        "skill.governance".into(),
+        "skill.curation".into(),
     ];
     descriptor.cleanup_policy = CleanupPolicy::OnStop;
     descriptor
@@ -56,9 +66,12 @@ mod tests {
     fn skill_descriptor_exports_contract_shape() {
         let descriptor = skill_service_descriptor();
         assert_eq!(descriptor.service_type.as_str(), "skill");
-        assert_eq!(descriptor.capabilities.len(), 4);
+        assert_eq!(descriptor.capabilities.len(), 6);
         assert!(descriptor
             .required_permissions
             .contains(&"skill.invoke".into()));
+        assert!(descriptor
+            .required_permissions
+            .contains(&"skill.governance".into()));
     }
 }

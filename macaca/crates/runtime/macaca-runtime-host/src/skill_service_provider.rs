@@ -15,11 +15,15 @@ use macaca_proto::{
     ServiceDescriptor, ServiceError, ServiceHealth, ServiceResult, TraceContext,
 };
 use macaca_skill::{
-    skill_service_descriptor, ExecutableSkillToolSet, SkillExecutableLoadCommand,
-    SkillExecutableLoadResult, SkillRuntimeFacade, SkillServiceSnapshot,
-    SkillServiceSnapshotCommand, SkillSnapshotRequest, SkillSnapshotServiceCommand,
-    SkillStatusCommand, SkillStatusResult, SkillToolCatalogCommand, SkillToolCatalogResult,
-    SkillToolInvokeCommand, SKILL_CLEANUP_COMMAND, SKILL_EXECUTABLE_LOAD_COMMAND, SKILL_SERVICE_ID,
+    skill_service_descriptor, ExecutableSkillToolSet, SkillCurationDryRunCommand,
+    SkillCurationDryRunResult, SkillExecutableLoadCommand, SkillExecutableLoadResult,
+    SkillGovernanceRecord, SkillGovernanceRecordUsageCommand, SkillGovernanceRecordUsageResult,
+    SkillGovernanceSnapshotCommand, SkillGovernanceSnapshotResult, SkillRuntimeFacade,
+    SkillServiceSnapshot, SkillServiceSnapshotCommand, SkillSnapshotRequest,
+    SkillSnapshotServiceCommand, SkillStatusCommand, SkillStatusResult, SkillToolCatalogCommand,
+    SkillToolCatalogResult, SkillToolInvokeCommand, SKILL_CLEANUP_COMMAND,
+    SKILL_CURATION_DRY_RUN_COMMAND, SKILL_EXECUTABLE_LOAD_COMMAND,
+    SKILL_GOVERNANCE_RECORD_USAGE_COMMAND, SKILL_GOVERNANCE_SNAPSHOT_COMMAND, SKILL_SERVICE_ID,
     SKILL_SERVICE_SNAPSHOT_COMMAND, SKILL_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND,
     SKILL_TOOL_CATALOG_COMMAND, SKILL_TOOL_INVOKE_COMMAND,
 };
@@ -31,6 +35,7 @@ pub struct SkillSystemServiceProvider {
     descriptor: ServiceDescriptor,
     snapshot_facade: Option<SkillRuntimeFacade>,
     executable_tools: Arc<Mutex<ExecutableSkillToolSet>>,
+    governance_records: Arc<Mutex<BTreeMap<String, SkillGovernanceRecord>>>,
 }
 
 impl SkillSystemServiceProvider {
@@ -40,6 +45,7 @@ impl SkillSystemServiceProvider {
             descriptor: skill_service_descriptor(),
             snapshot_facade: Some(SkillRuntimeFacade::new()),
             executable_tools: Arc::new(Mutex::new(ExecutableSkillToolSet::new())),
+            governance_records: Arc::new(Mutex::new(BTreeMap::new())),
         }
     }
 
@@ -49,6 +55,7 @@ impl SkillSystemServiceProvider {
             descriptor: skill_service_descriptor(),
             snapshot_facade: None,
             executable_tools: Arc::new(Mutex::new(ExecutableSkillToolSet::new())),
+            governance_records: Arc::new(Mutex::new(BTreeMap::new())),
         }
     }
 
@@ -244,6 +251,80 @@ impl SystemService for SkillSystemServiceProvider {
                 tracing::info!(trace_id = %typed.trace.trace_id, "skill service snapshot emitted");
                 Ok(Self::service_result(to_value(snapshot)?, typed.trace))
             }
+            SKILL_GOVERNANCE_RECORD_USAGE_COMMAND => {
+                let typed: SkillGovernanceRecordUsageCommand = decode(command.payload)?;
+                let observed_at = chrono::Utc::now();
+                let key = typed.observation.key();
+                let mut records = self.governance_records.lock().await;
+                let record = records
+                    .entry(key.clone())
+                    .and_modify(|record| record.apply(&typed.observation, observed_at))
+                    .or_insert_with(|| {
+                        SkillGovernanceRecord::from_observation(&typed.observation, observed_at)
+                    })
+                    .clone();
+                tracing::info!(
+                    trace_id = %typed.trace.trace_id,
+                    skill_id = %key,
+                    event = ?typed.observation.event,
+                    "skill governance usage observation recorded"
+                );
+                Ok(Self::service_result(
+                    to_value(SkillGovernanceRecordUsageResult {
+                        record,
+                        captured_at: observed_at,
+                    })?,
+                    typed.trace,
+                ))
+            }
+            SKILL_GOVERNANCE_SNAPSHOT_COMMAND => {
+                let typed: SkillGovernanceSnapshotCommand = decode(command.payload)?;
+                let mut records: Vec<_> = self
+                    .governance_records
+                    .lock()
+                    .await
+                    .values()
+                    .filter(|record| {
+                        typed.include_archived
+                            || record.lifecycle != macaca_skill::SkillLifecycleState::Archived
+                    })
+                    .cloned()
+                    .collect();
+                records.sort_by(|left, right| {
+                    left.provenance.skill_id.cmp(&right.provenance.skill_id)
+                });
+                tracing::info!(
+                    trace_id = %typed.trace.trace_id,
+                    records = records.len(),
+                    "skill governance snapshot emitted"
+                );
+                Ok(Self::service_result(
+                    to_value(SkillGovernanceSnapshotResult {
+                        records,
+                        captured_at: chrono::Utc::now(),
+                    })?,
+                    typed.trace,
+                ))
+            }
+            SKILL_CURATION_DRY_RUN_COMMAND => {
+                let typed: SkillCurationDryRunCommand = decode(command.payload)?;
+                let records = self
+                    .governance_records
+                    .lock()
+                    .await
+                    .values()
+                    .cloned()
+                    .collect::<Vec<_>>();
+                let result =
+                    SkillCurationDryRunResult::from_records(records, &typed, chrono::Utc::now());
+                tracing::info!(
+                    trace_id = %typed.trace.trace_id,
+                    recommendations = result.recommendations.len(),
+                    mutated = result.mutated,
+                    "skill curation dry-run completed"
+                );
+                Ok(Self::service_result(to_value(result)?, typed.trace))
+            }
             SKILL_CLEANUP_COMMAND => {
                 tracing::info!(trace_id = %trace.trace_id, "skill service cleanup completed");
                 Ok(Self::service_result(
@@ -288,4 +369,130 @@ fn to_value<T: serde::Serialize>(value: T) -> ServiceResult<serde_json::Value> {
 
 fn service_adapter_error(err: MacacaError) -> ServiceError {
     ServiceError::AdapterFailure(err.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use macaca_kernel::SystemService;
+    use macaca_proto::{ServiceCommandName, TraceContext};
+    use macaca_skill::{
+        SkillAuthorKind, SkillCurationAction, SkillServiceScope, SkillUsageEventKind,
+        SkillUsageObservation,
+    };
+
+    fn traced_command<T: serde::Serialize>(
+        name: &str,
+        payload: T,
+        trace: TraceContext,
+    ) -> ServiceCommand {
+        ServiceCommand::with_trace(
+            ServiceCommandName::new(name),
+            serde_json::to_value(payload).expect("test command payload must serialize"),
+            trace,
+        )
+    }
+
+    fn observation(event: SkillUsageEventKind, pinned: Option<bool>) -> SkillUsageObservation {
+        SkillUsageObservation {
+            skill_id: "skill://agent/example".into(),
+            name: "agent-example".into(),
+            source: "test".into(),
+            source_scope: "workspace".into(),
+            event,
+            author_kind: SkillAuthorKind::Agent,
+            created_by: Some("agent".into()),
+            pinned,
+            evidence_id: Some("event-1".into()),
+            metadata: BTreeMap::new(),
+        }
+    }
+
+    #[tokio::test]
+    async fn skill_governance_records_usage_and_snapshots_state() {
+        let provider = SkillSystemServiceProvider::new();
+        let trace = TraceContext::new("trace-skill-governance-record");
+        let payload = SkillGovernanceRecordUsageCommand {
+            trace: trace.clone(),
+            scope: SkillServiceScope::default(),
+            observation: observation(SkillUsageEventKind::Used, None),
+        };
+
+        let result = provider
+            .call(traced_command(
+                SKILL_GOVERNANCE_RECORD_USAGE_COMMAND,
+                payload,
+                trace.clone(),
+            ))
+            .await
+            .expect("usage recording should succeed");
+        let typed: SkillGovernanceRecordUsageResult =
+            serde_json::from_value(result.output).expect("usage result should decode");
+
+        assert_eq!(typed.record.provenance.name, "agent-example");
+        assert_eq!(typed.record.telemetry.use_count, 1);
+        assert_eq!(typed.record.provenance.author_kind, SkillAuthorKind::Agent);
+
+        let snapshot_payload = SkillGovernanceSnapshotCommand {
+            trace: trace.clone(),
+            scope: SkillServiceScope::default(),
+            include_archived: false,
+        };
+        let snapshot = provider
+            .call(traced_command(
+                SKILL_GOVERNANCE_SNAPSHOT_COMMAND,
+                snapshot_payload,
+                trace,
+            ))
+            .await
+            .expect("snapshot should succeed");
+        let snapshot: SkillGovernanceSnapshotResult =
+            serde_json::from_value(snapshot.output).expect("snapshot result should decode");
+        assert_eq!(snapshot.records.len(), 1);
+        assert_eq!(snapshot.records[0].telemetry.use_count, 1);
+    }
+
+    #[tokio::test]
+    async fn skill_governance_dry_run_keeps_pinned_skills_protected() {
+        let provider = SkillSystemServiceProvider::new();
+        let trace = TraceContext::new("trace-skill-curation-dry-run");
+        let payload = SkillGovernanceRecordUsageCommand {
+            trace: trace.clone(),
+            scope: SkillServiceScope::default(),
+            observation: observation(SkillUsageEventKind::Pinned, Some(true)),
+        };
+        provider
+            .call(traced_command(
+                SKILL_GOVERNANCE_RECORD_USAGE_COMMAND,
+                payload,
+                trace.clone(),
+            ))
+            .await
+            .expect("pinned observation should succeed");
+
+        let dry_run = SkillCurationDryRunCommand {
+            trace: trace.clone(),
+            scope: SkillServiceScope::default(),
+            stale_after_days: 0,
+            narrow_use_threshold: 0,
+        };
+        let result = provider
+            .call(traced_command(
+                SKILL_CURATION_DRY_RUN_COMMAND,
+                dry_run,
+                trace,
+            ))
+            .await
+            .expect("dry-run should succeed");
+        let result: SkillCurationDryRunResult =
+            serde_json::from_value(result.output).expect("dry-run result should decode");
+
+        assert!(!result.mutated);
+        assert_eq!(result.recommendations.len(), 1);
+        assert_eq!(
+            result.recommendations[0].action,
+            SkillCurationAction::Protected
+        );
+        assert!(result.recommendations[0].protected);
+    }
 }

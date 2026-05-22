@@ -21,6 +21,7 @@ pub mod definition;
 pub mod discovery;
 pub mod encrypted_package;
 pub mod facade;
+pub mod governance;
 pub mod handle;
 pub mod package;
 pub mod policy;
@@ -41,6 +42,7 @@ pub use facade::{
     load_executable_skill_definitions, ExecutableSkillToolSet, SkillCatalogSourceView,
     SkillRuntimeFacade,
 };
+pub use governance::*;
 pub use handle::{SkillRuntimeHandle, SkillRuntimeState};
 pub use package::{agent_skill_package_descriptor, skill_entry_package_descriptor};
 pub use policy::{PolicyDecision, SkillExposureContext, SkillExposurePolicy, SkillPolicyChain};

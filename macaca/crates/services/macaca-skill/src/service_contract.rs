@@ -28,6 +28,9 @@ pub const SKILL_TOOL_INVOKE_COMMAND: &str = "skill.tool.invoke";
 pub const SKILL_STATUS_COMMAND: &str = "skill.status";
 pub const SKILL_SERVICE_SNAPSHOT_COMMAND: &str = "skill.service.snapshot";
 pub const SKILL_CLEANUP_COMMAND: &str = "skill.cleanup";
+pub const SKILL_GOVERNANCE_RECORD_USAGE_COMMAND: &str = "skill.governance.record_usage";
+pub const SKILL_GOVERNANCE_SNAPSHOT_COMMAND: &str = "skill.governance.snapshot";
+pub const SKILL_CURATION_DRY_RUN_COMMAND: &str = "skill.curation.dry_run";
 
 /// Explicit scope for Skill service commands.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
