@@ -44,6 +44,7 @@ pub mod session;
 pub mod session_replay;
 pub mod shell;
 pub mod skill_mcp;
+pub mod skill_operations_routes;
 mod source_artifact;
 pub mod sse;
 pub mod state;
