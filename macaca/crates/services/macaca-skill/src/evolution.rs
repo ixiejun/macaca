@@ -95,10 +95,13 @@ impl SkillExperienceProposalRecord {
         candidate: SkillExperienceCandidate,
         created_at: DateTime<Utc>,
     ) -> Self {
+        let created_at_nanos = created_at
+            .timestamp_nanos_opt()
+            .unwrap_or_else(|| created_at.timestamp_micros() * 1_000);
         let proposal_id = format!(
             "skill-exp-{}-{}",
             candidate.task_id.trim(),
-            created_at.timestamp_millis()
+            created_at_nanos
         );
         Self {
             proposal_id,
@@ -136,6 +139,26 @@ pub struct SkillExperienceProposalCommand {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SkillExperienceProposalResult {
     pub proposal: SkillExperienceProposalRecord,
+    pub mutated: bool,
+    pub captured_at: DateTime<Utc>,
+}
+
+/// Command for reading draft experience proposals through the Skill service.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SkillExperienceProposalSnapshotCommand {
+    pub trace: TraceContext,
+    pub scope: SkillServiceScope,
+    /// Reserved lifecycle filter for future discarded/rejected proposals.
+    ///
+    /// The first provider only stores accepted draft proposals, but exposing
+    /// the filter now keeps future lifecycle states out of shell-owned logic.
+    pub include_discarded: bool,
+}
+
+/// Read-only snapshot of draft experience proposals.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SkillExperienceProposalSnapshotResult {
+    pub proposals: Vec<SkillExperienceProposalRecord>,
     pub mutated: bool,
     pub captured_at: DateTime<Utc>,
 }

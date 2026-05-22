@@ -9,6 +9,7 @@ use macaca_skill::{
     SkillAliasSnapshotResult, SkillAliasUpsertCommand, SkillAliasUpsertResult, SkillCleanupCommand,
     SkillCurationDryRunCommand, SkillCurationDryRunResult, SkillExecutableLoadCommand,
     SkillExecutableLoadResult, SkillExperienceProposalCommand, SkillExperienceProposalResult,
+    SkillExperienceProposalSnapshotCommand, SkillExperienceProposalSnapshotResult,
     SkillGovernanceRecordUsageCommand, SkillGovernanceRecordUsageResult,
     SkillGovernanceSnapshotCommand, SkillGovernanceSnapshotResult, SkillServiceSnapshot,
     SkillServiceSnapshotCommand, SkillSnapshotServiceCommand, SkillSnapshotServiceResult,
@@ -16,10 +17,10 @@ use macaca_skill::{
     SkillToolInvokeCommand, SkillToolInvokeResult, SKILL_ALIAS_RESOLVE_COMMAND,
     SKILL_ALIAS_SNAPSHOT_COMMAND, SKILL_ALIAS_UPSERT_COMMAND, SKILL_CLEANUP_COMMAND,
     SKILL_CURATION_DRY_RUN_COMMAND, SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND,
-    SKILL_EXECUTABLE_LOAD_COMMAND, SKILL_GOVERNANCE_RECORD_USAGE_COMMAND,
-    SKILL_GOVERNANCE_SNAPSHOT_COMMAND, SKILL_SERVICE_ID, SKILL_SERVICE_SNAPSHOT_COMMAND,
-    SKILL_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND, SKILL_TOOL_CATALOG_COMMAND,
-    SKILL_TOOL_INVOKE_COMMAND,
+    SKILL_EVOLUTION_SNAPSHOT_COMMAND, SKILL_EXECUTABLE_LOAD_COMMAND,
+    SKILL_GOVERNANCE_RECORD_USAGE_COMMAND, SKILL_GOVERNANCE_SNAPSHOT_COMMAND, SKILL_SERVICE_ID,
+    SKILL_SERVICE_SNAPSHOT_COMMAND, SKILL_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND,
+    SKILL_TOOL_CATALOG_COMMAND, SKILL_TOOL_INVOKE_COMMAND,
 };
 use tracing::{info, warn};
 
@@ -77,6 +78,10 @@ pub trait SystemSkillClient: Send + Sync {
         &self,
         command: SkillExperienceProposalCommand,
     ) -> MacacaResult<SkillExperienceProposalResult>;
+    async fn skill_experience_snapshot(
+        &self,
+        command: SkillExperienceProposalSnapshotCommand,
+    ) -> MacacaResult<SkillExperienceProposalSnapshotResult>;
     async fn cleanup(&self, command: SkillCleanupCommand) -> MacacaResult<serde_json::Value>;
 }
 
@@ -236,6 +241,21 @@ impl SystemSkillClient for UnavailableSystemSkillClient {
             "sdk skill client unavailable for experience proposal"
         );
         Err(MacacaError::Config("Skill service is unavailable".into()))
+    }
+
+    async fn skill_experience_snapshot(
+        &self,
+        command: SkillExperienceProposalSnapshotCommand,
+    ) -> MacacaResult<SkillExperienceProposalSnapshotResult> {
+        info!(
+            trace_id = %command.trace.trace_id,
+            "sdk skill client returning empty experience proposal snapshot"
+        );
+        Ok(SkillExperienceProposalSnapshotResult {
+            proposals: Vec::new(),
+            mutated: false,
+            captured_at: chrono::Utc::now(),
+        })
     }
 
     async fn cleanup(&self, command: SkillCleanupCommand) -> MacacaResult<serde_json::Value> {
@@ -419,6 +439,19 @@ impl SystemSkillClient for ServiceBackedSkillClient {
         call(
             &self.service,
             SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn skill_experience_snapshot(
+        &self,
+        command: SkillExperienceProposalSnapshotCommand,
+    ) -> MacacaResult<SkillExperienceProposalSnapshotResult> {
+        call(
+            &self.service,
+            SKILL_EVOLUTION_SNAPSHOT_COMMAND,
             command.trace.clone(),
             command,
         )

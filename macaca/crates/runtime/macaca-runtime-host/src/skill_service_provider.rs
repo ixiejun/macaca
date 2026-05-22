@@ -18,12 +18,13 @@ use macaca_skill::{
     skill_service_descriptor, ExecutableSkillToolSet, SkillAliasResolveCommand,
     SkillAliasSnapshotCommand, SkillAliasUpsertCommand, SkillCurationDryRunCommand,
     SkillExecutableLoadCommand, SkillExecutableLoadResult, SkillExperienceProposalCommand,
-    SkillGovernanceRecordUsageCommand, SkillGovernanceSnapshotCommand, SkillRuntimeFacade,
-    SkillServiceSnapshot, SkillServiceSnapshotCommand, SkillSnapshotRequest,
-    SkillSnapshotServiceCommand, SkillStatusCommand, SkillStatusResult, SkillToolCatalogCommand,
-    SkillToolCatalogResult, SkillToolInvokeCommand, SKILL_ALIAS_RESOLVE_COMMAND,
-    SKILL_ALIAS_SNAPSHOT_COMMAND, SKILL_ALIAS_UPSERT_COMMAND, SKILL_CLEANUP_COMMAND,
-    SKILL_CURATION_DRY_RUN_COMMAND, SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND,
+    SkillExperienceProposalSnapshotCommand, SkillGovernanceRecordUsageCommand,
+    SkillGovernanceSnapshotCommand, SkillRuntimeFacade, SkillServiceSnapshot,
+    SkillServiceSnapshotCommand, SkillSnapshotRequest, SkillSnapshotServiceCommand,
+    SkillStatusCommand, SkillStatusResult, SkillToolCatalogCommand, SkillToolCatalogResult,
+    SkillToolInvokeCommand, SKILL_ALIAS_RESOLVE_COMMAND, SKILL_ALIAS_SNAPSHOT_COMMAND,
+    SKILL_ALIAS_UPSERT_COMMAND, SKILL_CLEANUP_COMMAND, SKILL_CURATION_DRY_RUN_COMMAND,
+    SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND, SKILL_EVOLUTION_SNAPSHOT_COMMAND,
     SKILL_EXECUTABLE_LOAD_COMMAND, SKILL_GOVERNANCE_RECORD_USAGE_COMMAND,
     SKILL_GOVERNANCE_SNAPSHOT_COMMAND, SKILL_SERVICE_ID, SKILL_SERVICE_SNAPSHOT_COMMAND,
     SKILL_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND, SKILL_TOOL_CATALOG_COMMAND,
@@ -343,6 +344,18 @@ impl SystemService for SkillSystemServiceProvider {
                     action = ?result.proposal.recommended_action,
                     mutated = result.mutated,
                     "skill experience proposal created"
+                );
+                Ok(Self::service_result(to_value(result)?, typed.trace))
+            }
+            SKILL_EVOLUTION_SNAPSHOT_COMMAND => {
+                let typed: SkillExperienceProposalSnapshotCommand = decode(command.payload)?;
+                let result = self.governance_state.experience_snapshot().await;
+                tracing::info!(
+                    trace_id = %typed.trace.trace_id,
+                    proposals = result.proposals.len(),
+                    mutated = result.mutated,
+                    include_discarded = typed.include_discarded,
+                    "skill experience proposal snapshot emitted"
                 );
                 Ok(Self::service_result(to_value(result)?, typed.trace))
             }

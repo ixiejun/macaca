@@ -8,12 +8,13 @@ use macaca_skill::{
     SkillAliasUpsertResult, SkillAuthorKind, SkillCurationAction, SkillCurationDryRunCommand,
     SkillCurationDryRunResult, SkillEvolutionCandidateClassification, SkillEvolutionProposalAction,
     SkillExperienceCandidate, SkillExperienceProposalCommand, SkillExperienceProposalResult,
+    SkillExperienceProposalSnapshotCommand, SkillExperienceProposalSnapshotResult,
     SkillGovernanceRecordUsageCommand, SkillGovernanceRecordUsageResult,
     SkillGovernanceSnapshotCommand, SkillGovernanceSnapshotResult, SkillServiceScope,
     SkillUsageEventKind, SkillUsageObservation, SKILL_ALIAS_RESOLVE_COMMAND,
     SKILL_ALIAS_SNAPSHOT_COMMAND, SKILL_ALIAS_UPSERT_COMMAND, SKILL_CURATION_DRY_RUN_COMMAND,
-    SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND, SKILL_GOVERNANCE_RECORD_USAGE_COMMAND,
-    SKILL_GOVERNANCE_SNAPSHOT_COMMAND,
+    SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND, SKILL_EVOLUTION_SNAPSHOT_COMMAND,
+    SKILL_GOVERNANCE_RECORD_USAGE_COMMAND, SKILL_GOVERNANCE_SNAPSHOT_COMMAND,
 };
 
 use crate::SkillSystemServiceProvider;
@@ -302,6 +303,57 @@ async fn skill_experience_proposal_creates_draft_without_mutating_governance_rec
         snapshot.records.is_empty(),
         "draft proposals must not become active governance records"
     );
+}
+
+#[tokio::test]
+async fn skill_experience_snapshot_lists_draft_proposals_without_mutation() {
+    let provider = SkillSystemServiceProvider::new();
+    let trace = TraceContext::new("trace-skill-experience-snapshot");
+
+    for evidence_id in ["artifact-proof-2", "artifact-proof-1"] {
+        let command = SkillExperienceProposalCommand {
+            trace: trace.clone(),
+            scope: SkillServiceScope::default(),
+            candidate: reusable_experience_candidate(vec![evidence_id.into()]),
+        };
+        provider
+            .call(traced_command(
+                SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND,
+                command,
+                trace.clone(),
+            ))
+            .await
+            .expect("verified task evidence should create a proposal");
+    }
+
+    let snapshot_command = SkillExperienceProposalSnapshotCommand {
+        trace: trace.clone(),
+        scope: SkillServiceScope::default(),
+        include_discarded: false,
+    };
+    let result = provider
+        .call(traced_command(
+            SKILL_EVOLUTION_SNAPSHOT_COMMAND,
+            snapshot_command,
+            trace,
+        ))
+        .await
+        .expect("proposal snapshot should be available");
+    let snapshot: SkillExperienceProposalSnapshotResult =
+        serde_json::from_value(result.output).expect("proposal snapshot should decode");
+
+    assert_eq!(snapshot.proposals.len(), 2);
+    assert!(!snapshot.mutated);
+    assert!(snapshot.proposals[0].proposal_id <= snapshot.proposals[1].proposal_id);
+    assert_eq!(
+        snapshot.proposals[0].trace_id,
+        "trace-skill-experience-snapshot"
+    );
+    assert!(snapshot
+        .proposals
+        .iter()
+        .all(|proposal| proposal.target_skill_name.as_deref()
+            == Some("skill-experience-maintenance")));
 }
 
 #[tokio::test]

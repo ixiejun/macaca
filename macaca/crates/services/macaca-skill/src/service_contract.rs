@@ -35,6 +35,7 @@ pub const SKILL_ALIAS_UPSERT_COMMAND: &str = "skill.alias.upsert";
 pub const SKILL_ALIAS_RESOLVE_COMMAND: &str = "skill.alias.resolve";
 pub const SKILL_ALIAS_SNAPSHOT_COMMAND: &str = "skill.alias.snapshot";
 pub const SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND: &str = "skill.evolution.propose_from_task";
+pub const SKILL_EVOLUTION_SNAPSHOT_COMMAND: &str = "skill.evolution.snapshot";
 
 /// Explicit scope for Skill service commands.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

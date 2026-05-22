@@ -12,8 +12,8 @@ use macaca_skill::{
     SkillAliasRecord, SkillAliasResolveCommand, SkillAliasResolveResult, SkillAliasSnapshotResult,
     SkillAliasUpsertResult, SkillCurationDryRunCommand, SkillCurationDryRunResult,
     SkillExperienceProposalCommand, SkillExperienceProposalRecord, SkillExperienceProposalResult,
-    SkillGovernanceRecord, SkillGovernanceRecordUsageResult, SkillGovernanceSnapshotResult,
-    SkillLifecycleState, SkillUsageObservation,
+    SkillExperienceProposalSnapshotResult, SkillGovernanceRecord, SkillGovernanceRecordUsageResult,
+    SkillGovernanceSnapshotResult, SkillLifecycleState, SkillUsageObservation,
 };
 use tokio::sync::Mutex;
 
@@ -154,6 +154,25 @@ impl SkillProviderGovernanceState {
 
         SkillExperienceProposalResult {
             proposal,
+            mutated: false,
+            captured_at,
+        }
+    }
+
+    /// Return a deterministic, read-only snapshot of stored draft proposals.
+    pub(crate) async fn experience_snapshot(&self) -> SkillExperienceProposalSnapshotResult {
+        let captured_at = chrono::Utc::now();
+        let mut proposals = self
+            .proposals
+            .lock()
+            .await
+            .values()
+            .cloned()
+            .collect::<Vec<_>>();
+        proposals.sort_by(|left, right| left.proposal_id.cmp(&right.proposal_id));
+
+        SkillExperienceProposalSnapshotResult {
+            proposals,
             mutated: false,
             captured_at,
         }
