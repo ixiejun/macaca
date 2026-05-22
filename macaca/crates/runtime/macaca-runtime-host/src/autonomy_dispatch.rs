@@ -10,7 +10,8 @@ use std::time::Duration;
 
 use macaca_proto::{
     AgentExecutionCommand, AgentExecutionResult, AgentExecutionStatus, AgentExecutionTargetCommand,
-    AutonomyScope, HeartbeatWakeCommand, HeartbeatWakeIntent, KernelServiceId, MacacaResult,
+    AutonomousExecutionEnvelope, AutonomousExecutionSourceKind, AutonomyScope,
+    HeartbeatWakeCommand, HeartbeatWakeIntent, KernelServiceId, MacacaResult,
     ResolveScheduledAgentTaskPayloadCommand, ScheduledAgentTaskResolvedPayload,
     SchedulerTargetCommand, ServiceBusSource, ServiceCommand, ServiceCommandName, TraceContext,
     AGENT_EXECUTION_SERVICE_ID, HEARTBEAT_SERVICE_ID, SCHEDULED_AGENT_TASK_RESOLVE_PAYLOAD_COMMAND,
@@ -92,6 +93,7 @@ mod tests {
     struct RecordingExecutionBackend {
         commands: Mutex<Vec<AgentExecutionCommand>>,
         emit_evidence: bool,
+        emit_output_hash: bool,
     }
 
     #[async_trait]
@@ -107,6 +109,11 @@ mod tests {
                 result
                     .metadata
                     .insert("result_evidence_ref".into(), "event/agent-result/1".into());
+            }
+            if self.emit_output_hash {
+                result
+                    .metadata
+                    .insert("result_output_hash".into(), "hash.agent-output.1".into());
             }
             Ok(result)
         }
@@ -280,6 +287,18 @@ mod tests {
             command.metadata["scheduled_agent_task_audit_id"],
             "audit.scheduled_agent_task.created.1"
         );
+        let envelope = command
+            .execution_envelope
+            .as_ref()
+            .expect("scheduled dispatch must attach an execution envelope");
+        assert_eq!(
+            envelope.source_kind,
+            macaca_proto::AutonomousExecutionSourceKind::ScheduledAgentTask
+        );
+        assert_eq!(
+            envelope.source_instruction,
+            "Analyze the market and record result."
+        );
     }
 
     #[tokio::test]
@@ -330,6 +349,56 @@ mod tests {
             outcome.reason_code,
             "agent_execution_result_evidence_missing"
         );
+    }
+
+    #[tokio::test]
+    async fn completed_agent_execution_with_result_hash_satisfies_agent_result_policy() {
+        let runtime = ServiceRuntime::new(ServiceRuntimeConfig::default());
+        let payload_ref = payload_ref();
+        let backend = Arc::new(RecordingExecutionBackend {
+            emit_output_hash: true,
+            ..RecordingExecutionBackend::default()
+        });
+
+        register_static_service(
+            &runtime,
+            FakeScheduledAgentTaskResolver::descriptor(),
+            Arc::new(FakeScheduledAgentTaskResolver {
+                resolved: resolved_payload(payload_ref.clone()),
+            }),
+        )
+        .await;
+        register_static_service(
+            &runtime,
+            AgentExecutionSystemServiceProvider::new(backend.clone()).descriptor(),
+            Arc::new(AgentExecutionSystemServiceProvider::new(backend.clone())),
+        )
+        .await;
+
+        let target = AgentExecutionTargetCommand {
+            application_id: ApplicationId::from_name("scheduled-agent-dispatch-test"),
+            session_id: "session-scheduled-agent".into(),
+            task_id: Some(TaskId::new()),
+            target_agent: Some("worker".into()),
+            execution_intent: AgentExecutionIntent::TaskWorker,
+            payload_ref,
+            metadata: BTreeMap::new(),
+        };
+        let dispatcher = AutonomyDispatchStrategies::new(&runtime, 1_000);
+        let outcome = dispatcher
+            .dispatch(
+                TraceContext::new("trace-scheduled-agent-dispatch-output-hash"),
+                AutonomyScope::application(ApplicationId::from_name(
+                    "scheduled-agent-dispatch-test",
+                )),
+                SchedulerTargetCommand::AgentExecution(target),
+            )
+            .await
+            .unwrap();
+
+        assert!(outcome.succeeded);
+        assert!(!outcome.retryable);
+        assert_eq!(outcome.reason_code, "dispatch_succeeded");
     }
 }
 
@@ -453,11 +522,26 @@ impl<'a> AutonomyDispatchStrategies<'a> {
                 .metadata
                 .insert("scheduled_agent_task_audit_id".into(), audit_id);
         }
+        let envelope = AutonomousExecutionEnvelope::compile(
+            AutonomousExecutionSourceKind::ScheduledAgentTask,
+            resolved.user_prompt.clone(),
+            &command.metadata,
+        )?;
+        command.metadata.insert(
+            "execution_envelope.source_kind".into(),
+            envelope.source_kind.as_str().into(),
+        );
+        command.metadata.insert(
+            "execution_envelope.completion_policy".into(),
+            envelope.completion_policy.kind.as_str().into(),
+        );
 
         info!(
             service_id = AGENT_EXECUTION_SERVICE_ID,
             target_agent = command.target_agent.as_str(),
             task_id = resolved.task_id.as_str(),
+            source_kind = envelope.source_kind.as_str(),
+            completion_policy = envelope.completion_policy.kind.as_str(),
             payload_digest = command
                 .metadata
                 .get("payload_digest")
@@ -466,6 +550,7 @@ impl<'a> AutonomyDispatchStrategies<'a> {
             trace_id = trace.trace_id.as_str(),
             "scheduled agent dispatch invoking agent execution service"
         );
+        command.execution_envelope = Some(envelope.clone());
         let service_command = command.into_service_command()?;
         match timeout(
             Duration::from_millis(self.timeout_ms),
@@ -505,7 +590,10 @@ impl<'a> AutonomyDispatchStrategies<'a> {
                 );
                 match result.status {
                     AgentExecutionStatus::Completed => {
-                        match AgentExecutionEvidenceGate::evaluate(&result) {
+                        match AgentExecutionEvidenceGate::evaluate_with_policy(
+                            &result,
+                            &envelope.completion_policy,
+                        ) {
                             AgentExecutionEvidenceDecision::Verified { evidence_key } => {
                                 info!(
                                     service_id = AGENT_EXECUTION_SERVICE_ID,

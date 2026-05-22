@@ -162,11 +162,20 @@ pub fn app_manifest_to_heartbeat_agent_views(
             if !declared_agents.contains(&agent.name) {
                 diagnostics.push("heartbeat_agent_unknown".to_string());
             }
+            let native_profile_id = heartbeat_native_profile_id(manifest.id, &agent.name);
+            let wake_scope_key = heartbeat_wake_scope_key(manifest.id, &agent.name);
             ApplicationHeartbeatAgentView {
                 application_id: manifest.id,
                 agent_name: agent.name.clone(),
                 enabled: agent.enabled,
                 profile_id: agent.profile_id.clone(),
+                native_profile_id,
+                wake_scope_key,
+                fixed_interval_secs: agent
+                    .cadence
+                    .as_ref()
+                    .and_then(|cadence| cadence.fixed_interval_secs),
+                cooldown_secs: agent.gates.as_ref().and_then(|gates| gates.cooldown_secs),
                 metadata: sanitize_heartbeat_agent_metadata(&agent.metadata),
                 diagnostics,
             }
@@ -180,6 +189,52 @@ pub fn app_manifest_to_heartbeat_agent_views(
         "projected sanitized application heartbeat agent declarations"
     );
     views
+}
+
+/// Compute the concrete native Heartbeat profile id for one manifest agent.
+///
+/// This helper is pure string projection owned by the Application Framework. It
+/// does not register providers or inspect HEARTBEAT.md; runtime-host still owns
+/// the Adapter step that turns this safe id into a Heartbeat profile.
+pub fn heartbeat_native_profile_id(application_id: ApplicationId, agent_name: &str) -> String {
+    format!(
+        "profile.application.{}.agent.{}.heartbeat",
+        application_id,
+        heartbeat_agent_token(agent_name)
+    )
+}
+
+/// Compute the concrete Heartbeat wake scope key for one manifest agent.
+pub fn heartbeat_wake_scope_key(application_id: ApplicationId, agent_name: &str) -> String {
+    format!(
+        "application:{}.agent:{}.heartbeat",
+        application_id,
+        heartbeat_agent_token(agent_name)
+    )
+}
+
+/// Convert manifest agent names into stable, URL/path-safe profile fragments.
+///
+/// Agent names are application-owned identifiers, but Heartbeat profile ids and
+/// Web path parameters need predictable characters. The original name remains
+/// in the sanitized declaration view for display and dispatch.
+fn heartbeat_agent_token(agent_name: &str) -> String {
+    let token = agent_name
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '.') {
+                ch
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>();
+    let token = token.trim_matches('_');
+    if token.is_empty() {
+        "agent".into()
+    } else {
+        token.into()
+    }
 }
 
 fn manifest_v1_to_service_app_view(
@@ -668,6 +723,12 @@ mod tests {
                         name: "coordinator".into(),
                         enabled: true,
                         profile_id: "default".into(),
+                        cadence: Some(crate::model::AppHeartbeatCadenceConfig {
+                            fixed_interval_secs: Some(600),
+                        }),
+                        gates: Some(crate::model::AppHeartbeatGateConfig {
+                            cooldown_secs: Some(120),
+                        }),
                         metadata: std::collections::BTreeMap::from([(
                             "purpose".into(),
                             "operational_probe".into(),
@@ -677,6 +738,8 @@ mod tests {
                         name: "missing".into(),
                         enabled: true,
                         profile_id: "default".into(),
+                        cadence: None,
+                        gates: None,
                         metadata: std::collections::BTreeMap::new(),
                     },
                 ],
@@ -688,6 +751,14 @@ mod tests {
         assert_eq!(views.len(), 2);
         assert_eq!(views[0].agent_name, "coordinator");
         assert!(views[0].enabled);
+        assert!(views[0]
+            .native_profile_id
+            .contains(".agent.coordinator.heartbeat"));
+        assert!(views[0]
+            .wake_scope_key
+            .contains(".agent:coordinator.heartbeat"));
+        assert_eq!(views[0].fixed_interval_secs, Some(600));
+        assert_eq!(views[0].cooldown_secs, Some(120));
         assert!(views[0].diagnostics.is_empty());
         assert_eq!(
             views[0].metadata.get("purpose").map(String::as_str),
@@ -707,6 +778,8 @@ mod tests {
                     name: "coordinator".into(),
                     enabled: true,
                     profile_id: "default".into(),
+                    cadence: None,
+                    gates: None,
                     metadata: std::collections::BTreeMap::new(),
                 }],
             }),

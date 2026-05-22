@@ -25,10 +25,10 @@ use macaca_proto::{config::ContextConfig, ApplicationId, ForkId, LlmMessage};
 use macaca_runtime_host::ServiceRuntime;
 use macaca_sdk::{
     SystemApplicationClient, SystemContextClient, SystemDriverClient, SystemEntitlementClient,
-    SystemEvmClient, SystemLlmClient, SystemMcpClient, SystemMemoryClient, SystemPaymentClient,
-    SystemPluginCapabilityClient, SystemPluginControlClient, SystemPluginHookClient,
-    SystemScheduledAgentTaskClient, SystemSchedulerClient, SystemSkillClient, SystemStoreClient,
-    SystemWeb3Client,
+    SystemEvmClient, SystemHeartbeatClient, SystemLlmClient, SystemMcpClient, SystemMemoryClient,
+    SystemPaymentClient, SystemPluginCapabilityClient, SystemPluginControlClient,
+    SystemPluginHookClient, SystemScheduledAgentTaskClient, SystemSchedulerClient,
+    SystemSkillClient, SystemStoreClient, SystemWeb3Client,
 };
 use macaca_skill::SkillCatalog;
 use macaca_task::TodoStore;
@@ -337,6 +337,13 @@ pub struct AppState {
     /// Scheduler job creation, and Agent Execution dispatch remain in
     /// service/runtime-host layers rather than presentation code.
     pub scheduled_agent_task_client: Arc<dyn SystemScheduledAgentTaskClient>,
+    /// The serviceized Heartbeat client used by application-scoped Heartbeat
+    /// Operations routes.
+    ///
+    /// Web stores only the focused SDK facade. Native cadence, profile state,
+    /// wake coalescing, gates, and run mementos remain in `service.heartbeat`
+    /// and runtime-host providers.
+    pub heartbeat_client: Arc<dyn SystemHeartbeatClient>,
     /// The serviceized Web3 client used by optional Web3 shell/status paths.
     pub web3_client: Arc<dyn SystemWeb3Client>,
     /// The serviceized EVM client used by optional EVM shell/status paths.

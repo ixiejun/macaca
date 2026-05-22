@@ -120,19 +120,23 @@ impl StoredHeartbeatProfile {
     }
 
     pub(super) fn summary(&self) -> HeartbeatProfileSummary {
-        let next_eligible_at = match self.profile.cadence {
+        let (fixed_interval_ms, next_eligible_at) = match self.profile.cadence {
             HeartbeatCadencePolicy::FixedInterval {
                 interval_ms,
                 anchor,
-            } => self
-                .last_tick_at
-                .or(anchor)
-                .map(|last| last + Duration::milliseconds(interval_ms.min(i64::MAX as u64) as i64)),
+            } => (
+                interval_ms,
+                self.last_tick_at.or(anchor).map(|last| {
+                    last + Duration::milliseconds(interval_ms.min(i64::MAX as u64) as i64)
+                }),
+            ),
         };
         HeartbeatProfileSummary {
             profile_id: self.profile.profile_id.clone(),
             scope_key: self.profile.scope_identity.scope_key.clone(),
             enabled: self.profile.enabled,
+            fixed_interval_ms,
+            cooldown_ms: self.profile.cooldown_ms,
             next_eligible_at,
             last_tick_at: self.last_tick_at,
             last_run_id: self.last_run_id.clone(),

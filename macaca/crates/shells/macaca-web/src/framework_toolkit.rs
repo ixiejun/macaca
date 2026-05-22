@@ -147,15 +147,7 @@ pub(crate) async fn build_toolkit(
         }
     }
 
-    if let Some(ref allowlist) = policy.base_allowed_tools {
-        for tool in toolkit.get_definitions() {
-            if let Some(name) = tool.get("name").and_then(|v| v.as_str()) {
-                if !allowlist.contains(name) {
-                    toolkit.unregister(name);
-                }
-            }
-        }
-    }
+    enforce_base_tool_allowlist(&mut toolkit, policy.base_allowed_tools.as_ref());
 
     for tool_name in ["file_read", "file_write", "shell"] {
         toolkit.unregister(tool_name);
@@ -385,7 +377,35 @@ pub(crate) async fn build_toolkit(
         ),
     }
 
+    // Tool contributors run in phases: base tools, driver/skill service tools,
+    // workspace tools, autonomy tools, and finally MCP descriptors.  Some
+    // contributors intentionally execute late because they depend on
+    // service-owned catalogs.  Re-applying the manifest allowlist here makes the
+    // final Toolkit state match application policy instead of trusting every
+    // contributor to remember the same filtering order.
+    enforce_base_tool_allowlist(&mut toolkit, policy.base_allowed_tools.as_ref());
+
     toolkit
+}
+
+fn enforce_base_tool_allowlist(toolkit: &mut Toolkit, allowlist: Option<&HashSet<String>>) {
+    let Some(allowlist) = allowlist else {
+        return;
+    };
+    let names = toolkit
+        .get_definitions()
+        .into_iter()
+        .filter_map(|tool| {
+            tool.get("name")
+                .and_then(|value| value.as_str())
+                .map(str::to_string)
+        })
+        .collect::<Vec<_>>();
+    for name in names {
+        if !allowlist.contains(&name) {
+            toolkit.unregister(&name);
+        }
+    }
 }
 
 async fn register_mcp_definitions_with_service(
@@ -1373,11 +1393,49 @@ mod tests {
     use std::path::Path;
 
     use super::{
-        mcp_runtime_event_plans, mcp_starting_event_plans, normalize_tool_input,
-        resolve_workspace_path, skill_mcp_alias_event_plans,
+        enforce_base_tool_allowlist, mcp_runtime_event_plans, mcp_starting_event_plans,
+        normalize_tool_input, resolve_workspace_path, skill_mcp_alias_event_plans,
     };
+    use async_trait::async_trait;
     use macaca_framework::mcp::{McpSessionMode, McpTransportConfig};
+    use macaca_framework::tool::{ToolError, ToolHandler, ToolResponse, Toolkit};
     use macaca_runtime_host::{McpLifecycleScope, McpRuntimeStatus, McpRuntimeStatusState};
+
+    struct NamedTestTool(&'static str);
+
+    #[async_trait]
+    impl ToolHandler for NamedTestTool {
+        async fn execute(&self, _args: serde_json::Value) -> Result<ToolResponse, ToolError> {
+            Ok(ToolResponse::text("ok"))
+        }
+
+        fn name(&self) -> &str {
+            self.0
+        }
+
+        fn description(&self) -> &str {
+            "test tool"
+        }
+
+        fn schema(&self) -> serde_json::Value {
+            serde_json::json!({"type": "object"})
+        }
+    }
+
+    #[test]
+    fn final_tool_allowlist_removes_late_registered_tools() {
+        let mut toolkit = Toolkit::new();
+        toolkit.register(Box::new(NamedTestTool("shell")), None);
+        toolkit.register(Box::new(NamedTestTool("bing_search")), None);
+        toolkit.register(Box::new(NamedTestTool("file_write")), None);
+        let allowlist = std::collections::HashSet::from(["shell".to_string()]);
+
+        enforce_base_tool_allowlist(&mut toolkit, Some(&allowlist));
+
+        assert!(toolkit.get_tool("shell").is_some());
+        assert!(toolkit.get_tool("bing_search").is_none());
+        assert!(toolkit.get_tool("file_write").is_none());
+    }
 
     #[test]
     fn resolve_workspace_path_joins_relative_path_to_workspace_root() {

@@ -17,11 +17,11 @@ use std::collections::BTreeMap;
 use chrono::{DateTime, Duration, Utc};
 use macaca_proto::{
     AutonomyAuditCorrelation, AutonomyScope, AutonomyServiceErrorKind, AutonomyStructuredError,
-    HeartbeatCadencePolicy, HeartbeatCommandResult, HeartbeatGateDecision, HeartbeatProfile,
-    HeartbeatProfileId, HeartbeatRunId, HeartbeatRunState, HeartbeatScopeIdentity,
-    HeartbeatServiceSnapshot, HeartbeatWakeCommand, HeartbeatWakeDisposition, HeartbeatWakeIntent,
-    MacacaError, MacacaResult, ServiceDescriptor, ServiceHealth, ServiceLifecycleState,
-    TraceContext, HEARTBEAT_SERVICE_ID,
+    HeartbeatCadencePolicy, HeartbeatCommandResult, HeartbeatCompleteRunCommand,
+    HeartbeatGateDecision, HeartbeatProfile, HeartbeatProfileId, HeartbeatRunId, HeartbeatRunState,
+    HeartbeatScopeIdentity, HeartbeatServiceSnapshot, HeartbeatWakeCommand,
+    HeartbeatWakeDisposition, HeartbeatWakeIntent, MacacaError, MacacaResult, ServiceDescriptor,
+    ServiceHealth, ServiceLifecycleState, TraceContext, HEARTBEAT_SERVICE_ID,
 };
 use tracing::info;
 
@@ -31,6 +31,8 @@ use memento::{InMemoryHeartbeatStore, StoredHeartbeatProfile, StoredHeartbeatRun
 
 const LOCAL_PROVIDER_ID: &str = "local.in_memory";
 const DEFAULT_COOLDOWN_MS: i64 = 30_000;
+pub(super) const PROFILE_COOLDOWN_MS_KEY: &str = "heartbeat.profile.cooldown_ms";
+pub(super) const PROFILE_ID_METADATA_KEY: &str = "heartbeat.profile_id";
 const DEFAULT_ACTIVE_START_HOUR_UTC: u32 = 0;
 const DEFAULT_ACTIVE_END_HOUR_UTC: u32 = 24;
 const DEFAULT_NATIVE_PROFILE_ID: &str = "profile.system.autonomy";
@@ -178,7 +180,7 @@ impl LocalHeartbeatProvider {
         let mut results = Vec::new();
         for profile in due_profiles {
             let profile_id = profile.profile_id.clone();
-            let wake = HeartbeatWakeCommand::new(
+            let mut wake = HeartbeatWakeCommand::new(
                 trace.clone(),
                 profile.scope_identity.scope.clone(),
                 profile.scope_identity.scope_key.clone(),
@@ -186,8 +188,24 @@ impl LocalHeartbeatProvider {
                     profile_id: profile_id.clone(),
                 },
             )?;
+            // Copy bounded profile metadata into the wake command before gate
+            // evaluation. This is the only place where profile policy crosses
+            // from Heartbeat memento state into a wake decision; it keeps gate
+            // Strategies generic and avoids any application-specific branch.
+            wake.metadata = profile.metadata.clone();
+            wake.metadata.insert(
+                PROFILE_ID_METADATA_KEY.into(),
+                profile.profile_id.as_str().to_string(),
+            );
+            if let Some(cooldown_ms) = profile.cooldown_ms {
+                wake.metadata
+                    .insert(PROFILE_COOLDOWN_MS_KEY.into(), cooldown_ms.to_string());
+            }
             let result = self.wake(wake).await?;
             let mut result = result;
+            for (key, value) in &profile.metadata {
+                result.metadata.insert(key.clone(), value.clone());
+            }
             if let Some(app_id) = profile.scope_identity.scope.application_id {
                 result
                     .metadata
@@ -215,7 +233,6 @@ impl LocalHeartbeatProvider {
                 });
                 if result.accepted {
                     self.mark_run_running(trace.clone(), run_id.clone())?;
-                    self.mark_run_succeeded(trace.clone(), run_id)?;
                 }
             }
             info!(
@@ -316,6 +333,44 @@ impl LocalHeartbeatProvider {
             |run, now| {
                 run.summary.finished_at = Some(now);
                 run.summary.safe_status = "heartbeat run completed".into();
+            },
+        )
+    }
+
+    /// Apply a terminal completion reported by an external runtime observer.
+    ///
+    /// Heartbeat does not execute agents, tasks, plugins, or application
+    /// workflows. This method records only the sanitized terminal state reported
+    /// by Runtime Host after such a boundary returns. The metadata allowlist is
+    /// intentionally about platform execution evidence, not application
+    /// semantics, so all applications share the same audit surface.
+    pub fn complete_run(
+        &self,
+        command: HeartbeatCompleteRunCommand,
+    ) -> MacacaResult<HeartbeatCommandResult> {
+        let metadata = sanitized_completion_metadata(command.metadata);
+        let reason_code = normalize_label(
+            command.reason_code,
+            "heartbeat completion reason is required",
+        )?;
+        let state = command.state;
+        self.transition_run(
+            command.trace,
+            command.run_id,
+            state.clone(),
+            "complete",
+            |run, now| {
+                run.summary.finished_at = Some(now);
+                run.summary.safe_status = match state {
+                    HeartbeatRunState::Succeeded => "heartbeat delegated dispatch completed".into(),
+                    HeartbeatRunState::Failed => "heartbeat delegated dispatch failed".into(),
+                    HeartbeatRunState::Skipped => "heartbeat delegated dispatch skipped".into(),
+                    _ => "heartbeat delegated dispatch completion recorded".into(),
+                };
+                run.summary
+                    .metadata
+                    .insert("dispatch.reason_code".into(), reason_code);
+                run.summary.metadata.extend(metadata);
             },
         )
     }
@@ -450,4 +505,53 @@ fn normalize_label(value: String, message: &'static str) -> MacacaResult<String>
         return Err(MacacaError::Config(message.into()));
     }
     Ok(value)
+}
+
+fn sanitized_completion_metadata(metadata: BTreeMap<String, String>) -> BTreeMap<String, String> {
+    const MAX_KEY_LEN: usize = 96;
+    const MAX_VALUE_LEN: usize = 256;
+    const MAX_ENTRIES: usize = 24;
+    const ALLOWED_PREFIXES: &[&str] = &[
+        "agent_execution.",
+        "execution_envelope.",
+        "dispatch.",
+        "evidence.",
+        "heartbeat.",
+    ];
+    const REJECTED_FRAGMENTS: &[&str] = &[
+        "prompt",
+        "raw",
+        "secret",
+        "credential",
+        "private",
+        "manifest",
+        "package_bytes",
+        "provider_output",
+    ];
+
+    let mut sanitized = BTreeMap::new();
+    for (key, value) in metadata {
+        if sanitized.len() >= MAX_ENTRIES {
+            break;
+        }
+        let key = key.trim();
+        let value = value.trim();
+        if key.is_empty()
+            || value.is_empty()
+            || key.len() > MAX_KEY_LEN
+            || !ALLOWED_PREFIXES
+                .iter()
+                .any(|prefix| key.starts_with(prefix))
+            || REJECTED_FRAGMENTS
+                .iter()
+                .any(|fragment| key.to_ascii_lowercase().contains(fragment))
+        {
+            continue;
+        }
+        sanitized.insert(
+            key.to_string(),
+            value.chars().take(MAX_VALUE_LEN).collect::<String>(),
+        );
+    }
+    sanitized
 }

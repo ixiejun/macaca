@@ -10,6 +10,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use macaca_proto::{
     ApplicationDiscoverCommand, ApplicationDiscoverResult, ApplicationGenUiSurfaceCommand,
+    ApplicationHeartbeatAgentsQueryCommand, ApplicationHeartbeatAgentsResult,
     ApplicationHostDispatchResult, ApplicationHostDispatchServiceCommand,
     ApplicationMetadataQueryCommand, ApplicationMetadataResult, ApplicationRemoveCommand,
     ApplicationServiceSnapshot, ApplicationSessionResult, ApplicationSessionResumeCommand,
@@ -17,11 +18,11 @@ use macaca_proto::{
     ApplicationStartCommand, ApplicationStartResult, ApplicationStatusCommand,
     ApplicationStatusResult, ApplicationStopCommand, MacacaError, MacacaResult, UiIntent,
     APPLICATION_DISCOVER_COMMAND, APPLICATION_GENUI_SURFACE_COMMAND,
-    APPLICATION_HOST_DISPATCH_COMMAND, APPLICATION_METADATA_QUERY_COMMAND,
-    APPLICATION_REMOVE_COMMAND, APPLICATION_SERVICE_ID, APPLICATION_SESSION_RESUME_COMMAND,
-    APPLICATION_SESSION_START_COMMAND, APPLICATION_SESSION_STOP_COMMAND,
-    APPLICATION_SNAPSHOT_COMMAND, APPLICATION_START_COMMAND, APPLICATION_STATUS_COMMAND,
-    APPLICATION_STOP_COMMAND,
+    APPLICATION_HEARTBEAT_AGENTS_QUERY_COMMAND, APPLICATION_HOST_DISPATCH_COMMAND,
+    APPLICATION_METADATA_QUERY_COMMAND, APPLICATION_REMOVE_COMMAND, APPLICATION_SERVICE_ID,
+    APPLICATION_SESSION_RESUME_COMMAND, APPLICATION_SESSION_START_COMMAND,
+    APPLICATION_SESSION_STOP_COMMAND, APPLICATION_SNAPSHOT_COMMAND, APPLICATION_START_COMMAND,
+    APPLICATION_STATUS_COMMAND, APPLICATION_STOP_COMMAND,
 };
 use tracing::{info, warn};
 
@@ -78,6 +79,16 @@ pub trait SystemApplicationClient: Send + Sync {
         &self,
         command: ApplicationMetadataQueryCommand,
     ) -> MacacaResult<ApplicationMetadataResult>;
+    /// Query sanitized manifest-declared heartbeat agents.
+    ///
+    /// This keeps Web and CLI on the Application Service facade when they need
+    /// declaration views for Heartbeat Operations. Shells receive only bounded
+    /// metadata and diagnostics; raw manifests and HEARTBEAT.md content remain
+    /// behind the Application Service provider.
+    async fn heartbeat_agents(
+        &self,
+        command: ApplicationHeartbeatAgentsQueryCommand,
+    ) -> MacacaResult<ApplicationHeartbeatAgentsResult>;
 }
 
 /// Null-object Application client used when the service is not installed.
@@ -195,6 +206,17 @@ impl SystemApplicationClient for UnavailableSystemApplicationClient {
         Err(MacacaError::Config(
             "Application service is unavailable".into(),
         ))
+    }
+
+    async fn heartbeat_agents(
+        &self,
+        command: ApplicationHeartbeatAgentsQueryCommand,
+    ) -> MacacaResult<ApplicationHeartbeatAgentsResult> {
+        info!(
+            trace_id = %command.trace.trace_id,
+            "sdk application client returning empty heartbeat declaration view"
+        );
+        Ok(Vec::new())
     }
 }
 
@@ -357,6 +379,19 @@ impl SystemApplicationClient for ServiceBackedApplicationClient {
         call(
             &self.service,
             APPLICATION_METADATA_QUERY_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn heartbeat_agents(
+        &self,
+        command: ApplicationHeartbeatAgentsQueryCommand,
+    ) -> MacacaResult<ApplicationHeartbeatAgentsResult> {
+        call(
+            &self.service,
+            APPLICATION_HEARTBEAT_AGENTS_QUERY_COMMAND,
             command.trace.clone(),
             command,
         )

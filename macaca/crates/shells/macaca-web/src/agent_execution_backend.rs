@@ -14,24 +14,28 @@ use macaca_framework::agent::Agent;
 use macaca_framework::message::Msg;
 use macaca_kernel::executor::ExecutorEventFactory;
 use macaca_proto::{
-    AgentContextBuildCommand, AgentContextSnapshot, AgentExecutionCommand, AgentExecutionIntent,
-    AgentExecutionResult, AgentExecutionStatus, ExecutionControlCheckpointMode,
-    ExecutionControlCommandResult, ExecutionControlPolicy,
-    ExecutionControlRegisterExecutionCommand, ExecutionControlResolutionStatus,
-    ExecutionControlResolvePolicyCommand, ExecutionControlResolvedPolicy,
-    ExecutionControlResumeSource, ExecutionControlScope, ExecutionControlTrigger, KernelServiceId,
-    ServiceBusSource, ServiceError, ServiceResult, TaskId, AGENT_CONTEXT_SERVICE_ID,
-    EXECUTION_CONTROL_SERVICE_ID,
+    AgentContextBuildCommand, AgentContextSnapshot, AgentExecutionCommand, AgentExecutionEvent,
+    AgentExecutionIntent, AgentExecutionResult, AgentExecutionStatus,
+    AutonomousCompletionPolicyKind, ExecutionControlCheckpointMode, ExecutionControlCommandResult,
+    ExecutionControlPolicy, ExecutionControlRegisterExecutionCommand,
+    ExecutionControlResolutionStatus, ExecutionControlResolvePolicyCommand,
+    ExecutionControlResolvedPolicy, ExecutionControlResumeSource, ExecutionControlScope,
+    ExecutionControlTrigger, KernelServiceId, ServiceBusSource, ServiceError, ServiceResult,
+    TaskId, AGENT_CONTEXT_SERVICE_ID, EXECUTION_CONTROL_SERVICE_ID,
 };
 #[cfg(test)]
 use macaca_runtime_host::ExecutionControlPolicyResolver;
 use macaca_runtime_host::{AgentExecutionBackend, ServiceRuntime};
+use macaca_tools::{ShellTool, ToolCommand, ToolCommandExecutor};
 use tokio::sync::mpsc;
 
 use crate::agent_execution_evidence::{observed_agent_execution_events, stable_agent_output_hash};
 use crate::framework_runner::{FrameworkRunner, RuntimeExecutionControl};
 use crate::runtime_event_bridge::emit_execution_control_events;
 use crate::state::AppState;
+
+const DEFAULT_RUNTIME_AGENT_MAX_ITERS: usize = 25;
+const ARTIFACT_BACKED_RUNTIME_AGENT_MAX_ITERS: usize = 3;
 
 /// Web-owned implementation of the Agent Execution system service.
 pub(crate) struct WebAgentExecutionBackend {
@@ -73,15 +77,37 @@ impl WebAgentExecutionBackend {
 
     fn user_prompt_with_context(command: &AgentExecutionCommand) -> String {
         let context = Self::structured_execution_context(command);
-        if context.is_null() || context == serde_json::json!({}) {
-            return command.user_prompt.clone();
+        let envelope = Self::render_execution_envelope(command);
+        let mut sections = Vec::new();
+        if let Some(envelope) = envelope {
+            sections.push(envelope);
         }
-        let rendered_context =
-            serde_json::to_string_pretty(&context).unwrap_or_else(|_| context.to_string());
-        format!(
-            "{}\n\nStructured evidence context for this delegated task:\n```json\n{}\n```",
-            command.user_prompt, rendered_context
-        )
+        sections.push(command.user_prompt.clone());
+        if !context.is_null() && context != serde_json::json!({}) {
+            let rendered_context =
+                serde_json::to_string_pretty(&context).unwrap_or_else(|_| context.to_string());
+            sections.push(format!(
+                "Structured evidence context for this delegated task:\n```json\n{}\n```",
+                rendered_context
+            ));
+        }
+        sections.join("\n\n")
+    }
+
+    /// Render the OS-owned autonomous execution envelope before normal prompt
+    /// context.
+    ///
+    /// The envelope is not an application-specific template. It is a generic
+    /// contract view compiled by Runtime Host from source instruction and safe
+    /// metadata. Placing it first gives the runtime agent a clear ordering rule
+    /// while post-run evidence validation remains the final success authority.
+    fn render_execution_envelope(command: &AgentExecutionCommand) -> Option<String> {
+        let envelope = command.execution_envelope.as_ref()?;
+        let rendered = serde_json::to_string_pretty(envelope).unwrap_or_else(|_| "{}".to_string());
+        Some(format!(
+            "Highest-priority delegated execution contract. Follow this contract before persona, memory, profile, or other contextual material. If this contract conflicts with contextual guidance, the contract wins.\n```json\n{}\n```",
+            rendered
+        ))
     }
 
     /// Build provider-neutral context that is safe to show to the runtime agent.
@@ -159,6 +185,102 @@ impl WebAgentExecutionBackend {
     ) -> bool {
         matches!(command.execution_intent, AgentExecutionIntent::Heartbeat)
             && !Self::has_heartbeat_source_evidence(context_snapshot)
+    }
+
+    /// Choose the framework loop budget from the compiled completion policy.
+    ///
+    /// Artifact-backed autonomous work is complete only when the expected
+    /// durable artifact changes. Once a tool has produced that artifact, extra
+    /// ReAct turns are only a natural-language wrap-up and can turn a real side
+    /// effect into a scheduler timeout. A short budget lets the service return
+    /// to the evidence gate quickly while non-artifact work keeps the normal
+    /// runtime budget.
+    fn runtime_agent_max_iters(command: &AgentExecutionCommand) -> usize {
+        match command
+            .execution_envelope
+            .as_ref()
+            .map(|envelope| envelope.completion_policy.kind)
+        {
+            Some(AutonomousCompletionPolicyKind::RequireArtifact) => {
+                ARTIFACT_BACKED_RUNTIME_AGENT_MAX_ITERS
+            }
+            _ => DEFAULT_RUNTIME_AGENT_MAX_ITERS,
+        }
+    }
+
+    /// Extract a deterministic heartbeat shell contract from trusted profile
+    /// source evidence.
+    ///
+    /// This path is deliberately narrow: it applies only to heartbeat intent
+    /// with artifact completion, requires the Agent Context service to have
+    /// supplied a HEARTBEAT.md source, and accepts exactly one fenced shell
+    /// block. If the profile is ambiguous, execution falls back to the normal
+    /// framework agent path so the OS never guesses which action to run.
+    fn heartbeat_exact_shell_contract(
+        command: &AgentExecutionCommand,
+        context_snapshot: &AgentContextSnapshot,
+    ) -> Option<String> {
+        if !matches!(command.execution_intent, AgentExecutionIntent::Heartbeat)
+            || !matches!(
+                command
+                    .execution_envelope
+                    .as_ref()
+                    .map(|envelope| envelope.completion_policy.kind),
+                Some(AutonomousCompletionPolicyKind::RequireArtifact)
+            )
+        {
+            return None;
+        }
+        let source = context_snapshot.sources.iter().find(|source| {
+            source.kind == "profile_file"
+                && (source.name == "HEARTBEAT.md"
+                    || source
+                        .location
+                        .as_deref()
+                        .is_some_and(|location| location.ends_with("/HEARTBEAT.md")))
+        })?;
+        let path = source.location.as_ref()?;
+        let body = std::fs::read_to_string(path).ok()?;
+        extract_single_shell_fence(&body)
+    }
+
+    async fn execute_exact_heartbeat_shell(
+        command_text: &str,
+        agent_event_tx: &mpsc::Sender<AgentExecutionEvent>,
+    ) -> Result<serde_json::Value, String> {
+        let tool_input = serde_json::json!({
+            "command": command_text,
+            "timeout_secs": 10,
+        });
+        let _ = agent_event_tx
+            .send(AgentExecutionEvent::tool_call(
+                "shell".into(),
+                serde_json::json!({
+                    "contract": "heartbeat_profile_exact_shell",
+                    "timeout_secs": 10,
+                }),
+            ))
+            .await;
+        let result = ShellTool::default()
+            .execute_command(ToolCommand::new(tool_input))
+            .await
+            .map_err(|error| error.to_string())?;
+        let is_error = result
+            .get("exit_code")
+            .and_then(|value| value.as_i64())
+            .map(|code| code != 0)
+            .unwrap_or(false);
+        let _ = agent_event_tx
+            .send(AgentExecutionEvent::tool_result_with_error(
+                "shell".into(),
+                serde_json::to_string(&result).unwrap_or_else(|_| "{}".into()),
+                is_error,
+            ))
+            .await;
+        if is_error {
+            return Err(format!("heartbeat exact shell exited with {result}"));
+        }
+        Ok(result)
     }
 
     /// Resolve execution-control policy for this run through the system service.
@@ -440,6 +562,41 @@ impl WebAgentExecutionBackend {
     }
 }
 
+fn extract_single_shell_fence(body: &str) -> Option<String> {
+    let mut captured = Vec::new();
+    let mut active = false;
+    let mut matches = 0usize;
+    let mut current = Vec::new();
+
+    for line in body.lines() {
+        let trimmed = line.trim();
+        if !active && trimmed.starts_with("```") {
+            let lang = trimmed.trim_start_matches("```").trim();
+            if matches!(lang, "sh" | "shell" | "bash") {
+                active = true;
+                current.clear();
+            }
+            continue;
+        }
+        if active && trimmed == "```" {
+            active = false;
+            matches += 1;
+            captured = current.clone();
+            continue;
+        }
+        if active {
+            current.push(line.to_string());
+        }
+    }
+
+    if matches == 1 {
+        let command = captured.join("\n").trim().to_string();
+        (!command.is_empty()).then_some(command)
+    } else {
+        None
+    }
+}
+
 #[async_trait]
 impl AgentExecutionBackend for WebAgentExecutionBackend {
     async fn execute(&self, command: AgentExecutionCommand) -> ServiceResult<AgentExecutionResult> {
@@ -486,6 +643,59 @@ impl AgentExecutionBackend for WebAgentExecutionBackend {
             expected_artifact_path,
         );
 
+        if let Some(command_text) =
+            Self::heartbeat_exact_shell_contract(&command, &context_snapshot)
+        {
+            let shell_result =
+                Self::execute_exact_heartbeat_shell(&command_text, &agent_event_tx).await;
+            drop(agent_event_tx);
+            match shell_result {
+                Ok(shell_output) => {
+                    let task_result =
+                        event_factory.success_result("heartbeat exact shell completed");
+                    if emit_lifecycle {
+                        if let Some(executor) = executor.as_ref() {
+                            executor
+                                .broadcast_event(event_factory.completed_with_result(task_result));
+                        }
+                    }
+                    let mut result = AgentExecutionResult::completed(
+                        &AgentExecutionCommand {
+                            task_id: Some(task_id),
+                            ..command.clone()
+                        },
+                        serde_json::json!({
+                            "output": "heartbeat exact shell completed",
+                            "shell": shell_output,
+                        }),
+                    );
+                    result.context_snapshot = Some(context_snapshot);
+                    result.metadata.insert(
+                        "result_output_hash".into(),
+                        stable_agent_output_hash(&result.output),
+                    );
+                    result
+                        .metadata
+                        .insert("execution_mode".into(), "heartbeat_exact_shell".into());
+                    result.metadata.extend(evidence_observer.finish().await);
+                    return Ok(result);
+                }
+                Err(error) => {
+                    if emit_lifecycle {
+                        if let Some(executor) = executor.as_ref() {
+                            executor.broadcast_event(event_factory.failed(error.clone()));
+                        }
+                    }
+                    return Ok(Self::failed_result(
+                        &command,
+                        task_id,
+                        error,
+                        Some(context_snapshot),
+                    ));
+                }
+            }
+        }
+
         let control_policy = self
             .resolve_execution_control_policy_via_service(&command)
             .await?;
@@ -499,21 +709,24 @@ impl AgentExecutionBackend for WebAgentExecutionBackend {
             }
             None => None,
         };
+        let max_iters = Self::runtime_agent_max_iters(&command);
         let agent = match execution_control {
             Some(execution_control) => {
-                FrameworkRunner::build_runtime_agent_from_context_snapshot_with_execution_control(
+                FrameworkRunner::build_runtime_agent_from_context_snapshot_with_execution_control_and_max_iters(
                     &self.state,
                     &context_snapshot,
                     Some(agent_event_tx),
                     execution_control,
+                    max_iters,
                 )
                 .await
             }
             None => {
-                FrameworkRunner::build_runtime_agent_from_context_snapshot(
+                FrameworkRunner::build_runtime_agent_from_context_snapshot_with_max_iters(
                     &self.state,
                     &context_snapshot,
                     Some(agent_event_tx),
+                    max_iters,
                 )
                 .await
             }

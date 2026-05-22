@@ -10,7 +10,8 @@ use std::sync::Arc;
 
 use macaca_heartbeat::{HeartbeatService, LocalHeartbeatProvider};
 use macaca_proto::{
-    AutonomyScope, HeartbeatWakeCommand, HeartbeatWakeIntent, MacacaResult, TraceContext,
+    AutonomyScope, HeartbeatCommandResult, HeartbeatCompleteRunCommand, HeartbeatRunState,
+    HeartbeatWakeCommand, HeartbeatWakeIntent, MacacaResult, TraceContext,
 };
 use tracing::{info, warn};
 
@@ -28,201 +29,7 @@ pub(crate) struct HeartbeatLane {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    use std::collections::BTreeMap;
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::sync::Arc;
-    use std::time::Duration;
-
-    use async_trait::async_trait;
-    use chrono::{Duration as ChronoDuration, Utc};
-    use macaca_app::application_service_descriptor;
-    use macaca_kernel::SystemService;
-    use macaca_proto::{
-        AgentExecutionCommand, AgentExecutionResult, ApplicationHeartbeatAgentView,
-        ApplicationHeartbeatAgentsResult, ApplicationId, CleanupPolicy, HeartbeatCadencePolicy,
-        HeartbeatProfile, HeartbeatProfileId, HeartbeatScopeIdentity, ServiceCallResult,
-        ServiceCommand, ServiceDescriptor, ServiceError, ServiceHealth, ServiceResult,
-        APPLICATION_HEARTBEAT_AGENTS_QUERY_COMMAND,
-    };
-    use tokio::time::timeout;
-
-    use crate::{
-        agent_execution_service_descriptor, AgentExecutionBackend,
-        AgentExecutionSystemServiceProvider, ServiceProviderFactoryContext,
-        ServiceProviderInstance, ServiceRuntimeConfig, StaticServiceProviderFactory,
-    };
-
-    /// Minimal Application Service test double for heartbeat declaration lookup.
-    ///
-    /// The fake intentionally speaks only the generic `SystemService` contract
-    /// so the test exercises the same service-runtime boundary that production
-    /// Runtime Host uses.  It does not embed application names, workflow
-    /// behavior, or filesystem proof logic.
-    struct FakeApplicationHeartbeatService {
-        descriptor: ServiceDescriptor,
-        declarations: ApplicationHeartbeatAgentsResult,
-    }
-
-    impl FakeApplicationHeartbeatService {
-        fn new(declarations: ApplicationHeartbeatAgentsResult) -> Self {
-            Self {
-                descriptor: application_service_descriptor(),
-                declarations,
-            }
-        }
-    }
-
-    #[async_trait]
-    impl SystemService for FakeApplicationHeartbeatService {
-        fn descriptor(&self) -> ServiceDescriptor {
-            self.descriptor.clone()
-        }
-
-        async fn start(&self) -> ServiceResult<()> {
-            Ok(())
-        }
-
-        async fn call(&self, command: ServiceCommand) -> ServiceResult<ServiceCallResult> {
-            let trace = command
-                .trace
-                .clone()
-                .ok_or(ServiceError::MissingTraceContext)?;
-            if command.name.as_str() != APPLICATION_HEARTBEAT_AGENTS_QUERY_COMMAND {
-                return Err(ServiceError::UnsupportedCommand(command.name.to_string()));
-            }
-            Ok(ServiceCallResult {
-                status: "ok".into(),
-                output: serde_json::to_value(&self.declarations)
-                    .map_err(|error| ServiceError::AdapterFailure(error.to_string()))?,
-                trace,
-                metadata: BTreeMap::new(),
-                cleanup_hint: Some(CleanupPolicy::None),
-            })
-        }
-
-        async fn stop(&self) -> ServiceResult<()> {
-            Ok(())
-        }
-
-        async fn cleanup(&self) -> ServiceResult<()> {
-            Ok(())
-        }
-
-        async fn health(&self) -> ServiceResult<ServiceHealth> {
-            Ok(ServiceHealth::Healthy)
-        }
-    }
-
-    /// Slow Agent Execution backend used to prove HeartbeatLane does not await
-    /// long model/tool work inside the supervisor tick path.
-    #[derive(Default)]
-    struct SlowExecutionBackend {
-        started: AtomicUsize,
-    }
-
-    #[async_trait]
-    impl AgentExecutionBackend for SlowExecutionBackend {
-        async fn execute(
-            &self,
-            command: AgentExecutionCommand,
-        ) -> ServiceResult<AgentExecutionResult> {
-            self.started.fetch_add(1, Ordering::SeqCst);
-            tokio::time::sleep(Duration::from_secs(5)).await;
-            let mut result =
-                AgentExecutionResult::completed(&command, serde_json::json!({"accepted": true}));
-            result.metadata.insert(
-                "result_evidence_ref".into(),
-                "event/heartbeat-result/1".into(),
-            );
-            Ok(result)
-        }
-    }
-
-    async fn register_static_service(
-        runtime: &ServiceRuntime,
-        descriptor: ServiceDescriptor,
-        service: Arc<dyn SystemService>,
-    ) {
-        runtime
-            .register_provider(
-                &StaticServiceProviderFactory::new(ServiceProviderInstance::new(
-                    descriptor, service,
-                )),
-                ServiceProviderFactoryContext::new(),
-            )
-            .await
-            .unwrap();
-    }
-
-    fn due_application_profile(application_id: ApplicationId) -> HeartbeatProfile {
-        HeartbeatProfile::new(
-            HeartbeatProfileId::new("profile.application.test.heartbeat").unwrap(),
-            HeartbeatScopeIdentity::new(
-                AutonomyScope::application(application_id),
-                "application.test.heartbeat",
-            )
-            .unwrap(),
-            HeartbeatCadencePolicy::FixedInterval {
-                interval_ms: 1,
-                anchor: Some(Utc::now() - ChronoDuration::milliseconds(5)),
-            },
-        )
-        .unwrap()
-    }
-
-    #[tokio::test]
-    async fn heartbeat_tick_hands_off_agent_dispatch_without_blocking_scheduler_lane() {
-        let application_id = ApplicationId::from_name("generic-heartbeat-app");
-        let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
-        let heartbeat = Arc::new(LocalHeartbeatProvider::new());
-        let backend = Arc::new(SlowExecutionBackend::default());
-        let declaration = ApplicationHeartbeatAgentView {
-            application_id,
-            agent_name: "operator".into(),
-            enabled: true,
-            profile_id: "default".into(),
-            metadata: BTreeMap::new(),
-            diagnostics: Vec::new(),
-        };
-
-        heartbeat
-            .register_native_profile(due_application_profile(application_id))
-            .unwrap();
-        register_static_service(
-            &runtime,
-            application_service_descriptor(),
-            Arc::new(FakeApplicationHeartbeatService::new(vec![declaration])),
-        )
-        .await;
-        register_static_service(
-            &runtime,
-            agent_execution_service_descriptor(),
-            Arc::new(AgentExecutionSystemServiceProvider::new(backend.clone())),
-        )
-        .await;
-
-        let lane = HeartbeatLane::new(runtime, heartbeat, true, 1_000);
-        let accepted = timeout(
-            Duration::from_millis(250),
-            lane.tick_once(TraceContext::new("trace-heartbeat-nonblocking")),
-        )
-        .await
-        .expect("heartbeat tick should not await slow agent execution")
-        .unwrap();
-
-        assert!(accepted);
-        for _ in 0..20 {
-            if backend.started.load(Ordering::SeqCst) == 1 {
-                break;
-            }
-            tokio::time::sleep(Duration::from_millis(10)).await;
-        }
-        assert_eq!(backend.started.load(Ordering::SeqCst), 1);
-    }
-}
+mod tests;
 
 impl HeartbeatLane {
     /// Build a Heartbeat lane from approved runtime-host composition inputs.
@@ -269,6 +76,21 @@ impl HeartbeatLane {
                 let dispatcher = HeartbeatAgentDispatchStrategy::with_timeout(runtime, timeout_ms);
                 match dispatcher.dispatch_after_accepted_wake(&wake).await {
                     Ok(summary) => {
+                        if let Err(error) = record_dispatch_completion(
+                            &dispatcher,
+                            &wake,
+                            summary.completion_state.clone(),
+                            summary.reason_code.clone(),
+                            summary.metadata.clone(),
+                        )
+                        .await
+                        {
+                            warn!(
+                                trace_id = wake.trace.trace_id.as_str(),
+                                error = %error,
+                                "heartbeat dispatch completion memento record failed"
+                            );
+                        }
                         info!(
                             trace_id = wake.trace.trace_id.as_str(),
                             queried = summary.queried,
@@ -280,6 +102,21 @@ impl HeartbeatLane {
                         );
                     }
                     Err(error) => {
+                        let completion = record_dispatch_completion(
+                            &dispatcher,
+                            &wake,
+                            Some(HeartbeatRunState::Failed),
+                            Some("heartbeat_dispatch_failed".into()),
+                            Default::default(),
+                        )
+                        .await;
+                        if let Err(record_error) = completion {
+                            warn!(
+                                trace_id = wake.trace.trace_id.as_str(),
+                                error = %record_error,
+                                "heartbeat dispatch failure memento record failed"
+                            );
+                        }
                         warn!(
                             trace_id = wake.trace.trace_id.as_str(),
                             error = %error,
@@ -324,4 +161,22 @@ impl HeartbeatLane {
         );
         Ok(result.accepted)
     }
+}
+
+async fn record_dispatch_completion(
+    dispatcher: &HeartbeatAgentDispatchStrategy,
+    wake: &HeartbeatCommandResult,
+    state: Option<HeartbeatRunState>,
+    reason_code: Option<String>,
+    metadata: std::collections::BTreeMap<String, String>,
+) -> MacacaResult<()> {
+    let Some(run_id) = wake.run_id.clone() else {
+        return Ok(());
+    };
+    let state = state.unwrap_or(HeartbeatRunState::Skipped);
+    let reason_code = reason_code.unwrap_or_else(|| "heartbeat_dispatch_noop".into());
+    let mut command =
+        HeartbeatCompleteRunCommand::new(wake.trace.clone(), run_id, state, reason_code)?;
+    command.metadata = metadata;
+    dispatcher.record_completion(command).await
 }

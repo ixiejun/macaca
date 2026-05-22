@@ -25,6 +25,8 @@ pub const HEARTBEAT_WAKE_COMMAND: &str = "heartbeat.wake";
 pub const HEARTBEAT_CANCEL_WAKE_COMMAND: &str = "heartbeat.wake.cancel";
 pub const HEARTBEAT_GET_RUN_COMMAND: &str = "heartbeat.run.get";
 pub const HEARTBEAT_LIST_RUNS_COMMAND: &str = "heartbeat.run.list";
+pub const HEARTBEAT_COMPLETE_RUN_COMMAND: &str = "heartbeat.run.complete";
+pub const HEARTBEAT_UPDATE_PROFILE_COMMAND: &str = "heartbeat.profile.update";
 pub const HEARTBEAT_HEALTH_COMMAND: &str = "heartbeat.health";
 pub const HEARTBEAT_SNAPSHOT_COMMAND: &str = "heartbeat.snapshot";
 
@@ -153,6 +155,13 @@ pub struct HeartbeatProfile {
     pub profile_id: HeartbeatProfileId,
     pub scope_identity: HeartbeatScopeIdentity,
     pub cadence: HeartbeatCadencePolicy,
+    /// Optional profile-specific cooldown override.
+    ///
+    /// `None` means the provider Strategy uses its default cooldown. This keeps
+    /// old profiles compatible while allowing per-agent profile policy to be
+    /// edited without hiding cooldown in untyped metadata.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cooldown_ms: Option<u64>,
     pub actions: Vec<HeartbeatActionDeclaration>,
     pub enabled: bool,
     pub metadata: BTreeMap<String, String>,
@@ -170,6 +179,7 @@ impl HeartbeatProfile {
             profile_id,
             scope_identity,
             cadence,
+            cooldown_ms: None,
             actions: Vec::new(),
             enabled: true,
             metadata: BTreeMap::new(),
@@ -183,6 +193,10 @@ pub struct HeartbeatProfileSummary {
     pub profile_id: HeartbeatProfileId,
     pub scope_key: String,
     pub enabled: bool,
+    /// Effective fixed interval for this profile in milliseconds.
+    pub fixed_interval_ms: u64,
+    /// Profile-specific cooldown override in milliseconds, if configured.
+    pub cooldown_ms: Option<u64>,
     pub next_eligible_at: Option<DateTime<Utc>>,
     pub last_tick_at: Option<DateTime<Utc>>,
     pub last_run_id: Option<HeartbeatRunId>,
@@ -324,6 +338,65 @@ impl HeartbeatCancelWakeCommand {
     }
 }
 
+/// Command for recording the terminal outcome of work delegated from a wake.
+///
+/// Heartbeat owns wake mementos but does not execute application agents. Runtime
+/// Host therefore reports the observed dispatch result back through this typed
+/// command after Agent Execution, task execution, or another generic runtime
+/// boundary finishes. The command accepts only terminal states and bounded
+/// metadata so run history remains replayable without storing raw prompts,
+/// provider output, manifests, package bytes, credentials, or unbounded payloads.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HeartbeatCompleteRunCommand {
+    pub trace: TraceContext,
+    pub run_id: HeartbeatRunId,
+    pub state: HeartbeatRunState,
+    pub reason_code: String,
+    pub metadata: BTreeMap<String, String>,
+}
+
+impl HeartbeatCompleteRunCommand {
+    /// Build a traced completion command for a terminal heartbeat run state.
+    pub fn new(
+        trace: TraceContext,
+        run_id: HeartbeatRunId,
+        state: HeartbeatRunState,
+        reason_code: impl Into<String>,
+    ) -> MacacaResult<Self> {
+        validate_trace(&trace, "heartbeat run completion requires trace_id")?;
+        match state {
+            HeartbeatRunState::Succeeded
+            | HeartbeatRunState::Failed
+            | HeartbeatRunState::Skipped => {}
+            _ => {
+                return Err(crate::MacacaError::Config(
+                    "heartbeat run completion requires a terminal state".into(),
+                ));
+            }
+        }
+        Ok(Self {
+            trace,
+            run_id,
+            state,
+            reason_code: non_empty(
+                reason_code.into(),
+                "heartbeat completion reason_code is required",
+            )?,
+            metadata: BTreeMap::new(),
+        })
+    }
+
+    /// Convert this typed DTO into the generic service runtime command shape.
+    pub fn into_service_command(self) -> MacacaResult<ServiceCommand> {
+        let trace = self.trace.clone();
+        Ok(ServiceCommand::with_trace(
+            ServiceCommandName::new(HEARTBEAT_COMPLETE_RUN_COMMAND),
+            serde_json::to_value(self)?,
+            trace,
+        ))
+    }
+}
+
 /// Command for reading heartbeat diagnostics.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HeartbeatQueryCommand {
@@ -332,6 +405,69 @@ pub struct HeartbeatQueryCommand {
     pub run_id: Option<HeartbeatRunId>,
     pub wake_scope_key: Option<String>,
     pub limit: Option<usize>,
+}
+
+/// Trace-bearing command for editing native Heartbeat profile policy.
+///
+/// Profile policy is Heartbeat-owned runtime state. Application manifests keep
+/// declaring which agents participate in heartbeat execution; this command only
+/// updates the native profile that gates cadence and operator metadata for a
+/// provider-neutral scope. That split prevents Web shells from becoming raw
+/// manifest editors while still giving operators auditable runtime control.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HeartbeatUpdateProfileCommand {
+    pub trace: TraceContext,
+    pub scope: AutonomyScope,
+    pub profile_id: HeartbeatProfileId,
+    pub enabled: Option<bool>,
+    pub fixed_interval_ms: Option<u64>,
+    pub cooldown_ms: Option<u64>,
+    pub metadata: BTreeMap<String, String>,
+    pub reason_code: String,
+}
+
+impl HeartbeatUpdateProfileCommand {
+    /// Build a profile update command with trace and scope validation.
+    pub fn new(
+        trace: TraceContext,
+        scope: AutonomyScope,
+        profile_id: HeartbeatProfileId,
+        reason_code: impl Into<String>,
+    ) -> MacacaResult<Self> {
+        validate_trace(&trace, "heartbeat profile update requires trace_id")?;
+        Ok(Self {
+            trace,
+            scope,
+            profile_id,
+            enabled: None,
+            fixed_interval_ms: None,
+            cooldown_ms: None,
+            metadata: BTreeMap::new(),
+            reason_code: non_empty(reason_code.into(), "heartbeat reason_code is required")?,
+        })
+    }
+
+    /// Attach an optional fixed interval update.
+    pub fn with_fixed_interval_ms(mut self, interval_ms: Option<u64>) -> MacacaResult<Self> {
+        if matches!(interval_ms, Some(0)) {
+            return Err(crate::MacacaError::Config(
+                "heartbeat interval must be positive".into(),
+            ));
+        }
+        self.fixed_interval_ms = interval_ms;
+        Ok(self)
+    }
+
+    /// Attach an optional cooldown update.
+    pub fn with_cooldown_ms(mut self, cooldown_ms: Option<u64>) -> MacacaResult<Self> {
+        if matches!(cooldown_ms, Some(0)) {
+            return Err(crate::MacacaError::Config(
+                "heartbeat cooldown must be positive".into(),
+            ));
+        }
+        self.cooldown_ms = cooldown_ms;
+        Ok(self)
+    }
 }
 
 /// Bounded run summary returned by heartbeat history and snapshots.
@@ -363,6 +499,22 @@ pub struct HeartbeatCommandResult {
     pub error: Option<AutonomyStructuredError>,
     pub trace: TraceContext,
     pub audit_id: Option<String>,
+    pub metadata: BTreeMap<String, String>,
+}
+
+/// Result returned after a native Heartbeat profile mutation.
+///
+/// The result carries a sanitized profile summary instead of the full profile
+/// declaration. It is safe for Web, CLI, trace, and audit surfaces because it
+/// contains only identifiers, cadence timing, lifecycle state, metadata, and
+/// audit correlation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HeartbeatProfileMutationResult {
+    pub accepted: bool,
+    pub profile: Option<HeartbeatProfileSummary>,
+    pub trace: TraceContext,
+    pub audit_id: Option<String>,
+    pub error: Option<AutonomyStructuredError>,
     pub metadata: BTreeMap<String, String>,
 }
 

@@ -7,10 +7,12 @@
 use async_trait::async_trait;
 use chrono::Utc;
 use macaca_proto::{
-    AutonomyServiceErrorKind, HeartbeatCancelWakeCommand, HeartbeatCommandResult,
-    HeartbeatQueryCommand, HeartbeatRunState, HeartbeatRunSummary, HeartbeatServiceSnapshot,
-    HeartbeatWakeCommand, HeartbeatWakeDisposition, MacacaResult, ServiceDescriptor, TraceContext,
-    HEARTBEAT_SERVICE_ID,
+    AutonomyAuditCorrelation, AutonomyServiceErrorKind, AutonomyStructuredError,
+    HeartbeatCadencePolicy, HeartbeatCancelWakeCommand, HeartbeatCommandResult,
+    HeartbeatCompleteRunCommand, HeartbeatProfileMutationResult, HeartbeatQueryCommand,
+    HeartbeatRunState, HeartbeatRunSummary, HeartbeatServiceSnapshot,
+    HeartbeatUpdateProfileCommand, HeartbeatWakeCommand, HeartbeatWakeDisposition, MacacaResult,
+    ServiceDescriptor, TraceContext, HEARTBEAT_SERVICE_ID,
 };
 use tracing::{info, warn};
 
@@ -223,6 +225,13 @@ impl HeartbeatService for LocalHeartbeatProvider {
         }))
     }
 
+    async fn complete_run(
+        &self,
+        command: HeartbeatCompleteRunCommand,
+    ) -> MacacaResult<HeartbeatCommandResult> {
+        self.complete_run(command)
+    }
+
     async fn get_run(
         &self,
         command: HeartbeatQueryCommand,
@@ -279,6 +288,75 @@ impl HeartbeatService for LocalHeartbeatProvider {
                 .take(command.limit.unwrap_or(100))
                 .map(|run| run.summary.clone())
                 .collect()
+        }))
+    }
+
+    async fn update_profile(
+        &self,
+        command: HeartbeatUpdateProfileCommand,
+    ) -> MacacaResult<HeartbeatProfileMutationResult> {
+        let trace = command.trace.clone();
+        Ok(self.store.write(|state| {
+            let audit_id = state.record_audit("profile.updated");
+            let Some(profile) = state.profiles.get_mut(&command.profile_id) else {
+                let error = AutonomyAuditCorrelation::from_trace(trace.clone())
+                    .ok()
+                    .map(|correlation| AutonomyStructuredError {
+                        kind: AutonomyServiceErrorKind::InvalidRequest,
+                        reason_code: "profile_not_found".into(),
+                        safe_message: "heartbeat profile was not found".into(),
+                        correlation,
+                        metadata: Default::default(),
+                    });
+                return HeartbeatProfileMutationResult {
+                    accepted: false,
+                    profile: None,
+                    trace,
+                    audit_id: Some(audit_id),
+                    error,
+                    metadata: Default::default(),
+                };
+            };
+
+            if let Some(enabled) = command.enabled {
+                profile.profile.enabled = enabled;
+            }
+            if let Some(interval_ms) = command.fixed_interval_ms {
+                profile.profile.cadence = HeartbeatCadencePolicy::FixedInterval {
+                    interval_ms,
+                    anchor: Some(Utc::now()),
+                };
+            }
+            if let Some(cooldown_ms) = command.cooldown_ms {
+                profile.profile.cooldown_ms = Some(cooldown_ms);
+            }
+            for (key, value) in command.metadata {
+                if value.is_empty() {
+                    profile.profile.metadata.remove(&key);
+                } else {
+                    profile.profile.metadata.insert(key, value);
+                }
+            }
+            profile.safe_status = "native heartbeat profile policy updated".into();
+
+            info!(
+                service_id = HEARTBEAT_SERVICE_ID,
+                provider_id = LOCAL_PROVIDER_ID,
+                profile_id = command.profile_id.as_str(),
+                audit_id = audit_id.as_str(),
+                reason_code = command.reason_code.as_str(),
+                trace_id = trace.trace_id.as_str(),
+                "local heartbeat native profile policy updated"
+            );
+
+            HeartbeatProfileMutationResult {
+                accepted: true,
+                profile: Some(profile.summary()),
+                trace,
+                audit_id: Some(audit_id),
+                error: None,
+                metadata: Default::default(),
+            }
         }))
     }
 }

@@ -421,8 +421,8 @@ mod tests {
     use async_trait::async_trait;
     use chrono::Utc;
     use macaca_proto::{
-        AutonomyScope, KernelServiceId, SchedulerJobId, SchedulerRunState, SchedulerScheduleSpec,
-        SchedulerTargetCommand, ServiceCommandName, ServiceTargetCommand,
+        AutonomyScope, KernelServiceId, SchedulerJobDefinition, SchedulerJobId, SchedulerRunState,
+        SchedulerScheduleSpec, SchedulerTargetCommand, ServiceCommandName, ServiceTargetCommand,
     };
 
     use super::*;

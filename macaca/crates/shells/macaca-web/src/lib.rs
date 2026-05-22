@@ -23,6 +23,7 @@ mod external_context_adapter;
 pub mod framework_runner;
 pub mod framework_toolkit;
 pub mod genui_routes;
+pub mod heartbeat_operations_routes;
 pub mod hook_consumer;
 pub mod loop_manager;
 mod memory_runtime;
@@ -721,6 +722,9 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
     let scheduled_agent_task_client: Arc<dyn macaca_sdk::SystemScheduledAgentTaskClient> = Arc::new(
         macaca_sdk::ServiceBackedScheduledAgentTaskClient::new(Arc::clone(&generic_service_client)),
     );
+    let heartbeat_client: Arc<dyn macaca_sdk::SystemHeartbeatClient> = Arc::new(
+        macaca_sdk::ServiceBackedHeartbeatClient::new(Arc::clone(&generic_service_client)),
+    );
     let web3_client: Arc<dyn macaca_sdk::SystemWeb3Client> = Arc::new(
         macaca_sdk::ServiceBackedWeb3Client::new(Arc::clone(&generic_service_client)),
     );
@@ -769,6 +773,7 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
             payment_client: Arc::clone(&payment_client),
             scheduler_client: Arc::clone(&scheduler_client),
             scheduled_agent_task_client: Arc::clone(&scheduled_agent_task_client),
+            heartbeat_client: Arc::clone(&heartbeat_client),
             web3_client: Arc::clone(&web3_client),
             evm_client: Arc::clone(&evm_client),
             plugin_control_client: Arc::clone(&plugin_control_client),

@@ -67,6 +67,7 @@ enum FrameworkRunnerBuildMode {
     Runtime {
         event_tx: Option<mpsc::Sender<macaca_proto::AgentExecutionEvent>>,
         execution_control: Option<RuntimeExecutionControl>,
+        max_iters: usize,
     },
     Coordinator {
         sse_tx: mpsc::Sender<Result<Event, Infallible>>,
@@ -198,9 +199,15 @@ impl TracedAgentFactory for WebTracedAgentFactory {
             FrameworkRunnerBuildMode::Runtime {
                 event_tx,
                 execution_control,
+                max_iters,
             } => {
-                self.build_runtime_agent(request, event_tx.clone(), execution_control.clone())
-                    .await
+                self.build_runtime_agent(
+                    request,
+                    event_tx.clone(),
+                    execution_control.clone(),
+                    *max_iters,
+                )
+                .await
             }
             FrameworkRunnerBuildMode::Coordinator { .. } => {
                 Err("Coordinator construction requires owned channels".into())
@@ -410,6 +417,7 @@ impl FrameworkRunner {
             build_mode: FrameworkRunnerBuildMode::Runtime {
                 event_tx,
                 execution_control: None,
+                max_iters: 25,
             },
         };
         factory.build(request).await
@@ -426,6 +434,28 @@ impl FrameworkRunner {
         state: &Arc<AppState>,
         context_snapshot: &macaca_proto::AgentContextSnapshot,
         event_tx: Option<mpsc::Sender<macaca_proto::AgentExecutionEvent>>,
+    ) -> Result<HookedAgent<ReActAgent>, String> {
+        Self::build_runtime_agent_from_context_snapshot_with_max_iters(
+            state,
+            context_snapshot,
+            event_tx,
+            25,
+        )
+        .await
+    }
+
+    /// Build a runtime agent from an Agent Context snapshot with a caller-owned
+    /// ReAct iteration budget.
+    ///
+    /// Some Agent Execution callers already have a deterministic completion
+    /// policy, such as "the expected artifact must change". Those callers can
+    /// choose a short loop budget and let the evidence gate decide completion
+    /// instead of waiting for a long natural-language wrap-up loop.
+    pub(crate) async fn build_runtime_agent_from_context_snapshot_with_max_iters(
+        state: &Arc<AppState>,
+        context_snapshot: &macaca_proto::AgentContextSnapshot,
+        event_tx: Option<mpsc::Sender<macaca_proto::AgentExecutionEvent>>,
+        max_iters: usize,
     ) -> Result<HookedAgent<ReActAgent>, String> {
         let task_id = context_snapshot
             .task_id
@@ -457,6 +487,7 @@ impl FrameworkRunner {
             build_mode: FrameworkRunnerBuildMode::Runtime {
                 event_tx,
                 execution_control: None,
+                max_iters: max_iters.max(1),
             },
         };
         factory.build(request).await
@@ -474,6 +505,25 @@ impl FrameworkRunner {
         context_snapshot: &macaca_proto::AgentContextSnapshot,
         event_tx: Option<mpsc::Sender<macaca_proto::AgentExecutionEvent>>,
         execution_control: RuntimeExecutionControl,
+    ) -> Result<HookedAgent<ReActAgent>, String> {
+        Self::build_runtime_agent_from_context_snapshot_with_execution_control_and_max_iters(
+            state,
+            context_snapshot,
+            event_tx,
+            execution_control,
+            25,
+        )
+        .await
+    }
+
+    /// Build a runtime agent with execution-control middleware and a
+    /// caller-owned ReAct iteration budget.
+    pub(crate) async fn build_runtime_agent_from_context_snapshot_with_execution_control_and_max_iters(
+        state: &Arc<AppState>,
+        context_snapshot: &macaca_proto::AgentContextSnapshot,
+        event_tx: Option<mpsc::Sender<macaca_proto::AgentExecutionEvent>>,
+        execution_control: RuntimeExecutionControl,
+        max_iters: usize,
     ) -> Result<HookedAgent<ReActAgent>, String> {
         let task_id = context_snapshot
             .task_id
@@ -505,6 +555,7 @@ impl FrameworkRunner {
             build_mode: FrameworkRunnerBuildMode::Runtime {
                 event_tx,
                 execution_control: Some(execution_control),
+                max_iters: max_iters.max(1),
             },
         };
         factory.build(request).await
@@ -1526,6 +1577,7 @@ impl WebTracedAgentFactory {
         &self,
         request: AgentBuildRequest,
         mode: StandardAgentMode,
+        max_iters: usize,
     ) -> Result<HookedAgent<ReActAgent>, String> {
         let PreparedAgentParts {
             selection,
@@ -1590,7 +1642,7 @@ impl WebTracedAgentFactory {
             &request,
             &selection,
             toolkit,
-            25,
+            max_iters.max(1),
             routing_agent_id,
             skill_capability_catalog,
             mcp_capability_catalog,
@@ -1690,7 +1742,7 @@ impl WebTracedAgentFactory {
         request: AgentBuildRequest,
         executor: Arc<macaca_kernel::executor::ApplicationExecutor>,
     ) -> Result<HookedAgent<ReActAgent>, String> {
-        self.build_standard_agent(request, StandardAgentMode::Executor { executor })
+        self.build_standard_agent(request, StandardAgentMode::Executor { executor }, 25)
             .await
     }
 
@@ -1699,6 +1751,7 @@ impl WebTracedAgentFactory {
         request: AgentBuildRequest,
         event_tx: Option<mpsc::Sender<macaca_proto::AgentExecutionEvent>>,
         execution_control: Option<RuntimeExecutionControl>,
+        max_iters: usize,
     ) -> Result<HookedAgent<ReActAgent>, String> {
         self.build_standard_agent(
             request,
@@ -1706,6 +1759,7 @@ impl WebTracedAgentFactory {
                 event_tx,
                 execution_control,
             },
+            max_iters.max(1),
         )
         .await
     }

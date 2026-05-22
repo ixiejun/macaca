@@ -10,8 +10,8 @@ use macaca_proto::MacacaResult;
 
 use crate::state::AppState;
 use crate::{
-    app_ui_routes, chat_orchestrator, genui_routes, loop_manager, metrics, plugin_routes, routes,
-    session,
+    app_ui_routes, chat_orchestrator, genui_routes, heartbeat_operations_routes, loop_manager,
+    metrics, plugin_routes, routes, session,
 };
 
 /// Canonical builder for starting the web server.
@@ -162,6 +162,14 @@ impl WebRuntimeFacade {
             .route(
                 "/api/apps/{app_id}/autonomy/scheduler/runs",
                 get(routes::list_autonomy_scheduler_runs),
+            )
+            .route(
+                "/api/apps/{app_id}/autonomy/heartbeat/operations",
+                get(heartbeat_operations_routes::get_heartbeat_operations),
+            )
+            .route(
+                "/api/apps/{app_id}/autonomy/heartbeat/profiles/{profile_id}",
+                axum::routing::patch(heartbeat_operations_routes::update_heartbeat_profile),
             )
             .route(
                 "/api/apps/{app_id}/autonomy/scheduled-agent-tasks",

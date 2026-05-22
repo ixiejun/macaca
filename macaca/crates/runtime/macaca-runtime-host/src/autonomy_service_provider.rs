@@ -14,15 +14,17 @@ use macaca_heartbeat::{HeartbeatService, LocalHeartbeatProvider, UnavailableHear
 use macaca_kernel::SystemService;
 use macaca_proto::{
     CancelScheduledAgentTaskCommand, CreateScheduledAgentTaskCommand, HeartbeatCancelWakeCommand,
-    HeartbeatQueryCommand, HeartbeatWakeCommand, KernelServiceId, MacacaError, MacacaResult,
+    HeartbeatCompleteRunCommand, HeartbeatQueryCommand, HeartbeatUpdateProfileCommand,
+    HeartbeatWakeCommand, KernelServiceId, MacacaError, MacacaResult,
     RecordScheduledAgentTaskResultCommand, ResolveScheduledAgentTaskPayloadCommand,
     ScheduledAgentTaskQueryCommand, SchedulerDeleteJobCommand, SchedulerGetJobCommand,
     SchedulerJobCommand, SchedulerLifecycleJobCommand, SchedulerListJobsCommand,
     SchedulerQueryCommand, SchedulerRegisterJobCommand, SchedulerUpdateJobCommand,
     ServiceCallResult, ServiceCommand, ServiceDescriptor, ServiceError, ServiceHealth,
-    ServiceResult, TraceContext, HEARTBEAT_CANCEL_WAKE_COMMAND, HEARTBEAT_GET_RUN_COMMAND,
-    HEARTBEAT_HEALTH_COMMAND, HEARTBEAT_LIST_RUNS_COMMAND, HEARTBEAT_SERVICE_ID,
-    HEARTBEAT_SNAPSHOT_COMMAND, HEARTBEAT_WAKE_COMMAND, SCHEDULED_AGENT_TASK_CANCEL_COMMAND,
+    ServiceResult, TraceContext, HEARTBEAT_CANCEL_WAKE_COMMAND, HEARTBEAT_COMPLETE_RUN_COMMAND,
+    HEARTBEAT_GET_RUN_COMMAND, HEARTBEAT_HEALTH_COMMAND, HEARTBEAT_LIST_RUNS_COMMAND,
+    HEARTBEAT_SERVICE_ID, HEARTBEAT_SNAPSHOT_COMMAND, HEARTBEAT_UPDATE_PROFILE_COMMAND,
+    HEARTBEAT_WAKE_COMMAND, SCHEDULED_AGENT_TASK_CANCEL_COMMAND,
     SCHEDULED_AGENT_TASK_CREATE_COMMAND, SCHEDULED_AGENT_TASK_GET_COMMAND,
     SCHEDULED_AGENT_TASK_HEALTH_COMMAND, SCHEDULED_AGENT_TASK_LIST_COMMAND,
     SCHEDULED_AGENT_TASK_RECORD_RESULT_COMMAND, SCHEDULED_AGENT_TASK_RESOLVE_PAYLOAD_COMMAND,
@@ -443,6 +445,16 @@ impl SystemService for HeartbeatSystemServiceProvider {
                     trace,
                 )
             }
+            HEARTBEAT_COMPLETE_RUN_COMMAND => {
+                let typed: HeartbeatCompleteRunCommand = decode(command.payload)?;
+                service_result(
+                    self.provider
+                        .complete_run(typed)
+                        .await
+                        .map_err(service_adapter_error)?,
+                    trace,
+                )
+            }
             HEARTBEAT_GET_RUN_COMMAND => {
                 let typed: HeartbeatQueryCommand = decode(command.payload)?;
                 service_result(
@@ -458,6 +470,16 @@ impl SystemService for HeartbeatSystemServiceProvider {
                 service_result(
                     self.provider
                         .list_runs(typed)
+                        .await
+                        .map_err(service_adapter_error)?,
+                    trace,
+                )
+            }
+            HEARTBEAT_UPDATE_PROFILE_COMMAND => {
+                let typed: HeartbeatUpdateProfileCommand = decode(command.payload)?;
+                service_result(
+                    self.provider
+                        .update_profile(typed)
                         .await
                         .map_err(service_adapter_error)?,
                     trace,

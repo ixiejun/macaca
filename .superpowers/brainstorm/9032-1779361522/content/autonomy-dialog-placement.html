@@ -1,0 +1,43 @@
+<h2>Revised placement: Autonomy opens in an app-level dialog</h2>
+<p class="subtitle">The schedule manager should not live in the session tablist or the persistent right rail. It should open from an application-level action button.</p>
+
+<div class="cards">
+  <div class="card selected" data-choice="dialog" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">Recommended dialog model</div>
+        <div class="mockup-body">
+          <div style="display:grid;grid-template-columns:170px 1fr 300px;gap:12px;min-height:240px">
+            <div class="mock-sidebar">Applications<br><br>Sessions</div>
+            <div class="mock-content">
+              <div class="mock-nav">MAIN THREAD | AGENT A | AGENT B</div>
+              <div class="placeholder" style="margin-top:16px">Current session conversation and trace stream</div>
+              <div class="placeholder" style="height:55px;margin-top:12px">Input area</div>
+            </div>
+            <div class="mock-sidebar">Agents panel<br><br>Task status<br>Trace health</div>
+          </div>
+          <div style="position:relative;margin-top:-205px;margin-left:210px;width:72%;min-height:190px;border:1px solid #19c37d;border-radius:10px;background:rgba(0,0,0,.96);box-shadow:0 24px 80px rgba(0,0,0,.7);padding:16px">
+            <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(25,195,125,.35);padding-bottom:10px">
+              <div>
+                <div style="font-size:10px;color:#19c37d;letter-spacing:.16em">APP OPERATIONS</div>
+                <strong style="color:#7bf1a8">Autonomy schedules</strong>
+              </div>
+              <button class="mock-button">Close</button>
+            </div>
+            <div class="placeholder" style="height:46px;margin-top:12px">Schedule summary</div>
+            <div class="placeholder" style="height:58px;margin-top:10px">Schedule list and CRUD actions</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>App-level button + dialog</h3>
+      <p>Keep the normal right panel unchanged. Add a generic application operation button, then show schedule management in a modal dialog detached from sessions and agents.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Implementation shape</h3>
+  <p>Add an app-level button near the page header, for example <strong>APP OPERATIONS</strong> or <strong>AUTONOMY</strong>. Clicking it opens a modal dialog that contains the existing schedule manager. This keeps Autonomy visible as application capability, but not permanently competing with agents/tasks.</p>
+</div>

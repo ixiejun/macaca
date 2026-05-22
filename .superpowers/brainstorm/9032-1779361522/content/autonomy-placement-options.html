@@ -1,0 +1,77 @@
+<h2>Where should application-level Autonomy live?</h2>
+<p class="subtitle">The schedule manager is an application-level OS capability. It should not visually belong to a session, coordinator, or agent execution trace.</p>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">Recommended: App-level Operations rail</div>
+        <div class="mockup-body">
+          <div style="display:grid;grid-template-columns:170px 1fr 260px;gap:12px;min-height:220px">
+            <div class="mock-sidebar">Applications<br><br>Sessions</div>
+            <div class="mock-content">
+              <div class="mock-nav">Chat | App UI | Context</div>
+              <div class="placeholder" style="margin-top:16px">Current session conversation</div>
+              <div class="placeholder" style="height:55px;margin-top:12px">Input area</div>
+            </div>
+            <div class="mock-sidebar" style="border-color:#19c37d;color:#19c37d">
+              APP OPERATIONS<br><br>
+              Autonomy<br>
+              Schedules<br>
+              Heartbeats<br>
+              Health
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A. App-level Operations rail</h3>
+      <p>Keep chat/session tabs pure, and place Autonomy in a persistent application operations area. Best semantic boundary.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">App header navigation</div>
+        <div class="mockup-body">
+          <div class="mock-nav" style="color:#19c37d">Overview | Sessions | Autonomy | Events | Settings</div>
+          <div style="display:grid;grid-template-columns:190px 1fr;gap:12px;margin-top:14px;min-height:210px">
+            <div class="mock-sidebar">Session list</div>
+            <div class="mock-content">
+              <div class="placeholder">Autonomy page replaces session content when selected</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B. App header nav</h3>
+      <p>Make Autonomy a sibling of Sessions at the top application level. Clear and simple, but a larger page-shell change.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">Dedicated route</div>
+        <div class="mockup-body">
+          <div class="mock-nav">Application: macaca://app</div>
+          <div class="placeholder" style="margin-top:14px">/apps/{appId}/autonomy</div>
+          <div class="placeholder" style="height:90px;margin-top:12px">Schedule Manager</div>
+          <div class="placeholder" style="height:60px;margin-top:12px">Run history and health signals</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C. Dedicated Autonomy route</h3>
+      <p>Strong separation and future-proofing, but more navigation and routing work for a first UI iteration.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Recommendation</h3>
+  <p>Pick A now: move the schedule manager out of session/agent tabs into an application-level Operations rail or panel. It preserves microkernel semantics, avoids implying session ownership, and keeps the implementation smaller than creating a full app shell route.</p>
+</div>

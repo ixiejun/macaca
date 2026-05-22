@@ -9,11 +9,12 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use macaca_proto::{
-    HeartbeatCancelWakeCommand, HeartbeatCommandResult, HeartbeatQueryCommand, HeartbeatRunSummary,
-    HeartbeatServiceSnapshot, HeartbeatWakeCommand, MacacaError, MacacaResult, TraceContext,
+    HeartbeatCancelWakeCommand, HeartbeatCommandResult, HeartbeatProfileMutationResult,
+    HeartbeatQueryCommand, HeartbeatRunSummary, HeartbeatServiceSnapshot,
+    HeartbeatUpdateProfileCommand, HeartbeatWakeCommand, MacacaError, MacacaResult, TraceContext,
     HEARTBEAT_CANCEL_WAKE_COMMAND, HEARTBEAT_GET_RUN_COMMAND, HEARTBEAT_HEALTH_COMMAND,
     HEARTBEAT_LIST_RUNS_COMMAND, HEARTBEAT_SERVICE_ID, HEARTBEAT_SNAPSHOT_COMMAND,
-    HEARTBEAT_WAKE_COMMAND,
+    HEARTBEAT_UPDATE_PROFILE_COMMAND, HEARTBEAT_WAKE_COMMAND,
 };
 use tracing::{info, warn};
 
@@ -40,6 +41,10 @@ pub trait SystemHeartbeatClient: Send + Sync {
         &self,
         command: HeartbeatQueryCommand,
     ) -> MacacaResult<HeartbeatServiceSnapshot>;
+    async fn update_profile(
+        &self,
+        command: HeartbeatUpdateProfileCommand,
+    ) -> MacacaResult<HeartbeatProfileMutationResult>;
 }
 
 /// Null-object Heartbeat client used when `service.heartbeat` is absent.
@@ -92,6 +97,18 @@ impl SystemHeartbeatClient for UnavailableSystemHeartbeatClient {
         Ok(HeartbeatServiceSnapshot::unavailable(
             "Heartbeat service is unavailable",
         ))
+    }
+
+    async fn update_profile(
+        &self,
+        command: HeartbeatUpdateProfileCommand,
+    ) -> MacacaResult<HeartbeatProfileMutationResult> {
+        warn!(
+            trace_id = %command.trace.trace_id,
+            profile_id = %command.profile_id.as_str(),
+            "sdk heartbeat client unavailable for update_profile"
+        );
+        Err(unavailable_error())
     }
 }
 
@@ -176,6 +193,19 @@ impl SystemHeartbeatClient for ServiceBackedHeartbeatClient {
         call(
             &self.service,
             HEARTBEAT_SNAPSHOT_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn update_profile(
+        &self,
+        command: HeartbeatUpdateProfileCommand,
+    ) -> MacacaResult<HeartbeatProfileMutationResult> {
+        call(
+            &self.service,
+            HEARTBEAT_UPDATE_PROFILE_COMMAND,
             command.trace.clone(),
             command,
         )

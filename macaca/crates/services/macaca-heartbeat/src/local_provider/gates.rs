@@ -11,7 +11,7 @@ use macaca_proto::{HeartbeatGateDecision, HeartbeatGateKind, HeartbeatWakeComman
 
 use super::{
     memento::LocalHeartbeatState, DEFAULT_ACTIVE_END_HOUR_UTC, DEFAULT_ACTIVE_START_HOUR_UTC,
-    DEFAULT_COOLDOWN_MS,
+    DEFAULT_COOLDOWN_MS, PROFILE_COOLDOWN_MS_KEY,
 };
 
 const RESOURCE_UNITS_KEY: &str = "resource_units";
@@ -48,10 +48,16 @@ impl DefaultHeartbeatGateStrategy {
     ) -> Vec<HeartbeatGateDecision> {
         let now = Utc::now();
         let active_hours_allowed = self.in_active_hours(now);
+        let cooldown_ms = command
+            .metadata
+            .get(PROFILE_COOLDOWN_MS_KEY)
+            .and_then(|value| value.parse::<i64>().ok())
+            .filter(|value| *value > 0)
+            .unwrap_or(self.cooldown_ms);
         let cooldown_allowed = state
             .last_accepted_by_scope
             .get(&command.wake_scope_key)
-            .map(|last| now.signed_duration_since(*last).num_milliseconds() >= self.cooldown_ms)
+            .map(|last| now.signed_duration_since(*last).num_milliseconds() >= cooldown_ms)
             .unwrap_or(true);
         let busy_allowed = !state.pending_by_scope.contains_key(&command.wake_scope_key);
         let resource_units = metadata_units(&command.metadata, RESOURCE_UNITS_KEY);
@@ -75,7 +81,7 @@ impl DefaultHeartbeatGateStrategy {
                     state
                         .last_accepted_by_scope
                         .get(&command.wake_scope_key)
-                        .map(|last| *last + Duration::milliseconds(self.cooldown_ms))
+                        .map(|last| *last + Duration::milliseconds(cooldown_ms))
                 },
             ),
             gate(HeartbeatGateKind::Busy, busy_allowed, "busy", None),

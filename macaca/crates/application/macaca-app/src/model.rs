@@ -146,10 +146,47 @@ pub struct AppHeartbeatAgentConfig {
     /// Provider-neutral profile selector recorded in sanitized dispatch views.
     #[serde(default = "default_profile_id")]
     pub profile_id: String,
+    /// Optional per-agent cadence policy.
+    ///
+    /// This policy is declarative only. Runtime-host translates it into a
+    /// Heartbeat-owned native profile, while service.heartbeat remains the
+    /// owner of cadence evaluation, gate decisions, and run mementos.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cadence: Option<AppHeartbeatCadenceConfig>,
+    /// Optional per-agent gate policy.
+    ///
+    /// The first gate exposed to manifests is cooldown because it determines
+    /// how often an accepted wake may run after the fixed cadence becomes due.
+    /// Missing values preserve the provider default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gates: Option<AppHeartbeatGateConfig>,
     /// Bounded declaration metadata. Projection code sanitizes values before
     /// they cross service boundaries.
     #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
     pub metadata: std::collections::BTreeMap<String, String>,
+}
+
+/// Per-agent heartbeat cadence policy declared by an application.
+///
+/// The shape is intentionally small and provider-neutral. Future cadence
+/// variants can extend this object without making Scheduler own heartbeat
+/// timing or forcing Web shells to understand raw manifest semantics.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AppHeartbeatCadenceConfig {
+    /// Fixed interval in seconds for this agent's native Heartbeat profile.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fixed_interval_secs: Option<u64>,
+}
+
+/// Per-agent heartbeat gate policy declared by an application.
+///
+/// Gates are hints for Heartbeat-owned provider policy. They are not direct
+/// execution instructions and must remain generic across all application types.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AppHeartbeatGateConfig {
+    /// Optional cooldown in seconds after an accepted wake for this agent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cooldown_secs: Option<u64>,
 }
 
 fn default_true() -> bool {

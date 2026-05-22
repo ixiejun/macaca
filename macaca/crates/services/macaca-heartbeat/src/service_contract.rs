@@ -8,13 +8,14 @@
 use async_trait::async_trait;
 use macaca_proto::{
     AutonomyStructuredError, CapabilityId, CleanupPolicy, HeartbeatCancelWakeCommand,
-    HeartbeatCommandResult, HeartbeatQueryCommand, HeartbeatRunId, HeartbeatRunState,
-    HeartbeatRunSummary, HeartbeatServiceSnapshot, HeartbeatWakeCommand, HeartbeatWakeDisposition,
-    KernelServiceId, MacacaResult, ServiceCapability, ServiceDescriptor, ServiceHealth,
-    ServiceLifecycleState, ServiceScope, ServiceType, TraceContext, TraceSchemaRef,
-    HEARTBEAT_CANCEL_WAKE_COMMAND, HEARTBEAT_GET_RUN_COMMAND, HEARTBEAT_HEALTH_COMMAND,
-    HEARTBEAT_LIST_RUNS_COMMAND, HEARTBEAT_SERVICE_ID, HEARTBEAT_SNAPSHOT_COMMAND,
-    HEARTBEAT_WAKE_COMMAND,
+    HeartbeatCommandResult, HeartbeatCompleteRunCommand, HeartbeatProfileMutationResult,
+    HeartbeatQueryCommand, HeartbeatRunId, HeartbeatRunState, HeartbeatRunSummary,
+    HeartbeatServiceSnapshot, HeartbeatUpdateProfileCommand, HeartbeatWakeCommand,
+    HeartbeatWakeDisposition, KernelServiceId, MacacaResult, ServiceCapability, ServiceDescriptor,
+    ServiceHealth, ServiceLifecycleState, ServiceScope, ServiceType, TraceContext, TraceSchemaRef,
+    HEARTBEAT_CANCEL_WAKE_COMMAND, HEARTBEAT_COMPLETE_RUN_COMMAND, HEARTBEAT_GET_RUN_COMMAND,
+    HEARTBEAT_HEALTH_COMMAND, HEARTBEAT_LIST_RUNS_COMMAND, HEARTBEAT_SERVICE_ID,
+    HEARTBEAT_SNAPSHOT_COMMAND, HEARTBEAT_UPDATE_PROFILE_COMMAND, HEARTBEAT_WAKE_COMMAND,
 };
 use tracing::{info, warn};
 
@@ -47,6 +48,17 @@ pub trait HeartbeatService: Send + Sync {
         command: HeartbeatCancelWakeCommand,
     ) -> MacacaResult<HeartbeatCommandResult>;
 
+    /// Record the terminal outcome of runtime work delegated from a wake.
+    ///
+    /// Providers must treat this as memento state only. Agent execution,
+    /// planning, delivery, and product-specific behavior stay behind their own
+    /// services; Heartbeat only records the sanitized state transition that lets
+    /// operators audit whether a wake's delegated work actually finished.
+    async fn complete_run(
+        &self,
+        command: HeartbeatCompleteRunCommand,
+    ) -> MacacaResult<HeartbeatCommandResult>;
+
     /// Read one heartbeat run if the provider supports lookup.
     async fn get_run(&self, command: HeartbeatQueryCommand)
         -> MacacaResult<HeartbeatCommandResult>;
@@ -56,6 +68,16 @@ pub trait HeartbeatService: Send + Sync {
         &self,
         command: HeartbeatQueryCommand,
     ) -> MacacaResult<Vec<HeartbeatRunSummary>>;
+
+    /// Update native Heartbeat profile policy.
+    ///
+    /// Implementations must treat this as runtime profile state, not as an
+    /// application manifest mutation. Profile edits are auditable operator
+    /// policy changes for cadence and visibility only.
+    async fn update_profile(
+        &self,
+        command: HeartbeatUpdateProfileCommand,
+    ) -> MacacaResult<HeartbeatProfileMutationResult>;
 }
 
 /// Fail-closed Heartbeat provider used when no concrete provider is installed.
@@ -110,6 +132,31 @@ impl UnavailableHeartbeatProvider {
             metadata: Default::default(),
         })
     }
+
+    fn unavailable_profile_result(
+        &self,
+        command: HeartbeatUpdateProfileCommand,
+    ) -> MacacaResult<HeartbeatProfileMutationResult> {
+        warn!(
+            service_id = HEARTBEAT_SERVICE_ID,
+            provider_id = self.provider_id.as_str(),
+            command = HEARTBEAT_UPDATE_PROFILE_COMMAND,
+            profile_id = command.profile_id.as_str(),
+            trace_id = command.trace.trace_id.as_str(),
+            "heartbeat profile update rejected because no heartbeat provider is available"
+        );
+        Ok(HeartbeatProfileMutationResult {
+            accepted: false,
+            profile: None,
+            trace: command.trace.clone(),
+            audit_id: None,
+            error: Some(AutonomyStructuredError::unavailable(
+                command.trace,
+                self.reason.clone(),
+            )?),
+            metadata: Default::default(),
+        })
+    }
 }
 
 impl Default for UnavailableHeartbeatProvider {
@@ -144,6 +191,14 @@ impl HeartbeatService for UnavailableHeartbeatProvider {
             ServiceCapability::new(
                 CapabilityId::new(HEARTBEAT_HEALTH_COMMAND),
                 "Read heartbeat health",
+            ),
+            ServiceCapability::new(
+                CapabilityId::new(HEARTBEAT_UPDATE_PROFILE_COMMAND),
+                "Update native heartbeat profile policy",
+            ),
+            ServiceCapability::new(
+                CapabilityId::new(HEARTBEAT_COMPLETE_RUN_COMMAND),
+                "Record sanitized heartbeat dispatch completion",
             ),
         ];
         descriptor
@@ -187,6 +242,17 @@ impl HeartbeatService for UnavailableHeartbeatProvider {
         )
     }
 
+    async fn complete_run(
+        &self,
+        command: HeartbeatCompleteRunCommand,
+    ) -> MacacaResult<HeartbeatCommandResult> {
+        self.unavailable_result(
+            HEARTBEAT_COMPLETE_RUN_COMMAND,
+            command.trace,
+            Some(command.run_id),
+        )
+    }
+
     async fn get_run(
         &self,
         command: HeartbeatQueryCommand,
@@ -206,5 +272,12 @@ impl HeartbeatService for UnavailableHeartbeatProvider {
             "heartbeat run history requested but no heartbeat provider is available"
         );
         Ok(Vec::new())
+    }
+
+    async fn update_profile(
+        &self,
+        command: HeartbeatUpdateProfileCommand,
+    ) -> MacacaResult<HeartbeatProfileMutationResult> {
+        self.unavailable_profile_result(command)
     }
 }

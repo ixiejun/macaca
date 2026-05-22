@@ -300,7 +300,20 @@ pub struct ApplicationHeartbeatAgentView {
     pub application_id: ApplicationId,
     pub agent_name: String,
     pub enabled: bool,
+    /// Manifest-level profile selector kept for compatibility and traceability.
     pub profile_id: String,
+    /// Concrete native Heartbeat profile id registered for this declaration.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub native_profile_id: String,
+    /// Concrete wake scope key used by service.heartbeat for this agent.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub wake_scope_key: String,
+    /// Optional manifest-declared fixed interval for this agent in seconds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fixed_interval_secs: Option<u64>,
+    /// Optional manifest-declared cooldown for this agent in seconds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cooldown_secs: Option<u64>,
     pub metadata: BTreeMap<String, String>,
     pub diagnostics: Vec<String>,
 }
