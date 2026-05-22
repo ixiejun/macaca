@@ -16,6 +16,7 @@
 
 pub mod adapter;
 pub mod agent_skill;
+pub mod alias;
 pub mod catalog;
 pub mod definition;
 pub mod discovery;
@@ -37,6 +38,7 @@ pub mod tool;
 
 // Executable skills (YAML).
 pub use adapter::{LocalSkillRuntimeProxy, SkillRuntimeProxy, SkillToolAdapter};
+pub use alias::*;
 pub use definition::{SkillDefinition, SkillEntryPoint};
 pub use facade::{
     load_executable_skill_definitions, ExecutableSkillToolSet, SkillCatalogSourceView,

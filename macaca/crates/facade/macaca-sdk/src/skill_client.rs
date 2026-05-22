@@ -5,13 +5,16 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use macaca_proto::{MacacaError, MacacaResult};
 use macaca_skill::{
-    SkillCleanupCommand, SkillCurationDryRunCommand, SkillCurationDryRunResult,
-    SkillExecutableLoadCommand, SkillExecutableLoadResult, SkillGovernanceRecordUsageCommand,
-    SkillGovernanceRecordUsageResult, SkillGovernanceSnapshotCommand,
-    SkillGovernanceSnapshotResult, SkillServiceSnapshot, SkillServiceSnapshotCommand,
-    SkillSnapshotServiceCommand, SkillSnapshotServiceResult, SkillStatusCommand, SkillStatusResult,
-    SkillToolCatalogCommand, SkillToolCatalogResult, SkillToolInvokeCommand, SkillToolInvokeResult,
-    SKILL_CLEANUP_COMMAND, SKILL_CURATION_DRY_RUN_COMMAND, SKILL_EXECUTABLE_LOAD_COMMAND,
+    SkillAliasResolveCommand, SkillAliasResolveResult, SkillAliasSnapshotCommand,
+    SkillAliasSnapshotResult, SkillAliasUpsertCommand, SkillAliasUpsertResult, SkillCleanupCommand,
+    SkillCurationDryRunCommand, SkillCurationDryRunResult, SkillExecutableLoadCommand,
+    SkillExecutableLoadResult, SkillGovernanceRecordUsageCommand, SkillGovernanceRecordUsageResult,
+    SkillGovernanceSnapshotCommand, SkillGovernanceSnapshotResult, SkillServiceSnapshot,
+    SkillServiceSnapshotCommand, SkillSnapshotServiceCommand, SkillSnapshotServiceResult,
+    SkillStatusCommand, SkillStatusResult, SkillToolCatalogCommand, SkillToolCatalogResult,
+    SkillToolInvokeCommand, SkillToolInvokeResult, SKILL_ALIAS_RESOLVE_COMMAND,
+    SKILL_ALIAS_SNAPSHOT_COMMAND, SKILL_ALIAS_UPSERT_COMMAND, SKILL_CLEANUP_COMMAND,
+    SKILL_CURATION_DRY_RUN_COMMAND, SKILL_EXECUTABLE_LOAD_COMMAND,
     SKILL_GOVERNANCE_RECORD_USAGE_COMMAND, SKILL_GOVERNANCE_SNAPSHOT_COMMAND, SKILL_SERVICE_ID,
     SKILL_SERVICE_SNAPSHOT_COMMAND, SKILL_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND,
     SKILL_TOOL_CATALOG_COMMAND, SKILL_TOOL_INVOKE_COMMAND,
@@ -56,6 +59,18 @@ pub trait SystemSkillClient: Send + Sync {
         &self,
         command: SkillCurationDryRunCommand,
     ) -> MacacaResult<SkillCurationDryRunResult>;
+    async fn alias_upsert(
+        &self,
+        command: SkillAliasUpsertCommand,
+    ) -> MacacaResult<SkillAliasUpsertResult>;
+    async fn alias_resolve(
+        &self,
+        command: SkillAliasResolveCommand,
+    ) -> MacacaResult<SkillAliasResolveResult>;
+    async fn alias_snapshot(
+        &self,
+        command: SkillAliasSnapshotCommand,
+    ) -> MacacaResult<SkillAliasSnapshotResult>;
     async fn cleanup(&self, command: SkillCleanupCommand) -> MacacaResult<serde_json::Value>;
 }
 
@@ -160,6 +175,47 @@ impl SystemSkillClient for UnavailableSystemSkillClient {
             recommendations: Vec::new(),
             semantic_analysis_status: "unavailable: Skill service is unavailable".into(),
             mutated: false,
+            captured_at: chrono::Utc::now(),
+        })
+    }
+
+    async fn alias_upsert(
+        &self,
+        command: SkillAliasUpsertCommand,
+    ) -> MacacaResult<SkillAliasUpsertResult> {
+        warn!(
+            trace_id = %command.trace.trace_id,
+            source_skill_id = %command.record.source_skill_id,
+            "sdk skill client unavailable for alias upsert"
+        );
+        Err(MacacaError::Config("Skill service is unavailable".into()))
+    }
+
+    async fn alias_resolve(
+        &self,
+        command: SkillAliasResolveCommand,
+    ) -> MacacaResult<SkillAliasResolveResult> {
+        info!(
+            trace_id = %command.trace.trace_id,
+            skill_id = %command.skill_id,
+            "sdk skill client returning unresolved alias"
+        );
+        Ok(SkillAliasResolveResult::unresolved(
+            &command,
+            chrono::Utc::now(),
+        ))
+    }
+
+    async fn alias_snapshot(
+        &self,
+        command: SkillAliasSnapshotCommand,
+    ) -> MacacaResult<SkillAliasSnapshotResult> {
+        info!(
+            trace_id = %command.trace.trace_id,
+            "sdk skill client returning empty alias snapshot"
+        );
+        Ok(SkillAliasSnapshotResult {
+            aliases: Vec::new(),
             captured_at: chrono::Utc::now(),
         })
     }
@@ -293,6 +349,45 @@ impl SystemSkillClient for ServiceBackedSkillClient {
         call(
             &self.service,
             SKILL_CURATION_DRY_RUN_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn alias_upsert(
+        &self,
+        command: SkillAliasUpsertCommand,
+    ) -> MacacaResult<SkillAliasUpsertResult> {
+        call(
+            &self.service,
+            SKILL_ALIAS_UPSERT_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn alias_resolve(
+        &self,
+        command: SkillAliasResolveCommand,
+    ) -> MacacaResult<SkillAliasResolveResult> {
+        call(
+            &self.service,
+            SKILL_ALIAS_RESOLVE_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn alias_snapshot(
+        &self,
+        command: SkillAliasSnapshotCommand,
+    ) -> MacacaResult<SkillAliasSnapshotResult> {
+        call(
+            &self.service,
+            SKILL_ALIAS_SNAPSHOT_COMMAND,
             command.trace.clone(),
             command,
         )

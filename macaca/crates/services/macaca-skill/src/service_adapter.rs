@@ -43,6 +43,10 @@ pub fn skill_service_descriptor() -> ServiceDescriptor {
             CapabilityId::new("capability.skill.curation"),
             "Produces non-destructive skill curation recommendations.",
         ),
+        ServiceCapability::new(
+            CapabilityId::new("capability.skill.alias"),
+            "Resolves skill identity aliases without mutating scheduler, task, or skill files.",
+        ),
     ];
     descriptor.health = ServiceHealth::Healthy;
     descriptor.supported_scopes = vec![ServiceScope::Global, ServiceScope::Application("*".into())];
@@ -53,6 +57,7 @@ pub fn skill_service_descriptor() -> ServiceDescriptor {
         "skill.status".into(),
         "skill.governance".into(),
         "skill.curation".into(),
+        "skill.alias".into(),
     ];
     descriptor.cleanup_policy = CleanupPolicy::OnStop;
     descriptor
@@ -66,12 +71,15 @@ mod tests {
     fn skill_descriptor_exports_contract_shape() {
         let descriptor = skill_service_descriptor();
         assert_eq!(descriptor.service_type.as_str(), "skill");
-        assert_eq!(descriptor.capabilities.len(), 6);
+        assert_eq!(descriptor.capabilities.len(), 7);
         assert!(descriptor
             .required_permissions
             .contains(&"skill.invoke".into()));
         assert!(descriptor
             .required_permissions
             .contains(&"skill.governance".into()));
+        assert!(descriptor
+            .required_permissions
+            .contains(&"skill.alias".into()));
     }
 }
