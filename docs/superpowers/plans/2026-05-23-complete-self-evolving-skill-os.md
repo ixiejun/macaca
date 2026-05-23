@@ -61,14 +61,21 @@ Follow the OpenSpec `tasks.md` sequence:
 
 ### Task 3: Completion Gates Per Slice
 
-Run the relevant subset for each slice:
+Run the relevant subset for each slice. These gates are intentionally modeled as
+release checklist evidence rather than product logic, so runtime services remain
+generic and shells continue to act as thin adapters.
 
 ```bash
 openspec validate complete-self-evolving-skill-os --strict
 cargo test -p macaca-runtime-host skill_service -- --nocapture
 cargo check -p macaca-skill -p macaca-sdk -p macaca-runtime-host
+npm run lint
+npm run build
 git diff --check
 ```
 
-Also run GitNexus `detect_changes` before commits and record any HIGH/CRITICAL
-impact warnings before proceeding.
+Use the frontend lint/build commands only when the slice touches Web or frontend
+surfaces. Use the most focused cargo test target that proves the touched
+service, provider, or boundary, then run the shared cargo check before commit.
+Also run GitNexus `detect_changes` with staged scope before each commit and
+record any HIGH/CRITICAL impact warnings before proceeding.

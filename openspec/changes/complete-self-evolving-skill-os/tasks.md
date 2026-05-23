@@ -266,7 +266,7 @@
   payloads do not include raw prompts, secrets, provider payloads, manifests,
   package bytes, credentials, raw signatures, full skill bodies, or unbounded
   outputs.
-- [ ] 15.8 Add `git diff --check`, targeted cargo checks/tests, frontend
+- [x] 15.8 Add `git diff --check`, targeted cargo checks/tests, frontend
   lint/build where applicable, OpenSpec strict validation, and GitNexus
   `detect_changes` to each implementation slice's completion gate.
 
