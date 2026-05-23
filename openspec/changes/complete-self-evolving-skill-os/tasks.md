@@ -251,13 +251,13 @@
 
 ## 15. Boundary, Security, And Audit Gates
 
-- [ ] 15.1 Add dependency-boundary tests proving kernel has no curation,
+- [x] 15.1 Add dependency-boundary tests proving kernel has no curation,
   evolution, semantic provider, or mutation provider dependency.
-- [ ] 15.2 Add SDK boundary tests proving SDK does not construct runtime-host
+- [x] 15.2 Add SDK boundary tests proving SDK does not construct runtime-host
   providers, stores, package guards, or semantic providers.
-- [ ] 15.3 Add Web/CLI/frontend boundary tests proving shells call facade routes
+- [x] 15.3 Add Web/CLI/frontend boundary tests proving shells call facade routes
   and do not own curation semantics.
-- [ ] 15.4 Add service-provider tests proving no presentation shell dependency.
+- [x] 15.4 Add service-provider tests proving no presentation shell dependency.
 - [ ] 15.5 Add optional-provider tests proving absent semantic, marketplace,
   store, or entitlement providers return structured unavailable/denied states.
 - [ ] 15.6 Add audit replay tests for proposal, promotion, mutation, curation
