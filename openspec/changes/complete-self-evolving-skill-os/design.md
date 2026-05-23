@@ -470,6 +470,19 @@ Every command logs key execution nodes with sanitized fields:
   bodies, provider payloads, prompts, manifests, package bytes, credentials,
   signatures, or full skill instructions.
 
+### Slice 8F: Dry-Run Immutability Gate
+
+- Patterns: Specification is represented by a regression test proving dry-run
+  curation is recommendation-only for active governance and alias read models;
+  Observer may still append run evidence for audit.
+- Ownership: `macaca-runtime-host` verifies the built-in local Strategy keeps
+  governance records, alias maps, rollback refs, and package memento refs
+  unchanged during dry-run. Scheduler and Context refs are not owned by this
+  provider and remain untouched by construction.
+- Safety: the test asserts no rollback/package memento refs are produced by
+  dry-run, so active package files, scheduler refs, and context snapshots are
+  not implied or faked.
+
 ## Risks And Mitigations
 
 - Risk: skill mutation corrupts active packages. Mitigation: atomic writes,

@@ -399,6 +399,138 @@ async fn skill_curation_run_records_bounded_dry_run_without_file_mutation() {
 }
 
 #[tokio::test]
+async fn skill_curation_dry_run_does_not_mutate_active_governance_or_alias_state() {
+    let provider = SkillSystemServiceProvider::new();
+    let trace = TraceContext::new("trace-skill-curation-dry-run-immutability");
+    provider
+        .call(traced_command(
+            SKILL_GOVERNANCE_RECORD_USAGE_COMMAND,
+            SkillGovernanceRecordUsageCommand {
+                trace: trace.clone(),
+                scope: SkillServiceScope::default(),
+                observation: observation(SkillUsageEventKind::Used, None),
+            },
+            trace.clone(),
+        ))
+        .await
+        .expect("usage observation should seed immutable dry-run records");
+    provider
+        .call(traced_command(
+            SKILL_ALIAS_UPSERT_COMMAND,
+            SkillAliasUpsertCommand {
+                trace: trace.clone(),
+                scope: SkillServiceScope::default(),
+                record: alias_record(),
+            },
+            trace.clone(),
+        ))
+        .await
+        .expect("alias state should exist before dry-run");
+
+    let before_governance = provider
+        .call(traced_command(
+            SKILL_GOVERNANCE_SNAPSHOT_COMMAND,
+            SkillGovernanceSnapshotCommand {
+                trace: trace.clone(),
+                scope: SkillServiceScope::default(),
+                include_archived: true,
+                lifecycle_filters: Vec::new(),
+            },
+            trace.clone(),
+        ))
+        .await
+        .expect("pre dry-run governance snapshot should decode");
+    let before_governance: SkillGovernanceSnapshotResult =
+        serde_json::from_value(before_governance.output).expect("snapshot should decode");
+    let before_aliases = provider
+        .call(traced_command(
+            SKILL_ALIAS_SNAPSHOT_COMMAND,
+            SkillAliasSnapshotCommand {
+                trace: trace.clone(),
+                scope: SkillServiceScope::default(),
+            },
+            trace.clone(),
+        ))
+        .await
+        .expect("pre dry-run alias snapshot should decode");
+    let before_aliases: SkillAliasSnapshotResult =
+        serde_json::from_value(before_aliases.output).expect("alias snapshot should decode");
+
+    let dry_run = provider
+        .call(traced_command(
+            SKILL_CURATION_RUN_COMMAND,
+            SkillCurationRunCommand {
+                trace: trace.clone(),
+                scope: SkillServiceScope::default(),
+                dry_run: true,
+                stale_after_days: 30,
+                narrow_use_threshold: 1,
+                approval_refs: Vec::new(),
+                policy_decision_refs: Vec::new(),
+                audit_event_ids: vec!["audit://skill-curation/dry-run-immutability".into()],
+                policy: Default::default(),
+            },
+            trace.clone(),
+        ))
+        .await
+        .expect("dry-run command should be admitted without approval refs");
+    let dry_run: SkillCurationRunResult =
+        serde_json::from_value(dry_run.output).expect("dry-run result should decode");
+    assert!(!dry_run.mutated);
+    assert!(dry_run.rollback_ref.is_none());
+
+    let after_governance = provider
+        .call(traced_command(
+            SKILL_GOVERNANCE_SNAPSHOT_COMMAND,
+            SkillGovernanceSnapshotCommand {
+                trace: trace.clone(),
+                scope: SkillServiceScope::default(),
+                include_archived: true,
+                lifecycle_filters: Vec::new(),
+            },
+            trace.clone(),
+        ))
+        .await
+        .expect("post dry-run governance snapshot should decode");
+    let after_governance: SkillGovernanceSnapshotResult =
+        serde_json::from_value(after_governance.output).expect("snapshot should decode");
+    let after_aliases = provider
+        .call(traced_command(
+            SKILL_ALIAS_SNAPSHOT_COMMAND,
+            SkillAliasSnapshotCommand {
+                trace: trace.clone(),
+                scope: SkillServiceScope::default(),
+            },
+            trace.clone(),
+        ))
+        .await
+        .expect("post dry-run alias snapshot should decode");
+    let after_aliases: SkillAliasSnapshotResult =
+        serde_json::from_value(after_aliases.output).expect("alias snapshot should decode");
+    assert_eq!(after_governance.records, before_governance.records);
+    assert_eq!(after_aliases.aliases, before_aliases.aliases);
+
+    let curation_snapshot = provider
+        .call(traced_command(
+            SKILL_CURATION_SNAPSHOT_COMMAND,
+            SkillCurationSnapshotCommand {
+                trace: trace.clone(),
+                scope: SkillServiceScope::default(),
+                include_archived: true,
+                lifecycle_filters: Vec::new(),
+                include_package_mementos: true,
+            },
+            trace,
+        ))
+        .await
+        .expect("curation snapshot should expose refs only after dry-run");
+    let curation_snapshot: SkillCurationSnapshotResult =
+        serde_json::from_value(curation_snapshot.output).expect("curation snapshot should decode");
+    assert!(curation_snapshot.rollback_refs.is_empty());
+    assert!(curation_snapshot.package_memento_refs.is_empty());
+}
+
+#[tokio::test]
 async fn skill_curation_apply_run_requires_approval_and_policy_refs() {
     let provider = SkillSystemServiceProvider::new();
     let trace = TraceContext::new("trace-skill-curation-run-apply-denied");

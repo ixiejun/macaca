@@ -144,7 +144,7 @@
   report ref, rollback ref, policy decisions, and audit event ids.
 - [x] 8.6 Generate bounded `run.json` and `REPORT.md` store artifacts or
   equivalent durable report refs.
-- [ ] 8.7 Ensure dry-run does not mutate active governance state, aliases, files,
+- [x] 8.7 Ensure dry-run does not mutate active governance state, aliases, files,
   scheduler refs, or context snapshots.
 - [ ] 8.8 Add deterministic stale, archive, quarantine, size, invalid metadata,
   missing dependency, and protected skill phases.
