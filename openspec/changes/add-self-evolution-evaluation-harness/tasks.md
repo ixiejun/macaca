@@ -17,7 +17,7 @@
 - [x] 3.1 Add typed evaluation commands and results behind the Skill service or
   adjacent evaluation provider boundary.
 - [ ] 3.2 Add SDK/SystemFacade methods and Null Object unavailable behavior.
-- [ ] 3.3 Wire runtime-host provider construction without kernel, shell, or
+- [x] 3.3 Wire runtime-host provider construction without kernel, shell, or
   application-specific dependencies.
 
 ## 4. Evidence Integration

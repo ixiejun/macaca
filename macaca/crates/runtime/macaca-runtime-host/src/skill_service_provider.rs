@@ -14,9 +14,11 @@ use macaca_proto::{
     ServiceError, ServiceHealth, ServiceResult, TraceContext,
 };
 use macaca_skill::{
-    skill_service_descriptor, ExecutableSkillToolSet, SkillAliasResolveCommand,
-    SkillAliasSnapshotCommand, SkillAliasUpsertCommand, SkillContentMutationCommand,
-    SkillCurationLifecycleAction, SkillEvolutionPromoteDraftCommand,
+    skill_service_descriptor, ExecutableSkillToolSet, SelfEvolutionReportBuilder,
+    SelfEvolutionScoringPolicy, SkillAliasResolveCommand, SkillAliasSnapshotCommand,
+    SkillAliasUpsertCommand, SkillContentMutationCommand, SkillCurationLifecycleAction,
+    SkillEvaluationReportCommand, SkillEvaluationReportResult, SkillEvaluationScoreCommand,
+    SkillEvaluationScoreResult, SkillEvolutionPromoteDraftCommand,
     SkillEvolutionProposePatchCommand, SkillEvolutionRejectDraftCommand,
     SkillExecutableLoadCommand, SkillExecutableLoadResult, SkillExperienceProposalCommand,
     SkillExperienceProposalSnapshotCommand, SkillGovernanceRecordUsageCommand,
@@ -31,6 +33,7 @@ use macaca_skill::{
     SKILL_CURATION_RELEASE_QUARANTINE_COMMAND, SKILL_CURATION_RESTORE_COMMAND,
     SKILL_CURATION_ROLLBACK_COMMAND, SKILL_CURATION_RUN_COMMAND, SKILL_CURATION_SNAPSHOT_COMMAND,
     SKILL_CURATION_STATUS_COMMAND, SKILL_CURATION_SUPERSEDE_COMMAND, SKILL_CURATION_UNPIN_COMMAND,
+    SKILL_EVALUATION_REPORT_COMMAND, SKILL_EVALUATION_SCORE_COMMAND,
     SKILL_EVOLUTION_PROMOTE_DRAFT_COMMAND, SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND,
     SKILL_EVOLUTION_PROPOSE_PATCH_COMMAND, SKILL_EVOLUTION_REJECT_DRAFT_COMMAND,
     SKILL_EVOLUTION_SNAPSHOT_COMMAND, SKILL_EXECUTABLE_LOAD_COMMAND,
@@ -555,6 +558,44 @@ impl SystemService for SkillSystemServiceProvider {
                     mutated = result.mutated,
                     include_discarded = typed.include_discarded,
                     "skill experience proposal snapshot emitted"
+                );
+                Ok(service_result(to_value(result)?, typed.trace))
+            }
+            SKILL_EVALUATION_SCORE_COMMAND => {
+                let typed: SkillEvaluationScoreCommand = decode(command.payload)?;
+                let score = SelfEvolutionScoringPolicy::score(&typed.record);
+                tracing::info!(
+                    trace_id = %typed.trace.trace_id,
+                    evaluation_id = %typed.record.evaluation_id,
+                    task_family_id = %typed.record.task_family_id,
+                    passed = score.passed,
+                    reason_count = score.reason_codes.len(),
+                    "skill self-evolution evaluation scored"
+                );
+                Ok(service_result(
+                    to_value(SkillEvaluationScoreResult { score })?,
+                    typed.trace,
+                ))
+            }
+            SKILL_EVALUATION_REPORT_COMMAND => {
+                let typed: SkillEvaluationReportCommand = decode(command.payload)?;
+                let result = SkillEvaluationReportResult {
+                    score: typed.score.clone(),
+                    json_report: SelfEvolutionReportBuilder::json_summary(
+                        &typed.record,
+                        &typed.score,
+                    ),
+                    markdown_report: typed.include_markdown.then(|| {
+                        SelfEvolutionReportBuilder::markdown_summary(&typed.record, &typed.score)
+                    }),
+                };
+                tracing::info!(
+                    trace_id = %typed.trace.trace_id,
+                    evaluation_id = %typed.record.evaluation_id,
+                    task_family_id = %typed.record.task_family_id,
+                    include_markdown = typed.include_markdown,
+                    passed = typed.score.passed,
+                    "skill self-evolution evaluation report built"
                 );
                 Ok(service_result(to_value(result)?, typed.trace))
             }

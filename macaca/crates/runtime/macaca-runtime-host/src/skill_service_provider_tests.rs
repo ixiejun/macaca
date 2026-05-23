@@ -13,28 +13,31 @@ use macaca_proto::{
     TraceContext,
 };
 use macaca_skill::{
-    SkillAliasKind, SkillAliasRecord, SkillAliasResolutionPolicy, SkillAliasResolutionStatus,
-    SkillAliasResolveCommand, SkillAliasResolveResult, SkillAliasSnapshotCommand,
-    SkillAliasSnapshotResult, SkillAliasUpsertCommand, SkillAliasUpsertResult, SkillAuthorKind,
-    SkillCurationAction, SkillCurationDryRunCommand, SkillCurationDryRunResult, SkillCurationPhase,
+    SelfEvolutionEvaluationLifecycle, SelfEvolutionEvaluationRecord, SelfEvolutionReportRefs,
+    SelfEvolutionRunMetrics, SelfEvolutionWhiteBoxEvidence, SkillAliasKind, SkillAliasRecord,
+    SkillAliasResolutionPolicy, SkillAliasResolutionStatus, SkillAliasResolveCommand,
+    SkillAliasResolveResult, SkillAliasSnapshotCommand, SkillAliasSnapshotResult,
+    SkillAliasUpsertCommand, SkillAliasUpsertResult, SkillAuthorKind, SkillCurationAction,
+    SkillCurationDryRunCommand, SkillCurationDryRunResult, SkillCurationPhase,
     SkillCurationRollbackCommand, SkillCurationRollbackResult, SkillCurationRunCommand,
     SkillCurationRunRecord, SkillCurationRunResult, SkillCurationSnapshotCommand,
     SkillCurationSnapshotResult, SkillCurationStatusCommand, SkillCurationStatusResult,
-    SkillEvolutionCandidateClassification, SkillEvolutionProposalAction, SkillExperienceCandidate,
-    SkillExperienceCandidateDestination, SkillExperienceEvidenceGateStatus,
-    SkillExperienceProposalCommand, SkillExperienceProposalResult,
-    SkillExperienceProposalSnapshotCommand, SkillExperienceProposalSnapshotResult,
-    SkillGovernanceEventPayload, SkillGovernanceEventRecord, SkillGovernanceReadModel,
-    SkillGovernanceRecordUsageCommand, SkillGovernanceRecordUsageResult,
+    SkillEvaluationReportCommand, SkillEvaluationReportResult, SkillEvaluationScoreCommand,
+    SkillEvaluationScoreResult, SkillEvolutionCandidateClassification,
+    SkillEvolutionProposalAction, SkillExperienceCandidate, SkillExperienceCandidateDestination,
+    SkillExperienceEvidenceGateStatus, SkillExperienceProposalCommand,
+    SkillExperienceProposalResult, SkillExperienceProposalSnapshotCommand,
+    SkillExperienceProposalSnapshotResult, SkillGovernanceEventPayload, SkillGovernanceEventRecord,
+    SkillGovernanceReadModel, SkillGovernanceRecordUsageCommand, SkillGovernanceRecordUsageResult,
     SkillGovernanceSnapshotCommand, SkillGovernanceSnapshotRefRecord,
     SkillGovernanceSnapshotResult, SkillProvenanceAction, SkillRollbackRefRecord,
     SkillSemanticReviewStatus, SkillServiceScope, SkillStatusCommand, SkillStatusResult,
     SkillUsageEventKind, SkillUsageObservation, SKILL_ALIAS_RESOLVE_COMMAND,
     SKILL_ALIAS_SNAPSHOT_COMMAND, SKILL_ALIAS_UPSERT_COMMAND, SKILL_CURATION_DRY_RUN_COMMAND,
     SKILL_CURATION_ROLLBACK_COMMAND, SKILL_CURATION_RUN_COMMAND, SKILL_CURATION_SNAPSHOT_COMMAND,
-    SKILL_CURATION_STATUS_COMMAND, SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND,
-    SKILL_EVOLUTION_SNAPSHOT_COMMAND, SKILL_GOVERNANCE_RECORD_USAGE_COMMAND,
-    SKILL_GOVERNANCE_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND,
+    SKILL_CURATION_STATUS_COMMAND, SKILL_EVALUATION_REPORT_COMMAND, SKILL_EVALUATION_SCORE_COMMAND,
+    SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND, SKILL_EVOLUTION_SNAPSHOT_COMMAND,
+    SKILL_GOVERNANCE_RECORD_USAGE_COMMAND, SKILL_GOVERNANCE_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND,
 };
 use tokio::sync::Mutex;
 
@@ -104,6 +107,59 @@ fn reusable_experience_candidate(evidence_ids: Vec<String>) -> SkillExperienceCa
         target_skill_name: Some("skill-experience-maintenance".into()),
         evidence_ids,
         metadata: BTreeMap::new(),
+    }
+}
+
+fn complete_evaluation_record() -> SelfEvolutionEvaluationRecord {
+    SelfEvolutionEvaluationRecord {
+        evaluation_id: "eval-runtime".into(),
+        trace_id: "trace-runtime".into(),
+        task_family_id: "runtime_verification_loop".into(),
+        lifecycle: SelfEvolutionEvaluationLifecycle::EvolvedRecorded,
+        white_box: SelfEvolutionWhiteBoxEvidence {
+            verified_task_completion_ref: Some("task-evidence".into()),
+            experience_candidate_ref: Some("candidate".into()),
+            classification_ref: Some("classification".into()),
+            proposal_id: Some("proposal".into()),
+            curation_run_id: Some("curation".into()),
+            promotion_or_apply_ref: Some("promotion".into()),
+            active_catalog_snapshot_ref: Some("catalog".into()),
+            later_skill_activation_ref: Some("activation".into()),
+            policy_decision_id: Some("policy".into()),
+            audit_event_ids: vec!["audit".into()],
+            before_snapshot_ref: Some("before".into()),
+            after_snapshot_ref: Some("after".into()),
+            rollback_ref: Some("rollback".into()),
+        },
+        baseline: SelfEvolutionRunMetrics {
+            completion_success: true,
+            verified_artifact_count: 2,
+            human_intervention_count: 2,
+            elapsed_seconds: Some(100),
+            tool_call_count: 18,
+            retry_count: 2,
+            policy_violation_count: 0,
+            skill_activation_count: 0,
+            accepted_proposal_count: 0,
+            total_proposal_count: 1,
+            reuse_score: 0,
+            regression_count: 0,
+        },
+        evolved: SelfEvolutionRunMetrics {
+            completion_success: true,
+            verified_artifact_count: 2,
+            human_intervention_count: 1,
+            elapsed_seconds: Some(80),
+            tool_call_count: 14,
+            retry_count: 1,
+            policy_violation_count: 0,
+            skill_activation_count: 1,
+            accepted_proposal_count: 1,
+            total_proposal_count: 1,
+            reuse_score: 1,
+            regression_count: 0,
+        },
+        report_refs: SelfEvolutionReportRefs::default(),
     }
 }
 
@@ -257,6 +313,59 @@ async fn skill_status_exposes_bounded_telemetry_aggregate() {
     assert_eq!(status.telemetry_aggregate.record_count, 1);
     assert_eq!(status.telemetry_aggregate.successful_task_count, 1);
     assert_eq!(status.telemetry_aggregate.failed_task_count, 1);
+}
+
+#[tokio::test]
+async fn skill_evaluation_score_and_report_are_runtime_host_owned() {
+    let provider = SkillSystemServiceProvider::new();
+    let trace = TraceContext::new("trace-skill-evaluation-provider");
+    let record = complete_evaluation_record();
+    let score_command = SkillEvaluationScoreCommand {
+        trace: trace.clone(),
+        scope: SkillServiceScope::default(),
+        record: record.clone(),
+    };
+
+    let score_result = provider
+        .call(traced_command(
+            SKILL_EVALUATION_SCORE_COMMAND,
+            score_command,
+            trace.clone(),
+        ))
+        .await
+        .expect("evaluation score should succeed");
+    let score_result: SkillEvaluationScoreResult =
+        serde_json::from_value(score_result.output).expect("score result should decode");
+    assert!(score_result.score.passed);
+
+    let report_command = SkillEvaluationReportCommand {
+        trace: trace.clone(),
+        scope: SkillServiceScope::default(),
+        record,
+        score: score_result.score,
+        include_markdown: true,
+    };
+    let report_result = provider
+        .call(traced_command(
+            SKILL_EVALUATION_REPORT_COMMAND,
+            report_command,
+            trace,
+        ))
+        .await
+        .expect("evaluation report should succeed");
+    let report_result: SkillEvaluationReportResult =
+        serde_json::from_value(report_result.output).expect("report result should decode");
+
+    assert!(report_result.score.passed);
+    assert!(report_result
+        .json_report
+        .to_string()
+        .contains("eval-runtime"));
+    assert!(report_result
+        .markdown_report
+        .as_deref()
+        .unwrap_or_default()
+        .contains("Self-Evolution Evaluation"));
 }
 
 #[tokio::test]
