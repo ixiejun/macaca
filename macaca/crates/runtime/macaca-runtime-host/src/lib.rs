@@ -81,6 +81,8 @@ pub mod web3_service_provider;
 #[cfg(test)]
 mod service_router_tests;
 #[cfg(test)]
+mod skill_service_lifecycle_tests;
+#[cfg(test)]
 mod skill_service_provider_tests;
 
 pub use agent_context_service_provider::{

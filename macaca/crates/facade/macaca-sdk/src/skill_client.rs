@@ -7,24 +7,19 @@ use macaca_proto::{MacacaError, MacacaResult};
 use macaca_skill::{
     SkillAliasResolveCommand, SkillAliasResolveResult, SkillAliasSnapshotCommand,
     SkillAliasSnapshotResult, SkillAliasUpsertCommand, SkillAliasUpsertResult, SkillCleanupCommand,
-    SkillCurationDryRunCommand, SkillCurationDryRunResult, SkillExecutableLoadCommand,
+    SkillCurationDryRunCommand, SkillCurationDryRunResult, SkillCurationLifecycleAction,
+    SkillCurationLifecycleCommand, SkillCurationLifecycleResult, SkillExecutableLoadCommand,
     SkillExecutableLoadResult, SkillExperienceProposalCommand, SkillExperienceProposalResult,
     SkillExperienceProposalSnapshotCommand, SkillExperienceProposalSnapshotResult,
     SkillGovernanceRecordUsageCommand, SkillGovernanceRecordUsageResult,
     SkillGovernanceSnapshotCommand, SkillGovernanceSnapshotResult, SkillServiceSnapshot,
     SkillServiceSnapshotCommand, SkillSnapshotServiceCommand, SkillSnapshotServiceResult,
     SkillStatusCommand, SkillStatusResult, SkillToolCatalogCommand, SkillToolCatalogResult,
-    SkillToolInvokeCommand, SkillToolInvokeResult, SKILL_ALIAS_RESOLVE_COMMAND,
-    SKILL_ALIAS_SNAPSHOT_COMMAND, SKILL_ALIAS_UPSERT_COMMAND, SKILL_CLEANUP_COMMAND,
-    SKILL_CURATION_DRY_RUN_COMMAND, SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND,
-    SKILL_EVOLUTION_SNAPSHOT_COMMAND, SKILL_EXECUTABLE_LOAD_COMMAND,
-    SKILL_GOVERNANCE_RECORD_USAGE_COMMAND, SKILL_GOVERNANCE_SNAPSHOT_COMMAND, SKILL_SERVICE_ID,
-    SKILL_SERVICE_SNAPSHOT_COMMAND, SKILL_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND,
-    SKILL_TOOL_CATALOG_COMMAND, SKILL_TOOL_INVOKE_COMMAND,
+    SkillToolInvokeCommand, SkillToolInvokeResult, SKILL_SERVICE_ID,
 };
 use tracing::{info, warn};
 
-use crate::service_client::{ServiceCallCommand, SystemServiceClient};
+use crate::service_client::SystemServiceClient;
 
 /// Focused Skill client consumed by Web, CLI, framework, and applications.
 #[async_trait]
@@ -62,6 +57,11 @@ pub trait SystemSkillClient: Send + Sync {
         &self,
         command: SkillCurationDryRunCommand,
     ) -> MacacaResult<SkillCurationDryRunResult>;
+    async fn curation_lifecycle(
+        &self,
+        action: SkillCurationLifecycleAction,
+        command: SkillCurationLifecycleCommand,
+    ) -> MacacaResult<SkillCurationLifecycleResult>;
     async fn alias_upsert(
         &self,
         command: SkillAliasUpsertCommand,
@@ -190,6 +190,20 @@ impl SystemSkillClient for UnavailableSystemSkillClient {
         })
     }
 
+    async fn curation_lifecycle(
+        &self,
+        action: SkillCurationLifecycleAction,
+        command: SkillCurationLifecycleCommand,
+    ) -> MacacaResult<SkillCurationLifecycleResult> {
+        warn!(
+            trace_id = %command.trace.trace_id,
+            skill_id = %command.skill_id,
+            action = ?action,
+            "sdk skill client unavailable for curation lifecycle command"
+        );
+        Err(MacacaError::Config("Skill service is unavailable".into()))
+    }
+
     async fn alias_upsert(
         &self,
         command: SkillAliasUpsertCommand,
@@ -267,7 +281,7 @@ impl SystemSkillClient for UnavailableSystemSkillClient {
 /// Runtime-backed Skill client implemented over the generic SDK service client.
 #[derive(Clone)]
 pub struct ServiceBackedSkillClient {
-    service: Arc<dyn SystemServiceClient>,
+    pub(crate) service: Arc<dyn SystemServiceClient>,
 }
 
 impl ServiceBackedSkillClient {
@@ -275,216 +289,4 @@ impl ServiceBackedSkillClient {
     pub fn new(service: Arc<dyn SystemServiceClient>) -> Self {
         Self { service }
     }
-}
-
-#[async_trait]
-impl SystemSkillClient for ServiceBackedSkillClient {
-    async fn snapshot(
-        &self,
-        command: SkillSnapshotServiceCommand,
-    ) -> MacacaResult<SkillSnapshotServiceResult> {
-        call(
-            &self.service,
-            SKILL_SNAPSHOT_COMMAND,
-            command.trace.clone(),
-            command,
-        )
-        .await
-    }
-
-    async fn load_executable(
-        &self,
-        command: SkillExecutableLoadCommand,
-    ) -> MacacaResult<SkillExecutableLoadResult> {
-        call(
-            &self.service,
-            SKILL_EXECUTABLE_LOAD_COMMAND,
-            command.trace.clone(),
-            command,
-        )
-        .await
-    }
-
-    async fn tool_catalog(
-        &self,
-        command: SkillToolCatalogCommand,
-    ) -> MacacaResult<SkillToolCatalogResult> {
-        call(
-            &self.service,
-            SKILL_TOOL_CATALOG_COMMAND,
-            command.trace.clone(),
-            command,
-        )
-        .await
-    }
-
-    async fn invoke_tool(
-        &self,
-        command: SkillToolInvokeCommand,
-    ) -> MacacaResult<SkillToolInvokeResult> {
-        call(
-            &self.service,
-            SKILL_TOOL_INVOKE_COMMAND,
-            command.invocation.trace.clone(),
-            command,
-        )
-        .await
-    }
-
-    async fn status(&self, command: SkillStatusCommand) -> MacacaResult<SkillStatusResult> {
-        call(
-            &self.service,
-            SKILL_STATUS_COMMAND,
-            command.trace.clone(),
-            command,
-        )
-        .await
-    }
-
-    async fn service_snapshot(
-        &self,
-        command: SkillServiceSnapshotCommand,
-    ) -> MacacaResult<SkillServiceSnapshot> {
-        call(
-            &self.service,
-            SKILL_SERVICE_SNAPSHOT_COMMAND,
-            command.trace.clone(),
-            command,
-        )
-        .await
-    }
-
-    async fn record_governance_usage(
-        &self,
-        command: SkillGovernanceRecordUsageCommand,
-    ) -> MacacaResult<SkillGovernanceRecordUsageResult> {
-        call(
-            &self.service,
-            SKILL_GOVERNANCE_RECORD_USAGE_COMMAND,
-            command.trace.clone(),
-            command,
-        )
-        .await
-    }
-
-    async fn governance_snapshot(
-        &self,
-        command: SkillGovernanceSnapshotCommand,
-    ) -> MacacaResult<SkillGovernanceSnapshotResult> {
-        call(
-            &self.service,
-            SKILL_GOVERNANCE_SNAPSHOT_COMMAND,
-            command.trace.clone(),
-            command,
-        )
-        .await
-    }
-
-    async fn curation_dry_run(
-        &self,
-        command: SkillCurationDryRunCommand,
-    ) -> MacacaResult<SkillCurationDryRunResult> {
-        call(
-            &self.service,
-            SKILL_CURATION_DRY_RUN_COMMAND,
-            command.trace.clone(),
-            command,
-        )
-        .await
-    }
-
-    async fn alias_upsert(
-        &self,
-        command: SkillAliasUpsertCommand,
-    ) -> MacacaResult<SkillAliasUpsertResult> {
-        call(
-            &self.service,
-            SKILL_ALIAS_UPSERT_COMMAND,
-            command.trace.clone(),
-            command,
-        )
-        .await
-    }
-
-    async fn alias_resolve(
-        &self,
-        command: SkillAliasResolveCommand,
-    ) -> MacacaResult<SkillAliasResolveResult> {
-        call(
-            &self.service,
-            SKILL_ALIAS_RESOLVE_COMMAND,
-            command.trace.clone(),
-            command,
-        )
-        .await
-    }
-
-    async fn alias_snapshot(
-        &self,
-        command: SkillAliasSnapshotCommand,
-    ) -> MacacaResult<SkillAliasSnapshotResult> {
-        call(
-            &self.service,
-            SKILL_ALIAS_SNAPSHOT_COMMAND,
-            command.trace.clone(),
-            command,
-        )
-        .await
-    }
-
-    async fn propose_skill_experience(
-        &self,
-        command: SkillExperienceProposalCommand,
-    ) -> MacacaResult<SkillExperienceProposalResult> {
-        call(
-            &self.service,
-            SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND,
-            command.trace.clone(),
-            command,
-        )
-        .await
-    }
-
-    async fn skill_experience_snapshot(
-        &self,
-        command: SkillExperienceProposalSnapshotCommand,
-    ) -> MacacaResult<SkillExperienceProposalSnapshotResult> {
-        call(
-            &self.service,
-            SKILL_EVOLUTION_SNAPSHOT_COMMAND,
-            command.trace.clone(),
-            command,
-        )
-        .await
-    }
-
-    async fn cleanup(&self, command: SkillCleanupCommand) -> MacacaResult<serde_json::Value> {
-        call(
-            &self.service,
-            SKILL_CLEANUP_COMMAND,
-            command.trace.clone(),
-            command,
-        )
-        .await
-    }
-}
-
-async fn call<T, R>(
-    service: &Arc<dyn SystemServiceClient>,
-    command_name: &str,
-    trace: macaca_proto::TraceContext,
-    payload: T,
-) -> MacacaResult<R>
-where
-    T: serde::Serialize,
-    R: serde::de::DeserializeOwned,
-{
-    let service_command = ServiceCallCommand::new(
-        SKILL_SERVICE_ID,
-        command_name,
-        serde_json::to_value(payload)?,
-    )?
-    .with_trace(trace);
-    let result = service.call_service(&service_command).await?;
-    serde_json::from_value(result.output).map_err(MacacaError::from)
 }

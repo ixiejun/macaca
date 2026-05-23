@@ -25,6 +25,7 @@ pub mod evolution;
 pub mod facade;
 pub mod governance;
 pub mod handle;
+pub mod lifecycle;
 pub mod package;
 pub mod policy;
 pub mod provisioner;
@@ -47,6 +48,7 @@ pub use facade::{
 };
 pub use governance::*;
 pub use handle::{SkillRuntimeHandle, SkillRuntimeState};
+pub use lifecycle::*;
 pub use package::{agent_skill_package_descriptor, skill_entry_package_descriptor};
 pub use policy::{PolicyDecision, SkillExposureContext, SkillExposurePolicy, SkillPolicyChain};
 pub use registry::SkillRegistry;

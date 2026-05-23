@@ -13,6 +13,7 @@ use chrono::{DateTime, Duration, Utc};
 use macaca_proto::TraceContext;
 use serde::{Deserialize, Serialize};
 
+use crate::lifecycle::SkillCurationLifecycleCommand;
 use crate::service_contract::SkillServiceScope;
 
 /// Lifecycle state for a governed AgentSkill.
@@ -254,6 +255,35 @@ impl SkillGovernanceRecord {
             }
         }
     }
+
+    /// Create a metadata-only governance record for a lifecycle operation.
+    ///
+    /// Lifecycle commands can target a skill before usage telemetry has been
+    /// observed by this provider.  The built-in provider records the sanitized
+    /// identity and evidence so later snapshots can explain why the lifecycle
+    /// state exists without reading or modifying the skill's instruction files.
+    pub fn from_lifecycle_command(
+        command: &SkillCurationLifecycleCommand,
+        observed_at: DateTime<Utc>,
+    ) -> Self {
+        let mut provenance = SkillGovernanceProvenance::new(
+            command.skill_id.clone(),
+            command.name.clone(),
+            command.source.clone(),
+            command.source_scope.clone(),
+            command.author_kind.clone(),
+        );
+        provenance.evidence_ids = non_empty_evidence(&command.evidence_ids);
+
+        Self {
+            provenance,
+            lifecycle: SkillLifecycleState::Active,
+            pinned: false,
+            telemetry: SkillUsageTelemetry::default(),
+            updated_at: observed_at,
+            evidence_ids: non_empty_evidence(&command.evidence_ids),
+        }
+    }
 }
 
 /// Command for recording one sanitized skill usage observation.
@@ -417,4 +447,12 @@ fn recommend_for_record(
         confidence: 0.75,
         evidence_ids,
     }
+}
+
+fn non_empty_evidence(evidence_ids: &[String]) -> Vec<String> {
+    evidence_ids
+        .iter()
+        .filter(|id| !id.trim().is_empty())
+        .cloned()
+        .collect()
 }

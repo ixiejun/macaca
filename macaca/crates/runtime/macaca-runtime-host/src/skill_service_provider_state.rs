@@ -11,6 +11,7 @@ use std::collections::BTreeMap;
 use macaca_skill::{
     SkillAliasRecord, SkillAliasResolveCommand, SkillAliasResolveResult, SkillAliasSnapshotResult,
     SkillAliasUpsertResult, SkillCurationDryRunCommand, SkillCurationDryRunResult,
+    SkillCurationLifecycleAction, SkillCurationLifecycleCommand, SkillCurationLifecycleResult,
     SkillExperienceProposalCommand, SkillExperienceProposalRecord, SkillExperienceProposalResult,
     SkillExperienceProposalSnapshotResult, SkillGovernanceRecord, SkillGovernanceRecordUsageResult,
     SkillGovernanceSnapshotResult, SkillLifecycleState, SkillUsageObservation,
@@ -84,6 +85,69 @@ impl SkillProviderGovernanceState {
             .cloned()
             .collect::<Vec<_>>();
         SkillCurationDryRunResult::from_records(records, command, chrono::Utc::now())
+    }
+
+    /// Apply one metadata-only lifecycle transition to a governance record.
+    ///
+    /// This helper is deliberately limited to governance state.  It does not
+    /// touch skill package files, aliases, executable scripts, or scheduler
+    /// references; future durable providers can wrap the same transition in
+    /// policy decisions, mementos, and audit event persistence.
+    pub(crate) async fn apply_lifecycle(
+        &self,
+        command: SkillCurationLifecycleCommand,
+        action: SkillCurationLifecycleAction,
+    ) -> Result<SkillCurationLifecycleResult, String> {
+        let captured_at = chrono::Utc::now();
+        let key = command.key();
+        let sanitized_evidence = command
+            .evidence_ids
+            .iter()
+            .filter(|id| !id.trim().is_empty())
+            .cloned()
+            .collect::<Vec<_>>();
+        let mut records = self.records.lock().await;
+        let record = records.entry(key).or_insert_with(|| {
+            SkillGovernanceRecord::from_lifecycle_command(&command, captured_at)
+        });
+
+        if action == SkillCurationLifecycleAction::Archive && record.pinned {
+            return Err("pinned skill cannot be archived without an approval override".into());
+        }
+
+        match action {
+            SkillCurationLifecycleAction::Pin => {
+                record.pinned = true;
+            }
+            SkillCurationLifecycleAction::Unpin => {
+                record.pinned = false;
+            }
+            SkillCurationLifecycleAction::Archive => {
+                record.lifecycle = SkillLifecycleState::Archived;
+            }
+            SkillCurationLifecycleAction::Restore => {
+                record.lifecycle = SkillLifecycleState::Active;
+            }
+        }
+        record.updated_at = captured_at;
+        for evidence_id in &sanitized_evidence {
+            if !record.evidence_ids.contains(evidence_id) {
+                record.evidence_ids.push(evidence_id.clone());
+            }
+        }
+
+        Ok(SkillCurationLifecycleResult {
+            skill_id: record.provenance.skill_id.clone(),
+            name: record.provenance.name.clone(),
+            action,
+            lifecycle: record.lifecycle.clone(),
+            pinned: record.pinned,
+            mutated: true,
+            reason: command.reason,
+            evidence_ids: sanitized_evidence,
+            trace_id: command.trace.trace_id,
+            captured_at,
+        })
     }
 
     /// Insert or replace one alias record.
