@@ -10,11 +10,12 @@ use macaca_skill::{
     SkillCurationDryRunCommand, SkillCurationDryRunResult, SkillCurationLifecycleAction,
     SkillCurationLifecycleCommand, SkillCurationLifecycleResult, SkillCurationRollbackCommand,
     SkillCurationRollbackResult, SkillCurationRunCommand, SkillCurationRunResult,
-    SkillCurationSnapshotCommand, SkillCurationSnapshotResult, SkillEvolutionPromoteDraftCommand,
-    SkillEvolutionPromoteDraftResult, SkillEvolutionProposePatchCommand,
-    SkillEvolutionProposePatchResult, SkillEvolutionRejectDraftCommand,
-    SkillEvolutionRejectDraftResult, SkillExecutableLoadCommand, SkillExecutableLoadResult,
-    SkillExperienceProposalCommand, SkillExperienceProposalResult,
+    SkillCurationSnapshotCommand, SkillCurationSnapshotResult, SkillEvaluationReportCommand,
+    SkillEvaluationReportResult, SkillEvaluationScoreCommand, SkillEvaluationScoreResult,
+    SkillEvolutionPromoteDraftCommand, SkillEvolutionPromoteDraftResult,
+    SkillEvolutionProposePatchCommand, SkillEvolutionProposePatchResult,
+    SkillEvolutionRejectDraftCommand, SkillEvolutionRejectDraftResult, SkillExecutableLoadCommand,
+    SkillExecutableLoadResult, SkillExperienceProposalCommand, SkillExperienceProposalResult,
     SkillExperienceProposalSnapshotCommand, SkillExperienceProposalSnapshotResult,
     SkillGovernanceRecordUsageCommand, SkillGovernanceRecordUsageResult,
     SkillGovernanceSnapshotCommand, SkillGovernanceSnapshotResult, SkillServiceSnapshot,
@@ -111,6 +112,14 @@ pub trait SystemSkillClient: Send + Sync {
         &self,
         command: SkillExperienceProposalSnapshotCommand,
     ) -> MacacaResult<SkillExperienceProposalSnapshotResult>;
+    async fn evaluate_self_evolution(
+        &self,
+        command: SkillEvaluationScoreCommand,
+    ) -> MacacaResult<SkillEvaluationScoreResult>;
+    async fn self_evolution_evaluation_report(
+        &self,
+        command: SkillEvaluationReportCommand,
+    ) -> MacacaResult<SkillEvaluationReportResult>;
     async fn cleanup(&self, command: SkillCleanupCommand) -> MacacaResult<serde_json::Value>;
 }
 
@@ -377,6 +386,30 @@ impl SystemSkillClient for UnavailableSystemSkillClient {
         })
     }
 
+    async fn evaluate_self_evolution(
+        &self,
+        command: SkillEvaluationScoreCommand,
+    ) -> MacacaResult<SkillEvaluationScoreResult> {
+        warn!(
+            trace_id = %command.trace.trace_id,
+            evaluation_id = %command.record.evaluation_id,
+            "sdk skill client unavailable for self-evolution evaluation scoring"
+        );
+        Err(MacacaError::Config("Skill service is unavailable".into()))
+    }
+
+    async fn self_evolution_evaluation_report(
+        &self,
+        command: SkillEvaluationReportCommand,
+    ) -> MacacaResult<SkillEvaluationReportResult> {
+        warn!(
+            trace_id = %command.trace.trace_id,
+            evaluation_id = %command.record.evaluation_id,
+            "sdk skill client unavailable for self-evolution evaluation report"
+        );
+        Err(MacacaError::Config("Skill service is unavailable".into()))
+    }
+
     async fn cleanup(&self, command: SkillCleanupCommand) -> MacacaResult<serde_json::Value> {
         info!(trace_id = %command.trace.trace_id, "sdk skill client cleanup no-op");
         Ok(serde_json::json!({"status": "unavailable"}))
@@ -402,6 +435,9 @@ mod tests {
 
     use macaca_proto::TraceContext;
     use macaca_skill::{
+        SelfEvolutionEvaluationLifecycle, SelfEvolutionEvaluationRecord, SelfEvolutionReportRefs,
+        SelfEvolutionRunMetrics, SelfEvolutionScore, SelfEvolutionWhiteBoxEvidence,
+        SkillEvaluationReportCommand, SkillEvaluationScoreCommand,
         SkillEvolutionPromoteDraftCommand, SkillEvolutionRejectDraftCommand,
         SkillServicePolicyHints, SkillServiceScope,
     };
@@ -442,5 +478,47 @@ mod tests {
 
         assert!(client.promote_skill_draft(promote).await.is_err());
         assert!(client.reject_skill_draft(reject).await.is_err());
+    }
+
+    fn evaluation_record() -> SelfEvolutionEvaluationRecord {
+        SelfEvolutionEvaluationRecord {
+            evaluation_id: "eval-sdk".into(),
+            trace_id: "trace-sdk".into(),
+            task_family_id: "bug_trace_loop".into(),
+            lifecycle: SelfEvolutionEvaluationLifecycle::Prepared,
+            white_box: SelfEvolutionWhiteBoxEvidence::default(),
+            baseline: SelfEvolutionRunMetrics::default(),
+            evolved: SelfEvolutionRunMetrics::default(),
+            report_refs: SelfEvolutionReportRefs::default(),
+        }
+    }
+
+    #[tokio::test]
+    async fn unavailable_skill_client_rejects_self_evolution_evaluation_commands() {
+        let client = UnavailableSystemSkillClient;
+        let trace = TraceContext::new("trace-sdk-skill-evaluation-unavailable");
+        let score = SelfEvolutionScore {
+            lifecycle: SelfEvolutionEvaluationLifecycle::Inconclusive,
+            passed: false,
+            reason_codes: vec!["missing_evidence".into()],
+        };
+        let score_command = SkillEvaluationScoreCommand {
+            trace: trace.clone(),
+            scope: SkillServiceScope::default(),
+            record: evaluation_record(),
+        };
+        let report_command = SkillEvaluationReportCommand {
+            trace,
+            scope: SkillServiceScope::default(),
+            record: evaluation_record(),
+            score,
+            include_markdown: true,
+        };
+
+        assert!(client.evaluate_self_evolution(score_command).await.is_err());
+        assert!(client
+            .self_evolution_evaluation_report(report_command)
+            .await
+            .is_err());
     }
 }
