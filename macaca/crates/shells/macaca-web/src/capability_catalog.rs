@@ -20,7 +20,8 @@ use macaca_runtime_host::{
     McpRuntimeFacade, McpRuntimeStatus, McpRuntimeStatusState, McpToolPolicy,
 };
 use macaca_skill::{
-    SkillAliasResolveCommand, SkillAliasResolveResult, SkillPolicy, SkillRuntimeFacade,
+    SkillAliasResolveCommand, SkillAliasResolveResult, SkillGovernanceSnapshotCommand,
+    SkillGovernanceSnapshotResult, SkillLifecycleState, SkillPolicy, SkillRuntimeFacade,
     SkillServiceScope, SkillSnapshot, SkillSnapshotRequest, SkillSnapshotServiceCommand,
 };
 
@@ -33,6 +34,24 @@ use crate::state::AppState;
 #[must_use]
 pub fn skill_capability_catalog_from_snapshot(snapshot: &SkillSnapshot) -> SkillCapabilityCatalog {
     alias_resolution::catalog_from_snapshot_with_aliases(snapshot, &[])
+}
+
+/// Freeze a Skill service snapshot with a governance snapshot for normal
+/// Context Composer visibility.
+///
+/// The Skill service owns lifecycle state and alias semantics.  This adapter
+/// only maps those service-owned decisions into neutral context DTOs so
+/// `macaca-context` can stay provider-neutral and body-free.
+#[must_use]
+pub fn skill_capability_catalog_from_governance_snapshot(
+    snapshot: &SkillSnapshot,
+    governance: &SkillGovernanceSnapshotResult,
+) -> SkillCapabilityCatalog {
+    alias_resolution::catalog_from_snapshot_with_aliases_and_governance(
+        snapshot,
+        &[],
+        Some(governance),
+    )
 }
 
 #[must_use]
@@ -243,133 +262,69 @@ async fn resolve_aliases_for_snapshot(
     aliases
 }
 
-#[cfg(test)]
-mod tests {
-    use std::collections::BTreeMap;
-
-    use async_trait::async_trait;
-    use macaca_framework::mcp::{McpSessionMode, McpTransportConfig};
-    use macaca_framework::tool::{ToolError, ToolHandler, ToolResponse};
-    use macaca_runtime_host::{
-        McpDefinitionSource, McpLifecycleScope, McpRuntimeFacade, McpRuntimeStatus,
-        McpRuntimeStatusState, McpServerDefinition, McpToolPolicy,
-    };
-    use serde_json::Value;
-
-    use super::*;
-
-    fn sample_mcp_status(
-        server_id: &str,
-        state: McpRuntimeStatusState,
-        exposed_tools: Vec<String>,
-    ) -> McpRuntimeStatus {
-        McpRuntimeStatus {
-            server_id: server_id.to_string(),
-            transport: "stdio".into(),
-            lifecycle: McpLifecycleScope::Global,
-            session_mode: McpSessionMode::Stateful,
-            state,
-            exposed_tools,
-            failure_reason: None,
-        }
-    }
-
-    #[test]
-    fn mcp_catalog_maps_statuses_and_detects_cross_server_tool_collision() {
-        let statuses = [
-            sample_mcp_status(
-                "figma",
-                McpRuntimeStatusState::Ready,
-                vec!["get_figma_data".into(), "shared_tool".into()],
-            ),
-            sample_mcp_status(
-                "other",
-                McpRuntimeStatusState::Ready,
-                vec!["shared_tool".into()],
-            ),
-        ];
-
-        assert_eq!(
-            ready_mcp_server_ids(&statuses),
-            vec!["figma".to_string(), "other".to_string()]
-        );
-
-        let cat = mcp_capability_catalog_from_statuses(&statuses);
-        assert_eq!(cat.servers.len(), 2);
-        assert_eq!(cat.collisions.len(), 1);
-        assert_eq!(cat.collisions[0].local_key, "shared_tool");
-        assert!(cat.collisions[0].claimants.contains(&"figma".to_string()));
-    }
-
-    #[test]
-    fn ready_mcp_server_ids_ignores_non_ready() {
-        let statuses = [
-            sample_mcp_status("up", McpRuntimeStatusState::Ready, vec![]),
-            sample_mcp_status("down", McpRuntimeStatusState::Failed, vec![]),
-        ];
-        assert_eq!(ready_mcp_server_ids(&statuses), vec!["up"]);
-    }
-
-    #[test]
-    fn runtime_tool_catalog_lists_tool_names_sorted_and_deduped() {
-        struct NamedTool(&'static str);
-
-        #[async_trait]
-        impl ToolHandler for NamedTool {
-            async fn execute(&self, args: Value) -> Result<ToolResponse, ToolError> {
-                Ok(ToolResponse::json(args))
+/// Read the normal-profile governance snapshot used by capability context.
+///
+/// This requests every lifecycle explicitly instead of relying on legacy
+/// `include_archived` semantics. The adapter then applies the normal-profile
+/// `Active` visibility rule with enough service evidence to explain every
+/// filtered row in the Context report.
+pub async fn resolve_skill_governance_snapshot(
+    state: &Arc<AppState>,
+    app_id: &ApplicationId,
+    agent_name: &str,
+    session_id: Option<&str>,
+) -> Option<SkillGovernanceSnapshotResult> {
+    let scope =
+        match SkillServiceScope::agent(*app_id, session_id.unwrap_or("no-session"), agent_name) {
+            Ok(scope) => scope,
+            Err(error) => {
+                tracing::warn!(
+                    agent = %agent_name,
+                    error = %error,
+                    "skill governance scope validation failed during context catalog assembly"
+                );
+                return None;
             }
-            fn name(&self) -> &str {
-                self.0
-            }
-            fn description(&self) -> &str {
-                "test tool"
-            }
-            fn schema(&self) -> Value {
-                serde_json::json!({ "type": "object" })
-            }
-        }
-
-        let mut toolkit = Toolkit::new();
-        toolkit.register(Box::new(NamedTool("zzz")), None);
-        toolkit.register(Box::new(NamedTool("aaa")), None);
-        toolkit.register(Box::new(NamedTool("zzz")), None);
-
-        let cat = runtime_tool_capability_catalog_from_toolkit(&toolkit);
-        assert_eq!(cat.tool_names, vec!["aaa", "zzz"]);
-    }
-
-    #[tokio::test]
-    async fn probe_mcp_capability_inputs_matches_facade_probe_without_subprocess_enabled() {
-        let facade = Arc::new(McpRuntimeFacade::new());
-        let def = McpServerDefinition {
-            id: "fixture_disabled_stdio".into(),
-            transport: McpTransportConfig::Stdio {
-                command: "no-such-binary-for-probe-fixture".into(),
-                args: Vec::new(),
-                env: BTreeMap::new(),
-                cwd: None,
-            },
-            lifecycle: McpLifecycleScope::Session,
-            session_mode: McpSessionMode::Stateful,
-            tool_prefix: None,
-            required_bins: vec!["no-such-binary-for-probe-fixture".into()],
-            enabled: false,
-            source: McpDefinitionSource::App,
-            concurrency_isolation: None,
         };
-        facade.upsert_definition(def).await;
-
-        let (catalog, ready) =
-            probe_mcp_capability_inputs(&facade, &McpToolPolicy::default()).await;
-
-        assert!(ready.is_empty());
-        assert_eq!(catalog.servers.len(), 1);
-        assert_eq!(catalog.servers[0].server_id, "fixture_disabled_stdio");
-        assert!(catalog.servers[0].state.contains("Disabled"));
-        assert!(
-            catalog.servers[0].exposed_tools.is_empty(),
-            "disabled servers should surface no MCP tools until enabled"
-        );
+    match state
+        .skill_client
+        .governance_snapshot(SkillGovernanceSnapshotCommand {
+            trace: TraceContext::new("web-capability-skill-governance-snapshot"),
+            scope,
+            include_archived: true,
+            lifecycle_filters: vec![
+                SkillLifecycleState::Draft,
+                SkillLifecycleState::Active,
+                SkillLifecycleState::Stale,
+                SkillLifecycleState::Archived,
+                SkillLifecycleState::Quarantined,
+                SkillLifecycleState::Superseded,
+                SkillLifecycleState::Rejected,
+            ],
+        })
+        .await
+    {
+        Ok(snapshot) => {
+            tracing::info!(
+                agent = %agent_name,
+                records = snapshot.records.len(),
+                successful_tasks = snapshot.telemetry_aggregate.successful_task_count,
+                failed_tasks = snapshot.telemetry_aggregate.failed_task_count,
+                "skill governance snapshot consumed for context catalog assembly"
+            );
+            Some(snapshot)
+        }
+        Err(error) => {
+            tracing::warn!(
+                agent = %agent_name,
+                error = %error,
+                "skill governance snapshot unavailable during context catalog assembly"
+            );
+            None
+        }
     }
 }
+
+#[cfg(test)]
+#[path = "capability_catalog_tests.rs"]
+mod tests;

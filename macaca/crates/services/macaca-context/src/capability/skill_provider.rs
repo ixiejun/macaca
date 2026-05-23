@@ -6,7 +6,9 @@ use async_trait::async_trait;
 use macaca_proto::MacacaResult;
 
 use super::model::SkillCapabilityCatalog;
-use super::render::{skill_catalog_to_candidate, skill_missing_dependency_notes};
+use super::render::{
+    skill_catalog_governance_notes, skill_catalog_to_candidate, skill_missing_dependency_notes,
+};
 use crate::{
     ContextComposeContext, ContextProvider, ContextProviderDiagnostics, ContextProviderOutcome,
     ContextProviderStage,
@@ -51,6 +53,12 @@ impl ContextProvider for SkillContextProvider {
     ) -> MacacaResult<ContextProviderOutcome> {
         let mut diagnostics = Vec::new();
         for note in skill_missing_dependency_notes(&self.catalog, &self.ready_mcp_server_ids) {
+            diagnostics.push(ContextProviderDiagnostics {
+                provider_id: self.provider_id().to_string(),
+                message: note,
+            });
+        }
+        for note in skill_catalog_governance_notes(&self.catalog) {
             diagnostics.push(ContextProviderDiagnostics {
                 provider_id: self.provider_id().to_string(),
                 message: note,

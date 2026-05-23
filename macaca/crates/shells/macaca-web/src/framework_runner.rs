@@ -1403,7 +1403,22 @@ impl WebTracedAgentFactory {
             .await
             {
                 Ok(snap) => {
-                    crate::capability_catalog::skill_capability_catalog_from_snapshot(&snap)
+                    if let Some(governance) =
+                        crate::capability_catalog::resolve_skill_governance_snapshot(
+                            state,
+                            &request.identity.app_id,
+                            &request.identity.agent_name,
+                            request.identity.session_id.as_deref(),
+                        )
+                        .await
+                    {
+                        crate::capability_catalog::skill_capability_catalog_from_governance_snapshot(
+                            &snap,
+                            &governance,
+                        )
+                    } else {
+                        crate::capability_catalog::skill_capability_catalog_from_snapshot(&snap)
+                    }
                 }
                 Err(error) => {
                     tracing::warn!(

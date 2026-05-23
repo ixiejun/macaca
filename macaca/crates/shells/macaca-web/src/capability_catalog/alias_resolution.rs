@@ -6,12 +6,13 @@
 //! catalog that already honors the service-owned decision.
 
 use macaca_context::{
-    DeclaredCapabilityDependency, SkillCapabilityCatalog, SkillCapabilityRecord,
-    SkillFilterDiagnostic,
+    DeclaredCapabilityDependency, SkillCapabilityCatalog, SkillCapabilityGovernanceReport,
+    SkillCapabilityRecord, SkillFilterDiagnostic,
 };
 use macaca_skill::{
     FilteredSkill, SkillAliasKind, SkillAliasResolutionStatus, SkillAliasResolveResult,
-    SkillSnapshot, SkillSnapshotEntry,
+    SkillGovernanceRecord, SkillGovernanceSnapshotResult, SkillLifecycleState, SkillSnapshot,
+    SkillSnapshotEntry,
 };
 
 /// Freeze a skill snapshot after applying Skill-service alias decisions.
@@ -27,12 +28,31 @@ pub fn catalog_from_snapshot_with_aliases(
     snapshot: &SkillSnapshot,
     aliases: &[SkillAliasResolveResult],
 ) -> SkillCapabilityCatalog {
+    catalog_from_snapshot_with_aliases_and_governance(snapshot, aliases, None)
+}
+
+/// Freeze a skill snapshot after applying service-owned alias and governance
+/// decisions.
+///
+/// The lifecycle filter is intentionally normal-profile only: `Active` skills
+/// remain visible, while draft/stale/archived/quarantined/rejected/superseded
+/// rows are represented as filtered diagnostics.  Future experimental profiles
+/// can pass a richer governance snapshot here without changing composer
+/// contracts or reading skill directories in `macaca-context`.
+#[must_use]
+pub fn catalog_from_snapshot_with_aliases_and_governance(
+    snapshot: &SkillSnapshot,
+    aliases: &[SkillAliasResolveResult],
+    governance: Option<&SkillGovernanceSnapshotResult>,
+) -> SkillCapabilityCatalog {
     let alias_view = AliasResolvedSkillSnapshot::from_snapshot(snapshot, aliases);
+    let governance_view = GovernanceResolvedSkillSnapshot::from_snapshot(snapshot, governance);
 
     let entries: Vec<SkillCapabilityRecord> = snapshot
         .skills
         .iter()
         .filter(|e| !alias_view.hidden_sources.contains(&e.name))
+        .filter(|e| !governance_view.hidden_sources.contains(&e.name))
         .map(|e| {
             let stable_id = format!("skill:{}:{}", e.source_scope.as_str(), e.name);
             let declared_dependencies: Vec<DeclaredCapabilityDependency> = e
@@ -53,6 +73,10 @@ pub fn catalog_from_snapshot_with_aliases(
                 location_ref: e.location.display().to_string(),
                 source_label: e.source.clone(),
                 source_scope: e.source_scope.as_str().to_string(),
+                lifecycle: governance_view
+                    .lifecycle_by_name
+                    .get(&e.name)
+                    .map(ToString::to_string),
                 declared_dependencies,
             }
         })
@@ -66,12 +90,23 @@ pub fn catalog_from_snapshot_with_aliases(
             reason: f.reason.clone(),
         })
         .chain(alias_view.filtered_for_context)
+        .chain(governance_view.filtered_for_context)
         .collect();
+    let governance_report = SkillCapabilityGovernanceReport {
+        visible_count: entries.len(),
+        filtered_count: filtered.len(),
+        lifecycle_filtered_count: governance_view.lifecycle_filtered_count,
+        alias_filtered_count: alias_view.alias_filtered_count,
+        skill_read_count: entries.len(),
+        activation_observation_count: governance_view.activation_observation_count,
+        trace_refs: governance_view.trace_refs,
+    };
 
     SkillCapabilityCatalog {
         entries,
         filtered,
         truncated: snapshot.truncated,
+        governance_report,
     }
 }
 
@@ -106,6 +141,7 @@ struct AliasResolvedSkillSnapshot {
     hidden_sources: std::collections::BTreeSet<String>,
     filtered_for_context: Vec<SkillFilterDiagnostic>,
     filtered_for_runtime: Vec<(String, String)>,
+    alias_filtered_count: usize,
 }
 
 impl AliasResolvedSkillSnapshot {
@@ -150,11 +186,89 @@ impl AliasResolvedSkillSnapshot {
             filtered_for_runtime.push((source_name.to_string(), reason));
         }
 
+        let alias_filtered_count = hidden_sources.len();
         Self {
             hidden_sources,
             filtered_for_context,
             filtered_for_runtime,
+            alias_filtered_count,
         }
+    }
+}
+
+struct GovernanceResolvedSkillSnapshot {
+    hidden_sources: std::collections::BTreeSet<String>,
+    filtered_for_context: Vec<SkillFilterDiagnostic>,
+    lifecycle_by_name: std::collections::BTreeMap<String, &'static str>,
+    lifecycle_filtered_count: usize,
+    activation_observation_count: usize,
+    trace_refs: Vec<String>,
+}
+
+impl GovernanceResolvedSkillSnapshot {
+    fn from_snapshot(
+        snapshot: &SkillSnapshot,
+        governance: Option<&SkillGovernanceSnapshotResult>,
+    ) -> Self {
+        let mut records_by_name =
+            std::collections::BTreeMap::<String, &SkillGovernanceRecord>::new();
+        if let Some(governance) = governance {
+            for record in &governance.records {
+                records_by_name.insert(record.provenance.name.clone(), record);
+            }
+        }
+
+        let mut hidden_sources = std::collections::BTreeSet::<String>::new();
+        let mut filtered_for_context = Vec::<SkillFilterDiagnostic>::new();
+        let mut lifecycle_by_name = std::collections::BTreeMap::<String, &'static str>::new();
+        let mut activation_observation_count = 0usize;
+        let mut trace_refs = Vec::<String>::new();
+
+        for entry in &snapshot.skills {
+            let Some(record) = records_by_name.get(&entry.name) else {
+                lifecycle_by_name.insert(entry.name.clone(), "active");
+                continue;
+            };
+            let lifecycle_label = lifecycle_label(&record.lifecycle);
+            lifecycle_by_name.insert(entry.name.clone(), lifecycle_label);
+            activation_observation_count = activation_observation_count
+                .saturating_add(record.telemetry.activation_count as usize);
+            for evidence_id in record.evidence_ids.iter().take(4) {
+                if !evidence_id.trim().is_empty() {
+                    trace_refs.push(evidence_id.clone());
+                }
+            }
+            if record.lifecycle != SkillLifecycleState::Active {
+                hidden_sources.insert(entry.name.clone());
+                filtered_for_context.push(SkillFilterDiagnostic {
+                    name: entry.name.clone(),
+                    reason: format!("lifecycle_filtered:{lifecycle_label}"),
+                });
+            }
+        }
+        trace_refs.sort();
+        trace_refs.dedup();
+
+        Self {
+            lifecycle_filtered_count: hidden_sources.len(),
+            hidden_sources,
+            filtered_for_context,
+            lifecycle_by_name,
+            activation_observation_count,
+            trace_refs,
+        }
+    }
+}
+
+fn lifecycle_label(lifecycle: &SkillLifecycleState) -> &'static str {
+    match lifecycle {
+        SkillLifecycleState::Draft => "draft",
+        SkillLifecycleState::Active => "active",
+        SkillLifecycleState::Stale => "stale",
+        SkillLifecycleState::Archived => "archived",
+        SkillLifecycleState::Quarantined => "quarantined",
+        SkillLifecycleState::Superseded => "superseded",
+        SkillLifecycleState::Rejected => "rejected",
     }
 }
 

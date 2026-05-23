@@ -39,7 +39,8 @@ pub use capability::{
     skill_capability_provider_arc, CapabilityCollisionRecord, DeclaredCapabilityDependency,
     McpCapabilityCatalog, McpContextProvider, McpServerCapabilitySummary,
     RuntimeToolCapabilityCatalog, RuntimeToolCapabilityProvider, SkillCapabilityCatalog,
-    SkillCapabilityRecord, SkillContextProvider, SkillFilterDiagnostic,
+    SkillCapabilityGovernanceReport, SkillCapabilityRecord, SkillContextProvider,
+    SkillFilterDiagnostic,
 };
 pub use catalog::{
     assemble_context_providers, list_builtin_family_descriptors, ProviderAssemblyEnvironment,

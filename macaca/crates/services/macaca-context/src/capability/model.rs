@@ -54,6 +54,11 @@ pub struct SkillCapabilityRecord {
     pub location_ref: String,
     pub source_label: String,
     pub source_scope: String,
+    /// Optional governance lifecycle label copied from a Skill service
+    /// snapshot.  The context crate treats this as opaque metadata; lifecycle
+    /// policy remains owned by the Skill service and host adapter.
+    #[serde(default)]
+    pub lifecycle: Option<String>,
     pub declared_dependencies: Vec<DeclaredCapabilityDependency>,
 }
 
@@ -64,12 +69,46 @@ pub struct SkillFilterDiagnostic {
     pub reason: String,
 }
 
+/// Prompt-safe governance rollup for a frozen skill catalog.
+///
+/// These counts are intentionally coarse.  They let Context reports explain
+/// why the compact catalog changed without exposing skill bodies, raw task
+/// output, provider payloads, or application-specific policy internals.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SkillCapabilityGovernanceReport {
+    pub visible_count: usize,
+    pub filtered_count: usize,
+    pub lifecycle_filtered_count: usize,
+    pub alias_filtered_count: usize,
+    pub skill_read_count: usize,
+    pub activation_observation_count: usize,
+    pub trace_refs: Vec<String>,
+}
+
+impl Default for SkillCapabilityGovernanceReport {
+    fn default() -> Self {
+        Self {
+            visible_count: 0,
+            filtered_count: 0,
+            lifecycle_filtered_count: 0,
+            alias_filtered_count: 0,
+            skill_read_count: 0,
+            activation_observation_count: 0,
+            trace_refs: Vec::new(),
+        }
+    }
+}
+
 /// Input bundle for [`super::SkillContextProvider`].
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SkillCapabilityCatalog {
     pub entries: Vec<SkillCapabilityRecord>,
     pub filtered: Vec<SkillFilterDiagnostic>,
     pub truncated: bool,
+    /// Governance/report metadata that flows into Context diagnostics, not the
+    /// model-visible skill body.  Default preserves older serialized snapshots.
+    #[serde(default)]
+    pub governance_report: SkillCapabilityGovernanceReport,
 }
 
 /// One MCP server's **compact** capability surface (tools list + transport summary).

@@ -7,7 +7,8 @@ use std::sync::Arc;
 
 use crate::capability::model::{
     DeclaredCapabilityDependency, McpCapabilityCatalog, McpServerCapabilitySummary,
-    RuntimeToolCapabilityCatalog, SkillCapabilityCatalog, SkillCapabilityRecord,
+    RuntimeToolCapabilityCatalog, SkillCapabilityCatalog, SkillCapabilityGovernanceReport,
+    SkillCapabilityRecord,
 };
 use crate::{
     mcp_capability_provider_arc, runtime_tool_capability_provider_arc,
@@ -63,6 +64,7 @@ async fn skill_capability_provider_dependency_gap_becomes_diagnostics() {
             location_ref: "/skills/demo/SKILL.md".into(),
             source_label: "app".into(),
             source_scope: "application".into(),
+            lifecycle: Some("active".into()),
             declared_dependencies: vec![DeclaredCapabilityDependency {
                 capability_id: "mcp_server:figma".into(),
                 notes: None,
@@ -70,6 +72,7 @@ async fn skill_capability_provider_dependency_gap_becomes_diagnostics() {
         }],
         filtered: Vec::new(),
         truncated: false,
+        governance_report: Default::default(),
     });
 
     // Ready set intentionally omits `figma` so the provider should surface a diagnostic.
@@ -80,6 +83,46 @@ async fn skill_capability_provider_dependency_gap_becomes_diagnostics() {
     let out = provider.contribute(&compose_ctx(&assemble)).await.unwrap();
     assert_eq!(out.candidates.len(), 1);
     assert!(out.diagnostics.iter().any(|d| d.message.contains("figma")));
+}
+
+#[tokio::test]
+async fn skill_capability_provider_reports_governance_counts() {
+    let catalog = Arc::new(SkillCapabilityCatalog {
+        entries: vec![SkillCapabilityRecord {
+            stable_id: "skill:application:active".into(),
+            name: "active".into(),
+            description: "visible active skill".into(),
+            location_ref: "/skills/active/SKILL.md".into(),
+            source_label: "app".into(),
+            source_scope: "application".into(),
+            lifecycle: Some("active".into()),
+            declared_dependencies: Vec::new(),
+        }],
+        filtered: Vec::new(),
+        truncated: false,
+        governance_report: SkillCapabilityGovernanceReport {
+            visible_count: 1,
+            filtered_count: 2,
+            lifecycle_filtered_count: 1,
+            alias_filtered_count: 1,
+            skill_read_count: 1,
+            activation_observation_count: 3,
+            trace_refs: vec!["evidence://context/skill-read".into()],
+        },
+    });
+
+    let provider = skill_capability_provider_arc(catalog, Arc::new(Vec::new()));
+    let assemble = ContextAssembleInput::legacy("agent", "model", vec![], Default::default());
+    let out = provider.contribute(&compose_ctx(&assemble)).await.unwrap();
+
+    assert!(out
+        .diagnostics
+        .iter()
+        .any(|d| d.message.contains("lifecycle_filtered=1")));
+    assert!(out
+        .diagnostics
+        .iter()
+        .any(|d| d.message.contains("evidence://context/skill-read")));
 }
 
 #[tokio::test]

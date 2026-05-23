@@ -74,6 +74,12 @@ fn render_skill_capability_text(cat: &SkillCapabilityCatalog) -> String {
             xml_escape(&e.source_scope),
             xml_escape(&e.source_label)
         ));
+        if let Some(lifecycle) = e.lifecycle.as_deref() {
+            w.push_str(&format!(
+                "    <lifecycle>{}</lifecycle>\n",
+                xml_escape(lifecycle)
+            ));
+        }
         w.push_str("  </entry>\n");
     }
     w.push_str("</skill_capabilities>\n");
@@ -158,6 +164,37 @@ pub fn skill_missing_dependency_notes(
                     mid
                 ));
             }
+        }
+    }
+    notes
+}
+
+/// Returns bounded catalog-governance notes for Context report diagnostics.
+///
+/// The notes describe counts and trace references only.  They deliberately do
+/// not include skill instruction bodies, raw task summaries, or provider
+/// payloads; those remain behind progressive disclosure and service audit.
+pub fn skill_catalog_governance_notes(cat: &SkillCapabilityCatalog) -> Vec<String> {
+    let report = &cat.governance_report;
+    let mut notes = Vec::new();
+    if report.visible_count > 0
+        || report.filtered_count > 0
+        || report.lifecycle_filtered_count > 0
+        || report.alias_filtered_count > 0
+    {
+        notes.push(format!(
+            "skill governance catalog visible={} filtered={} lifecycle_filtered={} alias_filtered={} reads={} activations={}",
+            report.visible_count,
+            report.filtered_count,
+            report.lifecycle_filtered_count,
+            report.alias_filtered_count,
+            report.skill_read_count,
+            report.activation_observation_count
+        ));
+    }
+    for trace_ref in report.trace_refs.iter().take(8) {
+        if !trace_ref.trim().is_empty() {
+            notes.push(format!("skill governance trace_ref={trace_ref}"));
         }
     }
     notes
@@ -314,10 +351,12 @@ mod tests {
                 location_ref: "/tmp/skills/demo/SKILL.md".into(),
                 source_label: "app".into(),
                 source_scope: "workspace".into(),
+                lifecycle: Some("active".into()),
                 declared_dependencies: Vec::new(),
             }],
             filtered: Vec::new(),
             truncated: false,
+            governance_report: Default::default(),
         };
         let c = skill_catalog_to_candidate(&cat).unwrap();
         assert!(c.content.contains("short desc only"));
@@ -352,6 +391,7 @@ mod tests {
                 location_ref: "p".into(),
                 source_label: "l".into(),
                 source_scope: "workspace".into(),
+                lifecycle: Some("active".into()),
                 declared_dependencies: vec![DeclaredCapabilityDependency {
                     capability_id: "mcp_server:playwright".into(),
                     notes: None,
@@ -359,6 +399,7 @@ mod tests {
             }],
             filtered: Vec::new(),
             truncated: false,
+            governance_report: Default::default(),
         };
         let notes = skill_missing_dependency_notes(&cat, &["other".into()]);
         assert!(notes.iter().any(|n| n.contains("playwright")));
