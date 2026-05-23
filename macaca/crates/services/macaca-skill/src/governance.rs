@@ -135,24 +135,34 @@ impl SkillUsageObservation {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SkillUsageTelemetry {
     pub view_count: u64,
+    pub activation_count: u64,
+    pub resource_read_count: u64,
     pub use_count: u64,
     pub patch_count: u64,
+    pub successful_task_count: u64,
+    pub failed_task_count: u64,
     pub last_viewed_at: Option<DateTime<Utc>>,
     pub last_used_at: Option<DateTime<Utc>>,
     pub last_patched_at: Option<DateTime<Utc>>,
     pub last_lifecycle_event_at: Option<DateTime<Utc>>,
+    pub last_observed_at: Option<DateTime<Utc>>,
 }
 
 impl Default for SkillUsageTelemetry {
     fn default() -> Self {
         Self {
             view_count: 0,
+            activation_count: 0,
+            resource_read_count: 0,
             use_count: 0,
             patch_count: 0,
+            successful_task_count: 0,
+            failed_task_count: 0,
             last_viewed_at: None,
             last_used_at: None,
             last_patched_at: None,
             last_lifecycle_event_at: None,
+            last_observed_at: None,
         }
     }
 }
@@ -160,12 +170,14 @@ impl Default for SkillUsageTelemetry {
 impl SkillUsageTelemetry {
     /// Apply one sanitized event to aggregate counters.
     pub fn record(&mut self, event: &SkillUsageEventKind, observed_at: DateTime<Utc>) {
+        self.last_observed_at = Some(observed_at);
         match event {
             SkillUsageEventKind::Viewed => {
                 self.view_count = self.view_count.saturating_add(1);
                 self.last_viewed_at = Some(observed_at);
             }
             SkillUsageEventKind::Used => {
+                self.activation_count = self.activation_count.saturating_add(1);
                 self.use_count = self.use_count.saturating_add(1);
                 self.last_used_at = Some(observed_at);
             }

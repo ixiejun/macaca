@@ -17,15 +17,15 @@
 
 ## 2. Durable Skill Governance Store
 
-- [ ] 2.1 Define provider-neutral Store/EventLog-backed governance record DTOs
+- [x] 2.1 Define provider-neutral Store/EventLog-backed governance record DTOs
   for lifecycle, pinned status, source scope, ownership, trust, evidence refs,
   policy decision refs, audit event ids, and timestamps.
-- [ ] 2.2 Define durable `SkillProvenance` with skill id, version, author kind,
+- [x] 2.2 Define durable `SkillProvenance` with skill id, version, author kind,
   author agent id, application id, session id, task id, trace id, evidence refs,
   source scope, trust level, created timestamp, and updated timestamp.
-- [ ] 2.3 Define durable `SkillUsageTelemetry` with view, activation, resource
+- [x] 2.3 Define durable `SkillUsageTelemetry` with view, activation, resource
   read, patch, successful task, failed task, and last timestamp counters.
-- [ ] 2.4 Define durable `SkillAliasMap` with source skill, target skill,
+- [x] 2.4 Define durable `SkillAliasMap` with source skill, target skill,
   reason, run id, validity window, and resolution policy.
 - [x] 2.5 Define durable proposal, curation run, report, snapshot, and rollback
   reference records.

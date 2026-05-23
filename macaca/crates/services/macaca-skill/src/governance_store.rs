@@ -15,8 +15,85 @@ use serde::{Deserialize, Serialize};
 
 use crate::alias::SkillAliasRecord;
 use crate::evolution::SkillExperienceProposalRecord;
-use crate::governance::{SkillGovernanceRecord, SkillUsageObservation};
+use crate::governance::{SkillGovernanceRecord, SkillUsageObservation, SkillUsageTelemetry};
 use crate::service_contract::SkillServiceScope;
+
+/// Durable provenance for a governed skill package or draft.
+///
+/// This DTO is intentionally richer than the lightweight snapshot provenance
+/// because Store/EventLog providers must be able to answer who created or
+/// changed a skill, which task/session/application supplied the evidence, and
+/// which trace can replay the decision.  It stores only identifiers and refs;
+/// raw prompts, package bytes, manifests, and full skill bodies are never part
+/// of provenance.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SkillProvenance {
+    pub skill_id: String,
+    pub version: Option<String>,
+    pub author_kind: crate::governance::SkillAuthorKind,
+    pub author_agent_id: Option<String>,
+    pub application_id: Option<String>,
+    pub session_id: Option<String>,
+    pub task_id: Option<String>,
+    pub trace_id: String,
+    pub evidence_refs: Vec<String>,
+    pub source_scope: String,
+    pub trust_level: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// Durable governance read-record stored behind the Skill service boundary.
+///
+/// The record combines lifecycle metadata, pinning, ownership/trust hints,
+/// provenance, telemetry, and audit refs.  Keeping this as a provider-neutral
+/// DTO lets the built-in local Strategy and a future Store/EventLog Strategy
+/// expose the same command surface without moving curation semantics into
+/// kernel, SDK, Web, CLI, or frontend layers.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DurableSkillGovernanceRecord {
+    pub skill_id: String,
+    pub lifecycle: crate::governance::SkillLifecycleState,
+    pub pinned: bool,
+    pub source_scope: String,
+    pub ownership: String,
+    pub trust_level: Option<String>,
+    pub evidence_refs: Vec<String>,
+    pub policy_decision_refs: Vec<String>,
+    pub audit_event_ids: Vec<String>,
+    pub provenance: SkillProvenance,
+    pub telemetry: SkillUsageTelemetry,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// Resolution behavior for a service-owned skill alias.
+///
+/// Consumers ask the Skill service to resolve aliases instead of rewriting
+/// historical task, scheduler, or context references.  The policy keeps the
+/// decision explicit and auditable.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SkillAliasResolutionPolicy {
+    Redirect,
+    WarnAndRedirect,
+    Deny,
+}
+
+/// Durable alias-map record from one governed skill identity to another.
+///
+/// Alias records are metadata mementos for curation and merge flows.  They
+/// carry a validity window and run reference so future rollbacks can replay or
+/// retire the mapping without touching active skill package files directly.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SkillAliasMap {
+    pub source_skill_id: String,
+    pub target_skill_id: String,
+    pub reason: String,
+    pub run_id: Option<String>,
+    pub valid_from: DateTime<Utc>,
+    pub valid_until: Option<DateTime<Utc>>,
+    pub resolution_policy: SkillAliasResolutionPolicy,
+}
 
 /// Durable metadata for one bounded curation run.
 ///
@@ -189,4 +266,75 @@ impl SkillGovernanceReadModel {
 
 fn sorted_values<T>(map: BTreeMap<String, T>) -> Vec<T> {
     map.into_values().collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::governance::{SkillAuthorKind, SkillLifecycleState};
+
+    #[test]
+    fn durable_governance_dtos_capture_store_backed_skill_state_without_bodies() {
+        let now = Utc::now();
+        let provenance = SkillProvenance {
+            skill_id: "skill://agent/refactor".into(),
+            version: Some("1.0.0".into()),
+            author_kind: SkillAuthorKind::Agent,
+            author_agent_id: Some("agent-maintainer".into()),
+            application_id: Some("app-alpha".into()),
+            session_id: Some("session-1".into()),
+            task_id: Some("task-1".into()),
+            trace_id: "trace-1".into(),
+            evidence_refs: vec!["store://evidence/task-1".into()],
+            source_scope: "workspace".into(),
+            trust_level: Some("verified".into()),
+            created_at: now,
+            updated_at: now,
+        };
+        let telemetry = SkillUsageTelemetry {
+            view_count: 1,
+            activation_count: 2,
+            resource_read_count: 3,
+            use_count: 2,
+            patch_count: 4,
+            successful_task_count: 5,
+            failed_task_count: 6,
+            last_viewed_at: Some(now),
+            last_used_at: Some(now),
+            last_patched_at: Some(now),
+            last_lifecycle_event_at: Some(now),
+            last_observed_at: Some(now),
+        };
+        let record = DurableSkillGovernanceRecord {
+            skill_id: provenance.skill_id.clone(),
+            lifecycle: SkillLifecycleState::Active,
+            pinned: false,
+            source_scope: provenance.source_scope.clone(),
+            ownership: "agent-private".into(),
+            trust_level: provenance.trust_level.clone(),
+            evidence_refs: provenance.evidence_refs.clone(),
+            policy_decision_refs: vec!["policy://decision/1".into()],
+            audit_event_ids: vec!["audit://event/1".into()],
+            provenance,
+            telemetry,
+            created_at: now,
+            updated_at: now,
+        };
+        let alias = SkillAliasMap {
+            source_skill_id: "skill://agent/old".into(),
+            target_skill_id: "skill://agent/refactor".into(),
+            reason: "superseded by a broader maintained skill".into(),
+            run_id: Some("curation-run-1".into()),
+            valid_from: now,
+            valid_until: Some(now),
+            resolution_policy: SkillAliasResolutionPolicy::WarnAndRedirect,
+        };
+
+        let serialized = serde_json::to_string(&(record, alias))
+            .expect("durable governance DTOs should serialize");
+
+        assert!(serialized.contains("activation_count"));
+        assert!(serialized.contains("WarnAndRedirect"));
+        assert!(!serialized.contains("SKILL.md body"));
+    }
 }
