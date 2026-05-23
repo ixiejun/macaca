@@ -1,0 +1,60 @@
+use crate::{
+    SkillAliasKind, SkillMergeAliasEffect, SkillMergeRiskScore, SkillMergeSupportFileDestination,
+    SkillMergeSupportFileMovement, SkillUmbrellaMergeProposal,
+};
+
+#[test]
+fn umbrella_merge_proposal_carries_metadata_only_contract() {
+    let proposal = SkillUmbrellaMergeProposal {
+        proposal_id: "merge://proposal/agent-debugging".into(),
+        source_skill_ids: vec!["skill://agent/debug-heartbeat".into()],
+        target_umbrella_skill_id: "skill://agent/debugging".into(),
+        support_file_movements: vec![SkillMergeSupportFileMovement {
+            source_skill_id: "skill://agent/debug-heartbeat".into(),
+            source_path: "SKILL.md#case-study".into(),
+            destination: SkillMergeSupportFileDestination::References,
+            destination_path: "references/heartbeat-live-proof.md".into(),
+            rationale: "session-specific proof steps belong in references".into(),
+            evidence_ids: vec!["evidence://merge/reference-demotion".into()],
+        }],
+        alias_effects: vec![SkillMergeAliasEffect {
+            source_skill_id: "skill://agent/debug-heartbeat".into(),
+            source_name: "debug-heartbeat".into(),
+            target_skill_id: "skill://agent/debugging".into(),
+            target_name: "debugging".into(),
+            kind: SkillAliasKind::AbsorbedInto,
+            rationale: "source skill becomes a redirect to the umbrella flow".into(),
+            evidence_ids: vec!["evidence://merge/alias".into()],
+        }],
+        risk: SkillMergeRiskScore {
+            score: 0.35,
+            reasons: vec!["compatible diagnostic flow".into()],
+        },
+        policy_decision_refs: vec!["policy://skill-merge/compatible".into()],
+        evidence_ids: vec!["evidence://merge/proposal".into()],
+        rationale: "merge keeps reusable debugging flow in the umbrella skill".into(),
+    };
+
+    assert!(proposal.validate().is_ok());
+    assert_eq!(proposal.alias_effects[0].kind, SkillAliasKind::AbsorbedInto);
+    assert_eq!(
+        proposal.support_file_movements[0].destination,
+        SkillMergeSupportFileDestination::References
+    );
+}
+
+#[test]
+fn umbrella_merge_proposal_rejects_invalid_identity_and_risk() {
+    let mut proposal = SkillUmbrellaMergeProposal::metadata_only(
+        "merge://proposal/invalid",
+        vec!["skill://agent/source".into()],
+        "skill://agent/target",
+        "bounded rationale",
+    );
+    proposal.risk.score = 1.5;
+    assert!(proposal.validate().is_err());
+
+    proposal.risk.score = 0.5;
+    proposal.source_skill_ids.clear();
+    assert!(proposal.validate().is_err());
+}

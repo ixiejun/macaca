@@ -584,6 +584,19 @@ Every command logs key execution nodes with sanitized fields:
   the provider, and curation continues to log sanitized provider status,
   proposal count, mutation flag, and run identifiers.
 
+### Slice 10A: Umbrella Merge Proposal DTOs
+
+- Patterns: `macaca-skill` defines a metadata-only proposal contract for future
+  umbrella merge flows. The DTO separates source skill ids, target umbrella id,
+  support-file movement plans, alias effects, bounded risk score, policy refs,
+  evidence refs, and rationale before any apply command exists.
+- Boundaries: the contract is service-owned and exported through `macaca-skill`
+  only. It does not add SDK, kernel, Web, CLI, or frontend dependencies, and it
+  does not mutate lifecycle, aliases, or files.
+- Safety: validation rejects missing identities, source-equals-target merges,
+  invalid risk scores, blank evidence refs, oversized rationale, and excessive
+  source/movement/alias/evidence counts.
+
 ## Risks And Mitigations
 
 - Risk: skill mutation corrupts active packages. Mitigation: atomic writes,

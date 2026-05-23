@@ -30,6 +30,7 @@ pub mod governance_store;
 pub mod handle;
 pub mod lifecycle;
 pub mod lifecycle_state_machine;
+pub mod merge;
 pub mod mutation;
 pub mod package;
 pub mod policy;
@@ -54,6 +55,9 @@ mod curation_tests;
 mod governance_lifecycle_tests;
 
 #[cfg(test)]
+mod merge_tests;
+
+#[cfg(test)]
 mod semantic_review_tests;
 
 // Executable skills (YAML).
@@ -69,6 +73,7 @@ pub use governance_store::*;
 pub use handle::{SkillRuntimeHandle, SkillRuntimeState};
 pub use lifecycle::*;
 pub use lifecycle_state_machine::*;
+pub use merge::*;
 pub use mutation::*;
 pub use package::{agent_skill_package_descriptor, skill_entry_package_descriptor};
 pub use policy::{PolicyDecision, SkillExposureContext, SkillExposurePolicy, SkillPolicyChain};

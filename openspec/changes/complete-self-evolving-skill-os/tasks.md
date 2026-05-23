@@ -173,7 +173,7 @@
 
 ## 10. Umbrella Merge And Support-File Demotion
 
-- [ ] 10.1 Define merge proposal DTOs with source skills, target umbrella skill,
+- [x] 10.1 Define merge proposal DTOs with source skills, target umbrella skill,
   support-file movements, alias effects, risk score, and policy refs.
 - [ ] 10.2 Add merge eligibility specifications for scope, ownership,
   permissions, trust level, package source, executable semantics, tenant, and
