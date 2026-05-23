@@ -210,11 +210,11 @@
 - [x] 12.1 Consume frozen Skill service governance snapshots instead of reading
   skill directories directly.
 - [x] 12.2 Filter normal catalogs to active skills by default.
-- [ ] 12.3 Exclude or annotate draft, stale, archived, quarantined, rejected,
+- [x] 12.3 Exclude or annotate draft, stale, archived, quarantined, rejected,
   and superseded skills according to explicit profile settings.
 - [x] 12.4 Add context reports for visible count, filtered count, filter reasons,
   alias resolutions, skill reads, activations, and trace refs.
-- [ ] 12.5 Ensure draft skills can appear only in explicit experimental
+- [x] 12.5 Ensure draft skills can appear only in explicit experimental
   profiles.
 - [x] 12.6 Add tests for lifecycle filtering, alias resolution, activation
   telemetry, and no raw skill body in compact catalog.

@@ -15,6 +15,8 @@ use macaca_skill::{
     SkillSnapshotEntry,
 };
 
+use super::lifecycle_visibility::SkillLifecycleVisibilitySettings;
+
 /// Freeze a skill snapshot after applying Skill-service alias decisions.
 ///
 /// Alias resolution is intentionally accepted as service output, not recomputed
@@ -28,7 +30,12 @@ pub fn catalog_from_snapshot_with_aliases(
     snapshot: &SkillSnapshot,
     aliases: &[SkillAliasResolveResult],
 ) -> SkillCapabilityCatalog {
-    catalog_from_snapshot_with_aliases_and_governance(snapshot, aliases, None)
+    catalog_from_snapshot_with_aliases_and_governance(
+        snapshot,
+        aliases,
+        None,
+        &SkillLifecycleVisibilitySettings::default(),
+    )
 }
 
 /// Freeze a skill snapshot after applying service-owned alias and governance
@@ -44,9 +51,11 @@ pub fn catalog_from_snapshot_with_aliases_and_governance(
     snapshot: &SkillSnapshot,
     aliases: &[SkillAliasResolveResult],
     governance: Option<&SkillGovernanceSnapshotResult>,
+    visibility: &SkillLifecycleVisibilitySettings,
 ) -> SkillCapabilityCatalog {
     let alias_view = AliasResolvedSkillSnapshot::from_snapshot(snapshot, aliases);
-    let governance_view = GovernanceResolvedSkillSnapshot::from_snapshot(snapshot, governance);
+    let governance_view =
+        GovernanceResolvedSkillSnapshot::from_snapshot(snapshot, governance, visibility);
 
     let entries: Vec<SkillCapabilityRecord> = snapshot
         .skills
@@ -209,6 +218,7 @@ impl GovernanceResolvedSkillSnapshot {
     fn from_snapshot(
         snapshot: &SkillSnapshot,
         governance: Option<&SkillGovernanceSnapshotResult>,
+        visibility: &SkillLifecycleVisibilitySettings,
     ) -> Self {
         let mut records_by_name =
             std::collections::BTreeMap::<String, &SkillGovernanceRecord>::new();
@@ -238,11 +248,14 @@ impl GovernanceResolvedSkillSnapshot {
                     trace_refs.push(evidence_id.clone());
                 }
             }
-            if record.lifecycle != SkillLifecycleState::Active {
+            if !visibility.is_visible(&record.lifecycle) {
                 hidden_sources.insert(entry.name.clone());
                 filtered_for_context.push(SkillFilterDiagnostic {
                     name: entry.name.clone(),
-                    reason: format!("lifecycle_filtered:{lifecycle_label}"),
+                    reason: format!(
+                        "lifecycle_filtered:{lifecycle_label}:profile={}",
+                        visibility.profile_label()
+                    ),
                 });
             }
         }

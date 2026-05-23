@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use chrono::Utc;
 use macaca_framework::mcp::{McpSessionMode, McpTransportConfig};
 use macaca_framework::tool::{ToolError, ToolHandler, ToolResponse, Toolkit};
+use macaca_proto::config::{ContextConfig, ContextProviderFamilyConfig};
 use macaca_runtime_host::{
     McpDefinitionSource, McpLifecycleScope, McpRuntimeFacade, McpRuntimeStatus,
     McpRuntimeStatusState, McpServerDefinition, McpToolPolicy,
@@ -207,10 +208,89 @@ fn skill_catalog_filters_non_active_lifecycle_from_governance_snapshot() {
     assert!(catalog
         .filtered
         .iter()
-        .any(|row| row.reason == "lifecycle_filtered:draft"));
+        .any(|row| row.reason.starts_with("lifecycle_filtered:draft")));
     assert!(catalog
         .governance_report
         .trace_refs
         .iter()
         .any(|row| row.contains("active")));
+}
+
+#[test]
+fn skill_catalog_review_profile_can_annotate_non_active_rows_but_not_drafts() {
+    let snapshot = skill_snapshot(&["active", "stale", "draft"]);
+    let governance = SkillGovernanceSnapshotResult {
+        records: vec![
+            governance_record("active", SkillLifecycleState::Active, 0),
+            governance_record("stale", SkillLifecycleState::Stale, 0),
+            governance_record("draft", SkillLifecycleState::Draft, 0),
+        ],
+        telemetry_aggregate: Default::default(),
+        captured_at: Utc::now(),
+    };
+    let mut context = ContextConfig::default();
+    context.provider_families = vec![ContextProviderFamilyConfig {
+        family_id: "skill_capability".into(),
+        enabled: true,
+        params: serde_json::json!({
+            "lifecycle_profile": "review",
+            "visible_lifecycles": ["active", "stale", "draft"]
+        }),
+    }];
+    let visibility = skill_lifecycle_visibility_from_context(&context);
+
+    let catalog = skill_capability_catalog_from_governance_snapshot_with_visibility(
+        &snapshot,
+        &governance,
+        &visibility,
+    );
+
+    let names = catalog
+        .entries
+        .iter()
+        .map(|entry| entry.name.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(names, vec!["active", "stale"]);
+    assert_eq!(catalog.entries[1].lifecycle.as_deref(), Some("stale"));
+    assert!(catalog
+        .filtered
+        .iter()
+        .any(|row| row.reason.starts_with("lifecycle_filtered:draft")));
+}
+
+#[test]
+fn skill_catalog_experimental_profile_is_required_for_draft_visibility() {
+    let snapshot = skill_snapshot(&["active", "draft"]);
+    let governance = SkillGovernanceSnapshotResult {
+        records: vec![
+            governance_record("active", SkillLifecycleState::Active, 0),
+            governance_record("draft", SkillLifecycleState::Draft, 0),
+        ],
+        telemetry_aggregate: Default::default(),
+        captured_at: Utc::now(),
+    };
+    let mut context = ContextConfig::default();
+    context.provider_families = vec![ContextProviderFamilyConfig {
+        family_id: "skill_capability".into(),
+        enabled: true,
+        params: serde_json::json!({
+            "lifecycle_profile": "experimental",
+            "visible_lifecycles": ["active", "draft"]
+        }),
+    }];
+    let visibility = skill_lifecycle_visibility_from_context(&context);
+
+    let catalog = skill_capability_catalog_from_governance_snapshot_with_visibility(
+        &snapshot,
+        &governance,
+        &visibility,
+    );
+
+    let draft = catalog
+        .entries
+        .iter()
+        .find(|entry| entry.name == "draft")
+        .expect("experimental profile should expose annotated draft row");
+    assert_eq!(draft.lifecycle.as_deref(), Some("draft"));
+    assert!(catalog.filtered.is_empty());
 }

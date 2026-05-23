@@ -1366,6 +1366,7 @@ impl WebTracedAgentFactory {
         state: &Arc<AppState>,
         request: &AgentBuildRequest,
         toolkit: &Toolkit,
+        context_config: &ContextConfig,
     ) -> (
         Arc<macaca_context::SkillCapabilityCatalog>,
         Arc<macaca_context::McpCapabilityCatalog>,
@@ -1390,6 +1391,8 @@ impl WebTracedAgentFactory {
             &request.identity.agent_name,
         )
         .await;
+        let lifecycle_visibility =
+            crate::capability_catalog::skill_lifecycle_visibility_from_context(context_config);
         let skill_cap = Arc::new(
             match crate::capability_catalog::resolve_skill_snapshot_cached(
                 state,
@@ -1412,9 +1415,15 @@ impl WebTracedAgentFactory {
                         )
                         .await
                     {
-                        crate::capability_catalog::skill_capability_catalog_from_governance_snapshot(
+                        tracing::info!(
+                            agent = %request.identity.agent_name,
+                            visibility_profile = lifecycle_visibility.profile_label(),
+                            "skill lifecycle visibility profile selected for context catalog"
+                        );
+                        crate::capability_catalog::skill_capability_catalog_from_governance_snapshot_with_visibility(
                             &snap,
                             &governance,
+                            &lifecycle_visibility,
                         )
                     } else {
                         crate::capability_catalog::skill_capability_catalog_from_snapshot(&snap)
@@ -1643,7 +1652,13 @@ impl WebTracedAgentFactory {
             mcp_capability_catalog,
             runtime_tool_capability_catalog,
             ready_mcp_server_ids,
-        ) = Self::resolve_framework_capability_catalogs(&self.state, &request, &toolkit).await;
+        ) = Self::resolve_framework_capability_catalogs(
+            &self.state,
+            &request,
+            &toolkit,
+            &merged_ctx,
+        )
+        .await;
 
         let agent = Self::build_react_agent(
             llm_client,
@@ -1846,7 +1861,13 @@ impl WebTracedAgentFactory {
             mcp_capability_catalog,
             runtime_tool_capability_catalog,
             ready_mcp_server_ids,
-        ) = Self::resolve_framework_capability_catalogs(&self.state, &request, &toolkit).await;
+        ) = Self::resolve_framework_capability_catalogs(
+            &self.state,
+            &request,
+            &toolkit,
+            &merged_ctx,
+        )
+        .await;
 
         let agent = Self::build_react_agent(
             llm_client,

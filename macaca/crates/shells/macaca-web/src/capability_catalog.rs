@@ -9,12 +9,14 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 mod alias_resolution;
+mod lifecycle_visibility;
 
 use macaca_context::{
     mcp_tool_collisions, McpCapabilityCatalog, McpServerCapabilitySummary,
     RuntimeToolCapabilityCatalog, SkillCapabilityCatalog,
 };
 use macaca_framework::tool::Toolkit;
+use macaca_proto::config::ContextConfig;
 use macaca_proto::{ApplicationId, TraceContext};
 use macaca_runtime_host::{
     McpRuntimeFacade, McpRuntimeStatus, McpRuntimeStatusState, McpToolPolicy,
@@ -26,6 +28,8 @@ use macaca_skill::{
 };
 
 use crate::state::AppState;
+
+pub(crate) use lifecycle_visibility::SkillLifecycleVisibilitySettings;
 
 /// Freeze a progressive-disclosure snapshot into immutable capability rows (Tier-1 only).
 ///
@@ -43,15 +47,44 @@ pub fn skill_capability_catalog_from_snapshot(snapshot: &SkillSnapshot) -> Skill
 /// only maps those service-owned decisions into neutral context DTOs so
 /// `macaca-context` can stay provider-neutral and body-free.
 #[must_use]
+#[cfg(test)]
 pub fn skill_capability_catalog_from_governance_snapshot(
     snapshot: &SkillSnapshot,
     governance: &SkillGovernanceSnapshotResult,
+) -> SkillCapabilityCatalog {
+    skill_capability_catalog_from_governance_snapshot_with_visibility(
+        snapshot,
+        governance,
+        &SkillLifecycleVisibilitySettings::default(),
+    )
+}
+
+/// Freeze a Skill service snapshot with explicit lifecycle visibility settings.
+///
+/// The settings come from neutral Context provider configuration, not from
+/// application-specific code.  This lets normal profiles keep active-only
+/// catalogs while review/experimental profiles can opt into annotated
+/// non-active rows through a traceable configuration surface.
+#[must_use]
+pub(crate) fn skill_capability_catalog_from_governance_snapshot_with_visibility(
+    snapshot: &SkillSnapshot,
+    governance: &SkillGovernanceSnapshotResult,
+    visibility: &SkillLifecycleVisibilitySettings,
 ) -> SkillCapabilityCatalog {
     alias_resolution::catalog_from_snapshot_with_aliases_and_governance(
         snapshot,
         &[],
         Some(governance),
+        visibility,
     )
+}
+
+/// Resolve the visibility settings used by skill capability catalog assembly.
+#[must_use]
+pub(crate) fn skill_lifecycle_visibility_from_context(
+    context_config: &ContextConfig,
+) -> SkillLifecycleVisibilitySettings {
+    SkillLifecycleVisibilitySettings::from_context_config(context_config)
 }
 
 #[must_use]
