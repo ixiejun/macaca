@@ -7,7 +7,7 @@
 
 - [x] 2.1 Add provider-neutral evaluation DTOs for records, checkpoints,
   metrics, scoring output, report refs, and lifecycle state.
-- [ ] 2.2 Add deterministic scoring helpers for white-box and black-box gates.
+- [x] 2.2 Add deterministic scoring helpers for white-box and black-box gates.
 - [ ] 2.3 Add sanitized JSON and Markdown report builders.
 - [ ] 2.4 Add structured logs for checkpoint append, scoring, report creation,
   and sanitized failure decisions.
