@@ -105,6 +105,8 @@ pub enum SkillUsageEventKind {
     Patched,
     Archived,
     Restored,
+    Quarantined,
+    QuarantineReleased,
     Pinned,
     Unpinned,
 }
@@ -192,6 +194,8 @@ impl SkillUsageTelemetry {
             SkillUsageEventKind::Created
             | SkillUsageEventKind::Archived
             | SkillUsageEventKind::Restored
+            | SkillUsageEventKind::Quarantined
+            | SkillUsageEventKind::QuarantineReleased
             | SkillUsageEventKind::Pinned
             | SkillUsageEventKind::Unpinned => {
                 self.last_lifecycle_event_at = Some(observed_at);
@@ -259,6 +263,8 @@ impl SkillGovernanceRecord {
         match observation.event {
             SkillUsageEventKind::Archived => self.lifecycle = SkillLifecycleState::Archived,
             SkillUsageEventKind::Restored => self.lifecycle = SkillLifecycleState::Active,
+            SkillUsageEventKind::Quarantined => self.lifecycle = SkillLifecycleState::Quarantined,
+            SkillUsageEventKind::QuarantineReleased => self.lifecycle = SkillLifecycleState::Active,
             SkillUsageEventKind::Pinned | SkillUsageEventKind::Unpinned => {}
             SkillUsageEventKind::Created
             | SkillUsageEventKind::Viewed

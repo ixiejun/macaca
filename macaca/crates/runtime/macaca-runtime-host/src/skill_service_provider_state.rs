@@ -157,6 +157,11 @@ impl SkillProviderGovernanceState {
                 &SkillPinnedMutationOperation::Archive,
             )?;
         }
+        if action == SkillCurationLifecycleAction::ReleaseQuarantine
+            && record.lifecycle != SkillLifecycleState::Quarantined
+        {
+            return Err("quarantine release requires a quarantined skill lifecycle".into());
+        }
 
         let target_lifecycle = match &action {
             SkillCurationLifecycleAction::Pin => {
@@ -169,6 +174,8 @@ impl SkillProviderGovernanceState {
             }
             SkillCurationLifecycleAction::Archive => SkillLifecycleState::Archived,
             SkillCurationLifecycleAction::Restore => SkillLifecycleState::Active,
+            SkillCurationLifecycleAction::Quarantine => SkillLifecycleState::Quarantined,
+            SkillCurationLifecycleAction::ReleaseQuarantine => SkillLifecycleState::Active,
         };
         SkillLifecycleStateMachine::validate_transition(&record.lifecycle, &target_lifecycle)?;
         record.lifecycle = target_lifecycle;
@@ -212,6 +219,12 @@ impl SkillProviderGovernanceState {
                     SkillCurationLifecycleAction::Restore => {
                         macaca_skill::SkillUsageEventKind::Restored
                     }
+                    SkillCurationLifecycleAction::Quarantine => {
+                        macaca_skill::SkillUsageEventKind::Quarantined
+                    }
+                    SkillCurationLifecycleAction::ReleaseQuarantine => {
+                        macaca_skill::SkillUsageEventKind::QuarantineReleased
+                    }
                 },
                 author_kind: command.author_kind.clone(),
                 created_by: None,
@@ -219,7 +232,9 @@ impl SkillProviderGovernanceState {
                     SkillCurationLifecycleAction::Pin => Some(true),
                     SkillCurationLifecycleAction::Unpin => Some(false),
                     SkillCurationLifecycleAction::Archive
-                    | SkillCurationLifecycleAction::Restore => None,
+                    | SkillCurationLifecycleAction::Restore
+                    | SkillCurationLifecycleAction::Quarantine
+                    | SkillCurationLifecycleAction::ReleaseQuarantine => None,
                 },
                 evidence_id: sanitized_evidence.first().cloned(),
                 metadata: BTreeMap::new(),

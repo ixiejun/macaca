@@ -4,8 +4,9 @@ use macaca_skill::{
     SkillAuthorKind, SkillCurationLifecycleCommand, SkillCurationLifecycleResult,
     SkillGovernanceSnapshotCommand, SkillGovernanceSnapshotResult, SkillLifecycleState,
     SkillServicePolicyHints, SkillServiceScope, SKILL_CURATION_ARCHIVE_COMMAND,
-    SKILL_CURATION_PIN_COMMAND, SKILL_CURATION_RESTORE_COMMAND, SKILL_CURATION_UNPIN_COMMAND,
-    SKILL_GOVERNANCE_SNAPSHOT_COMMAND,
+    SKILL_CURATION_PIN_COMMAND, SKILL_CURATION_QUARANTINE_COMMAND,
+    SKILL_CURATION_RELEASE_QUARANTINE_COMMAND, SKILL_CURATION_RESTORE_COMMAND,
+    SKILL_CURATION_UNPIN_COMMAND, SKILL_GOVERNANCE_SNAPSHOT_COMMAND,
 };
 
 use crate::SkillSystemServiceProvider;
@@ -165,6 +166,38 @@ async fn skill_curation_archive_and_restore_update_snapshot_visibility() {
         serde_json::from_value(result.output).expect("visible snapshot should decode");
     assert_eq!(visible.records.len(), 1);
     assert_eq!(visible.records[0].lifecycle, SkillLifecycleState::Active);
+}
+
+#[tokio::test]
+async fn skill_curation_quarantine_and_release_update_lifecycle() {
+    let provider = SkillSystemServiceProvider::new();
+    let trace = TraceContext::new("trace-skill-curation-quarantine-release");
+    let quarantine = lifecycle_command(trace.clone(), vec!["quarantine-evidence-1".into()]);
+
+    let result = provider
+        .call(traced_command(
+            SKILL_CURATION_QUARANTINE_COMMAND,
+            quarantine,
+            trace.clone(),
+        ))
+        .await
+        .expect("quarantine command should update governance lifecycle");
+    let quarantined: SkillCurationLifecycleResult =
+        serde_json::from_value(result.output).expect("quarantine result should decode");
+    assert_eq!(quarantined.lifecycle, SkillLifecycleState::Quarantined);
+
+    let release = lifecycle_command(trace.clone(), vec!["release-quarantine-evidence-1".into()]);
+    let result = provider
+        .call(traced_command(
+            SKILL_CURATION_RELEASE_QUARANTINE_COMMAND,
+            release,
+            trace,
+        ))
+        .await
+        .expect("release quarantine command should restore active lifecycle");
+    let released: SkillCurationLifecycleResult =
+        serde_json::from_value(result.output).expect("release result should decode");
+    assert_eq!(released.lifecycle, SkillLifecycleState::Active);
 }
 
 #[tokio::test]

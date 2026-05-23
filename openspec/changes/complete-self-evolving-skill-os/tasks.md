@@ -52,7 +52,7 @@
   transition.
 - [x] 3.4 Deny archive, supersede, merge apply, or deletion of pinned skills
   unless an explicit approval override contract is added.
-- [ ] 3.5 Add quarantine commands and quarantine release/restore paths.
+- [x] 3.5 Add quarantine commands and quarantine release/restore paths.
 - [ ] 3.6 Add supersede transitions that require alias or redirect records.
 - [ ] 3.7 Add rejected proposal transitions that preserve evidence and rationale
   without activating skills.

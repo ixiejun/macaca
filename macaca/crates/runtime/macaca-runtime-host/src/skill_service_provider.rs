@@ -25,7 +25,8 @@ use macaca_skill::{
     SkillStatusCommand, SkillStatusResult, SkillToolCatalogCommand, SkillToolCatalogResult,
     SkillToolInvokeCommand, SKILL_ALIAS_RESOLVE_COMMAND, SKILL_ALIAS_SNAPSHOT_COMMAND,
     SKILL_ALIAS_UPSERT_COMMAND, SKILL_CLEANUP_COMMAND, SKILL_CURATION_ARCHIVE_COMMAND,
-    SKILL_CURATION_DRY_RUN_COMMAND, SKILL_CURATION_PIN_COMMAND, SKILL_CURATION_RESTORE_COMMAND,
+    SKILL_CURATION_DRY_RUN_COMMAND, SKILL_CURATION_PIN_COMMAND, SKILL_CURATION_QUARANTINE_COMMAND,
+    SKILL_CURATION_RELEASE_QUARANTINE_COMMAND, SKILL_CURATION_RESTORE_COMMAND,
     SKILL_CURATION_UNPIN_COMMAND, SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND,
     SKILL_EVOLUTION_SNAPSHOT_COMMAND, SKILL_EXECUTABLE_LOAD_COMMAND,
     SKILL_GOVERNANCE_RECORD_USAGE_COMMAND, SKILL_GOVERNANCE_SNAPSHOT_COMMAND, SKILL_SERVICE_ID,
@@ -355,6 +356,22 @@ impl SystemService for SkillSystemServiceProvider {
                     command.payload,
                     trace,
                     SkillCurationLifecycleAction::Restore,
+                )
+                .await
+            }
+            SKILL_CURATION_QUARANTINE_COMMAND => {
+                self.apply_lifecycle_command(
+                    command.payload,
+                    trace,
+                    SkillCurationLifecycleAction::Quarantine,
+                )
+                .await
+            }
+            SKILL_CURATION_RELEASE_QUARANTINE_COMMAND => {
+                self.apply_lifecycle_command(
+                    command.payload,
+                    trace,
+                    SkillCurationLifecycleAction::ReleaseQuarantine,
                 )
                 .await
             }

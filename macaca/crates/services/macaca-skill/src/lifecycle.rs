@@ -20,6 +20,8 @@ pub enum SkillCurationLifecycleAction {
     Unpin,
     Archive,
     Restore,
+    Quarantine,
+    ReleaseQuarantine,
 }
 
 /// Destructive mutation classes protected by pinned-skill policy.
