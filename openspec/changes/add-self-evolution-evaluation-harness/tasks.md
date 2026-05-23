@@ -1,7 +1,7 @@
 ## 1. Specification
 
-- [ ] 1.1 Create OpenSpec proposal, design, tasks, and delta spec.
-- [ ] 1.2 Validate the OpenSpec change with strict mode.
+- [x] 1.1 Create OpenSpec proposal, design, tasks, and delta spec.
+- [x] 1.2 Validate the OpenSpec change with strict mode.
 
 ## 2. Evaluation Contract
 
