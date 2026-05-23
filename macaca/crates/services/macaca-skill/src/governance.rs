@@ -7,14 +7,13 @@
 //! runtime-host can back them with an in-memory store today, while a future
 //! Store/EventLog-backed provider can implement the same command surface.
 
-use std::collections::BTreeMap;
-
 use chrono::{DateTime, Duration, Utc};
 use macaca_proto::TraceContext;
 use serde::{Deserialize, Serialize};
 
 use crate::lifecycle::SkillCurationLifecycleCommand;
 use crate::service_contract::SkillServiceScope;
+pub use crate::telemetry::{SkillUsageEventKind, SkillUsageObservation, SkillUsageTelemetry};
 
 /// Lifecycle state for a governed AgentSkill.
 ///
@@ -96,126 +95,6 @@ impl SkillGovernanceProvenance {
     }
 }
 
-/// Event types accepted by the usage telemetry command.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum SkillUsageEventKind {
-    Created,
-    Viewed,
-    Used,
-    Patched,
-    Archived,
-    Restored,
-    Quarantined,
-    QuarantineReleased,
-    Superseded,
-    Rejected,
-    Pinned,
-    Unpinned,
-}
-
-/// Sanitized observation emitted by framework tools or service providers.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SkillUsageObservation {
-    pub skill_id: String,
-    pub name: String,
-    pub source: String,
-    pub source_scope: String,
-    pub event: SkillUsageEventKind,
-    pub author_kind: SkillAuthorKind,
-    pub created_by: Option<String>,
-    pub pinned: Option<bool>,
-    pub evidence_id: Option<String>,
-    pub metadata: BTreeMap<String, String>,
-}
-
-impl SkillUsageObservation {
-    /// Stable key used by providers that have not introduced a separate id.
-    pub fn key(&self) -> String {
-        if self.skill_id.trim().is_empty() {
-            self.name.trim().to_string()
-        } else {
-            self.skill_id.trim().to_string()
-        }
-    }
-}
-
-/// Aggregated, prompt-safe telemetry for one governed skill.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SkillUsageTelemetry {
-    pub view_count: u64,
-    pub activation_count: u64,
-    pub resource_read_count: u64,
-    pub use_count: u64,
-    pub patch_count: u64,
-    pub successful_task_count: u64,
-    pub failed_task_count: u64,
-    pub last_viewed_at: Option<DateTime<Utc>>,
-    pub last_used_at: Option<DateTime<Utc>>,
-    pub last_patched_at: Option<DateTime<Utc>>,
-    pub last_lifecycle_event_at: Option<DateTime<Utc>>,
-    pub last_observed_at: Option<DateTime<Utc>>,
-}
-
-impl Default for SkillUsageTelemetry {
-    fn default() -> Self {
-        Self {
-            view_count: 0,
-            activation_count: 0,
-            resource_read_count: 0,
-            use_count: 0,
-            patch_count: 0,
-            successful_task_count: 0,
-            failed_task_count: 0,
-            last_viewed_at: None,
-            last_used_at: None,
-            last_patched_at: None,
-            last_lifecycle_event_at: None,
-            last_observed_at: None,
-        }
-    }
-}
-
-impl SkillUsageTelemetry {
-    /// Apply one sanitized event to aggregate counters.
-    pub fn record(&mut self, event: &SkillUsageEventKind, observed_at: DateTime<Utc>) {
-        self.last_observed_at = Some(observed_at);
-        match event {
-            SkillUsageEventKind::Viewed => {
-                self.view_count = self.view_count.saturating_add(1);
-                self.last_viewed_at = Some(observed_at);
-            }
-            SkillUsageEventKind::Used => {
-                self.activation_count = self.activation_count.saturating_add(1);
-                self.use_count = self.use_count.saturating_add(1);
-                self.last_used_at = Some(observed_at);
-            }
-            SkillUsageEventKind::Patched => {
-                self.patch_count = self.patch_count.saturating_add(1);
-                self.last_patched_at = Some(observed_at);
-            }
-            SkillUsageEventKind::Created
-            | SkillUsageEventKind::Archived
-            | SkillUsageEventKind::Restored
-            | SkillUsageEventKind::Quarantined
-            | SkillUsageEventKind::QuarantineReleased
-            | SkillUsageEventKind::Superseded
-            | SkillUsageEventKind::Rejected
-            | SkillUsageEventKind::Pinned
-            | SkillUsageEventKind::Unpinned => {
-                self.last_lifecycle_event_at = Some(observed_at);
-            }
-        }
-    }
-
-    /// Return the latest usage-like timestamp for deterministic curation.
-    pub fn last_activity_at(&self) -> Option<DateTime<Utc>> {
-        [self.last_used_at, self.last_viewed_at, self.last_patched_at]
-            .into_iter()
-            .flatten()
-            .max()
-    }
-}
-
 /// Full governance record for one skill.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SkillGovernanceRecord {
@@ -274,7 +153,11 @@ impl SkillGovernanceRecord {
             SkillUsageEventKind::Pinned | SkillUsageEventKind::Unpinned => {}
             SkillUsageEventKind::Created
             | SkillUsageEventKind::Viewed
+            | SkillUsageEventKind::Activated
             | SkillUsageEventKind::Used
+            | SkillUsageEventKind::ResourceRead
+            | SkillUsageEventKind::SuccessfulTask
+            | SkillUsageEventKind::FailedTask
             | SkillUsageEventKind::Patched => {}
         }
         if let Some(evidence_id) = &observation.evidence_id {

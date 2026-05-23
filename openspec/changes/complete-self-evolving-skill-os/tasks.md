@@ -62,7 +62,7 @@
 
 ## 4. Rich Provenance And Telemetry Capture
 
-- [ ] 4.1 Extend usage recording to distinguish view, activation, resource read,
+- [x] 4.1 Extend usage recording to distinguish view, activation, resource read,
   patch, lifecycle, success, and failure events.
 - [ ] 4.2 Add provenance capture at skill discovery, proposal creation,
   promotion, patch, curation, merge, archive, restore, quarantine, and rollback.

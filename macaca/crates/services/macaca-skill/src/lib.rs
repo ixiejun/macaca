@@ -38,6 +38,7 @@ pub mod service_adapter;
 pub mod service_contract;
 pub mod snapshot;
 pub mod source;
+pub mod telemetry;
 pub mod tool;
 
 #[cfg(test)]
@@ -62,6 +63,7 @@ pub use registry::SkillRegistry;
 pub use request::{SkillSnapshotRequest, SkillSnapshotRequestBuilder};
 pub use snapshot::SkillRegistrySnapshot;
 pub use source::{SkillSource, SkillSourceSet};
+pub use telemetry::*;
 pub use tool::SkillTool;
 
 // Agent Skills (SKILL.md / agentskills.io).

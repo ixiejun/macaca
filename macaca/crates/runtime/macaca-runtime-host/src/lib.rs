@@ -87,6 +87,8 @@ mod skill_governance_store_logging_tests;
 mod skill_service_lifecycle_tests;
 #[cfg(test)]
 mod skill_service_provider_tests;
+#[cfg(test)]
+mod skill_service_usage_tests;
 
 pub use agent_context_service_provider::{
     agent_context_service_descriptor, AgentContextBackend, AgentContextSystemServiceProvider,

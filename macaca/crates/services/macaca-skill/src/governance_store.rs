@@ -402,8 +402,11 @@ mod tests {
             successful_task_count: 5,
             failed_task_count: 6,
             last_viewed_at: Some(now),
+            last_resource_read_at: Some(now),
             last_used_at: Some(now),
             last_patched_at: Some(now),
+            last_successful_task_at: Some(now),
+            last_failed_task_at: Some(now),
             last_lifecycle_event_at: Some(now),
             last_observed_at: Some(now),
         };
