@@ -248,6 +248,7 @@ pub struct SkillCurationRunResult {
     pub run: SkillCurationRunRecord,
     pub recommendations: Vec<SkillCurationRecommendation>,
     pub semantic_analysis_status: String,
+    pub run_json_ref: Option<String>,
     pub report_ref: Option<String>,
     pub rollback_ref: Option<String>,
     pub mutated: bool,
@@ -275,12 +276,11 @@ impl SkillCurationRunResult {
                 format!("{}:{:?}", recommendation.skill_id, recommendation.action)
             })
             .collect::<Vec<_>>();
-        let report_ref = Some(format!(
-            "store://skill-curation/{}/REPORT.md",
-            run_id(&command.trace, started_at)
-        ));
+        let run_id = run_id(&command.trace, started_at);
+        let run_json_ref = Some(format!("store://skill-curation/{run_id}/run.json"));
+        let report_ref = Some(format!("store://skill-curation/{run_id}/REPORT.md"));
         let run = SkillCurationRunRecord {
-            run_id: run_id(&command.trace, started_at),
+            run_id,
             trace_id: command.trace.trace_id.clone(),
             provider_id: "local-skill-governance".into(),
             dry_run: command.dry_run,
@@ -289,6 +289,7 @@ impl SkillCurationRunResult {
             snapshot_refs: Vec::new(),
             started_at,
             finished_at: Some(finished_at),
+            run_json_ref: run_json_ref.clone(),
             report_ref: report_ref.clone(),
             rollback_ref: None,
             policy_decision_ids: non_empty(&command.policy_decision_refs),
@@ -299,6 +300,7 @@ impl SkillCurationRunResult {
             run,
             recommendations: dry_run_report.recommendations,
             semantic_analysis_status: dry_run_report.semantic_analysis_status,
+            run_json_ref,
             report_ref,
             rollback_ref: None,
             mutated: !command.dry_run,

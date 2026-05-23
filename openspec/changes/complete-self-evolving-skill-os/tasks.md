@@ -142,7 +142,7 @@
 - [x] 8.5 Model `SkillCurationRun` with run id, trace id, started/finished
   timestamps, provider id, dry-run flag, candidate count, actions, snapshots,
   report ref, rollback ref, policy decisions, and audit event ids.
-- [ ] 8.6 Generate bounded `run.json` and `REPORT.md` store artifacts or
+- [x] 8.6 Generate bounded `run.json` and `REPORT.md` store artifacts or
   equivalent durable report refs.
 - [ ] 8.7 Ensure dry-run does not mutate active governance state, aliases, files,
   scheduler refs, or context snapshots.

@@ -457,6 +457,19 @@ Every command logs key execution nodes with sanitized fields:
   not include raw prompts, raw task output, provider payloads, manifests,
   package bytes, credentials, signatures, or full skill bodies.
 
+### Slice 8E: Bounded Curation Report Refs
+
+- Patterns: Memento and Observer records now carry separate bounded refs for
+  `run.json` and `REPORT.md`, while Command results expose those refs without
+  embedding artifact bodies.
+- Ownership: `macaca-skill` owns the provider-neutral ref fields on the curation
+  run contract. `macaca-runtime-host` creates local Store-style refs in the
+  built-in Strategy. Durable Store/EventLog providers can replace the ref
+  backing without changing SDK or shell callers.
+- Safety: report refs are identifiers only. They do not contain raw report
+  bodies, provider payloads, prompts, manifests, package bytes, credentials,
+  signatures, or full skill instructions.
+
 ## Risks And Mitigations
 
 - Risk: skill mutation corrupts active packages. Mitigation: atomic writes,

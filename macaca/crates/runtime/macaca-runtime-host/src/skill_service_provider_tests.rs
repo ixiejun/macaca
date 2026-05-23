@@ -373,6 +373,11 @@ async fn skill_curation_run_records_bounded_dry_run_without_file_mutation() {
         .as_deref()
         .unwrap_or("")
         .contains("REPORT.md"));
+    assert!(result
+        .run_json_ref
+        .as_deref()
+        .unwrap_or("")
+        .contains("run.json"));
     assert!(result.rollback_ref.is_none());
 
     let status = provider
@@ -581,6 +586,10 @@ async fn skill_curation_rollback_restores_governance_alias_and_refs_from_memento
         .restored_report_refs
         .iter()
         .any(|report| report.contains("REPORT.md")));
+    assert!(rollback
+        .restored_report_refs
+        .iter()
+        .any(|report| report.contains("run.json")));
     assert!(rollback.package_memento_refs.contains(&rollback_ref));
 
     let governance = provider
@@ -1128,6 +1137,7 @@ fn skill_governance_event_replay_restores_read_model_without_skill_bodies() {
         snapshot_refs: vec!["store://skill-curation/run-1/snapshot".into()],
         started_at: created_at,
         finished_at: Some(created_at),
+        run_json_ref: Some("store://skill-curation/run-1/run.json".into()),
         report_ref: Some("store://skill-curation/run-1/report".into()),
         rollback_ref: None,
         policy_decision_ids: vec!["policy-decision-1".into()],

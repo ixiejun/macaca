@@ -206,7 +206,12 @@ impl SkillProviderGovernanceState {
                 finished_at.timestamp_nanos_opt().unwrap_or_default()
             );
             memento.after_snapshot_ref = Some(after_snapshot_ref.clone());
-            memento.report_refs = result.report_ref.iter().cloned().collect();
+            memento.report_refs = result
+                .run_json_ref
+                .iter()
+                .chain(result.report_ref.iter())
+                .cloned()
+                .collect();
             memento.package_memento_refs = vec![memento.rollback_ref.clone()];
             result.run.snapshot_refs =
                 vec![memento.before_snapshot_ref.clone(), after_snapshot_ref];
