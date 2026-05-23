@@ -8,6 +8,7 @@ use macaca_proto::error::{MacacaError, MacacaResult};
 use tokio::process::Command;
 
 use crate::commands;
+use crate::skill_operations::{self, SkillCliEvidenceRefs, SkillCliLifecycleAction};
 
 /// Canonical command execution boundary for CLI subcommands.
 #[async_trait(?Send)]
@@ -61,6 +62,139 @@ pub struct PluginListCommandHandler;
 impl CliCommandHandler for PluginListCommandHandler {
     async fn run(&self) -> MacacaResult<()> {
         commands::execute_list_plugins().await
+    }
+}
+
+/// Handler for printing bounded Skill governance operations state.
+#[derive(Debug, Default)]
+pub struct SkillOperationsSnapshotCommandHandler;
+
+#[async_trait(?Send)]
+impl CliCommandHandler for SkillOperationsSnapshotCommandHandler {
+    async fn run(&self) -> MacacaResult<()> {
+        skill_operations::execute_skill_operations_snapshot().await
+    }
+}
+
+/// Handler for deterministic or approval-gated Skill curation runs.
+#[derive(Debug)]
+pub struct SkillCurationRunCommandHandler {
+    dry_run: bool,
+    stale_after_days: i64,
+    narrow_use_threshold: u64,
+    refs: SkillCliEvidenceRefs,
+}
+
+impl SkillCurationRunCommandHandler {
+    pub fn new(
+        dry_run: bool,
+        stale_after_days: i64,
+        narrow_use_threshold: u64,
+        refs: SkillCliEvidenceRefs,
+    ) -> Self {
+        Self {
+            dry_run,
+            stale_after_days,
+            narrow_use_threshold,
+            refs,
+        }
+    }
+}
+
+#[async_trait(?Send)]
+impl CliCommandHandler for SkillCurationRunCommandHandler {
+    async fn run(&self) -> MacacaResult<()> {
+        skill_operations::execute_skill_curation_run(
+            self.dry_run,
+            self.stale_after_days,
+            self.narrow_use_threshold,
+            self.refs.clone(),
+        )
+        .await
+    }
+}
+
+/// Handler for one Skill lifecycle operation.
+#[derive(Debug)]
+pub struct SkillLifecycleCommandHandler {
+    action: SkillCliLifecycleAction,
+    skill_id: String,
+    refs: SkillCliEvidenceRefs,
+}
+
+impl SkillLifecycleCommandHandler {
+    pub fn new(
+        action: SkillCliLifecycleAction,
+        skill_id: String,
+        refs: SkillCliEvidenceRefs,
+    ) -> Self {
+        Self {
+            action,
+            skill_id,
+            refs,
+        }
+    }
+}
+
+#[async_trait(?Send)]
+impl CliCommandHandler for SkillLifecycleCommandHandler {
+    async fn run(&self) -> MacacaResult<()> {
+        skill_operations::execute_skill_lifecycle(
+            self.action,
+            self.skill_id.clone(),
+            self.refs.clone(),
+        )
+        .await
+    }
+}
+
+/// Handler for restoring a Skill curation rollback memento.
+#[derive(Debug)]
+pub struct SkillRollbackCommandHandler {
+    rollback_ref: String,
+    refs: SkillCliEvidenceRefs,
+}
+
+impl SkillRollbackCommandHandler {
+    pub fn new(rollback_ref: String, refs: SkillCliEvidenceRefs) -> Self {
+        Self { rollback_ref, refs }
+    }
+}
+
+#[async_trait(?Send)]
+impl CliCommandHandler for SkillRollbackCommandHandler {
+    async fn run(&self) -> MacacaResult<()> {
+        skill_operations::execute_skill_rollback(self.rollback_ref.clone(), self.refs.clone()).await
+    }
+}
+
+/// Handler for proposal promotion or rejection.
+#[derive(Debug)]
+pub struct SkillProposalDecisionCommandHandler {
+    proposal_id: String,
+    promote: bool,
+    refs: SkillCliEvidenceRefs,
+}
+
+impl SkillProposalDecisionCommandHandler {
+    pub fn new(proposal_id: String, promote: bool, refs: SkillCliEvidenceRefs) -> Self {
+        Self {
+            proposal_id,
+            promote,
+            refs,
+        }
+    }
+}
+
+#[async_trait(?Send)]
+impl CliCommandHandler for SkillProposalDecisionCommandHandler {
+    async fn run(&self) -> MacacaResult<()> {
+        skill_operations::execute_skill_proposal_decision(
+            self.proposal_id.clone(),
+            self.promote,
+            self.refs.clone(),
+        )
+        .await
     }
 }
 

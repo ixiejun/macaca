@@ -241,12 +241,12 @@
   facade.
 - [x] 14.2 Add frontend controls that submit typed commands without owning
   lifecycle, merge, alias, archive, or approval semantics.
-- [ ] 14.3 Add CLI commands that call the SDK facade and print bounded reports.
-- [ ] 14.4 Display policy denials, unavailable providers, report refs,
+- [x] 14.3 Add CLI commands that call the SDK facade and print bounded reports.
+- [x] 14.4 Display policy denials, unavailable providers, report refs,
   rollback refs, and audit ids without raw payloads.
-- [ ] 14.5 Add route logs for trace id, command, target id, bounded counts,
+- [x] 14.5 Add route logs for trace id, command, target id, bounded counts,
   policy result, and service error class.
-- [ ] 14.6 Test shell adapters do not import provider crates or implement
+- [x] 14.6 Test shell adapters do not import provider crates or implement
   semantic classification.
 
 ## 15. Boundary, Security, And Audit Gates

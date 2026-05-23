@@ -79,6 +79,12 @@ pub use heartbeat_client::{
     ServiceBackedHeartbeatClient, SystemHeartbeatClient, UnavailableSystemHeartbeatClient,
 };
 pub use llm_client::{ServiceBackedLlmClient, SystemLlmClient, UnavailableSystemLlmClient};
+pub use macaca_skill::{
+    SkillAuthorKind, SkillCurationLifecycleAction, SkillCurationLifecycleCommand,
+    SkillCurationRollbackCommand, SkillCurationRunCommand, SkillEvolutionPromoteDraftCommand,
+    SkillEvolutionRejectDraftCommand, SkillExperienceProposalSnapshotCommand,
+    SkillGovernanceSnapshotCommand, SkillServicePolicyHints, SkillServiceScope,
+};
 pub use macaca_task::{TaskServiceSnapshot, TaskServiceSnapshotCommand};
 pub use mcp_client::{ServiceBackedMcpClient, SystemMcpClient, UnavailableSystemMcpClient};
 pub use memory_client::{
