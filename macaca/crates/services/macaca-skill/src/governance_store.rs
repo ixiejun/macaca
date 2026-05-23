@@ -259,6 +259,7 @@ impl SkillGovernanceEventRecord {
         payload: SkillGovernanceEventPayload,
     ) -> Self {
         let trace_id = trace.trace_id.clone();
+        let payload = sanitize_event_payload(payload);
         let provenance =
             SkillProvenanceEventRecord::from_payload(&trace_id, &scope, occurred_at, &payload);
         Self {
@@ -272,6 +273,76 @@ impl SkillGovernanceEventRecord {
             payload,
         }
     }
+}
+
+fn sanitize_event_payload(payload: SkillGovernanceEventPayload) -> SkillGovernanceEventPayload {
+    match payload {
+        SkillGovernanceEventPayload::UsageRecorded(mut observation) => {
+            observation.metadata = sanitize_governance_metadata(observation.metadata);
+            SkillGovernanceEventPayload::UsageRecorded(observation)
+        }
+        SkillGovernanceEventPayload::LifecycleApplied(mut observation) => {
+            observation.metadata = sanitize_governance_metadata(observation.metadata);
+            SkillGovernanceEventPayload::LifecycleApplied(observation)
+        }
+        SkillGovernanceEventPayload::ProposalCreated(mut record) => {
+            record.metadata = sanitize_governance_metadata(record.metadata);
+            SkillGovernanceEventPayload::ProposalCreated(record)
+        }
+        other => other,
+    }
+}
+
+fn sanitize_governance_metadata(metadata: BTreeMap<String, String>) -> BTreeMap<String, String> {
+    metadata
+        .into_iter()
+        .filter_map(|(key, value)| {
+            let trimmed_key = key.trim();
+            if !is_prompt_safe_metadata_key(trimmed_key) {
+                return None;
+            }
+            let trimmed_value = value.trim();
+            if trimmed_value.is_empty() {
+                return None;
+            }
+            Some((
+                trimmed_key.to_string(),
+                bounded_metadata_value(trimmed_value),
+            ))
+        })
+        .collect()
+}
+
+fn is_prompt_safe_metadata_key(key: &str) -> bool {
+    let normalized = key.to_ascii_lowercase();
+    if [
+        "raw",
+        "task_output",
+        "provider_payload",
+        "secret",
+        "credential",
+        "signature",
+        "package_bytes",
+        "manifest_body",
+        "skill_body",
+        "body",
+    ]
+    .iter()
+    .any(|marker| normalized.contains(marker))
+    {
+        return false;
+    }
+    matches!(
+        key,
+        "task_id" | "action_ref" | "target_skill_id" | "evidence_ref"
+    ) || key.starts_with("evidence_ref.")
+        || key.ends_with("_id")
+        || key.ends_with("_ref")
+}
+
+fn bounded_metadata_value(value: &str) -> String {
+    const MAX_METADATA_VALUE_CHARS: usize = 256;
+    value.chars().take(MAX_METADATA_VALUE_CHARS).collect()
 }
 
 /// Replayable, prompt-safe Skill governance read model.
@@ -473,5 +544,53 @@ mod tests {
         assert!(append_err
             .reason
             .contains("Store/EventLog provider is absent"));
+    }
+
+    #[test]
+    fn governance_event_record_strips_raw_observation_metadata() {
+        let mut metadata = BTreeMap::new();
+        metadata.insert("task_id".into(), "task-safe".into());
+        metadata.insert("evidence_ref.1".into(), "evidence://task/extra".into());
+        metadata.insert("raw_prompt".into(), "sensitive prompt".into());
+        metadata.insert("provider_payload_ref".into(), "provider://raw".into());
+        metadata.insert("long_ref".into(), "x".repeat(300));
+
+        let event = SkillGovernanceEventRecord::new(
+            "event-sanitize-1",
+            &TraceContext::new("trace-event-sanitize"),
+            SkillServiceScope::default(),
+            Utc::now(),
+            SkillGovernanceEventPayload::UsageRecorded(SkillUsageObservation {
+                skill_id: "skill://agent/safe".into(),
+                name: "safe".into(),
+                source: "test".into(),
+                source_scope: "workspace".into(),
+                event: crate::governance::SkillUsageEventKind::SuccessfulTask,
+                author_kind: SkillAuthorKind::Agent,
+                created_by: Some("agent".into()),
+                pinned: None,
+                evidence_id: Some("evidence://task/primary".into()),
+                metadata,
+            }),
+        );
+
+        let serialized =
+            serde_json::to_string(&event).expect("governance event should serialize safely");
+        assert!(serialized.contains("task-safe"));
+        assert!(serialized.contains("evidence://task/extra"));
+        assert_eq!(
+            match &event.payload {
+                SkillGovernanceEventPayload::UsageRecorded(observation) => observation
+                    .metadata
+                    .get("long_ref")
+                    .expect("safe refs are retained")
+                    .chars()
+                    .count(),
+                _ => 0,
+            },
+            256
+        );
+        assert!(!serialized.contains("sensitive prompt"));
+        assert!(!serialized.contains("provider://raw"));
     }
 }

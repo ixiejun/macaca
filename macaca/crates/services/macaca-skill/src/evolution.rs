@@ -122,9 +122,53 @@ impl SkillExperienceProposalRecord {
                 .filter(|id| !id.trim().is_empty())
                 .collect(),
             created_at,
-            metadata: candidate.metadata,
+            metadata: sanitize_proposal_metadata(candidate.metadata),
         }
     }
+}
+
+fn sanitize_proposal_metadata(metadata: BTreeMap<String, String>) -> BTreeMap<String, String> {
+    metadata
+        .into_iter()
+        .filter_map(|(key, value)| {
+            let key = key.trim();
+            if !is_safe_proposal_metadata_key(key) {
+                return None;
+            }
+            let value = value.trim();
+            if value.is_empty() {
+                return None;
+            }
+            Some((key.to_string(), bounded_metadata_value(value)))
+        })
+        .collect()
+}
+
+fn is_safe_proposal_metadata_key(key: &str) -> bool {
+    let normalized = key.to_ascii_lowercase();
+    if [
+        "raw",
+        "task_output",
+        "provider_payload",
+        "secret",
+        "credential",
+        "signature",
+        "package_bytes",
+        "manifest_body",
+        "skill_body",
+        "body",
+    ]
+    .iter()
+    .any(|marker| normalized.contains(marker))
+    {
+        return false;
+    }
+    key.ends_with("_id") || key.ends_with("_ref") || key.starts_with("evidence_ref.")
+}
+
+fn bounded_metadata_value(value: &str) -> String {
+    const MAX_METADATA_VALUE_CHARS: usize = 256;
+    value.chars().take(MAX_METADATA_VALUE_CHARS).collect()
 }
 
 /// Command for proposing reusable task experience as a draft skill asset.
@@ -161,4 +205,55 @@ pub struct SkillExperienceProposalSnapshotResult {
     pub proposals: Vec<SkillExperienceProposalRecord>,
     pub mutated: bool,
     pub captured_at: DateTime<Utc>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn proposal_record_keeps_only_bounded_reference_metadata() {
+        let mut metadata = BTreeMap::new();
+        metadata.insert("memory_digest_ref".into(), "memory://digest/1".into());
+        metadata.insert("raw_prompt".into(), "do not store this prompt".into());
+        metadata.insert("provider_payload".into(), "provider bytes".into());
+        metadata.insert("long_ref".into(), "x".repeat(300));
+
+        let record = SkillExperienceProposalRecord::from_candidate(
+            &TraceContext::new("trace-proposal-metadata-sanitize"),
+            SkillExperienceCandidate {
+                task_id: "task-1".into(),
+                session_id: Some("session-1".into()),
+                application_id: None,
+                agent_name: Some("agent".into()),
+                bounded_summary: "bounded reusable summary".into(),
+                reusable_procedure: "bounded reusable procedure".into(),
+                classification: SkillEvolutionCandidateClassification::ReusableProcedure,
+                recommended_action: SkillEvolutionProposalAction::CreateDraft,
+                target_skill_id: None,
+                target_skill_name: Some("governed-skill".into()),
+                evidence_ids: vec!["evidence://task/1".into()],
+                metadata,
+            },
+            Utc::now(),
+        );
+
+        let serialized =
+            serde_json::to_string(&record).expect("proposal record should serialize safely");
+        assert_eq!(
+            record.metadata.get("memory_digest_ref").map(String::as_str),
+            Some("memory://digest/1")
+        );
+        assert_eq!(
+            record
+                .metadata
+                .get("long_ref")
+                .expect("safe refs are retained")
+                .chars()
+                .count(),
+            256
+        );
+        assert!(!serialized.contains("do not store this prompt"));
+        assert!(!serialized.contains("provider bytes"));
+    }
 }

@@ -305,6 +305,18 @@ Every command logs key execution nodes with sanitized fields:
   task output, provider payload, manifest, package bytes, credential, signature,
   or full skill body fields to telemetry, provenance, snapshots, or logs.
 
+### Slice 4C: Metadata Sanitization At Governance Event Boundaries
+
+- Patterns: Decorator-style sanitization runs inside the governance event and
+  proposal constructors before Store/EventLog replay can observe metadata;
+  Observer remains append-only, but it only receives bounded id/ref metadata.
+- Ownership: `macaca-skill` owns the prompt-safe metadata rules because they are
+  part of the Skill service contract. Runtime-host providers call the same DTO
+  constructors and do not maintain separate sanitization semantics.
+- Safety: metadata keys containing raw prompt, task output, provider payload,
+  package bytes, manifest body, skill body, secrets, credentials, or signatures
+  are dropped, and retained reference values are bounded before serialization.
+
 ## Risks And Mitigations
 
 - Risk: skill mutation corrupts active packages. Mitigation: atomic writes,
