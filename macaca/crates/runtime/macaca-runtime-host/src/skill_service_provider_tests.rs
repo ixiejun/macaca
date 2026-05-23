@@ -17,21 +17,21 @@ use macaca_skill::{
     SkillAliasSnapshotCommand, SkillAliasSnapshotResult, SkillAliasUpsertCommand,
     SkillAliasUpsertResult, SkillAuthorKind, SkillCurationAction, SkillCurationDryRunCommand,
     SkillCurationDryRunResult, SkillCurationRunCommand, SkillCurationRunRecord,
-    SkillCurationRunResult, SkillCurationStatusCommand, SkillCurationStatusResult,
-    SkillEvolutionCandidateClassification, SkillEvolutionProposalAction, SkillExperienceCandidate,
-    SkillExperienceCandidateDestination, SkillExperienceEvidenceGateStatus,
-    SkillExperienceProposalCommand, SkillExperienceProposalResult,
-    SkillExperienceProposalSnapshotCommand, SkillExperienceProposalSnapshotResult,
-    SkillGovernanceEventPayload, SkillGovernanceEventRecord, SkillGovernanceReadModel,
-    SkillGovernanceRecordUsageCommand, SkillGovernanceRecordUsageResult,
+    SkillCurationRunResult, SkillCurationSnapshotCommand, SkillCurationSnapshotResult,
+    SkillCurationStatusCommand, SkillCurationStatusResult, SkillEvolutionCandidateClassification,
+    SkillEvolutionProposalAction, SkillExperienceCandidate, SkillExperienceCandidateDestination,
+    SkillExperienceEvidenceGateStatus, SkillExperienceProposalCommand,
+    SkillExperienceProposalResult, SkillExperienceProposalSnapshotCommand,
+    SkillExperienceProposalSnapshotResult, SkillGovernanceEventPayload, SkillGovernanceEventRecord,
+    SkillGovernanceReadModel, SkillGovernanceRecordUsageCommand, SkillGovernanceRecordUsageResult,
     SkillGovernanceSnapshotCommand, SkillGovernanceSnapshotRefRecord,
     SkillGovernanceSnapshotResult, SkillProvenanceAction, SkillRollbackRefRecord,
     SkillServiceScope, SkillStatusCommand, SkillStatusResult, SkillUsageEventKind,
     SkillUsageObservation, SKILL_ALIAS_RESOLVE_COMMAND, SKILL_ALIAS_SNAPSHOT_COMMAND,
     SKILL_ALIAS_UPSERT_COMMAND, SKILL_CURATION_DRY_RUN_COMMAND, SKILL_CURATION_RUN_COMMAND,
-    SKILL_CURATION_STATUS_COMMAND, SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND,
-    SKILL_EVOLUTION_SNAPSHOT_COMMAND, SKILL_GOVERNANCE_RECORD_USAGE_COMMAND,
-    SKILL_GOVERNANCE_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND,
+    SKILL_CURATION_SNAPSHOT_COMMAND, SKILL_CURATION_STATUS_COMMAND,
+    SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND, SKILL_EVOLUTION_SNAPSHOT_COMMAND,
+    SKILL_GOVERNANCE_RECORD_USAGE_COMMAND, SKILL_GOVERNANCE_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND,
 };
 use tokio::sync::Mutex;
 
@@ -419,6 +419,71 @@ async fn skill_curation_apply_run_requires_approval_and_policy_refs() {
     assert!(
         err.to_string().contains("approval refs"),
         "denial should explain the missing approval gate"
+    );
+}
+
+#[tokio::test]
+async fn skill_curation_snapshot_returns_governance_and_memento_refs_only() {
+    let provider = SkillSystemServiceProvider::new();
+    let trace = TraceContext::new("trace-skill-curation-snapshot");
+    provider
+        .call(traced_command(
+            SKILL_GOVERNANCE_RECORD_USAGE_COMMAND,
+            SkillGovernanceRecordUsageCommand {
+                trace: trace.clone(),
+                scope: SkillServiceScope::default(),
+                observation: observation(SkillUsageEventKind::Used, None),
+            },
+            trace.clone(),
+        ))
+        .await
+        .expect("usage observation should seed snapshot records");
+    let run = provider
+        .call(traced_command(
+            SKILL_CURATION_RUN_COMMAND,
+            SkillCurationRunCommand {
+                trace: trace.clone(),
+                scope: SkillServiceScope::default(),
+                dry_run: true,
+                stale_after_days: 30,
+                narrow_use_threshold: 1,
+                approval_refs: Vec::new(),
+                policy_decision_refs: Vec::new(),
+                audit_event_ids: Vec::new(),
+                policy: Default::default(),
+            },
+            trace.clone(),
+        ))
+        .await
+        .expect("curation run should create a replayable run ref");
+    let run: SkillCurationRunResult =
+        serde_json::from_value(run.output).expect("run result should decode");
+
+    let snapshot = provider
+        .call(traced_command(
+            SKILL_CURATION_SNAPSHOT_COMMAND,
+            SkillCurationSnapshotCommand {
+                trace: trace.clone(),
+                scope: SkillServiceScope::default(),
+                include_archived: true,
+                lifecycle_filters: Vec::new(),
+                include_package_mementos: true,
+            },
+            trace,
+        ))
+        .await
+        .expect("curation snapshot should be a typed service command");
+    let snapshot: SkillCurationSnapshotResult =
+        serde_json::from_value(snapshot.output).expect("snapshot result should decode");
+
+    assert!(!snapshot.mutated);
+    assert_eq!(snapshot.snapshot.record_count, 1);
+    assert!(snapshot.curation_run_refs.contains(&run.run.run_id));
+    assert!(
+        !serde_json::to_string(&snapshot)
+            .expect("snapshot result should serialize")
+            .contains("SKILL.md body"),
+        "curation snapshot must not expose full skill instruction bodies"
     );
 }
 

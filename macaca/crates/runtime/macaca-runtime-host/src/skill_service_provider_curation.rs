@@ -8,8 +8,10 @@ use std::sync::Arc;
 use macaca_proto::{ServiceCallResult, ServiceError, ServiceResult, TraceContext};
 use macaca_skill::{
     SkillCurationDryRunCommand, SkillCurationDryRunResult, SkillCurationRunCommand,
-    SkillCurationRunResult, SkillCurationStatusCommand, SkillCurationStatusResult,
-    SkillGovernanceEventPayload, SkillGovernanceEventRecord, SkillGovernanceStoreStrategy,
+    SkillCurationRunResult, SkillCurationSnapshotCommand, SkillCurationSnapshotResult,
+    SkillCurationStatusCommand, SkillCurationStatusResult, SkillGovernanceEventPayload,
+    SkillGovernanceEventRecord, SkillGovernanceReadModel, SkillGovernanceSnapshotRefRecord,
+    SkillGovernanceStoreStrategy,
 };
 use serde_json::Value;
 
@@ -70,6 +72,24 @@ pub(crate) async fn run_command(
         rollback_ref = result.rollback_ref.as_deref().unwrap_or(""),
         mutated = result.mutated,
         "skill curation run completed"
+    );
+    Ok(service_result(to_value(result)?, trace))
+}
+
+pub(crate) async fn snapshot_command(
+    state: &Arc<SkillProviderGovernanceState>,
+    payload: Value,
+    trace: TraceContext,
+) -> ServiceResult<ServiceCallResult> {
+    let typed: SkillCurationSnapshotCommand = decode(payload)?;
+    let result = state.curation_snapshot(typed).await;
+    tracing::info!(
+        trace_id = %trace.trace_id,
+        snapshot_ref = %result.snapshot.snapshot_ref,
+        record_count = result.snapshot.record_count,
+        rollback_refs = result.rollback_refs.len(),
+        package_memento_refs = result.package_memento_refs.len(),
+        "skill curation snapshot recorded"
     );
     Ok(service_result(to_value(result)?, trace))
 }
@@ -166,5 +186,74 @@ impl SkillProviderGovernanceState {
             "skill curation run recorded through local governance strategy"
         );
         Ok(result)
+    }
+
+    /// Record a bounded curation snapshot ref and return replayable memento ids.
+    pub(crate) async fn curation_snapshot(
+        &self,
+        command: SkillCurationSnapshotCommand,
+    ) -> SkillCurationSnapshotResult {
+        let captured_at = chrono::Utc::now();
+        let governance = self
+            .governance_snapshot(command.include_archived, command.lifecycle_filters)
+            .await;
+        let read_model = <Self as SkillGovernanceStoreStrategy>::read_model(self)
+            .await
+            .unwrap_or_else(|_| empty_read_model(captured_at));
+        let snapshot = SkillGovernanceSnapshotRefRecord {
+            snapshot_ref: format!(
+                "store://skill-curation/{}/snapshot-{}",
+                command.trace.trace_id,
+                captured_at.timestamp_nanos_opt().unwrap_or_default()
+            ),
+            trace_id: command.trace.trace_id.clone(),
+            record_count: governance.records.len() as u64,
+            captured_at,
+            report_ref: None,
+        };
+        let package_memento_refs = if command.include_package_mementos {
+            read_model
+                .rollback_refs
+                .iter()
+                .map(|rollback| rollback.rollback_ref.clone())
+                .collect()
+        } else {
+            Vec::new()
+        };
+        let result = SkillCurationSnapshotResult {
+            snapshot: snapshot.clone(),
+            curation_run_refs: read_model
+                .curation_runs
+                .iter()
+                .map(|run| run.run_id.clone())
+                .collect(),
+            rollback_refs: read_model.rollback_refs,
+            package_memento_refs,
+            mutated: false,
+            captured_at,
+        };
+        let event = SkillGovernanceEventRecord::new(
+            event_id("skill-governance-curation-snapshot", captured_at),
+            &command.trace,
+            command.scope,
+            captured_at,
+            SkillGovernanceEventPayload::SnapshotRefRecorded(snapshot),
+        );
+        let _ = <Self as SkillGovernanceStoreStrategy>::append_event(self, event).await;
+        result
+    }
+}
+
+fn empty_read_model(captured_at: chrono::DateTime<chrono::Utc>) -> SkillGovernanceReadModel {
+    SkillGovernanceReadModel {
+        records: Vec::new(),
+        provenance_events: Vec::new(),
+        aliases: Vec::new(),
+        proposals: Vec::new(),
+        curation_runs: Vec::new(),
+        snapshot_refs: Vec::new(),
+        rollback_refs: Vec::new(),
+        replayed_events: 0,
+        captured_at,
     }
 }

@@ -10,7 +10,8 @@ use macaca_skill::{
     SkillAliasSnapshotResult, SkillAliasUpsertCommand, SkillAliasUpsertResult, SkillCleanupCommand,
     SkillCurationDryRunCommand, SkillCurationDryRunResult, SkillCurationLifecycleAction,
     SkillCurationLifecycleCommand, SkillCurationLifecycleResult, SkillCurationRunCommand,
-    SkillCurationRunResult, SkillEvolutionPromoteDraftCommand, SkillEvolutionPromoteDraftResult,
+    SkillCurationRunResult, SkillCurationSnapshotCommand, SkillCurationSnapshotResult,
+    SkillEvolutionPromoteDraftCommand, SkillEvolutionPromoteDraftResult,
     SkillEvolutionProposePatchCommand, SkillEvolutionProposePatchResult,
     SkillEvolutionRejectDraftCommand, SkillEvolutionRejectDraftResult, SkillExecutableLoadCommand,
     SkillExecutableLoadResult, SkillExperienceProposalCommand, SkillExperienceProposalResult,
@@ -24,7 +25,7 @@ use macaca_skill::{
     SKILL_CURATION_ARCHIVE_COMMAND, SKILL_CURATION_DRY_RUN_COMMAND, SKILL_CURATION_PIN_COMMAND,
     SKILL_CURATION_QUARANTINE_COMMAND, SKILL_CURATION_REJECT_COMMAND,
     SKILL_CURATION_RELEASE_QUARANTINE_COMMAND, SKILL_CURATION_RESTORE_COMMAND,
-    SKILL_CURATION_RUN_COMMAND, SKILL_CURATION_UNPIN_COMMAND,
+    SKILL_CURATION_RUN_COMMAND, SKILL_CURATION_SNAPSHOT_COMMAND, SKILL_CURATION_UNPIN_COMMAND,
     SKILL_EVOLUTION_PROMOTE_DRAFT_COMMAND, SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND,
     SKILL_EVOLUTION_PROPOSE_PATCH_COMMAND, SKILL_EVOLUTION_REJECT_DRAFT_COMMAND,
     SKILL_EVOLUTION_SNAPSHOT_COMMAND, SKILL_EXECUTABLE_LOAD_COMMAND,
@@ -159,6 +160,19 @@ impl SystemSkillClient for ServiceBackedSkillClient {
         call(
             &self.service,
             SKILL_CURATION_RUN_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn curation_snapshot(
+        &self,
+        command: SkillCurationSnapshotCommand,
+    ) -> MacacaResult<SkillCurationSnapshotResult> {
+        call(
+            &self.service,
+            SKILL_CURATION_SNAPSHOT_COMMAND,
             command.trace.clone(),
             command,
         )

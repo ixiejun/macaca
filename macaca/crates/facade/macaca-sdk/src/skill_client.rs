@@ -9,7 +9,8 @@ use macaca_skill::{
     SkillAliasSnapshotResult, SkillAliasUpsertCommand, SkillAliasUpsertResult, SkillCleanupCommand,
     SkillCurationDryRunCommand, SkillCurationDryRunResult, SkillCurationLifecycleAction,
     SkillCurationLifecycleCommand, SkillCurationLifecycleResult, SkillCurationRunCommand,
-    SkillCurationRunResult, SkillEvolutionPromoteDraftCommand, SkillEvolutionPromoteDraftResult,
+    SkillCurationRunResult, SkillCurationSnapshotCommand, SkillCurationSnapshotResult,
+    SkillEvolutionPromoteDraftCommand, SkillEvolutionPromoteDraftResult,
     SkillEvolutionProposePatchCommand, SkillEvolutionProposePatchResult,
     SkillEvolutionRejectDraftCommand, SkillEvolutionRejectDraftResult, SkillExecutableLoadCommand,
     SkillExecutableLoadResult, SkillExperienceProposalCommand, SkillExperienceProposalResult,
@@ -64,6 +65,10 @@ pub trait SystemSkillClient: Send + Sync {
         &self,
         command: SkillCurationRunCommand,
     ) -> MacacaResult<SkillCurationRunResult>;
+    async fn curation_snapshot(
+        &self,
+        command: SkillCurationSnapshotCommand,
+    ) -> MacacaResult<SkillCurationSnapshotResult>;
     async fn curation_lifecycle(
         &self,
         action: SkillCurationLifecycleAction,
@@ -219,6 +224,17 @@ impl SystemSkillClient for UnavailableSystemSkillClient {
             trace_id = %command.trace.trace_id,
             dry_run = command.dry_run,
             "sdk skill client unavailable for curation run"
+        );
+        Err(MacacaError::Config("Skill service is unavailable".into()))
+    }
+
+    async fn curation_snapshot(
+        &self,
+        command: SkillCurationSnapshotCommand,
+    ) -> MacacaResult<SkillCurationSnapshotResult> {
+        warn!(
+            trace_id = %command.trace.trace_id,
+            "sdk skill client unavailable for curation snapshot"
         );
         Err(MacacaError::Config("Skill service is unavailable".into()))
     }

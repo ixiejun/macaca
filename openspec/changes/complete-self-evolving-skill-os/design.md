@@ -425,6 +425,21 @@ Every command logs key execution nodes with sanitized fields:
   aliases, scheduler refs, context snapshots, raw provider payloads, prompts,
   manifests, package bytes, credentials, signatures, or full skill bodies.
 
+### Slice 8C: Curation Snapshot Command
+
+- Patterns: Command exposes `skill.curation.snapshot` as a typed ref-producing
+  snapshot operation; Facade routes the command through SDK; Strategy records a
+  local governance snapshot ref that future Store/EventLog providers can
+  replace; Observer appends a snapshot-ref event for replay.
+- Ownership: `macaca-skill` owns snapshot command/result DTOs and snapshot ref
+  contracts. `macaca-runtime-host` owns the built-in local projection from
+  governance records and event-log read models. Shells receive refs and counts
+  only and do not interpret lifecycle, rollback, or package state.
+- Safety: snapshot responses include governance counts, curation run ids,
+  rollback refs, and optional package memento refs only. They never embed
+  package bytes, manifests, raw provider payloads, prompts, credentials,
+  signatures, or full skill bodies.
+
 ## Risks And Mitigations
 
 - Risk: skill mutation corrupts active packages. Mitigation: atomic writes,

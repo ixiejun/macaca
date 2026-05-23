@@ -11,7 +11,9 @@ use macaca_proto::TraceContext;
 use serde::{Deserialize, Serialize};
 
 use crate::governance::{SkillGovernanceRecord, SkillLifecycleState};
-use crate::governance_store::SkillCurationRunRecord;
+use crate::governance_store::{
+    SkillCurationRunRecord, SkillGovernanceSnapshotRefRecord, SkillRollbackRefRecord,
+};
 use crate::service_contract::{SkillServicePolicyHints, SkillServiceScope};
 use crate::telemetry::SkillUsageTelemetry;
 
@@ -99,6 +101,32 @@ impl SkillCurationRunCommand {
         }
         Ok(())
     }
+}
+
+/// Command for recording and returning a curation governance snapshot ref.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SkillCurationSnapshotCommand {
+    pub trace: TraceContext,
+    pub scope: SkillServiceScope,
+    pub include_archived: bool,
+    #[serde(default)]
+    pub lifecycle_filters: Vec<SkillLifecycleState>,
+    /// Include rollback memento refs when the provider has them.
+    ///
+    /// The response carries refs only.  Package bytes and full skill bodies are
+    /// never embedded in the DTO.
+    pub include_package_mementos: bool,
+}
+
+/// Result for a curation governance snapshot command.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SkillCurationSnapshotResult {
+    pub snapshot: SkillGovernanceSnapshotRefRecord,
+    pub curation_run_refs: Vec<String>,
+    pub rollback_refs: Vec<SkillRollbackRefRecord>,
+    pub package_memento_refs: Vec<String>,
+    pub mutated: bool,
+    pub captured_at: DateTime<Utc>,
 }
 
 /// Recommendation action names are intentionally non-destructive.

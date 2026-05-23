@@ -135,7 +135,7 @@
   budget, provider, last run, next eligible run, and unavailable states.
 - [x] 8.2 Add `skill.curation.run` typed command supporting dry-run and
   approval-gated apply modes.
-- [ ] 8.3 Add `skill.curation.snapshot` typed command for durable governance
+- [x] 8.3 Add `skill.curation.snapshot` typed command for durable governance
   and package memento references.
 - [ ] 8.4 Add `skill.curation.rollback` typed command that restores lifecycle,
   telemetry, alias, report, and package refs from memento state.
