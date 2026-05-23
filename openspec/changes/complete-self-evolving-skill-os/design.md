@@ -597,6 +597,18 @@ Every command logs key execution nodes with sanitized fields:
   invalid risk scores, blank evidence refs, oversized rationale, and excessive
   source/movement/alias/evidence counts.
 
+### Slice 10B: Merge Eligibility Specification
+
+- Patterns: `macaca-skill` now exposes an executable Specification object for
+  merge eligibility. The policy compares sanitized facts rather than paths or
+  raw skill bodies.
+- Compatibility: the default policy requires exact matches for source scope,
+  ownership class, permission set, trust level, package source, executable
+  semantics, tenant id, and capability signature.
+- Safety: evaluation returns a bounded allowed/issues decision only. It never
+  mutates lifecycle records, aliases, support files, packages, scheduler refs,
+  or context snapshots.
+
 ## Risks And Mitigations
 
 - Risk: skill mutation corrupts active packages. Mitigation: atomic writes,

@@ -175,7 +175,7 @@
 
 - [x] 10.1 Define merge proposal DTOs with source skills, target umbrella skill,
   support-file movements, alias effects, risk score, and policy refs.
-- [ ] 10.2 Add merge eligibility specifications for scope, ownership,
+- [x] 10.2 Add merge eligibility specifications for scope, ownership,
   permissions, trust level, package source, executable semantics, tenant, and
   capability compatibility.
 - [ ] 10.3 Add support-file demotion proposals for session-specific references,
