@@ -258,7 +258,7 @@
 - [x] 15.3 Add Web/CLI/frontend boundary tests proving shells call facade routes
   and do not own curation semantics.
 - [x] 15.4 Add service-provider tests proving no presentation shell dependency.
-- [ ] 15.5 Add optional-provider tests proving absent semantic, marketplace,
+- [x] 15.5 Add optional-provider tests proving absent semantic, marketplace,
   store, or entitlement providers return structured unavailable/denied states.
 - [ ] 15.6 Add audit replay tests for proposal, promotion, mutation, curation
   run, rollback, and alias histories.

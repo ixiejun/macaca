@@ -96,6 +96,8 @@ mod skill_content_mutation_tests;
 #[cfg(test)]
 mod skill_governance_store_logging_tests;
 #[cfg(test)]
+mod skill_optional_provider_boundary_tests;
+#[cfg(test)]
 mod skill_proposal_lifecycle_tests;
 #[cfg(test)]
 mod skill_service_lifecycle_tests;
