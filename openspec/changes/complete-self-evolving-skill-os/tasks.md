@@ -33,7 +33,7 @@
   builders.
 - [x] 2.7 Implement a built-in local governance store strategy behind the Skill
   service provider.
-- [ ] 2.8 Add an unavailable governance store strategy that returns structured
+- [x] 2.8 Add an unavailable governance store strategy that returns structured
   unavailable states without panics or fake success.
 - [ ] 2.9 Migrate existing in-memory governance, alias, proposal, and lifecycle
   state behind the new store interface through a compatibility adapter.

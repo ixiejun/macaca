@@ -9,6 +9,7 @@
 
 use std::collections::BTreeMap;
 
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use macaca_proto::TraceContext;
 use serde::{Deserialize, Serialize};
@@ -93,6 +94,107 @@ pub struct SkillAliasMap {
     pub valid_from: DateTime<Utc>,
     pub valid_until: Option<DateTime<Utc>>,
     pub resolution_policy: SkillAliasResolutionPolicy,
+}
+
+/// Structured failure class returned by governance store strategies.
+///
+/// The enum is intentionally small for the first Store/EventLog slice.  Future
+/// strategies can add denied, conflict, or corruption classes without forcing
+/// callers to parse free-form strings.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SkillGovernanceStoreUnavailableKind {
+    Unavailable,
+}
+
+/// Structured unavailable state for governance store operations.
+///
+/// This is returned instead of panicking or pretending that an append/replay
+/// succeeded.  The timestamp and retry hint make operator diagnostics
+/// auditable without exposing raw event payloads.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SkillGovernanceStoreUnavailable {
+    pub kind: SkillGovernanceStoreUnavailableKind,
+    pub reason: String,
+    pub retryable_without_reconfiguration: bool,
+    pub captured_at: DateTime<Utc>,
+}
+
+impl SkillGovernanceStoreUnavailable {
+    /// Build a non-retryable unavailable state for missing Store/EventLog wiring.
+    pub fn unavailable(reason: impl Into<String>) -> Self {
+        Self {
+            kind: SkillGovernanceStoreUnavailableKind::Unavailable,
+            reason: reason.into(),
+            retryable_without_reconfiguration: false,
+            captured_at: Utc::now(),
+        }
+    }
+}
+
+/// Strategy interface for append-only Skill governance persistence.
+///
+/// Runtime-host can choose a local, Store/EventLog-backed, plugin, remote, or
+/// unavailable strategy at composition time.  The trait keeps persistence
+/// decisions behind the Skill service boundary and gives replay consumers a
+/// single provider-neutral contract.
+#[async_trait]
+pub trait SkillGovernanceStoreStrategy: Send + Sync {
+    async fn append_event(
+        &self,
+        event: SkillGovernanceEventRecord,
+    ) -> Result<SkillGovernanceEventRecord, SkillGovernanceStoreUnavailable>;
+
+    async fn read_model(&self)
+        -> Result<SkillGovernanceReadModel, SkillGovernanceStoreUnavailable>;
+}
+
+/// Null Object governance store for hosts without durable Store/EventLog wiring.
+///
+/// The strategy never mutates state and never returns fake success.  It emits
+/// sanitized logs for each denied append or replay so operators can see the
+/// exact service boundary where persistence is absent.
+#[derive(Debug, Clone)]
+pub struct UnavailableSkillGovernanceStore {
+    reason: String,
+}
+
+impl UnavailableSkillGovernanceStore {
+    /// Create an unavailable strategy with a bounded operator-facing reason.
+    pub fn new(reason: impl Into<String>) -> Self {
+        Self {
+            reason: reason.into(),
+        }
+    }
+
+    fn unavailable(&self) -> SkillGovernanceStoreUnavailable {
+        SkillGovernanceStoreUnavailable::unavailable(self.reason.clone())
+    }
+}
+
+#[async_trait]
+impl SkillGovernanceStoreStrategy for UnavailableSkillGovernanceStore {
+    async fn append_event(
+        &self,
+        event: SkillGovernanceEventRecord,
+    ) -> Result<SkillGovernanceEventRecord, SkillGovernanceStoreUnavailable> {
+        tracing::warn!(
+            event_id = %event.event_id,
+            trace_id = %event.trace_id,
+            reason = %self.reason,
+            "skill governance store append unavailable"
+        );
+        Err(self.unavailable())
+    }
+
+    async fn read_model(
+        &self,
+    ) -> Result<SkillGovernanceReadModel, SkillGovernanceStoreUnavailable> {
+        tracing::warn!(
+            reason = %self.reason,
+            "skill governance store replay unavailable"
+        );
+        Err(self.unavailable())
+    }
 }
 
 /// Durable metadata for one bounded curation run.
@@ -336,5 +438,51 @@ mod tests {
         assert!(serialized.contains("activation_count"));
         assert!(serialized.contains("WarnAndRedirect"));
         assert!(!serialized.contains("SKILL.md body"));
+    }
+
+    #[tokio::test]
+    async fn unavailable_governance_store_strategy_returns_structured_unavailable() {
+        let store = UnavailableSkillGovernanceStore::new("Store/EventLog provider is absent");
+        let trace = TraceContext::new("trace-governance-store-unavailable");
+        let event = SkillGovernanceEventRecord::new(
+            "event-unavailable-1",
+            &trace,
+            SkillServiceScope::default(),
+            Utc::now(),
+            SkillGovernanceEventPayload::UsageRecorded(SkillUsageObservation {
+                skill_id: "skill://agent/missing-store".into(),
+                name: "missing-store".into(),
+                source: "test".into(),
+                source_scope: "workspace".into(),
+                event: crate::governance::SkillUsageEventKind::Viewed,
+                author_kind: SkillAuthorKind::Agent,
+                created_by: None,
+                pinned: None,
+                evidence_id: Some("evidence-1".into()),
+                metadata: BTreeMap::new(),
+            }),
+        );
+
+        let append_err = store
+            .append_event(event)
+            .await
+            .expect_err("unavailable store must not fake append success");
+        let replay_err = store
+            .read_model()
+            .await
+            .expect_err("unavailable store must not fake replay success");
+
+        assert_eq!(
+            append_err.kind,
+            SkillGovernanceStoreUnavailableKind::Unavailable
+        );
+        assert_eq!(
+            replay_err.kind,
+            SkillGovernanceStoreUnavailableKind::Unavailable
+        );
+        assert!(!append_err.retryable_without_reconfiguration);
+        assert!(append_err
+            .reason
+            .contains("Store/EventLog provider is absent"));
     }
 }
