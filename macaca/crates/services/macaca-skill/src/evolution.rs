@@ -32,6 +32,47 @@ pub enum SkillEvolutionProposalAction {
     Discard,
 }
 
+/// Evidence-gate verdict supplied by Task/Autonomy before Skill Evolution runs.
+///
+/// The Skill service must not infer task completion from free-form summaries.
+/// A caller has to pass an explicit, provider-neutral gate result so the
+/// evolution path can reject unverified experience before it creates even a
+/// draft-only proposal.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SkillExperienceEvidenceGateStatus {
+    Accepted,
+    Rejected,
+    Missing,
+}
+
+impl Default for SkillExperienceEvidenceGateStatus {
+    fn default() -> Self {
+        Self::Accepted
+    }
+}
+
+/// Generic destination selected for a bounded reusable experience candidate.
+///
+/// These labels describe OS-owned routing classes, not application domains.
+/// Memory and Knowledge destinations are recorded as draft proposal metadata in
+/// this slice; later service integrations will hand those candidates to their
+/// own facades instead of writing skill files.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SkillExperienceCandidateDestination {
+    MemoryFact,
+    KnowledgeDigest,
+    ExistingSkillPatchProposal,
+    NewSkillDraft,
+    SupportFileDraft,
+    NoOp,
+}
+
+impl Default for SkillExperienceCandidateDestination {
+    fn default() -> Self {
+        Self::NewSkillDraft
+    }
+}
+
 /// Sanitized task evidence that may become a governed skill proposal.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SkillExperienceCandidate {
@@ -39,9 +80,19 @@ pub struct SkillExperienceCandidate {
     pub session_id: Option<String>,
     pub application_id: Option<ApplicationId>,
     pub agent_name: Option<String>,
+    #[serde(default = "default_verified_terminal_success")]
+    pub verified_terminal_success: bool,
+    #[serde(default)]
+    pub evidence_gate: SkillExperienceEvidenceGateStatus,
     pub bounded_summary: String,
+    #[serde(default)]
+    pub trace_digest: Option<String>,
+    #[serde(default)]
+    pub memory_digest_refs: Vec<String>,
     pub reusable_procedure: String,
     pub classification: SkillEvolutionCandidateClassification,
+    #[serde(default)]
+    pub destination: SkillExperienceCandidateDestination,
     pub recommended_action: SkillEvolutionProposalAction,
     pub target_skill_id: Option<String>,
     pub target_skill_name: Option<String>,
@@ -52,20 +103,39 @@ pub struct SkillExperienceCandidate {
 impl SkillExperienceCandidate {
     /// Validate the minimum evidence required before a proposal can exist.
     pub fn validate(&self) -> Result<(), String> {
+        const MAX_BOUNDED_SUMMARY_CHARS: usize = 2_048;
+        const MAX_REUSABLE_PROCEDURE_CHARS: usize = 4_096;
+
         if self.task_id.trim().is_empty() {
             return Err("skill experience proposal requires task_id".into());
+        }
+        if !self.verified_terminal_success {
+            return Err("skill experience proposal requires verified terminal task success".into());
+        }
+        if self.evidence_gate != SkillExperienceEvidenceGateStatus::Accepted {
+            return Err("skill experience proposal requires accepted evidence gate".into());
         }
         if self.bounded_summary.trim().is_empty() {
             return Err("skill experience proposal requires bounded summary".into());
         }
+        if self.bounded_summary.chars().count() > MAX_BOUNDED_SUMMARY_CHARS {
+            return Err("skill experience proposal bounded summary is too large".into());
+        }
         if self.reusable_procedure.trim().is_empty() {
             return Err("skill experience proposal requires reusable procedure".into());
+        }
+        if self.reusable_procedure.chars().count() > MAX_REUSABLE_PROCEDURE_CHARS {
+            return Err("skill experience proposal reusable procedure is too large".into());
         }
         if self.evidence_ids.iter().all(|id| id.trim().is_empty()) {
             return Err("skill experience proposal requires evidence references".into());
         }
         Ok(())
     }
+}
+
+fn default_verified_terminal_success() -> bool {
+    true
 }
 
 /// Stored draft proposal metadata.
@@ -78,8 +148,11 @@ pub struct SkillExperienceProposalRecord {
     pub application_id: Option<ApplicationId>,
     pub agent_name: Option<String>,
     pub bounded_summary: String,
+    pub trace_digest: Option<String>,
+    pub memory_digest_refs: Vec<String>,
     pub reusable_procedure: String,
     pub classification: SkillEvolutionCandidateClassification,
+    pub destination: SkillExperienceCandidateDestination,
     pub recommended_action: SkillEvolutionProposalAction,
     pub target_skill_id: Option<String>,
     pub target_skill_name: Option<String>,
@@ -111,8 +184,19 @@ impl SkillExperienceProposalRecord {
             application_id: candidate.application_id,
             agent_name: candidate.agent_name,
             bounded_summary: candidate.bounded_summary,
+            trace_digest: candidate
+                .trace_digest
+                .filter(|digest| !digest.trim().is_empty())
+                .map(|digest| bounded_metadata_value(digest.trim())),
+            memory_digest_refs: candidate
+                .memory_digest_refs
+                .into_iter()
+                .filter(|digest| !digest.trim().is_empty())
+                .map(|digest| bounded_metadata_value(digest.trim()))
+                .collect(),
             reusable_procedure: candidate.reusable_procedure,
             classification: candidate.classification,
+            destination: candidate.destination,
             recommended_action: candidate.recommended_action,
             target_skill_id: candidate.target_skill_id,
             target_skill_name: candidate.target_skill_name,
@@ -226,9 +310,14 @@ mod tests {
                 session_id: Some("session-1".into()),
                 application_id: None,
                 agent_name: Some("agent".into()),
+                verified_terminal_success: true,
+                evidence_gate: SkillExperienceEvidenceGateStatus::Accepted,
                 bounded_summary: "bounded reusable summary".into(),
+                trace_digest: Some("trace-digest://task/1".into()),
+                memory_digest_refs: vec!["memory://digest/1".into()],
                 reusable_procedure: "bounded reusable procedure".into(),
                 classification: SkillEvolutionCandidateClassification::ReusableProcedure,
+                destination: SkillExperienceCandidateDestination::NewSkillDraft,
                 recommended_action: SkillEvolutionProposalAction::CreateDraft,
                 target_skill_id: None,
                 target_skill_name: Some("governed-skill".into()),
@@ -243,6 +332,15 @@ mod tests {
         assert_eq!(
             record.metadata.get("memory_digest_ref").map(String::as_str),
             Some("memory://digest/1")
+        );
+        assert_eq!(
+            record.trace_digest.as_deref(),
+            Some("trace-digest://task/1")
+        );
+        assert_eq!(record.memory_digest_refs, vec!["memory://digest/1"]);
+        assert_eq!(
+            record.destination,
+            SkillExperienceCandidateDestination::NewSkillDraft
         );
         assert_eq!(
             record

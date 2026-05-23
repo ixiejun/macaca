@@ -7,7 +7,8 @@ use macaca_skill::{
     SkillAliasSnapshotCommand, SkillAliasSnapshotResult, SkillAliasUpsertCommand,
     SkillAliasUpsertResult, SkillAuthorKind, SkillCurationAction, SkillCurationDryRunCommand,
     SkillCurationDryRunResult, SkillCurationRunRecord, SkillEvolutionCandidateClassification,
-    SkillEvolutionProposalAction, SkillExperienceCandidate, SkillExperienceProposalCommand,
+    SkillEvolutionProposalAction, SkillExperienceCandidate, SkillExperienceCandidateDestination,
+    SkillExperienceEvidenceGateStatus, SkillExperienceProposalCommand,
     SkillExperienceProposalResult, SkillExperienceProposalSnapshotCommand,
     SkillExperienceProposalSnapshotResult, SkillGovernanceEventPayload, SkillGovernanceEventRecord,
     SkillGovernanceReadModel, SkillGovernanceRecordUsageCommand, SkillGovernanceRecordUsageResult,
@@ -70,9 +71,14 @@ fn reusable_experience_candidate(evidence_ids: Vec<String>) -> SkillExperienceCa
         session_id: Some("session-verified-1".into()),
         application_id: None,
         agent_name: Some("agent".into()),
+        verified_terminal_success: true,
+        evidence_gate: SkillExperienceEvidenceGateStatus::Accepted,
         bounded_summary: "A verified task produced a reusable skill maintenance procedure.".into(),
+        trace_digest: Some("trace-digest://task/verified-1".into()),
+        memory_digest_refs: vec!["memory://digest/task-verified-1".into()],
         reusable_procedure: "Record governance evidence, propose a draft skill, and keep active skill files unchanged until approval.".into(),
         classification: SkillEvolutionCandidateClassification::ReusableProcedure,
+        destination: SkillExperienceCandidateDestination::NewSkillDraft,
         recommended_action: SkillEvolutionProposalAction::CreateDraft,
         target_skill_id: None,
         target_skill_name: Some("skill-experience-maintenance".into()),
@@ -397,6 +403,18 @@ async fn skill_experience_proposal_creates_draft_without_mutating_governance_rec
         proposal.proposal.classification,
         SkillEvolutionCandidateClassification::ReusableProcedure
     );
+    assert_eq!(
+        proposal.proposal.destination,
+        SkillExperienceCandidateDestination::NewSkillDraft
+    );
+    assert_eq!(
+        proposal.proposal.trace_digest.as_deref(),
+        Some("trace-digest://task/verified-1")
+    );
+    assert_eq!(
+        proposal.proposal.memory_digest_refs,
+        vec!["memory://digest/task-verified-1"]
+    );
     assert_eq!(proposal.proposal.evidence_ids, vec!["artifact-proof-1"]);
     assert!(proposal.proposal.proposal_id.starts_with("skill-exp-"));
 
@@ -495,6 +513,87 @@ async fn skill_experience_proposal_rejects_missing_evidence() {
     assert!(
         err.to_string().contains("evidence"),
         "validation error should explain the missing evidence"
+    );
+}
+
+#[tokio::test]
+async fn skill_experience_proposal_rejects_unverified_terminal_status() {
+    let provider = SkillSystemServiceProvider::new();
+    let trace = TraceContext::new("trace-skill-experience-unverified-status");
+    let mut candidate = reusable_experience_candidate(vec!["artifact-proof-1".into()]);
+    candidate.verified_terminal_success = false;
+    let command = SkillExperienceProposalCommand {
+        trace: trace.clone(),
+        scope: SkillServiceScope::default(),
+        candidate,
+    };
+
+    let err = provider
+        .call(traced_command(
+            SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND,
+            command,
+            trace,
+        ))
+        .await
+        .expect_err("unverified terminal task status must be rejected");
+
+    assert!(
+        err.to_string().contains("verified terminal"),
+        "validation error should explain terminal success requirement"
+    );
+}
+
+#[tokio::test]
+async fn skill_experience_proposal_rejects_rejected_evidence_gate() {
+    let provider = SkillSystemServiceProvider::new();
+    let trace = TraceContext::new("trace-skill-experience-evidence-rejected");
+    let mut candidate = reusable_experience_candidate(vec!["artifact-proof-1".into()]);
+    candidate.evidence_gate = SkillExperienceEvidenceGateStatus::Rejected;
+    let command = SkillExperienceProposalCommand {
+        trace: trace.clone(),
+        scope: SkillServiceScope::default(),
+        candidate,
+    };
+
+    let err = provider
+        .call(traced_command(
+            SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND,
+            command,
+            trace,
+        ))
+        .await
+        .expect_err("rejected evidence gate must be rejected before proposal creation");
+
+    assert!(
+        err.to_string().contains("evidence gate"),
+        "validation error should explain evidence gate requirement"
+    );
+}
+
+#[tokio::test]
+async fn skill_experience_proposal_rejects_oversize_summary() {
+    let provider = SkillSystemServiceProvider::new();
+    let trace = TraceContext::new("trace-skill-experience-oversize-summary");
+    let mut candidate = reusable_experience_candidate(vec!["artifact-proof-1".into()]);
+    candidate.bounded_summary = "x".repeat(2_049);
+    let command = SkillExperienceProposalCommand {
+        trace: trace.clone(),
+        scope: SkillServiceScope::default(),
+        candidate,
+    };
+
+    let err = provider
+        .call(traced_command(
+            SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND,
+            command,
+            trace,
+        ))
+        .await
+        .expect_err("oversize bounded summary must be rejected");
+
+    assert!(
+        err.to_string().contains("too large"),
+        "validation error should explain bounded summary limit"
     );
 }
 

@@ -76,21 +76,21 @@
 
 ## 5. Task Completion Experience Extraction
 
-- [ ] 5.1 Add a Task/Autonomy service integration point for verified terminal
+- [x] 5.1 Add a Task/Autonomy service integration point for verified terminal
   success events.
-- [ ] 5.2 Define bounded `ExperienceCandidate` DTOs with summary, trace digest,
+- [x] 5.2 Define bounded `ExperienceCandidate` DTOs with summary, trace digest,
   memory digest refs, evidence refs, and provenance.
-- [ ] 5.3 Require Evidence Gate validation before Skill Evolution receives a
+- [x] 5.3 Require Evidence Gate validation before Skill Evolution receives a
   candidate.
-- [ ] 5.4 Add generic classification results for memory fact, knowledge digest,
+- [x] 5.4 Add generic classification results for memory fact, knowledge digest,
   existing skill patch proposal, new skill draft, support-file draft, and
   discard/no-op.
 - [ ] 5.5 Route memory and knowledge destinations through their service facades
   instead of writing skill files.
-- [ ] 5.6 Keep draft creation non-mutating for active catalogs by default.
-- [ ] 5.7 Add logs for candidate received, evidence accepted/rejected,
+- [x] 5.6 Keep draft creation non-mutating for active catalogs by default.
+- [x] 5.7 Add logs for candidate received, evidence accepted/rejected,
   classification result, proposal id, and no-op rationale.
-- [ ] 5.8 Test missing evidence, unverified task status, oversize summaries, and
+- [x] 5.8 Test missing evidence, unverified task status, oversize summaries, and
   sanitized proposal output.
 
 ## 6. Proposal Lifecycle Commands

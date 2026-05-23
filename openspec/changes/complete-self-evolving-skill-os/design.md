@@ -333,6 +333,25 @@ Every command logs key execution nodes with sanitized fields:
   output, provider payloads, manifests, package bytes, secrets, credentials, or
   full skill bodies.
 
+### Slice 5A: Verified Task Experience Candidate Contract
+
+- Patterns: Command remains the service integration point from Task/Autonomy to
+  Skill Evolution; Specification is used for explicit terminal-success,
+  evidence-gate, bounded-size, and generic-destination validation; Observer
+  logs candidate accepted/rejected and proposal-created events without
+  executing mutations.
+- Ownership: `macaca-skill` owns the provider-neutral candidate DTO,
+  destination enum, and validation contract. `macaca-runtime-host` only enforces
+  the contract at the service boundary and records sanitized logs. Task,
+  Memory, Knowledge, Context, SDK, Web, CLI, frontend, kernel, and
+  applications do not write skill files or infer skill curation semantics in
+  this slice.
+- Safety: the candidate stores bounded summaries, trace digest refs, memory
+  digest refs, evidence refs, destination labels, and proposal metadata only.
+  Unverified terminal tasks, rejected/missing evidence gates, missing evidence,
+  and oversize summaries are rejected before proposal creation. Draft proposals
+  remain non-mutating for active catalogs and package files.
+
 ## Risks And Mitigations
 
 - Risk: skill mutation corrupts active packages. Mitigation: atomic writes,

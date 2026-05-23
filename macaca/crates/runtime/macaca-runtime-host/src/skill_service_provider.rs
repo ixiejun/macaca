@@ -409,10 +409,25 @@ impl SystemService for SkillSystemServiceProvider {
             }
             SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND => {
                 let typed: SkillExperienceProposalCommand = decode(command.payload)?;
-                typed
-                    .candidate
-                    .validate()
-                    .map_err(ServiceError::InvalidArgument)?;
+                tracing::info!(
+                    trace_id = %typed.trace.trace_id,
+                    task_id = %typed.candidate.task_id,
+                    verified_terminal_success = typed.candidate.verified_terminal_success,
+                    evidence_gate = ?typed.candidate.evidence_gate,
+                    destination = ?typed.candidate.destination,
+                    evidence_refs = typed.candidate.evidence_ids.len(),
+                    "skill experience candidate received"
+                );
+                if let Err(err) = typed.candidate.validate() {
+                    tracing::warn!(
+                        trace_id = %typed.trace.trace_id,
+                        task_id = %typed.candidate.task_id,
+                        evidence_gate = ?typed.candidate.evidence_gate,
+                        reason = %err,
+                        "skill experience candidate rejected before proposal creation"
+                    );
+                    return Err(ServiceError::InvalidArgument(err));
+                }
                 let result = self
                     .governance_state
                     .propose_experience(typed.clone())
@@ -421,6 +436,7 @@ impl SystemService for SkillSystemServiceProvider {
                     trace_id = %typed.trace.trace_id,
                     proposal_id = %result.proposal.proposal_id,
                     task_id = %result.proposal.task_id,
+                    destination = ?result.proposal.destination,
                     action = ?result.proposal.recommended_action,
                     mutated = result.mutated,
                     "skill experience proposal created"
