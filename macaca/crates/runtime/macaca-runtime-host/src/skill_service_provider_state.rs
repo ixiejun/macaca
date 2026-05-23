@@ -139,6 +139,12 @@ impl SkillProviderGovernanceState {
             .filter(|id| !id.trim().is_empty())
             .cloned()
             .collect::<Vec<_>>();
+        let sanitized_policy_decisions = command
+            .policy_decision_refs
+            .iter()
+            .filter(|id| !id.trim().is_empty())
+            .cloned()
+            .collect::<Vec<_>>();
         let mut records = self.records.lock().await;
         let record = records.entry(key).or_insert_with(|| {
             SkillGovernanceRecord::from_lifecycle_command(&command, captured_at)
@@ -173,7 +179,15 @@ impl SkillProviderGovernanceState {
         let result_lifecycle = record.lifecycle.clone();
         let result_pinned = record.pinned;
         drop(records);
-        self.append_event(SkillGovernanceEventRecord::new(
+        tracing::info!(
+            trace_id = %command.trace.trace_id,
+            skill_id = %command.skill_id,
+            action = ?action,
+            evidence_refs = sanitized_evidence.len(),
+            policy_decision_refs = sanitized_policy_decisions.len(),
+            "skill governance lifecycle mutation accepted"
+        );
+        let mut event = SkillGovernanceEventRecord::new(
             event_id("skill-governance-lifecycle", captured_at),
             &command.trace,
             command.scope.clone(),
@@ -206,8 +220,9 @@ impl SkillProviderGovernanceState {
                 evidence_id: sanitized_evidence.first().cloned(),
                 metadata: BTreeMap::new(),
             }),
-        ))
-        .await;
+        );
+        event.policy_decision_ids = sanitized_policy_decisions.clone();
+        self.append_event(event).await;
 
         Ok(SkillCurationLifecycleResult {
             skill_id: result_skill_id,
@@ -218,6 +233,7 @@ impl SkillProviderGovernanceState {
             mutated: true,
             reason: command.reason,
             evidence_ids: sanitized_evidence,
+            policy_decision_refs: sanitized_policy_decisions,
             trace_id: command.trace.trace_id,
             captured_at,
         })

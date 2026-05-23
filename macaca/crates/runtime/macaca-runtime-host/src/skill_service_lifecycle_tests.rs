@@ -36,6 +36,7 @@ fn lifecycle_command(
         author_kind: SkillAuthorKind::Agent,
         reason: "operator requested a metadata-only lifecycle transition".into(),
         evidence_ids,
+        policy_decision_refs: vec!["policy://decision/lifecycle-test".into()],
         policy: SkillServicePolicyHints::default(),
     }
 }
@@ -60,6 +61,10 @@ async fn skill_curation_pin_and_unpin_mutate_only_governance_metadata() {
     assert!(pinned.pinned);
     assert_eq!(pinned.lifecycle, SkillLifecycleState::Active);
     assert_eq!(pinned.evidence_ids, vec!["pin-evidence-1"]);
+    assert_eq!(
+        pinned.policy_decision_refs,
+        vec!["policy://decision/lifecycle-test"]
+    );
 
     let unpin = lifecycle_command(trace.clone(), vec!["unpin-evidence-1".into()]);
     let result = provider
@@ -223,5 +228,23 @@ async fn skill_curation_lifecycle_rejects_missing_evidence() {
     assert!(
         err.to_string().contains("evidence"),
         "validation error should explain the missing evidence"
+    );
+}
+
+#[tokio::test]
+async fn skill_curation_lifecycle_rejects_missing_policy_decision_ref() {
+    let provider = SkillSystemServiceProvider::new();
+    let trace = TraceContext::new("trace-skill-curation-missing-policy");
+    let mut command = lifecycle_command(trace.clone(), vec!["pin-evidence-1".into()]);
+    command.policy_decision_refs.clear();
+
+    let err = provider
+        .call(traced_command(SKILL_CURATION_PIN_COMMAND, command, trace))
+        .await
+        .expect_err("lifecycle mutation must require policy decision refs");
+    assert!(
+        err.to_string()
+            .contains("requires policy decision references"),
+        "unexpected error: {err}"
     );
 }

@@ -34,6 +34,12 @@ pub struct SkillCurationLifecycleCommand {
     pub author_kind: SkillAuthorKind,
     pub reason: String,
     pub evidence_ids: Vec<String>,
+    /// Policy decision refs prove that the lifecycle mutation passed an
+    /// explicit governance decision before the provider mutates metadata.  The
+    /// refs are typed separately from free-form policy metadata so Store/EventLog
+    /// replay can audit every mutating transition without parsing hints.
+    #[serde(default)]
+    pub policy_decision_refs: Vec<String>,
     pub policy: SkillServicePolicyHints,
 }
 
@@ -59,6 +65,15 @@ impl SkillCurationLifecycleCommand {
         if self.evidence_ids.iter().all(|id| id.trim().is_empty()) {
             return Err("skill curation lifecycle command requires evidence references".into());
         }
+        if self
+            .policy_decision_refs
+            .iter()
+            .all(|id| id.trim().is_empty())
+        {
+            return Err(
+                "skill curation lifecycle command requires policy decision references".into(),
+            );
+        }
         Ok(())
     }
 }
@@ -74,6 +89,10 @@ pub struct SkillCurationLifecycleResult {
     pub mutated: bool,
     pub reason: String,
     pub evidence_ids: Vec<String>,
+    /// Policy decision refs copied from the accepted command so callers can
+    /// correlate the mutation response with durable governance audit records.
+    #[serde(default)]
+    pub policy_decision_refs: Vec<String>,
     pub trace_id: String,
     pub captured_at: DateTime<Utc>,
 }

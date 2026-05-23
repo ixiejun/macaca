@@ -4,7 +4,12 @@
 //! test keeps the wire contract explicit so SDK, shell, Context, Task, and
 //! future Store/EventLog providers do not invent lifecycle labels locally.
 
-use crate::{SkillLifecycleState, SkillLifecycleStateMachine};
+use macaca_proto::TraceContext;
+
+use crate::{
+    SkillAuthorKind, SkillCurationLifecycleCommand, SkillLifecycleState,
+    SkillLifecycleStateMachine, SkillServicePolicyHints, SkillServiceScope,
+};
 
 #[test]
 fn skill_lifecycle_state_contract_includes_complete_governance_set() {
@@ -56,4 +61,34 @@ fn lifecycle_state_machine_allows_only_governed_transitions() {
         &SkillLifecycleState::Archived
     )
     .is_err());
+}
+
+#[test]
+fn lifecycle_command_requires_evidence_and_policy_decision_refs() {
+    let mut command = SkillCurationLifecycleCommand {
+        trace: TraceContext::new("trace-lifecycle-command-contract"),
+        scope: SkillServiceScope::default(),
+        skill_id: "skill://agent/governed".into(),
+        name: "governed".into(),
+        source: "test".into(),
+        source_scope: "workspace".into(),
+        author_kind: SkillAuthorKind::Agent,
+        reason: "validate lifecycle mutation audit contract".into(),
+        evidence_ids: vec!["evidence://task/1".into()],
+        policy_decision_refs: vec!["policy://decision/1".into()],
+        policy: SkillServicePolicyHints::default(),
+    };
+
+    assert!(command.validate().is_ok());
+    command.policy_decision_refs.clear();
+    assert!(command
+        .validate()
+        .expect_err("policy refs must be mandatory")
+        .contains("policy decision references"));
+    command.policy_decision_refs = vec!["policy://decision/1".into()];
+    command.evidence_ids.clear();
+    assert!(command
+        .validate()
+        .expect_err("evidence refs must be mandatory")
+        .contains("evidence references"));
 }

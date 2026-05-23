@@ -48,7 +48,7 @@
   `Archived`, `Quarantined`, `Superseded`, and `Rejected`.
 - [x] 3.2 Implement a state-machine validator for allowed lifecycle
   transitions.
-- [ ] 3.3 Require policy decision refs and evidence refs for every mutating
+- [x] 3.3 Require policy decision refs and evidence refs for every mutating
   transition.
 - [ ] 3.4 Deny archive, supersede, merge apply, or deletion of pinned skills
   unless an explicit approval override contract is added.

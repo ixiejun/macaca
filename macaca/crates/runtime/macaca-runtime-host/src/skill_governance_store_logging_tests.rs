@@ -79,6 +79,7 @@ async fn local_governance_state_replays_through_store_strategy_adapter() {
                 author_kind: SkillAuthorKind::Agent,
                 reason: "verified stale lifecycle metadata".into(),
                 evidence_ids: vec!["lifecycle-evidence-1".into()],
+                policy_decision_refs: vec!["policy://decision/local-lifecycle".into()],
                 policy: SkillServicePolicyHints::default(),
             },
             SkillCurationLifecycleAction::Archive,
