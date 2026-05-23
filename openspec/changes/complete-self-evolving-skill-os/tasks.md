@@ -46,7 +46,7 @@
 
 - [x] 3.1 Extend lifecycle model to include `Draft`, `Active`, `Stale`,
   `Archived`, `Quarantined`, `Superseded`, and `Rejected`.
-- [ ] 3.2 Implement a state-machine validator for allowed lifecycle
+- [x] 3.2 Implement a state-machine validator for allowed lifecycle
   transitions.
 - [ ] 3.3 Require policy decision refs and evidence refs for every mutating
   transition.

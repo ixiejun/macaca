@@ -4,7 +4,7 @@
 //! test keeps the wire contract explicit so SDK, shell, Context, Task, and
 //! future Store/EventLog providers do not invent lifecycle labels locally.
 
-use crate::SkillLifecycleState;
+use crate::{SkillLifecycleState, SkillLifecycleStateMachine};
 
 #[test]
 fn skill_lifecycle_state_contract_includes_complete_governance_set() {
@@ -27,4 +27,33 @@ fn skill_lifecycle_state_contract_includes_complete_governance_set() {
     assert!(serialized.contains(&"\"Draft\"".to_string()));
     assert!(serialized.contains(&"\"Superseded\"".to_string()));
     assert!(serialized.contains(&"\"Rejected\"".to_string()));
+}
+
+#[test]
+fn lifecycle_state_machine_allows_only_governed_transitions() {
+    assert!(SkillLifecycleStateMachine::validate_transition(
+        &SkillLifecycleState::Draft,
+        &SkillLifecycleState::Active
+    )
+    .is_ok());
+    assert!(SkillLifecycleStateMachine::validate_transition(
+        &SkillLifecycleState::Active,
+        &SkillLifecycleState::Superseded
+    )
+    .is_ok());
+    assert!(SkillLifecycleStateMachine::validate_transition(
+        &SkillLifecycleState::Archived,
+        &SkillLifecycleState::Active
+    )
+    .is_ok());
+    assert!(SkillLifecycleStateMachine::validate_transition(
+        &SkillLifecycleState::Rejected,
+        &SkillLifecycleState::Active
+    )
+    .is_err());
+    assert!(SkillLifecycleStateMachine::validate_transition(
+        &SkillLifecycleState::Draft,
+        &SkillLifecycleState::Archived
+    )
+    .is_err());
 }
