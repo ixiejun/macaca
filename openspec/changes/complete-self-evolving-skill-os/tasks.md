@@ -236,7 +236,7 @@
 
 ## 14. Operations UI And CLI Mutation Adapters
 
-- [ ] 14.1 Add Web route commands for approval-gated pin, unpin, archive,
+- [x] 14.1 Add Web route commands for approval-gated pin, unpin, archive,
   restore, quarantine, promote, reject, run, apply, and rollback through the SDK
   facade.
 - [ ] 14.2 Add frontend controls that submit typed commands without owning

@@ -110,6 +110,30 @@ impl WebRuntimeFacade {
                 "/api/apps/{app_id}/skills/operations",
                 get(skill_operations_routes::get_skill_operations),
             )
+            .route(
+                "/api/apps/{app_id}/skills/operations/lifecycle/{action}/{skill_id}",
+                post(skill_operations_routes::post_skill_lifecycle_operation),
+            )
+            .route(
+                "/api/apps/{app_id}/skills/operations/curation/run",
+                post(skill_operations_routes::post_skill_curation_run),
+            )
+            .route(
+                "/api/apps/{app_id}/skills/operations/curation/apply",
+                post(skill_operations_routes::post_skill_curation_apply),
+            )
+            .route(
+                "/api/apps/{app_id}/skills/operations/curation/rollback",
+                post(skill_operations_routes::post_skill_curation_rollback),
+            )
+            .route(
+                "/api/apps/{app_id}/skills/operations/proposals/{proposal_id}/promote",
+                post(skill_operations_routes::post_skill_proposal_promote),
+            )
+            .route(
+                "/api/apps/{app_id}/skills/operations/proposals/{proposal_id}/reject",
+                post(skill_operations_routes::post_skill_proposal_reject),
+            )
             .route("/api/chat/v2", post(chat_orchestrator::post_chat_v2))
             .route("/api/chat/stop", post(chat_orchestrator::post_chat_stop))
             .route("/api/apps/{app_id}/todos", get(routes::list_todos))
