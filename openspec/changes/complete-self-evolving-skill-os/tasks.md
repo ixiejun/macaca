@@ -164,11 +164,11 @@
   success/failure correlation, and reference graph inputs.
 - [x] 9.4 Require semantic providers to output typed proposals only, never direct
   mutations.
-- [ ] 9.5 Add budget, resource, prompt sanitization, provider payload
+- [x] 9.5 Add budget, resource, prompt sanitization, provider payload
   sanitization, and bounded output decorators.
 - [ ] 9.6 Add runtime-host provider factory wiring without adding SDK, kernel,
   Web, CLI, or frontend dependencies.
-- [ ] 9.7 Test absent semantic provider fallback, typed proposal validation,
+- [x] 9.7 Test absent semantic provider fallback, typed proposal validation,
   provider error handling, and no raw provider payload in logs/reports.
 
 ## 10. Umbrella Merge And Support-File Demotion

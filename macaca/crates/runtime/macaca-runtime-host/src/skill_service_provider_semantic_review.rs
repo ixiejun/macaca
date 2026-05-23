@@ -27,6 +27,9 @@ pub(crate) async fn attach_unavailable_semantic_review(
             duplicate_inputs: Vec::new(),
             effectiveness_inputs: Vec::new(),
             reference_graph_inputs: Vec::new(),
+            budget: Default::default(),
+            resource_limits: Default::default(),
+            sanitization_policy: Default::default(),
             captured_at,
         })
         .await;

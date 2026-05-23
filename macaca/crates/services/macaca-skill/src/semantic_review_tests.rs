@@ -2,8 +2,9 @@ use macaca_proto::TraceContext;
 
 use crate::{
     SkillSemanticDuplicateInput, SkillSemanticEffectivenessInput, SkillSemanticReferenceGraphInput,
-    SkillSemanticReviewProposal, SkillSemanticReviewProposalKind, SkillSemanticReviewRequest,
-    SkillSemanticReviewResult, SkillSemanticReviewStatus, SkillSemanticSimilarityInput,
+    SkillSemanticReviewBudget, SkillSemanticReviewProposal, SkillSemanticReviewProposalKind,
+    SkillSemanticReviewRequest, SkillSemanticReviewResourceLimits, SkillSemanticReviewResult,
+    SkillSemanticReviewSanitizationPolicy, SkillSemanticReviewStatus, SkillSemanticSimilarityInput,
     SkillSemanticSkillSetInput, SkillServiceScope,
 };
 
@@ -42,6 +43,21 @@ fn semantic_review_request_carries_optional_analysis_inputs() {
             support_file_refs: vec!["references/example.md".into()],
             evidence_ids: vec!["evidence://reference-graph".into()],
         }],
+        budget: SkillSemanticReviewBudget {
+            max_provider_calls: 1,
+            max_input_items: 64,
+            max_output_proposals: 8,
+        },
+        resource_limits: SkillSemanticReviewResourceLimits {
+            timeout_ms: 1_000,
+            max_input_bytes: 16 * 1024,
+            max_output_bytes: 8 * 1024,
+        },
+        sanitization_policy: SkillSemanticReviewSanitizationPolicy {
+            redact_prompts: true,
+            redact_provider_payloads: true,
+            redact_secrets: true,
+        },
         captured_at: chrono::Utc::now(),
     };
 
@@ -53,6 +69,8 @@ fn semantic_review_request_carries_optional_analysis_inputs() {
     );
     assert_eq!(request.effectiveness_inputs[0].successful_tasks, 4);
     assert_eq!(request.reference_graph_inputs[0].support_file_refs.len(), 1);
+    assert_eq!(request.budget.max_output_proposals, 8);
+    assert!(request.sanitization_policy.redact_provider_payloads);
 }
 
 #[test]
@@ -85,4 +103,42 @@ fn semantic_review_result_rejects_direct_mutation_and_invalid_proposals() {
         captured_at,
     };
     assert!(invalid_proposal.validate_provider_output().is_err());
+}
+
+#[test]
+fn semantic_review_result_bounds_output_and_sanitizes_provider_errors() {
+    let captured_at = chrono::Utc::now();
+    let result = SkillSemanticReviewResult::provider_error(
+        "test-semantic-review",
+        "raw_provider_payload={\"prompt\":\"secret task details\"}",
+        captured_at,
+    );
+
+    assert_eq!(result.status, SkillSemanticReviewStatus::Failed);
+    assert!(!result.mutated);
+    assert!(result.validate_provider_output().is_ok());
+    let debug = format!("{:?}", result);
+    assert!(!debug.contains("raw_provider_payload"));
+    assert!(!debug.contains("prompt"));
+    assert!(!debug.contains("secret task details"));
+
+    let oversized = SkillSemanticReviewResult {
+        provider_id: "test-semantic-review".into(),
+        status: SkillSemanticReviewStatus::Completed,
+        proposals: (0..40)
+            .map(|idx| SkillSemanticReviewProposal {
+                proposal_id: format!("proposal-{idx}"),
+                kind: SkillSemanticReviewProposalKind::PatchSuggestion,
+                source_skill_ids: vec![format!("skill://agent/{idx}")],
+                target_skill_id: None,
+                rationale: "bounded rationale".into(),
+                confidence: 0.5,
+                evidence_ids: Vec::new(),
+            })
+            .collect(),
+        diagnostics: Vec::new(),
+        mutated: false,
+        captured_at,
+    };
+    assert!(oversized.validate_provider_output().is_err());
 }

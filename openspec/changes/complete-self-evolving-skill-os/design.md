@@ -555,6 +555,20 @@ Every command logs key execution nodes with sanitized fields:
   and evidence refs only. Provider outputs are typed proposals with bounded
   rationale and confidence, and `mutated=true` is explicitly invalid.
 
+### Slice 9C: Semantic Review Bounds And Error Sanitization
+
+- Patterns: Decorator-style contracts are represented by provider budget,
+  resource-limit, and sanitization-policy DTOs on the semantic review request.
+  Specification validation bounds proposal count, rationale length, evidence
+  refs, diagnostic count, and diagnostic bytes.
+- Ownership: `macaca-skill` owns the provider-neutral validation and sanitized
+  error result constructor. Runtime-host can enforce the same budget/resource
+  fields when 9.6 provider factory wiring lands.
+- Safety: provider errors are converted into structured `Failed` semantic
+  review results with sanitized diagnostics. The test gate proves prompt,
+  provider-payload, and secret markers are redacted before reports/logs can
+  expose them.
+
 ## Risks And Mitigations
 
 - Risk: skill mutation corrupts active packages. Mitigation: atomic writes,

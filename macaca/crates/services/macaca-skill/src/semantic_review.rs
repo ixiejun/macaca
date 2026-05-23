@@ -15,6 +15,12 @@ use serde::{Deserialize, Serialize};
 use crate::curation::SkillCurationRecommendation;
 use crate::service_contract::SkillServiceScope;
 
+const MAX_SEMANTIC_REVIEW_PROPOSALS: usize = 32;
+const MAX_SEMANTIC_REVIEW_DIAGNOSTICS: usize = 8;
+const MAX_SEMANTIC_REVIEW_DIAGNOSTIC_BYTES: usize = 256;
+const MAX_SEMANTIC_REVIEW_RATIONALE_BYTES: usize = 512;
+const MAX_SEMANTIC_REVIEW_EVIDENCE_REFS: usize = 16;
+
 /// Coarse provider execution state recorded in bounded reports.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SkillSemanticReviewStatus {
@@ -58,8 +64,14 @@ impl SkillSemanticReviewProposal {
         if self.rationale.trim().is_empty() {
             return Err("semantic review proposal requires bounded rationale".into());
         }
+        if self.rationale.len() > MAX_SEMANTIC_REVIEW_RATIONALE_BYTES {
+            return Err("semantic review proposal rationale exceeds bounded output".into());
+        }
         if !(0.0..=1.0).contains(&self.confidence) {
             return Err("semantic review proposal confidence must be between 0 and 1".into());
+        }
+        if self.evidence_ids.len() > MAX_SEMANTIC_REVIEW_EVIDENCE_REFS {
+            return Err("semantic review proposal carries too many evidence refs".into());
         }
         Ok(())
     }
@@ -108,6 +120,60 @@ pub struct SkillSemanticReferenceGraphInput {
     pub evidence_ids: Vec<String>,
 }
 
+/// Budget hints that bound optional semantic provider work.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SkillSemanticReviewBudget {
+    pub max_provider_calls: u32,
+    pub max_input_items: u32,
+    pub max_output_proposals: u32,
+}
+
+impl Default for SkillSemanticReviewBudget {
+    fn default() -> Self {
+        Self {
+            max_provider_calls: 0,
+            max_input_items: 0,
+            max_output_proposals: MAX_SEMANTIC_REVIEW_PROPOSALS as u32,
+        }
+    }
+}
+
+/// Resource limits that runtime-host decorators can enforce before provider calls.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SkillSemanticReviewResourceLimits {
+    pub timeout_ms: u64,
+    pub max_input_bytes: u64,
+    pub max_output_bytes: u64,
+}
+
+impl Default for SkillSemanticReviewResourceLimits {
+    fn default() -> Self {
+        Self {
+            timeout_ms: 0,
+            max_input_bytes: 0,
+            max_output_bytes: 0,
+        }
+    }
+}
+
+/// Sanitization policy for optional semantic provider boundaries.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SkillSemanticReviewSanitizationPolicy {
+    pub redact_prompts: bool,
+    pub redact_provider_payloads: bool,
+    pub redact_secrets: bool,
+}
+
+impl Default for SkillSemanticReviewSanitizationPolicy {
+    fn default() -> Self {
+        Self {
+            redact_prompts: true,
+            redact_provider_payloads: true,
+            redact_secrets: true,
+        }
+    }
+}
+
 /// Request passed to a semantic review Strategy.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SkillSemanticReviewRequest {
@@ -125,6 +191,12 @@ pub struct SkillSemanticReviewRequest {
     pub effectiveness_inputs: Vec<SkillSemanticEffectivenessInput>,
     #[serde(default)]
     pub reference_graph_inputs: Vec<SkillSemanticReferenceGraphInput>,
+    #[serde(default)]
+    pub budget: SkillSemanticReviewBudget,
+    #[serde(default)]
+    pub resource_limits: SkillSemanticReviewResourceLimits,
+    #[serde(default)]
+    pub sanitization_policy: SkillSemanticReviewSanitizationPolicy,
     pub captured_at: DateTime<Utc>,
 }
 
@@ -160,6 +232,22 @@ impl SkillSemanticReviewResult {
         Self::unavailable(Utc::now())
     }
 
+    /// Convert provider failure into bounded, sanitized structured output.
+    pub fn provider_error(
+        provider_id: impl Into<String>,
+        error: impl AsRef<str>,
+        captured_at: DateTime<Utc>,
+    ) -> Self {
+        Self {
+            provider_id: provider_id.into(),
+            status: SkillSemanticReviewStatus::Failed,
+            proposals: Vec::new(),
+            diagnostics: vec![sanitize_semantic_text(error.as_ref())],
+            mutated: false,
+            captured_at,
+        }
+    }
+
     /// Human-readable status kept for existing report fields and shell output.
     pub fn status_message(&self) -> String {
         match self.status {
@@ -185,11 +273,36 @@ impl SkillSemanticReviewResult {
         if self.mutated {
             return Err("semantic review providers must not mutate skill state".into());
         }
+        if self.proposals.len() > MAX_SEMANTIC_REVIEW_PROPOSALS {
+            return Err("semantic review provider returned too many proposals".into());
+        }
+        if self.diagnostics.len() > MAX_SEMANTIC_REVIEW_DIAGNOSTICS {
+            return Err("semantic review provider returned too many diagnostics".into());
+        }
+        if self
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.len() > MAX_SEMANTIC_REVIEW_DIAGNOSTIC_BYTES)
+        {
+            return Err("semantic review diagnostics exceed bounded output".into());
+        }
         for proposal in &self.proposals {
             proposal.validate()?;
         }
         Ok(())
     }
+}
+
+fn sanitize_semantic_text(value: &str) -> String {
+    let mut sanitized = value
+        .replace("raw_provider_payload", "[redacted]")
+        .replace("provider_payload", "[redacted]")
+        .replace("prompt", "[redacted]")
+        .replace("secret", "[redacted]");
+    if sanitized.len() > MAX_SEMANTIC_REVIEW_DIAGNOSTIC_BYTES {
+        sanitized.truncate(MAX_SEMANTIC_REVIEW_DIAGNOSTIC_BYTES);
+    }
+    sanitized
 }
 
 impl Default for SkillSemanticReviewResult {
