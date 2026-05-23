@@ -541,6 +541,20 @@ Every command logs key execution nodes with sanitized fields:
   and mutation=false; it never stores raw prompts, provider payloads, secrets,
   package bytes, manifests, or full skill bodies.
 
+### Slice 9B: Semantic Review Input And Proposal Validation
+
+- Patterns: Command-style DTOs now include optional sanitized inputs for
+  similarity, clustering, duplicate detection, success/failure correlation, and
+  reference graph review. Specification-style validation rejects direct
+  mutation and malformed typed proposals before future providers can affect
+  policy-gated apply flows.
+- Ownership: `macaca-skill` owns the input and proposal contracts. Runtime-host
+  currently supplies empty optional inputs for the unavailable provider; richer
+  provider factories remain a later runtime-host slice.
+- Safety: all semantic inputs carry ids, counts, score hints, support-file refs,
+  and evidence refs only. Provider outputs are typed proposals with bounded
+  rationale and confidence, and `mutated=true` is explicitly invalid.
+
 ## Risks And Mitigations
 
 - Risk: skill mutation corrupts active packages. Mitigation: atomic writes,

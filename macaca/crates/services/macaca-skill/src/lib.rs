@@ -53,6 +53,9 @@ mod curation_tests;
 #[cfg(test)]
 mod governance_lifecycle_tests;
 
+#[cfg(test)]
+mod semantic_review_tests;
+
 // Executable skills (YAML).
 pub use adapter::{LocalSkillRuntimeProxy, SkillRuntimeProxy, SkillToolAdapter};
 pub use alias::*;

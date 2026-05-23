@@ -46,6 +46,68 @@ pub struct SkillSemanticReviewProposal {
     pub evidence_ids: Vec<String>,
 }
 
+impl SkillSemanticReviewProposal {
+    /// Validate one typed proposal before the Skill service records it.
+    pub fn validate(&self) -> Result<(), String> {
+        if self.proposal_id.trim().is_empty() {
+            return Err("semantic review proposal requires proposal_id".into());
+        }
+        if self.source_skill_ids.iter().all(|id| id.trim().is_empty()) {
+            return Err("semantic review proposal requires source_skill_ids".into());
+        }
+        if self.rationale.trim().is_empty() {
+            return Err("semantic review proposal requires bounded rationale".into());
+        }
+        if !(0.0..=1.0).contains(&self.confidence) {
+            return Err("semantic review proposal confidence must be between 0 and 1".into());
+        }
+        Ok(())
+    }
+}
+
+/// Pairwise similarity input prepared by deterministic or optional providers.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SkillSemanticSimilarityInput {
+    pub skill_id: String,
+    pub comparable_skill_id: String,
+    pub score_hint: Option<f32>,
+    pub evidence_ids: Vec<String>,
+}
+
+/// Skill-set input for clustering and umbrella-merge analysis.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SkillSemanticSkillSetInput {
+    pub set_id: String,
+    pub skill_ids: Vec<String>,
+    pub evidence_ids: Vec<String>,
+}
+
+/// Duplicate-candidate input that keeps matching evidence as refs only.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SkillSemanticDuplicateInput {
+    pub source_skill_id: String,
+    pub candidate_skill_id: String,
+    pub evidence_ids: Vec<String>,
+}
+
+/// Success/failure correlation input for generic effectiveness review.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SkillSemanticEffectivenessInput {
+    pub skill_id: String,
+    pub successful_tasks: u64,
+    pub failed_tasks: u64,
+    pub evidence_ids: Vec<String>,
+}
+
+/// Reference graph input used for support-file and dependency proposals.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SkillSemanticReferenceGraphInput {
+    pub skill_id: String,
+    pub referenced_skill_ids: Vec<String>,
+    pub support_file_refs: Vec<String>,
+    pub evidence_ids: Vec<String>,
+}
+
 /// Request passed to a semantic review Strategy.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SkillSemanticReviewRequest {
@@ -53,6 +115,16 @@ pub struct SkillSemanticReviewRequest {
     pub scope: SkillServiceScope,
     pub dry_run: bool,
     pub recommendations: Vec<SkillCurationRecommendation>,
+    #[serde(default)]
+    pub similarity_inputs: Vec<SkillSemanticSimilarityInput>,
+    #[serde(default)]
+    pub clustering_inputs: Vec<SkillSemanticSkillSetInput>,
+    #[serde(default)]
+    pub duplicate_inputs: Vec<SkillSemanticDuplicateInput>,
+    #[serde(default)]
+    pub effectiveness_inputs: Vec<SkillSemanticEffectivenessInput>,
+    #[serde(default)]
+    pub reference_graph_inputs: Vec<SkillSemanticReferenceGraphInput>,
     pub captured_at: DateTime<Utc>,
 }
 
@@ -102,6 +174,21 @@ impl SkillSemanticReviewResult {
             }
             SkillSemanticReviewStatus::Failed => format!("failed: {}", self.diagnostics.join("; ")),
         }
+    }
+
+    /// Validate provider output before the Skill service trusts it.
+    ///
+    /// Semantic providers are proposal producers only.  Direct mutation is
+    /// rejected here so future runtime-host providers cannot accidentally turn
+    /// review into a side-effecting pathway.
+    pub fn validate_provider_output(&self) -> Result<(), String> {
+        if self.mutated {
+            return Err("semantic review providers must not mutate skill state".into());
+        }
+        for proposal in &self.proposals {
+            proposal.validate()?;
+        }
+        Ok(())
     }
 }
 

@@ -160,9 +160,9 @@
   contract.
 - [x] 9.2 Add unavailable provider behavior that preserves deterministic
   curation and records semantic analysis as unavailable.
-- [ ] 9.3 Add optional similarity, clustering, duplicate detection,
+- [x] 9.3 Add optional similarity, clustering, duplicate detection,
   success/failure correlation, and reference graph inputs.
-- [ ] 9.4 Require semantic providers to output typed proposals only, never direct
+- [x] 9.4 Require semantic providers to output typed proposals only, never direct
   mutations.
 - [ ] 9.5 Add budget, resource, prompt sanitization, provider payload
   sanitization, and bounded output decorators.

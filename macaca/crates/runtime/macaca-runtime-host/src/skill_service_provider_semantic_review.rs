@@ -22,6 +22,11 @@ pub(crate) async fn attach_unavailable_semantic_review(
             scope: command.scope.clone(),
             dry_run: command.dry_run,
             recommendations: result.recommendations.clone(),
+            similarity_inputs: Vec::new(),
+            clustering_inputs: Vec::new(),
+            duplicate_inputs: Vec::new(),
+            effectiveness_inputs: Vec::new(),
+            reference_graph_inputs: Vec::new(),
             captured_at,
         })
         .await;
