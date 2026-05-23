@@ -8,6 +8,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::alias::SkillAliasKind;
+use crate::alias::SkillAliasRecord;
 use crate::service_contract::SkillServiceScope;
 use macaca_proto::TraceContext;
 
@@ -209,6 +210,28 @@ pub struct SkillUmbrellaMergeApplyCommand {
     pub lifecycle_transition_refs: Vec<String>,
     pub safe_mutation_refs: Vec<String>,
     pub audit_event_ids: Vec<String>,
+}
+
+/// Bounded result returned after an approved umbrella merge apply.
+///
+/// The result exposes refs, lifecycle ids, and alias metadata only.  It never
+/// embeds skill bodies, package bytes, provider payloads, prompts, manifests,
+/// credentials, or support-file content.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SkillMergeApplyResult {
+    pub proposal_id: String,
+    pub target_umbrella_skill_id: String,
+    pub superseded_skill_ids: Vec<String>,
+    pub alias_records: Vec<SkillAliasRecord>,
+    pub support_file_movement_refs: Vec<String>,
+    pub bounded_report_summary: String,
+    pub evidence_ids: Vec<String>,
+    pub report_ref: Option<String>,
+    pub rollback_ref: Option<String>,
+    pub policy_decision_refs: Vec<String>,
+    pub audit_event_ids: Vec<String>,
+    pub mutated: bool,
+    pub captured_at: chrono::DateTime<chrono::Utc>,
 }
 
 impl SkillUmbrellaMergeApplyCommand {

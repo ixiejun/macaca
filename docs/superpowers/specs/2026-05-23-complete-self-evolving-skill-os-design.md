@@ -47,6 +47,19 @@ compatibility adapter, but it is not sufficient for 24/7 autonomous operation.
 - Abstract Factory: runtime-host owns built-in, plugin, remote, mock,
   unavailable, and optional semantic provider construction.
 
+## Slice 10E Update
+
+- `skill.curation.merge_apply` is the approved merge apply boundary. It applies
+  absorbed source lifecycle changes through the existing Skill service
+  supersede state machine and records alias effects through the service-owned
+  alias map.
+- Runtime-host captures a rollback memento before merge side effects and returns
+  only bounded report summaries, evidence refs, report refs, rollback refs,
+  superseded ids, and alias metadata.
+- Pinned sources remain protected by the shared pinned mutation guard. Shells
+  and SDK clients submit typed commands only; they do not own merge semantics,
+  classification, lifecycle rules, or file mutation.
+
 ## Boundary Decisions
 
 - Kernel only routes typed calls and keeps trace/audit/policy primitives.

@@ -182,10 +182,10 @@
   starter templates, repeatable scripts, and assets.
 - [x] 10.4 Apply merge only through approval-gated safe mutation and lifecycle
   transition commands.
-- [ ] 10.5 Mark absorbed skills `Superseded` and create alias/redirect records.
-- [ ] 10.6 Ensure merge reports explain rationale with bounded summaries and
+- [x] 10.5 Mark absorbed skills `Superseded` and create alias/redirect records.
+- [x] 10.6 Ensure merge reports explain rationale with bounded summaries and
   evidence refs.
-- [ ] 10.7 Test merge eligibility rejection, support-file demotion, alias
+- [x] 10.7 Test merge eligibility rejection, support-file demotion, alias
   creation, superseded filtering, pinned protection, and rollback.
 
 ## 11. Alias Resolution Across Consumers

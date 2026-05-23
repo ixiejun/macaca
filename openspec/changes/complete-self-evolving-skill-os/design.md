@@ -632,6 +632,26 @@ Every command logs key execution nodes with sanitized fields:
   admission fails unless approval, policy, lifecycle, and safe mutation refs are
   all present.
 
+### Slice 10E: Merge Apply Supersede, Alias, Report, And Rollback
+
+- Patterns: runtime-host implements `skill.curation.merge_apply` as a focused
+  Strategy that orchestrates existing Skill service commands instead of owning
+  new shell semantics. The merge envelope stays the Command boundary, source
+  lifecycle changes reuse the State machine through `supersede`, alias writes
+  reuse the service-owned alias map, rollback refs use the Memento pattern, and
+  lifecycle/alias/rollback events remain Observer evidence in the governance
+  event log.
+- Boundaries: `macaca-skill` owns the provider-neutral result DTO and command
+  name. `macaca-runtime-host` owns the built-in local apply Strategy. Web, CLI,
+  SDK, kernel, and frontend do not classify merge content, mutate skill files,
+  or construct providers.
+- Safety: apply requires one alias effect per absorbed source, approval refs,
+  policy refs, lifecycle refs, safe-mutation refs, and audit refs. Pinned source
+  skills are denied through the shared pinned mutation guard. The result exposes
+  bounded summaries, evidence refs, report refs, rollback refs, superseded ids,
+  and alias metadata only; it never returns skill bodies, package bytes,
+  provider payloads, prompts, manifests, credentials, or support-file content.
+
 ## Risks And Mitigations
 
 - Risk: skill mutation corrupts active packages. Mitigation: atomic writes,

@@ -78,6 +78,7 @@ pub mod skill_service_provider;
 pub(crate) mod skill_service_provider_curation;
 pub(crate) mod skill_service_provider_curation_log;
 pub(crate) mod skill_service_provider_lifecycle;
+pub(crate) mod skill_service_provider_merge;
 pub(crate) mod skill_service_provider_proposals;
 pub(crate) mod skill_service_provider_semantic_review;
 pub(crate) mod skill_service_provider_state;
@@ -97,6 +98,8 @@ mod skill_governance_store_logging_tests;
 mod skill_proposal_lifecycle_tests;
 #[cfg(test)]
 mod skill_service_lifecycle_tests;
+#[cfg(test)]
+mod skill_service_merge_tests;
 #[cfg(test)]
 mod skill_service_provider_tests;
 #[cfg(test)]
