@@ -10,7 +10,8 @@ use macaca_context::{
     SkillFilterDiagnostic,
 };
 use macaca_skill::{
-    FilteredSkill, SkillAliasKind, SkillAliasResolveResult, SkillSnapshot, SkillSnapshotEntry,
+    FilteredSkill, SkillAliasKind, SkillAliasResolutionStatus, SkillAliasResolveResult,
+    SkillSnapshot, SkillSnapshotEntry,
 };
 
 /// Freeze a skill snapshot after applying Skill-service alias decisions.
@@ -158,11 +159,22 @@ impl AliasResolvedSkillSnapshot {
 }
 
 pub fn alias_kind_label(alias: &SkillAliasResolveResult) -> &'static str {
-    match alias.kind {
+    match &alias.kind {
         Some(SkillAliasKind::Redirect) => "redirect",
         Some(SkillAliasKind::SupersededBy) => "superseded_by",
         Some(SkillAliasKind::AbsorbedInto) => "absorbed_into",
         None => "unknown",
+    }
+}
+
+pub fn alias_status_label(alias: &SkillAliasResolveResult) -> &'static str {
+    match &alias.status {
+        SkillAliasResolutionStatus::Miss => "miss",
+        SkillAliasResolutionStatus::Redirected => "redirected",
+        SkillAliasResolutionStatus::WarnAndRedirected => "warn_and_redirected",
+        SkillAliasResolutionStatus::Denied => "denied",
+        SkillAliasResolutionStatus::Expired => "expired",
+        SkillAliasResolutionStatus::LoopPrevented => "loop_prevented",
     }
 }
 
@@ -176,8 +188,9 @@ mod tests {
 
     use chrono::Utc;
     use macaca_skill::{
-        SkillAliasKind, SkillAliasResolveResult, SkillMcpServerConfig, SkillSnapshot,
-        SkillSnapshotEntry, SkillSourceScope,
+        SkillAliasKind, SkillAliasResolutionPolicy, SkillAliasResolutionStatus,
+        SkillAliasResolveResult, SkillMcpServerConfig, SkillSnapshot, SkillSnapshotEntry,
+        SkillSourceScope,
     };
 
     use super::*;
@@ -226,9 +239,11 @@ mod tests {
             requested_skill_id: "skill://application/old-debugging".into(),
             requested_name: Some("old-debugging".into()),
             resolved: true,
+            status: SkillAliasResolutionStatus::Redirected,
             target_skill_id: Some("skill://application/debugging".into()),
             target_name: Some("debugging".into()),
             kind: Some(SkillAliasKind::AbsorbedInto),
+            resolution_policy: Some(SkillAliasResolutionPolicy::Redirect),
             rationale: Some("absorbed into umbrella debugging skill".into()),
             evidence_ids: vec!["evidence://alias/debugging".into()],
             captured_at: Utc::now(),

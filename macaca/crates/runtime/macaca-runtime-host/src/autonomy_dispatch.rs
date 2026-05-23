@@ -76,8 +76,8 @@ mod tests {
         ServiceResult, ServiceScope, ServiceType, TaskId, TraceSchemaRef,
     };
     use macaca_skill::{
-        SkillAliasKind, SkillAliasRecord, SkillAliasUpsertCommand, SkillServiceScope,
-        SKILL_ALIAS_UPSERT_COMMAND,
+        SkillAliasKind, SkillAliasRecord, SkillAliasResolutionPolicy, SkillAliasUpsertCommand,
+        SkillServiceScope, SKILL_ALIAS_UPSERT_COMMAND,
     };
 
     use crate::agent_execution_service_provider::{
@@ -222,6 +222,9 @@ mod tests {
                         target_skill_id: target_skill_id.into(),
                         target_name: "target-skill".into(),
                         kind: SkillAliasKind::SupersededBy,
+                        resolution_policy: SkillAliasResolutionPolicy::Redirect,
+                        valid_from: chrono::Utc::now(),
+                        valid_until: None,
                         rationale: "test alias for dispatch boundary".into(),
                         created_at: chrono::Utc::now(),
                         updated_at: chrono::Utc::now(),

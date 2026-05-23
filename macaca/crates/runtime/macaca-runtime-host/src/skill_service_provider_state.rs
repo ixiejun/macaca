@@ -9,9 +9,10 @@
 use std::collections::BTreeMap;
 
 use macaca_skill::{
-    SkillAliasRecord, SkillAliasResolveCommand, SkillAliasResolveResult, SkillAliasSnapshotResult,
-    SkillAliasUpsertCommand, SkillAliasUpsertResult, SkillCurationLifecycleAction,
-    SkillCurationLifecycleCommand, SkillCurationLifecycleResult, SkillCurationSupersedeCommand,
+    SkillAliasRecord, SkillAliasResolutionStatus, SkillAliasResolveCommand,
+    SkillAliasResolveResult, SkillAliasSnapshotResult, SkillAliasUpsertCommand,
+    SkillAliasUpsertResult, SkillCurationLifecycleAction, SkillCurationLifecycleCommand,
+    SkillCurationLifecycleResult, SkillCurationSupersedeCommand,
     SkillExperienceDestinationRouteResult, SkillExperienceProposalCommand,
     SkillExperienceProposalRecord, SkillExperienceProposalResult,
     SkillExperienceProposalSnapshotResult, SkillGovernanceEventPayload, SkillGovernanceEventRecord,
@@ -21,6 +22,7 @@ use macaca_skill::{
     SkillTelemetryAggregate, SkillUsageObservation,
 };
 use tokio::sync::Mutex;
+use tracing::{debug, info, warn};
 
 /// In-memory governance state for the built-in provider.
 ///
@@ -360,11 +362,73 @@ impl SkillProviderGovernanceState {
     ) -> SkillAliasResolveResult {
         let captured_at = chrono::Utc::now();
         let aliases = self.aliases.lock().await;
-        aliases
-            .get(&command.key())
-            .cloned()
-            .map(|record| SkillAliasResolveResult::resolved(command, record, captured_at))
-            .unwrap_or_else(|| SkillAliasResolveResult::unresolved(command, captured_at))
+        let Some(record) = aliases.get(&command.key()).cloned() else {
+            debug!(
+                requested_skill_id = %command.skill_id,
+                requested_name = ?command.name,
+                trace_id = %command.trace.trace_id,
+                "skill alias miss in governance state"
+            );
+            return SkillAliasResolveResult::unresolved(command, captured_at);
+        };
+
+        if !record.is_active_at(captured_at) {
+            info!(
+                source_skill_id = %record.source_skill_id,
+                target_skill_id = %record.target_skill_id,
+                trace_id = %command.trace.trace_id,
+                "expired skill alias decision skipped redirect"
+            );
+            return SkillAliasResolveResult::blocked(
+                command,
+                record,
+                captured_at,
+                SkillAliasResolutionStatus::Expired,
+            );
+        }
+
+        if aliases
+            .get(&record.target_key())
+            .map(|next| next.target_key() == record.key())
+            .unwrap_or(false)
+            || record.target_key() == record.key()
+        {
+            warn!(
+                source_skill_id = %record.source_skill_id,
+                target_skill_id = %record.target_skill_id,
+                trace_id = %command.trace.trace_id,
+                "skill alias loop prevented before redirect"
+            );
+            return SkillAliasResolveResult::blocked(
+                command,
+                record,
+                captured_at,
+                SkillAliasResolutionStatus::LoopPrevented,
+            );
+        }
+
+        let result = SkillAliasResolveResult::resolved(command, record, captured_at);
+        match &result.status {
+            SkillAliasResolutionStatus::WarnAndRedirected => info!(
+                requested_skill_id = %result.requested_skill_id,
+                target_skill_id = ?result.target_skill_id,
+                trace_id = %command.trace.trace_id,
+                "skill alias warn-and-redirect decision resolved"
+            ),
+            SkillAliasResolutionStatus::Denied => warn!(
+                requested_skill_id = %result.requested_skill_id,
+                trace_id = %command.trace.trace_id,
+                "skill alias deny decision blocked redirect"
+            ),
+            _ => info!(
+                requested_skill_id = %result.requested_skill_id,
+                target_skill_id = ?result.target_skill_id,
+                status = ?result.status,
+                trace_id = %command.trace.trace_id,
+                "skill alias decision resolved"
+            ),
+        }
+        result
     }
 
     /// Return a deterministic alias snapshot for diagnostics and audit replay.

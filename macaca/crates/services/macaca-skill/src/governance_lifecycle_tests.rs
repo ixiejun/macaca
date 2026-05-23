@@ -7,10 +7,10 @@
 use macaca_proto::TraceContext;
 
 use crate::{
-    SkillAliasKind, SkillAliasRecord, SkillAuthorKind, SkillCurationLifecycleCommand,
-    SkillCurationSupersedeCommand, SkillLifecycleState, SkillLifecycleStateMachine,
-    SkillPinnedMutationGuard, SkillPinnedMutationOperation, SkillServicePolicyHints,
-    SkillServiceScope,
+    SkillAliasKind, SkillAliasRecord, SkillAliasResolutionPolicy, SkillAuthorKind,
+    SkillCurationLifecycleCommand, SkillCurationSupersedeCommand, SkillLifecycleState,
+    SkillLifecycleStateMachine, SkillPinnedMutationGuard, SkillPinnedMutationOperation,
+    SkillServicePolicyHints, SkillServiceScope,
 };
 
 #[test]
@@ -109,6 +109,9 @@ fn supersede_command_requires_alias_redirect_evidence() {
             target_skill_id: "skill://agent/target".into(),
             target_name: "target".into(),
             kind: SkillAliasKind::SupersededBy,
+            resolution_policy: SkillAliasResolutionPolicy::Redirect,
+            valid_from: now,
+            valid_until: None,
             rationale: "source is redirected to target".into(),
             created_at: now,
             updated_at: now,

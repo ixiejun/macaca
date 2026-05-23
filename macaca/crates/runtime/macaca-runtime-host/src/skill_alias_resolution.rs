@@ -15,7 +15,8 @@ use macaca_proto::{
     TraceContext,
 };
 use macaca_skill::{
-    SkillAliasKind, SkillAliasResolveCommand, SkillAliasResolveResult, SkillServiceScope,
+    SkillAliasKind, SkillAliasResolutionPolicy, SkillAliasResolutionStatus,
+    SkillAliasResolveCommand, SkillAliasResolveResult, SkillServiceScope,
     SKILL_ALIAS_RESOLVE_COMMAND, SKILL_SERVICE_ID,
 };
 use tokio::time::timeout;
@@ -30,6 +31,7 @@ const STATUS_KEY: &str = "skill.alias.status";
 const EFFECTIVE_ID_KEY: &str = "skill.alias.effective_id";
 const EFFECTIVE_NAME_KEY: &str = "skill.alias.effective_name";
 const KIND_KEY: &str = "skill.alias.kind";
+const POLICY_KEY: &str = "skill.alias.policy";
 const EVIDENCE_COUNT_KEY: &str = "skill.alias.evidence_count";
 
 /// Resolve one metadata-declared Skill reference through `service.skill`.
@@ -88,23 +90,40 @@ pub(crate) async fn resolve_skill_alias_metadata(
             };
             let result: SkillAliasResolveResult = serde_json::from_value(output)?;
             apply_resolution_metadata(metadata, &result);
-            if result.resolved {
-                info!(
-                    service_id = SKILL_SERVICE_ID,
-                    requested_skill_id = result.requested_skill_id.as_str(),
-                    target_skill_id = result.target_skill_id.as_deref().unwrap_or("none"),
-                    dispatch_source,
-                    trace_id = trace.trace_id.as_str(),
-                    "skill alias hit before autonomous execution"
-                );
-            } else {
-                info!(
-                    service_id = SKILL_SERVICE_ID,
-                    requested_skill_id = result.requested_skill_id.as_str(),
-                    dispatch_source,
-                    trace_id = trace.trace_id.as_str(),
-                    "skill alias miss before autonomous execution"
-                );
+            match &result.status {
+                SkillAliasResolutionStatus::Redirected
+                | SkillAliasResolutionStatus::WarnAndRedirected => {
+                    info!(
+                        service_id = SKILL_SERVICE_ID,
+                        requested_skill_id = result.requested_skill_id.as_str(),
+                        target_skill_id = result.target_skill_id.as_deref().unwrap_or("none"),
+                        status = alias_status_label(&result.status),
+                        dispatch_source,
+                        trace_id = trace.trace_id.as_str(),
+                        "skill alias hit before autonomous execution"
+                    );
+                }
+                SkillAliasResolutionStatus::Miss => {
+                    info!(
+                        service_id = SKILL_SERVICE_ID,
+                        requested_skill_id = result.requested_skill_id.as_str(),
+                        dispatch_source,
+                        trace_id = trace.trace_id.as_str(),
+                        "skill alias miss before autonomous execution"
+                    );
+                }
+                SkillAliasResolutionStatus::Denied
+                | SkillAliasResolutionStatus::Expired
+                | SkillAliasResolutionStatus::LoopPrevented => {
+                    warn!(
+                        service_id = SKILL_SERVICE_ID,
+                        requested_skill_id = result.requested_skill_id.as_str(),
+                        status = alias_status_label(&result.status),
+                        dispatch_source,
+                        trace_id = trace.trace_id.as_str(),
+                        "skill alias guarded decision before autonomous execution"
+                    );
+                }
             }
         }
         Ok(Ok(reply)) => {
@@ -155,10 +174,7 @@ fn apply_resolution_metadata(
     result: &SkillAliasResolveResult,
 ) {
     metadata.insert(RESOLVED_KEY.into(), result.resolved.to_string());
-    metadata.insert(
-        STATUS_KEY.into(),
-        if result.resolved { "hit" } else { "miss" }.into(),
-    );
+    metadata.insert(STATUS_KEY.into(), alias_status_label(&result.status).into());
     if let Some(target_skill_id) = result.target_skill_id.as_ref() {
         metadata.insert(EFFECTIVE_ID_KEY.into(), target_skill_id.clone());
     }
@@ -167,6 +183,9 @@ fn apply_resolution_metadata(
     }
     if let Some(kind) = result.kind.as_ref() {
         metadata.insert(KIND_KEY.into(), alias_kind_label(kind).into());
+    }
+    if let Some(policy) = result.resolution_policy.as_ref() {
+        metadata.insert(POLICY_KEY.into(), alias_policy_label(policy).into());
     }
     metadata.insert(
         EVIDENCE_COUNT_KEY.into(),
@@ -179,10 +198,29 @@ fn mark_unavailable(metadata: &mut BTreeMap<String, String>, reason: &str) {
     metadata.insert(STATUS_KEY.into(), format!("unavailable:{reason}"));
 }
 
+fn alias_status_label(status: &SkillAliasResolutionStatus) -> &'static str {
+    match status {
+        SkillAliasResolutionStatus::Miss => "miss",
+        SkillAliasResolutionStatus::Redirected => "redirected",
+        SkillAliasResolutionStatus::WarnAndRedirected => "warn_and_redirected",
+        SkillAliasResolutionStatus::Denied => "denied",
+        SkillAliasResolutionStatus::Expired => "expired",
+        SkillAliasResolutionStatus::LoopPrevented => "loop_prevented",
+    }
+}
+
 fn alias_kind_label(kind: &SkillAliasKind) -> &'static str {
     match kind {
         SkillAliasKind::Redirect => "redirect",
         SkillAliasKind::SupersededBy => "superseded_by",
         SkillAliasKind::AbsorbedInto => "absorbed_into",
+    }
+}
+
+fn alias_policy_label(policy: &SkillAliasResolutionPolicy) -> &'static str {
+    match policy {
+        SkillAliasResolutionPolicy::Redirect => "redirect",
+        SkillAliasResolutionPolicy::WarnAndRedirect => "warn_and_redirect",
+        SkillAliasResolutionPolicy::Deny => "deny",
     }
 }

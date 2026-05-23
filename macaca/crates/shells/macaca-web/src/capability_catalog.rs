@@ -206,7 +206,20 @@ async fn resolve_aliases_for_snapshot(
                         target_skill_id = ?result.target_skill_id,
                         target_name = ?result.target_name,
                         kind = alias_resolution::alias_kind_label(&result),
+                        status = alias_resolution::alias_status_label(&result),
                         "skill alias hit during context catalog assembly"
+                    );
+                } else if matches!(
+                    result.status,
+                    macaca_skill::SkillAliasResolutionStatus::Denied
+                        | macaca_skill::SkillAliasResolutionStatus::Expired
+                        | macaca_skill::SkillAliasResolutionStatus::LoopPrevented
+                ) {
+                    tracing::warn!(
+                        requested_skill_id = %result.requested_skill_id,
+                        requested_name = ?result.requested_name,
+                        status = alias_resolution::alias_status_label(&result),
+                        "skill alias guarded decision during context catalog assembly"
                     );
                 } else {
                     tracing::debug!(

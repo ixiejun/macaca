@@ -10,8 +10,8 @@ use std::collections::BTreeMap;
 
 use macaca_proto::TraceContext;
 use macaca_skill::{
-    SkillAliasKind, SkillAliasRecord, SkillAliasUpsertCommand, SkillAuthorKind,
-    SkillCurationLifecycleAction, SkillCurationLifecycleCommand,
+    SkillAliasKind, SkillAliasRecord, SkillAliasResolutionPolicy, SkillAliasUpsertCommand,
+    SkillAuthorKind, SkillCurationLifecycleAction, SkillCurationLifecycleCommand,
     SkillEvolutionCandidateClassification, SkillEvolutionProposalAction, SkillExperienceCandidate,
     SkillExperienceCandidateDestination, SkillExperienceDestinationRouteResult,
     SkillExperienceEvidenceGateStatus, SkillExperienceProposalCommand,
@@ -108,6 +108,9 @@ async fn local_governance_state_replays_through_store_strategy_adapter() {
                 target_skill_id: "skill://agent/local".into(),
                 target_name: "local-skill".into(),
                 kind: SkillAliasKind::SupersededBy,
+                resolution_policy: SkillAliasResolutionPolicy::Redirect,
+                valid_from: now,
+                valid_until: None,
                 rationale: "local test alias".into(),
                 created_at: now,
                 updated_at: now,

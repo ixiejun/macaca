@@ -459,8 +459,8 @@ mod tests {
         ServiceResult, APPLICATION_HEARTBEAT_AGENTS_QUERY_COMMAND,
     };
     use macaca_skill::{
-        SkillAliasKind, SkillAliasRecord, SkillAliasUpsertCommand, SkillServiceScope,
-        SKILL_ALIAS_UPSERT_COMMAND,
+        SkillAliasKind, SkillAliasRecord, SkillAliasResolutionPolicy, SkillAliasUpsertCommand,
+        SkillServiceScope, SKILL_ALIAS_UPSERT_COMMAND,
     };
 
     use super::*;
@@ -596,6 +596,9 @@ mod tests {
                         target_skill_id: target_skill_id.into(),
                         target_name: "target-skill".into(),
                         kind: SkillAliasKind::AbsorbedInto,
+                        resolution_policy: SkillAliasResolutionPolicy::Redirect,
+                        valid_from: chrono::Utc::now(),
+                        valid_until: None,
                         rationale: "test alias for heartbeat dispatch boundary".into(),
                         created_at: chrono::Utc::now(),
                         updated_at: chrono::Utc::now(),

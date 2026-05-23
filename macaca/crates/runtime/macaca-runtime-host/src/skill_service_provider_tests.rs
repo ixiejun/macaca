@@ -13,18 +13,19 @@ use macaca_proto::{
     TraceContext,
 };
 use macaca_skill::{
-    SkillAliasKind, SkillAliasRecord, SkillAliasResolveCommand, SkillAliasResolveResult,
-    SkillAliasSnapshotCommand, SkillAliasSnapshotResult, SkillAliasUpsertCommand,
-    SkillAliasUpsertResult, SkillAuthorKind, SkillCurationAction, SkillCurationDryRunCommand,
-    SkillCurationDryRunResult, SkillCurationPhase, SkillCurationRollbackCommand,
-    SkillCurationRollbackResult, SkillCurationRunCommand, SkillCurationRunRecord,
-    SkillCurationRunResult, SkillCurationSnapshotCommand, SkillCurationSnapshotResult,
-    SkillCurationStatusCommand, SkillCurationStatusResult, SkillEvolutionCandidateClassification,
-    SkillEvolutionProposalAction, SkillExperienceCandidate, SkillExperienceCandidateDestination,
-    SkillExperienceEvidenceGateStatus, SkillExperienceProposalCommand,
-    SkillExperienceProposalResult, SkillExperienceProposalSnapshotCommand,
-    SkillExperienceProposalSnapshotResult, SkillGovernanceEventPayload, SkillGovernanceEventRecord,
-    SkillGovernanceReadModel, SkillGovernanceRecordUsageCommand, SkillGovernanceRecordUsageResult,
+    SkillAliasKind, SkillAliasRecord, SkillAliasResolutionPolicy, SkillAliasResolutionStatus,
+    SkillAliasResolveCommand, SkillAliasResolveResult, SkillAliasSnapshotCommand,
+    SkillAliasSnapshotResult, SkillAliasUpsertCommand, SkillAliasUpsertResult, SkillAuthorKind,
+    SkillCurationAction, SkillCurationDryRunCommand, SkillCurationDryRunResult, SkillCurationPhase,
+    SkillCurationRollbackCommand, SkillCurationRollbackResult, SkillCurationRunCommand,
+    SkillCurationRunRecord, SkillCurationRunResult, SkillCurationSnapshotCommand,
+    SkillCurationSnapshotResult, SkillCurationStatusCommand, SkillCurationStatusResult,
+    SkillEvolutionCandidateClassification, SkillEvolutionProposalAction, SkillExperienceCandidate,
+    SkillExperienceCandidateDestination, SkillExperienceEvidenceGateStatus,
+    SkillExperienceProposalCommand, SkillExperienceProposalResult,
+    SkillExperienceProposalSnapshotCommand, SkillExperienceProposalSnapshotResult,
+    SkillGovernanceEventPayload, SkillGovernanceEventRecord, SkillGovernanceReadModel,
+    SkillGovernanceRecordUsageCommand, SkillGovernanceRecordUsageResult,
     SkillGovernanceSnapshotCommand, SkillGovernanceSnapshotRefRecord,
     SkillGovernanceSnapshotResult, SkillProvenanceAction, SkillRollbackRefRecord,
     SkillSemanticReviewStatus, SkillServiceScope, SkillStatusCommand, SkillStatusResult,
@@ -74,6 +75,9 @@ fn alias_record() -> SkillAliasRecord {
         target_skill_id: "skill://agent/new".into(),
         target_name: "new-skill".into(),
         kind: SkillAliasKind::AbsorbedInto,
+        resolution_policy: SkillAliasResolutionPolicy::Redirect,
+        valid_from: now,
+        valid_until: None,
         rationale: "old skill was absorbed into the broader replacement skill".into(),
         created_at: now,
         updated_at: now,
@@ -1025,6 +1029,179 @@ async fn skill_alias_resolve_without_record_does_not_fake_fallback() {
     assert!(!resolved.resolved);
     assert!(resolved.target_skill_id.is_none());
     assert!(resolved.kind.is_none());
+}
+
+#[tokio::test]
+async fn skill_alias_policy_statuses_cover_warn_deny_expired_and_loop() {
+    let provider = SkillSystemServiceProvider::new();
+    let trace = TraceContext::new("trace-skill-alias-policy-status");
+    let now = chrono::Utc::now();
+
+    upsert_alias_for_policy_test(
+        &provider,
+        &trace,
+        SkillAliasRecord {
+            source_skill_id: "skill://agent/warn-source".into(),
+            source_name: "warn-source".into(),
+            target_skill_id: "skill://agent/warn-target".into(),
+            target_name: "warn-target".into(),
+            kind: SkillAliasKind::Redirect,
+            resolution_policy: SkillAliasResolutionPolicy::WarnAndRedirect,
+            valid_from: now,
+            valid_until: None,
+            rationale: "warn consumers before following this redirect".into(),
+            created_at: now,
+            updated_at: now,
+            evidence_ids: vec!["evidence://alias/warn".into()],
+        },
+    )
+    .await;
+    let warned =
+        resolve_alias_for_policy_test(&provider, &trace, "skill://agent/warn-source").await;
+    assert!(warned.resolved);
+    assert_eq!(warned.status, SkillAliasResolutionStatus::WarnAndRedirected);
+    assert_eq!(
+        warned.resolution_policy,
+        Some(SkillAliasResolutionPolicy::WarnAndRedirect)
+    );
+
+    upsert_alias_for_policy_test(
+        &provider,
+        &trace,
+        SkillAliasRecord {
+            source_skill_id: "skill://agent/deny-source".into(),
+            source_name: "deny-source".into(),
+            target_skill_id: "skill://agent/deny-target".into(),
+            target_name: "deny-target".into(),
+            kind: SkillAliasKind::Redirect,
+            resolution_policy: SkillAliasResolutionPolicy::Deny,
+            valid_from: now,
+            valid_until: None,
+            rationale: "policy denies this historical reference".into(),
+            created_at: now,
+            updated_at: now,
+            evidence_ids: vec!["evidence://alias/deny".into()],
+        },
+    )
+    .await;
+    let denied =
+        resolve_alias_for_policy_test(&provider, &trace, "skill://agent/deny-source").await;
+    assert!(!denied.resolved);
+    assert_eq!(denied.status, SkillAliasResolutionStatus::Denied);
+    assert!(denied.target_skill_id.is_none());
+
+    upsert_alias_for_policy_test(
+        &provider,
+        &trace,
+        SkillAliasRecord {
+            source_skill_id: "skill://agent/expired-source".into(),
+            source_name: "expired-source".into(),
+            target_skill_id: "skill://agent/expired-target".into(),
+            target_name: "expired-target".into(),
+            kind: SkillAliasKind::SupersededBy,
+            resolution_policy: SkillAliasResolutionPolicy::Redirect,
+            valid_from: now - chrono::Duration::days(2),
+            valid_until: Some(now - chrono::Duration::days(1)),
+            rationale: "expired redirect must not affect new activations".into(),
+            created_at: now,
+            updated_at: now,
+            evidence_ids: vec!["evidence://alias/expired".into()],
+        },
+    )
+    .await;
+    let expired =
+        resolve_alias_for_policy_test(&provider, &trace, "skill://agent/expired-source").await;
+    assert!(!expired.resolved);
+    assert_eq!(expired.status, SkillAliasResolutionStatus::Expired);
+
+    upsert_alias_for_policy_test(
+        &provider,
+        &trace,
+        SkillAliasRecord {
+            source_skill_id: "skill://agent/loop-a".into(),
+            source_name: "loop-a".into(),
+            target_skill_id: "skill://agent/loop-b".into(),
+            target_name: "loop-b".into(),
+            kind: SkillAliasKind::Redirect,
+            resolution_policy: SkillAliasResolutionPolicy::Redirect,
+            valid_from: now,
+            valid_until: None,
+            rationale: "first half of an invalid alias loop".into(),
+            created_at: now,
+            updated_at: now,
+            evidence_ids: vec!["evidence://alias/loop-a".into()],
+        },
+    )
+    .await;
+    upsert_alias_for_policy_test(
+        &provider,
+        &trace,
+        SkillAliasRecord {
+            source_skill_id: "skill://agent/loop-b".into(),
+            source_name: "loop-b".into(),
+            target_skill_id: "skill://agent/loop-a".into(),
+            target_name: "loop-a".into(),
+            kind: SkillAliasKind::Redirect,
+            resolution_policy: SkillAliasResolutionPolicy::Redirect,
+            valid_from: now,
+            valid_until: None,
+            rationale: "second half of an invalid alias loop".into(),
+            created_at: now,
+            updated_at: now,
+            evidence_ids: vec!["evidence://alias/loop-b".into()],
+        },
+    )
+    .await;
+    let looped = resolve_alias_for_policy_test(&provider, &trace, "skill://agent/loop-a").await;
+    assert!(!looped.resolved);
+    assert_eq!(looped.status, SkillAliasResolutionStatus::LoopPrevented);
+}
+
+async fn upsert_alias_for_policy_test(
+    provider: &SkillSystemServiceProvider,
+    trace: &TraceContext,
+    record: SkillAliasRecord,
+) {
+    let command = SkillAliasUpsertCommand {
+        trace: trace.clone(),
+        scope: SkillServiceScope::default(),
+        record,
+    };
+    provider
+        .call(traced_command(
+            SKILL_ALIAS_UPSERT_COMMAND,
+            command,
+            trace.clone(),
+        ))
+        .await
+        .expect("alias upsert should succeed for policy-status test");
+}
+
+async fn resolve_alias_for_policy_test(
+    provider: &SkillSystemServiceProvider,
+    trace: &TraceContext,
+    skill_id: &str,
+) -> SkillAliasResolveResult {
+    let name = skill_id
+        .rsplit('/')
+        .next()
+        .expect("test skill id should contain a final path segment")
+        .to_string();
+    let command = SkillAliasResolveCommand {
+        trace: trace.clone(),
+        scope: SkillServiceScope::default(),
+        skill_id: skill_id.into(),
+        name: Some(name),
+    };
+    let result = provider
+        .call(traced_command(
+            SKILL_ALIAS_RESOLVE_COMMAND,
+            command,
+            trace.clone(),
+        ))
+        .await
+        .expect("alias resolve should succeed for policy-status test");
+    serde_json::from_value(result.output).expect("alias policy-status result should decode")
 }
 
 #[tokio::test]

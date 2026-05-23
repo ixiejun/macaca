@@ -1,13 +1,14 @@
 use macaca_kernel::SystemService;
 use macaca_proto::{ServiceCommand, ServiceCommandName, TraceContext};
 use macaca_skill::{
-    SkillAliasKind, SkillAliasRecord, SkillAliasSnapshotCommand, SkillAliasSnapshotResult,
-    SkillAuthorKind, SkillCurationLifecycleCommand, SkillCurationLifecycleResult,
-    SkillCurationSupersedeCommand, SkillGovernanceSnapshotCommand, SkillGovernanceSnapshotResult,
-    SkillLifecycleState, SkillServicePolicyHints, SkillServiceScope, SKILL_ALIAS_SNAPSHOT_COMMAND,
-    SKILL_CURATION_ARCHIVE_COMMAND, SKILL_CURATION_PIN_COMMAND, SKILL_CURATION_QUARANTINE_COMMAND,
-    SKILL_CURATION_REJECT_COMMAND, SKILL_CURATION_RELEASE_QUARANTINE_COMMAND,
-    SKILL_CURATION_RESTORE_COMMAND, SKILL_CURATION_SUPERSEDE_COMMAND, SKILL_CURATION_UNPIN_COMMAND,
+    SkillAliasKind, SkillAliasRecord, SkillAliasResolutionPolicy, SkillAliasSnapshotCommand,
+    SkillAliasSnapshotResult, SkillAuthorKind, SkillCurationLifecycleCommand,
+    SkillCurationLifecycleResult, SkillCurationSupersedeCommand, SkillGovernanceSnapshotCommand,
+    SkillGovernanceSnapshotResult, SkillLifecycleState, SkillServicePolicyHints, SkillServiceScope,
+    SKILL_ALIAS_SNAPSHOT_COMMAND, SKILL_CURATION_ARCHIVE_COMMAND, SKILL_CURATION_PIN_COMMAND,
+    SKILL_CURATION_QUARANTINE_COMMAND, SKILL_CURATION_REJECT_COMMAND,
+    SKILL_CURATION_RELEASE_QUARANTINE_COMMAND, SKILL_CURATION_RESTORE_COMMAND,
+    SKILL_CURATION_SUPERSEDE_COMMAND, SKILL_CURATION_UNPIN_COMMAND,
     SKILL_GOVERNANCE_SNAPSHOT_COMMAND,
 };
 
@@ -53,6 +54,9 @@ fn supersede_alias_record() -> SkillAliasRecord {
         target_skill_id: "skill://agent/lifecycle-v2".into(),
         target_name: "agent-lifecycle-v2".into(),
         kind: SkillAliasKind::SupersededBy,
+        resolution_policy: SkillAliasResolutionPolicy::Redirect,
+        valid_from: now,
+        valid_until: None,
         rationale: "operator approved redirect before hiding the source skill".into(),
         created_at: now,
         updated_at: now,

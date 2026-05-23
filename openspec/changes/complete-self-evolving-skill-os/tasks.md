@@ -200,7 +200,7 @@
   resolution before wake execution.
 - [x] 11.5 Avoid rewriting historical scheduler/task refs by default; preserve
   transparent alias resolution and audit evidence.
-- [ ] 11.6 Add logs for alias hit, miss, warn, deny, loop prevention, and
+- [x] 11.6 Add logs for alias hit, miss, warn, deny, loop prevention, and
   expired alias decisions.
 - [ ] 11.7 Test alias resolution in context, task, scheduler, superseded skill,
   expired alias, deny alias, and loop cases.

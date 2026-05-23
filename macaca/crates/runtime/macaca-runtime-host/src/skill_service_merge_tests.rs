@@ -3,9 +3,9 @@ use std::collections::BTreeMap;
 use macaca_kernel::SystemService;
 use macaca_proto::{ServiceCommand, ServiceCommandName, TraceContext};
 use macaca_skill::{
-    SkillAliasKind, SkillAliasRecord, SkillAliasSnapshotCommand, SkillAliasSnapshotResult,
-    SkillAuthorKind, SkillCurationRollbackCommand, SkillCurationRollbackResult,
-    SkillGovernanceRecordUsageCommand, SkillGovernanceSnapshotCommand,
+    SkillAliasKind, SkillAliasRecord, SkillAliasResolutionPolicy, SkillAliasSnapshotCommand,
+    SkillAliasSnapshotResult, SkillAuthorKind, SkillCurationRollbackCommand,
+    SkillCurationRollbackResult, SkillGovernanceRecordUsageCommand, SkillGovernanceSnapshotCommand,
     SkillGovernanceSnapshotResult, SkillLifecycleState, SkillMergeAliasEffect,
     SkillMergeApplyResult, SkillMergeRiskScore, SkillServiceScope, SkillUmbrellaMergeApplyCommand,
     SkillUmbrellaMergeProposal, SkillUsageEventKind, SkillUsageObservation,
@@ -176,6 +176,9 @@ async fn skill_curation_merge_apply_supersedes_absorbed_sources_and_records_alia
             target_skill_id: "skill://agent/debugging".into(),
             target_name: "debugging".into(),
             kind: SkillAliasKind::AbsorbedInto,
+            resolution_policy: SkillAliasResolutionPolicy::Redirect,
+            valid_from: aliases.aliases[0].valid_from,
+            valid_until: None,
             rationale: "source skill was absorbed into the generic debugging umbrella".into(),
             created_at: aliases.aliases[0].created_at,
             updated_at: aliases.aliases[0].updated_at,

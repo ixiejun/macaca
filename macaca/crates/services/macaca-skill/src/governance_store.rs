@@ -14,7 +14,7 @@ use chrono::{DateTime, Utc};
 use macaca_proto::TraceContext;
 use serde::{Deserialize, Serialize};
 
-use crate::alias::SkillAliasRecord;
+use crate::alias::{SkillAliasRecord, SkillAliasResolutionPolicy};
 use crate::evolution::SkillExperienceProposalRecord;
 use crate::governance::{SkillGovernanceRecord, SkillUsageObservation, SkillUsageTelemetry};
 use crate::provenance::{SkillProvenance, SkillProvenanceEventRecord};
@@ -42,18 +42,6 @@ pub struct DurableSkillGovernanceRecord {
     pub telemetry: SkillUsageTelemetry,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-}
-
-/// Resolution behavior for a service-owned skill alias.
-///
-/// Consumers ask the Skill service to resolve aliases instead of rewriting
-/// historical task, scheduler, or context references.  The policy keeps the
-/// decision explicit and auditable.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum SkillAliasResolutionPolicy {
-    Redirect,
-    WarnAndRedirect,
-    Deny,
 }
 
 /// Durable alias-map record from one governed skill identity to another.
