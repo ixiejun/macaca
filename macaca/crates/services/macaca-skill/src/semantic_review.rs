@@ -218,7 +218,7 @@ impl SkillSemanticReviewResult {
     /// leaking prompts, provider payloads, package content, or secret material.
     pub fn unavailable(captured_at: DateTime<Utc>) -> Self {
         Self {
-            provider_id: "unavailable-skill-semantic-review".into(),
+            provider_id: UnavailableSkillSemanticReviewProvider::PROVIDER_ID.into(),
             status: SkillSemanticReviewStatus::Unavailable,
             proposals: Vec::new(),
             diagnostics: vec!["semantic review provider is unavailable".into()],
@@ -325,6 +325,11 @@ pub trait SkillSemanticReviewProvider: Send + Sync {
 /// Null Object provider used when no semantic reviewer is configured.
 #[derive(Debug, Default)]
 pub struct UnavailableSkillSemanticReviewProvider;
+
+impl UnavailableSkillSemanticReviewProvider {
+    /// Stable provider id recorded in logs and reports for absent backends.
+    pub const PROVIDER_ID: &'static str = "unavailable-skill-semantic-review";
+}
 
 #[async_trait]
 impl SkillSemanticReviewProvider for UnavailableSkillSemanticReviewProvider {

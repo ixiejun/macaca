@@ -166,7 +166,7 @@
   mutations.
 - [x] 9.5 Add budget, resource, prompt sanitization, provider payload
   sanitization, and bounded output decorators.
-- [ ] 9.6 Add runtime-host provider factory wiring without adding SDK, kernel,
+- [x] 9.6 Add runtime-host provider factory wiring without adding SDK, kernel,
   Web, CLI, or frontend dependencies.
 - [x] 9.7 Test absent semantic provider fallback, typed proposal validation,
   provider error handling, and no raw provider payload in logs/reports.

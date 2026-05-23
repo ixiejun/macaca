@@ -569,6 +569,21 @@ Every command logs key execution nodes with sanitized fields:
   provider-payload, and secret markers are redacted before reports/logs can
   expose them.
 
+### Slice 9D: Runtime-Host Semantic Provider Factory
+
+- Patterns: Runtime-host now owns a small Factory that returns the semantic
+  review provider behind the existing `SkillSemanticReviewProvider` Strategy
+  contract. The current factory returns the Null Object unavailable provider,
+  preserving deterministic curation while giving future providers a single
+  wiring point.
+- Boundaries: provider construction remains private to runtime-host. No SDK,
+  kernel, Web, CLI, or frontend contract changes are required, and the stable
+  unavailable provider id lives with the provider type rather than being copied
+  across crates.
+- Traceability: the factory logs the selected provider id before curation calls
+  the provider, and curation continues to log sanitized provider status,
+  proposal count, mutation flag, and run identifiers.
+
 ## Risks And Mitigations
 
 - Risk: skill mutation corrupts active packages. Mitigation: atomic writes,
