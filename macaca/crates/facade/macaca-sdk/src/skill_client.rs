@@ -8,8 +8,11 @@ use macaca_skill::{
     SkillAliasResolveCommand, SkillAliasResolveResult, SkillAliasSnapshotCommand,
     SkillAliasSnapshotResult, SkillAliasUpsertCommand, SkillAliasUpsertResult, SkillCleanupCommand,
     SkillCurationDryRunCommand, SkillCurationDryRunResult, SkillCurationLifecycleAction,
-    SkillCurationLifecycleCommand, SkillCurationLifecycleResult, SkillExecutableLoadCommand,
-    SkillExecutableLoadResult, SkillExperienceProposalCommand, SkillExperienceProposalResult,
+    SkillCurationLifecycleCommand, SkillCurationLifecycleResult, SkillEvolutionPromoteDraftCommand,
+    SkillEvolutionPromoteDraftResult, SkillEvolutionProposePatchCommand,
+    SkillEvolutionProposePatchResult, SkillEvolutionRejectDraftCommand,
+    SkillEvolutionRejectDraftResult, SkillExecutableLoadCommand, SkillExecutableLoadResult,
+    SkillExperienceProposalCommand, SkillExperienceProposalResult,
     SkillExperienceProposalSnapshotCommand, SkillExperienceProposalSnapshotResult,
     SkillGovernanceRecordUsageCommand, SkillGovernanceRecordUsageResult,
     SkillGovernanceSnapshotCommand, SkillGovernanceSnapshotResult, SkillServiceSnapshot,
@@ -78,6 +81,18 @@ pub trait SystemSkillClient: Send + Sync {
         &self,
         command: SkillExperienceProposalCommand,
     ) -> MacacaResult<SkillExperienceProposalResult>;
+    async fn propose_skill_patch(
+        &self,
+        command: SkillEvolutionProposePatchCommand,
+    ) -> MacacaResult<SkillEvolutionProposePatchResult>;
+    async fn promote_skill_draft(
+        &self,
+        command: SkillEvolutionPromoteDraftCommand,
+    ) -> MacacaResult<SkillEvolutionPromoteDraftResult>;
+    async fn reject_skill_draft(
+        &self,
+        command: SkillEvolutionRejectDraftCommand,
+    ) -> MacacaResult<SkillEvolutionRejectDraftResult>;
     async fn skill_experience_snapshot(
         &self,
         command: SkillExperienceProposalSnapshotCommand,
@@ -259,6 +274,42 @@ impl SystemSkillClient for UnavailableSystemSkillClient {
         Err(MacacaError::Config("Skill service is unavailable".into()))
     }
 
+    async fn propose_skill_patch(
+        &self,
+        command: SkillEvolutionProposePatchCommand,
+    ) -> MacacaResult<SkillEvolutionProposePatchResult> {
+        warn!(
+            trace_id = %command.trace.trace_id,
+            target_skill_id = ?command.candidate.target_skill_id,
+            "sdk skill client unavailable for patch proposal"
+        );
+        Err(MacacaError::Config("Skill service is unavailable".into()))
+    }
+
+    async fn promote_skill_draft(
+        &self,
+        command: SkillEvolutionPromoteDraftCommand,
+    ) -> MacacaResult<SkillEvolutionPromoteDraftResult> {
+        warn!(
+            trace_id = %command.trace.trace_id,
+            proposal_id = %command.proposal_id,
+            "sdk skill client unavailable for draft promotion"
+        );
+        Err(MacacaError::Config("Skill service is unavailable".into()))
+    }
+
+    async fn reject_skill_draft(
+        &self,
+        command: SkillEvolutionRejectDraftCommand,
+    ) -> MacacaResult<SkillEvolutionRejectDraftResult> {
+        warn!(
+            trace_id = %command.trace.trace_id,
+            proposal_id = %command.proposal_id,
+            "sdk skill client unavailable for draft rejection"
+        );
+        Err(MacacaError::Config("Skill service is unavailable".into()))
+    }
+
     async fn skill_experience_snapshot(
         &self,
         command: SkillExperienceProposalSnapshotCommand,
@@ -290,5 +341,54 @@ impl ServiceBackedSkillClient {
     /// Create a service-backed client from an existing generic service client.
     pub fn new(service: Arc<dyn SystemServiceClient>) -> Self {
         Self { service }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use macaca_proto::TraceContext;
+    use macaca_skill::{
+        SkillEvolutionPromoteDraftCommand, SkillEvolutionRejectDraftCommand,
+        SkillServicePolicyHints, SkillServiceScope,
+    };
+
+    use super::{SystemSkillClient, UnavailableSystemSkillClient};
+
+    fn policy_hints() -> SkillServicePolicyHints {
+        SkillServicePolicyHints {
+            required_permissions: vec!["skill.evolution.promote".into()],
+            entitlement_ready: Some(false),
+            package_ready: Some(false),
+            metadata: BTreeMap::new(),
+        }
+    }
+
+    #[tokio::test]
+    async fn unavailable_skill_client_rejects_proposal_lifecycle_side_effects() {
+        let client = UnavailableSystemSkillClient;
+        let trace = TraceContext::new("trace-sdk-skill-proposal-unavailable");
+        let promote = SkillEvolutionPromoteDraftCommand {
+            trace: trace.clone(),
+            scope: SkillServiceScope::default(),
+            proposal_id: "proposal-1".into(),
+            reason: "approval cannot run without the Skill service".into(),
+            evidence_ids: vec!["evidence://approval/1".into()],
+            policy_decision_refs: vec!["policy://decision/1".into()],
+            policy: policy_hints(),
+        };
+        let reject = SkillEvolutionRejectDraftCommand {
+            trace,
+            scope: SkillServiceScope::default(),
+            proposal_id: "proposal-1".into(),
+            rationale: "rejection cannot run without the Skill service".into(),
+            evidence_ids: vec!["evidence://reject/1".into()],
+            policy_decision_refs: vec!["policy://decision/2".into()],
+            policy: policy_hints(),
+        };
+
+        assert!(client.promote_skill_draft(promote).await.is_err());
+        assert!(client.reject_skill_draft(reject).await.is_err());
     }
 }

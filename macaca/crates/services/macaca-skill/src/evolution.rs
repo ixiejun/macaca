@@ -2,9 +2,8 @@
 //!
 //! These DTOs model the first safe step of self-evolving skills: a verified
 //! task may produce a sanitized proposal, but active skill files and catalog
-//! state remain unchanged.  Future providers can persist proposals in Store or
-//! EventLog and add approval/promotion commands without changing the caller
-//! contract introduced here.
+//! state remain unchanged until an explicit proposal-lifecycle command passes
+//! trace, evidence, and policy gates.
 
 use std::collections::BTreeMap;
 
@@ -13,6 +12,7 @@ use macaca_proto::{ApplicationId, TraceContext};
 use serde::{Deserialize, Serialize};
 
 use crate::service_contract::SkillServiceScope;
+use crate::SkillEvolutionProposalLifecycle;
 
 /// High-level classification for a bounded task experience candidate.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -154,6 +154,8 @@ pub struct SkillExperienceProposalRecord {
     pub classification: SkillEvolutionCandidateClassification,
     pub destination: SkillExperienceCandidateDestination,
     pub recommended_action: SkillEvolutionProposalAction,
+    #[serde(default)]
+    pub lifecycle: SkillEvolutionProposalLifecycle,
     pub target_skill_id: Option<String>,
     pub target_skill_name: Option<String>,
     pub evidence_ids: Vec<String>,
@@ -301,6 +303,7 @@ impl SkillExperienceProposalRecord {
             classification: candidate.classification,
             destination: candidate.destination,
             recommended_action: candidate.recommended_action,
+            lifecycle: SkillEvolutionProposalLifecycle::Draft,
             target_skill_id: candidate.target_skill_id,
             target_skill_name: candidate.target_skill_name,
             evidence_ids: candidate

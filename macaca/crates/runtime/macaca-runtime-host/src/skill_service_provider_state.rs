@@ -8,7 +8,6 @@
 
 use std::collections::BTreeMap;
 
-use async_trait::async_trait;
 use macaca_skill::{
     SkillAliasRecord, SkillAliasResolveCommand, SkillAliasResolveResult, SkillAliasSnapshotResult,
     SkillAliasUpsertCommand, SkillAliasUpsertResult, SkillCurationDryRunCommand,
@@ -17,11 +16,10 @@ use macaca_skill::{
     SkillExperienceDestinationRouteResult, SkillExperienceProposalCommand,
     SkillExperienceProposalRecord, SkillExperienceProposalResult,
     SkillExperienceProposalSnapshotResult, SkillGovernanceEventPayload, SkillGovernanceEventRecord,
-    SkillGovernanceReadModel, SkillGovernanceRecord, SkillGovernanceRecordUsageCommand,
-    SkillGovernanceRecordUsageResult, SkillGovernanceSnapshotResult, SkillGovernanceStoreStrategy,
-    SkillGovernanceStoreUnavailable, SkillLifecycleState, SkillLifecycleStateMachine,
-    SkillPinnedMutationGuard, SkillPinnedMutationOperation, SkillTelemetryAggregate,
-    SkillUsageObservation,
+    SkillGovernanceRecord, SkillGovernanceRecordUsageCommand, SkillGovernanceRecordUsageResult,
+    SkillGovernanceSnapshotResult, SkillGovernanceStoreStrategy, SkillLifecycleState,
+    SkillLifecycleStateMachine, SkillPinnedMutationGuard, SkillPinnedMutationOperation,
+    SkillTelemetryAggregate, SkillUsageObservation,
 };
 use tokio::sync::Mutex;
 
@@ -32,10 +30,10 @@ use tokio::sync::Mutex;
 /// tests, development hosts, and future migration to a durable governance store.
 #[derive(Default)]
 pub(crate) struct SkillProviderGovernanceState {
-    records: Mutex<BTreeMap<String, SkillGovernanceRecord>>,
-    aliases: Mutex<BTreeMap<String, SkillAliasRecord>>,
-    proposals: Mutex<BTreeMap<String, SkillExperienceProposalRecord>>,
-    event_log: Mutex<Vec<SkillGovernanceEventRecord>>,
+    pub(crate) records: Mutex<BTreeMap<String, SkillGovernanceRecord>>,
+    pub(crate) aliases: Mutex<BTreeMap<String, SkillAliasRecord>>,
+    pub(crate) proposals: Mutex<BTreeMap<String, SkillExperienceProposalRecord>>,
+    pub(crate) event_log: Mutex<Vec<SkillGovernanceEventRecord>>,
 }
 
 impl SkillProviderGovernanceState {
@@ -435,65 +433,8 @@ impl SkillProviderGovernanceState {
         }
     }
 
-    async fn append_event(&self, event: SkillGovernanceEventRecord) {
+    pub(crate) async fn append_event(&self, event: SkillGovernanceEventRecord) {
         let _ = <Self as SkillGovernanceStoreStrategy>::append_event(self, event).await;
-    }
-}
-
-#[async_trait]
-impl SkillGovernanceStoreStrategy for SkillProviderGovernanceState {
-    async fn append_event(
-        &self,
-        mut event: SkillGovernanceEventRecord,
-    ) -> Result<SkillGovernanceEventRecord, SkillGovernanceStoreUnavailable> {
-        if event.provenance.policy_decision_refs.is_empty() {
-            event.provenance.policy_decision_refs = event.policy_decision_ids.clone();
-        }
-        if event.provenance.audit_event_ids.is_empty() {
-            event.provenance.audit_event_ids = event.audit_event_ids.clone();
-        }
-        tracing::info!(
-            event_id = %event.event_id,
-            trace_id = %event.trace_id,
-            event_kind = %governance_event_kind(&event.payload),
-            provenance_action = ?event.provenance.action,
-            application_id = ?event.scope.application_id,
-            session_id = ?event.scope.session_id,
-            agent_name = ?event.scope.agent_name,
-            "skill governance event appended through local compatibility adapter"
-        );
-        self.event_log.lock().await.push(event.clone());
-        Ok(event)
-    }
-
-    async fn read_model(
-        &self,
-    ) -> Result<SkillGovernanceReadModel, SkillGovernanceStoreUnavailable> {
-        let events = self.event_log.lock().await.clone();
-        let read_model = SkillGovernanceReadModel::from_events(events);
-        tracing::info!(
-            events = read_model.replayed_events,
-            records = read_model.records.len(),
-            provenance_events = read_model.provenance_events.len(),
-            aliases = read_model.aliases.len(),
-            proposals = read_model.proposals.len(),
-            curation_runs = read_model.curation_runs.len(),
-            rollback_refs = read_model.rollback_refs.len(),
-            "skill governance read model replayed through local compatibility adapter"
-        );
-        Ok(read_model)
-    }
-}
-
-fn governance_event_kind(payload: &SkillGovernanceEventPayload) -> &'static str {
-    match payload {
-        SkillGovernanceEventPayload::UsageRecorded(_) => "usage_recorded",
-        SkillGovernanceEventPayload::LifecycleApplied(_) => "lifecycle_applied",
-        SkillGovernanceEventPayload::AliasUpserted(_) => "alias_upserted",
-        SkillGovernanceEventPayload::ProposalCreated(_) => "proposal_created",
-        SkillGovernanceEventPayload::CurationRunRecorded(_) => "curation_run_recorded",
-        SkillGovernanceEventPayload::SnapshotRefRecorded(_) => "snapshot_ref_recorded",
-        SkillGovernanceEventPayload::RollbackRefRecorded(_) => "rollback_ref_recorded",
     }
 }
 
@@ -508,7 +449,7 @@ fn snapshot_includes_lifecycle(
     include_archived || lifecycle != &SkillLifecycleState::Archived
 }
 
-fn event_id(prefix: &str, captured_at: chrono::DateTime<chrono::Utc>) -> String {
+pub(crate) fn event_id(prefix: &str, captured_at: chrono::DateTime<chrono::Utc>) -> String {
     let nanos = captured_at
         .timestamp_nanos_opt()
         .unwrap_or_else(|| captured_at.timestamp_micros() * 1_000);

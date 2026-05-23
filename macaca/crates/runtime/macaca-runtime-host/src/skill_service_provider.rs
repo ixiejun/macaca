@@ -16,22 +16,24 @@ use macaca_proto::{
 use macaca_skill::{
     skill_service_descriptor, ExecutableSkillToolSet, SkillAliasResolveCommand,
     SkillAliasSnapshotCommand, SkillAliasUpsertCommand, SkillCurationDryRunCommand,
-    SkillCurationLifecycleAction, SkillExecutableLoadCommand, SkillExecutableLoadResult,
-    SkillExperienceProposalCommand, SkillExperienceProposalSnapshotCommand,
-    SkillGovernanceRecordUsageCommand, SkillGovernanceSnapshotCommand, SkillRuntimeFacade,
-    SkillServiceSnapshot, SkillServiceSnapshotCommand, SkillSnapshotRequest,
-    SkillSnapshotServiceCommand, SkillStatusCommand, SkillStatusResult, SkillToolCatalogCommand,
-    SkillToolCatalogResult, SkillToolInvokeCommand, SKILL_ALIAS_RESOLVE_COMMAND,
-    SKILL_ALIAS_SNAPSHOT_COMMAND, SKILL_ALIAS_UPSERT_COMMAND, SKILL_CLEANUP_COMMAND,
-    SKILL_CURATION_ARCHIVE_COMMAND, SKILL_CURATION_DRY_RUN_COMMAND, SKILL_CURATION_PIN_COMMAND,
-    SKILL_CURATION_QUARANTINE_COMMAND, SKILL_CURATION_REJECT_COMMAND,
-    SKILL_CURATION_RELEASE_QUARANTINE_COMMAND, SKILL_CURATION_RESTORE_COMMAND,
-    SKILL_CURATION_SUPERSEDE_COMMAND, SKILL_CURATION_UNPIN_COMMAND,
-    SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND, SKILL_EVOLUTION_SNAPSHOT_COMMAND,
-    SKILL_EXECUTABLE_LOAD_COMMAND, SKILL_GOVERNANCE_RECORD_USAGE_COMMAND,
-    SKILL_GOVERNANCE_SNAPSHOT_COMMAND, SKILL_SERVICE_ID, SKILL_SERVICE_SNAPSHOT_COMMAND,
-    SKILL_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND, SKILL_TOOL_CATALOG_COMMAND,
-    SKILL_TOOL_INVOKE_COMMAND,
+    SkillCurationLifecycleAction, SkillEvolutionPromoteDraftCommand,
+    SkillEvolutionProposePatchCommand, SkillEvolutionRejectDraftCommand,
+    SkillExecutableLoadCommand, SkillExecutableLoadResult, SkillExperienceProposalCommand,
+    SkillExperienceProposalSnapshotCommand, SkillGovernanceRecordUsageCommand,
+    SkillGovernanceSnapshotCommand, SkillRuntimeFacade, SkillServiceSnapshot,
+    SkillServiceSnapshotCommand, SkillSnapshotRequest, SkillSnapshotServiceCommand,
+    SkillStatusCommand, SkillStatusResult, SkillToolCatalogCommand, SkillToolCatalogResult,
+    SkillToolInvokeCommand, SKILL_ALIAS_RESOLVE_COMMAND, SKILL_ALIAS_SNAPSHOT_COMMAND,
+    SKILL_ALIAS_UPSERT_COMMAND, SKILL_CLEANUP_COMMAND, SKILL_CURATION_ARCHIVE_COMMAND,
+    SKILL_CURATION_DRY_RUN_COMMAND, SKILL_CURATION_PIN_COMMAND, SKILL_CURATION_QUARANTINE_COMMAND,
+    SKILL_CURATION_REJECT_COMMAND, SKILL_CURATION_RELEASE_QUARANTINE_COMMAND,
+    SKILL_CURATION_RESTORE_COMMAND, SKILL_CURATION_SUPERSEDE_COMMAND, SKILL_CURATION_UNPIN_COMMAND,
+    SKILL_EVOLUTION_PROMOTE_DRAFT_COMMAND, SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND,
+    SKILL_EVOLUTION_PROPOSE_PATCH_COMMAND, SKILL_EVOLUTION_REJECT_DRAFT_COMMAND,
+    SKILL_EVOLUTION_SNAPSHOT_COMMAND, SKILL_EXECUTABLE_LOAD_COMMAND,
+    SKILL_GOVERNANCE_RECORD_USAGE_COMMAND, SKILL_GOVERNANCE_SNAPSHOT_COMMAND, SKILL_SERVICE_ID,
+    SKILL_SERVICE_SNAPSHOT_COMMAND, SKILL_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND,
+    SKILL_TOOL_CATALOG_COMMAND, SKILL_TOOL_INVOKE_COMMAND,
 };
 use macaca_tools::{ToolCommand, ToolCommandExecutor};
 use tokio::sync::Mutex;
@@ -446,6 +448,57 @@ impl SystemService for SkillSystemServiceProvider {
                     action = ?result.proposal.recommended_action,
                     mutated = result.mutated,
                     "skill experience proposal created"
+                );
+                Ok(service_result(to_value(result)?, typed.trace))
+            }
+            SKILL_EVOLUTION_PROPOSE_PATCH_COMMAND => {
+                let typed: SkillEvolutionProposePatchCommand = decode(command.payload)?;
+                typed.validate().map_err(ServiceError::InvalidArgument)?;
+                let result = self.governance_state.propose_patch(typed.clone()).await;
+                tracing::info!(
+                    trace_id = %typed.trace.trace_id,
+                    proposal_id = %result.proposal.proposal_id,
+                    target_skill_id = ?result.proposal.target_skill_id,
+                    evidence_refs = result.proposal.evidence_ids.len(),
+                    mutated = result.mutated,
+                    "skill patch proposal created"
+                );
+                Ok(service_result(to_value(result)?, typed.trace))
+            }
+            SKILL_EVOLUTION_PROMOTE_DRAFT_COMMAND => {
+                let typed: SkillEvolutionPromoteDraftCommand = decode(command.payload)?;
+                typed.validate().map_err(ServiceError::InvalidArgument)?;
+                let result = self
+                    .governance_state
+                    .promote_draft(typed.clone())
+                    .await
+                    .map_err(ServiceError::InvalidArgument)?;
+                tracing::info!(
+                    trace_id = %typed.trace.trace_id,
+                    proposal_id = %typed.proposal_id,
+                    skill_id = %result.record.provenance.skill_id,
+                    policy_decision_refs = result.policy_decision_refs.len(),
+                    evidence_refs = result.evidence_ids.len(),
+                    mutated = result.mutated,
+                    "skill draft proposal promoted"
+                );
+                Ok(service_result(to_value(result)?, typed.trace))
+            }
+            SKILL_EVOLUTION_REJECT_DRAFT_COMMAND => {
+                let typed: SkillEvolutionRejectDraftCommand = decode(command.payload)?;
+                typed.validate().map_err(ServiceError::InvalidArgument)?;
+                let result = self
+                    .governance_state
+                    .reject_draft(typed.clone())
+                    .await
+                    .map_err(ServiceError::InvalidArgument)?;
+                tracing::info!(
+                    trace_id = %typed.trace.trace_id,
+                    proposal_id = %typed.proposal_id,
+                    policy_decision_refs = result.policy_decision_refs.len(),
+                    evidence_refs = result.evidence_ids.len(),
+                    mutated = result.mutated,
+                    "skill draft proposal rejected"
                 );
                 Ok(service_result(to_value(result)?, typed.trace))
             }

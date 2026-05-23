@@ -9,8 +9,11 @@ use macaca_skill::{
     SkillAliasResolveCommand, SkillAliasResolveResult, SkillAliasSnapshotCommand,
     SkillAliasSnapshotResult, SkillAliasUpsertCommand, SkillAliasUpsertResult, SkillCleanupCommand,
     SkillCurationDryRunCommand, SkillCurationDryRunResult, SkillCurationLifecycleAction,
-    SkillCurationLifecycleCommand, SkillCurationLifecycleResult, SkillExecutableLoadCommand,
-    SkillExecutableLoadResult, SkillExperienceProposalCommand, SkillExperienceProposalResult,
+    SkillCurationLifecycleCommand, SkillCurationLifecycleResult, SkillEvolutionPromoteDraftCommand,
+    SkillEvolutionPromoteDraftResult, SkillEvolutionProposePatchCommand,
+    SkillEvolutionProposePatchResult, SkillEvolutionRejectDraftCommand,
+    SkillEvolutionRejectDraftResult, SkillExecutableLoadCommand, SkillExecutableLoadResult,
+    SkillExperienceProposalCommand, SkillExperienceProposalResult,
     SkillExperienceProposalSnapshotCommand, SkillExperienceProposalSnapshotResult,
     SkillGovernanceRecordUsageCommand, SkillGovernanceRecordUsageResult,
     SkillGovernanceSnapshotCommand, SkillGovernanceSnapshotResult, SkillServiceSnapshot,
@@ -21,11 +24,13 @@ use macaca_skill::{
     SKILL_CURATION_ARCHIVE_COMMAND, SKILL_CURATION_DRY_RUN_COMMAND, SKILL_CURATION_PIN_COMMAND,
     SKILL_CURATION_QUARANTINE_COMMAND, SKILL_CURATION_REJECT_COMMAND,
     SKILL_CURATION_RELEASE_QUARANTINE_COMMAND, SKILL_CURATION_RESTORE_COMMAND,
-    SKILL_CURATION_UNPIN_COMMAND, SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND,
-    SKILL_EVOLUTION_SNAPSHOT_COMMAND, SKILL_EXECUTABLE_LOAD_COMMAND,
-    SKILL_GOVERNANCE_RECORD_USAGE_COMMAND, SKILL_GOVERNANCE_SNAPSHOT_COMMAND, SKILL_SERVICE_ID,
-    SKILL_SERVICE_SNAPSHOT_COMMAND, SKILL_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND,
-    SKILL_TOOL_CATALOG_COMMAND, SKILL_TOOL_INVOKE_COMMAND,
+    SKILL_CURATION_UNPIN_COMMAND, SKILL_EVOLUTION_PROMOTE_DRAFT_COMMAND,
+    SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND, SKILL_EVOLUTION_PROPOSE_PATCH_COMMAND,
+    SKILL_EVOLUTION_REJECT_DRAFT_COMMAND, SKILL_EVOLUTION_SNAPSHOT_COMMAND,
+    SKILL_EXECUTABLE_LOAD_COMMAND, SKILL_GOVERNANCE_RECORD_USAGE_COMMAND,
+    SKILL_GOVERNANCE_SNAPSHOT_COMMAND, SKILL_SERVICE_ID, SKILL_SERVICE_SNAPSHOT_COMMAND,
+    SKILL_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND, SKILL_TOOL_CATALOG_COMMAND,
+    SKILL_TOOL_INVOKE_COMMAND,
 };
 
 use crate::service_client::ServiceCallCommand;
@@ -202,6 +207,45 @@ impl SystemSkillClient for ServiceBackedSkillClient {
         call(
             &self.service,
             SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn propose_skill_patch(
+        &self,
+        command: SkillEvolutionProposePatchCommand,
+    ) -> MacacaResult<SkillEvolutionProposePatchResult> {
+        call(
+            &self.service,
+            SKILL_EVOLUTION_PROPOSE_PATCH_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn promote_skill_draft(
+        &self,
+        command: SkillEvolutionPromoteDraftCommand,
+    ) -> MacacaResult<SkillEvolutionPromoteDraftResult> {
+        call(
+            &self.service,
+            SKILL_EVOLUTION_PROMOTE_DRAFT_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn reject_skill_draft(
+        &self,
+        command: SkillEvolutionRejectDraftCommand,
+    ) -> MacacaResult<SkillEvolutionRejectDraftResult> {
+        call(
+            &self.service,
+            SKILL_EVOLUTION_REJECT_DRAFT_COMMAND,
             command.trace.clone(),
             command,
         )

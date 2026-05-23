@@ -44,6 +44,9 @@ pub const SKILL_ALIAS_UPSERT_COMMAND: &str = "skill.alias.upsert";
 pub const SKILL_ALIAS_RESOLVE_COMMAND: &str = "skill.alias.resolve";
 pub const SKILL_ALIAS_SNAPSHOT_COMMAND: &str = "skill.alias.snapshot";
 pub const SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND: &str = "skill.evolution.propose_from_task";
+pub const SKILL_EVOLUTION_PROPOSE_PATCH_COMMAND: &str = "skill.evolution.propose_patch";
+pub const SKILL_EVOLUTION_PROMOTE_DRAFT_COMMAND: &str = "skill.evolution.promote_draft";
+pub const SKILL_EVOLUTION_REJECT_DRAFT_COMMAND: &str = "skill.evolution.reject_draft";
 pub const SKILL_EVOLUTION_SNAPSHOT_COMMAND: &str = "skill.evolution.snapshot";
 
 /// Explicit scope for Skill service commands.

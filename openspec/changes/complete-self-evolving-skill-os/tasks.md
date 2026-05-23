@@ -95,18 +95,18 @@
 
 ## 6. Proposal Lifecycle Commands
 
-- [ ] 6.1 Add `skill.evolution.propose_patch` typed command and result.
-- [ ] 6.2 Add `skill.evolution.promote_draft` typed command and result.
-- [ ] 6.3 Add `skill.evolution.reject_draft` typed command and result.
-- [ ] 6.4 Add policy and approval decorators before promotion or rejection
+- [x] 6.1 Add `skill.evolution.propose_patch` typed command and result.
+- [x] 6.2 Add `skill.evolution.promote_draft` typed command and result.
+- [x] 6.3 Add `skill.evolution.reject_draft` typed command and result.
+- [x] 6.4 Add policy and approval decorators before promotion or rejection
   side effects.
-- [ ] 6.5 Keep rejected proposals durable and auditable with rationale and
+- [x] 6.5 Keep rejected proposals durable and auditable with rationale and
   evidence refs.
-- [ ] 6.6 Ensure promoted drafts update lifecycle, provenance, telemetry, alias
+- [x] 6.6 Ensure promoted drafts update lifecycle, provenance, telemetry, alias
   state, and snapshots atomically through the governance store.
-- [ ] 6.7 Add SDK/SystemFacade methods and unavailable Null Object behavior for
+- [x] 6.7 Add SDK/SystemFacade methods and unavailable Null Object behavior for
   all proposal lifecycle commands.
-- [ ] 6.8 Test promotion, rejection, duplicate promotion denial, missing trace,
+- [x] 6.8 Test promotion, rejection, duplicate promotion denial, missing trace,
   missing evidence, denied policy, and unavailable provider behavior.
 
 ## 7. Safe Skill Content Mutation

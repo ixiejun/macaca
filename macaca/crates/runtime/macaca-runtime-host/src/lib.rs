@@ -72,8 +72,10 @@ pub mod service_runtime_error;
 pub mod service_runtime_event;
 pub(crate) mod skill_service_codec;
 pub(crate) mod skill_service_experience_routing;
+pub(crate) mod skill_service_governance_store;
 pub mod skill_service_provider;
 pub(crate) mod skill_service_provider_lifecycle;
+pub(crate) mod skill_service_provider_proposals;
 pub(crate) mod skill_service_provider_state;
 pub mod store_entitlement_admission;
 pub mod store_service_provider;
@@ -85,6 +87,8 @@ pub mod web3_service_provider;
 mod service_router_tests;
 #[cfg(test)]
 mod skill_governance_store_logging_tests;
+#[cfg(test)]
+mod skill_proposal_lifecycle_tests;
 #[cfg(test)]
 mod skill_service_lifecycle_tests;
 #[cfg(test)]
