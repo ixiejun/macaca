@@ -352,6 +352,26 @@ Every command logs key execution nodes with sanitized fields:
   and oversize summaries are rejected before proposal creation. Draft proposals
   remain non-mutating for active catalogs and package files.
 
+### Slice 5B: Memory And Knowledge Destination Routing
+
+- Patterns: Facade routes `MemoryFact` and `KnowledgeDigest` destinations to
+  the Memory runtime facade while Command keeps Skill Evolution inputs and
+  outputs typed; Strategy is preserved because runtime-host injects an optional
+  replaceable Memory runtime; Observer logs routed, unavailable, and failed
+  destination outcomes with bounded refs only.
+- Ownership: Skill Evolution still owns reusable experience classification and
+  governance proposals. Memory owns fact persistence. The Memory knowledge
+  compiler owns knowledge digest compilation. Runtime-host performs provider
+  wiring at the composition root. Web only passes the existing runtime facade
+  into the Skill service provider and does not implement classification,
+  lifecycle, memory, or knowledge semantics.
+- Safety: routed payloads use bounded summaries, trace ids, task ids, evidence
+  refs, trace digest refs, and memory digest refs. Route results expose
+  synthetic `memory://` or `knowledge://candidate/` refs and structured
+  skipped/unavailable/failed states. No raw prompts, raw task outputs, provider
+  payloads, manifests, package bytes, credentials, signatures, or full skill
+  bodies enter route results or logs.
+
 ## Risks And Mitigations
 
 - Risk: skill mutation corrupts active packages. Mitigation: atomic writes,

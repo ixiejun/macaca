@@ -54,9 +54,9 @@ impl Default for SkillExperienceEvidenceGateStatus {
 /// Generic destination selected for a bounded reusable experience candidate.
 ///
 /// These labels describe OS-owned routing classes, not application domains.
-/// Memory and Knowledge destinations are recorded as draft proposal metadata in
-/// this slice; later service integrations will hand those candidates to their
-/// own facades instead of writing skill files.
+/// Memory and Knowledge destinations are routed to their owning service
+/// facades by runtime-host providers; skill-oriented destinations remain in
+/// the Skill governance proposal workflow until a later approval command.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SkillExperienceCandidateDestination {
     MemoryFact,
@@ -159,6 +159,109 @@ pub struct SkillExperienceProposalRecord {
     pub evidence_ids: Vec<String>,
     pub created_at: DateTime<Utc>,
     pub metadata: BTreeMap<String, String>,
+}
+
+/// Structured status for routing non-skill destinations to their owning service.
+///
+/// The value is serialized as a stable lowercase label so SDK and shell
+/// adapters can display it without learning Memory, Knowledge, or Skill
+/// service internals.  Routing may be unavailable when the destination service
+/// is absent; that is an explicit state, never fake success.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SkillExperienceDestinationRouteStatus {
+    Routed,
+    Skipped,
+    Unavailable,
+    Failed,
+}
+
+impl SkillExperienceDestinationRouteStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Routed => "routed",
+            Self::Skipped => "skipped",
+            Self::Unavailable => "unavailable",
+            Self::Failed => "failed",
+        }
+    }
+}
+
+impl Default for SkillExperienceDestinationRouteStatus {
+    fn default() -> Self {
+        Self::Skipped
+    }
+}
+
+/// Provider-neutral route result for the candidate destination.
+///
+/// `target_ref` stores only stable ids or synthetic service refs.  It must not
+/// contain memory bodies, knowledge statements, raw task output, prompts, or
+/// provider payloads.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SkillExperienceDestinationRouteResult {
+    pub destination: SkillExperienceCandidateDestination,
+    pub status: SkillExperienceDestinationRouteStatus,
+    pub target_ref: Option<String>,
+    pub reason: Option<String>,
+}
+
+impl SkillExperienceDestinationRouteResult {
+    pub fn skipped(
+        destination: SkillExperienceCandidateDestination,
+        reason: impl Into<String>,
+    ) -> Self {
+        Self {
+            destination,
+            status: SkillExperienceDestinationRouteStatus::Skipped,
+            target_ref: None,
+            reason: Some(bounded_metadata_value(reason.into().trim())),
+        }
+    }
+
+    pub fn routed(
+        destination: SkillExperienceCandidateDestination,
+        target_ref: impl Into<String>,
+    ) -> Self {
+        Self {
+            destination,
+            status: SkillExperienceDestinationRouteStatus::Routed,
+            target_ref: Some(bounded_metadata_value(target_ref.into().trim())),
+            reason: None,
+        }
+    }
+
+    pub fn unavailable(
+        destination: SkillExperienceCandidateDestination,
+        reason: impl Into<String>,
+    ) -> Self {
+        Self {
+            destination,
+            status: SkillExperienceDestinationRouteStatus::Unavailable,
+            target_ref: None,
+            reason: Some(bounded_metadata_value(reason.into().trim())),
+        }
+    }
+
+    pub fn failed(
+        destination: SkillExperienceCandidateDestination,
+        reason: impl Into<String>,
+    ) -> Self {
+        Self {
+            destination,
+            status: SkillExperienceDestinationRouteStatus::Failed,
+            target_ref: None,
+            reason: Some(bounded_metadata_value(reason.into().trim())),
+        }
+    }
+}
+
+impl Default for SkillExperienceDestinationRouteResult {
+    fn default() -> Self {
+        Self::skipped(
+            SkillExperienceCandidateDestination::NewSkillDraft,
+            "candidate remains in skill governance proposal store",
+        )
+    }
 }
 
 impl SkillExperienceProposalRecord {
@@ -269,6 +372,8 @@ pub struct SkillExperienceProposalResult {
     pub proposal: SkillExperienceProposalRecord,
     pub mutated: bool,
     pub captured_at: DateTime<Utc>,
+    #[serde(default)]
+    pub destination_route: SkillExperienceDestinationRouteResult,
 }
 
 /// Command for reading draft experience proposals through the Skill service.

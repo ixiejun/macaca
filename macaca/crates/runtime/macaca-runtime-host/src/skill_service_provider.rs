@@ -1,18 +1,17 @@
 //! Runtime-host adapter for the Route C Skill Service.
-//!
 //! The provider bridges typed Skill service commands to existing skill runtime
 //! facades.  It keeps Web and CLI from constructing skill runtimes directly
 //! while preserving the old semantics through deprecated compatibility anchors.
 
-use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use macaca_kernel::SystemService;
+use macaca_memory::MemoryRuntimeFacade;
 use macaca_proto::{
     CapabilityToolDescriptor, CapabilityToolInvocationResult, CapabilityToolOriginKind,
-    CapabilityToolResourceScope, CleanupPolicy, MacacaError, ServiceCallResult, ServiceCommand,
-    ServiceDescriptor, ServiceError, ServiceHealth, ServiceResult, TraceContext,
+    CapabilityToolResourceScope, ServiceCallResult, ServiceCommand, ServiceDescriptor,
+    ServiceError, ServiceHealth, ServiceResult, TraceContext,
 };
 use macaca_skill::{
     skill_service_descriptor, ExecutableSkillToolSet, SkillAliasResolveCommand,
@@ -37,6 +36,8 @@ use macaca_skill::{
 use macaca_tools::{ToolCommand, ToolCommandExecutor};
 use tokio::sync::Mutex;
 
+use crate::skill_service_codec::{decode, service_adapter_error, service_result, to_value};
+use crate::skill_service_experience_routing::SkillExperienceDestinationRouter;
 use crate::skill_service_provider_state::SkillProviderGovernanceState;
 
 /// Host-owned Skill service provider backed by skill facades.
@@ -45,6 +46,7 @@ pub struct SkillSystemServiceProvider {
     snapshot_facade: Option<SkillRuntimeFacade>,
     executable_tools: Arc<Mutex<ExecutableSkillToolSet>>,
     governance_state: Arc<SkillProviderGovernanceState>,
+    experience_router: SkillExperienceDestinationRouter,
 }
 
 impl SkillSystemServiceProvider {
@@ -55,6 +57,7 @@ impl SkillSystemServiceProvider {
             snapshot_facade: Some(SkillRuntimeFacade::new()),
             executable_tools: Arc::new(Mutex::new(ExecutableSkillToolSet::new())),
             governance_state: Arc::new(SkillProviderGovernanceState::default()),
+            experience_router: SkillExperienceDestinationRouter::default(),
         }
     }
 
@@ -65,7 +68,22 @@ impl SkillSystemServiceProvider {
             snapshot_facade: None,
             executable_tools: Arc::new(Mutex::new(ExecutableSkillToolSet::new())),
             governance_state: Arc::new(SkillProviderGovernanceState::default()),
+            experience_router: SkillExperienceDestinationRouter::default(),
         }
+    }
+
+    /// Attach the Memory runtime facade used for MemoryFact and KnowledgeDigest
+    /// destinations.
+    ///
+    /// Skill Evolution owns classification and governance proposal creation,
+    /// while Memory owns fact persistence and knowledge compilation.  Injecting
+    /// this facade keeps the runtime-host composition root responsible for
+    /// wiring replaceable providers and prevents Skill service code from
+    /// constructing memory stores directly.
+    pub fn with_memory_runtime(mut self, memory_runtime: Arc<dyn MemoryRuntimeFacade>) -> Self {
+        self.experience_router =
+            SkillExperienceDestinationRouter::with_memory_runtime(memory_runtime);
+        self
     }
 
     fn facade(&self) -> ServiceResult<SkillRuntimeFacade> {
@@ -79,20 +97,6 @@ impl SkillSystemServiceProvider {
             .trace
             .clone()
             .ok_or(ServiceError::MissingTraceContext)
-    }
-
-    fn service_result(output: serde_json::Value, trace: TraceContext) -> ServiceCallResult {
-        service_result(output, trace)
-    }
-}
-
-pub(crate) fn service_result(output: serde_json::Value, trace: TraceContext) -> ServiceCallResult {
-    ServiceCallResult {
-        output,
-        trace,
-        status: "ok".into(),
-        metadata: BTreeMap::new(),
-        cleanup_hint: Some(CleanupPolicy::None),
     }
 }
 
@@ -146,7 +150,7 @@ impl SystemService for SkillSystemServiceProvider {
                     skills = snapshot.skills.len(),
                     "skill service snapshot completed"
                 );
-                Ok(Self::service_result(to_value(snapshot)?, typed.trace))
+                Ok(service_result(to_value(snapshot)?, typed.trace))
             }
             SKILL_EXECUTABLE_LOAD_COMMAND => {
                 let typed: SkillExecutableLoadCommand = decode(command.payload)?;
@@ -176,7 +180,7 @@ impl SystemService for SkillSystemServiceProvider {
                     failed,
                     "skill service executable load completed"
                 );
-                Ok(Self::service_result(to_value(result)?, typed.trace))
+                Ok(service_result(to_value(result)?, typed.trace))
             }
             SKILL_TOOL_CATALOG_COMMAND => {
                 let typed: SkillToolCatalogCommand = decode(command.payload)?;
@@ -201,14 +205,14 @@ impl SystemService for SkillSystemServiceProvider {
                             )
                         })
                     })
-                    .collect::<Result<Vec<_>, MacacaError>>()
+                    .collect::<Result<Vec<_>, _>>()
                     .map_err(service_adapter_error)?;
                 tracing::info!(
                     trace_id = %typed.trace.trace_id,
                     count = descriptors.len(),
                     "skill service tool catalog emitted"
                 );
-                Ok(Self::service_result(
+                Ok(service_result(
                     to_value(SkillToolCatalogResult::new(descriptors))?,
                     typed.trace,
                 ))
@@ -239,10 +243,7 @@ impl SystemService for SkillSystemServiceProvider {
                     output,
                     typed.invocation.trace.clone(),
                 );
-                Ok(Self::service_result(
-                    to_value(result)?,
-                    typed.invocation.trace,
-                ))
+                Ok(service_result(to_value(result)?, typed.invocation.trace))
             }
             SKILL_STATUS_COMMAND => {
                 let typed: SkillStatusCommand = decode(command.payload)?;
@@ -256,7 +257,7 @@ impl SystemService for SkillSystemServiceProvider {
                     telemetry_aggregate,
                     captured_at: chrono::Utc::now(),
                 };
-                Ok(Self::service_result(to_value(result)?, typed.trace))
+                Ok(service_result(to_value(result)?, typed.trace))
             }
             SKILL_SERVICE_SNAPSHOT_COMMAND => {
                 let typed: SkillServiceSnapshotCommand = decode(command.payload)?;
@@ -264,7 +265,7 @@ impl SystemService for SkillSystemServiceProvider {
                 let snapshot =
                     SkillServiceSnapshot::new(None, Some(registry.clone()), registry.len());
                 tracing::info!(trace_id = %typed.trace.trace_id, "skill service snapshot emitted");
-                Ok(Self::service_result(to_value(snapshot)?, typed.trace))
+                Ok(service_result(to_value(snapshot)?, typed.trace))
             }
             SKILL_GOVERNANCE_RECORD_USAGE_COMMAND => {
                 let typed: SkillGovernanceRecordUsageCommand = decode(command.payload)?;
@@ -277,7 +278,7 @@ impl SystemService for SkillSystemServiceProvider {
                     event = ?event,
                     "skill governance usage observation recorded"
                 );
-                Ok(Self::service_result(to_value(result)?, trace))
+                Ok(service_result(to_value(result)?, trace))
             }
             SKILL_GOVERNANCE_SNAPSHOT_COMMAND => {
                 let typed: SkillGovernanceSnapshotCommand = decode(command.payload)?;
@@ -290,7 +291,7 @@ impl SystemService for SkillSystemServiceProvider {
                     records = result.records.len(),
                     "skill governance snapshot emitted"
                 );
-                Ok(Self::service_result(to_value(result)?, typed.trace))
+                Ok(service_result(to_value(result)?, typed.trace))
             }
             SKILL_CURATION_DRY_RUN_COMMAND => {
                 let typed: SkillCurationDryRunCommand = decode(command.payload)?;
@@ -301,7 +302,7 @@ impl SystemService for SkillSystemServiceProvider {
                     mutated = result.mutated,
                     "skill curation dry-run completed"
                 );
-                Ok(Self::service_result(to_value(result)?, typed.trace))
+                Ok(service_result(to_value(result)?, typed.trace))
             }
             SKILL_CURATION_PIN_COMMAND => {
                 crate::skill_service_provider_lifecycle::apply_lifecycle_command(
@@ -384,7 +385,7 @@ impl SystemService for SkillSystemServiceProvider {
                     target_skill_id = %target_skill_id,
                     "skill alias record upserted"
                 );
-                Ok(Self::service_result(to_value(result)?, trace))
+                Ok(service_result(to_value(result)?, trace))
             }
             SKILL_ALIAS_RESOLVE_COMMAND => {
                 let typed: SkillAliasResolveCommand = decode(command.payload)?;
@@ -395,7 +396,7 @@ impl SystemService for SkillSystemServiceProvider {
                     resolved = result.resolved,
                     "skill alias resolution completed"
                 );
-                Ok(Self::service_result(to_value(result)?, typed.trace))
+                Ok(service_result(to_value(result)?, typed.trace))
             }
             SKILL_ALIAS_SNAPSHOT_COMMAND => {
                 let typed: SkillAliasSnapshotCommand = decode(command.payload)?;
@@ -405,7 +406,7 @@ impl SystemService for SkillSystemServiceProvider {
                     aliases = result.aliases.len(),
                     "skill alias snapshot emitted"
                 );
-                Ok(Self::service_result(to_value(result)?, typed.trace))
+                Ok(service_result(to_value(result)?, typed.trace))
             }
             SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND => {
                 let typed: SkillExperienceProposalCommand = decode(command.payload)?;
@@ -428,20 +429,25 @@ impl SystemService for SkillSystemServiceProvider {
                     );
                     return Err(ServiceError::InvalidArgument(err));
                 }
+                let destination_route = self
+                    .experience_router
+                    .route(&typed.scope, &typed.candidate, &typed.trace)
+                    .await;
                 let result = self
                     .governance_state
-                    .propose_experience(typed.clone())
+                    .propose_experience(typed.clone(), destination_route)
                     .await;
                 tracing::info!(
                     trace_id = %typed.trace.trace_id,
                     proposal_id = %result.proposal.proposal_id,
                     task_id = %result.proposal.task_id,
                     destination = ?result.proposal.destination,
+                    destination_route_status = result.destination_route.status.as_str(),
                     action = ?result.proposal.recommended_action,
                     mutated = result.mutated,
                     "skill experience proposal created"
                 );
-                Ok(Self::service_result(to_value(result)?, typed.trace))
+                Ok(service_result(to_value(result)?, typed.trace))
             }
             SKILL_EVOLUTION_SNAPSHOT_COMMAND => {
                 let typed: SkillExperienceProposalSnapshotCommand = decode(command.payload)?;
@@ -453,11 +459,11 @@ impl SystemService for SkillSystemServiceProvider {
                     include_discarded = typed.include_discarded,
                     "skill experience proposal snapshot emitted"
                 );
-                Ok(Self::service_result(to_value(result)?, typed.trace))
+                Ok(service_result(to_value(result)?, typed.trace))
             }
             SKILL_CLEANUP_COMMAND => {
                 tracing::info!(trace_id = %trace.trace_id, "skill service cleanup completed");
-                Ok(Self::service_result(
+                Ok(service_result(
                     serde_json::json!({"status": "cleaned"}),
                     trace,
                 ))
@@ -487,16 +493,4 @@ impl SystemService for SkillSystemServiceProvider {
             })
         }
     }
-}
-
-pub(crate) fn decode<T: serde::de::DeserializeOwned>(value: serde_json::Value) -> ServiceResult<T> {
-    serde_json::from_value(value).map_err(|err| ServiceError::UnsupportedCommand(err.to_string()))
-}
-
-pub(crate) fn to_value<T: serde::Serialize>(value: T) -> ServiceResult<serde_json::Value> {
-    serde_json::to_value(value).map_err(|err| ServiceError::AdapterFailure(err.to_string()))
-}
-
-fn service_adapter_error(err: MacacaError) -> ServiceError {
-    ServiceError::AdapterFailure(err.to_string())
 }

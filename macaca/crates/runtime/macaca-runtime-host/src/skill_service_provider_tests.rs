@@ -1,7 +1,17 @@
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
+use async_trait::async_trait;
 use macaca_kernel::SystemService;
-use macaca_proto::{ServiceCommand, ServiceCommandName, TraceContext};
+use macaca_memory::{
+    ActiveRecallRequest, ActiveRecallResult, KnowledgeCompileRequest, KnowledgeCompileResult,
+    MemoryDeleteRequest, MemoryGetRequest, MemoryRuntimeFacade, MemoryRuntimeStatus,
+    MemorySearchRequest, MemoryWriteRequest,
+};
+use macaca_proto::{
+    ApplicationId, MacacaResult, MemoryEntry, MemoryId, ServiceCommand, ServiceCommandName,
+    TraceContext,
+};
 use macaca_skill::{
     SkillAliasKind, SkillAliasRecord, SkillAliasResolveCommand, SkillAliasResolveResult,
     SkillAliasSnapshotCommand, SkillAliasSnapshotResult, SkillAliasUpsertCommand,
@@ -20,6 +30,7 @@ use macaca_skill::{
     SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND, SKILL_EVOLUTION_SNAPSHOT_COMMAND,
     SKILL_GOVERNANCE_RECORD_USAGE_COMMAND, SKILL_GOVERNANCE_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND,
 };
+use tokio::sync::Mutex;
 
 use crate::SkillSystemServiceProvider;
 
@@ -84,6 +95,70 @@ fn reusable_experience_candidate(evidence_ids: Vec<String>) -> SkillExperienceCa
         target_skill_name: Some("skill-experience-maintenance".into()),
         evidence_ids,
         metadata: BTreeMap::new(),
+    }
+}
+
+#[derive(Default)]
+struct RecordingMemoryRuntime {
+    writes: Mutex<Vec<MemoryWriteRequest>>,
+    knowledge_compiles: Mutex<Vec<KnowledgeCompileRequest>>,
+}
+
+#[async_trait]
+impl MemoryRuntimeFacade for RecordingMemoryRuntime {
+    async fn remember(&self, request: MemoryWriteRequest) -> MacacaResult<MemoryId> {
+        self.writes.lock().await.push(request);
+        Ok(MemoryId::new())
+    }
+
+    async fn search(&self, _request: MemorySearchRequest) -> MacacaResult<Vec<MemoryEntry>> {
+        Ok(Vec::new())
+    }
+
+    async fn get(&self, _request: MemoryGetRequest) -> MacacaResult<Option<MemoryEntry>> {
+        Ok(None)
+    }
+
+    async fn delete(&self, _request: MemoryDeleteRequest) -> MacacaResult<()> {
+        Ok(())
+    }
+
+    async fn active_recall(
+        &self,
+        _request: ActiveRecallRequest,
+    ) -> MacacaResult<ActiveRecallResult> {
+        Ok(ActiveRecallResult {
+            provider_id: "recording-memory-runtime".into(),
+            candidates: Vec::new(),
+            selected: Vec::new(),
+            latency_ms: 0,
+            diagnostics: Vec::new(),
+        })
+    }
+
+    async fn compile_knowledge(
+        &self,
+        request: KnowledgeCompileRequest,
+    ) -> MacacaResult<KnowledgeCompileResult> {
+        self.knowledge_compiles.lock().await.push(request.clone());
+        Ok(KnowledgeCompileResult {
+            scope: request.scope,
+            claims: Vec::new(),
+            conflicts: Vec::new(),
+            compiled_at: chrono::Utc::now(),
+        })
+    }
+
+    async fn status(&self) -> MemoryRuntimeStatus {
+        MemoryRuntimeStatus {
+            runtime_id: "recording-memory-runtime".into(),
+            provider_profile: Some("recording".into()),
+            store_available: true,
+            search_available: true,
+            active_recall_available: true,
+            knowledge_available: true,
+            diagnostics: Vec::new(),
+        }
     }
 }
 
@@ -438,6 +513,119 @@ async fn skill_experience_proposal_creates_draft_without_mutating_governance_rec
         snapshot.records.is_empty(),
         "draft proposals must not become active governance records"
     );
+}
+
+#[tokio::test]
+async fn skill_experience_memory_destination_routes_through_memory_facade() {
+    let memory_runtime = Arc::new(RecordingMemoryRuntime::default());
+    let provider = SkillSystemServiceProvider::new()
+        .with_memory_runtime(Arc::clone(&memory_runtime) as Arc<dyn MemoryRuntimeFacade>);
+    let trace = TraceContext::new("trace-skill-experience-memory-route");
+    let application_id = ApplicationId::new();
+    let mut candidate = reusable_experience_candidate(vec!["artifact-proof-memory".into()]);
+    candidate.application_id = Some(application_id);
+    candidate.destination = SkillExperienceCandidateDestination::MemoryFact;
+    candidate.recommended_action = SkillEvolutionProposalAction::Discard;
+    let command = SkillExperienceProposalCommand {
+        trace: trace.clone(),
+        scope: SkillServiceScope {
+            application_id: Some(application_id),
+            session_id: Some("session-memory-route".into()),
+            tenant_id: Some("tenant-route".into()),
+            agent_name: Some("agent".into()),
+        },
+        candidate,
+    };
+
+    let result = provider
+        .call(traced_command(
+            SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND,
+            command,
+            trace,
+        ))
+        .await
+        .expect("memory destination should route through the injected memory facade");
+    let proposal: SkillExperienceProposalResult =
+        serde_json::from_value(result.output).expect("proposal result should decode");
+
+    assert!(!proposal.mutated);
+    assert_eq!(proposal.destination_route.status.as_str(), "routed");
+    assert_eq!(
+        proposal.destination_route.destination,
+        SkillExperienceCandidateDestination::MemoryFact
+    );
+    assert!(proposal
+        .destination_route
+        .target_ref
+        .as_deref()
+        .is_some_and(|target| target.starts_with("memory://")));
+    let writes = memory_runtime.writes.lock().await;
+    assert_eq!(writes.len(), 1);
+    assert_eq!(writes[0].scope.identity.application_id, application_id);
+    assert_eq!(
+        writes[0].scope.identity.session_id.as_deref(),
+        Some("session-memory-route")
+    );
+    assert!(writes[0]
+        .content
+        .contains("verified task produced a reusable skill maintenance procedure"));
+    assert!(!writes[0].content.contains("SKILL.md"));
+}
+
+#[tokio::test]
+async fn skill_experience_knowledge_destination_routes_through_knowledge_facade() {
+    let memory_runtime = Arc::new(RecordingMemoryRuntime::default());
+    let provider = SkillSystemServiceProvider::new()
+        .with_memory_runtime(Arc::clone(&memory_runtime) as Arc<dyn MemoryRuntimeFacade>);
+    let trace = TraceContext::new("trace-skill-experience-knowledge-route");
+    let application_id = ApplicationId::new();
+    let mut candidate = reusable_experience_candidate(vec!["artifact-proof-knowledge".into()]);
+    candidate.application_id = Some(application_id);
+    candidate.destination = SkillExperienceCandidateDestination::KnowledgeDigest;
+    candidate.recommended_action = SkillEvolutionProposalAction::Discard;
+    let command = SkillExperienceProposalCommand {
+        trace: trace.clone(),
+        scope: SkillServiceScope {
+            application_id: Some(application_id),
+            session_id: Some("session-knowledge-route".into()),
+            tenant_id: None,
+            agent_name: Some("agent".into()),
+        },
+        candidate,
+    };
+
+    let result = provider
+        .call(traced_command(
+            SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND,
+            command,
+            trace,
+        ))
+        .await
+        .expect("knowledge destination should route through the injected knowledge facade");
+    let proposal: SkillExperienceProposalResult =
+        serde_json::from_value(result.output).expect("proposal result should decode");
+
+    assert_eq!(proposal.destination_route.status.as_str(), "routed");
+    assert_eq!(
+        proposal.destination_route.destination,
+        SkillExperienceCandidateDestination::KnowledgeDigest
+    );
+    assert!(proposal
+        .destination_route
+        .target_ref
+        .as_deref()
+        .is_some_and(|target| target.starts_with("knowledge://")));
+    let compiles = memory_runtime.knowledge_compiles.lock().await;
+    assert_eq!(compiles.len(), 1);
+    assert_eq!(compiles[0].scope.identity.application_id, application_id);
+    assert_eq!(compiles[0].candidates.len(), 1);
+    assert_eq!(
+        compiles[0].candidates[0].source,
+        macaca_memory::CandidateSource::AgentSummary
+    );
+    assert!(compiles[0].candidates[0]
+        .content
+        .contains("verified task produced a reusable skill maintenance procedure"));
 }
 
 #[tokio::test]

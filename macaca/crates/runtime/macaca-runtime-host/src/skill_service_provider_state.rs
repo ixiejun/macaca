@@ -13,7 +13,8 @@ use macaca_skill::{
     SkillAliasRecord, SkillAliasResolveCommand, SkillAliasResolveResult, SkillAliasSnapshotResult,
     SkillAliasUpsertCommand, SkillAliasUpsertResult, SkillCurationDryRunCommand,
     SkillCurationDryRunResult, SkillCurationLifecycleAction, SkillCurationLifecycleCommand,
-    SkillCurationLifecycleResult, SkillCurationSupersedeCommand, SkillExperienceProposalCommand,
+    SkillCurationLifecycleResult, SkillCurationSupersedeCommand,
+    SkillExperienceDestinationRouteResult, SkillExperienceProposalCommand,
     SkillExperienceProposalRecord, SkillExperienceProposalResult,
     SkillExperienceProposalSnapshotResult, SkillGovernanceEventPayload, SkillGovernanceEventRecord,
     SkillGovernanceReadModel, SkillGovernanceRecord, SkillGovernanceRecordUsageCommand,
@@ -386,6 +387,7 @@ impl SkillProviderGovernanceState {
     pub(crate) async fn propose_experience(
         &self,
         command: SkillExperienceProposalCommand,
+        destination_route: SkillExperienceDestinationRouteResult,
     ) -> SkillExperienceProposalResult {
         let captured_at = chrono::Utc::now();
         let proposal = SkillExperienceProposalRecord::from_candidate(
@@ -410,6 +412,7 @@ impl SkillProviderGovernanceState {
             proposal,
             mutated: false,
             captured_at,
+            destination_route,
         }
     }
 

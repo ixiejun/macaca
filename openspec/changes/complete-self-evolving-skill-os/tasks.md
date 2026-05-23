@@ -85,7 +85,7 @@
 - [x] 5.4 Add generic classification results for memory fact, knowledge digest,
   existing skill patch proposal, new skill draft, support-file draft, and
   discard/no-op.
-- [ ] 5.5 Route memory and knowledge destinations through their service facades
+- [x] 5.5 Route memory and knowledge destinations through their service facades
   instead of writing skill files.
 - [x] 5.6 Keep draft creation non-mutating for active catalogs by default.
 - [x] 5.7 Add logs for candidate received, evidence accepted/rejected,

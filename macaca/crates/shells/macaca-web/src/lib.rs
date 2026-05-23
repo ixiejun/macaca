@@ -542,12 +542,18 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
         )
         .await
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+    let skill_service_provider = if let Some(runtime) = memory_runtime.as_ref() {
+        macaca_runtime_host::SkillSystemServiceProvider::new()
+            .with_memory_runtime(Arc::clone(runtime) as Arc<dyn macaca_memory::MemoryRuntimeFacade>)
+    } else {
+        macaca_runtime_host::SkillSystemServiceProvider::new()
+    };
     service_runtime
         .register_provider(
             &macaca_runtime_host::StaticServiceProviderFactory::new(
                 macaca_runtime_host::ServiceProviderInstance::new(
                     macaca_skill::skill_service_descriptor(),
-                    Arc::new(macaca_runtime_host::SkillSystemServiceProvider::new()),
+                    Arc::new(skill_service_provider),
                 ),
             ),
             macaca_runtime_host::ServiceProviderFactoryContext::new(),

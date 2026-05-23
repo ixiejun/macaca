@@ -70,6 +70,8 @@ pub mod service_router;
 pub mod service_runtime;
 pub mod service_runtime_error;
 pub mod service_runtime_event;
+pub(crate) mod skill_service_codec;
+pub(crate) mod skill_service_experience_routing;
 pub mod skill_service_provider;
 pub(crate) mod skill_service_provider_lifecycle;
 pub(crate) mod skill_service_provider_state;

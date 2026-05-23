@@ -12,7 +12,7 @@ use macaca_skill::{
     SkillCurationLifecycleAction, SkillCurationLifecycleCommand, SkillCurationSupersedeCommand,
 };
 
-use crate::skill_service_provider::{service_result, to_value};
+use crate::skill_service_codec::{decode, service_result, to_value};
 use crate::skill_service_provider_state::SkillProviderGovernanceState;
 
 /// Decode and apply one metadata-only lifecycle curation command.
@@ -22,7 +22,7 @@ pub(crate) async fn apply_lifecycle_command(
     trace: TraceContext,
     action: SkillCurationLifecycleAction,
 ) -> ServiceResult<ServiceCallResult> {
-    let typed: SkillCurationLifecycleCommand = crate::skill_service_provider::decode(payload)?;
+    let typed: SkillCurationLifecycleCommand = decode(payload)?;
     typed.validate().map_err(ServiceError::InvalidArgument)?;
     let result = governance_state
         .apply_lifecycle(typed.clone(), action.clone())
@@ -45,7 +45,7 @@ pub(crate) async fn supersede_command(
     governance_state: &Arc<SkillProviderGovernanceState>,
     payload: serde_json::Value,
 ) -> ServiceResult<ServiceCallResult> {
-    let typed: SkillCurationSupersedeCommand = crate::skill_service_provider::decode(payload)?;
+    let typed: SkillCurationSupersedeCommand = decode(payload)?;
     typed.validate().map_err(ServiceError::InvalidArgument)?;
     let result = governance_state
         .supersede(typed.clone())

@@ -13,10 +13,10 @@ use macaca_skill::{
     SkillAliasKind, SkillAliasRecord, SkillAliasUpsertCommand, SkillAuthorKind,
     SkillCurationLifecycleAction, SkillCurationLifecycleCommand,
     SkillEvolutionCandidateClassification, SkillEvolutionProposalAction, SkillExperienceCandidate,
-    SkillExperienceCandidateDestination, SkillExperienceEvidenceGateStatus,
-    SkillExperienceProposalCommand, SkillGovernanceRecordUsageCommand,
-    SkillGovernanceStoreStrategy, SkillServicePolicyHints, SkillServiceScope, SkillUsageEventKind,
-    SkillUsageObservation,
+    SkillExperienceCandidateDestination, SkillExperienceDestinationRouteResult,
+    SkillExperienceEvidenceGateStatus, SkillExperienceProposalCommand,
+    SkillGovernanceRecordUsageCommand, SkillGovernanceStoreStrategy, SkillServicePolicyHints,
+    SkillServiceScope, SkillUsageEventKind, SkillUsageObservation,
 };
 
 use crate::skill_service_provider_state::SkillProviderGovernanceState;
@@ -116,31 +116,34 @@ async fn local_governance_state_replays_through_store_strategy_adapter() {
         })
         .await;
     state
-        .propose_experience(SkillExperienceProposalCommand {
-            trace: trace.clone(),
-            scope,
-            candidate: SkillExperienceCandidate {
-                task_id: "task-local-1".into(),
-                session_id: Some("session-local-1".into()),
-                application_id: None,
-                agent_name: Some("agent".into()),
-                verified_terminal_success: true,
-                evidence_gate: SkillExperienceEvidenceGateStatus::Accepted,
-                bounded_summary: "Verified local governance replay evidence.".into(),
-                trace_digest: Some("trace-digest://task/local-1".into()),
-                memory_digest_refs: vec!["memory://digest/local-1".into()],
-                reusable_procedure:
-                    "Replay append-only local governance events through the store strategy adapter."
-                        .into(),
-                classification: SkillEvolutionCandidateClassification::ReusableProcedure,
-                destination: SkillExperienceCandidateDestination::NewSkillDraft,
-                recommended_action: SkillEvolutionProposalAction::CreateDraft,
-                target_skill_id: None,
-                target_skill_name: Some("local-governance-replay".into()),
-                evidence_ids: vec!["proposal-evidence-1".into()],
-                metadata: BTreeMap::new(),
+        .propose_experience(
+            SkillExperienceProposalCommand {
+                trace: trace.clone(),
+                scope,
+                candidate: SkillExperienceCandidate {
+                    task_id: "task-local-1".into(),
+                    session_id: Some("session-local-1".into()),
+                    application_id: None,
+                    agent_name: Some("agent".into()),
+                    verified_terminal_success: true,
+                    evidence_gate: SkillExperienceEvidenceGateStatus::Accepted,
+                    bounded_summary: "Verified local governance replay evidence.".into(),
+                    trace_digest: Some("trace-digest://task/local-1".into()),
+                    memory_digest_refs: vec!["memory://digest/local-1".into()],
+                    reusable_procedure:
+                        "Replay append-only local governance events through the store strategy adapter."
+                            .into(),
+                    classification: SkillEvolutionCandidateClassification::ReusableProcedure,
+                    destination: SkillExperienceCandidateDestination::NewSkillDraft,
+                    recommended_action: SkillEvolutionProposalAction::CreateDraft,
+                    target_skill_id: None,
+                    target_skill_name: Some("local-governance-replay".into()),
+                    evidence_ids: vec!["proposal-evidence-1".into()],
+                    metadata: BTreeMap::new(),
+                },
             },
-        })
+            SkillExperienceDestinationRouteResult::default(),
+        )
         .await;
 
     let read_model = state
