@@ -7,7 +7,9 @@
 //! traceable, auditable, and safe for shell display.
 
 pub mod model;
+pub mod report;
 pub mod scoring;
 
 pub use model::*;
+pub use report::*;
 pub use scoring::*;

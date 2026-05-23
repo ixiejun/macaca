@@ -1,6 +1,7 @@
 use crate::evaluation::{
-    SelfEvolutionEvaluationLifecycle, SelfEvolutionEvaluationRecord, SelfEvolutionReportRefs,
-    SelfEvolutionRunMetrics, SelfEvolutionScoringPolicy, SelfEvolutionWhiteBoxEvidence,
+    SelfEvolutionEvaluationLifecycle, SelfEvolutionEvaluationRecord, SelfEvolutionReportBuilder,
+    SelfEvolutionReportRefs, SelfEvolutionRunMetrics, SelfEvolutionScoringPolicy,
+    SelfEvolutionWhiteBoxEvidence,
 };
 
 #[test]
@@ -182,4 +183,39 @@ fn self_evolution_evaluation_scoring_is_inconclusive_without_efficiency_gain() {
         SelfEvolutionEvaluationLifecycle::Inconclusive
     );
     assert!(score.reason_codes.contains(&"no_efficiency_gain".into()));
+}
+
+#[test]
+fn self_evolution_evaluation_report_renders_sanitized_json_summary() {
+    let mut record = complete_evaluation_record();
+    record.trace_id = "trace-RAW_PROMPT_SECRET".into();
+    record.white_box.rollback_ref = Some("store://rollback/SECRET-provider-payload".into());
+    let score = SelfEvolutionScoringPolicy::score(&record);
+
+    let report = SelfEvolutionReportBuilder::json_summary(&record, &score);
+    let encoded = serde_json::to_string(&report).expect("report should serialize");
+
+    assert!(encoded.contains("eval-score"));
+    assert!(encoded.contains("spec_change_loop"));
+    assert!(encoded.contains("\"human_intervention_count\":1"));
+    assert!(!encoded.contains("RAW_PROMPT_SECRET"));
+    assert!(!encoded.contains("SECRET-provider-payload"));
+    assert!(!encoded.contains("full skill body"));
+}
+
+#[test]
+fn self_evolution_evaluation_report_renders_markdown_summary_without_raw_payloads() {
+    let mut record = complete_evaluation_record();
+    record.white_box.later_skill_activation_ref = None;
+    record.evolved.skill_activation_count = 0;
+    let score = SelfEvolutionScoringPolicy::score(&record);
+
+    let report = SelfEvolutionReportBuilder::markdown_summary(&record, &score);
+
+    assert!(report.contains("# Self-Evolution Evaluation"));
+    assert!(report.contains("eval-score"));
+    assert!(report.contains("missing_skill_activation"));
+    assert!(report.contains("skill_activation_count"));
+    assert!(!report.contains("raw provider payload"));
+    assert!(!report.contains("full skill body"));
 }
