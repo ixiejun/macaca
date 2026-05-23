@@ -262,7 +262,7 @@
   store, or entitlement providers return structured unavailable/denied states.
 - [x] 15.6 Add audit replay tests for proposal, promotion, mutation, curation
   run, rollback, and alias histories.
-- [ ] 15.7 Add sanitization tests proving logs, snapshots, reports, and route
+- [x] 15.7 Add sanitization tests proving logs, snapshots, reports, and route
   payloads do not include raw prompts, secrets, provider payloads, manifests,
   package bytes, credentials, raw signatures, full skill bodies, or unbounded
   outputs.
