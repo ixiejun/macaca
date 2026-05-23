@@ -194,11 +194,11 @@
   source of redirect/warn/deny behavior.
 - [x] 11.2 Wire Context Composer skill catalog building through Skill service
   alias resolution.
-- [ ] 11.3 Wire Task service skill references through Skill service alias
+- [x] 11.3 Wire Task service skill references through Skill service alias
   resolution before execution.
-- [ ] 11.4 Wire Scheduler/Autonomy skill references through Skill service alias
+- [x] 11.4 Wire Scheduler/Autonomy skill references through Skill service alias
   resolution before wake execution.
-- [ ] 11.5 Avoid rewriting historical scheduler/task refs by default; preserve
+- [x] 11.5 Avoid rewriting historical scheduler/task refs by default; preserve
   transparent alias resolution and audit evidence.
 - [ ] 11.6 Add logs for alias hit, miss, warn, deny, loop prevention, and
   expired alias decisions.

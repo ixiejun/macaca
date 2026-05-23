@@ -434,7 +434,7 @@ impl LocalScheduledAgentTaskState {
             target_agent: Some(command.target_agent.clone()),
             execution_intent: AgentExecutionIntent::TaskWorker,
             payload_ref: payload_ref.clone(),
-            metadata: scheduler_target_metadata(&task_id, &payload_digest),
+            metadata: scheduler_target_metadata(&task_id, &payload_digest, &command.metadata),
         });
         let mut definition = SchedulerJobDefinition::new(
             command.scope.clone(),
@@ -646,11 +646,17 @@ struct StoredScheduledAgentTask {
 fn scheduler_target_metadata(
     task_id: &ScheduledAgentTaskId,
     payload_digest: &Option<String>,
+    caller_metadata: &BTreeMap<String, String>,
 ) -> BTreeMap<String, String> {
     let mut metadata = BTreeMap::new();
     metadata.insert("source".into(), SCHEDULED_AGENT_TASK_SERVICE_ID.into());
     metadata.insert("scheduled_agent_task_id".into(), task_id.as_str().into());
     metadata.insert("scheduler_run_source".into(), "service.scheduler".into());
+    for (key, value) in sanitize_metadata(caller_metadata.clone()) {
+        if key.starts_with("skill.alias.") && !value.trim().is_empty() {
+            metadata.insert(key, value);
+        }
+    }
     if let Some(digest) = payload_digest {
         metadata.insert("payload_digest".into(), digest.clone());
     }
@@ -845,6 +851,19 @@ mod tests {
         .with_metadata(metadata)
     }
 
+    fn create_command_with_skill_alias(raw_prompt: &str) -> CreateScheduledAgentTaskCommand {
+        let mut command = create_command(raw_prompt);
+        command.metadata.insert(
+            "skill.alias.requested_id".into(),
+            "skill://agent/legacy-task-skill".into(),
+        );
+        command.metadata.insert(
+            "prompt.secret".into(),
+            "RAW_PROMPT_METADATA_SHOULD_NOT_LEAK".into(),
+        );
+        command
+    }
+
     #[tokio::test]
     async fn create_stores_prompt_in_payload_store_and_registers_agent_execution_target() {
         let scheduler = Arc::new(RecordingScheduler::default());
@@ -875,6 +894,32 @@ mod tests {
                 assert!(target.payload_ref.content_digest.is_some());
                 let encoded = serde_json::to_string(target).unwrap();
                 assert!(!encoded.contains(raw_prompt));
+            }
+            other => panic!("expected agent execution target, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn create_preserves_sanitized_skill_alias_refs_for_scheduler_dispatch() {
+        let scheduler = Arc::new(RecordingScheduler::default());
+        let provider = LocalScheduledAgentTaskProvider::new(scheduler.clone());
+
+        let result = provider
+            .create_task(create_command_with_skill_alias(
+                "RAW_PROMPT_STAYS_IN_PAYLOAD_STORE",
+            ))
+            .await
+            .unwrap();
+
+        assert!(result.accepted);
+        let jobs = scheduler.jobs.lock().await;
+        match &jobs[0].target {
+            SchedulerTargetCommand::AgentExecution(target) => {
+                assert_eq!(
+                    target.metadata["skill.alias.requested_id"],
+                    "skill://agent/legacy-task-skill"
+                );
+                assert!(!target.metadata.contains_key("prompt.secret"));
             }
             other => panic!("expected agent execution target, got {other:?}"),
         }

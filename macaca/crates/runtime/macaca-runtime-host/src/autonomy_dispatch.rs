@@ -21,6 +21,7 @@ use tokio::time::timeout;
 use tracing::{info, warn};
 
 use crate::autonomy_result_evidence::{AgentExecutionEvidenceDecision, AgentExecutionEvidenceGate};
+use crate::skill_alias_resolution::resolve_skill_alias_metadata;
 use crate::ServiceRuntime;
 
 /// Safe result class returned to Scheduler run-control transitions.
@@ -74,13 +75,17 @@ mod tests {
         ScheduledAgentTaskId, ServiceCallResult, ServiceDescriptor, ServiceError, ServiceHealth,
         ServiceResult, ServiceScope, ServiceType, TaskId, TraceSchemaRef,
     };
+    use macaca_skill::{
+        SkillAliasKind, SkillAliasRecord, SkillAliasUpsertCommand, SkillServiceScope,
+        SKILL_ALIAS_UPSERT_COMMAND,
+    };
 
     use crate::agent_execution_service_provider::{
         AgentExecutionBackend, AgentExecutionSystemServiceProvider,
     };
     use crate::{
         ServiceProviderFactoryContext, ServiceProviderInstance, ServiceRuntimeConfig,
-        StaticServiceProviderFactory,
+        SkillSystemServiceProvider, StaticServiceProviderFactory,
     };
 
     /// Test double that records the command crossing into `service.agent_execution`.
@@ -198,6 +203,39 @@ mod tests {
             .unwrap();
     }
 
+    async fn register_skill_alias(
+        runtime: &ServiceRuntime,
+        source_skill_id: &str,
+        target_skill_id: &str,
+    ) {
+        let provider = Arc::new(SkillSystemServiceProvider::new());
+        let trace = TraceContext::new("trace-scheduled-agent-skill-alias-upsert");
+        provider
+            .call(ServiceCommand::with_trace(
+                macaca_proto::ServiceCommandName::new(SKILL_ALIAS_UPSERT_COMMAND),
+                serde_json::to_value(SkillAliasUpsertCommand {
+                    trace: trace.clone(),
+                    scope: SkillServiceScope::default(),
+                    record: SkillAliasRecord {
+                        source_skill_id: source_skill_id.into(),
+                        source_name: "source-skill".into(),
+                        target_skill_id: target_skill_id.into(),
+                        target_name: "target-skill".into(),
+                        kind: SkillAliasKind::SupersededBy,
+                        rationale: "test alias for dispatch boundary".into(),
+                        created_at: chrono::Utc::now(),
+                        updated_at: chrono::Utc::now(),
+                        evidence_ids: vec!["evidence://skill-alias/test".into()],
+                    },
+                })
+                .unwrap(),
+                trace,
+            ))
+            .await
+            .unwrap();
+        register_static_service(runtime, provider.descriptor(), provider).await;
+    }
+
     fn payload_ref() -> AutonomyPayloadRef {
         let mut payload_ref = AutonomyPayloadRef::new(
             "scheduled-agent-task://payload/test",
@@ -299,6 +337,74 @@ mod tests {
             envelope.source_instruction,
             "Analyze the market and record result."
         );
+    }
+
+    #[tokio::test]
+    async fn agent_execution_target_resolves_skill_alias_before_agent_execution() {
+        let runtime = ServiceRuntime::new(ServiceRuntimeConfig::default());
+        let payload_ref = payload_ref();
+        let backend = Arc::new(RecordingExecutionBackend {
+            emit_evidence: true,
+            ..RecordingExecutionBackend::default()
+        });
+        let mut resolved = resolved_payload(payload_ref.clone());
+        resolved.metadata.insert(
+            "skill.alias.requested_id".into(),
+            "skill://agent/legacy-debug".into(),
+        );
+
+        register_static_service(
+            &runtime,
+            FakeScheduledAgentTaskResolver::descriptor(),
+            Arc::new(FakeScheduledAgentTaskResolver { resolved }),
+        )
+        .await;
+        register_skill_alias(
+            &runtime,
+            "skill://agent/legacy-debug",
+            "skill://agent/current-debug",
+        )
+        .await;
+        register_static_service(
+            &runtime,
+            AgentExecutionSystemServiceProvider::new(backend.clone()).descriptor(),
+            Arc::new(AgentExecutionSystemServiceProvider::new(backend.clone())),
+        )
+        .await;
+
+        let target = AgentExecutionTargetCommand {
+            application_id: ApplicationId::from_name("scheduled-agent-dispatch-test"),
+            session_id: "session-scheduled-agent".into(),
+            task_id: Some(TaskId::new()),
+            target_agent: Some("worker".into()),
+            execution_intent: AgentExecutionIntent::TaskWorker,
+            payload_ref,
+            metadata: BTreeMap::new(),
+        };
+        let outcome = AutonomyDispatchStrategies::new(&runtime, 1_000)
+            .dispatch(
+                TraceContext::new("trace-scheduled-agent-dispatch-skill-alias"),
+                AutonomyScope::application(ApplicationId::from_name(
+                    "scheduled-agent-dispatch-test",
+                )),
+                SchedulerTargetCommand::AgentExecution(target),
+            )
+            .await
+            .unwrap();
+
+        assert!(outcome.succeeded);
+        let commands = backend.commands.lock().unwrap();
+        let metadata = &commands[0].metadata;
+        assert_eq!(
+            metadata["skill.alias.requested_id"],
+            "skill://agent/legacy-debug"
+        );
+        assert_eq!(metadata["skill.alias.resolved"], "true");
+        assert_eq!(
+            metadata["skill.alias.effective_id"],
+            "skill://agent/current-debug"
+        );
+        assert_eq!(metadata["skill.alias.kind"], "superseded_by");
     }
 
     #[tokio::test]
@@ -500,7 +606,9 @@ impl<'a> AutonomyDispatchStrategies<'a> {
         command.policy = resolved.policy.clone();
         command.metadata = target.metadata.clone();
         for (key, value) in &resolved.metadata {
-            if key.starts_with("evidence.") && !value.trim().is_empty() {
+            if (key.starts_with("evidence.") || key.starts_with("skill.alias."))
+                && !value.trim().is_empty()
+            {
                 command.metadata.insert(key.clone(), value.clone());
             }
         }
@@ -522,6 +630,19 @@ impl<'a> AutonomyDispatchStrategies<'a> {
                 .metadata
                 .insert("scheduled_agent_task_audit_id".into(), audit_id);
         }
+        resolve_skill_alias_metadata(
+            self.runtime,
+            trace.clone(),
+            macaca_skill::SkillServiceScope::agent(
+                resolved.application_id,
+                resolved.session_id.clone(),
+                command.target_agent.clone(),
+            )?,
+            &mut command.metadata,
+            "runtime.autonomy_supervisor",
+            self.timeout_ms,
+        )
+        .await?;
         let envelope = AutonomousExecutionEnvelope::compile(
             AutonomousExecutionSourceKind::ScheduledAgentTask,
             resolved.user_prompt.clone(),

@@ -652,6 +652,25 @@ Every command logs key execution nodes with sanitized fields:
   and alias metadata only; it never returns skill bodies, package bytes,
   provider payloads, prompts, manifests, credentials, or support-file content.
 
+### Slice 11A: Task, Scheduler, And Heartbeat Alias Resolution
+
+- Patterns: runtime-host owns a shared alias-resolution Strategy that calls the
+  Skill service through the existing ServiceRuntime Facade immediately before
+  autonomous Agent Execution. The Scheduled Agent Task provider uses a
+  Builder-style safe metadata path to carry explicit `skill.alias.*` refs into
+  Scheduler targets without owning Skill governance.
+- Boundaries: Skill alias decisions remain in `service.skill`. Scheduled Agent
+  Task stores historical refs as sanitized metadata, Scheduler stores only the
+  target payload ref and safe metadata, and Runtime Host performs the just-in-time
+  service call before Agent Execution. No kernel, SDK, Web, CLI, frontend, or
+  application-specific code branches on skill names or lifecycle rules.
+- Traceability: alias requests, hits, misses, unavailable replies, service
+  errors, and timeouts are logged with trace id, dispatch source, service id,
+  requested skill id, and bounded result facts. Execution metadata records the
+  requested id plus effective target id/name/kind/evidence count when the Skill
+  service resolves an alias, preserving original task/scheduler refs for audit
+  replay.
+
 ## Risks And Mitigations
 
 - Risk: skill mutation corrupts active packages. Mitigation: atomic writes,

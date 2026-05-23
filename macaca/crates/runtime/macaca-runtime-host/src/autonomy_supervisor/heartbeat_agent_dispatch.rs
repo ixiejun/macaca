@@ -24,6 +24,7 @@ use tracing::{info, warn};
 use uuid::Uuid;
 
 use crate::autonomy_result_evidence::{AgentExecutionEvidenceDecision, AgentExecutionEvidenceGate};
+use crate::skill_alias_resolution::resolve_skill_alias_metadata;
 use crate::ServiceRuntime;
 
 /// Bounded dispatch summary recorded by HeartbeatLane logs and tests.
@@ -252,6 +253,19 @@ impl HeartbeatAgentDispatchStrategy {
             wake.trace.clone(),
         )?;
         command.metadata = dispatch_metadata(wake, declaration);
+        resolve_skill_alias_metadata(
+            self.runtime.as_ref(),
+            wake.trace.clone(),
+            macaca_skill::SkillServiceScope::agent(
+                declaration.application_id,
+                command.session_id.clone(),
+                declaration.agent_name.clone(),
+            )?,
+            &mut command.metadata,
+            "runtime.heartbeat_agent_dispatch",
+            self.timeout_ms,
+        )
+        .await?;
         let envelope = AutonomousExecutionEnvelope::compile(
             AutonomousExecutionSourceKind::HeartbeatProfile,
             command.user_prompt.clone(),
@@ -387,7 +401,9 @@ fn dispatch_metadata(
         metadata.insert("heartbeat_audit_id".into(), audit_id.clone());
     }
     for (key, value) in &declaration.metadata {
-        if key.starts_with("evidence.") && !value.trim().is_empty() {
+        if (key.starts_with("evidence.") || key.starts_with("skill.alias."))
+            && !value.trim().is_empty()
+        {
             metadata.insert(key.clone(), value.clone());
         }
     }
@@ -442,12 +458,17 @@ mod tests {
         ServiceCallResult, ServiceCommand, ServiceDescriptor, ServiceError, ServiceHealth,
         ServiceResult, APPLICATION_HEARTBEAT_AGENTS_QUERY_COMMAND,
     };
+    use macaca_skill::{
+        SkillAliasKind, SkillAliasRecord, SkillAliasUpsertCommand, SkillServiceScope,
+        SKILL_ALIAS_UPSERT_COMMAND,
+    };
 
     use super::*;
     use crate::{
         agent_execution_service_descriptor, AgentExecutionBackend,
         AgentExecutionSystemServiceProvider, ServiceProviderFactoryContext,
-        ServiceProviderInstance, ServiceRuntimeConfig, StaticServiceProviderFactory,
+        ServiceProviderInstance, ServiceRuntimeConfig, SkillSystemServiceProvider,
+        StaticServiceProviderFactory,
     };
 
     /// Application Service test double that returns prebuilt manifest projections.
@@ -554,6 +575,39 @@ mod tests {
             .register_provider(&factory, ServiceProviderFactoryContext::new())
             .await
             .unwrap();
+    }
+
+    async fn register_skill_alias(
+        runtime: &ServiceRuntime,
+        source_skill_id: &str,
+        target_skill_id: &str,
+    ) {
+        let provider = Arc::new(SkillSystemServiceProvider::new());
+        let trace = TraceContext::new("trace-heartbeat-skill-alias-upsert");
+        provider
+            .call(ServiceCommand::with_trace(
+                macaca_proto::ServiceCommandName::new(SKILL_ALIAS_UPSERT_COMMAND),
+                serde_json::to_value(SkillAliasUpsertCommand {
+                    trace: trace.clone(),
+                    scope: SkillServiceScope::default(),
+                    record: SkillAliasRecord {
+                        source_skill_id: source_skill_id.into(),
+                        source_name: "source-skill".into(),
+                        target_skill_id: target_skill_id.into(),
+                        target_name: "target-skill".into(),
+                        kind: SkillAliasKind::AbsorbedInto,
+                        rationale: "test alias for heartbeat dispatch boundary".into(),
+                        created_at: chrono::Utc::now(),
+                        updated_at: chrono::Utc::now(),
+                        evidence_ids: vec!["evidence://skill-alias/heartbeat".into()],
+                    },
+                })
+                .unwrap(),
+                trace,
+            ))
+            .await
+            .unwrap();
+        register_static_service(runtime, provider.descriptor(), provider).await;
     }
 
     fn accepted_app_wake(application_id: ApplicationId) -> HeartbeatCommandResult {
@@ -671,6 +725,66 @@ mod tests {
             envelope.completion_policy.kind,
             macaca_proto::AutonomousCompletionPolicyKind::RequireArtifact
         );
+    }
+
+    #[tokio::test]
+    async fn declaration_driven_dispatch_resolves_skill_alias_before_execution() {
+        let application_id = ApplicationId::from_name("generic-app");
+        let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
+        let backend = Arc::new(RecordingExecutionBackend::default());
+        let declaration = ApplicationHeartbeatAgentView {
+            application_id,
+            agent_name: "operator".into(),
+            enabled: true,
+            profile_id: "default".into(),
+            native_profile_id: "profile.application.test.agent.operator.heartbeat".into(),
+            wake_scope_key: "application.test.agent:operator.heartbeat".into(),
+            fixed_interval_secs: Some(30),
+            cooldown_secs: None,
+            metadata: BTreeMap::from([(
+                "skill.alias.requested_id".into(),
+                "skill://agent/legacy-heartbeat".into(),
+            )]),
+            diagnostics: Vec::new(),
+        };
+
+        register_static_service(
+            &runtime,
+            application_service_descriptor(),
+            Arc::new(FakeApplicationHeartbeatService::new(vec![declaration])),
+        )
+        .await;
+        register_skill_alias(
+            &runtime,
+            "skill://agent/legacy-heartbeat",
+            "skill://agent/current-heartbeat",
+        )
+        .await;
+        register_static_service(
+            &runtime,
+            agent_execution_service_descriptor(),
+            Arc::new(AgentExecutionSystemServiceProvider::new(backend.clone())),
+        )
+        .await;
+
+        let summary = HeartbeatAgentDispatchStrategy::with_timeout(runtime, 30_000)
+            .dispatch_after_accepted_wake(&accepted_app_wake(application_id))
+            .await
+            .unwrap();
+
+        assert_eq!(summary.dispatched, 1);
+        let commands = backend.commands.lock().unwrap();
+        let metadata = &commands[0].metadata;
+        assert_eq!(
+            metadata["skill.alias.requested_id"],
+            "skill://agent/legacy-heartbeat"
+        );
+        assert_eq!(metadata["skill.alias.resolved"], "true");
+        assert_eq!(
+            metadata["skill.alias.effective_id"],
+            "skill://agent/current-heartbeat"
+        );
+        assert_eq!(metadata["skill.alias.kind"], "absorbed_into");
     }
 
     #[tokio::test]

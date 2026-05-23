@@ -70,6 +70,7 @@ pub mod service_router;
 pub mod service_runtime;
 pub mod service_runtime_error;
 pub mod service_runtime_event;
+pub(crate) mod skill_alias_resolution;
 pub(crate) mod skill_service_codec;
 pub(crate) mod skill_service_content_mutation;
 pub(crate) mod skill_service_experience_routing;
