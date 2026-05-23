@@ -185,6 +185,10 @@ pub struct SkillCurationRunRecord {
     pub provider_id: String,
     pub dry_run: bool,
     pub candidate_count: u64,
+    #[serde(default)]
+    pub actions: Vec<String>,
+    #[serde(default)]
+    pub snapshot_refs: Vec<String>,
     pub started_at: DateTime<Utc>,
     pub finished_at: Option<DateTime<Utc>>,
     pub report_ref: Option<String>,

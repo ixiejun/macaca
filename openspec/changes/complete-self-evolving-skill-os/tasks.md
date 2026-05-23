@@ -133,13 +133,13 @@
 
 - [x] 8.1 Add `skill.curation.status` typed command with interval, idle,
   budget, provider, last run, next eligible run, and unavailable states.
-- [ ] 8.2 Add `skill.curation.run` typed command supporting dry-run and
+- [x] 8.2 Add `skill.curation.run` typed command supporting dry-run and
   approval-gated apply modes.
 - [ ] 8.3 Add `skill.curation.snapshot` typed command for durable governance
   and package memento references.
 - [ ] 8.4 Add `skill.curation.rollback` typed command that restores lifecycle,
   telemetry, alias, report, and package refs from memento state.
-- [ ] 8.5 Model `SkillCurationRun` with run id, trace id, started/finished
+- [x] 8.5 Model `SkillCurationRun` with run id, trace id, started/finished
   timestamps, provider id, dry-run flag, candidate count, actions, snapshots,
   report ref, rollback ref, policy decisions, and audit event ids.
 - [ ] 8.6 Generate bounded `run.json` and `REPORT.md` store artifacts or

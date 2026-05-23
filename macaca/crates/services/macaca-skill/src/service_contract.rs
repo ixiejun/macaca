@@ -33,6 +33,7 @@ pub const SKILL_GOVERNANCE_RECORD_USAGE_COMMAND: &str = "skill.governance.record
 pub const SKILL_GOVERNANCE_SNAPSHOT_COMMAND: &str = "skill.governance.snapshot";
 pub const SKILL_CURATION_STATUS_COMMAND: &str = "skill.curation.status";
 pub const SKILL_CURATION_DRY_RUN_COMMAND: &str = "skill.curation.dry_run";
+pub const SKILL_CURATION_RUN_COMMAND: &str = "skill.curation.run";
 pub const SKILL_CURATION_PIN_COMMAND: &str = "skill.curation.pin";
 pub const SKILL_CURATION_UNPIN_COMMAND: &str = "skill.curation.unpin";
 pub const SKILL_CURATION_ARCHIVE_COMMAND: &str = "skill.curation.archive";

@@ -16,25 +16,26 @@ use macaca_proto::{
 use macaca_skill::{
     skill_service_descriptor, ExecutableSkillToolSet, SkillAliasResolveCommand,
     SkillAliasSnapshotCommand, SkillAliasUpsertCommand, SkillContentMutationCommand,
-    SkillCurationDryRunCommand, SkillCurationLifecycleAction, SkillCurationStatusCommand,
-    SkillEvolutionPromoteDraftCommand, SkillEvolutionProposePatchCommand,
-    SkillEvolutionRejectDraftCommand, SkillExecutableLoadCommand, SkillExecutableLoadResult,
-    SkillExperienceProposalCommand, SkillExperienceProposalSnapshotCommand,
-    SkillGovernanceRecordUsageCommand, SkillGovernanceSnapshotCommand, SkillRuntimeFacade,
-    SkillServiceSnapshot, SkillServiceSnapshotCommand, SkillSnapshotRequest,
-    SkillSnapshotServiceCommand, SkillStatusCommand, SkillStatusResult, SkillToolCatalogCommand,
-    SkillToolCatalogResult, SkillToolInvokeCommand, SKILL_ALIAS_RESOLVE_COMMAND,
-    SKILL_ALIAS_SNAPSHOT_COMMAND, SKILL_ALIAS_UPSERT_COMMAND, SKILL_CLEANUP_COMMAND,
-    SKILL_CONTENT_MUTATE_COMMAND, SKILL_CURATION_ARCHIVE_COMMAND, SKILL_CURATION_DRY_RUN_COMMAND,
-    SKILL_CURATION_PIN_COMMAND, SKILL_CURATION_QUARANTINE_COMMAND, SKILL_CURATION_REJECT_COMMAND,
+    SkillCurationLifecycleAction, SkillEvolutionPromoteDraftCommand,
+    SkillEvolutionProposePatchCommand, SkillEvolutionRejectDraftCommand,
+    SkillExecutableLoadCommand, SkillExecutableLoadResult, SkillExperienceProposalCommand,
+    SkillExperienceProposalSnapshotCommand, SkillGovernanceRecordUsageCommand,
+    SkillGovernanceSnapshotCommand, SkillRuntimeFacade, SkillServiceSnapshot,
+    SkillServiceSnapshotCommand, SkillSnapshotRequest, SkillSnapshotServiceCommand,
+    SkillStatusCommand, SkillStatusResult, SkillToolCatalogCommand, SkillToolCatalogResult,
+    SkillToolInvokeCommand, SKILL_ALIAS_RESOLVE_COMMAND, SKILL_ALIAS_SNAPSHOT_COMMAND,
+    SKILL_ALIAS_UPSERT_COMMAND, SKILL_CLEANUP_COMMAND, SKILL_CONTENT_MUTATE_COMMAND,
+    SKILL_CURATION_ARCHIVE_COMMAND, SKILL_CURATION_DRY_RUN_COMMAND, SKILL_CURATION_PIN_COMMAND,
+    SKILL_CURATION_QUARANTINE_COMMAND, SKILL_CURATION_REJECT_COMMAND,
     SKILL_CURATION_RELEASE_QUARANTINE_COMMAND, SKILL_CURATION_RESTORE_COMMAND,
-    SKILL_CURATION_STATUS_COMMAND, SKILL_CURATION_SUPERSEDE_COMMAND, SKILL_CURATION_UNPIN_COMMAND,
-    SKILL_EVOLUTION_PROMOTE_DRAFT_COMMAND, SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND,
-    SKILL_EVOLUTION_PROPOSE_PATCH_COMMAND, SKILL_EVOLUTION_REJECT_DRAFT_COMMAND,
-    SKILL_EVOLUTION_SNAPSHOT_COMMAND, SKILL_EXECUTABLE_LOAD_COMMAND,
-    SKILL_GOVERNANCE_RECORD_USAGE_COMMAND, SKILL_GOVERNANCE_SNAPSHOT_COMMAND, SKILL_SERVICE_ID,
-    SKILL_SERVICE_SNAPSHOT_COMMAND, SKILL_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND,
-    SKILL_TOOL_CATALOG_COMMAND, SKILL_TOOL_INVOKE_COMMAND,
+    SKILL_CURATION_RUN_COMMAND, SKILL_CURATION_STATUS_COMMAND, SKILL_CURATION_SUPERSEDE_COMMAND,
+    SKILL_CURATION_UNPIN_COMMAND, SKILL_EVOLUTION_PROMOTE_DRAFT_COMMAND,
+    SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND, SKILL_EVOLUTION_PROPOSE_PATCH_COMMAND,
+    SKILL_EVOLUTION_REJECT_DRAFT_COMMAND, SKILL_EVOLUTION_SNAPSHOT_COMMAND,
+    SKILL_EXECUTABLE_LOAD_COMMAND, SKILL_GOVERNANCE_RECORD_USAGE_COMMAND,
+    SKILL_GOVERNANCE_SNAPSHOT_COMMAND, SKILL_SERVICE_ID, SKILL_SERVICE_SNAPSHOT_COMMAND,
+    SKILL_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND, SKILL_TOOL_CATALOG_COMMAND,
+    SKILL_TOOL_INVOKE_COMMAND,
 };
 use macaca_tools::{ToolCommand, ToolCommandExecutor};
 use tokio::sync::Mutex;
@@ -301,28 +302,28 @@ impl SystemService for SkillSystemServiceProvider {
                 Ok(service_result(to_value(result)?, typed.trace))
             }
             SKILL_CURATION_DRY_RUN_COMMAND => {
-                let typed: SkillCurationDryRunCommand = decode(command.payload)?;
-                let result = self.governance_state.curation_dry_run(&typed).await;
-                tracing::info!(
-                    trace_id = %typed.trace.trace_id,
-                    recommendations = result.recommendations.len(),
-                    mutated = result.mutated,
-                    "skill curation dry-run completed"
-                );
-                Ok(service_result(to_value(result)?, typed.trace))
+                crate::skill_service_provider_curation::dry_run_command(
+                    &self.governance_state,
+                    command.payload,
+                    trace,
+                )
+                .await
             }
             SKILL_CURATION_STATUS_COMMAND => {
-                let typed: SkillCurationStatusCommand = decode(command.payload)?;
-                let result = self.governance_state.curation_status(&typed).await;
-                tracing::info!(
-                    trace_id = %typed.trace.trace_id,
-                    provider_id = %result.provider_id,
-                    available = result.available,
-                    interval_ms = result.interval_ms,
-                    last_run_id = result.last_run_id.as_deref().unwrap_or(""),
-                    "skill curation status emitted"
-                );
-                Ok(service_result(to_value(result)?, typed.trace))
+                crate::skill_service_provider_curation::status_command(
+                    &self.governance_state,
+                    command.payload,
+                    trace,
+                )
+                .await
+            }
+            SKILL_CURATION_RUN_COMMAND => {
+                crate::skill_service_provider_curation::run_command(
+                    &self.governance_state,
+                    command.payload,
+                    trace,
+                )
+                .await
             }
             SKILL_CURATION_PIN_COMMAND => {
                 crate::skill_service_provider_lifecycle::apply_lifecycle_command(

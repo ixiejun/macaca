@@ -18,6 +18,7 @@ pub mod adapter;
 pub mod agent_skill;
 pub mod alias;
 pub mod catalog;
+pub mod curation;
 pub mod definition;
 pub mod discovery;
 pub mod encrypted_package;
@@ -77,6 +78,7 @@ pub use agent_skill::{
     SkillMcpServerConfig, SkillMetadata, SkillSourceScope,
 };
 pub use catalog::{CatalogEntry, SkillCatalog};
+pub use curation::*;
 pub use discovery::{DiscoveredSkill, SkillScope};
 pub use encrypted_package::{
     encrypted_package_metadata, DecryptedPackage, EncryptedPackageAuthorizer,

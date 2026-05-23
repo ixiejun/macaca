@@ -16,20 +16,22 @@ use macaca_skill::{
     SkillAliasKind, SkillAliasRecord, SkillAliasResolveCommand, SkillAliasResolveResult,
     SkillAliasSnapshotCommand, SkillAliasSnapshotResult, SkillAliasUpsertCommand,
     SkillAliasUpsertResult, SkillAuthorKind, SkillCurationAction, SkillCurationDryRunCommand,
-    SkillCurationDryRunResult, SkillCurationRunRecord, SkillCurationStatusCommand,
-    SkillCurationStatusResult, SkillEvolutionCandidateClassification, SkillEvolutionProposalAction,
-    SkillExperienceCandidate, SkillExperienceCandidateDestination,
-    SkillExperienceEvidenceGateStatus, SkillExperienceProposalCommand,
-    SkillExperienceProposalResult, SkillExperienceProposalSnapshotCommand,
-    SkillExperienceProposalSnapshotResult, SkillGovernanceEventPayload, SkillGovernanceEventRecord,
-    SkillGovernanceReadModel, SkillGovernanceRecordUsageCommand, SkillGovernanceRecordUsageResult,
+    SkillCurationDryRunResult, SkillCurationRunCommand, SkillCurationRunRecord,
+    SkillCurationRunResult, SkillCurationStatusCommand, SkillCurationStatusResult,
+    SkillEvolutionCandidateClassification, SkillEvolutionProposalAction, SkillExperienceCandidate,
+    SkillExperienceCandidateDestination, SkillExperienceEvidenceGateStatus,
+    SkillExperienceProposalCommand, SkillExperienceProposalResult,
+    SkillExperienceProposalSnapshotCommand, SkillExperienceProposalSnapshotResult,
+    SkillGovernanceEventPayload, SkillGovernanceEventRecord, SkillGovernanceReadModel,
+    SkillGovernanceRecordUsageCommand, SkillGovernanceRecordUsageResult,
     SkillGovernanceSnapshotCommand, SkillGovernanceSnapshotRefRecord,
     SkillGovernanceSnapshotResult, SkillProvenanceAction, SkillRollbackRefRecord,
     SkillServiceScope, SkillStatusCommand, SkillStatusResult, SkillUsageEventKind,
     SkillUsageObservation, SKILL_ALIAS_RESOLVE_COMMAND, SKILL_ALIAS_SNAPSHOT_COMMAND,
-    SKILL_ALIAS_UPSERT_COMMAND, SKILL_CURATION_DRY_RUN_COMMAND, SKILL_CURATION_STATUS_COMMAND,
-    SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND, SKILL_EVOLUTION_SNAPSHOT_COMMAND,
-    SKILL_GOVERNANCE_RECORD_USAGE_COMMAND, SKILL_GOVERNANCE_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND,
+    SKILL_ALIAS_UPSERT_COMMAND, SKILL_CURATION_DRY_RUN_COMMAND, SKILL_CURATION_RUN_COMMAND,
+    SKILL_CURATION_STATUS_COMMAND, SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND,
+    SKILL_EVOLUTION_SNAPSHOT_COMMAND, SKILL_GOVERNANCE_RECORD_USAGE_COMMAND,
+    SKILL_GOVERNANCE_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND,
 };
 use tokio::sync::Mutex;
 
@@ -321,6 +323,103 @@ async fn skill_curation_status_reports_read_only_local_provider_state() {
     assert_eq!(result.idle_budget_ms, Some(10_000));
     assert!(result.last_run_id.is_none());
     assert!(result.next_eligible_run_at.is_none());
+}
+
+#[tokio::test]
+async fn skill_curation_run_records_bounded_dry_run_without_file_mutation() {
+    let provider = SkillSystemServiceProvider::new();
+    let trace = TraceContext::new("trace-skill-curation-run-dry");
+    provider
+        .call(traced_command(
+            SKILL_GOVERNANCE_RECORD_USAGE_COMMAND,
+            SkillGovernanceRecordUsageCommand {
+                trace: trace.clone(),
+                scope: SkillServiceScope::default(),
+                observation: observation(SkillUsageEventKind::Used, None),
+            },
+            trace.clone(),
+        ))
+        .await
+        .expect("usage observation should seed curation candidates");
+
+    let result = provider
+        .call(traced_command(
+            SKILL_CURATION_RUN_COMMAND,
+            SkillCurationRunCommand {
+                trace: trace.clone(),
+                scope: SkillServiceScope::default(),
+                dry_run: true,
+                stale_after_days: 30,
+                narrow_use_threshold: 1,
+                approval_refs: Vec::new(),
+                policy_decision_refs: Vec::new(),
+                audit_event_ids: vec!["audit://skill-curation/dry-run".into()],
+                policy: Default::default(),
+            },
+            trace.clone(),
+        ))
+        .await
+        .expect("dry-run curation command should be accepted");
+    let result: SkillCurationRunResult =
+        serde_json::from_value(result.output).expect("run result should decode");
+
+    assert!(result.run.dry_run);
+    assert!(!result.mutated);
+    assert_eq!(result.run.candidate_count, 1);
+    assert_eq!(result.recommendations.len(), 1);
+    assert!(result
+        .report_ref
+        .as_deref()
+        .unwrap_or("")
+        .contains("REPORT.md"));
+    assert!(result.rollback_ref.is_none());
+
+    let status = provider
+        .call(traced_command(
+            SKILL_CURATION_STATUS_COMMAND,
+            SkillCurationStatusCommand {
+                trace: trace.clone(),
+                scope: SkillServiceScope::default(),
+                interval_ms: 60_000,
+                idle_budget_ms: None,
+            },
+            trace,
+        ))
+        .await
+        .expect("curation status should observe the recorded run");
+    let status: SkillCurationStatusResult =
+        serde_json::from_value(status.output).expect("status result should decode");
+    assert_eq!(status.last_run_id, Some(result.run.run_id));
+}
+
+#[tokio::test]
+async fn skill_curation_apply_run_requires_approval_and_policy_refs() {
+    let provider = SkillSystemServiceProvider::new();
+    let trace = TraceContext::new("trace-skill-curation-run-apply-denied");
+
+    let err = provider
+        .call(traced_command(
+            SKILL_CURATION_RUN_COMMAND,
+            SkillCurationRunCommand {
+                trace: trace.clone(),
+                scope: SkillServiceScope::default(),
+                dry_run: false,
+                stale_after_days: 30,
+                narrow_use_threshold: 1,
+                approval_refs: Vec::new(),
+                policy_decision_refs: Vec::new(),
+                audit_event_ids: Vec::new(),
+                policy: Default::default(),
+            },
+            trace,
+        ))
+        .await
+        .expect_err("apply curation run must be approval-gated");
+
+    assert!(
+        err.to_string().contains("approval refs"),
+        "denial should explain the missing approval gate"
+    );
 }
 
 #[tokio::test]
@@ -829,6 +928,8 @@ fn skill_governance_event_replay_restores_read_model_without_skill_bodies() {
         provider_id: "builtin-local-governance-store".into(),
         dry_run: true,
         candidate_count: 1,
+        actions: vec!["skill://agent/example:WouldArchive".into()],
+        snapshot_refs: vec!["store://skill-curation/run-1/snapshot".into()],
         started_at: created_at,
         finished_at: Some(created_at),
         report_ref: Some("store://skill-curation/run-1/report".into()),

@@ -407,6 +407,24 @@ Every command logs key execution nodes with sanitized fields:
 - Safety: status is non-mutating and does not inspect skill bodies, package
   bytes, raw provider payloads, prompts, or task output.
 
+### Slice 8B: Governed Curation Run Command
+
+- Patterns: Command exposes `skill.curation.run` as the single typed entrypoint
+  for dry-run and approval-gated apply runs; Facade adds SDK routing without
+  shell semantics; Strategy keeps the built-in deterministic local runner
+  replaceable; Observer records bounded run events for status and replay;
+  Memento fields are modeled as report, snapshot, and rollback refs before the
+  later snapshot/rollback implementation slices attach concrete artifacts.
+- Ownership: `macaca-skill` owns the provider-neutral curation command/result
+  DTOs and `SkillCurationRunRecord`. `macaca-runtime-host` owns the local
+  Strategy and sanitized logs. SDK forwards commands through the Skill service
+  facade. Web, CLI, frontend, kernel, and applications do not classify,
+  archive, merge, alias, or mutate skills in this slice.
+- Safety: dry-run and the first approval-gated apply path produce bounded
+  recommendations and run refs only; they do not touch skill package files,
+  aliases, scheduler refs, context snapshots, raw provider payloads, prompts,
+  manifests, package bytes, credentials, signatures, or full skill bodies.
+
 ## Risks And Mitigations
 
 - Risk: skill mutation corrupts active packages. Mitigation: atomic writes,
