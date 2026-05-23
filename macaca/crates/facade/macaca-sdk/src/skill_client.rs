@@ -8,12 +8,13 @@ use macaca_skill::{
     SkillAliasResolveCommand, SkillAliasResolveResult, SkillAliasSnapshotCommand,
     SkillAliasSnapshotResult, SkillAliasUpsertCommand, SkillAliasUpsertResult, SkillCleanupCommand,
     SkillCurationDryRunCommand, SkillCurationDryRunResult, SkillCurationLifecycleAction,
-    SkillCurationLifecycleCommand, SkillCurationLifecycleResult, SkillCurationRunCommand,
-    SkillCurationRunResult, SkillCurationSnapshotCommand, SkillCurationSnapshotResult,
-    SkillEvolutionPromoteDraftCommand, SkillEvolutionPromoteDraftResult,
-    SkillEvolutionProposePatchCommand, SkillEvolutionProposePatchResult,
-    SkillEvolutionRejectDraftCommand, SkillEvolutionRejectDraftResult, SkillExecutableLoadCommand,
-    SkillExecutableLoadResult, SkillExperienceProposalCommand, SkillExperienceProposalResult,
+    SkillCurationLifecycleCommand, SkillCurationLifecycleResult, SkillCurationRollbackCommand,
+    SkillCurationRollbackResult, SkillCurationRunCommand, SkillCurationRunResult,
+    SkillCurationSnapshotCommand, SkillCurationSnapshotResult, SkillEvolutionPromoteDraftCommand,
+    SkillEvolutionPromoteDraftResult, SkillEvolutionProposePatchCommand,
+    SkillEvolutionProposePatchResult, SkillEvolutionRejectDraftCommand,
+    SkillEvolutionRejectDraftResult, SkillExecutableLoadCommand, SkillExecutableLoadResult,
+    SkillExperienceProposalCommand, SkillExperienceProposalResult,
     SkillExperienceProposalSnapshotCommand, SkillExperienceProposalSnapshotResult,
     SkillGovernanceRecordUsageCommand, SkillGovernanceRecordUsageResult,
     SkillGovernanceSnapshotCommand, SkillGovernanceSnapshotResult, SkillServiceSnapshot,
@@ -69,6 +70,10 @@ pub trait SystemSkillClient: Send + Sync {
         &self,
         command: SkillCurationSnapshotCommand,
     ) -> MacacaResult<SkillCurationSnapshotResult>;
+    async fn curation_rollback(
+        &self,
+        command: SkillCurationRollbackCommand,
+    ) -> MacacaResult<SkillCurationRollbackResult>;
     async fn curation_lifecycle(
         &self,
         action: SkillCurationLifecycleAction,
@@ -235,6 +240,18 @@ impl SystemSkillClient for UnavailableSystemSkillClient {
         warn!(
             trace_id = %command.trace.trace_id,
             "sdk skill client unavailable for curation snapshot"
+        );
+        Err(MacacaError::Config("Skill service is unavailable".into()))
+    }
+
+    async fn curation_rollback(
+        &self,
+        command: SkillCurationRollbackCommand,
+    ) -> MacacaResult<SkillCurationRollbackResult> {
+        warn!(
+            trace_id = %command.trace.trace_id,
+            rollback_ref = %command.rollback_ref,
+            "sdk skill client unavailable for curation rollback"
         );
         Err(MacacaError::Config("Skill service is unavailable".into()))
     }

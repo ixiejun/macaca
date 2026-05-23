@@ -16,10 +16,11 @@ use macaca_skill::{
     SkillAliasKind, SkillAliasRecord, SkillAliasResolveCommand, SkillAliasResolveResult,
     SkillAliasSnapshotCommand, SkillAliasSnapshotResult, SkillAliasUpsertCommand,
     SkillAliasUpsertResult, SkillAuthorKind, SkillCurationAction, SkillCurationDryRunCommand,
-    SkillCurationDryRunResult, SkillCurationRunCommand, SkillCurationRunRecord,
-    SkillCurationRunResult, SkillCurationSnapshotCommand, SkillCurationSnapshotResult,
-    SkillCurationStatusCommand, SkillCurationStatusResult, SkillEvolutionCandidateClassification,
-    SkillEvolutionProposalAction, SkillExperienceCandidate, SkillExperienceCandidateDestination,
+    SkillCurationDryRunResult, SkillCurationRollbackCommand, SkillCurationRollbackResult,
+    SkillCurationRunCommand, SkillCurationRunRecord, SkillCurationRunResult,
+    SkillCurationSnapshotCommand, SkillCurationSnapshotResult, SkillCurationStatusCommand,
+    SkillCurationStatusResult, SkillEvolutionCandidateClassification, SkillEvolutionProposalAction,
+    SkillExperienceCandidate, SkillExperienceCandidateDestination,
     SkillExperienceEvidenceGateStatus, SkillExperienceProposalCommand,
     SkillExperienceProposalResult, SkillExperienceProposalSnapshotCommand,
     SkillExperienceProposalSnapshotResult, SkillGovernanceEventPayload, SkillGovernanceEventRecord,
@@ -28,8 +29,8 @@ use macaca_skill::{
     SkillGovernanceSnapshotResult, SkillProvenanceAction, SkillRollbackRefRecord,
     SkillServiceScope, SkillStatusCommand, SkillStatusResult, SkillUsageEventKind,
     SkillUsageObservation, SKILL_ALIAS_RESOLVE_COMMAND, SKILL_ALIAS_SNAPSHOT_COMMAND,
-    SKILL_ALIAS_UPSERT_COMMAND, SKILL_CURATION_DRY_RUN_COMMAND, SKILL_CURATION_RUN_COMMAND,
-    SKILL_CURATION_SNAPSHOT_COMMAND, SKILL_CURATION_STATUS_COMMAND,
+    SKILL_ALIAS_UPSERT_COMMAND, SKILL_CURATION_DRY_RUN_COMMAND, SKILL_CURATION_ROLLBACK_COMMAND,
+    SKILL_CURATION_RUN_COMMAND, SKILL_CURATION_SNAPSHOT_COMMAND, SKILL_CURATION_STATUS_COMMAND,
     SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND, SKILL_EVOLUTION_SNAPSHOT_COMMAND,
     SKILL_GOVERNANCE_RECORD_USAGE_COMMAND, SKILL_GOVERNANCE_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND,
 };
@@ -485,6 +486,136 @@ async fn skill_curation_snapshot_returns_governance_and_memento_refs_only() {
             .contains("SKILL.md body"),
         "curation snapshot must not expose full skill instruction bodies"
     );
+}
+
+#[tokio::test]
+async fn skill_curation_rollback_restores_governance_alias_and_refs_from_memento() {
+    let provider = SkillSystemServiceProvider::new();
+    let trace = TraceContext::new("trace-skill-curation-rollback");
+    provider
+        .call(traced_command(
+            SKILL_GOVERNANCE_RECORD_USAGE_COMMAND,
+            SkillGovernanceRecordUsageCommand {
+                trace: trace.clone(),
+                scope: SkillServiceScope::default(),
+                observation: observation(SkillUsageEventKind::Used, None),
+            },
+            trace.clone(),
+        ))
+        .await
+        .expect("usage observation should seed rollback memento records");
+
+    let run = provider
+        .call(traced_command(
+            SKILL_CURATION_RUN_COMMAND,
+            SkillCurationRunCommand {
+                trace: trace.clone(),
+                scope: SkillServiceScope::default(),
+                dry_run: false,
+                stale_after_days: 30,
+                narrow_use_threshold: 1,
+                approval_refs: vec!["approval://skill-curation/apply".into()],
+                policy_decision_refs: vec!["policy://skill-curation/apply".into()],
+                audit_event_ids: vec!["audit://skill-curation/apply".into()],
+                policy: Default::default(),
+            },
+            trace.clone(),
+        ))
+        .await
+        .expect("approved apply run should create rollback memento refs");
+    let run: SkillCurationRunResult =
+        serde_json::from_value(run.output).expect("apply run result should decode");
+    let rollback_ref = run
+        .rollback_ref
+        .clone()
+        .expect("apply run should return a rollback ref");
+
+    provider
+        .call(traced_command(
+            SKILL_GOVERNANCE_RECORD_USAGE_COMMAND,
+            SkillGovernanceRecordUsageCommand {
+                trace: trace.clone(),
+                scope: SkillServiceScope::default(),
+                observation: observation(SkillUsageEventKind::FailedTask, None),
+            },
+            trace.clone(),
+        ))
+        .await
+        .expect("post-memento telemetry mutation should be observable");
+    provider
+        .call(traced_command(
+            SKILL_ALIAS_UPSERT_COMMAND,
+            SkillAliasUpsertCommand {
+                trace: trace.clone(),
+                scope: SkillServiceScope::default(),
+                record: alias_record(),
+            },
+            trace.clone(),
+        ))
+        .await
+        .expect("post-memento alias mutation should be observable");
+
+    let rollback = provider
+        .call(traced_command(
+            SKILL_CURATION_ROLLBACK_COMMAND,
+            SkillCurationRollbackCommand {
+                trace: trace.clone(),
+                scope: SkillServiceScope::default(),
+                rollback_ref: rollback_ref.clone(),
+                approval_refs: vec!["approval://skill-curation/rollback".into()],
+                policy_decision_refs: vec!["policy://skill-curation/rollback".into()],
+                audit_event_ids: vec!["audit://skill-curation/rollback".into()],
+                policy: Default::default(),
+            },
+            trace.clone(),
+        ))
+        .await
+        .expect("rollback command should restore the pre-apply memento");
+    let rollback: SkillCurationRollbackResult =
+        serde_json::from_value(rollback.output).expect("rollback result should decode");
+    assert_eq!(rollback.rollback_ref, rollback_ref);
+    assert!(rollback.mutated);
+    assert_eq!(rollback.restored_record_count, 1);
+    assert_eq!(rollback.restored_alias_count, 0);
+    assert!(rollback
+        .restored_report_refs
+        .iter()
+        .any(|report| report.contains("REPORT.md")));
+    assert!(rollback.package_memento_refs.contains(&rollback_ref));
+
+    let governance = provider
+        .call(traced_command(
+            SKILL_GOVERNANCE_SNAPSHOT_COMMAND,
+            SkillGovernanceSnapshotCommand {
+                trace: trace.clone(),
+                scope: SkillServiceScope::default(),
+                include_archived: true,
+                lifecycle_filters: Vec::new(),
+            },
+            trace.clone(),
+        ))
+        .await
+        .expect("governance snapshot should show restored telemetry");
+    let governance: SkillGovernanceSnapshotResult =
+        serde_json::from_value(governance.output).expect("governance snapshot should decode");
+    assert_eq!(governance.records.len(), 1);
+    assert_eq!(governance.records[0].telemetry.use_count, 1);
+    assert_eq!(governance.records[0].telemetry.failed_task_count, 0);
+
+    let aliases = provider
+        .call(traced_command(
+            SKILL_ALIAS_SNAPSHOT_COMMAND,
+            SkillAliasSnapshotCommand {
+                trace: trace.clone(),
+                scope: SkillServiceScope::default(),
+            },
+            trace,
+        ))
+        .await
+        .expect("alias snapshot should show restored alias map");
+    let aliases: SkillAliasSnapshotResult =
+        serde_json::from_value(aliases.output).expect("alias snapshot should decode");
+    assert!(aliases.aliases.is_empty());
 }
 
 #[tokio::test]

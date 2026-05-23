@@ -7,11 +7,12 @@ use std::sync::Arc;
 
 use macaca_proto::{ServiceCallResult, ServiceError, ServiceResult, TraceContext};
 use macaca_skill::{
-    SkillCurationDryRunCommand, SkillCurationDryRunResult, SkillCurationRunCommand,
-    SkillCurationRunResult, SkillCurationSnapshotCommand, SkillCurationSnapshotResult,
-    SkillCurationStatusCommand, SkillCurationStatusResult, SkillGovernanceEventPayload,
-    SkillGovernanceEventRecord, SkillGovernanceReadModel, SkillGovernanceSnapshotRefRecord,
-    SkillGovernanceStoreStrategy,
+    SkillCurationDryRunCommand, SkillCurationDryRunResult, SkillCurationRollbackCommand,
+    SkillCurationRollbackResult, SkillCurationRunCommand, SkillCurationRunResult,
+    SkillCurationSnapshotCommand, SkillCurationSnapshotResult, SkillCurationStatusCommand,
+    SkillCurationStatusResult, SkillGovernanceEventPayload, SkillGovernanceEventRecord,
+    SkillGovernanceReadModel, SkillGovernanceSnapshotRefRecord, SkillGovernanceStoreStrategy,
+    SkillRollbackRefRecord,
 };
 use serde_json::Value;
 
@@ -94,6 +95,30 @@ pub(crate) async fn snapshot_command(
     Ok(service_result(to_value(result)?, trace))
 }
 
+pub(crate) async fn rollback_command(
+    state: &Arc<SkillProviderGovernanceState>,
+    payload: Value,
+    trace: TraceContext,
+) -> ServiceResult<ServiceCallResult> {
+    let typed: SkillCurationRollbackCommand = decode(payload)?;
+    typed.validate().map_err(ServiceError::InvalidArgument)?;
+    let result = state
+        .curation_rollback(typed.clone())
+        .await
+        .map_err(ServiceError::InvalidArgument)?;
+    tracing::info!(
+        trace_id = %typed.trace.trace_id,
+        rollback_ref = %result.rollback_ref,
+        restored_records = result.restored_record_count,
+        restored_aliases = result.restored_alias_count,
+        restored_reports = result.restored_report_refs.len(),
+        package_mementos = result.package_memento_refs.len(),
+        mutated = result.mutated,
+        "skill curation rollback restored governance memento"
+    );
+    Ok(service_result(to_value(result)?, trace))
+}
+
 impl SkillProviderGovernanceState {
     /// Build a deterministic curation report without mutating state.
     pub(crate) async fn curation_dry_run(
@@ -156,6 +181,14 @@ impl SkillProviderGovernanceState {
         command: SkillCurationRunCommand,
     ) -> Result<SkillCurationRunResult, String> {
         let started_at = chrono::Utc::now();
+        let pre_apply_memento = if command.dry_run {
+            None
+        } else {
+            Some(
+                self.capture_curation_rollback_memento(&command.trace, started_at)
+                    .await,
+            )
+        };
         let records = self
             .records
             .lock()
@@ -164,8 +197,46 @@ impl SkillProviderGovernanceState {
             .cloned()
             .collect::<Vec<_>>();
         let finished_at = chrono::Utc::now();
-        let result =
+        let mut result =
             SkillCurationRunResult::from_records(records, &command, started_at, finished_at);
+        if let Some(mut memento) = pre_apply_memento {
+            let after_snapshot_ref = format!(
+                "store://skill-curation/{}/after-{}",
+                result.run.run_id,
+                finished_at.timestamp_nanos_opt().unwrap_or_default()
+            );
+            memento.after_snapshot_ref = Some(after_snapshot_ref.clone());
+            memento.report_refs = result.report_ref.iter().cloned().collect();
+            memento.package_memento_refs = vec![memento.rollback_ref.clone()];
+            result.run.snapshot_refs =
+                vec![memento.before_snapshot_ref.clone(), after_snapshot_ref];
+            result.run.rollback_ref = Some(memento.rollback_ref.clone());
+            result.rollback_ref = Some(memento.rollback_ref.clone());
+            self.curation_mementos
+                .lock()
+                .await
+                .insert(memento.rollback_ref.clone(), memento.clone());
+            let rollback_record = SkillRollbackRefRecord {
+                rollback_ref: memento.rollback_ref,
+                run_id: result.run.run_id.clone(),
+                trace_id: command.trace.trace_id.clone(),
+                before_snapshot_ref: memento.before_snapshot_ref,
+                after_snapshot_ref: memento.after_snapshot_ref,
+                report_ref: result.report_ref.clone(),
+                captured_at: finished_at,
+            };
+            let mut rollback_event = SkillGovernanceEventRecord::new(
+                event_id("skill-governance-curation-rollback-ref", finished_at),
+                &command.trace,
+                command.scope.clone(),
+                finished_at,
+                SkillGovernanceEventPayload::RollbackRefRecorded(rollback_record),
+            );
+            rollback_event.policy_decision_ids = result.run.policy_decision_ids.clone();
+            rollback_event.audit_event_ids = result.run.audit_event_ids.clone();
+            let _ =
+                <Self as SkillGovernanceStoreStrategy>::append_event(self, rollback_event).await;
+        }
         let mut event = SkillGovernanceEventRecord::new(
             event_id("skill-governance-curation-run", finished_at),
             &command.trace,
@@ -186,6 +257,99 @@ impl SkillProviderGovernanceState {
             "skill curation run recorded through local governance strategy"
         );
         Ok(result)
+    }
+
+    /// Capture a local pre-apply memento for rollback before any curation side effect.
+    async fn capture_curation_rollback_memento(
+        &self,
+        trace: &TraceContext,
+        captured_at: chrono::DateTime<chrono::Utc>,
+    ) -> crate::skill_service_provider_state::SkillCurationRollbackMemento {
+        let records = self.records.lock().await.clone();
+        let aliases = self.aliases.lock().await.clone();
+        let proposals = self.proposals.lock().await.clone();
+        let event_log = self.event_log.lock().await.clone();
+        let rollback_ref = format!(
+            "store://skill-curation/{}/rollback-{}",
+            trace.trace_id,
+            captured_at.timestamp_nanos_opt().unwrap_or_default()
+        );
+        crate::skill_service_provider_state::SkillCurationRollbackMemento {
+            rollback_ref: rollback_ref.clone(),
+            before_snapshot_ref: format!(
+                "store://skill-curation/{}/before-{}",
+                trace.trace_id,
+                captured_at.timestamp_nanos_opt().unwrap_or_default()
+            ),
+            after_snapshot_ref: None,
+            records,
+            aliases,
+            proposals,
+            event_log,
+            report_refs: Vec::new(),
+            package_memento_refs: vec![rollback_ref],
+        }
+    }
+
+    /// Restore lifecycle, telemetry, aliases, reports, and package refs from a memento.
+    pub(crate) async fn curation_rollback(
+        &self,
+        command: SkillCurationRollbackCommand,
+    ) -> Result<SkillCurationRollbackResult, String> {
+        let captured_at = chrono::Utc::now();
+        let memento = self
+            .curation_mementos
+            .lock()
+            .await
+            .get(&command.rollback_ref)
+            .cloned()
+            .ok_or_else(|| "skill curation rollback_ref was not found".to_string())?;
+
+        *self.records.lock().await = memento.records.clone();
+        *self.aliases.lock().await = memento.aliases.clone();
+        *self.proposals.lock().await = memento.proposals.clone();
+        *self.event_log.lock().await = memento.event_log.clone();
+
+        let restored_read_model = SkillGovernanceReadModel::from_events(memento.event_log.clone());
+        let rollback_record = SkillRollbackRefRecord {
+            rollback_ref: command.rollback_ref.clone(),
+            run_id: restored_read_model
+                .curation_runs
+                .last()
+                .map(|run| run.run_id.clone())
+                .unwrap_or_else(|| "restored-before-apply".into()),
+            trace_id: command.trace.trace_id.clone(),
+            before_snapshot_ref: memento.before_snapshot_ref.clone(),
+            after_snapshot_ref: memento.after_snapshot_ref.clone(),
+            report_ref: memento.report_refs.first().cloned(),
+            captured_at,
+        };
+        let mut event = SkillGovernanceEventRecord::new(
+            event_id("skill-governance-curation-rollback", captured_at),
+            &command.trace,
+            command.scope,
+            captured_at,
+            SkillGovernanceEventPayload::RollbackRefRecorded(rollback_record),
+        );
+        event.policy_decision_ids = non_empty(&command.policy_decision_refs);
+        event.audit_event_ids = non_empty(&command.audit_event_ids);
+        let _ = <Self as SkillGovernanceStoreStrategy>::append_event(self, event).await;
+
+        Ok(SkillCurationRollbackResult {
+            rollback_ref: command.rollback_ref,
+            before_snapshot_ref: memento.before_snapshot_ref,
+            after_snapshot_ref: memento.after_snapshot_ref,
+            restored_record_count: memento.records.len() as u64,
+            restored_alias_count: memento.aliases.len() as u64,
+            restored_curation_run_count: restored_read_model.curation_runs.len() as u64,
+            restored_rollback_ref_count: restored_read_model.rollback_refs.len() as u64,
+            restored_report_refs: memento.report_refs,
+            package_memento_refs: memento.package_memento_refs,
+            policy_decision_refs: non_empty(&command.policy_decision_refs),
+            audit_event_ids: non_empty(&command.audit_event_ids),
+            mutated: true,
+            captured_at,
+        })
     }
 
     /// Record a bounded curation snapshot ref and return replayable memento ids.
@@ -256,4 +420,12 @@ fn empty_read_model(captured_at: chrono::DateTime<chrono::Utc>) -> SkillGovernan
         replayed_events: 0,
         captured_at,
     }
+}
+
+fn non_empty(values: &[String]) -> Vec<String> {
+    values
+        .iter()
+        .filter(|value| !value.trim().is_empty())
+        .cloned()
+        .collect()
 }

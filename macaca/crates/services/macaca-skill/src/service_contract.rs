@@ -35,6 +35,7 @@ pub const SKILL_CURATION_STATUS_COMMAND: &str = "skill.curation.status";
 pub const SKILL_CURATION_DRY_RUN_COMMAND: &str = "skill.curation.dry_run";
 pub const SKILL_CURATION_RUN_COMMAND: &str = "skill.curation.run";
 pub const SKILL_CURATION_SNAPSHOT_COMMAND: &str = "skill.curation.snapshot";
+pub const SKILL_CURATION_ROLLBACK_COMMAND: &str = "skill.curation.rollback";
 pub const SKILL_CURATION_PIN_COMMAND: &str = "skill.curation.pin";
 pub const SKILL_CURATION_UNPIN_COMMAND: &str = "skill.curation.unpin";
 pub const SKILL_CURATION_ARCHIVE_COMMAND: &str = "skill.curation.archive";

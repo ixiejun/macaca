@@ -33,6 +33,25 @@ pub(crate) struct SkillProviderGovernanceState {
     pub(crate) aliases: Mutex<BTreeMap<String, SkillAliasRecord>>,
     pub(crate) proposals: Mutex<BTreeMap<String, SkillExperienceProposalRecord>>,
     pub(crate) event_log: Mutex<Vec<SkillGovernanceEventRecord>>,
+    pub(crate) curation_mementos: Mutex<BTreeMap<String, SkillCurationRollbackMemento>>,
+}
+
+/// Local rollback memento captured before an approved curation apply run.
+///
+/// A future Store/EventLog strategy can persist this same shape as durable
+/// artifacts.  The built-in provider keeps it in memory so rollback semantics
+/// can be proven without leaking skill bodies or package bytes into reports.
+#[derive(Debug, Clone)]
+pub(crate) struct SkillCurationRollbackMemento {
+    pub(crate) rollback_ref: String,
+    pub(crate) before_snapshot_ref: String,
+    pub(crate) after_snapshot_ref: Option<String>,
+    pub(crate) records: BTreeMap<String, SkillGovernanceRecord>,
+    pub(crate) aliases: BTreeMap<String, SkillAliasRecord>,
+    pub(crate) proposals: BTreeMap<String, SkillExperienceProposalRecord>,
+    pub(crate) event_log: Vec<SkillGovernanceEventRecord>,
+    pub(crate) report_refs: Vec<String>,
+    pub(crate) package_memento_refs: Vec<String>,
 }
 
 impl SkillProviderGovernanceState {

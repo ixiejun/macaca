@@ -137,7 +137,7 @@
   approval-gated apply modes.
 - [x] 8.3 Add `skill.curation.snapshot` typed command for durable governance
   and package memento references.
-- [ ] 8.4 Add `skill.curation.rollback` typed command that restores lifecycle,
+- [x] 8.4 Add `skill.curation.rollback` typed command that restores lifecycle,
   telemetry, alias, report, and package refs from memento state.
 - [x] 8.5 Model `SkillCurationRun` with run id, trace id, started/finished
   timestamps, provider id, dry-run flag, candidate count, actions, snapshots,

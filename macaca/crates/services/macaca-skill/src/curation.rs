@@ -129,6 +129,72 @@ pub struct SkillCurationSnapshotResult {
     pub captured_at: DateTime<Utc>,
 }
 
+/// Command for restoring governance state from a curation rollback memento.
+///
+/// Rollback is a privileged mutation because it rewinds lifecycle, telemetry,
+/// aliases, and report/package refs to a known pre-apply state.  The command
+/// therefore requires trace, approval, and policy decision refs before a
+/// provider can restore any local or Store/EventLog-backed memento.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SkillCurationRollbackCommand {
+    pub trace: TraceContext,
+    pub scope: SkillServiceScope,
+    pub rollback_ref: String,
+    #[serde(default)]
+    pub approval_refs: Vec<String>,
+    #[serde(default)]
+    pub policy_decision_refs: Vec<String>,
+    #[serde(default)]
+    pub audit_event_ids: Vec<String>,
+    #[serde(default)]
+    pub policy: SkillServicePolicyHints,
+}
+
+impl SkillCurationRollbackCommand {
+    /// Validate rollback admission before restoring a memento.
+    pub fn validate(&self) -> Result<(), String> {
+        if self.trace.trace_id.trim().is_empty() {
+            return Err("skill curation rollback requires trace_id".into());
+        }
+        if self.rollback_ref.trim().is_empty() {
+            return Err("skill curation rollback requires rollback_ref".into());
+        }
+        if self.approval_refs.iter().all(|id| id.trim().is_empty()) {
+            return Err("skill curation rollback requires approval refs".into());
+        }
+        if self
+            .policy_decision_refs
+            .iter()
+            .all(|id| id.trim().is_empty())
+        {
+            return Err("skill curation rollback requires policy decision refs".into());
+        }
+        Ok(())
+    }
+}
+
+/// Result returned after a provider restores a curation rollback memento.
+///
+/// The response carries counts and refs only.  It never echoes skill package
+/// bytes, full instruction bodies, raw provider payloads, prompts, secrets, or
+/// other sensitive artifacts.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SkillCurationRollbackResult {
+    pub rollback_ref: String,
+    pub before_snapshot_ref: String,
+    pub after_snapshot_ref: Option<String>,
+    pub restored_record_count: u64,
+    pub restored_alias_count: u64,
+    pub restored_curation_run_count: u64,
+    pub restored_rollback_ref_count: u64,
+    pub restored_report_refs: Vec<String>,
+    pub package_memento_refs: Vec<String>,
+    pub policy_decision_refs: Vec<String>,
+    pub audit_event_ids: Vec<String>,
+    pub mutated: bool,
+    pub captured_at: DateTime<Utc>,
+}
+
 /// Recommendation action names are intentionally non-destructive.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SkillCurationAction {

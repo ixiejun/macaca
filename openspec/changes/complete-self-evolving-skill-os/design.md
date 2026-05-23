@@ -440,6 +440,23 @@ Every command logs key execution nodes with sanitized fields:
   package bytes, manifests, raw provider payloads, prompts, credentials,
   signatures, or full skill bodies.
 
+### Slice 8D: Curation Rollback Command
+
+- Patterns: Command exposes `skill.curation.rollback` as the single typed
+  rollback entrypoint; Memento restores the local governance read state from a
+  pre-apply snapshot; Observer appends a bounded rollback event after restore so
+  replay remains auditable; Facade keeps SDK/Web/CLI/frontend as command
+  forwarders rather than rollback semantic owners.
+- Ownership: `macaca-skill` owns rollback command/result DTOs and validation
+  rules. `macaca-runtime-host` owns the built-in local rollback Strategy and
+  in-memory memento projection until a Store/EventLog provider supplies durable
+  artifacts. Kernel, SDK, Web, CLI, frontend, Context, Task, and applications do
+  not reconstruct lifecycle, telemetry, alias, report, or package refs.
+- Safety: rollback requires trace, rollback ref, approval refs, and policy
+  decision refs. Results expose restored counts and refs only; logs and DTOs do
+  not include raw prompts, raw task output, provider payloads, manifests,
+  package bytes, credentials, signatures, or full skill bodies.
+
 ## Risks And Mitigations
 
 - Risk: skill mutation corrupts active packages. Mitigation: atomic writes,
