@@ -97,6 +97,10 @@ impl SelfEvolutionReportBuilder {
              - state: {:?}\n\
              - passed: {}\n\
              - reasons: {}\n\n\
+             ## Mementos\n\n\
+             - before_snapshot_ref: {}\n\
+             - after_snapshot_ref: {}\n\
+             - rollback_ref: {}\n\n\
              ## Baseline\n\n\
              - human_intervention_count: {}\n\
              - retry_count: {}\n\
@@ -117,6 +121,9 @@ impl SelfEvolutionReportBuilder {
             score.lifecycle,
             score.passed,
             reasons,
+            sanitize_opt(&record.white_box.before_snapshot_ref).unwrap_or_else(|| "none".into()),
+            sanitize_opt(&record.white_box.after_snapshot_ref).unwrap_or_else(|| "none".into()),
+            sanitize_opt(&record.white_box.rollback_ref).unwrap_or_else(|| "none".into()),
             record.baseline.human_intervention_count,
             record.baseline.retry_count,
             optional_u64(record.baseline.elapsed_seconds),

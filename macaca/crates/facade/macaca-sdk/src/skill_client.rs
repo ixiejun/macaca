@@ -10,12 +10,14 @@ use macaca_skill::{
     SkillCurationDryRunCommand, SkillCurationDryRunResult, SkillCurationLifecycleAction,
     SkillCurationLifecycleCommand, SkillCurationLifecycleResult, SkillCurationRollbackCommand,
     SkillCurationRollbackResult, SkillCurationRunCommand, SkillCurationRunResult,
-    SkillCurationSnapshotCommand, SkillCurationSnapshotResult, SkillEvaluationReportCommand,
-    SkillEvaluationReportResult, SkillEvaluationScoreCommand, SkillEvaluationScoreResult,
-    SkillEvolutionPromoteDraftCommand, SkillEvolutionPromoteDraftResult,
-    SkillEvolutionProposePatchCommand, SkillEvolutionProposePatchResult,
-    SkillEvolutionRejectDraftCommand, SkillEvolutionRejectDraftResult, SkillExecutableLoadCommand,
-    SkillExecutableLoadResult, SkillExperienceProposalCommand, SkillExperienceProposalResult,
+    SkillCurationSnapshotCommand, SkillCurationSnapshotResult,
+    SkillEvaluationCheckpointAppendCommand, SkillEvaluationCheckpointAppendResult,
+    SkillEvaluationReportCommand, SkillEvaluationReportResult, SkillEvaluationScoreCommand,
+    SkillEvaluationScoreResult, SkillEvolutionPromoteDraftCommand,
+    SkillEvolutionPromoteDraftResult, SkillEvolutionProposePatchCommand,
+    SkillEvolutionProposePatchResult, SkillEvolutionRejectDraftCommand,
+    SkillEvolutionRejectDraftResult, SkillExecutableLoadCommand, SkillExecutableLoadResult,
+    SkillExperienceProposalCommand, SkillExperienceProposalResult,
     SkillExperienceProposalSnapshotCommand, SkillExperienceProposalSnapshotResult,
     SkillGovernanceRecordUsageCommand, SkillGovernanceRecordUsageResult,
     SkillGovernanceSnapshotCommand, SkillGovernanceSnapshotResult, SkillServiceSnapshot,
@@ -112,6 +114,10 @@ pub trait SystemSkillClient: Send + Sync {
         &self,
         command: SkillExperienceProposalSnapshotCommand,
     ) -> MacacaResult<SkillExperienceProposalSnapshotResult>;
+    async fn append_self_evolution_checkpoint(
+        &self,
+        command: SkillEvaluationCheckpointAppendCommand,
+    ) -> MacacaResult<SkillEvaluationCheckpointAppendResult>;
     async fn evaluate_self_evolution(
         &self,
         command: SkillEvaluationScoreCommand,
@@ -386,6 +392,18 @@ impl SystemSkillClient for UnavailableSystemSkillClient {
         })
     }
 
+    async fn append_self_evolution_checkpoint(
+        &self,
+        command: SkillEvaluationCheckpointAppendCommand,
+    ) -> MacacaResult<SkillEvaluationCheckpointAppendResult> {
+        warn!(
+            trace_id = %command.trace.trace_id,
+            evaluation_id = %command.record.evaluation_id,
+            "sdk skill client unavailable for self-evolution checkpoint append"
+        );
+        Err(MacacaError::Config("Skill service is unavailable".into()))
+    }
+
     async fn evaluate_self_evolution(
         &self,
         command: SkillEvaluationScoreCommand,
@@ -435,11 +453,12 @@ mod tests {
 
     use macaca_proto::TraceContext;
     use macaca_skill::{
+        SelfEvolutionEvaluationCheckpoint, SelfEvolutionEvaluationCheckpointKind,
         SelfEvolutionEvaluationLifecycle, SelfEvolutionEvaluationRecord, SelfEvolutionReportRefs,
         SelfEvolutionRunMetrics, SelfEvolutionScore, SelfEvolutionWhiteBoxEvidence,
-        SkillEvaluationReportCommand, SkillEvaluationScoreCommand,
-        SkillEvolutionPromoteDraftCommand, SkillEvolutionRejectDraftCommand,
-        SkillServicePolicyHints, SkillServiceScope,
+        SkillEvaluationCheckpointAppendCommand, SkillEvaluationReportCommand,
+        SkillEvaluationScoreCommand, SkillEvolutionPromoteDraftCommand,
+        SkillEvolutionRejectDraftCommand, SkillServicePolicyHints, SkillServiceScope,
     };
 
     use super::{SystemSkillClient, UnavailableSystemSkillClient};
@@ -507,6 +526,16 @@ mod tests {
             scope: SkillServiceScope::default(),
             record: evaluation_record(),
         };
+        let checkpoint_command = SkillEvaluationCheckpointAppendCommand {
+            trace: trace.clone(),
+            scope: SkillServiceScope::default(),
+            record: evaluation_record(),
+            checkpoint: SelfEvolutionEvaluationCheckpoint {
+                kind: SelfEvolutionEvaluationCheckpointKind::VerifiedTaskCompletion,
+                evidence_ref: Some("evidence://task/1".into()),
+                ..Default::default()
+            },
+        };
         let report_command = SkillEvaluationReportCommand {
             trace,
             scope: SkillServiceScope::default(),
@@ -515,6 +544,10 @@ mod tests {
             include_markdown: true,
         };
 
+        assert!(client
+            .append_self_evolution_checkpoint(checkpoint_command)
+            .await
+            .is_err());
         assert!(client.evaluate_self_evolution(score_command).await.is_err());
         assert!(client
             .self_evolution_evaluation_report(report_command)

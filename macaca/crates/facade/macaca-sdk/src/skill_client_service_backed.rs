@@ -11,12 +11,14 @@ use macaca_skill::{
     SkillCurationDryRunCommand, SkillCurationDryRunResult, SkillCurationLifecycleAction,
     SkillCurationLifecycleCommand, SkillCurationLifecycleResult, SkillCurationRollbackCommand,
     SkillCurationRollbackResult, SkillCurationRunCommand, SkillCurationRunResult,
-    SkillCurationSnapshotCommand, SkillCurationSnapshotResult, SkillEvaluationReportCommand,
-    SkillEvaluationReportResult, SkillEvaluationScoreCommand, SkillEvaluationScoreResult,
-    SkillEvolutionPromoteDraftCommand, SkillEvolutionPromoteDraftResult,
-    SkillEvolutionProposePatchCommand, SkillEvolutionProposePatchResult,
-    SkillEvolutionRejectDraftCommand, SkillEvolutionRejectDraftResult, SkillExecutableLoadCommand,
-    SkillExecutableLoadResult, SkillExperienceProposalCommand, SkillExperienceProposalResult,
+    SkillCurationSnapshotCommand, SkillCurationSnapshotResult,
+    SkillEvaluationCheckpointAppendCommand, SkillEvaluationCheckpointAppendResult,
+    SkillEvaluationReportCommand, SkillEvaluationReportResult, SkillEvaluationScoreCommand,
+    SkillEvaluationScoreResult, SkillEvolutionPromoteDraftCommand,
+    SkillEvolutionPromoteDraftResult, SkillEvolutionProposePatchCommand,
+    SkillEvolutionProposePatchResult, SkillEvolutionRejectDraftCommand,
+    SkillEvolutionRejectDraftResult, SkillExecutableLoadCommand, SkillExecutableLoadResult,
+    SkillExperienceProposalCommand, SkillExperienceProposalResult,
     SkillExperienceProposalSnapshotCommand, SkillExperienceProposalSnapshotResult,
     SkillGovernanceRecordUsageCommand, SkillGovernanceRecordUsageResult,
     SkillGovernanceSnapshotCommand, SkillGovernanceSnapshotResult, SkillServiceSnapshot,
@@ -28,7 +30,8 @@ use macaca_skill::{
     SKILL_CURATION_QUARANTINE_COMMAND, SKILL_CURATION_REJECT_COMMAND,
     SKILL_CURATION_RELEASE_QUARANTINE_COMMAND, SKILL_CURATION_RESTORE_COMMAND,
     SKILL_CURATION_ROLLBACK_COMMAND, SKILL_CURATION_RUN_COMMAND, SKILL_CURATION_SNAPSHOT_COMMAND,
-    SKILL_CURATION_UNPIN_COMMAND, SKILL_EVALUATION_REPORT_COMMAND, SKILL_EVALUATION_SCORE_COMMAND,
+    SKILL_CURATION_UNPIN_COMMAND, SKILL_EVALUATION_CHECKPOINT_APPEND_COMMAND,
+    SKILL_EVALUATION_REPORT_COMMAND, SKILL_EVALUATION_SCORE_COMMAND,
     SKILL_EVOLUTION_PROMOTE_DRAFT_COMMAND, SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND,
     SKILL_EVOLUTION_PROPOSE_PATCH_COMMAND, SKILL_EVOLUTION_REJECT_DRAFT_COMMAND,
     SKILL_EVOLUTION_SNAPSHOT_COMMAND, SKILL_EXECUTABLE_LOAD_COMMAND,
@@ -302,6 +305,19 @@ impl SystemSkillClient for ServiceBackedSkillClient {
         call(
             &self.service,
             SKILL_EVOLUTION_SNAPSHOT_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn append_self_evolution_checkpoint(
+        &self,
+        command: SkillEvaluationCheckpointAppendCommand,
+    ) -> MacacaResult<SkillEvaluationCheckpointAppendResult> {
+        call(
+            &self.service,
+            SKILL_EVALUATION_CHECKPOINT_APPEND_COMMAND,
             command.trace.clone(),
             command,
         )

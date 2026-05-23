@@ -1,11 +1,14 @@
 use crate::evaluation::{
+    SelfEvolutionEvaluationCheckpoint, SelfEvolutionEvaluationCheckpointKind,
     SelfEvolutionEvaluationLifecycle, SelfEvolutionEvaluationRecord, SelfEvolutionReportBuilder,
     SelfEvolutionReportRefs, SelfEvolutionRunMetrics, SelfEvolutionScoringPolicy,
     SelfEvolutionWhiteBoxEvidence,
 };
 use crate::service_contract::{
+    SkillEvaluationCheckpointAppendCommand, SkillEvaluationCheckpointAppendResult,
     SkillEvaluationReportCommand, SkillEvaluationReportResult, SkillEvaluationScoreCommand,
-    SKILL_EVALUATION_REPORT_COMMAND, SKILL_EVALUATION_SCORE_COMMAND,
+    SKILL_EVALUATION_CHECKPOINT_APPEND_COMMAND, SKILL_EVALUATION_REPORT_COMMAND,
+    SKILL_EVALUATION_SCORE_COMMAND,
 };
 
 #[test]
@@ -147,6 +150,42 @@ fn self_evolution_evaluation_scoring_fails_without_later_activation() {
 }
 
 #[test]
+fn self_evolution_evaluation_scoring_fails_each_required_white_box_checkpoint() {
+    let cases: Vec<(&str, Box<dyn Fn(&mut SelfEvolutionEvaluationRecord)>)> = vec![
+        (
+            "missing_proposal",
+            Box::new(|record| record.white_box.proposal_id = None),
+        ),
+        (
+            "missing_curation_run",
+            Box::new(|record| record.white_box.curation_run_id = None),
+        ),
+        (
+            "missing_promotion_or_apply",
+            Box::new(|record| record.white_box.promotion_or_apply_ref = None),
+        ),
+        (
+            "missing_active_catalog_snapshot",
+            Box::new(|record| record.white_box.active_catalog_snapshot_ref = None),
+        ),
+    ];
+
+    for (reason, mutate) in cases {
+        let mut record = complete_evaluation_record();
+        mutate(&mut record);
+
+        let score = SelfEvolutionScoringPolicy::score(&record);
+
+        assert!(!score.passed, "{reason} should not pass");
+        assert_eq!(score.lifecycle, SelfEvolutionEvaluationLifecycle::Failed);
+        assert!(
+            score.reason_codes.contains(&reason.to_string()),
+            "{reason} should be reported as a bounded reason"
+        );
+    }
+}
+
+#[test]
 fn self_evolution_evaluation_scoring_fails_completion_regression() {
     let mut record = complete_evaluation_record();
     record.evolved.completion_success = false;
@@ -225,6 +264,71 @@ fn self_evolution_evaluation_report_renders_markdown_summary_without_raw_payload
 }
 
 #[test]
+fn self_evolution_evaluation_report_includes_memento_refs_without_audit_payloads() {
+    let record = complete_evaluation_record();
+    let score = SelfEvolutionScoringPolicy::score(&record);
+
+    let markdown = SelfEvolutionReportBuilder::markdown_summary(&record, &score);
+    let json = SelfEvolutionReportBuilder::json_summary(&record, &score);
+
+    assert!(markdown.contains("before_snapshot_ref: before"));
+    assert!(markdown.contains("after_snapshot_ref: after"));
+    assert!(markdown.contains("rollback_ref: rollback"));
+    assert_eq!(json["white_box"]["before_snapshot_ref"], "before");
+    assert_eq!(json["white_box"]["after_snapshot_ref"], "after");
+    assert_eq!(json["white_box"]["rollback_ref"], "rollback");
+    assert!(!markdown.contains("audit"));
+}
+
+#[test]
+fn self_evolution_evaluation_checkpoint_append_maps_refs_without_raw_payloads() {
+    let mut record = complete_evaluation_record();
+    record.white_box = SelfEvolutionWhiteBoxEvidence::default();
+
+    let command = SkillEvaluationCheckpointAppendCommand {
+        trace: macaca_proto::TraceContext::new("trace-evaluation-checkpoint"),
+        scope: crate::SkillServiceScope::default(),
+        record,
+        checkpoint: SelfEvolutionEvaluationCheckpoint {
+            kind: SelfEvolutionEvaluationCheckpointKind::Proposal,
+            evidence_ref: Some("proposal-ref-raw_prompt-secret".into()),
+            proposal_id: Some("proposal-2".into()),
+            curation_run_id: None,
+            policy_decision_id: Some("policy-2".into()),
+            audit_event_ids: vec!["audit-2".into(), "audit-3".into()],
+            before_snapshot_ref: Some("before-2".into()),
+            after_snapshot_ref: Some("after-2".into()),
+            rollback_ref: Some("rollback-2".into()),
+        },
+    };
+
+    let result = SkillEvaluationCheckpointAppendResult::from_command(&command);
+
+    assert_eq!(
+        result.record.white_box.proposal_id.as_deref(),
+        Some("proposal-2")
+    );
+    assert_eq!(
+        result.record.white_box.before_snapshot_ref.as_deref(),
+        Some("before-2")
+    );
+    assert_eq!(
+        result.record.white_box.after_snapshot_ref.as_deref(),
+        Some("after-2")
+    );
+    assert_eq!(
+        result.record.white_box.rollback_ref.as_deref(),
+        Some("rollback-2")
+    );
+    assert_eq!(result.checkpoint_count, 1);
+    assert_eq!(result.audit_event_count, 2);
+    assert_ne!(
+        result.record.white_box.proposal_id.as_deref(),
+        Some("proposal-ref-raw_prompt-secret")
+    );
+}
+
+#[test]
 fn self_evolution_evaluation_service_contract_scores_and_reports_generically() {
     let record = complete_evaluation_record();
     let score = SelfEvolutionScoringPolicy::score(&record);
@@ -254,6 +358,10 @@ fn self_evolution_evaluation_service_contract_scores_and_reports_generically() {
 
     assert_eq!(SKILL_EVALUATION_SCORE_COMMAND, "skill.evaluation.score");
     assert_eq!(SKILL_EVALUATION_REPORT_COMMAND, "skill.evaluation.report");
+    assert_eq!(
+        SKILL_EVALUATION_CHECKPOINT_APPEND_COMMAND,
+        "skill.evaluation.checkpoint.append"
+    );
     assert_eq!(score_command.record.evaluation_id, "eval-score");
     assert!(report_result.score.passed);
     assert!(report_result

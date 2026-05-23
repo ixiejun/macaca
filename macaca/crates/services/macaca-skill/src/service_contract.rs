@@ -15,7 +15,8 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use crate::evaluation::{
-    SelfEvolutionEvaluationRecord, SelfEvolutionReportBuilder, SelfEvolutionScore,
+    SelfEvolutionEvaluationCheckpoint, SelfEvolutionEvaluationRecord, SelfEvolutionReportBuilder,
+    SelfEvolutionScore,
 };
 use crate::governance::SkillTelemetryAggregate;
 use crate::runtime::{SkillPolicy, SkillSnapshot};
@@ -56,6 +57,7 @@ pub const SKILL_EVOLUTION_PROPOSE_PATCH_COMMAND: &str = "skill.evolution.propose
 pub const SKILL_EVOLUTION_PROMOTE_DRAFT_COMMAND: &str = "skill.evolution.promote_draft";
 pub const SKILL_EVOLUTION_REJECT_DRAFT_COMMAND: &str = "skill.evolution.reject_draft";
 pub const SKILL_EVOLUTION_SNAPSHOT_COMMAND: &str = "skill.evolution.snapshot";
+pub const SKILL_EVALUATION_CHECKPOINT_APPEND_COMMAND: &str = "skill.evaluation.checkpoint.append";
 pub const SKILL_EVALUATION_SCORE_COMMAND: &str = "skill.evaluation.score";
 pub const SKILL_EVALUATION_REPORT_COMMAND: &str = "skill.evaluation.report";
 pub use crate::mutation::SKILL_CONTENT_MUTATE_COMMAND;
@@ -201,10 +203,78 @@ pub struct SkillEvaluationScoreCommand {
     pub record: SelfEvolutionEvaluationRecord,
 }
 
+/// Command for appending one sanitized checkpoint to an evaluation record.
+///
+/// This keeps checkpoint observation behind the Skill service contract. Shells
+/// submit typed refs and counts through SDK/SystemFacade; they never interpret
+/// white-box gates or mutate scoring semantics locally.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SkillEvaluationCheckpointAppendCommand {
+    pub trace: TraceContext,
+    pub scope: SkillServiceScope,
+    pub record: SelfEvolutionEvaluationRecord,
+    pub checkpoint: SelfEvolutionEvaluationCheckpoint,
+}
+
+/// Result for a checkpoint append operation.
+///
+/// Counts are bounded diagnostics for logs and reports. The result returns the
+/// updated record so callers can persist it through Store/EventLog without the
+/// command handler storing raw checkpoint payloads.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SkillEvaluationCheckpointAppendResult {
+    pub record: SelfEvolutionEvaluationRecord,
+    pub checkpoint_count: usize,
+    pub audit_event_count: usize,
+}
+
+impl SkillEvaluationCheckpointAppendResult {
+    /// Apply a checkpoint append command to a cloned evaluation record.
+    pub fn from_command(command: &SkillEvaluationCheckpointAppendCommand) -> Self {
+        let mut record = command.record.clone();
+        record.white_box.append_checkpoint(&command.checkpoint);
+        let checkpoint_count = populated_checkpoint_count(&record);
+        let audit_event_count = record.white_box.audit_event_ids.len();
+
+        tracing::info!(
+            trace_id = %command.trace.trace_id,
+            evaluation_id = %record.evaluation_id,
+            task_family_id = %record.task_family_id,
+            checkpoint_kind = ?command.checkpoint.kind,
+            checkpoint_count,
+            audit_event_count,
+            "appended sanitized self-evolution evaluation checkpoint"
+        );
+
+        Self {
+            record,
+            checkpoint_count,
+            audit_event_count,
+        }
+    }
+}
+
 /// Result for deterministic self-evolution evaluation scoring.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SkillEvaluationScoreResult {
     pub score: SelfEvolutionScore,
+}
+
+fn populated_checkpoint_count(record: &SelfEvolutionEvaluationRecord) -> usize {
+    let white_box = &record.white_box;
+    [
+        white_box.verified_task_completion_ref.as_ref(),
+        white_box.experience_candidate_ref.as_ref(),
+        white_box.classification_ref.as_ref(),
+        white_box.proposal_id.as_ref(),
+        white_box.curation_run_id.as_ref(),
+        white_box.promotion_or_apply_ref.as_ref(),
+        white_box.active_catalog_snapshot_ref.as_ref(),
+        white_box.later_skill_activation_ref.as_ref(),
+    ]
+    .into_iter()
+    .filter(|value| value.is_some())
+    .count()
 }
 
 /// Command for building sanitized self-evolution evaluation reports.

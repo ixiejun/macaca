@@ -85,6 +85,137 @@ pub struct SelfEvolutionWhiteBoxEvidence {
     pub rollback_ref: Option<String>,
 }
 
+/// White-box checkpoint category observed through service boundaries.
+///
+/// The enum is a Specification boundary for required self-evolution evidence.
+/// It describes generic OS checkpoints only, never application workflows or
+/// business-domain events.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub enum SelfEvolutionEvaluationCheckpointKind {
+    /// Verified terminal task completion from Task/Autonomy evidence.
+    VerifiedTaskCompletion,
+    /// ExperienceCandidate derived from verified completion evidence.
+    ExperienceCandidate,
+    /// Generic classification result for the candidate.
+    Classification,
+    /// Draft or patch proposal created by skill evolution.
+    Proposal,
+    /// Curation dry-run or apply checkpoint.
+    Curation,
+    /// Approval, promotion, or apply decision.
+    PromotionOrApply,
+    /// Active catalog visibility snapshot.
+    CatalogVisibility,
+    /// Later read or activation of the evolved skill state.
+    SkillActivation,
+    /// Rejection evidence proving rejected proposals remain durable.
+    Rejection,
+    /// Rollback evidence proving memento restoration is available.
+    Rollback,
+}
+
+/// Sanitized checkpoint append input for self-evolution evaluation.
+///
+/// The checkpoint carries refs and ids only. Providers must not place raw task
+/// output, prompts, provider payloads, manifests, package bytes, credentials, or
+/// full skill bodies in these fields; report builders still sanitize strings as
+/// a defense-in-depth boundary before shell display.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct SelfEvolutionEvaluationCheckpoint {
+    /// Generic checkpoint kind used by the append command to update evidence.
+    pub kind: SelfEvolutionEvaluationCheckpointKind,
+    /// Evidence ref for checkpoint kinds that map to one white-box evidence ref.
+    pub evidence_ref: Option<String>,
+    /// Proposal id when the checkpoint created or referenced a draft/patch.
+    pub proposal_id: Option<String>,
+    /// Curation run id when deterministic curation participated.
+    pub curation_run_id: Option<String>,
+    /// Policy decision id attached to this checkpoint, when policy ran.
+    pub policy_decision_id: Option<String>,
+    /// Sanitized audit event ids emitted for this checkpoint.
+    pub audit_event_ids: Vec<String>,
+    /// Memento ref captured before side effects.
+    pub before_snapshot_ref: Option<String>,
+    /// Memento ref captured after side effects.
+    pub after_snapshot_ref: Option<String>,
+    /// Rollback memento ref when the checkpoint can be reverted.
+    pub rollback_ref: Option<String>,
+}
+
+impl Default for SelfEvolutionEvaluationCheckpointKind {
+    fn default() -> Self {
+        Self::VerifiedTaskCompletion
+    }
+}
+
+impl SelfEvolutionWhiteBoxEvidence {
+    /// Append one sanitized checkpoint into the white-box evidence chain.
+    ///
+    /// This is the Memento/Observer bridge for the evaluation harness: callers
+    /// observe service-owned events and append refs here, while scoring remains
+    /// deterministic over the resulting bounded record. The function never
+    /// interprets application-specific behavior and never copies raw payloads.
+    pub fn append_checkpoint(&mut self, checkpoint: &SelfEvolutionEvaluationCheckpoint) {
+        match checkpoint.kind {
+            SelfEvolutionEvaluationCheckpointKind::VerifiedTaskCompletion => {
+                replace_if_present(
+                    &mut self.verified_task_completion_ref,
+                    &checkpoint.evidence_ref,
+                );
+            }
+            SelfEvolutionEvaluationCheckpointKind::ExperienceCandidate => {
+                replace_if_present(&mut self.experience_candidate_ref, &checkpoint.evidence_ref);
+            }
+            SelfEvolutionEvaluationCheckpointKind::Classification => {
+                replace_if_present(&mut self.classification_ref, &checkpoint.evidence_ref);
+            }
+            SelfEvolutionEvaluationCheckpointKind::Proposal => {
+                replace_if_present(&mut self.proposal_id, &checkpoint.proposal_id);
+            }
+            SelfEvolutionEvaluationCheckpointKind::Curation => {
+                replace_if_present(&mut self.curation_run_id, &checkpoint.curation_run_id);
+            }
+            SelfEvolutionEvaluationCheckpointKind::PromotionOrApply => {
+                replace_if_present(&mut self.promotion_or_apply_ref, &checkpoint.evidence_ref);
+            }
+            SelfEvolutionEvaluationCheckpointKind::CatalogVisibility => {
+                replace_if_present(
+                    &mut self.active_catalog_snapshot_ref,
+                    &checkpoint.evidence_ref,
+                );
+            }
+            SelfEvolutionEvaluationCheckpointKind::SkillActivation => {
+                replace_if_present(
+                    &mut self.later_skill_activation_ref,
+                    &checkpoint.evidence_ref,
+                );
+            }
+            SelfEvolutionEvaluationCheckpointKind::Rejection => {
+                replace_if_present(&mut self.policy_decision_id, &checkpoint.policy_decision_id);
+            }
+            SelfEvolutionEvaluationCheckpointKind::Rollback => {
+                replace_if_present(&mut self.rollback_ref, &checkpoint.rollback_ref);
+            }
+        }
+
+        replace_if_present(&mut self.policy_decision_id, &checkpoint.policy_decision_id);
+        replace_if_present(
+            &mut self.before_snapshot_ref,
+            &checkpoint.before_snapshot_ref,
+        );
+        replace_if_present(&mut self.after_snapshot_ref, &checkpoint.after_snapshot_ref);
+        replace_if_present(&mut self.rollback_ref, &checkpoint.rollback_ref);
+        self.audit_event_ids
+            .extend(checkpoint.audit_event_ids.iter().cloned());
+    }
+}
+
+fn replace_if_present(target: &mut Option<String>, value: &Option<String>) {
+    if let Some(value) = value.as_ref().filter(|value| !value.trim().is_empty()) {
+        *target = Some(value.clone());
+    }
+}
+
 /// Comparable black-box task metrics for baseline and evolved runs.
 ///
 /// Metrics are intentionally simple counts and durations. The scoring policy can

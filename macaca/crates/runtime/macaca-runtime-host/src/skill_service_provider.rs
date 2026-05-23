@@ -17,6 +17,7 @@ use macaca_skill::{
     skill_service_descriptor, ExecutableSkillToolSet, SelfEvolutionReportBuilder,
     SelfEvolutionScoringPolicy, SkillAliasResolveCommand, SkillAliasSnapshotCommand,
     SkillAliasUpsertCommand, SkillContentMutationCommand, SkillCurationLifecycleAction,
+    SkillEvaluationCheckpointAppendCommand, SkillEvaluationCheckpointAppendResult,
     SkillEvaluationReportCommand, SkillEvaluationReportResult, SkillEvaluationScoreCommand,
     SkillEvaluationScoreResult, SkillEvolutionPromoteDraftCommand,
     SkillEvolutionProposePatchCommand, SkillEvolutionRejectDraftCommand,
@@ -33,13 +34,14 @@ use macaca_skill::{
     SKILL_CURATION_RELEASE_QUARANTINE_COMMAND, SKILL_CURATION_RESTORE_COMMAND,
     SKILL_CURATION_ROLLBACK_COMMAND, SKILL_CURATION_RUN_COMMAND, SKILL_CURATION_SNAPSHOT_COMMAND,
     SKILL_CURATION_STATUS_COMMAND, SKILL_CURATION_SUPERSEDE_COMMAND, SKILL_CURATION_UNPIN_COMMAND,
-    SKILL_EVALUATION_REPORT_COMMAND, SKILL_EVALUATION_SCORE_COMMAND,
-    SKILL_EVOLUTION_PROMOTE_DRAFT_COMMAND, SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND,
-    SKILL_EVOLUTION_PROPOSE_PATCH_COMMAND, SKILL_EVOLUTION_REJECT_DRAFT_COMMAND,
-    SKILL_EVOLUTION_SNAPSHOT_COMMAND, SKILL_EXECUTABLE_LOAD_COMMAND,
-    SKILL_GOVERNANCE_RECORD_USAGE_COMMAND, SKILL_GOVERNANCE_SNAPSHOT_COMMAND, SKILL_SERVICE_ID,
-    SKILL_SERVICE_SNAPSHOT_COMMAND, SKILL_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND,
-    SKILL_TOOL_CATALOG_COMMAND, SKILL_TOOL_INVOKE_COMMAND,
+    SKILL_EVALUATION_CHECKPOINT_APPEND_COMMAND, SKILL_EVALUATION_REPORT_COMMAND,
+    SKILL_EVALUATION_SCORE_COMMAND, SKILL_EVOLUTION_PROMOTE_DRAFT_COMMAND,
+    SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND, SKILL_EVOLUTION_PROPOSE_PATCH_COMMAND,
+    SKILL_EVOLUTION_REJECT_DRAFT_COMMAND, SKILL_EVOLUTION_SNAPSHOT_COMMAND,
+    SKILL_EXECUTABLE_LOAD_COMMAND, SKILL_GOVERNANCE_RECORD_USAGE_COMMAND,
+    SKILL_GOVERNANCE_SNAPSHOT_COMMAND, SKILL_SERVICE_ID, SKILL_SERVICE_SNAPSHOT_COMMAND,
+    SKILL_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND, SKILL_TOOL_CATALOG_COMMAND,
+    SKILL_TOOL_INVOKE_COMMAND,
 };
 use macaca_tools::{ToolCommand, ToolCommandExecutor};
 use tokio::sync::Mutex;
@@ -558,6 +560,20 @@ impl SystemService for SkillSystemServiceProvider {
                     mutated = result.mutated,
                     include_discarded = typed.include_discarded,
                     "skill experience proposal snapshot emitted"
+                );
+                Ok(service_result(to_value(result)?, typed.trace))
+            }
+            SKILL_EVALUATION_CHECKPOINT_APPEND_COMMAND => {
+                let typed: SkillEvaluationCheckpointAppendCommand = decode(command.payload)?;
+                let result = SkillEvaluationCheckpointAppendResult::from_command(&typed);
+                tracing::info!(
+                    trace_id = %typed.trace.trace_id,
+                    evaluation_id = %result.record.evaluation_id,
+                    task_family_id = %result.record.task_family_id,
+                    checkpoint_kind = ?typed.checkpoint.kind,
+                    checkpoint_count = result.checkpoint_count,
+                    audit_event_count = result.audit_event_count,
+                    "skill self-evolution evaluation checkpoint appended"
                 );
                 Ok(service_result(to_value(result)?, typed.trace))
             }
