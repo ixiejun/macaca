@@ -35,7 +35,7 @@
   service provider.
 - [x] 2.8 Add an unavailable governance store strategy that returns structured
   unavailable states without panics or fake success.
-- [ ] 2.9 Migrate existing in-memory governance, alias, proposal, and lifecycle
+- [x] 2.9 Migrate existing in-memory governance, alias, proposal, and lifecycle
   state behind the new store interface through a compatibility adapter.
 - [ ] 2.10 Add structured logs for store append, read-model replay, snapshot
   build, and store-unavailable decisions.
