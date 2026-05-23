@@ -15,6 +15,7 @@ use macaca_sdk::{
     SkillGovernanceSnapshotCommand, SkillServicePolicyHints, SkillServiceScope, SystemSkillClient,
     UnavailableSystemSkillClient,
 };
+use serde_json::Value;
 use tracing::{info, warn};
 
 /// Shared operator evidence refs accepted by mutating CLI commands.
@@ -24,6 +25,47 @@ pub struct SkillCliEvidenceRefs {
     pub evidence_ref: Option<String>,
     pub policy_ref: Option<String>,
     pub approval_ref: Option<String>,
+}
+
+/// Optional live runtime target for CLI Skill commands.
+///
+/// CLI is a presentation shell, not a provider composition root.  When an
+/// application id is supplied, CLI reaches the already-running Web shell through
+/// its public HTTP facade so every command observes the same live
+/// `service.skill` runtime that the frontend and API use.  When no app id is
+/// supplied, commands deliberately keep the SDK Null Object path as a diagnostic
+/// unavailable state instead of pretending a live runtime exists.
+#[derive(Debug, Clone, Default)]
+pub struct SkillCliRuntimeTarget {
+    pub app_id: Option<String>,
+    pub api_base: Option<String>,
+}
+
+impl SkillCliRuntimeTarget {
+    fn live_client(&self) -> MacacaResult<Option<LiveSkillOperationsClient>> {
+        let Some(app_id) = self
+            .app_id
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        else {
+            return Ok(None);
+        };
+        uuid::Uuid::parse_str(app_id).map_err(|error| {
+            MacacaError::Config(format!(
+                "skill live operations require a valid app id: {error}"
+            ))
+        })?;
+        let api_base = self
+            .api_base
+            .clone()
+            .or_else(|| std::env::var("MACACA_API_BASE").ok())
+            .unwrap_or_else(|| "http://127.0.0.1:3001".into());
+        Ok(Some(LiveSkillOperationsClient::new(
+            api_base,
+            app_id.into(),
+        )?))
+    }
 }
 
 /// Lifecycle actions exposed by the CLI transport.
@@ -62,10 +104,26 @@ impl SkillCliLifecycleAction {
             Self::Reject => "reject",
         }
     }
+
+    fn route_segment(self) -> &'static str {
+        match self {
+            Self::ReleaseQuarantine => "release-quarantine",
+            _ => self.as_str(),
+        }
+    }
 }
 
 /// Print a sanitized Skill operations snapshot through the SDK Skill facade.
-pub async fn execute_skill_operations_snapshot() -> MacacaResult<()> {
+pub async fn execute_skill_operations_snapshot(target: SkillCliRuntimeTarget) -> MacacaResult<()> {
+    if let Some(client) = target.live_client()? {
+        let response = client.get("").await?;
+        info!(
+            app_id = %client.app_id,
+            "CLI emitted live Skill operations snapshot from public Web API facade"
+        );
+        return print_json(response);
+    }
+
     let client = UnavailableSystemSkillClient;
     let trace = TraceContext::new("cli-skill-operations-snapshot");
     let scope = SkillServiceScope::default();
@@ -106,11 +164,38 @@ pub async fn execute_skill_operations_snapshot() -> MacacaResult<()> {
 
 /// Run deterministic curation analysis or approval-gated apply through SDK.
 pub async fn execute_skill_curation_run(
+    target: SkillCliRuntimeTarget,
     dry_run: bool,
     stale_after_days: i64,
     narrow_use_threshold: u64,
     refs: SkillCliEvidenceRefs,
 ) -> MacacaResult<()> {
+    if let Some(client) = target.live_client()? {
+        let trace_label = if dry_run {
+            "cli-skill-curation-run"
+        } else {
+            "cli-skill-curation-apply"
+        };
+        let response = client
+            .post(
+                if dry_run {
+                    "/curation/run"
+                } else {
+                    "/curation/apply"
+                },
+                live_operator_payload(refs)
+                    .with_curation_thresholds(stale_after_days, narrow_use_threshold),
+            )
+            .await?;
+        info!(
+            app_id = %client.app_id,
+            command = trace_label,
+            dry_run,
+            "CLI forwarded live Skill curation command through public Web API facade"
+        );
+        return print_json(response);
+    }
+
     let client = UnavailableSystemSkillClient;
     let trace = TraceContext::new(if dry_run {
         "cli-skill-curation-run"
@@ -143,10 +228,27 @@ pub async fn execute_skill_curation_run(
 
 /// Forward one lifecycle mutation request through the SDK Skill facade.
 pub async fn execute_skill_lifecycle(
+    target: SkillCliRuntimeTarget,
     action: SkillCliLifecycleAction,
     skill_id: String,
     refs: SkillCliEvidenceRefs,
 ) -> MacacaResult<()> {
+    if let Some(client) = target.live_client()? {
+        let path = format!(
+            "/lifecycle/{}/{}",
+            action.route_segment(),
+            url_segment(&skill_id)
+        );
+        let response = client.post(&path, live_operator_payload(refs)).await?;
+        info!(
+            app_id = %client.app_id,
+            action = action.as_str(),
+            skill_id = %skill_id,
+            "CLI forwarded live Skill lifecycle command through public Web API facade"
+        );
+        return print_json(response);
+    }
+
     let client = UnavailableSystemSkillClient;
     let trace = TraceContext::new(format!("cli-skill-lifecycle-{}", action.as_str()));
     let command = SkillCurationLifecycleCommand {
@@ -184,9 +286,25 @@ pub async fn execute_skill_lifecycle(
 
 /// Restore governance state from a curation rollback memento ref through SDK.
 pub async fn execute_skill_rollback(
+    target: SkillCliRuntimeTarget,
     rollback_ref: String,
     refs: SkillCliEvidenceRefs,
 ) -> MacacaResult<()> {
+    if let Some(client) = target.live_client()? {
+        let response = client
+            .post(
+                "/curation/rollback",
+                live_operator_payload(refs).with_rollback_ref(rollback_ref.clone()),
+            )
+            .await?;
+        info!(
+            app_id = %client.app_id,
+            rollback_ref = %rollback_ref,
+            "CLI forwarded live Skill rollback command through public Web API facade"
+        );
+        return print_json(response);
+    }
+
     let client = UnavailableSystemSkillClient;
     let trace = TraceContext::new("cli-skill-curation-rollback");
     let command = SkillCurationRollbackCommand {
@@ -210,10 +328,24 @@ pub async fn execute_skill_rollback(
 
 /// Promote or reject a draft proposal through the SDK Skill facade.
 pub async fn execute_skill_proposal_decision(
+    target: SkillCliRuntimeTarget,
     proposal_id: String,
     promote: bool,
     refs: SkillCliEvidenceRefs,
 ) -> MacacaResult<()> {
+    if let Some(client) = target.live_client()? {
+        let decision = if promote { "promote" } else { "reject" };
+        let path = format!("/proposals/{}/{}", url_segment(&proposal_id), decision);
+        let response = client.post(&path, live_operator_payload(refs)).await?;
+        info!(
+            app_id = %client.app_id,
+            proposal_id = %proposal_id,
+            decision,
+            "CLI forwarded live Skill proposal decision through public Web API facade"
+        );
+        return print_json(response);
+    }
+
     let client = UnavailableSystemSkillClient;
     if promote {
         let trace = TraceContext::new("cli-skill-proposal-promote");
@@ -279,6 +411,169 @@ fn policy_hints() -> SkillServicePolicyHints {
     }
 }
 
+/// Small HTTP Adapter over the public Web Skill operations API.
+///
+/// The adapter intentionally knows only route transport details: app id, base
+/// URL, request method, and bounded JSON payloads.  It does not decode Skill
+/// service DTOs or make lifecycle decisions, preserving Web/service ownership
+/// of curation semantics while still allowing CLI to prove a live runtime path.
+#[derive(Debug, Clone)]
+struct LiveSkillOperationsClient {
+    api_base: String,
+    app_id: String,
+    http: reqwest::Client,
+}
+
+impl LiveSkillOperationsClient {
+    fn new(api_base: String, app_id: String) -> MacacaResult<Self> {
+        let api_base = normalize_api_base(&api_base)?;
+        Ok(Self {
+            api_base,
+            app_id,
+            http: reqwest::Client::new(),
+        })
+    }
+
+    async fn get(&self, path: &str) -> MacacaResult<Value> {
+        let url = self.url(path);
+        info!(
+            app_id = %self.app_id,
+            url = %url,
+            method = "GET",
+            "CLI requesting live Skill operations state from Web API facade"
+        );
+        let response = self.http.get(url).send().await.map_err(http_error)?;
+        decode_live_response(response).await
+    }
+
+    async fn post(&self, path: &str, payload: LiveSkillOperatorPayload) -> MacacaResult<Value> {
+        let url = self.url(path);
+        info!(
+            app_id = %self.app_id,
+            url = %url,
+            method = "POST",
+            evidence_count = payload.evidence_ids.len(),
+            policy_decision_count = payload.policy_decision_refs.len(),
+            approval_count = payload.approval_refs.len(),
+            "CLI forwarding live Skill operation to Web API facade"
+        );
+        let response = self
+            .http
+            .post(url)
+            .json(&payload)
+            .send()
+            .await
+            .map_err(http_error)?;
+        decode_live_response(response).await
+    }
+
+    fn url(&self, path: &str) -> String {
+        format!(
+            "{}/api/apps/{}/skills/operations{}",
+            self.api_base,
+            url_segment(&self.app_id),
+            path
+        )
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+struct LiveSkillOperatorPayload {
+    reason: String,
+    rationale: String,
+    evidence_ids: Vec<String>,
+    policy_decision_refs: Vec<String>,
+    approval_refs: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    rollback_ref: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    stale_after_days: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    narrow_use_threshold: Option<u64>,
+    source: String,
+    source_scope: String,
+}
+
+impl LiveSkillOperatorPayload {
+    fn with_curation_thresholds(
+        mut self,
+        stale_after_days: i64,
+        narrow_use_threshold: u64,
+    ) -> Self {
+        self.stale_after_days = Some(stale_after_days);
+        self.narrow_use_threshold = Some(narrow_use_threshold);
+        self
+    }
+
+    fn with_rollback_ref(mut self, rollback_ref: String) -> Self {
+        self.rollback_ref = Some(rollback_ref);
+        self
+    }
+}
+
+fn live_operator_payload(refs: SkillCliEvidenceRefs) -> LiveSkillOperatorPayload {
+    let reason = refs
+        .reason
+        .unwrap_or_else(|| "cli_skill_operation".into())
+        .trim()
+        .to_string();
+    let reason = if reason.is_empty() {
+        "cli_skill_operation".into()
+    } else {
+        reason
+    };
+    LiveSkillOperatorPayload {
+        rationale: reason.clone(),
+        reason,
+        evidence_ids: optional_vec(refs.evidence_ref),
+        policy_decision_refs: optional_vec(refs.policy_ref),
+        approval_refs: optional_vec(refs.approval_ref),
+        rollback_ref: None,
+        stale_after_days: None,
+        narrow_use_threshold: None,
+        source: "cli-skill-operations".into(),
+        source_scope: "operator".into(),
+    }
+}
+
+fn normalize_api_base(value: &str) -> MacacaResult<String> {
+    let trimmed = value.trim().trim_end_matches('/');
+    if trimmed.is_empty() {
+        return Err(MacacaError::Config(
+            "skill live operations require a non-empty API base".into(),
+        ));
+    }
+    if !(trimmed.starts_with("http://") || trimmed.starts_with("https://")) {
+        return Err(MacacaError::Config(
+            "skill live operations API base must start with http:// or https://".into(),
+        ));
+    }
+    Ok(trimmed.to_string())
+}
+
+fn url_segment(value: &str) -> String {
+    value.replace('%', "%25").replace('/', "%2F")
+}
+
+fn http_error(error: reqwest::Error) -> MacacaError {
+    MacacaError::Config(format!("skill live operations API request failed: {error}"))
+}
+
+async fn decode_live_response(response: reqwest::Response) -> MacacaResult<Value> {
+    let status = response.status();
+    let data = response.json::<Value>().await.map_err(http_error)?;
+    if status.is_success() {
+        return Ok(data);
+    }
+    let reason = data
+        .get("error")
+        .and_then(Value::as_str)
+        .unwrap_or("skill live operations request failed");
+    Err(MacacaError::Config(format!(
+        "skill live operations API returned HTTP {status}: {reason}"
+    )))
+}
+
 fn print_sdk_result<T: serde::Serialize>(
     trace: TraceContext,
     result: MacacaResult<T>,
@@ -312,9 +607,65 @@ fn print_json(value: serde_json::Value) -> MacacaResult<()> {
 
 #[cfg(test)]
 mod tests {
+    use super::{
+        live_operator_payload, normalize_api_base, SkillCliEvidenceRefs, SkillCliLifecycleAction,
+        SkillCliRuntimeTarget,
+    };
+
     #[tokio::test]
     async fn cli_skill_snapshot_uses_sdk_null_object() {
-        super::execute_skill_operations_snapshot().await.unwrap();
+        super::execute_skill_operations_snapshot(SkillCliRuntimeTarget::default())
+            .await
+            .unwrap();
+    }
+
+    #[test]
+    fn cli_skill_live_target_builds_public_web_api_url() {
+        let target = SkillCliRuntimeTarget {
+            app_id: Some("2c96f3f2-b78c-5edd-beb4-740c8c004910".into()),
+            api_base: Some("http://127.0.0.1:3001/".into()),
+        };
+        let client = target.live_client().unwrap().unwrap();
+        assert_eq!(
+            client.url("/curation/run"),
+            "http://127.0.0.1:3001/api/apps/2c96f3f2-b78c-5edd-beb4-740c8c004910/skills/operations/curation/run"
+        );
+    }
+
+    #[test]
+    fn cli_skill_live_payload_keeps_operator_refs_bounded() {
+        let payload = live_operator_payload(SkillCliEvidenceRefs {
+            reason: Some("approved curation".into()),
+            evidence_ref: Some("evidence://run/1".into()),
+            policy_ref: Some("policy://decision/1".into()),
+            approval_ref: Some("approval://operator/1".into()),
+        })
+        .with_curation_thresholds(14, 2);
+        let json = serde_json::to_value(payload).unwrap();
+        assert_eq!(json["reason"], "approved curation");
+        assert_eq!(json["evidence_ids"][0], "evidence://run/1");
+        assert_eq!(json["policy_decision_refs"][0], "policy://decision/1");
+        assert_eq!(json["approval_refs"][0], "approval://operator/1");
+        assert_eq!(json["stale_after_days"], 14);
+        assert_eq!(json["narrow_use_threshold"], 2);
+    }
+
+    #[test]
+    fn cli_skill_live_target_rejects_non_http_api_base() {
+        assert!(normalize_api_base("file:///tmp/socket").is_err());
+        assert_eq!(
+            normalize_api_base("http://127.0.0.1:3001/").unwrap(),
+            "http://127.0.0.1:3001"
+        );
+    }
+
+    #[test]
+    fn cli_skill_lifecycle_uses_public_route_segments() {
+        assert_eq!(SkillCliLifecycleAction::Pin.route_segment(), "pin");
+        assert_eq!(
+            SkillCliLifecycleAction::ReleaseQuarantine.route_segment(),
+            "release-quarantine"
+        );
     }
 
     #[test]

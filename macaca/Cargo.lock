@@ -1466,6 +1466,7 @@ dependencies = [
  "flate2",
  "macaca-proto",
  "macaca-sdk",
+ "reqwest",
  "sd-notify",
  "serde",
  "serde_json",

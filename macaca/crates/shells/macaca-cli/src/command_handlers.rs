@@ -8,7 +8,9 @@ use macaca_proto::error::{MacacaError, MacacaResult};
 use tokio::process::Command;
 
 use crate::commands;
-use crate::skill_operations::{self, SkillCliEvidenceRefs, SkillCliLifecycleAction};
+use crate::skill_operations::{
+    self, SkillCliEvidenceRefs, SkillCliLifecycleAction, SkillCliRuntimeTarget,
+};
 
 /// Canonical command execution boundary for CLI subcommands.
 #[async_trait(?Send)]
@@ -67,18 +69,27 @@ impl CliCommandHandler for PluginListCommandHandler {
 
 /// Handler for printing bounded Skill governance operations state.
 #[derive(Debug, Default)]
-pub struct SkillOperationsSnapshotCommandHandler;
+pub struct SkillOperationsSnapshotCommandHandler {
+    target: SkillCliRuntimeTarget,
+}
+
+impl SkillOperationsSnapshotCommandHandler {
+    pub fn new(target: SkillCliRuntimeTarget) -> Self {
+        Self { target }
+    }
+}
 
 #[async_trait(?Send)]
 impl CliCommandHandler for SkillOperationsSnapshotCommandHandler {
     async fn run(&self) -> MacacaResult<()> {
-        skill_operations::execute_skill_operations_snapshot().await
+        skill_operations::execute_skill_operations_snapshot(self.target.clone()).await
     }
 }
 
 /// Handler for deterministic or approval-gated Skill curation runs.
 #[derive(Debug)]
 pub struct SkillCurationRunCommandHandler {
+    target: SkillCliRuntimeTarget,
     dry_run: bool,
     stale_after_days: i64,
     narrow_use_threshold: u64,
@@ -87,12 +98,14 @@ pub struct SkillCurationRunCommandHandler {
 
 impl SkillCurationRunCommandHandler {
     pub fn new(
+        target: SkillCliRuntimeTarget,
         dry_run: bool,
         stale_after_days: i64,
         narrow_use_threshold: u64,
         refs: SkillCliEvidenceRefs,
     ) -> Self {
         Self {
+            target,
             dry_run,
             stale_after_days,
             narrow_use_threshold,
@@ -105,6 +118,7 @@ impl SkillCurationRunCommandHandler {
 impl CliCommandHandler for SkillCurationRunCommandHandler {
     async fn run(&self) -> MacacaResult<()> {
         skill_operations::execute_skill_curation_run(
+            self.target.clone(),
             self.dry_run,
             self.stale_after_days,
             self.narrow_use_threshold,
@@ -117,6 +131,7 @@ impl CliCommandHandler for SkillCurationRunCommandHandler {
 /// Handler for one Skill lifecycle operation.
 #[derive(Debug)]
 pub struct SkillLifecycleCommandHandler {
+    target: SkillCliRuntimeTarget,
     action: SkillCliLifecycleAction,
     skill_id: String,
     refs: SkillCliEvidenceRefs,
@@ -124,11 +139,13 @@ pub struct SkillLifecycleCommandHandler {
 
 impl SkillLifecycleCommandHandler {
     pub fn new(
+        target: SkillCliRuntimeTarget,
         action: SkillCliLifecycleAction,
         skill_id: String,
         refs: SkillCliEvidenceRefs,
     ) -> Self {
         Self {
+            target,
             action,
             skill_id,
             refs,
@@ -140,6 +157,7 @@ impl SkillLifecycleCommandHandler {
 impl CliCommandHandler for SkillLifecycleCommandHandler {
     async fn run(&self) -> MacacaResult<()> {
         skill_operations::execute_skill_lifecycle(
+            self.target.clone(),
             self.action,
             self.skill_id.clone(),
             self.refs.clone(),
@@ -151,34 +169,55 @@ impl CliCommandHandler for SkillLifecycleCommandHandler {
 /// Handler for restoring a Skill curation rollback memento.
 #[derive(Debug)]
 pub struct SkillRollbackCommandHandler {
+    target: SkillCliRuntimeTarget,
     rollback_ref: String,
     refs: SkillCliEvidenceRefs,
 }
 
 impl SkillRollbackCommandHandler {
-    pub fn new(rollback_ref: String, refs: SkillCliEvidenceRefs) -> Self {
-        Self { rollback_ref, refs }
+    pub fn new(
+        target: SkillCliRuntimeTarget,
+        rollback_ref: String,
+        refs: SkillCliEvidenceRefs,
+    ) -> Self {
+        Self {
+            target,
+            rollback_ref,
+            refs,
+        }
     }
 }
 
 #[async_trait(?Send)]
 impl CliCommandHandler for SkillRollbackCommandHandler {
     async fn run(&self) -> MacacaResult<()> {
-        skill_operations::execute_skill_rollback(self.rollback_ref.clone(), self.refs.clone()).await
+        skill_operations::execute_skill_rollback(
+            self.target.clone(),
+            self.rollback_ref.clone(),
+            self.refs.clone(),
+        )
+        .await
     }
 }
 
 /// Handler for proposal promotion or rejection.
 #[derive(Debug)]
 pub struct SkillProposalDecisionCommandHandler {
+    target: SkillCliRuntimeTarget,
     proposal_id: String,
     promote: bool,
     refs: SkillCliEvidenceRefs,
 }
 
 impl SkillProposalDecisionCommandHandler {
-    pub fn new(proposal_id: String, promote: bool, refs: SkillCliEvidenceRefs) -> Self {
+    pub fn new(
+        target: SkillCliRuntimeTarget,
+        proposal_id: String,
+        promote: bool,
+        refs: SkillCliEvidenceRefs,
+    ) -> Self {
         Self {
+            target,
             proposal_id,
             promote,
             refs,
@@ -190,6 +229,7 @@ impl SkillProposalDecisionCommandHandler {
 impl CliCommandHandler for SkillProposalDecisionCommandHandler {
     async fn run(&self) -> MacacaResult<()> {
         skill_operations::execute_skill_proposal_decision(
+            self.target.clone(),
             self.proposal_id.clone(),
             self.promote,
             self.refs.clone(),

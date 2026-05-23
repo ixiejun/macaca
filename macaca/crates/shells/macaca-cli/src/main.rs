@@ -9,7 +9,9 @@ use macaca_cli::command_handlers::{
     SkillOperationsSnapshotCommandHandler, SkillProposalDecisionCommandHandler,
     SkillRollbackCommandHandler, StatusCommandHandler, VersionCommandHandler, WebCommandHandler,
 };
-use macaca_cli::skill_operations::{SkillCliEvidenceRefs, SkillCliLifecycleAction};
+use macaca_cli::skill_operations::{
+    SkillCliEvidenceRefs, SkillCliLifecycleAction, SkillCliRuntimeTarget,
+};
 use macaca_proto::config::MacacaConfig;
 
 /// Agent OS — autonomous agent orchestration platform.
@@ -36,6 +38,8 @@ enum Commands {
     },
     /// Skill governance and curation operations.
     Skill {
+        #[command(flatten)]
+        target: SkillRuntimeArgs,
         #[command(subcommand)]
         command: SkillCommands,
     },
@@ -54,6 +58,19 @@ enum Commands {
 enum PluginCommands {
     /// List plugins through Plugin Control Service.
     List,
+}
+
+/// Optional live Web/runtime target for Skill operations.
+///
+/// These flags keep CLI as a terminal Adapter.  Supplying `--app-id` tells CLI
+/// to call the public Web API facade for the already-running runtime.  Omitting
+/// it preserves the structured SDK unavailable diagnostic path.
+#[derive(Args, Clone, Default)]
+struct SkillRuntimeArgs {
+    #[arg(long)]
+    app_id: Option<String>,
+    #[arg(long)]
+    api_base: Option<String>,
 }
 
 /// Skill operations subcommands.
@@ -166,7 +183,7 @@ async fn main() {
         Commands::Plugin { command } => match command {
             PluginCommands::List => PluginListCommandHandler.run().await,
         },
-        Commands::Skill { command } => run_skill_command(command).await,
+        Commands::Skill { target, command } => run_skill_command(target.into(), command).await,
         Commands::Version => {
             VersionCommandHandler::new(env!("CARGO_PKG_VERSION"))
                 .run()
@@ -181,14 +198,22 @@ async fn main() {
     }
 }
 
-async fn run_skill_command(command: SkillCommands) -> macaca_proto::error::MacacaResult<()> {
+async fn run_skill_command(
+    target: SkillCliRuntimeTarget,
+    command: SkillCommands,
+) -> macaca_proto::error::MacacaResult<()> {
     match command {
-        SkillCommands::Operations => SkillOperationsSnapshotCommandHandler.run().await,
+        SkillCommands::Operations => {
+            SkillOperationsSnapshotCommandHandler::new(target)
+                .run()
+                .await
+        }
         SkillCommands::CurationRun {
             stale_after_days,
             narrow_use_threshold,
         } => {
             SkillCurationRunCommandHandler::new(
+                target,
                 true,
                 stale_after_days,
                 narrow_use_threshold,
@@ -203,6 +228,7 @@ async fn run_skill_command(command: SkillCommands) -> macaca_proto::error::Macac
             refs,
         } => {
             SkillCurationRunCommandHandler::new(
+                target,
                 false,
                 stale_after_days,
                 narrow_use_threshold,
@@ -211,20 +237,21 @@ async fn run_skill_command(command: SkillCommands) -> macaca_proto::error::Macac
             .run()
             .await
         }
-        SkillCommands::Lifecycle { action } => run_skill_lifecycle_command(action).await,
+        SkillCommands::Lifecycle { action } => run_skill_lifecycle_command(target, action).await,
         SkillCommands::Rollback { rollback_ref, refs } => {
-            SkillRollbackCommandHandler::new(rollback_ref, refs.into())
+            SkillRollbackCommandHandler::new(target, rollback_ref, refs.into())
                 .run()
                 .await
         }
-        SkillCommands::Proposal { command } => run_skill_proposal_command(command).await,
+        SkillCommands::Proposal { command } => run_skill_proposal_command(target, command).await,
     }
 }
 
 async fn run_skill_lifecycle_command(
+    runtime_target: SkillCliRuntimeTarget,
     action: SkillLifecycleCommands,
 ) -> macaca_proto::error::MacacaResult<()> {
-    let (action, target) = match action {
+    let (action, skill_target) = match action {
         SkillLifecycleCommands::Pin(target) => (SkillCliLifecycleAction::Pin, target),
         SkillLifecycleCommands::Unpin(target) => (SkillCliLifecycleAction::Unpin, target),
         SkillLifecycleCommands::Archive(target) => (SkillCliLifecycleAction::Archive, target),
@@ -235,24 +262,49 @@ async fn run_skill_lifecycle_command(
         }
         SkillLifecycleCommands::Reject(target) => (SkillCliLifecycleAction::Reject, target),
     };
-    SkillLifecycleCommandHandler::new(action, target.skill_id, target.refs.into())
-        .run()
-        .await
+    SkillLifecycleCommandHandler::new(
+        runtime_target,
+        action,
+        skill_target.skill_id,
+        skill_target.refs.into(),
+    )
+    .run()
+    .await
 }
 
 async fn run_skill_proposal_command(
+    target: SkillCliRuntimeTarget,
     command: SkillProposalCommands,
 ) -> macaca_proto::error::MacacaResult<()> {
     match command {
         SkillProposalCommands::Promote(args) => {
-            SkillProposalDecisionCommandHandler::new(args.proposal_id, true, args.refs.into())
-                .run()
-                .await
+            SkillProposalDecisionCommandHandler::new(
+                target,
+                args.proposal_id,
+                true,
+                args.refs.into(),
+            )
+            .run()
+            .await
         }
         SkillProposalCommands::Reject(args) => {
-            SkillProposalDecisionCommandHandler::new(args.proposal_id, false, args.refs.into())
-                .run()
-                .await
+            SkillProposalDecisionCommandHandler::new(
+                target,
+                args.proposal_id,
+                false,
+                args.refs.into(),
+            )
+            .run()
+            .await
+        }
+    }
+}
+
+impl From<SkillRuntimeArgs> for SkillCliRuntimeTarget {
+    fn from(args: SkillRuntimeArgs) -> Self {
+        Self {
+            app_id: args.app_id,
+            api_base: args.api_base,
         }
     }
 }
