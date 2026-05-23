@@ -272,13 +272,13 @@
 
 ## 16. Documentation And Operator Runbooks
 
-- [ ] 16.1 Document Skill Governance Store record classes and replay behavior.
-- [ ] 16.2 Document lifecycle states, transition rules, and protected ownership
+- [x] 16.1 Document Skill Governance Store record classes and replay behavior.
+- [x] 16.2 Document lifecycle states, transition rules, and protected ownership
   classes.
-- [ ] 16.3 Document curation run phases, deterministic fallback, semantic
+- [x] 16.3 Document curation run phases, deterministic fallback, semantic
   provider absence, report refs, and rollback flow.
-- [ ] 16.4 Document approval policy expectations for private, central,
+- [x] 16.4 Document approval policy expectations for private, central,
   application-owned, marketplace, bundled, paid, and encrypted skills.
-- [ ] 16.5 Document Context Composer visibility rules and alias behavior.
-- [ ] 16.6 Document operation examples using generic skill ids and service
+- [x] 16.5 Document Context Composer visibility rules and alias behavior.
+- [x] 16.6 Document operation examples using generic skill ids and service
   commands only, with no application-specific workflow names.
