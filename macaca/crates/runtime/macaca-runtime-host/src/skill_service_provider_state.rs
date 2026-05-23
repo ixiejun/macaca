@@ -215,6 +215,13 @@ impl SkillProviderGovernanceState {
             policy_decision_refs = sanitized_policy_decisions.len(),
             "skill governance lifecycle mutation accepted"
         );
+        let mut lifecycle_metadata = BTreeMap::new();
+        if let Some(task_id) = command.task_id.as_ref().filter(|id| !id.trim().is_empty()) {
+            lifecycle_metadata.insert("task_id".into(), task_id.clone());
+        }
+        for (index, evidence_id) in sanitized_evidence.iter().enumerate().skip(1) {
+            lifecycle_metadata.insert(format!("evidence_ref.{index}"), evidence_id.clone());
+        }
         let mut event = SkillGovernanceEventRecord::new(
             event_id("skill-governance-lifecycle", captured_at),
             &command.trace,
@@ -250,7 +257,7 @@ impl SkillProviderGovernanceState {
                     }
                 },
                 author_kind: command.author_kind.clone(),
-                created_by: None,
+                created_by: command.scope.agent_name.clone(),
                 pinned: match &action {
                     SkillCurationLifecycleAction::Pin => Some(true),
                     SkillCurationLifecycleAction::Unpin => Some(false),
@@ -262,7 +269,7 @@ impl SkillProviderGovernanceState {
                     | SkillCurationLifecycleAction::Reject => None,
                 },
                 evidence_id: sanitized_evidence.first().cloned(),
-                metadata: BTreeMap::new(),
+                metadata: lifecycle_metadata,
             }),
         );
         event.policy_decision_ids = sanitized_policy_decisions.clone();

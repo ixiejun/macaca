@@ -50,6 +50,14 @@ pub const SKILL_EVOLUTION_SNAPSHOT_COMMAND: &str = "skill.evolution.snapshot";
 pub struct SkillServiceScope {
     pub application_id: Option<ApplicationId>,
     pub session_id: Option<String>,
+    /// Optional tenant boundary for future multi-tenant Skill governance.
+    ///
+    /// The Skill service treats tenant identity as routing and audit metadata
+    /// only.  It must not infer application behavior from the value, but
+    /// Store/EventLog providers need the reference to replay who owned a
+    /// governance event when curation, promotion, or mutation becomes durable.
+    #[serde(default)]
+    pub tenant_id: Option<String>,
     pub agent_name: Option<String>,
 }
 
@@ -66,6 +74,7 @@ impl SkillServiceScope {
                 session_id.into(),
                 "skill service requires session_id",
             )?),
+            tenant_id: None,
             agent_name: Some(non_empty(
                 agent_name.into(),
                 "skill service requires agent_name",
@@ -79,6 +88,7 @@ impl Default for SkillServiceScope {
         Self {
             application_id: None,
             session_id: None,
+            tenant_id: None,
             agent_name: None,
         }
     }

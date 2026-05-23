@@ -49,7 +49,12 @@ fn local_governance_store_logs_key_audit_nodes_with_structured_fields() {
 async fn local_governance_state_replays_through_store_strategy_adapter() {
     let state = SkillProviderGovernanceState::default();
     let trace = TraceContext::new("trace-local-governance-store-adapter");
-    let scope = SkillServiceScope::default();
+    let scope = SkillServiceScope {
+        application_id: None,
+        session_id: Some("session-local-1".into()),
+        tenant_id: Some("tenant-local-1".into()),
+        agent_name: Some("agent".into()),
+    };
 
     let mut usage_metadata = BTreeMap::new();
     usage_metadata.insert("task_id".into(), "task-local-1".into());
@@ -83,6 +88,7 @@ async fn local_governance_state_replays_through_store_strategy_adapter() {
                 author_kind: SkillAuthorKind::Agent,
                 reason: "verified stale lifecycle metadata".into(),
                 evidence_ids: vec!["lifecycle-evidence-1".into()],
+                task_id: Some("task-local-1".into()),
                 policy_decision_refs: vec!["policy://decision/local-lifecycle".into()],
                 policy: SkillServicePolicyHints::default(),
             },
@@ -144,6 +150,24 @@ async fn local_governance_state_replays_through_store_strategy_adapter() {
             .provenance
             .task_id
             .as_deref(),
+        Some("task-local-1")
+    );
+    assert!(read_model.provenance_events.iter().all(|event| event
+        .provenance
+        .session_id
+        .as_deref()
+        == Some("session-local-1")));
+    assert!(read_model
+        .provenance_events
+        .iter()
+        .all(|event| event.provenance.tenant_id.as_deref() == Some("tenant-local-1")));
+    let lifecycle_event = read_model
+        .provenance_events
+        .iter()
+        .find(|event| matches!(event.action, macaca_skill::SkillProvenanceAction::Archived))
+        .expect("lifecycle mutation should emit archived provenance");
+    assert_eq!(
+        lifecycle_event.provenance.task_id.as_deref(),
         Some("task-local-1")
     );
     assert_eq!(read_model.aliases.len(), 1);

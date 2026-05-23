@@ -109,6 +109,7 @@ fn application_skill_scope(app_id: ApplicationId) -> SkillServiceScope {
     SkillServiceScope {
         application_id: Some(app_id),
         session_id: None,
+        tenant_id: None,
         agent_name: None,
     }
 }

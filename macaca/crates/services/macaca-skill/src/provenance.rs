@@ -32,6 +32,8 @@ pub struct SkillProvenance {
     pub author_agent_id: Option<String>,
     pub application_id: Option<String>,
     pub session_id: Option<String>,
+    #[serde(default)]
+    pub tenant_id: Option<String>,
     pub task_id: Option<String>,
     pub trace_id: String,
     pub evidence_refs: Vec<String>,
@@ -127,7 +129,7 @@ impl SkillProvenanceEventRecord {
                 scope,
                 observation.metadata.get("task_id").cloned(),
                 trace_id,
-                observation.evidence_id.iter().cloned().collect(),
+                evidence_refs_from_observation(observation),
                 observation.source_scope.clone(),
                 occurred_at,
             ),
@@ -299,6 +301,7 @@ fn base_provenance(
         author_agent_id,
         application_id: scope.application_id.as_ref().map(ToString::to_string),
         session_id: scope.session_id.clone(),
+        tenant_id: scope.tenant_id.clone(),
         task_id: task_id.filter(|value| !value.trim().is_empty()),
         trace_id: trace_id.to_string(),
         evidence_refs: evidence_refs
@@ -310,6 +313,24 @@ fn base_provenance(
         created_at: occurred_at,
         updated_at: occurred_at,
     }
+}
+
+fn evidence_refs_from_observation(observation: &SkillUsageObservation) -> Vec<String> {
+    let mut evidence_refs = observation
+        .evidence_id
+        .iter()
+        .filter(|value| !value.trim().is_empty())
+        .cloned()
+        .collect::<Vec<_>>();
+    for (key, value) in &observation.metadata {
+        if key == "evidence_ref" || key.starts_with("evidence_ref.") {
+            let trimmed = value.trim();
+            if !trimmed.is_empty() && !evidence_refs.iter().any(|existing| existing == trimmed) {
+                evidence_refs.push(trimmed.to_string());
+            }
+        }
+    }
+    evidence_refs
 }
 
 fn action_from_usage(event: &SkillUsageEventKind) -> SkillProvenanceAction {

@@ -290,6 +290,21 @@ Every command logs key execution nodes with sanitized fields:
   payloads, manifests, package bytes, credentials, signatures, and full skill
   bodies.
 
+### Slice 4B: Optional Scope References In Provenance
+
+- Patterns: Command DTOs carry optional app/session/tenant/task references as
+  metadata; Observer projects those refs into provenance events; Facade remains
+  unchanged because shells still submit typed service commands instead of
+  interpreting governance semantics.
+- Ownership: `macaca-skill` owns the scope/provenance DTOs and keeps tenant
+  identity as an audit/routing ref. `macaca-runtime-host` copies lifecycle task
+  refs and additional evidence refs into the local compatibility event only.
+  No kernel, SDK, Web, CLI, frontend, or application-specific behavior is
+  introduced.
+- Safety: optional refs are ids only. The slice does not add raw prompt, raw
+  task output, provider payload, manifest, package bytes, credential, signature,
+  or full skill body fields to telemetry, provenance, snapshots, or logs.
+
 ## Risks And Mitigations
 
 - Risk: skill mutation corrupts active packages. Mitigation: atomic writes,

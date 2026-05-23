@@ -39,6 +39,7 @@ fn lifecycle_command(
         author_kind: SkillAuthorKind::Agent,
         reason: "operator requested a metadata-only lifecycle transition".into(),
         evidence_ids,
+        task_id: Some("task-lifecycle-test".into()),
         policy_decision_refs: vec!["policy://decision/lifecycle-test".into()],
         policy: SkillServicePolicyHints::default(),
     }

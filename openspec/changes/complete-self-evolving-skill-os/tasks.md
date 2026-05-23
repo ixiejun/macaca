@@ -66,7 +66,7 @@
   patch, lifecycle, success, and failure events.
 - [ ] 4.2 Add provenance capture at skill discovery, proposal creation,
   promotion, patch, curation, merge, archive, restore, quarantine, and rollback.
-- [ ] 4.3 Attach session, task, application, tenant, trace, and evidence refs
+- [x] 4.3 Attach session, task, application, tenant, trace, and evidence refs
   when available, while keeping fields optional and provider-neutral.
 - [ ] 4.4 Ensure no raw prompt, raw task output, provider payload, manifest,
   package bytes, secret, credential, or full skill body enters telemetry.

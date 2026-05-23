@@ -96,6 +96,7 @@ fn supersede_command_requires_alias_redirect_evidence() {
         author_kind: SkillAuthorKind::Agent,
         reason: "validate alias-before-supersede contract".into(),
         evidence_ids: vec!["evidence://task/supersede".into()],
+        task_id: Some("task-supersede".into()),
         policy_decision_refs: vec!["policy://decision/supersede".into()],
         policy: SkillServicePolicyHints::default(),
     };
@@ -135,6 +136,7 @@ fn lifecycle_command_requires_evidence_and_policy_decision_refs() {
         author_kind: SkillAuthorKind::Agent,
         reason: "validate lifecycle mutation audit contract".into(),
         evidence_ids: vec!["evidence://task/1".into()],
+        task_id: Some("task-lifecycle-contract".into()),
         policy_decision_refs: vec!["policy://decision/1".into()],
         policy: SkillServicePolicyHints::default(),
     };

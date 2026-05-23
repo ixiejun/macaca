@@ -370,6 +370,7 @@ mod tests {
             author_agent_id: Some("agent-maintainer".into()),
             application_id: Some("app-alpha".into()),
             session_id: Some("session-1".into()),
+            tenant_id: Some("tenant-alpha".into()),
             task_id: Some("task-1".into()),
             trace_id: "trace-1".into(),
             evidence_refs: vec!["store://evidence/task-1".into()],

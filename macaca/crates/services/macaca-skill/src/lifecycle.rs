@@ -89,6 +89,13 @@ pub struct SkillCurationLifecycleCommand {
     pub author_kind: SkillAuthorKind,
     pub reason: String,
     pub evidence_ids: Vec<String>,
+    /// Optional task reference that caused the lifecycle decision.
+    ///
+    /// Lifecycle commands are often emitted by curation or task-review flows.
+    /// Capturing only the task id keeps provenance replayable without storing
+    /// raw task output, prompts, or provider payloads in the Skill service.
+    #[serde(default)]
+    pub task_id: Option<String>,
     /// Policy decision refs prove that the lifecycle mutation passed an
     /// explicit governance decision before the provider mutates metadata.  The
     /// refs are typed separately from free-form policy metadata so Store/EventLog
