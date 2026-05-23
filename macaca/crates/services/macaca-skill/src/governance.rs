@@ -7,6 +7,8 @@
 //! runtime-host can back them with an in-memory store today, while a future
 //! Store/EventLog-backed provider can implement the same command surface.
 
+use std::collections::BTreeMap;
+
 use chrono::{DateTime, Utc};
 use macaca_proto::TraceContext;
 use serde::{Deserialize, Serialize};
@@ -102,6 +104,8 @@ pub struct SkillGovernanceRecord {
     pub lifecycle: SkillLifecycleState,
     pub pinned: bool,
     pub telemetry: SkillUsageTelemetry,
+    #[serde(default)]
+    pub diagnostics: SkillGovernanceDiagnostics,
     pub updated_at: DateTime<Utc>,
     pub evidence_ids: Vec<String>,
 }
@@ -129,6 +133,7 @@ impl SkillGovernanceRecord {
             lifecycle: SkillLifecycleState::Active,
             pinned: observation.pinned.unwrap_or(false),
             telemetry: SkillUsageTelemetry::default(),
+            diagnostics: SkillGovernanceDiagnostics::from_metadata(&observation.metadata),
             updated_at: observed_at,
             evidence_ids: Vec::new(),
         };
@@ -139,6 +144,7 @@ impl SkillGovernanceRecord {
     /// Apply a sanitized observation while preserving existing provenance.
     pub fn apply(&mut self, observation: &SkillUsageObservation, observed_at: DateTime<Utc>) {
         self.telemetry.record(&observation.event, observed_at);
+        self.diagnostics.apply_metadata(&observation.metadata);
         self.updated_at = observed_at;
         if let Some(pinned) = observation.pinned {
             self.pinned = pinned;
@@ -191,8 +197,59 @@ impl SkillGovernanceRecord {
             lifecycle: SkillLifecycleState::Active,
             pinned: false,
             telemetry: SkillUsageTelemetry::default(),
+            diagnostics: SkillGovernanceDiagnostics::default(),
             updated_at: observed_at,
             evidence_ids: non_empty_evidence(&command.evidence_ids),
+        }
+    }
+}
+
+/// Sanitized curation diagnostics derived from provider metadata.
+///
+/// These fields are deliberately small, typed hints instead of a raw metadata
+/// echo.  Curation can reason about package size, metadata validity, missing
+/// dependency refs, and quarantine signals without storing prompts, skill
+/// bodies, package bytes, or application-specific payloads in governance state.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct SkillGovernanceDiagnostics {
+    pub size_bytes: Option<u64>,
+    pub invalid_metadata: bool,
+    pub quarantine_required: bool,
+    pub missing_dependency_refs: Vec<String>,
+}
+
+impl SkillGovernanceDiagnostics {
+    /// Build diagnostics from a bounded allowlist of observation metadata keys.
+    pub fn from_metadata(metadata: &BTreeMap<String, String>) -> Self {
+        let mut diagnostics = Self::default();
+        diagnostics.apply_metadata(metadata);
+        diagnostics
+    }
+
+    /// Apply one observation's diagnostic hints without retaining raw metadata.
+    pub fn apply_metadata(&mut self, metadata: &BTreeMap<String, String>) {
+        if let Some(size_bytes) = metadata
+            .get("skill.size_bytes")
+            .and_then(|value| value.trim().parse::<u64>().ok())
+        {
+            self.size_bytes = Some(size_bytes);
+        }
+        if matches_bool(metadata.get("skill.metadata_valid"), false)
+            || matches_bool(metadata.get("skill.invalid_metadata"), true)
+        {
+            self.invalid_metadata = true;
+        }
+        if matches_bool(metadata.get("skill.quarantine_required"), true) {
+            self.quarantine_required = true;
+        }
+        if let Some(refs) = metadata.get("skill.missing_dependencies") {
+            self.missing_dependency_refs = refs
+                .split(',')
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .take(16)
+                .map(|value| value.chars().take(128).collect::<String>())
+                .collect();
         }
     }
 }
@@ -309,4 +366,17 @@ fn non_empty_evidence(evidence_ids: &[String]) -> Vec<String> {
         .filter(|id| !id.trim().is_empty())
         .cloned()
         .collect()
+}
+
+fn matches_bool(value: Option<&String>, expected: bool) -> bool {
+    value
+        .map(|raw| {
+            matches!(
+                raw.trim().to_ascii_lowercase().as_str(),
+                "true" | "1" | "yes"
+            )
+        })
+        .unwrap_or(false)
+        == expected
+        && value.is_some()
 }

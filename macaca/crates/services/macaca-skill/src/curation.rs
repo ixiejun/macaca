@@ -6,7 +6,7 @@
 //! refs, counters, and policy ids, never raw prompts, provider payloads, package
 //! bytes, manifests, or full `SKILL.md` bodies.
 
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Utc};
 use macaca_proto::TraceContext;
 use serde::{Deserialize, Serialize};
 
@@ -15,7 +15,6 @@ use crate::governance_store::{
     SkillCurationRunRecord, SkillGovernanceSnapshotRefRecord, SkillRollbackRefRecord,
 };
 use crate::service_contract::{SkillServicePolicyHints, SkillServiceScope};
-use crate::telemetry::SkillUsageTelemetry;
 
 /// Command for reading curation runner readiness without starting a run.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -200,9 +199,38 @@ pub struct SkillCurationRollbackResult {
 pub enum SkillCurationAction {
     Keep,
     Protected,
+    WouldQuarantine,
+    WouldReduceSize,
+    WouldFixMetadata,
+    WouldResolveMissingDependency,
     WouldMarkStale,
     WouldArchive,
     WouldReviewForConsolidation,
+}
+
+/// Deterministic curation phase that produced a recommendation.
+///
+/// A recommendation can carry multiple phases because diagnostics are
+/// independent.  For example, a skill may be both oversized and missing a
+/// dependency.  The action remains the highest-priority non-destructive plan,
+/// while phases keep the report audit-friendly without shell-side inference.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SkillCurationPhase {
+    Keep,
+    Protected,
+    Quarantine,
+    Size,
+    InvalidMetadata,
+    MissingDependency,
+    Stale,
+    Archive,
+    Consolidation,
+}
+
+impl Default for SkillCurationPhase {
+    fn default() -> Self {
+        Self::Keep
+    }
 }
 
 /// One deterministic recommendation in a curation report.
@@ -211,6 +239,8 @@ pub struct SkillCurationRecommendation {
     pub skill_id: String,
     pub name: String,
     pub action: SkillCurationAction,
+    #[serde(default)]
+    pub phases: Vec<SkillCurationPhase>,
     pub rationale: String,
     pub protected: bool,
     pub confidence: f32,
@@ -233,7 +263,7 @@ impl SkillCurationDryRunResult {
         command: &SkillCurationDryRunCommand,
         now: DateTime<Utc>,
     ) -> Self {
-        deterministic_report(
+        crate::curation_policy::deterministic_report(
             records,
             command.stale_after_days,
             command.narrow_use_threshold,
@@ -263,7 +293,7 @@ impl SkillCurationRunResult {
         started_at: DateTime<Utc>,
         finished_at: DateTime<Utc>,
     ) -> Self {
-        let dry_run_report = deterministic_report(
+        let dry_run_report = crate::curation_policy::deterministic_report(
             records,
             command.stale_after_days,
             command.narrow_use_threshold,
@@ -307,104 +337,6 @@ impl SkillCurationRunResult {
             captured_at: finished_at,
         }
     }
-}
-
-fn deterministic_report(
-    records: impl IntoIterator<Item = SkillGovernanceRecord>,
-    stale_after_days: i64,
-    narrow_use_threshold: u64,
-    now: DateTime<Utc>,
-) -> SkillCurationDryRunResult {
-    let stale_after = Duration::days(stale_after_days.max(0));
-    let recommendations = records
-        .into_iter()
-        .map(|record| recommend_for_record(record, stale_after, narrow_use_threshold, now))
-        .collect();
-
-    SkillCurationDryRunResult {
-        recommendations,
-        semantic_analysis_status:
-            "unavailable: deterministic curation did not call an LLM or similarity provider".into(),
-        mutated: false,
-        captured_at: now,
-    }
-}
-
-fn recommend_for_record(
-    record: SkillGovernanceRecord,
-    stale_after: Duration,
-    narrow_use_threshold: u64,
-    now: DateTime<Utc>,
-) -> SkillCurationRecommendation {
-    let skill_id = record.provenance.skill_id.clone();
-    let name = record.provenance.name.clone();
-    let evidence_ids = record.evidence_ids.clone();
-    if record.pinned {
-        return SkillCurationRecommendation {
-            skill_id,
-            name,
-            action: SkillCurationAction::Protected,
-            rationale:
-                "skill is pinned, so curation may observe it but must not recommend mutation".into(),
-            protected: true,
-            confidence: 1.0,
-            evidence_ids,
-        };
-    }
-
-    let last_activity = record
-        .telemetry
-        .last_activity_at()
-        .unwrap_or(record.provenance.created_at);
-    let inactive_for = now.signed_duration_since(last_activity);
-    let action = if record.lifecycle == SkillLifecycleState::Stale && inactive_for >= stale_after {
-        SkillCurationAction::WouldArchive
-    } else if inactive_for >= stale_after {
-        SkillCurationAction::WouldMarkStale
-    } else if should_review_for_consolidation(&record.telemetry, narrow_use_threshold) {
-        SkillCurationAction::WouldReviewForConsolidation
-    } else {
-        SkillCurationAction::Keep
-    };
-    let rationale = match action {
-        SkillCurationAction::Keep => {
-            "skill has recent or sufficient usage for this deterministic policy".into()
-        }
-        SkillCurationAction::WouldMarkStale => {
-            "skill has no recent usage beyond the configured stale threshold".into()
-        }
-        SkillCurationAction::WouldArchive => {
-            "skill is already stale and remains inactive beyond the configured threshold".into()
-        }
-        SkillCurationAction::WouldReviewForConsolidation => {
-            "agent-created skill has low usage and should be reviewed for umbrella consolidation"
-                .into()
-        }
-        SkillCurationAction::Protected => "skill is protected".into(),
-    };
-
-    SkillCurationRecommendation {
-        skill_id,
-        name,
-        action,
-        rationale,
-        protected: false,
-        confidence: 0.75,
-        evidence_ids,
-    }
-}
-
-fn should_review_for_consolidation(
-    telemetry: &SkillUsageTelemetry,
-    narrow_use_threshold: u64,
-) -> bool {
-    let total_effective_task_outcomes = telemetry
-        .successful_task_count
-        .saturating_add(telemetry.failed_task_count);
-    telemetry.use_count <= narrow_use_threshold
-        && telemetry.patch_count == 0
-        && telemetry.successful_task_count == 0
-        && total_effective_task_outcomes <= narrow_use_threshold
 }
 
 fn run_id(trace: &TraceContext, started_at: DateTime<Utc>) -> String {

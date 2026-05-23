@@ -146,7 +146,7 @@
   equivalent durable report refs.
 - [x] 8.7 Ensure dry-run does not mutate active governance state, aliases, files,
   scheduler refs, or context snapshots.
-- [ ] 8.8 Add deterministic stale, archive, quarantine, size, invalid metadata,
+- [x] 8.8 Add deterministic stale, archive, quarantine, size, invalid metadata,
   missing dependency, and protected skill phases.
 - [ ] 8.9 Add structured logs for curation start, phase boundaries, candidate
   counts, policy decisions, report refs, rollback refs, and completion.

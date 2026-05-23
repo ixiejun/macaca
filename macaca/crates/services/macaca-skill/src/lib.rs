@@ -19,6 +19,7 @@ pub mod agent_skill;
 pub mod alias;
 pub mod catalog;
 pub mod curation;
+pub(crate) mod curation_policy;
 pub mod definition;
 pub mod discovery;
 pub mod encrypted_package;
@@ -44,6 +45,9 @@ pub mod snapshot;
 pub mod source;
 pub mod telemetry;
 pub mod tool;
+
+#[cfg(test)]
+mod curation_tests;
 
 #[cfg(test)]
 mod governance_lifecycle_tests;

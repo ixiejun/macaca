@@ -483,6 +483,23 @@ Every command logs key execution nodes with sanitized fields:
   dry-run, so active package files, scheduler refs, and context snapshots are
   not implied or faked.
 
+### Slice 8G: Deterministic Curation Phases
+
+- Patterns: Specification owns deterministic phase evaluation inside
+  `macaca-skill`, while runtime-host remains a Strategy executor that dispatches
+  typed service commands.  Governance observations keep only allowlisted
+  diagnostics, not raw provider metadata.
+- Phases: the deterministic report now covers protected, quarantine, size,
+  invalid metadata, missing dependency, stale, archive, consolidation, and keep
+  phases.  A recommendation may include multiple phases, while its action is
+  the highest-priority non-destructive plan for operators and future apply
+  policies.
+- Safety: package size, metadata validity, missing dependency, and quarantine
+  hints are stored as bounded, sanitized governance diagnostics.  Reports still
+  contain refs, counts, rationales, and evidence ids only; skill bodies, package
+  bytes, prompts, provider payloads, and application semantics stay out of the
+  Skill service contract.
+
 ## Risks And Mitigations
 
 - Risk: skill mutation corrupts active packages. Mitigation: atomic writes,
