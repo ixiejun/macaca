@@ -417,12 +417,19 @@ impl SkillProviderGovernanceState {
 impl SkillGovernanceStoreStrategy for SkillProviderGovernanceState {
     async fn append_event(
         &self,
-        event: SkillGovernanceEventRecord,
+        mut event: SkillGovernanceEventRecord,
     ) -> Result<SkillGovernanceEventRecord, SkillGovernanceStoreUnavailable> {
+        if event.provenance.policy_decision_refs.is_empty() {
+            event.provenance.policy_decision_refs = event.policy_decision_ids.clone();
+        }
+        if event.provenance.audit_event_ids.is_empty() {
+            event.provenance.audit_event_ids = event.audit_event_ids.clone();
+        }
         tracing::info!(
             event_id = %event.event_id,
             trace_id = %event.trace_id,
             event_kind = %governance_event_kind(&event.payload),
+            provenance_action = ?event.provenance.action,
             application_id = ?event.scope.application_id,
             session_id = ?event.scope.session_id,
             agent_name = ?event.scope.agent_name,
@@ -440,6 +447,7 @@ impl SkillGovernanceStoreStrategy for SkillProviderGovernanceState {
         tracing::info!(
             events = read_model.replayed_events,
             records = read_model.records.len(),
+            provenance_events = read_model.provenance_events.len(),
             aliases = read_model.aliases.len(),
             proposals = read_model.proposals.len(),
             curation_runs = read_model.curation_runs.len(),

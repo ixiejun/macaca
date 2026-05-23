@@ -272,6 +272,24 @@ Every command logs key execution nodes with sanitized fields:
   accept raw prompts, raw task output, provider payloads, manifests, package
   bytes, secrets, credentials, signatures, or full `SKILL.md` bodies.
 
+### Slice 4A: Provenance Event Capture For Existing Governance Events
+
+- Patterns: Observer remains the append-only governance event stream; Memento is
+  extended with derived provenance events that replay alongside lifecycle,
+  alias, proposal, curation, snapshot, and rollback records; Command DTOs stay
+  unchanged for callers, so shells and SDK clients do not learn provenance
+  semantics; Strategy remains open because future Store/EventLog providers can
+  persist the same derived provenance events without changing consumers.
+- Ownership: `macaca-skill` owns sanitized provenance event DTOs and replay
+  projection. `macaca-runtime-host` only logs and stores the derived records in
+  the local compatibility adapter. Kernel, SDK, Web, CLI, frontend, and
+  applications do not classify or mutate provenance.
+- Safety: provenance events copy only skill ids, optional app/session/task/agent
+  refs, trace ids, evidence refs, policy/audit refs, action labels, and bounded
+  target refs. They deliberately exclude raw prompts, task output, provider
+  payloads, manifests, package bytes, credentials, signatures, and full skill
+  bodies.
+
 ## Risks And Mitigations
 
 - Risk: skill mutation corrupts active packages. Mitigation: atomic writes,

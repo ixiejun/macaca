@@ -17,32 +17,8 @@ use serde::{Deserialize, Serialize};
 use crate::alias::SkillAliasRecord;
 use crate::evolution::SkillExperienceProposalRecord;
 use crate::governance::{SkillGovernanceRecord, SkillUsageObservation, SkillUsageTelemetry};
+use crate::provenance::{SkillProvenance, SkillProvenanceEventRecord};
 use crate::service_contract::SkillServiceScope;
-
-/// Durable provenance for a governed skill package or draft.
-///
-/// This DTO is intentionally richer than the lightweight snapshot provenance
-/// because Store/EventLog providers must be able to answer who created or
-/// changed a skill, which task/session/application supplied the evidence, and
-/// which trace can replay the decision.  It stores only identifiers and refs;
-/// raw prompts, package bytes, manifests, and full skill bodies are never part
-/// of provenance.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SkillProvenance {
-    pub skill_id: String,
-    pub version: Option<String>,
-    pub author_kind: crate::governance::SkillAuthorKind,
-    pub author_agent_id: Option<String>,
-    pub application_id: Option<String>,
-    pub session_id: Option<String>,
-    pub task_id: Option<String>,
-    pub trace_id: String,
-    pub evidence_refs: Vec<String>,
-    pub source_scope: String,
-    pub trust_level: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
 
 /// Durable governance read-record stored behind the Skill service boundary.
 ///
@@ -269,6 +245,7 @@ pub struct SkillGovernanceEventRecord {
     pub occurred_at: DateTime<Utc>,
     pub policy_decision_ids: Vec<String>,
     pub audit_event_ids: Vec<String>,
+    pub provenance: SkillProvenanceEventRecord,
     pub payload: SkillGovernanceEventPayload,
 }
 
@@ -281,13 +258,17 @@ impl SkillGovernanceEventRecord {
         occurred_at: DateTime<Utc>,
         payload: SkillGovernanceEventPayload,
     ) -> Self {
+        let trace_id = trace.trace_id.clone();
+        let provenance =
+            SkillProvenanceEventRecord::from_payload(&trace_id, &scope, occurred_at, &payload);
         Self {
             event_id: event_id.into(),
-            trace_id: trace.trace_id.clone(),
+            trace_id,
             scope,
             occurred_at,
             policy_decision_ids: Vec::new(),
             audit_event_ids: Vec::new(),
+            provenance,
             payload,
         }
     }
@@ -302,6 +283,7 @@ impl SkillGovernanceEventRecord {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SkillGovernanceReadModel {
     pub records: Vec<SkillGovernanceRecord>,
+    pub provenance_events: Vec<SkillProvenanceEventRecord>,
     pub aliases: Vec<SkillAliasRecord>,
     pub proposals: Vec<SkillExperienceProposalRecord>,
     pub curation_runs: Vec<SkillCurationRunRecord>,
@@ -315,6 +297,7 @@ impl SkillGovernanceReadModel {
     /// Rebuild the read model by replaying append-only governance events.
     pub fn from_events(events: impl IntoIterator<Item = SkillGovernanceEventRecord>) -> Self {
         let mut records = BTreeMap::<String, SkillGovernanceRecord>::new();
+        let mut provenance_events = Vec::<SkillProvenanceEventRecord>::new();
         let mut aliases = BTreeMap::<String, SkillAliasRecord>::new();
         let mut proposals = BTreeMap::<String, SkillExperienceProposalRecord>::new();
         let mut curation_runs = BTreeMap::<String, SkillCurationRunRecord>::new();
@@ -324,6 +307,7 @@ impl SkillGovernanceReadModel {
 
         for event in events {
             replayed_events = replayed_events.saturating_add(1);
+            provenance_events.push(event.provenance.clone());
             match event.payload {
                 SkillGovernanceEventPayload::UsageRecorded(observation)
                 | SkillGovernanceEventPayload::LifecycleApplied(observation) => {
@@ -355,6 +339,7 @@ impl SkillGovernanceReadModel {
 
         Self {
             records: sorted_values(records),
+            provenance_events,
             aliases: sorted_values(aliases),
             proposals: sorted_values(proposals),
             curation_runs: sorted_values(curation_runs),

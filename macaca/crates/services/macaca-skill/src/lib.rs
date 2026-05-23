@@ -30,6 +30,7 @@ pub mod lifecycle;
 pub mod lifecycle_state_machine;
 pub mod package;
 pub mod policy;
+pub mod provenance;
 pub mod provisioner;
 pub mod registry;
 pub mod request;
@@ -78,6 +79,7 @@ pub use encrypted_package::{
     EncryptedPackageDecryptor, EncryptedPackageLoader, EncryptedPackageMetadata,
 };
 pub use evolution::*;
+pub use provenance::*;
 pub use provisioner::{ClientConfig, SkillProvisioner};
 pub use runtime::{
     path_belongs_to_snapshot_skill, FilteredSkill, SkillPolicy, SkillRuntime, SkillRuntimeLimits,

@@ -28,10 +28,12 @@ fn local_governance_store_logs_key_audit_nodes_with_structured_fields() {
     assert!(state_source
         .contains("skill governance event appended through local compatibility adapter"));
     assert!(state_source.contains("event_kind = %governance_event_kind(&event.payload)"));
+    assert!(state_source.contains("provenance_action = ?event.provenance.action"));
     assert!(state_source.contains("application_id = ?event.scope.application_id"));
     assert!(state_source
         .contains("skill governance read model replayed through local compatibility adapter"));
     assert!(state_source.contains("records = read_model.records.len()"));
+    assert!(state_source.contains("provenance_events = read_model.provenance_events.len()"));
     assert!(state_source.contains("aliases = read_model.aliases.len()"));
     assert!(state_source
         .contains("skill governance snapshot built through local compatibility adapter"));
@@ -49,6 +51,8 @@ async fn local_governance_state_replays_through_store_strategy_adapter() {
     let trace = TraceContext::new("trace-local-governance-store-adapter");
     let scope = SkillServiceScope::default();
 
+    let mut usage_metadata = BTreeMap::new();
+    usage_metadata.insert("task_id".into(), "task-local-1".into());
     state
         .record_usage(SkillGovernanceRecordUsageCommand {
             trace: trace.clone(),
@@ -63,7 +67,7 @@ async fn local_governance_state_replays_through_store_strategy_adapter() {
                 created_by: Some("agent".into()),
                 pinned: None,
                 evidence_id: Some("usage-evidence-1".into()),
-                metadata: BTreeMap::new(),
+                metadata: usage_metadata,
             },
         })
         .await;
@@ -133,7 +137,15 @@ async fn local_governance_state_replays_through_store_strategy_adapter() {
         .expect("local in-memory state should replay through the store strategy");
 
     assert_eq!(read_model.records.len(), 1);
+    assert_eq!(read_model.provenance_events.len(), 4);
     assert_eq!(read_model.records[0].telemetry.activation_count, 1);
+    assert_eq!(
+        read_model.provenance_events[0]
+            .provenance
+            .task_id
+            .as_deref(),
+        Some("task-local-1")
+    );
     assert_eq!(read_model.aliases.len(), 1);
     assert_eq!(read_model.proposals.len(), 1);
     assert_eq!(read_model.replayed_events, 4);
