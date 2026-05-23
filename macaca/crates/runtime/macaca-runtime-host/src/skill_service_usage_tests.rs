@@ -88,4 +88,10 @@ async fn skill_governance_records_distinct_usage_event_counters() {
     assert_eq!(telemetry.patch_count, 1);
     assert_eq!(telemetry.successful_task_count, 1);
     assert_eq!(telemetry.failed_task_count, 1);
+    assert_eq!(snapshot.telemetry_aggregate.view_count, 1);
+    assert_eq!(snapshot.telemetry_aggregate.activation_count, 1);
+    assert_eq!(snapshot.telemetry_aggregate.resource_read_count, 1);
+    assert_eq!(snapshot.telemetry_aggregate.patch_count, 1);
+    assert_eq!(snapshot.telemetry_aggregate.successful_task_count, 1);
+    assert_eq!(snapshot.telemetry_aggregate.failed_task_count, 1);
 }

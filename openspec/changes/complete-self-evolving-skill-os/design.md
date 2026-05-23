@@ -317,6 +317,22 @@ Every command logs key execution nodes with sanitized fields:
   package bytes, manifest body, skill body, secrets, credentials, or signatures
   are dropped, and retained reference values are bounded before serialization.
 
+### Slice 4D: Bounded Telemetry Aggregates And Generic Effectiveness Signals
+
+- Patterns: Observer continues to collect sanitized usage events, while a small
+  Facade-friendly aggregate DTO exposes bounded counters on snapshot and status
+  commands. The deterministic curation Specification consumes only generic
+  success/failure counters and never branches on application, workflow, or
+  domain names.
+- Ownership: `macaca-skill` owns `SkillTelemetryAggregate` and deterministic
+  curation rules. `macaca-runtime-host` only computes the aggregate from its
+  local governance read model and passes it through typed service results. SDK,
+  Web, CLI, frontend, kernel, and applications do not compute curation
+  rationale.
+- Safety: aggregates contain counters only. They do not expose prompts, task
+  output, provider payloads, manifests, package bytes, secrets, credentials, or
+  full skill bodies.
+
 ## Risks And Mitigations
 
 - Risk: skill mutation corrupts active packages. Mitigation: atomic writes,

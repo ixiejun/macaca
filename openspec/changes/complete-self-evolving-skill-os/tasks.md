@@ -64,14 +64,14 @@
 
 - [x] 4.1 Extend usage recording to distinguish view, activation, resource read,
   patch, lifecycle, success, and failure events.
-- [ ] 4.2 Add provenance capture at skill discovery, proposal creation,
+- [x] 4.2 Add provenance capture at skill discovery, proposal creation,
   promotion, patch, curation, merge, archive, restore, quarantine, and rollback.
 - [x] 4.3 Attach session, task, application, tenant, trace, and evidence refs
   when available, while keeping fields optional and provider-neutral.
 - [x] 4.4 Ensure no raw prompt, raw task output, provider payload, manifest,
   package bytes, secret, credential, or full skill body enters telemetry.
-- [ ] 4.5 Add bounded telemetry aggregation for snapshot and status commands.
-- [ ] 4.6 Add tests for success/failure counters influencing dry-run rationale
+- [x] 4.5 Add bounded telemetry aggregation for snapshot and status commands.
+- [x] 4.6 Add tests for success/failure counters influencing dry-run rationale
   without hardcoding application-specific outcomes.
 
 ## 5. Task Completion Experience Extraction

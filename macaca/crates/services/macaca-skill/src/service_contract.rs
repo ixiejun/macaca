@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
+use crate::governance::SkillTelemetryAggregate;
 use crate::runtime::{SkillPolicy, SkillSnapshot};
 use crate::snapshot::SkillRegistrySnapshot;
 
@@ -221,6 +222,8 @@ pub struct SkillStatusResult {
     pub healthy: bool,
     pub snapshot_skills: usize,
     pub executable_skills: usize,
+    #[serde(default)]
+    pub telemetry_aggregate: SkillTelemetryAggregate,
     pub captured_at: DateTime<Utc>,
 }
 

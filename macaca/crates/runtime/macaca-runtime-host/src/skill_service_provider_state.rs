@@ -19,7 +19,8 @@ use macaca_skill::{
     SkillGovernanceReadModel, SkillGovernanceRecord, SkillGovernanceRecordUsageCommand,
     SkillGovernanceRecordUsageResult, SkillGovernanceSnapshotResult, SkillGovernanceStoreStrategy,
     SkillGovernanceStoreUnavailable, SkillLifecycleState, SkillLifecycleStateMachine,
-    SkillPinnedMutationGuard, SkillPinnedMutationOperation, SkillUsageObservation,
+    SkillPinnedMutationGuard, SkillPinnedMutationOperation, SkillTelemetryAggregate,
+    SkillUsageObservation,
 };
 use tokio::sync::Mutex;
 
@@ -97,18 +98,34 @@ impl SkillProviderGovernanceState {
             })
             .collect();
         records.sort_by(|left, right| left.provenance.skill_id.cmp(&right.provenance.skill_id));
+        let telemetry_aggregate = SkillTelemetryAggregate::from_records(records.iter());
         tracing::info!(
             include_archived = include_archived,
             lifecycle_filters = lifecycle_filters.len(),
             records = records.len(),
             filtered_records = filtered_out,
+            successful_tasks = telemetry_aggregate.successful_task_count,
+            failed_tasks = telemetry_aggregate.failed_task_count,
             "skill governance snapshot built through local compatibility adapter"
         );
 
         SkillGovernanceSnapshotResult {
             records,
+            telemetry_aggregate,
             captured_at: chrono::Utc::now(),
         }
+    }
+
+    /// Return a bounded telemetry rollup for lightweight status surfaces.
+    pub(crate) async fn telemetry_aggregate(&self) -> SkillTelemetryAggregate {
+        let records = self
+            .records
+            .lock()
+            .await
+            .values()
+            .cloned()
+            .collect::<Vec<_>>();
+        SkillTelemetryAggregate::from_records(records.iter())
     }
 
     /// Build a deterministic curation report without mutating state.

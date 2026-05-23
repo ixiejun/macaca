@@ -247,11 +247,13 @@ impl SystemService for SkillSystemServiceProvider {
             SKILL_STATUS_COMMAND => {
                 let typed: SkillStatusCommand = decode(command.payload)?;
                 let registry = self.executable_tools.lock().await.snapshot();
+                let telemetry_aggregate = self.governance_state.telemetry_aggregate().await;
                 let result = SkillStatusResult {
                     service_id: SKILL_SERVICE_ID.into(),
                     healthy: self.snapshot_facade.is_some(),
                     snapshot_skills: 0,
                     executable_skills: registry.len(),
+                    telemetry_aggregate,
                     captured_at: chrono::Utc::now(),
                 };
                 Ok(Self::service_result(to_value(result)?, typed.trace))

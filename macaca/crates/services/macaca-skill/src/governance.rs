@@ -228,10 +228,78 @@ pub struct SkillGovernanceSnapshotCommand {
     pub lifecycle_filters: Vec<SkillLifecycleState>,
 }
 
+/// Bounded telemetry rollup for governance snapshot and status surfaces.
+///
+/// Operators need enough aggregate signal to understand whether curation is
+/// acting on usage, success, and failure evidence, but shell adapters must not
+/// re-compute policy or inspect raw task output.  This DTO therefore exposes
+/// counters only and keeps all application-specific interpretation inside the
+/// Skill service.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SkillTelemetryAggregate {
+    pub record_count: u64,
+    pub view_count: u64,
+    pub activation_count: u64,
+    pub resource_read_count: u64,
+    pub use_count: u64,
+    pub patch_count: u64,
+    pub successful_task_count: u64,
+    pub failed_task_count: u64,
+}
+
+impl SkillTelemetryAggregate {
+    /// Build a bounded rollup from already-sanitized governance records.
+    pub fn from_records<'a>(records: impl IntoIterator<Item = &'a SkillGovernanceRecord>) -> Self {
+        let mut aggregate = Self::default();
+        for record in records {
+            aggregate.record_count = aggregate.record_count.saturating_add(1);
+            aggregate.view_count = aggregate
+                .view_count
+                .saturating_add(record.telemetry.view_count);
+            aggregate.activation_count = aggregate
+                .activation_count
+                .saturating_add(record.telemetry.activation_count);
+            aggregate.resource_read_count = aggregate
+                .resource_read_count
+                .saturating_add(record.telemetry.resource_read_count);
+            aggregate.use_count = aggregate
+                .use_count
+                .saturating_add(record.telemetry.use_count);
+            aggregate.patch_count = aggregate
+                .patch_count
+                .saturating_add(record.telemetry.patch_count);
+            aggregate.successful_task_count = aggregate
+                .successful_task_count
+                .saturating_add(record.telemetry.successful_task_count);
+            aggregate.failed_task_count = aggregate
+                .failed_task_count
+                .saturating_add(record.telemetry.failed_task_count);
+        }
+        aggregate
+    }
+}
+
+impl Default for SkillTelemetryAggregate {
+    fn default() -> Self {
+        Self {
+            record_count: 0,
+            view_count: 0,
+            activation_count: 0,
+            resource_read_count: 0,
+            use_count: 0,
+            patch_count: 0,
+            successful_task_count: 0,
+            failed_task_count: 0,
+        }
+    }
+}
+
 /// Sanitized governance snapshot result.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SkillGovernanceSnapshotResult {
     pub records: Vec<SkillGovernanceRecord>,
+    #[serde(default)]
+    pub telemetry_aggregate: SkillTelemetryAggregate,
     pub captured_at: DateTime<Utc>,
 }
 
@@ -332,10 +400,7 @@ fn recommend_for_record(
         SkillCurationAction::WouldArchive
     } else if inactive_for >= stale_after {
         SkillCurationAction::WouldMarkStale
-    } else if record.provenance.author_kind == SkillAuthorKind::Agent
-        && record.telemetry.use_count <= narrow_use_threshold
-        && record.telemetry.patch_count == 0
-    {
+    } else if should_review_for_consolidation(&record.telemetry, narrow_use_threshold) {
         SkillCurationAction::WouldReviewForConsolidation
     } else {
         SkillCurationAction::Keep
@@ -366,6 +431,19 @@ fn recommend_for_record(
         confidence: 0.75,
         evidence_ids,
     }
+}
+
+fn should_review_for_consolidation(
+    telemetry: &SkillUsageTelemetry,
+    narrow_use_threshold: u64,
+) -> bool {
+    let total_effective_task_outcomes = telemetry
+        .successful_task_count
+        .saturating_add(telemetry.failed_task_count);
+    telemetry.use_count <= narrow_use_threshold
+        && telemetry.patch_count == 0
+        && telemetry.successful_task_count == 0
+        && total_effective_task_outcomes <= narrow_use_threshold
 }
 
 fn non_empty_evidence(evidence_ids: &[String]) -> Vec<String> {

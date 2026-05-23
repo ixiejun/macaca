@@ -134,6 +134,7 @@ impl SystemSkillClient for UnavailableSystemSkillClient {
             healthy: false,
             snapshot_skills: 0,
             executable_skills: 0,
+            telemetry_aggregate: Default::default(),
             captured_at: chrono::Utc::now(),
         })
     }
@@ -170,6 +171,7 @@ impl SystemSkillClient for UnavailableSystemSkillClient {
         );
         Ok(SkillGovernanceSnapshotResult {
             records: Vec::new(),
+            telemetry_aggregate: Default::default(),
             captured_at: chrono::Utc::now(),
         })
     }
