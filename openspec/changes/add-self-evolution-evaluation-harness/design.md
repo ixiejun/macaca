@@ -116,6 +116,22 @@ decision ids, audit event counts, result state, and bounded failure reasons.
 Reports are generated as JSON plus Markdown summary refs. Both formats must be
 sanitized.
 
+## Live Completion Observer Boundary
+
+Live task-loop proposal extraction is observed at the `service.agent_execution`
+completion boundary. The Web composition root wraps its concrete
+`AgentExecutionBackend` with a Decorator that records bounded observer EventLog
+checkpoints and forwards successful `AgentExecutionResult` values to the Skill
+service through `skill.evolution.propose_from_task`.
+
+The wrapper is an Observer only. It does not parse prompts, branch on
+application names, inspect business output, mutate skill files, promote drafts,
+or decide curation lifecycle. Proposal validation, storage, promotion,
+rejection, and rollback remain owned by the Skill service. If Skill
+self-evolution is unavailable or rejects a candidate, the wrapper records a
+structured observer outcome and still returns the original Agent Execution
+result.
+
 ## Migration Plan
 
 1. Add the OpenSpec requirement and a focused evaluation report model.

@@ -47,3 +47,18 @@
 - [x] 6.3 Test report sanitization and bounded diagnostics.
 - [x] 6.4 Run OpenSpec strict validation, targeted Rust checks/tests, frontend
   lint/build when touched, `git diff --check`, and GitNexus detect changes.
+
+## 7. Live Task-Loop Verification
+
+- [x] 7.1 Install the `service.agent_execution` completion observer Decorator
+  and verify it emits bounded `skill_self_evolution_observer` EventLog
+  checkpoints without changing Agent Execution success/failure semantics.
+- [x] 7.2 Run repeated real `/api/chat/v2` tasks against a live Macaca app and
+  capture session detail, executor events, run traces, and Skill operations
+  snapshots before and after each run.
+- [x] 7.3 Verify real task completion produces governed Skill experience
+  proposals through the Skill service boundary without raw prompt/output
+  leakage.
+- [x] 7.4 Promote or reject generated proposals through existing operations
+  commands, then run follow-up tasks to prove evolved catalog visibility or a
+  correctly governed non-activation/rejection state.

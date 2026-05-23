@@ -369,6 +369,50 @@ fn execution_backend_returns_context_snapshot_for_audit_replay() {
 }
 
 #[test]
+fn agent_execution_service_registers_skill_self_evolution_decorator() {
+    let lib_source = include_str!("../lib.rs");
+    let decorator_source = include_str!("../skill_self_evolution_execution_observer.rs");
+
+    assert!(lib_source.contains("SkillSelfEvolutionObservedAgentExecutionBackend"));
+    assert!(lib_source.contains("SkillSelfEvolutionObservedAgentExecutionBackend::new"));
+    assert!(decorator_source.contains("impl AgentExecutionBackend"));
+    assert!(decorator_source.contains("emit_runtime_event"));
+    assert!(decorator_source.contains("\"service.agent_execution\""));
+    assert!(decorator_source.contains("\"agent_execution_completed_seen\""));
+    assert!(decorator_source.contains("\"agent_execution_service_error\""));
+    assert!(decorator_source.contains("observe_agent_execution_result_for_skill_self_evolution"));
+    assert!(
+        !decorator_source.contains("result.output"),
+        "decorator checkpoints must not copy raw agent output into EventLog"
+    );
+}
+
+#[test]
+fn skill_self_evolution_observation_is_centralized_at_agent_execution_boundary() {
+    let backend_source = include_str!("../agent_execution_backend.rs");
+    let chat_source = include_str!("../chat_orchestrator.rs");
+    let event_persistence_source = include_str!("../event_persistence.rs");
+    let observer_source = include_str!("../skill_self_evolution_observer.rs");
+
+    assert!(
+        !backend_source.contains("spawn_skill_self_evolution_observation"),
+        "agent execution backend should return results; the decorator owns observation"
+    );
+    assert!(
+        !chat_source.contains("observe_agent_execution_result_for_skill_self_evolution"),
+        "chat orchestration must not duplicate Skill self-evolution observation"
+    );
+    assert!(
+        !event_persistence_source.contains("observe_executor_event_for_skill_self_evolution"),
+        "event persistence must remain durable logging, not Skill proposal ownership"
+    );
+    assert!(
+        !observer_source.contains("observe_executor_event_for_skill_self_evolution"),
+        "observer helpers must expose the service.agent_execution result boundary only"
+    );
+}
+
+#[test]
 fn execution_control_selection_does_not_branch_on_application_or_provider_names() {
     let backend_source = include_str!("../agent_execution_backend.rs");
     let runtime_policy_source =

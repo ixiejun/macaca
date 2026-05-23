@@ -22,7 +22,7 @@ use crate::run_trace::{phase, status, RunTracer};
 /// and writing because session_id is known upfront.
 ///
 /// Also feeds the `AgentTraceCollector` for backward-compatible session save.
-pub fn spawn_session_event_collector(
+pub(crate) fn spawn_session_event_collector(
     executor: Arc<ApplicationExecutor>,
     event_log: Arc<EventLog>,
     run_tracer: Arc<RunTracer>,

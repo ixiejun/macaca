@@ -45,6 +45,8 @@ pub mod session_replay;
 pub mod shell;
 pub mod skill_mcp;
 pub mod skill_operations_routes;
+mod skill_self_evolution_execution_observer;
+pub mod skill_self_evolution_observer;
 mod source_artifact;
 pub mod sse;
 pub mod state;
@@ -84,6 +86,7 @@ pub use crate::bootstrap::{WebRuntimeFacade, WebServerBuilder};
 use crate::external_context_adapter::install_external_adapters_from_config;
 use crate::orchestration_tools::build_web_tools;
 use crate::persistence_adapter::RedbKernelPersistenceAdapter;
+use crate::skill_self_evolution_execution_observer::SkillSelfEvolutionObservedAgentExecutionBackend;
 use crate::state::{AppConfig, AppState, LoopState, PersistenceState, SessionState};
 use crate::wasm_orchestration_backend::WebApplicationOrchestrationBackend;
 
@@ -904,9 +907,12 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
                     macaca_runtime_host::agent_execution_service_descriptor(),
                     Arc::new(
                         macaca_runtime_host::AgentExecutionSystemServiceProvider::new(Arc::new(
-                            WebAgentExecutionBackend::new(
+                            SkillSelfEvolutionObservedAgentExecutionBackend::new(
+                                Arc::new(WebAgentExecutionBackend::new(
+                                    Arc::clone(&state),
+                                    Arc::clone(&service_runtime),
+                                )),
                                 Arc::clone(&state),
-                                Arc::clone(&service_runtime),
                             ),
                         )),
                     ),
