@@ -403,11 +403,13 @@ mod tests {
             "skill://agent/legacy-debug"
         );
         assert_eq!(metadata["skill.alias.resolved"], "true");
+        assert_eq!(metadata["skill.alias.status"], "redirected");
         assert_eq!(
             metadata["skill.alias.effective_id"],
             "skill://agent/current-debug"
         );
         assert_eq!(metadata["skill.alias.kind"], "superseded_by");
+        assert_eq!(metadata["skill.alias.policy"], "redirect");
     }
 
     #[tokio::test]

@@ -202,7 +202,7 @@
   transparent alias resolution and audit evidence.
 - [x] 11.6 Add logs for alias hit, miss, warn, deny, loop prevention, and
   expired alias decisions.
-- [ ] 11.7 Test alias resolution in context, task, scheduler, superseded skill,
+- [x] 11.7 Test alias resolution in context, task, scheduler, superseded skill,
   expired alias, deny alias, and loop cases.
 
 ## 12. Context Composer Integration

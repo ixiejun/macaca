@@ -260,6 +260,61 @@ mod tests {
     }
 
     #[test]
+    fn skill_capability_catalog_keeps_sources_for_guarded_alias_decisions() {
+        let snapshot = SkillSnapshot {
+            agent: "architect".into(),
+            prompt: "".into(),
+            skills: vec![SkillSnapshotEntry {
+                name: "old-debugging".into(),
+                description: "Deprecated debugging skill kept visible by a guard".into(),
+                source_location: PathBuf::from("/app/skills/old-debugging/SKILL.md"),
+                source_base_dir: PathBuf::from("/app/skills/old-debugging"),
+                location: PathBuf::from("/app/skills/old-debugging/SKILL.md"),
+                base_dir: PathBuf::from("/app/skills/old-debugging"),
+                source: "app".into(),
+                source_scope: SkillSourceScope::Application,
+                primary_env: None,
+                required_env: vec![],
+                install: vec![],
+                mcp_servers: vec![],
+            }],
+            filtered: vec![],
+            truncated: false,
+            compact: true,
+            version: 1,
+        };
+
+        for status in [
+            SkillAliasResolutionStatus::Denied,
+            SkillAliasResolutionStatus::Expired,
+            SkillAliasResolutionStatus::LoopPrevented,
+        ] {
+            let alias = SkillAliasResolveResult {
+                requested_skill_id: "skill://application/old-debugging".into(),
+                requested_name: Some("old-debugging".into()),
+                resolved: false,
+                status,
+                target_skill_id: None,
+                target_name: None,
+                kind: Some(SkillAliasKind::Redirect),
+                resolution_policy: Some(SkillAliasResolutionPolicy::Deny),
+                rationale: Some("guarded alias decision must not hide source".into()),
+                evidence_ids: vec!["evidence://alias/guarded".into()],
+                captured_at: Utc::now(),
+            };
+
+            let cat = catalog_from_snapshot_with_aliases(&snapshot, &[alias]);
+
+            assert_eq!(cat.entries.len(), 1);
+            assert_eq!(cat.entries[0].name, "old-debugging");
+            assert!(
+                cat.filtered.is_empty(),
+                "guarded alias decisions must not fabricate filtered rows"
+            );
+        }
+    }
+
+    #[test]
     fn skill_capability_catalog_derives_stable_ids_and_mcp_dependencies() {
         let snapshot = SkillSnapshot {
             agent: "architect".into(),

@@ -783,11 +783,13 @@ mod tests {
             "skill://agent/legacy-heartbeat"
         );
         assert_eq!(metadata["skill.alias.resolved"], "true");
+        assert_eq!(metadata["skill.alias.status"], "redirected");
         assert_eq!(
             metadata["skill.alias.effective_id"],
             "skill://agent/current-heartbeat"
         );
         assert_eq!(metadata["skill.alias.kind"], "absorbed_into");
+        assert_eq!(metadata["skill.alias.policy"], "redirect");
     }
 
     #[tokio::test]
