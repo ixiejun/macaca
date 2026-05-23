@@ -3,6 +3,10 @@ use crate::evaluation::{
     SelfEvolutionReportRefs, SelfEvolutionRunMetrics, SelfEvolutionScoringPolicy,
     SelfEvolutionWhiteBoxEvidence,
 };
+use crate::service_contract::{
+    SkillEvaluationReportCommand, SkillEvaluationReportResult, SkillEvaluationScoreCommand,
+    SKILL_EVALUATION_REPORT_COMMAND, SKILL_EVALUATION_SCORE_COMMAND,
+};
 
 #[test]
 fn self_evolution_evaluation_model_keeps_traceable_refs() {
@@ -218,4 +222,43 @@ fn self_evolution_evaluation_report_renders_markdown_summary_without_raw_payload
     assert!(report.contains("skill_activation_count"));
     assert!(!report.contains("raw provider payload"));
     assert!(!report.contains("full skill body"));
+}
+
+#[test]
+fn self_evolution_evaluation_service_contract_scores_and_reports_generically() {
+    let record = complete_evaluation_record();
+    let score = SelfEvolutionScoringPolicy::score(&record);
+    let score_command = SkillEvaluationScoreCommand {
+        trace: macaca_proto::TraceContext::new("trace-evaluation-score"),
+        scope: crate::SkillServiceScope::default(),
+        record: record.clone(),
+    };
+    let report_command = SkillEvaluationReportCommand {
+        trace: macaca_proto::TraceContext::new("trace-evaluation-report"),
+        scope: crate::SkillServiceScope::default(),
+        record,
+        score: score.clone(),
+        include_markdown: true,
+    };
+    let report_result = SkillEvaluationReportResult {
+        score,
+        json_report: SelfEvolutionReportBuilder::json_summary(
+            &report_command.record,
+            &report_command.score,
+        ),
+        markdown_report: Some(SelfEvolutionReportBuilder::markdown_summary(
+            &report_command.record,
+            &report_command.score,
+        )),
+    };
+
+    assert_eq!(SKILL_EVALUATION_SCORE_COMMAND, "skill.evaluation.score");
+    assert_eq!(SKILL_EVALUATION_REPORT_COMMAND, "skill.evaluation.report");
+    assert_eq!(score_command.record.evaluation_id, "eval-score");
+    assert!(report_result.score.passed);
+    assert!(report_result
+        .markdown_report
+        .as_deref()
+        .unwrap_or_default()
+        .contains("Self-Evolution Evaluation"));
 }

@@ -1,9 +1,11 @@
+use serde::{Deserialize, Serialize};
+
 /// Lifecycle state for a self-evolution evaluation run.
 ///
 /// The state machine is intentionally small and generic. It lets a provider,
 /// SDK client, or shell report whether baseline and evolved evidence have been
 /// collected without embedding any application-specific workflow semantics.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum SelfEvolutionEvaluationLifecycle {
     /// The evaluation record exists but no comparable run has been recorded.
     Prepared,
@@ -28,7 +30,7 @@ pub enum SelfEvolutionEvaluationLifecycle {
 /// measurement and shells can display it without receiving raw prompts,
 /// provider payloads, package bytes, manifests, credentials, or full skill
 /// instructions.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SelfEvolutionEvaluationRecord {
     /// Stable id for this evaluation run, suitable for logs and report refs.
     pub evaluation_id: String,
@@ -53,7 +55,7 @@ pub struct SelfEvolutionEvaluationRecord {
 /// Every field is optional because the scoring policy must be able to explain
 /// exactly which checkpoint is missing. Missing checkpoints are not silently
 /// accepted; they become bounded failure or inconclusive reasons.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SelfEvolutionWhiteBoxEvidence {
     /// Ref to verified terminal task success evidence from Task/Autonomy.
     pub verified_task_completion_ref: Option<String>,
@@ -89,7 +91,7 @@ pub struct SelfEvolutionWhiteBoxEvidence {
 /// compare runs without reading task-specific payloads or branching on
 /// application names, models, providers, drivers, gateways, chains, or business
 /// domains.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SelfEvolutionRunMetrics {
     /// Whether the run completed with verified terminal success.
     pub completion_success: bool,
@@ -121,7 +123,7 @@ pub struct SelfEvolutionRunMetrics {
 ///
 /// Reports are referenced, not embedded, so Store/EventLog can own retention and
 /// shells can fetch sanitized summaries through SDK/SystemFacade readers.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SelfEvolutionReportRefs {
     /// Ref to a sanitized machine-readable report.
     pub json_report_ref: Option<String>,
@@ -134,7 +136,7 @@ pub struct SelfEvolutionReportRefs {
 /// Reasons are bounded strings selected by the scoring policy. They are suitable
 /// for logs and reports because they describe missing refs or metric failures
 /// without copying raw task output.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SelfEvolutionScore {
     /// Final lifecycle state produced by scoring.
     pub lifecycle: SelfEvolutionEvaluationLifecycle,

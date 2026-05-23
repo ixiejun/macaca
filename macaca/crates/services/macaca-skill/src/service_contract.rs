@@ -14,6 +14,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
+use crate::evaluation::{
+    SelfEvolutionEvaluationRecord, SelfEvolutionReportBuilder, SelfEvolutionScore,
+};
 use crate::governance::SkillTelemetryAggregate;
 use crate::runtime::{SkillPolicy, SkillSnapshot};
 use crate::snapshot::SkillRegistrySnapshot;
@@ -53,6 +56,8 @@ pub const SKILL_EVOLUTION_PROPOSE_PATCH_COMMAND: &str = "skill.evolution.propose
 pub const SKILL_EVOLUTION_PROMOTE_DRAFT_COMMAND: &str = "skill.evolution.promote_draft";
 pub const SKILL_EVOLUTION_REJECT_DRAFT_COMMAND: &str = "skill.evolution.reject_draft";
 pub const SKILL_EVOLUTION_SNAPSHOT_COMMAND: &str = "skill.evolution.snapshot";
+pub const SKILL_EVALUATION_SCORE_COMMAND: &str = "skill.evaluation.score";
+pub const SKILL_EVALUATION_REPORT_COMMAND: &str = "skill.evaluation.report";
 pub use crate::mutation::SKILL_CONTENT_MUTATE_COMMAND;
 
 /// Explicit scope for Skill service commands.
@@ -182,6 +187,63 @@ pub struct SkillServiceSnapshotCommand {
 pub struct SkillCleanupCommand {
     pub trace: TraceContext,
     pub scope: SkillServiceScope,
+}
+
+/// Command for deterministic self-evolution evaluation scoring.
+///
+/// The command carries a sanitized evaluation record instead of raw task output.
+/// Runtime-host providers can score the record through a Strategy implementation
+/// while Store/EventLog, policy, and audit decorators retain traceability.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SkillEvaluationScoreCommand {
+    pub trace: TraceContext,
+    pub scope: SkillServiceScope,
+    pub record: SelfEvolutionEvaluationRecord,
+}
+
+/// Result for deterministic self-evolution evaluation scoring.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SkillEvaluationScoreResult {
+    pub score: SelfEvolutionScore,
+}
+
+/// Command for building sanitized self-evolution evaluation reports.
+///
+/// Report generation is explicit so shells can request bounded operator output
+/// without learning scoring semantics or reconstructing checkpoint evidence.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SkillEvaluationReportCommand {
+    pub trace: TraceContext,
+    pub scope: SkillServiceScope,
+    pub record: SelfEvolutionEvaluationRecord,
+    pub score: SelfEvolutionScore,
+    pub include_markdown: bool,
+}
+
+/// Result for sanitized self-evolution evaluation reports.
+///
+/// JSON is the durable machine-readable summary. Markdown is optional operator
+/// presentation text and remains generated from the same sanitized refs/counts.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SkillEvaluationReportResult {
+    pub score: SelfEvolutionScore,
+    pub json_report: serde_json::Value,
+    pub markdown_report: Option<String>,
+}
+
+impl SkillEvaluationReportResult {
+    /// Build a sanitized report result from the typed report command.
+    pub fn from_command(command: &SkillEvaluationReportCommand) -> Self {
+        let markdown_report = command
+            .include_markdown
+            .then(|| SelfEvolutionReportBuilder::markdown_summary(&command.record, &command.score));
+
+        Self {
+            score: command.score.clone(),
+            json_report: SelfEvolutionReportBuilder::json_summary(&command.record, &command.score),
+            markdown_report,
+        }
+    }
 }
 
 /// Structured load result for executable skills.

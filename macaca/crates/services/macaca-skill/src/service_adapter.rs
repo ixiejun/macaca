@@ -55,6 +55,10 @@ pub fn skill_service_descriptor() -> ServiceDescriptor {
             CapabilityId::new("capability.skill.mutation"),
             "Applies policy-gated skill package mutations with rollback mementos.",
         ),
+        ServiceCapability::new(
+            CapabilityId::new("capability.skill.evaluation"),
+            "Scores and reports governed skill self-evolution with sanitized evidence refs.",
+        ),
     ];
     descriptor.health = ServiceHealth::Healthy;
     descriptor.supported_scopes = vec![ServiceScope::Global, ServiceScope::Application("*".into())];
@@ -68,6 +72,7 @@ pub fn skill_service_descriptor() -> ServiceDescriptor {
         "skill.alias".into(),
         "skill.evolution".into(),
         "skill.mutation".into(),
+        "skill.evaluation".into(),
     ];
     descriptor.cleanup_policy = CleanupPolicy::OnStop;
     descriptor
@@ -81,7 +86,7 @@ mod tests {
     fn skill_descriptor_exports_contract_shape() {
         let descriptor = skill_service_descriptor();
         assert_eq!(descriptor.service_type.as_str(), "skill");
-        assert_eq!(descriptor.capabilities.len(), 9);
+        assert_eq!(descriptor.capabilities.len(), 10);
         assert!(descriptor
             .required_permissions
             .contains(&"skill.invoke".into()));
@@ -97,5 +102,8 @@ mod tests {
         assert!(descriptor
             .required_permissions
             .contains(&"skill.mutation".into()));
+        assert!(descriptor
+            .required_permissions
+            .contains(&"skill.evaluation".into()));
     }
 }
