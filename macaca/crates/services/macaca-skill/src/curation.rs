@@ -14,6 +14,7 @@ use crate::governance::{SkillGovernanceRecord, SkillLifecycleState};
 use crate::governance_store::{
     SkillCurationRunRecord, SkillGovernanceSnapshotRefRecord, SkillRollbackRefRecord,
 };
+use crate::semantic_review::SkillSemanticReviewResult;
 use crate::service_contract::{SkillServicePolicyHints, SkillServiceScope};
 
 /// Command for reading curation runner readiness without starting a run.
@@ -252,6 +253,8 @@ pub struct SkillCurationRecommendation {
 pub struct SkillCurationDryRunResult {
     pub recommendations: Vec<SkillCurationRecommendation>,
     pub semantic_analysis_status: String,
+    #[serde(default = "SkillSemanticReviewResult::unavailable_default")]
+    pub semantic_review: SkillSemanticReviewResult,
     pub mutated: bool,
     pub captured_at: DateTime<Utc>,
 }
@@ -278,6 +281,8 @@ pub struct SkillCurationRunResult {
     pub run: SkillCurationRunRecord,
     pub recommendations: Vec<SkillCurationRecommendation>,
     pub semantic_analysis_status: String,
+    #[serde(default = "SkillSemanticReviewResult::unavailable_default")]
+    pub semantic_review: SkillSemanticReviewResult,
     pub run_json_ref: Option<String>,
     pub report_ref: Option<String>,
     pub rollback_ref: Option<String>,
@@ -330,6 +335,7 @@ impl SkillCurationRunResult {
             run,
             recommendations: dry_run_report.recommendations,
             semantic_analysis_status: dry_run_report.semantic_analysis_status,
+            semantic_review: dry_run_report.semantic_review,
             run_json_ref,
             report_ref,
             rollback_ref: None,

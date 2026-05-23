@@ -12,6 +12,7 @@ use crate::curation::{
     SkillCurationAction, SkillCurationDryRunResult, SkillCurationPhase, SkillCurationRecommendation,
 };
 use crate::governance::{SkillAuthorKind, SkillGovernanceRecord, SkillLifecycleState};
+use crate::semantic_review::SkillSemanticReviewResult;
 use crate::telemetry::SkillUsageTelemetry;
 
 const DEFAULT_MAX_SKILL_CURATION_SIZE_BYTES: u64 = 64 * 1024;
@@ -33,10 +34,12 @@ pub(crate) fn deterministic_report(
         .map(|record| recommend_for_record(record, stale_after, narrow_use_threshold, now))
         .collect();
 
+    let semantic_review = SkillSemanticReviewResult::unavailable(now);
+
     SkillCurationDryRunResult {
         recommendations,
-        semantic_analysis_status:
-            "unavailable: deterministic curation did not call an LLM or similarity provider".into(),
+        semantic_analysis_status: semantic_review.status_message(),
+        semantic_review,
         mutated: false,
         captured_at: now,
     }

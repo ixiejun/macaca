@@ -39,6 +39,7 @@ pub mod provisioner;
 pub mod registry;
 pub mod request;
 pub mod runtime;
+pub mod semantic_review;
 pub mod service_adapter;
 pub mod service_contract;
 pub mod snapshot;
@@ -95,5 +96,6 @@ pub use runtime::{
     path_belongs_to_snapshot_skill, FilteredSkill, SkillPolicy, SkillRuntime, SkillRuntimeLimits,
     SkillRuntimeOptions, SkillSnapshot, SkillSnapshotEntry,
 };
+pub use semantic_review::*;
 pub use service_adapter::skill_service_descriptor;
 pub use service_contract::*;

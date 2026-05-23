@@ -156,9 +156,9 @@
 
 ## 9. Optional Semantic Review Provider
 
-- [ ] 9.1 Define a semantic review provider trait and typed proposal result
+- [x] 9.1 Define a semantic review provider trait and typed proposal result
   contract.
-- [ ] 9.2 Add unavailable provider behavior that preserves deterministic
+- [x] 9.2 Add unavailable provider behavior that preserves deterministic
   curation and records semantic analysis as unavailable.
 - [ ] 9.3 Add optional similarity, clustering, duplicate detection,
   success/failure correlation, and reference graph inputs.

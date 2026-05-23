@@ -79,6 +79,7 @@ pub(crate) mod skill_service_provider_curation;
 pub(crate) mod skill_service_provider_curation_log;
 pub(crate) mod skill_service_provider_lifecycle;
 pub(crate) mod skill_service_provider_proposals;
+pub(crate) mod skill_service_provider_semantic_review;
 pub(crate) mod skill_service_provider_state;
 pub mod store_entitlement_admission;
 pub mod store_service_provider;

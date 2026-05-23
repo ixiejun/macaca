@@ -524,6 +524,23 @@ Every command logs key execution nodes with sanitized fields:
   refs are store refs only, rollback is absent for dry-run, and no mutation is
   reported.
 
+### Slice 9A: Optional Semantic Review Null Strategy
+
+- Patterns: Strategy is used for the optional semantic review provider;
+  Command-style DTOs carry `SkillSemanticReviewRequest` and
+  `SkillSemanticReviewResult`; Null Object is represented by the unavailable
+  provider so deterministic curation keeps running when no semantic provider is
+  configured.
+- Ownership: `macaca-skill` owns the provider-neutral semantic review contract
+  and typed proposal result. `macaca-runtime-host` records the default
+  unavailable result at the curation boundary until the later provider factory
+  wiring slice lands. SDK, Web, CLI, frontend, applications, and kernel do not
+  construct or own semantic review providers.
+- Safety: the unavailable provider records absence as structured metadata only.
+  The curation report carries typed proposals, diagnostics, status, provider id,
+  and mutation=false; it never stores raw prompts, provider payloads, secrets,
+  package bytes, manifests, or full skill bodies.
+
 ## Risks And Mitigations
 
 - Risk: skill mutation corrupts active packages. Mitigation: atomic writes,

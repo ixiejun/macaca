@@ -216,6 +216,9 @@ impl SystemSkillClient for UnavailableSystemSkillClient {
         Ok(SkillCurationDryRunResult {
             recommendations: Vec::new(),
             semantic_analysis_status: "unavailable: Skill service is unavailable".into(),
+            semantic_review: macaca_skill::SkillSemanticReviewResult::unavailable(
+                chrono::Utc::now(),
+            ),
             mutated: false,
             captured_at: chrono::Utc::now(),
         })

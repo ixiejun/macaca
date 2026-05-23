@@ -27,12 +27,13 @@ use macaca_skill::{
     SkillGovernanceReadModel, SkillGovernanceRecordUsageCommand, SkillGovernanceRecordUsageResult,
     SkillGovernanceSnapshotCommand, SkillGovernanceSnapshotRefRecord,
     SkillGovernanceSnapshotResult, SkillProvenanceAction, SkillRollbackRefRecord,
-    SkillServiceScope, SkillStatusCommand, SkillStatusResult, SkillUsageEventKind,
-    SkillUsageObservation, SKILL_ALIAS_RESOLVE_COMMAND, SKILL_ALIAS_SNAPSHOT_COMMAND,
-    SKILL_ALIAS_UPSERT_COMMAND, SKILL_CURATION_DRY_RUN_COMMAND, SKILL_CURATION_ROLLBACK_COMMAND,
-    SKILL_CURATION_RUN_COMMAND, SKILL_CURATION_SNAPSHOT_COMMAND, SKILL_CURATION_STATUS_COMMAND,
-    SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND, SKILL_EVOLUTION_SNAPSHOT_COMMAND,
-    SKILL_GOVERNANCE_RECORD_USAGE_COMMAND, SKILL_GOVERNANCE_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND,
+    SkillSemanticReviewStatus, SkillServiceScope, SkillStatusCommand, SkillStatusResult,
+    SkillUsageEventKind, SkillUsageObservation, SKILL_ALIAS_RESOLVE_COMMAND,
+    SKILL_ALIAS_SNAPSHOT_COMMAND, SKILL_ALIAS_UPSERT_COMMAND, SKILL_CURATION_DRY_RUN_COMMAND,
+    SKILL_CURATION_ROLLBACK_COMMAND, SKILL_CURATION_RUN_COMMAND, SKILL_CURATION_SNAPSHOT_COMMAND,
+    SKILL_CURATION_STATUS_COMMAND, SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND,
+    SKILL_EVOLUTION_SNAPSHOT_COMMAND, SKILL_GOVERNANCE_RECORD_USAGE_COMMAND,
+    SKILL_GOVERNANCE_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND,
 };
 use tokio::sync::Mutex;
 
@@ -595,6 +596,51 @@ async fn skill_curation_report_keeps_protected_ownership_and_absent_provider_san
     assert!(!report_ref.contains("prompt"));
     assert!(!run_json_ref.contains("provider_payload"));
     assert!(result.rollback_ref.is_none());
+    assert!(!result.mutated);
+}
+
+#[tokio::test]
+async fn skill_curation_run_records_structured_absent_semantic_provider() {
+    let provider = SkillSystemServiceProvider::new();
+    let trace = TraceContext::new("trace-skill-curation-semantic-provider-absent");
+
+    let result = provider
+        .call(traced_command(
+            SKILL_CURATION_RUN_COMMAND,
+            SkillCurationRunCommand {
+                trace: trace.clone(),
+                scope: SkillServiceScope::default(),
+                dry_run: true,
+                stale_after_days: 30,
+                narrow_use_threshold: 0,
+                approval_refs: Vec::new(),
+                policy_decision_refs: Vec::new(),
+                audit_event_ids: vec!["audit://skill-curation/semantic-absent".into()],
+                policy: Default::default(),
+            },
+            trace,
+        ))
+        .await
+        .expect("dry-run should preserve deterministic curation when semantic provider is absent");
+    let result: SkillCurationRunResult =
+        serde_json::from_value(result.output).expect("curation run result should decode");
+
+    assert_eq!(
+        result.semantic_review.status,
+        SkillSemanticReviewStatus::Unavailable
+    );
+    assert!(result.semantic_review.proposals.is_empty());
+    assert!(!result.semantic_review.mutated);
+    assert!(result
+        .semantic_review
+        .diagnostics
+        .iter()
+        .any(|diagnostic| { diagnostic.contains("semantic review provider is unavailable") }));
+    let sanitized_debug = format!("{:?}", result.semantic_review);
+    assert!(!sanitized_debug.contains("raw_provider_payload"));
+    assert!(!sanitized_debug.contains("prompt"));
+    assert!(!sanitized_debug.contains("secret"));
+    assert!(result.semantic_analysis_status.contains("unavailable"));
     assert!(!result.mutated);
 }
 

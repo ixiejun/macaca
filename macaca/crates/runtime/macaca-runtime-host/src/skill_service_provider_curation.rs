@@ -216,6 +216,21 @@ impl SkillProviderGovernanceState {
         let finished_at = chrono::Utc::now();
         let mut result =
             SkillCurationRunResult::from_records(records, &command, started_at, finished_at);
+        crate::skill_service_provider_semantic_review::attach_unavailable_semantic_review(
+            &mut result,
+            &command,
+            finished_at,
+        )
+        .await;
+        tracing::info!(
+            trace_id = %command.trace.trace_id,
+            run_id = %result.run.run_id,
+            semantic_provider_id = %result.semantic_review.provider_id,
+            semantic_status = ?result.semantic_review.status,
+            semantic_proposals = result.semantic_review.proposals.len(),
+            semantic_mutated = result.semantic_review.mutated,
+            "skill curation semantic review completed"
+        );
         let phase_counts = curation_phase_counts(&result);
         tracing::info!(
             trace_id = %command.trace.trace_id,
