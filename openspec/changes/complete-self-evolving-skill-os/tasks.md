@@ -260,7 +260,7 @@
 - [x] 15.4 Add service-provider tests proving no presentation shell dependency.
 - [x] 15.5 Add optional-provider tests proving absent semantic, marketplace,
   store, or entitlement providers return structured unavailable/denied states.
-- [ ] 15.6 Add audit replay tests for proposal, promotion, mutation, curation
+- [x] 15.6 Add audit replay tests for proposal, promotion, mutation, curation
   run, rollback, and alias histories.
 - [ ] 15.7 Add sanitization tests proving logs, snapshots, reports, and route
   payloads do not include raw prompts, secrets, provider payloads, manifests,

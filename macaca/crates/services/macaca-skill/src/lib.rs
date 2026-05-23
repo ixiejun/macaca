@@ -57,6 +57,9 @@ mod curation_tests;
 mod governance_lifecycle_tests;
 
 #[cfg(test)]
+mod governance_audit_replay_tests;
+
+#[cfg(test)]
 mod merge_tests;
 
 #[cfg(test)]
