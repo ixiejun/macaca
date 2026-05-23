@@ -513,6 +513,17 @@ Every command logs key execution nodes with sanitized fields:
   package bytes, prompts, raw provider payloads, unbounded metadata, or
   application-specific workflow names.
 
+### Slice 8I: Curation Report Test Gate
+
+- Coverage: runtime-host curation tests now cover status, dry-run
+  immutability, approval-gated apply rejection, rollback restore, pinned
+  protection, protected ownership, absent semantic provider behavior, and
+  bounded report refs.
+- Safety: the added report test verifies protected ownership produces a
+  protected recommendation, semantic review is explicitly unavailable, report
+  refs are store refs only, rollback is absent for dry-run, and no mutation is
+  reported.
+
 ## Risks And Mitigations
 
 - Risk: skill mutation corrupts active packages. Mitigation: atomic writes,

@@ -16,11 +16,11 @@ use macaca_skill::{
     SkillAliasKind, SkillAliasRecord, SkillAliasResolveCommand, SkillAliasResolveResult,
     SkillAliasSnapshotCommand, SkillAliasSnapshotResult, SkillAliasUpsertCommand,
     SkillAliasUpsertResult, SkillAuthorKind, SkillCurationAction, SkillCurationDryRunCommand,
-    SkillCurationDryRunResult, SkillCurationRollbackCommand, SkillCurationRollbackResult,
-    SkillCurationRunCommand, SkillCurationRunRecord, SkillCurationRunResult,
-    SkillCurationSnapshotCommand, SkillCurationSnapshotResult, SkillCurationStatusCommand,
-    SkillCurationStatusResult, SkillEvolutionCandidateClassification, SkillEvolutionProposalAction,
-    SkillExperienceCandidate, SkillExperienceCandidateDestination,
+    SkillCurationDryRunResult, SkillCurationPhase, SkillCurationRollbackCommand,
+    SkillCurationRollbackResult, SkillCurationRunCommand, SkillCurationRunRecord,
+    SkillCurationRunResult, SkillCurationSnapshotCommand, SkillCurationSnapshotResult,
+    SkillCurationStatusCommand, SkillCurationStatusResult, SkillEvolutionCandidateClassification,
+    SkillEvolutionProposalAction, SkillExperienceCandidate, SkillExperienceCandidateDestination,
     SkillExperienceEvidenceGateStatus, SkillExperienceProposalCommand,
     SkillExperienceProposalResult, SkillExperienceProposalSnapshotCommand,
     SkillExperienceProposalSnapshotResult, SkillGovernanceEventPayload, SkillGovernanceEventRecord,
@@ -528,6 +528,74 @@ async fn skill_curation_dry_run_does_not_mutate_active_governance_or_alias_state
         serde_json::from_value(curation_snapshot.output).expect("curation snapshot should decode");
     assert!(curation_snapshot.rollback_refs.is_empty());
     assert!(curation_snapshot.package_memento_refs.is_empty());
+}
+
+#[tokio::test]
+async fn skill_curation_report_keeps_protected_ownership_and_absent_provider_sanitized() {
+    let provider = SkillSystemServiceProvider::new();
+    let trace = TraceContext::new("trace-skill-curation-report-sanitized");
+    let mut protected_system_skill = observation(SkillUsageEventKind::Created, None);
+    protected_system_skill.skill_id = "skill://system/protected".into();
+    protected_system_skill.name = "system-protected".into();
+    protected_system_skill.author_kind = SkillAuthorKind::System;
+    protected_system_skill.evidence_id = Some("evidence://system/protected".into());
+    provider
+        .call(traced_command(
+            SKILL_GOVERNANCE_RECORD_USAGE_COMMAND,
+            SkillGovernanceRecordUsageCommand {
+                trace: trace.clone(),
+                scope: SkillServiceScope::default(),
+                observation: protected_system_skill,
+            },
+            trace.clone(),
+        ))
+        .await
+        .expect("protected ownership observation should seed curation report");
+
+    let result = provider
+        .call(traced_command(
+            SKILL_CURATION_RUN_COMMAND,
+            SkillCurationRunCommand {
+                trace: trace.clone(),
+                scope: SkillServiceScope::default(),
+                dry_run: true,
+                stale_after_days: 30,
+                narrow_use_threshold: 0,
+                approval_refs: Vec::new(),
+                policy_decision_refs: Vec::new(),
+                audit_event_ids: vec!["audit://skill-curation/report-sanitized".into()],
+                policy: Default::default(),
+            },
+            trace,
+        ))
+        .await
+        .expect("dry-run report command should be accepted without semantic provider");
+    let result: SkillCurationRunResult =
+        serde_json::from_value(result.output).expect("curation run result should decode");
+
+    assert!(result.semantic_analysis_status.contains("unavailable"));
+    let recommendation = result
+        .recommendations
+        .iter()
+        .find(|candidate| candidate.skill_id == "skill://system/protected")
+        .expect("protected ownership recommendation should exist");
+    assert_eq!(recommendation.action, SkillCurationAction::Protected);
+    assert!(recommendation.protected);
+    assert!(recommendation
+        .phases
+        .contains(&SkillCurationPhase::Protected));
+
+    let report_ref = result.report_ref.as_deref().unwrap_or("");
+    let run_json_ref = result.run_json_ref.as_deref().unwrap_or("");
+    assert!(report_ref.starts_with("store://skill-curation/"));
+    assert!(report_ref.ends_with("/REPORT.md"));
+    assert!(run_json_ref.starts_with("store://skill-curation/"));
+    assert!(run_json_ref.ends_with("/run.json"));
+    assert!(!report_ref.contains("SKILL.md"));
+    assert!(!report_ref.contains("prompt"));
+    assert!(!run_json_ref.contains("provider_payload"));
+    assert!(result.rollback_ref.is_none());
+    assert!(!result.mutated);
 }
 
 #[tokio::test]

@@ -150,7 +150,7 @@
   missing dependency, and protected skill phases.
 - [x] 8.9 Add structured logs for curation start, phase boundaries, candidate
   counts, policy decisions, report refs, rollback refs, and completion.
-- [ ] 8.10 Test status, dry-run immutability, apply with approval, rollback,
+- [x] 8.10 Test status, dry-run immutability, apply with approval, rollback,
   pinned protection, protected ownership, absent provider, and report
   sanitization.
 
