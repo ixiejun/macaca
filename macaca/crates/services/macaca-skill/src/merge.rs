@@ -25,6 +25,60 @@ pub enum SkillMergeSupportFileDestination {
     Assets,
 }
 
+/// Why content should move from core instructions into a support file.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SkillSupportFileDemotionKind {
+    SessionSpecificReference,
+    StarterTemplate,
+    RepeatableScript,
+    Asset,
+}
+
+impl SkillSupportFileDemotionKind {
+    /// Destination required by the demotion class.
+    pub fn expected_destination(&self) -> SkillMergeSupportFileDestination {
+        match self {
+            Self::SessionSpecificReference => SkillMergeSupportFileDestination::References,
+            Self::StarterTemplate => SkillMergeSupportFileDestination::Templates,
+            Self::RepeatableScript => SkillMergeSupportFileDestination::Scripts,
+            Self::Asset => SkillMergeSupportFileDestination::Assets,
+        }
+    }
+}
+
+/// Standalone support-file demotion proposal used before merge apply exists.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SkillSupportFileDemotionProposal {
+    pub skill_id: String,
+    pub source_path: String,
+    pub destination: SkillMergeSupportFileDestination,
+    pub kind: SkillSupportFileDemotionKind,
+    pub destination_path: String,
+    pub rationale: String,
+    pub evidence_ids: Vec<String>,
+}
+
+impl SkillSupportFileDemotionProposal {
+    /// Validate destination class, identity, rationale, and evidence refs.
+    pub fn validate(&self) -> Result<(), String> {
+        ensure_present(&self.skill_id, "support-file demotion requires skill id")?;
+        ensure_present(
+            &self.source_path,
+            "support-file demotion requires source path",
+        )?;
+        ensure_present(
+            &self.destination_path,
+            "support-file demotion requires destination path",
+        )?;
+        ensure_bounded_text(&self.rationale, "support-file demotion rationale")?;
+        ensure_evidence_refs(&self.evidence_ids, "support-file demotion")?;
+        if self.destination != self.kind.expected_destination() {
+            return Err("support-file demotion destination does not match demotion kind".into());
+        }
+        Ok(())
+    }
+}
+
 /// One planned movement from an absorbed skill into a support-file area.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SkillMergeSupportFileMovement {

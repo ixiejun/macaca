@@ -1,6 +1,7 @@
 use crate::{
     SkillAliasKind, SkillMergeAliasEffect, SkillMergeRiskScore, SkillMergeSupportFileDestination,
-    SkillMergeSupportFileMovement, SkillUmbrellaMergeProposal,
+    SkillMergeSupportFileMovement, SkillSupportFileDemotionKind, SkillSupportFileDemotionProposal,
+    SkillUmbrellaMergeProposal,
 };
 
 #[test]
@@ -57,4 +58,23 @@ fn umbrella_merge_proposal_rejects_invalid_identity_and_risk() {
     proposal.risk.score = 0.5;
     proposal.source_skill_ids.clear();
     assert!(proposal.validate().is_err());
+}
+
+#[test]
+fn support_file_demotion_proposal_matches_destination_class() {
+    let proposal = SkillSupportFileDemotionProposal {
+        skill_id: "skill://agent/debugging".into(),
+        source_path: "SKILL.md#incident-notes".into(),
+        destination: SkillMergeSupportFileDestination::References,
+        kind: SkillSupportFileDemotionKind::SessionSpecificReference,
+        destination_path: "references/incident-notes.md".into(),
+        rationale: "incident notes are useful evidence but not core workflow".into(),
+        evidence_ids: vec!["evidence://demotion/reference".into()],
+    };
+
+    assert!(proposal.validate().is_ok());
+
+    let mut invalid = proposal;
+    invalid.destination = SkillMergeSupportFileDestination::Scripts;
+    assert!(invalid.validate().is_err());
 }

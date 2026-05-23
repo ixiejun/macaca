@@ -178,7 +178,7 @@
 - [x] 10.2 Add merge eligibility specifications for scope, ownership,
   permissions, trust level, package source, executable semantics, tenant, and
   capability compatibility.
-- [ ] 10.3 Add support-file demotion proposals for session-specific references,
+- [x] 10.3 Add support-file demotion proposals for session-specific references,
   starter templates, repeatable scripts, and assets.
 - [ ] 10.4 Apply merge only through approval-gated safe mutation and lifecycle
   transition commands.

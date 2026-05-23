@@ -609,6 +609,18 @@ Every command logs key execution nodes with sanitized fields:
   mutates lifecycle records, aliases, support files, packages, scheduler refs,
   or context snapshots.
 
+### Slice 10C: Support-File Demotion Proposal Classes
+
+- Patterns: `macaca-skill` now models standalone support-file demotion proposals
+  so semantic review and curation can describe detail movement before any apply
+  command exists.
+- Destinations: session-specific references map to `references/`, starter
+  templates map to `templates/`, repeatable scripts map to `scripts/`, and
+  assets map to `assets/`.
+- Safety: validation rejects missing identities, blank paths, oversized
+  rationale, blank evidence refs, and any demotion kind whose destination does
+  not match the expected support-file area.
+
 ## Risks And Mitigations
 
 - Risk: skill mutation corrupts active packages. Mitigation: atomic writes,
