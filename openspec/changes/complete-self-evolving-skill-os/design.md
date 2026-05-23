@@ -500,6 +500,19 @@ Every command logs key execution nodes with sanitized fields:
   bytes, prompts, provider payloads, and application semantics stay out of the
   Skill service contract.
 
+### Slice 8H: Curation Run Structured Logs
+
+- Patterns: Observer is applied at runtime-host Strategy boundaries.  The local
+  provider logs run start, deterministic phase input, deterministic phase
+  completion, rollback ref recording, and final run recording without moving
+  curation semantics into shell or presentation layers.
+- Audit fields: structured logs include trace id, run id, dry-run flag,
+  threshold inputs, candidate counts, phase counts, policy decision ref counts,
+  audit event id counts, report refs, rollback refs, and mutation status.
+- Safety: logs aggregate phase counts only.  They never print skill bodies,
+  package bytes, prompts, raw provider payloads, unbounded metadata, or
+  application-specific workflow names.
+
 ## Risks And Mitigations
 
 - Risk: skill mutation corrupts active packages. Mitigation: atomic writes,

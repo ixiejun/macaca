@@ -76,6 +76,7 @@ pub(crate) mod skill_service_experience_routing;
 pub(crate) mod skill_service_governance_store;
 pub mod skill_service_provider;
 pub(crate) mod skill_service_provider_curation;
+pub(crate) mod skill_service_provider_curation_log;
 pub(crate) mod skill_service_provider_lifecycle;
 pub(crate) mod skill_service_provider_proposals;
 pub(crate) mod skill_service_provider_state;

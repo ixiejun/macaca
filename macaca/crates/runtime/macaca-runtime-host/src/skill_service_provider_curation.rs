@@ -17,6 +17,7 @@ use macaca_skill::{
 use serde_json::Value;
 
 use crate::skill_service_codec::{decode, service_result, to_value};
+use crate::skill_service_provider_curation_log::curation_phase_counts;
 use crate::skill_service_provider_state::{event_id, SkillProviderGovernanceState};
 
 pub(crate) async fn dry_run_command(
@@ -181,6 +182,16 @@ impl SkillProviderGovernanceState {
         command: SkillCurationRunCommand,
     ) -> Result<SkillCurationRunResult, String> {
         let started_at = chrono::Utc::now();
+        tracing::info!(
+            trace_id = %command.trace.trace_id,
+            dry_run = command.dry_run,
+            stale_after_days = command.stale_after_days,
+            narrow_use_threshold = command.narrow_use_threshold,
+            approval_refs = command.approval_refs.len(),
+            policy_decision_refs = command.policy_decision_refs.len(),
+            audit_event_ids = command.audit_event_ids.len(),
+            "skill curation run started"
+        );
         let pre_apply_memento = if command.dry_run {
             None
         } else {
@@ -196,9 +207,33 @@ impl SkillProviderGovernanceState {
             .values()
             .cloned()
             .collect::<Vec<_>>();
+        tracing::info!(
+            trace_id = %command.trace.trace_id,
+            candidate_records = records.len(),
+            dry_run = command.dry_run,
+            "skill curation deterministic phase input collected"
+        );
         let finished_at = chrono::Utc::now();
         let mut result =
             SkillCurationRunResult::from_records(records, &command, started_at, finished_at);
+        let phase_counts = curation_phase_counts(&result);
+        tracing::info!(
+            trace_id = %command.trace.trace_id,
+            run_id = %result.run.run_id,
+            recommendations = result.recommendations.len(),
+            keep = phase_counts.keep,
+            protected = phase_counts.protected,
+            quarantine = phase_counts.quarantine,
+            size = phase_counts.size,
+            invalid_metadata = phase_counts.invalid_metadata,
+            missing_dependency = phase_counts.missing_dependency,
+            stale = phase_counts.stale,
+            archive = phase_counts.archive,
+            consolidation = phase_counts.consolidation,
+            report_ref = result.report_ref.as_deref().unwrap_or(""),
+            run_json_ref = result.run_json_ref.as_deref().unwrap_or(""),
+            "skill curation deterministic phase completed"
+        );
         if let Some(mut memento) = pre_apply_memento {
             let after_snapshot_ref = format!(
                 "store://skill-curation/{}/after-{}",
@@ -241,6 +276,15 @@ impl SkillProviderGovernanceState {
             rollback_event.audit_event_ids = result.run.audit_event_ids.clone();
             let _ =
                 <Self as SkillGovernanceStoreStrategy>::append_event(self, rollback_event).await;
+            tracing::info!(
+                trace_id = %command.trace.trace_id,
+                run_id = %result.run.run_id,
+                rollback_ref = result.rollback_ref.as_deref().unwrap_or(""),
+                report_ref = result.report_ref.as_deref().unwrap_or(""),
+                policy_decision_refs = result.run.policy_decision_ids.len(),
+                audit_event_ids = result.run.audit_event_ids.len(),
+                "skill curation rollback ref recorded"
+            );
         }
         let mut event = SkillGovernanceEventRecord::new(
             event_id("skill-governance-curation-run", finished_at),
@@ -259,6 +303,10 @@ impl SkillProviderGovernanceState {
             candidates = result.run.candidate_count,
             policy_decision_refs = result.run.policy_decision_ids.len(),
             audit_event_ids = result.run.audit_event_ids.len(),
+            report_ref = result.report_ref.as_deref().unwrap_or(""),
+            run_json_ref = result.run_json_ref.as_deref().unwrap_or(""),
+            rollback_ref = result.rollback_ref.as_deref().unwrap_or(""),
+            mutated = result.mutated,
             "skill curation run recorded through local governance strategy"
         );
         Ok(result)

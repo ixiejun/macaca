@@ -148,7 +148,7 @@
   scheduler refs, or context snapshots.
 - [x] 8.8 Add deterministic stale, archive, quarantine, size, invalid metadata,
   missing dependency, and protected skill phases.
-- [ ] 8.9 Add structured logs for curation start, phase boundaries, candidate
+- [x] 8.9 Add structured logs for curation start, phase boundaries, candidate
   counts, policy decisions, report refs, rollback refs, and completion.
 - [ ] 8.10 Test status, dry-run immutability, apply with approval, rollback,
   pinned protection, protected ownership, absent provider, and report
