@@ -5,7 +5,7 @@
 
 ## 2. Evaluation Contract
 
-- [ ] 2.1 Add provider-neutral evaluation DTOs for records, checkpoints,
+- [x] 2.1 Add provider-neutral evaluation DTOs for records, checkpoints,
   metrics, scoring output, report refs, and lifecycle state.
 - [ ] 2.2 Add deterministic scoring helpers for white-box and black-box gates.
 - [ ] 2.3 Add sanitized JSON and Markdown report builders.

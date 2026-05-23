@@ -23,6 +23,7 @@ pub(crate) mod curation_policy;
 pub mod definition;
 pub mod discovery;
 pub mod encrypted_package;
+pub mod evaluation;
 pub mod evolution;
 pub mod facade;
 pub mod governance;
@@ -71,6 +72,9 @@ mod semantic_review_tests;
 #[cfg(test)]
 mod ownership_policy_tests;
 
+#[cfg(test)]
+mod evaluation_tests;
+
 // Executable skills (YAML).
 pub use adapter::{LocalSkillRuntimeProxy, SkillRuntimeProxy, SkillToolAdapter};
 pub use alias::*;
@@ -110,6 +114,7 @@ pub use encrypted_package::{
     encrypted_package_metadata, DecryptedPackage, EncryptedPackageAuthorizer,
     EncryptedPackageDecryptor, EncryptedPackageLoader, EncryptedPackageMetadata,
 };
+pub use evaluation::*;
 pub use evolution::*;
 pub use provenance::*;
 pub use provisioner::{ClientConfig, SkillProvisioner};
