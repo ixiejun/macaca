@@ -111,21 +111,21 @@
 
 ## 7. Safe Skill Content Mutation
 
-- [ ] 7.1 Define service-owned mutation commands for create, patch, write support
+- [x] 7.1 Define service-owned mutation commands for create, patch, write support
   file, remove support file, archive materialization, and restore
   materialization.
-- [ ] 7.2 Restrict mutable paths to `SKILL.md`, `references/`, `templates/`,
+- [x] 7.2 Restrict mutable paths to `SKILL.md`, `references/`, `templates/`,
   `scripts/`, and `assets/` inside the governed skill package root.
-- [ ] 7.3 Add path traversal, symlink, executable script, size limit, encoding,
+- [x] 7.3 Add path traversal, symlink, executable script, size limit, encoding,
   and sensitive-content validation.
-- [ ] 7.4 Require package guard, entitlement, resource, and policy approval
+- [x] 7.4 Require package guard, entitlement, resource, and policy approval
   before any file side effect.
-- [ ] 7.5 Implement atomic write and rollback memento creation before mutation.
-- [ ] 7.6 Keep bundled, marketplace, application-owned, paid, encrypted, and
+- [x] 7.5 Implement atomic write and rollback memento creation before mutation.
+- [x] 7.6 Keep bundled, marketplace, application-owned, paid, encrypted, and
   cross-tenant skills protected according to ownership policy.
-- [ ] 7.7 Emit sanitized logs for mutation plan, validation, policy result,
+- [x] 7.7 Emit sanitized logs for mutation plan, validation, policy result,
   memento ref, write result, and rollback eligibility.
-- [ ] 7.8 Test allowed support-file draft writes, denied executable script
+- [x] 7.8 Test allowed support-file draft writes, denied executable script
   mutation, denied protected package mutation, rollback memento creation, and
   sanitized diagnostics.
 

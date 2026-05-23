@@ -51,6 +51,10 @@ pub fn skill_service_descriptor() -> ServiceDescriptor {
             CapabilityId::new("capability.skill.evolution"),
             "Creates sanitized draft skill experience proposals without mutating active skills.",
         ),
+        ServiceCapability::new(
+            CapabilityId::new("capability.skill.mutation"),
+            "Applies policy-gated skill package mutations with rollback mementos.",
+        ),
     ];
     descriptor.health = ServiceHealth::Healthy;
     descriptor.supported_scopes = vec![ServiceScope::Global, ServiceScope::Application("*".into())];
@@ -63,6 +67,7 @@ pub fn skill_service_descriptor() -> ServiceDescriptor {
         "skill.curation".into(),
         "skill.alias".into(),
         "skill.evolution".into(),
+        "skill.mutation".into(),
     ];
     descriptor.cleanup_policy = CleanupPolicy::OnStop;
     descriptor
@@ -76,7 +81,7 @@ mod tests {
     fn skill_descriptor_exports_contract_shape() {
         let descriptor = skill_service_descriptor();
         assert_eq!(descriptor.service_type.as_str(), "skill");
-        assert_eq!(descriptor.capabilities.len(), 8);
+        assert_eq!(descriptor.capabilities.len(), 9);
         assert!(descriptor
             .required_permissions
             .contains(&"skill.invoke".into()));
@@ -89,5 +94,8 @@ mod tests {
         assert!(descriptor
             .required_permissions
             .contains(&"skill.evolution".into()));
+        assert!(descriptor
+            .required_permissions
+            .contains(&"skill.mutation".into()));
     }
 }

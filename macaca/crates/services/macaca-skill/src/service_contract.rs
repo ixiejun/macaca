@@ -48,6 +48,7 @@ pub const SKILL_EVOLUTION_PROPOSE_PATCH_COMMAND: &str = "skill.evolution.propose
 pub const SKILL_EVOLUTION_PROMOTE_DRAFT_COMMAND: &str = "skill.evolution.promote_draft";
 pub const SKILL_EVOLUTION_REJECT_DRAFT_COMMAND: &str = "skill.evolution.reject_draft";
 pub const SKILL_EVOLUTION_SNAPSHOT_COMMAND: &str = "skill.evolution.snapshot";
+pub use crate::mutation::SKILL_CONTENT_MUTATE_COMMAND;
 
 /// Explicit scope for Skill service commands.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

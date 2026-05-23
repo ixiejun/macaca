@@ -15,8 +15,8 @@ use macaca_proto::{
 };
 use macaca_skill::{
     skill_service_descriptor, ExecutableSkillToolSet, SkillAliasResolveCommand,
-    SkillAliasSnapshotCommand, SkillAliasUpsertCommand, SkillCurationDryRunCommand,
-    SkillCurationLifecycleAction, SkillEvolutionPromoteDraftCommand,
+    SkillAliasSnapshotCommand, SkillAliasUpsertCommand, SkillContentMutationCommand,
+    SkillCurationDryRunCommand, SkillCurationLifecycleAction, SkillEvolutionPromoteDraftCommand,
     SkillEvolutionProposePatchCommand, SkillEvolutionRejectDraftCommand,
     SkillExecutableLoadCommand, SkillExecutableLoadResult, SkillExperienceProposalCommand,
     SkillExperienceProposalSnapshotCommand, SkillGovernanceRecordUsageCommand,
@@ -24,10 +24,11 @@ use macaca_skill::{
     SkillServiceSnapshotCommand, SkillSnapshotRequest, SkillSnapshotServiceCommand,
     SkillStatusCommand, SkillStatusResult, SkillToolCatalogCommand, SkillToolCatalogResult,
     SkillToolInvokeCommand, SKILL_ALIAS_RESOLVE_COMMAND, SKILL_ALIAS_SNAPSHOT_COMMAND,
-    SKILL_ALIAS_UPSERT_COMMAND, SKILL_CLEANUP_COMMAND, SKILL_CURATION_ARCHIVE_COMMAND,
-    SKILL_CURATION_DRY_RUN_COMMAND, SKILL_CURATION_PIN_COMMAND, SKILL_CURATION_QUARANTINE_COMMAND,
-    SKILL_CURATION_REJECT_COMMAND, SKILL_CURATION_RELEASE_QUARANTINE_COMMAND,
-    SKILL_CURATION_RESTORE_COMMAND, SKILL_CURATION_SUPERSEDE_COMMAND, SKILL_CURATION_UNPIN_COMMAND,
+    SKILL_ALIAS_UPSERT_COMMAND, SKILL_CLEANUP_COMMAND, SKILL_CONTENT_MUTATE_COMMAND,
+    SKILL_CURATION_ARCHIVE_COMMAND, SKILL_CURATION_DRY_RUN_COMMAND, SKILL_CURATION_PIN_COMMAND,
+    SKILL_CURATION_QUARANTINE_COMMAND, SKILL_CURATION_REJECT_COMMAND,
+    SKILL_CURATION_RELEASE_QUARANTINE_COMMAND, SKILL_CURATION_RESTORE_COMMAND,
+    SKILL_CURATION_SUPERSEDE_COMMAND, SKILL_CURATION_UNPIN_COMMAND,
     SKILL_EVOLUTION_PROMOTE_DRAFT_COMMAND, SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND,
     SKILL_EVOLUTION_PROPOSE_PATCH_COMMAND, SKILL_EVOLUTION_REJECT_DRAFT_COMMAND,
     SKILL_EVOLUTION_SNAPSHOT_COMMAND, SKILL_EXECUTABLE_LOAD_COMMAND,
@@ -39,6 +40,7 @@ use macaca_tools::{ToolCommand, ToolCommandExecutor};
 use tokio::sync::Mutex;
 
 use crate::skill_service_codec::{decode, service_adapter_error, service_result, to_value};
+use crate::skill_service_content_mutation::LocalSkillContentMutationStrategy;
 use crate::skill_service_experience_routing::SkillExperienceDestinationRouter;
 use crate::skill_service_provider_state::SkillProviderGovernanceState;
 
@@ -49,6 +51,7 @@ pub struct SkillSystemServiceProvider {
     executable_tools: Arc<Mutex<ExecutableSkillToolSet>>,
     governance_state: Arc<SkillProviderGovernanceState>,
     experience_router: SkillExperienceDestinationRouter,
+    content_mutation: LocalSkillContentMutationStrategy,
 }
 
 impl SkillSystemServiceProvider {
@@ -60,6 +63,7 @@ impl SkillSystemServiceProvider {
             executable_tools: Arc::new(Mutex::new(ExecutableSkillToolSet::new())),
             governance_state: Arc::new(SkillProviderGovernanceState::default()),
             experience_router: SkillExperienceDestinationRouter::default(),
+            content_mutation: LocalSkillContentMutationStrategy,
         }
     }
 
@@ -71,6 +75,7 @@ impl SkillSystemServiceProvider {
             executable_tools: Arc::new(Mutex::new(ExecutableSkillToolSet::new())),
             governance_state: Arc::new(SkillProviderGovernanceState::default()),
             experience_router: SkillExperienceDestinationRouter::default(),
+            content_mutation: LocalSkillContentMutationStrategy,
         }
     }
 
@@ -511,6 +516,22 @@ impl SystemService for SkillSystemServiceProvider {
                     mutated = result.mutated,
                     include_discarded = typed.include_discarded,
                     "skill experience proposal snapshot emitted"
+                );
+                Ok(service_result(to_value(result)?, typed.trace))
+            }
+            SKILL_CONTENT_MUTATE_COMMAND => {
+                let typed: SkillContentMutationCommand = decode(command.payload)?;
+                let result = self.content_mutation.apply(typed.clone()).await?;
+                tracing::info!(
+                    trace_id = %typed.trace.trace_id,
+                    skill_id = %typed.skill_id,
+                    relative_path = %typed.relative_path.display(),
+                    mutation_kind = ?typed.kind,
+                    status = ?result.status,
+                    mutated = result.mutated,
+                    evidence_refs = result.evidence_ids.len(),
+                    policy_decision_refs = result.policy_decision_refs.len(),
+                    "skill content mutation command completed"
                 );
                 Ok(service_result(to_value(result)?, typed.trace))
             }

@@ -372,6 +372,27 @@ Every command logs key execution nodes with sanitized fields:
   payloads, manifests, package bytes, credentials, signatures, or full skill
   bodies enter route results or logs.
 
+### Slice 7A: Safe Skill Content Mutation Foundation
+
+- Patterns: Command DTOs describe create, patch, support-file write/remove,
+  archive materialization, and restore materialization without shell-owned
+  semantics; Strategy is the runtime-host local mutation applier that can later
+  be replaced by Store/Package providers; Decorator-style validation performs
+  trace, policy, entitlement, package guard, path, size, encoding, executable,
+  and sensitive-content checks before side effects; Specification captures
+  allowed paths and protected ownership classes; Memento records rollback refs
+  before atomic writes or removals.
+- Ownership: `macaca-skill` owns provider-neutral mutation contracts and
+  validation rules. `macaca-runtime-host` owns the built-in local filesystem
+  Strategy and sanitized logs. Kernel, SDK, Web, CLI, frontend, applications,
+  and Context/Task consumers do not write skill files or infer mutation policy
+  in this slice.
+- Safety: mutation results expose only refs, bounded counts, status, and
+  sanitized denial reasons. Commands may carry content because the Skill
+  service is the mutation boundary, but logs, reports, snapshots, and results
+  never echo raw content, prompts, provider payloads, manifests, package bytes,
+  credentials, signatures, or full skill bodies.
+
 ## Risks And Mitigations
 
 - Risk: skill mutation corrupts active packages. Mitigation: atomic writes,
