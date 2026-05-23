@@ -131,7 +131,7 @@
 
 ## 8. Curation Status, Run, Snapshot, And Rollback
 
-- [ ] 8.1 Add `skill.curation.status` typed command with interval, idle,
+- [x] 8.1 Add `skill.curation.status` typed command with interval, idle,
   budget, provider, last run, next eligible run, and unavailable states.
 - [ ] 8.2 Add `skill.curation.run` typed command supporting dry-run and
   approval-gated apply modes.

@@ -12,9 +12,9 @@ use macaca_skill::{
     SkillAliasRecord, SkillAliasResolveCommand, SkillAliasResolveResult, SkillAliasSnapshotResult,
     SkillAliasUpsertCommand, SkillAliasUpsertResult, SkillCurationDryRunCommand,
     SkillCurationDryRunResult, SkillCurationLifecycleAction, SkillCurationLifecycleCommand,
-    SkillCurationLifecycleResult, SkillCurationSupersedeCommand,
-    SkillExperienceDestinationRouteResult, SkillExperienceProposalCommand,
-    SkillExperienceProposalRecord, SkillExperienceProposalResult,
+    SkillCurationLifecycleResult, SkillCurationStatusCommand, SkillCurationStatusResult,
+    SkillCurationSupersedeCommand, SkillExperienceDestinationRouteResult,
+    SkillExperienceProposalCommand, SkillExperienceProposalRecord, SkillExperienceProposalResult,
     SkillExperienceProposalSnapshotResult, SkillGovernanceEventPayload, SkillGovernanceEventRecord,
     SkillGovernanceRecord, SkillGovernanceRecordUsageCommand, SkillGovernanceRecordUsageResult,
     SkillGovernanceSnapshotResult, SkillGovernanceStoreStrategy, SkillLifecycleState,
@@ -140,6 +140,55 @@ impl SkillProviderGovernanceState {
             .cloned()
             .collect::<Vec<_>>();
         SkillCurationDryRunResult::from_records(records, command, chrono::Utc::now())
+    }
+
+    /// Return read-only curation runner readiness and the latest durable run.
+    ///
+    /// Status is derived from append-only governance events so operators can
+    /// inspect runner liveness without triggering curation, mutating aliases,
+    /// touching package files, or reading skill bodies.
+    pub(crate) async fn curation_status(
+        &self,
+        command: &SkillCurationStatusCommand,
+    ) -> SkillCurationStatusResult {
+        let captured_at = chrono::Utc::now();
+        let last_run = self
+            .event_log
+            .lock()
+            .await
+            .iter()
+            .filter_map(|event| match &event.payload {
+                SkillGovernanceEventPayload::CurationRunRecorded(record) => Some(record.clone()),
+                SkillGovernanceEventPayload::UsageRecorded(_)
+                | SkillGovernanceEventPayload::LifecycleApplied(_)
+                | SkillGovernanceEventPayload::AliasUpserted(_)
+                | SkillGovernanceEventPayload::ProposalCreated(_)
+                | SkillGovernanceEventPayload::SnapshotRefRecorded(_)
+                | SkillGovernanceEventPayload::RollbackRefRecorded(_) => None,
+            })
+            .max_by_key(|record| record.finished_at.unwrap_or(record.started_at));
+        let last_finished_at = last_run.as_ref().and_then(|run| run.finished_at);
+        let idle_for_ms = last_finished_at
+            .and_then(|finished_at| captured_at.signed_duration_since(finished_at).to_std().ok())
+            .map(|duration| duration.as_millis().min(u128::from(u64::MAX)) as u64);
+        let next_eligible_run_at = last_finished_at.and_then(|finished_at| {
+            chrono::Duration::from_std(std::time::Duration::from_millis(command.interval_ms))
+                .ok()
+                .map(|interval| finished_at + interval)
+        });
+
+        SkillCurationStatusResult {
+            provider_id: "local-skill-governance".into(),
+            available: true,
+            interval_ms: command.interval_ms,
+            idle_budget_ms: command.idle_budget_ms,
+            idle_for_ms,
+            last_run_id: last_run.map(|run| run.run_id),
+            last_run_finished_at: last_finished_at,
+            next_eligible_run_at,
+            unavailable_reason: None,
+            captured_at,
+        }
     }
 
     /// Apply one metadata-only lifecycle transition to a governance record.

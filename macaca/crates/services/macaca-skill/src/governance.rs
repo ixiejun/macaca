@@ -303,6 +303,36 @@ pub struct SkillGovernanceSnapshotResult {
     pub captured_at: DateTime<Utc>,
 }
 
+/// Command for reading curation runner readiness without starting a run.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SkillCurationStatusCommand {
+    pub trace: TraceContext,
+    pub scope: SkillServiceScope,
+    /// Configured runner interval used to compute the next eligible run.
+    ///
+    /// The caller supplies the interval because scheduler/runtime policy owns
+    /// wake cadence.  The Skill service reports readiness and last-run state
+    /// without hardcoding an application or scheduler profile.
+    pub interval_ms: u64,
+    /// Optional idle/budget window for operator diagnostics.
+    pub idle_budget_ms: Option<u64>,
+}
+
+/// Read-only curation status returned to SDK and shell adapters.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SkillCurationStatusResult {
+    pub provider_id: String,
+    pub available: bool,
+    pub interval_ms: u64,
+    pub idle_budget_ms: Option<u64>,
+    pub idle_for_ms: Option<u64>,
+    pub last_run_id: Option<String>,
+    pub last_run_finished_at: Option<DateTime<Utc>>,
+    pub next_eligible_run_at: Option<DateTime<Utc>>,
+    pub unavailable_reason: Option<String>,
+    pub captured_at: DateTime<Utc>,
+}
+
 /// Command for deterministic, non-destructive curation analysis.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SkillCurationDryRunCommand {

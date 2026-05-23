@@ -16,8 +16,9 @@ use macaca_skill::{
     SkillAliasKind, SkillAliasRecord, SkillAliasResolveCommand, SkillAliasResolveResult,
     SkillAliasSnapshotCommand, SkillAliasSnapshotResult, SkillAliasUpsertCommand,
     SkillAliasUpsertResult, SkillAuthorKind, SkillCurationAction, SkillCurationDryRunCommand,
-    SkillCurationDryRunResult, SkillCurationRunRecord, SkillEvolutionCandidateClassification,
-    SkillEvolutionProposalAction, SkillExperienceCandidate, SkillExperienceCandidateDestination,
+    SkillCurationDryRunResult, SkillCurationRunRecord, SkillCurationStatusCommand,
+    SkillCurationStatusResult, SkillEvolutionCandidateClassification, SkillEvolutionProposalAction,
+    SkillExperienceCandidate, SkillExperienceCandidateDestination,
     SkillExperienceEvidenceGateStatus, SkillExperienceProposalCommand,
     SkillExperienceProposalResult, SkillExperienceProposalSnapshotCommand,
     SkillExperienceProposalSnapshotResult, SkillGovernanceEventPayload, SkillGovernanceEventRecord,
@@ -26,7 +27,7 @@ use macaca_skill::{
     SkillGovernanceSnapshotResult, SkillProvenanceAction, SkillRollbackRefRecord,
     SkillServiceScope, SkillStatusCommand, SkillStatusResult, SkillUsageEventKind,
     SkillUsageObservation, SKILL_ALIAS_RESOLVE_COMMAND, SKILL_ALIAS_SNAPSHOT_COMMAND,
-    SKILL_ALIAS_UPSERT_COMMAND, SKILL_CURATION_DRY_RUN_COMMAND,
+    SKILL_ALIAS_UPSERT_COMMAND, SKILL_CURATION_DRY_RUN_COMMAND, SKILL_CURATION_STATUS_COMMAND,
     SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND, SKILL_EVOLUTION_SNAPSHOT_COMMAND,
     SKILL_GOVERNANCE_RECORD_USAGE_COMMAND, SKILL_GOVERNANCE_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND,
 };
@@ -292,6 +293,34 @@ async fn skill_governance_dry_run_keeps_pinned_skills_protected() {
         SkillCurationAction::Protected
     );
     assert!(result.recommendations[0].protected);
+}
+
+#[tokio::test]
+async fn skill_curation_status_reports_read_only_local_provider_state() {
+    let provider = SkillSystemServiceProvider::new();
+    let trace = TraceContext::new("trace-skill-curation-status");
+    let result = provider
+        .call(traced_command(
+            SKILL_CURATION_STATUS_COMMAND,
+            SkillCurationStatusCommand {
+                trace: trace.clone(),
+                scope: SkillServiceScope::default(),
+                interval_ms: 60_000,
+                idle_budget_ms: Some(10_000),
+            },
+            trace,
+        ))
+        .await
+        .expect("curation status should be a read-only provider command");
+    let result: SkillCurationStatusResult =
+        serde_json::from_value(result.output).expect("curation status result should decode");
+
+    assert!(result.available);
+    assert_eq!(result.provider_id, "local-skill-governance");
+    assert_eq!(result.interval_ms, 60_000);
+    assert_eq!(result.idle_budget_ms, Some(10_000));
+    assert!(result.last_run_id.is_none());
+    assert!(result.next_eligible_run_at.is_none());
 }
 
 #[tokio::test]

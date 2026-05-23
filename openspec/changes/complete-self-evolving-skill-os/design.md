@@ -393,6 +393,20 @@ Every command logs key execution nodes with sanitized fields:
   never echo raw content, prompts, provider payloads, manifests, package bytes,
   credentials, signatures, or full skill bodies.
 
+### Slice 8A: Read-Only Curation Status
+
+- Patterns: Command exposes `skill.curation.status` as a typed read-only
+  status request; Facade compatibility is preserved because shells can render
+  provider, interval, idle, last-run, next-run, and unavailable fields without
+  owning curation scheduling; Observer reads the append-only governance event
+  stream for last-run refs; Strategy remains the local provider state and can
+  later be replaced by Store/EventLog-backed status.
+- Ownership: `macaca-skill` owns the status DTO. `macaca-runtime-host` owns
+  local status projection from provider state. Scheduler/runtime policy owns
+  cadence input, and shells only display the returned DTO.
+- Safety: status is non-mutating and does not inspect skill bodies, package
+  bytes, raw provider payloads, prompts, or task output.
+
 ## Risks And Mitigations
 
 - Risk: skill mutation corrupts active packages. Mitigation: atomic writes,
