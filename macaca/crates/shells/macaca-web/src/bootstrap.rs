@@ -127,6 +127,10 @@ impl WebRuntimeFacade {
                 post(skill_operations_routes::post_skill_curation_rollback),
             )
             .route(
+                "/api/apps/{app_id}/skills/operations/evaluation/report",
+                post(skill_operations_routes::post_skill_evaluation_report),
+            )
+            .route(
                 "/api/apps/{app_id}/skills/operations/proposals/{proposal_id}/promote",
                 post(skill_operations_routes::post_skill_proposal_promote),
             )

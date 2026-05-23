@@ -13,13 +13,14 @@ use axum::http::StatusCode;
 use axum::Json;
 use macaca_proto::{ApplicationId, TraceContext};
 use macaca_skill::{
-    SkillAliasSnapshotCommand, SkillAuthorKind, SkillCurationDryRunCommand,
-    SkillCurationLifecycleAction, SkillCurationLifecycleCommand, SkillCurationRollbackCommand,
-    SkillCurationRunCommand, SkillEvolutionPromoteDraftCommand, SkillEvolutionRejectDraftCommand,
-    SkillExperienceProposalSnapshotCommand, SkillGovernanceSnapshotCommand,
-    SkillServicePolicyHints, SkillServiceScope,
+    SelfEvolutionEvaluationRecord, SelfEvolutionScore, SkillAliasSnapshotCommand,
+    SkillAuthorKind, SkillCurationDryRunCommand, SkillCurationLifecycleAction,
+    SkillCurationLifecycleCommand, SkillCurationRollbackCommand, SkillCurationRunCommand,
+    SkillEvaluationReportCommand, SkillEvaluationScoreCommand, SkillEvolutionPromoteDraftCommand,
+    SkillEvolutionRejectDraftCommand, SkillExperienceProposalSnapshotCommand,
+    SkillGovernanceSnapshotCommand, SkillServicePolicyHints, SkillServiceScope,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::routes::{err, proto_err, ErrorResponse};
 use crate::state::AppState;
@@ -133,6 +134,19 @@ pub struct SkillOperatorCommandRequest {
     pub stale_after_days: Option<i64>,
     pub narrow_use_threshold: Option<u64>,
     pub rollback_ref: Option<String>,
+}
+
+/// Request body for building a self-evolution evaluation report.
+///
+/// The Web shell accepts only the provider-neutral record and optional prior
+/// score. If a score is omitted, Web asks the SDK-backed Skill service to score
+/// first; either way, report construction remains service-owned.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct SkillEvaluationReportRequest {
+    pub record: SelfEvolutionEvaluationRecord,
+    pub score: Option<SelfEvolutionScore>,
+    #[serde(default = "default_include_markdown")]
+    pub include_markdown: bool,
 }
 
 /// POST /api/apps/{app_id}/skills/operations/lifecycle/{action}/{skill_id}
@@ -340,6 +354,60 @@ pub async fn post_skill_proposal_reject(
     ))
 }
 
+/// POST /api/apps/{app_id}/skills/operations/evaluation/report.
+///
+/// Builds a sanitized self-evolution report through the Skill service facade.
+/// The route is intentionally a thin Adapter: it does not inspect checkpoint
+/// semantics, evaluate metric thresholds, or branch on application-specific
+/// benchmark logic.
+pub async fn post_skill_evaluation_report(
+    State(state): State<Arc<AppState>>,
+    Path(app_id): Path<String>,
+    Json(body): Json<SkillEvaluationReportRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponse>)> {
+    let app_id = parse_application_id(&app_id)?;
+    let trace = TraceContext::new(format!("web-skill-evaluation-report-{}", app_id.0));
+    let scope = application_skill_scope(app_id);
+    let score = match body.score {
+        Some(score) => score,
+        None => {
+            state
+                .skill_client
+                .evaluate_self_evolution(SkillEvaluationScoreCommand {
+                    trace: trace.clone(),
+                    scope: scope.clone(),
+                    record: body.record.clone(),
+                })
+                .await
+                .map_err(|error| proto_err(StatusCode::BAD_GATEWAY, &error))?
+                .score
+        }
+    };
+    let result = state
+        .skill_client
+        .self_evolution_evaluation_report(SkillEvaluationReportCommand {
+            trace: trace.clone(),
+            scope,
+            record: body.record,
+            score,
+            include_markdown: body.include_markdown,
+        })
+        .await
+        .map_err(|error| proto_err(StatusCode::BAD_GATEWAY, &error))?;
+
+    tracing::info!(
+        app_id = %app_id.0,
+        trace_id = %trace.trace_id,
+        passed = result.score.passed,
+        reason_count = result.score.reason_codes.len(),
+        include_markdown = body.include_markdown,
+        "web route emitted Skill self-evolution evaluation report through SDK"
+    );
+    Ok(Json(
+        serde_json::json!({ "result": result, "trace_id": trace.trace_id }),
+    ))
+}
+
 fn parse_application_id(app_id: &str) -> Result<ApplicationId, (StatusCode, Json<ErrorResponse>)> {
     uuid::Uuid::parse_str(app_id)
         .map(ApplicationId)
@@ -449,6 +517,10 @@ fn policy_hints(
     }
 }
 
+fn default_include_markdown() -> bool {
+    true
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -458,6 +530,12 @@ mod tests {
         assert!(source.contains("curation_lifecycle"));
         assert!(source.contains("promote_skill_draft"));
         assert!(source.contains("reject_skill_draft"));
+        assert!(source.contains("self_evolution_evaluation_report"));
+        assert!(source.contains("evaluate_self_evolution"));
+        assert!(!source.contains(&format!(
+            "{}{}",
+            "SelfEvolutionScoringPolicy", "::score"
+        )));
         assert!(!source.contains(&format!("{}{}", "macaca_runtime", "_host::")));
         assert!(!source.contains(&format!("{}{}", "SkillGovernance", "StoreStrategy")));
         assert!(!source.contains(&format!("{}{}", "SkillLifecycleState::", "Archived")));
