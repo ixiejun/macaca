@@ -37,7 +37,7 @@
   unavailable states without panics or fake success.
 - [x] 2.9 Migrate existing in-memory governance, alias, proposal, and lifecycle
   state behind the new store interface through a compatibility adapter.
-- [ ] 2.10 Add structured logs for store append, read-model replay, snapshot
+- [x] 2.10 Add structured logs for store append, read-model replay, snapshot
   build, and store-unavailable decisions.
 - [x] 2.11 Test replay restores lifecycle, telemetry, aliases, proposals,
   curation runs, and rollback refs from event records.

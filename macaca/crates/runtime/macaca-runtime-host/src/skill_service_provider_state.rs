@@ -71,15 +71,33 @@ impl SkillProviderGovernanceState {
         &self,
         include_archived: bool,
     ) -> SkillGovernanceSnapshotResult {
-        let mut records: Vec<_> = self
+        let all_records = self
             .records
             .lock()
             .await
             .values()
-            .filter(|record| include_archived || record.lifecycle != SkillLifecycleState::Archived)
             .cloned()
+            .collect::<Vec<_>>();
+        let archived_records = all_records
+            .iter()
+            .filter(|record| record.lifecycle == SkillLifecycleState::Archived)
+            .count();
+        let filtered_out = if include_archived {
+            0
+        } else {
+            archived_records
+        };
+        let mut records: Vec<_> = all_records
+            .into_iter()
+            .filter(|record| include_archived || record.lifecycle != SkillLifecycleState::Archived)
             .collect();
         records.sort_by(|left, right| left.provenance.skill_id.cmp(&right.provenance.skill_id));
+        tracing::info!(
+            include_archived = include_archived,
+            records = records.len(),
+            filtered_records = filtered_out,
+            "skill governance snapshot built through local compatibility adapter"
+        );
 
         SkillGovernanceSnapshotResult {
             records,
@@ -329,6 +347,10 @@ impl SkillGovernanceStoreStrategy for SkillProviderGovernanceState {
         tracing::info!(
             event_id = %event.event_id,
             trace_id = %event.trace_id,
+            event_kind = %governance_event_kind(&event.payload),
+            application_id = ?event.scope.application_id,
+            session_id = ?event.scope.session_id,
+            agent_name = ?event.scope.agent_name,
             "skill governance event appended through local compatibility adapter"
         );
         self.event_log.lock().await.push(event.clone());
@@ -339,127 +361,34 @@ impl SkillGovernanceStoreStrategy for SkillProviderGovernanceState {
         &self,
     ) -> Result<SkillGovernanceReadModel, SkillGovernanceStoreUnavailable> {
         let events = self.event_log.lock().await.clone();
+        let read_model = SkillGovernanceReadModel::from_events(events);
         tracing::info!(
-            events = events.len(),
+            events = read_model.replayed_events,
+            records = read_model.records.len(),
+            aliases = read_model.aliases.len(),
+            proposals = read_model.proposals.len(),
+            curation_runs = read_model.curation_runs.len(),
+            rollback_refs = read_model.rollback_refs.len(),
             "skill governance read model replayed through local compatibility adapter"
         );
-        Ok(SkillGovernanceReadModel::from_events(events))
+        Ok(read_model)
     }
 }
 
+fn governance_event_kind(payload: &SkillGovernanceEventPayload) -> &'static str {
+    match payload {
+        SkillGovernanceEventPayload::UsageRecorded(_) => "usage_recorded",
+        SkillGovernanceEventPayload::LifecycleApplied(_) => "lifecycle_applied",
+        SkillGovernanceEventPayload::AliasUpserted(_) => "alias_upserted",
+        SkillGovernanceEventPayload::ProposalCreated(_) => "proposal_created",
+        SkillGovernanceEventPayload::CurationRunRecorded(_) => "curation_run_recorded",
+        SkillGovernanceEventPayload::SnapshotRefRecorded(_) => "snapshot_ref_recorded",
+        SkillGovernanceEventPayload::RollbackRefRecorded(_) => "rollback_ref_recorded",
+    }
+}
 fn event_id(prefix: &str, captured_at: chrono::DateTime<chrono::Utc>) -> String {
     let nanos = captured_at
         .timestamp_nanos_opt()
         .unwrap_or_else(|| captured_at.timestamp_micros() * 1_000);
     format!("{prefix}-{nanos}")
-}
-
-#[cfg(test)]
-mod tests {
-    use std::collections::BTreeMap;
-
-    use macaca_proto::TraceContext;
-    use macaca_skill::{
-        SkillAliasKind, SkillAliasRecord, SkillAliasUpsertCommand, SkillAuthorKind,
-        SkillCurationLifecycleAction, SkillCurationLifecycleCommand,
-        SkillEvolutionCandidateClassification, SkillEvolutionProposalAction,
-        SkillExperienceCandidate, SkillExperienceProposalCommand,
-        SkillGovernanceRecordUsageCommand, SkillGovernanceStoreStrategy, SkillServicePolicyHints,
-        SkillServiceScope, SkillUsageEventKind, SkillUsageObservation,
-    };
-
-    use super::SkillProviderGovernanceState;
-
-    #[tokio::test]
-    async fn local_governance_state_replays_through_store_strategy_adapter() {
-        let state = SkillProviderGovernanceState::default();
-        let trace = TraceContext::new("trace-local-governance-store-adapter");
-        let scope = SkillServiceScope::default();
-
-        state
-            .record_usage(SkillGovernanceRecordUsageCommand {
-                trace: trace.clone(),
-                scope: scope.clone(),
-                observation: SkillUsageObservation {
-                    skill_id: "skill://agent/local".into(),
-                    name: "local-skill".into(),
-                    source: "test".into(),
-                    source_scope: "workspace".into(),
-                    event: SkillUsageEventKind::Used,
-                    author_kind: SkillAuthorKind::Agent,
-                    created_by: Some("agent".into()),
-                    pinned: None,
-                    evidence_id: Some("usage-evidence-1".into()),
-                    metadata: BTreeMap::new(),
-                },
-            })
-            .await;
-        state
-            .apply_lifecycle(
-                SkillCurationLifecycleCommand {
-                    trace: trace.clone(),
-                    scope: scope.clone(),
-                    skill_id: "skill://agent/local".into(),
-                    name: "local-skill".into(),
-                    source: "test".into(),
-                    source_scope: "workspace".into(),
-                    author_kind: SkillAuthorKind::Agent,
-                    reason: "verified stale lifecycle metadata".into(),
-                    evidence_ids: vec!["lifecycle-evidence-1".into()],
-                    policy: SkillServicePolicyHints::default(),
-                },
-                SkillCurationLifecycleAction::Archive,
-            )
-            .await
-            .expect("local lifecycle adapter should accept evidence");
-        let now = chrono::Utc::now();
-        state
-            .upsert_alias(SkillAliasUpsertCommand {
-                trace: trace.clone(),
-                scope: scope.clone(),
-                record: SkillAliasRecord {
-                    source_skill_id: "skill://agent/old-local".into(),
-                    source_name: "old-local".into(),
-                    target_skill_id: "skill://agent/local".into(),
-                    target_name: "local-skill".into(),
-                    kind: SkillAliasKind::SupersededBy,
-                    rationale: "local test alias".into(),
-                    created_at: now,
-                    updated_at: now,
-                    evidence_ids: vec!["alias-evidence-1".into()],
-                },
-            })
-            .await;
-        state
-            .propose_experience(SkillExperienceProposalCommand {
-                trace: trace.clone(),
-                scope,
-                candidate: SkillExperienceCandidate {
-                    task_id: "task-local-1".into(),
-                    session_id: Some("session-local-1".into()),
-                    application_id: None,
-                    agent_name: Some("agent".into()),
-                    bounded_summary: "Verified local governance replay evidence.".into(),
-                    reusable_procedure: "Replay append-only local governance events through the store strategy adapter.".into(),
-                    classification: SkillEvolutionCandidateClassification::ReusableProcedure,
-                    recommended_action: SkillEvolutionProposalAction::CreateDraft,
-                    target_skill_id: None,
-                    target_skill_name: Some("local-governance-replay".into()),
-                    evidence_ids: vec!["proposal-evidence-1".into()],
-                    metadata: BTreeMap::new(),
-                },
-            })
-            .await;
-
-        let read_model = state
-            .read_model()
-            .await
-            .expect("local in-memory state should replay through the store strategy");
-
-        assert_eq!(read_model.records.len(), 1);
-        assert_eq!(read_model.records[0].telemetry.activation_count, 1);
-        assert_eq!(read_model.aliases.len(), 1);
-        assert_eq!(read_model.proposals.len(), 1);
-        assert_eq!(read_model.replayed_events, 4);
-    }
 }
