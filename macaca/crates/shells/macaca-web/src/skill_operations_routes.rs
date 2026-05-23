@@ -42,6 +42,7 @@ pub async fn get_skill_operations(
             trace: trace.clone(),
             scope: scope.clone(),
             include_archived: true,
+            lifecycle_filters: Vec::new(),
         })
         .await
         .map_err(|error| proto_err(StatusCode::BAD_GATEWAY, &error))?;

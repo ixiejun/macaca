@@ -17,21 +17,22 @@ use macaca_proto::{
 use macaca_skill::{
     skill_service_descriptor, ExecutableSkillToolSet, SkillAliasResolveCommand,
     SkillAliasSnapshotCommand, SkillAliasUpsertCommand, SkillCurationDryRunCommand,
-    SkillCurationLifecycleAction, SkillCurationLifecycleCommand, SkillExecutableLoadCommand,
-    SkillExecutableLoadResult, SkillExperienceProposalCommand,
-    SkillExperienceProposalSnapshotCommand, SkillGovernanceRecordUsageCommand,
-    SkillGovernanceSnapshotCommand, SkillRuntimeFacade, SkillServiceSnapshot,
-    SkillServiceSnapshotCommand, SkillSnapshotRequest, SkillSnapshotServiceCommand,
-    SkillStatusCommand, SkillStatusResult, SkillToolCatalogCommand, SkillToolCatalogResult,
-    SkillToolInvokeCommand, SKILL_ALIAS_RESOLVE_COMMAND, SKILL_ALIAS_SNAPSHOT_COMMAND,
-    SKILL_ALIAS_UPSERT_COMMAND, SKILL_CLEANUP_COMMAND, SKILL_CURATION_ARCHIVE_COMMAND,
-    SKILL_CURATION_DRY_RUN_COMMAND, SKILL_CURATION_PIN_COMMAND, SKILL_CURATION_QUARANTINE_COMMAND,
+    SkillCurationLifecycleAction, SkillExecutableLoadCommand, SkillExecutableLoadResult,
+    SkillExperienceProposalCommand, SkillExperienceProposalSnapshotCommand,
+    SkillGovernanceRecordUsageCommand, SkillGovernanceSnapshotCommand, SkillRuntimeFacade,
+    SkillServiceSnapshot, SkillServiceSnapshotCommand, SkillSnapshotRequest,
+    SkillSnapshotServiceCommand, SkillStatusCommand, SkillStatusResult, SkillToolCatalogCommand,
+    SkillToolCatalogResult, SkillToolInvokeCommand, SKILL_ALIAS_RESOLVE_COMMAND,
+    SKILL_ALIAS_SNAPSHOT_COMMAND, SKILL_ALIAS_UPSERT_COMMAND, SKILL_CLEANUP_COMMAND,
+    SKILL_CURATION_ARCHIVE_COMMAND, SKILL_CURATION_DRY_RUN_COMMAND, SKILL_CURATION_PIN_COMMAND,
+    SKILL_CURATION_QUARANTINE_COMMAND, SKILL_CURATION_REJECT_COMMAND,
     SKILL_CURATION_RELEASE_QUARANTINE_COMMAND, SKILL_CURATION_RESTORE_COMMAND,
-    SKILL_CURATION_UNPIN_COMMAND, SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND,
-    SKILL_EVOLUTION_SNAPSHOT_COMMAND, SKILL_EXECUTABLE_LOAD_COMMAND,
-    SKILL_GOVERNANCE_RECORD_USAGE_COMMAND, SKILL_GOVERNANCE_SNAPSHOT_COMMAND, SKILL_SERVICE_ID,
-    SKILL_SERVICE_SNAPSHOT_COMMAND, SKILL_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND,
-    SKILL_TOOL_CATALOG_COMMAND, SKILL_TOOL_INVOKE_COMMAND,
+    SKILL_CURATION_SUPERSEDE_COMMAND, SKILL_CURATION_UNPIN_COMMAND,
+    SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND, SKILL_EVOLUTION_SNAPSHOT_COMMAND,
+    SKILL_EXECUTABLE_LOAD_COMMAND, SKILL_GOVERNANCE_RECORD_USAGE_COMMAND,
+    SKILL_GOVERNANCE_SNAPSHOT_COMMAND, SKILL_SERVICE_ID, SKILL_SERVICE_SNAPSHOT_COMMAND,
+    SKILL_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND, SKILL_TOOL_CATALOG_COMMAND,
+    SKILL_TOOL_INVOKE_COMMAND,
 };
 use macaca_tools::{ToolCommand, ToolCommandExecutor};
 use tokio::sync::Mutex;
@@ -81,44 +82,17 @@ impl SkillSystemServiceProvider {
     }
 
     fn service_result(output: serde_json::Value, trace: TraceContext) -> ServiceCallResult {
-        ServiceCallResult {
-            output,
-            trace,
-            status: "ok".into(),
-            metadata: BTreeMap::new(),
-            cleanup_hint: Some(CleanupPolicy::None),
-        }
+        service_result(output, trace)
     }
+}
 
-    /// Decode and apply one metadata-only lifecycle curation command.
-    ///
-    /// The runtime-host provider acts as the built-in Strategy behind the Skill
-    /// service contract.  It logs the auditable boundary event and delegates the
-    /// state transition to `SkillProviderGovernanceState`; it never edits skill
-    /// instruction files, package bytes, aliases, or executable scripts.
-    async fn apply_lifecycle_command(
-        &self,
-        payload: serde_json::Value,
-        trace: TraceContext,
-        action: SkillCurationLifecycleAction,
-    ) -> ServiceResult<ServiceCallResult> {
-        let typed: SkillCurationLifecycleCommand = decode(payload)?;
-        typed.validate().map_err(ServiceError::InvalidArgument)?;
-        let result = self
-            .governance_state
-            .apply_lifecycle(typed.clone(), action.clone())
-            .await
-            .map_err(ServiceError::InvalidArgument)?;
-        tracing::info!(
-            trace_id = %typed.trace.trace_id,
-            skill_id = %result.skill_id,
-            action = ?action,
-            lifecycle = ?result.lifecycle,
-            pinned = result.pinned,
-            mutated = result.mutated,
-            "skill curation lifecycle metadata updated"
-        );
-        Ok(Self::service_result(to_value(result)?, trace))
+pub(crate) fn service_result(output: serde_json::Value, trace: TraceContext) -> ServiceCallResult {
+    ServiceCallResult {
+        output,
+        trace,
+        status: "ok".into(),
+        metadata: BTreeMap::new(),
+        cleanup_hint: Some(CleanupPolicy::None),
     }
 }
 
@@ -307,7 +281,7 @@ impl SystemService for SkillSystemServiceProvider {
                 let typed: SkillGovernanceSnapshotCommand = decode(command.payload)?;
                 let result = self
                     .governance_state
-                    .governance_snapshot(typed.include_archived)
+                    .governance_snapshot(typed.include_archived, typed.lifecycle_filters)
                     .await;
                 tracing::info!(
                     trace_id = %typed.trace.trace_id,
@@ -328,7 +302,8 @@ impl SystemService for SkillSystemServiceProvider {
                 Ok(Self::service_result(to_value(result)?, typed.trace))
             }
             SKILL_CURATION_PIN_COMMAND => {
-                self.apply_lifecycle_command(
+                crate::skill_service_provider_lifecycle::apply_lifecycle_command(
+                    &self.governance_state,
                     command.payload,
                     trace,
                     SkillCurationLifecycleAction::Pin,
@@ -336,7 +311,8 @@ impl SystemService for SkillSystemServiceProvider {
                 .await
             }
             SKILL_CURATION_UNPIN_COMMAND => {
-                self.apply_lifecycle_command(
+                crate::skill_service_provider_lifecycle::apply_lifecycle_command(
+                    &self.governance_state,
                     command.payload,
                     trace,
                     SkillCurationLifecycleAction::Unpin,
@@ -344,7 +320,8 @@ impl SystemService for SkillSystemServiceProvider {
                 .await
             }
             SKILL_CURATION_ARCHIVE_COMMAND => {
-                self.apply_lifecycle_command(
+                crate::skill_service_provider_lifecycle::apply_lifecycle_command(
+                    &self.governance_state,
                     command.payload,
                     trace,
                     SkillCurationLifecycleAction::Archive,
@@ -352,7 +329,8 @@ impl SystemService for SkillSystemServiceProvider {
                 .await
             }
             SKILL_CURATION_RESTORE_COMMAND => {
-                self.apply_lifecycle_command(
+                crate::skill_service_provider_lifecycle::apply_lifecycle_command(
+                    &self.governance_state,
                     command.payload,
                     trace,
                     SkillCurationLifecycleAction::Restore,
@@ -360,7 +338,8 @@ impl SystemService for SkillSystemServiceProvider {
                 .await
             }
             SKILL_CURATION_QUARANTINE_COMMAND => {
-                self.apply_lifecycle_command(
+                crate::skill_service_provider_lifecycle::apply_lifecycle_command(
+                    &self.governance_state,
                     command.payload,
                     trace,
                     SkillCurationLifecycleAction::Quarantine,
@@ -368,10 +347,27 @@ impl SystemService for SkillSystemServiceProvider {
                 .await
             }
             SKILL_CURATION_RELEASE_QUARANTINE_COMMAND => {
-                self.apply_lifecycle_command(
+                crate::skill_service_provider_lifecycle::apply_lifecycle_command(
+                    &self.governance_state,
                     command.payload,
                     trace,
                     SkillCurationLifecycleAction::ReleaseQuarantine,
+                )
+                .await
+            }
+            SKILL_CURATION_REJECT_COMMAND => {
+                crate::skill_service_provider_lifecycle::apply_lifecycle_command(
+                    &self.governance_state,
+                    command.payload,
+                    trace,
+                    SkillCurationLifecycleAction::Reject,
+                )
+                .await
+            }
+            SKILL_CURATION_SUPERSEDE_COMMAND => {
+                crate::skill_service_provider_lifecycle::supersede_command(
+                    &self.governance_state,
+                    command.payload,
                 )
                 .await
             }
@@ -475,11 +471,11 @@ impl SystemService for SkillSystemServiceProvider {
     }
 }
 
-fn decode<T: serde::de::DeserializeOwned>(value: serde_json::Value) -> ServiceResult<T> {
+pub(crate) fn decode<T: serde::de::DeserializeOwned>(value: serde_json::Value) -> ServiceResult<T> {
     serde_json::from_value(value).map_err(|err| ServiceError::UnsupportedCommand(err.to_string()))
 }
 
-fn to_value<T: serde::Serialize>(value: T) -> ServiceResult<serde_json::Value> {
+pub(crate) fn to_value<T: serde::Serialize>(value: T) -> ServiceResult<serde_json::Value> {
     serde_json::to_value(value).map_err(|err| ServiceError::AdapterFailure(err.to_string()))
 }
 

@@ -7,9 +7,10 @@
 use macaca_proto::TraceContext;
 
 use crate::{
-    SkillAuthorKind, SkillCurationLifecycleCommand, SkillLifecycleState,
-    SkillLifecycleStateMachine, SkillPinnedMutationGuard, SkillPinnedMutationOperation,
-    SkillServicePolicyHints, SkillServiceScope,
+    SkillAliasKind, SkillAliasRecord, SkillAuthorKind, SkillCurationLifecycleCommand,
+    SkillCurationSupersedeCommand, SkillLifecycleState, SkillLifecycleStateMachine,
+    SkillPinnedMutationGuard, SkillPinnedMutationOperation, SkillServicePolicyHints,
+    SkillServiceScope,
 };
 
 #[test]
@@ -37,21 +38,40 @@ fn skill_lifecycle_state_contract_includes_complete_governance_set() {
 
 #[test]
 fn lifecycle_state_machine_allows_only_governed_transitions() {
-    assert!(SkillLifecycleStateMachine::validate_transition(
-        &SkillLifecycleState::Draft,
-        &SkillLifecycleState::Active
-    )
-    .is_ok());
-    assert!(SkillLifecycleStateMachine::validate_transition(
-        &SkillLifecycleState::Active,
-        &SkillLifecycleState::Superseded
-    )
-    .is_ok());
-    assert!(SkillLifecycleStateMachine::validate_transition(
-        &SkillLifecycleState::Archived,
-        &SkillLifecycleState::Active
-    )
-    .is_ok());
+    let allowed = [
+        (SkillLifecycleState::Draft, SkillLifecycleState::Active),
+        (SkillLifecycleState::Draft, SkillLifecycleState::Rejected),
+        (SkillLifecycleState::Active, SkillLifecycleState::Stale),
+        (SkillLifecycleState::Active, SkillLifecycleState::Archived),
+        (
+            SkillLifecycleState::Active,
+            SkillLifecycleState::Quarantined,
+        ),
+        (SkillLifecycleState::Active, SkillLifecycleState::Superseded),
+        (SkillLifecycleState::Stale, SkillLifecycleState::Active),
+        (SkillLifecycleState::Stale, SkillLifecycleState::Archived),
+        (SkillLifecycleState::Stale, SkillLifecycleState::Quarantined),
+        (SkillLifecycleState::Stale, SkillLifecycleState::Superseded),
+        (SkillLifecycleState::Archived, SkillLifecycleState::Active),
+        (
+            SkillLifecycleState::Quarantined,
+            SkillLifecycleState::Active,
+        ),
+        (
+            SkillLifecycleState::Quarantined,
+            SkillLifecycleState::Archived,
+        ),
+        (
+            SkillLifecycleState::Quarantined,
+            SkillLifecycleState::Rejected,
+        ),
+    ];
+    for (from, to) in allowed {
+        assert!(
+            SkillLifecycleStateMachine::validate_transition(&from, &to).is_ok(),
+            "{from:?} -> {to:?} should be allowed"
+        );
+    }
     assert!(SkillLifecycleStateMachine::validate_transition(
         &SkillLifecycleState::Rejected,
         &SkillLifecycleState::Active
@@ -62,6 +82,45 @@ fn lifecycle_state_machine_allows_only_governed_transitions() {
         &SkillLifecycleState::Archived
     )
     .is_err());
+}
+
+#[test]
+fn supersede_command_requires_alias_redirect_evidence() {
+    let lifecycle = SkillCurationLifecycleCommand {
+        trace: TraceContext::new("trace-supersede-command-contract"),
+        scope: SkillServiceScope::default(),
+        skill_id: "skill://agent/source".into(),
+        name: "source".into(),
+        source: "test".into(),
+        source_scope: "workspace".into(),
+        author_kind: SkillAuthorKind::Agent,
+        reason: "validate alias-before-supersede contract".into(),
+        evidence_ids: vec!["evidence://task/supersede".into()],
+        policy_decision_refs: vec!["policy://decision/supersede".into()],
+        policy: SkillServicePolicyHints::default(),
+    };
+    let now = chrono::Utc::now();
+    let mut command = SkillCurationSupersedeCommand {
+        lifecycle,
+        alias: SkillAliasRecord {
+            source_skill_id: "skill://agent/source".into(),
+            source_name: "source".into(),
+            target_skill_id: "skill://agent/target".into(),
+            target_name: "target".into(),
+            kind: SkillAliasKind::SupersededBy,
+            rationale: "source is redirected to target".into(),
+            created_at: now,
+            updated_at: now,
+            evidence_ids: vec!["evidence://alias/supersede".into()],
+        },
+    };
+
+    assert!(command.validate().is_ok());
+    command.alias.evidence_ids.clear();
+    assert!(command
+        .validate()
+        .expect_err("alias evidence is required")
+        .contains("alias evidence"));
 }
 
 #[test]

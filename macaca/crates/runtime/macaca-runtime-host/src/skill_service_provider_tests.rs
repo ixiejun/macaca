@@ -108,6 +108,7 @@ async fn skill_governance_records_usage_and_snapshots_state() {
         trace: trace.clone(),
         scope: SkillServiceScope::default(),
         include_archived: false,
+        lifecycle_filters: Vec::new(),
     };
     let snapshot = provider
         .call(traced_command(
@@ -289,6 +290,7 @@ async fn skill_experience_proposal_creates_draft_without_mutating_governance_rec
         trace: trace.clone(),
         scope: SkillServiceScope::default(),
         include_archived: true,
+        lifecycle_filters: Vec::new(),
     };
     let result = provider
         .call(traced_command(

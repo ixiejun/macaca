@@ -71,6 +71,7 @@ pub mod service_runtime;
 pub mod service_runtime_error;
 pub mod service_runtime_event;
 pub mod skill_service_provider;
+pub(crate) mod skill_service_provider_lifecycle;
 pub(crate) mod skill_service_provider_state;
 pub mod store_entitlement_admission;
 pub mod store_service_provider;

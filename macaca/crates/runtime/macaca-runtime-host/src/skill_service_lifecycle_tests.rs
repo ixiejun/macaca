@@ -1,12 +1,14 @@
 use macaca_kernel::SystemService;
 use macaca_proto::{ServiceCommand, ServiceCommandName, TraceContext};
 use macaca_skill::{
+    SkillAliasKind, SkillAliasRecord, SkillAliasSnapshotCommand, SkillAliasSnapshotResult,
     SkillAuthorKind, SkillCurationLifecycleCommand, SkillCurationLifecycleResult,
-    SkillGovernanceSnapshotCommand, SkillGovernanceSnapshotResult, SkillLifecycleState,
-    SkillServicePolicyHints, SkillServiceScope, SKILL_CURATION_ARCHIVE_COMMAND,
-    SKILL_CURATION_PIN_COMMAND, SKILL_CURATION_QUARANTINE_COMMAND,
-    SKILL_CURATION_RELEASE_QUARANTINE_COMMAND, SKILL_CURATION_RESTORE_COMMAND,
-    SKILL_CURATION_UNPIN_COMMAND, SKILL_GOVERNANCE_SNAPSHOT_COMMAND,
+    SkillCurationSupersedeCommand, SkillGovernanceSnapshotCommand, SkillGovernanceSnapshotResult,
+    SkillLifecycleState, SkillServicePolicyHints, SkillServiceScope, SKILL_ALIAS_SNAPSHOT_COMMAND,
+    SKILL_CURATION_ARCHIVE_COMMAND, SKILL_CURATION_PIN_COMMAND, SKILL_CURATION_QUARANTINE_COMMAND,
+    SKILL_CURATION_REJECT_COMMAND, SKILL_CURATION_RELEASE_QUARANTINE_COMMAND,
+    SKILL_CURATION_RESTORE_COMMAND, SKILL_CURATION_SUPERSEDE_COMMAND, SKILL_CURATION_UNPIN_COMMAND,
+    SKILL_GOVERNANCE_SNAPSHOT_COMMAND,
 };
 
 use crate::SkillSystemServiceProvider;
@@ -39,6 +41,21 @@ fn lifecycle_command(
         evidence_ids,
         policy_decision_refs: vec!["policy://decision/lifecycle-test".into()],
         policy: SkillServicePolicyHints::default(),
+    }
+}
+
+fn supersede_alias_record() -> SkillAliasRecord {
+    let now = chrono::Utc::now();
+    SkillAliasRecord {
+        source_skill_id: "skill://agent/lifecycle".into(),
+        source_name: "agent-lifecycle".into(),
+        target_skill_id: "skill://agent/lifecycle-v2".into(),
+        target_name: "agent-lifecycle-v2".into(),
+        kind: SkillAliasKind::SupersededBy,
+        rationale: "operator approved redirect before hiding the source skill".into(),
+        created_at: now,
+        updated_at: now,
+        evidence_ids: vec!["supersede-alias-evidence-1".into()],
     }
 }
 
@@ -84,6 +101,7 @@ async fn skill_curation_pin_and_unpin_mutate_only_governance_metadata() {
         trace: trace.clone(),
         scope: SkillServiceScope::default(),
         include_archived: true,
+        lifecycle_filters: Vec::new(),
     };
     let result = provider
         .call(traced_command(
@@ -123,6 +141,7 @@ async fn skill_curation_archive_and_restore_update_snapshot_visibility() {
         trace: trace.clone(),
         scope: SkillServiceScope::default(),
         include_archived: false,
+        lifecycle_filters: Vec::new(),
     };
     let result = provider
         .call(traced_command(
@@ -153,6 +172,7 @@ async fn skill_curation_archive_and_restore_update_snapshot_visibility() {
         trace: trace.clone(),
         scope: SkillServiceScope::default(),
         include_archived: false,
+        lifecycle_filters: Vec::new(),
     };
     let result = provider
         .call(traced_command(
@@ -201,6 +221,95 @@ async fn skill_curation_quarantine_and_release_update_lifecycle() {
 }
 
 #[tokio::test]
+async fn skill_curation_supersede_requires_and_records_alias() {
+    let provider = SkillSystemServiceProvider::new();
+    let trace = TraceContext::new("trace-skill-curation-supersede");
+    let command = SkillCurationSupersedeCommand {
+        lifecycle: lifecycle_command(trace.clone(), vec!["supersede-evidence-1".into()]),
+        alias: supersede_alias_record(),
+    };
+
+    let result = provider
+        .call(traced_command(
+            SKILL_CURATION_SUPERSEDE_COMMAND,
+            command,
+            trace.clone(),
+        ))
+        .await
+        .expect("supersede command should update lifecycle after alias upsert");
+    let superseded: SkillCurationLifecycleResult =
+        serde_json::from_value(result.output).expect("supersede result should decode");
+    assert_eq!(superseded.lifecycle, SkillLifecycleState::Superseded);
+    assert_eq!(superseded.evidence_ids, vec!["supersede-evidence-1"]);
+
+    let alias_snapshot = SkillAliasSnapshotCommand {
+        trace: trace.clone(),
+        scope: SkillServiceScope::default(),
+    };
+    let result = provider
+        .call(traced_command(
+            SKILL_ALIAS_SNAPSHOT_COMMAND,
+            alias_snapshot,
+            trace.clone(),
+        ))
+        .await
+        .expect("alias snapshot should expose supersede redirect");
+    let aliases: SkillAliasSnapshotResult =
+        serde_json::from_value(result.output).expect("alias snapshot should decode");
+    assert_eq!(aliases.aliases.len(), 1);
+    assert_eq!(aliases.aliases[0].kind, SkillAliasKind::SupersededBy);
+
+    let snapshot = SkillGovernanceSnapshotCommand {
+        trace: trace.clone(),
+        scope: SkillServiceScope::default(),
+        include_archived: true,
+        lifecycle_filters: vec![SkillLifecycleState::Superseded],
+    };
+    let result = provider
+        .call(traced_command(
+            SKILL_GOVERNANCE_SNAPSHOT_COMMAND,
+            snapshot,
+            trace,
+        ))
+        .await
+        .expect("filtered snapshot should include superseded record");
+    let snapshot: SkillGovernanceSnapshotResult =
+        serde_json::from_value(result.output).expect("snapshot result should decode");
+    assert_eq!(snapshot.records.len(), 1);
+    assert_eq!(
+        snapshot.records[0].lifecycle,
+        SkillLifecycleState::Superseded
+    );
+}
+
+#[tokio::test]
+async fn skill_curation_reject_preserves_rationale_and_evidence() {
+    let provider = SkillSystemServiceProvider::new();
+    let trace = TraceContext::new("trace-skill-curation-reject");
+    let command = lifecycle_command(trace.clone(), vec!["reject-evidence-1".into()]);
+
+    let result = provider
+        .call(traced_command(
+            SKILL_CURATION_REJECT_COMMAND,
+            command,
+            trace.clone(),
+        ))
+        .await
+        .expect("reject command should preserve draft rationale as rejected lifecycle");
+    let rejected: SkillCurationLifecycleResult =
+        serde_json::from_value(result.output).expect("reject result should decode");
+    assert_eq!(rejected.lifecycle, SkillLifecycleState::Rejected);
+    assert_eq!(rejected.evidence_ids, vec!["reject-evidence-1"]);
+    assert_eq!(
+        rejected.policy_decision_refs,
+        vec!["policy://decision/lifecycle-test"]
+    );
+    assert!(rejected
+        .reason
+        .contains("metadata-only lifecycle transition"));
+}
+
+#[tokio::test]
 async fn skill_curation_archive_rejects_pinned_skill() {
     let provider = SkillSystemServiceProvider::new();
     let trace = TraceContext::new("trace-skill-curation-pinned-archive");
@@ -232,6 +341,7 @@ async fn skill_curation_archive_rejects_pinned_skill() {
         trace: trace.clone(),
         scope: SkillServiceScope::default(),
         include_archived: true,
+        lifecycle_filters: Vec::new(),
     };
     let result = provider
         .call(traced_command(

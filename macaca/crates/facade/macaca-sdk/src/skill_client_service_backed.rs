@@ -19,13 +19,13 @@ use macaca_skill::{
     SkillToolInvokeCommand, SkillToolInvokeResult, SKILL_ALIAS_RESOLVE_COMMAND,
     SKILL_ALIAS_SNAPSHOT_COMMAND, SKILL_ALIAS_UPSERT_COMMAND, SKILL_CLEANUP_COMMAND,
     SKILL_CURATION_ARCHIVE_COMMAND, SKILL_CURATION_DRY_RUN_COMMAND, SKILL_CURATION_PIN_COMMAND,
-    SKILL_CURATION_QUARANTINE_COMMAND, SKILL_CURATION_RELEASE_QUARANTINE_COMMAND,
-    SKILL_CURATION_RESTORE_COMMAND, SKILL_CURATION_UNPIN_COMMAND,
-    SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND, SKILL_EVOLUTION_SNAPSHOT_COMMAND,
-    SKILL_EXECUTABLE_LOAD_COMMAND, SKILL_GOVERNANCE_RECORD_USAGE_COMMAND,
-    SKILL_GOVERNANCE_SNAPSHOT_COMMAND, SKILL_SERVICE_ID, SKILL_SERVICE_SNAPSHOT_COMMAND,
-    SKILL_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND, SKILL_TOOL_CATALOG_COMMAND,
-    SKILL_TOOL_INVOKE_COMMAND,
+    SKILL_CURATION_QUARANTINE_COMMAND, SKILL_CURATION_REJECT_COMMAND,
+    SKILL_CURATION_RELEASE_QUARANTINE_COMMAND, SKILL_CURATION_RESTORE_COMMAND,
+    SKILL_CURATION_UNPIN_COMMAND, SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND,
+    SKILL_EVOLUTION_SNAPSHOT_COMMAND, SKILL_EXECUTABLE_LOAD_COMMAND,
+    SKILL_GOVERNANCE_RECORD_USAGE_COMMAND, SKILL_GOVERNANCE_SNAPSHOT_COMMAND, SKILL_SERVICE_ID,
+    SKILL_SERVICE_SNAPSHOT_COMMAND, SKILL_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND,
+    SKILL_TOOL_CATALOG_COMMAND, SKILL_TOOL_INVOKE_COMMAND,
 };
 
 use crate::service_client::ServiceCallCommand;
@@ -152,13 +152,8 @@ impl SystemSkillClient for ServiceBackedSkillClient {
         action: SkillCurationLifecycleAction,
         command: SkillCurationLifecycleCommand,
     ) -> MacacaResult<SkillCurationLifecycleResult> {
-        call(
-            &self.service,
-            curation_lifecycle_command_name(&action),
-            command.trace.clone(),
-            command,
-        )
-        .await
+        let command_name = curation_lifecycle_command_name(&action)?;
+        call(&self.service, command_name, command.trace.clone(), command).await
     }
 
     async fn alias_upsert(
@@ -237,8 +232,10 @@ impl SystemSkillClient for ServiceBackedSkillClient {
     }
 }
 
-fn curation_lifecycle_command_name(action: &SkillCurationLifecycleAction) -> &'static str {
-    match action {
+fn curation_lifecycle_command_name(
+    action: &SkillCurationLifecycleAction,
+) -> MacacaResult<&'static str> {
+    Ok(match action {
         SkillCurationLifecycleAction::Pin => SKILL_CURATION_PIN_COMMAND,
         SkillCurationLifecycleAction::Unpin => SKILL_CURATION_UNPIN_COMMAND,
         SkillCurationLifecycleAction::Archive => SKILL_CURATION_ARCHIVE_COMMAND,
@@ -247,7 +244,13 @@ fn curation_lifecycle_command_name(action: &SkillCurationLifecycleAction) -> &'s
         SkillCurationLifecycleAction::ReleaseQuarantine => {
             SKILL_CURATION_RELEASE_QUARANTINE_COMMAND
         }
-    }
+        SkillCurationLifecycleAction::Supersede => {
+            return Err(MacacaError::Config(
+                "supersede requires a SkillCurationSupersedeCommand with alias evidence".into(),
+            ));
+        }
+        SkillCurationLifecycleAction::Reject => SKILL_CURATION_REJECT_COMMAND,
+    })
 }
 
 async fn call<T, R>(

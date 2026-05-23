@@ -107,6 +107,8 @@ pub enum SkillUsageEventKind {
     Restored,
     Quarantined,
     QuarantineReleased,
+    Superseded,
+    Rejected,
     Pinned,
     Unpinned,
 }
@@ -196,6 +198,8 @@ impl SkillUsageTelemetry {
             | SkillUsageEventKind::Restored
             | SkillUsageEventKind::Quarantined
             | SkillUsageEventKind::QuarantineReleased
+            | SkillUsageEventKind::Superseded
+            | SkillUsageEventKind::Rejected
             | SkillUsageEventKind::Pinned
             | SkillUsageEventKind::Unpinned => {
                 self.last_lifecycle_event_at = Some(observed_at);
@@ -265,6 +269,8 @@ impl SkillGovernanceRecord {
             SkillUsageEventKind::Restored => self.lifecycle = SkillLifecycleState::Active,
             SkillUsageEventKind::Quarantined => self.lifecycle = SkillLifecycleState::Quarantined,
             SkillUsageEventKind::QuarantineReleased => self.lifecycle = SkillLifecycleState::Active,
+            SkillUsageEventKind::Superseded => self.lifecycle = SkillLifecycleState::Superseded,
+            SkillUsageEventKind::Rejected => self.lifecycle = SkillLifecycleState::Rejected,
             SkillUsageEventKind::Pinned | SkillUsageEventKind::Unpinned => {}
             SkillUsageEventKind::Created
             | SkillUsageEventKind::Viewed
@@ -328,7 +334,15 @@ pub struct SkillGovernanceRecordUsageResult {
 pub struct SkillGovernanceSnapshotCommand {
     pub trace: TraceContext,
     pub scope: SkillServiceScope,
+    /// Backward-compatible archived visibility switch for older shell callers.
+    ///
+    /// New callers should prefer `lifecycle_filters` because the governance
+    /// lifecycle set is now larger than active/archived.  Keeping this field
+    /// preserves existing SDK and Web route behavior while the richer filter is
+    /// rolled out across consumers.
     pub include_archived: bool,
+    #[serde(default)]
+    pub lifecycle_filters: Vec<SkillLifecycleState>,
 }
 
 /// Sanitized governance snapshot result.

@@ -8,7 +8,7 @@
 - [x] 1.3 Confirm every slice assigns ownership to Skill, Store/EventLog, Task,
   Memory, Knowledge, Context, Policy, Entitlement, Runtime Host, SDK, or shell
   without adding kernel semantics.
-- [ ] 1.4 Keep OpenSpec proposal, design, tasks, and delta spec updated before
+- [x] 1.4 Keep OpenSpec proposal, design, tasks, and delta spec updated before
   code changes in each slice.
 - [x] 1.5 Run `openspec validate complete-self-evolving-skill-os --strict`
   after every spec update.
@@ -53,12 +53,12 @@
 - [x] 3.4 Deny archive, supersede, merge apply, or deletion of pinned skills
   unless an explicit approval override contract is added.
 - [x] 3.5 Add quarantine commands and quarantine release/restore paths.
-- [ ] 3.6 Add supersede transitions that require alias or redirect records.
-- [ ] 3.7 Add rejected proposal transitions that preserve evidence and rationale
+- [x] 3.6 Add supersede transitions that require alias or redirect records.
+- [x] 3.7 Add rejected proposal transitions that preserve evidence and rationale
   without activating skills.
-- [ ] 3.8 Update snapshots to expose lifecycle filters without returning skill
+- [x] 3.8 Update snapshots to expose lifecycle filters without returning skill
   instruction bodies.
-- [ ] 3.9 Test every allowed and denied lifecycle transition.
+- [x] 3.9 Test every allowed and denied lifecycle transition.
 
 ## 4. Rich Provenance And Telemetry Capture
 

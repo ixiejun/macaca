@@ -13,13 +13,13 @@ use macaca_skill::{
     SkillAliasRecord, SkillAliasResolveCommand, SkillAliasResolveResult, SkillAliasSnapshotResult,
     SkillAliasUpsertCommand, SkillAliasUpsertResult, SkillCurationDryRunCommand,
     SkillCurationDryRunResult, SkillCurationLifecycleAction, SkillCurationLifecycleCommand,
-    SkillCurationLifecycleResult, SkillExperienceProposalCommand, SkillExperienceProposalRecord,
-    SkillExperienceProposalResult, SkillExperienceProposalSnapshotResult,
-    SkillGovernanceEventPayload, SkillGovernanceEventRecord, SkillGovernanceReadModel,
-    SkillGovernanceRecord, SkillGovernanceRecordUsageCommand, SkillGovernanceRecordUsageResult,
-    SkillGovernanceSnapshotResult, SkillGovernanceStoreStrategy, SkillGovernanceStoreUnavailable,
-    SkillLifecycleState, SkillLifecycleStateMachine, SkillPinnedMutationGuard,
-    SkillPinnedMutationOperation, SkillUsageObservation,
+    SkillCurationLifecycleResult, SkillCurationSupersedeCommand, SkillExperienceProposalCommand,
+    SkillExperienceProposalRecord, SkillExperienceProposalResult,
+    SkillExperienceProposalSnapshotResult, SkillGovernanceEventPayload, SkillGovernanceEventRecord,
+    SkillGovernanceReadModel, SkillGovernanceRecord, SkillGovernanceRecordUsageCommand,
+    SkillGovernanceRecordUsageResult, SkillGovernanceSnapshotResult, SkillGovernanceStoreStrategy,
+    SkillGovernanceStoreUnavailable, SkillLifecycleState, SkillLifecycleStateMachine,
+    SkillPinnedMutationGuard, SkillPinnedMutationOperation, SkillUsageObservation,
 };
 use tokio::sync::Mutex;
 
@@ -71,6 +71,7 @@ impl SkillProviderGovernanceState {
     pub(crate) async fn governance_snapshot(
         &self,
         include_archived: bool,
+        lifecycle_filters: Vec<SkillLifecycleState>,
     ) -> SkillGovernanceSnapshotResult {
         let all_records = self
             .records
@@ -79,22 +80,26 @@ impl SkillProviderGovernanceState {
             .values()
             .cloned()
             .collect::<Vec<_>>();
-        let archived_records = all_records
+        let filtered_out = all_records
             .iter()
-            .filter(|record| record.lifecycle == SkillLifecycleState::Archived)
+            .filter(|record| {
+                !snapshot_includes_lifecycle(
+                    &record.lifecycle,
+                    include_archived,
+                    &lifecycle_filters,
+                )
+            })
             .count();
-        let filtered_out = if include_archived {
-            0
-        } else {
-            archived_records
-        };
         let mut records: Vec<_> = all_records
             .into_iter()
-            .filter(|record| include_archived || record.lifecycle != SkillLifecycleState::Archived)
+            .filter(|record| {
+                snapshot_includes_lifecycle(&record.lifecycle, include_archived, &lifecycle_filters)
+            })
             .collect();
         records.sort_by(|left, right| left.provenance.skill_id.cmp(&right.provenance.skill_id));
         tracing::info!(
             include_archived = include_archived,
+            lifecycle_filters = lifecycle_filters.len(),
             records = records.len(),
             filtered_records = filtered_out,
             "skill governance snapshot built through local compatibility adapter"
@@ -148,13 +153,23 @@ impl SkillProviderGovernanceState {
             .collect::<Vec<_>>();
         let mut records = self.records.lock().await;
         let record = records.entry(key).or_insert_with(|| {
-            SkillGovernanceRecord::from_lifecycle_command(&command, captured_at)
+            let mut record = SkillGovernanceRecord::from_lifecycle_command(&command, captured_at);
+            if action == SkillCurationLifecycleAction::Reject {
+                record.lifecycle = SkillLifecycleState::Draft;
+            }
+            record
         });
 
         if action == SkillCurationLifecycleAction::Archive {
             SkillPinnedMutationGuard::ensure_not_pinned(
                 record.pinned,
                 &SkillPinnedMutationOperation::Archive,
+            )?;
+        }
+        if action == SkillCurationLifecycleAction::Supersede {
+            SkillPinnedMutationGuard::ensure_not_pinned(
+                record.pinned,
+                &SkillPinnedMutationOperation::Supersede,
             )?;
         }
         if action == SkillCurationLifecycleAction::ReleaseQuarantine
@@ -176,6 +191,8 @@ impl SkillProviderGovernanceState {
             SkillCurationLifecycleAction::Restore => SkillLifecycleState::Active,
             SkillCurationLifecycleAction::Quarantine => SkillLifecycleState::Quarantined,
             SkillCurationLifecycleAction::ReleaseQuarantine => SkillLifecycleState::Active,
+            SkillCurationLifecycleAction::Supersede => SkillLifecycleState::Superseded,
+            SkillCurationLifecycleAction::Reject => SkillLifecycleState::Rejected,
         };
         SkillLifecycleStateMachine::validate_transition(&record.lifecycle, &target_lifecycle)?;
         record.lifecycle = target_lifecycle;
@@ -225,6 +242,12 @@ impl SkillProviderGovernanceState {
                     SkillCurationLifecycleAction::ReleaseQuarantine => {
                         macaca_skill::SkillUsageEventKind::QuarantineReleased
                     }
+                    SkillCurationLifecycleAction::Supersede => {
+                        macaca_skill::SkillUsageEventKind::Superseded
+                    }
+                    SkillCurationLifecycleAction::Reject => {
+                        macaca_skill::SkillUsageEventKind::Rejected
+                    }
                 },
                 author_kind: command.author_kind.clone(),
                 created_by: None,
@@ -234,7 +257,9 @@ impl SkillProviderGovernanceState {
                     SkillCurationLifecycleAction::Archive
                     | SkillCurationLifecycleAction::Restore
                     | SkillCurationLifecycleAction::Quarantine
-                    | SkillCurationLifecycleAction::ReleaseQuarantine => None,
+                    | SkillCurationLifecycleAction::ReleaseQuarantine
+                    | SkillCurationLifecycleAction::Supersede
+                    | SkillCurationLifecycleAction::Reject => None,
                 },
                 evidence_id: sanitized_evidence.first().cloned(),
                 metadata: BTreeMap::new(),
@@ -256,6 +281,21 @@ impl SkillProviderGovernanceState {
             trace_id: command.trace.trace_id,
             captured_at,
         })
+    }
+
+    /// Upsert the required alias before hiding the source skill as superseded.
+    pub(crate) async fn supersede(
+        &self,
+        command: SkillCurationSupersedeCommand,
+    ) -> Result<SkillCurationLifecycleResult, String> {
+        let alias_command = SkillAliasUpsertCommand {
+            trace: command.lifecycle.trace.clone(),
+            scope: command.lifecycle.scope.clone(),
+            record: command.alias,
+        };
+        self.upsert_alias(alias_command).await;
+        self.apply_lifecycle(command.lifecycle, SkillCurationLifecycleAction::Supersede)
+            .await
     }
 
     /// Insert or replace one alias record.
@@ -421,6 +461,18 @@ fn governance_event_kind(payload: &SkillGovernanceEventPayload) -> &'static str 
         SkillGovernanceEventPayload::RollbackRefRecorded(_) => "rollback_ref_recorded",
     }
 }
+
+fn snapshot_includes_lifecycle(
+    lifecycle: &SkillLifecycleState,
+    include_archived: bool,
+    lifecycle_filters: &[SkillLifecycleState],
+) -> bool {
+    if !lifecycle_filters.is_empty() {
+        return lifecycle_filters.contains(lifecycle);
+    }
+    include_archived || lifecycle != &SkillLifecycleState::Archived
+}
+
 fn event_id(prefix: &str, captured_at: chrono::DateTime<chrono::Utc>) -> String {
     let nanos = captured_at
         .timestamp_nanos_opt()

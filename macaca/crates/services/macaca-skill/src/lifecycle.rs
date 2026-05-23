@@ -10,6 +10,7 @@ use chrono::{DateTime, Utc};
 use macaca_proto::TraceContext;
 use serde::{Deserialize, Serialize};
 
+use crate::alias::SkillAliasRecord;
 use crate::governance::{SkillAuthorKind, SkillLifecycleState};
 use crate::service_contract::{SkillServicePolicyHints, SkillServiceScope};
 
@@ -22,6 +23,8 @@ pub enum SkillCurationLifecycleAction {
     Restore,
     Quarantine,
     ReleaseQuarantine,
+    Supersede,
+    Reject,
 }
 
 /// Destructive mutation classes protected by pinned-skill policy.
@@ -125,6 +128,43 @@ impl SkillCurationLifecycleCommand {
             return Err(
                 "skill curation lifecycle command requires policy decision references".into(),
             );
+        }
+        Ok(())
+    }
+}
+
+/// Traced command for superseding a skill with an already accepted alias.
+///
+/// Supersede is deliberately modeled as a separate Command object instead of a
+/// free-form lifecycle action.  The alias record is the redirect/warn/deny
+/// contract consumed by Context, Task, Scheduler, and shells, so the provider
+/// can reject a hidden superseded lifecycle before the alias map is durable.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SkillCurationSupersedeCommand {
+    pub lifecycle: SkillCurationLifecycleCommand,
+    pub alias: SkillAliasRecord,
+}
+
+impl SkillCurationSupersedeCommand {
+    /// Validate both the lifecycle audit envelope and the redirect evidence.
+    pub fn validate(&self) -> Result<(), String> {
+        self.lifecycle.validate()?;
+        if self.alias.source_skill_id.trim().is_empty() {
+            return Err("skill supersede command requires alias source skill id".into());
+        }
+        if self.alias.target_skill_id.trim().is_empty() {
+            return Err("skill supersede command requires alias target skill id".into());
+        }
+        if self
+            .alias
+            .evidence_ids
+            .iter()
+            .all(|id| id.trim().is_empty())
+        {
+            return Err("skill supersede command requires alias evidence references".into());
+        }
+        if self.alias.source_skill_id.trim() != self.lifecycle.key() {
+            return Err("skill supersede alias source must match lifecycle skill identity".into());
         }
         Ok(())
     }
