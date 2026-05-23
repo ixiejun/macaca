@@ -253,6 +253,25 @@ Every command logs key execution nodes with sanitized fields:
 9. Add shell approval mutations through SDK routes and UI controls.
 10. Strengthen boundary, rollback, sanitization, and optional-provider gates.
 
+## Implementation Design Notes
+
+### Slice 2A: Governance Event Records And Replay Read Model
+
+- Patterns: Command DTOs remain the service boundary; Strategy is represented
+  by provider-neutral Store/EventLog event records that the built-in local
+  provider can append today and a durable provider can persist later; Observer
+  is used for append-only governance events; Memento is represented by snapshot
+  and rollback reference records; Specification remains reserved for later
+  policy/package eligibility rules.
+- Ownership: `macaca-skill` owns the provider-neutral governance event and
+  read-model contracts. `macaca-runtime-host` owns the built-in local append
+  strategy beside the existing compatibility state. SDK, Web, CLI, frontend,
+  applications, and kernel do not gain governance semantics.
+- Safety: replay events store only identifiers, counters, refs, bounded
+  metadata, policy decision ids, audit event ids, and timestamps. They do not
+  accept raw prompts, raw task output, provider payloads, manifests, package
+  bytes, secrets, credentials, signatures, or full `SKILL.md` bodies.
+
 ## Risks And Mitigations
 
 - Risk: skill mutation corrupts active packages. Mitigation: atomic writes,

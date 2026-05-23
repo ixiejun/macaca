@@ -1,18 +1,18 @@
 ## 1. Specification And Governance Alignment
 
-- [ ] 1.1 Review `docs/macaca-agent-self-evolving-skills-research.md` and the
+- [x] 1.1 Review `docs/macaca-agent-self-evolving-skills-research.md` and the
   completed skill changes to keep this proposal aligned with current behavior.
-- [ ] 1.2 Re-read `macaca-os-architecture-governance.md`,
+- [x] 1.2 Re-read `macaca-os-architecture-governance.md`,
   `macaca-os-microkernel-boundaries.md`, and
   `macaca-os-serviceization-allowlist.md` before each implementation slice.
-- [ ] 1.3 Confirm every slice assigns ownership to Skill, Store/EventLog, Task,
+- [x] 1.3 Confirm every slice assigns ownership to Skill, Store/EventLog, Task,
   Memory, Knowledge, Context, Policy, Entitlement, Runtime Host, SDK, or shell
   without adding kernel semantics.
 - [ ] 1.4 Keep OpenSpec proposal, design, tasks, and delta spec updated before
   code changes in each slice.
-- [ ] 1.5 Run `openspec validate complete-self-evolving-skill-os --strict`
+- [x] 1.5 Run `openspec validate complete-self-evolving-skill-os --strict`
   after every spec update.
-- [ ] 1.6 Record the selected design patterns for each implementation slice in
+- [x] 1.6 Record the selected design patterns for each implementation slice in
   the implementation design notes.
 
 ## 2. Durable Skill Governance Store
@@ -27,11 +27,11 @@
   read, patch, successful task, failed task, and last timestamp counters.
 - [ ] 2.4 Define durable `SkillAliasMap` with source skill, target skill,
   reason, run id, validity window, and resolution policy.
-- [ ] 2.5 Define durable proposal, curation run, report, snapshot, and rollback
+- [x] 2.5 Define durable proposal, curation run, report, snapshot, and rollback
   reference records.
-- [ ] 2.6 Add append-only governance event types and replayable read-model
+- [x] 2.6 Add append-only governance event types and replayable read-model
   builders.
-- [ ] 2.7 Implement a built-in local governance store strategy behind the Skill
+- [x] 2.7 Implement a built-in local governance store strategy behind the Skill
   service provider.
 - [ ] 2.8 Add an unavailable governance store strategy that returns structured
   unavailable states without panics or fake success.
@@ -39,7 +39,7 @@
   state behind the new store interface through a compatibility adapter.
 - [ ] 2.10 Add structured logs for store append, read-model replay, snapshot
   build, and store-unavailable decisions.
-- [ ] 2.11 Test replay restores lifecycle, telemetry, aliases, proposals,
+- [x] 2.11 Test replay restores lifecycle, telemetry, aliases, proposals,
   curation runs, and rollback refs from event records.
 
 ## 3. Lifecycle State Machine

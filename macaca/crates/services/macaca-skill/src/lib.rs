@@ -24,6 +24,7 @@ pub mod encrypted_package;
 pub mod evolution;
 pub mod facade;
 pub mod governance;
+pub mod governance_store;
 pub mod handle;
 pub mod lifecycle;
 pub mod package;
@@ -47,6 +48,7 @@ pub use facade::{
     SkillRuntimeFacade,
 };
 pub use governance::*;
+pub use governance_store::*;
 pub use handle::{SkillRuntimeHandle, SkillRuntimeState};
 pub use lifecycle::*;
 pub use package::{agent_skill_package_descriptor, skill_entry_package_descriptor};

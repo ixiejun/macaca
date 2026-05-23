@@ -6,12 +6,13 @@ use macaca_skill::{
     SkillAliasKind, SkillAliasRecord, SkillAliasResolveCommand, SkillAliasResolveResult,
     SkillAliasSnapshotCommand, SkillAliasSnapshotResult, SkillAliasUpsertCommand,
     SkillAliasUpsertResult, SkillAuthorKind, SkillCurationAction, SkillCurationDryRunCommand,
-    SkillCurationDryRunResult, SkillEvolutionCandidateClassification, SkillEvolutionProposalAction,
-    SkillExperienceCandidate, SkillExperienceProposalCommand, SkillExperienceProposalResult,
-    SkillExperienceProposalSnapshotCommand, SkillExperienceProposalSnapshotResult,
-    SkillGovernanceRecordUsageCommand, SkillGovernanceRecordUsageResult,
-    SkillGovernanceSnapshotCommand, SkillGovernanceSnapshotResult, SkillServiceScope,
-    SkillUsageEventKind, SkillUsageObservation, SKILL_ALIAS_RESOLVE_COMMAND,
+    SkillCurationDryRunResult, SkillCurationRunRecord, SkillEvolutionCandidateClassification,
+    SkillEvolutionProposalAction, SkillExperienceCandidate, SkillExperienceProposalCommand,
+    SkillExperienceProposalResult, SkillExperienceProposalSnapshotCommand,
+    SkillExperienceProposalSnapshotResult, SkillGovernanceEventPayload, SkillGovernanceEventRecord,
+    SkillGovernanceReadModel, SkillGovernanceRecordUsageCommand, SkillGovernanceRecordUsageResult,
+    SkillGovernanceSnapshotCommand, SkillGovernanceSnapshotResult, SkillRollbackRefRecord,
+    SkillServiceScope, SkillUsageEventKind, SkillUsageObservation, SKILL_ALIAS_RESOLVE_COMMAND,
     SKILL_ALIAS_SNAPSHOT_COMMAND, SKILL_ALIAS_UPSERT_COMMAND, SKILL_CURATION_DRY_RUN_COMMAND,
     SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND, SKILL_EVOLUTION_SNAPSHOT_COMMAND,
     SKILL_GOVERNANCE_RECORD_USAGE_COMMAND, SKILL_GOVERNANCE_SNAPSHOT_COMMAND,
@@ -378,5 +379,111 @@ async fn skill_experience_proposal_rejects_missing_evidence() {
     assert!(
         err.to_string().contains("evidence"),
         "validation error should explain the missing evidence"
+    );
+}
+
+#[test]
+fn skill_governance_event_replay_restores_read_model_without_skill_bodies() {
+    let trace = TraceContext::new("trace-skill-governance-replay");
+    let created_at = chrono::Utc::now();
+    let proposal = macaca_skill::SkillExperienceProposalRecord::from_candidate(
+        &trace,
+        reusable_experience_candidate(vec!["artifact-proof-1".into()]),
+        created_at,
+    );
+    let run = SkillCurationRunRecord {
+        run_id: "curation-run-1".into(),
+        trace_id: trace.trace_id.clone(),
+        provider_id: "builtin-local-governance-store".into(),
+        dry_run: true,
+        candidate_count: 1,
+        started_at: created_at,
+        finished_at: Some(created_at),
+        report_ref: Some("store://skill-curation/run-1/report".into()),
+        rollback_ref: None,
+        policy_decision_ids: vec!["policy-decision-1".into()],
+        audit_event_ids: vec!["audit-event-1".into()],
+    };
+    let rollback = SkillRollbackRefRecord {
+        rollback_ref: "store://skill-curation/run-1/rollback".into(),
+        run_id: run.run_id.clone(),
+        trace_id: trace.trace_id.clone(),
+        before_snapshot_ref: "store://skill-curation/run-1/before".into(),
+        after_snapshot_ref: Some("store://skill-curation/run-1/after".into()),
+        report_ref: run.report_ref.clone(),
+        captured_at: created_at,
+    };
+    let events = vec![
+        SkillGovernanceEventRecord::new(
+            "event-usage-1",
+            &trace,
+            SkillServiceScope::default(),
+            created_at,
+            SkillGovernanceEventPayload::UsageRecorded(observation(
+                SkillUsageEventKind::Used,
+                None,
+            )),
+        ),
+        SkillGovernanceEventRecord::new(
+            "event-lifecycle-1",
+            &trace,
+            SkillServiceScope::default(),
+            created_at,
+            SkillGovernanceEventPayload::LifecycleApplied(observation(
+                SkillUsageEventKind::Archived,
+                None,
+            )),
+        ),
+        SkillGovernanceEventRecord::new(
+            "event-alias-1",
+            &trace,
+            SkillServiceScope::default(),
+            created_at,
+            SkillGovernanceEventPayload::AliasUpserted(alias_record()),
+        ),
+        SkillGovernanceEventRecord::new(
+            "event-proposal-1",
+            &trace,
+            SkillServiceScope::default(),
+            created_at,
+            SkillGovernanceEventPayload::ProposalCreated(proposal),
+        ),
+        SkillGovernanceEventRecord::new(
+            "event-run-1",
+            &trace,
+            SkillServiceScope::default(),
+            created_at,
+            SkillGovernanceEventPayload::CurationRunRecorded(run),
+        ),
+        SkillGovernanceEventRecord::new(
+            "event-rollback-1",
+            &trace,
+            SkillServiceScope::default(),
+            created_at,
+            SkillGovernanceEventPayload::RollbackRefRecorded(rollback),
+        ),
+    ];
+
+    let read_model = SkillGovernanceReadModel::from_events(events);
+
+    assert_eq!(read_model.records.len(), 1);
+    assert_eq!(read_model.records[0].telemetry.use_count, 1);
+    assert_eq!(
+        read_model.records[0].lifecycle,
+        macaca_skill::SkillLifecycleState::Archived
+    );
+    assert_eq!(read_model.aliases.len(), 1);
+    assert_eq!(read_model.proposals.len(), 1);
+    assert_eq!(read_model.curation_runs.len(), 1);
+    assert_eq!(read_model.rollback_refs.len(), 1);
+    assert_eq!(read_model.replayed_events, 6);
+    assert!(serde_json::to_string(&read_model)
+        .expect("read model should serialize")
+        .contains("store://skill-curation/run-1/report"));
+    assert!(
+        !serde_json::to_string(&read_model)
+            .expect("read model should serialize")
+            .contains("SKILL.md body"),
+        "governance replay must not materialize full skill instruction bodies"
     );
 }

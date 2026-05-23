@@ -293,14 +293,14 @@ impl SystemService for SkillSystemServiceProvider {
                 let typed: SkillGovernanceRecordUsageCommand = decode(command.payload)?;
                 let key = typed.observation.key();
                 let event = typed.observation.event.clone();
-                let result = self.governance_state.record_usage(typed.observation).await;
+                let result = self.governance_state.record_usage(typed).await;
                 tracing::info!(
-                    trace_id = %typed.trace.trace_id,
+                    trace_id = %trace.trace_id,
                     skill_id = %key,
                     event = ?event,
                     "skill governance usage observation recorded"
                 );
-                Ok(Self::service_result(to_value(result)?, typed.trace))
+                Ok(Self::service_result(to_value(result)?, trace))
             }
             SKILL_GOVERNANCE_SNAPSHOT_COMMAND => {
                 let typed: SkillGovernanceSnapshotCommand = decode(command.payload)?;
@@ -362,14 +362,14 @@ impl SystemService for SkillSystemServiceProvider {
                 let typed: SkillAliasUpsertCommand = decode(command.payload)?;
                 let source_skill_id = typed.record.source_skill_id.clone();
                 let target_skill_id = typed.record.target_skill_id.clone();
-                let result = self.governance_state.upsert_alias(typed.record).await;
+                let result = self.governance_state.upsert_alias(typed).await;
                 tracing::info!(
-                    trace_id = %typed.trace.trace_id,
+                    trace_id = %trace.trace_id,
                     source_skill_id = %source_skill_id,
                     target_skill_id = %target_skill_id,
                     "skill alias record upserted"
                 );
-                Ok(Self::service_result(to_value(result)?, typed.trace))
+                Ok(Self::service_result(to_value(result)?, trace))
             }
             SKILL_ALIAS_RESOLVE_COMMAND => {
                 let typed: SkillAliasResolveCommand = decode(command.payload)?;

@@ -10,10 +10,12 @@ use std::collections::BTreeMap;
 
 use macaca_skill::{
     SkillAliasRecord, SkillAliasResolveCommand, SkillAliasResolveResult, SkillAliasSnapshotResult,
-    SkillAliasUpsertResult, SkillCurationDryRunCommand, SkillCurationDryRunResult,
-    SkillCurationLifecycleAction, SkillCurationLifecycleCommand, SkillCurationLifecycleResult,
-    SkillExperienceProposalCommand, SkillExperienceProposalRecord, SkillExperienceProposalResult,
-    SkillExperienceProposalSnapshotResult, SkillGovernanceRecord, SkillGovernanceRecordUsageResult,
+    SkillAliasUpsertCommand, SkillAliasUpsertResult, SkillCurationDryRunCommand,
+    SkillCurationDryRunResult, SkillCurationLifecycleAction, SkillCurationLifecycleCommand,
+    SkillCurationLifecycleResult, SkillExperienceProposalCommand, SkillExperienceProposalRecord,
+    SkillExperienceProposalResult, SkillExperienceProposalSnapshotResult,
+    SkillGovernanceEventPayload, SkillGovernanceEventRecord, SkillGovernanceRecord,
+    SkillGovernanceRecordUsageCommand, SkillGovernanceRecordUsageResult,
     SkillGovernanceSnapshotResult, SkillLifecycleState, SkillUsageObservation,
 };
 use tokio::sync::Mutex;
@@ -28,15 +30,17 @@ pub(crate) struct SkillProviderGovernanceState {
     records: Mutex<BTreeMap<String, SkillGovernanceRecord>>,
     aliases: Mutex<BTreeMap<String, SkillAliasRecord>>,
     proposals: Mutex<BTreeMap<String, SkillExperienceProposalRecord>>,
+    event_log: Mutex<Vec<SkillGovernanceEventRecord>>,
 }
 
 impl SkillProviderGovernanceState {
     /// Record one sanitized usage observation and return the updated record.
     pub(crate) async fn record_usage(
         &self,
-        observation: SkillUsageObservation,
+        command: SkillGovernanceRecordUsageCommand,
     ) -> SkillGovernanceRecordUsageResult {
         let observed_at = chrono::Utc::now();
+        let observation = command.observation;
         let key = observation.key();
         let mut records = self.records.lock().await;
         let record = records
@@ -44,6 +48,15 @@ impl SkillProviderGovernanceState {
             .and_modify(|record| record.apply(&observation, observed_at))
             .or_insert_with(|| SkillGovernanceRecord::from_observation(&observation, observed_at))
             .clone();
+        drop(records);
+        self.append_event(SkillGovernanceEventRecord::new(
+            event_id("skill-governance-usage", observed_at),
+            &command.trace,
+            command.scope,
+            observed_at,
+            SkillGovernanceEventPayload::UsageRecorded(observation),
+        ))
+        .await;
 
         SkillGovernanceRecordUsageResult {
             record,
@@ -115,7 +128,7 @@ impl SkillProviderGovernanceState {
             return Err("pinned skill cannot be archived without an approval override".into());
         }
 
-        match action {
+        match &action {
             SkillCurationLifecycleAction::Pin => {
                 record.pinned = true;
             }
@@ -135,13 +148,53 @@ impl SkillProviderGovernanceState {
                 record.evidence_ids.push(evidence_id.clone());
             }
         }
+        let result_skill_id = record.provenance.skill_id.clone();
+        let result_name = record.provenance.name.clone();
+        let result_lifecycle = record.lifecycle.clone();
+        let result_pinned = record.pinned;
+        drop(records);
+        self.append_event(SkillGovernanceEventRecord::new(
+            event_id("skill-governance-lifecycle", captured_at),
+            &command.trace,
+            command.scope.clone(),
+            captured_at,
+            SkillGovernanceEventPayload::LifecycleApplied(SkillUsageObservation {
+                skill_id: command.skill_id.clone(),
+                name: command.name.clone(),
+                source: command.source.clone(),
+                source_scope: command.source_scope.clone(),
+                event: match &action {
+                    SkillCurationLifecycleAction::Pin => macaca_skill::SkillUsageEventKind::Pinned,
+                    SkillCurationLifecycleAction::Unpin => {
+                        macaca_skill::SkillUsageEventKind::Unpinned
+                    }
+                    SkillCurationLifecycleAction::Archive => {
+                        macaca_skill::SkillUsageEventKind::Archived
+                    }
+                    SkillCurationLifecycleAction::Restore => {
+                        macaca_skill::SkillUsageEventKind::Restored
+                    }
+                },
+                author_kind: command.author_kind.clone(),
+                created_by: None,
+                pinned: match &action {
+                    SkillCurationLifecycleAction::Pin => Some(true),
+                    SkillCurationLifecycleAction::Unpin => Some(false),
+                    SkillCurationLifecycleAction::Archive
+                    | SkillCurationLifecycleAction::Restore => None,
+                },
+                evidence_id: sanitized_evidence.first().cloned(),
+                metadata: BTreeMap::new(),
+            }),
+        ))
+        .await;
 
         Ok(SkillCurationLifecycleResult {
-            skill_id: record.provenance.skill_id.clone(),
-            name: record.provenance.name.clone(),
+            skill_id: result_skill_id,
+            name: result_name,
             action,
-            lifecycle: record.lifecycle.clone(),
-            pinned: record.pinned,
+            lifecycle: result_lifecycle,
+            pinned: result_pinned,
             mutated: true,
             reason: command.reason,
             evidence_ids: sanitized_evidence,
@@ -153,15 +206,25 @@ impl SkillProviderGovernanceState {
     /// Insert or replace one alias record.
     pub(crate) async fn upsert_alias(
         &self,
-        mut record: SkillAliasRecord,
+        command: SkillAliasUpsertCommand,
     ) -> SkillAliasUpsertResult {
         let captured_at = chrono::Utc::now();
+        let mut record = command.record;
         if record.created_at > captured_at {
             record.created_at = captured_at;
         }
         record.updated_at = captured_at;
         let mut aliases = self.aliases.lock().await;
         aliases.insert(record.key(), record.clone());
+        drop(aliases);
+        self.append_event(SkillGovernanceEventRecord::new(
+            event_id("skill-governance-alias", captured_at),
+            &command.trace,
+            command.scope,
+            captured_at,
+            SkillGovernanceEventPayload::AliasUpserted(record.clone()),
+        ))
+        .await;
 
         SkillAliasUpsertResult {
             record,
@@ -215,6 +278,14 @@ impl SkillProviderGovernanceState {
             .lock()
             .await
             .insert(proposal.proposal_id.clone(), proposal.clone());
+        self.append_event(SkillGovernanceEventRecord::new(
+            event_id("skill-governance-proposal", captured_at),
+            &command.trace,
+            command.scope,
+            captured_at,
+            SkillGovernanceEventPayload::ProposalCreated(proposal.clone()),
+        ))
+        .await;
 
         SkillExperienceProposalResult {
             proposal,
@@ -241,4 +312,20 @@ impl SkillProviderGovernanceState {
             captured_at,
         }
     }
+
+    async fn append_event(&self, event: SkillGovernanceEventRecord) {
+        tracing::info!(
+            event_id = %event.event_id,
+            trace_id = %event.trace_id,
+            "skill governance event appended to local built-in store"
+        );
+        self.event_log.lock().await.push(event);
+    }
+}
+
+fn event_id(prefix: &str, captured_at: chrono::DateTime<chrono::Utc>) -> String {
+    let nanos = captured_at
+        .timestamp_nanos_opt()
+        .unwrap_or_else(|| captured_at.timestamp_micros() * 1_000);
+    format!("{prefix}-{nanos}")
 }
