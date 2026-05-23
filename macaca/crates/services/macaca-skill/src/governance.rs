@@ -18,15 +18,19 @@ use crate::service_contract::SkillServiceScope;
 
 /// Lifecycle state for a governed AgentSkill.
 ///
-/// The states model curation as explicit data rather than implicit filesystem
-/// moves.  Destructive transitions are deliberately absent from the first slice;
-/// later providers can require approval and mementos before changing state.
+/// These states are provider-neutral service DTO labels, not filesystem
+/// locations.  The enum is intentionally complete before all transition
+/// commands exist, so Store/EventLog, Context, Task, SDK, and shell adapters can
+/// exchange lifecycle snapshots without inventing local labels.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SkillLifecycleState {
+    Draft,
     Active,
     Stale,
     Archived,
     Quarantined,
+    Superseded,
+    Rejected,
 }
 
 impl Default for SkillLifecycleState {

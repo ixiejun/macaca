@@ -44,7 +44,7 @@
 
 ## 3. Lifecycle State Machine
 
-- [ ] 3.1 Extend lifecycle model to include `Draft`, `Active`, `Stale`,
+- [x] 3.1 Extend lifecycle model to include `Draft`, `Active`, `Stale`,
   `Archived`, `Quarantined`, `Superseded`, and `Rejected`.
 - [ ] 3.2 Implement a state-machine validator for allowed lifecycle
   transitions.

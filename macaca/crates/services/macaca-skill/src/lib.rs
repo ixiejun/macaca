@@ -39,6 +39,9 @@ pub mod snapshot;
 pub mod source;
 pub mod tool;
 
+#[cfg(test)]
+mod governance_lifecycle_tests;
+
 // Executable skills (YAML).
 pub use adapter::{LocalSkillRuntimeProxy, SkillRuntimeProxy, SkillToolAdapter};
 pub use alias::*;
