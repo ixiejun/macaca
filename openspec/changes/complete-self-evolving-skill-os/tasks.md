@@ -239,7 +239,7 @@
 - [x] 14.1 Add Web route commands for approval-gated pin, unpin, archive,
   restore, quarantine, promote, reject, run, apply, and rollback through the SDK
   facade.
-- [ ] 14.2 Add frontend controls that submit typed commands without owning
+- [x] 14.2 Add frontend controls that submit typed commands without owning
   lifecycle, merge, alias, archive, or approval semantics.
 - [ ] 14.3 Add CLI commands that call the SDK facade and print bounded reports.
 - [ ] 14.4 Display policy denials, unavailable providers, report refs,
