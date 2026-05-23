@@ -22,6 +22,56 @@ pub enum SkillCurationLifecycleAction {
     Restore,
 }
 
+/// Destructive mutation classes protected by pinned-skill policy.
+///
+/// This enum intentionally includes future curation operations before all
+/// commands exist.  Runtime providers can share the same guard for archive,
+/// supersede, merge apply, and deletion instead of scattering pinned checks
+/// across separate adapters.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SkillPinnedMutationOperation {
+    Archive,
+    Supersede,
+    MergeApply,
+    Delete,
+}
+
+impl SkillPinnedMutationOperation {
+    /// Stable audit label used in denial messages and structured logs.
+    pub fn audit_label(&self) -> &'static str {
+        match self {
+            Self::Archive => "archive",
+            Self::Supersede => "supersede",
+            Self::MergeApply => "merge_apply",
+            Self::Delete => "delete",
+        }
+    }
+}
+
+/// Guard for destructive mutations against pinned skills.
+///
+/// Macaca does not currently define an approval override contract for pinned
+/// destructive operations.  The guard therefore denies all such operations when
+/// a record is pinned, while keeping the decision as a reusable service-owned
+/// policy object for future approval decorators.
+pub struct SkillPinnedMutationGuard;
+
+impl SkillPinnedMutationGuard {
+    /// Ensure a destructive mutation may proceed for the current pinned state.
+    pub fn ensure_not_pinned(
+        pinned: bool,
+        operation: &SkillPinnedMutationOperation,
+    ) -> Result<(), String> {
+        if !pinned {
+            return Ok(());
+        }
+        Err(format!(
+            "pinned skill cannot be {} without an approval override contract",
+            operation.audit_label()
+        ))
+    }
+}
+
 /// Traced command for one governed Skill lifecycle mutation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SkillCurationLifecycleCommand {

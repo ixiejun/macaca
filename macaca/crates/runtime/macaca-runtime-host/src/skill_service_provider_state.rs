@@ -18,7 +18,8 @@ use macaca_skill::{
     SkillGovernanceEventPayload, SkillGovernanceEventRecord, SkillGovernanceReadModel,
     SkillGovernanceRecord, SkillGovernanceRecordUsageCommand, SkillGovernanceRecordUsageResult,
     SkillGovernanceSnapshotResult, SkillGovernanceStoreStrategy, SkillGovernanceStoreUnavailable,
-    SkillLifecycleState, SkillLifecycleStateMachine, SkillUsageObservation,
+    SkillLifecycleState, SkillLifecycleStateMachine, SkillPinnedMutationGuard,
+    SkillPinnedMutationOperation, SkillUsageObservation,
 };
 use tokio::sync::Mutex;
 
@@ -150,8 +151,11 @@ impl SkillProviderGovernanceState {
             SkillGovernanceRecord::from_lifecycle_command(&command, captured_at)
         });
 
-        if action == SkillCurationLifecycleAction::Archive && record.pinned {
-            return Err("pinned skill cannot be archived without an approval override".into());
+        if action == SkillCurationLifecycleAction::Archive {
+            SkillPinnedMutationGuard::ensure_not_pinned(
+                record.pinned,
+                &SkillPinnedMutationOperation::Archive,
+            )?;
         }
 
         let target_lifecycle = match &action {

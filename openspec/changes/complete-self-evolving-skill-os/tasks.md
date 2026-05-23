@@ -50,7 +50,7 @@
   transitions.
 - [x] 3.3 Require policy decision refs and evidence refs for every mutating
   transition.
-- [ ] 3.4 Deny archive, supersede, merge apply, or deletion of pinned skills
+- [x] 3.4 Deny archive, supersede, merge apply, or deletion of pinned skills
   unless an explicit approval override contract is added.
 - [ ] 3.5 Add quarantine commands and quarantine release/restore paths.
 - [ ] 3.6 Add supersede transitions that require alias or redirect records.

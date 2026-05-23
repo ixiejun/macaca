@@ -8,7 +8,8 @@ use macaca_proto::TraceContext;
 
 use crate::{
     SkillAuthorKind, SkillCurationLifecycleCommand, SkillLifecycleState,
-    SkillLifecycleStateMachine, SkillServicePolicyHints, SkillServiceScope,
+    SkillLifecycleStateMachine, SkillPinnedMutationGuard, SkillPinnedMutationOperation,
+    SkillServicePolicyHints, SkillServiceScope,
 };
 
 #[test]
@@ -91,4 +92,25 @@ fn lifecycle_command_requires_evidence_and_policy_decision_refs() {
         .validate()
         .expect_err("evidence refs must be mandatory")
         .contains("evidence references"));
+}
+
+#[test]
+fn pinned_mutation_guard_denies_all_destructive_operations_without_override() {
+    let destructive_operations = [
+        SkillPinnedMutationOperation::Archive,
+        SkillPinnedMutationOperation::Supersede,
+        SkillPinnedMutationOperation::MergeApply,
+        SkillPinnedMutationOperation::Delete,
+    ];
+
+    for operation in destructive_operations {
+        assert!(
+            SkillPinnedMutationGuard::ensure_not_pinned(false, &operation).is_ok(),
+            "unpinned skills should allow {operation:?}"
+        );
+        let err = SkillPinnedMutationGuard::ensure_not_pinned(true, &operation)
+            .expect_err("pinned destructive operations require a future override contract");
+        assert!(err.contains("pinned skill"));
+        assert!(err.contains("approval override"));
+    }
 }
