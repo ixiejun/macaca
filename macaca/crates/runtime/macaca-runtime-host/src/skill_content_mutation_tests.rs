@@ -31,6 +31,17 @@ fn approved_policy() -> SkillServicePolicyHints {
     }
 }
 
+fn approved_policy_with_metadata<const N: usize>(
+    entries: [(&str, &str); N],
+) -> SkillServicePolicyHints {
+    let mut policy = approved_policy();
+    policy.metadata = entries
+        .into_iter()
+        .map(|(key, value)| (key.to_string(), value.to_string()))
+        .collect();
+    policy
+}
+
 fn mutation_command(
     root: std::path::PathBuf,
     relative_path: &str,
@@ -151,6 +162,93 @@ async fn skill_content_mutation_denies_protected_package_ownership() {
         .denied_reason
         .as_deref()
         .unwrap_or_default()
-        .contains("protected skill package"));
+        .contains("local overlay"));
     assert!(!temp.path().join("references/marketplace.md").exists());
+}
+
+#[tokio::test]
+async fn skill_content_mutation_requires_application_scope_for_application_owned_skill() {
+    let temp = tempfile::tempdir().expect("temp skill package root should exist");
+    let provider = SkillSystemServiceProvider::new();
+    let trace = TraceContext::new("trace-skill-content-mutation-app-scope");
+    let mut command = mutation_command(
+        temp.path().to_path_buf(),
+        "references/app-owned.md",
+        Some(b"application scoped support material\n".to_vec()),
+        SkillPackageOwnershipClass::ApplicationOwned,
+    );
+
+    let denied = provider
+        .call(traced_command(
+            SKILL_CONTENT_MUTATE_COMMAND,
+            command.clone(),
+            trace.clone(),
+        ))
+        .await
+        .expect("missing app-scope approval should be structured");
+    let denied: SkillContentMutationResult =
+        serde_json::from_value(denied.output).expect("mutation denial should decode");
+    assert_eq!(denied.status, SkillContentMutationStatus::Denied);
+    assert!(denied
+        .denied_reason
+        .as_deref()
+        .unwrap_or_default()
+        .contains("application-scope"));
+
+    command.policy = approved_policy_with_metadata([("skill.application_scope_approved", "true")]);
+    let applied = provider
+        .call(traced_command(
+            SKILL_CONTENT_MUTATE_COMMAND,
+            command,
+            trace.clone(),
+        ))
+        .await
+        .expect("app-scoped approval should allow the mutation strategy to run");
+    let applied: SkillContentMutationResult =
+        serde_json::from_value(applied.output).expect("mutation result should decode");
+    assert_eq!(applied.status, SkillContentMutationStatus::Applied);
+}
+
+#[tokio::test]
+async fn skill_content_mutation_requires_entitlement_for_paid_or_encrypted_skill() {
+    let temp = tempfile::tempdir().expect("temp skill package root should exist");
+    let provider = SkillSystemServiceProvider::new();
+    let trace = TraceContext::new("trace-skill-content-mutation-paid-entitlement");
+    let mut command = mutation_command(
+        temp.path().to_path_buf(),
+        "references/paid.md",
+        Some(b"entitled paid package support material\n".to_vec()),
+        SkillPackageOwnershipClass::Paid,
+    );
+
+    let denied = provider
+        .call(traced_command(
+            SKILL_CONTENT_MUTATE_COMMAND,
+            command.clone(),
+            trace.clone(),
+        ))
+        .await
+        .expect("missing mutation entitlement should be structured");
+    let denied: SkillContentMutationResult =
+        serde_json::from_value(denied.output).expect("mutation denial should decode");
+    assert_eq!(denied.status, SkillContentMutationStatus::Denied);
+    assert!(denied
+        .denied_reason
+        .as_deref()
+        .unwrap_or_default()
+        .contains("mutation entitlement"));
+
+    command.policy =
+        approved_policy_with_metadata([("skill.mutation_entitlement_granted", "true")]);
+    let applied = provider
+        .call(traced_command(
+            SKILL_CONTENT_MUTATE_COMMAND,
+            command,
+            trace.clone(),
+        ))
+        .await
+        .expect("mutation entitlement should allow the mutation strategy to run");
+    let applied: SkillContentMutationResult =
+        serde_json::from_value(applied.output).expect("mutation result should decode");
+    assert_eq!(applied.status, SkillContentMutationStatus::Applied);
 }

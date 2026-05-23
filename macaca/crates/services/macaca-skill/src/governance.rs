@@ -14,6 +14,7 @@ use macaca_proto::TraceContext;
 use serde::{Deserialize, Serialize};
 
 use crate::lifecycle::SkillCurationLifecycleCommand;
+use crate::mutation::SkillPackageOwnershipClass;
 use crate::service_contract::SkillServiceScope;
 pub use crate::telemetry::{SkillUsageEventKind, SkillUsageObservation, SkillUsageTelemetry};
 
@@ -216,6 +217,8 @@ pub struct SkillGovernanceDiagnostics {
     pub invalid_metadata: bool,
     pub quarantine_required: bool,
     pub missing_dependency_refs: Vec<String>,
+    #[serde(default)]
+    pub package_ownership: Option<SkillPackageOwnershipClass>,
 }
 
 impl SkillGovernanceDiagnostics {
@@ -250,6 +253,12 @@ impl SkillGovernanceDiagnostics {
                 .take(16)
                 .map(|value| value.chars().take(128).collect::<String>())
                 .collect();
+        }
+        if let Some(ownership) = metadata
+            .get("skill.package_ownership")
+            .and_then(|value| SkillPackageOwnershipClass::from_policy_label(value))
+        {
+            self.package_ownership = Some(ownership);
         }
     }
 }

@@ -33,6 +33,7 @@ pub mod lifecycle_state_machine;
 pub mod merge;
 pub mod merge_eligibility;
 pub mod mutation;
+pub mod ownership_policy;
 pub mod package;
 pub mod policy;
 pub mod proposal_lifecycle;
@@ -64,6 +65,9 @@ mod merge_eligibility_tests;
 #[cfg(test)]
 mod semantic_review_tests;
 
+#[cfg(test)]
+mod ownership_policy_tests;
+
 // Executable skills (YAML).
 pub use adapter::{LocalSkillRuntimeProxy, SkillRuntimeProxy, SkillToolAdapter};
 pub use alias::*;
@@ -80,6 +84,7 @@ pub use lifecycle_state_machine::*;
 pub use merge::*;
 pub use merge_eligibility::*;
 pub use mutation::*;
+pub use ownership_policy::*;
 pub use package::{agent_skill_package_descriptor, skill_entry_package_descriptor};
 pub use policy::{PolicyDecision, SkillExposureContext, SkillExposurePolicy, SkillPolicyChain};
 pub use proposal_lifecycle::*;

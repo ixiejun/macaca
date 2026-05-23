@@ -221,17 +221,17 @@
 
 ## 13. Package, Store, Entitlement, And Ownership Policy
 
-- [ ] 13.1 Model skill package ownership for bundled, marketplace,
+- [x] 13.1 Model skill package ownership for bundled, marketplace,
   application-owned, agent-private, central user, tenant, paid, encrypted, and
   plugin-provided skills.
-- [ ] 13.2 Add policy specifications for which ownership classes can be patched,
+- [x] 13.2 Add policy specifications for which ownership classes can be patched,
   archived, restored, superseded, merged, or aliased automatically.
-- [ ] 13.3 Require local overlay/draft behavior for marketplace skills rather
+- [x] 13.3 Require local overlay/draft behavior for marketplace skills rather
   than upstream mutation.
-- [ ] 13.4 Require application-scope policy for application-owned skill changes.
-- [ ] 13.5 Restrict paid/encrypted skills to metadata and alias operations unless
+- [x] 13.4 Require application-scope policy for application-owned skill changes.
+- [x] 13.5 Restrict paid/encrypted skills to metadata and alias operations unless
   entitlement grants mutation.
-- [ ] 13.6 Add tests proving protected ownership classes cannot be auto-patched,
+- [x] 13.6 Add tests proving protected ownership classes cannot be auto-patched,
   auto-archived, or mutated by generic agent flows.
 
 ## 14. Operations UI And CLI Mutation Adapters

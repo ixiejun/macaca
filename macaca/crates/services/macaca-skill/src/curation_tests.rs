@@ -85,6 +85,45 @@ fn deterministic_curation_reports_all_service_owned_phases() {
     assert!(!result.mutated);
 }
 
+#[test]
+fn deterministic_curation_protects_package_ownership_classes_from_auto_archive() {
+    let command = SkillCurationDryRunCommand {
+        trace: TraceContext::new("trace-deterministic-curation-ownership"),
+        scope: SkillServiceScope::default(),
+        stale_after_days: 1,
+        narrow_use_threshold: 0,
+    };
+    let records = [
+        ("skill://ownership/bundled", "bundled"),
+        ("skill://ownership/marketplace", "marketplace"),
+        ("skill://ownership/application", "application_owned"),
+        ("skill://ownership/paid", "paid"),
+        ("skill://ownership/encrypted", "encrypted"),
+        ("skill://ownership/plugin", "plugin_provided"),
+    ]
+    .into_iter()
+    .map(|(skill_id, ownership)| {
+        let mut record = base_record(
+            skill_id,
+            SkillAuthorKind::Agent,
+            metadata_map([("skill.package_ownership", ownership)]),
+        );
+        record.lifecycle = SkillLifecycleState::Stale;
+        record.provenance.created_at = Utc::now() - Duration::days(10);
+        record
+    });
+
+    let result = SkillCurationDryRunResult::from_records(records, &command, Utc::now());
+
+    for recommendation in result.recommendations {
+        assert_eq!(recommendation.action, SkillCurationAction::Protected);
+        assert!(recommendation.protected);
+        assert!(recommendation
+            .phases
+            .contains(&SkillCurationPhase::Protected));
+    }
+}
+
 fn inactive_record(skill_id: &str, lifecycle: SkillLifecycleState) -> SkillGovernanceRecord {
     let mut record = base_record(skill_id, SkillAuthorKind::Agent, BTreeMap::new());
     record.lifecycle = lifecycle;

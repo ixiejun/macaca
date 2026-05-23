@@ -671,6 +671,25 @@ Every command logs key execution nodes with sanitized fields:
   service resolves an alias, preserving original task/scheduler refs for audit
   replay.
 
+### Slice 13A: Package Ownership Policy Specification
+
+- Patterns: `macaca-skill` now exposes a service-owned Specification for
+  package ownership policy. The policy evaluates sanitized ownership facts and
+  operation classes before curation, evolution, merge, alias, or mutation paths
+  can change active lifecycle state or package bytes.
+- Boundaries: the ownership decision lives in the Skill service contract, while
+  runtime-host only invokes it as part of the local mutation Strategy. Shells,
+  SDK callers, Context, Task, Scheduler, and the kernel do not implement
+  marketplace, application-owned, paid, encrypted, bundled, plugin, central, or
+  tenant semantics locally.
+- Safety: marketplace skills require local overlay/draft behavior instead of
+  upstream mutation, application-owned skills require application-scope approval,
+  paid/encrypted skills require mutation entitlement for content or lifecycle
+  mutation, and protected ownership classes are marked `Protected` in
+  deterministic curation instead of being auto-archived. Alias and metadata
+  operations remain available for observability without exposing raw skill
+  bodies or package bytes.
+
 ## Risks And Mitigations
 
 - Risk: skill mutation corrupts active packages. Mitigation: atomic writes,

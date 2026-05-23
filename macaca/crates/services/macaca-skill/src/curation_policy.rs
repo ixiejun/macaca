@@ -12,6 +12,10 @@ use crate::curation::{
     SkillCurationAction, SkillCurationDryRunResult, SkillCurationPhase, SkillCurationRecommendation,
 };
 use crate::governance::{SkillAuthorKind, SkillGovernanceRecord, SkillLifecycleState};
+use crate::ownership_policy::{
+    SkillOwnershipOperation, SkillOwnershipPolicy, SkillOwnershipPolicyContext,
+    SkillOwnershipPolicyDecision,
+};
 use crate::semantic_review::SkillSemanticReviewResult;
 use crate::telemetry::SkillUsageTelemetry;
 
@@ -54,7 +58,10 @@ fn recommend_for_record(
     let skill_id = record.provenance.skill_id.clone();
     let name = record.provenance.name.clone();
     let evidence_ids = record.evidence_ids.clone();
-    if record.pinned || is_protected_author_kind(&record.provenance.author_kind) {
+    if record.pinned
+        || is_protected_author_kind(&record.provenance.author_kind)
+        || protected_by_package_ownership(&record)
+    {
         return SkillCurationRecommendation {
             skill_id,
             name,
@@ -183,6 +190,17 @@ fn is_protected_author_kind(author_kind: &SkillAuthorKind) -> bool {
         author_kind,
         SkillAuthorKind::System | SkillAuthorKind::Package
     )
+}
+
+fn protected_by_package_ownership(record: &SkillGovernanceRecord) -> bool {
+    let Some(ownership) = record.diagnostics.package_ownership.clone() else {
+        return false;
+    };
+    let context = SkillOwnershipPolicyContext::generic_agent_flow(
+        ownership,
+        SkillOwnershipOperation::Archive,
+    );
+    SkillOwnershipPolicy.evaluate(&context) != SkillOwnershipPolicyDecision::Allowed
 }
 
 fn should_review_for_consolidation(

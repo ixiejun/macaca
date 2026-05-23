@@ -13,7 +13,10 @@ use chrono::{DateTime, Utc};
 use macaca_proto::TraceContext;
 use serde::{Deserialize, Serialize};
 
-use crate::{SkillServicePolicyHints, SkillServiceScope};
+use crate::{
+    SkillOwnershipOperation, SkillOwnershipPolicy, SkillOwnershipPolicyContext,
+    SkillServicePolicyHints, SkillServiceScope,
+};
 
 /// Maximum payload accepted by the built-in mutation contract.
 ///
@@ -51,6 +54,26 @@ pub enum SkillPackageOwnershipClass {
 }
 
 impl SkillPackageOwnershipClass {
+    /// Parse a bounded metadata label into an ownership class.
+    ///
+    /// Metadata labels are lower-case service policy facts, not package-manager
+    /// provider names. Unknown values stay absent so callers fail closed
+    /// through their normal policy defaults instead of inventing ownership.
+    pub fn from_policy_label(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "agent_private" | "agent-private" => Some(Self::AgentPrivate),
+            "central_user" | "central-user" => Some(Self::CentralUser),
+            "tenant" => Some(Self::Tenant),
+            "bundled" => Some(Self::Bundled),
+            "marketplace" => Some(Self::Marketplace),
+            "application_owned" | "application-owned" => Some(Self::ApplicationOwned),
+            "paid" => Some(Self::Paid),
+            "encrypted" => Some(Self::Encrypted),
+            "plugin_provided" | "plugin-provided" => Some(Self::PluginProvided),
+            _ => None,
+        }
+    }
+
     /// Return true when generic agent flows must not mutate active package
     /// bytes without a stronger future override contract.
     pub fn is_protected(&self) -> bool {
@@ -147,11 +170,10 @@ impl SkillContentMutationCommand {
                 true,
             ));
         }
-        if self.ownership.is_protected() {
-            return Err(SkillContentMutationDenied::new(
-                "protected skill package ownership denies active content mutation",
-                true,
-            ));
+        let ownership_context = self.ownership_policy_context();
+        let ownership_decision = SkillOwnershipPolicy.evaluate(&ownership_context);
+        if let Some(reason) = ownership_decision.denied_reason() {
+            return Err(SkillContentMutationDenied::new(reason, true));
         }
         validate_allowed_relative_path(&self.relative_path)?;
         validate_content_shape(self)?;
@@ -166,6 +188,38 @@ impl SkillContentMutationCommand {
     /// Return sanitized evidence refs for audit and result DTOs.
     pub fn sanitized_evidence_ids(&self) -> Vec<String> {
         sanitized_refs(&self.evidence_ids)
+    }
+
+    /// Convert mutation command hints into the shared ownership-policy context.
+    ///
+    /// The command does not trust shell-local approval semantics.  It accepts
+    /// only bounded boolean hints that must already have come from policy,
+    /// package guard, entitlement, or application-scope services.
+    fn ownership_policy_context(&self) -> SkillOwnershipPolicyContext {
+        SkillOwnershipPolicyContext {
+            ownership: self.ownership.clone(),
+            operation: SkillOwnershipOperation::PatchActiveContent,
+            automatic_agent_flow: metadata_bool(
+                &self.policy.metadata,
+                "skill.automatic_agent_flow",
+            )
+            .unwrap_or(true),
+            application_scope_approved: metadata_bool(
+                &self.policy.metadata,
+                "skill.application_scope_approved",
+            )
+            .unwrap_or(false),
+            mutation_entitlement_granted: metadata_bool(
+                &self.policy.metadata,
+                "skill.mutation_entitlement_granted",
+            )
+            .unwrap_or(false),
+            explicit_approval_granted: metadata_bool(
+                &self.policy.metadata,
+                "skill.explicit_approval_granted",
+            )
+            .unwrap_or(false),
+        }
     }
 }
 
@@ -353,4 +407,14 @@ fn sanitized_refs(values: &[String]) -> Vec<String> {
             (!trimmed.is_empty()).then(|| trimmed.to_string())
         })
         .collect()
+}
+
+fn metadata_bool(metadata: &BTreeMap<String, String>, key: &str) -> Option<bool> {
+    metadata
+        .get(key)
+        .and_then(|value| match value.trim().to_ascii_lowercase().as_str() {
+            "true" | "1" | "yes" => Some(true),
+            "false" | "0" | "no" => Some(false),
+            _ => None,
+        })
 }
