@@ -180,7 +180,7 @@
   capability compatibility.
 - [x] 10.3 Add support-file demotion proposals for session-specific references,
   starter templates, repeatable scripts, and assets.
-- [ ] 10.4 Apply merge only through approval-gated safe mutation and lifecycle
+- [x] 10.4 Apply merge only through approval-gated safe mutation and lifecycle
   transition commands.
 - [ ] 10.5 Mark absorbed skills `Superseded` and create alias/redirect records.
 - [ ] 10.6 Ensure merge reports explain rationale with bounded summaries and

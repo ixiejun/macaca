@@ -8,6 +8,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::alias::SkillAliasKind;
+use crate::service_contract::SkillServiceScope;
+use macaca_proto::TraceContext;
 
 const MAX_MERGE_SOURCE_SKILLS: usize = 32;
 const MAX_MERGE_SUPPORT_FILE_MOVEMENTS: usize = 64;
@@ -189,6 +191,56 @@ pub struct SkillUmbrellaMergeProposal {
     pub policy_decision_refs: Vec<String>,
     pub evidence_ids: Vec<String>,
     pub rationale: String,
+}
+
+/// Approval-gated command envelope for applying one umbrella merge.
+///
+/// The command intentionally carries refs to lifecycle and safe mutation
+/// commands rather than raw file content.  Runtime providers must materialize
+/// the actual supersede, alias, and support-file writes through those narrower
+/// command surfaces so merge apply cannot become an unbounded mutation path.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SkillUmbrellaMergeApplyCommand {
+    pub trace: TraceContext,
+    pub scope: SkillServiceScope,
+    pub proposal: SkillUmbrellaMergeProposal,
+    pub approval_refs: Vec<String>,
+    pub policy_decision_refs: Vec<String>,
+    pub lifecycle_transition_refs: Vec<String>,
+    pub safe_mutation_refs: Vec<String>,
+    pub audit_event_ids: Vec<String>,
+}
+
+impl SkillUmbrellaMergeApplyCommand {
+    /// Validate approval and command-ref gates before a provider can apply.
+    pub fn validate(&self) -> Result<(), String> {
+        if self.trace.trace_id.trim().is_empty() {
+            return Err("umbrella merge apply requires trace_id".into());
+        }
+        self.proposal.validate()?;
+        ensure_non_empty_list(
+            &self.approval_refs,
+            MAX_MERGE_EVIDENCE_REFS,
+            "merge approval refs",
+        )?;
+        ensure_non_empty_list(
+            &self.policy_decision_refs,
+            MAX_MERGE_EVIDENCE_REFS,
+            "merge policy decision refs",
+        )?;
+        ensure_non_empty_list(
+            &self.lifecycle_transition_refs,
+            MAX_MERGE_EVIDENCE_REFS,
+            "merge lifecycle transition refs",
+        )?;
+        ensure_non_empty_list(
+            &self.safe_mutation_refs,
+            MAX_MERGE_EVIDENCE_REFS,
+            "merge safe mutation refs",
+        )?;
+        ensure_evidence_refs(&self.audit_event_ids, "merge audit event")?;
+        Ok(())
+    }
 }
 
 impl SkillUmbrellaMergeProposal {

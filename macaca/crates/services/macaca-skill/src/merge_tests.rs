@@ -1,7 +1,7 @@
 use crate::{
     SkillAliasKind, SkillMergeAliasEffect, SkillMergeRiskScore, SkillMergeSupportFileDestination,
     SkillMergeSupportFileMovement, SkillSupportFileDemotionKind, SkillSupportFileDemotionProposal,
-    SkillUmbrellaMergeProposal,
+    SkillUmbrellaMergeApplyCommand, SkillUmbrellaMergeProposal,
 };
 
 #[test]
@@ -77,4 +77,32 @@ fn support_file_demotion_proposal_matches_destination_class() {
     let mut invalid = proposal;
     invalid.destination = SkillMergeSupportFileDestination::Scripts;
     assert!(invalid.validate().is_err());
+}
+
+#[test]
+fn umbrella_merge_apply_requires_approval_and_command_refs() {
+    let proposal = SkillUmbrellaMergeProposal::metadata_only(
+        "merge://proposal/apply",
+        vec!["skill://agent/source".into()],
+        "skill://agent/target",
+        "bounded rationale",
+    );
+    let mut command = SkillUmbrellaMergeApplyCommand {
+        trace: macaca_proto::TraceContext::new("trace-merge-apply"),
+        scope: Default::default(),
+        proposal,
+        approval_refs: Vec::new(),
+        policy_decision_refs: Vec::new(),
+        lifecycle_transition_refs: Vec::new(),
+        safe_mutation_refs: Vec::new(),
+        audit_event_ids: Vec::new(),
+    };
+
+    assert!(command.validate().is_err());
+
+    command.approval_refs = vec!["approval://merge/apply".into()];
+    command.policy_decision_refs = vec!["policy://merge/apply".into()];
+    command.lifecycle_transition_refs = vec!["skill.curation.supersede://source".into()];
+    command.safe_mutation_refs = vec!["skill.content.mutate://support-file".into()];
+    assert!(command.validate().is_ok());
 }

@@ -621,6 +621,17 @@ Every command logs key execution nodes with sanitized fields:
   rationale, blank evidence refs, and any demotion kind whose destination does
   not match the expected support-file area.
 
+### Slice 10D: Approval-Gated Merge Apply Envelope
+
+- Patterns: merge apply is modeled as a command envelope that validates an
+  already bounded merge proposal, approval refs, policy decision refs,
+  lifecycle transition refs, safe mutation refs, and audit event refs.
+- Boundaries: the command carries refs to narrower lifecycle and content
+  mutation command surfaces rather than raw skill bodies or file payloads.
+- Safety: a provider cannot treat merge apply as a hidden mutation path; apply
+  admission fails unless approval, policy, lifecycle, and safe mutation refs are
+  all present.
+
 ## Risks And Mitigations
 
 - Risk: skill mutation corrupts active packages. Mitigation: atomic writes,
