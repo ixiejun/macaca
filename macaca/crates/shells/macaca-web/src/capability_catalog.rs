@@ -8,10 +8,11 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
+mod alias_resolution;
+
 use macaca_context::{
-    mcp_tool_collisions, DeclaredCapabilityDependency, McpCapabilityCatalog,
-    McpServerCapabilitySummary, RuntimeToolCapabilityCatalog, SkillCapabilityCatalog,
-    SkillCapabilityRecord, SkillFilterDiagnostic,
+    mcp_tool_collisions, McpCapabilityCatalog, McpServerCapabilitySummary,
+    RuntimeToolCapabilityCatalog, SkillCapabilityCatalog,
 };
 use macaca_framework::tool::Toolkit;
 use macaca_proto::{ApplicationId, TraceContext};
@@ -19,8 +20,8 @@ use macaca_runtime_host::{
     McpRuntimeFacade, McpRuntimeStatus, McpRuntimeStatusState, McpToolPolicy,
 };
 use macaca_skill::{
-    SkillPolicy, SkillRuntimeFacade, SkillServiceScope, SkillSnapshot, SkillSnapshotRequest,
-    SkillSnapshotServiceCommand,
+    SkillAliasResolveCommand, SkillAliasResolveResult, SkillPolicy, SkillRuntimeFacade,
+    SkillServiceScope, SkillSnapshot, SkillSnapshotRequest, SkillSnapshotServiceCommand,
 };
 
 use crate::state::AppState;
@@ -31,48 +32,7 @@ use crate::state::AppState;
 /// so capability context guarantees **frontmatter/metadata only** regardless of snapshot prompt mode.
 #[must_use]
 pub fn skill_capability_catalog_from_snapshot(snapshot: &SkillSnapshot) -> SkillCapabilityCatalog {
-    let entries: Vec<SkillCapabilityRecord> = snapshot
-        .skills
-        .iter()
-        .map(|e| {
-            let stable_id = format!("skill:{}:{}", e.source_scope.as_str(), e.name);
-            let declared_dependencies: Vec<DeclaredCapabilityDependency> = e
-                .mcp_servers
-                .iter()
-                .map(|m| DeclaredCapabilityDependency {
-                    capability_id: format!("mcp_server:{}", m.id),
-                    notes: Some(format!(
-                        "declared in SKILL.md manifest (transport={})",
-                        m.transport
-                    )),
-                })
-                .collect();
-            SkillCapabilityRecord {
-                stable_id,
-                name: e.name.clone(),
-                description: e.description.clone(),
-                location_ref: e.location.display().to_string(),
-                source_label: e.source.clone(),
-                source_scope: e.source_scope.as_str().to_string(),
-                declared_dependencies,
-            }
-        })
-        .collect();
-
-    let filtered: Vec<SkillFilterDiagnostic> = snapshot
-        .filtered
-        .iter()
-        .map(|f| SkillFilterDiagnostic {
-            name: f.name.clone(),
-            reason: f.reason.clone(),
-        })
-        .collect();
-
-    SkillCapabilityCatalog {
-        entries,
-        filtered,
-        truncated: snapshot.truncated,
-    }
+    alias_resolution::catalog_from_snapshot_with_aliases(snapshot, &[])
 }
 
 #[must_use]
@@ -204,6 +164,11 @@ pub async fn resolve_skill_snapshot_cached(
                     SkillRuntimeFacade::new().build_snapshot(request).await?
                 }
             };
+            let alias_scope =
+                SkillServiceScope::agent(*app_id, session_id.unwrap_or("no-session"), agent_name)
+                    .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+            let aliases = resolve_aliases_for_snapshot(state, alias_scope, &snapshot).await;
+            let snapshot = alias_resolution::apply_to_snapshot(snapshot, &aliases);
             if let Some(session_id) = session_id {
                 if let Ok(value) = serde_json::to_value(&snapshot) {
                     let _ = state
@@ -218,6 +183,53 @@ pub async fn resolve_skill_snapshot_cached(
     }
 }
 
+async fn resolve_aliases_for_snapshot(
+    state: &Arc<AppState>,
+    scope: SkillServiceScope,
+    snapshot: &SkillSnapshot,
+) -> Vec<SkillAliasResolveResult> {
+    let mut aliases = Vec::new();
+
+    for entry in &snapshot.skills {
+        let command = SkillAliasResolveCommand {
+            trace: TraceContext::new("web-capability-skill-alias-resolve"),
+            scope: scope.clone(),
+            skill_id: alias_resolution::governed_skill_id(entry),
+            name: Some(entry.name.clone()),
+        };
+        match state.skill_client.alias_resolve(command).await {
+            Ok(result) => {
+                if result.resolved {
+                    tracing::info!(
+                        requested_skill_id = %result.requested_skill_id,
+                        requested_name = ?result.requested_name,
+                        target_skill_id = ?result.target_skill_id,
+                        target_name = ?result.target_name,
+                        kind = alias_resolution::alias_kind_label(&result),
+                        "skill alias hit during context catalog assembly"
+                    );
+                } else {
+                    tracing::debug!(
+                        requested_skill_id = %result.requested_skill_id,
+                        requested_name = ?result.requested_name,
+                        "skill alias miss during context catalog assembly"
+                    );
+                }
+                aliases.push(result);
+            }
+            Err(error) => {
+                tracing::warn!(
+                    skill = %entry.name,
+                    error = %error,
+                    "skill alias resolution unavailable during context catalog assembly"
+                );
+            }
+        }
+    }
+
+    aliases
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
@@ -229,7 +241,6 @@ mod tests {
         McpDefinitionSource, McpLifecycleScope, McpRuntimeFacade, McpRuntimeStatus,
         McpRuntimeStatusState, McpServerDefinition, McpToolPolicy,
     };
-    use macaca_skill::{SkillMcpServerConfig, SkillSnapshot, SkillSnapshotEntry, SkillSourceScope};
     use serde_json::Value;
 
     use super::*;
@@ -284,53 +295,6 @@ mod tests {
             sample_mcp_status("down", McpRuntimeStatusState::Failed, vec![]),
         ];
         assert_eq!(ready_mcp_server_ids(&statuses), vec!["up"]);
-    }
-
-    #[test]
-    fn skill_capability_catalog_derives_stable_ids_and_mcp_dependencies() {
-        let snapshot = SkillSnapshot {
-            agent: "architect".into(),
-            prompt: "".into(),
-            skills: vec![SkillSnapshotEntry {
-                name: "figma-mcp".into(),
-                description: "Figma context".into(),
-                source_location: PathBuf::from("/app/skills/figma-mcp/SKILL.md"),
-                source_base_dir: PathBuf::from("/app/skills/figma-mcp"),
-                location: PathBuf::from("/app/skills/figma-mcp/SKILL.md"),
-                base_dir: PathBuf::from("/app/skills/figma-mcp"),
-                source: "app".into(),
-                source_scope: SkillSourceScope::Application,
-                primary_env: None,
-                required_env: vec![],
-                install: vec![],
-                mcp_servers: vec![SkillMcpServerConfig {
-                    id: "figma".into(),
-                    command: "npx".into(),
-                    args: vec![],
-                    transport: "stdio".into(),
-                    tool_prefix: None,
-                }],
-            }],
-            filtered: vec![],
-            truncated: false,
-            compact: true,
-            version: 1,
-        };
-
-        let cat = skill_capability_catalog_from_snapshot(&snapshot);
-        assert_eq!(cat.entries.len(), 1);
-        let row = &cat.entries[0];
-        assert_eq!(row.stable_id, "skill:application:figma-mcp");
-        assert_eq!(row.declared_dependencies.len(), 1);
-        assert_eq!(
-            row.declared_dependencies[0].capability_id,
-            "mcp_server:figma"
-        );
-        assert!(row.declared_dependencies[0]
-            .notes
-            .as_ref()
-            .expect("transport note")
-            .contains("stdio"));
     }
 
     #[test]

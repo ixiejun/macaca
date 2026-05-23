@@ -190,9 +190,9 @@
 
 ## 11. Alias Resolution Across Consumers
 
-- [ ] 11.1 Keep `SkillAliasMap` resolution in the Skill service as the only
+- [x] 11.1 Keep `SkillAliasMap` resolution in the Skill service as the only
   source of redirect/warn/deny behavior.
-- [ ] 11.2 Wire Context Composer skill catalog building through Skill service
+- [x] 11.2 Wire Context Composer skill catalog building through Skill service
   alias resolution.
 - [ ] 11.3 Wire Task service skill references through Skill service alias
   resolution before execution.
