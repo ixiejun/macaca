@@ -102,6 +102,10 @@ mod skill_proposal_lifecycle_tests;
 #[cfg(test)]
 mod skill_sanitization_boundary_tests;
 #[cfg(test)]
+mod skill_self_evolution_evaluation_harness_fixture;
+#[cfg(test)]
+mod skill_self_evolution_evaluation_harness_tests;
+#[cfg(test)]
 mod skill_service_lifecycle_tests;
 #[cfg(test)]
 mod skill_service_merge_tests;
