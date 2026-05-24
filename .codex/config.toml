@@ -21,3 +21,9 @@ approval_mode = "approve"
 
 [mcp_servers.gitnexus.tools.context]
 approval_mode = "approve"
+
+[mcp_servers.gitnexus.tools.list_repos]
+approval_mode = "approve"
+
+[mcp_servers.gitnexus.tools.cypher]
+approval_mode = "approve"
