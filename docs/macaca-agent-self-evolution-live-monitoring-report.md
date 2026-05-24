@@ -3700,3 +3700,134 @@ Execution note:
   - A full live `/api/chat/v2` restart proof should be rerun next to update Run
     49's failed live verdict with real process restart evidence from the new
     journal.
+
+## Run 51 - Live Durable Telemetry Replay and API-First Audit Proof
+
+- Date: 2026-05-24.
+- Goal: rerun the Run 49 live chain after Run 50's fix and prove the complete
+  service-owned path:
+  - real `/api/chat/v2` task writes usage telemetry into the durable governance
+    journal;
+  - process restart replays the journal instead of relying on package-only
+    recovery;
+  - canonical API-first audit remains readable after restart;
+  - a subsequent real task continues the same telemetry chain.
+- Target:
+  `materialization-skill-package-registry-load-path-usage-telemetry`.
+- Baseline:
+  - Server started from current source with
+    `cargo run --bin macaca-web-server -- --port 3001`.
+  - Startup had no prior durable replay in that process and package recovery
+    populated four governance identities.
+  - Baseline
+    `/api/apps/a9435a4b-d123-5a4c-b0b7-d9b1342089ea/skills/self-evolution/audit?agent=coordinator&target_skill=materialization-skill-package-registry-load-path-usage-telemetry`
+    failed closed with
+    `observer_events:missing_session_id_for_observer_evidence`, proving the
+    audit surface does not silently pass without canonical observer evidence.
+- First real task before restart:
+  - Request capture:
+    `/tmp/macaca-self-evolution-run51-20260524235733/run51-chat-before-restart-20260524235815.json`.
+  - SSE capture:
+    `/tmp/macaca-self-evolution-run51-20260524235733/run51-chat-before-restart-20260524235815.sse`.
+  - Session id: `49208e79-b047-4bb8-af25-3877a1f279d9`.
+  - Delegated task id: `4b0c0e47-ed64-4244-9c36-7cc7785bc174`.
+  - Proposal id:
+    `skill-exp-4b0c0e47-ed64-4244-9c36-7cc7785bc174-1779638383680941000`.
+  - Artifact:
+    `/Users/quantum/.macaca/workspaces/a9435a4b-d123-5a4c-b0b7-d9b1342089ea/shared/self_evolution_run51_before_restart_20260524235815.md`.
+  - SSE metrics:
+    - bytes: `76211`
+    - tool calls: `22`
+    - tool results: `22`
+    - `skill_self_evolution_observer` events: `2`
+    - `proposal_created` events: `1`
+    - `done` events: `1`
+- Canonical telemetry after the first task:
+  - `/api/apps/a9435a4b-d123-5a4c-b0b7-d9b1342089ea/skills/operations`
+    showed the target record advanced to:
+    - `activation_count: 1`
+    - `use_count: 1`
+    - `successful_task_count: 1`
+    - `last_used_at: 2026-05-24T15:58:16.346083Z`
+    - `last_successful_task_at: 2026-05-24T15:59:43.733726Z`
+  - Evidence ids included:
+    - `eventlog://sessions/49208e79-b047-4bb8-af25-3877a1f279d9/skill_snapshot/coordinator`
+    - `eventlog://sessions/49208e79-b047-4bb8-af25-3877a1f279d9/agent_execution/coordinator/4b0c0e47-ed64-4244-9c36-7cc7785bc174`
+  - Durable journal
+    `/Users/quantum/.macaca/workspaces/skill-governance-events.jsonl`
+    contained `31` records after the first task.
+- Canonical API-first audit after the first task:
+  - Request:
+    `/api/apps/a9435a4b-d123-5a4c-b0b7-d9b1342089ea/skills/self-evolution/audit?agent=coordinator&target_skill=materialization-skill-package-registry-load-path-usage-telemetry&session_id=49208e79-b047-4bb8-af25-3877a1f279d9`.
+  - Result: `passed`.
+  - Evidence categories:
+    - operations: `passed`;
+    - registry/load-path: `passed`, including
+      `skill-registry:///Users/quantum/.macaca/workspaces/a9435a4b-d123-5a4c-b0b7-d9b1342089ea/available_skills/materialization_skill_package_registry_load_path_usage_telemetry/SKILL.md`;
+    - observer events: `passed` with four EventLog references for the session.
+- Restart durability proof:
+  - Stopped the server and restarted current source with
+    `cargo run --bin macaca-web-server -- --port 3001`.
+  - Restart log:
+    `/tmp/macaca-run51-restart-server-20260525000151.log`.
+  - The restart log showed:
+    - `loaded_events=31`
+    - `skipped_events=0`
+    - `replayed_events=31`
+    - `governance_event_journal_configured=true`
+    - `recovered_governance_records=0`
+  - This proves the post-restart telemetry state was restored from the durable
+    governance event journal rather than from materialized package identity
+    recovery.
+  - After restart, `/skills/operations` still showed the target as `Active` with
+    `activation_count: 1`, `use_count: 1`, and
+    `successful_task_count: 1`.
+  - After restart, the same audit request for session
+    `49208e79-b047-4bb8-af25-3877a1f279d9` still returned `passed`.
+- Second real task after restart:
+  - Request capture:
+    `/tmp/macaca-self-evolution-run51-20260524235733/run51-chat-after-restart-20260525000256.json`.
+  - SSE capture:
+    `/tmp/macaca-self-evolution-run51-20260524235733/run51-chat-after-restart-20260525000256.sse`.
+  - Session id: `934532dc-df24-4232-828a-5e3539ae59a5`.
+  - Delegated task id: `d99686fc-62db-42c1-ab50-8e54664650d5`.
+  - Proposal id:
+    `skill-exp-d99686fc-62db-42c1-ab50-8e54664650d5-1779638668708999000`.
+  - Artifact:
+    `/Users/quantum/.macaca/workspaces/a9435a4b-d123-5a4c-b0b7-d9b1342089ea/shared/self_evolution_run51_after_restart_20260525000256.md`.
+  - SSE metrics:
+    - bytes: `80224`
+    - tool calls: `38`
+    - tool results: `37`
+    - `skill_self_evolution_observer` events: `2`
+    - `proposal_created` events: `1`
+    - `done` events: `1`
+- Canonical telemetry after the second task:
+  - `/skills/operations` showed the same target record advanced to:
+    - `activation_count: 2`
+    - `use_count: 2`
+    - `successful_task_count: 2`
+    - `last_used_at: 2026-05-24T16:02:57.096670Z`
+    - `last_successful_task_at: 2026-05-24T16:04:28.763392Z`
+  - Evidence ids included both live sessions:
+    - `49208e79-b047-4bb8-af25-3877a1f279d9`
+    - `934532dc-df24-4232-828a-5e3539ae59a5`
+  - The audit request for session
+    `934532dc-df24-4232-828a-5e3539ae59a5` returned `passed` with operations,
+    registry/load-path, and observer evidence all present.
+  - Durable journal length advanced to `52` records after the follow-up task.
+- Quantified follow-up observation:
+  - The two live tasks were not normalized workloads. The second task was broader
+    and used more tool traffic (`38` calls versus `22`), so this run should not
+    be claimed as a fresh efficiency improvement benchmark.
+  - The durable optimization-relevant metric proven here is continuity:
+    post-restart usage telemetry did not reset and continued from `1/1/1` to
+    `2/2/2` on the same semantic Skill record.
+- Verdict:
+  - Real `/api/chat/v2` telemetry write to durable journal: proven.
+  - Durable usage telemetry replay after process restart: proven.
+  - API-first self-evolution audit after restart: proven.
+  - Subsequent task telemetry continuity: proven.
+  - Normalized later-task efficiency improvement: not newly proven in Run 51;
+    use the earlier normalized Run 47 delta for that claim, or run a paired
+    same-prompt benchmark if a fresh optimization-efficiency proof is required.
