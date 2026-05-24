@@ -188,6 +188,7 @@ impl SkillProviderGovernanceState {
                 records: self.records.lock().await.clone(),
                 aliases: self.aliases.lock().await.clone(),
                 proposals: self.proposals.lock().await.clone(),
+                proposal_processing: self.proposal_processing.lock().await.clone(),
                 event_log: self.event_log.lock().await.clone(),
                 report_refs: vec![format!(
                     "store://skill-curation/{}/merge/{}/REPORT.md",

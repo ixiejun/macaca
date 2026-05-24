@@ -7,11 +7,13 @@ use async_trait::async_trait;
 use macaca_proto::{MacacaError, MacacaResult};
 use macaca_skill::{
     SkillAliasResolveCommand, SkillAliasResolveResult, SkillAliasSnapshotCommand,
-    SkillAliasSnapshotResult, SkillAliasUpsertCommand, SkillAliasUpsertResult, SkillCleanupCommand,
-    SkillCurationDryRunCommand, SkillCurationDryRunResult, SkillCurationLifecycleAction,
-    SkillCurationLifecycleCommand, SkillCurationLifecycleResult, SkillCurationRollbackCommand,
-    SkillCurationRollbackResult, SkillCurationRunCommand, SkillCurationRunResult,
-    SkillCurationSnapshotCommand, SkillCurationSnapshotResult,
+    SkillAliasSnapshotResult, SkillAliasUpsertCommand, SkillAliasUpsertResult,
+    SkillAutonomousMaterializationRunCommand, SkillAutonomousMaterializationRunResult,
+    SkillAutonomousMaterializationSnapshotCommand, SkillAutonomousMaterializationSnapshotResult,
+    SkillCleanupCommand, SkillCurationDryRunCommand, SkillCurationDryRunResult,
+    SkillCurationLifecycleAction, SkillCurationLifecycleCommand, SkillCurationLifecycleResult,
+    SkillCurationRollbackCommand, SkillCurationRollbackResult, SkillCurationRunCommand,
+    SkillCurationRunResult, SkillCurationSnapshotCommand, SkillCurationSnapshotResult,
     SkillEvaluationCheckpointAppendCommand, SkillEvaluationCheckpointAppendResult,
     SkillEvaluationReportCommand, SkillEvaluationReportResult, SkillEvaluationScoreCommand,
     SkillEvaluationScoreResult, SkillEvolutionPromoteDraftCommand,
@@ -21,17 +23,22 @@ use macaca_skill::{
     SkillExperienceProposalCommand, SkillExperienceProposalResult,
     SkillExperienceProposalSnapshotCommand, SkillExperienceProposalSnapshotResult,
     SkillGovernanceRecordUsageCommand, SkillGovernanceRecordUsageResult,
-    SkillGovernanceSnapshotCommand, SkillGovernanceSnapshotResult, SkillServiceSnapshot,
-    SkillServiceSnapshotCommand, SkillSnapshotServiceCommand, SkillSnapshotServiceResult,
-    SkillStatusCommand, SkillStatusResult, SkillToolCatalogCommand, SkillToolCatalogResult,
-    SkillToolInvokeCommand, SkillToolInvokeResult, SKILL_ALIAS_RESOLVE_COMMAND,
-    SKILL_ALIAS_SNAPSHOT_COMMAND, SKILL_ALIAS_UPSERT_COMMAND, SKILL_CLEANUP_COMMAND,
-    SKILL_CURATION_ARCHIVE_COMMAND, SKILL_CURATION_DRY_RUN_COMMAND, SKILL_CURATION_PIN_COMMAND,
-    SKILL_CURATION_QUARANTINE_COMMAND, SKILL_CURATION_REJECT_COMMAND,
+    SkillGovernanceSnapshotCommand, SkillGovernanceSnapshotResult,
+    SkillProposalProcessingRunCommand, SkillProposalProcessingRunResult,
+    SkillProposalProcessingSnapshotCommand, SkillProposalProcessingSnapshotResult,
+    SkillServiceSnapshot, SkillServiceSnapshotCommand, SkillSnapshotServiceCommand,
+    SkillSnapshotServiceResult, SkillStatusCommand, SkillStatusResult, SkillToolCatalogCommand,
+    SkillToolCatalogResult, SkillToolInvokeCommand, SkillToolInvokeResult,
+    SKILL_ALIAS_RESOLVE_COMMAND, SKILL_ALIAS_SNAPSHOT_COMMAND, SKILL_ALIAS_UPSERT_COMMAND,
+    SKILL_CLEANUP_COMMAND, SKILL_CURATION_ARCHIVE_COMMAND, SKILL_CURATION_DRY_RUN_COMMAND,
+    SKILL_CURATION_PIN_COMMAND, SKILL_CURATION_QUARANTINE_COMMAND, SKILL_CURATION_REJECT_COMMAND,
     SKILL_CURATION_RELEASE_QUARANTINE_COMMAND, SKILL_CURATION_RESTORE_COMMAND,
     SKILL_CURATION_ROLLBACK_COMMAND, SKILL_CURATION_RUN_COMMAND, SKILL_CURATION_SNAPSHOT_COMMAND,
     SKILL_CURATION_UNPIN_COMMAND, SKILL_EVALUATION_CHECKPOINT_APPEND_COMMAND,
     SKILL_EVALUATION_REPORT_COMMAND, SKILL_EVALUATION_SCORE_COMMAND,
+    SKILL_EVOLUTION_MATERIALIZATION_OPERATOR_RUN_COMMAND,
+    SKILL_EVOLUTION_MATERIALIZATION_OPERATOR_SNAPSHOT_COMMAND,
+    SKILL_EVOLUTION_PROCESSING_RUN_COMMAND, SKILL_EVOLUTION_PROCESSING_SNAPSHOT_COMMAND,
     SKILL_EVOLUTION_PROMOTE_DRAFT_COMMAND, SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND,
     SKILL_EVOLUTION_PROPOSE_PATCH_COMMAND, SKILL_EVOLUTION_REJECT_DRAFT_COMMAND,
     SKILL_EVOLUTION_SNAPSHOT_COMMAND, SKILL_EXECUTABLE_LOAD_COMMAND,
@@ -305,6 +312,58 @@ impl SystemSkillClient for ServiceBackedSkillClient {
         call(
             &self.service,
             SKILL_EVOLUTION_SNAPSHOT_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn process_skill_proposals(
+        &self,
+        command: SkillProposalProcessingRunCommand,
+    ) -> MacacaResult<SkillProposalProcessingRunResult> {
+        call(
+            &self.service,
+            SKILL_EVOLUTION_PROCESSING_RUN_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn skill_proposal_processing_snapshot(
+        &self,
+        command: SkillProposalProcessingSnapshotCommand,
+    ) -> MacacaResult<SkillProposalProcessingSnapshotResult> {
+        call(
+            &self.service,
+            SKILL_EVOLUTION_PROCESSING_SNAPSHOT_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn run_autonomous_materialization(
+        &self,
+        command: SkillAutonomousMaterializationRunCommand,
+    ) -> MacacaResult<SkillAutonomousMaterializationRunResult> {
+        call(
+            &self.service,
+            SKILL_EVOLUTION_MATERIALIZATION_OPERATOR_RUN_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn autonomous_materialization_snapshot(
+        &self,
+        command: SkillAutonomousMaterializationSnapshotCommand,
+    ) -> MacacaResult<SkillAutonomousMaterializationSnapshotResult> {
+        call(
+            &self.service,
+            SKILL_EVOLUTION_MATERIALIZATION_OPERATOR_SNAPSHOT_COMMAND,
             command.trace.clone(),
             command,
         )

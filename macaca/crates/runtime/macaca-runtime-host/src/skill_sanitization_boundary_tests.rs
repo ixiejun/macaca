@@ -50,30 +50,38 @@ fn governance_replay_drops_raw_metadata_from_snapshots() {
         "RAW_PROVIDER_PAYLOAD_SHOULD_NOT_SURFACE".into(),
     );
     metadata.insert("manifest_body".into(), "MANIFEST_SHOULD_NOT_SURFACE".into());
-    metadata.insert("package_bytes".into(), "PACKAGE_BYTES_SHOULD_NOT_SURFACE".into());
-    metadata.insert("skill_body".into(), "FULL_SKILL_BODY_SHOULD_NOT_SURFACE".into());
+    metadata.insert(
+        "package_bytes".into(),
+        "PACKAGE_BYTES_SHOULD_NOT_SURFACE".into(),
+    );
+    metadata.insert(
+        "skill_body".into(),
+        "FULL_SKILL_BODY_SHOULD_NOT_SURFACE".into(),
+    );
     metadata.insert("credential".into(), "CREDENTIAL_SHOULD_NOT_SURFACE".into());
-    metadata.insert("raw_signature".into(), "SIGNATURE_SHOULD_NOT_SURFACE".into());
+    metadata.insert(
+        "raw_signature".into(),
+        "SIGNATURE_SHOULD_NOT_SURFACE".into(),
+    );
 
-    let read_model =
-        SkillGovernanceReadModel::from_events([SkillGovernanceEventRecord::new(
-            "event-sanitized-replay",
-            &trace,
-            SkillServiceScope::default(),
-            chrono::Utc::now(),
-            SkillGovernanceEventPayload::UsageRecorded(SkillUsageObservation {
-                skill_id: "skill://agent/sanitized".into(),
-                name: "sanitized-skill".into(),
-                source: "test".into(),
-                source_scope: "workspace".into(),
-                event: SkillUsageEventKind::Viewed,
-                author_kind: macaca_skill::SkillAuthorKind::Agent,
-                created_by: Some("agent".into()),
-                pinned: None,
-                evidence_id: Some("evidence://safe-primary".into()),
-                metadata,
-            }),
-        )]);
+    let read_model = SkillGovernanceReadModel::from_events([SkillGovernanceEventRecord::new(
+        "event-sanitized-replay",
+        &trace,
+        SkillServiceScope::default(),
+        chrono::Utc::now(),
+        SkillGovernanceEventPayload::UsageRecorded(SkillUsageObservation {
+            skill_id: "skill://agent/sanitized".into(),
+            name: "sanitized-skill".into(),
+            source: "test".into(),
+            source_scope: "workspace".into(),
+            event: SkillUsageEventKind::Viewed,
+            author_kind: macaca_skill::SkillAuthorKind::Agent,
+            created_by: Some("agent".into()),
+            pinned: None,
+            evidence_id: Some("evidence://safe-primary".into()),
+            metadata,
+        }),
+    )]);
     let encoded = serde_json::to_string(&read_model).expect("read model should serialize");
 
     assert!(encoded.contains("evidence://safe"));
@@ -86,7 +94,10 @@ fn governance_replay_drops_raw_metadata_from_snapshots() {
         "CREDENTIAL_SHOULD_NOT_SURFACE",
         "SIGNATURE_SHOULD_NOT_SURFACE",
     ] {
-        assert!(!encoded.contains(forbidden), "{forbidden} leaked into replay");
+        assert!(
+            !encoded.contains(forbidden),
+            "{forbidden} leaked into replay"
+        );
     }
 }
 

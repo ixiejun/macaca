@@ -6,7 +6,7 @@
 //! the SDK Skill facade. The Skill service remains the owner of proposal
 //! validation, policy, storage, curation, promotion, and rollback behavior.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use chrono::Utc;
@@ -31,6 +31,13 @@ const MAX_ARTIFACT_REFS: usize = 8;
 
 /// Maximum number of characters copied from one artifact reference.
 const MAX_ARTIFACT_REF_CHARS: usize = 256;
+
+/// Maximum number of semantic trigger phrases used for an autonomous Skill name.
+///
+/// The frontmatter `name` is a model-facing selector, not a provenance id.  A
+/// short phrase budget keeps generated Skills easy to trigger while avoiding
+/// overfitted task transcripts or application-specific wording.
+const MAX_SEMANTIC_TRIGGER_PHRASES: usize = 4;
 
 /// Bounded observer result written to EventLog by the decorator.
 ///
@@ -100,12 +107,21 @@ pub(crate) async fn observe_agent_execution_result_for_skill_self_evolution(
 fn task_result_from_agent_execution_result(result: &AgentExecutionResult) -> TaskResult {
     let task_id = result.task_id.unwrap_or_else(TaskId::new);
     let output = agent_execution_output_text(&result.output);
+    let artifacts = artifact_refs_from_agent_execution_result(result);
+    if !artifacts.is_empty() {
+        tracing::info!(
+            trace_id = %result.trace.trace_id,
+            task_id = %task_id,
+            artifact_refs = artifacts.len(),
+            "Skill self-evolution observer preserved bounded artifact evidence from Agent Execution metadata"
+        );
+    }
     TaskResult {
         task_id,
         success: true,
         output,
         error: None,
-        artifacts: Vec::new(),
+        artifacts,
         completed_at: Utc::now(),
         tokens_used: None,
     }
@@ -196,6 +212,7 @@ fn build_skill_experience_proposal_command(
         tenant_id: None,
         agent_name: Some(agent.to_string()),
     };
+    let semantic_signal = SemanticSkillCreatorSignal::from_task_result(result);
 
     let evidence_ids = vec![
         format!(
@@ -228,6 +245,14 @@ fn build_skill_experience_proposal_command(
         );
     }
 
+    tracing::info!(
+        task_id = %result.task_id,
+        semantic_target = semantic_signal.target_skill_name.as_deref().unwrap_or(""),
+        semantic_phrase_count = semantic_signal.trigger_phrases.len(),
+        semantic_signal_fallback = semantic_signal.target_skill_name.is_none(),
+        "Skill self-evolution observer built Skill Creator-compatible semantic trigger signal"
+    );
+
     Some(SkillExperienceProposalCommand {
         trace,
         scope,
@@ -238,7 +263,7 @@ fn build_skill_experience_proposal_command(
             agent_name: Some(agent.to_string()),
             verified_terminal_success: true,
             evidence_gate: SkillExperienceEvidenceGateStatus::Accepted,
-            bounded_summary: format!(
+            bounded_summary: semantic_signal.bounded_summary(format!(
                 "Verified terminal task completion observed through service.agent_execution; output_chars={}, artifact_count={}, token_total={}.",
                 result.output.chars().count(),
                 result.artifacts.len(),
@@ -247,7 +272,7 @@ fn build_skill_experience_proposal_command(
                     .as_ref()
                     .map(|tokens| tokens.total_tokens.to_string())
                     .unwrap_or_else(|| "unavailable".to_string())
-            ),
+            )),
             trace_digest: Some(format!(
                 "session={},task={},agent={},agent_execution_trace={},completed_at={}",
                 session_id,
@@ -257,12 +282,12 @@ fn build_skill_experience_proposal_command(
                 result.completed_at.to_rfc3339()
             )),
             memory_digest_refs: Vec::new(),
-            reusable_procedure: "Review the linked event-log and Agent Execution trace refs, extract the provider-neutral steps that led to verified terminal success, and keep any promoted skill draft governed by curation, approval, rollback, and sanitized evidence gates.".into(),
+            reusable_procedure: semantic_signal.reusable_procedure(),
             classification: SkillEvolutionCandidateClassification::ReusableProcedure,
             destination: SkillExperienceCandidateDestination::NewSkillDraft,
             recommended_action: SkillEvolutionProposalAction::CreateDraft,
             target_skill_id: None,
-            target_skill_name: None,
+            target_skill_name: semantic_signal.target_skill_name,
             evidence_ids,
             metadata,
         },
@@ -289,6 +314,239 @@ fn proposal_trace(
 /// Return a bounded artifact reference suitable for proposal metadata.
 fn bounded_artifact_ref(artifact: &str) -> String {
     artifact.chars().take(MAX_ARTIFACT_REF_CHARS).collect()
+}
+
+/// Extract bounded artifact evidence that Web already collected for the
+/// service.agent_execution result.
+///
+/// Agent Execution exposes durable write evidence as sanitized metadata instead
+/// of raw file paths or file bodies.  The self-evolution observer must preserve
+/// those refs when building the Skill proposal; otherwise downstream proposal
+/// quality and materialization readiness cannot distinguish "useful artifact
+/// produced" from "chat-only completion".  This helper deliberately accepts
+/// only stable ref/digest fields and caps the number and size of refs.
+fn artifact_refs_from_agent_execution_result(result: &AgentExecutionResult) -> Vec<String> {
+    let mut refs = Vec::new();
+    push_bounded_artifact_ref(&mut refs, result.metadata.get("artifact_ref"));
+    for (key, value) in &result.metadata {
+        if key.starts_with("evidence_ref.artifact_") {
+            push_bounded_artifact_ref(&mut refs, Some(value));
+        }
+    }
+    if refs.is_empty() {
+        push_bounded_artifact_ref(&mut refs, result.metadata.get("artifact_digest"));
+    }
+    refs.sort();
+    refs.dedup();
+    refs.truncate(MAX_ARTIFACT_REFS);
+    refs
+}
+
+fn push_bounded_artifact_ref(refs: &mut Vec<String>, value: Option<&String>) {
+    let Some(value) = value else {
+        return;
+    };
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return;
+    }
+    refs.push(bounded_artifact_ref(trimmed));
+}
+
+/// Bounded semantic signal used to create Skill Creator-compatible proposals.
+///
+/// The observer cannot author application-specific Skills and must not copy raw
+/// task output into generated packages.  This value object applies a small
+/// deterministic Specification over sanitized completion text: it keeps
+/// reusable Skill OS concepts, folds well-known compound phrases, and emits a
+/// trigger-oriented name/procedure that the downstream materialization Builder
+/// can turn into valid `SKILL.md` frontmatter.
+struct SemanticSkillCreatorSignal {
+    target_skill_name: Option<String>,
+    trigger_phrases: Vec<String>,
+}
+
+impl SemanticSkillCreatorSignal {
+    fn from_task_result(result: &TaskResult) -> Self {
+        let trigger_phrases = semantic_trigger_phrases(&result.output);
+        let target_skill_name = if trigger_phrases.len() >= 2 {
+            Some(trigger_phrases.join("-"))
+        } else {
+            None
+        };
+        Self {
+            target_skill_name,
+            trigger_phrases,
+        }
+    }
+
+    /// Build a Skill Creator-style bounded summary.
+    ///
+    /// The summary is still count/ref based for audit safety, but when semantic
+    /// triggers are available it exposes them as bounded trigger context instead
+    /// of leaving materialization to infer identity from generic observer text.
+    fn bounded_summary(&self, fallback: String) -> String {
+        if self.trigger_phrases.is_empty() {
+            return fallback;
+        }
+        format!(
+            "Reusable Skill trigger context: {}; {}",
+            self.trigger_phrases.join(", "),
+            fallback
+        )
+    }
+
+    /// Build concise procedural guidance for a generated Skill.
+    ///
+    /// This mirrors Skill Creator constraints: description/trigger identity
+    /// must be meaningful, the body must stay lean, and provenance stays in refs
+    /// rather than raw task artifacts.
+    fn reusable_procedure(&self) -> String {
+        if self.trigger_phrases.is_empty() {
+            return "Review linked event-log and Agent Execution trace refs, extract provider-neutral steps that led to verified terminal success, and keep promoted skill drafts governed by curation, approval, rollback, and sanitized evidence gates.".into();
+        }
+        format!(
+            "Use linked event-log and Agent Execution trace refs to repeat tasks involving {}. Keep the generated Skill concise, trigger-oriented, proposal-linked, registry-visible, telemetry-audited, and governed by approval, rollback, and sanitized evidence gates.",
+            self.trigger_phrases.join(", ")
+        )
+    }
+}
+
+/// Extract deterministic trigger phrases from bounded completion text.
+///
+/// The phrase table is generic to the Skill OS domain rather than a particular
+/// application.  It preserves compound concepts such as `registry-load-path`
+/// because splitting them into individual words makes model-facing Skill names
+/// much harder to trigger and audit.
+fn semantic_trigger_phrases(output: &str) -> Vec<String> {
+    let tokens = normalized_semantic_tokens(output);
+    let mut discovered = BTreeSet::new();
+    for index in 0..tokens.len() {
+        if let Some(phrase) = semantic_compound_phrase(&tokens, index) {
+            discovered.insert(phrase);
+        }
+        if is_semantic_trigger_token(&tokens[index]) {
+            discovered.insert(tokens[index].clone());
+        }
+    }
+    if tokens.iter().any(|token| token == "skill") && tokens.iter().any(|token| token == "package")
+    {
+        discovered.insert("skill-package".into());
+    }
+    if tokens.iter().any(|token| token == "registry")
+        && tokens
+            .iter()
+            .any(|token| token == "path" || token == "loadpath")
+    {
+        discovered.insert("registry-load-path".into());
+    }
+    semantic_trigger_priority_order()
+        .iter()
+        .filter(|phrase| discovered.contains(**phrase))
+        .take(MAX_SEMANTIC_TRIGGER_PHRASES)
+        .map(|phrase| (*phrase).to_string())
+        .collect()
+}
+
+fn normalized_semantic_tokens(output: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+    let mut current = String::new();
+    for character in output.chars() {
+        if character.is_ascii_alphanumeric() {
+            current.push(character.to_ascii_lowercase());
+        } else if !current.is_empty() {
+            push_normalized_token(&mut tokens, &current);
+            current.clear();
+        }
+    }
+    if !current.is_empty() {
+        push_normalized_token(&mut tokens, &current);
+    }
+    tokens
+}
+
+fn push_normalized_token(tokens: &mut Vec<String>, token: &str) {
+    if token.len() < 4 || is_semantic_stop_word(token) {
+        return;
+    }
+    tokens.push(token.to_string());
+}
+
+fn semantic_compound_phrase(tokens: &[String], index: usize) -> Option<String> {
+    let current = tokens.get(index)?.as_str();
+    let next = tokens.get(index + 1).map(String::as_str);
+    match (current, next) {
+        ("proposal", Some("linked")) => Some("proposal-linked".into()),
+        ("skill", Some("package")) => Some("skill-package".into()),
+        ("registry", Some("load")) => Some("registry-load-path".into()),
+        ("usage", Some("telemetry")) => Some("usage-telemetry".into()),
+        ("semantic", Some("naming")) => Some("semantic-naming".into()),
+        ("semantic", Some("identity")) => Some("semantic-identity".into()),
+        ("follow", Some("optimization")) => Some("follow-up-optimization".into()),
+        ("measurable", Some("optimization")) => Some("measurable-optimization".into()),
+        _ => None,
+    }
+}
+
+fn semantic_trigger_priority_order() -> &'static [&'static str] {
+    &[
+        "materialization",
+        "proposal-linked",
+        "skill-package",
+        "registry-load-path",
+        "usage-telemetry",
+        "semantic-naming",
+        "semantic-identity",
+        "measurable-optimization",
+        "follow-up-optimization",
+        "activation",
+        "curation",
+        "evaluation",
+        "governance",
+        "telemetry",
+        "validation",
+        "optimization",
+        "registry",
+        "proposal",
+    ]
+}
+
+fn is_semantic_trigger_token(token: &str) -> bool {
+    matches!(
+        token,
+        "activation"
+            | "curation"
+            | "evaluation"
+            | "governance"
+            | "loadpath"
+            | "materialization"
+            | "optimization"
+            | "proposal"
+            | "registry"
+            | "telemetry"
+            | "validation"
+            | "verification"
+    )
+}
+
+fn is_semantic_stop_word(token: &str) -> bool {
+    matches!(
+        token,
+        "actual"
+            | "after"
+            | "before"
+            | "could"
+            | "covering"
+            | "creation"
+            | "future"
+            | "measurable"
+            | "naming"
+            | "reusable"
+            | "should"
+            | "through"
+            | "verification"
+            | "wrote"
+    )
 }
 
 /// Extract a bounded textual completion signal from Agent Execution output.
@@ -386,6 +644,111 @@ mod tests {
             "trace-empty"
         )
         .is_none());
+    }
+
+    #[test]
+    fn agent_execution_metadata_artifact_ref_becomes_proposal_artifact_evidence() {
+        let app_id = ApplicationId::new();
+        let task_id = TaskId::new();
+        let mut metadata = BTreeMap::new();
+        metadata.insert("artifact_ref".into(), "tool:file_write:abcd1234".into());
+        metadata.insert("artifact_digest".into(), "digest://artifact/1".into());
+        let result = AgentExecutionResult {
+            application_id: app_id,
+            session_id: "session-artifact-evidence".into(),
+            task_id: Some(task_id),
+            target_agent: "coordinator".into(),
+            status: AgentExecutionStatus::Completed,
+            output: serde_json::json!({
+                "output": "agent execution completed with a written artifact"
+            }),
+            context_snapshot: None,
+            trace: TraceContext::new("test-artifact-evidence"),
+            metadata,
+        };
+
+        let task_result = task_result_from_agent_execution_result(&result);
+        let command = build_skill_experience_proposal_command(
+            &app_id,
+            &result.session_id,
+            &result.target_agent,
+            &task_result,
+            &result.trace.trace_id,
+        )
+        .expect("artifact-backed execution should produce a proposal command");
+
+        assert!(command
+            .candidate
+            .bounded_summary
+            .contains("artifact_count=1"));
+        assert_eq!(
+            command
+                .candidate
+                .metadata
+                .get("evidence_ref.artifact_0")
+                .map(String::as_str),
+            Some("tool:file_write:abcd1234")
+        );
+    }
+
+    #[test]
+    fn command_derives_semantic_skill_creator_identity_from_bounded_completion_signal() {
+        let app_id = ApplicationId::new();
+        let result = TaskResult {
+            task_id: TaskId::new(),
+            success: true,
+            output: "Wrote a reusable verification note covering materialization, proposal-linked Skill package creation, registry load-path visibility, usage telemetry, semantic skill naming, and measurable follow-up optimization.".into(),
+            error: None,
+            artifacts: vec!["tool:file_write:semantic-live-note".into()],
+            completed_at: Utc::now(),
+            tokens_used: None,
+        };
+
+        let command = build_skill_experience_proposal_command(
+            &app_id,
+            "session-semantic-identity",
+            "coordinator",
+            &result,
+            "trace-semantic-identity",
+        )
+        .expect("bounded semantic completion should produce a proposal command");
+
+        assert_eq!(
+            command.candidate.target_skill_name.as_deref(),
+            Some("materialization-proposal-linked-skill-package-registry-load-path")
+        );
+        assert!(command
+            .candidate
+            .reusable_procedure
+            .contains("materialization"));
+        assert!(command.candidate.reusable_procedure.contains("telemetry"));
+        assert!(
+            !command
+                .candidate
+                .reusable_procedure
+                .contains("semantic-live-note"),
+            "Skill Creator-facing trigger text must not copy raw artifact refs"
+        );
+        assert!(command.candidate.validate().is_ok());
+    }
+
+    #[test]
+    fn semantic_identity_uses_priority_phrases_across_realistic_artifact_summary() {
+        let phrases = semantic_trigger_phrases(
+            "Self-Evolution Materialization. Proposal-Linked Skill Creation. \
+             Every Skill package should be traceable. Registry Load-Path Visibility. \
+             Usage Telemetry and measurable follow-up optimization.",
+        );
+
+        assert_eq!(
+            phrases,
+            vec![
+                "materialization",
+                "proposal-linked",
+                "skill-package",
+                "registry-load-path"
+            ]
+        );
     }
 
     #[tokio::test]

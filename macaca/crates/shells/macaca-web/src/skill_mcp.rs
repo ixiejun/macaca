@@ -4,7 +4,7 @@
 //! servers that provide the executable tools. This module bridges eligible,
 //! visible skill snapshots into framework toolkit tools.
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 
 use macaca_app::AppLoader;
@@ -16,8 +16,10 @@ use macaca_runtime_host::{
     McpRuntimeStatusState, McpToolPolicy,
 };
 use macaca_skill::{
-    SkillMcpServerConfig, SkillPolicy, SkillRuntimeFacade, SkillServiceScope, SkillSnapshot,
-    SkillSnapshotEntry, SkillSnapshotRequest, SkillSnapshotServiceCommand,
+    SkillGovernanceRecord, SkillGovernanceRecordUsageCommand, SkillGovernanceSnapshotCommand,
+    SkillLifecycleState, SkillMcpServerConfig, SkillPolicy, SkillRuntimeFacade, SkillServiceScope,
+    SkillSnapshot, SkillSnapshotEntry, SkillSnapshotRequest, SkillSnapshotServiceCommand,
+    SkillUsageEventKind, SkillUsageObservation,
 };
 use serde::Serialize;
 
@@ -138,6 +140,10 @@ pub(crate) async fn load_or_build_skill_snapshot(
                     TRACE_ID,
                 )
                 .await;
+                record_governed_skill_snapshot_activation(
+                    state, app_id, agent_name, session_id, &snapshot, TRACE_ID,
+                )
+                .await;
                 return Some(snapshot);
             }
         }
@@ -231,6 +237,10 @@ pub(crate) async fn load_or_build_skill_snapshot(
             TRACE_ID,
         )
         .await;
+        record_governed_skill_snapshot_activation(
+            state, app_id, agent_name, session_id, &snapshot, TRACE_ID,
+        )
+        .await;
     }
     if let Some(session_id) = session_id {
         if let Ok(value) = serde_json::to_value(&snapshot) {
@@ -251,6 +261,121 @@ pub(crate) async fn load_or_build_skill_snapshot(
         }
     }
     Some(snapshot)
+}
+
+async fn record_governed_skill_snapshot_activation(
+    state: &Arc<AppState>,
+    app_id: &ApplicationId,
+    agent_name: &str,
+    session_id: &str,
+    snapshot: &SkillSnapshot,
+    trace_id: &str,
+) {
+    let scope = match SkillServiceScope::agent(*app_id, session_id, agent_name) {
+        Ok(scope) => scope,
+        Err(error) => {
+            tracing::warn!(
+                error = %error,
+                app_id = %app_id,
+                agent = %agent_name,
+                session_id,
+                "skipping governed Skill activation telemetry because scope is invalid"
+            );
+            return;
+        }
+    };
+    let governance = match state
+        .skill_client
+        .governance_snapshot(SkillGovernanceSnapshotCommand {
+            trace: TraceContext::new(trace_id),
+            scope: scope.clone(),
+            include_archived: false,
+            lifecycle_filters: vec![SkillLifecycleState::Active],
+        })
+        .await
+    {
+        Ok(snapshot) => snapshot,
+        Err(error) => {
+            tracing::warn!(
+                error = %error,
+                app_id = %app_id,
+                agent = %agent_name,
+                session_id,
+                "governed Skill activation telemetry snapshot lookup failed"
+            );
+            return;
+        }
+    };
+
+    for command in build_governed_skill_activation_usage_commands(
+        snapshot,
+        &governance.records,
+        *app_id,
+        session_id,
+        agent_name,
+        trace_id,
+    ) {
+        let skill_id = command.observation.skill_id.clone();
+        if let Err(error) = state.skill_client.record_governance_usage(command).await {
+            tracing::warn!(
+                error = %error,
+                app_id = %app_id,
+                agent = %agent_name,
+                session_id,
+                skill_id,
+                "governed Skill activation telemetry recording failed"
+            );
+        }
+    }
+}
+
+fn build_governed_skill_activation_usage_commands(
+    snapshot: &SkillSnapshot,
+    governance_records: &[SkillGovernanceRecord],
+    app_id: ApplicationId,
+    session_id: &str,
+    agent_name: &str,
+    trace_id: &str,
+) -> Vec<SkillGovernanceRecordUsageCommand> {
+    let visible_skill_names = snapshot
+        .skills
+        .iter()
+        .map(|skill| skill.name.as_str())
+        .collect::<HashSet<_>>();
+    let Ok(scope) = SkillServiceScope::agent(app_id, session_id, agent_name) else {
+        return Vec::new();
+    };
+
+    governance_records
+        .iter()
+        .filter(|record| record.lifecycle == SkillLifecycleState::Active)
+        .filter(|record| visible_skill_names.contains(record.provenance.name.as_str()))
+        .map(|record| {
+            let mut metadata = BTreeMap::new();
+            metadata.insert("activation_surface".into(), "agent_skill_snapshot".into());
+            metadata.insert("agent_name".into(), agent_name.into());
+            metadata.insert("session_id".into(), session_id.into());
+            metadata.insert("snapshot_version".into(), snapshot.version.to_string());
+            SkillGovernanceRecordUsageCommand {
+                trace: TraceContext::new(trace_id),
+                scope: scope.clone(),
+                observation: SkillUsageObservation {
+                    skill_id: record.provenance.skill_id.clone(),
+                    name: record.provenance.name.clone(),
+                    source: record.provenance.source.clone(),
+                    source_scope: record.provenance.source_scope.clone(),
+                    event: SkillUsageEventKind::Activated,
+                    author_kind: record.provenance.author_kind.clone(),
+                    created_by: record.provenance.created_by.clone(),
+                    pinned: Some(record.pinned),
+                    evidence_id: Some(format!(
+                        "eventlog://sessions/{session_id}/skill_snapshot/{agent_name}"
+                    )),
+                    metadata,
+                },
+            }
+        })
+        .collect()
 }
 
 async fn resolve_agent_skill_policy(
@@ -427,6 +552,107 @@ mod tests {
             }],
             mcp_servers: Vec::new(),
         }
+    }
+
+    #[test]
+    fn activation_usage_commands_only_cover_active_governed_snapshot_skills() {
+        let app_id = ApplicationId(uuid::Uuid::new_v4());
+        let active_name = "skill-exp-active";
+        let snapshot = SkillSnapshot {
+            agent: "coordinator".into(),
+            prompt: String::new(),
+            skills: vec![
+                SkillSnapshotEntry {
+                    name: active_name.into(),
+                    description: "active governed skill".into(),
+                    source_location: std::path::PathBuf::from("/tmp/active/SKILL.md"),
+                    source_base_dir: std::path::PathBuf::from("/tmp/active"),
+                    location: std::path::PathBuf::from("/tmp/available/active/SKILL.md"),
+                    base_dir: std::path::PathBuf::from("/tmp/available/active"),
+                    source: "application".into(),
+                    source_scope: macaca_skill::SkillSourceScope::Application,
+                    primary_env: None,
+                    required_env: Vec::new(),
+                    install: Vec::new(),
+                    mcp_servers: Vec::new(),
+                },
+                SkillSnapshotEntry {
+                    name: "ungoverned".into(),
+                    description: "plain app skill".into(),
+                    source_location: std::path::PathBuf::from("/tmp/plain/SKILL.md"),
+                    source_base_dir: std::path::PathBuf::from("/tmp/plain"),
+                    location: std::path::PathBuf::from("/tmp/available/plain/SKILL.md"),
+                    base_dir: std::path::PathBuf::from("/tmp/available/plain"),
+                    source: "application".into(),
+                    source_scope: macaca_skill::SkillSourceScope::Application,
+                    primary_env: None,
+                    required_env: Vec::new(),
+                    install: Vec::new(),
+                    mcp_servers: Vec::new(),
+                },
+            ],
+            filtered: Vec::new(),
+            truncated: false,
+            compact: false,
+            version: 1,
+        };
+        let active_record = macaca_skill::SkillGovernanceRecord {
+            provenance: macaca_skill::SkillGovernanceProvenance::new(
+                "skill://agent/skill-exp-active",
+                active_name,
+                "skill.evolution",
+                "proposal",
+                macaca_skill::SkillAuthorKind::Agent,
+            ),
+            lifecycle: macaca_skill::SkillLifecycleState::Active,
+            pinned: false,
+            telemetry: Default::default(),
+            diagnostics: Default::default(),
+            updated_at: chrono::Utc::now(),
+            evidence_ids: vec!["eventlog://run-42".into()],
+        };
+        let archived_record = macaca_skill::SkillGovernanceRecord {
+            provenance: macaca_skill::SkillGovernanceProvenance::new(
+                "skill://agent/archived",
+                "archived",
+                "skill.evolution",
+                "proposal",
+                macaca_skill::SkillAuthorKind::Agent,
+            ),
+            lifecycle: macaca_skill::SkillLifecycleState::Archived,
+            pinned: false,
+            telemetry: Default::default(),
+            diagnostics: Default::default(),
+            updated_at: chrono::Utc::now(),
+            evidence_ids: Vec::new(),
+        };
+
+        let commands = build_governed_skill_activation_usage_commands(
+            &snapshot,
+            &[active_record, archived_record],
+            app_id,
+            "session-1",
+            "coordinator",
+            "trace-skill-visible",
+        );
+
+        assert_eq!(commands.len(), 1);
+        assert_eq!(
+            commands[0].observation.skill_id,
+            "skill://agent/skill-exp-active"
+        );
+        assert_eq!(
+            commands[0].observation.event,
+            macaca_skill::SkillUsageEventKind::Activated
+        );
+        assert_eq!(
+            commands[0]
+                .observation
+                .metadata
+                .get("activation_surface")
+                .map(String::as_str),
+            Some("agent_skill_snapshot")
+        );
     }
 
     #[test]

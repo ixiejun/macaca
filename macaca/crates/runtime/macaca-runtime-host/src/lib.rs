@@ -78,8 +78,13 @@ pub(crate) mod skill_service_governance_store;
 pub mod skill_service_provider;
 pub(crate) mod skill_service_provider_curation;
 pub(crate) mod skill_service_provider_curation_log;
+pub(crate) mod skill_service_provider_event_journal;
 pub(crate) mod skill_service_provider_lifecycle;
+pub(crate) mod skill_service_provider_materialization_operator;
 pub(crate) mod skill_service_provider_merge;
+pub(crate) mod skill_service_provider_package_recovery;
+pub(crate) mod skill_service_provider_proposal_materialization;
+pub(crate) mod skill_service_provider_proposal_processing;
 pub(crate) mod skill_service_provider_proposals;
 pub(crate) mod skill_service_provider_semantic_review;
 pub(crate) mod skill_service_provider_state;
@@ -96,9 +101,15 @@ mod skill_content_mutation_tests;
 #[cfg(test)]
 mod skill_governance_store_logging_tests;
 #[cfg(test)]
+mod skill_materialization_operator_tests;
+#[cfg(test)]
 mod skill_optional_provider_boundary_tests;
 #[cfg(test)]
 mod skill_proposal_lifecycle_tests;
+#[cfg(test)]
+mod skill_proposal_materialization_tests;
+#[cfg(test)]
+mod skill_proposal_processing_tests;
 #[cfg(test)]
 mod skill_sanitization_boundary_tests;
 #[cfg(test)]

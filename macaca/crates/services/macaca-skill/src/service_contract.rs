@@ -57,6 +57,14 @@ pub const SKILL_EVOLUTION_PROPOSE_PATCH_COMMAND: &str = "skill.evolution.propose
 pub const SKILL_EVOLUTION_PROMOTE_DRAFT_COMMAND: &str = "skill.evolution.promote_draft";
 pub const SKILL_EVOLUTION_REJECT_DRAFT_COMMAND: &str = "skill.evolution.reject_draft";
 pub const SKILL_EVOLUTION_SNAPSHOT_COMMAND: &str = "skill.evolution.snapshot";
+pub const SKILL_EVOLUTION_PROCESSING_RUN_COMMAND: &str = "skill.evolution.processing.run";
+pub const SKILL_EVOLUTION_PROCESSING_SNAPSHOT_COMMAND: &str = "skill.evolution.processing.snapshot";
+pub const SKILL_EVOLUTION_MATERIALIZATION_APPLY_COMMAND: &str =
+    "skill.evolution.materialization.apply";
+pub const SKILL_EVOLUTION_MATERIALIZATION_OPERATOR_RUN_COMMAND: &str =
+    "skill.evolution.materialization.operator.run";
+pub const SKILL_EVOLUTION_MATERIALIZATION_OPERATOR_SNAPSHOT_COMMAND: &str =
+    "skill.evolution.materialization.operator.snapshot";
 pub const SKILL_EVALUATION_CHECKPOINT_APPEND_COMMAND: &str = "skill.evaluation.checkpoint.append";
 pub const SKILL_EVALUATION_SCORE_COMMAND: &str = "skill.evaluation.score";
 pub const SKILL_EVALUATION_REPORT_COMMAND: &str = "skill.evaluation.report";

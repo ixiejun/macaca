@@ -6,6 +6,7 @@
 //! trace/scope metadata, logs sanitized counts, and serializes the service
 //! DTOs without reading skill files or classifying lifecycle state locally.
 
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::extract::{Path, State};
@@ -13,12 +14,14 @@ use axum::http::StatusCode;
 use axum::Json;
 use macaca_proto::{ApplicationId, TraceContext};
 use macaca_skill::{
-    SelfEvolutionEvaluationRecord, SelfEvolutionScore, SkillAliasSnapshotCommand,
-    SkillAuthorKind, SkillCurationDryRunCommand, SkillCurationLifecycleAction,
-    SkillCurationLifecycleCommand, SkillCurationRollbackCommand, SkillCurationRunCommand,
-    SkillEvaluationReportCommand, SkillEvaluationScoreCommand, SkillEvolutionPromoteDraftCommand,
+    SelfEvolutionEvaluationRecord, SelfEvolutionScore, SkillAliasSnapshotCommand, SkillAuthorKind,
+    SkillAutonomousMaterializationRunCommand, SkillAutonomousMaterializationSnapshotCommand,
+    SkillCurationDryRunCommand, SkillCurationLifecycleAction, SkillCurationLifecycleCommand,
+    SkillCurationRollbackCommand, SkillCurationRunCommand, SkillEvaluationReportCommand,
+    SkillEvaluationScoreCommand, SkillEvolutionPromoteDraftCommand,
     SkillEvolutionRejectDraftCommand, SkillExperienceProposalSnapshotCommand,
-    SkillGovernanceSnapshotCommand, SkillServicePolicyHints, SkillServiceScope,
+    SkillGovernanceSnapshotCommand, SkillPackageOwnershipClass,
+    SkillProposalProcessingSnapshotCommand, SkillServicePolicyHints, SkillServiceScope,
 };
 use serde::{Deserialize, Serialize};
 
@@ -73,8 +76,25 @@ pub async fn get_skill_operations(
         .skill_client
         .skill_experience_snapshot(SkillExperienceProposalSnapshotCommand {
             trace: trace.clone(),
-            scope,
+            scope: scope.clone(),
             include_discarded: false,
+        })
+        .await
+        .map_err(|error| proto_err(StatusCode::BAD_GATEWAY, &error))?;
+    let processing = state
+        .skill_client
+        .skill_proposal_processing_snapshot(SkillProposalProcessingSnapshotCommand {
+            trace: trace.clone(),
+            scope: scope.clone(),
+        })
+        .await
+        .map_err(|error| proto_err(StatusCode::BAD_GATEWAY, &error))?;
+    let materialization_operator = state
+        .skill_client
+        .autonomous_materialization_snapshot(SkillAutonomousMaterializationSnapshotCommand {
+            trace: trace.clone(),
+            scope,
+            limit: 10,
         })
         .await
         .map_err(|error| proto_err(StatusCode::BAD_GATEWAY, &error))?;
@@ -86,6 +106,12 @@ pub async fn get_skill_operations(
         recommendations = curation.recommendations.len(),
         aliases = aliases.aliases.len(),
         proposals = proposals.proposals.len(),
+        processing_records = processing.records.len(),
+        processing_ready = processing.state_counts.ready_for_materialization,
+        processing_duplicates = processing.state_counts.suppressed_duplicate,
+        processing_rejected = processing.state_counts.rejected,
+        materialization_operator_runs = materialization_operator.recent_runs.len(),
+        materialization_operator_applied = materialization_operator.status_counts.applied,
         "web route emitted sanitized skill operations snapshot"
     );
 
@@ -94,11 +120,23 @@ pub async fn get_skill_operations(
         "curation": curation,
         "aliases": aliases,
         "proposals": proposals,
+        "processing": processing,
+        "materialization_operator": materialization_operator,
         "count": {
             "governance_records": governance.records.len(),
             "curation_recommendations": curation.recommendations.len(),
             "aliases": aliases.aliases.len(),
             "proposals": proposals.proposals.len(),
+            "processing_records": processing.records.len(),
+            "processing_waiting_proposals": processing.waiting_proposal_count,
+            "processing_duplicate_groups": processing.duplicate_group_count,
+            "processing_ready": processing.state_counts.ready_for_materialization,
+            "processing_suppressed_duplicates": processing.state_counts.suppressed_duplicate,
+            "processing_rejected": processing.state_counts.rejected,
+            "materialization_operator_runs": materialization_operator.recent_runs.len(),
+            "materialization_operator_applied": materialization_operator.status_counts.applied,
+            "materialization_operator_previewed": materialization_operator.status_counts.previewed,
+            "materialization_operator_denied": materialization_operator.status_counts.denied,
         },
         "trace_id": trace.trace_id,
     })))
@@ -134,6 +172,11 @@ pub struct SkillOperatorCommandRequest {
     pub stale_after_days: Option<i64>,
     pub narrow_use_threshold: Option<u64>,
     pub rollback_ref: Option<String>,
+    pub package_collection_root: Option<PathBuf>,
+    pub dry_run: Option<bool>,
+    pub batch_limit: Option<u16>,
+    pub min_ready_score: Option<u8>,
+    pub ownership: Option<SkillPackageOwnershipClass>,
 }
 
 /// Request body for building a self-evolution evaluation report.
@@ -265,6 +308,70 @@ pub async fn post_skill_curation_rollback(
     Ok(Json(
         serde_json::json!({ "result": result, "trace_id": trace.trace_id }),
     ))
+}
+
+/// POST /api/apps/{app_id}/skills/operations/materialization/operator/run
+/// runs the service-owned autonomous materialization operator.
+///
+/// Web remains a transport Adapter here: package target selection, proposal
+/// processing, materialization, policy admission, and result mementos all stay
+/// behind the SDK-backed Skill service command.
+pub async fn post_skill_materialization_operator_run(
+    State(state): State<Arc<AppState>>,
+    Path(app_id): Path<String>,
+    Json(body): Json<SkillOperatorCommandRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponse>)> {
+    let app_id = parse_application_id(&app_id)?;
+    let trace = TraceContext::new(format!("web-skill-materialization-operator-{}", app_id.0));
+    let package_collection_root =
+        materialization_collection_root(&state, &app_id, body.package_collection_root.as_ref())
+            .await
+            .map_err(|message| err(StatusCode::BAD_REQUEST, message))?;
+    let policy = policy_hints(
+        body.required_permissions,
+        body.entitlement_ready,
+        body.package_ready,
+        body.metadata,
+    );
+    let policy_decision_refs = refs_or_approval_refs(body.policy_decision_refs, body.approval_refs);
+
+    let result = state
+        .skill_client
+        .run_autonomous_materialization(SkillAutonomousMaterializationRunCommand {
+            trace: trace.clone(),
+            scope: application_skill_scope(app_id),
+            dry_run: body.dry_run.unwrap_or(true),
+            batch_limit: body.batch_limit.unwrap_or(5),
+            min_ready_score: body.min_ready_score.unwrap_or(40),
+            package_collection_root,
+            ownership: body
+                .ownership
+                .unwrap_or(SkillPackageOwnershipClass::AgentPrivate),
+            reason: body
+                .reason
+                .or(body.rationale)
+                .unwrap_or_else(|| "operator requested autonomous materialization".into()),
+            evidence_ids: body.evidence_ids,
+            policy_decision_refs,
+            audit_event_ids: body.audit_event_ids,
+            policy,
+        })
+        .await
+        .map_err(|error| proto_err(StatusCode::BAD_GATEWAY, &error))?;
+
+    tracing::info!(
+        trace_id = %trace.trace_id,
+        run_id = %result.run_id,
+        status = ?result.status,
+        selected = result.selected_proposal_ids.len(),
+        mutated = result.mutated,
+        "web route forwarded autonomous materialization operator run"
+    );
+
+    Ok(Json(serde_json::json!({
+        "result": result,
+        "trace_id": trace.trace_id,
+    })))
 }
 
 /// POST /api/apps/{app_id}/skills/operations/proposals/{proposal_id}/promote.
@@ -423,6 +530,35 @@ fn application_skill_scope(app_id: ApplicationId) -> SkillServiceScope {
     }
 }
 
+/// Resolve the package collection root used by autonomous materialization.
+///
+/// `available_skills/` is a projection output produced by the Skill runtime for
+/// model prompt locations. It is not a discovery source. When Web invokes the
+/// service-owned operator without an explicit package root, this adapter selects
+/// the workspace `skills/` source so a materialized package can be discovered by
+/// later `SkillRuntime` snapshots and then projected into `available_skills/`.
+async fn materialization_collection_root(
+    state: &Arc<AppState>,
+    app_id: &ApplicationId,
+    explicit_root: Option<&PathBuf>,
+) -> Result<PathBuf, String> {
+    if let Some(root) = explicit_root {
+        return Ok(root.clone());
+    }
+    let workspaces = state.config.app_workspaces.read().await;
+    let workspace = workspaces.get(app_id).ok_or_else(|| {
+        "package_collection_root is required when the app workspace is unavailable".to_string()
+    })?;
+    Ok(workspace.root.join("skills"))
+}
+
+#[cfg(test)]
+fn materialization_collection_root_from_workspace_path(
+    workspace_root: &std::path::Path,
+) -> PathBuf {
+    workspace_root.join("skills")
+}
+
 async fn run_curation(
     state: Arc<AppState>,
     app_id: String,
@@ -517,12 +653,27 @@ fn policy_hints(
     }
 }
 
+fn refs_or_approval_refs(
+    policy_decision_refs: Vec<String>,
+    approval_refs: Vec<String>,
+) -> Vec<String> {
+    if policy_decision_refs.is_empty() {
+        approval_refs
+    } else {
+        policy_decision_refs
+    }
+}
+
 fn default_include_markdown() -> bool {
     true
 }
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
+    use super::materialization_collection_root_from_workspace_path;
+
     #[test]
     fn skill_operations_routes_remain_thin_sdk_adapters() {
         let source = include_str!("skill_operations_routes.rs");
@@ -532,12 +683,22 @@ mod tests {
         assert!(source.contains("reject_skill_draft"));
         assert!(source.contains("self_evolution_evaluation_report"));
         assert!(source.contains("evaluate_self_evolution"));
-        assert!(!source.contains(&format!(
-            "{}{}",
-            "SelfEvolutionScoringPolicy", "::score"
-        )));
+        assert!(!source.contains(&format!("{}{}", "SelfEvolutionScoringPolicy", "::score")));
         assert!(!source.contains(&format!("{}{}", "macaca_runtime", "_host::")));
         assert!(!source.contains(&format!("{}{}", "SkillGovernance", "StoreStrategy")));
         assert!(!source.contains(&format!("{}{}", "SkillLifecycleState::", "Archived")));
+    }
+
+    #[test]
+    fn default_materialization_root_uses_workspace_skills_source() {
+        let workspace_root = PathBuf::from("/tmp/macaca-workspace/app-id");
+
+        let root = materialization_collection_root_from_workspace_path(&workspace_root);
+
+        assert_eq!(root, workspace_root.join("skills"));
+        assert!(
+            !root.ends_with("available_skills"),
+            "available_skills is a projection output and must not be the default package source"
+        );
     }
 }

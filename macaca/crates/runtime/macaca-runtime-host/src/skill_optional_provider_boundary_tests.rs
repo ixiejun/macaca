@@ -101,7 +101,11 @@ async fn paid_store_install_without_entitlement_provider_is_structured_unavailab
     };
 
     let error = provider
-        .call(traced_command(STORE_PACKAGE_INSTALL_COMMAND, command, trace))
+        .call(traced_command(
+            STORE_PACKAGE_INSTALL_COMMAND,
+            command,
+            trace,
+        ))
         .await
         .expect_err("paid install must not fake success without Entitlement service");
 

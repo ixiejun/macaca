@@ -3,6 +3,7 @@
 //! facades.  It keeps Web and CLI from constructing skill runtimes directly
 //! while preserving the old semantics through deprecated compatibility anchors.
 
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -35,13 +36,16 @@ use macaca_skill::{
     SKILL_CURATION_ROLLBACK_COMMAND, SKILL_CURATION_RUN_COMMAND, SKILL_CURATION_SNAPSHOT_COMMAND,
     SKILL_CURATION_STATUS_COMMAND, SKILL_CURATION_SUPERSEDE_COMMAND, SKILL_CURATION_UNPIN_COMMAND,
     SKILL_EVALUATION_CHECKPOINT_APPEND_COMMAND, SKILL_EVALUATION_REPORT_COMMAND,
-    SKILL_EVALUATION_SCORE_COMMAND, SKILL_EVOLUTION_PROMOTE_DRAFT_COMMAND,
-    SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND, SKILL_EVOLUTION_PROPOSE_PATCH_COMMAND,
-    SKILL_EVOLUTION_REJECT_DRAFT_COMMAND, SKILL_EVOLUTION_SNAPSHOT_COMMAND,
-    SKILL_EXECUTABLE_LOAD_COMMAND, SKILL_GOVERNANCE_RECORD_USAGE_COMMAND,
-    SKILL_GOVERNANCE_SNAPSHOT_COMMAND, SKILL_SERVICE_ID, SKILL_SERVICE_SNAPSHOT_COMMAND,
-    SKILL_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND, SKILL_TOOL_CATALOG_COMMAND,
-    SKILL_TOOL_INVOKE_COMMAND,
+    SKILL_EVALUATION_SCORE_COMMAND, SKILL_EVOLUTION_MATERIALIZATION_APPLY_COMMAND,
+    SKILL_EVOLUTION_MATERIALIZATION_OPERATOR_RUN_COMMAND,
+    SKILL_EVOLUTION_MATERIALIZATION_OPERATOR_SNAPSHOT_COMMAND,
+    SKILL_EVOLUTION_PROCESSING_RUN_COMMAND, SKILL_EVOLUTION_PROCESSING_SNAPSHOT_COMMAND,
+    SKILL_EVOLUTION_PROMOTE_DRAFT_COMMAND, SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND,
+    SKILL_EVOLUTION_PROPOSE_PATCH_COMMAND, SKILL_EVOLUTION_REJECT_DRAFT_COMMAND,
+    SKILL_EVOLUTION_SNAPSHOT_COMMAND, SKILL_EXECUTABLE_LOAD_COMMAND,
+    SKILL_GOVERNANCE_RECORD_USAGE_COMMAND, SKILL_GOVERNANCE_SNAPSHOT_COMMAND, SKILL_SERVICE_ID,
+    SKILL_SERVICE_SNAPSHOT_COMMAND, SKILL_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND,
+    SKILL_TOOL_CATALOG_COMMAND, SKILL_TOOL_INVOKE_COMMAND,
 };
 use macaca_tools::{ToolCommand, ToolCommandExecutor};
 use tokio::sync::Mutex;
@@ -59,6 +63,8 @@ pub struct SkillSystemServiceProvider {
     governance_state: Arc<SkillProviderGovernanceState>,
     experience_router: SkillExperienceDestinationRouter,
     content_mutation: LocalSkillContentMutationStrategy,
+    materialized_skill_roots: Vec<PathBuf>,
+    governance_event_journal_path: Option<PathBuf>,
 }
 
 impl SkillSystemServiceProvider {
@@ -71,6 +77,8 @@ impl SkillSystemServiceProvider {
             governance_state: Arc::new(SkillProviderGovernanceState::default()),
             experience_router: SkillExperienceDestinationRouter::default(),
             content_mutation: LocalSkillContentMutationStrategy,
+            materialized_skill_roots: Vec::new(),
+            governance_event_journal_path: None,
         }
     }
 
@@ -83,7 +91,32 @@ impl SkillSystemServiceProvider {
             governance_state: Arc::new(SkillProviderGovernanceState::default()),
             experience_router: SkillExperienceDestinationRouter::default(),
             content_mutation: LocalSkillContentMutationStrategy,
+            materialized_skill_roots: Vec::new(),
+            governance_event_journal_path: None,
         }
+    }
+
+    /// Configure generic Skill package roots used for restart recovery.
+    ///
+    /// The roots are source directories such as a workspace or application
+    /// `skills/` directory.  The provider does not infer application behavior
+    /// from the path; it only scans direct child packages for bounded
+    /// materialization provenance so active governance identities can survive a
+    /// process restart.
+    pub fn with_materialized_skill_roots(mut self, roots: Vec<PathBuf>) -> Self {
+        self.materialized_skill_roots = roots;
+        self
+    }
+
+    /// Configure the provider-local durable governance event journal.
+    ///
+    /// The journal is a local Memento for sanitized Skill governance events. It
+    /// is intentionally optional so tests, unavailable providers, and future
+    /// Store/EventLog-backed providers can use the same service contract without
+    /// depending on a filesystem path.
+    pub fn with_governance_event_journal_path(mut self, path: PathBuf) -> Self {
+        self.governance_event_journal_path = Some(path);
+        self
     }
 
     /// Attach the Memory runtime facade used for MemoryFact and KnowledgeDigest
@@ -127,9 +160,24 @@ impl SystemService for SkillSystemServiceProvider {
     }
 
     async fn start(&self) -> ServiceResult<()> {
+        self.governance_state
+            .configure_governance_event_journal_path(self.governance_event_journal_path.clone())
+            .await;
+        let replayed = self
+            .governance_state
+            .replay_governance_event_journal()
+            .await;
+        let recovered = self
+            .governance_state
+            .recover_materialized_skill_packages(&self.materialized_skill_roots)
+            .await;
         tracing::info!(
             service_id = %self.descriptor.id,
             configured = self.snapshot_facade.is_some(),
+            materialized_skill_roots = self.materialized_skill_roots.len(),
+            governance_event_journal_configured = self.governance_event_journal_path.is_some(),
+            replayed_governance_events = replayed,
+            recovered_governance_records = recovered,
             "skill service provider started"
         );
         Ok(())
@@ -562,6 +610,48 @@ impl SystemService for SkillSystemServiceProvider {
                     "skill experience proposal snapshot emitted"
                 );
                 Ok(service_result(to_value(result)?, typed.trace))
+            }
+            SKILL_EVOLUTION_PROCESSING_RUN_COMMAND => {
+                crate::skill_service_provider_proposal_processing::run_command(
+                    &self.governance_state,
+                    command.payload,
+                    trace,
+                )
+                .await
+            }
+            SKILL_EVOLUTION_PROCESSING_SNAPSHOT_COMMAND => {
+                crate::skill_service_provider_proposal_processing::snapshot_command(
+                    &self.governance_state,
+                    command.payload,
+                    trace,
+                )
+                .await
+            }
+            SKILL_EVOLUTION_MATERIALIZATION_APPLY_COMMAND => {
+                crate::skill_service_provider_proposal_materialization::apply_command(
+                    &self.governance_state,
+                    &self.content_mutation,
+                    command.payload,
+                    trace,
+                )
+                .await
+            }
+            SKILL_EVOLUTION_MATERIALIZATION_OPERATOR_RUN_COMMAND => {
+                crate::skill_service_provider_materialization_operator::run_command(
+                    &self.governance_state,
+                    &self.content_mutation,
+                    command.payload,
+                    trace,
+                )
+                .await
+            }
+            SKILL_EVOLUTION_MATERIALIZATION_OPERATOR_SNAPSHOT_COMMAND => {
+                crate::skill_service_provider_materialization_operator::snapshot_command(
+                    &self.governance_state,
+                    command.payload,
+                    trace,
+                )
+                .await
             }
             SKILL_EVALUATION_CHECKPOINT_APPEND_COMMAND => {
                 let typed: SkillEvaluationCheckpointAppendCommand = decode(command.payload)?;

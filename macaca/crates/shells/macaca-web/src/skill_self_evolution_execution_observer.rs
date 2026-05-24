@@ -15,6 +15,7 @@ use macaca_runtime_host::AgentExecutionBackend;
 
 use crate::runtime_event_bridge::emit_runtime_event;
 use crate::skill_self_evolution_observer::observe_agent_execution_result_for_skill_self_evolution;
+use crate::skill_usage_telemetry::record_governed_skill_successful_task;
 use crate::state::AppState;
 
 /// Decorates Agent Execution with best-effort Skill self-evolution observation.
@@ -92,6 +93,14 @@ impl SkillSelfEvolutionObservedAgentExecutionBackend {
             )
             .await;
         }
+
+        // Task outcome telemetry is intentionally recorded after the proposal
+        // observer. The proposal checkpoint remains the first self-evolution
+        // memento, while this best-effort adapter lets the Skill service count
+        // later successful task runs for governed Skills that were visible in
+        // the session snapshot. Failures are logged inside the adapter and never
+        // rewrite the already-completed Agent Execution result.
+        record_governed_skill_successful_task(&self.state, result).await;
     }
 
     /// Record service errors that occur before an `AgentExecutionResult` exists.

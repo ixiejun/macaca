@@ -59,6 +59,18 @@ pub fn skill_service_descriptor() -> ServiceDescriptor {
             CapabilityId::new("capability.skill.evaluation"),
             "Scores and reports governed skill self-evolution with sanitized evidence refs.",
         ),
+        ServiceCapability::new(
+            CapabilityId::new("capability.skill.proposal_processing"),
+            "Scores, groups, and snapshots draft proposal backlog pressure without materializing skills.",
+        ),
+        ServiceCapability::new(
+            CapabilityId::new("capability.skill.proposal_materialization"),
+            "Materializes ready draft proposals into bounded skill package files through policy-gated mutation.",
+        ),
+        ServiceCapability::new(
+            CapabilityId::new("capability.skill.proposal_materialization_operator"),
+            "Runs governed proposal processing and materialization cycles without shell-owned semantics.",
+        ),
     ];
     descriptor.health = ServiceHealth::Healthy;
     descriptor.supported_scopes = vec![ServiceScope::Global, ServiceScope::Application("*".into())];
@@ -73,6 +85,9 @@ pub fn skill_service_descriptor() -> ServiceDescriptor {
         "skill.evolution".into(),
         "skill.mutation".into(),
         "skill.evaluation".into(),
+        "skill.proposal_processing".into(),
+        "skill.proposal_materialization".into(),
+        "skill.proposal_materialization_operator".into(),
     ];
     descriptor.cleanup_policy = CleanupPolicy::OnStop;
     descriptor
@@ -86,7 +101,7 @@ mod tests {
     fn skill_descriptor_exports_contract_shape() {
         let descriptor = skill_service_descriptor();
         assert_eq!(descriptor.service_type.as_str(), "skill");
-        assert_eq!(descriptor.capabilities.len(), 10);
+        assert_eq!(descriptor.capabilities.len(), 13);
         assert!(descriptor
             .required_permissions
             .contains(&"skill.invoke".into()));
@@ -105,5 +120,14 @@ mod tests {
         assert!(descriptor
             .required_permissions
             .contains(&"skill.evaluation".into()));
+        assert!(descriptor
+            .required_permissions
+            .contains(&"skill.proposal_processing".into()));
+        assert!(descriptor
+            .required_permissions
+            .contains(&"skill.proposal_materialization".into()));
+        assert!(descriptor
+            .required_permissions
+            .contains(&"skill.proposal_materialization_operator".into()));
     }
 }

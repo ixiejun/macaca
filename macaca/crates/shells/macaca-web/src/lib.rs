@@ -45,8 +45,10 @@ pub mod session_replay;
 pub mod shell;
 pub mod skill_mcp;
 pub mod skill_operations_routes;
+pub mod skill_self_evolution_audit;
 mod skill_self_evolution_execution_observer;
 pub mod skill_self_evolution_observer;
+mod skill_usage_telemetry;
 mod source_artifact;
 pub mod sse;
 pub mod state;
@@ -545,11 +547,19 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
         )
         .await
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+    let materialized_skill_roots =
+        materialized_skill_recovery_roots(&config.workspace.root_dir, &skills_dirs);
+    let governance_event_journal_path =
+        skill_governance_event_journal_path(&config.workspace.root_dir);
     let skill_service_provider = if let Some(runtime) = memory_runtime.as_ref() {
         macaca_runtime_host::SkillSystemServiceProvider::new()
+            .with_materialized_skill_roots(materialized_skill_roots.clone())
+            .with_governance_event_journal_path(governance_event_journal_path.clone())
             .with_memory_runtime(Arc::clone(runtime) as Arc<dyn macaca_memory::MemoryRuntimeFacade>)
     } else {
         macaca_runtime_host::SkillSystemServiceProvider::new()
+            .with_materialized_skill_roots(materialized_skill_roots.clone())
+            .with_governance_event_journal_path(governance_event_journal_path.clone())
     };
     service_runtime
         .register_provider(
@@ -1052,6 +1062,46 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
         .map_err(|e| macaca_proto::MacacaError::Io(e))?;
 
     Ok(())
+}
+
+/// Build provider-neutral Skill package roots for governance restart recovery.
+///
+/// Web remains a composition root here: it contributes filesystem roots that it
+/// already owns through configuration and application startup, but it does not
+/// parse Skill metadata, inspect package bodies, or decide governance state.
+/// The Skill service provider performs those semantic checks behind the service
+/// boundary.
+fn materialized_skill_recovery_roots(
+    workspace_root: &str,
+    application_skill_roots: &[PathBuf],
+) -> Vec<PathBuf> {
+    let mut roots = application_skill_roots.to_vec();
+    let workspace_root = PathBuf::from(workspace_root);
+    if let Ok(children) = std::fs::read_dir(&workspace_root) {
+        for child in children.flatten() {
+            let path = child.path();
+            if !path.is_dir() {
+                continue;
+            }
+            if path.file_name().is_some_and(|name| name == "apps") {
+                continue;
+            }
+            roots.push(path.join("skills"));
+        }
+    }
+    roots.sort();
+    roots.dedup();
+    roots
+}
+
+/// Return the local Skill governance event journal path for this host.
+///
+/// Web is acting only as an approved composition root here: it chooses a
+/// workspace-scoped service storage location and passes it to the Skill service
+/// provider.  It does not parse the journal, interpret governance events, or
+/// branch on application-specific semantics.
+fn skill_governance_event_journal_path(workspace_root: &str) -> PathBuf {
+    PathBuf::from(workspace_root).join("skill-governance-events.jsonl")
 }
 
 /// Translate provider-neutral web configuration into runtime-host activation.

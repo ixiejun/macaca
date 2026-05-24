@@ -6,11 +6,13 @@ use async_trait::async_trait;
 use macaca_proto::{MacacaError, MacacaResult};
 use macaca_skill::{
     SkillAliasResolveCommand, SkillAliasResolveResult, SkillAliasSnapshotCommand,
-    SkillAliasSnapshotResult, SkillAliasUpsertCommand, SkillAliasUpsertResult, SkillCleanupCommand,
-    SkillCurationDryRunCommand, SkillCurationDryRunResult, SkillCurationLifecycleAction,
-    SkillCurationLifecycleCommand, SkillCurationLifecycleResult, SkillCurationRollbackCommand,
-    SkillCurationRollbackResult, SkillCurationRunCommand, SkillCurationRunResult,
-    SkillCurationSnapshotCommand, SkillCurationSnapshotResult,
+    SkillAliasSnapshotResult, SkillAliasUpsertCommand, SkillAliasUpsertResult,
+    SkillAutonomousMaterializationRunCommand, SkillAutonomousMaterializationRunResult,
+    SkillAutonomousMaterializationSnapshotCommand, SkillAutonomousMaterializationSnapshotResult,
+    SkillCleanupCommand, SkillCurationDryRunCommand, SkillCurationDryRunResult,
+    SkillCurationLifecycleAction, SkillCurationLifecycleCommand, SkillCurationLifecycleResult,
+    SkillCurationRollbackCommand, SkillCurationRollbackResult, SkillCurationRunCommand,
+    SkillCurationRunResult, SkillCurationSnapshotCommand, SkillCurationSnapshotResult,
     SkillEvaluationCheckpointAppendCommand, SkillEvaluationCheckpointAppendResult,
     SkillEvaluationReportCommand, SkillEvaluationReportResult, SkillEvaluationScoreCommand,
     SkillEvaluationScoreResult, SkillEvolutionPromoteDraftCommand,
@@ -20,10 +22,12 @@ use macaca_skill::{
     SkillExperienceProposalCommand, SkillExperienceProposalResult,
     SkillExperienceProposalSnapshotCommand, SkillExperienceProposalSnapshotResult,
     SkillGovernanceRecordUsageCommand, SkillGovernanceRecordUsageResult,
-    SkillGovernanceSnapshotCommand, SkillGovernanceSnapshotResult, SkillServiceSnapshot,
-    SkillServiceSnapshotCommand, SkillSnapshotServiceCommand, SkillSnapshotServiceResult,
-    SkillStatusCommand, SkillStatusResult, SkillToolCatalogCommand, SkillToolCatalogResult,
-    SkillToolInvokeCommand, SkillToolInvokeResult, SKILL_SERVICE_ID,
+    SkillGovernanceSnapshotCommand, SkillGovernanceSnapshotResult,
+    SkillProposalProcessingRunCommand, SkillProposalProcessingRunResult,
+    SkillProposalProcessingSnapshotCommand, SkillProposalProcessingSnapshotResult,
+    SkillServiceSnapshot, SkillServiceSnapshotCommand, SkillSnapshotServiceCommand,
+    SkillSnapshotServiceResult, SkillStatusCommand, SkillStatusResult, SkillToolCatalogCommand,
+    SkillToolCatalogResult, SkillToolInvokeCommand, SkillToolInvokeResult, SKILL_SERVICE_ID,
 };
 use tracing::{info, warn};
 
@@ -114,6 +118,22 @@ pub trait SystemSkillClient: Send + Sync {
         &self,
         command: SkillExperienceProposalSnapshotCommand,
     ) -> MacacaResult<SkillExperienceProposalSnapshotResult>;
+    async fn process_skill_proposals(
+        &self,
+        command: SkillProposalProcessingRunCommand,
+    ) -> MacacaResult<SkillProposalProcessingRunResult>;
+    async fn skill_proposal_processing_snapshot(
+        &self,
+        command: SkillProposalProcessingSnapshotCommand,
+    ) -> MacacaResult<SkillProposalProcessingSnapshotResult>;
+    async fn run_autonomous_materialization(
+        &self,
+        command: SkillAutonomousMaterializationRunCommand,
+    ) -> MacacaResult<SkillAutonomousMaterializationRunResult>;
+    async fn autonomous_materialization_snapshot(
+        &self,
+        command: SkillAutonomousMaterializationSnapshotCommand,
+    ) -> MacacaResult<SkillAutonomousMaterializationSnapshotResult>;
     async fn append_self_evolution_checkpoint(
         &self,
         command: SkillEvaluationCheckpointAppendCommand,
@@ -392,6 +412,64 @@ impl SystemSkillClient for UnavailableSystemSkillClient {
         })
     }
 
+    async fn process_skill_proposals(
+        &self,
+        command: SkillProposalProcessingRunCommand,
+    ) -> MacacaResult<SkillProposalProcessingRunResult> {
+        warn!(
+            trace_id = %command.trace.trace_id,
+            dry_run = command.dry_run,
+            "sdk skill client unavailable for proposal processing run"
+        );
+        Err(MacacaError::Config("Skill service is unavailable".into()))
+    }
+
+    async fn skill_proposal_processing_snapshot(
+        &self,
+        command: SkillProposalProcessingSnapshotCommand,
+    ) -> MacacaResult<SkillProposalProcessingSnapshotResult> {
+        info!(
+            trace_id = %command.trace.trace_id,
+            "sdk skill client returning empty proposal processing snapshot"
+        );
+        Ok(SkillProposalProcessingSnapshotResult {
+            records: Vec::new(),
+            state_counts: Default::default(),
+            duplicate_group_count: 0,
+            waiting_proposal_count: 0,
+            mutated: false,
+            captured_at: chrono::Utc::now(),
+        })
+    }
+
+    async fn run_autonomous_materialization(
+        &self,
+        command: SkillAutonomousMaterializationRunCommand,
+    ) -> MacacaResult<SkillAutonomousMaterializationRunResult> {
+        warn!(
+            trace_id = %command.trace.trace_id,
+            dry_run = command.dry_run,
+            "sdk skill client unavailable for autonomous materialization run"
+        );
+        Err(MacacaError::Config("Skill service is unavailable".into()))
+    }
+
+    async fn autonomous_materialization_snapshot(
+        &self,
+        command: SkillAutonomousMaterializationSnapshotCommand,
+    ) -> MacacaResult<SkillAutonomousMaterializationSnapshotResult> {
+        info!(
+            trace_id = %command.trace.trace_id,
+            "sdk skill client returning empty autonomous materialization snapshot"
+        );
+        Ok(SkillAutonomousMaterializationSnapshotResult {
+            recent_runs: Vec::new(),
+            status_counts: Default::default(),
+            last_run_ref: None,
+            captured_at: chrono::Utc::now(),
+        })
+    }
+
     async fn append_self_evolution_checkpoint(
         &self,
         command: SkillEvaluationCheckpointAppendCommand,
@@ -456,9 +534,11 @@ mod tests {
         SelfEvolutionEvaluationCheckpoint, SelfEvolutionEvaluationCheckpointKind,
         SelfEvolutionEvaluationLifecycle, SelfEvolutionEvaluationRecord, SelfEvolutionReportRefs,
         SelfEvolutionRunMetrics, SelfEvolutionScore, SelfEvolutionWhiteBoxEvidence,
+        SkillAutonomousMaterializationRunCommand, SkillAutonomousMaterializationSnapshotCommand,
         SkillEvaluationCheckpointAppendCommand, SkillEvaluationReportCommand,
         SkillEvaluationScoreCommand, SkillEvolutionPromoteDraftCommand,
-        SkillEvolutionRejectDraftCommand, SkillServicePolicyHints, SkillServiceScope,
+        SkillEvolutionRejectDraftCommand, SkillProposalProcessingRunCommand,
+        SkillProposalProcessingSnapshotCommand, SkillServicePolicyHints, SkillServiceScope,
     };
 
     use super::{SystemSkillClient, UnavailableSystemSkillClient};
@@ -553,5 +633,67 @@ mod tests {
             .self_evolution_evaluation_report(report_command)
             .await
             .is_err());
+    }
+
+    #[tokio::test]
+    async fn unavailable_skill_client_rejects_proposal_processing_apply_but_allows_snapshot() {
+        let client = UnavailableSystemSkillClient;
+        let trace = TraceContext::new("trace-sdk-skill-processing-unavailable");
+        let run = SkillProposalProcessingRunCommand {
+            trace: trace.clone(),
+            scope: SkillServiceScope::default(),
+            dry_run: false,
+            min_ready_score: 40,
+            evidence_ids: vec!["evidence://processing/apply".into()],
+            policy_decision_refs: vec!["policy://processing/approved".into()],
+            audit_event_ids: Vec::new(),
+            policy: policy_hints(),
+        };
+        let snapshot = SkillProposalProcessingSnapshotCommand {
+            trace,
+            scope: SkillServiceScope::default(),
+        };
+
+        assert!(client.process_skill_proposals(run).await.is_err());
+        let snapshot = client
+            .skill_proposal_processing_snapshot(snapshot)
+            .await
+            .expect("unavailable client should expose an empty read-only snapshot");
+        assert_eq!(snapshot.records.len(), 0);
+        assert!(!snapshot.mutated);
+    }
+
+    #[tokio::test]
+    async fn unavailable_skill_client_rejects_autonomous_materialization_apply_but_allows_snapshot()
+    {
+        let client = UnavailableSystemSkillClient;
+        let trace = TraceContext::new("trace-sdk-skill-operator-unavailable");
+        let run = SkillAutonomousMaterializationRunCommand {
+            trace: trace.clone(),
+            scope: SkillServiceScope::default(),
+            dry_run: false,
+            batch_limit: 1,
+            min_ready_score: 40,
+            package_collection_root: "/tmp/unused-operator-root".into(),
+            ownership: macaca_skill::SkillPackageOwnershipClass::AgentPrivate,
+            reason: "approved autonomous materialization run".into(),
+            evidence_ids: vec!["evidence://operator/apply".into()],
+            policy_decision_refs: vec!["policy://operator/approved".into()],
+            audit_event_ids: Vec::new(),
+            policy: policy_hints(),
+        };
+        let snapshot = SkillAutonomousMaterializationSnapshotCommand {
+            trace,
+            scope: SkillServiceScope::default(),
+            limit: 10,
+        };
+
+        assert!(client.run_autonomous_materialization(run).await.is_err());
+        let snapshot = client
+            .autonomous_materialization_snapshot(snapshot)
+            .await
+            .expect("unavailable client should expose an empty operator snapshot");
+        assert_eq!(snapshot.recent_runs.len(), 0);
+        assert!(snapshot.last_run_ref.is_none());
     }
 }

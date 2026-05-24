@@ -75,6 +75,14 @@ applications.
 | 28 | optimization_metrics_probe_loop | Audit whether service-owned metrics exist to prove later-task optimization across elapsed time, retries, tool calls, token totals, artifact refs, reuse counters, activation counters, trace duration, and baselines. | Optimization-metric sufficiency matrix and distinction between weak output_chars summaries and real optimization proof. |
 | 29 | closed_loop_metric_contract_loop | Define and check the minimal service-owned contract required to prove proposal capture became materialized Skill reuse and measurable optimization. | Five-phase P1-P5 proof contract separating capture, lifecycle transition, materialization, activation/reuse, and optimization. |
 | 30 | autonomous_compensation_governance_pressure_loop | Audit whether proposal growth is followed by autonomous curation, deduplication, retry/compensation, lifecycle transition, materialization, activation/reuse, or metric-baseline updates. | Distinction between proposal-volume growth and post-capture governance pressure or autonomous compensation. |
+| 31 | app_scoped_backlog_routing_probe_loop | Verify whether app-scoped backlog has processing, routing, and isolation controls beyond app-level capture-only Draft. | Service-owned app-scoped processor/queue/curation lane and false-positive exclusion. |
+| 32 | reusability_probe_loop | Probe measurable reuse/activation after repeated real tasks using platform-wide and app-scoped evidence. | Registry/load-path, usage telemetry, reuse attempt, and distinct procedure-body checks. |
+| 33 | reusable_procedure_capture_loop | Reproduce the self-evolution evidence extraction path and derive bounded reusable procedure steps. | Evidence capture invariants and reusable bounded command set. |
+| 34 | reuse_consistency_roundtrip_loop | Re-attempt reuse by explicitly referencing Run33 output and checking proposal-content reuse readiness. | Proposal-content reuse, lifecycle progress, and measurable reuse consistency score. |
+| 35 | routing_backlog_pressure_loop | Pressure-test whether app-scoped capture can advance into queue-like routing, backlog pressure, or governed transition state. | Correct operations-route use, endpoint false-positive filtering, and Draft-to-transition failure evidence. |
+| 36 | app_scoped_backlog_routing_probe_loop | Re-check app-scoped routing evidence after the Run 35 endpoint regression. | Whether the app-scoped routing state now proves any non-Draft transition lane. |
+| 37 | reusable_procedure_capture_loop | Re-run reproducible capture with stricter lifecycle-variance checks. | Proposal quality variance, lifecycle diversity, and `proposal_id`/`completedSummary` binding. |
+| 38 | proposal_materialization_contract_smoke_loop | Probe whether the governance contract for controlled materialization is even executable without mutation. | Evidence for Contract C1 and a precondition-safe transition boundary. |
 
 ## Evidence Checklist Per Wake
 
@@ -86,6 +94,7 @@ Each wake records:
 - SSE `delegated_task_complete` or equivalent terminal event.
 - SSE or EventLog `skill_self_evolution_observer` statuses.
 - Skill operations proposal count before and after the run.
+- `captured_at` monotonicity check between before/after snapshot pairs.
 - Matching proposal id, lifecycle, classification, destination, and evidence ids.
 - Whether the generated proposal was promoted, rejected, or left as draft.
 - Whether a later task shows Skill catalog visibility, Skill file materialization,
@@ -2225,10 +2234,666 @@ capture is durable, but post-capture governance pressure is not: no autonomous
 curation, deduplication, retry, lifecycle transition, materialization,
 activation/reuse, or metric-baseline update is proven for this workspace.
 
+### Run 31
+
+- Time: 2026-05-24 06:39 Asia/Shanghai.
+- App id: `a9435a4b-d123-5a4c-b0b7-d9b1342089ea`.
+- Session id: `714bd109-7276-4c32-b73d-c40665227940`.
+- Task id: `f903858f-6577-4e2b-86c0-00b0bcda15bc`.
+- Task family: `app_scoped_backlog_routing_probe_loop`.
+- SSE capture: `/tmp/macaca-self-evolution-real-task-31.sse`.
+- Request capture: `/tmp/macaca-self-evolution-run31-request.json`.
+- Operations snapshots:
+  - Before: `/tmp/macaca-self-evolution-ops-before-run31.json`.
+  - After: `/tmp/macaca-self-evolution-ops-after-run31.json`.
+- Artifact:
+  `/Users/quantum/.macaca/workspaces/a9435a4b-d123-5a4c-b0b7-d9b1342089ea/shared/self_evolution_app_scoped_backlog_routing_probe_31.md`.
+- Artifact size: 10,310 bytes, 147 lines.
+- Terminal event observed: `delegated_task_complete`.
+- Observer checkpoint observed: `agent_execution_completed_seen`.
+- Proposal checkpoint observed: `proposal_created`.
+- Proposal id:
+  `skill-exp-f903858f-6577-4e2b-86c0-00b0bcda15bc-1779575999130714000`.
+- Proposal lifecycle: `Draft`.
+- Proposal classification: `ReusableProcedure`.
+- Proposal destination: `NewSkillDraft`.
+- Proposal recommended action: `CreateDraft`.
+- Proposal target skill name: `None`.
+- Evidence refs:
+  - `eventlog://sessions/714bd109-7276-4c32-b73d-c40665227940/skill_self_evolution_observer/agent_execution_completed_seen/f903858f-6577-4e2b-86c0-00b0bcda15bc`
+  - `trace://service.agent_execution/chat-main-thread:a9435a4b-d123-5a4c-b0b7-d9b1342089ea:coordinator:714bd109-7276-4c32-b73d-c40665227940`
+- Ops before-counts from this artifact's app-scoped view:
+  - Total proposals: 817.
+  - App-scoped proposals (`a9435a4b`): 25.
+- Ops after-counts from captured snapshot pair:
+  - Total proposals: 2,358.
+  - App-scoped proposals (`a9435a4b`): 26.
+- Telemetry after the run: `activation=0`, `use=0`, `view=0`,
+  `successful_task_count=0`, `failed_task_count=0`, `patch_count=0`,
+  `record_count=0`, `resource_read_count=0`.
+- Governance `.md` artifacts (shared): 31 files, 5,978 lines.
+- Workspace evidence:
+  - `shared/.omc/state/mission-state.json`: 3 missions with `name:"none"`,
+    5 Explore agents, all `completedSummary: null`.
+  - `shared/.omc/state/agent-replay-*.jsonl`: 3 files, all `agent_type:"Explore"`.
+  - `available_skills`: 17 dirs, 4 with `SKILL.md` + `_meta.json`.
+  - `find . -name ".registry.json"` / `"_usage.json"` / `"*.sse"`: 0 each.
+
+### Run 31 Diagnosis
+
+Run 31 verifies two things. First, isolation is sound: false-positive curation
+artifacts in `/tmp` are from another workspace (`2c96f3f2`) and do not act on
+this app. Second, app-scoped routing remains unproven: no proposal lifecycle
+transition, no queue/processor lane, no materialization path, and no activation or
+usage telemetry for app-scoped proposals.
+
+The run also exposed an ops-observability fragility: the `before/after` snapshot
+pairs have non-monotonic `captured_at` timestamps. This is now tracked in the
+wake checklist before accepting deltas as authoritative.
+
+### Run 32
+
+- Time: 2026-05-24 13:11 Asia/Shanghai.
+- App id: `a9435a4b-d123-5a4c-b0b7-d9b1342089ea`.
+- Session id: `f79e2bdd-9f11-49ea-82db-16de75b6903c`.
+- Task id: `a5a246fb-6548-44b4-88e0-b19b58f16419`.
+- Task family: `reusability_probe_loop`.
+- SSE capture: `/tmp/macaca-self-evolution-real-task-32.sse`.
+- Request capture: `/tmp/macaca-self-evolution-run32-request.json`.
+- Operations snapshots:
+  - Before: `/tmp/macaca-self-evolution-ops-before-run32.json`.
+  - After: `/tmp/macaca-self-evolution-ops-after-run32.json`.
+- Artifact:
+  `/Users/quantum/.macaca/workspaces/a9435a4b-d123-5a4c-b0b7-d9b1342089ea/shared/self_evolution_reusability_probe_32.md`.
+- Artifact size: 14,547 bytes, 221 lines.
+- Terminal event observed: `delegated_task_complete`.
+- Observer checkpoint observed: `agent_execution_completed_seen`.
+- Proposal checkpoint observed: `proposal_created`.
+- Proposal id:
+  `skill-exp-a5a246fb-6548-44b4-88e0-b19b58f16419-1779599470499746000`.
+- Proposal lifecycle: `Draft`.
+- Proposal classification: `ReusableProcedure`.
+- Proposal destination: `NewSkillDraft`.
+- Proposal recommended action: `CreateDraft`.
+- Proposal target skill name: `None`.
+- Evidence refs:
+  - `eventlog://sessions/f79e2bdd-9f11-49ea-82db-16de75b6903c/skill_self_evolution_observer/agent_execution_completed_seen/a5a246fb-6548-44b4-88e0-b19b58f16419`
+  - `trace://service.agent_execution/chat-main-thread:a9435a4b-d123-5a4c-b0b7-d9b1342089ea:coordinator:f79e2bdd-9f11-49ea-82db-16de75b6903c`
+- Operations proposals before the run:
+  - Total: 2,382.
+  - App-scoped (`a9435a4b`): 26.
+  - Lifecycle: 100% Draft, 100% CreateDraft, 100% ReusableProcedure.
+- Operations proposals after the run:
+  - Total: 2,395.
+  - App-scoped (`a9435a4b`): 27.
+  - Lifecycle: 100% Draft, 100% CreateDraft, 100% ReusableProcedure.
+- Telemetry after the run:
+  - `activation=0`, `use=0`, `view=0`, `successful=0`, `failed=0`,
+    `patch=0`, `record=0`, `resource_read=0`.
+- Governance `.md` artifacts (shared): 31 files, 5,978 lines.
+- Cross-app `reusable_procedure`: one unique text across all 2,382 proposals.
+- Workspace evidence:
+  - `available_skills`: 17 dirs, 4 with `SKILL.md` + `_meta.json`.
+  - `.registry.json`: 0.
+  - `_usage.json`: 0.
+  - `*.sse`: 0.
+  - `crontab -l`: NO_CRONTAB.
+
+### Run 32 Diagnosis
+
+Run 32 still sees the same capture-only behavior. The platform recorded a modest
+platform-wide proposal increase (`+13`), while app-scoped proposals rose from
+26 to 27. But both before and after snapshots stayed 100% Draft / CreateDraft /
+ReusableProcedure, with no lifecycle transitions, no materialized package,
+no registry/load-path discovery, no usage telemetry, and no reuse-target
+references.
+
+The key additional finding is signal quality: the process is generating duplicate
+or template-identical `reusable_procedure` text (single unique string across all
+run-32-visible proposals), which means proposals are uniform metadata rather than
+distinct reusable experience content.
+
+The status remains `PRE-EXECUTION GOVERNANCE`; Contract C1 (a non-null
+`completedSummary` with a concrete slug-bound lifecycle transition) is still
+missing.
+
+### Run 33
+
+- Time: 2026-05-24 13:17 Asia/Shanghai.
+- App id: `a9435a4b-d123-5a4c-b0b7-d9b1342089ea`.
+- Session id: `de53430e-ce69-47a9-83f7-f4c70dbb0571`.
+- Task id: `840638b0-b3af-4268-8f68-6488cfb4325d`.
+- Task family: `reusable_procedure_capture_loop`.
+- SSE capture: `/tmp/macaca-self-evolution-real-task-33.sse`.
+- Request capture: `/tmp/macaca-self-evolution-run33-request.json`.
+- Operations snapshots:
+  - Before: `/tmp/macaca-self-evolution-ops-before-run33.json`.
+  - After: `/tmp/macaca-self-evolution-ops-after-run33.json`.
+- Artifact:
+  `/Users/quantum/.macaca/workspaces/a9435a4b-d123-5a4c-b0b7-d9b1342089ea/shared/self_evolution_reusable_procedure_capture_33.md`.
+- Artifact size: 10,240 bytes, 175 lines.
+- Terminal event observed: `delegated_task_complete`.
+- Observer checkpoint observed: `agent_execution_completed_seen`.
+- Proposal checkpoint observed: `proposal_created`.
+- Proposal id:
+  `skill-exp-840638b0-b3af-4268-8f68-6488cfb4325d-1779599947320519000`.
+- Proposal lifecycle: `Draft`.
+- Proposal classification: `ReusableProcedure`.
+- Proposal destination: `NewSkillDraft`.
+- Proposal recommended action: `CreateDraft`.
+- Proposal target skill name: `None`.
+- Evidence refs:
+  - `eventlog://sessions/de53430e-ce69-47a9-83f7-f4c70dbb0571/skill_self_evolution_observer/agent_execution_completed_seen/840638b0-b3af-4268-8f68-6488cfb4325d`
+  - `trace://service.agent_execution/chat-main-thread:a9435a4b-d123-5a4c-b0b7-d9b1342089ea:coordinator:de53430e-ce69-47a9-83f7-f4c70dbb0571`
+- Operations proposals before the run:
+  - Total: 2,415.
+  - App-scoped (`a9435a4b`): 27.
+  - Lifecycle: 100% Draft, 100% CreateDraft, 100% ReusableProcedure.
+- Operations proposals after the run:
+  - Total: 2,428.
+  - App-scoped (`a9435a4b`): 28.
+  - Lifecycle: 100% Draft, 100% CreateDraft, 100% ReusableProcedure.
+- Telemetry after the run:
+  - `activation=0`, `use=0`, `view=0`, `successful=0`, `failed=0`,
+    `patch=0`, `record=0`, `resource_read_count=0`.
+- Governance `.md` artifacts (shared): 33 files, 6,199 lines.
+- Workspace evidence:
+  - `available_skills`: 17 dirs, 4 with `SKILL.md` + `_meta.json`.
+  - `.registry.json`: 0.
+  - `_usage.json`: 0.
+  - `*.sse`: 0.
+
+### Run 33 Diagnosis
+
+Run 33 confirms the execution path is still stable and repeatable: the task
+generated a bounded reusable-procedure artifact and a new app-scoped Draft proposal
+record under real `/api/chat/v2` execution, with replayable observer refs.
+
+The closure state is unchanged. The run added 13 global proposals and moved app-scoped
+proposals from 27 to 28, but lifecycle/actionability remained frozen as
+100% Draft/CreateDraft/ReusableProcedure. No lifecycle transitions, materialization
+signals, registry/usage telemetry, or non-null `completedSummary` evidence appeared.
+
+### Run 34
+
+- Time: 2026-05-24 13:20 Asia/Shanghai.
+- App id: `a9435a4b-d123-5a4c-b0b7-d9b1342089ea`.
+- Session id: `36d10233-ad66-4d2d-8c7f-7474b5658da4`.
+- Task id: `60909ff9-9ee2-4374-8255-b8257f73dada`.
+- Task family: `reuse_consistency_roundtrip_loop`.
+- SSE capture: `/tmp/macaca-self-evolution-real-task-34.sse`.
+- Request capture: `/tmp/macaca-self-evolution-run34-request.json`.
+- Operations snapshots:
+  - Before: `/tmp/macaca-self-evolution-ops-before-run34.json`.
+  - After: `/tmp/macaca-self-evolution-ops-after-run34.json`.
+- Artifact:
+  `/Users/quantum/.macaca/workspaces/a9435a4b-d123-5a4c-b0b7-d9b1342089ea/shared/self_evolution_reuse_consistency_roundtrip_34.md`.
+- Artifact size: 9,426 bytes, 148 lines.
+- Terminal event observed: `delegated_task_complete`.
+- Observer checkpoint observed: `agent_execution_completed_seen`.
+- Proposal checkpoint observed: `proposal_created`.
+- Proposal id:
+  `skill-exp-60909ff9-9ee2-4374-8255-b8257f73dada-1779600209677437000`.
+- Proposal lifecycle: `Draft`.
+- Proposal classification: `ReusableProcedure`.
+- Proposal destination: `NewSkillDraft`.
+- Proposal recommended action: `CreateDraft`.
+- Proposal target skill name: `None`.
+- Evidence refs:
+  - `eventlog://sessions/36d10233-ad66-4d2d-8c7f-7474b5658da4/skill_self_evolution_observer/agent_execution_completed_seen/60909ff9-9ee2-4374-8255-b8257f73dada`
+  - `trace://service.agent_execution/chat-main-thread:a9435a4b-d123-5a4c-b0b7-d9b1342089ea:coordinator:36d10233-ad66-4d2d-8c7f-7474b5658da4`
+- Operations proposals before the run:
+  - Total: 2,428.
+  - App-scoped (`a9435a4b`): 28.
+  - Lifecycle: 100% Draft, 100% CreateDraft, 100% ReusableProcedure.
+- Operations proposals after the run:
+  - Total: 2,436.
+  - App-scoped (`a9435a4b`): 28.
+  - Lifecycle: 100% Draft, 100% CreateDraft, 100% ReusableProcedure.
+- Telemetry after the run:
+  - `activation=0`, `use=0`, `view=0`, `successful=0`, `failed=0`,
+    `patch=0`, `record=0`, `resource_read_count=0`.
+- Governance `.md` artifacts (shared): 34 files, 6,374 lines.
+- Workspace evidence:
+  - `available_skills`: 17 dirs, 4 with `SKILL.md` + `_meta.json`.
+  - `.registry.json`: 0.
+  - `_usage.json`: 0.
+  - `*.sse`: 0.
+- Explicit reuse outcome:
+  - The task explicitly referenced `self_evolution_reusable_procedure_capture_33.md`,
+    but no proposal-derived reusable content was materialized.
+  - No non-null `completedSummary` binding or pipeline-produced skill artifact was
+    observed.
+
+### Run 34 Diagnosis
+
+Run 34 is the targeted consistency roundtrip. It explicitly attempted to reuse
+prior run content as a concrete reusable-procedure source, but the platform still
+did not perform proposal-to-materialization promotion. Global proposals increased by
+8 while app-scoped remained flat (`+0`), and all proposals stayed Draft-only with
+uniform `reusable_procedure` text.
+
+No registry, load-path, usage, activation, or reuse telemetry appeared in this
+run; lifecycle transitions remained zero.
+
+### Run 35
+
+- Time: 2026-05-24 13:33 Asia/Shanghai.
+- App id: `a9435a4b-d123-5a4c-b0b7-d9b1342089ea`.
+- Session id: `bbd02441-1b7b-4cb1-bdae-df81b9d83929`.
+- Task id: `001ecb09-5219-41e5-a1bb-6d332d5b8d1d`.
+- Task family: `routing_backlog_pressure_loop`.
+- SSE capture: `/tmp/macaca-self-evolution-real-task-35.sse`.
+- Request capture: `/tmp/macaca-self-evolution-run35-request.json`.
+- Operations snapshots:
+  - Before: `/tmp/macaca-self-evolution-ops-before-run35.json`.
+  - After: `/tmp/macaca-self-evolution-ops-after-run35.json`.
+- Artifact:
+  `/Users/quantum/.macaca/workspaces/a9435a4b-d123-5a4c-b0b7-d9b1342089ea/shared/self_evolution_routing_backlog_pressure_35.md`.
+- Artifact size: 22,256 bytes, 372 lines.
+- Terminal event observed: `delegated_task_complete`.
+- Observer checkpoint observed: `agent_execution_completed_seen`.
+- Proposal checkpoint observed: `proposal_created`.
+- Proposal id:
+  `skill-exp-001ecb09-5219-41e5-a1bb-6d332d5b8d1d-1779600793945010000`.
+- Proposal lifecycle: `Draft`.
+- Proposal classification: `ReusableProcedure`.
+- Proposal destination: `NewSkillDraft`.
+- Proposal recommended action: `CreateDraft`.
+- Proposal target skill name: `None`.
+- Evidence refs:
+  - `eventlog://sessions/bbd02441-1b7b-4cb1-bdae-df81b9d83929/skill_self_evolution_observer/agent_execution_completed_seen/001ecb09-5219-41e5-a1bb-6d332d5b8d1d`
+  - `trace://service.agent_execution/chat-main-thread:a9435a4b-d123-5a4c-b0b7-d9b1342089ea:coordinator:bbd02441-1b7b-4cb1-bdae-df81b9d83929`
+- Operations proposals before the run:
+  - Total: 2,467.
+  - App-scoped (`a9435a4b`): 29.
+  - Lifecycle: 100% Draft, 100% CreateDraft, 100% ReusableProcedure.
+- Operations proposals after the run:
+  - Total: 2,490.
+  - App-scoped (`a9435a4b`): 30.
+  - Lifecycle: 100% Draft, 100% CreateDraft, 100% ReusableProcedure.
+- Telemetry after the run:
+  - `activation=0`, `use=0`, `view=0`, `successful=0`, `failed=0`,
+    `patch=0`, `record=0`, `resource_read_count=0`.
+- Governance `.md` artifacts (shared): 35 files, 6,894 lines.
+- Workspace evidence:
+  - `available_skills`: no new `SKILL.md`, `_meta.json`, `_usage.json`, or
+    `.registry.json` files since Run 35 started.
+  - `.registry.json`: 0.
+  - `_usage.json`: 0.
+  - `*.sse`: 0.
+- Endpoint check:
+  - Wrong proposal-like paths such as `/api/self-evolution/proposals` returned
+    404 during the task.
+  - The correct route
+    `/api/apps/a9435a4b-d123-5a4c-b0b7-d9b1342089ea/skills/operations`
+    remained available and produced the after snapshot above.
+  - Observability rule update: legacy proposal API routes are now treated as
+    unrelated to the canonical monitoring path unless the app-scoped operations
+    route is also unavailable.
+
+### Run 35 Diagnosis
+
+Run 35 confirms that app-scoped capture still cannot advance beyond Draft into a
+governed transition lane. The run created another real artifact and another
+app-scoped Draft proposal, but no queue-like state transition, quality pressure,
+curation record, materialization attempt, registry/load-path entry, usage
+telemetry, or non-null `completedSummary` appeared.
+
+The new operational lesson is endpoint hygiene. The task correctly surfaced that
+several proposal-looking paths return 404, but that is not evidence that the
+Skill operations surface is down. The governed monitoring path remains the
+app-scoped Skill operations route; future probes should avoid treating unrelated
+404s as operations outage evidence and should anchor before/after deltas to
+that route.
+
+### Run 36
+
+- Time: 2026-05-24 14:06 Asia/Shanghai.
+- App id: `a9435a4b-d123-5a4c-b0b7-d9b1342089ea`.
+- Session id: `c5fa14d4-2d33-4a0a-9808-8003e11eced1`.
+- Task id: `9787050b-753c-4c75-b31d-13f37ce46187`.
+- Task family: `app_scoped_backlog_routing_probe_loop`.
+- SSE capture: `/tmp/macaca-self-evolution-real-task-36.sse`.
+- Request capture: `/tmp/macaca-self-evolution-run36-request.json`.
+- Operations snapshots:
+  - Before: `/tmp/macaca-self-evolution-ops-before-run36.json`.
+  - After: `/tmp/macaca-self-evolution-ops-after-run36.json`.
+- Artifact:
+  `/Users/quantum/.macaca/workspaces/a9435a4b-d123-5a4c-b0b7-d9b1342089ea/shared/self_evolution_app_scoped_routing_recheck_36.md`.
+- Artifact size: 21,305 bytes, 364 lines.
+- Terminal event observed: `delegated_task_complete`.
+- Observer checkpoint observed: `agent_execution_completed_seen`.
+- Proposal checkpoint observed: `proposal_created`.
+- Proposal id:
+  `skill-exp-9787050b-753c-4c75-b31d-13f37ce46187-1779602806816165000`.
+- Proposal lifecycle: `Draft`.
+- Proposal classification: `ReusableProcedure`.
+- Proposal destination: `NewSkillDraft`.
+- Proposal recommended action: `CreateDraft`.
+- Proposal target skill name: `None`.
+- Evidence refs:
+  - `eventlog://sessions/c5fa14d4-2d33-4a0a-9808-8003e11eced1/skill_self_evolution_observer/agent_execution_completed_seen/9787050b-753c-4c75-b31d-13f37ce46187`
+  - `trace://service.agent_execution/chat-main-thread:a9435a4b-d123-5a4c-b0b7-d9b1342089ea:coordinator:c5fa14d4-2d33-4a0a-9808-8003e11eced1`
+- Operations proposals before the run:
+  - Total: 2.
+  - App-scoped (`a9435a4b`): 0.
+  - Other workspace (`2c96f3f2`): 2.
+  - Lifecycle: 100% Draft.
+  - Processing state counts: queued 0, reviewing 0,
+    ready_for_materialization 0, rejected 0, suppressed_duplicate 0.
+- Operations proposals after the run:
+  - Total: 19.
+  - App-scoped (`a9435a4b`): 1, created by this run's
+    `service.agent_execution` decorator checkpoint.
+  - Other workspace (`2c96f3f2`): 18.
+  - Lifecycle: 100% Draft.
+  - Processing state counts: queued 0, reviewing 0,
+    ready_for_materialization 0, rejected 0, suppressed_duplicate 0.
+- Telemetry after the run:
+  - `activation=0`, `use=0`, `view=0`, `successful=0`, `failed=0`,
+    `patch=0`, `record=0`, `resource_read_count=0`.
+- Workspace evidence:
+  - `available_skills`: no new `SKILL.md`, `_meta.json`, `_usage.json`, or
+    `.registry.json` files appeared between the pre/post file lists.
+  - `.registry.json`: 0.
+  - `_usage.json`: 0.
+  - `*.sse`: no workspace-persisted SSE evidence.
+- Snapshot interpretation:
+  - The before snapshot was captured from the canonical route and carried trace
+    id `web-skill-operations-a9435a4b-d123-5a4c-b0b7-d9b1342089ea`.
+  - The task-internal artifact correctly observed `a9435a4b` proposal count 0
+    before this run's decorated completion event.
+  - The post-completion after snapshot then showed the new app-scoped Draft
+    proposal for task `9787050b-753c-4c75-b31d-13f37ce46187`.
+
+### Run 36 Diagnosis
+
+Run 36 proves the canonical app-scoped operations route is reachable, but also
+exposes a sharp data-surface change from the Run 35 legacy/global snapshot:
+before this run the route showed zero proposals for `a9435a4b`, while the
+post-completion snapshot showed exactly one new proposal from the current
+decorated `service.agent_execution` result. That makes capture live at the
+service boundary, but only as another Draft proposal.
+
+No lifecycle transition, processing record, curation recommendation, governance
+record, materializer output, registry/load-path file, usage telemetry, or
+non-null `completedSummary` appeared. The route-clean recheck therefore
+strengthens, rather than weakens, the current diagnosis: the platform can capture
+bounded reusable-procedure proposals, but the closed-loop Skill optimization
+lane is still absent or inactive.
+
+### Run 37
+
+- Time: 2026-05-24 14:18 Asia/Shanghai.
+- App id: `a9435a4b-d123-5a4c-b0b7-d9b1342089ea`.
+- Session id: `3f07ce1c-f336-44e3-8962-fb4fdba757a6`.
+- Task id: `ed7900e5-4566-4c35-b723-b39098137513`.
+- Task family: `reusable_procedure_capture_loop`.
+- SSE capture: `/tmp/macaca-self-evolution-real-task-37.sse`.
+- Request capture: `/tmp/macaca-self-evolution-run37-request.json`.
+- Operations snapshots:
+  - Before: `/tmp/macaca-self-evolution-ops-before-run37.json`.
+  - Task-internal before: `/tmp/macaca-skills-ops-before-run37.json`.
+  - Task-internal after: `/tmp/macaca-skills-ops-after-run37.json`.
+  - Post-completion after: `/tmp/macaca-self-evolution-ops-after-run37.json`.
+- Artifact:
+  `/Users/quantum/.macaca/workspaces/a9435a4b-d123-5a4c-b0b7-d9b1342089ea/shared/self_evolution_reusable_procedure_capture_37.md`.
+- Artifact size: 27,837 bytes, 419 lines.
+- Terminal event observed: `delegated_task_complete`.
+- Observer checkpoint observed: `agent_execution_completed_seen`.
+- Proposal checkpoint observed: `proposal_created`.
+- Proposal id:
+  `skill-exp-ed7900e5-4566-4c35-b723-b39098137513-1779603521065713000`.
+- Proposal lifecycle: `Draft`.
+- Proposal classification: `ReusableProcedure`.
+- Proposal destination: `NewSkillDraft`.
+- Proposal recommended action: `CreateDraft`.
+- Proposal target skill name: `None`.
+- Evidence refs:
+  - `eventlog://sessions/3f07ce1c-f336-44e3-8962-fb4fdba757a6/skill_self_evolution_observer/agent_execution_completed_seen/ed7900e5-4566-4c35-b723-b39098137513`
+  - `trace://service.agent_execution/chat-main-thread:a9435a4b-d123-5a4c-b0b7-d9b1342089ea:coordinator:3f07ce1c-f336-44e3-8962-fb4fdba757a6`
+  - `tool:file_write:f798d916ce9304ad`
+- Operations proposals before the run:
+  - Total: 2.
+  - App-scoped (`a9435a4b`): 0.
+  - Other workspace (`2c96f3f2`): 2.
+  - Lifecycle: 100% Draft.
+  - Processing state counts: queued 0, reviewing 0,
+    ready_for_materialization 0, rejected 0, suppressed_duplicate 0.
+- Task-internal operations snapshots:
+  - Before: total 4, app-scoped 0.
+  - After: total 6, app-scoped 0.
+  - Interpretation: these snapshots happened before the final
+    `service.agent_execution` decorated completion proposal was created.
+- Post-completion operations snapshot:
+  - Total: 15.
+  - App-scoped (`a9435a4b`): 1, created by this run's
+    `service.agent_execution` decorator checkpoint.
+  - Other workspace (`2c96f3f2`): 14.
+  - Lifecycle: 100% Draft.
+  - Processing state counts: queued 0, reviewing 0,
+    ready_for_materialization 0, rejected 0, suppressed_duplicate 0.
+- Telemetry after the run:
+  - `activation=0`, `use=0`, `view=0`, `successful=0`, `failed=0`,
+    `patch=0`, `record=0`, `resource_read_count=0`.
+- Proposal quality and evidence:
+  - Existing task-internal proposal population still showed one
+    `reusable_procedure` text and no lifecycle variance.
+  - The post-completion proposal added `artifact_count=1` and
+    `metadata.evidence_ref.artifact_0=tool:file_write:f798d916ce9304ad`.
+  - The proposal still remained `Draft` with no `target_skill_name`,
+    processing record, curation record, governance record, or activation
+    telemetry.
+- Workspace evidence:
+  - `available_skills`: no new `SKILL.md`, `_meta.json`, `_usage.json`, or
+    `.registry.json` files appeared between the pre/post file lists.
+  - `.registry.json`: 0.
+  - `_usage.json`: 0.
+  - `*.sse`: no workspace-persisted SSE evidence.
+
+### Run 37 Diagnosis
+
+Run 37 adds two important refinements. First, the task-internal snapshots again
+showed that canonical operations is not a stable historical ledger and can show
+zero current app-scoped proposals before the decorated completion boundary.
+Second, the post-completion snapshot proved the decorator still creates a fresh
+app-scoped Draft proposal for the current task, this time with a bounded artifact
+evidence ref attached to proposal metadata.
+
+That is better evidence binding than earlier zero-artifact summaries, but it is
+still capture only. Lifecycle diversity remains zero, the reusable procedure body
+is still the same generic template, and the processing/curation/governance/
+materialization/registry/usage/activation surfaces all stayed empty.
+
+### Run 38
+
+- Time: 2026-05-24 15:00-15:06 Asia/Shanghai.
+- App id: `a9435a4b-d123-5a4c-b0b7-d9b1342089ea`.
+- Session id: `4ca6988b-a7a4-4f8e-8204-81b52f31132e`.
+- Task id: `926384b8-1613-462e-8b5b-c3175da16646`.
+- Task family: `proposal_materialization_contract_smoke_loop`.
+- Request capture: `/tmp/macaca-self-evolution-real-task-38.json`.
+- SSE capture: `/tmp/macaca-self-evolution-real-task-38.sse`.
+- Operations snapshots:
+  - Before: `/tmp/macaca-self-evolution-ops-before-1779606101.json`.
+  - After: `/tmp/macaca-self-evolution-ops-after-1779606101.json`.
+- Server status:
+  - `GET /api/status` returned version `0.1.0`, `app_count=4`,
+    `agent_count=16`, and `llm_provider=deepseek`.
+  - Existing server process was already listening on port `3001`.
+- Terminal event observed: `delegated_task_error`.
+- Observer checkpoint observed: `agent_execution_completed_seen`.
+- Proposal checkpoint observed: none.
+- Proposal id: none.
+- Failure:
+  - The task failed before terminal success with
+    `deepseek API error 524 <unknown status code>`.
+  - The observer correctly emitted `skipped_non_completed_agent_execution`.
+- Artifact: none. The requested
+  `self_evolution_run_38_materialization_autonomy_check.md` file was not written.
+- Operations snapshot delta:
+  - Before total proposals: 125.
+  - After total proposals: 145.
+  - The app-scoped `a9435a4b` proposal count stayed at 1 before and after.
+  - The delta came from the separate `2c96f3f2-b78c-5edd-beb4-740c8c004910`
+    workspace heartbeat population, not from this failed chat task.
+  - All proposals remained `Draft`.
+  - Processing state after the run: queued 145,
+    ready_for_materialization 0, rejected 0, suppressed_duplicate 0.
+  - Governance records after the run: 0.
+- Materialization and reuse checks:
+  - Automatic materialization command invocation: not observed.
+  - Proposal-linked `SKILL.md` package: not observed.
+  - Registry/load-path entry: not observed.
+  - Usage telemetry: not observed.
+  - Later-task reuse or measurable optimization: not observed.
+- P1-P5 verdict:
+  - P1 proposal capture for this run: fail because execution did not complete.
+  - P2 lifecycle transition: fail.
+  - P3 materialization: fail.
+  - P4 activation/reuse: fail.
+  - P5 measurable optimization: fail.
+
+### Run 38 Diagnosis
+
+Run 38 is primarily an external-provider failure sample, not a clean
+materialization regression sample. The `service.agent_execution` decorator still
+fires and records the failure boundary, and it correctly refuses to create a
+proposal for a non-completed execution. That behavior is useful: failed runs do
+not pollute the proposal backlog.
+
+The surrounding operations snapshots still expose the next platform repair
+target. A separate app's heartbeat proposals continued to accumulate, yet every
+record stayed `Draft`/`Queued`, with `ready_for_materialization=0`, zero
+governance records, no materialization command evidence, no proposal-linked
+`SKILL.md`, no registry/load-path entry, and no usage telemetry. The repository
+now has a service-owned materialization capability, but no autonomous operator
+has been proven to invoke proposal processing and then materialization after
+capture.
+
+Next repair slice: add a governed autonomous materialization operator that runs
+inside the Skill service boundary or an approved runtime-host service provider,
+not inside Web shell code. It must first process proposals with policy/audit
+refs, then materialize only `ReadyForMaterialization` records through the
+existing materialization command. The operator must be generic, app-scoped,
+quality-gated, duplicate-aware, trace-required, policy-gated, entitlement-aware,
+rollback-backed, and observable through operations snapshots. It must not branch
+on application names, task families, provider names, driver names, or business
+logic.
+
+## Code Root Cause Follow-Up
+
+Status: repository fix applied and unit-regression verified; live server replay is
+still required before calling the deployed platform fixed.
+
+Root cause found during the systematic debugging pass:
+
+- Artifact evidence was generated by the Agent Execution evidence observer, but
+  the Web self-evolution observer projected `AgentExecutionResult` into a
+  `TaskResult` with an empty artifact list. That made real file-writing tasks
+  look like chat-only completions to the proposal builder.
+- The proposal processing snapshot only returned records that had already been
+  mutated by an explicit processing run. Fresh captured proposals therefore
+  appeared as `waiting_proposal_count` only, while `records` and `queued` state
+  stayed zero.
+- The deterministic processing score checked the older `artifact_count` metadata
+  key, while the service-safe artifact evidence can also arrive as
+  `evidence_ref.artifact_*`.
+
+Repair now in code:
+
+- `macaca-web` preserves bounded artifact refs from Agent Execution metadata and
+  forwards them into proposal candidate metadata as `evidence_ref.artifact_*`.
+- `macaca-runtime-host` synthesizes read-only `Queued` processing records for
+  proposals that have not yet been processed, so backlog pressure is visible
+  without mutating proposal lifecycle or writing Skill packages.
+- The processing scorer recognizes both older artifact-count metadata and newer
+  service-safe artifact refs.
+
+Verification run:
+
+- `cargo test -p macaca-runtime-host skill_proposal_processing_snapshot_reports_unprocessed_proposals_as_queued`
+- `cargo test -p macaca-web agent_execution_metadata_artifact_ref_becomes_proposal_artifact_evidence`
+- `cargo test -p macaca-runtime-host skill_proposal_processing`
+- `cargo test -p macaca-web skill_self_evolution_observer`
+- `openspec validate add-skill-proposal-processing-lane --strict`
+- `cargo check -p macaca-web`
+
+Local route smoke:
+
+- Time: 2026-05-24 14:23 Asia/Shanghai.
+- Server command:
+  `cargo run -p macaca-web --bin macaca-web-server -- --port 3001`.
+- Route:
+  `/api/apps/a9435a4b-d123-5a4c-b0b7-d9b1342089ea/skills/operations`.
+- Observed `processing.records=2`, `state_counts.queued=2`,
+  `waiting_proposal_count=2`, and quality reason
+  `proposal_reports_artifact_refs`.
+- Limitation: this was a route-level smoke only. All configured LLM providers
+  were unavailable in the local environment, so a fresh `/api/chat/v2`
+  live-task replay remains the next required deployed proof.
+
+Boundary note: this fix does not create `SKILL.md`, activate a new Skill, or
+claim optimization. It only repairs evidence preservation and queued-backlog
+observability before a future governed materialization lane.
+
+### Materialization Lane Follow-Up
+
+Status: repository fix implemented and focused tests verified; live autonomous
+task replay is still required before calling the deployed platform
+self-evolving.
+
+Root cause update:
+
+- The previous processing lane intentionally stopped at
+  `ReadyForMaterialization`. It exposed queue state and policy-gated readiness,
+  but the design was non-materializing and therefore could never prove that an
+  agent task produced a concrete `SKILL.md`.
+- The missing boundary was a service-owned materialization command that consumes
+  a ready proposal, preserves evidence/policy refs, writes only through the
+  governed Skill content mutation Strategy, and promotes governance only after a
+  successful write.
+
+Repair now in code:
+
+- `macaca-skill` now defines provider-neutral proposal materialization command
+  and result DTOs, including dry-run/apply mode, policy/evidence refs,
+  entitlement refs, and body-free serialization.
+- `macaca-runtime-host` now owns a proposal materialization Strategy. It rejects
+  non-ready proposals, previews deterministic `SKILL.md` bytes without mutation,
+  delegates apply-mode writes to the existing content mutation Strategy, and
+  promotes the proposal only after the mutation succeeds.
+- The materializer uses a bounded Builder to derive generic AgentSkills-compatible
+  content from proposal metadata. It does not branch on application names,
+  workflows, drivers, or business-specific task semantics.
+- The Skill service descriptor exposes a materialization capability and
+  permission hint so shells can discover the service-owned path instead of
+  writing Skill files directly.
+
+Verification run:
+
+- `cargo test -p macaca-skill proposal_materialization`
+- `cargo test -p macaca-runtime-host skill_proposal_materialization`
+- `cargo test -p macaca-runtime-host skill_proposal_processing`
+- `cargo test -p macaca-runtime-host skill_content_mutation`
+- `openspec validate add-skill-proposal-materialization-lane --strict`
+- `cargo check -p macaca-web`
+
+Current limitation:
+
+- This proves the service capability can materialize a ready proposal in focused
+  tests. It does not yet prove the full autonomous loop from a fresh
+  `/api/chat/v2` task into automatic materialization, activation, reuse, and
+  measurable optimization. The next live-monitoring runs must look for a real
+  materialization command invocation, a proposal-linked Skill package,
+  registry/load-path evidence, usage telemetry, and before/after task metrics.
+
 ## Current Platform Diagnosis
 
-Status: proposal capture is live; closed-loop Skill optimization is not yet
-proven.
+Status: proposal capture at the `service.agent_execution` boundary is live, and
+a service-owned proposal materialization capability now exists in code;
+closed-loop autonomous Skill optimization is not yet proven.
 
 What is proven:
 
@@ -2238,6 +2903,10 @@ What is proven:
 - The proposal stores refs and bounded summary data rather than raw task output.
 - Repeated real tasks can produce new Draft proposals with replayable
   `service.agent_execution` and EventLog refs.
+- The canonical app-scoped Skill operations route can expose the current run's
+  service-bound proposal after completion.
+- The proposal metadata can now include a bounded artifact evidence reference
+  for a completed run artifact, as seen in Run 37's `tool:file_write:*` ref.
 - The runtime can load an existing Skill snapshot and register MCP-backed tools
   from existing Skill packages during an agent session.
 - The agent can synthesize useful generic operating artifacts from repeated
@@ -2247,6 +2916,19 @@ What is proven:
 - The app-scoped Skill operations route can expose the Run 5 proposal with
   bounded EventLog and `service.agent_execution` trace refs after the server is
   running.
+- Run 35 showed that `/api/self-evolution/proposals` became unavailable while the
+  app-scoped operations route remained reachable, so canonical evidence capture is
+  now explicitly tied to the app-scoped route.
+- Run 36 showed that the canonical route's before snapshot can differ radically
+  from the old global/legacy snapshot surface, so future conclusions must be made
+  from one canonical route plus exact capture time, not mixed endpoints.
+- Run 37 showed the same timing split: task-internal operations snapshots can see
+  app-scoped count 0 before completion, while the post-completion snapshot sees
+  the newly captured app-scoped Draft proposal.
+- The runtime-host materialization lane can now convert a
+  `ReadyForMaterialization` proposal into a governed `SKILL.md` write in focused
+  tests, while preserving evidence/policy refs and promoting the proposal only
+  after successful content mutation.
 - The Run 6 next-signal task can independently verify S1-S7 as executable
   checks and produce another Draft proposal with bounded refs.
 - The agent can execute the candidate review checklist as a real task and write
@@ -2317,11 +2999,22 @@ What is proven:
 - The monitor can separate platform-level curation artifacts from autonomous
   compensation for this app's backlog, and can distinguish proposal-volume
   growth from post-capture governance pressure.
+- Run 33 showed that the reusable procedure probe is itself reproducible as a
+  real task, producing another bounded evidence artifact and another app-scoped
+  capture record.
+- Run 34 added a direct consistency attempt and confirmed that explicit reuse of
+  prior Run33 capture output still did not produce any materialization, registry,
+  load-path, usage, or completedSummary-binding evidence.
+- Run 35 proved the correct app-scoped Skill operations route is still usable
+  after proposal-like endpoints returned 404, and it captured another real
+  app-scoped Draft proposal with bounded evidence refs.
 
 What is not yet proven:
 
-- Automatic Skill writing/materialization from proposal to `SKILL.md`.
-- Governed promotion/apply without manual intervention.
+- Autonomous Skill writing/materialization from a fresh live task without a
+  manually issued materialization command.
+- End-to-end governed promotion/apply triggered by the live self-evolution
+  worker after proposal processing.
 - Later task activation of a newly evolved Skill.
 - Measurable reduction in retries, elapsed time, tool calls, or human
   intervention due to evolved Skill reuse.
@@ -2333,8 +3026,12 @@ What is not yet proven:
 - Stable app-scoped Skill operations snapshots across server restart.
 - Any observed transition from Run 5's S1-S7 fail state to a materialization,
   activation, or reuse pass state.
-- A mutating, service-owned proposal-to-materialization transition that creates
-  a convention-compliant Skill package and records the lifecycle change.
+- Live-route proof that the new mutating, service-owned
+  proposal-to-materialization transition creates a convention-compliant Skill
+  package and records the lifecycle change for a real `/api/chat/v2` task.
+- A reliable, version-stable legacy proposal API surface for before/after deltas.
+  Run 35 showed `/api/self-evolution/proposals` 404; this regression is not yet
+  explained or bounded by a fallback contract in tests.
 - Any autonomous transition from Run 8's `READY-WITH-GAPS` dry-run contract into
   a concrete Skill directory, activation record, usage log, or proposal lifecycle
   state change.
@@ -2437,20 +3134,51 @@ What is not yet proven:
   suppression, quality score, retry/compensation, lifecycle transition,
   materialization attempt, activation/reuse telemetry, or metric-baseline
   update for this workspace.
+- App-scoped reuse/optimization signal after 32 probes. Run 32 shows platform
+  growth with one unique procedure template, zero distinct reusable content,
+  no activation/reuse telemetry, and no lifecycle transitions.
+- Run 33/34 confirmed the same signal pattern under direct reuse-consistency
+  pressure: capture growth continued, app-scoped growth stalled in Run 34, and
+  all evidence remained Draft-only with the same single `reusable_procedure` text.
+- Run 35 confirmed app-scoped backlog pressure still does not create a governed
+  transition lane: app-scoped proposals rose to 30, but lifecycle/action,
+  materialization, registry, usage, and completedSummary evidence stayed flat.
+- Run 36 confirmed the route-clean service boundary still creates a new
+  app-scoped Draft proposal after completion, but processing state, governance
+  records, curation, telemetry, materialization, and activation evidence all
+  stayed flat.
+- Run 37 confirmed the same boundary again and improved artifact evidence
+  binding for the current proposal, but lifecycle variance, distinct reusable
+  procedure content, processing, governance, materialization, registry, usage,
+  and activation evidence all stayed flat.
+- Observability integrity. Run 31 exposed non-monotonic `captured_at` in an
+  ops-before/after pair, so run-to-run deltas now require snapshot-order
+  validation before interpretation.
+- Endpoint hygiene. Run 35 showed several proposal-looking endpoints return 404;
+  this is a false-positive failure mode unless the app-scoped Skill operations
+  route is also unavailable.
+- Endpoint-surface fidelity. Run 36 showed the canonical route may not preserve
+  the same historical/global population previously seen through the legacy
+  route; monitoring must treat mixed-route deltas as non-comparable.
+- Completion-boundary timing. Run 37 showed app-scoped proposal capture should
+  be checked after `proposal_created`; snapshots taken before decorated
+  completion can correctly show app-scoped count 0.
 
 Current strongest repair hypothesis:
 
-- Add a governed proposal-to-materialization transition gate after proposal
-  capture. Only after that exists should activation, reuse telemetry, review
-  lifecycle transitions, and optimization metrics be instrumented. Without the
-  materialization gate, the system should be described as "experience proposal
-  capture" or `PRE-EXECUTION GOVERNANCE`, not "closed-loop Skill
-  self-optimization." Run 8 narrowed this from an abstract hypothesis into a
-  dry-run contract; the unproven part is still the mutating service-owned
-  transition and its downstream activation/reuse telemetry. Run 9 confirmed that
-  the dry-run contract alone does not trigger that transition. Run 10 confirmed
-  that draft-content authoring exists, but remains on the governance-artifact
-  side of the boundary until a materializer owns the mutation. Run 11 added an
+- Add an autonomous operator that invokes the governed
+  proposal-to-materialization transition after proposal capture and processing.
+  The service capability now exists, but only after the live platform invokes it
+  and records registry/load-path, activation, reuse telemetry, review lifecycle
+  transitions, and optimization metrics should the system be described as
+  closed-loop Skill self-optimization. Until then, the platform should be
+  described as "experience proposal capture plus service-owned materialization
+  capability." Run 8 narrowed this from an abstract hypothesis into a dry-run
+  contract; the remaining unproven part is live autonomous invocation plus
+  downstream activation/reuse telemetry. Run 9 confirmed that the dry-run
+  contract alone does not trigger that transition. Run 10 confirmed that
+  draft-content authoring exists, but remains on the governance-artifact side of
+  the boundary until a materializer owns the mutation. Run 11 added an
   operational failure sample: failed executions do not generate proposals or
   optimization artifacts, so provider-failure recovery remains outside the
   proven self-evolution loop. Run 12 showed the next task can complete after
@@ -2510,7 +3238,223 @@ Current strongest repair hypothesis:
   self-optimizing until evidence exists at all five phases, not merely at the
   proposal-capture phase. Run 30 adds that the lane must also be app-scoped and
   backlog-aware: platform curation artifacts from another workspace are not
-  evidence of autonomous pressure on this app's self-evolution backlog.
+  evidence of autonomous pressure on this app's self-evolution backlog. Run 31
+  confirms app-scoped evidence is still isolated and exposes snapshot-ordering
+  fragility in one ops pair. Run 32 adds that the growing proposal volume is
+  template-redundant (`reusable_procedure` single template across 2,382
+  proposals) and still lacks downstream lifecycle, registry, usage, or reuse
+  binding. Run 33 verified the reproducible capture path remains live, and Run 34
+  confirmed explicit reuse-consistency prompting still cannot produce proposal
+  materialization, non-null `completedSummary` binding, or new app-scoped
+  growth. Run 35 adds that backlog-pressure repair should expose a single
+  canonical app-scoped operations/query surface and avoid undocumented
+  proposal-like endpoints; the correct operations route still works, but it only
+  proves capture, not transition. Run 36 adds that even on the canonical route,
+  capture only appears after the decorated completion boundary and remains
+  Draft-only; the required repair is still a service-owned processing lane with
+  app-scoped identity fidelity, queue/processor state, policy-gated lifecycle
+  transitions, materialization output, registry/load-path integration, and
+  activation/reuse telemetry. Run 37 adds that artifact evidence binding can be
+  present on the captured proposal, so the next repair should preserve that
+  evidence quality while adding the missing transition lane rather than merely
+  creating more Draft proposals.
+
+### Implementation Repair Slice: Autonomous Materialization Operator Exposure
+
+- Time: 2026-05-24 afternoon Asia/Shanghai.
+- Scope: service-owned autonomous materialization operator exposure, not a full
+  live closed-loop proof.
+- OpenSpec change:
+  `openspec/changes/add-skill-autonomous-materialization-operator`.
+- Added proof surface:
+  - `service.skill` operator run command is callable through SDK.
+  - `service.skill` operator snapshot command returns recent body-free operator
+    run mementos.
+  - `/api/apps/{app_id}/skills/operations` includes
+    `materialization_operator` counts and recent run refs.
+  - `/api/apps/{app_id}/skills/operations/materialization/operator/run`
+    forwards a typed operator command through the SDK. Web supplies transport
+    fields only; processing, materialization, policy admission, target
+    resolution, mutation, and result mementos stay service-owned.
+- Verification:
+  - `cargo test -p macaca-skill autonomous_operator --manifest-path macaca/Cargo.toml`
+    passed: 3 tests.
+  - `cargo test -p macaca-runtime-host materialization_operator --manifest-path macaca/Cargo.toml`
+    passed: 2 tests.
+  - `cargo test -p macaca-sdk unavailable_skill_client_rejects_autonomous_materialization --manifest-path macaca/Cargo.toml`
+    passed: 1 test.
+  - `cargo test -p macaca-web skill_operations_routes_remain_thin_sdk_adapters --manifest-path macaca/Cargo.toml`
+    passed: 1 test.
+  - `cargo check -p macaca-web --manifest-path macaca/Cargo.toml` passed.
+  - `openspec validate add-skill-autonomous-materialization-operator --strict`
+    passed.
+  - `git diff --check` passed.
+- Remaining blocker:
+  - This repair makes the operator triggerable and observable, but it does not
+    yet prove the full P1-P5 live chain. The next wake must run a real
+    `/api/chat/v2` task, call the operator with explicit policy/evidence/package
+    refs, then verify proposal-linked package materialization, registry/load-path
+    availability, usage telemetry, and later-task optimization metrics.
+
+### Live Proof Update: Run 44/45 Materialization And Usage Telemetry
+
+- Time: 2026-05-24 17:50-17:55 Asia/Shanghai.
+- Server: restarted from `macaca/` with
+  `cargo run --bin macaca-web-server -- --port 3001`, so the live proof used the
+  current source and loaded `config/default.toml`.
+- Code repair under test:
+  `macaca/crates/shells/macaca-web/src/skill_mcp.rs` now records
+  service-owned governance usage when a session-scoped skill snapshot contains
+  an `Active` governed skill. The event is non-blocking and writes
+  `SkillUsageEventKind::Activated`, which increments both `activation_count` and
+  `use_count`.
+- Verification before live run:
+  - `cargo test -p macaca-web activation_usage_commands_only_cover_active_governed_snapshot_skills --manifest-path macaca/Cargo.toml`
+    passed.
+  - `cargo check -p macaca-web --manifest-path macaca/Cargo.toml` passed.
+- Run 44:
+  - Real `/api/chat/v2` session:
+    `be15fe8e-68ca-4e08-ae1d-3b2d2a010e45`.
+  - SSE path: `/tmp/macaca_live_run44.sse`.
+  - Artifact:
+    `/Users/quantum/.macaca/workspaces/a9435a4b-d123-5a4c-b0b7-d9b1342089ea/shared/self_evolution_live_proof_44.md`.
+  - SSE contained `skill_snapshot_cache_hit`, `delegated_task_complete`,
+    `skill_self_evolution_observer` `agent_execution_completed_seen`, and
+    `skill_self_evolution_observer` `proposal_created`.
+  - The delegated task directly read the previously materialized
+    `available_skills/skill_exp_1590b4d7_0aa7_4d87_ad40_14e222b2394b_1779614687697856000/SKILL.md`,
+    proving load-path visibility to the live agent.
+- Restart caveat found:
+  - After the server restart, the existing `available_skills` filesystem
+    projection survived, but `/skills/operations` reported
+    `governance_records: 0`. This means the current governance snapshot is not
+    fully reconstructed from already-materialized package files after process
+    restart. Do not treat persisted package files alone as persisted governance
+    state.
+- Current-process materialization rerun:
+  - The first operator run was correctly `Denied` because the operator command
+    omitted required evidence refs.
+  - The second operator run included evidence refs and returned `Applied`,
+    `mutated: true`, selected
+    `skill-exp-0bd3b7f3-6797-40d8-ba1a-d53409bb4536-1779616302740038000`,
+    and wrote
+    `/Users/quantum/.macaca/workspaces/apps/fullstack-autodev/skills/skill-exp-0bd3b7f3-6797-40d8-ba1a-d53409bb4536-1779616302740038000/SKILL.md`.
+  - Before the follow-up task, the Active governance record existed but telemetry
+    was still `activation_count: 0`, `use_count: 0`.
+- Run 45:
+  - Real `/api/chat/v2` follow-up task confirmed
+    `available_skills/skill_exp_0bd3b7f3_6797_40d8_ba1a_d53409bb4536_1779616302740038000/SKILL.md`.
+  - Artifact:
+    `/Users/quantum/.macaca/workspaces/a9435a4b-d123-5a4c-b0b7-d9b1342089ea/shared/self_evolution_live_proof_45.md`.
+  - After the session-scoped snapshot load, `/skills/operations` showed the
+    Active governed skill telemetry advanced to `activation_count: 1`,
+    `use_count: 1`, and `last_used_at:
+    2026-05-24T09:55:06.984501Z`.
+- Verdict:
+  - Live proposal capture: proven.
+  - Proposal processing and materialization: proven in the current service
+    process with explicit evidence/policy/package refs.
+  - Proposal-linked Skill package: proven by the written app skill package.
+  - Registry/load-path projection: proven by run 45 reading the
+    underscore-normalized `available_skills` entry and its `SKILL.md`.
+  - Usage telemetry: proven for session-scoped snapshot activation in the current
+    service process.
+  - Remaining blocker: governance records do not yet appear to recover from
+    already-materialized package files after a server restart, and the
+    optimization metric is still limited to visibility/activation evidence rather
+    than token/tool/time reduction across a controlled repeated workload.
+
+### Live Proof Update: Run 46/47 Semantic Skill And Successful Task Telemetry
+
+- Time: 2026-05-24 21:44-21:52 Asia/Shanghai.
+- Server: restarted from current source with
+  `cargo run --bin macaca-web-server -- --port 3001` after stopping the prior
+  DB-locking process on port 3001.
+- Code repair under test:
+  `macaca/crates/shells/macaca-web/src/skill_usage_telemetry.rs` records a
+  best-effort `SuccessfulTask` usage event through the Skill service when Agent
+  Execution completes and the cached session Skill snapshot contains an Active
+  governed Skill.
+- Pre-live verification:
+  - `cargo test -p macaca-web skill_usage_telemetry -- --nocapture` passed.
+  - `cargo test -p macaca-web skill_self_evolution_observer -- --nocapture`
+    passed.
+  - `cargo check -p macaca-web` passed.
+  - `openspec validate record-skill-task-outcome-telemetry --strict` passed.
+- Run 46 seed task:
+  - Real `/api/chat/v2` SSE:
+    `/tmp/macaca_self_evolution_fullstack_seed_20260524214525.sse`.
+  - Task id: `c45f3c17-9648-4585-b302-66251fb0bd21`.
+  - Session id: `92fe193d-ebff-42a8-af30-0b9f5721cc17`.
+  - Artifact:
+    `/Users/quantum/.macaca/workspaces/a9435a4b-d123-5a4c-b0b7-d9b1342089ea/shared/self_evolution_successful_task_seed_${RUN_ID}.md`
+    (`14777` bytes).
+  - SSE contained `delegated_task_complete`,
+    `skill_self_evolution_observer: agent_execution_completed_seen`, and
+    `skill_self_evolution_observer: proposal_created`.
+  - Proposal created:
+    `skill-exp-c45f3c17-9648-4585-b302-66251fb0bd21-1779630385146742000`.
+  - Semantic target name:
+    `materialization-skill-package-registry-load-path-usage-telemetry`.
+- Current-process materialization:
+  - Operator command used explicit evidence refs, policy decision refs,
+    `entitlement_ready: true`, and `package_ready: true`.
+  - Result: `Applied`, `mutated: true`, `promoted: true`.
+  - Selected proposal:
+    `skill-exp-c45f3c17-9648-4585-b302-66251fb0bd21-1779630385146742000`.
+  - Skill id:
+    `skill://agent/materialization-skill-package-registry-load-path-usage-telemetry`.
+  - Source package:
+    `/Users/quantum/.macaca/workspaces/a9435a4b-d123-5a4c-b0b7-d9b1342089ea/skills/materialization-skill-package-registry-load-path-usage-telemetry/SKILL.md`.
+  - Registry/load-path projection:
+    `/Users/quantum/.macaca/workspaces/a9435a4b-d123-5a4c-b0b7-d9b1342089ea/available_skills/materialization_skill_package_registry_load_path_usage_telemetry/SKILL.md`.
+  - `GET /api/apps/a9435a4b-d123-5a4c-b0b7-d9b1342089ea/skills?agent=coordinator`
+    returned the semantic Skill in the visible list with `source: workspace`.
+- Before Run 47 telemetry:
+  - `activation_count: 0`
+  - `use_count: 0`
+  - `successful_task_count: 0`
+  - `patch_count: 1`
+  - `record_count: 1`
+- Run 47 follow-up task:
+  - Real `/api/chat/v2` SSE:
+    `/tmp/macaca_self_evolution_successful_task_followup_20260524214951.sse`.
+  - Task id: `98995b3e-7196-4055-b22b-be9b63f16c90`.
+  - Artifact:
+    `/Users/quantum/.macaca/workspaces/a9435a4b-d123-5a4c-b0b7-d9b1342089ea/shared/self_evolution_successful_task_followup_${RUN_ID}.md`
+    (`4669` bytes).
+  - SSE contained `delegated_task_complete`,
+    `skill_self_evolution_observer: agent_execution_completed_seen`, and
+    `skill_self_evolution_observer: proposal_created`.
+- After Run 47 telemetry for
+  `materialization-skill-package-registry-load-path-usage-telemetry`:
+  - `activation_count: 1`
+  - `use_count: 1`
+  - `successful_task_count: 1`
+  - `patch_count: 1`
+  - `record_count: 1`
+  - `last_successful_task_at: 2026-05-24T13:50:33.832580Z`
+  - `last_used_at: 2026-05-24T13:49:56.252441Z`
+- Quantified follow-up optimization signal:
+  - Seed artifact bytes: `14777`; follow-up artifact bytes: `4669`
+    (`-10108`, about `68.4%` smaller).
+  - Seed SSE bytes: `45258`; follow-up SSE bytes: `35700`
+    (`-9558`, about `21.1%` smaller).
+  - Seed delegated tool calls: `10`; follow-up delegated tool calls: `9`
+    (`-1`, `10%` fewer).
+  - This is a bounded repeat-workload signal, not yet a normalized token/time
+    benchmark. It is sufficient to prove the later-task telemetry repair and a
+    measurable repeat-task delta in this live run.
+- Verdict:
+  - Live proposal capture: proven again.
+  - Proposal-linked semantic Skill package: proven.
+  - Registry/load-path projection: proven through API visible list and
+    `available_skills` projection.
+  - Usage telemetry: proven for activation/use and successful task outcome.
+  - Later-task measurable delta: proven for artifact size, SSE size, and tool
+    call count on this bounded workload.
+  - Remaining blocker: restart recovery of governed records from previously
+    materialized packages is still not proven by this run.
 
 ## Next Wake Instructions
 
@@ -2526,3 +3470,233 @@ On each wake:
    the user explicitly asks to promote a candidate.
 7. Keep the diagnosis honest: do not claim Skill optimization until there is
    materialization or reuse evidence.
+
+### 10-20 Minute Wake Plan (new)
+
+Suggested cadence: every 15 minutes (can be 10–20 minute adaptive).
+
+- Run A (app-scoped routing): `app_scoped_backlog_routing_probe_loop`.
+- Run B (reusability probe): `reusability_probe_loop`.
+- Run C (diagnostic delta): `autonomous_compensation_governance_pressure_loop`.
+- Run D (contract smoke): `proposal_materialization_contract_smoke_loop`.
+
+Cycle recommendation: A → B → C → D, then repeat as Run `n+4` groups (e.g., 36–39, 40–43, ...), unless a hard stop criterion is met.
+
+Each wake should log:
+- Time, session id, task id, SSE path, artifact path.
+- `captured_at` delta between before/after snapshots must be checked first.
+- Proposal-id, destination, lifecycle, classification, and candidate summary
+  fields.
+- App-scoped counts, platform-wide counts, and post-run count deltas.
+- `completedSummary`, `registry/load-path/usage`, and activation/reuse telemetry.
+- Final verdict for: `proposal routing`, `materialization`, `activation/usage`,
+  `optimization metric`.
+- If API probes show any undocumented route instability, document it immediately in
+  a dedicated "Endpoint Regression" subsection before run interpretation.
+
+Stop criteria for the run chain:
+- Any run shows a non-null `completedSummary` linked to proposal slug and a
+  non-Draft lifecycle transition.
+- Any run shows proposal-derived `available_skills` materialization with
+  verifiable registry/use-path reference.
+  - Any run produces measurable reductions in repeat-task signal baselines
+  (tool calls/token/time/failures) from this same workload.
+
+Execution note:
+
+- A heartbeat monitor named `Macaca self-evolution live monitor` is already active
+  on this thread at a 15-minute interval. It uses this report as the canonical
+  source of truth and continues unless manually stopped.
+
+## Run 48 - Restart Recovery Proof for Materialized Skill Governance
+
+- Date: 2026-05-24.
+- Goal: prove that a restarted backend can recover governance records from
+  already materialized Skill packages, not only keep registry projection alive.
+- Pre-fix observed break:
+  - Source package existed at
+    `/Users/quantum/.macaca/workspaces/a9435a4b-d123-5a4c-b0b7-d9b1342089ea/skills/materialization-skill-package-registry-load-path-usage-telemetry/SKILL.md`.
+  - Registry/load-path projection existed under `available_skills`.
+  - Restarted `/skills/operations` previously returned zero governance records.
+- Fix implemented:
+  - Runtime-host Skill provider now accepts generic materialized Skill roots and
+    restores missing governance identity from bounded `SKILL.md` frontmatter plus
+    proposal/task/trace provenance refs.
+  - Web remains a composition root only: it passes configured application
+    `skills/` roots and existing workspace `*/skills` roots into `service.skill`.
+  - Recovery emits a `Created` usage observation through the Skill service
+    governance event path. It does not restore historical activation/use/success
+    counters from logs.
+- Restart proof:
+  - Stopped the old listener on `:3001`.
+  - Started current source with
+    `cargo run --bin macaca-web-server -- --port 3001`.
+  - Runtime logs showed governance snapshot recovery with `records=4`.
+  - HTTP `/api/apps/a9435a4b-d123-5a4c-b0b7-d9b1342089ea/skills/operations`
+    returned the target record:
+    - `name: materialization-skill-package-registry-load-path-usage-telemetry`
+    - `skill_id: skill://agent/materialization-skill-package-registry-load-path-usage-telemetry`
+    - `lifecycle: Active`
+    - `source_scope: workspace`
+    - `source: /Users/quantum/.macaca/workspaces/a9435a4b-d123-5a4c-b0b7-d9b1342089ea/skills/materialization-skill-package-registry-load-path-usage-telemetry`
+    - `evidence_ids: [skill-exp-c45f3c17-9648-4585-b302-66251fb0bd21-1779630385146742000]`
+    - telemetry counters after restart recovery are intentionally zero because
+      only identity was recovered from package provenance.
+  - HTTP `/api/apps/a9435a4b-d123-5a4c-b0b7-d9b1342089ea/skills?agent=coordinator`
+    returned:
+    - `visible_count: 21`
+    - matching skill source `workspace`
+    - matching projected location
+      `/Users/quantum/.macaca/workspaces/a9435a4b-d123-5a4c-b0b7-d9b1342089ea/available_skills/materialization_skill_package_registry_load_path_usage_telemetry/SKILL.md`
+- Verification:
+  - `cargo test -p macaca-runtime-host restart_recovers_active_governance_record_from_materialized_package -- --nocapture`
+  - `cargo test -p macaca-runtime-host proposal_materialization -- --nocapture`
+  - `cargo test -p macaca-runtime-host materialization_operator -- --nocapture`
+  - `cargo check -p macaca-runtime-host`
+  - `cargo check -p macaca-web`
+  - `openspec validate restore-skill-governance-from-materialized-packages --strict`
+  - `git diff --check`
+- Verdict:
+  - Restart recovery of governance identity from materialized packages: proven.
+  - Registry/load-path after restart: proven.
+  - Historical usage counter persistence after restart: not claimed in this run;
+    package provenance recovery restores identity only. Future durable Store or
+    EventLog replay can restore counters if required.
+
+## Run 49 - Gap Verification After Restart Recovery
+
+- Date: 2026-05-24.
+- Goal: verify the remaining gaps directly after Run 48, with emphasis on
+  automatic reuse, usage telemetry durability, later-task metric deltas, and
+  whether the agent's own self-evolution audit uses canonical service evidence.
+- Baseline after restart:
+  - `/api/apps/a9435a4b-d123-5a4c-b0b7-d9b1342089ea/skills/operations`
+    returned the semantic target as `Active`.
+  - Target:
+    `materialization-skill-package-registry-load-path-usage-telemetry`.
+  - Baseline telemetry was intentionally reset by restart recovery:
+    - `activation_count: 0`
+    - `use_count: 0`
+    - `successful_task_count: 0`
+  - Registry/load-path still exposed the target through
+    `/api/apps/a9435a4b-d123-5a4c-b0b7-d9b1342089ea/skills?agent=coordinator`
+    with `visible_count: 21` and the projected location
+    `/Users/quantum/.macaca/workspaces/a9435a4b-d123-5a4c-b0b7-d9b1342089ea/available_skills/materialization_skill_package_registry_load_path_usage_telemetry/SKILL.md`.
+- Real follow-up task:
+  - Request capture:
+    `/tmp/macaca-self-evolution-gap-proof/run49-chat-20260524225840.json`.
+  - SSE capture:
+    `/tmp/macaca-self-evolution-gap-proof/run49-chat-20260524225840.sse`.
+  - Session id: `a8243b4a-5c8c-4a6c-b79d-a21ae7f6908e`.
+  - Delegated task id: `699d6d32-4a63-4d3a-a82a-78e289d8d0bc`.
+  - Artifact:
+    `/Users/quantum/.macaca/workspaces/a9435a4b-d123-5a4c-b0b7-d9b1342089ea/shared/self_evolution_gap_run49_20260524225840.md`.
+  - SSE metrics:
+    - bytes: `145055`
+    - delegated tool calls: `66`
+    - delegated tool results: `66`
+    - `skill_self_evolution_observer` events: `2`
+    - `proposal_created` events: `1`
+  - The run completed through the real `/api/chat/v2` path and created proposal
+    `skill-exp-699d6d32-4a63-4d3a-a82a-78e289d8d0bc-1779634859441862000`.
+- Canonical service telemetry after the task:
+  - `/skills/operations` showed the target record advanced from zero counters to:
+    - `activation_count: 1`
+    - `use_count: 1`
+    - `successful_task_count: 1`
+    - `last_used_at: 2026-05-24T14:58:41.005430Z`
+    - `last_successful_task_at: 2026-05-24T15:00:59.490255Z`
+  - Additional evidence ids were attached:
+    - `eventlog://sessions/a8243b4a-5c8c-4a6c-b79d-a21ae7f6908e/skill_snapshot/coordinator`
+    - `eventlog://sessions/a8243b4a-5c8c-4a6c-b79d-a21ae7f6908e/agent_execution/coordinator/699d6d32-4a63-4d3a-a82a-78e289d8d0bc`
+- Restart durability check:
+  - Stopped the server and restarted current source with
+    `cargo run --bin macaca-web-server -- --port 3001`.
+  - After restart, `/skills/operations` again recovered the target record as
+    `Active` with proposal evidence, and `/skills?agent=coordinator` still
+    exposed the projected workspace Skill.
+  - The three Run 49 usage counters did not persist:
+    - `activation_count: 0`
+    - `use_count: 0`
+    - `successful_task_count: 0`
+  - This proves usage telemetry is currently process-local or otherwise not
+    replayed from durable evidence, even though governance identity recovery now
+    works.
+- Agent self-audit quality finding:
+  - The agent-written artifact claimed "zero telemetry infrastructure",
+    "no runtime load-path enumeration mechanism", and "no restart-recovery".
+  - Those statements conflict with canonical service API evidence from the same
+    run: `/skills/operations` had live usage telemetry, `/skills?agent=coordinator`
+    enumerated the load path, and Run 48/49 restart recovery restored governance
+    identity.
+  - The artifact is therefore useful as a negative-control sample: a live agent
+    can still over-weight filesystem-only probes and miss service-owned truth.
+- Verdict:
+  - Real later-task activation/use/success telemetry in the current process:
+    proven.
+  - Registry/load-path availability after restart: still proven.
+  - Durable historical usage counter replay after restart: not proven; failed in
+    this run.
+  - Automatic reuse semantics: partially proven only as session snapshot
+    activation. The task did not prove that the agent selected the semantic Skill
+    body because of trigger matching, and the artifact quality shows the reuse
+    path is not yet robust enough to trust without API-side validation.
+  - Quantified optimization: not improved in this run. The task used `66`
+    delegated tool calls and produced a `145055` byte SSE stream, so Run 47's
+    smaller repeat-task delta did not generalize to this broader gap audit.
+
+## Run 50 - Closed-Loop Gap Fix Implementation
+
+- Date: 2026-05-24.
+- Goal: fix the two concrete Run 49 gaps without moving Skill semantics into
+  Web or application code:
+  - durable usage telemetry replay;
+  - canonical API-first self-evolution audit/trigger verification.
+- OpenSpec:
+  - Added `fix-skill-telemetry-replay-api-first-audit`.
+  - The delta requires replay of sanitized `Created`, `Activated`, and
+    `SuccessfulTask` governance events after restart.
+  - The delta also requires an API-first audit adapter that checks operations,
+    registry/load-path, and EventLog observer evidence before any filesystem
+    support evidence.
+- Runtime-host fix:
+  - Added a local append-only JSONL governance event journal for the built-in
+    Skill provider.
+  - The provider now replays the journal into `SkillGovernanceReadModel` on
+    startup before materialized package recovery runs.
+  - Materialized package recovery remains identity/provenance recovery only and
+    no longer masks the lack of telemetry replay when a journal exists.
+  - The journal persists only already-sanitized `SkillGovernanceEventRecord`
+    values; it does not store raw prompts, raw provider payloads, full Skill
+    bodies, package bytes, credentials, or application-specific task content.
+- Web/API-first fix:
+  - Added `GET /api/apps/{app_id}/skills/self-evolution/audit`.
+  - Required query fields:
+    - `agent`
+    - `target_skill`
+    - optional `session_id` for EventLog observer evidence
+  - The route aggregates canonical evidence from:
+    - Skill operations governance snapshot;
+    - Skill runtime registry/load-path snapshot;
+    - EventLog `skill_self_evolution_observer` or `skill_snapshot*` events.
+  - The response returns `passed` only when all canonical categories are present
+    and otherwise reports explicit missing categories.
+- Verification:
+  - Red/green check:
+    `cargo test -p macaca-runtime-host skill_governance_usage_telemetry_replays_from_durable_journal_after_restart -- --nocapture`
+    initially failed because `with_governance_event_journal_path` did not exist,
+    then passed after implementation.
+  - `cargo test -p macaca-runtime-host skill_service_usage_tests -- --nocapture`
+    passed.
+  - `cargo test -p macaca-web skill_self_evolution_audit -- --nocapture`
+    passed.
+  - `cargo check -p macaca-runtime-host -p macaca-web` passed.
+  - `openspec validate fix-skill-telemetry-replay-api-first-audit --strict`
+    passed.
+- Verdict:
+  - Durable usage telemetry replay is now covered by service-owned replay tests.
+  - API-first audit/trigger verification now has a canonical Web diagnostic
+    surface and tests proving it fails closed when canonical evidence is missing.
+  - A full live `/api/chat/v2` restart proof should be rerun next to update Run
+    49's failed live verdict with real process restart evidence from the new
+    journal.

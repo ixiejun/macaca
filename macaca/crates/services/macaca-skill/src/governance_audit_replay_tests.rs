@@ -5,12 +5,11 @@ use macaca_proto::TraceContext;
 
 use crate::{
     SkillAliasKind, SkillAliasRecord, SkillAliasResolutionPolicy, SkillAuthorKind,
-    SkillCurationRunRecord, SkillEvolutionCandidateClassification,
-    SkillEvolutionProposalAction, SkillEvolutionProposalLifecycle, SkillExperienceCandidate,
-    SkillExperienceCandidateDestination, SkillExperienceEvidenceGateStatus,
-    SkillExperienceProposalRecord, SkillGovernanceEventPayload, SkillGovernanceEventRecord,
-    SkillGovernanceReadModel, SkillRollbackRefRecord, SkillServiceScope, SkillUsageEventKind,
-    SkillUsageObservation,
+    SkillCurationRunRecord, SkillEvolutionCandidateClassification, SkillEvolutionProposalAction,
+    SkillEvolutionProposalLifecycle, SkillExperienceCandidate, SkillExperienceCandidateDestination,
+    SkillExperienceEvidenceGateStatus, SkillExperienceProposalRecord, SkillGovernanceEventPayload,
+    SkillGovernanceEventRecord, SkillGovernanceReadModel, SkillRollbackRefRecord,
+    SkillServiceScope, SkillUsageEventKind, SkillUsageObservation,
 };
 
 fn scope() -> SkillServiceScope {
@@ -66,7 +65,10 @@ fn lifecycle_observation(event_kind: SkillUsageEventKind) -> SkillUsageObservati
     let mut metadata = BTreeMap::new();
     metadata.insert("task_id".into(), "task-audit-replay".into());
     metadata.insert("action_ref".into(), "skill.content.mutate://audit".into());
-    metadata.insert("target_skill_id".into(), "skill://agent/audit-target".into());
+    metadata.insert(
+        "target_skill_id".into(),
+        "skill://agent/audit-target".into(),
+    );
     SkillUsageObservation {
         skill_id: "skill://agent/audit-target".into(),
         name: "audit-target".into(),
@@ -124,7 +126,10 @@ fn audit_replay_reconstructs_skill_governance_histories_from_events() {
         dry_run: false,
         candidate_count: 2,
         actions: vec!["archive".into(), "alias".into()],
-        snapshot_refs: vec!["store://snapshot/before".into(), "store://snapshot/after".into()],
+        snapshot_refs: vec![
+            "store://snapshot/before".into(),
+            "store://snapshot/after".into(),
+        ],
         started_at: Utc::now(),
         finished_at: Some(Utc::now()),
         run_json_ref: Some("store://reports/run.json".into()),
@@ -200,7 +205,10 @@ fn audit_replay_reconstructs_skill_governance_histories_from_events() {
     assert_eq!(read_model.records.len(), 1);
     assert_eq!(read_model.records[0].telemetry.patch_count, 1);
     assert_eq!(read_model.aliases.len(), 1);
-    assert_eq!(read_model.aliases[0].target_skill_id, "skill://agent/audit-target");
+    assert_eq!(
+        read_model.aliases[0].target_skill_id,
+        "skill://agent/audit-target"
+    );
     assert_eq!(read_model.curation_runs.len(), 1);
     assert_eq!(
         read_model.curation_runs[0].policy_decision_ids,

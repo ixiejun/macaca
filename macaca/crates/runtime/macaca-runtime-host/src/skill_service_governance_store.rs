@@ -35,6 +35,14 @@ impl SkillGovernanceStoreStrategy for SkillProviderGovernanceState {
             "skill governance event appended through local compatibility adapter"
         );
         self.event_log.lock().await.push(event.clone());
+        if let Err(error) = self.persist_governance_event_journal(&event).await {
+            tracing::warn!(
+                event_id = %event.event_id,
+                trace_id = %event.trace_id,
+                error = %error,
+                "skill governance event durable journal append failed"
+            );
+        }
         Ok(event)
     }
 

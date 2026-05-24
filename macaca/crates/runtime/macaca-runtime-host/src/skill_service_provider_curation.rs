@@ -336,6 +336,7 @@ impl SkillProviderGovernanceState {
         let records = self.records.lock().await.clone();
         let aliases = self.aliases.lock().await.clone();
         let proposals = self.proposals.lock().await.clone();
+        let proposal_processing = self.proposal_processing.lock().await.clone();
         let event_log = self.event_log.lock().await.clone();
         let rollback_ref = format!(
             "store://skill-curation/{}/rollback-{}",
@@ -353,6 +354,7 @@ impl SkillProviderGovernanceState {
             records,
             aliases,
             proposals,
+            proposal_processing,
             event_log,
             report_refs: Vec::new(),
             package_memento_refs: vec![rollback_ref],
@@ -376,6 +378,7 @@ impl SkillProviderGovernanceState {
         *self.records.lock().await = memento.records.clone();
         *self.aliases.lock().await = memento.aliases.clone();
         *self.proposals.lock().await = memento.proposals.clone();
+        *self.proposal_processing.lock().await = memento.proposal_processing.clone();
         *self.event_log.lock().await = memento.event_log.clone();
 
         let restored_read_model = SkillGovernanceReadModel::from_events(memento.event_log.clone());

@@ -11,7 +11,7 @@ use macaca_proto::MacacaResult;
 use crate::state::AppState;
 use crate::{
     app_ui_routes, chat_orchestrator, genui_routes, heartbeat_operations_routes, loop_manager,
-    metrics, plugin_routes, routes, session, skill_operations_routes,
+    metrics, plugin_routes, routes, session, skill_operations_routes, skill_self_evolution_audit,
 };
 
 /// Canonical builder for starting the web server.
@@ -127,8 +127,16 @@ impl WebRuntimeFacade {
                 post(skill_operations_routes::post_skill_curation_rollback),
             )
             .route(
+                "/api/apps/{app_id}/skills/operations/materialization/operator/run",
+                post(skill_operations_routes::post_skill_materialization_operator_run),
+            )
+            .route(
                 "/api/apps/{app_id}/skills/operations/evaluation/report",
                 post(skill_operations_routes::post_skill_evaluation_report),
+            )
+            .route(
+                "/api/apps/{app_id}/skills/self-evolution/audit",
+                get(skill_self_evolution_audit::get_skill_self_evolution_audit),
             )
             .route(
                 "/api/apps/{app_id}/skills/operations/proposals/{proposal_id}/promote",

@@ -7,19 +7,22 @@
 //! providers to replace the in-memory implementation.
 
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 
 use macaca_skill::{
     SkillAliasRecord, SkillAliasResolutionStatus, SkillAliasResolveCommand,
     SkillAliasResolveResult, SkillAliasSnapshotResult, SkillAliasUpsertCommand,
-    SkillAliasUpsertResult, SkillCurationLifecycleAction, SkillCurationLifecycleCommand,
-    SkillCurationLifecycleResult, SkillCurationSupersedeCommand,
+    SkillAliasUpsertResult, SkillAutonomousMaterializationRunResult,
+    SkillAutonomousMaterializationSnapshotCommand, SkillAutonomousMaterializationSnapshotResult,
+    SkillAutonomousMaterializationStatusCounts, SkillCurationLifecycleAction,
+    SkillCurationLifecycleCommand, SkillCurationLifecycleResult, SkillCurationSupersedeCommand,
     SkillExperienceDestinationRouteResult, SkillExperienceProposalCommand,
     SkillExperienceProposalRecord, SkillExperienceProposalResult,
     SkillExperienceProposalSnapshotResult, SkillGovernanceEventPayload, SkillGovernanceEventRecord,
     SkillGovernanceRecord, SkillGovernanceRecordUsageCommand, SkillGovernanceRecordUsageResult,
     SkillGovernanceSnapshotResult, SkillGovernanceStoreStrategy, SkillLifecycleState,
     SkillLifecycleStateMachine, SkillPinnedMutationGuard, SkillPinnedMutationOperation,
-    SkillTelemetryAggregate, SkillUsageObservation,
+    SkillProposalProcessingRecord, SkillTelemetryAggregate, SkillUsageObservation,
 };
 use tokio::sync::Mutex;
 use tracing::{debug, info, warn};
@@ -34,7 +37,11 @@ pub(crate) struct SkillProviderGovernanceState {
     pub(crate) records: Mutex<BTreeMap<String, SkillGovernanceRecord>>,
     pub(crate) aliases: Mutex<BTreeMap<String, SkillAliasRecord>>,
     pub(crate) proposals: Mutex<BTreeMap<String, SkillExperienceProposalRecord>>,
+    pub(crate) proposal_processing: Mutex<BTreeMap<String, SkillProposalProcessingRecord>>,
+    pub(crate) materialization_operator_runs: Mutex<Vec<SkillAutonomousMaterializationRunResult>>,
     pub(crate) event_log: Mutex<Vec<SkillGovernanceEventRecord>>,
+    pub(crate) event_journal_path: Mutex<Option<PathBuf>>,
+    pub(crate) event_journal_write_lock: Mutex<()>,
     pub(crate) curation_mementos: Mutex<BTreeMap<String, SkillCurationRollbackMemento>>,
 }
 
@@ -51,6 +58,7 @@ pub(crate) struct SkillCurationRollbackMemento {
     pub(crate) records: BTreeMap<String, SkillGovernanceRecord>,
     pub(crate) aliases: BTreeMap<String, SkillAliasRecord>,
     pub(crate) proposals: BTreeMap<String, SkillExperienceProposalRecord>,
+    pub(crate) proposal_processing: BTreeMap<String, SkillProposalProcessingRecord>,
     pub(crate) event_log: Vec<SkillGovernanceEventRecord>,
     pub(crate) report_refs: Vec<String>,
     pub(crate) package_memento_refs: Vec<String>,
@@ -145,6 +153,62 @@ impl SkillProviderGovernanceState {
             .cloned()
             .collect::<Vec<_>>();
         SkillTelemetryAggregate::from_records(records.iter())
+    }
+
+    /// Persist a bounded, body-free Memento for the most recent operator runs.
+    ///
+    /// This does not make the in-memory provider durable. It gives SDK/Web
+    /// surfaces a service-owned evidence source for the current process while
+    /// preserving the future Store/EventLog migration point: a durable provider
+    /// can replace this vector with append-only event persistence without
+    /// changing the command/result contract.
+    pub(crate) async fn record_materialization_operator_run(
+        &self,
+        result: SkillAutonomousMaterializationRunResult,
+    ) {
+        const MAX_OPERATOR_MEMENTOS: usize = 20;
+
+        let mut runs = self.materialization_operator_runs.lock().await;
+        runs.push(result);
+        if runs.len() > MAX_OPERATOR_MEMENTOS {
+            let overflow = runs.len() - MAX_OPERATOR_MEMENTOS;
+            runs.drain(0..overflow);
+        }
+    }
+
+    /// Return recent autonomous materialization operator evidence.
+    ///
+    /// Shells use this read model to display P3 materialization attempts without
+    /// recomputing lifecycle semantics or reading package files directly.
+    pub(crate) async fn materialization_operator_snapshot(
+        &self,
+        command: SkillAutonomousMaterializationSnapshotCommand,
+    ) -> SkillAutonomousMaterializationSnapshotResult {
+        let limit = if command.limit == 0 {
+            20usize
+        } else {
+            command.limit.min(20) as usize
+        };
+        let runs = self.materialization_operator_runs.lock().await;
+        let recent_runs = runs.iter().rev().take(limit).cloned().collect::<Vec<_>>();
+        let status_counts = SkillAutonomousMaterializationStatusCounts::from_runs(&recent_runs);
+        let last_run_ref = recent_runs.first().map(|run| run.run_id.clone());
+
+        tracing::info!(
+            trace_id = %command.trace.trace_id,
+            recent_runs = recent_runs.len(),
+            applied = status_counts.applied,
+            previewed = status_counts.previewed,
+            denied = status_counts.denied,
+            "skill autonomous materialization operator snapshot emitted"
+        );
+
+        SkillAutonomousMaterializationSnapshotResult {
+            recent_runs,
+            status_counts,
+            last_run_ref,
+            captured_at: chrono::Utc::now(),
+        }
     }
 
     /// Apply one metadata-only lifecycle transition to a governance record.

@@ -102,6 +102,12 @@ fn inline_manifest(name: &str, agent_count: usize) -> AppManifest {
         context: None,
         service_contract: None,
         ui: None,
+        // These declarative application fixtures intentionally exercise the
+        // classic manifest path without autonomous runtime declarations. The
+        // application framework owns autonomy as an optional manifest contract,
+        // so tests that do not opt in must state the absence explicitly instead
+        // of relying on field omission.
+        autonomy: None,
     }
 }
 
