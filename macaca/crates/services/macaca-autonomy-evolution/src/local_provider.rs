@@ -25,7 +25,8 @@ use crate::{
     EvolutionLiveTickCommand, EvolutionLiveTickResult, EvolutionReleaseCommand,
     EvolutionReleaseResult, EvolutionReleaseSafetyStrategy, EvolutionRunRecord,
     EvolutionServiceSnapshot, EvolutionSnapshotCommand, EvolutionTransitionCommand,
-    EvolutionTransitionResult, AUTONOMY_EVOLUTION_SERVICE_ID,
+    EvolutionTransitionResult, OsCodeEvolutionProposalAdapter, OsCodeEvolutionProposalCommand,
+    OsCodeEvolutionProposalResult, AUTONOMY_EVOLUTION_SERVICE_ID,
 };
 
 #[derive(Debug, Default, Clone)]
@@ -203,6 +204,20 @@ impl AutonomyEvolutionService for InMemoryAutonomyEvolutionProvider {
             "autonomy evolution release safety command received"
         );
         DefaultEvolutionReleaseSafetyStrategy.evaluate(&command)
+    }
+
+    async fn evaluate_os_code_proposal(
+        &self,
+        command: OsCodeEvolutionProposalCommand,
+    ) -> MacacaResult<OsCodeEvolutionProposalResult> {
+        info!(
+            service_id = AUTONOMY_EVOLUTION_SERVICE_ID,
+            proposal_id = command.proposal_id.as_str(),
+            run_id = command.run_id.as_str(),
+            trace_id = command.trace.trace_id.as_str(),
+            "autonomy evolution os-code proposal command received"
+        );
+        crate::DefaultOsCodeEvolutionProposalAdapter.evaluate(command)
     }
 
     async fn run_live_tick(

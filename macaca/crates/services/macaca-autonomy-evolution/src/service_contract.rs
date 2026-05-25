@@ -19,11 +19,13 @@ use crate::{
     EvolutionBenchmarkResult, EvolutionLiveAuditCommand, EvolutionLiveAuditResult,
     EvolutionLiveTickCommand, EvolutionLiveTickResult, EvolutionReleaseCommand,
     EvolutionReleaseResult, EvolutionScope, EvolutionServiceSnapshot, EvolutionSnapshotCommand,
-    EvolutionTransitionCommand, EvolutionTransitionResult, AUTONOMY_EVOLUTION_ADMISSION_COMMAND,
+    EvolutionTransitionCommand, EvolutionTransitionResult, OsCodeEvolutionProposalCommand,
+    OsCodeEvolutionProposalResult, AUTONOMY_EVOLUTION_ADMISSION_COMMAND,
     AUTONOMY_EVOLUTION_BENCHMARK_COMMAND, AUTONOMY_EVOLUTION_HEALTH_COMMAND,
     AUTONOMY_EVOLUTION_LIVE_AUDIT_COMMAND, AUTONOMY_EVOLUTION_LIVE_TICK_COMMAND,
-    AUTONOMY_EVOLUTION_RELEASE_COMMAND, AUTONOMY_EVOLUTION_SERVICE_ID,
-    AUTONOMY_EVOLUTION_SNAPSHOT_COMMAND, AUTONOMY_EVOLUTION_TRANSITION_COMMAND,
+    AUTONOMY_EVOLUTION_OS_CODE_PROPOSAL_COMMAND, AUTONOMY_EVOLUTION_RELEASE_COMMAND,
+    AUTONOMY_EVOLUTION_SERVICE_ID, AUTONOMY_EVOLUTION_SNAPSHOT_COMMAND,
+    AUTONOMY_EVOLUTION_TRANSITION_COMMAND,
 };
 
 #[async_trait]
@@ -56,6 +58,11 @@ pub trait AutonomyEvolutionService: Send + Sync {
         &self,
         command: EvolutionReleaseCommand,
     ) -> MacacaResult<EvolutionReleaseResult>;
+
+    async fn evaluate_os_code_proposal(
+        &self,
+        command: OsCodeEvolutionProposalCommand,
+    ) -> MacacaResult<OsCodeEvolutionProposalResult>;
 
     async fn run_live_tick(
         &self,
@@ -199,6 +206,48 @@ impl AutonomyEvolutionService for UnavailableAutonomyEvolutionProvider {
         ))
     }
 
+    async fn evaluate_os_code_proposal(
+        &self,
+        command: OsCodeEvolutionProposalCommand,
+    ) -> MacacaResult<OsCodeEvolutionProposalResult> {
+        warn!(
+            service_id = AUTONOMY_EVOLUTION_SERVICE_ID,
+            provider_id = self.provider_id.as_str(),
+            trace_id = command.trace.trace_id.as_str(),
+            proposal_id = command.proposal_id.as_str(),
+            "autonomy evolution os-code proposal denied because provider is unavailable"
+        );
+        Ok(OsCodeEvolutionProposalResult {
+            proposal_id: command.proposal_id,
+            run_id: command.run_id,
+            decision: crate::OsCodeEvolutionProposalDecision::Denied,
+            trace: command.trace,
+            bundle: crate::OsCodeEvolutionProposalBundle {
+                proposal_ref: None,
+                title: String::new(),
+                summary: String::new(),
+                affected_capability_refs: Vec::new(),
+                requested_change_refs: Vec::new(),
+                openspec_refs: Vec::new(),
+                superpowers_refs: Vec::new(),
+                gitnexus_refs: Vec::new(),
+                expected_test_refs: Vec::new(),
+                release_gate_refs: Vec::new(),
+                rollback_refs: Vec::new(),
+            },
+            findings: Vec::new(),
+            missing_evidence: Vec::new(),
+            reason_codes: vec![format!(
+                "autonomy evolution provider unavailable: {}",
+                self.reason
+            )],
+            source_mutation_performed: false,
+            policy_decision_refs: command.policy_decision_refs,
+            audit_refs: command.audit_refs,
+            captured_at: chrono::Utc::now(),
+        })
+    }
+
     async fn run_live_tick(
         &self,
         command: EvolutionLiveTickCommand,
@@ -265,6 +314,10 @@ pub fn autonomy_evolution_service_descriptor(health: ServiceHealth) -> ServiceDe
         ServiceCapability::new(
             CapabilityId::new(AUTONOMY_EVOLUTION_RELEASE_COMMAND),
             "Evaluate quarantine, canary, promotion, and rollback release safety",
+        ),
+        ServiceCapability::new(
+            CapabilityId::new(AUTONOMY_EVOLUTION_OS_CODE_PROPOSAL_COMMAND),
+            "Evaluate a governed OS-code evolution proposal bundle",
         ),
         ServiceCapability::new(
             CapabilityId::new(AUTONOMY_EVOLUTION_LIVE_TICK_COMMAND),

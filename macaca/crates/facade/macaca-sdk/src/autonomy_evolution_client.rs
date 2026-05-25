@@ -13,11 +13,13 @@ use macaca_autonomy_evolution::{
     EvolutionBenchmarkResult, EvolutionLiveAuditCommand, EvolutionLiveAuditResult,
     EvolutionLiveTickCommand, EvolutionLiveTickResult, EvolutionReleaseCommand,
     EvolutionReleaseResult, EvolutionRunState, EvolutionServiceSnapshot, EvolutionSnapshotCommand,
-    EvolutionTransitionCommand, EvolutionTransitionResult, AUTONOMY_EVOLUTION_ADMISSION_COMMAND,
+    EvolutionTransitionCommand, EvolutionTransitionResult, OsCodeEvolutionProposalCommand,
+    OsCodeEvolutionProposalResult, AUTONOMY_EVOLUTION_ADMISSION_COMMAND,
     AUTONOMY_EVOLUTION_BENCHMARK_COMMAND, AUTONOMY_EVOLUTION_HEALTH_COMMAND,
     AUTONOMY_EVOLUTION_LIVE_AUDIT_COMMAND, AUTONOMY_EVOLUTION_LIVE_TICK_COMMAND,
-    AUTONOMY_EVOLUTION_RELEASE_COMMAND, AUTONOMY_EVOLUTION_SERVICE_ID,
-    AUTONOMY_EVOLUTION_SNAPSHOT_COMMAND, AUTONOMY_EVOLUTION_TRANSITION_COMMAND,
+    AUTONOMY_EVOLUTION_OS_CODE_PROPOSAL_COMMAND, AUTONOMY_EVOLUTION_RELEASE_COMMAND,
+    AUTONOMY_EVOLUTION_SERVICE_ID, AUTONOMY_EVOLUTION_SNAPSHOT_COMMAND,
+    AUTONOMY_EVOLUTION_TRANSITION_COMMAND,
 };
 use macaca_proto::{MacacaError, MacacaResult, TraceContext};
 use tracing::{info, warn};
@@ -53,6 +55,11 @@ pub trait SystemAutonomyEvolutionClient: Send + Sync {
         &self,
         command: EvolutionReleaseCommand,
     ) -> MacacaResult<EvolutionReleaseResult>;
+
+    async fn evaluate_os_code_proposal(
+        &self,
+        command: OsCodeEvolutionProposalCommand,
+    ) -> MacacaResult<OsCodeEvolutionProposalResult>;
 
     async fn run_live_tick(
         &self,
@@ -158,6 +165,43 @@ impl SystemAutonomyEvolutionClient for UnavailableSystemAutonomyEvolutionClient 
             &command,
             "autonomy evolution control plane service is unavailable",
         ))
+    }
+
+    async fn evaluate_os_code_proposal(
+        &self,
+        command: OsCodeEvolutionProposalCommand,
+    ) -> MacacaResult<OsCodeEvolutionProposalResult> {
+        warn!(
+            trace_id = command.trace.trace_id.as_str(),
+            proposal_id = command.proposal_id.as_str(),
+            "sdk autonomy evolution client unavailable for os-code proposal"
+        );
+        Ok(OsCodeEvolutionProposalResult {
+            proposal_id: command.proposal_id,
+            run_id: command.run_id,
+            decision: macaca_autonomy_evolution::OsCodeEvolutionProposalDecision::Denied,
+            trace: command.trace,
+            bundle: macaca_autonomy_evolution::OsCodeEvolutionProposalBundle {
+                proposal_ref: None,
+                title: String::new(),
+                summary: String::new(),
+                affected_capability_refs: Vec::new(),
+                requested_change_refs: Vec::new(),
+                openspec_refs: Vec::new(),
+                superpowers_refs: Vec::new(),
+                gitnexus_refs: Vec::new(),
+                expected_test_refs: Vec::new(),
+                release_gate_refs: Vec::new(),
+                rollback_refs: Vec::new(),
+            },
+            findings: Vec::new(),
+            missing_evidence: Vec::new(),
+            reason_codes: vec!["autonomy evolution control plane service is unavailable".into()],
+            source_mutation_performed: false,
+            policy_decision_refs: command.policy_decision_refs,
+            audit_refs: command.audit_refs,
+            captured_at: chrono::Utc::now(),
+        })
     }
 
     async fn run_live_tick(
@@ -276,6 +320,19 @@ impl SystemAutonomyEvolutionClient for ServiceBackedAutonomyEvolutionClient {
         call(
             &self.service,
             AUTONOMY_EVOLUTION_RELEASE_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn evaluate_os_code_proposal(
+        &self,
+        command: OsCodeEvolutionProposalCommand,
+    ) -> MacacaResult<OsCodeEvolutionProposalResult> {
+        call(
+            &self.service,
+            AUTONOMY_EVOLUTION_OS_CODE_PROPOSAL_COMMAND,
             command.trace.clone(),
             command,
         )

@@ -15,6 +15,8 @@ pub const AUTONOMY_EVOLUTION_SERVICE_ID: &str = "service.autonomy_evolution";
 pub const AUTONOMY_EVOLUTION_TRANSITION_COMMAND: &str = "autonomy.evolution.transition";
 pub const AUTONOMY_EVOLUTION_ADMISSION_COMMAND: &str = "autonomy.evolution.admit_candidate";
 pub const AUTONOMY_EVOLUTION_BENCHMARK_COMMAND: &str = "autonomy.evolution.benchmark.paired";
+pub const AUTONOMY_EVOLUTION_OS_CODE_PROPOSAL_COMMAND: &str =
+    "autonomy.evolution.os_code.proposal.evaluate";
 pub const AUTONOMY_EVOLUTION_SNAPSHOT_COMMAND: &str = "autonomy.evolution.snapshot";
 pub const AUTONOMY_EVOLUTION_HEALTH_COMMAND: &str = "autonomy.evolution.health";
 

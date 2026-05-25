@@ -3,6 +3,8 @@ use macaca_autonomy_evolution::{
     EvolutionBenchmarkMetrics, EvolutionLiveAdapterDispatch, EvolutionLiveAuditCommand,
     EvolutionLivePhaseStatus, EvolutionLiveTickCommand, EvolutionReleaseAction,
     EvolutionReleasePolicyInput, EvolutionScope, EvolutionTargetType, EvolutionTrustLevel,
+    OsCodeEvolutionProposalCommand, OsCodeEvolutionProposalDecision,
+    OsCodeEvolutionProposalEvidence, OsCodeEvolutionProposalIntent,
 };
 use macaca_proto::TraceContext;
 use macaca_sdk::{SystemAutonomyEvolutionClient, UnavailableSystemAutonomyEvolutionClient};
@@ -90,6 +92,37 @@ fn tick() -> EvolutionLiveTickCommand {
     }
 }
 
+fn os_code_proposal() -> OsCodeEvolutionProposalCommand {
+    OsCodeEvolutionProposalCommand {
+        proposal_id: "proposal-sdk-os-code".into(),
+        run_id: "run-sdk-live".into(),
+        actor_id: "agent.sdk.live".into(),
+        trace: TraceContext::new("trace-sdk-os-code"),
+        scope: scope(),
+        intent: OsCodeEvolutionProposalIntent {
+            title: "Generic SDK OS proposal".into(),
+            summary: "A generic non-mutating OS-code proposal.".into(),
+            affected_capability_refs: vec!["capability://sdk".into()],
+            requested_change_refs: vec!["openspec://sdk".into()],
+            allow_source_mutation: false,
+            blast_radius_score: 10,
+        },
+        evidence: OsCodeEvolutionProposalEvidence {
+            openspec_proposal_refs: vec!["openspec://proposal".into()],
+            openspec_design_refs: vec!["openspec://design".into()],
+            openspec_tasks_refs: vec!["openspec://tasks".into()],
+            superpowers_design_refs: vec!["superpowers://design".into()],
+            superpowers_plan_refs: vec!["superpowers://plan".into()],
+            gitnexus_impact_refs: vec!["gitnexus://impact".into()],
+            expected_test_refs: vec!["cargo://test".into()],
+            release_gate_refs: vec!["release://gate".into()],
+            rollback_refs: vec!["rollback://memento".into()],
+        },
+        policy_decision_refs: vec!["policy://sdk/live".into()],
+        audit_refs: vec!["audit://sdk/live".into()],
+    }
+}
+
 #[tokio::test]
 async fn unavailable_client_returns_unavailable_live_tick() {
     let client = UnavailableSystemAutonomyEvolutionClient;
@@ -121,6 +154,22 @@ async fn unavailable_client_returns_empty_live_audit() {
     assert!(result.checkpoints.is_empty());
     assert!(result
         .diagnostics
+        .iter()
+        .any(|reason| reason.contains("unavailable")));
+}
+
+#[tokio::test]
+async fn unavailable_client_denies_os_code_proposal() {
+    let client = UnavailableSystemAutonomyEvolutionClient;
+    let result = client
+        .evaluate_os_code_proposal(os_code_proposal())
+        .await
+        .unwrap();
+
+    assert_eq!(result.decision, OsCodeEvolutionProposalDecision::Denied);
+    assert!(!result.source_mutation_performed);
+    assert!(result
+        .reason_codes
         .iter()
         .any(|reason| reason.contains("unavailable")));
 }
