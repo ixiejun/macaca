@@ -16,11 +16,12 @@ use tracing::{info, warn};
 
 use crate::{
     EvolutionAdmissionCommand, EvolutionAdmissionResult, EvolutionBenchmarkCommand,
-    EvolutionBenchmarkResult, EvolutionScope, EvolutionServiceSnapshot, EvolutionSnapshotCommand,
-    EvolutionTransitionCommand, EvolutionTransitionResult, AUTONOMY_EVOLUTION_ADMISSION_COMMAND,
+    EvolutionBenchmarkResult, EvolutionReleaseCommand, EvolutionReleaseResult, EvolutionScope,
+    EvolutionServiceSnapshot, EvolutionSnapshotCommand, EvolutionTransitionCommand,
+    EvolutionTransitionResult, AUTONOMY_EVOLUTION_ADMISSION_COMMAND,
     AUTONOMY_EVOLUTION_BENCHMARK_COMMAND, AUTONOMY_EVOLUTION_HEALTH_COMMAND,
-    AUTONOMY_EVOLUTION_SERVICE_ID, AUTONOMY_EVOLUTION_SNAPSHOT_COMMAND,
-    AUTONOMY_EVOLUTION_TRANSITION_COMMAND,
+    AUTONOMY_EVOLUTION_RELEASE_COMMAND, AUTONOMY_EVOLUTION_SERVICE_ID,
+    AUTONOMY_EVOLUTION_SNAPSHOT_COMMAND, AUTONOMY_EVOLUTION_TRANSITION_COMMAND,
 };
 
 #[async_trait]
@@ -48,6 +49,11 @@ pub trait AutonomyEvolutionService: Send + Sync {
         &self,
         command: EvolutionBenchmarkCommand,
     ) -> MacacaResult<EvolutionBenchmarkResult>;
+
+    async fn evaluate_release(
+        &self,
+        command: EvolutionReleaseCommand,
+    ) -> MacacaResult<EvolutionReleaseResult>;
 }
 
 #[derive(Debug, Clone)]
@@ -163,6 +169,23 @@ impl AutonomyEvolutionService for UnavailableAutonomyEvolutionProvider {
             format!("autonomy evolution provider unavailable: {}", self.reason),
         ))
     }
+
+    async fn evaluate_release(
+        &self,
+        command: EvolutionReleaseCommand,
+    ) -> MacacaResult<EvolutionReleaseResult> {
+        warn!(
+            service_id = AUTONOMY_EVOLUTION_SERVICE_ID,
+            provider_id = self.provider_id.as_str(),
+            trace_id = command.trace.trace_id.as_str(),
+            release_id = command.release_id.as_str(),
+            "autonomy evolution release safety denied because provider is unavailable"
+        );
+        Ok(EvolutionReleaseResult::unavailable(
+            &command,
+            format!("autonomy evolution provider unavailable: {}", self.reason),
+        ))
+    }
 }
 
 /// Descriptor helper shared by concrete and unavailable providers.
@@ -192,6 +215,10 @@ pub fn autonomy_evolution_service_descriptor(health: ServiceHealth) -> ServiceDe
         ServiceCapability::new(
             CapabilityId::new(AUTONOMY_EVOLUTION_BENCHMARK_COMMAND),
             "Score a normalized paired evolution benchmark",
+        ),
+        ServiceCapability::new(
+            CapabilityId::new(AUTONOMY_EVOLUTION_RELEASE_COMMAND),
+            "Evaluate quarantine, canary, promotion, and rollback release safety",
         ),
         ServiceCapability::new(
             CapabilityId::new(AUTONOMY_EVOLUTION_SNAPSHOT_COMMAND),

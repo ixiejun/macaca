@@ -10,10 +10,11 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use macaca_autonomy_evolution::{
     EvolutionAdmissionCommand, EvolutionAdmissionResult, EvolutionBenchmarkCommand,
-    EvolutionBenchmarkResult, EvolutionRunState, EvolutionServiceSnapshot,
-    EvolutionSnapshotCommand, EvolutionTransitionCommand, EvolutionTransitionResult,
-    AUTONOMY_EVOLUTION_ADMISSION_COMMAND, AUTONOMY_EVOLUTION_BENCHMARK_COMMAND,
-    AUTONOMY_EVOLUTION_HEALTH_COMMAND, AUTONOMY_EVOLUTION_SERVICE_ID,
+    EvolutionBenchmarkResult, EvolutionReleaseCommand, EvolutionReleaseResult, EvolutionRunState,
+    EvolutionServiceSnapshot, EvolutionSnapshotCommand, EvolutionTransitionCommand,
+    EvolutionTransitionResult, AUTONOMY_EVOLUTION_ADMISSION_COMMAND,
+    AUTONOMY_EVOLUTION_BENCHMARK_COMMAND, AUTONOMY_EVOLUTION_HEALTH_COMMAND,
+    AUTONOMY_EVOLUTION_RELEASE_COMMAND, AUTONOMY_EVOLUTION_SERVICE_ID,
     AUTONOMY_EVOLUTION_SNAPSHOT_COMMAND, AUTONOMY_EVOLUTION_TRANSITION_COMMAND,
 };
 use macaca_proto::{MacacaError, MacacaResult, TraceContext};
@@ -45,6 +46,11 @@ pub trait SystemAutonomyEvolutionClient: Send + Sync {
         &self,
         command: EvolutionBenchmarkCommand,
     ) -> MacacaResult<EvolutionBenchmarkResult>;
+
+    async fn evaluate_release(
+        &self,
+        command: EvolutionReleaseCommand,
+    ) -> MacacaResult<EvolutionReleaseResult>;
 }
 
 /// Null Object client used when no control-plane service is installed.
@@ -125,6 +131,22 @@ impl SystemAutonomyEvolutionClient for UnavailableSystemAutonomyEvolutionClient 
             "autonomy evolution control plane service is unavailable",
         ))
     }
+
+    async fn evaluate_release(
+        &self,
+        command: EvolutionReleaseCommand,
+    ) -> MacacaResult<EvolutionReleaseResult> {
+        warn!(
+            trace_id = command.trace.trace_id.as_str(),
+            release_id = command.release_id.as_str(),
+            run_id = command.run_id.as_str(),
+            "sdk autonomy evolution client unavailable for release safety"
+        );
+        Ok(EvolutionReleaseResult::unavailable(
+            &command,
+            "autonomy evolution control plane service is unavailable",
+        ))
+    }
 }
 
 /// Runtime-backed client implemented over generic service calls.
@@ -198,6 +220,19 @@ impl SystemAutonomyEvolutionClient for ServiceBackedAutonomyEvolutionClient {
         call(
             &self.service,
             AUTONOMY_EVOLUTION_BENCHMARK_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn evaluate_release(
+        &self,
+        command: EvolutionReleaseCommand,
+    ) -> MacacaResult<EvolutionReleaseResult> {
+        call(
+            &self.service,
+            AUTONOMY_EVOLUTION_RELEASE_COMMAND,
             command.trace.clone(),
             command,
         )

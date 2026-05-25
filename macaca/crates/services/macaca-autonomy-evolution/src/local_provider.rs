@@ -17,10 +17,12 @@ use tracing::{info, warn};
 use crate::{
     autonomy_evolution_service_descriptor, validate_transition, AutonomyEvolutionService,
     DefaultEvolutionAdmissionSpecification, DefaultEvolutionBenchmarkScoringStrategy,
-    EvolutionAdmissionCommand, EvolutionAdmissionResult, EvolutionAdmissionSpecification,
-    EvolutionBenchmarkCommand, EvolutionBenchmarkResult, EvolutionBenchmarkScoringStrategy,
-    EvolutionRunRecord, EvolutionServiceSnapshot, EvolutionSnapshotCommand,
-    EvolutionTransitionCommand, EvolutionTransitionResult, AUTONOMY_EVOLUTION_SERVICE_ID,
+    DefaultEvolutionReleaseSafetyStrategy, EvolutionAdmissionCommand, EvolutionAdmissionResult,
+    EvolutionAdmissionSpecification, EvolutionBenchmarkCommand, EvolutionBenchmarkResult,
+    EvolutionBenchmarkScoringStrategy, EvolutionReleaseCommand, EvolutionReleaseResult,
+    EvolutionReleaseSafetyStrategy, EvolutionRunRecord, EvolutionServiceSnapshot,
+    EvolutionSnapshotCommand, EvolutionTransitionCommand, EvolutionTransitionResult,
+    AUTONOMY_EVOLUTION_SERVICE_ID,
 };
 
 #[derive(Debug, Default, Clone)]
@@ -180,5 +182,20 @@ impl AutonomyEvolutionService for InMemoryAutonomyEvolutionProvider {
             "autonomy evolution paired benchmark command received"
         );
         DefaultEvolutionBenchmarkScoringStrategy.score(&command)
+    }
+
+    async fn evaluate_release(
+        &self,
+        command: EvolutionReleaseCommand,
+    ) -> MacacaResult<EvolutionReleaseResult> {
+        info!(
+            service_id = AUTONOMY_EVOLUTION_SERVICE_ID,
+            release_id = command.release_id.as_str(),
+            run_id = command.run_id.as_str(),
+            trace_id = command.trace.trace_id.as_str(),
+            action = ?command.action,
+            "autonomy evolution release safety command received"
+        );
+        DefaultEvolutionReleaseSafetyStrategy.evaluate(&command)
     }
 }

@@ -11,6 +11,8 @@ mod admission;
 mod benchmark;
 mod local_provider;
 mod model;
+mod release;
+mod release_model;
 mod service_contract;
 mod state_machine;
 
@@ -18,5 +20,7 @@ pub use admission::*;
 pub use benchmark::*;
 pub use local_provider::*;
 pub use model::*;
+pub use release::*;
+pub use release_model::*;
 pub use service_contract::*;
 pub use state_machine::*;
