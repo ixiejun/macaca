@@ -6,6 +6,7 @@ members = [
     "crates/foundation/macaca-persist",
     "crates/kernel/macaca-kernel",
     "crates/services/macaca-task",
+    "crates/services/macaca-autonomy-evolution",
     "crates/services/macaca-scheduler",
     "crates/services/macaca-scheduled-agent-task",
     "crates/services/macaca-heartbeat",
@@ -79,6 +80,7 @@ macaca-tools = { path = "crates/services/macaca-tools" }
 macaca-persist = { path = "crates/foundation/macaca-persist" }
 macaca-agent = { path = "crates/application/macaca-agent" }
 macaca-task = { path = "crates/services/macaca-task" }
+macaca-autonomy-evolution = { path = "crates/services/macaca-autonomy-evolution" }
 macaca-scheduler = { path = "crates/services/macaca-scheduler" }
 macaca-scheduled-agent-task = { path = "crates/services/macaca-scheduled-agent-task" }
 macaca-heartbeat = { path = "crates/services/macaca-heartbeat" }

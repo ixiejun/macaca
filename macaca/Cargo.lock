@@ -1457,6 +1457,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "macaca-autonomy-evolution"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "macaca-proto",
+ "serde",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "macaca-cli"
 version = "0.1.0"
 dependencies = [
@@ -1725,6 +1737,7 @@ dependencies = [
  "chrono",
  "dirs",
  "macaca-app",
+ "macaca-autonomy-evolution",
  "macaca-context",
  "macaca-driver",
  "macaca-framework",
@@ -1783,6 +1796,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "macaca-agent",
+ "macaca-autonomy-evolution",
  "macaca-context",
  "macaca-driver",
  "macaca-kernel",

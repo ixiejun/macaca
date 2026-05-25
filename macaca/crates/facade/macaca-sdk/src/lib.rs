@@ -9,6 +9,7 @@ pub mod application;
 pub mod application_client;
 pub mod application_kit;
 pub mod application_testkit;
+pub mod autonomy_evolution_client;
 pub mod builder;
 pub mod config;
 pub mod context_client;
@@ -60,6 +61,10 @@ pub use application_kit::{
 };
 pub use application_testkit::{
     ApplicationContractDiagnostic, ApplicationContractReport, ApplicationContractTestKit,
+};
+pub use autonomy_evolution_client::{
+    ServiceBackedAutonomyEvolutionClient, SystemAutonomyEvolutionClient,
+    UnavailableSystemAutonomyEvolutionClient,
 };
 pub use builder::{AgentBuilder, DeclarativeAgent};
 pub use config::AgentConfig;

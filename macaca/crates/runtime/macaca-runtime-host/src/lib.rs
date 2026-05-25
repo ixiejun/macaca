@@ -17,6 +17,7 @@ pub mod agent_execution_service_provider;
 pub mod application_hosts;
 pub mod application_service_provider;
 pub mod autonomy_dispatch;
+pub mod autonomy_evolution_service_provider;
 pub(crate) mod autonomy_result_evidence;
 pub mod autonomy_runtime_config;
 pub mod autonomy_service_provider;
@@ -138,6 +139,7 @@ pub use application_hosts::{
 pub use application_service_provider::{
     ApplicationOrchestrationBackend, ApplicationSystemServiceProvider,
 };
+pub use autonomy_evolution_service_provider::AutonomyEvolutionSystemServiceProvider;
 pub use autonomy_runtime_config::{AutonomyProviderMode, AutonomyRuntimeConfig};
 pub use autonomy_service_provider::{
     bootstrap_autonomy_local_services, bootstrap_autonomy_services,

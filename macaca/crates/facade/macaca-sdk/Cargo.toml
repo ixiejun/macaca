@@ -12,6 +12,7 @@ macaca-context = { workspace = true }
 macaca-driver = { workspace = true }
 macaca-tools = { workspace = true }
 macaca-task = { workspace = true }
+macaca-autonomy-evolution = { workspace = true }
 macaca-skill = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
