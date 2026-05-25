@@ -9,6 +9,7 @@
 
 mod admission;
 mod benchmark;
+mod governance_ledger;
 mod local_provider;
 mod model;
 mod release;
@@ -18,6 +19,7 @@ mod state_machine;
 
 pub use admission::*;
 pub use benchmark::*;
+pub use governance_ledger::*;
 pub use local_provider::*;
 pub use model::*;
 pub use release::*;
