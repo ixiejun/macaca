@@ -10,10 +10,12 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use macaca_autonomy_evolution::{
     EvolutionAdmissionCommand, EvolutionAdmissionResult, EvolutionBenchmarkCommand,
-    EvolutionBenchmarkResult, EvolutionReleaseCommand, EvolutionReleaseResult, EvolutionRunState,
-    EvolutionServiceSnapshot, EvolutionSnapshotCommand, EvolutionTransitionCommand,
-    EvolutionTransitionResult, AUTONOMY_EVOLUTION_ADMISSION_COMMAND,
+    EvolutionBenchmarkResult, EvolutionLiveAuditCommand, EvolutionLiveAuditResult,
+    EvolutionLiveTickCommand, EvolutionLiveTickResult, EvolutionReleaseCommand,
+    EvolutionReleaseResult, EvolutionRunState, EvolutionServiceSnapshot, EvolutionSnapshotCommand,
+    EvolutionTransitionCommand, EvolutionTransitionResult, AUTONOMY_EVOLUTION_ADMISSION_COMMAND,
     AUTONOMY_EVOLUTION_BENCHMARK_COMMAND, AUTONOMY_EVOLUTION_HEALTH_COMMAND,
+    AUTONOMY_EVOLUTION_LIVE_AUDIT_COMMAND, AUTONOMY_EVOLUTION_LIVE_TICK_COMMAND,
     AUTONOMY_EVOLUTION_RELEASE_COMMAND, AUTONOMY_EVOLUTION_SERVICE_ID,
     AUTONOMY_EVOLUTION_SNAPSHOT_COMMAND, AUTONOMY_EVOLUTION_TRANSITION_COMMAND,
 };
@@ -51,6 +53,16 @@ pub trait SystemAutonomyEvolutionClient: Send + Sync {
         &self,
         command: EvolutionReleaseCommand,
     ) -> MacacaResult<EvolutionReleaseResult>;
+
+    async fn run_live_tick(
+        &self,
+        command: EvolutionLiveTickCommand,
+    ) -> MacacaResult<EvolutionLiveTickResult>;
+
+    async fn audit_live_run(
+        &self,
+        command: EvolutionLiveAuditCommand,
+    ) -> MacacaResult<EvolutionLiveAuditResult>;
 }
 
 /// Null Object client used when no control-plane service is installed.
@@ -147,6 +159,37 @@ impl SystemAutonomyEvolutionClient for UnavailableSystemAutonomyEvolutionClient 
             "autonomy evolution control plane service is unavailable",
         ))
     }
+
+    async fn run_live_tick(
+        &self,
+        command: EvolutionLiveTickCommand,
+    ) -> MacacaResult<EvolutionLiveTickResult> {
+        warn!(
+            trace_id = command.trace.trace_id.as_str(),
+            run_id = command.run_id.as_str(),
+            idempotency_key = command.idempotency_key.as_str(),
+            "sdk autonomy evolution client unavailable for live tick"
+        );
+        Ok(EvolutionLiveTickResult::unavailable(
+            &command,
+            "autonomy evolution control plane service is unavailable",
+        ))
+    }
+
+    async fn audit_live_run(
+        &self,
+        command: EvolutionLiveAuditCommand,
+    ) -> MacacaResult<EvolutionLiveAuditResult> {
+        info!(
+            trace_id = command.trace.trace_id.as_str(),
+            run_id = command.run_id.as_str(),
+            "sdk autonomy evolution client returning unavailable live audit"
+        );
+        Ok(EvolutionLiveAuditResult::unavailable(
+            &command,
+            "autonomy evolution control plane service is unavailable",
+        ))
+    }
 }
 
 /// Runtime-backed client implemented over generic service calls.
@@ -233,6 +276,32 @@ impl SystemAutonomyEvolutionClient for ServiceBackedAutonomyEvolutionClient {
         call(
             &self.service,
             AUTONOMY_EVOLUTION_RELEASE_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn run_live_tick(
+        &self,
+        command: EvolutionLiveTickCommand,
+    ) -> MacacaResult<EvolutionLiveTickResult> {
+        call(
+            &self.service,
+            AUTONOMY_EVOLUTION_LIVE_TICK_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn audit_live_run(
+        &self,
+        command: EvolutionLiveAuditCommand,
+    ) -> MacacaResult<EvolutionLiveAuditResult> {
+        call(
+            &self.service,
+            AUTONOMY_EVOLUTION_LIVE_AUDIT_COMMAND,
             command.trace.clone(),
             command,
         )

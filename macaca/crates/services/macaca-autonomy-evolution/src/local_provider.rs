@@ -17,17 +17,23 @@ use tracing::{info, warn};
 use crate::{
     autonomy_evolution_service_descriptor, validate_transition, AutonomyEvolutionService,
     DefaultEvolutionAdmissionSpecification, DefaultEvolutionBenchmarkScoringStrategy,
-    DefaultEvolutionReleaseSafetyStrategy, EvolutionAdmissionCommand, EvolutionAdmissionResult,
-    EvolutionAdmissionSpecification, EvolutionBenchmarkCommand, EvolutionBenchmarkResult,
-    EvolutionBenchmarkScoringStrategy, EvolutionReleaseCommand, EvolutionReleaseResult,
-    EvolutionReleaseSafetyStrategy, EvolutionRunRecord, EvolutionServiceSnapshot,
-    EvolutionSnapshotCommand, EvolutionTransitionCommand, EvolutionTransitionResult,
-    AUTONOMY_EVOLUTION_SERVICE_ID,
+    DefaultEvolutionLiveOrchestrator, DefaultEvolutionReleaseSafetyStrategy,
+    EvolutionAdmissionCommand, EvolutionAdmissionResult, EvolutionAdmissionSpecification,
+    EvolutionBenchmarkCommand, EvolutionBenchmarkResult, EvolutionBenchmarkScoringStrategy,
+    EvolutionGovernanceLedgerRecord, EvolutionGovernanceLedgerRecordKind,
+    EvolutionLiveAuditCommand, EvolutionLiveAuditResult, EvolutionLiveOrchestrator,
+    EvolutionLiveTickCommand, EvolutionLiveTickResult, EvolutionReleaseCommand,
+    EvolutionReleaseResult, EvolutionReleaseSafetyStrategy, EvolutionRunRecord,
+    EvolutionServiceSnapshot, EvolutionSnapshotCommand, EvolutionTransitionCommand,
+    EvolutionTransitionResult, AUTONOMY_EVOLUTION_SERVICE_ID,
 };
 
 #[derive(Debug, Default, Clone)]
 pub struct InMemoryAutonomyEvolutionProvider {
     records: Arc<Mutex<BTreeMap<String, EvolutionRunRecord>>>,
+    live_checkpoints: Arc<Mutex<BTreeMap<String, EvolutionLiveTickResult>>>,
+    live_ledger: Arc<Mutex<Vec<EvolutionGovernanceLedgerRecord>>>,
+    live_sequence: Arc<Mutex<u64>>,
 }
 
 #[async_trait]
@@ -197,5 +203,143 @@ impl AutonomyEvolutionService for InMemoryAutonomyEvolutionProvider {
             "autonomy evolution release safety command received"
         );
         DefaultEvolutionReleaseSafetyStrategy.evaluate(&command)
+    }
+
+    async fn run_live_tick(
+        &self,
+        command: EvolutionLiveTickCommand,
+    ) -> MacacaResult<EvolutionLiveTickResult> {
+        info!(
+            service_id = AUTONOMY_EVOLUTION_SERVICE_ID,
+            run_id = command.run_id.as_str(),
+            lease_id = command.lease_id.as_str(),
+            idempotency_key = command.idempotency_key.as_str(),
+            trace_id = command.trace.trace_id.as_str(),
+            "autonomy evolution live tick command received"
+        );
+        if let Some(previous) = self
+            .live_checkpoints
+            .lock()
+            .expect("live checkpoints mutex poisoned")
+            .get(&command.idempotency_key)
+            .cloned()
+        {
+            let mut duplicate = previous;
+            duplicate.adapter_dispatch_performed = false;
+            if !duplicate
+                .reason_codes
+                .iter()
+                .any(|reason| reason == "duplicate_idempotency_key")
+            {
+                duplicate
+                    .reason_codes
+                    .push("duplicate_idempotency_key".into());
+            }
+            warn!(
+                service_id = AUTONOMY_EVOLUTION_SERVICE_ID,
+                run_id = command.run_id.as_str(),
+                idempotency_key = command.idempotency_key.as_str(),
+                trace_id = command.trace.trace_id.as_str(),
+                "autonomy evolution live tick returned existing idempotent checkpoint"
+            );
+            return Ok(duplicate);
+        }
+
+        let sequence = {
+            let mut sequence = self
+                .live_sequence
+                .lock()
+                .expect("live sequence mutex poisoned");
+            *sequence += 1;
+            *sequence
+        };
+        let result = match DefaultEvolutionLiveOrchestrator.run_tick(command.clone(), sequence) {
+            Ok(result) => result,
+            Err(error) => EvolutionLiveTickResult::denied(
+                &command,
+                sequence,
+                crate::EvolutionLivePhaseStatus::Denied,
+                error.to_string(),
+            ),
+        };
+        self.live_checkpoints
+            .lock()
+            .expect("live checkpoints mutex poisoned")
+            .insert(command.idempotency_key.clone(), result.clone());
+        self.live_ledger
+            .lock()
+            .expect("live ledger mutex poisoned")
+            .push(live_ledger_record(&command, &result));
+        Ok(result)
+    }
+
+    async fn audit_live_run(
+        &self,
+        command: EvolutionLiveAuditCommand,
+    ) -> MacacaResult<EvolutionLiveAuditResult> {
+        info!(
+            service_id = AUTONOMY_EVOLUTION_SERVICE_ID,
+            run_id = command.run_id.as_str(),
+            trace_id = command.trace.trace_id.as_str(),
+            "autonomy evolution live audit command received"
+        );
+        let limit = command.limit.min(100);
+        let live_keys = self
+            .live_ledger
+            .lock()
+            .expect("live ledger mutex poisoned")
+            .iter()
+            .filter(|record| {
+                record.run_id == command.run_id
+                    && command
+                        .after_sequence
+                        .map(|sequence| record.sequence > sequence)
+                        .unwrap_or(true)
+            })
+            .map(|record| record.record_ref.clone())
+            .collect::<Vec<_>>();
+        let checkpoint_map = self
+            .live_checkpoints
+            .lock()
+            .expect("live checkpoints mutex poisoned");
+        let mut checkpoints = live_keys
+            .into_iter()
+            .filter_map(|key| checkpoint_map.get(&key).cloned())
+            .collect::<Vec<_>>();
+        checkpoints.sort_by_key(|checkpoint| checkpoint.sequence);
+        checkpoints.truncate(limit);
+        let next_after_sequence = checkpoints.last().map(|checkpoint| checkpoint.sequence);
+        Ok(EvolutionLiveAuditResult {
+            service_id: AUTONOMY_EVOLUTION_SERVICE_ID.into(),
+            run_id: command.run_id,
+            trace: command.trace,
+            checkpoints,
+            next_after_sequence,
+            diagnostics: Vec::new(),
+            captured_at: Utc::now(),
+        })
+    }
+}
+
+fn live_ledger_record(
+    command: &EvolutionLiveTickCommand,
+    result: &EvolutionLiveTickResult,
+) -> EvolutionGovernanceLedgerRecord {
+    EvolutionGovernanceLedgerRecord {
+        schema_version: 1,
+        sequence: result.sequence,
+        record_id: format!("live-checkpoint-{}", result.sequence),
+        run_id: result.run_id.clone(),
+        node_id: command.lease_id.clone(),
+        kind: EvolutionGovernanceLedgerRecordKind::Other("live_orchestrator_checkpoint".into()),
+        target_type: Some(result.target_type.clone()),
+        trace_id: result.trace.trace_id.clone(),
+        scope: command.scope.clone(),
+        record_ref: result.idempotency_key.clone(),
+        evidence_refs: result.evidence_refs.clone(),
+        policy_decision_refs: result.policy_decision_refs.clone(),
+        audit_refs: result.audit_refs.clone(),
+        rollback_refs: result.rollback_refs.clone(),
+        captured_at: result.captured_at,
     }
 }

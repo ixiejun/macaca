@@ -10,6 +10,8 @@
 mod admission;
 mod benchmark;
 mod governance_ledger;
+mod live_orchestrator;
+mod live_orchestrator_model;
 mod local_provider;
 mod model;
 mod os_code_proposal_adapter;
@@ -21,6 +23,8 @@ mod state_machine;
 pub use admission::*;
 pub use benchmark::*;
 pub use governance_ledger::*;
+pub use live_orchestrator::*;
+pub use live_orchestrator_model::*;
 pub use local_provider::*;
 pub use model::*;
 pub use os_code_proposal_adapter::*;

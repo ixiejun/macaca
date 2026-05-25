@@ -16,10 +16,12 @@ use tracing::{info, warn};
 
 use crate::{
     EvolutionAdmissionCommand, EvolutionAdmissionResult, EvolutionBenchmarkCommand,
-    EvolutionBenchmarkResult, EvolutionReleaseCommand, EvolutionReleaseResult, EvolutionScope,
-    EvolutionServiceSnapshot, EvolutionSnapshotCommand, EvolutionTransitionCommand,
-    EvolutionTransitionResult, AUTONOMY_EVOLUTION_ADMISSION_COMMAND,
+    EvolutionBenchmarkResult, EvolutionLiveAuditCommand, EvolutionLiveAuditResult,
+    EvolutionLiveTickCommand, EvolutionLiveTickResult, EvolutionReleaseCommand,
+    EvolutionReleaseResult, EvolutionScope, EvolutionServiceSnapshot, EvolutionSnapshotCommand,
+    EvolutionTransitionCommand, EvolutionTransitionResult, AUTONOMY_EVOLUTION_ADMISSION_COMMAND,
     AUTONOMY_EVOLUTION_BENCHMARK_COMMAND, AUTONOMY_EVOLUTION_HEALTH_COMMAND,
+    AUTONOMY_EVOLUTION_LIVE_AUDIT_COMMAND, AUTONOMY_EVOLUTION_LIVE_TICK_COMMAND,
     AUTONOMY_EVOLUTION_RELEASE_COMMAND, AUTONOMY_EVOLUTION_SERVICE_ID,
     AUTONOMY_EVOLUTION_SNAPSHOT_COMMAND, AUTONOMY_EVOLUTION_TRANSITION_COMMAND,
 };
@@ -54,6 +56,16 @@ pub trait AutonomyEvolutionService: Send + Sync {
         &self,
         command: EvolutionReleaseCommand,
     ) -> MacacaResult<EvolutionReleaseResult>;
+
+    async fn run_live_tick(
+        &self,
+        command: EvolutionLiveTickCommand,
+    ) -> MacacaResult<EvolutionLiveTickResult>;
+
+    async fn audit_live_run(
+        &self,
+        command: EvolutionLiveAuditCommand,
+    ) -> MacacaResult<EvolutionLiveAuditResult>;
 }
 
 #[derive(Debug, Clone)]
@@ -186,6 +198,40 @@ impl AutonomyEvolutionService for UnavailableAutonomyEvolutionProvider {
             format!("autonomy evolution provider unavailable: {}", self.reason),
         ))
     }
+
+    async fn run_live_tick(
+        &self,
+        command: EvolutionLiveTickCommand,
+    ) -> MacacaResult<EvolutionLiveTickResult> {
+        warn!(
+            service_id = AUTONOMY_EVOLUTION_SERVICE_ID,
+            provider_id = self.provider_id.as_str(),
+            trace_id = command.trace.trace_id.as_str(),
+            run_id = command.run_id.as_str(),
+            "autonomy evolution live tick denied because provider is unavailable"
+        );
+        Ok(EvolutionLiveTickResult::unavailable(
+            &command,
+            format!("autonomy evolution provider unavailable: {}", self.reason),
+        ))
+    }
+
+    async fn audit_live_run(
+        &self,
+        command: EvolutionLiveAuditCommand,
+    ) -> MacacaResult<EvolutionLiveAuditResult> {
+        info!(
+            service_id = AUTONOMY_EVOLUTION_SERVICE_ID,
+            provider_id = self.provider_id.as_str(),
+            trace_id = command.trace.trace_id.as_str(),
+            run_id = command.run_id.as_str(),
+            "autonomy evolution live audit requested from unavailable provider"
+        );
+        Ok(EvolutionLiveAuditResult::unavailable(
+            &command,
+            format!("autonomy evolution provider unavailable: {}", self.reason),
+        ))
+    }
 }
 
 /// Descriptor helper shared by concrete and unavailable providers.
@@ -219,6 +265,14 @@ pub fn autonomy_evolution_service_descriptor(health: ServiceHealth) -> ServiceDe
         ServiceCapability::new(
             CapabilityId::new(AUTONOMY_EVOLUTION_RELEASE_COMMAND),
             "Evaluate quarantine, canary, promotion, and rollback release safety",
+        ),
+        ServiceCapability::new(
+            CapabilityId::new(AUTONOMY_EVOLUTION_LIVE_TICK_COMMAND),
+            "Run one bounded autonomy evolution live orchestration tick",
+        ),
+        ServiceCapability::new(
+            CapabilityId::new(AUTONOMY_EVOLUTION_LIVE_AUDIT_COMMAND),
+            "Replay live autonomy evolution orchestration checkpoints",
         ),
         ServiceCapability::new(
             CapabilityId::new(AUTONOMY_EVOLUTION_SNAPSHOT_COMMAND),

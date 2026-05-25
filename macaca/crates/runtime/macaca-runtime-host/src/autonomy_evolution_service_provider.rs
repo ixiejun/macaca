@@ -13,12 +13,13 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use macaca_autonomy_evolution::{
     AutonomyEvolutionService, EvolutionAdmissionCommand, EvolutionBenchmarkCommand,
-    EvolutionReleaseCommand, EvolutionSnapshotCommand, EvolutionTransitionCommand,
-    InMemoryAutonomyEvolutionProvider, UnavailableAutonomyEvolutionProvider,
-    AUTONOMY_EVOLUTION_ADMISSION_COMMAND, AUTONOMY_EVOLUTION_BENCHMARK_COMMAND,
-    AUTONOMY_EVOLUTION_HEALTH_COMMAND, AUTONOMY_EVOLUTION_RELEASE_COMMAND,
-    AUTONOMY_EVOLUTION_SERVICE_ID, AUTONOMY_EVOLUTION_SNAPSHOT_COMMAND,
-    AUTONOMY_EVOLUTION_TRANSITION_COMMAND,
+    EvolutionLiveAuditCommand, EvolutionLiveTickCommand, EvolutionReleaseCommand,
+    EvolutionSnapshotCommand, EvolutionTransitionCommand, InMemoryAutonomyEvolutionProvider,
+    UnavailableAutonomyEvolutionProvider, AUTONOMY_EVOLUTION_ADMISSION_COMMAND,
+    AUTONOMY_EVOLUTION_BENCHMARK_COMMAND, AUTONOMY_EVOLUTION_HEALTH_COMMAND,
+    AUTONOMY_EVOLUTION_LIVE_AUDIT_COMMAND, AUTONOMY_EVOLUTION_LIVE_TICK_COMMAND,
+    AUTONOMY_EVOLUTION_RELEASE_COMMAND, AUTONOMY_EVOLUTION_SERVICE_ID,
+    AUTONOMY_EVOLUTION_SNAPSHOT_COMMAND, AUTONOMY_EVOLUTION_TRANSITION_COMMAND,
 };
 use macaca_kernel::SystemService;
 use macaca_proto::{
@@ -108,6 +109,26 @@ impl SystemService for AutonomyEvolutionSystemServiceProvider {
                 service_result(
                     self.provider
                         .evaluate_release(typed)
+                        .await
+                        .map_err(service_adapter_error)?,
+                    trace,
+                )
+            }
+            AUTONOMY_EVOLUTION_LIVE_TICK_COMMAND => {
+                let typed: EvolutionLiveTickCommand = decode(command.payload)?;
+                service_result(
+                    self.provider
+                        .run_live_tick(typed)
+                        .await
+                        .map_err(service_adapter_error)?,
+                    trace,
+                )
+            }
+            AUTONOMY_EVOLUTION_LIVE_AUDIT_COMMAND => {
+                let typed: EvolutionLiveAuditCommand = decode(command.payload)?;
+                service_result(
+                    self.provider
+                        .audit_live_run(typed)
                         .await
                         .map_err(service_adapter_error)?,
                     trace,
