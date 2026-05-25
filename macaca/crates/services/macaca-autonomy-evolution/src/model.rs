@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 
 pub const AUTONOMY_EVOLUTION_SERVICE_ID: &str = "service.autonomy_evolution";
 pub const AUTONOMY_EVOLUTION_TRANSITION_COMMAND: &str = "autonomy.evolution.transition";
+pub const AUTONOMY_EVOLUTION_ADMISSION_COMMAND: &str = "autonomy.evolution.admit_candidate";
 pub const AUTONOMY_EVOLUTION_SNAPSHOT_COMMAND: &str = "autonomy.evolution.snapshot";
 pub const AUTONOMY_EVOLUTION_HEALTH_COMMAND: &str = "autonomy.evolution.health";
 
@@ -93,6 +94,86 @@ pub struct EvolutionTransitionCommand {
     pub audit_refs: Vec<String>,
     pub rollback_refs: Vec<String>,
     pub diagnostics: BTreeMap<String, String>,
+}
+
+/// Final admission decision emitted by executable quality gates.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AdmissionDecision {
+    Accepted,
+    Denied,
+    NeedsEvidence,
+    Quarantined,
+}
+
+/// Metadata-only candidate shape used by admission Specifications.
+///
+/// This structure intentionally carries bounded summaries and evidence
+/// references instead of package bytes or raw Skill bodies. The admission
+/// service judges whether later target adapters may continue, but it does not
+/// own Skill file mutation or application-specific workflow logic.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvolutionAdmissionCandidate {
+    pub candidate_id: String,
+    pub target_type: EvolutionTargetType,
+    pub package_name: String,
+    pub trigger_descriptions: Vec<String>,
+    pub skill_summary: String,
+    pub resource_categories: Vec<String>,
+    pub quick_validation_refs: Vec<String>,
+    pub forward_test_refs: Vec<String>,
+    pub duplicate_candidate_refs: Vec<String>,
+    pub metadata_stale: bool,
+}
+
+/// Command for evaluating one candidate through service-owned admission gates.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvolutionAdmissionCommand {
+    pub actor_id: String,
+    pub trace: TraceContext,
+    pub scope: EvolutionScope,
+    pub candidate: EvolutionAdmissionCandidate,
+    pub evidence_refs: Vec<String>,
+    pub policy_decision_refs: Vec<String>,
+}
+
+/// Bounded diagnostic for one executable admission gate.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvolutionAdmissionFinding {
+    pub gate: String,
+    pub decision: AdmissionDecision,
+    pub reason_code: String,
+    pub evidence_refs: Vec<String>,
+}
+
+/// Result returned by admission providers and SDK clients.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvolutionAdmissionResult {
+    pub candidate_id: String,
+    pub target_type: EvolutionTargetType,
+    pub decision: AdmissionDecision,
+    pub trace: TraceContext,
+    pub findings: Vec<EvolutionAdmissionFinding>,
+    pub missing_evidence: Vec<String>,
+    pub summary_reason: Option<String>,
+    pub policy_decision_refs: Vec<String>,
+    pub captured_at: DateTime<Utc>,
+}
+
+impl EvolutionAdmissionResult {
+    /// Build a fail-closed result when the admission service is absent.
+    pub fn unavailable(command: &EvolutionAdmissionCommand, reason: impl Into<String>) -> Self {
+        Self {
+            candidate_id: command.candidate.candidate_id.clone(),
+            target_type: command.candidate.target_type.clone(),
+            decision: AdmissionDecision::Denied,
+            trace: command.trace.clone(),
+            findings: Vec::new(),
+            missing_evidence: Vec::new(),
+            summary_reason: Some(reason.into()),
+            policy_decision_refs: command.policy_decision_refs.clone(),
+            captured_at: Utc::now(),
+        }
+    }
 }
 
 /// Body-free transition result returned by providers and SDK clients.

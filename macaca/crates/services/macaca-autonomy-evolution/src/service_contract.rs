@@ -15,9 +15,11 @@ use macaca_proto::{
 use tracing::{info, warn};
 
 use crate::{
-    EvolutionScope, EvolutionServiceSnapshot, EvolutionSnapshotCommand, EvolutionTransitionCommand,
-    EvolutionTransitionResult, AUTONOMY_EVOLUTION_HEALTH_COMMAND, AUTONOMY_EVOLUTION_SERVICE_ID,
-    AUTONOMY_EVOLUTION_SNAPSHOT_COMMAND, AUTONOMY_EVOLUTION_TRANSITION_COMMAND,
+    EvolutionAdmissionCommand, EvolutionAdmissionResult, EvolutionScope, EvolutionServiceSnapshot,
+    EvolutionSnapshotCommand, EvolutionTransitionCommand, EvolutionTransitionResult,
+    AUTONOMY_EVOLUTION_ADMISSION_COMMAND, AUTONOMY_EVOLUTION_HEALTH_COMMAND,
+    AUTONOMY_EVOLUTION_SERVICE_ID, AUTONOMY_EVOLUTION_SNAPSHOT_COMMAND,
+    AUTONOMY_EVOLUTION_TRANSITION_COMMAND,
 };
 
 #[async_trait]
@@ -35,6 +37,11 @@ pub trait AutonomyEvolutionService: Send + Sync {
         &self,
         command: EvolutionTransitionCommand,
     ) -> MacacaResult<EvolutionTransitionResult>;
+
+    async fn admit_candidate(
+        &self,
+        command: EvolutionAdmissionCommand,
+    ) -> MacacaResult<EvolutionAdmissionResult>;
 }
 
 #[derive(Debug, Clone)]
@@ -116,6 +123,23 @@ impl AutonomyEvolutionService for UnavailableAutonomyEvolutionProvider {
     ) -> MacacaResult<EvolutionTransitionResult> {
         Ok(self.unavailable_result(&command))
     }
+
+    async fn admit_candidate(
+        &self,
+        command: EvolutionAdmissionCommand,
+    ) -> MacacaResult<EvolutionAdmissionResult> {
+        warn!(
+            service_id = AUTONOMY_EVOLUTION_SERVICE_ID,
+            provider_id = self.provider_id.as_str(),
+            trace_id = command.trace.trace_id.as_str(),
+            candidate_id = command.candidate.candidate_id.as_str(),
+            "autonomy evolution admission rejected because provider is unavailable"
+        );
+        Ok(EvolutionAdmissionResult::unavailable(
+            &command,
+            format!("autonomy evolution provider unavailable: {}", self.reason),
+        ))
+    }
 }
 
 /// Descriptor helper shared by concrete and unavailable providers.
@@ -137,6 +161,10 @@ pub fn autonomy_evolution_service_descriptor(health: ServiceHealth) -> ServiceDe
         ServiceCapability::new(
             CapabilityId::new(AUTONOMY_EVOLUTION_TRANSITION_COMMAND),
             "Advance a provider-neutral evolution run lifecycle",
+        ),
+        ServiceCapability::new(
+            CapabilityId::new(AUTONOMY_EVOLUTION_ADMISSION_COMMAND),
+            "Evaluate an evolution candidate through admission quality gates",
         ),
         ServiceCapability::new(
             CapabilityId::new(AUTONOMY_EVOLUTION_SNAPSHOT_COMMAND),

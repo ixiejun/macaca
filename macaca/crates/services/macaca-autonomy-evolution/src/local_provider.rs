@@ -16,8 +16,10 @@ use tracing::{info, warn};
 
 use crate::{
     autonomy_evolution_service_descriptor, validate_transition, AutonomyEvolutionService,
-    EvolutionRunRecord, EvolutionServiceSnapshot, EvolutionSnapshotCommand,
-    EvolutionTransitionCommand, EvolutionTransitionResult, AUTONOMY_EVOLUTION_SERVICE_ID,
+    DefaultEvolutionAdmissionSpecification, EvolutionAdmissionCommand, EvolutionAdmissionResult,
+    EvolutionAdmissionSpecification, EvolutionRunRecord, EvolutionServiceSnapshot,
+    EvolutionSnapshotCommand, EvolutionTransitionCommand, EvolutionTransitionResult,
+    AUTONOMY_EVOLUTION_SERVICE_ID,
 };
 
 #[derive(Debug, Default, Clone)]
@@ -150,5 +152,18 @@ impl AutonomyEvolutionService for InMemoryAutonomyEvolutionProvider {
             decision.next_state,
             decision.adapter_dispatch_required,
         ))
+    }
+
+    async fn admit_candidate(
+        &self,
+        command: EvolutionAdmissionCommand,
+    ) -> MacacaResult<EvolutionAdmissionResult> {
+        info!(
+            service_id = AUTONOMY_EVOLUTION_SERVICE_ID,
+            candidate_id = command.candidate.candidate_id.as_str(),
+            trace_id = command.trace.trace_id.as_str(),
+            "autonomy evolution admission command received"
+        );
+        DefaultEvolutionAdmissionSpecification.evaluate(&command)
     }
 }

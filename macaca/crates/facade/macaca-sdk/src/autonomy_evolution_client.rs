@@ -9,10 +9,11 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use macaca_autonomy_evolution::{
-    EvolutionRunState, EvolutionServiceSnapshot, EvolutionSnapshotCommand,
-    EvolutionTransitionCommand, EvolutionTransitionResult, AUTONOMY_EVOLUTION_HEALTH_COMMAND,
-    AUTONOMY_EVOLUTION_SERVICE_ID, AUTONOMY_EVOLUTION_SNAPSHOT_COMMAND,
-    AUTONOMY_EVOLUTION_TRANSITION_COMMAND,
+    EvolutionAdmissionCommand, EvolutionAdmissionResult, EvolutionRunState,
+    EvolutionServiceSnapshot, EvolutionSnapshotCommand, EvolutionTransitionCommand,
+    EvolutionTransitionResult, AUTONOMY_EVOLUTION_ADMISSION_COMMAND,
+    AUTONOMY_EVOLUTION_HEALTH_COMMAND, AUTONOMY_EVOLUTION_SERVICE_ID,
+    AUTONOMY_EVOLUTION_SNAPSHOT_COMMAND, AUTONOMY_EVOLUTION_TRANSITION_COMMAND,
 };
 use macaca_proto::{MacacaError, MacacaResult, TraceContext};
 use tracing::{info, warn};
@@ -33,6 +34,11 @@ pub trait SystemAutonomyEvolutionClient: Send + Sync {
     ) -> MacacaResult<EvolutionServiceSnapshot>;
 
     async fn health(&self, trace: TraceContext) -> MacacaResult<EvolutionServiceSnapshot>;
+
+    async fn admit_candidate(
+        &self,
+        command: EvolutionAdmissionCommand,
+    ) -> MacacaResult<EvolutionAdmissionResult>;
 }
 
 /// Null Object client used when no control-plane service is installed.
@@ -79,6 +85,21 @@ impl SystemAutonomyEvolutionClient for UnavailableSystemAutonomyEvolutionClient 
             "sdk autonomy evolution client returning unavailable health"
         );
         Ok(EvolutionServiceSnapshot::unavailable(
+            "autonomy evolution control plane service is unavailable",
+        ))
+    }
+
+    async fn admit_candidate(
+        &self,
+        command: EvolutionAdmissionCommand,
+    ) -> MacacaResult<EvolutionAdmissionResult> {
+        warn!(
+            trace_id = command.trace.trace_id.as_str(),
+            candidate_id = command.candidate.candidate_id.as_str(),
+            "sdk autonomy evolution client unavailable for candidate admission"
+        );
+        Ok(EvolutionAdmissionResult::unavailable(
+            &command,
             "autonomy evolution control plane service is unavailable",
         ))
     }
@@ -131,6 +152,19 @@ impl SystemAutonomyEvolutionClient for ServiceBackedAutonomyEvolutionClient {
             AUTONOMY_EVOLUTION_HEALTH_COMMAND,
             trace.clone(),
             serde_json::json!({}),
+        )
+        .await
+    }
+
+    async fn admit_candidate(
+        &self,
+        command: EvolutionAdmissionCommand,
+    ) -> MacacaResult<EvolutionAdmissionResult> {
+        call(
+            &self.service,
+            AUTONOMY_EVOLUTION_ADMISSION_COMMAND,
+            command.trace.clone(),
+            command,
         )
         .await
     }

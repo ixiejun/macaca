@@ -7,11 +7,13 @@
 //! service adapters so the control plane remains a traceable State machine
 //! rather than another application workflow engine.
 
+mod admission;
 mod local_provider;
 mod model;
 mod service_contract;
 mod state_machine;
 
+pub use admission::*;
 pub use local_provider::*;
 pub use model::*;
 pub use service_contract::*;

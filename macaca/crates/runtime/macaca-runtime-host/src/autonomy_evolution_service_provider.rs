@@ -12,8 +12,9 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use macaca_autonomy_evolution::{
-    AutonomyEvolutionService, EvolutionSnapshotCommand, EvolutionTransitionCommand,
-    InMemoryAutonomyEvolutionProvider, UnavailableAutonomyEvolutionProvider,
+    AutonomyEvolutionService, EvolutionAdmissionCommand, EvolutionSnapshotCommand,
+    EvolutionTransitionCommand, InMemoryAutonomyEvolutionProvider,
+    UnavailableAutonomyEvolutionProvider, AUTONOMY_EVOLUTION_ADMISSION_COMMAND,
     AUTONOMY_EVOLUTION_HEALTH_COMMAND, AUTONOMY_EVOLUTION_SERVICE_ID,
     AUTONOMY_EVOLUTION_SNAPSHOT_COMMAND, AUTONOMY_EVOLUTION_TRANSITION_COMMAND,
 };
@@ -75,6 +76,16 @@ impl SystemService for AutonomyEvolutionSystemServiceProvider {
                 service_result(
                     self.provider
                         .transition(typed)
+                        .await
+                        .map_err(service_adapter_error)?,
+                    trace,
+                )
+            }
+            AUTONOMY_EVOLUTION_ADMISSION_COMMAND => {
+                let typed: EvolutionAdmissionCommand = decode(command.payload)?;
+                service_result(
+                    self.provider
+                        .admit_candidate(typed)
                         .await
                         .map_err(service_adapter_error)?,
                     trace,
