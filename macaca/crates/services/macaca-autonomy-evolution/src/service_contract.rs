@@ -15,9 +15,10 @@ use macaca_proto::{
 use tracing::{info, warn};
 
 use crate::{
-    EvolutionAdmissionCommand, EvolutionAdmissionResult, EvolutionScope, EvolutionServiceSnapshot,
-    EvolutionSnapshotCommand, EvolutionTransitionCommand, EvolutionTransitionResult,
-    AUTONOMY_EVOLUTION_ADMISSION_COMMAND, AUTONOMY_EVOLUTION_HEALTH_COMMAND,
+    EvolutionAdmissionCommand, EvolutionAdmissionResult, EvolutionBenchmarkCommand,
+    EvolutionBenchmarkResult, EvolutionScope, EvolutionServiceSnapshot, EvolutionSnapshotCommand,
+    EvolutionTransitionCommand, EvolutionTransitionResult, AUTONOMY_EVOLUTION_ADMISSION_COMMAND,
+    AUTONOMY_EVOLUTION_BENCHMARK_COMMAND, AUTONOMY_EVOLUTION_HEALTH_COMMAND,
     AUTONOMY_EVOLUTION_SERVICE_ID, AUTONOMY_EVOLUTION_SNAPSHOT_COMMAND,
     AUTONOMY_EVOLUTION_TRANSITION_COMMAND,
 };
@@ -42,6 +43,11 @@ pub trait AutonomyEvolutionService: Send + Sync {
         &self,
         command: EvolutionAdmissionCommand,
     ) -> MacacaResult<EvolutionAdmissionResult>;
+
+    async fn run_paired_benchmark(
+        &self,
+        command: EvolutionBenchmarkCommand,
+    ) -> MacacaResult<EvolutionBenchmarkResult>;
 }
 
 #[derive(Debug, Clone)]
@@ -140,6 +146,23 @@ impl AutonomyEvolutionService for UnavailableAutonomyEvolutionProvider {
             format!("autonomy evolution provider unavailable: {}", self.reason),
         ))
     }
+
+    async fn run_paired_benchmark(
+        &self,
+        command: EvolutionBenchmarkCommand,
+    ) -> MacacaResult<EvolutionBenchmarkResult> {
+        warn!(
+            service_id = AUTONOMY_EVOLUTION_SERVICE_ID,
+            provider_id = self.provider_id.as_str(),
+            trace_id = command.trace.trace_id.as_str(),
+            benchmark_id = command.benchmark_id.as_str(),
+            "autonomy evolution benchmark rejected because provider is unavailable"
+        );
+        Ok(EvolutionBenchmarkResult::unavailable(
+            &command,
+            format!("autonomy evolution provider unavailable: {}", self.reason),
+        ))
+    }
 }
 
 /// Descriptor helper shared by concrete and unavailable providers.
@@ -165,6 +188,10 @@ pub fn autonomy_evolution_service_descriptor(health: ServiceHealth) -> ServiceDe
         ServiceCapability::new(
             CapabilityId::new(AUTONOMY_EVOLUTION_ADMISSION_COMMAND),
             "Evaluate an evolution candidate through admission quality gates",
+        ),
+        ServiceCapability::new(
+            CapabilityId::new(AUTONOMY_EVOLUTION_BENCHMARK_COMMAND),
+            "Score a normalized paired evolution benchmark",
         ),
         ServiceCapability::new(
             CapabilityId::new(AUTONOMY_EVOLUTION_SNAPSHOT_COMMAND),

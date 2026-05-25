@@ -8,12 +8,14 @@
 //! rather than another application workflow engine.
 
 mod admission;
+mod benchmark;
 mod local_provider;
 mod model;
 mod service_contract;
 mod state_machine;
 
 pub use admission::*;
+pub use benchmark::*;
 pub use local_provider::*;
 pub use model::*;
 pub use service_contract::*;

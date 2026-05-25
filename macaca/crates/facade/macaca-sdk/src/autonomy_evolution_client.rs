@@ -9,9 +9,10 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use macaca_autonomy_evolution::{
-    EvolutionAdmissionCommand, EvolutionAdmissionResult, EvolutionRunState,
-    EvolutionServiceSnapshot, EvolutionSnapshotCommand, EvolutionTransitionCommand,
-    EvolutionTransitionResult, AUTONOMY_EVOLUTION_ADMISSION_COMMAND,
+    EvolutionAdmissionCommand, EvolutionAdmissionResult, EvolutionBenchmarkCommand,
+    EvolutionBenchmarkResult, EvolutionRunState, EvolutionServiceSnapshot,
+    EvolutionSnapshotCommand, EvolutionTransitionCommand, EvolutionTransitionResult,
+    AUTONOMY_EVOLUTION_ADMISSION_COMMAND, AUTONOMY_EVOLUTION_BENCHMARK_COMMAND,
     AUTONOMY_EVOLUTION_HEALTH_COMMAND, AUTONOMY_EVOLUTION_SERVICE_ID,
     AUTONOMY_EVOLUTION_SNAPSHOT_COMMAND, AUTONOMY_EVOLUTION_TRANSITION_COMMAND,
 };
@@ -39,6 +40,11 @@ pub trait SystemAutonomyEvolutionClient: Send + Sync {
         &self,
         command: EvolutionAdmissionCommand,
     ) -> MacacaResult<EvolutionAdmissionResult>;
+
+    async fn run_paired_benchmark(
+        &self,
+        command: EvolutionBenchmarkCommand,
+    ) -> MacacaResult<EvolutionBenchmarkResult>;
 }
 
 /// Null Object client used when no control-plane service is installed.
@@ -103,6 +109,22 @@ impl SystemAutonomyEvolutionClient for UnavailableSystemAutonomyEvolutionClient 
             "autonomy evolution control plane service is unavailable",
         ))
     }
+
+    async fn run_paired_benchmark(
+        &self,
+        command: EvolutionBenchmarkCommand,
+    ) -> MacacaResult<EvolutionBenchmarkResult> {
+        warn!(
+            trace_id = command.trace.trace_id.as_str(),
+            benchmark_id = command.benchmark_id.as_str(),
+            run_id = command.run_id.as_str(),
+            "sdk autonomy evolution client unavailable for paired benchmark"
+        );
+        Ok(EvolutionBenchmarkResult::unavailable(
+            &command,
+            "autonomy evolution control plane service is unavailable",
+        ))
+    }
 }
 
 /// Runtime-backed client implemented over generic service calls.
@@ -163,6 +185,19 @@ impl SystemAutonomyEvolutionClient for ServiceBackedAutonomyEvolutionClient {
         call(
             &self.service,
             AUTONOMY_EVOLUTION_ADMISSION_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn run_paired_benchmark(
+        &self,
+        command: EvolutionBenchmarkCommand,
+    ) -> MacacaResult<EvolutionBenchmarkResult> {
+        call(
+            &self.service,
+            AUTONOMY_EVOLUTION_BENCHMARK_COMMAND,
             command.trace.clone(),
             command,
         )

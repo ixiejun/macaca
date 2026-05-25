@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 pub const AUTONOMY_EVOLUTION_SERVICE_ID: &str = "service.autonomy_evolution";
 pub const AUTONOMY_EVOLUTION_TRANSITION_COMMAND: &str = "autonomy.evolution.transition";
 pub const AUTONOMY_EVOLUTION_ADMISSION_COMMAND: &str = "autonomy.evolution.admit_candidate";
+pub const AUTONOMY_EVOLUTION_BENCHMARK_COMMAND: &str = "autonomy.evolution.benchmark.paired";
 pub const AUTONOMY_EVOLUTION_SNAPSHOT_COMMAND: &str = "autonomy.evolution.snapshot";
 pub const AUTONOMY_EVOLUTION_HEALTH_COMMAND: &str = "autonomy.evolution.health";
 
@@ -174,6 +175,135 @@ impl EvolutionAdmissionResult {
             captured_at: Utc::now(),
         }
     }
+}
+
+/// Final decision emitted by normalized paired benchmark scoring.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum BenchmarkDecision {
+    Passed,
+    Failed,
+    Inconclusive,
+}
+
+/// Standard metric schema used for baseline/candidate comparisons.
+///
+/// All fields are normalized counters or scores. The service receives these
+/// values from evidence collectors; it does not execute workloads, inspect raw
+/// artifacts, or infer domain-specific quality from application content.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvolutionBenchmarkMetrics {
+    pub input_tokens: u64,
+    pub output_tokens: u64,
+    pub total_tokens: u64,
+    pub elapsed_ms: u64,
+    pub tool_calls: u32,
+    pub tool_results: u32,
+    pub retry_count: u32,
+    pub failure_recovery_count: u32,
+    pub quality_score: u32,
+    pub human_intervention_count: u32,
+    pub policy_decision_count: u32,
+    pub activation_count: u32,
+    pub use_count: u32,
+    pub success_count: u32,
+}
+
+/// One side of a paired benchmark comparison.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvolutionBenchmarkMeasurement {
+    pub measurement_id: String,
+    pub task_family_id: String,
+    pub target_type: EvolutionTargetType,
+    pub metrics: Option<EvolutionBenchmarkMetrics>,
+    pub evidence_refs: Vec<String>,
+    pub artifact_refs: Vec<String>,
+    pub regression_reason_codes: Vec<String>,
+}
+
+/// Typed command for normalized baseline-versus-candidate scoring.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvolutionBenchmarkCommand {
+    pub benchmark_id: String,
+    pub run_id: String,
+    pub actor_id: String,
+    pub trace: TraceContext,
+    pub scope: EvolutionScope,
+    pub baseline: EvolutionBenchmarkMeasurement,
+    pub candidate: EvolutionBenchmarkMeasurement,
+    pub policy_decision_refs: Vec<String>,
+}
+
+/// Bounded numeric delta snapshot returned by the default scoring Strategy.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvolutionBenchmarkScoreDelta {
+    pub total_token_delta: i64,
+    pub elapsed_ms_delta: i64,
+    pub tool_call_delta: i64,
+    pub retry_delta: i64,
+    pub quality_delta: i64,
+    pub human_intervention_delta: i64,
+    pub success_count_delta: i64,
+    pub efficiency_improved: bool,
+    pub quality_preserved: bool,
+}
+
+/// Result returned by benchmark providers and SDK clients.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvolutionBenchmarkResult {
+    pub benchmark_id: String,
+    pub run_id: String,
+    pub task_family_id: String,
+    pub target_type: EvolutionTargetType,
+    pub decision: BenchmarkDecision,
+    pub trace: TraceContext,
+    pub score_delta: EvolutionBenchmarkScoreDelta,
+    pub reason_codes: Vec<String>,
+    pub evidence_refs: Vec<String>,
+    pub artifact_refs: Vec<String>,
+    pub policy_decision_refs: Vec<String>,
+    pub captured_at: DateTime<Utc>,
+}
+
+impl EvolutionBenchmarkResult {
+    /// Build a fail-closed benchmark result when the service is absent.
+    pub fn unavailable(command: &EvolutionBenchmarkCommand, reason: impl Into<String>) -> Self {
+        Self {
+            benchmark_id: command.benchmark_id.clone(),
+            run_id: command.run_id.clone(),
+            task_family_id: command.baseline.task_family_id.clone(),
+            target_type: command.candidate.target_type.clone(),
+            decision: BenchmarkDecision::Inconclusive,
+            trace: command.trace.clone(),
+            score_delta: EvolutionBenchmarkScoreDelta::default(),
+            reason_codes: vec![reason.into()],
+            evidence_refs: bounded_pair_refs(
+                &command.baseline.evidence_refs,
+                &command.candidate.evidence_refs,
+            ),
+            artifact_refs: bounded_pair_refs(
+                &command.baseline.artifact_refs,
+                &command.candidate.artifact_refs,
+            ),
+            policy_decision_refs: command.policy_decision_refs.clone(),
+            captured_at: Utc::now(),
+        }
+    }
+}
+
+fn bounded_pair_refs(left: &[String], right: &[String]) -> Vec<String> {
+    left.iter()
+        .chain(right.iter())
+        .take(8)
+        .map(|value| {
+            if value.len() > 160 {
+                let mut bounded = value.clone();
+                bounded.truncate(160);
+                bounded
+            } else {
+                value.clone()
+            }
+        })
+        .collect()
 }
 
 /// Body-free transition result returned by providers and SDK clients.
