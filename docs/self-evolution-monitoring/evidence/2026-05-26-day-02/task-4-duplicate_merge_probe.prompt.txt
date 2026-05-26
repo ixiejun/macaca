@@ -1,0 +1,2 @@
+Daily self-evolution monitor day-02, task family duplicate_merge_probe.
+Create shared/self_evolution_2026-05-26_day-02_duplicate_merge_probe.md. Identify duplicate or overlapping Skills using slug similarity, trigger similarity, procedure overlap, and telemetry evidence. Recommend merge, suppress, or keep decisions with stable refs and rollback expectations. Do not mutate files directly and do not encode application-specific logic.

@@ -1,0 +1,2 @@
+Daily self-evolution monitor day-01, task family precipitation_seed.
+Create shared/self_evolution_2026-05-25_day-01_precipitation_seed.md. Capture a reusable, application-neutral procedure from the current Macaca self-evolution evidence. Record only stable refs, bounded counts, and generic steps. Do not include application-specific business logic, provider names, raw prompts, secrets, or unbounded task output.
