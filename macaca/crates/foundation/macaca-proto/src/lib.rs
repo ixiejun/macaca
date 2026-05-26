@@ -30,6 +30,7 @@ pub mod scheduler_service;
 pub mod service;
 pub mod service_bus;
 pub mod store_service;
+pub mod tool_service;
 pub mod types;
 pub mod ui;
 pub mod wasm_package_admission;
@@ -48,6 +49,8 @@ mod plugin_capability_tests;
 mod plugin_hook_tests;
 #[cfg(test)]
 mod plugin_host_tests;
+#[cfg(test)]
+mod tool_service_tests;
 #[cfg(test)]
 mod web3_tests;
 
@@ -83,6 +86,7 @@ pub use scheduler_service::*;
 pub use service::*;
 pub use service_bus::*;
 pub use store_service::*;
+pub use tool_service::*;
 pub use types::*;
 pub use ui::*;
 pub use wasm_package_admission::*;

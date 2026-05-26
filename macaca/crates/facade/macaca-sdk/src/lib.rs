@@ -42,6 +42,7 @@ pub mod status_client;
 pub mod store_client;
 pub mod system_facade;
 pub mod task_client;
+pub mod tool_client;
 pub mod trace_client;
 pub mod validation;
 pub mod web3_client;
@@ -148,5 +149,6 @@ pub use system_facade::{
     TraceTailCommand, UnavailableSystemServiceClient,
 };
 pub use task_client::{TaskServiceClient, UnavailableTaskServiceClient};
+pub use tool_client::{ServiceBackedToolClient, SystemToolClient, UnavailableSystemToolClient};
 pub use validation::{SdkValidationChain, SdkValidator};
 pub use web3_client::{ServiceBackedWeb3Client, SystemWeb3Client, UnavailableSystemWeb3Client};

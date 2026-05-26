@@ -40,6 +40,9 @@ pub use crate::task_client::{
     SystemTaskClient, TaskBoardDataSource, TaskBoardQueryCommand, TaskBoardQueryResult,
     TodoStoreTaskBoardDataSource,
 };
+pub use crate::tool_client::{
+    ServiceBackedToolClient, SystemToolClient, UnavailableSystemToolClient,
+};
 pub use crate::trace_client::{
     EmptySystemTraceClient, SessionEventQueryCommand, SystemTraceClient, TraceQueryResult,
     TraceTailCommand,
