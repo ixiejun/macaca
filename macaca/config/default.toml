@@ -73,7 +73,7 @@ collection_name = "agent_memory"
 [memory.embedding]
 provider = "dashscope"
 model = "text-embedding-v4"
-api_key = "DASHSCOPE_API_KEY"
+api_key = "sk-7720115f25214ebaa4f83d5857224f9a"
 dimensions = 1024
 base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 
