@@ -1,11 +1,16 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use chrono::Utc;
 use macaca_memory::{
     ActiveRecallCapability, ActiveRecallRequest, ActiveRecallResult, DefaultActiveRecallStrategy,
     KnowledgeCompileCapability, KnowledgeCompileRequest, KnowledgeCompileResult, KnowledgeCompiler,
-    MemoryDeleteRequest, MemoryFacade, MemoryGetRequest, MemoryRuntimeFacade, MemoryRuntimeStatus,
-    MemorySearchRequest, MemoryWriteRequest, RecallQuery, TestMemoryManager,
+    MemoryCapabilitySet, MemoryDeleteRequest, MemoryFacade, MemoryForgetCommand, MemoryGetCommand,
+    MemoryGetRequest, MemoryGetResult, MemoryPrefetchCommand, MemoryPrefetchRequest,
+    MemoryRecallCommand, MemoryRecallResult, MemoryRememberCommand, MemoryRememberResult,
+    MemoryRuntimeFacade, MemoryRuntimeStatus, MemorySearchRequest, MemoryServiceSnapshot,
+    MemoryServiceSnapshotCommand, MemoryStatusCommand, MemoryStatusReport, MemoryWriteRequest,
+    RecallQuery, RememberText, TestMemoryManager,
 };
 use macaca_proto::{MacacaResult, MemoryEntry, MemoryId};
 
@@ -21,7 +26,20 @@ impl WebMemoryRuntime {
     }
 
     pub fn from_workspace_memory(memory: Arc<TestMemoryManager>) -> Self {
-        Self::new(Arc::new(LegacyWorkspaceMemoryRuntime::new(memory)))
+        Self::new(Arc::new(ManagerWorkspaceMemoryRuntime::new(
+            memory,
+            "legacy-workspace-builtin",
+        )))
+    }
+
+    pub fn from_configured_memory(
+        memory: Arc<macaca_memory::ConfiguredMemoryManager>,
+        provider_profile: impl Into<String>,
+    ) -> Self {
+        Self::new(Arc::new(ManagerWorkspaceMemoryRuntime::new(
+            memory,
+            provider_profile,
+        )))
     }
 
     pub async fn remember_text(&self, request: MemoryWriteRequest) -> MacacaResult<MemoryId> {
@@ -59,23 +77,80 @@ impl WebMemoryRuntime {
     }
 }
 
-/// Runtime facade over the legacy workspace `TestMemoryManager`.
-struct LegacyWorkspaceMemoryRuntime {
-    memory: Arc<TestMemoryManager>,
-    knowledge: KnowledgeCompiler,
+/// Minimal backend port implemented by concrete MemoryManager instances.
+///
+/// `macaca-web` must not know whether the backing manager uses in-memory test
+/// stores, Milvus, or a future provider. This local Adapter port exposes only
+/// the manager operations needed by the Web memory runtime and keeps provider
+/// selection inside the Memory service Abstract Factory.
+#[async_trait]
+trait WorkspaceMemoryBackend: Send + Sync {
+    async fn remember_text(&self, input: RememberText) -> MacacaResult<MemoryId>;
+    async fn recall(&self, query: RecallQuery) -> MacacaResult<macaca_memory::RecallResult>;
+    async fn get_entry(&self, id: &MemoryId) -> MacacaResult<Option<MemoryEntry>>;
+    async fn forget(&self, input: macaca_memory::ForgetMemory) -> MacacaResult<()>;
 }
 
-impl LegacyWorkspaceMemoryRuntime {
-    fn new(memory: Arc<TestMemoryManager>) -> Self {
+#[async_trait]
+impl WorkspaceMemoryBackend for TestMemoryManager {
+    async fn remember_text(&self, input: RememberText) -> MacacaResult<MemoryId> {
+        TestMemoryManager::remember_text(self, input).await
+    }
+
+    async fn recall(&self, query: RecallQuery) -> MacacaResult<macaca_memory::RecallResult> {
+        TestMemoryManager::recall(self, query).await
+    }
+
+    async fn get_entry(&self, id: &MemoryId) -> MacacaResult<Option<MemoryEntry>> {
+        TestMemoryManager::get_entry(self, id).await
+    }
+
+    async fn forget(&self, input: macaca_memory::ForgetMemory) -> MacacaResult<()> {
+        TestMemoryManager::forget(self, input).await
+    }
+}
+
+#[async_trait]
+impl WorkspaceMemoryBackend for macaca_memory::ConfiguredMemoryManager {
+    async fn remember_text(&self, input: RememberText) -> MacacaResult<MemoryId> {
+        macaca_memory::ConfiguredMemoryManager::remember_text(self, input).await
+    }
+
+    async fn recall(&self, query: RecallQuery) -> MacacaResult<macaca_memory::RecallResult> {
+        macaca_memory::ConfiguredMemoryManager::recall(self, query).await
+    }
+
+    async fn get_entry(&self, id: &MemoryId) -> MacacaResult<Option<MemoryEntry>> {
+        macaca_memory::ConfiguredMemoryManager::get_entry(self, id).await
+    }
+
+    async fn forget(&self, input: macaca_memory::ForgetMemory) -> MacacaResult<()> {
+        macaca_memory::ConfiguredMemoryManager::forget(self, input).await
+    }
+}
+
+/// Runtime facade over a MemoryManager selected by the Memory backend factory.
+struct ManagerWorkspaceMemoryRuntime {
+    memory: Arc<dyn WorkspaceMemoryBackend>,
+    knowledge: KnowledgeCompiler,
+    provider_profile: String,
+}
+
+impl ManagerWorkspaceMemoryRuntime {
+    fn new<M>(memory: Arc<M>, provider_profile: impl Into<String>) -> Self
+    where
+        M: WorkspaceMemoryBackend + 'static,
+    {
         Self {
             memory,
             knowledge: KnowledgeCompiler,
+            provider_profile: provider_profile.into(),
         }
     }
 }
 
 #[async_trait]
-impl MemoryRuntimeFacade for LegacyWorkspaceMemoryRuntime {
+impl MemoryRuntimeFacade for ManagerWorkspaceMemoryRuntime {
     async fn remember(&self, request: MemoryWriteRequest) -> MacacaResult<MemoryId> {
         let mut input = macaca_memory::RememberText::new(request.content)
             .layer(request.layer)
@@ -122,7 +197,7 @@ impl MemoryRuntimeFacade for LegacyWorkspaceMemoryRuntime {
     async fn status(&self) -> MemoryRuntimeStatus {
         MemoryRuntimeStatus {
             runtime_id: "web-memory-runtime".into(),
-            provider_profile: Some("legacy-workspace-builtin".into()),
+            provider_profile: Some(self.provider_profile.clone()),
             store_available: true,
             search_available: true,
             active_recall_available: true,
@@ -133,7 +208,7 @@ impl MemoryRuntimeFacade for LegacyWorkspaceMemoryRuntime {
 }
 
 #[async_trait]
-impl MemoryFacade for LegacyWorkspaceMemoryRuntime {
+impl MemoryFacade for ManagerWorkspaceMemoryRuntime {
     async fn remember(&self, request: MemoryWriteRequest) -> MacacaResult<MemoryId> {
         MemoryRuntimeFacade::remember(self, request).await
     }
@@ -154,7 +229,7 @@ impl MemoryFacade for LegacyWorkspaceMemoryRuntime {
 
     fn status(&self) -> macaca_memory::MemoryStatusReport {
         macaca_memory::MemoryStatusReport::healthy(
-            "web-memory-runtime",
+            self.provider_profile.clone(),
             macaca_memory::MemoryCapabilitySet {
                 store: true,
                 search: true,
@@ -243,5 +318,104 @@ impl MemoryFacade for WebMemoryRuntime {
                 knowledge: true,
             },
         )
+    }
+}
+
+#[async_trait]
+impl macaca_sdk::SystemMemoryClient for WebMemoryRuntime {
+    async fn remember(&self, command: MemoryRememberCommand) -> MacacaResult<MemoryRememberResult> {
+        let id = MemoryRuntimeFacade::remember(
+            self,
+            MemoryWriteRequest::new(command.scope, command.content)
+                .layer(command.layer)
+                .metadata(command.metadata),
+        )
+        .await?;
+        Ok(MemoryRememberResult {
+            id,
+            stored_at: Utc::now(),
+        })
+    }
+
+    async fn recall(&self, command: MemoryRecallCommand) -> MacacaResult<MemoryRecallResult> {
+        let entries = MemoryRuntimeFacade::search(
+            self,
+            MemorySearchRequest::new(command.scope, command.query, command.limit),
+        )
+        .await?;
+        Ok(MemoryRecallResult::new(entries))
+    }
+
+    async fn prefetch(&self, command: MemoryPrefetchCommand) -> MacacaResult<MemoryRecallResult> {
+        let entries = MemoryFacade::prefetch(
+            self,
+            MemoryPrefetchRequest {
+                scope: command.scope,
+                query: command.query,
+                limit: command.limit,
+            },
+        )
+        .await?;
+        Ok(MemoryRecallResult::new(entries))
+    }
+
+    async fn get(&self, command: MemoryGetCommand) -> MacacaResult<MemoryGetResult> {
+        let entry = MemoryRuntimeFacade::get(
+            self,
+            MemoryGetRequest {
+                scope: command.scope,
+                id: command.id,
+            },
+        )
+        .await?;
+        Ok(MemoryGetResult::new(entry))
+    }
+
+    async fn forget(&self, command: MemoryForgetCommand) -> MacacaResult<()> {
+        MemoryRuntimeFacade::delete(
+            self,
+            MemoryDeleteRequest {
+                scope: command.scope,
+                id: command.id,
+            },
+        )
+        .await
+    }
+
+    async fn status(&self, _command: MemoryStatusCommand) -> MacacaResult<MemoryStatusReport> {
+        Ok(MemoryStatusReport::healthy(
+            "web-memory-runtime",
+            MemoryCapabilitySet {
+                store: true,
+                search: true,
+                prompt: true,
+                lifecycle: true,
+                flush: false,
+                artifact: false,
+                governance: false,
+                knowledge: true,
+            },
+        ))
+    }
+
+    async fn snapshot(
+        &self,
+        _command: MemoryServiceSnapshotCommand,
+    ) -> MacacaResult<MemoryServiceSnapshot> {
+        Ok(MemoryServiceSnapshot::new(
+            "web-memory-runtime",
+            true,
+            MemoryCapabilitySet {
+                store: true,
+                search: true,
+                prompt: true,
+                lifecycle: true,
+                flush: false,
+                artifact: false,
+                governance: false,
+                knowledge: true,
+            },
+            None,
+        ))
     }
 }

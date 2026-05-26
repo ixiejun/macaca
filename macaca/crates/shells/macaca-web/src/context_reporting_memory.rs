@@ -7,12 +7,13 @@
 
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use macaca_context::{
     ActiveRecallBudget, ActiveRecallCapability, ActiveRecallPolicy, DefaultActiveRecallProvider,
-    KnowledgeDigestCapability,
+    KnowledgeDigestCapability, MemoryPrefetchResult, MemoryRecallQuery,
 };
-use macaca_memory::{MemoryScope, SharedTombstoneRegistry};
-use macaca_proto::{config::ContextConfig, AgentId, ApplicationId};
+use macaca_memory::{MemoryScope, SharedTombstoneRegistry, TombstoneIndex};
+use macaca_proto::{config::ContextConfig, AgentId, ApplicationId, MacacaError, MacacaResult};
 
 use crate::workspace_knowledge_digest_capability::WorkspaceKnowledgeDigestCapability;
 use crate::workspace_memory_recall_source::WorkspaceMemoryRecallSource;
@@ -86,6 +87,86 @@ pub(crate) fn build_workspace_recall_capability(
         source,
         policy,
     )))
+}
+
+/// Service-owned active recall capability that derives memory scope from each request.
+///
+/// `service.context` is process-wide, so it cannot safely hold the per-call app/session/agent
+/// capability created by [`build_workspace_recall_capability`].  This adapter keeps the same
+/// service-backed retrieval and budget policy while rebuilding a conservative session/shared
+/// scope from [`MemoryRecallQuery`] on every compose call.
+struct ContextServiceWorkspaceRecallCapability {
+    memory_client: Arc<dyn macaca_sdk::SystemMemoryClient>,
+    tombstones: Option<Arc<dyn TombstoneIndex>>,
+    config: macaca_proto::config::ActiveVectorMemoryContextConfig,
+}
+
+impl ContextServiceWorkspaceRecallCapability {
+    fn query_scope(query: &MemoryRecallQuery) -> MacacaResult<MemoryScope> {
+        let raw_app = query
+            .application_id
+            .as_deref()
+            .ok_or_else(|| MacacaError::Config("active recall requires application_id".into()))?;
+        let app_uuid = uuid::Uuid::parse_str(raw_app).map_err(|err| {
+            MacacaError::Config(format!("active recall application_id is invalid: {err}"))
+        })?;
+        Ok(digest_scope(
+            ApplicationId(app_uuid),
+            query.session_id.as_deref(),
+        ))
+    }
+}
+
+#[async_trait]
+impl ActiveRecallCapability for ContextServiceWorkspaceRecallCapability {
+    fn provider_id(&self) -> &str {
+        "workspace-active-recall"
+    }
+
+    async fn prefetch(&self, query: MemoryRecallQuery) -> MacacaResult<MemoryPrefetchResult> {
+        let scope = Self::query_scope(&query)?;
+        let source = Arc::new(WorkspaceMemoryRecallSource::new(
+            Arc::clone(&self.memory_client),
+            scope,
+            self.config.max_hits,
+            None,
+            self.tombstones.clone(),
+        ));
+        let policy = ActiveRecallPolicy {
+            budget: ActiveRecallBudget {
+                max_hits: self.config.max_hits,
+                max_chars: self.config.max_chars,
+                max_tokens: self.config.max_tokens,
+                timeout_ms: self.config.timeout_ms,
+            },
+            ..ActiveRecallPolicy::default()
+        };
+        DefaultActiveRecallProvider::new("workspace-active-recall", source, policy)
+            .prefetch(query)
+            .await
+    }
+}
+
+/// Builds the Context Service active-recall capability.
+///
+/// The returned capability is intentionally request-scoped internally: the service provider can
+/// store it globally, but every `prefetch` call reconstructs the app/session memory scope from the
+/// incoming context assembly request.
+pub(crate) fn build_context_service_recall_capability(
+    cfg: &ContextConfig,
+    memory_client: Arc<dyn macaca_sdk::SystemMemoryClient>,
+    tombstones: Option<&Arc<SharedTombstoneRegistry>>,
+) -> Option<Arc<dyn ActiveRecallCapability>> {
+    if !cfg.active_vector_memory.enabled {
+        return None;
+    }
+    let tomb_index: Option<Arc<dyn TombstoneIndex>> =
+        tombstones.map(|reg| Arc::clone(reg) as Arc<dyn TombstoneIndex>);
+    Some(Arc::new(ContextServiceWorkspaceRecallCapability {
+        memory_client,
+        tombstones: tomb_index,
+        config: cfg.active_vector_memory.clone(),
+    }))
 }
 
 /// Builds the [`KnowledgeDigestCapability`] used by the knowledge digest provider.

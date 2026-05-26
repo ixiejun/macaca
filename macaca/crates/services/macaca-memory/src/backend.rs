@@ -1,20 +1,62 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use macaca_proto::{AgentId, ApplicationId};
+use macaca_proto::{AgentId, ApplicationId, MacacaError, MacacaResult};
 
-use crate::embedding::MockEmbedding;
+use crate::embedding::{DashScopeEmbedding, MockEmbedding};
 use crate::file::FileMemory;
 use crate::isolated::IsolatedMemoryManager;
 use crate::manager::MemoryManager;
 use crate::session::SessionMemory;
-use crate::vector::InMemoryVectorStore;
+use crate::store::{DynamicEmbeddingProvider, DynamicVectorStore};
+use crate::vector::{InMemoryVectorStore, MilvusStore};
+
+/// Runtime-selected memory manager shape used by host composition roots.
+///
+/// Tests and embedded call sites may still use concrete generic managers. The
+/// configured path erases only the provider family so Web/CLI startup can honor
+/// `config/default.toml` without spreading provider-specific branches across
+/// shells or application code.
+pub type ConfiguredMemoryManager = MemoryManager<DynamicVectorStore, DynamicEmbeddingProvider>;
+
+/// Sanitized report of the provider profile selected by the backend factory.
+///
+/// This is operational metadata only: it intentionally excludes API keys,
+/// endpoint credentials, memory bodies, vectors, and raw prompts. Operators can
+/// use it to audit whether a process selected Milvus/DashScope or a fallback
+/// profile without exposing sensitive payloads.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MemoryBackendProfile {
+    pub vector_backend: String,
+    pub vector_collection: Option<String>,
+    pub embedding_provider: String,
+    pub embedding_model: String,
+    pub embedding_dimensions: usize,
+}
+
+#[derive(Debug, Clone)]
+struct VectorBackendProfileConfig {
+    backend: String,
+    milvus_url: String,
+    collection_name: String,
+}
+
+#[derive(Debug, Clone)]
+struct EmbeddingProviderProfileConfig {
+    provider: String,
+    model: String,
+    api_key: String,
+    base_url: String,
+    dimensions: usize,
+}
 
 #[derive(Debug, Clone)]
 pub struct MemoryBackendConfig {
     pub base_path: PathBuf,
     pub session_ttl: Duration,
     pub enable_vector: bool,
+    vector_backend: VectorBackendProfileConfig,
+    embedding_provider: EmbeddingProviderProfileConfig,
 }
 
 impl MemoryBackendConfig {
@@ -23,6 +65,18 @@ impl MemoryBackendConfig {
             base_path,
             session_ttl: Duration::from_secs(60),
             enable_vector: true,
+            vector_backend: VectorBackendProfileConfig {
+                backend: "in_memory".into(),
+                milvus_url: "http://localhost:19530".into(),
+                collection_name: "agent_memory".into(),
+            },
+            embedding_provider: EmbeddingProviderProfileConfig {
+                provider: "mock".into(),
+                model: "mock-embedding".into(),
+                api_key: String::new(),
+                base_url: String::new(),
+                dimensions: 1024,
+            },
         }
     }
 
@@ -33,6 +87,49 @@ impl MemoryBackendConfig {
 
     pub fn enable_vector(mut self, enable_vector: bool) -> Self {
         self.enable_vector = enable_vector;
+        self
+    }
+
+    /// Select the vector backend family for configured runtime construction.
+    ///
+    /// The factory accepts string identifiers because they come from the
+    /// provider-neutral TOML surface. Validation happens in `configured_manager`
+    /// so unsupported providers fail with a structured Memory error instead of
+    /// silently falling back to a test store.
+    pub fn vector_backend(
+        mut self,
+        backend: impl Into<String>,
+        milvus_url: impl Into<String>,
+        collection_name: impl Into<String>,
+    ) -> Self {
+        self.vector_backend = VectorBackendProfileConfig {
+            backend: backend.into(),
+            milvus_url: milvus_url.into(),
+            collection_name: collection_name.into(),
+        };
+        self
+    }
+
+    /// Select the embedding provider family for configured runtime construction.
+    ///
+    /// This keeps provider details in the Memory service Abstract Factory. Upper
+    /// shells pass configuration through once and continue using the stable
+    /// Memory Service client/facade after startup.
+    pub fn embedding_provider(
+        mut self,
+        provider: impl Into<String>,
+        model: impl Into<String>,
+        api_key: impl Into<String>,
+        base_url: impl Into<String>,
+        dimensions: usize,
+    ) -> Self {
+        self.embedding_provider = EmbeddingProviderProfileConfig {
+            provider: provider.into(),
+            model: model.into(),
+            api_key: api_key.into(),
+            base_url: base_url.into(),
+            dimensions,
+        };
         self
     }
 }
@@ -57,6 +154,59 @@ impl MemoryBackendFactory {
         )
     }
 
+    /// Return the sanitized configured provider profile without opening network connections.
+    ///
+    /// Startup diagnostics and tests use this report to prove the configuration
+    /// selected the intended provider family. The report is derived from config
+    /// only and never validates credentials, creates Milvus collections, or
+    /// emits raw endpoint secrets.
+    pub fn configured_profile(&self) -> MacacaResult<MemoryBackendProfile> {
+        let vector_backend = normalize_provider_id(&self.config.vector_backend.backend);
+        let embedding_provider = normalize_provider_id(&self.config.embedding_provider.provider);
+        self.validate_configured_profile(&vector_backend, &embedding_provider)?;
+        Ok(MemoryBackendProfile {
+            vector_backend,
+            vector_collection: self.config.enable_vector.then(|| {
+                if self.config.vector_backend.collection_name.trim().is_empty() {
+                    "agent_memory".into()
+                } else {
+                    self.config.vector_backend.collection_name.clone()
+                }
+            }),
+            embedding_provider,
+            embedding_model: self.config.embedding_provider.model.clone(),
+            embedding_dimensions: self.config.embedding_provider.dimensions,
+        })
+    }
+
+    /// Build a runtime manager from the configured backend profile.
+    ///
+    /// This method is the Memory service Abstract Factory boundary. It is the
+    /// only place that branches on provider identifiers; callers receive a
+    /// normal `MemoryManager` behind trait-object provider slots. Construction
+    /// avoids live network probes so absent optional infrastructure, such as a
+    /// local Milvus daemon, is reported when an actual vector operation runs and
+    /// remains non-fatal to session/file persistence.
+    pub fn configured_manager(&self) -> MacacaResult<ConfiguredMemoryManager> {
+        let profile = self.configured_profile()?;
+        let vector = if self.config.enable_vector {
+            Some(self.build_vector_store(&profile.vector_backend)?)
+        } else {
+            None
+        };
+        let embedding = if self.config.enable_vector {
+            Some(self.build_embedding_provider(&profile.embedding_provider)?)
+        } else {
+            None
+        };
+        Ok(MemoryManager::new(
+            SessionMemory::new(self.config.session_ttl),
+            FileMemory::new(self.config.base_path.clone()),
+            vector,
+            embedding,
+        ))
+    }
+
     pub fn isolated_test_manager(
         &self,
         app_id: ApplicationId,
@@ -72,6 +222,95 @@ impl MemoryBackendFactory {
             vector,
             embedding,
         )
+    }
+
+    fn validate_configured_profile(
+        &self,
+        vector_backend: &str,
+        embedding_provider: &str,
+    ) -> MacacaResult<()> {
+        match vector_backend {
+            "milvus" | "in_memory" | "memory" | "mock" => {}
+            other => {
+                return Err(MacacaError::Memory(format!(
+                    "unsupported memory vector backend '{other}'"
+                )));
+            }
+        }
+        match embedding_provider {
+            "dashscope" | "mock" | "in_memory" => {}
+            other => {
+                return Err(MacacaError::Memory(format!(
+                    "unsupported memory embedding provider '{other}'"
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    fn build_vector_store(&self, backend: &str) -> MacacaResult<DynamicVectorStore> {
+        match backend {
+            "milvus" => Ok(Box::new(MilvusStore::new(
+                self.config.vector_backend.milvus_url.clone(),
+                configured_collection_name(&self.config.vector_backend.collection_name),
+                self.config.embedding_provider.dimensions,
+            ))),
+            "in_memory" | "memory" | "mock" => Ok(Box::new(InMemoryVectorStore::new())),
+            other => Err(MacacaError::Memory(format!(
+                "unsupported memory vector backend '{other}'"
+            ))),
+        }
+    }
+
+    fn build_embedding_provider(&self, provider: &str) -> MacacaResult<DynamicEmbeddingProvider> {
+        match provider {
+            "dashscope" => {
+                let api_key = resolve_memory_api_key(&self.config.embedding_provider.api_key)?;
+                let mut embedding = DashScopeEmbedding::new(api_key)
+                    .with_model(self.config.embedding_provider.model.clone());
+                if !self.config.embedding_provider.base_url.trim().is_empty() {
+                    embedding =
+                        embedding.with_base_url(self.config.embedding_provider.base_url.clone());
+                }
+                Ok(Box::new(embedding))
+            }
+            "mock" | "in_memory" => Ok(Box::new(MockEmbedding::new(
+                self.config.embedding_provider.dimensions,
+            ))),
+            other => Err(MacacaError::Memory(format!(
+                "unsupported memory embedding provider '{other}'"
+            ))),
+        }
+    }
+}
+
+fn normalize_provider_id(value: &str) -> String {
+    value.trim().to_ascii_lowercase().replace('-', "_")
+}
+
+fn configured_collection_name(value: &str) -> String {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        "agent_memory".into()
+    } else {
+        trimmed.into()
+    }
+}
+
+fn resolve_memory_api_key(value: &str) -> MacacaResult<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Err(MacacaError::Memory(
+            "memory embedding provider requires an api key or env var".into(),
+        ));
+    }
+    if trimmed
+        .chars()
+        .all(|ch| ch.is_ascii_uppercase() || ch == '_')
+    {
+        Ok(std::env::var(trimmed).unwrap_or_else(|_| trimmed.into()))
+    } else {
+        Ok(trimmed.into())
     }
 }
 
@@ -108,5 +347,28 @@ mod tests {
 
         assert_eq!(manager.app_id(), app_id);
         assert_eq!(manager.agent_id(), agent_id);
+    }
+
+    #[test]
+    fn factory_reports_configured_milvus_dashscope_profile() {
+        let dir = TempDir::new().unwrap();
+        let factory = MemoryBackendFactory::new(
+            MemoryBackendConfig::new(dir.path().to_path_buf())
+                .vector_backend("milvus", "http://localhost:19530", "agent_memory")
+                .embedding_provider(
+                    "dashscope",
+                    "text-embedding-v4",
+                    "test-api-key",
+                    "https://dashscope.aliyuncs.com/api/v1/services/embeddings/text-embedding/text-embedding",
+                    1024,
+                ),
+        );
+
+        let profile = factory.configured_profile().unwrap();
+
+        assert_eq!(profile.vector_backend, "milvus");
+        assert_eq!(profile.embedding_provider, "dashscope");
+        assert_eq!(profile.vector_collection, Some("agent_memory".into()));
+        assert_eq!(profile.embedding_dimensions, 1024);
     }
 }

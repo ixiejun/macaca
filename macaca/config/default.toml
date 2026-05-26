@@ -75,7 +75,7 @@ provider = "dashscope"
 model = "text-embedding-v4"
 api_key = "DASHSCOPE_API_KEY"
 dimensions = 1024
-base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+base_url = "https://dashscope.aliyuncs.com/api/v1/services/embeddings/text-embedding/text-embedding"
 
 [memory.compression]
 enabled = true
@@ -171,6 +171,33 @@ FIGMA_API_KEY = "figd_DP_td8sx285ub8u2nVClYoOfavmFsTNwd0oHQtpr"
 # ---------------------------------------------------------------------------
 # Context engine + composer (macaca-proto `ContextConfig`)
 # ---------------------------------------------------------------------------
+[context]
+# Use the composer-aware builtin engine by default in local runs so configured
+# providers such as active vector memory recall execute before model calls.
+# Keep legacy as the fallback for conservative degradation.
+default_engine = "windowed"
+fallback_engine = "legacy"
+
+[context.recall]
+# Start the local workspace Memory Service so active vector memory has a real
+# retrieval backend. This exposes memory tools but leaves legacy preflight
+# recall disabled; active recall remains owned by the composer provider below.
+expose_memory_tools = true
+
+# Enable composer-stage active vector memory recall for the local Macaca web
+# host. The recall provider stays application-neutral: it reads only scoped
+# workspace memory through the SystemMemoryClient before each model call, and
+# the composer treats recalled rows as dynamic, untrusted, request-only context.
+[context.active_vector_memory]
+enabled = true
+include_agent_private = true
+include_session_shared = true
+timeout_ms = 1500
+max_query_tokens = 2048
+max_hits = 8
+max_chars = 4000
+max_tokens = 1000
+
 # Loads OpenClaw-style profile Markdown via `ProfileFileContextProvider` into the composer.
 # - `persona_directory`: `{app_dir}/personas/{agent_name}` (same tree as IDENTITY.md / TOOLS.md)
 # - `agent_private_workspace`: `{data_dir}/workspaces/{app_id}/agents/{agent_name}`

@@ -1394,7 +1394,7 @@ pub(crate) async fn post_chat_v2(
                 stored.meta.status = status.to_string();
                 stored.turns.push(StoredTurn {
                     role: "assistant".into(),
-                    content: final_content,
+                    content: final_content.clone(),
                     status: Some(status.to_string()),
                     trace_steps: Vec::new(),
                     meta: None,
@@ -1411,6 +1411,21 @@ pub(crate) async fn post_chat_v2(
         }
 
         if status != "error" {
+            let mut trace = TraceContext::new(format!(
+                "chat-session-memory-capture:{session_key_for_task}"
+            ));
+            trace.session_id = Some(session_key_for_task.clone());
+            trace.agent = Some(entry_agent_name.clone());
+            crate::session_memory_capture::capture_successful_session_completion(
+                Arc::clone(&state_for_task.memory_client),
+                app_id,
+                session_key_for_task.clone(),
+                entry_agent_name.clone(),
+                final_content,
+                trace,
+            )
+            .await;
+
             if let Some(manifest) = state_for_task
                 .kernel
                 .get_agent_by_name(&entry_agent_name)

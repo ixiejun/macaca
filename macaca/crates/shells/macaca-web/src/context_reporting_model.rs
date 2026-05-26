@@ -423,12 +423,18 @@ impl ContextReportingChatModel {
         }
         assembled.report.lineage_compaction_count = lineage_count;
         let message_count_before_recall = assembled.messages.len();
+        // The Route-C Context Service is process-wide, while the existing workspace recall
+        // capability is scoped per app/session/agent in this Web wrapper.  Treat composer recall
+        // as handled only when the service report proves that the active-recall provider ran;
+        // otherwise fall back to the scoped Web recall path before the model call.
+        let composer_active_recall_proven = self.composer_handles_active_vector_recall()
+            && !assembled.report.active_recall.is_empty();
         apply_active_recall(
             &self.recall_runtime,
             &self.memory_client,
             recall_scope(self.app_id, self.session_id.as_deref(), None),
             &preflight_cfg,
-            self.composer_handles_active_vector_recall(),
+            composer_active_recall_proven,
             &mut assembled,
             messages,
         )

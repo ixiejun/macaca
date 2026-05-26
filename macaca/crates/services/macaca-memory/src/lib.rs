@@ -35,7 +35,9 @@ pub mod vector_backend;
 pub mod vector_conformance;
 pub mod vector_topology;
 
-pub use backend::{MemoryBackendConfig, MemoryBackendFactory};
+pub use backend::{
+    ConfiguredMemoryManager, MemoryBackendConfig, MemoryBackendFactory, MemoryBackendProfile,
+};
 pub use cache::{CachedEmbeddingProvider, EmbeddingCache};
 pub use core::{
     ActiveRecallBudget, ActiveRecallCandidate, ActiveRecallCapability, ActiveRecallDecision,
@@ -103,7 +105,10 @@ pub use service_contract::{
 };
 pub use session::SessionMemory;
 pub use snapshot::{MemorySnapshot, MemorySnapshotStore};
-pub use store::{EmbeddingProvider, MemoryRetriever, MemoryStore, VectorSearchResult, VectorStore};
+pub use store::{
+    DynamicEmbeddingProvider, DynamicVectorStore, EmbeddingProvider, MemoryRetriever, MemoryStore,
+    VectorSearchResult, VectorStore,
+};
 pub use tombstone_index::{
     EmptyTombstoneIndex, GovernanceFacadeTombstones, MergedTombstoneIndex, SharedTombstoneRegistry,
     TombstoneIndex,

@@ -41,6 +41,7 @@ mod scheduled_agent_task_tool;
 mod service_runtime_client;
 mod service_tool_adapter;
 pub mod session;
+mod session_memory_capture;
 pub mod session_replay;
 pub mod shell;
 pub mod skill_mcp;
@@ -65,7 +66,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use macaca_app::{AppLoader, AppRegistry, AppRuntime};
 use macaca_framework::session::{
@@ -499,26 +500,78 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
         Arc::new(FrameworkInMemorySessionStore::new());
     let mcp_runtime = Arc::new(macaca_runtime_host::McpRuntimeFacade::load_default().await);
 
-    let (workspace_memory, workspace_memory_tombstones) =
+    let (memory_runtime, workspace_memory, workspace_memory_tombstones) =
         if config.context.recall.expose_memory_tools {
-            let mem_dir = data_dir.join("workspace_memory");
+            let mem_dir = configured_memory_base_path(&data_dir, &config.memory.file_store_path);
             std::fs::create_dir_all(&mem_dir).ok();
             let factory = macaca_memory::MemoryBackendFactory::new(
-                macaca_memory::MemoryBackendConfig::new(mem_dir).session_ttl(Duration::from_secs(
-                    config.memory.session_ttl_seconds.max(1),
-                )),
+                macaca_memory::MemoryBackendConfig::new(mem_dir.clone())
+                    .session_ttl(Duration::from_secs(
+                        config.memory.session_ttl_seconds.max(1),
+                    ))
+                    .enable_vector(config.context.active_vector_memory.enabled)
+                    .vector_backend(
+                        config.memory.vector.backend.clone(),
+                        config.memory.vector.milvus_url.clone(),
+                        config.memory.vector.collection_name.clone(),
+                    )
+                    .embedding_provider(
+                        config.memory.embedding.provider.clone(),
+                        config.memory.embedding.model.clone(),
+                        config.memory.embedding.api_key.clone(),
+                        config.memory.embedding.base_url.clone(),
+                        config.memory.embedding.dimensions,
+                    ),
             );
+            let profile = factory
+                .configured_profile()
+                .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
             let tomb = Arc::new(macaca_memory::SharedTombstoneRegistry::new());
+            info!(
+                memory_base_path = %mem_dir.display(),
+                vector_backend = %profile.vector_backend,
+                vector_collection = ?profile.vector_collection,
+                embedding_provider = %profile.embedding_provider,
+                embedding_model = %profile.embedding_model,
+                embedding_dimensions = profile.embedding_dimensions,
+                "Configured workspace memory runtime"
+            );
+            let configured_manager = Arc::new(
+                factory
+                    .configured_manager()
+                    .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?,
+            );
+            let provider_profile = format!(
+                "{}:{}:{}",
+                profile.vector_backend,
+                profile
+                    .vector_collection
+                    .clone()
+                    .unwrap_or_else(|| "vector-disabled".into()),
+                profile.embedding_provider
+            );
+            let runtime = Arc::new(
+                crate::memory_runtime::WebMemoryRuntime::from_configured_memory(
+                    configured_manager,
+                    provider_profile,
+                ),
+            );
             (
-                Some(Arc::new(factory.test_manager())),
+                Some(runtime),
+                None::<Arc<macaca_memory::TestMemoryManager>>,
                 Some(Arc::clone(&tomb)),
             )
         } else {
-            (None, None)
+            warn!("Workspace memory runtime disabled by context recall configuration");
+            (None, None, None)
         };
-    let memory_runtime = workspace_memory.as_ref().map(|memory| {
-        Arc::new(crate::memory_runtime::WebMemoryRuntime::from_workspace_memory(Arc::clone(memory)))
-    });
+    let memory_client: Arc<dyn macaca_sdk::SystemMemoryClient> = if memory_runtime.is_some() {
+        Arc::new(macaca_sdk::ServiceBackedMemoryClient::new(Arc::clone(
+            &generic_service_client,
+        )))
+    } else {
+        Arc::new(macaca_sdk::UnavailableSystemMemoryClient)
+    };
     service_runtime
         .register_provider(
             &macaca_runtime_host::StaticServiceProviderFactory::new(
@@ -619,6 +672,18 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
             .with_installations(external_adapter_installations),
     );
     let context_engine_registry = Arc::new(configured_external_adapters.registry);
+    let context_service_capabilities = macaca_context::ContextServiceRuntimeCapabilities {
+        memory_recall: if let Some(runtime) = memory_runtime.as_ref() {
+            crate::context_reporting_memory::build_context_service_recall_capability(
+                &config.context,
+                Arc::clone(runtime) as Arc<dyn macaca_sdk::SystemMemoryClient>,
+                workspace_memory_tombstones.as_ref(),
+            )
+        } else {
+            None
+        },
+        knowledge_digest: None,
+    };
     service_runtime
         .register_provider(
             &macaca_runtime_host::StaticServiceProviderFactory::new(
@@ -628,9 +693,12 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
                         macaca_proto::ServiceType::new("context"),
                         macaca_proto::TraceSchemaRef::new("trace.system_service.context.v1"),
                     ),
-                    Arc::new(macaca_runtime_host::ContextSystemServiceProvider::new(
-                        (*context_engine_registry).clone(),
-                    )),
+                    Arc::new(
+                        macaca_runtime_host::ContextSystemServiceProvider::with_capabilities(
+                            (*context_engine_registry).clone(),
+                            context_service_capabilities,
+                        ),
+                    ),
                 ),
             ),
             macaca_runtime_host::ServiceProviderFactoryContext::new(),
@@ -708,13 +776,6 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
     let llm_client: Arc<dyn macaca_sdk::SystemLlmClient> = Arc::new(
         macaca_sdk::ServiceBackedLlmClient::new(Arc::clone(&generic_service_client)),
     );
-    let memory_client: Arc<dyn macaca_sdk::SystemMemoryClient> = if memory_runtime.is_some() {
-        Arc::new(macaca_sdk::ServiceBackedMemoryClient::new(Arc::clone(
-            &generic_service_client,
-        )))
-    } else {
-        Arc::new(macaca_sdk::UnavailableSystemMemoryClient)
-    };
     let context_client: Arc<dyn macaca_sdk::SystemContextClient> = Arc::new(
         macaca_sdk::ServiceBackedContextClient::new(Arc::clone(&generic_service_client)),
     );
@@ -1102,6 +1163,27 @@ fn materialized_skill_recovery_roots(
 /// branch on application-specific semantics.
 fn skill_governance_event_journal_path(workspace_root: &str) -> PathBuf {
     PathBuf::from(workspace_root).join("skill-governance-events.jsonl")
+}
+
+/// Resolve the durable Memory file-store base path for local web runs.
+///
+/// The Memory service can write to both file/session layers and vector
+/// providers. Keeping this resolver in the Web composition root lets operators
+/// use a relative `memory.file_store_path` in config while still getting a
+/// deterministic path under the host data directory. No application id, agent
+/// name, or business workflow is hardcoded here; scope-specific isolation stays
+/// inside Memory Service commands and providers.
+fn configured_memory_base_path(data_dir: &std::path::Path, configured: &str) -> PathBuf {
+    let configured = configured.trim();
+    if configured.is_empty() {
+        return data_dir.join("workspace_memory");
+    }
+    let path = PathBuf::from(configured);
+    if path.is_absolute() {
+        path
+    } else {
+        data_dir.join(path)
+    }
 }
 
 /// Translate provider-neutral web configuration into runtime-host activation.

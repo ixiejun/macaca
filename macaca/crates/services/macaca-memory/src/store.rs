@@ -46,6 +46,26 @@ pub trait EmbeddingProvider: Send + Sync {
     fn dimensions(&self) -> usize;
 }
 
+/// Type-erased embedding provider used by configuration-driven composition roots.
+///
+/// `MemoryManager` is intentionally generic for zero-cost test and embedded
+/// configurations, but a web/runtime composition root must select providers
+/// from configuration at startup. This alias and the forwarding implementation
+/// keep that Abstract Factory decision outside callers while preserving the
+/// same `EmbeddingProvider` contract after construction.
+pub type DynamicEmbeddingProvider = Box<dyn EmbeddingProvider>;
+
+#[async_trait]
+impl EmbeddingProvider for DynamicEmbeddingProvider {
+    async fn embed(&self, texts: Vec<String>) -> MacacaResult<Vec<Vec<f32>>> {
+        self.as_ref().embed(texts).await
+    }
+
+    fn dimensions(&self) -> usize {
+        self.as_ref().dimensions()
+    }
+}
+
 /// Stores and searches vectors by similarity.
 #[async_trait]
 pub trait VectorStore: Send + Sync {
@@ -53,4 +73,31 @@ pub trait VectorStore: Send + Sync {
     async fn search(&self, vector: Vec<f32>, limit: usize)
         -> MacacaResult<Vec<VectorSearchResult>>;
     async fn delete(&self, id: &str) -> MacacaResult<()>;
+}
+
+/// Type-erased vector store used when the backend family is chosen from config.
+///
+/// The box is still a concrete provider instance owned by the Memory service
+/// composition root. Upper layers never observe whether this is Milvus,
+/// in-memory, or a future plugin-backed store; they only receive stable Memory
+/// Service behavior and sanitized status.
+pub type DynamicVectorStore = Box<dyn VectorStore>;
+
+#[async_trait]
+impl VectorStore for DynamicVectorStore {
+    async fn upsert(&self, id: &str, vector: Vec<f32>, payload: Value) -> MacacaResult<()> {
+        self.as_ref().upsert(id, vector, payload).await
+    }
+
+    async fn search(
+        &self,
+        vector: Vec<f32>,
+        limit: usize,
+    ) -> MacacaResult<Vec<VectorSearchResult>> {
+        self.as_ref().search(vector, limit).await
+    }
+
+    async fn delete(&self, id: &str) -> MacacaResult<()> {
+        self.as_ref().delete(id).await
+    }
 }

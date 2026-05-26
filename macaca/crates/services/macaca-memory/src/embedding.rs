@@ -48,6 +48,7 @@ pub struct DashScopeEmbedding {
     client: reqwest::Client,
     api_key: String,
     base_url: String,
+    model: String,
 }
 
 impl DashScopeEmbedding {
@@ -56,6 +57,7 @@ impl DashScopeEmbedding {
             client: reqwest::Client::new(),
             api_key,
             base_url: DEFAULT_DASHSCOPE_EMBED_URL.to_owned(),
+            model: "text-embedding-v4".to_owned(),
         }
     }
 
@@ -64,6 +66,20 @@ impl DashScopeEmbedding {
         let url = base_url.into();
         if !url.is_empty() {
             self.base_url = url;
+        }
+        self
+    }
+
+    /// Override the embedding model selected by runtime configuration.
+    ///
+    /// DashScope currently defaults to `text-embedding-v4`, but keeping the
+    /// model configurable avoids baking a provider-specific model name into the
+    /// Memory service composition path. Empty config values preserve the safe
+    /// default so older configuration files continue to work.
+    pub fn with_model(mut self, model: impl Into<String>) -> Self {
+        let model = model.into();
+        if !model.trim().is_empty() {
+            self.model = model;
         }
         self
     }
@@ -82,7 +98,7 @@ impl EmbeddingProvider for DashScopeEmbedding {
         debug!(count = texts.len(), "dashscope: embedding texts");
 
         let body = EmbedRequest {
-            model: "text-embedding-v4",
+            model: &self.model,
             input: EmbedInput { texts: &texts },
             parameters: EmbedParameters {
                 text_type: "document",
