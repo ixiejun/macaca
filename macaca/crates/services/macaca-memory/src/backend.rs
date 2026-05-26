@@ -308,7 +308,13 @@ fn resolve_memory_api_key(value: &str) -> MacacaResult<String> {
         .chars()
         .all(|ch| ch.is_ascii_uppercase() || ch == '_')
     {
-        Ok(std::env::var(trimmed).unwrap_or_else(|_| trimmed.into()))
+        // Memory embedding configuration follows the same placeholder contract as LLM
+        // providers: an all-caps value names an environment variable, not a literal
+        // credential. Failing fast here keeps local startup diagnostics explicit and
+        // prevents accidental outbound requests that use `DASHSCOPE_API_KEY` as the
+        // bearer token when the operator forgot to export the real secret.
+        std::env::var(trimmed)
+            .map_err(|_| MacacaError::Memory(format!("{trimmed} not set for memory embedding")))
     } else {
         Ok(trimmed.into())
     }
@@ -370,5 +376,18 @@ mod tests {
         assert_eq!(profile.embedding_provider, "dashscope");
         assert_eq!(profile.vector_collection, Some("agent_memory".into()));
         assert_eq!(profile.embedding_dimensions, 1024);
+    }
+
+    #[test]
+    fn memory_api_key_placeholder_requires_environment_variable() {
+        // Use a test-scoped placeholder name that should never be present in the
+        // operator environment. The assertion protects the generic configuration
+        // contract without depending on any real provider secret.
+        let err = resolve_memory_api_key("MACACA_MEMORY_TEST_MISSING_API_KEY")
+            .expect_err("all-caps placeholders must resolve through the environment");
+
+        assert!(err
+            .to_string()
+            .contains("MACACA_MEMORY_TEST_MISSING_API_KEY not set"));
     }
 }
