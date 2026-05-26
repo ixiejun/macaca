@@ -75,7 +75,7 @@ provider = "dashscope"
 model = "text-embedding-v4"
 api_key = "DASHSCOPE_API_KEY"
 dimensions = 1024
-base_url = "https://dashscope.aliyuncs.com/api/v1/services/embeddings/text-embedding/text-embedding"
+base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 
 [memory.compression]
 enabled = true
@@ -192,7 +192,7 @@ expose_memory_tools = true
 enabled = true
 include_agent_private = true
 include_session_shared = true
-timeout_ms = 1500
+timeout_ms = 5000
 max_query_tokens = 2048
 max_hits = 8
 max_chars = 4000

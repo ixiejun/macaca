@@ -23,6 +23,8 @@ struct MilvusInsertRequest {
 struct MilvusSearchRequest {
     #[serde(rename = "collectionName")]
     collection_name: String,
+    #[serde(rename = "annsField")]
+    anns_field: String,
     data: Vec<Vec<f32>>,
     limit: usize,
     #[serde(rename = "outputFields")]
@@ -53,7 +55,40 @@ struct MilvusDeleteRequest {
 struct CreateCollectionRequest {
     #[serde(rename = "collectionName")]
     collection_name: String,
-    dimension: usize,
+    schema: CreateCollectionSchema,
+    #[serde(rename = "indexParams")]
+    index_params: Vec<CreateCollectionIndexParam>,
+}
+
+#[derive(Debug, Serialize)]
+struct CreateCollectionSchema {
+    #[serde(rename = "autoId")]
+    auto_id: bool,
+    #[serde(rename = "enableDynamicField")]
+    enable_dynamic_field: bool,
+    fields: Vec<CreateCollectionField>,
+}
+
+#[derive(Debug, Serialize)]
+struct CreateCollectionField {
+    #[serde(rename = "fieldName")]
+    field_name: String,
+    #[serde(rename = "dataType")]
+    data_type: String,
+    #[serde(rename = "isPrimary", skip_serializing_if = "std::ops::Not::not")]
+    is_primary: bool,
+    #[serde(rename = "elementTypeParams")]
+    element_type_params: HashMap<String, String>,
+}
+
+#[derive(Debug, Serialize)]
+struct CreateCollectionIndexParam {
+    #[serde(rename = "fieldName")]
+    field_name: String,
+    #[serde(rename = "indexName")]
+    index_name: String,
+    #[serde(rename = "metricType")]
+    metric_type: String,
 }
 
 /// Milvus vector store backed by the Milvus REST API.
@@ -81,10 +116,7 @@ impl MilvusStore {
     /// Ensure the collection exists, creating it if necessary.
     pub async fn ensure_collection(&self) -> MacacaResult<()> {
         let url = format!("{}/v2/vectordb/collections/create", self.base_url);
-        let body = CreateCollectionRequest {
-            collection_name: self.collection.clone(),
-            dimension: self.dimension,
-        };
+        let body = CreateCollectionRequest::new(self.collection.clone(), self.dimension);
         let resp = self
             .client
             .post(&url)
@@ -106,9 +138,54 @@ impl MilvusStore {
     }
 }
 
+impl CreateCollectionRequest {
+    /// Build the explicit Milvus schema required by Macaca memory records.
+    ///
+    /// Milvus' compact REST create API defaults the primary key field to
+    /// `Int64`. Macaca memory ids are UUID strings, so the default schema
+    /// accepts the create call but makes later string-key inserts/searches
+    /// effectively unusable. The explicit schema keeps `id` as `VarChar`,
+    /// enables dynamic metadata fields, and creates a cosine vector index for
+    /// the `vector` field used by [`MilvusStore::upsert`].
+    fn new(collection_name: impl Into<String>, dimension: usize) -> Self {
+        Self {
+            collection_name: collection_name.into(),
+            schema: CreateCollectionSchema {
+                auto_id: false,
+                enable_dynamic_field: true,
+                fields: vec![
+                    CreateCollectionField {
+                        field_name: "id".into(),
+                        data_type: "VarChar".into(),
+                        is_primary: true,
+                        element_type_params: HashMap::from([("max_length".into(), "128".into())]),
+                    },
+                    CreateCollectionField {
+                        field_name: "vector".into(),
+                        data_type: "FloatVector".into(),
+                        is_primary: false,
+                        element_type_params: HashMap::from([("dim".into(), dimension.to_string())]),
+                    },
+                ],
+            },
+            index_params: vec![CreateCollectionIndexParam {
+                field_name: "vector".into(),
+                index_name: "vector".into(),
+                metric_type: "COSINE".into(),
+            }],
+        }
+    }
+}
+
 #[async_trait]
 impl VectorStore for MilvusStore {
     async fn upsert(&self, id: &str, vector: Vec<f32>, payload: Value) -> MacacaResult<()> {
+        // Milvus collections are runtime infrastructure, not application data.
+        // Creating them lazily on the first write keeps local and plugin-backed
+        // memory runtimes self-healing after a fresh database start while still
+        // surfacing real schema/network errors as structured Memory failures.
+        self.ensure_collection().await?;
+
         let url = format!("{}/v2/vectordb/entities/insert", self.base_url);
         let mut data_obj = match payload {
             Value::Object(m) => m,
@@ -148,6 +225,7 @@ impl VectorStore for MilvusStore {
         let url = format!("{}/v2/vectordb/entities/search", self.base_url);
         let body = MilvusSearchRequest {
             collection_name: self.collection.clone(),
+            anns_field: "vector".into(),
             data: vec![vector],
             limit,
             output_fields: vec!["*".into()],
@@ -338,6 +416,47 @@ mod tests {
         assert_eq!(results.len(), 2);
     }
 
+    #[test]
+    fn milvus_create_collection_request_uses_string_memory_ids() {
+        let body = CreateCollectionRequest::new("agent_memory", 1024);
+        let value = serde_json::to_value(body).unwrap();
+
+        assert_eq!(value["collectionName"], "agent_memory");
+        assert_eq!(value["schema"]["autoId"], false);
+        assert_eq!(value["schema"]["enableDynamicField"], true);
+        assert_eq!(value["schema"]["fields"][0]["fieldName"], "id");
+        assert_eq!(value["schema"]["fields"][0]["dataType"], "VarChar");
+        assert_eq!(value["schema"]["fields"][0]["isPrimary"], true);
+        assert_eq!(
+            value["schema"]["fields"][0]["elementTypeParams"]["max_length"],
+            "128"
+        );
+        assert_eq!(value["schema"]["fields"][1]["fieldName"], "vector");
+        assert_eq!(value["schema"]["fields"][1]["dataType"], "FloatVector");
+        assert_eq!(
+            value["schema"]["fields"][1]["elementTypeParams"]["dim"],
+            "1024"
+        );
+        assert_eq!(value["indexParams"][0]["metricType"], "COSINE");
+    }
+
+    #[test]
+    fn milvus_search_request_targets_vector_field_explicitly() {
+        let body = MilvusSearchRequest {
+            collection_name: "agent_memory".into(),
+            anns_field: "vector".into(),
+            data: vec![vec![1.0, 0.0, 0.0, 0.0]],
+            limit: 1,
+            output_fields: vec!["*".into()],
+        };
+        let value = serde_json::to_value(body).unwrap();
+
+        assert_eq!(value["collectionName"], "agent_memory");
+        assert_eq!(value["annsField"], "vector");
+        assert_eq!(value["limit"], 1);
+        assert_eq!(value["outputFields"][0], "*");
+    }
+
     #[tokio::test]
     #[ignore]
     async fn milvus_live() {
@@ -351,7 +470,14 @@ mod tests {
             )
             .await
             .unwrap();
-        let results = store.search(vec![1.0, 0.0, 0.0, 0.0], 1).await.unwrap();
+        let mut results = Vec::new();
+        for _ in 0..10 {
+            results = store.search(vec![1.0, 0.0, 0.0, 0.0], 1).await.unwrap();
+            if !results.is_empty() {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        }
         assert!(!results.is_empty());
         store.delete("m1").await.unwrap();
     }

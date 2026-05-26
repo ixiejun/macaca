@@ -171,6 +171,35 @@ impl ContextReportingChatModel {
         }
     }
 
+    /// Build the Web-scoped active recall fallback policy for one model call.
+    ///
+    /// Composer-stage active vector recall is the preferred path because it
+    /// flows through the generic Context Service provider chain. The Context
+    /// Service can still fail open, for example when a remote embedding call
+    /// exceeds the configured timeout. When that happens the report contains no
+    /// active-recall telemetry, so this method enables the legacy Web Strategy
+    /// adapter for exactly one bounded retry. Keeping the fallback policy here
+    /// preserves service ownership while allowing the shell composition root to
+    /// supply app/session/agent scoped memory handles that the process-wide
+    /// Context Service does not own.
+    fn active_recall_fallback_config(
+        active_vector_memory: &macaca_proto::config::ActiveVectorMemoryContextConfig,
+        preflight_cfg: &ContextPreflightRecallConfig,
+        composer_active_recall_proven: bool,
+    ) -> ContextPreflightRecallConfig {
+        if !active_vector_memory.enabled || composer_active_recall_proven {
+            return preflight_cfg.clone();
+        }
+        ContextPreflightRecallConfig {
+            enabled: true,
+            allowed_tool_names: preflight_cfg.allowed_tool_names.clone(),
+            timeout_ms: active_vector_memory.timeout_ms,
+            max_chars: active_vector_memory.max_chars,
+            max_tokens: active_vector_memory.max_tokens,
+            fatal_on_failure: false,
+        }
+    }
+
     /// Count previously created compaction successors for the current session root.
     ///
     /// This is a diagnostic-only read used to enrich context reports with
@@ -271,12 +300,19 @@ impl ContextReportingChatModel {
                 }
                 assembled.report.lineage_compaction_count = lineage_count;
                 let message_count_before_recall = assembled.messages.len();
+                let composer_active_recall_proven = self.composer_handles_active_vector_recall()
+                    && !assembled.report.active_recall.is_empty();
+                let active_recall_cfg = Self::active_recall_fallback_config(
+                    &self.active_vector_memory,
+                    &preflight_cfg,
+                    composer_active_recall_proven,
+                );
                 apply_active_recall(
                     &self.recall_runtime,
                     &self.memory_client,
                     recall_scope(self.app_id, self.session_id.as_deref(), None),
-                    &preflight_cfg,
-                    self.composer_handles_active_vector_recall(),
+                    &active_recall_cfg,
+                    composer_active_recall_proven,
                     &mut assembled,
                     messages,
                 )
@@ -429,11 +465,16 @@ impl ContextReportingChatModel {
         // otherwise fall back to the scoped Web recall path before the model call.
         let composer_active_recall_proven = self.composer_handles_active_vector_recall()
             && !assembled.report.active_recall.is_empty();
+        let active_recall_cfg = Self::active_recall_fallback_config(
+            &self.active_vector_memory,
+            &preflight_cfg,
+            composer_active_recall_proven,
+        );
         apply_active_recall(
             &self.recall_runtime,
             &self.memory_client,
             recall_scope(self.app_id, self.session_id.as_deref(), None),
-            &preflight_cfg,
+            &active_recall_cfg,
             composer_active_recall_proven,
             &mut assembled,
             messages,
@@ -500,5 +541,67 @@ impl ChatModel for ContextReportingChatModel {
 
     fn name(&self) -> &str {
         self.inner.name()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn active_recall_fallback_enables_bounded_retry_after_composer_timeout() {
+        let active_vector_memory = macaca_proto::config::ActiveVectorMemoryContextConfig {
+            enabled: true,
+            timeout_ms: 5_000,
+            max_chars: 2_048,
+            max_tokens: 512,
+            ..Default::default()
+        };
+        let preflight_cfg = ContextPreflightRecallConfig {
+            enabled: false,
+            allowed_tool_names: Vec::new(),
+            timeout_ms: 1_500,
+            max_chars: 4_000,
+            max_tokens: 1_000,
+            fatal_on_failure: false,
+        };
+
+        let fallback = ContextReportingChatModel::active_recall_fallback_config(
+            &active_vector_memory,
+            &preflight_cfg,
+            false,
+        );
+
+        assert!(fallback.enabled);
+        assert_eq!(fallback.timeout_ms, 5_000);
+        assert_eq!(fallback.max_chars, 2_048);
+        assert_eq!(fallback.max_tokens, 512);
+        assert!(!fallback.fatal_on_failure);
+    }
+
+    #[test]
+    fn active_recall_fallback_stays_disabled_when_composer_proves_recall() {
+        let active_vector_memory = macaca_proto::config::ActiveVectorMemoryContextConfig {
+            enabled: true,
+            timeout_ms: 5_000,
+            ..Default::default()
+        };
+        let preflight_cfg = ContextPreflightRecallConfig {
+            enabled: false,
+            allowed_tool_names: Vec::new(),
+            timeout_ms: 1_500,
+            max_chars: 4_000,
+            max_tokens: 1_000,
+            fatal_on_failure: false,
+        };
+
+        let fallback = ContextReportingChatModel::active_recall_fallback_config(
+            &active_vector_memory,
+            &preflight_cfg,
+            true,
+        );
+
+        assert!(!fallback.enabled);
+        assert_eq!(fallback.timeout_ms, 1_500);
     }
 }

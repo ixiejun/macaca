@@ -4,6 +4,8 @@ use macaca_memory::{MemoryPolicyHints, MemoryRememberCommand, MemoryScope};
 use macaca_proto::{ApplicationId, MemoryLayer, TraceContext};
 use tracing::{info, warn};
 
+const MAX_CAPTURE_EXCERPT_CHARS: usize = 1200;
+
 /// Persist sanitized completion evidence into the Memory Service.
 ///
 /// This module is a Web-shell Observer over the generic chat lifecycle. It does
@@ -24,14 +26,17 @@ pub(crate) async fn capture_successful_session_completion(
     let agent_name = agent_name.into();
     let output_chars = final_content.as_ref().chars().count();
     let scope = MemoryScope::session_shared(app_id, session_id.clone()).agent_name(agent_name);
+    let result_excerpt = searchable_completion_excerpt(final_content.as_ref());
     let content = format!(
-        "Chat session completed successfully. output_chars={output_chars}; source=chat_session_completion"
+        "Chat session completed successfully. output_chars={output_chars}; \
+         source=chat_session_completion; result_excerpt={result_excerpt}"
     );
     let metadata = serde_json::json!({
         "source": "chat_session_completion",
         "session_id": session_id,
         "output_chars": output_chars,
-        "capture_version": 1,
+        "capture_version": 2,
+        "excerpt_chars": result_excerpt.chars().count(),
     });
 
     let mut command = match MemoryRememberCommand::new(scope, trace, content) {
@@ -74,9 +79,45 @@ pub(crate) async fn capture_successful_session_completion(
     }
 }
 
+/// Build the searchable part of an automatic session-completion memory.
+///
+/// Active vector recall needs enough semantic content to match later tasks, but
+/// the Web observer must not persist unbounded model output or obvious secrets.
+/// This helper therefore records only the user-visible assistant result, caps it
+/// by character count, normalizes whitespace for compact retrieval, and masks
+/// common credential-shaped tokens before the content crosses into Memory
+/// Service storage.
+fn searchable_completion_excerpt(content: &str) -> String {
+    let compact = content.split_whitespace().collect::<Vec<_>>().join(" ");
+    let mut bounded = compact
+        .chars()
+        .take(MAX_CAPTURE_EXCERPT_CHARS)
+        .collect::<String>();
+    if compact.chars().count() > MAX_CAPTURE_EXCERPT_CHARS {
+        bounded.push_str(" ...[truncated]");
+    }
+    mask_secret_like_tokens(&bounded)
+}
+
+fn mask_secret_like_tokens(content: &str) -> String {
+    content
+        .split_whitespace()
+        .map(|token| {
+            if token.starts_with("sk-") && token.len() > 12 {
+                "sk-...****".to_string()
+            } else if token.starts_with("Bearer") {
+                "Bearer...****".to_string()
+            } else {
+                token.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 #[cfg(test)]
 mod tests {
-    use super::capture_successful_session_completion;
+    use super::{capture_successful_session_completion, searchable_completion_excerpt};
 
     use std::sync::Arc;
 
@@ -169,6 +210,18 @@ mod tests {
         );
         assert_eq!(command.layer, macaca_proto::MemoryLayer::Vector);
         assert_eq!(command.metadata["source"], "chat_session_completion");
-        assert!(!command.content.contains("Summarize the durable behavior"));
+        assert!(command.content.contains("Summarize the durable behavior"));
+        assert_eq!(command.metadata["capture_version"], 2);
+    }
+
+    #[test]
+    fn searchable_completion_excerpt_masks_secret_like_tokens_and_bounds_output() {
+        let input = format!("fact sk-12345678901234567890 {}", "x ".repeat(2000));
+        let excerpt = searchable_completion_excerpt(&input);
+
+        assert!(excerpt.contains("fact"));
+        assert!(excerpt.contains("...[truncated]"));
+        assert!(excerpt.contains("sk-...****"));
+        assert!(!excerpt.contains("sk-12345678901234567890"));
     }
 }

@@ -14,7 +14,7 @@ use macaca_memory::{
     MEMORY_FORGET_COMMAND, MEMORY_GET_COMMAND, MEMORY_PREFETCH_COMMAND, MEMORY_RECALL_COMMAND,
     MEMORY_REMEMBER_COMMAND, MEMORY_SERVICE_ID, MEMORY_SNAPSHOT_COMMAND, MEMORY_STATUS_COMMAND,
 };
-use macaca_proto::{MacacaError, MacacaResult};
+use macaca_proto::{MacacaError, MacacaResult, TraceContext};
 use tracing::{info, warn};
 
 use crate::service_client::{ServiceCallCommand, SystemServiceClient};
@@ -94,53 +94,149 @@ impl ServiceBackedMemoryClient {
 #[async_trait]
 impl SystemMemoryClient for ServiceBackedMemoryClient {
     async fn remember(&self, command: MemoryRememberCommand) -> MacacaResult<MemoryRememberResult> {
-        call(&*self.service, MEMORY_REMEMBER_COMMAND, command).await
+        let trace = command.trace.clone();
+        call(&*self.service, MEMORY_REMEMBER_COMMAND, trace, command).await
     }
 
     async fn recall(&self, command: MemoryRecallCommand) -> MacacaResult<MemoryRecallResult> {
-        call(&*self.service, MEMORY_RECALL_COMMAND, command).await
+        let trace = command.trace.clone();
+        call(&*self.service, MEMORY_RECALL_COMMAND, trace, command).await
     }
 
     async fn prefetch(&self, command: MemoryPrefetchCommand) -> MacacaResult<MemoryRecallResult> {
-        call(&*self.service, MEMORY_PREFETCH_COMMAND, command).await
+        let trace = command.trace.clone();
+        call(&*self.service, MEMORY_PREFETCH_COMMAND, trace, command).await
     }
 
     async fn get(&self, command: MemoryGetCommand) -> MacacaResult<MemoryGetResult> {
-        call(&*self.service, MEMORY_GET_COMMAND, command).await
+        let trace = command.trace.clone();
+        call(&*self.service, MEMORY_GET_COMMAND, trace, command).await
     }
 
     async fn forget(&self, command: MemoryForgetCommand) -> MacacaResult<()> {
-        let _: serde_json::Value = call(&*self.service, MEMORY_FORGET_COMMAND, command).await?;
+        let trace = command.trace.clone();
+        let _: serde_json::Value =
+            call(&*self.service, MEMORY_FORGET_COMMAND, trace, command).await?;
         Ok(())
     }
 
     async fn status(&self, command: MemoryStatusCommand) -> MacacaResult<MemoryStatusReport> {
-        call(&*self.service, MEMORY_STATUS_COMMAND, command).await
+        let trace = command.trace.clone();
+        call(&*self.service, MEMORY_STATUS_COMMAND, trace, command).await
     }
 
     async fn snapshot(
         &self,
         command: MemoryServiceSnapshotCommand,
     ) -> MacacaResult<MemoryServiceSnapshot> {
-        call(&*self.service, MEMORY_SNAPSHOT_COMMAND, command).await
+        let trace = command.trace.clone();
+        call(&*self.service, MEMORY_SNAPSHOT_COMMAND, trace, command).await
     }
 }
 
 async fn call<T, R>(
     service: &dyn SystemServiceClient,
     command_name: &str,
+    trace: TraceContext,
     command: T,
 ) -> MacacaResult<R>
 where
     T: serde::Serialize,
     R: serde::de::DeserializeOwned,
 {
+    // Memory commands are trace-required service commands.  The command payload
+    // keeps trace for provider/audit use, while the outer SDK service envelope
+    // must also carry the same trace so ServiceRuntime can admit and audit the
+    // call before dispatching to `service.memory`.
     let result = service
-        .call_service(&ServiceCallCommand::new(
-            MEMORY_SERVICE_ID,
-            command_name,
-            serde_json::to_value(command)?,
-        )?)
+        .call_service(
+            &ServiceCallCommand::new(
+                MEMORY_SERVICE_ID,
+                command_name,
+                serde_json::to_value(command)?,
+            )?
+            .with_trace(trace),
+        )
         .await?;
     serde_json::from_value(result.output).map_err(MacacaError::from)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::sync::Mutex;
+
+    use chrono::Utc;
+    use macaca_memory::MemoryScope;
+    use macaca_proto::{ApplicationId, MemoryId};
+
+    use crate::service_client::{
+        ServiceCallResult, ServiceInspectionCommand, ServiceInspectionResult,
+    };
+
+    struct CapturingServiceClient {
+        last_call: Mutex<Option<ServiceCallCommand>>,
+        output: serde_json::Value,
+    }
+
+    #[async_trait]
+    impl SystemServiceClient for CapturingServiceClient {
+        async fn inspect_services(
+            &self,
+            command: &ServiceInspectionCommand,
+        ) -> MacacaResult<ServiceInspectionResult> {
+            Ok(ServiceInspectionResult {
+                scope: command.scope.clone(),
+                services: vec![MEMORY_SERVICE_ID.into()],
+            })
+        }
+
+        async fn call_service(
+            &self,
+            command: &ServiceCallCommand,
+        ) -> MacacaResult<ServiceCallResult> {
+            *self.last_call.lock().expect("capture mutex poisoned") = Some(command.clone());
+            Ok(ServiceCallResult {
+                service_id: command.service_id.clone(),
+                output: self.output.clone(),
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn service_backed_memory_client_forwards_trace_to_service_envelope() {
+        let expected_trace = TraceContext::new("memory-sdk-trace-forwarding-test");
+        let scope = MemoryScope::session_shared(ApplicationId::new(), "session-a");
+        let command =
+            MemoryRememberCommand::new(scope, expected_trace.clone(), "sanitized derived memory")
+                .expect("valid memory command");
+        let service = Arc::new(CapturingServiceClient {
+            last_call: Mutex::new(None),
+            output: serde_json::to_value(MemoryRememberResult {
+                id: MemoryId::new(),
+                stored_at: Utc::now(),
+            })
+            .expect("serializable memory result"),
+        });
+        let client = ServiceBackedMemoryClient::new(service.clone());
+
+        client
+            .remember(command)
+            .await
+            .expect("service-backed memory remember should succeed");
+
+        let captured = service
+            .last_call
+            .lock()
+            .expect("capture mutex poisoned")
+            .clone()
+            .expect("service call should be captured");
+        assert_eq!(captured.service_id, MEMORY_SERVICE_ID);
+        assert_eq!(captured.command_name, MEMORY_REMEMBER_COMMAND);
+        assert_eq!(
+            captured.trace.map(|trace| trace.trace_id),
+            Some(expected_trace.trace_id)
+        );
+    }
 }

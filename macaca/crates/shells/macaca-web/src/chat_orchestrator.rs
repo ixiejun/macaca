@@ -1369,15 +1369,6 @@ pub(crate) async fn post_chat_v2(
                     serde_json::json!({ "content": final_content.clone() }).to_string(),
                 )))
                 .await;
-            let _ = tx
-                .send(Ok(Event::default().event("done").data(
-                    serde_json::json!({
-                        "status": "completed",
-                        "mode": "service_agent_execution",
-                    })
-                    .to_string(),
-                )))
-                .await;
         }
 
         // Update session with final result
@@ -1411,6 +1402,13 @@ pub(crate) async fn post_chat_v2(
         }
 
         if status != "error" {
+            // Treat the public `done` SSE event as the durable completion boundary.
+            // The memory write is intentionally performed before `done` so local
+            // monitors can rely on a completed stream meaning that sanitized
+            // long-term memory capture has already been attempted.  The capture
+            // helper owns error downgrading, so an unavailable memory backend
+            // remains observable without turning successful chat execution into
+            // an application-level failure.
             let mut trace = TraceContext::new(format!(
                 "chat-session-memory-capture:{session_key_for_task}"
             ));
@@ -1425,6 +1423,16 @@ pub(crate) async fn post_chat_v2(
                 trace,
             )
             .await;
+
+            let _ = tx
+                .send(Ok(Event::default().event("done").data(
+                    serde_json::json!({
+                        "status": "completed",
+                        "mode": "service_agent_execution",
+                    })
+                    .to_string(),
+                )))
+                .await;
 
             if let Some(manifest) = state_for_task
                 .kernel
@@ -1592,5 +1600,24 @@ mod tests {
         assert!(source.contains("AgentExecutionIntent::ChatMainThread"));
         assert!(source.contains("AGENT_EXECUTION_SERVICE_ID"));
         assert!(!source.contains(&legacy_builder));
+    }
+
+    #[test]
+    fn chat_done_event_is_after_session_memory_capture_attempt() {
+        let source = include_str!("chat_orchestrator.rs");
+        let capture = "capture_successful_session_completion";
+        let done = r#".event("done")"#;
+        let capture_index = source
+            .find(capture)
+            .expect("chat completion should attempt sanitized memory capture");
+        let done_index = source[capture_index..]
+            .find(done)
+            .expect("chat completion should emit done after memory capture")
+            + capture_index;
+
+        assert!(
+            capture_index < done_index,
+            "the public done event must remain a durable boundary after memory capture"
+        );
     }
 }

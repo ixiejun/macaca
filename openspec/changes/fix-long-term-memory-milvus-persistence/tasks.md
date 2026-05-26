@@ -22,3 +22,4 @@
 - [x] 4.2 Run OpenSpec validation and diff checks.
 - [x] 4.3 Record GitNexus HIGH/CRITICAL output as non-blocking risk notes.
 - [x] 4.4 Commit all frontend/backend changes in the repo.
+- [x] 4.5 Verify composer active-recall timeout degradation and add a bounded Web-scoped fallback test.
