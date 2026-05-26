@@ -23,6 +23,7 @@ pub mod prompt;
 pub mod report;
 pub mod service_contract;
 pub mod source;
+pub mod tool_capability_provider;
 
 pub use active_recall::{
     active_recall_degraded, active_recall_diagnostics_from_prefetch, render_active_recall_fence,
@@ -98,6 +99,7 @@ pub use prompt::{
     CompiledContext, CompiledPrompt, PromptComposer, PromptSection, PromptSectionBuilder,
     PromptStability, TrustLevel,
 };
+pub use report::ToolCapabilityReport;
 pub use report::{
     ActiveRecallDiagnostics, ComposerPlanSummary, ComposerSkipRecord, ContextDecisionReport,
     ContextDecisionSeverity, ContextReport, ContextReportBuilder, ContextSourceKind,
@@ -117,3 +119,9 @@ pub use source::{
     ContextSnippet, ContextSourceReference, DefaultBudgetPolicy, DefaultPruningPolicy,
     DefaultSourceRenderer, PruningDecision, PruningPolicy,
 };
+pub use tool_capability_provider::{
+    tool_capability_provider_arc, ToolCapabilityContextProvider, ToolCapabilityIndex,
+};
+
+#[cfg(test)]
+mod tool_capability_provider_tests;

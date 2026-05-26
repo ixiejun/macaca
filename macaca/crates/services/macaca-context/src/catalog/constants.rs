@@ -15,6 +15,9 @@ pub const FAMILY_MCP_CAPABILITY: &str = "mcp_capability";
 /// Registered framework tool *names* only.
 pub const FAMILY_RUNTIME_TOOL_CAPABILITY: &str = "runtime_tool_capability";
 
+/// Service-owned Tool Capability Plane compact planning index.
+pub const FAMILY_TOOL_CAPABILITY: &str = "tool_capability";
+
 /// Active vector / workspace memory recall path.
 pub const FAMILY_MEMORY_ACTIVE_RECALL: &str = "memory_active_recall";
 
@@ -27,6 +30,7 @@ pub const BUILTIN_FAMILY_ORDER: &[&str] = &[
     FAMILY_SKILL_CAPABILITY,
     FAMILY_MCP_CAPABILITY,
     FAMILY_RUNTIME_TOOL_CAPABILITY,
+    FAMILY_TOOL_CAPABILITY,
     FAMILY_KNOWLEDGE_DIGEST,
     FAMILY_MEMORY_ACTIVE_RECALL,
 ];

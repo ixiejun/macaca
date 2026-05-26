@@ -110,6 +110,7 @@ impl SystemService for ContextSystemServiceProvider {
                         runtime_tool_capability_catalog: Some(std::sync::Arc::new(
                             snapshot.runtime_tool_capability_catalog.clone(),
                         )),
+                        tool_capability_index: None,
                         ready_mcp_server_ids: Some(std::sync::Arc::new(
                             snapshot.ready_mcp_server_ids.clone(),
                         )),

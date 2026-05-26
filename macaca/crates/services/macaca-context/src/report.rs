@@ -1,5 +1,7 @@
 //! Context report value objects.
 
+use std::collections::BTreeMap;
+
 use chrono::{DateTime, Utc};
 use macaca_proto::ApplicationId;
 use serde::{Deserialize, Serialize};
@@ -253,6 +255,26 @@ pub struct ContextReport {
     /// Provider-runtime governance summary (timeouts, drops, policy fingerprint) — no raw prompt text.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider_runtime: Option<ProviderRuntimeSummary>,
+    /// Compact tool capability planning summaries.
+    ///
+    /// These rows are safe to persist because they carry aggregate counts and
+    /// stable reason codes only.  They intentionally exclude raw tool schemas,
+    /// raw provider payloads, secrets, credentials, and model-visible prompt
+    /// bodies.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tool_capabilities: Vec<ToolCapabilityReport>,
+}
+
+/// Aggregate report for the service-owned Tool Capability Plane context index.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ToolCapabilityReport {
+    pub provider_id: String,
+    pub visible_count: usize,
+    pub hidden_count: usize,
+    pub skipped_count: usize,
+    pub conflict_count: usize,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub reason_counts: BTreeMap<String, usize>,
 }
 
 /// Redacted observability surface for how [`crate::governance::pipeline`] executed providers.
@@ -327,6 +349,7 @@ impl ContextReportBuilder {
                 knowledge_digest: Vec::new(),
                 composer: None,
                 provider_runtime: None,
+                tool_capabilities: Vec::new(),
             },
         }
     }
@@ -443,6 +466,17 @@ impl ContextReportBuilder {
     /// Attach provider runtime summary produced by the governance pipeline.
     pub fn provider_runtime(mut self, summary: ProviderRuntimeSummary) -> Self {
         self.report.provider_runtime = Some(summary);
+        self
+    }
+
+    /// Append one compact tool capability planning summary.
+    ///
+    /// The builder accepts only counts and reason codes so callers cannot
+    /// accidentally smuggle raw descriptor schemas or provider diagnostics into
+    /// the report.  Detailed operator views belong to the Tool service audit
+    /// surface, not the default context report.
+    pub fn tool_capabilities(mut self, report: ToolCapabilityReport) -> Self {
+        self.report.tool_capabilities.push(report);
         self
     }
 

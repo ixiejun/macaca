@@ -105,6 +105,8 @@ fn service_tool_commands_and_descriptor_are_stable() {
         agent_name: Some("coordinator".into()),
         requested_toolsets: vec![ToolsetRef::new("research").unwrap()],
         requested_families: vec![ToolFamilyRef::new("web").unwrap()],
+        allowed_tools: Vec::new(),
+        denied_families: Vec::new(),
         include_hidden: true,
         metadata: BTreeMap::new(),
     };

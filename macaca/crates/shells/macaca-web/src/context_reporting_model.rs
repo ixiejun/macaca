@@ -249,6 +249,7 @@ impl ContextReportingChatModel {
             runtime_tool_capability_catalog: Some(Arc::clone(
                 &self.runtime_tool_capability_catalog,
             )),
+            tool_capability_index: None,
             ready_mcp_server_ids: Some(Arc::clone(&self.ready_mcp_server_ids)),
             memory_recall_capability: self.memory_recall_capability.clone(),
             active_vector_memory: self.active_vector_memory.clone(),

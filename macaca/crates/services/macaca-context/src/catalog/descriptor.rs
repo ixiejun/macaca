@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use super::constants::{
     BUILTIN_FAMILY_ORDER, FAMILY_AGENT_PROFILE, FAMILY_KNOWLEDGE_DIGEST, FAMILY_MCP_CAPABILITY,
     FAMILY_MEMORY_ACTIVE_RECALL, FAMILY_RUNTIME_TOOL_CAPABILITY, FAMILY_SKILL_CAPABILITY,
+    FAMILY_TOOL_CAPABILITY,
 };
 
 /// Crate semantic version (`CARGO_PKG_VERSION`) reused for all first-party built-ins.
@@ -53,6 +54,10 @@ pub fn list_builtin_family_descriptors() -> Vec<ProviderFamilyDescriptor> {
             FAMILY_RUNTIME_TOOL_CAPABILITY => ProviderFamilyDescriptor::builtin(
                 FAMILY_RUNTIME_TOOL_CAPABILITY,
                 &["builtin", "capability_index", "tool"],
+            ),
+            FAMILY_TOOL_CAPABILITY => ProviderFamilyDescriptor::builtin(
+                FAMILY_TOOL_CAPABILITY,
+                &["builtin", "capability_index", "tool_plan"],
             ),
             FAMILY_KNOWLEDGE_DIGEST => ProviderFamilyDescriptor::builtin(
                 FAMILY_KNOWLEDGE_DIGEST,

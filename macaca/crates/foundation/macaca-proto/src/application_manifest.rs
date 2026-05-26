@@ -181,6 +181,19 @@ pub struct ApplicationManifestV1 {
     pub compatibility: ApplicationCompatibilityDeclaration,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub execution_control: Option<ExecutionControlPolicy>,
+    /// Abstract tool families requested by the application.
+    ///
+    /// This is data-only manifest policy. Planning services interpret these
+    /// strings through generic family/toolset rules; OS code must not branch on
+    /// package names or business domains.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tool_families: Vec<String>,
+    /// Declarative toolsets requested by the application.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub toolsets: Vec<String>,
+    /// Backward-compatible exact tool allowlist.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub allowed_tools: Vec<String>,
     pub metadata: BTreeMap<String, String>,
 }
 
@@ -210,6 +223,9 @@ impl ApplicationManifestV1 {
             plugin_dependencies: Vec::new(),
             compatibility,
             execution_control: None,
+            tool_families: Vec::new(),
+            toolsets: Vec::new(),
+            allowed_tools: Vec::new(),
             metadata: BTreeMap::new(),
         }
     }
@@ -241,6 +257,21 @@ impl ApplicationManifestV1 {
 
     pub fn execution_control(mut self, policy: ExecutionControlPolicy) -> Self {
         self.execution_control = Some(policy);
+        self
+    }
+
+    pub fn tool_family(mut self, family: impl Into<String>) -> Self {
+        self.tool_families.push(family.into());
+        self
+    }
+
+    pub fn toolset(mut self, toolset: impl Into<String>) -> Self {
+        self.toolsets.push(toolset.into());
+        self
+    }
+
+    pub fn allowed_tool(mut self, tool_name: impl Into<String>) -> Self {
+        self.allowed_tools.push(tool_name.into());
         self
     }
 }
@@ -306,5 +337,28 @@ mod tests {
         assert!(decoded_policy.allow_command_overrides);
         assert_eq!(decoded_policy.triggers.len(), 1);
         assert_eq!(decoded_policy.resume_sources.len(), 1);
+    }
+
+    #[test]
+    fn application_manifest_v1_roundtrips_tool_planning_policy() {
+        let manifest = ApplicationManifestV1::new(
+            PackageId::new("application.tool.policy.fixture"),
+            DeveloperId::new("developer.fixture"),
+            "Tool Policy Fixture",
+            "1.0.0",
+            ApplicationRuntimeProfile::new(PackageRuntimeKind::Yaml, "1"),
+            ApplicationCompatibilityDeclaration::new("0.1.0"),
+        )
+        .tool_family("web")
+        .tool_family("memory")
+        .toolset("research")
+        .allowed_tool("read_file");
+
+        let encoded = serde_json::to_string(&manifest).unwrap();
+        let decoded: ApplicationManifestV1 = serde_json::from_str(&encoded).unwrap();
+
+        assert_eq!(decoded.tool_families, vec!["web", "memory"]);
+        assert_eq!(decoded.toolsets, vec!["research"]);
+        assert_eq!(decoded.allowed_tools, vec!["read_file"]);
     }
 }

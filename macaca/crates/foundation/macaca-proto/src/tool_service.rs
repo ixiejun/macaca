@@ -298,6 +298,10 @@ pub struct ToolCatalogPlanCommand {
     pub agent_name: Option<String>,
     pub requested_toolsets: Vec<ToolsetRef>,
     pub requested_families: Vec<ToolFamilyRef>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub allowed_tools: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub denied_families: Vec<ToolFamilyRef>,
     pub include_hidden: bool,
     pub metadata: BTreeMap<String, String>,
 }
@@ -311,6 +315,8 @@ impl ToolCatalogPlanCommand {
             agent_name: None,
             requested_toolsets: Vec::new(),
             requested_families: Vec::new(),
+            allowed_tools: Vec::new(),
+            denied_families: Vec::new(),
             include_hidden: false,
             metadata: BTreeMap::new(),
         })

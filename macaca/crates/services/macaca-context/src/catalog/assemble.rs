@@ -17,6 +17,7 @@ use crate::capability::{
 use crate::catalog::constants::{
     BUILTIN_FAMILY_ORDER, FAMILY_AGENT_PROFILE, FAMILY_KNOWLEDGE_DIGEST, FAMILY_MCP_CAPABILITY,
     FAMILY_MEMORY_ACTIVE_RECALL, FAMILY_RUNTIME_TOOL_CAPABILITY, FAMILY_SKILL_CAPABILITY,
+    FAMILY_TOOL_CAPABILITY,
 };
 use crate::catalog::descriptor::MACACA_CONTEXT_CRATE_SEMVER;
 use crate::catalog::versioned::VersionedContextProvider;
@@ -26,6 +27,7 @@ use crate::knowledge_digest::knowledge_digest_provider_arc;
 use crate::memory_active_recall_provider::memory_active_recall_provider_arc;
 use crate::profile::profile_provider_arc;
 use crate::report::{ContextDecisionReport, ContextDecisionSeverity};
+use crate::tool_capability_provider::{tool_capability_provider_arc, ToolCapabilityIndex};
 
 /// Environment-specific dependencies for instantiating built-in families.
 ///
@@ -39,6 +41,7 @@ pub struct ProviderAssemblyEnvironment {
     pub mcp_capability_catalog: Option<Arc<crate::capability::McpCapabilityCatalog>>,
     pub runtime_tool_capability_catalog:
         Option<Arc<crate::capability::RuntimeToolCapabilityCatalog>>,
+    pub tool_capability_index: Option<Arc<ToolCapabilityIndex>>,
     pub ready_mcp_server_ids: Option<Arc<Vec<String>>>,
     pub memory_recall_capability: Option<Arc<dyn crate::memory::ActiveRecallCapability>>,
     pub active_vector_memory: macaca_proto::config::ActiveVectorMemoryContextConfig,
@@ -55,6 +58,7 @@ impl ProviderAssemblyEnvironment {
             skill_capability_catalog: None,
             mcp_capability_catalog: None,
             runtime_tool_capability_catalog: None,
+            tool_capability_index: None,
             ready_mcp_server_ids: None,
             memory_recall_capability: None,
             active_vector_memory: Default::default(),
@@ -190,6 +194,17 @@ pub async fn assemble_context_providers(
                     ))
                 } else {
                     diagnostics.push(skip_diag(fid, "runtime tool catalog unavailable"));
+                    None
+                }
+            }
+            FAMILY_TOOL_CAPABILITY => {
+                if let Some(index) = env.tool_capability_index.as_ref() {
+                    Some(VersionedContextProvider::new(
+                        tool_capability_provider_arc((**index).clone()),
+                        MACACA_CONTEXT_CRATE_SEMVER,
+                    ))
+                } else {
+                    diagnostics.push(skip_diag(fid, "tool capability index unavailable"));
                     None
                 }
             }
