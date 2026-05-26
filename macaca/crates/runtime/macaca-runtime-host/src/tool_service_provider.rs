@@ -2,9 +2,8 @@
 //!
 //! This provider owns planning orchestration only.  It decodes typed
 //! `service.tool` commands, delegates deterministic plan construction to
-//! `ToolPlanningService`, stores bounded snapshots, and returns structured
-//! unavailable/unsupported states for invocation commands that belong to later
-//! proposals.
+//! `ToolPlanningService`, stores bounded snapshots, and routes invocation
+//! commands through owning services without stealing provider lifecycle.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -14,11 +13,14 @@ use macaca_kernel::SystemService;
 use macaca_proto::{
     tool_service_descriptor, CleanupPolicy, KernelServiceId, MacacaError, MacacaResult,
     ServiceCallResult, ServiceCommand, ServiceError, ServiceHealth, ServiceResult,
-    ToolCatalogPlanCommand, ToolGenericTraceCommand, TraceContext, TOOL_CATALOG_PLAN_COMMAND,
-    TOOL_CATALOG_SNAPSHOT_COMMAND, TOOL_PROVIDER_HEALTH_COMMAND, TOOL_PROVIDER_STATUS_COMMAND,
-    TOOL_SERVICE_ID, TOOL_TOOLSET_RESOLVE_COMMAND,
+    ToolCatalogPlanCommand, ToolGenericTraceCommand, TraceContext, TOOL_ARTIFACT_OPEN_COMMAND,
+    TOOL_CATALOG_PLAN_COMMAND, TOOL_CATALOG_SNAPSHOT_COMMAND, TOOL_INVOCATION_STATUS_COMMAND,
+    TOOL_INVOKE_CANCEL_COMMAND, TOOL_INVOKE_COMMAND, TOOL_PROVIDER_HEALTH_COMMAND,
+    TOOL_PROVIDER_STATUS_COMMAND, TOOL_RESULT_GET_COMMAND, TOOL_SERVICE_ID,
+    TOOL_TOOLSET_RESOLVE_COMMAND,
 };
 
+use crate::tool_service_invocation::ToolInvocationService;
 use crate::tool_service_planning::ToolPlanningService;
 use crate::tool_service_provider_state::ToolServiceProviderState;
 use crate::{
@@ -29,13 +31,16 @@ use crate::{
 pub struct ToolSystemServiceProvider {
     planner: Arc<ToolPlanningService>,
     state: Arc<ToolServiceProviderState>,
+    invocation: ToolInvocationService,
 }
 
 impl ToolSystemServiceProvider {
-    pub fn new(planner: Arc<ToolPlanningService>) -> Self {
+    pub fn new(planner: Arc<ToolPlanningService>, runtime: Arc<ServiceRuntime>) -> Self {
+        let state = Arc::new(ToolServiceProviderState::default());
         Self {
             planner,
-            state: Arc::new(ToolServiceProviderState::default()),
+            invocation: ToolInvocationService::new(runtime, Arc::clone(&state)),
+            state,
         }
     }
 
@@ -68,7 +73,10 @@ pub async fn bootstrap_tool_planning_service(
     planner: Arc<ToolPlanningService>,
     trace_id: impl Into<String>,
 ) -> MacacaResult<KernelServiceId> {
-    let service: Arc<dyn SystemService> = Arc::new(ToolSystemServiceProvider::new(planner));
+    let service: Arc<dyn SystemService> = Arc::new(ToolSystemServiceProvider::new(
+        planner,
+        Arc::clone(&runtime),
+    ));
     let descriptor = service.descriptor();
     let service_id = descriptor.id.clone();
     let trace = TraceContext::new(trace_id);
@@ -160,6 +168,56 @@ impl SystemService for ToolSystemServiceProvider {
                         captured_at: chrono::Utc::now(),
                         metadata: BTreeMap::new(),
                     })?,
+                    typed.trace,
+                ))
+            }
+            TOOL_INVOKE_COMMAND => {
+                let typed: macaca_proto::ToolInvokeCommand = decode(command.payload)?;
+                let trace = typed.trace.clone();
+                let result = self
+                    .invocation
+                    .invoke(typed)
+                    .await
+                    .map_err(|err| ServiceError::AdapterFailure(err.to_string()))?;
+                Ok(Self::service_result(to_value(result)?, trace))
+            }
+            TOOL_INVOKE_CANCEL_COMMAND => {
+                let typed: macaca_proto::ToolInvokeCancelCommand = decode(command.payload)?;
+                Ok(Self::service_result(
+                    to_value(
+                        self.invocation
+                            .cancel(typed.trace.clone(), typed.invocation_ref),
+                    )?,
+                    typed.trace,
+                ))
+            }
+            TOOL_INVOCATION_STATUS_COMMAND => {
+                let typed: macaca_proto::ToolInvocationStatusCommand = decode(command.payload)?;
+                Ok(Self::service_result(
+                    to_value(
+                        self.invocation
+                            .status(typed.trace.clone(), typed.invocation_ref),
+                    )?,
+                    typed.trace,
+                ))
+            }
+            TOOL_RESULT_GET_COMMAND => {
+                let typed: macaca_proto::ToolResultGetCommand = decode(command.payload)?;
+                Ok(Self::service_result(
+                    to_value(
+                        self.invocation
+                            .result_get(typed.trace.clone(), typed.invocation_ref),
+                    )?,
+                    typed.trace,
+                ))
+            }
+            TOOL_ARTIFACT_OPEN_COMMAND => {
+                let typed: macaca_proto::ToolArtifactOpenCommand = decode(command.payload)?;
+                Ok(Self::service_result(
+                    to_value(
+                        self.invocation
+                            .artifact_open(typed.trace.clone(), typed.artifact_ref),
+                    )?,
                     typed.trace,
                 ))
             }

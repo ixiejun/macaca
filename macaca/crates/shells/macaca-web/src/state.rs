@@ -28,7 +28,7 @@ use macaca_sdk::{
     SystemEvmClient, SystemHeartbeatClient, SystemLlmClient, SystemMcpClient, SystemMemoryClient,
     SystemPaymentClient, SystemPluginCapabilityClient, SystemPluginControlClient,
     SystemPluginHookClient, SystemScheduledAgentTaskClient, SystemSchedulerClient,
-    SystemSkillClient, SystemStoreClient, SystemWeb3Client,
+    SystemSkillClient, SystemStoreClient, SystemToolClient, SystemWeb3Client,
 };
 use macaca_skill::SkillCatalog;
 use macaca_task::TodoStore;
@@ -317,6 +317,11 @@ pub struct AppState {
     pub skill_client: Arc<dyn SystemSkillClient>,
     /// The serviceized MCP client used by new Route C call paths.
     pub mcp_client: Arc<dyn SystemMcpClient>,
+    /// The serviceized Tool Capability Plane client used for production
+    /// framework tool invocation.  Web still adapts descriptors into framework
+    /// tools, but invocation routing, policy, result budget, and audit now
+    /// cross `service.tool`.
+    pub tool_client: Arc<dyn SystemToolClient>,
     /// The serviceized Store client used by package-manager shell paths.
     pub store_client: Arc<dyn SystemStoreClient>,
     /// The serviceized Entitlement client used by package authorization/audit paths.

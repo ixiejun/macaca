@@ -740,6 +740,12 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
         )
         .await
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+    macaca_runtime_host::bootstrap_tool_planning_service(
+        Arc::clone(&service_runtime),
+        Arc::new(macaca_runtime_host::ToolPlanningService::builder().build()),
+        "web-startup-tool-service",
+    )
+    .await?;
     // Built-in domain-pack services are registered at the generic service
     // boundary, not in any individual application path.  WASM applications
     // declare packs and service ids in their manifest; the host simply makes a
@@ -787,6 +793,9 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
     );
     let mcp_client: Arc<dyn macaca_sdk::SystemMcpClient> = Arc::new(
         macaca_sdk::ServiceBackedMcpClient::new(Arc::clone(&generic_service_client)),
+    );
+    let tool_client: Arc<dyn macaca_sdk::SystemToolClient> = Arc::new(
+        macaca_sdk::ServiceBackedToolClient::new(Arc::clone(&generic_service_client)),
     );
     let store_client: Arc<dyn macaca_sdk::SystemStoreClient> = Arc::new(
         macaca_sdk::ServiceBackedStoreClient::new(Arc::clone(&generic_service_client)),
@@ -849,6 +858,7 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
             driver_client: Arc::clone(&driver_client),
             skill_client: Arc::clone(&skill_client),
             mcp_client: Arc::clone(&mcp_client),
+            tool_client: Arc::clone(&tool_client),
             store_client: Arc::clone(&store_client),
             entitlement_client: Arc::clone(&entitlement_client),
             payment_client: Arc::clone(&payment_client),

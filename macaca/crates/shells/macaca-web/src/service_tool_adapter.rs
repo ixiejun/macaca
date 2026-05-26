@@ -1,248 +1,97 @@
-//! Web-local adapters from serviceized tool descriptors to framework tools.
+//! Web adapter from service-owned descriptors to framework tools.
 //!
-//! The framework toolkit needs concrete `Tool` objects, while Route C S6 wants
-//! Driver/Skill/MCP invocation to pass through service clients.  These adapters
-//! apply the Adapter pattern at the Web shell boundary: descriptors remain
-//! service-owned metadata, and invocation is forwarded to focused SDK clients
-//! with explicit trace and application/session/agent scope.
+//! The Web shell owns only the projection from a descriptor into a framework
+//! `Tool`.  Production invocation crosses the SDK `SystemToolClient` facade and
+//! then `service.tool/tool.invoke`; Driver, Skill, and MCP services retain
+//! concrete lifecycle and execution ownership behind that route.
 
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use macaca_driver::DriverToolInvokeCommand;
 use macaca_proto::{
-    ApplicationId, CapabilityToolDescriptor, CapabilityToolInvocation,
-    CapabilityToolInvocationScope, CapabilityToolOriginKind, MacacaError, MacacaResult,
-    McpServiceLifecycleScope, McpToolInvokeCommand, TraceContext, MCP_DESCRIPTOR_BACKEND_TOOL_NAME,
-    MCP_DESCRIPTOR_LIFECYCLE_SCOPE,
+    ApplicationId, CapabilityToolDescriptor, CapabilityToolInvocationScope,
+    CapabilityToolOriginKind, IndustrialToolDescriptor, MacacaError, MacacaResult, ToolFamilyRef,
+    ToolInvokeCommand, TraceContext,
 };
-use macaca_sdk::{SystemDriverClient, SystemMcpClient, SystemSkillClient};
-use macaca_skill::SkillToolInvokeCommand;
+use macaca_sdk::SystemToolClient;
 use macaca_tools::Tool;
-use serde_json::Value;
+use serde_json::{json, Value};
 
-/// Service-backed tool adapter for Driver Service descriptors.
-pub struct ServiceDriverToolAdapter {
-    descriptor: CapabilityToolDescriptor,
-    client: Arc<dyn SystemDriverClient>,
+/// Framework `Tool` implementation that invokes through `service.tool`.
+pub struct ToolServiceInvocationAdapter {
+    descriptor: IndustrialToolDescriptor,
+    client: Arc<dyn SystemToolClient>,
     scope: CapabilityToolInvocationScope,
 }
 
-impl ServiceDriverToolAdapter {
-    /// Create a driver adapter from sanitized descriptor metadata and scope.
+impl ToolServiceInvocationAdapter {
+    /// Create an adapter from a sanitized descriptor and explicit runtime scope.
+    ///
+    /// The descriptor is included in the command so `service.tool` can route by
+    /// stable owner metadata even when the planning cache is empty or stale.
     pub fn new(
-        descriptor: CapabilityToolDescriptor,
-        client: Arc<dyn SystemDriverClient>,
+        descriptor: IndustrialToolDescriptor,
+        client: Arc<dyn SystemToolClient>,
         app_id: ApplicationId,
         session_id: Option<String>,
         agent_name: impl Into<String>,
     ) -> Self {
-        Self {
-            descriptor,
-            client,
-            scope: CapabilityToolInvocationScope {
-                application_id: app_id,
-                session_id: session_id.unwrap_or_else(|| "no-session".into()),
-                agent_name: agent_name.into(),
-            },
-        }
-    }
-}
-
-#[async_trait]
-impl Tool for ServiceDriverToolAdapter {
-    fn name(&self) -> &str {
-        &self.descriptor.tool_name
-    }
-
-    fn description(&self) -> &str {
-        &self.descriptor.description
-    }
-
-    fn parameters_schema(&self) -> Value {
-        self.descriptor.parameters_schema.clone()
-    }
-
-    async fn execute(&self, input: Value) -> MacacaResult<Value> {
-        let trace = TraceContext::new(format!("driver-tool-{}", self.descriptor.tool_name));
-        let invocation = CapabilityToolInvocation::new(
-            trace,
-            self.scope.clone(),
-            self.descriptor.tool_name.clone(),
-            input,
-        )?;
-        let result = self
-            .client
-            .invoke_tool(DriverToolInvokeCommand { invocation })
-            .await?;
-        Ok(result.output.unwrap_or(Value::Null))
-    }
-}
-
-/// Service-backed tool adapter for Skill Service descriptors.
-pub struct ServiceSkillToolAdapter {
-    descriptor: CapabilityToolDescriptor,
-    client: Arc<dyn SystemSkillClient>,
-    scope: CapabilityToolInvocationScope,
-}
-
-impl ServiceSkillToolAdapter {
-    /// Create a skill adapter from sanitized descriptor metadata and scope.
-    pub fn new(
-        descriptor: CapabilityToolDescriptor,
-        client: Arc<dyn SystemSkillClient>,
-        app_id: ApplicationId,
-        session_id: Option<String>,
-        agent_name: impl Into<String>,
-    ) -> Self {
-        Self {
-            descriptor,
-            client,
-            scope: CapabilityToolInvocationScope {
-                application_id: app_id,
-                session_id: session_id.unwrap_or_else(|| "no-session".into()),
-                agent_name: agent_name.into(),
-            },
-        }
-    }
-}
-
-#[async_trait]
-impl Tool for ServiceSkillToolAdapter {
-    fn name(&self) -> &str {
-        &self.descriptor.tool_name
-    }
-
-    fn description(&self) -> &str {
-        &self.descriptor.description
-    }
-
-    fn parameters_schema(&self) -> Value {
-        self.descriptor.parameters_schema.clone()
-    }
-
-    async fn execute(&self, input: Value) -> MacacaResult<Value> {
-        let trace = TraceContext::new(format!("skill-tool-{}", self.descriptor.tool_name));
-        let invocation = CapabilityToolInvocation::new(
-            trace,
-            self.scope.clone(),
-            self.descriptor.tool_name.clone(),
-            input,
-        )?;
-        let result = self
-            .client
-            .invoke_tool(SkillToolInvokeCommand { invocation })
-            .await?;
-        Ok(result.output.unwrap_or(Value::Null))
-    }
-}
-
-/// Service-backed tool adapter for MCP Service descriptors.
-///
-/// The adapter deliberately stores only the sanitized descriptor, focused SDK
-/// client, and explicit invocation scope.  It never constructs an MCP protocol
-/// client or infers routing from the visible tool name, which keeps Web as a
-/// shell adapter and leaves MCP lifecycle semantics inside `service.mcp`.
-pub struct ServiceMcpToolAdapter {
-    descriptor: CapabilityToolDescriptor,
-    client: Arc<dyn SystemMcpClient>,
-    scope: CapabilityToolInvocationScope,
-}
-
-impl ServiceMcpToolAdapter {
-    /// Create an MCP adapter from descriptor metadata produced by MCP Service.
-    pub fn new(
-        descriptor: CapabilityToolDescriptor,
-        client: Arc<dyn SystemMcpClient>,
-        app_id: ApplicationId,
-        session_id: Option<String>,
-        agent_name: impl Into<String>,
-    ) -> Self {
-        Self {
-            descriptor,
-            client,
-            scope: CapabilityToolInvocationScope {
-                application_id: app_id,
-                session_id: session_id.unwrap_or_else(|| "no-session".into()),
-                agent_name: agent_name.into(),
-            },
-        }
-    }
-
-    fn backend_tool_name(&self) -> MacacaResult<String> {
-        self.descriptor
-            .metadata
-            .get(MCP_DESCRIPTOR_BACKEND_TOOL_NAME)
-            .cloned()
-            .ok_or_else(|| {
-                MacacaError::Config(format!(
-                    "MCP descriptor '{}' is missing backend tool metadata",
-                    self.descriptor.tool_name
-                ))
-            })
-    }
-
-    fn lifecycle(&self) -> MacacaResult<McpServiceLifecycleScope> {
-        let Some(value) = self.descriptor.metadata.get(MCP_DESCRIPTOR_LIFECYCLE_SCOPE) else {
-            return Ok(McpServiceLifecycleScope::AgentSession);
+        let agent_name = agent_name.into();
+        let scope = CapabilityToolInvocationScope {
+            application_id: app_id,
+            session_id: session_id.unwrap_or_else(|| "no-session".into()),
+            agent_name,
         };
-        match value.as_str() {
-            "global" => Ok(McpServiceLifecycleScope::Global),
-            "app" => Ok(McpServiceLifecycleScope::App),
-            "session" => Ok(McpServiceLifecycleScope::Session),
-            "agent_session" => Ok(McpServiceLifecycleScope::AgentSession),
-            "call" => Ok(McpServiceLifecycleScope::Call),
-            other => Err(MacacaError::Config(format!(
-                "unsupported MCP descriptor lifecycle '{other}'"
-            ))),
+        Self {
+            descriptor,
+            client,
+            scope,
         }
     }
 }
 
 #[async_trait]
-impl Tool for ServiceMcpToolAdapter {
+impl Tool for ToolServiceInvocationAdapter {
     fn name(&self) -> &str {
-        &self.descriptor.tool_name
+        &self.descriptor.visible_name
     }
 
     fn description(&self) -> &str {
-        &self.descriptor.description
+        &self.descriptor.base_descriptor.description
     }
 
     fn parameters_schema(&self) -> Value {
-        self.descriptor.parameters_schema.clone()
+        self.descriptor.base_descriptor.parameters_schema.clone()
     }
 
     async fn execute(&self, input: Value) -> MacacaResult<Value> {
-        let trace = TraceContext::new(format!("mcp-tool-{}", self.descriptor.tool_name));
-        let invocation = CapabilityToolInvocation::new(
+        let trace = TraceContext::new(format!("tool-service-{}", self.descriptor.visible_name));
+        let command = ToolInvokeCommand {
             trace,
-            self.scope.clone(),
-            self.descriptor.tool_name.clone(),
+            scope: self.scope.clone(),
+            tool_id: self.descriptor.stable_tool_id.clone(),
+            descriptor: Some(self.descriptor.clone()),
             input,
-        )?;
-        let result = self
-            .client
-            .invoke_tool(McpToolInvokeCommand::routed(
-                invocation,
-                self.descriptor.provider_id.clone(),
-                self.backend_tool_name()?,
-                self.lifecycle()?,
-            )?)
-            .await?;
-        if result.status == "ok" {
-            Ok(result.output.unwrap_or(Value::Null))
-        } else {
-            Err(MacacaError::Config(
-                result
-                    .error_summary
-                    .unwrap_or_else(|| "MCP tool invocation failed".into()),
-            ))
+            policy_ref: None,
+            approval_ref: None,
+            metadata: Default::default(),
+        };
+        let result = self.client.invoke(command).await?;
+        match result.status.as_str() {
+            "ok" | "approval_required" => Ok(result.inline_output.unwrap_or_else(|| {
+                json!({
+                    "status": result.status,
+                    "artifact_refs": result.artifact_refs.into_iter().map(|item| item.0).collect::<Vec<_>>(),
+                })
+            })),
+            _ => Err(MacacaError::Config(result.error_summary.unwrap_or_else(|| {
+                format!("tool service invocation failed with status '{}'", result.status)
+            }))),
         }
     }
 }
 
-/// Convert one descriptor into the correct service-backed Web adapter.
+/// Convert one service-owned descriptor into a production framework tool.
 pub fn service_tool_from_descriptor(
     descriptor: CapabilityToolDescriptor,
     state: &crate::state::AppState,
@@ -250,90 +99,59 @@ pub fn service_tool_from_descriptor(
     session_id: Option<String>,
     agent_name: &str,
 ) -> Option<Box<dyn Tool>> {
-    match descriptor.origin_kind {
-        CapabilityToolOriginKind::Driver => Some(Box::new(ServiceDriverToolAdapter::new(
-            descriptor,
-            Arc::clone(&state.driver_client),
-            app_id,
-            session_id,
-            agent_name.to_string(),
-        ))),
-        CapabilityToolOriginKind::Skill => Some(Box::new(ServiceSkillToolAdapter::new(
-            descriptor,
-            Arc::clone(&state.skill_client),
-            app_id,
-            session_id,
-            agent_name.to_string(),
-        ))),
-        CapabilityToolOriginKind::Mcp => Some(Box::new(ServiceMcpToolAdapter::new(
-            descriptor,
-            Arc::clone(&state.mcp_client),
-            app_id,
-            session_id,
-            agent_name.to_string(),
-        ))),
+    let industrial = industrial_from_capability_descriptor(descriptor).ok()?;
+    Some(Box::new(ToolServiceInvocationAdapter::new(
+        industrial,
+        Arc::clone(&state.tool_client),
+        app_id,
+        session_id,
+        agent_name.to_string(),
+    )))
+}
+
+fn industrial_from_capability_descriptor(
+    descriptor: CapabilityToolDescriptor,
+) -> MacacaResult<IndustrialToolDescriptor> {
+    let family = descriptor
+        .metadata
+        .get("tool.family")
+        .cloned()
+        .unwrap_or_else(|| default_family(&descriptor.origin_kind).to_string());
+    let title = descriptor
+        .display_name
+        .clone()
+        .unwrap_or_else(|| descriptor.tool_name.clone());
+    let stable_tool_id = descriptor
+        .metadata
+        .get("tool.stable_id")
+        .cloned()
+        .unwrap_or_else(|| {
+            format!(
+                "tool.{}.{}.{}",
+                descriptor.service_id, descriptor.provider_id, descriptor.tool_name
+            )
+        });
+    IndustrialToolDescriptor::new(
+        stable_tool_id,
+        descriptor.tool_name.clone(),
+        title,
+        ToolFamilyRef::new(family)?,
+        descriptor,
+    )
+}
+
+fn default_family(origin_kind: &CapabilityToolOriginKind) -> &'static str {
+    match origin_kind {
+        CapabilityToolOriginKind::Driver => "driver",
+        CapabilityToolOriginKind::Skill => "skill",
+        CapabilityToolOriginKind::Mcp => "mcp",
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use async_trait::async_trait;
-    use macaca_proto::{
-        McpCleanupCommand, McpProbeCommand, McpRegisterCommand, McpRegisterResult,
-        McpRuntimeStatusView, McpServiceSnapshot, McpServiceSnapshotCommand, McpStatusCommand,
-        McpStatusResult, McpToolAttachCommand, McpToolAttachResult, McpToolCatalogCommand,
-        McpToolCatalogResult, McpToolInvokeResult,
-    };
-
-    #[derive(Default)]
-    struct UnusedMcpClient;
-
-    #[async_trait]
-    impl SystemMcpClient for UnusedMcpClient {
-        async fn register(&self, _: McpRegisterCommand) -> MacacaResult<McpRegisterResult> {
-            unreachable!("metadata parsing tests do not invoke the client")
-        }
-
-        async fn probe(&self, _: McpProbeCommand) -> MacacaResult<McpStatusResult> {
-            Ok(McpStatusResult::new(Vec::<McpRuntimeStatusView>::new()))
-        }
-
-        async fn tool_catalog(
-            &self,
-            _: McpToolCatalogCommand,
-        ) -> MacacaResult<McpToolCatalogResult> {
-            Ok(McpToolCatalogResult {
-                tools: Vec::new(),
-                captured_at: chrono::Utc::now(),
-            })
-        }
-
-        async fn attach_tools(&self, _: McpToolAttachCommand) -> MacacaResult<McpToolAttachResult> {
-            Ok(McpToolAttachResult {
-                statuses: Vec::new(),
-                conflicts: Vec::new(),
-                applied_prefixes: Vec::new(),
-                captured_at: chrono::Utc::now(),
-            })
-        }
-
-        async fn invoke_tool(&self, _: McpToolInvokeCommand) -> MacacaResult<McpToolInvokeResult> {
-            unreachable!("metadata parsing tests do not invoke the client")
-        }
-
-        async fn status(&self, _: McpStatusCommand) -> MacacaResult<McpStatusResult> {
-            Ok(McpStatusResult::new(Vec::<McpRuntimeStatusView>::new()))
-        }
-
-        async fn snapshot(&self, _: McpServiceSnapshotCommand) -> MacacaResult<McpServiceSnapshot> {
-            Ok(McpServiceSnapshot::unavailable("unused test client"))
-        }
-
-        async fn cleanup(&self, _: McpCleanupCommand) -> MacacaResult<McpStatusResult> {
-            Ok(McpStatusResult::new(Vec::<McpRuntimeStatusView>::new()))
-        }
-    }
+    use macaca_proto::{MCP_DESCRIPTOR_BACKEND_TOOL_NAME, MCP_DESCRIPTOR_LIFECYCLE_SCOPE};
 
     fn mcp_descriptor() -> CapabilityToolDescriptor {
         let mut descriptor = CapabilityToolDescriptor::new(
@@ -357,20 +175,21 @@ mod tests {
     }
 
     #[test]
-    fn mcp_adapter_reads_descriptor_routing_without_name_parsing() {
-        let adapter = ServiceMcpToolAdapter::new(
-            mcp_descriptor(),
-            Arc::new(UnusedMcpClient),
-            ApplicationId::new(),
-            Some("session-a".into()),
-            "agent-a",
-        );
+    fn adapter_preserves_descriptor_routing_without_name_parsing() {
+        let descriptor = industrial_from_capability_descriptor(mcp_descriptor()).unwrap();
 
-        assert_eq!(adapter.name(), "mcp_lookup");
-        assert_eq!(adapter.backend_tool_name().unwrap(), "lookup");
+        assert_eq!(descriptor.visible_name, "mcp_lookup");
         assert_eq!(
-            adapter.lifecycle().unwrap(),
-            McpServiceLifecycleScope::AgentSession
+            descriptor.executor_route.service_id,
+            macaca_proto::MCP_SERVICE_ID
+        );
+        assert_eq!(
+            descriptor
+                .base_descriptor
+                .metadata
+                .get(MCP_DESCRIPTOR_BACKEND_TOOL_NAME)
+                .unwrap(),
+            "lookup"
         );
     }
 }

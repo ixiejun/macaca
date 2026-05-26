@@ -7,9 +7,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::{
-    ApplicationId, CapabilityId, CapabilityToolDescriptor, KernelServiceId, MacacaError,
-    MacacaResult, ServiceCapability, ServiceDescriptor, ServiceHealth, ServiceScope, ServiceType,
-    TraceContext, TraceSchemaRef,
+    ApplicationId, CapabilityId, CapabilityToolDescriptor, CapabilityToolInvocationScope,
+    KernelServiceId, MacacaError, MacacaResult, ServiceCapability, ServiceDescriptor,
+    ServiceHealth, ServiceScope, ServiceType, TraceContext, TraceSchemaRef,
 };
 
 pub const TOOL_SERVICE_ID: &str = "service.tool";
@@ -412,7 +412,9 @@ pub type ToolAuditQueryCommand = ToolGenericTraceCommand;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ToolInvokeCommand {
     pub trace: TraceContext,
+    pub scope: CapabilityToolInvocationScope,
     pub tool_id: String,
+    pub descriptor: Option<IndustrialToolDescriptor>,
     pub input: Value,
     pub policy_ref: Option<ToolPolicyRef>,
     pub approval_ref: Option<ToolApprovalRef>,

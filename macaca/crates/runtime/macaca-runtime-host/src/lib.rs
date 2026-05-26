@@ -93,9 +93,11 @@ pub(crate) mod skill_service_provider_state;
 pub mod store_entitlement_admission;
 pub mod store_service_provider;
 pub mod tool_service_availability;
+pub mod tool_service_invocation;
 pub mod tool_service_planning;
 pub mod tool_service_provider;
 pub mod tool_service_provider_state;
+pub mod tool_service_result;
 pub mod transport;
 pub mod wasm_runtime_provider;
 pub mod web3_service_provider;
@@ -130,6 +132,8 @@ mod skill_service_merge_tests;
 mod skill_service_provider_tests;
 #[cfg(test)]
 mod skill_service_usage_tests;
+#[cfg(test)]
+mod tool_service_invocation_tests;
 #[cfg(test)]
 mod tool_service_planning_tests;
 
