@@ -92,6 +92,7 @@ pub(crate) mod skill_service_provider_semantic_review;
 pub(crate) mod skill_service_provider_state;
 pub mod store_entitlement_admission;
 pub mod store_service_provider;
+pub mod tool_family_providers;
 pub mod tool_service_availability;
 pub mod tool_service_environment;
 pub mod tool_service_gateway;
@@ -138,6 +139,8 @@ mod skill_service_usage_tests;
 mod tool_service_audit_tests;
 #[cfg(test)]
 mod tool_service_environment_tests;
+#[cfg(test)]
+mod tool_service_family_provider_tests;
 #[cfg(test)]
 mod tool_service_gateway_tests;
 #[cfg(test)]
@@ -297,6 +300,11 @@ pub use service_runtime_event::{
 };
 pub use skill_service_provider::SkillSystemServiceProvider;
 pub use store_service_provider::{store_service_descriptor, StoreSystemServiceProvider};
+pub use tool_family_providers::{
+    industrial_tool_family_provider_contributor, industrial_tool_family_provider_inventory,
+    industrial_tool_family_toolsets, IndustrialToolFamilyProviderInventory,
+    REQUIRED_INDUSTRIAL_TOOL_FAMILIES,
+};
 pub use tool_service_availability::{AvailabilitySignalSet, ToolAvailabilityEvaluator};
 pub use tool_service_environment::{
     StaticToolRuntimeEnvironmentProvider, ToolRuntimeEnvironmentProvider,
