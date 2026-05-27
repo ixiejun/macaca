@@ -2,7 +2,9 @@ use macaca_proto::{
     ApplicationId, AvailabilityExpression, CapabilityToolDescriptor, CapabilityToolOriginKind,
     IndustrialToolDescriptor, KernelServiceId, MacacaResult, ServiceBusSource, ServiceCommand,
     ServiceCommandName, ServiceHealth, ToolCatalogPlanCommand, ToolCatalogPlanResult,
-    ToolFamilyRef, ToolHiddenReason, ToolsetRef, TraceContext, TOOL_CATALOG_PLAN_COMMAND,
+    ToolFamilyRef, ToolGenericTraceCommand, ToolHiddenReason, ToolProviderHealthResult, ToolsetRef,
+    TraceContext, TOOL_CATALOG_PLAN_COMMAND, TOOL_PROVIDER_HEALTH_COMMAND,
+    TOOL_TOOLSET_RESOLVE_COMMAND,
 };
 use std::sync::Arc;
 
@@ -325,4 +327,87 @@ async fn tool_planning_service_registers_and_plans_through_service_runtime() {
 
     assert_eq!(result.visible.len(), 1);
     assert_eq!(result.visible[0].descriptor.visible_name, "read_file");
+}
+
+#[tokio::test]
+async fn tool_provider_health_reports_registered_contributors_before_first_plan() {
+    let service = Arc::new(
+        ToolPlanningService::builder()
+            .with_contributor(StaticToolDescriptorContributor::new(
+                "fixture-contributor",
+                ServiceHealth::Healthy,
+                vec![descriptor("tool.file.read", "read_file", "file", &[], vec![]).unwrap()],
+            ))
+            .build(),
+    );
+    let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
+    let service_id = bootstrap_tool_planning_service(
+        Arc::clone(&runtime),
+        service,
+        "trace-tool-health-bootstrap",
+    )
+    .await
+    .unwrap();
+    let trace = TraceContext::new("trace-tool-provider-health");
+    let reply = runtime
+        .call(
+            &service_id,
+            ServiceBusSource::new("test.tool-provider-health"),
+            ServiceCommand::with_trace(
+                ServiceCommandName::new(TOOL_PROVIDER_HEALTH_COMMAND),
+                serde_json::to_value(ToolGenericTraceCommand::new(trace.clone()).unwrap()).unwrap(),
+                trace,
+            ),
+        )
+        .await
+        .unwrap();
+    let result: ToolProviderHealthResult = serde_json::from_value(reply.output.unwrap()).unwrap();
+
+    assert_eq!(result.provider_count, 1);
+    assert_eq!(result.health, ServiceHealth::Healthy);
+}
+
+#[tokio::test]
+async fn toolset_resolve_returns_real_plan_instead_of_empty_synthetic_plan() {
+    let service = Arc::new(
+        ToolPlanningService::builder()
+            .with_contributor(StaticToolDescriptorContributor::new(
+                "fixture-contributor",
+                ServiceHealth::Healthy,
+                vec![
+                    descriptor("tool.web.lookup", "lookup", "web", &["research"], vec![]).unwrap(),
+                ],
+            ))
+            .with_toolsets(ToolPlanningToolsetResolver::default().with_toolset("research", ["web"]))
+            .build(),
+    );
+    let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
+    let service_id = bootstrap_tool_planning_service(
+        Arc::clone(&runtime),
+        service,
+        "trace-toolset-resolve-bootstrap",
+    )
+    .await
+    .unwrap();
+    let trace = TraceContext::new("trace-toolset-resolve");
+    let mut command = ToolGenericTraceCommand::new(trace.clone()).unwrap();
+    command
+        .metadata
+        .insert("toolsets".into(), "research".into());
+    let reply = runtime
+        .call(
+            &service_id,
+            ServiceBusSource::new("test.toolset-resolve"),
+            ServiceCommand::with_trace(
+                ServiceCommandName::new(TOOL_TOOLSET_RESOLVE_COMMAND),
+                serde_json::to_value(command).unwrap(),
+                trace,
+            ),
+        )
+        .await
+        .unwrap();
+    let result: ToolCatalogPlanResult = serde_json::from_value(reply.output.unwrap()).unwrap();
+
+    assert_eq!(result.visible.len(), 1);
+    assert_eq!(result.visible[0].descriptor.family.as_str(), "web");
 }

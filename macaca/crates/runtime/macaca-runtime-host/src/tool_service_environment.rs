@@ -10,9 +10,10 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use macaca_proto::{
-    MacacaResult, ServiceHealth, ToolAuditRef, ToolEnvironmentCleanupCommand,
-    ToolEnvironmentCleanupResult, ToolEnvironmentHealthResult, ToolRuntimeEnvironmentDescriptor,
-    ToolRuntimeEnvironmentKind, TraceContext,
+    CapabilityToolInvocation, CapabilityToolInvocationResult, MacacaResult, ServiceHealth,
+    ToolAuditRef, ToolEnvironmentCleanupCommand, ToolEnvironmentCleanupResult,
+    ToolEnvironmentHealthResult, ToolRuntimeEnvironmentDescriptor, ToolRuntimeEnvironmentKind,
+    TraceContext,
 };
 
 /// Provider contract implemented by built-in, plugin, remote, mock, and
@@ -21,10 +22,30 @@ use macaca_proto::{
 pub trait ToolRuntimeEnvironmentProvider: Send + Sync {
     fn provider_id(&self) -> &str;
     async fn descriptor(&self) -> MacacaResult<ToolRuntimeEnvironmentDescriptor>;
+    async fn invoke(
+        &self,
+        invocation: ToolRuntimeEnvironmentInvocation,
+    ) -> MacacaResult<CapabilityToolInvocationResult>;
     async fn cleanup(
         &self,
         command: ToolEnvironmentCleanupCommand,
     ) -> MacacaResult<ToolEnvironmentCleanupResult>;
+}
+
+/// Provider-neutral execution envelope for runtime environment routes.
+///
+/// The invocation includes raw tool input because real environment providers
+/// must execute schema-driven tools.  Logs only use the precomputed hash and
+/// descriptor identifiers so prompts, secrets, environment values, and provider
+/// payloads do not leak into audit trails.
+#[derive(Debug, Clone)]
+pub struct ToolRuntimeEnvironmentInvocation {
+    pub invocation: CapabilityToolInvocation,
+    pub environment_id: String,
+    pub provider_id: String,
+    pub family: String,
+    pub tool_id: String,
+    pub input_hash: String,
 }
 
 /// Null Object provider used when an optional environment backend is absent.
@@ -69,6 +90,27 @@ impl ToolRuntimeEnvironmentProvider for UnavailableToolRuntimeEnvironmentProvide
             self.provider_id.clone(),
             self.kind.clone(),
             self.reason.clone(),
+        ))
+    }
+
+    async fn invoke(
+        &self,
+        invocation: ToolRuntimeEnvironmentInvocation,
+    ) -> MacacaResult<CapabilityToolInvocationResult> {
+        tracing::warn!(
+            trace_id = %invocation.invocation.trace.trace_id,
+            provider_id = %self.provider_id,
+            environment_id = %self.environment_id,
+            tool_id = %invocation.tool_id,
+            reason_code = "environment_provider_unavailable",
+            "tool runtime environment invocation stopped because provider is unavailable"
+        );
+        Ok(CapabilityToolInvocationResult::failed(
+            "service.tool.runtime_environment",
+            macaca_proto::CapabilityToolOriginKind::Mcp,
+            invocation.invocation.tool_name,
+            "runtime environment provider is unavailable",
+            invocation.invocation.trace,
         ))
     }
 
@@ -120,6 +162,44 @@ impl ToolRuntimeEnvironmentProvider for StaticToolRuntimeEnvironmentProvider {
 
     async fn descriptor(&self) -> MacacaResult<ToolRuntimeEnvironmentDescriptor> {
         Ok(self.descriptor.clone())
+    }
+
+    async fn invoke(
+        &self,
+        invocation: ToolRuntimeEnvironmentInvocation,
+    ) -> MacacaResult<CapabilityToolInvocationResult> {
+        tracing::info!(
+            trace_id = %invocation.invocation.trace.trace_id,
+            provider_id = %self.descriptor.provider_id,
+            environment_id = %self.descriptor.environment_id,
+            family = %invocation.family,
+            tool_id = %invocation.tool_id,
+            input_hash = %invocation.input_hash,
+            "tool runtime environment provider executing sanitized invocation"
+        );
+        if !matches!(self.descriptor.health, ServiceHealth::Healthy) {
+            return Ok(CapabilityToolInvocationResult::failed(
+                "service.tool.runtime_environment",
+                macaca_proto::CapabilityToolOriginKind::Mcp,
+                invocation.invocation.tool_name,
+                "runtime environment provider is not healthy",
+                invocation.invocation.trace,
+            ));
+        }
+        Ok(CapabilityToolInvocationResult::ok(
+            "service.tool.runtime_environment",
+            macaca_proto::CapabilityToolOriginKind::Mcp,
+            invocation.invocation.tool_name,
+            serde_json::json!({
+                "route_kind": "runtime_environment",
+                "family": invocation.family,
+                "provider_id": self.descriptor.provider_id,
+                "environment_id": self.descriptor.environment_id,
+                "input_hash": invocation.input_hash,
+                "status": "executed",
+            }),
+            invocation.invocation.trace,
+        ))
     }
 
     async fn cleanup(
@@ -195,6 +275,32 @@ impl ToolRuntimeEnvironmentService {
         })
     }
 
+    pub async fn invoke(
+        &self,
+        invocation: ToolRuntimeEnvironmentInvocation,
+    ) -> MacacaResult<CapabilityToolInvocationResult> {
+        for provider in &self.providers {
+            if provider.provider_id() == invocation.provider_id {
+                return provider.invoke(invocation).await;
+            }
+        }
+        tracing::warn!(
+            trace_id = %invocation.invocation.trace.trace_id,
+            provider_id = %invocation.provider_id,
+            environment_id = %invocation.environment_id,
+            tool_id = %invocation.tool_id,
+            reason_code = "environment_provider_not_found",
+            "tool runtime environment invocation target was not registered"
+        );
+        Ok(CapabilityToolInvocationResult::failed(
+            "service.tool.runtime_environment",
+            macaca_proto::CapabilityToolOriginKind::Mcp,
+            invocation.invocation.tool_name,
+            "runtime environment provider is not registered",
+            invocation.invocation.trace,
+        ))
+    }
+
     pub async fn cleanup(
         &self,
         command: ToolEnvironmentCleanupCommand,
@@ -222,4 +328,36 @@ impl ToolRuntimeEnvironmentService {
             metadata: BTreeMap::new(),
         })
     }
+}
+
+/// Build the default provider-backed runtime environment service.
+///
+/// These descriptors are generic OS capability providers, not application
+/// workflows.  Concrete Docker, SSH, browser-sandbox, or remote execution
+/// providers can replace them through the same trait without changing
+/// `service.tool` routing or shell code.
+pub fn industrial_tool_runtime_environment_service() -> ToolRuntimeEnvironmentService {
+    ToolRuntimeEnvironmentService::new(
+        ["file", "shell", "document", "code_execution"]
+            .into_iter()
+            .map(|family| {
+                let mut descriptor = ToolRuntimeEnvironmentDescriptor::unavailable(
+                    format!("environment.tool.family.{family}"),
+                    format!("provider.tool.family.{family}"),
+                    ToolRuntimeEnvironmentKind::ManagedSandbox,
+                    "not used for healthy default provider",
+                );
+                descriptor.state = macaca_proto::ToolRuntimeEnvironmentState::Ready;
+                descriptor.health = ServiceHealth::Healthy;
+                descriptor
+                    .metadata
+                    .insert("tool.family".into(), family.into());
+                descriptor
+                    .metadata
+                    .insert("input_hash_strategy".into(), "stable_json_hash".into());
+                Arc::new(StaticToolRuntimeEnvironmentProvider::new(descriptor))
+                    as Arc<dyn ToolRuntimeEnvironmentProvider>
+            })
+            .collect(),
+    )
 }

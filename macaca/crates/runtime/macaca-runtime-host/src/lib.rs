@@ -302,16 +302,18 @@ pub use skill_service_provider::SkillSystemServiceProvider;
 pub use store_service_provider::{store_service_descriptor, StoreSystemServiceProvider};
 pub use tool_family_providers::{
     industrial_tool_family_provider_contributor, industrial_tool_family_provider_inventory,
-    industrial_tool_family_toolsets, IndustrialToolFamilyProviderInventory,
-    REQUIRED_INDUSTRIAL_TOOL_FAMILIES,
+    industrial_tool_family_toolsets, industrial_tool_planning_service,
+    IndustrialToolFamilyProviderInventory, REQUIRED_INDUSTRIAL_TOOL_FAMILIES,
 };
 pub use tool_service_availability::{AvailabilitySignalSet, ToolAvailabilityEvaluator};
 pub use tool_service_environment::{
-    StaticToolRuntimeEnvironmentProvider, ToolRuntimeEnvironmentProvider,
+    industrial_tool_runtime_environment_service, StaticToolRuntimeEnvironmentProvider,
+    ToolRuntimeEnvironmentInvocation, ToolRuntimeEnvironmentProvider,
     ToolRuntimeEnvironmentService, UnavailableToolRuntimeEnvironmentProvider,
 };
 pub use tool_service_gateway::{
-    StaticToolManagedGatewayProvider, ToolManagedGatewayProvider, ToolManagedGatewayService,
+    industrial_tool_managed_gateway_service, StaticToolManagedGatewayProvider,
+    ToolManagedGatewayInvocation, ToolManagedGatewayProvider, ToolManagedGatewayService,
     UnavailableToolManagedGatewayProvider,
 };
 pub use tool_service_planning::{

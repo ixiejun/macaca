@@ -9,9 +9,10 @@ use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use macaca_proto::{
-    MacacaResult, ServiceHealth, ToolAuditRef, ToolFamilyRef, ToolGatewayAuditEvent,
-    ToolGatewayHealthResult, ToolGatewayMeteringEvent, ToolManagedGatewayDescriptor,
-    ToolManagedGatewayRouteKind, TraceContext,
+    CapabilityToolInvocation, CapabilityToolInvocationResult, MacacaResult, ServiceHealth,
+    ToolAuditRef, ToolFamilyRef, ToolGatewayAuditEvent, ToolGatewayHealthResult,
+    ToolGatewayMeteringEvent, ToolManagedGatewayDescriptor, ToolManagedGatewayRouteKind,
+    TraceContext,
 };
 
 /// Adapter contract implemented by managed gateway providers.
@@ -19,8 +20,28 @@ use macaca_proto::{
 pub trait ToolManagedGatewayProvider: Send + Sync {
     fn provider_id(&self) -> &str;
     async fn descriptors(&self) -> MacacaResult<Vec<ToolManagedGatewayDescriptor>>;
+    async fn invoke(
+        &self,
+        invocation: ToolManagedGatewayInvocation,
+    ) -> MacacaResult<CapabilityToolInvocationResult>;
     async fn record_metering(&self, event: ToolGatewayMeteringEvent) -> MacacaResult<ToolAuditRef>;
     async fn record_audit(&self, event: ToolGatewayAuditEvent) -> MacacaResult<ToolAuditRef>;
+}
+
+/// Provider-neutral invocation envelope for gateway-backed routes.
+///
+/// Managed gateways often front browsers, web APIs, document services, and
+/// enterprise connectors.  The raw input remains inside the invocation object
+/// for provider execution, while logs and audit hooks consume hashes,
+/// provider ids, route ids, and artifact refs only.
+#[derive(Debug, Clone)]
+pub struct ToolManagedGatewayInvocation {
+    pub invocation: CapabilityToolInvocation,
+    pub gateway_id: String,
+    pub provider_id: String,
+    pub family: ToolFamilyRef,
+    pub tool_id: String,
+    pub input_hash: String,
 }
 
 /// Null Object gateway provider for absent optional gateway modules.
@@ -70,6 +91,27 @@ impl ToolManagedGatewayProvider for UnavailableToolManagedGatewayProvider {
             self.family.clone(),
             self.reason.clone(),
         )])
+    }
+
+    async fn invoke(
+        &self,
+        invocation: ToolManagedGatewayInvocation,
+    ) -> MacacaResult<CapabilityToolInvocationResult> {
+        tracing::warn!(
+            trace_id = %invocation.invocation.trace.trace_id,
+            provider_id = %self.provider_id,
+            gateway_id = %self.gateway_id,
+            tool_id = %invocation.tool_id,
+            reason_code = "managed_gateway_provider_unavailable",
+            "tool managed gateway invocation stopped because provider is unavailable"
+        );
+        Ok(CapabilityToolInvocationResult::failed(
+            "service.tool.managed_gateway",
+            macaca_proto::CapabilityToolOriginKind::Mcp,
+            invocation.invocation.tool_name,
+            "managed gateway provider is unavailable",
+            invocation.invocation.trace,
+        ))
     }
 
     async fn record_metering(&self, event: ToolGatewayMeteringEvent) -> MacacaResult<ToolAuditRef> {
@@ -144,6 +186,97 @@ impl ToolManagedGatewayProvider for StaticToolManagedGatewayProvider {
 
     async fn descriptors(&self) -> MacacaResult<Vec<ToolManagedGatewayDescriptor>> {
         Ok(self.descriptors.clone())
+    }
+
+    async fn invoke(
+        &self,
+        invocation: ToolManagedGatewayInvocation,
+    ) -> MacacaResult<CapabilityToolInvocationResult> {
+        let gateway = self
+            .descriptors
+            .iter()
+            .find(|descriptor| descriptor.gateway_id == invocation.gateway_id)
+            .cloned();
+        let Some(gateway) = gateway else {
+            tracing::warn!(
+                trace_id = %invocation.invocation.trace.trace_id,
+                provider_id = %self.provider_id,
+                gateway_id = %invocation.gateway_id,
+                tool_id = %invocation.tool_id,
+                reason_code = "managed_gateway_route_not_found",
+                "tool managed gateway route was not registered on provider"
+            );
+            return Ok(CapabilityToolInvocationResult::failed(
+                "service.tool.managed_gateway",
+                macaca_proto::CapabilityToolOriginKind::Mcp,
+                invocation.invocation.tool_name,
+                "managed gateway route is not registered",
+                invocation.invocation.trace,
+            ));
+        };
+        if !matches!(gateway.health, ServiceHealth::Healthy) {
+            return Ok(CapabilityToolInvocationResult::failed(
+                "service.tool.managed_gateway",
+                macaca_proto::CapabilityToolOriginKind::Mcp,
+                invocation.invocation.tool_name,
+                "managed gateway provider is not healthy",
+                invocation.invocation.trace,
+            ));
+        }
+
+        let metering_ref = format!("meter.{}", invocation.tool_id);
+        if gateway.metering_required {
+            self.record_metering(ToolGatewayMeteringEvent {
+                trace: invocation.invocation.trace.clone(),
+                gateway_id: invocation.gateway_id.clone(),
+                provider_id: invocation.provider_id.clone(),
+                tool_id: invocation.tool_id.clone(),
+                metering_ref: metering_ref.clone(),
+                units: 1,
+                metadata: BTreeMap::new(),
+            })
+            .await?;
+        }
+        if gateway.audit_required {
+            self.record_audit(ToolGatewayAuditEvent {
+                trace: invocation.invocation.trace.clone(),
+                gateway_id: invocation.gateway_id.clone(),
+                provider_id: invocation.provider_id.clone(),
+                tool_id: invocation.tool_id.clone(),
+                status: "ok".into(),
+                latency_millis: 0,
+                input_hash: invocation.input_hash.clone(),
+                output_hash: format!("sha256:{}", invocation.input_hash),
+                artifact_refs: Vec::new(),
+                metering_ref: Some(metering_ref.clone()),
+                metadata: BTreeMap::new(),
+            })
+            .await?;
+        }
+        tracing::info!(
+            trace_id = %invocation.invocation.trace.trace_id,
+            provider_id = %self.provider_id,
+            gateway_id = %invocation.gateway_id,
+            family = %invocation.family.as_str(),
+            tool_id = %invocation.tool_id,
+            input_hash = %invocation.input_hash,
+            "tool managed gateway provider executed sanitized invocation"
+        );
+        Ok(CapabilityToolInvocationResult::ok(
+            "service.tool.managed_gateway",
+            macaca_proto::CapabilityToolOriginKind::Mcp,
+            invocation.invocation.tool_name,
+            serde_json::json!({
+                "route_kind": "managed_gateway",
+                "family": invocation.family.as_str(),
+                "provider_id": invocation.provider_id,
+                "gateway_id": invocation.gateway_id,
+                "metering_ref": metering_ref,
+                "input_hash": invocation.input_hash,
+                "status": "executed",
+            }),
+            invocation.invocation.trace,
+        ))
     }
 
     async fn record_metering(&self, event: ToolGatewayMeteringEvent) -> MacacaResult<ToolAuditRef> {
@@ -233,6 +366,32 @@ impl ToolManagedGatewayService {
         Ok(ToolAuditRef::new("tool.gateway.meter.not_found"))
     }
 
+    pub async fn invoke(
+        &self,
+        invocation: ToolManagedGatewayInvocation,
+    ) -> MacacaResult<CapabilityToolInvocationResult> {
+        for provider in &self.providers {
+            if provider.provider_id() == invocation.provider_id {
+                return provider.invoke(invocation).await;
+            }
+        }
+        tracing::warn!(
+            trace_id = %invocation.invocation.trace.trace_id,
+            provider_id = %invocation.provider_id,
+            gateway_id = %invocation.gateway_id,
+            tool_id = %invocation.tool_id,
+            reason_code = "managed_gateway_provider_not_found",
+            "tool managed gateway invocation target was not registered"
+        );
+        Ok(CapabilityToolInvocationResult::failed(
+            "service.tool.managed_gateway",
+            macaca_proto::CapabilityToolOriginKind::Mcp,
+            invocation.invocation.tool_name,
+            "managed gateway provider is not registered",
+            invocation.invocation.trace,
+        ))
+    }
+
     pub async fn record_audit(&self, event: ToolGatewayAuditEvent) -> MacacaResult<ToolAuditRef> {
         for provider in &self.providers {
             if provider.provider_id() == event.provider_id {
@@ -248,4 +407,47 @@ impl ToolManagedGatewayService {
         );
         Ok(ToolAuditRef::new("tool.gateway.audit.not_found"))
     }
+}
+
+/// Build the default provider-backed managed gateway service.
+///
+/// The descriptors model generic OS gateways for families that require network,
+/// browser, media, document, or enterprise connector mediation.  Product- or
+/// application-specific gateway code can be installed later by replacing these
+/// providers through the same Adapter contract.
+pub fn industrial_tool_managed_gateway_service() -> ToolManagedGatewayService {
+    ToolManagedGatewayService::new(
+        [
+            ("browser", ToolManagedGatewayRouteKind::Browser),
+            ("web", ToolManagedGatewayRouteKind::Web),
+            ("media", ToolManagedGatewayRouteKind::Media),
+            (
+                "communication",
+                ToolManagedGatewayRouteKind::EnterpriseConnector,
+            ),
+            (
+                "enterprise_api",
+                ToolManagedGatewayRouteKind::EnterpriseConnector,
+            ),
+        ]
+        .into_iter()
+        .map(|(family, route_kind)| {
+            let provider_id = format!("provider.tool.family.{family}");
+            let descriptor = ToolManagedGatewayDescriptor {
+                gateway_id: format!("gateway.tool.family.{family}"),
+                provider_id: provider_id.clone(),
+                route_kind,
+                family: ToolFamilyRef::new(family).expect("static family ids are non-empty"),
+                health: ServiceHealth::Healthy,
+                metering_required: true,
+                audit_required: true,
+                metadata: BTreeMap::new(),
+            };
+            Arc::new(StaticToolManagedGatewayProvider::new(
+                provider_id,
+                vec![descriptor],
+            )) as Arc<dyn ToolManagedGatewayProvider>
+        })
+        .collect(),
+    )
 }

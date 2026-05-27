@@ -12,11 +12,21 @@ use std::collections::BTreeMap;
 
 use macaca_proto::{
     AvailabilityExpression, CapabilityToolDescriptor, CapabilityToolOriginKind,
-    IndustrialToolDescriptor, MacacaResult, ToolArtifactPolicy, ToolFamilyRef, ToolLifecycleScope,
-    ToolResultClass, ToolSideEffectClass, ToolTrustLevel, ToolsetRef,
+    IndustrialToolDescriptor, MacacaResult, ToolArtifactPolicy, ToolExecutorRouteKind,
+    ToolFamilyRef, ToolLifecycleScope, ToolResultClass, ToolSideEffectClass, ToolTrustLevel,
+    ToolsetRef, ENTITLEMENT_SERVICE_ID, MCP_SERVICE_ID, PAYMENT_SERVICE_ID,
+    SCHEDULED_AGENT_TASK_SERVICE_ID, SCHEDULER_SERVICE_ID, TOOL_SERVICE_ID,
 };
 
-use crate::tool_service_planning::{StaticToolDescriptorContributor, ToolPlanningToolsetResolver};
+use crate::tool_service_availability::AvailabilitySignalSet;
+use crate::tool_service_planning::{
+    StaticToolDescriptorContributor, ToolPlanningService, ToolPlanningToolsetResolver,
+};
+
+const TASK_SERVICE_ID: &str = "service.task";
+const TOOL_RUNTIME_ENVIRONMENT_SERVICE_ID: &str = "service.tool.runtime_environment";
+const TOOL_MANAGED_GATEWAY_SERVICE_ID: &str = "service.tool.managed_gateway";
+const TOOL_PLUGIN_SERVICE_ID: &str = "service.plugin";
 
 /// Stable provider-neutral families required by the industrial Tools proposal.
 ///
@@ -131,6 +141,39 @@ pub fn industrial_tool_family_toolsets() -> MacacaResult<ToolPlanningToolsetReso
         ))
 }
 
+/// Build the production industrial planner used by runtime-host bootstraps.
+///
+/// This is the approved Abstract Factory composition point for the generic
+/// industrial tool surface. The planner receives the real family contributor,
+/// generic toolsets, and service availability signals for in-process services
+/// known to the runtime host. Optional external providers remain structured
+/// hidden diagnostics until a plugin, MCP server, gateway, or environment
+/// provider contributes a healthy route.
+pub fn industrial_tool_planning_service() -> MacacaResult<ToolPlanningService> {
+    let mut availability = AvailabilitySignalSet::default();
+    for service_id in [
+        TOOL_SERVICE_ID,
+        TOOL_RUNTIME_ENVIRONMENT_SERVICE_ID,
+        TOOL_MANAGED_GATEWAY_SERVICE_ID,
+        macaca_memory::MEMORY_SERVICE_ID,
+        macaca_context::CONTEXT_SERVICE_ID,
+        TASK_SERVICE_ID,
+        SCHEDULER_SERVICE_ID,
+        SCHEDULED_AGENT_TASK_SERVICE_ID,
+        macaca_skill::SKILL_SERVICE_ID,
+        MCP_SERVICE_ID,
+        ENTITLEMENT_SERVICE_ID,
+        PAYMENT_SERVICE_ID,
+    ] {
+        availability = availability.with_service(service_id);
+    }
+    Ok(ToolPlanningService::builder()
+        .with_contributor(industrial_tool_family_provider_contributor()?)
+        .with_availability(availability)
+        .with_toolsets(industrial_tool_family_toolsets()?)
+        .build())
+}
+
 #[derive(Debug, Clone)]
 struct FamilySpec {
     /// Stable family identifier exposed to tool planning requests.
@@ -145,6 +188,8 @@ struct FamilySpec {
     tool_name: String,
     /// Sanitized extension class, never a raw provider implementation detail.
     provider_path: &'static str,
+    /// Typed execution route used by service.tool invocation dispatch.
+    route_kind: ToolExecutorRouteKind,
     /// Registry seam where a real provider may be installed by platform code.
     extension_point: &'static str,
     /// Declares how service.tool should classify successful outputs.
@@ -177,90 +222,105 @@ fn family_specs() -> Vec<FamilySpec> {
         spec(
             "file",
             "owning_service",
+            ToolExecutorRouteKind::RuntimeEnvironment,
             ToolResultClass::BinaryArtifact,
             ToolSideEffectClass::Write,
         ),
         spec(
             "shell",
             "runtime_adapter",
+            ToolExecutorRouteKind::RuntimeEnvironment,
             ToolResultClass::StructuredJson,
             ToolSideEffectClass::Process,
         ),
         spec(
             "browser",
-            "mcp",
+            "gateway",
+            ToolExecutorRouteKind::ManagedGateway,
             ToolResultClass::StructuredJson,
             ToolSideEffectClass::External,
         ),
         spec(
             "web",
             "gateway",
+            ToolExecutorRouteKind::ManagedGateway,
             ToolResultClass::StructuredJson,
             ToolSideEffectClass::Network,
         ),
         spec(
             "memory",
             "owning_service",
+            ToolExecutorRouteKind::OwningServiceCommand,
             ToolResultClass::StructuredJson,
             ToolSideEffectClass::ReadOnly,
         ),
         spec(
             "knowledge",
             "owning_service",
+            ToolExecutorRouteKind::OwningServiceCommand,
             ToolResultClass::StructuredJson,
             ToolSideEffectClass::ReadOnly,
         ),
         spec(
             "task",
             "owning_service",
+            ToolExecutorRouteKind::OwningServiceCommand,
             ToolResultClass::StructuredJson,
             ToolSideEffectClass::Write,
         ),
         spec(
             "scheduler",
             "owning_service",
+            ToolExecutorRouteKind::OwningServiceCommand,
             ToolResultClass::BackgroundHandle,
             ToolSideEffectClass::Write,
         ),
         spec(
             "skill",
             "owning_service",
+            ToolExecutorRouteKind::Skill,
             ToolResultClass::StructuredJson,
             ToolSideEffectClass::External,
         ),
         spec(
             "mcp",
             "mcp",
+            ToolExecutorRouteKind::Mcp,
             ToolResultClass::StructuredJson,
             ToolSideEffectClass::External,
         ),
         spec(
             "media",
             "gateway",
+            ToolExecutorRouteKind::ManagedGateway,
             ToolResultClass::Multimodal,
             ToolSideEffectClass::External,
         ),
         spec(
             "document",
             "runtime_adapter",
+            ToolExecutorRouteKind::RuntimeEnvironment,
             ToolResultClass::BinaryArtifact,
             ToolSideEffectClass::Write,
         ),
         spec(
             "communication",
             "gateway",
+            ToolExecutorRouteKind::ManagedGateway,
             ToolResultClass::StructuredJson,
             ToolSideEffectClass::External,
         ),
         spec(
             "enterprise_api",
             "gateway",
+            ToolExecutorRouteKind::ManagedGateway,
             ToolResultClass::StructuredJson,
             ToolSideEffectClass::External,
         ),
         spec(
             "code_execution",
             "runtime_adapter",
+            ToolExecutorRouteKind::RuntimeEnvironment,
             ToolResultClass::StructuredJson,
             ToolSideEffectClass::Process,
         ),
@@ -269,6 +329,7 @@ fn family_specs() -> Vec<FamilySpec> {
             ..spec(
                 "computer_use",
                 "plugin",
+                ToolExecutorRouteKind::Plugin,
                 ToolResultClass::StructuredJson,
                 ToolSideEffectClass::External,
             )
@@ -276,6 +337,7 @@ fn family_specs() -> Vec<FamilySpec> {
         spec(
             "payment_entitlement",
             "owning_service",
+            ToolExecutorRouteKind::OwningServiceCommand,
             ToolResultClass::StructuredJson,
             ToolSideEffectClass::External,
         ),
@@ -285,22 +347,45 @@ fn family_specs() -> Vec<FamilySpec> {
 fn spec(
     family: &'static str,
     provider_path: &'static str,
+    route_kind: ToolExecutorRouteKind,
     result_class: ToolResultClass,
     side_effect_class: ToolSideEffectClass,
 ) -> FamilySpec {
+    let owner_service = owner_service_for(family, &route_kind);
     FamilySpec {
         family,
-        owner_service: format!("service.tool.family.{family}"),
+        owner_service: owner_service.clone(),
         provider_id: format!("provider.tool.family.{family}"),
         capability_id: format!("capability.tool.family.{family}"),
         tool_name: format!("{family}_tool"),
         provider_path,
+        route_kind,
         extension_point: "service_or_extension_registry",
         result_class,
         side_effect_class,
         artifact_policy: ToolArtifactPolicy::PersistOversized,
         trust_level: ToolTrustLevel::Unavailable,
         unsupported_platform: false,
+    }
+}
+
+fn owner_service_for(family: &str, route_kind: &ToolExecutorRouteKind) -> String {
+    match route_kind {
+        ToolExecutorRouteKind::Driver => macaca_driver::DRIVER_SERVICE_ID.into(),
+        ToolExecutorRouteKind::Skill => macaca_skill::SKILL_SERVICE_ID.into(),
+        ToolExecutorRouteKind::Mcp => MCP_SERVICE_ID.into(),
+        ToolExecutorRouteKind::RuntimeEnvironment => TOOL_RUNTIME_ENVIRONMENT_SERVICE_ID.into(),
+        ToolExecutorRouteKind::ManagedGateway => TOOL_MANAGED_GATEWAY_SERVICE_ID.into(),
+        ToolExecutorRouteKind::Plugin => TOOL_PLUGIN_SERVICE_ID.into(),
+        ToolExecutorRouteKind::Unavailable => format!("{TOOL_SERVICE_ID}.unavailable"),
+        ToolExecutorRouteKind::OwningServiceCommand => match family {
+            "memory" => macaca_memory::MEMORY_SERVICE_ID.into(),
+            "knowledge" => macaca_context::CONTEXT_SERVICE_ID.into(),
+            "task" => TASK_SERVICE_ID.into(),
+            "scheduler" => SCHEDULER_SERVICE_ID.into(),
+            "payment_entitlement" => ENTITLEMENT_SERVICE_ID.into(),
+            _ => TOOL_SERVICE_ID.into(),
+        },
     }
 }
 
@@ -321,7 +406,7 @@ fn spec_to_descriptor(spec: FamilySpec) -> MacacaResult<IndustrialToolDescriptor
             "type": "object",
             "additionalProperties": true,
         }),
-        CapabilityToolOriginKind::Mcp,
+        origin_kind_for_route(&spec.route_kind),
     )?;
     base.metadata
         .insert("tool.family".into(), spec.family.into());
@@ -345,6 +430,9 @@ fn spec_to_descriptor(spec: FamilySpec) -> MacacaResult<IndustrialToolDescriptor
         ToolFamilyRef::new(spec.family)?,
         base,
     )?;
+    descriptor.executor_route = descriptor
+        .executor_route
+        .with_route_kind(spec.route_kind.clone(), command_name_for(&spec));
     descriptor.toolsets = toolsets_for_family(spec.family)
         .into_iter()
         .map(ToolsetRef::new)
@@ -364,7 +452,36 @@ fn spec_to_descriptor(spec: FamilySpec) -> MacacaResult<IndustrialToolDescriptor
     descriptor
         .sanitized_metadata
         .insert("availability_state".into(), spec.availability_state());
+    descriptor
+        .sanitized_metadata
+        .insert("route_kind".into(), format!("{:?}", spec.route_kind));
     Ok(descriptor)
+}
+
+fn origin_kind_for_route(route_kind: &ToolExecutorRouteKind) -> CapabilityToolOriginKind {
+    match route_kind {
+        ToolExecutorRouteKind::Driver => CapabilityToolOriginKind::Driver,
+        ToolExecutorRouteKind::Skill => CapabilityToolOriginKind::Skill,
+        ToolExecutorRouteKind::Mcp => CapabilityToolOriginKind::Mcp,
+        // Route kinds outside the historical Driver/Skill/MCP origin surface
+        // use MCP-compatible descriptor origin only for legacy serialization.
+        // The typed executor route is authoritative for dispatch.
+        ToolExecutorRouteKind::OwningServiceCommand
+        | ToolExecutorRouteKind::RuntimeEnvironment
+        | ToolExecutorRouteKind::ManagedGateway
+        | ToolExecutorRouteKind::Plugin
+        | ToolExecutorRouteKind::Unavailable => CapabilityToolOriginKind::Mcp,
+    }
+}
+
+fn command_name_for(spec: &FamilySpec) -> Option<String> {
+    match spec.route_kind {
+        ToolExecutorRouteKind::RuntimeEnvironment => Some("tool.runtime_environment.invoke".into()),
+        ToolExecutorRouteKind::ManagedGateway => Some("tool.managed_gateway.invoke".into()),
+        ToolExecutorRouteKind::Plugin => Some("tool.plugin.invoke".into()),
+        ToolExecutorRouteKind::OwningServiceCommand => Some(format!("{}.tool.invoke", spec.family)),
+        _ => None,
+    }
 }
 
 fn availability_for(spec: &FamilySpec) -> Vec<AvailabilityExpression> {

@@ -8,14 +8,14 @@
 use std::collections::BTreeSet;
 
 use macaca_proto::{
-    ToolCatalogPlanCommand, ToolFamilyRef, ToolHiddenReason, ToolResultClass, ToolsetRef,
-    TraceContext,
+    CapabilityToolOriginKind, ToolCatalogPlanCommand, ToolExecutorRouteKind, ToolFamilyRef,
+    ToolHiddenReason, ToolResultClass, ToolsetRef, TraceContext,
 };
 
 use crate::{
     industrial_tool_family_provider_contributor, industrial_tool_family_provider_inventory,
-    industrial_tool_family_toolsets, AvailabilitySignalSet, ToolPlanningService,
-    REQUIRED_INDUSTRIAL_TOOL_FAMILIES,
+    industrial_tool_family_toolsets, AvailabilitySignalSet, ToolDescriptorContributor,
+    ToolPlanningService, REQUIRED_INDUSTRIAL_TOOL_FAMILIES,
 };
 
 #[tokio::test]
@@ -30,6 +30,11 @@ async fn industrial_family_inventory_covers_required_families_without_raw_metada
     assert_eq!(actual, expected);
     for entry in inventory {
         assert!(!entry.owner_service.as_str().trim().is_empty());
+        assert!(
+            !entry.owner_service.starts_with("service.tool.family."),
+            "family {} still uses synthetic service.tool.family owner",
+            entry.family
+        );
         assert!(!entry.provider_id.trim().is_empty());
         assert!(!entry.capability_id.trim().is_empty());
         assert_ne!(entry.provider_path, "application_specific");
@@ -42,6 +47,36 @@ async fn industrial_family_inventory_covers_required_families_without_raw_metada
             .values()
             .all(|value| !value.contains("RAW_PROVIDER_PAYLOAD")));
     }
+}
+
+#[tokio::test]
+async fn family_descriptors_use_typed_routes_instead_of_all_mcp_origins() {
+    let descriptors = industrial_tool_family_provider_contributor()
+        .unwrap()
+        .descriptors()
+        .await
+        .unwrap();
+    let route_kinds: Vec<_> = descriptors
+        .iter()
+        .map(|descriptor| descriptor.executor_route.route_kind.clone())
+        .collect();
+    let origin_kinds: Vec<_> = descriptors
+        .iter()
+        .map(|descriptor| descriptor.base_descriptor.origin_kind.clone())
+        .collect();
+
+    assert!(route_kinds.contains(&ToolExecutorRouteKind::RuntimeEnvironment));
+    assert!(route_kinds.contains(&ToolExecutorRouteKind::ManagedGateway));
+    assert!(route_kinds.contains(&ToolExecutorRouteKind::OwningServiceCommand));
+    assert!(route_kinds.contains(&ToolExecutorRouteKind::Skill));
+    assert!(route_kinds.contains(&ToolExecutorRouteKind::Mcp));
+    assert!(route_kinds.contains(&ToolExecutorRouteKind::Plugin));
+    assert!(origin_kinds.contains(&CapabilityToolOriginKind::Skill));
+    assert!(origin_kinds.contains(&CapabilityToolOriginKind::Mcp));
+    assert!(descriptors.iter().all(|descriptor| !descriptor
+        .executor_route
+        .service_id
+        .starts_with("service.tool.family.")));
 }
 
 #[tokio::test]
@@ -80,7 +115,9 @@ async fn planner_surfaces_missing_optional_families_as_unavailable_diagnostics()
 async fn planner_marks_signal_backed_families_visible_without_provider_name_branches() {
     let service = ToolPlanningService::builder()
         .with_contributor(industrial_tool_family_provider_contributor().unwrap())
-        .with_availability(AvailabilitySignalSet::default().with_service("service.tool.family.web"))
+        .with_availability(
+            AvailabilitySignalSet::default().with_service("service.tool.managed_gateway"),
+        )
         .with_toolsets(industrial_tool_family_toolsets().unwrap())
         .build();
     let mut command =

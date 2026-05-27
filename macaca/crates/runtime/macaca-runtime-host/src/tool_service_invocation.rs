@@ -11,9 +11,9 @@ use std::sync::Arc;
 
 use macaca_driver::{DriverToolInvokeCommand, DRIVER_TOOL_INVOKE_COMMAND};
 use macaca_proto::{
-    CapabilityToolInvocation, CapabilityToolInvocationResult, CapabilityToolOriginKind,
-    IndustrialToolDescriptor, KernelServiceId, MacacaError, MacacaResult, McpServiceLifecycleScope,
-    McpToolInvokeCommand, ServiceBusSource, ServiceCommand, ServiceCommandName, ToolCommandResult,
+    CapabilityToolInvocation, CapabilityToolInvocationResult, IndustrialToolDescriptor,
+    KernelServiceId, MacacaError, MacacaResult, McpServiceLifecycleScope, McpToolInvokeCommand,
+    ServiceBusSource, ServiceCommand, ServiceCommandName, ToolCommandResult, ToolExecutorRouteKind,
     ToolInvocationRef, ToolInvokeCommand, ToolResultClass, TraceContext,
     MCP_DESCRIPTOR_BACKEND_TOOL_NAME, MCP_DESCRIPTOR_LIFECYCLE_SCOPE, MCP_TOOL_INVOKE_COMMAND,
 };
@@ -23,6 +23,11 @@ use serde_json::Value;
 use crate::tool_service_provider_state::stable_json_hash;
 use crate::tool_service_provider_state::ToolServiceProviderState;
 use crate::tool_service_result::{bounded_summary, command_result, normalize_invocation_result};
+use crate::{
+    industrial_tool_managed_gateway_service, industrial_tool_runtime_environment_service,
+    ToolManagedGatewayInvocation, ToolManagedGatewayService, ToolRuntimeEnvironmentInvocation,
+    ToolRuntimeEnvironmentService,
+};
 use crate::{ServiceRuntime, ServiceRuntimeError};
 
 static INVOCATION_SEQ: AtomicU64 = AtomicU64::new(1);
@@ -32,6 +37,8 @@ pub struct ToolInvocationService {
     runtime: Arc<ServiceRuntime>,
     state: Arc<ToolServiceProviderState>,
     source: ServiceBusSource,
+    environment_service: ToolRuntimeEnvironmentService,
+    gateway_service: ToolManagedGatewayService,
 }
 
 impl ToolInvocationService {
@@ -40,6 +47,8 @@ impl ToolInvocationService {
             runtime,
             state,
             source: ServiceBusSource::new("service.tool"),
+            environment_service: industrial_tool_runtime_environment_service(),
+            gateway_service: industrial_tool_managed_gateway_service(),
         }
     }
 
@@ -69,29 +78,19 @@ impl ToolInvocationService {
             "acquired",
         );
 
-        if let Some(result) = policy_denial(&command, &descriptor) {
+        let admission =
+            ToolInvocationAdmissionChain::evaluate(&command, &descriptor, &invocation_ref);
+        if let ToolAdmissionDecision::Denied(result)
+        | ToolAdmissionDecision::ApprovalRequired(result)
+        | ToolAdmissionDecision::Unavailable(result) = admission
+        {
             tracing::warn!(
                 trace_id = %command.trace.trace_id,
                 invocation_ref = %invocation_ref.0,
                 tool_id = %command.tool_id,
-                "tool service policy denied invocation before owning-service dispatch"
-            );
-            self.state.record_invocation_result(result.clone());
-            self.state.record_invocation_audit(
-                &result,
-                &command.tool_id,
-                &descriptor.executor_route.provider_id,
-                &descriptor.executor_route.service_id,
-                input_hash,
-            );
-            return Ok(result);
-        }
-        if let Some(result) = approval_required(&command, &descriptor, invocation_ref.clone()) {
-            tracing::info!(
-                trace_id = %command.trace.trace_id,
-                invocation_ref = %invocation_ref.0,
-                tool_id = %command.tool_id,
-                "tool service approval required before side effects"
+                route_kind = ?descriptor.executor_route.route_kind,
+                status = %result.status,
+                "tool service admission stopped invocation before provider dispatch"
             );
             self.state.record_invocation_result(result.clone());
             self.state.record_invocation_audit(
@@ -266,33 +265,136 @@ impl ToolInvocationService {
             descriptor.visible_name.clone(),
             command.input.clone(),
         )?;
-        let (service_id, command_name, payload) = match descriptor.base_descriptor.origin_kind {
-            CapabilityToolOriginKind::Driver => (
-                descriptor.executor_route.service_id.clone(),
-                DRIVER_TOOL_INVOKE_COMMAND,
-                serde_json::to_value(DriverToolInvokeCommand { invocation })?,
-            ),
-            CapabilityToolOriginKind::Skill => (
-                descriptor.executor_route.service_id.clone(),
-                SKILL_TOOL_INVOKE_COMMAND,
-                serde_json::to_value(SkillToolInvokeCommand { invocation })?,
-            ),
-            CapabilityToolOriginKind::Mcp => (
-                descriptor.executor_route.service_id.clone(),
-                MCP_TOOL_INVOKE_COMMAND,
-                serde_json::to_value(McpToolInvokeCommand::routed(
-                    invocation,
-                    descriptor.base_descriptor.provider_id.clone(),
-                    backend_tool_name(descriptor)?,
-                    lifecycle(descriptor)?,
-                )?)?,
-            ),
-        };
+        match descriptor.executor_route.route_kind {
+            ToolExecutorRouteKind::Driver => {
+                self.dispatch_service_command(
+                    command,
+                    &descriptor.executor_route.service_id,
+                    DRIVER_TOOL_INVOKE_COMMAND,
+                    serde_json::to_value(DriverToolInvokeCommand { invocation })?,
+                )
+                .await
+            }
+            ToolExecutorRouteKind::Skill => {
+                self.dispatch_service_command(
+                    command,
+                    &descriptor.executor_route.service_id,
+                    SKILL_TOOL_INVOKE_COMMAND,
+                    serde_json::to_value(SkillToolInvokeCommand { invocation })?,
+                )
+                .await
+            }
+            ToolExecutorRouteKind::Mcp => {
+                self.dispatch_service_command(
+                    command,
+                    descriptor.executor_route.service_id.clone(),
+                    MCP_TOOL_INVOKE_COMMAND,
+                    serde_json::to_value(McpToolInvokeCommand::routed(
+                        invocation,
+                        descriptor.base_descriptor.provider_id.clone(),
+                        backend_tool_name(descriptor)?,
+                        lifecycle(descriptor)?,
+                    )?)?,
+                )
+                .await
+            }
+            ToolExecutorRouteKind::OwningServiceCommand => {
+                let command_name = descriptor
+                    .executor_route
+                    .command_name
+                    .as_deref()
+                    .unwrap_or("tool.invoke");
+                self.dispatch_service_command(
+                    command,
+                    &descriptor.executor_route.service_id,
+                    command_name,
+                    serde_json::to_value(command)?,
+                )
+                .await
+            }
+            ToolExecutorRouteKind::RuntimeEnvironment => {
+                self.dispatch_runtime_environment(command, descriptor, invocation)
+                    .await
+            }
+            ToolExecutorRouteKind::ManagedGateway => {
+                self.dispatch_managed_gateway(command, descriptor, invocation)
+                    .await
+            }
+            ToolExecutorRouteKind::Plugin | ToolExecutorRouteKind::Unavailable => {
+                Ok(CapabilityToolInvocationResult::failed(
+                    descriptor.executor_route.service_id.clone(),
+                    descriptor.base_descriptor.origin_kind.clone(),
+                    descriptor.visible_name.clone(),
+                    "tool route is unavailable until a provider plugin registers this capability",
+                    command.trace.clone(),
+                ))
+            }
+        }
+    }
+
+    async fn dispatch_runtime_environment(
+        &self,
+        command: &ToolInvokeCommand,
+        descriptor: &IndustrialToolDescriptor,
+        invocation: CapabilityToolInvocation,
+    ) -> MacacaResult<CapabilityToolInvocationResult> {
+        tracing::info!(
+            trace_id = %command.trace.trace_id,
+            tool_id = %command.tool_id,
+            provider_id = %descriptor.executor_route.provider_id,
+            family = %descriptor.family.as_str(),
+            "tool service dispatching to runtime environment provider service"
+        );
+        self.environment_service
+            .invoke(ToolRuntimeEnvironmentInvocation {
+                invocation,
+                environment_id: format!("environment.tool.family.{}", descriptor.family.as_str()),
+                provider_id: descriptor.executor_route.provider_id.clone(),
+                family: descriptor.family.as_str().into(),
+                tool_id: command.tool_id.clone(),
+                input_hash: stable_json_hash(&command.input),
+            })
+            .await
+    }
+
+    async fn dispatch_managed_gateway(
+        &self,
+        command: &ToolInvokeCommand,
+        descriptor: &IndustrialToolDescriptor,
+        invocation: CapabilityToolInvocation,
+    ) -> MacacaResult<CapabilityToolInvocationResult> {
+        tracing::info!(
+            trace_id = %command.trace.trace_id,
+            tool_id = %command.tool_id,
+            provider_id = %descriptor.executor_route.provider_id,
+            family = %descriptor.family.as_str(),
+            "tool service dispatching to managed gateway provider service"
+        );
+        self.gateway_service
+            .invoke(ToolManagedGatewayInvocation {
+                invocation,
+                gateway_id: format!("gateway.tool.family.{}", descriptor.family.as_str()),
+                provider_id: descriptor.executor_route.provider_id.clone(),
+                family: descriptor.family.clone(),
+                tool_id: command.tool_id.clone(),
+                input_hash: stable_json_hash(&command.input),
+            })
+            .await
+    }
+
+    async fn dispatch_service_command(
+        &self,
+        command: &ToolInvokeCommand,
+        service_id: impl AsRef<str>,
+        command_name: &str,
+        payload: serde_json::Value,
+    ) -> MacacaResult<CapabilityToolInvocationResult> {
         let service_command = ServiceCommand::with_trace(
             ServiceCommandName::new(command_name),
             payload,
             command.trace.clone(),
         );
+        let service_id = service_id.as_ref().to_string();
         let reply = self
             .runtime
             .call(
@@ -304,6 +406,56 @@ impl ToolInvocationService {
             .map_err(runtime_error)?;
         let output = reply.output.unwrap_or(Value::Null);
         serde_json::from_value(output).map_err(MacacaError::from)
+    }
+}
+
+/// Typed admission outcome returned by the admission decorator chain.
+///
+/// Keeping this as an enum prevents policy, entitlement, approval, and
+/// unavailable-provider outcomes from being inferred from free-form strings in
+/// the dispatch code. Metadata remains an input compatibility surface, but the
+/// router consumes typed decisions before any side effect.
+enum ToolAdmissionDecision {
+    Admit,
+    Denied(ToolCommandResult),
+    ApprovalRequired(ToolCommandResult),
+    Unavailable(ToolCommandResult),
+}
+
+/// Decorator-style admission chain for `tool.invoke`.
+///
+/// The chain is intentionally small and local in this slice, but each check is
+/// its own step so future policy, resource, entitlement, and budget services
+/// can replace the data source without changing route dispatch.
+struct ToolInvocationAdmissionChain;
+
+impl ToolInvocationAdmissionChain {
+    fn evaluate(
+        command: &ToolInvokeCommand,
+        descriptor: &IndustrialToolDescriptor,
+        invocation_ref: &ToolInvocationRef,
+    ) -> ToolAdmissionDecision {
+        if descriptor.executor_route.route_kind == ToolExecutorRouteKind::Unavailable {
+            return ToolAdmissionDecision::Unavailable(command_result(
+                command.trace.clone(),
+                "unavailable",
+                ToolResultClass::Failure,
+                None,
+                Vec::new(),
+                Some(invocation_ref.clone()),
+                Some("tool route has no registered provider".into()),
+            ));
+        }
+        if let Some(result) = policy_denial(command, descriptor) {
+            return ToolAdmissionDecision::Denied(result);
+        }
+        if let Some(result) = entitlement_missing(command, descriptor) {
+            return ToolAdmissionDecision::Denied(result);
+        }
+        if let Some(result) = approval_required(command, descriptor, invocation_ref.clone()) {
+            return ToolAdmissionDecision::ApprovalRequired(result);
+        }
+        ToolAdmissionDecision::Admit
     }
 }
 
@@ -332,6 +484,34 @@ fn policy_denial(
             Vec::new(),
             None,
             Some("tool invocation denied by policy before side effects".into()),
+        )
+    })
+}
+
+fn entitlement_missing(
+    command: &ToolInvokeCommand,
+    descriptor: &IndustrialToolDescriptor,
+) -> Option<ToolCommandResult> {
+    let requires_entitlement = command.metadata.contains_key("entitlement.required")
+        || descriptor.availability.iter().any(|expr| {
+            matches!(
+                expr,
+                macaca_proto::AvailabilityExpression::Entitlement { .. }
+            )
+        });
+    let has_entitlement = command
+        .metadata
+        .get("entitlement.state")
+        .is_some_and(|value| value == "granted");
+    (requires_entitlement && !has_entitlement).then(|| {
+        command_result(
+            command.trace.clone(),
+            "entitlement_missing",
+            ToolResultClass::Failure,
+            None,
+            Vec::new(),
+            None,
+            Some("tool invocation missing required entitlement before side effects".into()),
         )
     })
 }

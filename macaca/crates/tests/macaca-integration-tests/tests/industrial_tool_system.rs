@@ -1,52 +1,38 @@
 //! Application-neutral industrial tool-system integration proof.
 //!
-//! The test wires `service.tool` with the generic family provider contributor,
-//! registers a minimal owner service for one family, then proves the full
-//! planning, invocation, artifact, and audit-replay chain without embedding any
-//! application workflow or raw provider payload in OS-level code.
+//! This proof intentionally avoids fake owner services and manually injected
+//! availability signals. The runtime-host industrial composition helper builds
+//! provider-backed family descriptors, typed executor routes, availability, and
+//! toolsets exactly like production Web startup. The test then proves planning,
+//! typed runtime invocation, artifact handling, provider health, and sanitized
+//! audit replay through `service.tool`.
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
-use macaca_kernel::SystemService;
 use macaca_proto::{
-    ApplicationId, CapabilityToolInvocationResult, CapabilityToolInvocationScope,
-    CapabilityToolOriginKind, CleanupPolicy, KernelServiceId, McpToolInvokeCommand,
-    ServiceBusSource, ServiceCallResult, ServiceCommand, ServiceCommandName, ServiceDescriptor,
-    ServiceError, ServiceHealth, ServiceResult, ServiceScope, ServiceType, ToolArtifactOpenCommand,
-    ToolCatalogPlanCommand, ToolGenericTraceCommand, ToolInvokeCommand, ToolResultClass,
-    ToolResultGetCommand, ToolsetRef, TraceContext, TraceSchemaRef, MCP_TOOL_INVOKE_COMMAND,
-    TOOL_ARTIFACT_OPEN_COMMAND, TOOL_AUDIT_QUERY_COMMAND, TOOL_CATALOG_PLAN_COMMAND,
-    TOOL_INVOKE_COMMAND, TOOL_RESULT_GET_COMMAND, TOOL_SERVICE_ID,
+    ApplicationId, CapabilityToolInvocationScope, KernelServiceId, ServiceBusSource,
+    ServiceCommand, ServiceCommandName, ToolArtifactOpenCommand, ToolCatalogPlanCommand,
+    ToolExecutorRouteKind, ToolGenericTraceCommand, ToolInvokeCommand, ToolProviderHealthResult,
+    ToolResultClass, ToolResultGetCommand, ToolsetRef, TraceContext, TOOL_ARTIFACT_OPEN_COMMAND,
+    TOOL_AUDIT_QUERY_COMMAND, TOOL_CATALOG_PLAN_COMMAND, TOOL_INVOKE_COMMAND,
+    TOOL_PROVIDER_HEALTH_COMMAND, TOOL_RESULT_GET_COMMAND, TOOL_SERVICE_ID,
 };
 use macaca_runtime_host::{
-    bootstrap_tool_planning_service, industrial_tool_family_provider_contributor,
-    industrial_tool_family_toolsets, AvailabilitySignalSet, ServiceProviderFactoryContext,
-    ServiceProviderInstance, ServiceRuntime, ServiceRuntimeConfig, StaticServiceProviderFactory,
-    ToolPlanningService,
+    bootstrap_tool_planning_service, industrial_tool_planning_service, ServiceRuntime,
+    ServiceRuntimeConfig,
 };
 use serde_json::json;
 
 #[tokio::test]
 async fn industrial_tool_system_plans_invokes_artifacts_and_audit_replay() {
     let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
-    register_owner(runtime.clone()).await;
-    let planner = ToolPlanningService::builder()
-        .with_contributor(industrial_tool_family_provider_contributor().unwrap())
-        .with_availability(
-            AvailabilitySignalSet::default()
-                .with_service("service.tool.family.web")
-                .with_service("service.tool.family.file")
-                .with_service("service.tool.family.shell")
-                .with_service("service.tool.family.memory")
-                .with_service("service.tool.family.document")
-                .with_service("service.tool.family.scheduler"),
-        )
-        .with_toolsets(industrial_tool_family_toolsets().unwrap())
-        .build();
-    bootstrap_tool_planning_service(runtime.clone(), Arc::new(planner), "trace-proof-bootstrap")
-        .await
-        .unwrap();
+    bootstrap_tool_planning_service(
+        runtime.clone(),
+        Arc::new(industrial_tool_planning_service().unwrap()),
+        "trace-proof-bootstrap",
+    )
+    .await
+    .unwrap();
 
     let mut plan_command =
         ToolCatalogPlanCommand::new(TraceContext::new("trace-industrial-plan")).unwrap();
@@ -58,8 +44,30 @@ async fn industrial_tool_system_plans_invokes_artifacts_and_audit_replay() {
         plan_command,
     )
     .await;
+
     assert_eq!(plan.visible.len(), 6);
     assert_eq!(plan.hidden.len(), 0);
+    assert!(plan.visible.iter().all(|entry| {
+        !entry
+            .descriptor
+            .executor_route
+            .service_id
+            .starts_with("service.tool.family.")
+    }));
+    assert!(plan.visible.iter().any(|entry| {
+        entry.descriptor.executor_route.route_kind == ToolExecutorRouteKind::RuntimeEnvironment
+    }));
+    assert!(plan.visible.iter().any(|entry| {
+        entry.descriptor.executor_route.route_kind == ToolExecutorRouteKind::ManagedGateway
+    }));
+
+    let health = call_tool::<_, ToolProviderHealthResult>(
+        runtime.clone(),
+        TOOL_PROVIDER_HEALTH_COMMAND,
+        ToolGenericTraceCommand::new(TraceContext::new("trace-industrial-health")).unwrap(),
+    )
+    .await;
+    assert_eq!(health.provider_count, 1);
 
     let descriptor = plan
         .visible
@@ -67,6 +75,10 @@ async fn industrial_tool_system_plans_invokes_artifacts_and_audit_replay() {
         .find(|entry| entry.descriptor.family.as_str() == "document")
         .map(|entry| entry.descriptor.clone())
         .unwrap();
+    assert_eq!(
+        descriptor.executor_route.route_kind,
+        ToolExecutorRouteKind::RuntimeEnvironment
+    );
     let mut invoke = ToolInvokeCommand {
         trace: TraceContext::new("trace-industrial-invoke"),
         scope: CapabilityToolInvocationScope::new(ApplicationId::new(), "session-proof", "agent")
@@ -151,76 +163,4 @@ where
         .await
         .unwrap();
     serde_json::from_value(reply.output.unwrap()).unwrap()
-}
-
-async fn register_owner(runtime: Arc<ServiceRuntime>) {
-    let owner = Arc::new(IndustrialProofOwner);
-    let descriptor = owner.descriptor();
-    runtime
-        .register_provider(
-            &StaticServiceProviderFactory::new(ServiceProviderInstance::new(descriptor, owner)),
-            ServiceProviderFactoryContext::new(),
-        )
-        .await
-        .unwrap();
-}
-
-struct IndustrialProofOwner;
-
-#[async_trait]
-impl SystemService for IndustrialProofOwner {
-    fn descriptor(&self) -> ServiceDescriptor {
-        let mut descriptor = ServiceDescriptor::new(
-            KernelServiceId::new("service.tool.family.document"),
-            ServiceType::new("industrial.tool.proof"),
-            TraceSchemaRef::new("trace.industrial.tool.proof"),
-        );
-        descriptor.supported_scopes = vec![ServiceScope::Global];
-        descriptor
-    }
-
-    async fn start(&self) -> ServiceResult<()> {
-        Ok(())
-    }
-
-    async fn call(&self, command: ServiceCommand) -> ServiceResult<ServiceCallResult> {
-        let trace = command
-            .trace
-            .clone()
-            .ok_or(ServiceError::MissingTraceContext)?;
-        if command.name.as_str() != MCP_TOOL_INVOKE_COMMAND {
-            return Err(ServiceError::UnsupportedCommand(command.name.to_string()));
-        }
-        let typed: McpToolInvokeCommand = serde_json::from_value(command.payload)
-            .map_err(|err| ServiceError::InvalidArgument(err.to_string()))?;
-        let result = CapabilityToolInvocationResult::ok(
-            "service.tool.family.document",
-            CapabilityToolOriginKind::Mcp,
-            typed.invocation.tool_name,
-            json!({
-                "summary": "sanitized industrial proof output",
-                "large": "x".repeat(128),
-            }),
-            trace.clone(),
-        );
-        Ok(ServiceCallResult {
-            output: serde_json::to_value(result).unwrap(),
-            trace,
-            status: "ok".into(),
-            metadata: Default::default(),
-            cleanup_hint: Some(CleanupPolicy::None),
-        })
-    }
-
-    async fn stop(&self) -> ServiceResult<()> {
-        Ok(())
-    }
-
-    async fn cleanup(&self) -> ServiceResult<()> {
-        Ok(())
-    }
-
-    async fn health(&self) -> ServiceResult<ServiceHealth> {
-        Ok(ServiceHealth::Healthy)
-    }
 }

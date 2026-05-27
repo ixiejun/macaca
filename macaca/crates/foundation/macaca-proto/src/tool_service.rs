@@ -126,8 +126,28 @@ pub enum ToolLifecycleScope {
     Call,
 }
 
+/// Application-neutral execution route selected by the Tool Capability Plane.
+///
+/// This route kind is the critical ownership boundary for industrial tools. It
+/// tells `service.tool` how to dispatch after policy admission without forcing
+/// non-MCP families through MCP semantics and without branching on concrete
+/// application, provider, or product names.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ToolExecutorRouteKind {
+    Driver,
+    Skill,
+    Mcp,
+    OwningServiceCommand,
+    RuntimeEnvironment,
+    ManagedGateway,
+    Plugin,
+    Unavailable,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ToolExecutorRoute {
+    pub route_kind: ToolExecutorRouteKind,
     pub service_id: String,
     pub provider_id: String,
     pub capability_id: String,
@@ -136,12 +156,34 @@ pub struct ToolExecutorRoute {
 
 impl ToolExecutorRoute {
     fn from_descriptor(base: &CapabilityToolDescriptor) -> Self {
+        let route_kind = match base.origin_kind {
+            crate::CapabilityToolOriginKind::Driver => ToolExecutorRouteKind::Driver,
+            crate::CapabilityToolOriginKind::Skill => ToolExecutorRouteKind::Skill,
+            crate::CapabilityToolOriginKind::Mcp => ToolExecutorRouteKind::Mcp,
+        };
         Self {
+            route_kind,
             service_id: base.service_id.clone(),
             provider_id: base.provider_id.clone(),
             capability_id: base.capability_id.clone(),
             command_name: None,
         }
+    }
+
+    /// Override the route kind and optional command after descriptor creation.
+    ///
+    /// Family contributors use this Builder-style method to keep base
+    /// descriptor compatibility while carrying industrial route metadata for
+    /// runtime environments, gateways, plugins, owning-service commands, and
+    /// unavailable providers.
+    pub fn with_route_kind(
+        mut self,
+        route_kind: ToolExecutorRouteKind,
+        command_name: Option<String>,
+    ) -> Self {
+        self.route_kind = route_kind;
+        self.command_name = command_name;
+        self
     }
 }
 

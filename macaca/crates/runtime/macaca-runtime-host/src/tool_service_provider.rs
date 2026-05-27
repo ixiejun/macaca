@@ -37,6 +37,7 @@ pub struct ToolSystemServiceProvider {
 impl ToolSystemServiceProvider {
     pub fn new(planner: Arc<ToolPlanningService>, runtime: Arc<ServiceRuntime>) -> Self {
         let state = Arc::new(ToolServiceProviderState::default());
+        state.set_provider_count(planner.contributor_count());
         Self {
             planner,
             invocation: ToolInvocationService::new(runtime, Arc::clone(&state)),
@@ -151,18 +152,54 @@ impl SystemService for ToolSystemServiceProvider {
             }
             TOOL_TOOLSET_RESOLVE_COMMAND => {
                 let typed: ToolGenericTraceCommand = decode(command.payload)?;
-                Ok(Self::service_result(
-                    to_value(macaca_proto::ToolCatalogPlanResult::empty(
-                        typed.trace.clone(),
-                    ))?,
-                    typed.trace,
-                ))
+                let mut plan_command = ToolCatalogPlanCommand::new(typed.trace.clone())
+                    .map_err(|err| ServiceError::InvalidArgument(err.to_string()))?;
+                plan_command.include_hidden = true;
+                if let Some(toolsets) = typed.metadata.get("toolsets") {
+                    plan_command.requested_toolsets = toolsets
+                        .split(',')
+                        .map(str::trim)
+                        .filter(|item| !item.is_empty())
+                        .map(macaca_proto::ToolsetRef::new)
+                        .collect::<MacacaResult<Vec<_>>>()
+                        .map_err(|err| ServiceError::InvalidArgument(err.to_string()))?;
+                }
+                if let Some(families) = typed.metadata.get("families") {
+                    plan_command.requested_families = families
+                        .split(',')
+                        .map(str::trim)
+                        .filter(|item| !item.is_empty())
+                        .map(macaca_proto::ToolFamilyRef::new)
+                        .collect::<MacacaResult<Vec<_>>>()
+                        .map_err(|err| ServiceError::InvalidArgument(err.to_string()))?;
+                }
+                let result = self
+                    .planner
+                    .plan(plan_command)
+                    .await
+                    .map_err(|err| ServiceError::AdapterFailure(err.to_string()))?;
+                let provider_count = result
+                    .metadata
+                    .get("tool.contributor_count")
+                    .and_then(|value| value.parse::<usize>().ok())
+                    .unwrap_or_else(|| self.planner.contributor_count());
+                self.state.record_plan(result.clone(), provider_count);
+                Ok(Self::service_result(to_value(result)?, typed.trace))
             }
             TOOL_PROVIDER_HEALTH_COMMAND => {
                 let typed: ToolGenericTraceCommand = decode(command.payload)?;
-                let health =
-                    self.state
-                        .provider_health(typed.trace.clone(), ServiceHealth::Healthy, 0);
+                let provider_count = self.state.provider_count();
+                let health = self.state.provider_health(
+                    typed.trace.clone(),
+                    if provider_count == 0 {
+                        ServiceHealth::Unavailable {
+                            reason: "no tool providers registered".into(),
+                        }
+                    } else {
+                        ServiceHealth::Healthy
+                    },
+                    provider_count,
+                );
                 Ok(Self::service_result(to_value(health)?, typed.trace))
             }
             TOOL_AUDIT_QUERY_COMMAND => {

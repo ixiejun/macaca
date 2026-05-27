@@ -25,6 +25,25 @@ pub struct ToolServiceProviderState {
 }
 
 impl ToolServiceProviderState {
+    /// Seed the registered provider count before the first plan request.
+    ///
+    /// This avoids the previous fake `provider_count = 0` healthy diagnostic
+    /// while still making plan-specific visible/hidden counts come from real
+    /// contributor output.
+    pub fn set_provider_count(&self, provider_count: usize) {
+        *self
+            .provider_count
+            .write()
+            .expect("tool provider cache lock poisoned") = provider_count;
+    }
+
+    pub fn provider_count(&self) -> usize {
+        *self
+            .provider_count
+            .read()
+            .expect("tool provider cache lock poisoned")
+    }
+
     pub fn record_plan(&self, plan: ToolCatalogPlanResult, provider_count: usize) {
         self.record_plan_audit(&plan, provider_count);
         *self

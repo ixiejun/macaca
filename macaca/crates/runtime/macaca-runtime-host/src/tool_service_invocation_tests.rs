@@ -8,8 +8,8 @@ use macaca_proto::{
     CapabilityToolInvocationScope, CapabilityToolOriginKind, CleanupPolicy,
     IndustrialToolDescriptor, KernelServiceId, ServiceCallResult, ServiceCommand,
     ServiceDescriptor, ServiceError, ServiceHealth, ServiceResult, ServiceScope, ServiceType,
-    ToolFamilyRef, ToolInvokeCommand, ToolResultClass, ToolResultGetCommand, TraceContext,
-    TraceSchemaRef, TOOL_INVOKE_COMMAND, TOOL_RESULT_GET_COMMAND,
+    ToolExecutorRouteKind, ToolFamilyRef, ToolInvokeCommand, ToolResultClass, ToolResultGetCommand,
+    TraceContext, TraceSchemaRef, TOOL_INVOKE_COMMAND, TOOL_RESULT_GET_COMMAND,
 };
 use serde_json::json;
 
@@ -125,6 +125,85 @@ async fn tool_invoke_oversized_result_becomes_retrievable_artifact_ref() {
     assert_eq!(fetched.artifact_refs, vec![artifact_ref]);
 }
 
+#[tokio::test]
+async fn tool_invoke_runtime_environment_route_executes_without_mcp_owner() {
+    let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
+    bootstrap_tool_planning_service(
+        runtime.clone(),
+        Arc::new(ToolPlanningService::builder().build()),
+        "trace-bootstrap-tool-runtime-env",
+    )
+    .await
+    .unwrap();
+
+    let mut descriptor = family_descriptor("file", "service.tool.runtime_environment");
+    descriptor.executor_route = descriptor.executor_route.with_route_kind(
+        ToolExecutorRouteKind::RuntimeEnvironment,
+        Some("tool.runtime_environment.invoke".into()),
+    );
+    let result = invoke_tool(runtime, descriptor, json!({"operation": "status"})).await;
+
+    assert_eq!(result.status, "ok");
+    assert_eq!(
+        result.inline_output.unwrap()["route_kind"],
+        "runtime_environment"
+    );
+}
+
+#[tokio::test]
+async fn tool_invoke_managed_gateway_route_executes_with_metering_ref() {
+    let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
+    bootstrap_tool_planning_service(
+        runtime.clone(),
+        Arc::new(ToolPlanningService::builder().build()),
+        "trace-bootstrap-tool-gateway",
+    )
+    .await
+    .unwrap();
+
+    let mut descriptor = family_descriptor("web", "service.tool.managed_gateway");
+    descriptor.executor_route = descriptor.executor_route.with_route_kind(
+        ToolExecutorRouteKind::ManagedGateway,
+        Some("tool.managed_gateway.invoke".into()),
+    );
+    let result = invoke_tool(runtime, descriptor, json!({"operation": "lookup"})).await;
+
+    assert_eq!(result.status, "ok");
+    assert_eq!(
+        result.inline_output.unwrap()["route_kind"],
+        "managed_gateway"
+    );
+}
+
+#[tokio::test]
+async fn tool_invoke_entitlement_gate_stops_before_owner_dispatch() {
+    let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
+    let owner = Arc::new(EchoToolOwner::new(
+        "service.driver",
+        CapabilityToolOriginKind::Driver,
+    ));
+    register_owner(runtime.clone(), owner.clone()).await;
+    bootstrap_tool_planning_service(
+        runtime.clone(),
+        Arc::new(ToolPlanningService::builder().build()),
+        "trace-bootstrap-tool-entitlement",
+    )
+    .await
+    .unwrap();
+
+    let mut command = invoke_command(
+        descriptor("service.driver", CapabilityToolOriginKind::Driver),
+        json!({}),
+    );
+    command
+        .metadata
+        .insert("entitlement.required".into(), "capability.paid".into());
+    let result = call_tool_service(runtime, TOOL_INVOKE_COMMAND, command).await;
+
+    assert_eq!(result.status, "entitlement_missing");
+    assert_eq!(owner.calls.load(Ordering::SeqCst), 0);
+}
+
 async fn invoke_tool(
     runtime: Arc<ServiceRuntime>,
     descriptor: IndustrialToolDescriptor,
@@ -204,6 +283,27 @@ fn descriptor(service_id: &str, origin_kind: CapabilityToolOriginKind) -> Indust
         "echo_tool",
         "Echo Tool",
         ToolFamilyRef::new("test").unwrap(),
+        base,
+    )
+    .unwrap()
+}
+
+fn family_descriptor(family: &str, service_id: &str) -> IndustrialToolDescriptor {
+    let base = CapabilityToolDescriptor::new(
+        service_id,
+        format!("provider.tool.family.{family}"),
+        format!("capability.tool.family.{family}"),
+        format!("{family}_tool"),
+        format!("Generic {family} family tool"),
+        json!({"type": "object"}),
+        CapabilityToolOriginKind::Mcp,
+    )
+    .unwrap();
+    IndustrialToolDescriptor::new(
+        format!("tool.family.{family}.default"),
+        format!("{family}_tool"),
+        format!("{family} family provider"),
+        ToolFamilyRef::new(family).unwrap(),
         base,
     )
     .unwrap()

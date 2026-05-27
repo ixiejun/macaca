@@ -195,6 +195,7 @@ fn classify_crate(crate_name: &str) -> Option<Layer> {
         "macaca-ipc" => Some(Layer::IpcServiceBus),
         "macaca-context" => Some(Layer::ServiceContract),
         "macaca-llm"
+        | "macaca-autonomy-evolution"
         | "macaca-memory"
         | "macaca-task"
         | "macaca-driver"

@@ -743,7 +743,7 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
     macaca_runtime_host::bootstrap_tool_planning_service(
         Arc::clone(&service_runtime),
-        Arc::new(macaca_runtime_host::ToolPlanningService::builder().build()),
+        Arc::new(macaca_runtime_host::industrial_tool_planning_service()?),
         "web-startup-tool-service",
     )
     .await?;

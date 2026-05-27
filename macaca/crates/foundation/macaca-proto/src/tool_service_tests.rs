@@ -3,10 +3,10 @@ use std::collections::BTreeMap;
 use crate::{
     tool_service_descriptor, AvailabilityExpression, CapabilityToolDescriptor,
     CapabilityToolOriginKind, IndustrialToolDescriptor, MacacaResult, ServiceHealth,
-    ToolArtifactPolicy, ToolAuditRef, ToolCatalogPlanCommand, ToolCatalogPlanResult, ToolFamilyRef,
-    ToolHiddenReason, ToolPlanEntry, ToolResultClass, ToolServiceHealthResult,
-    ToolServiceSnapshotResult, ToolSideEffectClass, ToolTrustLevel, ToolsetRef, TraceContext,
-    TOOL_CATALOG_PLAN_COMMAND, TOOL_SERVICE_ID,
+    ToolArtifactPolicy, ToolAuditRef, ToolCatalogPlanCommand, ToolCatalogPlanResult,
+    ToolExecutorRouteKind, ToolFamilyRef, ToolHiddenReason, ToolPlanEntry, ToolResultClass,
+    ToolServiceHealthResult, ToolServiceSnapshotResult, ToolSideEffectClass, ToolTrustLevel,
+    ToolsetRef, TraceContext, TOOL_CATALOG_PLAN_COMMAND, TOOL_SERVICE_ID,
 };
 
 fn descriptor() -> MacacaResult<IndustrialToolDescriptor> {
@@ -55,6 +55,7 @@ fn industrial_tool_descriptor_round_trips_without_secret_fields() {
 
     assert_eq!(encoded["stable_tool_id"], "tool.web.lookup");
     assert_eq!(encoded["executor_route"]["service_id"], "service.mcp");
+    assert_eq!(encoded["executor_route"]["route_kind"], "mcp");
     assert!(encoded.get("raw_secret").is_none());
     assert!(encoded.get("credentials").is_none());
     assert!(encoded.get("headers").is_none());
@@ -62,6 +63,27 @@ fn industrial_tool_descriptor_round_trips_without_secret_fields() {
     let decoded: IndustrialToolDescriptor = serde_json::from_value(encoded).unwrap();
     assert_eq!(decoded.family.as_str(), "web");
     assert_eq!(decoded.toolsets[0].as_str(), "research");
+}
+
+#[test]
+fn industrial_tool_descriptor_supports_non_mcp_executor_routes() {
+    let mut descriptor = descriptor().unwrap();
+    descriptor.executor_route = descriptor.executor_route.with_route_kind(
+        ToolExecutorRouteKind::RuntimeEnvironment,
+        Some("tool.runtime_environment.invoke".into()),
+    );
+
+    let encoded = serde_json::to_value(&descriptor).unwrap();
+
+    assert_eq!(encoded["base_descriptor"]["origin_kind"], "mcp");
+    assert_eq!(
+        encoded["executor_route"]["route_kind"],
+        "runtime_environment"
+    );
+    assert_eq!(
+        encoded["executor_route"]["command_name"],
+        "tool.runtime_environment.invoke"
+    );
 }
 
 #[test]

@@ -201,6 +201,15 @@ impl ToolPlanningService {
         ToolPlanningServiceBuilder::default()
     }
 
+    /// Return the number of descriptor contributors installed in this planner.
+    ///
+    /// Operator diagnostics use this cheap snapshot before the first catalog
+    /// plan has been requested. It is contributor count, not a claim that every
+    /// optional provider is healthy or callable.
+    pub fn contributor_count(&self) -> usize {
+        self.contributors.len()
+    }
+
     pub async fn plan(
         &self,
         command: ToolCatalogPlanCommand,
