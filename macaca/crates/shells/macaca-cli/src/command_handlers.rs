@@ -11,6 +11,7 @@ use crate::commands;
 use crate::skill_operations::{
     self, SkillCliEvidenceRefs, SkillCliLifecycleAction, SkillCliRuntimeTarget,
 };
+use crate::tool_operations::{self, ToolCliRuntimeTarget};
 
 /// Canonical command execution boundary for CLI subcommands.
 #[async_trait(?Send)]
@@ -64,6 +65,25 @@ pub struct PluginListCommandHandler;
 impl CliCommandHandler for PluginListCommandHandler {
     async fn run(&self) -> MacacaResult<()> {
         commands::execute_list_plugins().await
+    }
+}
+
+/// Handler for printing bounded Tool Capability Plane diagnostics.
+#[derive(Debug, Default)]
+pub struct ToolOperationsSnapshotCommandHandler {
+    target: ToolCliRuntimeTarget,
+}
+
+impl ToolOperationsSnapshotCommandHandler {
+    pub fn new(target: ToolCliRuntimeTarget) -> Self {
+        Self { target }
+    }
+}
+
+#[async_trait(?Send)]
+impl CliCommandHandler for ToolOperationsSnapshotCommandHandler {
+    async fn run(&self) -> MacacaResult<()> {
+        tool_operations::execute_tool_operations_snapshot(self.target.clone()).await
     }
 }
 

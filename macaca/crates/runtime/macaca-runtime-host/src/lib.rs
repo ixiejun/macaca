@@ -135,6 +135,8 @@ mod skill_service_provider_tests;
 #[cfg(test)]
 mod skill_service_usage_tests;
 #[cfg(test)]
+mod tool_service_audit_tests;
+#[cfg(test)]
 mod tool_service_environment_tests;
 #[cfg(test)]
 mod tool_service_gateway_tests;

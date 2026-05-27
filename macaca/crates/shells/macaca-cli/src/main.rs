@@ -7,11 +7,13 @@ use macaca_cli::command_handlers::{
     AgentsCommandHandler, CliCommandHandler, PluginListCommandHandler, RunCommandHandler,
     SkillCurationRunCommandHandler, SkillLifecycleCommandHandler,
     SkillOperationsSnapshotCommandHandler, SkillProposalDecisionCommandHandler,
-    SkillRollbackCommandHandler, StatusCommandHandler, VersionCommandHandler, WebCommandHandler,
+    SkillRollbackCommandHandler, StatusCommandHandler, ToolOperationsSnapshotCommandHandler,
+    VersionCommandHandler, WebCommandHandler,
 };
 use macaca_cli::skill_operations::{
     SkillCliEvidenceRefs, SkillCliLifecycleAction, SkillCliRuntimeTarget,
 };
+use macaca_cli::tool_operations::ToolCliRuntimeTarget;
 use macaca_proto::config::MacacaConfig;
 
 /// Agent OS — autonomous agent orchestration platform.
@@ -43,6 +45,13 @@ enum Commands {
         #[command(subcommand)]
         command: SkillCommands,
     },
+    /// Tool Capability Plane diagnostics.
+    Tool {
+        #[command(flatten)]
+        target: ToolRuntimeArgs,
+        #[command(subcommand)]
+        command: ToolCommands,
+    },
     /// Print version information.
     Version,
     /// Start the web UI server.
@@ -71,6 +80,22 @@ struct SkillRuntimeArgs {
     app_id: Option<String>,
     #[arg(long)]
     api_base: Option<String>,
+}
+
+/// Optional live Web/runtime target for Tool diagnostics.
+#[derive(Args, Clone, Default)]
+struct ToolRuntimeArgs {
+    #[arg(long)]
+    app_id: Option<String>,
+    #[arg(long)]
+    api_base: Option<String>,
+}
+
+/// Tool diagnostics subcommands.
+#[derive(Subcommand)]
+enum ToolCommands {
+    /// Print bounded Tool plan, provider health, and audit replay state.
+    Operations,
 }
 
 /// Skill operations subcommands.
@@ -184,6 +209,7 @@ async fn main() {
             PluginCommands::List => PluginListCommandHandler.run().await,
         },
         Commands::Skill { target, command } => run_skill_command(target.into(), command).await,
+        Commands::Tool { target, command } => run_tool_command(target.into(), command).await,
         Commands::Version => {
             VersionCommandHandler::new(env!("CARGO_PKG_VERSION"))
                 .run()
@@ -195,6 +221,19 @@ async fn main() {
     if let Err(e) = result {
         tracing::error!(error = %e, "Command failed");
         std::process::exit(1);
+    }
+}
+
+async fn run_tool_command(
+    target: ToolCliRuntimeTarget,
+    command: ToolCommands,
+) -> macaca_proto::error::MacacaResult<()> {
+    match command {
+        ToolCommands::Operations => {
+            ToolOperationsSnapshotCommandHandler::new(target)
+                .run()
+                .await
+        }
     }
 }
 
@@ -302,6 +341,15 @@ async fn run_skill_proposal_command(
 
 impl From<SkillRuntimeArgs> for SkillCliRuntimeTarget {
     fn from(args: SkillRuntimeArgs) -> Self {
+        Self {
+            app_id: args.app_id,
+            api_base: args.api_base,
+        }
+    }
+}
+
+impl From<ToolRuntimeArgs> for ToolCliRuntimeTarget {
+    fn from(args: ToolRuntimeArgs) -> Self {
         Self {
             app_id: args.app_id,
             api_base: args.api_base,

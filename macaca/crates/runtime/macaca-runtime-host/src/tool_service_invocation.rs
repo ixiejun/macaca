@@ -20,6 +20,7 @@ use macaca_proto::{
 use macaca_skill::{SkillToolInvokeCommand, SKILL_TOOL_INVOKE_COMMAND};
 use serde_json::Value;
 
+use crate::tool_service_provider_state::stable_json_hash;
 use crate::tool_service_provider_state::ToolServiceProviderState;
 use crate::tool_service_result::{bounded_summary, command_result, normalize_invocation_result};
 use crate::{ServiceRuntime, ServiceRuntimeError};
@@ -46,6 +47,7 @@ impl ToolInvocationService {
     pub async fn invoke(&self, command: ToolInvokeCommand) -> MacacaResult<ToolCommandResult> {
         let descriptor = self.resolve_descriptor(&command)?;
         let invocation_ref = next_invocation_ref(&command.trace);
+        let input_hash = stable_json_hash(&command.input);
         tracing::info!(
             trace_id = %command.trace.trace_id,
             invocation_ref = %invocation_ref.0,
@@ -54,6 +56,18 @@ impl ToolInvocationService {
             family = %descriptor.family.as_str(),
             "tool service invocation accepted"
         );
+        self.state.record_invocation_event(
+            &command.trace,
+            &command.tool_id,
+            "tool.invocation.started",
+            "accepted",
+        );
+        self.state.record_invocation_event(
+            &command.trace,
+            &command.tool_id,
+            "tool.resource_lease.acquired",
+            "acquired",
+        );
 
         if let Some(result) = policy_denial(&command, &descriptor) {
             tracing::warn!(
@@ -61,6 +75,14 @@ impl ToolInvocationService {
                 invocation_ref = %invocation_ref.0,
                 tool_id = %command.tool_id,
                 "tool service policy denied invocation before owning-service dispatch"
+            );
+            self.state.record_invocation_result(result.clone());
+            self.state.record_invocation_audit(
+                &result,
+                &command.tool_id,
+                &descriptor.executor_route.provider_id,
+                &descriptor.executor_route.service_id,
+                input_hash,
             );
             return Ok(result);
         }
@@ -72,6 +94,13 @@ impl ToolInvocationService {
                 "tool service approval required before side effects"
             );
             self.state.record_invocation_result(result.clone());
+            self.state.record_invocation_audit(
+                &result,
+                &command.tool_id,
+                &descriptor.executor_route.provider_id,
+                &descriptor.executor_route.service_id,
+                input_hash,
+            );
             return Ok(result);
         }
         if command
@@ -89,6 +118,13 @@ impl ToolInvocationService {
                 Some("tool invocation timed out before dispatch".into()),
             );
             self.state.record_invocation_result(result.clone());
+            self.state.record_invocation_audit(
+                &result,
+                &command.tool_id,
+                &descriptor.executor_route.provider_id,
+                &descriptor.executor_route.service_id,
+                input_hash,
+            );
             return Ok(result);
         }
 
@@ -114,6 +150,13 @@ impl ToolInvocationService {
         }
         self.state
             .record_invocation_result(normalized.command_result.clone());
+        self.state.record_invocation_audit(
+            &normalized.command_result,
+            &command.tool_id,
+            &descriptor.executor_route.provider_id,
+            &descriptor.executor_route.service_id,
+            input_hash,
+        );
         tracing::info!(
             trace_id = %normalized.command_result.trace.trace_id,
             status = %normalized.command_result.status,

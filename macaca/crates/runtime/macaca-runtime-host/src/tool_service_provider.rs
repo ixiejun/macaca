@@ -14,10 +14,10 @@ use macaca_proto::{
     tool_service_descriptor, CleanupPolicy, KernelServiceId, MacacaError, MacacaResult,
     ServiceCallResult, ServiceCommand, ServiceError, ServiceHealth, ServiceResult,
     ToolCatalogPlanCommand, ToolGenericTraceCommand, TraceContext, TOOL_ARTIFACT_OPEN_COMMAND,
-    TOOL_CATALOG_PLAN_COMMAND, TOOL_CATALOG_SNAPSHOT_COMMAND, TOOL_INVOCATION_STATUS_COMMAND,
-    TOOL_INVOKE_CANCEL_COMMAND, TOOL_INVOKE_COMMAND, TOOL_PROVIDER_HEALTH_COMMAND,
-    TOOL_PROVIDER_STATUS_COMMAND, TOOL_RESULT_GET_COMMAND, TOOL_SERVICE_ID,
-    TOOL_TOOLSET_RESOLVE_COMMAND,
+    TOOL_AUDIT_QUERY_COMMAND, TOOL_CATALOG_PLAN_COMMAND, TOOL_CATALOG_SNAPSHOT_COMMAND,
+    TOOL_INVOCATION_STATUS_COMMAND, TOOL_INVOKE_CANCEL_COMMAND, TOOL_INVOKE_COMMAND,
+    TOOL_POLICY_EXPLAIN_COMMAND, TOOL_PROVIDER_HEALTH_COMMAND, TOOL_PROVIDER_STATUS_COMMAND,
+    TOOL_RESULT_GET_COMMAND, TOOL_SERVICE_ID, TOOL_TOOLSET_RESOLVE_COMMAND,
 };
 
 use crate::tool_service_invocation::ToolInvocationService;
@@ -160,14 +160,22 @@ impl SystemService for ToolSystemServiceProvider {
             }
             TOOL_PROVIDER_HEALTH_COMMAND => {
                 let typed: ToolGenericTraceCommand = decode(command.payload)?;
+                let health =
+                    self.state
+                        .provider_health(typed.trace.clone(), ServiceHealth::Healthy, 0);
+                Ok(Self::service_result(to_value(health)?, typed.trace))
+            }
+            TOOL_AUDIT_QUERY_COMMAND => {
+                let typed: ToolGenericTraceCommand = decode(command.payload)?;
                 Ok(Self::service_result(
-                    to_value(macaca_proto::ToolServiceHealthResult {
-                        trace: typed.trace.clone(),
-                        health: ServiceHealth::Healthy,
-                        provider_count: 0,
-                        captured_at: chrono::Utc::now(),
-                        metadata: BTreeMap::new(),
-                    })?,
+                    to_value(self.state.audit_query(typed.trace.clone()))?,
+                    typed.trace,
+                ))
+            }
+            TOOL_POLICY_EXPLAIN_COMMAND => {
+                let typed: ToolGenericTraceCommand = decode(command.payload)?;
+                Ok(Self::service_result(
+                    to_value(self.state.policy_explain(typed.trace.clone()))?,
                     typed.trace,
                 ))
             }

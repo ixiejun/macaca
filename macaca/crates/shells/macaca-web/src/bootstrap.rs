@@ -12,6 +12,7 @@ use crate::state::AppState;
 use crate::{
     app_ui_routes, chat_orchestrator, genui_routes, heartbeat_operations_routes, loop_manager,
     metrics, plugin_routes, routes, session, skill_operations_routes, skill_self_evolution_audit,
+    tool_routes,
 };
 
 /// Canonical builder for starting the web server.
@@ -109,6 +110,10 @@ impl WebRuntimeFacade {
             .route(
                 "/api/apps/{app_id}/skills/operations",
                 get(skill_operations_routes::get_skill_operations),
+            )
+            .route(
+                "/api/apps/{app_id}/tools/operations",
+                get(tool_routes::get_tool_operations),
             )
             .route(
                 "/api/apps/{app_id}/skills/operations/lifecycle/{action}/{skill_id}",

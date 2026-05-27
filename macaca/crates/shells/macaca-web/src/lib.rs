@@ -53,6 +53,7 @@ mod skill_usage_telemetry;
 mod source_artifact;
 pub mod sse;
 pub mod state;
+pub mod tool_routes;
 pub mod trace_events;
 mod wasm_orchestration_backend;
 pub mod web3_status;
