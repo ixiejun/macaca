@@ -93,6 +93,8 @@ pub(crate) mod skill_service_provider_state;
 pub mod store_entitlement_admission;
 pub mod store_service_provider;
 pub mod tool_service_availability;
+pub mod tool_service_environment;
+pub mod tool_service_gateway;
 pub mod tool_service_invocation;
 pub mod tool_service_planning;
 pub mod tool_service_provider;
@@ -132,6 +134,10 @@ mod skill_service_merge_tests;
 mod skill_service_provider_tests;
 #[cfg(test)]
 mod skill_service_usage_tests;
+#[cfg(test)]
+mod tool_service_environment_tests;
+#[cfg(test)]
+mod tool_service_gateway_tests;
 #[cfg(test)]
 mod tool_service_invocation_tests;
 #[cfg(test)]
@@ -290,6 +296,14 @@ pub use service_runtime_event::{
 pub use skill_service_provider::SkillSystemServiceProvider;
 pub use store_service_provider::{store_service_descriptor, StoreSystemServiceProvider};
 pub use tool_service_availability::{AvailabilitySignalSet, ToolAvailabilityEvaluator};
+pub use tool_service_environment::{
+    StaticToolRuntimeEnvironmentProvider, ToolRuntimeEnvironmentProvider,
+    ToolRuntimeEnvironmentService, UnavailableToolRuntimeEnvironmentProvider,
+};
+pub use tool_service_gateway::{
+    StaticToolManagedGatewayProvider, ToolManagedGatewayProvider, ToolManagedGatewayService,
+    UnavailableToolManagedGatewayProvider,
+};
 pub use tool_service_planning::{
     CapabilityToolDescriptorContributor, StaticToolDescriptorContributor,
     ToolDescriptorContributor, ToolPlanningService, ToolPlanningToolsetResolver,
