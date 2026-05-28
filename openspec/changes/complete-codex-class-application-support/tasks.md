@@ -86,21 +86,21 @@
 
 ## 4. `service.file`: Filesystem Provider
 
-- [ ] 4.1 Create `service.file` descriptor, lifecycle, health, snapshot,
+- [x] 4.1 Create `service.file` descriptor, lifecycle, health, snapshot,
   command dispatch, local provider, mock provider, and unavailable provider.
-- [ ] 4.2 Implement `file.read` with workspace root policy, symlink policy,
+- [x] 4.2 Implement `file.read` with workspace root policy, symlink policy,
   binary detection, size budget, artifact fallback, and sanitized audit.
-- [ ] 4.3 Implement `file.write` with pre-write memento, path policy, approval
+- [x] 4.3 Implement `file.write` with pre-write memento, path policy, approval
   integration, artifact handling, and audit.
-- [ ] 4.4 Implement `file.patch` with structured patch input, conflict
+- [x] 4.4 Implement `file.patch` with structured patch input, conflict
   diagnostics, pre/post hashes, and rollback refs.
-- [ ] 4.5 Implement `file.copy`, `file.remove`, `file.metadata`,
+- [x] 4.5 Implement `file.copy`, `file.remove`, `file.metadata`,
   `file.directory.list`, and bounded result summaries.
-- [ ] 4.6 Implement `file.watch` and `file.unwatch` with stable watch ids and
+- [x] 4.6 Implement `file.watch` and `file.unwatch` with stable watch ids and
   bounded changed notifications.
-- [ ] 4.7 Wire file descriptors into `service.tool` planning and invocation as
+- [x] 4.7 Wire file descriptors into `service.tool` planning and invocation as
   service-owned providers.
-- [ ] 4.8 Add tests for path traversal, symlink denial, read-only denial,
+- [x] 4.8 Add tests for path traversal, symlink denial, read-only denial,
   write approval, oversized file artifacts, watch notification, and audit
   replay.
 

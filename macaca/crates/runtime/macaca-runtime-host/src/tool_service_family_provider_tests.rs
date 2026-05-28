@@ -77,6 +77,18 @@ async fn family_descriptors_use_typed_routes_instead_of_all_mcp_origins() {
         .executor_route
         .service_id
         .starts_with("service.tool.family.")));
+    let file_descriptor = descriptors
+        .iter()
+        .find(|descriptor| descriptor.family.as_str() == "file")
+        .expect("file family descriptor is required");
+    assert_eq!(
+        file_descriptor.executor_route.service_id,
+        macaca_proto::workbench::file::SERVICE_ID
+    );
+    assert_eq!(
+        file_descriptor.executor_route.command_name.as_deref(),
+        Some(macaca_proto::workbench::file::TOOL_INVOKE_COMMAND)
+    );
 }
 
 #[tokio::test]
@@ -115,31 +127,29 @@ async fn planner_surfaces_missing_optional_families_as_unavailable_diagnostics()
 async fn planner_marks_signal_backed_families_visible_without_provider_name_branches() {
     let service = ToolPlanningService::builder()
         .with_contributor(industrial_tool_family_provider_contributor().unwrap())
-        .with_availability(
-            AvailabilitySignalSet::default().with_service("service.tool.managed_gateway"),
-        )
+        .with_availability(AvailabilitySignalSet::default().with_service("service.file"))
         .with_toolsets(industrial_tool_family_toolsets().unwrap())
         .build();
     let mut command =
         ToolCatalogPlanCommand::new(TraceContext::new("trace-family-visible")).unwrap();
-    command.requested_families = vec![ToolFamilyRef::new("web").unwrap()];
+    command.requested_families = vec![ToolFamilyRef::new("file").unwrap()];
     command.include_hidden = true;
 
     let result = service.plan(command).await.unwrap();
 
     assert_eq!(result.visible.len(), 1);
-    assert_eq!(result.visible[0].descriptor.family.as_str(), "web");
+    assert_eq!(result.visible[0].descriptor.family.as_str(), "file");
     assert_eq!(
         result.visible[0]
             .descriptor
             .sanitized_metadata
             .get("provider_path")
             .map(String::as_str),
-        Some("gateway")
+        Some("owning_service")
     );
     assert_eq!(
         result.visible[0].descriptor.result_class,
-        ToolResultClass::StructuredJson
+        ToolResultClass::BinaryArtifact
     );
     assert_eq!(result.hidden.len(), 0);
 }

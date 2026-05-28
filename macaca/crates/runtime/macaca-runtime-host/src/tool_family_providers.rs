@@ -157,6 +157,7 @@ pub fn industrial_tool_planning_service() -> MacacaResult<ToolPlanningService> {
         TOOL_MANAGED_GATEWAY_SERVICE_ID,
         macaca_memory::MEMORY_SERVICE_ID,
         macaca_context::CONTEXT_SERVICE_ID,
+        macaca_proto::workbench::file::SERVICE_ID,
         TASK_SERVICE_ID,
         SCHEDULER_SERVICE_ID,
         SCHEDULED_AGENT_TASK_SERVICE_ID,
@@ -222,7 +223,7 @@ fn family_specs() -> Vec<FamilySpec> {
         spec(
             "file",
             "owning_service",
-            ToolExecutorRouteKind::RuntimeEnvironment,
+            ToolExecutorRouteKind::OwningServiceCommand,
             ToolResultClass::BinaryArtifact,
             ToolSideEffectClass::Write,
         ),
@@ -380,6 +381,7 @@ fn owner_service_for(family: &str, route_kind: &ToolExecutorRouteKind) -> String
         ToolExecutorRouteKind::Unavailable => format!("{TOOL_SERVICE_ID}.unavailable"),
         ToolExecutorRouteKind::OwningServiceCommand => match family {
             "memory" => macaca_memory::MEMORY_SERVICE_ID.into(),
+            "file" => macaca_proto::workbench::file::SERVICE_ID.into(),
             "knowledge" => macaca_context::CONTEXT_SERVICE_ID.into(),
             "task" => TASK_SERVICE_ID.into(),
             "scheduler" => SCHEDULER_SERVICE_ID.into(),

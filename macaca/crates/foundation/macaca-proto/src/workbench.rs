@@ -19,6 +19,7 @@ use crate::{
 };
 
 pub mod app_protocol;
+pub mod file;
 pub mod interaction;
 
 /// Stable command outcomes shared by all workbench-family services.
@@ -245,22 +246,6 @@ macro_rules! workbench_family_module {
     };
 }
 
-workbench_family_module!(
-    file,
-    "service.file",
-    "capability.file",
-    [
-        "file.read",
-        "file.write",
-        "file.patch",
-        "file.copy",
-        "file.remove",
-        "file.metadata",
-        "file.directory.list",
-        "file.watch",
-        "file.unwatch"
-    ]
-);
 workbench_family_module!(
     process,
     "service.process",

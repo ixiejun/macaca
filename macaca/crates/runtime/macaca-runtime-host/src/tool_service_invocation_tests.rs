@@ -14,8 +14,9 @@ use macaca_proto::{
 use serde_json::json;
 
 use crate::{
-    bootstrap_tool_planning_service, ServiceProviderFactoryContext, ServiceProviderInstance,
-    ServiceRuntime, ServiceRuntimeConfig, StaticServiceProviderFactory, ToolPlanningService,
+    bootstrap_local_file_service, bootstrap_tool_planning_service, ServiceProviderFactoryContext,
+    ServiceProviderInstance, ServiceRuntime, ServiceRuntimeConfig, StaticServiceProviderFactory,
+    ToolPlanningService,
 };
 
 #[tokio::test]
@@ -172,6 +173,49 @@ async fn tool_invoke_managed_gateway_route_executes_with_metering_ref() {
     assert_eq!(
         result.inline_output.unwrap()["route_kind"],
         "managed_gateway"
+    );
+}
+
+#[tokio::test]
+async fn tool_invoke_file_family_routes_to_service_file_provider() {
+    let workspace = tempfile::tempdir().unwrap();
+    std::fs::write(workspace.path().join("input.txt"), "from service.file").unwrap();
+    let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
+    bootstrap_local_file_service(runtime.clone(), "trace-bootstrap-file-tool")
+        .await
+        .unwrap();
+    bootstrap_tool_planning_service(
+        runtime.clone(),
+        Arc::new(ToolPlanningService::builder().build()),
+        "trace-bootstrap-tool-file",
+    )
+    .await
+    .unwrap();
+
+    let mut descriptor = family_descriptor("file", macaca_proto::workbench::file::SERVICE_ID);
+    descriptor.executor_route = descriptor.executor_route.with_route_kind(
+        ToolExecutorRouteKind::OwningServiceCommand,
+        Some(macaca_proto::workbench::file::TOOL_INVOKE_COMMAND.into()),
+    );
+    let result = invoke_tool(
+        runtime,
+        descriptor,
+        json!({
+            "operation": "read",
+            "target": {
+                "workspace_root": workspace.path().to_string_lossy(),
+                "path": "input.txt",
+                "follow_symlinks": false
+            },
+            "inline_budget_bytes": 1024
+        }),
+    )
+    .await;
+
+    assert_eq!(result.status, "ok");
+    assert_eq!(
+        result.inline_output.unwrap()["Read"]["content"],
+        serde_json::Value::String("from service.file".into())
     );
 }
 
