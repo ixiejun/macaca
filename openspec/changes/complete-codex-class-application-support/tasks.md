@@ -106,24 +106,24 @@
 
 ## 5. `service.process`: Command, PTY, and Background Processes
 
-- [ ] 5.1 Create `service.process` descriptor, lifecycle, health, snapshot,
+- [x] 5.1 Create `service.process` descriptor, lifecycle, health, snapshot,
   local provider, mock provider, and unavailable provider.
-- [ ] 5.2 Implement `process.exec` for bounded command execution with sandbox
+- [x] 5.2 Implement `process.exec` for bounded command execution with sandbox
   profile resolution before spawn.
-- [ ] 5.3 Implement `process.spawn` for long-running/background processes with
+- [x] 5.3 Implement `process.spawn` for long-running/background processes with
   process handles and lifecycle events.
-- [ ] 5.4 Implement PTY allocation, `stdin.write`, `pty.resize`, and
+- [x] 5.4 Implement PTY allocation, `stdin.write`, `pty.resize`, and
   `process.terminate`.
-- [ ] 5.5 Implement output subscription and base64/binary-safe output deltas
+- [x] 5.5 Implement output subscription and base64/binary-safe output deltas
   with inline budget and artifact refs.
-- [ ] 5.6 Implement background process cleanup by thread/session/application
+- [x] 5.6 Implement background process cleanup by thread/session/application
   scope.
-- [ ] 5.7 Add command hash, executable summary, cwd scope, sandbox ref,
+- [x] 5.7 Add command hash, executable summary, cwd scope, sandbox ref,
   resource lease refs, exit status, duration, output byte counts, and audit
   refs to every process record.
-- [ ] 5.8 Wire process/shell descriptors into `service.tool` planning and
+- [x] 5.8 Wire process/shell descriptors into `service.tool` planning and
   invocation.
-- [ ] 5.9 Add tests for policy-before-spawn, denied command no-op,
+- [x] 5.9 Add tests for policy-before-spawn, denied command no-op,
   cancellation, stdin, PTY resize, timeout, output truncation, artifact output,
   background cleanup, and audit replay.
 

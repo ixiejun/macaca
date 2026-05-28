@@ -89,6 +89,18 @@ async fn family_descriptors_use_typed_routes_instead_of_all_mcp_origins() {
         file_descriptor.executor_route.command_name.as_deref(),
         Some(macaca_proto::workbench::file::TOOL_INVOKE_COMMAND)
     );
+    let shell_descriptor = descriptors
+        .iter()
+        .find(|descriptor| descriptor.family.as_str() == "shell")
+        .expect("shell family descriptor is required");
+    assert_eq!(
+        shell_descriptor.executor_route.service_id,
+        macaca_proto::workbench::process::SERVICE_ID
+    );
+    assert_eq!(
+        shell_descriptor.executor_route.command_name.as_deref(),
+        Some(macaca_proto::workbench::process::TOOL_INVOKE_COMMAND)
+    );
 }
 
 #[tokio::test]

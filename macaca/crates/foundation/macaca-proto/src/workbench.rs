@@ -21,6 +21,7 @@ use crate::{
 pub mod app_protocol;
 pub mod file;
 pub mod interaction;
+pub mod process;
 
 /// Stable command outcomes shared by all workbench-family services.
 ///
@@ -246,19 +247,6 @@ macro_rules! workbench_family_module {
     };
 }
 
-workbench_family_module!(
-    process,
-    "service.process",
-    "capability.process",
-    [
-        "process.exec",
-        "process.spawn",
-        "process.stdin.write",
-        "process.pty.resize",
-        "process.terminate",
-        "process.output.subscribe"
-    ]
-);
 workbench_family_module!(
     sandbox,
     "service.sandbox",
