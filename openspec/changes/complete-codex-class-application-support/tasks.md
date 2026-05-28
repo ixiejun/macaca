@@ -162,20 +162,20 @@
 
 ## 8. `service.hook`: Managed Lifecycle Hooks
 
-- [ ] 8.1 Create `service.hook` descriptor, lifecycle, health, snapshot, local
+- [x] 8.1 Create `service.hook` descriptor, lifecycle, health, snapshot, local
   provider, mock provider, and unavailable provider.
-- [ ] 8.2 Implement hook catalog and hook policy resolution by application,
+- [x] 8.2 Implement hook catalog and hook policy resolution by application,
   session, thread, turn, tool family, and command scope.
-- [ ] 8.3 Implement pre-tool hooks that can continue, rewrite bounded input, or
+- [x] 8.3 Implement pre-tool hooks that can continue, rewrite bounded input, or
   block before provider dispatch.
-- [ ] 8.4 Implement post-tool hooks that can add bounded additional context,
+- [x] 8.4 Implement post-tool hooks that can add bounded additional context,
   request stop, or replace model-visible tool output.
-- [ ] 8.5 Implement session/turn lifecycle hooks.
-- [ ] 8.6 Implement managed-only hook requirements and ignore user/project/
+- [x] 8.5 Implement session/turn lifecycle hooks.
+- [x] 8.6 Implement managed-only hook requirements and ignore user/project/
   session hooks when required.
-- [ ] 8.7 Add script/plugin/WASM/remote hook adapter seams with unavailable
+- [x] 8.7 Add script/plugin/WASM/remote hook adapter seams with unavailable
   behavior where providers are absent.
-- [ ] 8.8 Add tests for hook ordering, block before side effect, managed-only
+- [x] 8.8 Add tests for hook ordering, block before side effect, managed-only
   filtering, bounded feedback, audit, and event emission.
 
 ## 9. `service.config` and Requirements

@@ -21,6 +21,7 @@ use crate::{
 pub mod app_protocol;
 pub mod approval;
 pub mod file;
+pub mod hook;
 pub mod interaction;
 pub mod process;
 pub mod sandbox;
@@ -249,18 +250,6 @@ macro_rules! workbench_family_module {
     };
 }
 
-workbench_family_module!(
-    hook,
-    "service.hook",
-    "capability.hook",
-    [
-        "hook.catalog.list",
-        "hook.pre_tool.run",
-        "hook.post_tool.run",
-        "hook.session.run",
-        "hook.turn.run"
-    ]
-);
 workbench_family_module!(
     config_service,
     "service.config",

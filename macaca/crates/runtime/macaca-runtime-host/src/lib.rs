@@ -46,6 +46,8 @@ pub(crate) mod finance_live_data;
 #[cfg(test)]
 pub mod finance_llm_analysis_provider;
 pub mod genui_surface_store;
+pub(crate) mod hook_service_commands;
+pub mod hook_service_provider;
 pub mod interaction_ledger_store;
 pub mod interaction_service_bootstrap;
 pub(crate) mod interaction_service_items;
@@ -128,6 +130,8 @@ mod app_protocol_service_provider_tests;
 mod approval_service_provider_tests;
 #[cfg(test)]
 mod file_service_provider_tests;
+#[cfg(test)]
+mod hook_service_provider_tests;
 #[cfg(test)]
 mod interaction_service_provider_tests;
 #[cfg(test)]
@@ -241,6 +245,7 @@ pub use file_service_provider::{bootstrap_local_file_service, FileSystemServiceP
 #[cfg(test)]
 pub use finance_llm_analysis_provider::FinanceLlmAnalysisSystemServiceProvider;
 pub use genui_surface_store::ApplicationGenUiSurfaceStore;
+pub use hook_service_provider::{bootstrap_local_hook_service, HookSystemServiceProvider};
 pub use interaction_ledger_store::{InteractionLedgerStore, PersistInteractionLedgerStore};
 pub use interaction_service_bootstrap::bootstrap_interaction_service;
 pub use interaction_service_provider::{
