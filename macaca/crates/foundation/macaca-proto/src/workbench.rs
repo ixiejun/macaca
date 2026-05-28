@@ -19,6 +19,7 @@ use crate::{
 };
 
 pub mod app_protocol;
+pub mod approval;
 pub mod file;
 pub mod interaction;
 pub mod process;
@@ -248,19 +249,6 @@ macro_rules! workbench_family_module {
     };
 }
 
-workbench_family_module!(
-    approval,
-    "service.approval",
-    "capability.approval",
-    [
-        "approval.request.create",
-        "approval.request.list",
-        "approval.request.read",
-        "approval.request.resolve",
-        "approval.request.cancel",
-        "approval.request.expire"
-    ]
-);
 workbench_family_module!(
     hook,
     "service.hook",

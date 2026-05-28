@@ -18,6 +18,8 @@ pub(crate) mod app_protocol_service_commands;
 pub mod app_protocol_service_provider;
 pub mod application_hosts;
 pub mod application_service_provider;
+pub(crate) mod approval_service_commands;
+pub mod approval_service_provider;
 pub mod autonomy_dispatch;
 pub mod autonomy_evolution_live_executor;
 pub mod autonomy_evolution_service_provider;
@@ -123,6 +125,8 @@ pub mod web3_service_provider;
 #[cfg(test)]
 mod app_protocol_service_provider_tests;
 #[cfg(test)]
+mod approval_service_provider_tests;
+#[cfg(test)]
 mod file_service_provider_tests;
 #[cfg(test)]
 mod interaction_service_provider_tests;
@@ -189,6 +193,10 @@ pub use application_hosts::{
 };
 pub use application_service_provider::{
     ApplicationOrchestrationBackend, ApplicationSystemServiceProvider,
+};
+pub use approval_service_provider::{
+    bootstrap_local_approval_service, ApprovalReviewerPolicy, ApprovalSystemServiceProvider,
+    LocalApprovalReviewerPolicy,
 };
 pub use autonomy_evolution_live_executor::{
     AutonomyEvolutionLiveExecutionCommand, AutonomyEvolutionLiveExecutionResult,

@@ -16,6 +16,7 @@ use std::time::Instant;
 use async_trait::async_trait;
 use macaca_proto::workbench::process::*;
 use macaca_proto::workbench::sandbox::resolve_builtin_permission_profile;
+use macaca_proto::workbench::sandbox::{SandboxNetworkMode, SandboxWriteScope};
 use macaca_proto::{ServiceError, ServiceResult};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::process::{Child, ChildStdin, Command};
@@ -332,6 +333,13 @@ fn validate_policy_before_spawn(request: &ProcessCommandRequest) -> ServiceResul
     if !profile.can_spawn_process {
         return Err(ServiceError::DisabledByPolicy(
             "permission profile denies process spawn".into(),
+        ));
+    }
+    let privileged = matches!(profile.write_scope, SandboxWriteScope::FullAccess)
+        || matches!(profile.network_mode, SandboxNetworkMode::Allowed);
+    if privileged && request.sandbox.approval_ref.is_none() {
+        return Err(ServiceError::DisabledByPolicy(
+            "process spawn requires approval_ref for privileged permission profiles".into(),
         ));
     }
     Ok(())

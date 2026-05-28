@@ -98,6 +98,32 @@ async fn denied_permission_profile_blocks_before_spawn() {
 }
 
 #[tokio::test]
+async fn privileged_permission_profile_requires_approval_before_spawn() {
+    let root = tempfile::tempdir().unwrap();
+    let provider = ProcessSystemServiceProvider::local();
+    let mut privileged = request(&root, "printf", &["blocked"]);
+    privileged.sandbox.permission_profile_ref = "permission.full_access".into();
+
+    let err = provider
+        .call(command(EXEC_COMMAND, privileged.clone()))
+        .await
+        .unwrap_err();
+
+    assert!(matches!(err, ServiceError::DisabledByPolicy(_)));
+
+    privileged.sandbox.approval_ref = Some("approval://process/full-access".into());
+    let result = decode(
+        provider
+            .call(command(EXEC_COMMAND, privileged))
+            .await
+            .unwrap()
+            .output,
+    );
+
+    assert!(matches!(result.status, WorkbenchCommandStatus::Completed));
+}
+
+#[tokio::test]
 async fn exec_timeout_returns_adapter_failure_without_fake_success() {
     let root = tempfile::tempdir().unwrap();
     let provider = ProcessSystemServiceProvider::local();

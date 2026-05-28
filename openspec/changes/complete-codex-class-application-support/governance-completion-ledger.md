@@ -59,3 +59,23 @@ synthetic healthy state.
 - Adding the Codex-class scope-control integration test creates new test symbols
   not present in the current GitNexus index, so pre-edit symbol impact is
   recorded as index-missing advisory rather than a blocker.
+- 2026-05-28 `service.approval` implementation impact attempts for
+  `workbench_service_descriptors`, `WorkbenchClientCatalog`,
+  `FileSystemServiceProvider`, and Web startup returned `target not found` from
+  the current GitNexus index. Per user instruction, this is recorded as an
+  advisory note and not treated as a blocker.
+
+## Task 7 Evidence
+
+- `service.approval` now has provider-neutral DTOs for request lifecycle,
+  reviewer policy explanation, shell-visible events, and sanitized decision
+  audit.
+- Runtime-host owns local/mock/unavailable provider construction through
+  `ApprovalSystemServiceProvider` and `bootstrap_local_approval_service`.
+- The built-in reviewer policy is a Strategy object; Web bootstraps the service
+  but does not decide approval policy.
+- File writes continue to require approval refs when requested, and privileged
+  process profiles now fail before spawn unless an approval ref is present.
+- Focused tests cover create/list/read/resolve/cancel/expire, policy explain,
+  audit replay, unavailable behavior, approval events, and process
+  policy-before-spawn behavior.

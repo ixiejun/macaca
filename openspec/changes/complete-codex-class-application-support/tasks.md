@@ -147,17 +147,17 @@
 
 ## 7. `service.approval`: Approval and Guardian Flow
 
-- [ ] 7.1 Create `service.approval` descriptor, lifecycle, health, snapshot,
+- [x] 7.1 Create `service.approval` descriptor, lifecycle, health, snapshot,
   local provider, mock provider, and unavailable provider.
-- [ ] 7.2 Implement approval request create/list/read/resolve/cancel/expire.
-- [ ] 7.3 Implement reviewer policy strategy and approval profile resolution.
-- [ ] 7.4 Integrate approval decorators before file write, process spawn, Git
+- [x] 7.2 Implement approval request create/list/read/resolve/cancel/expire.
+- [x] 7.3 Implement reviewer policy strategy and approval profile resolution.
+- [x] 7.4 Integrate approval decorators before file write, process spawn, Git
   patch, plugin install, MCP auth/tool call, remote environment, and other
   privileged side effects.
-- [ ] 7.5 Emit approval pending/resolved/expired/cancelled events for shells.
-- [ ] 7.6 Persist sanitized approval audit with action summary, side-effect
+- [x] 7.5 Emit approval pending/resolved/expired/cancelled events for shells.
+- [x] 7.6 Persist sanitized approval audit with action summary, side-effect
   class, reviewer class, decision, reason code, and trace refs.
-- [ ] 7.7 Add tests proving shells render/submit decisions but do not own
+- [x] 7.7 Add tests proving shells render/submit decisions but do not own
   approval policy.
 
 ## 8. `service.hook`: Managed Lifecycle Hooks
