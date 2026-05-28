@@ -99,6 +99,7 @@ pub mod service_runtime;
 pub mod service_runtime_error;
 pub mod service_runtime_event;
 pub(crate) mod skill_alias_resolution;
+pub(crate) mod skill_operator_lifecycle;
 pub(crate) mod skill_service_codec;
 pub(crate) mod skill_service_content_mutation;
 pub(crate) mod skill_service_experience_routing;
@@ -161,6 +162,8 @@ mod skill_content_mutation_tests;
 mod skill_governance_store_logging_tests;
 #[cfg(test)]
 mod skill_materialization_operator_tests;
+#[cfg(test)]
+mod skill_operator_lifecycle_tests;
 #[cfg(test)]
 mod skill_optional_provider_boundary_tests;
 #[cfg(test)]

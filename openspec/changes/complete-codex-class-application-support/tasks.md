@@ -246,15 +246,15 @@
 
 ## 13. Skill Operator Lifecycle
 
-- [ ] 13.1 Upgrade `service.skill` descriptor and commands for catalog list,
+- [x] 13.1 Upgrade `service.skill` descriptor and commands for catalog list,
   markdown read, config write, watch/unwatch, changed events, enablement
   changes, and provenance audit.
-- [ ] 13.2 Implement app-scoped, workspace-scoped, user-scoped, managed, and
+- [x] 13.2 Implement app-scoped, workspace-scoped, user-scoped, managed, and
   plugin-provided skill source handling.
-- [ ] 13.3 Implement skill config persistence with policy and redaction.
-- [ ] 13.4 Implement skill watch notifications and service-owned visibility
+- [x] 13.3 Implement skill config persistence with policy and redaction.
+- [x] 13.4 Implement skill watch notifications and service-owned visibility
   refresh for context/tool planning.
-- [ ] 13.5 Add tests for source precedence, enablement policy, watch changes,
+- [x] 13.5 Add tests for source precedence, enablement policy, watch changes,
   markdown read bounds, config redaction, and provenance audit.
 
 ## 14. Code Intelligence, Git, Patch, and Review

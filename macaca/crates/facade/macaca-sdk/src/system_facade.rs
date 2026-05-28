@@ -31,6 +31,7 @@ pub use crate::service_client::{
     SystemServiceClient, UnavailableSystemServiceClient,
 };
 pub use crate::skill_client::{SystemSkillClient, UnavailableSystemSkillClient};
+pub use crate::skill_operator_client::SystemSkillOperatorClient;
 pub use crate::status_client::{
     kernel_status_snapshot, StaticSystemStatusDataSource, SystemStatusClient,
     SystemStatusDataSource, SystemStatusSnapshot,

@@ -39,6 +39,7 @@ pub mod scheduler_client;
 pub mod service_client;
 pub mod skill_client;
 mod skill_client_service_backed;
+pub mod skill_operator_client;
 pub mod spec;
 pub mod status_client;
 pub mod store_client;
@@ -146,6 +147,7 @@ pub use scheduler_client::{
 };
 pub use service_client::{ServiceCallCommand, ServiceCallResult, ServiceInspectionResult};
 pub use skill_client::{ServiceBackedSkillClient, SystemSkillClient, UnavailableSystemSkillClient};
+pub use skill_operator_client::SystemSkillOperatorClient;
 pub use spec::{AgentSpec, AgentSpecBuilder, TracePolicy};
 pub use store_client::{ServiceBackedStoreClient, SystemStoreClient, UnavailableSystemStoreClient};
 pub use system_facade::{

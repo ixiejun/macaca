@@ -24,12 +24,14 @@ use macaca_skill::{
     SkillEvolutionProposePatchCommand, SkillEvolutionRejectDraftCommand,
     SkillExecutableLoadCommand, SkillExecutableLoadResult, SkillExperienceProposalCommand,
     SkillExperienceProposalSnapshotCommand, SkillGovernanceRecordUsageCommand,
-    SkillGovernanceSnapshotCommand, SkillRuntimeFacade, SkillServiceSnapshot,
-    SkillServiceSnapshotCommand, SkillSnapshotRequest, SkillSnapshotServiceCommand,
-    SkillStatusCommand, SkillStatusResult, SkillToolCatalogCommand, SkillToolCatalogResult,
-    SkillToolInvokeCommand, SKILL_ALIAS_RESOLVE_COMMAND, SKILL_ALIAS_SNAPSHOT_COMMAND,
-    SKILL_ALIAS_UPSERT_COMMAND, SKILL_CLEANUP_COMMAND, SKILL_CONTENT_MUTATE_COMMAND,
-    SKILL_CURATION_ARCHIVE_COMMAND, SKILL_CURATION_DRY_RUN_COMMAND,
+    SkillGovernanceSnapshotCommand, SkillOperatorCatalogListCommand, SkillOperatorChangedCommand,
+    SkillOperatorConfigWriteCommand, SkillOperatorEnablementCommand,
+    SkillOperatorMarkdownReadCommand, SkillOperatorUnwatchCommand, SkillOperatorWatchCommand,
+    SkillRuntimeFacade, SkillServiceSnapshot, SkillServiceSnapshotCommand, SkillSnapshotRequest,
+    SkillSnapshotServiceCommand, SkillStatusCommand, SkillStatusResult, SkillToolCatalogCommand,
+    SkillToolCatalogResult, SkillToolInvokeCommand, SKILL_ALIAS_RESOLVE_COMMAND,
+    SKILL_ALIAS_SNAPSHOT_COMMAND, SKILL_ALIAS_UPSERT_COMMAND, SKILL_CLEANUP_COMMAND,
+    SKILL_CONTENT_MUTATE_COMMAND, SKILL_CURATION_ARCHIVE_COMMAND, SKILL_CURATION_DRY_RUN_COMMAND,
     SKILL_CURATION_MERGE_APPLY_COMMAND, SKILL_CURATION_PIN_COMMAND,
     SKILL_CURATION_QUARANTINE_COMMAND, SKILL_CURATION_REJECT_COMMAND,
     SKILL_CURATION_RELEASE_QUARANTINE_COMMAND, SKILL_CURATION_RESTORE_COMMAND,
@@ -43,13 +45,18 @@ use macaca_skill::{
     SKILL_EVOLUTION_PROMOTE_DRAFT_COMMAND, SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND,
     SKILL_EVOLUTION_PROPOSE_PATCH_COMMAND, SKILL_EVOLUTION_REJECT_DRAFT_COMMAND,
     SKILL_EVOLUTION_SNAPSHOT_COMMAND, SKILL_EXECUTABLE_LOAD_COMMAND,
-    SKILL_GOVERNANCE_RECORD_USAGE_COMMAND, SKILL_GOVERNANCE_SNAPSHOT_COMMAND, SKILL_SERVICE_ID,
-    SKILL_SERVICE_SNAPSHOT_COMMAND, SKILL_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND,
-    SKILL_TOOL_CATALOG_COMMAND, SKILL_TOOL_INVOKE_COMMAND,
+    SKILL_GOVERNANCE_RECORD_USAGE_COMMAND, SKILL_GOVERNANCE_SNAPSHOT_COMMAND,
+    SKILL_OPERATOR_CATALOG_LIST_COMMAND, SKILL_OPERATOR_CHANGED_COMMAND,
+    SKILL_OPERATOR_CONFIG_WRITE_COMMAND, SKILL_OPERATOR_ENABLEMENT_COMMAND,
+    SKILL_OPERATOR_MARKDOWN_READ_COMMAND, SKILL_OPERATOR_UNWATCH_COMMAND,
+    SKILL_OPERATOR_WATCH_COMMAND, SKILL_SERVICE_ID, SKILL_SERVICE_SNAPSHOT_COMMAND,
+    SKILL_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND, SKILL_TOOL_CATALOG_COMMAND,
+    SKILL_TOOL_INVOKE_COMMAND,
 };
 use macaca_tools::{ToolCommand, ToolCommandExecutor};
 use tokio::sync::Mutex;
 
+use crate::skill_operator_lifecycle::SkillOperatorLifecycle;
 use crate::skill_service_codec::{decode, service_adapter_error, service_result, to_value};
 use crate::skill_service_content_mutation::LocalSkillContentMutationStrategy;
 use crate::skill_service_experience_routing::SkillExperienceDestinationRouter;
@@ -63,6 +70,7 @@ pub struct SkillSystemServiceProvider {
     governance_state: Arc<SkillProviderGovernanceState>,
     experience_router: SkillExperienceDestinationRouter,
     content_mutation: LocalSkillContentMutationStrategy,
+    operator_lifecycle: SkillOperatorLifecycle,
     materialized_skill_roots: Vec<PathBuf>,
     governance_event_journal_path: Option<PathBuf>,
 }
@@ -77,6 +85,7 @@ impl SkillSystemServiceProvider {
             governance_state: Arc::new(SkillProviderGovernanceState::default()),
             experience_router: SkillExperienceDestinationRouter::default(),
             content_mutation: LocalSkillContentMutationStrategy,
+            operator_lifecycle: SkillOperatorLifecycle::new(),
             materialized_skill_roots: Vec::new(),
             governance_event_journal_path: None,
         }
@@ -91,6 +100,7 @@ impl SkillSystemServiceProvider {
             governance_state: Arc::new(SkillProviderGovernanceState::default()),
             experience_router: SkillExperienceDestinationRouter::default(),
             content_mutation: LocalSkillContentMutationStrategy,
+            operator_lifecycle: SkillOperatorLifecycle::new(),
             materialized_skill_roots: Vec::new(),
             governance_event_journal_path: None,
         }
@@ -319,6 +329,41 @@ impl SystemService for SkillSystemServiceProvider {
                     telemetry_aggregate,
                     captured_at: chrono::Utc::now(),
                 };
+                Ok(service_result(to_value(result)?, typed.trace))
+            }
+            SKILL_OPERATOR_CATALOG_LIST_COMMAND => {
+                let typed: SkillOperatorCatalogListCommand = decode(command.payload)?;
+                let result = self.operator_lifecycle.catalog_list(typed.clone()).await?;
+                Ok(service_result(to_value(result)?, typed.trace))
+            }
+            SKILL_OPERATOR_MARKDOWN_READ_COMMAND => {
+                let typed: SkillOperatorMarkdownReadCommand = decode(command.payload)?;
+                let result = self.operator_lifecycle.markdown_read(typed.clone()).await?;
+                Ok(service_result(to_value(result)?, typed.trace))
+            }
+            SKILL_OPERATOR_CONFIG_WRITE_COMMAND => {
+                let typed: SkillOperatorConfigWriteCommand = decode(command.payload)?;
+                let result = self.operator_lifecycle.config_write(typed.clone()).await?;
+                Ok(service_result(to_value(result)?, typed.trace))
+            }
+            SKILL_OPERATOR_WATCH_COMMAND => {
+                let typed: SkillOperatorWatchCommand = decode(command.payload)?;
+                let result = self.operator_lifecycle.watch(typed.clone()).await;
+                Ok(service_result(to_value(result)?, typed.trace))
+            }
+            SKILL_OPERATOR_UNWATCH_COMMAND => {
+                let typed: SkillOperatorUnwatchCommand = decode(command.payload)?;
+                let result = self.operator_lifecycle.unwatch(typed.clone()).await;
+                Ok(service_result(to_value(result)?, typed.trace))
+            }
+            SKILL_OPERATOR_CHANGED_COMMAND => {
+                let typed: SkillOperatorChangedCommand = decode(command.payload)?;
+                let result = self.operator_lifecycle.changed(typed.clone()).await?;
+                Ok(service_result(to_value(result)?, typed.trace))
+            }
+            SKILL_OPERATOR_ENABLEMENT_COMMAND => {
+                let typed: SkillOperatorEnablementCommand = decode(command.payload)?;
+                let result = self.operator_lifecycle.enablement(typed.clone()).await?;
                 Ok(service_result(to_value(result)?, typed.trace))
             }
             SKILL_SERVICE_SNAPSHOT_COMMAND => {
