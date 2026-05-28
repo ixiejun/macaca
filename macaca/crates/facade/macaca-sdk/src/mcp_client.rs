@@ -8,13 +8,20 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use macaca_proto::{
-    MacacaError, MacacaResult, McpCleanupCommand, McpProbeCommand, McpRegisterCommand,
-    McpRegisterResult, McpRuntimeStatusView, McpServiceSnapshot, McpServiceSnapshotCommand,
-    McpStatusCommand, McpStatusResult, McpToolAttachCommand, McpToolAttachResult,
-    McpToolCatalogCommand, McpToolCatalogResult, McpToolInvokeCommand, McpToolInvokeResult,
-    MCP_CLEANUP_COMMAND, MCP_PROBE_COMMAND, MCP_REGISTER_COMMAND, MCP_SERVICE_ID,
-    MCP_SNAPSHOT_COMMAND, MCP_STATUS_COMMAND, MCP_TOOL_ATTACH_COMMAND, MCP_TOOL_CATALOG_COMMAND,
-    MCP_TOOL_INVOKE_COMMAND,
+    MacacaError, MacacaResult, McpCleanupCommand, McpDiagnosticsSnapshot,
+    McpDiagnosticsSnapshotCommand, McpExposureRefreshCommand, McpExposureRefreshResult,
+    McpOAuthLoginCommand, McpOAuthStatusCommand, McpOAuthStatusResult, McpProbeCommand,
+    McpRegisterCommand, McpRegisterResult, McpReloadCommand, McpReloadResult,
+    McpResourceListCommand, McpResourceListResult, McpResourceReadCommand, McpResourceReadResult,
+    McpResourceTemplateListResult, McpRuntimeStatusView, McpServerStatusListCommand,
+    McpServerStatusListResult, McpServiceSnapshot, McpServiceSnapshotCommand, McpStatusCommand,
+    McpStatusResult, McpToolAttachCommand, McpToolAttachResult, McpToolCatalogCommand,
+    McpToolCatalogResult, McpToolInvokeCommand, McpToolInvokeResult, MCP_CLEANUP_COMMAND,
+    MCP_DIAGNOSTICS_SNAPSHOT_COMMAND, MCP_EXPOSURE_REFRESH_COMMAND, MCP_OAUTH_LOGIN_COMMAND,
+    MCP_OAUTH_STATUS_COMMAND, MCP_PROBE_COMMAND, MCP_REGISTER_COMMAND, MCP_RELOAD_COMMAND,
+    MCP_RESOURCE_LIST_COMMAND, MCP_RESOURCE_READ_COMMAND, MCP_RESOURCE_TEMPLATE_LIST_COMMAND,
+    MCP_SERVER_STATUS_LIST_COMMAND, MCP_SERVICE_ID, MCP_SNAPSHOT_COMMAND, MCP_STATUS_COMMAND,
+    MCP_TOOL_ATTACH_COMMAND, MCP_TOOL_CATALOG_COMMAND, MCP_TOOL_INVOKE_COMMAND,
 };
 use tracing::{info, warn};
 
@@ -36,6 +43,39 @@ pub trait SystemMcpClient: Send + Sync {
     async fn invoke_tool(&self, command: McpToolInvokeCommand)
         -> MacacaResult<McpToolInvokeResult>;
     async fn status(&self, command: McpStatusCommand) -> MacacaResult<McpStatusResult>;
+    async fn server_status_list(
+        &self,
+        command: McpServerStatusListCommand,
+    ) -> MacacaResult<McpServerStatusListResult>;
+    async fn reload(&self, command: McpReloadCommand) -> MacacaResult<McpReloadResult>;
+    async fn oauth_login(
+        &self,
+        command: McpOAuthLoginCommand,
+    ) -> MacacaResult<McpOAuthStatusResult>;
+    async fn oauth_status(
+        &self,
+        command: McpOAuthStatusCommand,
+    ) -> MacacaResult<McpOAuthStatusResult>;
+    async fn resource_list(
+        &self,
+        command: McpResourceListCommand,
+    ) -> MacacaResult<McpResourceListResult>;
+    async fn resource_template_list(
+        &self,
+        command: McpResourceListCommand,
+    ) -> MacacaResult<McpResourceTemplateListResult>;
+    async fn resource_read(
+        &self,
+        command: McpResourceReadCommand,
+    ) -> MacacaResult<McpResourceReadResult>;
+    async fn diagnostics_snapshot(
+        &self,
+        command: McpDiagnosticsSnapshotCommand,
+    ) -> MacacaResult<McpDiagnosticsSnapshot>;
+    async fn exposure_refresh(
+        &self,
+        command: McpExposureRefreshCommand,
+    ) -> MacacaResult<McpExposureRefreshResult>;
     async fn snapshot(
         &self,
         command: McpServiceSnapshotCommand,
@@ -98,6 +138,102 @@ impl SystemMcpClient for UnavailableSystemMcpClient {
     async fn status(&self, command: McpStatusCommand) -> MacacaResult<McpStatusResult> {
         info!(trace_id = %command.trace.trace_id, "sdk mcp client returning empty status");
         Ok(McpStatusResult::new(Vec::<McpRuntimeStatusView>::new()))
+    }
+
+    async fn server_status_list(
+        &self,
+        command: McpServerStatusListCommand,
+    ) -> MacacaResult<McpServerStatusListResult> {
+        info!(trace_id = %command.trace.trace_id, "sdk mcp client returning empty operator status");
+        Ok(McpServerStatusListResult {
+            statuses: Vec::new(),
+            captured_at: chrono::Utc::now(),
+        })
+    }
+
+    async fn reload(&self, command: McpReloadCommand) -> MacacaResult<McpReloadResult> {
+        warn!(trace_id = %command.trace.trace_id, "sdk mcp client unavailable for reload");
+        Err(MacacaError::Config("MCP service is unavailable".into()))
+    }
+
+    async fn oauth_login(
+        &self,
+        command: McpOAuthLoginCommand,
+    ) -> MacacaResult<McpOAuthStatusResult> {
+        warn!(trace_id = %command.trace.trace_id, "sdk mcp client unavailable for oauth login");
+        Err(MacacaError::Config("MCP service is unavailable".into()))
+    }
+
+    async fn oauth_status(
+        &self,
+        command: McpOAuthStatusCommand,
+    ) -> MacacaResult<McpOAuthStatusResult> {
+        warn!(trace_id = %command.trace.trace_id, "sdk mcp client unavailable for oauth status");
+        Err(MacacaError::Config("MCP service is unavailable".into()))
+    }
+
+    async fn resource_list(
+        &self,
+        command: McpResourceListCommand,
+    ) -> MacacaResult<McpResourceListResult> {
+        info!(trace_id = %command.trace.trace_id, "sdk mcp client returning empty resources");
+        Ok(McpResourceListResult {
+            resources: Vec::new(),
+            captured_at: chrono::Utc::now(),
+        })
+    }
+
+    async fn resource_template_list(
+        &self,
+        command: McpResourceListCommand,
+    ) -> MacacaResult<McpResourceTemplateListResult> {
+        info!(trace_id = %command.trace.trace_id, "sdk mcp client returning empty resource templates");
+        Ok(McpResourceTemplateListResult {
+            templates: Vec::new(),
+            captured_at: chrono::Utc::now(),
+        })
+    }
+
+    async fn resource_read(
+        &self,
+        command: McpResourceReadCommand,
+    ) -> MacacaResult<McpResourceReadResult> {
+        info!(trace_id = %command.trace.trace_id, "sdk mcp client returning unavailable resource read");
+        Ok(McpResourceReadResult::denied(
+            command.server_id,
+            command.uri,
+            "runtime-backed MCP service is not installed",
+        ))
+    }
+
+    async fn diagnostics_snapshot(
+        &self,
+        command: McpDiagnosticsSnapshotCommand,
+    ) -> MacacaResult<McpDiagnosticsSnapshot> {
+        info!(trace_id = %command.trace.trace_id, "sdk mcp client returning unavailable diagnostics");
+        Ok(McpDiagnosticsSnapshot {
+            service_id: MCP_SERVICE_ID.into(),
+            exposure_generation: 0,
+            server_count: 0,
+            auth_required: 0,
+            ready: 0,
+            failed: 0,
+            captured_at: chrono::Utc::now(),
+        })
+    }
+
+    async fn exposure_refresh(
+        &self,
+        command: McpExposureRefreshCommand,
+    ) -> MacacaResult<McpExposureRefreshResult> {
+        info!(trace_id = %command.trace.trace_id, "sdk mcp client exposure refresh no-op");
+        Ok(McpExposureRefreshResult {
+            thread_id: command.thread_id,
+            refreshed: false,
+            exposure_generation: 0,
+            visible_tool_count: 0,
+            captured_at: chrono::Utc::now(),
+        })
     }
 
     async fn snapshot(
@@ -194,6 +330,120 @@ impl SystemMcpClient for ServiceBackedMcpClient {
         call(
             &self.service,
             MCP_STATUS_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn server_status_list(
+        &self,
+        command: McpServerStatusListCommand,
+    ) -> MacacaResult<McpServerStatusListResult> {
+        call(
+            &self.service,
+            MCP_SERVER_STATUS_LIST_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn reload(&self, command: McpReloadCommand) -> MacacaResult<McpReloadResult> {
+        call(
+            &self.service,
+            MCP_RELOAD_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn oauth_login(
+        &self,
+        command: McpOAuthLoginCommand,
+    ) -> MacacaResult<McpOAuthStatusResult> {
+        call(
+            &self.service,
+            MCP_OAUTH_LOGIN_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn oauth_status(
+        &self,
+        command: McpOAuthStatusCommand,
+    ) -> MacacaResult<McpOAuthStatusResult> {
+        call(
+            &self.service,
+            MCP_OAUTH_STATUS_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn resource_list(
+        &self,
+        command: McpResourceListCommand,
+    ) -> MacacaResult<McpResourceListResult> {
+        call(
+            &self.service,
+            MCP_RESOURCE_LIST_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn resource_template_list(
+        &self,
+        command: McpResourceListCommand,
+    ) -> MacacaResult<McpResourceTemplateListResult> {
+        call(
+            &self.service,
+            MCP_RESOURCE_TEMPLATE_LIST_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn resource_read(
+        &self,
+        command: McpResourceReadCommand,
+    ) -> MacacaResult<McpResourceReadResult> {
+        call(
+            &self.service,
+            MCP_RESOURCE_READ_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn diagnostics_snapshot(
+        &self,
+        command: McpDiagnosticsSnapshotCommand,
+    ) -> MacacaResult<McpDiagnosticsSnapshot> {
+        call(
+            &self.service,
+            MCP_DIAGNOSTICS_SNAPSHOT_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn exposure_refresh(
+        &self,
+        command: McpExposureRefreshCommand,
+    ) -> MacacaResult<McpExposureRefreshResult> {
+        call(
+            &self.service,
+            MCP_EXPOSURE_REFRESH_COMMAND,
             command.trace.clone(),
             command,
         )

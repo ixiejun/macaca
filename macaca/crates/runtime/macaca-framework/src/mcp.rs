@@ -163,6 +163,39 @@ pub struct McpCallResult {
     pub metadata: Option<Value>,
 }
 
+/// Resource metadata returned by MCP `resources/list`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct McpResourceDef {
+    pub uri: String,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default, alias = "mimeType")]
+    pub mime_type: Option<String>,
+}
+
+/// Template metadata returned by MCP `resources/templates/list`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct McpResourceTemplateDef {
+    #[serde(alias = "uriTemplate")]
+    pub uri_template: String,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default, alias = "mimeType")]
+    pub mime_type: Option<String>,
+}
+
+/// Bounded resource content returned by MCP `resources/read`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct McpResourceRead {
+    pub uri: String,
+    #[serde(default, alias = "mimeType")]
+    pub mime_type: Option<String>,
+    #[serde(default)]
+    pub text: Option<String>,
+    #[serde(default)]
+    pub blob: Option<String>,
+}
+
 // ---------------------------------------------------------------------------
 // McpClient trait
 // ---------------------------------------------------------------------------
@@ -176,6 +209,26 @@ pub trait McpClient: Send + Sync {
     async fn list_tools(&mut self) -> Result<Vec<McpToolDef>, McpError>;
     /// Call a tool by name with the given arguments.
     async fn call_tool(&mut self, name: &str, args: Value) -> Result<McpCallResult, McpError>;
+    /// List readable MCP resources. Implementations without resource support
+    /// return an explicit unsupported protocol error rather than faking empty
+    /// success, so operator diagnostics can distinguish absence from no data.
+    async fn list_resources(&mut self) -> Result<Vec<McpResourceDef>, McpError> {
+        Err(McpError::UnsupportedTransport(
+            "mcp resources/list is not supported by this client".into(),
+        ))
+    }
+    /// List resource templates exposed by the MCP server.
+    async fn list_resource_templates(&mut self) -> Result<Vec<McpResourceTemplateDef>, McpError> {
+        Err(McpError::UnsupportedTransport(
+            "mcp resources/templates/list is not supported by this client".into(),
+        ))
+    }
+    /// Read a single MCP resource by URI.
+    async fn read_resource(&mut self, _uri: &str) -> Result<McpResourceRead, McpError> {
+        Err(McpError::UnsupportedTransport(
+            "mcp resources/read is not supported by this client".into(),
+        ))
+    }
     /// Close the connection gracefully.
     async fn close(&mut self) -> Result<(), McpError>;
     /// Check if connected.
@@ -414,6 +467,63 @@ impl McpClient for StdioMcpClient {
 
     async fn call_tool(&mut self, name: &str, args: Value) -> Result<McpCallResult, McpError> {
         self.call_tool_mut(name, args).await
+    }
+
+    async fn list_resources(&mut self) -> Result<Vec<McpResourceDef>, McpError> {
+        if !self.connected {
+            return Err(McpError::NotConnected);
+        }
+        let result = timeout(
+            self.timeouts.call_tool,
+            self.send_request("resources/list", None),
+        )
+        .await
+        .map_err(|_| McpError::Timeout)??;
+        let resources = result
+            .get("resources")
+            .cloned()
+            .unwrap_or(Value::Array(vec![]));
+        serde_json::from_value(resources).map_err(|e| McpError::Protocol(e.to_string()))
+    }
+
+    async fn list_resource_templates(&mut self) -> Result<Vec<McpResourceTemplateDef>, McpError> {
+        if !self.connected {
+            return Err(McpError::NotConnected);
+        }
+        let result = timeout(
+            self.timeouts.call_tool,
+            self.send_request("resources/templates/list", None),
+        )
+        .await
+        .map_err(|_| McpError::Timeout)??;
+        let templates = result
+            .get("resourceTemplates")
+            .or_else(|| result.get("resource_templates"))
+            .cloned()
+            .unwrap_or(Value::Array(vec![]));
+        serde_json::from_value(templates).map_err(|e| McpError::Protocol(e.to_string()))
+    }
+
+    async fn read_resource(&mut self, uri: &str) -> Result<McpResourceRead, McpError> {
+        if !self.connected {
+            return Err(McpError::NotConnected);
+        }
+        let result = timeout(
+            self.timeouts.call_tool,
+            self.send_request("resources/read", Some(serde_json::json!({ "uri": uri }))),
+        )
+        .await
+        .map_err(|_| McpError::Timeout)??;
+        let mut contents: Vec<McpResourceRead> = serde_json::from_value(
+            result
+                .get("contents")
+                .cloned()
+                .unwrap_or_else(|| Value::Array(vec![])),
+        )
+        .map_err(|e| McpError::Protocol(e.to_string()))?;
+        contents
+            .pop()
+            .ok_or_else(|| McpError::Protocol("resource read returned no contents".into()))
     }
 
     async fn close(&mut self) -> Result<(), McpError> {
@@ -785,6 +895,58 @@ impl McpClient for HttpMcpClient {
             .send_request("tools/call", Some(params), self.timeouts.call_tool)
             .await?;
         parse_call_result(&result)
+    }
+
+    async fn list_resources(&mut self) -> Result<Vec<McpResourceDef>, McpError> {
+        if !self.connected {
+            return Err(McpError::NotConnected);
+        }
+        let result = self
+            .send_request("resources/list", None, self.timeouts.call_tool)
+            .await?;
+        let resources = result
+            .get("resources")
+            .cloned()
+            .unwrap_or(Value::Array(vec![]));
+        serde_json::from_value(resources).map_err(|e| McpError::Protocol(e.to_string()))
+    }
+
+    async fn list_resource_templates(&mut self) -> Result<Vec<McpResourceTemplateDef>, McpError> {
+        if !self.connected {
+            return Err(McpError::NotConnected);
+        }
+        let result = self
+            .send_request("resources/templates/list", None, self.timeouts.call_tool)
+            .await?;
+        let templates = result
+            .get("resourceTemplates")
+            .or_else(|| result.get("resource_templates"))
+            .cloned()
+            .unwrap_or(Value::Array(vec![]));
+        serde_json::from_value(templates).map_err(|e| McpError::Protocol(e.to_string()))
+    }
+
+    async fn read_resource(&mut self, uri: &str) -> Result<McpResourceRead, McpError> {
+        if !self.connected {
+            return Err(McpError::NotConnected);
+        }
+        let result = self
+            .send_request(
+                "resources/read",
+                Some(serde_json::json!({ "uri": uri })),
+                self.timeouts.call_tool,
+            )
+            .await?;
+        let mut contents: Vec<McpResourceRead> = serde_json::from_value(
+            result
+                .get("contents")
+                .cloned()
+                .unwrap_or_else(|| Value::Array(vec![])),
+        )
+        .map_err(|e| McpError::Protocol(e.to_string()))?;
+        contents
+            .pop()
+            .ok_or_else(|| McpError::Protocol("resource read returned no contents".into()))
     }
 
     async fn close(&mut self) -> Result<(), McpError> {

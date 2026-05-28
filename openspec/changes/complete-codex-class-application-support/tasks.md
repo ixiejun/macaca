@@ -230,18 +230,18 @@
 
 ## 12. MCP Operator Lifecycle
 
-- [ ] 12.1 Upgrade `service.mcp` descriptor and commands for server status,
+- [x] 12.1 Upgrade `service.mcp` descriptor and commands for server status,
   reload, resource read, tool call, OAuth login/status, diagnostics snapshot,
   and watched changes.
-- [ ] 12.2 Implement per-thread MCP exposure refresh on next active turn after
+- [x] 12.2 Implement per-thread MCP exposure refresh on next active turn after
   reload.
-- [ ] 12.3 Implement OAuth auth-required, login-started, login-completed,
+- [x] 12.3 Implement OAuth auth-required, login-started, login-completed,
   failed, and unavailable states.
-- [ ] 12.4 Implement resource/resource-template listing and bounded resource
+- [x] 12.4 Implement resource/resource-template listing and bounded resource
   read.
-- [ ] 12.5 Ensure MCP tool calls continue to route through `service.tool` when
+- [x] 12.5 Ensure MCP tool calls continue to route through `service.tool` when
   model-invoked.
-- [ ] 12.6 Add tests for reload, OAuth-required denial, resource read, tool
+- [x] 12.6 Add tests for reload, OAuth-required denial, resource read, tool
   call audit, status snapshots, and plugin-provided MCP servers.
 
 ## 13. Skill Operator Lifecycle

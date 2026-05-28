@@ -16,8 +16,9 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use macaca_framework::mcp::{
-    register_mcp_tools_with_options, McpClient, McpError, McpSessionMode, McpTimeouts,
-    McpToolNameConflictPolicy, McpToolRegistrationOptions, McpTransportConfig,
+    register_mcp_tools_with_options, McpClient, McpError, McpResourceDef, McpResourceRead,
+    McpResourceTemplateDef, McpSessionMode, McpTimeouts, McpToolNameConflictPolicy,
+    McpToolRegistrationOptions, McpTransportConfig,
 };
 use macaca_framework::tool::Toolkit;
 use macaca_proto::{
@@ -421,6 +422,39 @@ impl McpRuntimeFacade {
             .await
     }
 
+    /// List MCP resources through the runtime-owned protocol strategy.
+    #[allow(deprecated)]
+    pub async fn list_resources(
+        &self,
+        server_id: Option<&str>,
+        policy: &McpToolPolicy,
+    ) -> Vec<Result<(String, Vec<McpResourceDef>), String>> {
+        self.manager.list_resources(server_id, policy).await
+    }
+
+    /// List MCP resource templates through the runtime-owned protocol strategy.
+    #[allow(deprecated)]
+    pub async fn list_resource_templates(
+        &self,
+        server_id: Option<&str>,
+        policy: &McpToolPolicy,
+    ) -> Vec<Result<(String, Vec<McpResourceTemplateDef>), String>> {
+        self.manager
+            .list_resource_templates(server_id, policy)
+            .await
+    }
+
+    /// Read one MCP resource through the runtime-owned protocol strategy.
+    #[allow(deprecated)]
+    pub async fn read_resource(
+        &self,
+        server_id: &str,
+        uri: &str,
+        policy: &McpToolPolicy,
+    ) -> Result<McpResourceRead, String> {
+        self.manager.read_resource(server_id, uri, policy).await
+    }
+
     #[allow(deprecated)]
     pub async fn register(
         &self,
@@ -581,6 +615,105 @@ impl McpRuntimeManager {
             }
         }
         descriptors
+    }
+
+    async fn list_resources(
+        &self,
+        server_id: Option<&str>,
+        policy: &McpToolPolicy,
+    ) -> Vec<Result<(String, Vec<McpResourceDef>), String>> {
+        let definitions = self.definitions().await;
+        let mut results = Vec::new();
+        for definition in definitions {
+            if server_id.is_some_and(|requested| requested != definition.id) {
+                continue;
+            }
+            if let Some(error) = resource_access_error(&definition, policy) {
+                results.push(Err(error));
+                continue;
+            }
+            let server = definition.id.clone();
+            results.push(match self.connected_client(&definition).await {
+                Ok(mut client) => {
+                    let result = client
+                        .list_resources()
+                        .await
+                        .map(|resources| (server, resources))
+                        .map_err(|error| error.to_string());
+                    let _ = client.close().await;
+                    result
+                }
+                Err(error) => Err(error),
+            });
+        }
+        results
+    }
+
+    async fn list_resource_templates(
+        &self,
+        server_id: Option<&str>,
+        policy: &McpToolPolicy,
+    ) -> Vec<Result<(String, Vec<McpResourceTemplateDef>), String>> {
+        let definitions = self.definitions().await;
+        let mut results = Vec::new();
+        for definition in definitions {
+            if server_id.is_some_and(|requested| requested != definition.id) {
+                continue;
+            }
+            if let Some(error) = resource_access_error(&definition, policy) {
+                results.push(Err(error));
+                continue;
+            }
+            let server = definition.id.clone();
+            results.push(match self.connected_client(&definition).await {
+                Ok(mut client) => {
+                    let result = client
+                        .list_resource_templates()
+                        .await
+                        .map(|templates| (server, templates))
+                        .map_err(|error| error.to_string());
+                    let _ = client.close().await;
+                    result
+                }
+                Err(error) => Err(error),
+            });
+        }
+        results
+    }
+
+    async fn read_resource(
+        &self,
+        server_id: &str,
+        uri: &str,
+        policy: &McpToolPolicy,
+    ) -> Result<McpResourceRead, String> {
+        let Some(definition) = self.definitions.read().await.get(server_id).cloned() else {
+            return Err("unknown_mcp_server".into());
+        };
+        if let Some(error) = resource_access_error(&definition, policy) {
+            return Err(error);
+        }
+        let mut client = self.connected_client(&definition).await?;
+        let result = client
+            .read_resource(uri)
+            .await
+            .map_err(|error| error.to_string());
+        let _ = client.close().await;
+        result
+    }
+
+    async fn connected_client(
+        &self,
+        definition: &McpServerDefinition,
+    ) -> Result<Box<dyn McpClient>, String> {
+        let mut client = self
+            .create_client(definition)
+            .map_err(|error| error.to_string())?;
+        timeout(self.timeouts.connect, client.connect())
+            .await
+            .map_err(|_| "connect_timeout".to_string())?
+            .map_err(|error| error.to_string())?;
+        Ok(client)
     }
 
     async fn invoke_tool(
@@ -1105,6 +1238,16 @@ fn resource_scope_for_lifecycle(lifecycle: &McpLifecycleScope) -> CapabilityTool
     }
 }
 
+fn resource_access_error(
+    definition: &McpServerDefinition,
+    policy: &McpToolPolicy,
+) -> Option<String> {
+    if !definition.enabled || !policy.allows_server(&definition.id) {
+        return Some("mcp_server_denied".into());
+    }
+    missing_required_bin(definition).map(|missing| format!("missing dependency: {missing}"))
+}
+
 fn lifecycle_scope_name(lifecycle: &McpLifecycleScope) -> &'static str {
     match lifecycle {
         McpLifecycleScope::Global => "global",
@@ -1373,6 +1516,18 @@ impl McpClient for ClientBox {
         args: serde_json::Value,
     ) -> Result<macaca_framework::mcp::McpCallResult, macaca_framework::mcp::McpError> {
         self.inner.call_tool(name, args).await
+    }
+
+    async fn list_resources(&mut self) -> Result<Vec<McpResourceDef>, McpError> {
+        self.inner.list_resources().await
+    }
+
+    async fn list_resource_templates(&mut self) -> Result<Vec<McpResourceTemplateDef>, McpError> {
+        self.inner.list_resource_templates().await
+    }
+
+    async fn read_resource(&mut self, uri: &str) -> Result<McpResourceRead, McpError> {
+        self.inner.read_resource(uri).await
     }
 
     async fn close(&mut self) -> Result<(), macaca_framework::mcp::McpError> {
@@ -1766,6 +1921,33 @@ mod tests {
             }
         }
 
+        async fn list_resources(&mut self) -> Result<Vec<McpResourceDef>, McpError> {
+            Ok(vec![McpResourceDef {
+                uri: "fixture://resource-a".into(),
+                name: Some("Resource A".into()),
+                mime_type: Some("text/plain".into()),
+            }])
+        }
+
+        async fn list_resource_templates(
+            &mut self,
+        ) -> Result<Vec<McpResourceTemplateDef>, McpError> {
+            Ok(vec![McpResourceTemplateDef {
+                uri_template: "fixture://{id}".into(),
+                name: Some("Fixture Template".into()),
+                mime_type: Some("text/plain".into()),
+            }])
+        }
+
+        async fn read_resource(&mut self, uri: &str) -> Result<McpResourceRead, McpError> {
+            Ok(McpResourceRead {
+                uri: uri.into(),
+                mime_type: Some("text/plain".into()),
+                text: Some("fixture resource body".into()),
+                blob: None,
+            })
+        }
+
         async fn close(&mut self) -> Result<(), McpError> {
             self.connected = false;
             Ok(())
@@ -1789,6 +1971,47 @@ mod tests {
             }),
             timeouts,
         ))
+    }
+
+    #[tokio::test]
+    async fn managed_resource_listing_and_read_use_mcp_protocol_client() {
+        let manager =
+            manager_with_fixture_client(TestMcpClientBehavior::Success, McpTimeouts::default());
+        let facade = McpRuntimeFacade::from_manager(manager);
+        let mut definition = stdio_definition("server-a", "fixture-mcp");
+        definition.transport = McpTransportConfig::StreamableHttp {
+            url: "http://127.0.0.1/mcp".into(),
+            headers: BTreeMap::new(),
+        };
+        definition.required_bins.clear();
+        facade.upsert_definition(definition).await;
+
+        let resources = facade
+            .list_resources(Some("server-a"), &McpToolPolicy::default())
+            .await;
+        assert_eq!(resources.len(), 1);
+        assert_eq!(
+            resources[0].as_ref().unwrap().1[0].uri,
+            "fixture://resource-a"
+        );
+
+        let templates = facade
+            .list_resource_templates(Some("server-a"), &McpToolPolicy::default())
+            .await;
+        assert_eq!(
+            templates[0].as_ref().unwrap().1[0].uri_template,
+            "fixture://{id}"
+        );
+
+        let resource = facade
+            .read_resource(
+                "server-a",
+                "fixture://resource-a",
+                &McpToolPolicy::default(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resource.text.as_deref(), Some("fixture resource body"));
     }
 
     #[test]

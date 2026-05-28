@@ -61,6 +61,7 @@ pub mod llm_service_hardening;
 pub mod llm_service_provider;
 pub(crate) mod mcp_descriptor_index;
 pub(crate) mod mcp_invocation_registry;
+pub(crate) mod mcp_operator_lifecycle;
 pub mod mcp_runtime;
 pub mod mcp_service_provider;
 pub mod memory_service_provider;

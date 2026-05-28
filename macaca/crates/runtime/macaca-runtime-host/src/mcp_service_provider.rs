@@ -13,23 +13,33 @@ use async_trait::async_trait;
 use macaca_kernel::SystemService;
 use macaca_proto::{
     CapabilityToolInvocationResult, CapabilityToolOriginKind, CapabilityToolPolicyHints,
-    CleanupPolicy, KernelServiceId, McpCleanupCommand, McpProbeCommand, McpRegisterCommand,
-    McpRegisterResult, McpRuntimeStatusView, McpServiceLifecycleScope, McpServiceSnapshot,
-    McpServiceSnapshotCommand, McpStatusCommand, McpStatusResult, McpToolAttachCommand,
-    McpToolAttachResult, McpToolCatalogCommand, McpToolCatalogResult, McpToolInvokeCommand,
-    ServiceCallResult, ServiceCapability, ServiceCommand, ServiceDescriptor, ServiceError,
-    ServiceHealth, ServiceResult, ServiceScope, ServiceType, TraceContext, TraceSchemaRef,
-    MCP_CLEANUP_COMMAND, MCP_PROBE_COMMAND, MCP_REGISTER_COMMAND, MCP_SERVICE_ID,
-    MCP_SNAPSHOT_COMMAND, MCP_STATUS_COMMAND, MCP_TOOL_ATTACH_COMMAND, MCP_TOOL_CATALOG_COMMAND,
-    MCP_TOOL_INVOKE_COMMAND,
+    CleanupPolicy, KernelServiceId, McpCleanupCommand, McpDiagnosticsSnapshotCommand,
+    McpExposureRefreshCommand, McpExposureRefreshResult, McpOAuthLoginCommand,
+    McpOAuthStatusCommand, McpProbeCommand, McpRegisterCommand, McpRegisterResult,
+    McpReloadCommand, McpResourceListCommand, McpResourceReadCommand, McpRuntimeStatusView,
+    McpServerStatusListCommand, McpServerStatusListResult, McpServiceLifecycleScope,
+    McpServiceSnapshot, McpServiceSnapshotCommand, McpStatusCommand, McpStatusResult,
+    McpToolAttachCommand, McpToolAttachResult, McpToolCatalogCommand, McpToolCatalogResult,
+    McpToolInvokeCommand, ServiceCallResult, ServiceCapability, ServiceCommand, ServiceDescriptor,
+    ServiceError, ServiceHealth, ServiceResult, ServiceScope, ServiceType, TraceContext,
+    TraceSchemaRef, MCP_CLEANUP_COMMAND, MCP_DIAGNOSTICS_SNAPSHOT_COMMAND,
+    MCP_EXPOSURE_REFRESH_COMMAND, MCP_OAUTH_LOGIN_COMMAND, MCP_OAUTH_STATUS_COMMAND,
+    MCP_PROBE_COMMAND, MCP_REGISTER_COMMAND, MCP_RELOAD_COMMAND, MCP_RESOURCE_LIST_COMMAND,
+    MCP_RESOURCE_READ_COMMAND, MCP_RESOURCE_TEMPLATE_LIST_COMMAND, MCP_SERVER_STATUS_LIST_COMMAND,
+    MCP_SERVICE_ID, MCP_SNAPSHOT_COMMAND, MCP_STATUS_COMMAND, MCP_TOOL_ATTACH_COMMAND,
+    MCP_TOOL_CATALOG_COMMAND, MCP_TOOL_INVOKE_COMMAND,
 };
 
+use crate::mcp_operator_lifecycle::{
+    runtime_policy_from_hints, McpOperatorLifecycle, McpOperatorState,
+};
 use crate::mcp_runtime::{McpRuntimeContext, McpRuntimeFacade, McpRuntimeStatus, McpToolPolicy};
 
 /// Host-owned MCP service provider backed by an optional facade.
 pub struct McpSystemServiceProvider {
     descriptor: ServiceDescriptor,
     facade: Option<Arc<McpRuntimeFacade>>,
+    operator_state: Arc<McpOperatorState>,
 }
 
 impl McpSystemServiceProvider {
@@ -38,6 +48,7 @@ impl McpSystemServiceProvider {
         Self {
             descriptor: mcp_service_descriptor(),
             facade: Some(facade),
+            operator_state: Arc::new(McpOperatorState::default()),
         }
     }
 
@@ -46,6 +57,7 @@ impl McpSystemServiceProvider {
         Self {
             descriptor: mcp_service_descriptor(),
             facade: None,
+            operator_state: Arc::new(McpOperatorState::default()),
         }
     }
 
@@ -53,6 +65,13 @@ impl McpSystemServiceProvider {
         self.facade
             .clone()
             .ok_or_else(|| ServiceError::ServiceUnavailable("MCP runtime is not configured".into()))
+    }
+
+    fn operator(&self) -> ServiceResult<McpOperatorLifecycle> {
+        Ok(McpOperatorLifecycle::new(
+            self.facade()?,
+            self.operator_state.clone(),
+        ))
     }
 
     fn trace(command: &ServiceCommand) -> ServiceResult<TraceContext> {
@@ -238,6 +257,25 @@ impl SystemService for McpSystemServiceProvider {
                     );
                     return Ok(Self::service_result(to_value(result)?, trace));
                 }
+                if typed
+                    .invocation
+                    .policy
+                    .metadata
+                    .get("mcp.oauth_required")
+                    .is_some_and(|value| value == "true")
+                {
+                    tracing::warn!(
+                        trace_id = %typed.invocation.trace.trace_id,
+                        visible_tool = %typed.invocation.tool_name,
+                        "mcp service tool invocation rejected because oauth is required"
+                    );
+                    let result = failed_invocation_result(
+                        &typed.invocation.tool_name,
+                        "mcp_oauth_required",
+                        typed.invocation.trace,
+                    );
+                    return Ok(Self::service_result(to_value(result)?, trace));
+                }
                 let facade = self.facade()?;
                 let server_id = typed.server_id.as_deref().ok_or_else(|| {
                     ServiceError::UnsupportedCommand(
@@ -284,6 +322,134 @@ impl SystemService for McpSystemServiceProvider {
                     to_value(status_result(statuses))?,
                     typed.trace,
                 ))
+            }
+            MCP_SERVER_STATUS_LIST_COMMAND => {
+                let typed: McpServerStatusListCommand = decode(command.payload)?;
+                let facade = self.facade()?;
+                let policy = runtime_policy_from_hints(typed.policy);
+                let statuses = status_result(facade.probe(&policy).await).statuses;
+                let operator_statuses = self.operator()?.status_list(statuses).await;
+                tracing::info!(
+                    trace_id = %typed.trace.trace_id,
+                    count = operator_statuses.len(),
+                    "mcp operator server statuses emitted"
+                );
+                Ok(Self::service_result(
+                    to_value(McpServerStatusListResult {
+                        statuses: operator_statuses,
+                        captured_at: chrono::Utc::now(),
+                    })?,
+                    typed.trace,
+                ))
+            }
+            MCP_RELOAD_COMMAND => {
+                let typed: McpReloadCommand = decode(command.payload)?;
+                let result = self
+                    .operator()?
+                    .reload(&typed.scope, typed.definitions)
+                    .await
+                    .map_err(ServiceError::AdapterFailure)?;
+                tracing::info!(
+                    trace_id = %typed.trace.trace_id,
+                    reloaded = result.reloaded,
+                    exposure_generation = result.exposure_generation,
+                    "mcp operator reload completed"
+                );
+                Ok(Self::service_result(to_value(result)?, typed.trace))
+            }
+            MCP_EXPOSURE_REFRESH_COMMAND => {
+                let typed: McpExposureRefreshCommand = decode(command.payload)?;
+                let (refreshed, generation, tool_count) = self
+                    .operator()?
+                    .refresh_exposure(&typed.thread_id, &McpToolPolicy::default())
+                    .await;
+                tracing::info!(
+                    trace_id = %typed.trace.trace_id,
+                    thread_id = %typed.thread_id,
+                    refreshed,
+                    exposure_generation = generation,
+                    "mcp operator exposure refresh evaluated"
+                );
+                Ok(Self::service_result(
+                    to_value(McpExposureRefreshResult {
+                        thread_id: typed.thread_id,
+                        refreshed,
+                        exposure_generation: generation,
+                        visible_tool_count: tool_count,
+                        captured_at: chrono::Utc::now(),
+                    })?,
+                    typed.trace,
+                ))
+            }
+            MCP_OAUTH_LOGIN_COMMAND => {
+                let typed: McpOAuthLoginCommand = decode(command.payload)?;
+                let result = self.operator()?.start_oauth(&typed.server_id).await;
+                tracing::info!(
+                    trace_id = %typed.trace.trace_id,
+                    server_id = %typed.server_id,
+                    "mcp operator oauth login started"
+                );
+                Ok(Self::service_result(to_value(result)?, typed.trace))
+            }
+            MCP_OAUTH_STATUS_COMMAND => {
+                let typed: McpOAuthStatusCommand = decode(command.payload)?;
+                let result = self.operator()?.oauth_status(&typed.server_id).await;
+                Ok(Self::service_result(to_value(result)?, typed.trace))
+            }
+            MCP_RESOURCE_LIST_COMMAND => {
+                let typed: McpResourceListCommand = decode(command.payload)?;
+                let result = self
+                    .operator()?
+                    .resource_list(
+                        typed.server_id.as_deref(),
+                        &runtime_policy_from_hints(typed.policy),
+                    )
+                    .await;
+                tracing::info!(
+                    trace_id = %typed.trace.trace_id,
+                    count = result.resources.len(),
+                    "mcp operator resources listed"
+                );
+                Ok(Self::service_result(to_value(result)?, typed.trace))
+            }
+            MCP_RESOURCE_TEMPLATE_LIST_COMMAND => {
+                let typed: McpResourceListCommand = decode(command.payload)?;
+                let result = self
+                    .operator()?
+                    .resource_template_list(
+                        typed.server_id.as_deref(),
+                        &runtime_policy_from_hints(typed.policy),
+                    )
+                    .await;
+                Ok(Self::service_result(to_value(result)?, typed.trace))
+            }
+            MCP_RESOURCE_READ_COMMAND => {
+                let typed: McpResourceReadCommand = decode(command.payload)?;
+                let result = self
+                    .operator()?
+                    .read_resource(
+                        &typed.server_id,
+                        &typed.uri,
+                        typed.max_bytes,
+                        &McpToolPolicy::default(),
+                    )
+                    .await;
+                tracing::info!(
+                    trace_id = %typed.trace.trace_id,
+                    server_id = %typed.server_id,
+                    uri_hash = %crate::tool_service_provider_state::stable_json_hash(&serde_json::json!(typed.uri)),
+                    truncated = result.truncated,
+                    "mcp operator resource read completed"
+                );
+                Ok(Self::service_result(to_value(result)?, typed.trace))
+            }
+            MCP_DIAGNOSTICS_SNAPSHOT_COMMAND => {
+                let typed: McpDiagnosticsSnapshotCommand = decode(command.payload)?;
+                let facade = self.facade()?;
+                let statuses =
+                    status_result(facade.probe(&McpToolPolicy::default()).await).statuses;
+                let result = self.operator()?.diagnostics(statuses).await;
+                Ok(Self::service_result(to_value(result)?, typed.trace))
             }
             MCP_SNAPSHOT_COMMAND => {
                 let typed: McpServiceSnapshotCommand = decode(command.payload)?;
@@ -379,6 +545,10 @@ pub fn mcp_service_descriptor() -> ServiceDescriptor {
             macaca_proto::CapabilityId::new("capability.mcp.cleanup"),
             "Cleans MCP resources through explicit lifecycle scope.",
         ),
+        ServiceCapability::new(
+            macaca_proto::CapabilityId::new("capability.mcp.operator_lifecycle"),
+            "Manages MCP reload, OAuth, resources, diagnostics, and exposure refresh.",
+        ),
     ];
     descriptor.health = ServiceHealth::Healthy;
     descriptor.supported_scopes = vec![
@@ -391,6 +561,10 @@ pub fn mcp_service_descriptor() -> ServiceDescriptor {
         "mcp.probe".into(),
         "mcp.tool.catalog".into(),
         "mcp.tool.invoke".into(),
+        "mcp.server.reload".into(),
+        "mcp.oauth.login".into(),
+        "mcp.resource.read".into(),
+        "mcp.diagnostics.snapshot".into(),
         "mcp.cleanup".into(),
     ];
     descriptor.cleanup_policy = CleanupPolicy::Always;
@@ -609,7 +783,9 @@ mod tests {
     use macaca_framework::mcp::McpTransportConfig;
     use macaca_kernel::SystemService;
     use macaca_proto::{
-        ApplicationId, CapabilityToolInvocation, CapabilityToolInvocationScope, ServiceCommandName,
+        ApplicationId, CapabilityToolInvocation, CapabilityToolInvocationScope,
+        McpExposureRefreshCommand, McpOAuthLoginCommand, McpOAuthState, McpReloadCommand,
+        ServiceCommandName,
     };
 
     fn scoped_invocation(trace_id: &str, session_id: &str) -> CapabilityToolInvocation {
@@ -623,6 +799,25 @@ mod tests {
             tool_name: "mcp_lookup".into(),
             input: serde_json::json!({"query": "value"}),
             policy: CapabilityToolPolicyHints::default(),
+        }
+    }
+
+    fn operator_definition(server_id: &str) -> crate::McpServerDefinition {
+        crate::McpServerDefinition {
+            id: server_id.into(),
+            transport: McpTransportConfig::Stdio {
+                command: "missing-test-mcp-binary".into(),
+                args: Vec::new(),
+                env: std::collections::BTreeMap::new(),
+                cwd: None,
+            },
+            lifecycle: crate::mcp_runtime::McpLifecycleScope::AgentSession,
+            session_mode: macaca_framework::mcp::McpSessionMode::Stateful,
+            tool_prefix: Some("fixture".into()),
+            required_bins: Vec::new(),
+            enabled: true,
+            source: crate::McpDefinitionSource::Global,
+            concurrency_isolation: None,
         }
     }
 
@@ -652,6 +847,71 @@ mod tests {
             invocation.metadata.get("mcp.policy_decision"),
             Some(&"deny".to_string())
         );
+    }
+
+    #[tokio::test]
+    async fn operator_reload_marks_thread_for_next_turn_exposure_refresh() {
+        let provider = McpSystemServiceProvider::new(Arc::new(McpRuntimeFacade::new()));
+        let app_id = ApplicationId::new();
+        let scope =
+            macaca_proto::McpServiceScope::agent_session(app_id, "thread-a", "agent-a").unwrap();
+        let reload = McpReloadCommand {
+            trace: TraceContext::new("trace-mcp-reload"),
+            scope: scope.clone(),
+            definitions: vec![serde_json::to_value(operator_definition("server-a")).unwrap()],
+            reason: Some("test reload".into()),
+        };
+        let result = provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new(MCP_RELOAD_COMMAND),
+                serde_json::to_value(reload).unwrap(),
+                TraceContext::new("trace-mcp-reload"),
+            ))
+            .await
+            .unwrap();
+        let reload: macaca_proto::McpReloadResult = serde_json::from_value(result.output).unwrap();
+        assert_eq!(reload.reloaded, 1);
+        assert_eq!(reload.pending_thread_ids, vec!["thread-a".to_string()]);
+
+        let refresh = McpExposureRefreshCommand {
+            trace: TraceContext::new("trace-mcp-refresh"),
+            scope,
+            thread_id: "thread-a".into(),
+            active_turn_id: Some("turn-a".into()),
+        };
+        let result = provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new(MCP_EXPOSURE_REFRESH_COMMAND),
+                serde_json::to_value(refresh).unwrap(),
+                TraceContext::new("trace-mcp-refresh"),
+            ))
+            .await
+            .unwrap();
+        let refresh: McpExposureRefreshResult = serde_json::from_value(result.output).unwrap();
+        assert!(refresh.refreshed);
+        assert_eq!(refresh.exposure_generation, 1);
+    }
+
+    #[tokio::test]
+    async fn operator_oauth_login_and_status_are_structured() {
+        let provider = McpSystemServiceProvider::new(Arc::new(McpRuntimeFacade::new()));
+        let command = McpOAuthLoginCommand {
+            trace: TraceContext::new("trace-mcp-oauth"),
+            scope: macaca_proto::McpServiceScope::default(),
+            server_id: "server-a".into(),
+        };
+        let result = provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new(MCP_OAUTH_LOGIN_COMMAND),
+                serde_json::to_value(command).unwrap(),
+                TraceContext::new("trace-mcp-oauth"),
+            ))
+            .await
+            .unwrap();
+        let status: macaca_proto::McpOAuthStatusResult =
+            serde_json::from_value(result.output).unwrap();
+        assert_eq!(status.state, McpOAuthState::LoginStarted);
+        assert!(status.login_flow_ref.is_some());
     }
 
     #[tokio::test]
@@ -703,6 +963,43 @@ mod tests {
         assert_eq!(
             invocation.error_summary.as_deref(),
             Some("mcp_provider_unavailable")
+        );
+        assert_eq!(
+            invocation.metadata.get("mcp.policy_decision"),
+            Some(&"deny".into())
+        );
+    }
+
+    #[tokio::test]
+    async fn invoke_returns_structured_failure_when_oauth_is_required() {
+        let provider = McpSystemServiceProvider::new(Arc::new(McpRuntimeFacade::new()));
+        let mut invocation = scoped_invocation("trace-mcp-oauth-required", "session-a");
+        invocation
+            .policy
+            .metadata
+            .insert("mcp.oauth_required".into(), "true".into());
+        let command = McpToolInvokeCommand {
+            invocation,
+            server_id: Some("server-a".into()),
+            backend_tool_name: Some("lookup".into()),
+            lifecycle: Some(McpServiceLifecycleScope::AgentSession),
+        };
+
+        let result = provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new(MCP_TOOL_INVOKE_COMMAND),
+                serde_json::to_value(command).unwrap(),
+                TraceContext::new("outer-trace"),
+            ))
+            .await
+            .unwrap();
+        let invocation: CapabilityToolInvocationResult =
+            serde_json::from_value(result.output).unwrap();
+
+        assert_eq!(invocation.status, "failed");
+        assert_eq!(
+            invocation.error_summary.as_deref(),
+            Some("mcp_oauth_required")
         );
         assert_eq!(
             invocation.metadata.get("mcp.policy_decision"),
