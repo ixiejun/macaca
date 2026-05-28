@@ -18,6 +18,7 @@ use crate::{
     TraceContext, TraceSchemaRef,
 };
 
+pub mod app_protocol;
 pub mod interaction;
 
 /// Stable command outcomes shared by all workbench-family services.
@@ -244,18 +245,6 @@ macro_rules! workbench_family_module {
     };
 }
 
-workbench_family_module!(
-    app_protocol,
-    "service.app_protocol",
-    "capability.app_protocol",
-    [
-        "app_protocol.initialize",
-        "app_protocol.subscribe",
-        "app_protocol.unsubscribe",
-        "app_protocol.notify",
-        "app_protocol.health"
-    ]
-);
 workbench_family_module!(
     file,
     "service.file",

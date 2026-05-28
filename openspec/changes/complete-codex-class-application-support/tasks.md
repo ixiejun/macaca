@@ -64,24 +64,24 @@
 
 ## 3. `service.app_protocol`: Bidirectional Protocol Gateway
 
-- [ ] 3.1 Create `service.app_protocol` descriptor, lifecycle, health,
+- [x] 3.1 Create `service.app_protocol` descriptor, lifecycle, health,
   snapshot, connection state, and unavailable provider.
-- [ ] 3.2 Implement initialize/initialized handshake with client metadata,
+- [x] 3.2 Implement initialize/initialized handshake with client metadata,
   protocol version, capability negotiation, and notification opt-out.
-- [ ] 3.3 Implement subscription create/close and thread/app/service event
+- [x] 3.3 Implement subscription create/close and thread/app/service event
   routing through focused clients.
-- [ ] 3.4 Implement JSON-RPC framing for websocket-compatible transport.
-- [ ] 3.5 Implement stdio/unix-socket-compatible transport adapters where the
+- [x] 3.4 Implement JSON-RPC framing for websocket-compatible transport.
+- [x] 3.5 Implement stdio/unix-socket-compatible transport adapters where the
   runtime supports them; otherwise expose structured unavailable diagnostics.
-- [ ] 3.6 Implement bounded ingress/outbound queues, overload error, retryable
+- [x] 3.6 Implement bounded ingress/outbound queues, overload error, retryable
   reason code, and backpressure logs.
-- [ ] 3.7 Implement health probes and connection lifecycle diagnostics.
-- [ ] 3.8 Translate Thread/Turn/Item, process output, filesystem changed,
+- [x] 3.7 Implement health probes and connection lifecycle diagnostics.
+- [x] 3.8 Translate Thread/Turn/Item, process output, filesystem changed,
   approval, hook, tool, review, diagnostics, MCP, skill, and plugin events into
   typed protocol notifications.
-- [ ] 3.9 Prove the gateway does not own interaction, file, process, sandbox,
+- [x] 3.9 Prove the gateway does not own interaction, file, process, sandbox,
   approval, plugin, MCP, skill, tool, Git, review, or diagnostics semantics.
-- [ ] 3.10 Add protocol tests for initialization gating, duplicate
+- [x] 3.10 Add protocol tests for initialization gating, duplicate
   initialization, overload, subscription close, event ordering, and redaction.
 
 ## 4. `service.file`: Filesystem Provider

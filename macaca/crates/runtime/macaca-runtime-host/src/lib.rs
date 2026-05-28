@@ -14,6 +14,8 @@
 
 pub mod agent_context_service_provider;
 pub mod agent_execution_service_provider;
+pub(crate) mod app_protocol_service_commands;
+pub mod app_protocol_service_provider;
 pub mod application_hosts;
 pub mod application_service_provider;
 pub mod autonomy_dispatch;
@@ -112,6 +114,8 @@ pub mod wasm_runtime_provider;
 pub mod web3_service_provider;
 
 #[cfg(test)]
+mod app_protocol_service_provider_tests;
+#[cfg(test)]
 mod interaction_service_provider_tests;
 #[cfg(test)]
 mod interaction_service_state_tests;
@@ -164,6 +168,8 @@ pub use agent_context_service_provider::{
 pub use agent_execution_service_provider::{
     agent_execution_service_descriptor, AgentExecutionBackend, AgentExecutionSystemServiceProvider,
 };
+pub use app_protocol_service_commands::app_protocol_service_command;
+pub use app_protocol_service_provider::AppProtocolSystemServiceProvider;
 pub use application_hosts::{
     is_application_runtime_unavailable, ApplicationHostRuntime, UnavailableApplicationRuntimeHost,
     UnavailableWasmApplicationHost, WasmApplicationHostFactory,

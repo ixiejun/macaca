@@ -5,6 +5,7 @@
 //! the kernel from declarative config files.
 
 pub mod ability_kit;
+pub mod app_protocol_client;
 pub mod application;
 pub mod application_client;
 pub mod application_kit;
@@ -50,6 +51,9 @@ pub mod web3_client;
 pub mod workbench_client;
 
 pub use ability_kit::{AbilityDescriptorBuilder, AbilityKit};
+pub use app_protocol_client::{
+    ServiceBackedAppProtocolClient, SystemAppProtocolClient, UnavailableSystemAppProtocolClient,
+};
 pub use application::{
     service_call_command, trace_emit_command, ApplicationAbiBuilder, ApplicationHostCommandBuilder,
 };
