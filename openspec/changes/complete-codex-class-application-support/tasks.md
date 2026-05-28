@@ -347,22 +347,22 @@
 
 ## 19. Codex-class Application-neutral Proof
 
-- [ ] 19.1 Add a proof fixture application manifest declaring the full
+- [x] 19.1 Add a proof fixture application manifest declaring the full
   workbench capability set.
-- [ ] 19.2 Start a thread and turn through `service.interaction`.
-- [ ] 19.3 Inspect repository files through `service.file`.
-- [ ] 19.4 Search code through `service.code_intelligence`.
-- [ ] 19.5 Apply a patch through `service.git`.
-- [ ] 19.6 Run tests through `service.process` under `service.sandbox`.
-- [ ] 19.7 Trigger and resolve an approval through `service.approval`.
-- [ ] 19.8 Run pre/post hooks through `service.hook`.
-- [ ] 19.9 Invoke at least one MCP or skill tool through `service.tool`.
-- [ ] 19.10 Produce structured review findings through `service.review`.
-- [ ] 19.11 Produce diagnostics through `service.diagnostics`.
-- [ ] 19.12 Stream all Thread/Turn/Item, process output, file change, tool,
+- [x] 19.2 Start a thread and turn through `service.interaction`.
+- [x] 19.3 Inspect repository files through `service.file`.
+- [x] 19.4 Search code through `service.code_intelligence`.
+- [x] 19.5 Apply a patch through `service.git`.
+- [x] 19.6 Run tests through `service.process` under `service.sandbox`.
+- [x] 19.7 Trigger and resolve an approval through `service.approval`.
+- [x] 19.8 Run pre/post hooks through `service.hook`.
+- [x] 19.9 Invoke at least one MCP or skill tool through `service.tool`.
+- [x] 19.10 Produce structured review findings through `service.review`.
+- [x] 19.11 Produce diagnostics through `service.diagnostics`.
+- [x] 19.12 Stream all Thread/Turn/Item, process output, file change, tool,
   approval, hook, review, and diagnostics events through `service.app_protocol`.
-- [ ] 19.13 Replay audit evidence and artifact refs for the workflow.
-- [ ] 19.14 Prove the workflow contains no OS-layer application-specific
+- [x] 19.13 Replay audit evidence and artifact refs for the workflow.
+- [x] 19.14 Prove the workflow contains no OS-layer application-specific
   branches.
 
 ## 20. Validation and Completion Gates
