@@ -8,12 +8,13 @@ use macaca_cli::command_handlers::{
     SkillCurationRunCommandHandler, SkillLifecycleCommandHandler,
     SkillOperationsSnapshotCommandHandler, SkillProposalDecisionCommandHandler,
     SkillRollbackCommandHandler, StatusCommandHandler, ToolOperationsSnapshotCommandHandler,
-    VersionCommandHandler, WebCommandHandler,
+    VersionCommandHandler, WebCommandHandler, WorkbenchOperationsSnapshotCommandHandler,
 };
 use macaca_cli::skill_operations::{
     SkillCliEvidenceRefs, SkillCliLifecycleAction, SkillCliRuntimeTarget,
 };
 use macaca_cli::tool_operations::ToolCliRuntimeTarget;
+use macaca_cli::workbench_operations::WorkbenchCliRuntimeTarget;
 use macaca_proto::config::MacacaConfig;
 
 /// Agent OS — autonomous agent orchestration platform.
@@ -51,6 +52,13 @@ enum Commands {
         target: ToolRuntimeArgs,
         #[command(subcommand)]
         command: ToolCommands,
+    },
+    /// Interactive workbench diagnostics.
+    Workbench {
+        #[command(flatten)]
+        target: WorkbenchRuntimeArgs,
+        #[command(subcommand)]
+        command: WorkbenchCommands,
     },
     /// Print version information.
     Version,
@@ -91,10 +99,26 @@ struct ToolRuntimeArgs {
     api_base: Option<String>,
 }
 
+/// Optional live Web/runtime target for Workbench diagnostics.
+#[derive(Args, Clone, Default)]
+struct WorkbenchRuntimeArgs {
+    #[arg(long)]
+    app_id: Option<String>,
+    #[arg(long)]
+    api_base: Option<String>,
+}
+
 /// Tool diagnostics subcommands.
 #[derive(Subcommand)]
 enum ToolCommands {
     /// Print bounded Tool plan, provider health, and audit replay state.
+    Operations,
+}
+
+/// Workbench diagnostics subcommands.
+#[derive(Subcommand)]
+enum WorkbenchCommands {
+    /// Print focused-client snapshots for workbench-family services.
     Operations,
 }
 
@@ -210,6 +234,9 @@ async fn main() {
         },
         Commands::Skill { target, command } => run_skill_command(target.into(), command).await,
         Commands::Tool { target, command } => run_tool_command(target.into(), command).await,
+        Commands::Workbench { target, command } => {
+            run_workbench_command(target.into(), command).await
+        }
         Commands::Version => {
             VersionCommandHandler::new(env!("CARGO_PKG_VERSION"))
                 .run()
@@ -221,6 +248,19 @@ async fn main() {
     if let Err(e) = result {
         tracing::error!(error = %e, "Command failed");
         std::process::exit(1);
+    }
+}
+
+async fn run_workbench_command(
+    target: WorkbenchCliRuntimeTarget,
+    command: WorkbenchCommands,
+) -> macaca_proto::error::MacacaResult<()> {
+    match command {
+        WorkbenchCommands::Operations => {
+            WorkbenchOperationsSnapshotCommandHandler::new(target)
+                .run()
+                .await
+        }
     }
 }
 
@@ -350,6 +390,15 @@ impl From<SkillRuntimeArgs> for SkillCliRuntimeTarget {
 
 impl From<ToolRuntimeArgs> for ToolCliRuntimeTarget {
     fn from(args: ToolRuntimeArgs) -> Self {
+        Self {
+            app_id: args.app_id,
+            api_base: args.api_base,
+        }
+    }
+}
+
+impl From<WorkbenchRuntimeArgs> for WorkbenchCliRuntimeTarget {
+    fn from(args: WorkbenchRuntimeArgs) -> Self {
         Self {
             app_id: args.app_id,
             api_base: args.api_base,

@@ -18,6 +18,14 @@ Codex-class coding workflow using generic Macaca OS services.
   lifecycle, approvals, hooks, review findings, and diagnostics SHALL stream as
   typed bounded notifications
 
+#### Scenario: Shell adapters remain thin
+- **WHEN** Web, CLI, or frontend exposes workbench operations
+- **THEN** it SHALL call focused SDK clients or public shell API adapters only
+- **AND** it SHALL render descriptors, snapshots, typed events, provider health,
+  and structured unavailable diagnostics without owning policy, approval,
+  filesystem, process, sandbox, tool routing, plugin lifecycle, or application
+  workflow semantics
+
 ### Requirement: Application Framework Manifest Integration
 The Application Framework SHALL let YAML, WASM, GenUI, headless, and
 workbench-style applications declare the same generic workbench capability

@@ -57,6 +57,7 @@ pub mod tool_routes;
 pub mod trace_events;
 mod wasm_orchestration_backend;
 pub mod web3_status;
+pub mod workbench_routes;
 pub mod workspace;
 mod workspace_knowledge_digest_capability;
 mod workspace_memory_recall_source;

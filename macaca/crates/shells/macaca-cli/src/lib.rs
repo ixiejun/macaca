@@ -10,6 +10,7 @@ pub mod commands;
 pub mod logging;
 pub mod skill_operations;
 pub mod tool_operations;
+pub mod workbench_operations;
 
 pub use commands::{
     execute_list_agents, execute_list_plugins, execute_run_kernel, execute_show_status,

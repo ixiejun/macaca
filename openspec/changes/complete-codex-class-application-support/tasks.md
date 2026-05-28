@@ -314,19 +314,19 @@
 
 ## 17. Shell, Web, CLI, and Frontend Adapters
 
-- [ ] 17.1 Add Web routes for interaction, app protocol diagnostics, file,
+- [x] 17.1 Add Web routes for interaction, app protocol diagnostics, file,
   process, sandbox, approval, hooks, config, plugin, MCP, skill, code, Git,
   review, diagnostics, realtime, and remote environment through focused
   clients only.
-- [ ] 17.2 Add CLI commands for operator diagnostics and local testing through
+- [x] 17.2 Add CLI commands for operator diagnostics and local testing through
   focused clients only.
-- [ ] 17.3 Add frontend views for Thread/Turn/Item streams, process output,
+- [x] 17.3 Add frontend views for Thread/Turn/Item streams, process output,
   file changes, approvals, hooks, plugin/MCP/skill status, review findings,
   diagnostics, and provider health.
-- [ ] 17.4 Ensure frontend remains a renderer and never owns policy, approval,
+- [x] 17.4 Ensure frontend remains a renderer and never owns policy, approval,
   tool routing, plugin lifecycle, file/process/sandbox semantics, or coding
   workflow logic.
-- [ ] 17.5 Add UI/API tests proving shell surfaces degrade gracefully when
+- [x] 17.5 Add UI/API tests proving shell surfaces degrade gracefully when
   optional providers are unavailable.
 
 ## 18. Tool Capability Plane Integration

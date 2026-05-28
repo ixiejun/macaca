@@ -12,6 +12,7 @@ use crate::skill_operations::{
     self, SkillCliEvidenceRefs, SkillCliLifecycleAction, SkillCliRuntimeTarget,
 };
 use crate::tool_operations::{self, ToolCliRuntimeTarget};
+use crate::workbench_operations::{self, WorkbenchCliRuntimeTarget};
 
 /// Canonical command execution boundary for CLI subcommands.
 #[async_trait(?Send)]
@@ -84,6 +85,25 @@ impl ToolOperationsSnapshotCommandHandler {
 impl CliCommandHandler for ToolOperationsSnapshotCommandHandler {
     async fn run(&self) -> MacacaResult<()> {
         tool_operations::execute_tool_operations_snapshot(self.target.clone()).await
+    }
+}
+
+/// Handler for printing bounded workbench-family diagnostics.
+#[derive(Debug, Default)]
+pub struct WorkbenchOperationsSnapshotCommandHandler {
+    target: WorkbenchCliRuntimeTarget,
+}
+
+impl WorkbenchOperationsSnapshotCommandHandler {
+    pub fn new(target: WorkbenchCliRuntimeTarget) -> Self {
+        Self { target }
+    }
+}
+
+#[async_trait(?Send)]
+impl CliCommandHandler for WorkbenchOperationsSnapshotCommandHandler {
+    async fn run(&self) -> MacacaResult<()> {
+        workbench_operations::execute_workbench_operations_snapshot(self.target.clone()).await
     }
 }
 
