@@ -390,6 +390,31 @@ mod tests {
     }
 
     #[test]
+    fn application_manifest_v1_declares_code_git_and_review_tool_families() {
+        let manifest = ApplicationManifestV1::new(
+            PackageId::new("application.workbench.policy.fixture"),
+            DeveloperId::new("developer.fixture"),
+            "Workbench Policy Fixture",
+            "1.0.0",
+            ApplicationRuntimeProfile::new(PackageRuntimeKind::Yaml, "1"),
+            ApplicationCompatibilityDeclaration::new("0.1.0"),
+        )
+        .tool_family("code_intelligence")
+        .tool_family("git")
+        .tool_family("review")
+        .toolset("industrial.proof");
+
+        let encoded = serde_json::to_string(&manifest).unwrap();
+        let decoded: ApplicationManifestV1 = serde_json::from_str(&encoded).unwrap();
+
+        assert_eq!(
+            decoded.tool_families,
+            vec!["code_intelligence", "git", "review"]
+        );
+        assert_eq!(decoded.toolsets, vec!["industrial.proof"]);
+    }
+
+    #[test]
     fn application_manifest_v1_roundtrips_sandbox_policy_declarations() {
         let manifest = ApplicationManifestV1::new(
             PackageId::new("application.sandbox.policy.fixture"),

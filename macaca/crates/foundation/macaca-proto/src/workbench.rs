@@ -20,12 +20,15 @@ use crate::{
 
 pub mod app_protocol;
 pub mod approval;
+pub mod code_intelligence;
 pub mod config;
 pub mod file;
+pub mod git;
 pub mod hook;
 pub mod interaction;
 pub mod plugin_marketplace;
 pub mod process;
+pub mod review;
 pub mod sandbox;
 
 /// Compatibility module name used by the initial workbench descriptor catalog.
@@ -261,40 +264,6 @@ macro_rules! workbench_family_module {
     };
 }
 
-workbench_family_module!(
-    code_intelligence,
-    "service.code_intelligence",
-    "capability.code_intelligence",
-    [
-        "code.search",
-        "code.symbol.context",
-        "code.references.find",
-        "code.diagnostics"
-    ]
-);
-workbench_family_module!(
-    git,
-    "service.git",
-    "capability.git",
-    [
-        "git.status",
-        "git.diff",
-        "git.apply_patch",
-        "git.rollback_marker.create",
-        "git.rollback_marker.replay"
-    ]
-);
-workbench_family_module!(
-    review,
-    "service.review",
-    "capability.review",
-    [
-        "review.start",
-        "review.progress",
-        "review.result",
-        "review.findings.list"
-    ]
-);
 workbench_family_module!(
     diagnostics,
     "service.diagnostics",

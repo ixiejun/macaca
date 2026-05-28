@@ -41,6 +41,9 @@ pub const REQUIRED_INDUSTRIAL_TOOL_FAMILIES: &[&str] = &[
     "web",
     "memory",
     "knowledge",
+    "code_intelligence",
+    "git",
+    "review",
     "task",
     "scheduler",
     "skill",
@@ -159,6 +162,9 @@ pub fn industrial_tool_planning_service() -> MacacaResult<ToolPlanningService> {
         macaca_memory::MEMORY_SERVICE_ID,
         macaca_context::CONTEXT_SERVICE_ID,
         macaca_proto::workbench::file::SERVICE_ID,
+        macaca_proto::workbench::code_intelligence::SERVICE_ID,
+        macaca_proto::workbench::git::SERVICE_ID,
+        macaca_proto::workbench::review::SERVICE_ID,
         macaca_proto::workbench::sandbox::SERVICE_ID,
         macaca_proto::workbench::process::SERVICE_ID,
         TASK_SERVICE_ID,
@@ -271,6 +277,27 @@ fn family_specs() -> Vec<FamilySpec> {
             ToolExecutorRouteKind::OwningServiceCommand,
             ToolResultClass::StructuredJson,
             ToolSideEffectClass::ReadOnly,
+        ),
+        spec(
+            "code_intelligence",
+            "owning_service",
+            ToolExecutorRouteKind::OwningServiceCommand,
+            ToolResultClass::StructuredJson,
+            ToolSideEffectClass::ReadOnly,
+        ),
+        spec(
+            "git",
+            "owning_service",
+            ToolExecutorRouteKind::OwningServiceCommand,
+            ToolResultClass::StructuredJson,
+            ToolSideEffectClass::Write,
+        ),
+        spec(
+            "review",
+            "owning_service",
+            ToolExecutorRouteKind::OwningServiceCommand,
+            ToolResultClass::StructuredJson,
+            ToolSideEffectClass::Write,
         ),
         spec(
             "task",
@@ -395,6 +422,9 @@ fn owner_service_for(family: &str, route_kind: &ToolExecutorRouteKind) -> String
             "sandbox" => macaca_proto::workbench::sandbox::SERVICE_ID.into(),
             "shell" | "code_execution" => macaca_proto::workbench::process::SERVICE_ID.into(),
             "knowledge" => macaca_context::CONTEXT_SERVICE_ID.into(),
+            "code_intelligence" => macaca_proto::workbench::code_intelligence::SERVICE_ID.into(),
+            "git" => macaca_proto::workbench::git::SERVICE_ID.into(),
+            "review" => macaca_proto::workbench::review::SERVICE_ID.into(),
             "task" => TASK_SERVICE_ID.into(),
             "scheduler" => SCHEDULER_SERVICE_ID.into(),
             "payment_entitlement" => ENTITLEMENT_SERVICE_ID.into(),
@@ -495,6 +525,11 @@ fn command_name_for(spec: &FamilySpec) -> Option<String> {
         ToolExecutorRouteKind::Plugin => Some("tool.plugin.invoke".into()),
         ToolExecutorRouteKind::OwningServiceCommand => match spec.family {
             "file" => Some(macaca_proto::workbench::file::TOOL_INVOKE_COMMAND.into()),
+            "code_intelligence" => {
+                Some(macaca_proto::workbench::code_intelligence::SEARCH_COMMAND.into())
+            }
+            "git" => Some(macaca_proto::workbench::git::STATUS_COMMAND.into()),
+            "review" => Some(macaca_proto::workbench::review::START_COMMAND.into()),
             "sandbox" => Some(macaca_proto::workbench::sandbox::TOOL_INVOKE_COMMAND.into()),
             "shell" | "code_execution" => {
                 Some(macaca_proto::workbench::process::TOOL_INVOKE_COMMAND.into())
@@ -523,19 +558,20 @@ fn availability_for(spec: &FamilySpec) -> Vec<AvailabilityExpression> {
 fn toolsets_for_family(family: &str) -> Vec<&'static str> {
     let mut toolsets = vec!["industrial.full_stack"];
     match family {
-        "web" | "file" | "sandbox" | "shell" | "memory" | "document" | "scheduler" => {
+        "web" | "file" | "sandbox" | "shell" | "memory" | "document" | "scheduler" | "git"
+        | "review" => {
             toolsets.push("industrial.proof");
         }
         _ => {}
     }
     match family {
-        "web" | "browser" | "memory" | "knowledge" | "document" => {
+        "web" | "browser" | "memory" | "knowledge" | "document" | "code_intelligence" => {
             toolsets.push("industrial.research");
         }
         _ => {}
     }
     match family {
-        "task" | "scheduler" | "skill" | "mcp" | "computer_use" => {
+        "task" | "scheduler" | "skill" | "mcp" | "computer_use" | "review" => {
             toolsets.push("industrial.automation");
         }
         _ => {}

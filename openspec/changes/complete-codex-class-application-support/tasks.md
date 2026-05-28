@@ -259,23 +259,23 @@
 
 ## 14. Code Intelligence, Git, Patch, and Review
 
-- [ ] 14.1 Create `service.code_intelligence` with descriptor, lifecycle,
+- [x] 14.1 Create `service.code_intelligence` with descriptor, lifecycle,
   health, snapshot, local/search provider, mock provider, and unavailable
   provider.
-- [ ] 14.2 Implement code search, symbol context, file reference discovery, and
+- [x] 14.2 Implement code search, symbol context, file reference discovery, and
   analyzer diagnostics with bounded snippets and provider health diagnostics.
-- [ ] 14.3 Create `service.git` with descriptor, lifecycle, health, snapshot,
+- [x] 14.3 Create `service.git` with descriptor, lifecycle, health, snapshot,
   local Git provider, mock provider, and unavailable provider.
-- [ ] 14.4 Implement git status, diff, apply patch, rollback marker, path
+- [x] 14.4 Implement git status, diff, apply patch, rollback marker, path
   policy, pre-change memento, post-change hash, and patch provenance.
-- [ ] 14.5 Create `service.review` with descriptor, lifecycle, health,
+- [x] 14.5 Create `service.review` with descriptor, lifecycle, health,
   snapshot, local provider, mock provider, and unavailable provider.
-- [ ] 14.6 Implement review start/progress/result, structured findings,
+- [x] 14.6 Implement review start/progress/result, structured findings,
   severity, location, rationale, evidence refs, and artifact-backed review
   payloads.
-- [ ] 14.7 Wire code/Git/review descriptors into application manifests,
+- [x] 14.7 Wire code/Git/review descriptors into application manifests,
   service.tool where appropriate, and SDK focused clients.
-- [ ] 14.8 Add tests for path denial, patch conflict, rollback marker replay,
+- [x] 14.8 Add tests for path denial, patch conflict, rollback marker replay,
   analyzer unavailable, structured review findings, and audit replay.
 
 ## 15. Diagnostics, Feedback, Realtime, and Remote Environment

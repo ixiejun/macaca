@@ -27,6 +27,7 @@ pub(crate) mod autonomy_result_evidence;
 pub mod autonomy_runtime_config;
 pub mod autonomy_service_provider;
 pub mod autonomy_supervisor;
+pub mod code_intelligence_service_provider;
 pub mod compat;
 pub(crate) mod config_service_commands;
 pub mod config_service_provider;
@@ -48,6 +49,7 @@ pub(crate) mod finance_live_data;
 #[cfg(test)]
 pub mod finance_llm_analysis_provider;
 pub mod genui_surface_store;
+pub mod git_service_provider;
 pub(crate) mod hook_service_commands;
 pub mod hook_service_provider;
 pub mod interaction_ledger_store;
@@ -83,6 +85,7 @@ pub(crate) mod plugin_marketplace_service_support;
 pub(crate) mod process_service_local;
 pub mod process_service_provider;
 pub(crate) mod process_service_records;
+pub mod review_service_provider;
 pub mod route_c_bootstrap;
 pub(crate) mod sandbox_service_local;
 pub mod sandbox_service_provider;
@@ -137,9 +140,13 @@ mod app_protocol_service_provider_tests;
 #[cfg(test)]
 mod approval_service_provider_tests;
 #[cfg(test)]
+mod code_intelligence_service_provider_tests;
+#[cfg(test)]
 mod config_service_provider_tests;
 #[cfg(test)]
 mod file_service_provider_tests;
+#[cfg(test)]
+mod git_service_provider_tests;
 #[cfg(test)]
 mod hook_service_provider_tests;
 #[cfg(test)]
@@ -152,6 +159,8 @@ mod llm_service_provider_hardening_tests;
 mod plugin_marketplace_service_provider_tests;
 #[cfg(test)]
 mod process_service_provider_tests;
+#[cfg(test)]
+mod review_service_provider_tests;
 #[cfg(test)]
 mod sandbox_service_provider_tests;
 #[cfg(test)]
@@ -230,6 +239,10 @@ pub use autonomy_service_provider::{
     ScheduledAgentTaskSystemServiceProvider, SchedulerSystemServiceProvider,
 };
 pub use autonomy_supervisor::AutonomySupervisor;
+pub use code_intelligence_service_provider::{
+    bootstrap_local_code_intelligence_service, CodeIntelligenceProvider,
+    CodeIntelligenceSystemServiceProvider, LocalCodeIntelligenceProvider,
+};
 pub use config_service_provider::{bootstrap_local_config_service, ConfigSystemServiceProvider};
 pub use context_service_provider::ContextSystemServiceProvider;
 #[allow(deprecated)]
@@ -262,6 +275,9 @@ pub use file_service_provider::{bootstrap_local_file_service, FileSystemServiceP
 #[cfg(test)]
 pub use finance_llm_analysis_provider::FinanceLlmAnalysisSystemServiceProvider;
 pub use genui_surface_store::ApplicationGenUiSurfaceStore;
+pub use git_service_provider::{
+    bootstrap_local_git_service, GitProvider, GitSystemServiceProvider, LocalGitProvider,
+};
 pub use hook_service_provider::{bootstrap_local_hook_service, HookSystemServiceProvider};
 pub use interaction_ledger_store::{InteractionLedgerStore, PersistInteractionLedgerStore};
 pub use interaction_service_bootstrap::bootstrap_interaction_service;
@@ -328,6 +344,10 @@ pub use plugin_marketplace_service_provider::{
 };
 pub use process_service_local::{LocalProcessProvider, ProcessProvider};
 pub use process_service_provider::{bootstrap_local_process_service, ProcessSystemServiceProvider};
+pub use review_service_provider::{
+    bootstrap_local_review_service, LocalReviewProvider, ReviewProvider,
+    ReviewSystemServiceProvider,
+};
 pub use route_c_bootstrap::{
     bootstrap_route_c_optional_services, RouteCBootstrapDiagnostic, RouteCHostRuntimeBundle,
     RouteCOptionalServicesBootstrap, RouteCOptionalServicesBootstrapInputs,
