@@ -18,6 +18,8 @@ use crate::{
     TraceContext, TraceSchemaRef,
 };
 
+pub mod interaction;
+
 /// Stable command outcomes shared by all workbench-family services.
 ///
 /// The enum is deliberately data-only so absent providers, policy denials, and
@@ -242,22 +244,6 @@ macro_rules! workbench_family_module {
     };
 }
 
-workbench_family_module!(
-    interaction,
-    "service.interaction",
-    "capability.interaction_ledger",
-    [
-        "interaction.thread.start",
-        "interaction.thread.resume",
-        "interaction.thread.fork",
-        "interaction.thread.archive",
-        "interaction.thread.rollback",
-        "interaction.turn.start",
-        "interaction.turn.interrupt",
-        "interaction.item.append",
-        "interaction.item.list"
-    ]
-);
 workbench_family_module!(
     app_protocol,
     "service.app_protocol",

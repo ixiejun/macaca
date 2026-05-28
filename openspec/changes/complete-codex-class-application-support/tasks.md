@@ -43,24 +43,24 @@
 
 ## 2. `service.interaction`: Thread / Turn / Item Ledger
 
-- [ ] 2.1 Create `service.interaction` provider crate or runtime-host provider
+- [x] 2.1 Create `service.interaction` provider crate or runtime-host provider
   wrapper with descriptor, lifecycle, health, snapshot, command dispatch, and
   structured unavailable provider.
-- [ ] 2.2 Implement `interaction.thread.start`, `resume`, `fork`, `archive`,
+- [x] 2.2 Implement `interaction.thread.start`, `resume`, `fork`, `archive`,
   `unarchive`, `rollback`, `list`, `read`, and loaded-thread listing.
-- [ ] 2.3 Implement `interaction.turn.start`, `interrupt`, `steer`,
+- [x] 2.3 Implement `interaction.turn.start`, `interrupt`, `steer`,
   `complete`, `fail`, and turn history listing.
-- [ ] 2.4 Implement `interaction.item.append`, `complete`, `fail`, `list`, and
+- [x] 2.4 Implement `interaction.item.append`, `complete`, `fail`, `list`, and
   item watch/subscribe with bounded payloads.
-- [ ] 2.5 Persist Thread/Turn/Item records in a replayable store without using
+- [x] 2.5 Persist Thread/Turn/Item records in a replayable store without using
   shell memory as the source of truth.
-- [ ] 2.6 Store oversized or sensitive item payloads as artifact refs.
-- [ ] 2.7 Emit EventLog and audit events for thread, turn, and item lifecycle.
-- [ ] 2.8 Add replay tests for resume, fork, rollback, interrupted turn,
+- [x] 2.6 Store oversized or sensitive item payloads as artifact refs.
+- [x] 2.7 Emit EventLog and audit events for thread, turn, and item lifecycle.
+- [x] 2.8 Add replay tests for resume, fork, rollback, interrupted turn,
   completed turn, failed turn, and artifact-backed item payloads.
-- [ ] 2.9 Add compatibility adapters from existing session/event-log paths to
+- [x] 2.9 Add compatibility adapters from existing session/event-log paths to
   the new interaction service without regressing `/api/chat/v2`.
-- [ ] 2.10 Add shell-facing read/list APIs through SDK clients only.
+- [x] 2.10 Add shell-facing read/list APIs through SDK clients only.
 
 ## 3. `service.app_protocol`: Bidirectional Protocol Gateway
 

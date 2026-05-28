@@ -473,6 +473,13 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
     let event_log = Arc::new(macaca_persist::EventLog::new(Arc::clone(
         &session_store_impl,
     )));
+    macaca_runtime_host::bootstrap_interaction_service(
+        Arc::clone(&service_runtime),
+        Arc::clone(&session_store_shared),
+        Some(Arc::clone(&event_log)),
+        "web-startup-interaction-service",
+    )
+    .await?;
     let entitlement_store: Arc<dyn macaca_persist::EntitlementStore> =
         Arc::new(macaca_persist::InMemoryEntitlementStore::new());
     let payment_store: Arc<dyn macaca_persist::PaymentStore> =

@@ -40,6 +40,12 @@ pub(crate) mod finance_live_data;
 #[cfg(test)]
 pub mod finance_llm_analysis_provider;
 pub mod genui_surface_store;
+pub mod interaction_ledger_store;
+pub mod interaction_service_bootstrap;
+pub(crate) mod interaction_service_items;
+pub mod interaction_service_provider;
+pub(crate) mod interaction_service_threads;
+pub(crate) mod interaction_service_turns;
 pub mod lease;
 pub mod llm_service_provider;
 pub(crate) mod mcp_descriptor_index;
@@ -105,6 +111,10 @@ pub mod transport;
 pub mod wasm_runtime_provider;
 pub mod web3_service_provider;
 
+#[cfg(test)]
+mod interaction_service_provider_tests;
+#[cfg(test)]
+mod interaction_service_state_tests;
 #[cfg(test)]
 mod service_router_tests;
 #[cfg(test)]
@@ -202,6 +212,11 @@ pub use factory::{McpServerFactory, RuntimeEnvBuilder};
 #[cfg(test)]
 pub use finance_llm_analysis_provider::FinanceLlmAnalysisSystemServiceProvider;
 pub use genui_surface_store::ApplicationGenUiSurfaceStore;
+pub use interaction_ledger_store::{InteractionLedgerStore, PersistInteractionLedgerStore};
+pub use interaction_service_bootstrap::bootstrap_interaction_service;
+pub use interaction_service_provider::{
+    interaction_service_command, InteractionLedgerEvent, InteractionSystemServiceProvider,
+};
 pub use lease::McpSessionLease;
 pub use llm_service_provider::LlmSystemServiceProvider;
 #[allow(deprecated)]

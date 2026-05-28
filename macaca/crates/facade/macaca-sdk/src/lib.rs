@@ -19,6 +19,7 @@ pub mod evm;
 pub mod evm_client;
 pub mod facade;
 pub mod heartbeat_client;
+pub mod interaction_client;
 pub mod llm_client;
 pub mod mcp_client;
 pub mod memory_client;
@@ -84,6 +85,9 @@ pub use evm_client::{ServiceBackedEvmClient, SystemEvmClient, UnavailableSystemE
 pub use facade::{AgentRegistryApi, KernelAgentRegistry, KernelPrimitiveSdk, MacacaSdk};
 pub use heartbeat_client::{
     ServiceBackedHeartbeatClient, SystemHeartbeatClient, UnavailableSystemHeartbeatClient,
+};
+pub use interaction_client::{
+    ServiceBackedInteractionClient, SystemInteractionClient, UnavailableSystemInteractionClient,
 };
 pub use llm_client::{ServiceBackedLlmClient, SystemLlmClient, UnavailableSystemLlmClient};
 pub use macaca_skill::{
