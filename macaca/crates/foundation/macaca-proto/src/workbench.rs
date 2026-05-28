@@ -22,12 +22,15 @@ pub mod app_protocol;
 pub mod approval;
 pub mod code_intelligence;
 pub mod config;
+pub mod diagnostics;
 pub mod file;
 pub mod git;
 pub mod hook;
 pub mod interaction;
 pub mod plugin_marketplace;
 pub mod process;
+pub mod realtime;
+pub mod remote_environment;
 pub mod review;
 pub mod sandbox;
 
@@ -224,81 +227,6 @@ impl WorkbenchServiceDescriptor {
         }
     }
 }
-
-macro_rules! workbench_family_module {
-    ($module:ident, $service_id:literal, $capability_id:literal, [$($command:literal),+ $(,)?]) => {
-        pub mod $module {
-            use serde::{Deserialize, Serialize};
-
-            use super::{BoundedSummary, WorkbenchCommand, WorkbenchServiceDescriptor};
-
-            pub const SERVICE_ID: &str = $service_id;
-            pub const CAPABILITY_ID: &str = $capability_id;
-            pub const COMMANDS: &[&str] = &[$($command),+];
-
-            /// Minimal provider-neutral request used by contract tests and early SDK facades.
-            ///
-            /// Concrete providers are expected to define richer internal input types, but public
-            /// service boundaries should continue to accept trace-scoped commands instead of
-            /// leaking provider or application workflow details.
-            #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-            pub struct Request {
-                pub operation: String,
-                pub target_ref: Option<String>,
-                pub summary: Option<BoundedSummary>,
-            }
-
-            pub type Command = WorkbenchCommand<Request>;
-
-            pub fn descriptor() -> WorkbenchServiceDescriptor {
-                WorkbenchServiceDescriptor::new(
-                    SERVICE_ID,
-                    CAPABILITY_ID,
-                    COMMANDS.to_vec(),
-                    concat!($service_id, ".events.v1"),
-                    concat!($service_id, ".audit.v1"),
-                    concat!($service_id, ".snapshot.v1"),
-                )
-            }
-        }
-    };
-}
-
-workbench_family_module!(
-    diagnostics,
-    "service.diagnostics",
-    "capability.diagnostics",
-    [
-        "diagnostics.snapshot",
-        "diagnostics.feedback.upload",
-        "diagnostics.trace.bundle",
-        "diagnostics.health.summary"
-    ]
-);
-workbench_family_module!(
-    realtime,
-    "service.realtime",
-    "capability.realtime",
-    [
-        "realtime.session.start",
-        "realtime.session.stop",
-        "realtime.text.send",
-        "realtime.audio.send",
-        "realtime.health"
-    ]
-);
-workbench_family_module!(
-    remote_environment,
-    "service.remote_environment",
-    "capability.remote_environment",
-    [
-        "remote_environment.register",
-        "remote_environment.health",
-        "remote_environment.workspace_roots",
-        "remote_environment.cleanup",
-        "remote_environment.select"
-    ]
-);
 
 /// Return descriptors for every workbench-family service introduced by the
 /// foundation contract slice.

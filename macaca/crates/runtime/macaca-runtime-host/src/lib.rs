@@ -32,6 +32,7 @@ pub mod compat;
 pub(crate) mod config_service_commands;
 pub mod config_service_provider;
 pub mod context_service_provider;
+pub mod diagnostics_service_provider;
 pub mod domain_pack_service_provider;
 pub mod driver_service_provider;
 pub mod entitlement;
@@ -85,6 +86,8 @@ pub(crate) mod plugin_marketplace_service_support;
 pub(crate) mod process_service_local;
 pub mod process_service_provider;
 pub(crate) mod process_service_records;
+pub mod realtime_service_provider;
+pub mod remote_environment_service_provider;
 pub mod review_service_provider;
 pub mod route_c_bootstrap;
 pub(crate) mod sandbox_service_local;
@@ -143,6 +146,8 @@ mod approval_service_provider_tests;
 mod code_intelligence_service_provider_tests;
 #[cfg(test)]
 mod config_service_provider_tests;
+#[cfg(test)]
+mod diagnostics_realtime_remote_service_provider_tests;
 #[cfg(test)]
 mod file_service_provider_tests;
 #[cfg(test)]
@@ -245,6 +250,9 @@ pub use code_intelligence_service_provider::{
 };
 pub use config_service_provider::{bootstrap_local_config_service, ConfigSystemServiceProvider};
 pub use context_service_provider::ContextSystemServiceProvider;
+pub use diagnostics_service_provider::{
+    bootstrap_local_diagnostics_service, DiagnosticsSystemServiceProvider,
+};
 #[allow(deprecated)]
 pub use domain_pack_service_provider::{
     bootstrap_builtin_domain_pack_services, bootstrap_domain_pack_services,
@@ -344,6 +352,8 @@ pub use plugin_marketplace_service_provider::{
 };
 pub use process_service_local::{LocalProcessProvider, ProcessProvider};
 pub use process_service_provider::{bootstrap_local_process_service, ProcessSystemServiceProvider};
+pub use realtime_service_provider::{RealtimeProvider, RealtimeSystemServiceProvider};
+pub use remote_environment_service_provider::RemoteEnvironmentSystemServiceProvider;
 pub use review_service_provider::{
     bootstrap_local_review_service, LocalReviewProvider, ReviewProvider,
     ReviewSystemServiceProvider,

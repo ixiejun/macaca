@@ -280,20 +280,20 @@
 
 ## 15. Diagnostics, Feedback, Realtime, and Remote Environment
 
-- [ ] 15.1 Create `service.diagnostics` with descriptor, lifecycle, health,
+- [x] 15.1 Create `service.diagnostics` with descriptor, lifecycle, health,
   snapshot, local provider, mock provider, and unavailable provider.
-- [ ] 15.2 Implement diagnostics snapshot, feedback upload, trace bundle, health
+- [x] 15.2 Implement diagnostics snapshot, feedback upload, trace bundle, health
   summary, redaction profile, and bounded bundle artifact refs.
-- [ ] 15.3 Add diagnostics sources for interaction, file, process, sandbox,
+- [x] 15.3 Add diagnostics sources for interaction, file, process, sandbox,
   approval, hooks, config, plugins, MCP, skills, tools, LLM, Git, review, and
   app protocol.
-- [ ] 15.4 Create optional `service.realtime` contract and unavailable provider;
+- [x] 15.4 Create optional `service.realtime` contract and unavailable provider;
   add text/audio/WebRTC provider seams without making realtime a base
   dependency.
-- [ ] 15.5 Create optional `service.remote_environment` contract and unavailable
+- [x] 15.5 Create optional `service.remote_environment` contract and unavailable
   provider; add remote exec-server registration, health, workspace roots,
   cleanup, and selection seams.
-- [ ] 15.6 Add tests proving diagnostics redaction, optional provider absence,
+- [x] 15.6 Add tests proving diagnostics redaction, optional provider absence,
   remote health diagnostics, and no base OS dependency on optional modules.
 
 ## 16. Application Framework and Manifest Integration
