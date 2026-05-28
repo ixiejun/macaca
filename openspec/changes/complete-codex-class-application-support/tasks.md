@@ -16,29 +16,29 @@
 
 ## 1. Foundation Contracts and SDK Facades
 
-- [ ] 1.1 Add provider-neutral DTO modules in `macaca-proto` for
+- [x] 1.1 Add provider-neutral DTO modules in `macaca-proto` for
   interaction ledger, app protocol, file, process, sandbox, approval, hook,
   config, plugin marketplace, code intelligence, Git, review, diagnostics,
   realtime, and remote environment.
-- [ ] 1.2 Add command constants and result enums for unavailable, unsupported,
+- [x] 1.2 Add command constants and result enums for unavailable, unsupported,
   denied, failed, pending approval, cancelled, timeout, artifact-backed, and
   completed states.
-- [ ] 1.3 Add service descriptors with lifecycle, health, snapshot, command
+- [x] 1.3 Add service descriptors with lifecycle, health, snapshot, command
   list, event schema, and audit schema for every new or upgraded service.
-- [ ] 1.4 Add trace-required command wrappers so every public service command
+- [x] 1.4 Add trace-required command wrappers so every public service command
   carries application id, session id, optional task/turn/thread refs, and
   `TraceContext`.
-- [ ] 1.5 Add artifact-ref DTOs and bounded summary DTOs for file contents,
+- [x] 1.5 Add artifact-ref DTOs and bounded summary DTOs for file contents,
   process output, item payloads, diagnostics bundles, review evidence, and
   provider payloads.
-- [ ] 1.6 Add focused SDK clients for each service.
-- [ ] 1.7 Add Null Object SDK clients returning structured unavailable states
+- [x] 1.6 Add focused SDK clients for each service.
+- [x] 1.7 Add Null Object SDK clients returning structured unavailable states
   without panics, fake success, or silent fallback.
-- [ ] 1.8 Add SystemFacade entrypoints that expose the focused clients without
+- [x] 1.8 Add SystemFacade entrypoints that expose the focused clients without
   constructing concrete providers.
-- [ ] 1.9 Add English comments to non-obvious DTOs and clients explaining
+- [x] 1.9 Add English comments to non-obvious DTOs and clients explaining
   ownership, trace requirements, redaction rules, and operating principles.
-- [ ] 1.10 Add contract tests for DTO serialization, command names, lifecycle
+- [x] 1.10 Add contract tests for DTO serialization, command names, lifecycle
   descriptors, health snapshots, and Null Object behavior.
 
 ## 2. `service.interaction`: Thread / Turn / Item Ledger

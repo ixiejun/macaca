@@ -39,6 +39,7 @@ pub mod wasm_runtime_provider;
 pub mod wasm_supply_chain;
 pub mod web3;
 pub mod web3_service;
+pub mod workbench;
 
 #[cfg(test)]
 mod a2a_tests;
@@ -56,6 +57,8 @@ mod tool_runtime_environment_tests;
 mod tool_service_tests;
 #[cfg(test)]
 mod web3_tests;
+#[cfg(test)]
+mod workbench_tests;
 
 pub use a2a::*;
 pub use agent_execution_service::*;
@@ -98,3 +101,4 @@ pub use wasm_runtime_provider::*;
 pub use wasm_supply_chain::*;
 pub use web3::*;
 pub use web3_service::*;
+pub use workbench::*;

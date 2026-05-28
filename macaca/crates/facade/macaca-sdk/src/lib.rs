@@ -46,6 +46,7 @@ pub mod tool_client;
 pub mod trace_client;
 pub mod validation;
 pub mod web3_client;
+pub mod workbench_client;
 
 pub use ability_kit::{AbilityDescriptorBuilder, AbilityKit};
 pub use application::{
@@ -152,3 +153,7 @@ pub use task_client::{TaskServiceClient, UnavailableTaskServiceClient};
 pub use tool_client::{ServiceBackedToolClient, SystemToolClient, UnavailableSystemToolClient};
 pub use validation::{SdkValidationChain, SdkValidator};
 pub use web3_client::{ServiceBackedWeb3Client, SystemWeb3Client, UnavailableSystemWeb3Client};
+pub use workbench_client::{
+    is_structured_unavailable, ServiceBackedWorkbenchClient, SystemWorkbenchClient,
+    SystemWorkbenchFacadeExt, UnavailableWorkbenchServiceClient, WorkbenchClientCatalog,
+};
