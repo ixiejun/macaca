@@ -331,18 +331,18 @@
 
 ## 18. Tool Capability Plane Integration
 
-- [ ] 18.1 Add descriptor contributors from file, process, sandbox, approval,
+- [x] 18.1 Add descriptor contributors from file, process, sandbox, approval,
   hook, plugin, MCP, skill, code intelligence, Git, review, diagnostics,
   realtime, and remote environment services.
-- [ ] 18.2 Update `tool.catalog.plan` to surface visible/hidden diagnostics for
+- [x] 18.2 Update `tool.catalog.plan` to surface visible/hidden diagnostics for
   workbench capabilities.
-- [ ] 18.3 Update `tool.toolset.resolve` for workbench toolsets without
+- [x] 18.3 Update `tool.toolset.resolve` for workbench toolsets without
   application-specific branches.
-- [ ] 18.4 Update `tool.invoke` routing to call owning services for all new
+- [x] 18.4 Update `tool.invoke` routing to call owning services for all new
   provider-backed families.
-- [ ] 18.5 Add policy/resource/approval/artifact/audit coverage for each new
+- [x] 18.5 Add policy/resource/approval/artifact/audit coverage for each new
   tool route.
-- [ ] 18.6 Add tests proving no descriptor-only route is considered complete
+- [x] 18.6 Add tests proving no descriptor-only route is considered complete
   unless invocation works or returns structured unavailable.
 
 ## 19. Codex-class Application-neutral Proof

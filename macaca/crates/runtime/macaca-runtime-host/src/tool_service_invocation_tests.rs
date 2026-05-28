@@ -14,9 +14,9 @@ use macaca_proto::{
 use serde_json::json;
 
 use crate::{
-    bootstrap_local_file_service, bootstrap_tool_planning_service, ServiceProviderFactoryContext,
-    ServiceProviderInstance, ServiceRuntime, ServiceRuntimeConfig, StaticServiceProviderFactory,
-    ToolPlanningService,
+    bootstrap_local_approval_service, bootstrap_local_file_service,
+    bootstrap_tool_planning_service, ServiceProviderFactoryContext, ServiceProviderInstance,
+    ServiceRuntime, ServiceRuntimeConfig, StaticServiceProviderFactory, ToolPlanningService,
 };
 
 #[tokio::test]
@@ -216,6 +216,45 @@ async fn tool_invoke_file_family_routes_to_service_file_provider() {
     assert_eq!(
         result.inline_output.unwrap()["Read"]["content"],
         serde_json::Value::String("from service.file".into())
+    );
+}
+
+#[tokio::test]
+async fn tool_invoke_workbench_family_routes_typed_payload_to_owning_service() {
+    let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
+    bootstrap_local_approval_service(runtime.clone(), "trace-bootstrap-approval-tool")
+        .await
+        .unwrap();
+    bootstrap_tool_planning_service(
+        runtime.clone(),
+        Arc::new(ToolPlanningService::builder().build()),
+        "trace-bootstrap-tool-approval",
+    )
+    .await
+    .unwrap();
+
+    let mut descriptor =
+        family_descriptor("approval", macaca_proto::workbench::approval::SERVICE_ID);
+    descriptor.executor_route = descriptor.executor_route.with_route_kind(
+        ToolExecutorRouteKind::OwningServiceCommand,
+        Some(macaca_proto::workbench::approval::POLICY_EXPLAIN_COMMAND.into()),
+    );
+    let result = invoke_tool(
+        runtime,
+        descriptor,
+        json!({
+            "side_effect_class": "tool_invocation",
+            "approval_profile_ref": null,
+            "metadata": {}
+        }),
+    )
+    .await;
+
+    assert_eq!(result.status, "ok");
+    assert_eq!(result.result_class, ToolResultClass::StructuredJson);
+    assert_eq!(
+        result.inline_output.unwrap()["output"]["PolicyExplanation"]["required"],
+        true
     );
 }
 

@@ -37,6 +37,10 @@ pub const REQUIRED_INDUSTRIAL_TOOL_FAMILIES: &[&str] = &[
     "file",
     "sandbox",
     "shell",
+    "approval",
+    "hook",
+    "config",
+    "plugin_marketplace",
     "browser",
     "web",
     "memory",
@@ -55,6 +59,9 @@ pub const REQUIRED_INDUSTRIAL_TOOL_FAMILIES: &[&str] = &[
     "code_execution",
     "computer_use",
     "payment_entitlement",
+    "diagnostics",
+    "realtime",
+    "remote_environment",
 ];
 
 /// Inventory row used by governance notes, tests, and descriptor generation.
@@ -142,6 +149,26 @@ pub fn industrial_tool_family_toolsets() -> MacacaResult<ToolPlanningToolsetReso
         .with_toolset(
             "industrial.automation",
             ["task", "scheduler", "skill", "mcp", "computer_use"],
+        )
+        .with_toolset(
+            "industrial.workbench",
+            [
+                "file",
+                "sandbox",
+                "shell",
+                "approval",
+                "hook",
+                "config",
+                "plugin_marketplace",
+                "mcp",
+                "skill",
+                "code_intelligence",
+                "git",
+                "review",
+                "diagnostics",
+                "realtime",
+                "remote_environment",
+            ],
         ))
 }
 
@@ -167,6 +194,11 @@ pub fn industrial_tool_planning_service() -> MacacaResult<ToolPlanningService> {
         macaca_proto::workbench::review::SERVICE_ID,
         macaca_proto::workbench::sandbox::SERVICE_ID,
         macaca_proto::workbench::process::SERVICE_ID,
+        macaca_proto::workbench::approval::SERVICE_ID,
+        macaca_proto::workbench::hook::SERVICE_ID,
+        macaca_proto::workbench::config::SERVICE_ID,
+        macaca_proto::workbench::plugin_marketplace::SERVICE_ID,
+        macaca_proto::workbench::diagnostics::SERVICE_ID,
         TASK_SERVICE_ID,
         SCHEDULER_SERVICE_ID,
         SCHEDULED_AGENT_TASK_SERVICE_ID,
@@ -249,6 +281,34 @@ fn family_specs() -> Vec<FamilySpec> {
             ToolExecutorRouteKind::OwningServiceCommand,
             ToolResultClass::StructuredJson,
             ToolSideEffectClass::Process,
+        ),
+        spec(
+            "approval",
+            "owning_service",
+            ToolExecutorRouteKind::OwningServiceCommand,
+            ToolResultClass::ApprovalRequest,
+            ToolSideEffectClass::External,
+        ),
+        spec(
+            "hook",
+            "owning_service",
+            ToolExecutorRouteKind::OwningServiceCommand,
+            ToolResultClass::StructuredJson,
+            ToolSideEffectClass::External,
+        ),
+        spec(
+            "config",
+            "owning_service",
+            ToolExecutorRouteKind::OwningServiceCommand,
+            ToolResultClass::StructuredJson,
+            ToolSideEffectClass::Write,
+        ),
+        spec(
+            "plugin_marketplace",
+            "owning_service",
+            ToolExecutorRouteKind::OwningServiceCommand,
+            ToolResultClass::StructuredJson,
+            ToolSideEffectClass::External,
         ),
         spec(
             "browser",
@@ -379,6 +439,33 @@ fn family_specs() -> Vec<FamilySpec> {
             ToolResultClass::StructuredJson,
             ToolSideEffectClass::External,
         ),
+        spec(
+            "diagnostics",
+            "owning_service",
+            ToolExecutorRouteKind::OwningServiceCommand,
+            ToolResultClass::StructuredJson,
+            ToolSideEffectClass::ReadOnly,
+        ),
+        FamilySpec {
+            unsupported_platform: true,
+            ..spec(
+                "realtime",
+                "owning_service",
+                ToolExecutorRouteKind::OwningServiceCommand,
+                ToolResultClass::StructuredJson,
+                ToolSideEffectClass::External,
+            )
+        },
+        FamilySpec {
+            unsupported_platform: true,
+            ..spec(
+                "remote_environment",
+                "owning_service",
+                ToolExecutorRouteKind::OwningServiceCommand,
+                ToolResultClass::StructuredJson,
+                ToolSideEffectClass::External,
+            )
+        },
     ]
 }
 
@@ -421,10 +508,17 @@ fn owner_service_for(family: &str, route_kind: &ToolExecutorRouteKind) -> String
             "file" => macaca_proto::workbench::file::SERVICE_ID.into(),
             "sandbox" => macaca_proto::workbench::sandbox::SERVICE_ID.into(),
             "shell" | "code_execution" => macaca_proto::workbench::process::SERVICE_ID.into(),
+            "approval" => macaca_proto::workbench::approval::SERVICE_ID.into(),
+            "hook" => macaca_proto::workbench::hook::SERVICE_ID.into(),
+            "config" => macaca_proto::workbench::config::SERVICE_ID.into(),
+            "plugin_marketplace" => macaca_proto::workbench::plugin_marketplace::SERVICE_ID.into(),
             "knowledge" => macaca_context::CONTEXT_SERVICE_ID.into(),
             "code_intelligence" => macaca_proto::workbench::code_intelligence::SERVICE_ID.into(),
             "git" => macaca_proto::workbench::git::SERVICE_ID.into(),
             "review" => macaca_proto::workbench::review::SERVICE_ID.into(),
+            "diagnostics" => macaca_proto::workbench::diagnostics::SERVICE_ID.into(),
+            "realtime" => macaca_proto::workbench::realtime::SERVICE_ID.into(),
+            "remote_environment" => macaca_proto::workbench::remote_environment::SERVICE_ID.into(),
             "task" => TASK_SERVICE_ID.into(),
             "scheduler" => SCHEDULER_SERVICE_ID.into(),
             "payment_entitlement" => ENTITLEMENT_SERVICE_ID.into(),
@@ -534,6 +628,19 @@ fn command_name_for(spec: &FamilySpec) -> Option<String> {
             "shell" | "code_execution" => {
                 Some(macaca_proto::workbench::process::TOOL_INVOKE_COMMAND.into())
             }
+            "approval" => Some(macaca_proto::workbench::approval::POLICY_EXPLAIN_COMMAND.into()),
+            "hook" => Some(macaca_proto::workbench::hook::CATALOG_LIST_COMMAND.into()),
+            "config" => Some(macaca_proto::workbench::config::FEATURE_LIST_COMMAND.into()),
+            "plugin_marketplace" => {
+                Some(macaca_proto::workbench::plugin_marketplace::PLUGIN_LIST_COMMAND.into())
+            }
+            "diagnostics" => {
+                Some(macaca_proto::workbench::diagnostics::HEALTH_SUMMARY_COMMAND.into())
+            }
+            "realtime" => Some(macaca_proto::workbench::realtime::HEALTH_COMMAND.into()),
+            "remote_environment" => {
+                Some(macaca_proto::workbench::remote_environment::HEALTH_COMMAND.into())
+            }
             _ => Some(format!("{}.tool.invoke", spec.family)),
         },
         _ => None,
@@ -558,8 +665,9 @@ fn availability_for(spec: &FamilySpec) -> Vec<AvailabilityExpression> {
 fn toolsets_for_family(family: &str) -> Vec<&'static str> {
     let mut toolsets = vec!["industrial.full_stack"];
     match family {
-        "web" | "file" | "sandbox" | "shell" | "memory" | "document" | "scheduler" | "git"
-        | "review" => {
+        "web" | "file" | "sandbox" | "shell" | "approval" | "hook" | "config"
+        | "plugin_marketplace" | "memory" | "document" | "scheduler" | "git" | "review"
+        | "diagnostics" => {
             toolsets.push("industrial.proof");
         }
         _ => {}
@@ -571,8 +679,18 @@ fn toolsets_for_family(family: &str) -> Vec<&'static str> {
         _ => {}
     }
     match family {
-        "task" | "scheduler" | "skill" | "mcp" | "computer_use" | "review" => {
+        "task" | "scheduler" | "skill" | "mcp" | "computer_use" | "review" | "approval"
+        | "hook" | "config" | "plugin_marketplace" | "diagnostics" | "realtime"
+        | "remote_environment" => {
             toolsets.push("industrial.automation");
+        }
+        _ => {}
+    }
+    match family {
+        "file" | "sandbox" | "shell" | "approval" | "hook" | "config" | "plugin_marketplace"
+        | "mcp" | "skill" | "code_intelligence" | "git" | "review" | "diagnostics" | "realtime"
+        | "remote_environment" => {
+            toolsets.push("industrial.workbench");
         }
         _ => {}
     }

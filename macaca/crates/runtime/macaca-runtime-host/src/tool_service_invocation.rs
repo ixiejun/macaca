@@ -11,10 +11,10 @@ use std::sync::Arc;
 
 use macaca_driver::{DriverToolInvokeCommand, DRIVER_TOOL_INVOKE_COMMAND};
 use macaca_proto::{
-    CapabilityToolInvocation, CapabilityToolInvocationResult, IndustrialToolDescriptor,
-    KernelServiceId, MacacaError, MacacaResult, McpServiceLifecycleScope, McpToolInvokeCommand,
-    ServiceBusSource, ServiceCommand, ServiceCommandName, ToolCommandResult, ToolExecutorRouteKind,
-    ToolInvocationRef, ToolInvokeCommand, ToolResultClass, TraceContext,
+    CapabilityToolInvocation, CapabilityToolInvocationResult, CapabilityToolOriginKind,
+    IndustrialToolDescriptor, KernelServiceId, MacacaError, MacacaResult, McpServiceLifecycleScope,
+    McpToolInvokeCommand, ServiceBusSource, ServiceCommand, ServiceCommandName, ToolCommandResult,
+    ToolExecutorRouteKind, ToolInvocationRef, ToolInvokeCommand, ToolResultClass, TraceContext,
     MCP_DESCRIPTOR_BACKEND_TOOL_NAME, MCP_DESCRIPTOR_LIFECYCLE_SCOPE, MCP_TOOL_INVOKE_COMMAND,
 };
 use macaca_skill::{SkillToolInvokeCommand, SKILL_TOOL_INVOKE_COMMAND};
@@ -304,11 +304,12 @@ impl ToolInvocationService {
                     .command_name
                     .as_deref()
                     .unwrap_or("tool.invoke");
+                let payload = owning_service_payload(command_name, command)?;
                 self.dispatch_service_command(
                     command,
                     &descriptor.executor_route.service_id,
                     command_name,
-                    serde_json::to_value(command)?,
+                    payload,
                 )
                 .await
             }
@@ -405,8 +406,59 @@ impl ToolInvocationService {
             .await
             .map_err(runtime_error)?;
         let output = reply.output.unwrap_or(Value::Null);
-        serde_json::from_value(output).map_err(MacacaError::from)
+        match serde_json::from_value::<CapabilityToolInvocationResult>(output.clone()) {
+            Ok(result) => Ok(result),
+            Err(_) => Ok(wrap_service_command_reply(
+                service_id,
+                command_name,
+                output,
+                command.trace.clone(),
+            )),
+        }
     }
+}
+
+fn wrap_service_command_reply(
+    service_id: String,
+    command_name: &str,
+    output: serde_json::Value,
+    trace: TraceContext,
+) -> CapabilityToolInvocationResult {
+    // Workbench-family services return their own typed WorkbenchCommandResult
+    // envelopes. service.tool normalizes those replies into the historical
+    // CapabilityToolInvocationResult shape so result budgeting, artifact
+    // storage, and audit recording stay uniform across old and new providers.
+    let mut result = if let Some(reason) = workbench_unavailable_reason(&output) {
+        CapabilityToolInvocationResult::failed(
+            service_id,
+            CapabilityToolOriginKind::Mcp,
+            command_name,
+            reason,
+            trace,
+        )
+    } else {
+        CapabilityToolInvocationResult::ok(
+            service_id,
+            CapabilityToolOriginKind::Mcp,
+            command_name,
+            output,
+            trace,
+        )
+    };
+    result.metadata.insert(
+        "service_tool.normalized_reply".into(),
+        "workbench_command".into(),
+    );
+    result
+}
+
+fn workbench_unavailable_reason(output: &serde_json::Value) -> Option<String> {
+    output
+        .get("status")
+        .and_then(|status| status.get("Unavailable"))
+        .and_then(|unavailable| unavailable.get("reason"))
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_string)
 }
 
 /// Typed admission outcome returned by the admission decorator chain.
@@ -548,6 +600,23 @@ fn inline_budget_bytes(metadata: &std::collections::BTreeMap<String, String>) ->
         .get("result.inline_budget_bytes")
         .and_then(|value| value.parse::<usize>().ok())
         .unwrap_or(16 * 1024)
+}
+
+fn owning_service_payload(
+    command_name: &str,
+    command: &ToolInvokeCommand,
+) -> MacacaResult<serde_json::Value> {
+    // Some workbench services expose a family-specific `*.tool.invoke`
+    // compatibility command that expects the full ToolInvokeCommand envelope.
+    // Other service-owned tools route directly to existing typed service
+    // commands, where service.tool must forward only the caller-provided input
+    // DTO.  This small Adapter keeps the route data authoritative and avoids
+    // service.tool learning application or provider-specific command shapes.
+    if command_name.ends_with(".tool.invoke") || command_name == "tool.invoke" {
+        serde_json::to_value(command).map_err(MacacaError::from)
+    } else {
+        Ok(command.input.clone())
+    }
 }
 
 fn backend_tool_name(descriptor: &IndustrialToolDescriptor) -> MacacaResult<String> {

@@ -113,6 +113,33 @@ async fn family_descriptors_use_typed_routes_instead_of_all_mcp_origins() {
         shell_descriptor.executor_route.command_name.as_deref(),
         Some(macaca_proto::workbench::process::TOOL_INVOKE_COMMAND)
     );
+    let approval_descriptor = descriptors
+        .iter()
+        .find(|descriptor| descriptor.family.as_str() == "approval")
+        .expect("approval family descriptor is required");
+    assert_eq!(
+        approval_descriptor.executor_route.service_id,
+        macaca_proto::workbench::approval::SERVICE_ID
+    );
+    assert_eq!(
+        approval_descriptor.executor_route.command_name.as_deref(),
+        Some(macaca_proto::workbench::approval::POLICY_EXPLAIN_COMMAND)
+    );
+    let diagnostics_descriptor = descriptors
+        .iter()
+        .find(|descriptor| descriptor.family.as_str() == "diagnostics")
+        .expect("diagnostics family descriptor is required");
+    assert_eq!(
+        diagnostics_descriptor.executor_route.service_id,
+        macaca_proto::workbench::diagnostics::SERVICE_ID
+    );
+    assert_eq!(
+        diagnostics_descriptor
+            .executor_route
+            .command_name
+            .as_deref(),
+        Some(macaca_proto::workbench::diagnostics::HEALTH_SUMMARY_COMMAND)
+    );
 }
 
 #[tokio::test]
@@ -145,6 +172,69 @@ async fn planner_surfaces_missing_optional_families_as_unavailable_diagnostics()
         .metadata
         .get("tool.reason.service_unavailable")
         .is_some());
+}
+
+#[tokio::test]
+async fn workbench_toolset_resolves_all_interactive_service_families() {
+    let service = ToolPlanningService::builder()
+        .with_contributor(industrial_tool_family_provider_contributor().unwrap())
+        .with_availability(
+            AvailabilitySignalSet::default()
+                .with_service(macaca_proto::workbench::file::SERVICE_ID)
+                .with_service(macaca_proto::workbench::process::SERVICE_ID)
+                .with_service(macaca_proto::workbench::sandbox::SERVICE_ID)
+                .with_service(macaca_proto::workbench::approval::SERVICE_ID)
+                .with_service(macaca_proto::workbench::hook::SERVICE_ID)
+                .with_service(macaca_proto::workbench::config::SERVICE_ID)
+                .with_service(macaca_proto::workbench::plugin_marketplace::SERVICE_ID)
+                .with_service(macaca_proto::workbench::code_intelligence::SERVICE_ID)
+                .with_service(macaca_proto::workbench::git::SERVICE_ID)
+                .with_service(macaca_proto::workbench::review::SERVICE_ID)
+                .with_service(macaca_proto::workbench::diagnostics::SERVICE_ID)
+                .with_service(macaca_skill::SKILL_SERVICE_ID)
+                .with_service(macaca_proto::MCP_SERVICE_ID),
+        )
+        .with_toolsets(industrial_tool_family_toolsets().unwrap())
+        .build();
+    let mut command =
+        ToolCatalogPlanCommand::new(TraceContext::new("trace-workbench-toolset")).unwrap();
+    command.requested_toolsets = vec![ToolsetRef::new("industrial.workbench").unwrap()];
+    command.include_hidden = true;
+
+    let result = service.plan(command).await.unwrap();
+    let visible_families: BTreeSet<_> = result
+        .visible
+        .iter()
+        .map(|entry| entry.descriptor.family.as_str())
+        .collect();
+    let hidden_families: BTreeSet<_> = result
+        .hidden
+        .iter()
+        .map(|entry| entry.descriptor.family.as_str())
+        .collect();
+
+    for family in [
+        "file",
+        "sandbox",
+        "shell",
+        "approval",
+        "hook",
+        "config",
+        "plugin_marketplace",
+        "mcp",
+        "skill",
+        "code_intelligence",
+        "git",
+        "review",
+        "diagnostics",
+    ] {
+        assert!(
+            visible_families.contains(family),
+            "workbench family {family} should be visible when its service signal is present"
+        );
+    }
+    assert!(hidden_families.contains("realtime"));
+    assert!(hidden_families.contains("remote_environment"));
 }
 
 #[tokio::test]
