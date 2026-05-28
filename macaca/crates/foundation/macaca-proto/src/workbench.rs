@@ -22,6 +22,7 @@ pub mod app_protocol;
 pub mod file;
 pub mod interaction;
 pub mod process;
+pub mod sandbox;
 
 /// Stable command outcomes shared by all workbench-family services.
 ///
@@ -247,18 +248,6 @@ macro_rules! workbench_family_module {
     };
 }
 
-workbench_family_module!(
-    sandbox,
-    "service.sandbox",
-    "capability.sandbox",
-    [
-        "sandbox.profile.resolve",
-        "sandbox.environment.prepare",
-        "sandbox.environment.health",
-        "sandbox.environment.cleanup",
-        "sandbox.policy.explain"
-    ]
-);
 workbench_family_module!(
     approval,
     "service.approval",

@@ -129,20 +129,20 @@
 
 ## 6. `service.sandbox`: Permission Profiles and Runtime Environments
 
-- [ ] 6.1 Create `service.sandbox` descriptor, lifecycle, health, snapshot,
+- [x] 6.1 Create `service.sandbox` descriptor, lifecycle, health, snapshot,
   local provider, mock provider, and unavailable provider.
-- [ ] 6.2 Implement permission profile catalog and resolution for read-only,
+- [x] 6.2 Implement permission profile catalog and resolution for read-only,
   workspace-write, full-access, network modes, and remote environment modes.
-- [ ] 6.3 Implement sandbox environment prepare/health/cleanup with resource
+- [x] 6.3 Implement sandbox environment prepare/health/cleanup with resource
   leases and trace refs.
-- [ ] 6.4 Implement path, network, environment-variable, workspace-root, and
+- [x] 6.4 Implement path, network, environment-variable, workspace-root, and
   write-scope policy explanation.
-- [ ] 6.5 Add Docker, SSH, OS-specific, browser, and WASM sandbox provider
+- [x] 6.5 Add Docker, SSH, OS-specific, browser, and WASM sandbox provider
   seams with explicit unavailable states when absent.
-- [ ] 6.6 Connect `service.process`, `service.file`, `service.tool`, and
+- [x] 6.6 Connect `service.process`, `service.file`, `service.tool`, and
   application manifests to sandbox profile resolution without provider-name
   branches.
-- [ ] 6.7 Add tests for unavailable optional providers, cleanup after
+- [x] 6.7 Add tests for unavailable optional providers, cleanup after
   cancellation, network denial, write-scope denial, and resource release.
 
 ## 7. `service.approval`: Approval and Guardian Flow

@@ -11,8 +11,8 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ApplicationAbilityDescriptor, DeveloperId, ExecutionControlPolicy, PackageId,
-    PackageRuntimeKind, PackageType,
+    workbench::sandbox::SandboxRuntimeKind, ApplicationAbilityDescriptor, DeveloperId,
+    ExecutionControlPolicy, PackageId, PackageRuntimeKind, PackageType,
 };
 
 /// Version of the Application Manifest schema.
@@ -194,6 +194,20 @@ pub struct ApplicationManifestV1 {
     /// Backward-compatible exact tool allowlist.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub allowed_tools: Vec<String>,
+    /// Permission profiles requested by the application for workbench calls.
+    ///
+    /// Admission and sandbox services resolve these profile refs through
+    /// `service.sandbox`; the manifest only declares intent and never names a
+    /// concrete provider or application workflow.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub permission_profiles: Vec<String>,
+    /// Runtime environment categories the application may request.
+    ///
+    /// These categories are provider-neutral.  Optional providers such as
+    /// Docker, SSH, browser, WASM, or remote environments can be absent and
+    /// still produce structured unavailable states through `service.sandbox`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sandbox_runtime_kinds: Vec<SandboxRuntimeKind>,
     pub metadata: BTreeMap<String, String>,
 }
 
@@ -226,6 +240,8 @@ impl ApplicationManifestV1 {
             tool_families: Vec::new(),
             toolsets: Vec::new(),
             allowed_tools: Vec::new(),
+            permission_profiles: Vec::new(),
+            sandbox_runtime_kinds: Vec::new(),
             metadata: BTreeMap::new(),
         }
     }
@@ -274,12 +290,23 @@ impl ApplicationManifestV1 {
         self.allowed_tools.push(tool_name.into());
         self
     }
+
+    pub fn permission_profile(mut self, profile_ref: impl Into<String>) -> Self {
+        self.permission_profiles.push(profile_ref.into());
+        self
+    }
+
+    pub fn sandbox_runtime_kind(mut self, kind: SandboxRuntimeKind) -> Self {
+        self.sandbox_runtime_kinds.push(kind);
+        self
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{
+        workbench::sandbox::{SandboxRuntimeKind, WORKSPACE_WRITE_PROFILE},
         AbilityImplementationKind, ApplicationAbilityKind, ExecutionControlCheckpointMode,
         ExecutionControlMode, ExecutionControlPolicy, ExecutionControlResumeSource,
         ExecutionControlTrigger,
@@ -360,5 +387,28 @@ mod tests {
         assert_eq!(decoded.tool_families, vec!["web", "memory"]);
         assert_eq!(decoded.toolsets, vec!["research"]);
         assert_eq!(decoded.allowed_tools, vec!["read_file"]);
+    }
+
+    #[test]
+    fn application_manifest_v1_roundtrips_sandbox_policy_declarations() {
+        let manifest = ApplicationManifestV1::new(
+            PackageId::new("application.sandbox.policy.fixture"),
+            DeveloperId::new("developer.fixture"),
+            "Sandbox Policy Fixture",
+            "1.0.0",
+            ApplicationRuntimeProfile::new(PackageRuntimeKind::Yaml, "1"),
+            ApplicationCompatibilityDeclaration::new("0.1.0"),
+        )
+        .permission_profile(WORKSPACE_WRITE_PROFILE)
+        .sandbox_runtime_kind(SandboxRuntimeKind::LocalSandbox);
+
+        let encoded = serde_json::to_string(&manifest).unwrap();
+        let decoded: ApplicationManifestV1 = serde_json::from_str(&encoded).unwrap();
+
+        assert_eq!(decoded.permission_profiles, vec![WORKSPACE_WRITE_PROFILE]);
+        assert_eq!(
+            decoded.sandbox_runtime_kinds,
+            vec![SandboxRuntimeKind::LocalSandbox]
+        );
     }
 }

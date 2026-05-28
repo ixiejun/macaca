@@ -73,6 +73,8 @@ pub(crate) mod process_service_local;
 pub mod process_service_provider;
 pub(crate) mod process_service_records;
 pub mod route_c_bootstrap;
+pub(crate) mod sandbox_service_local;
+pub mod sandbox_service_provider;
 pub mod service_audit_runtime_bundle;
 pub mod service_call_audit;
 pub mod service_call_audit_service_provider;
@@ -128,6 +130,8 @@ mod interaction_service_provider_tests;
 mod interaction_service_state_tests;
 #[cfg(test)]
 mod process_service_provider_tests;
+#[cfg(test)]
+mod sandbox_service_provider_tests;
 #[cfg(test)]
 mod service_router_tests;
 #[cfg(test)]
@@ -294,6 +298,8 @@ pub use route_c_bootstrap::{
     bootstrap_route_c_optional_services, RouteCBootstrapDiagnostic, RouteCHostRuntimeBundle,
     RouteCOptionalServicesBootstrap, RouteCOptionalServicesBootstrapInputs,
 };
+pub use sandbox_service_local::{LocalSandboxProvider, MockSandboxProvider, SandboxProvider};
+pub use sandbox_service_provider::{bootstrap_local_sandbox_service, SandboxSystemServiceProvider};
 pub use service_audit_runtime_bundle::ServiceAuditRuntimeBundle;
 pub use service_call_audit::{
     InMemoryServiceCallAuditSink, ServiceCallAuditEvent, ServiceCallAuditSink,
