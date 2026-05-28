@@ -76,6 +76,9 @@ pub mod plugin_control_service_provider;
 pub mod plugin_hook;
 pub mod plugin_hook_service_provider;
 pub mod plugin_hosts;
+pub(crate) mod plugin_marketplace_service_commands;
+pub mod plugin_marketplace_service_provider;
+pub(crate) mod plugin_marketplace_service_support;
 pub(crate) mod process_service_local;
 pub mod process_service_provider;
 pub(crate) mod process_service_records;
@@ -143,6 +146,8 @@ mod interaction_service_provider_tests;
 mod interaction_service_state_tests;
 #[cfg(test)]
 mod llm_service_provider_hardening_tests;
+#[cfg(test)]
+mod plugin_marketplace_service_provider_tests;
 #[cfg(test)]
 mod process_service_provider_tests;
 #[cfg(test)]
@@ -313,6 +318,9 @@ pub use plugin_hosts::{
     BuiltInAdapterPluginRuntimeHost, DescriptorPluginRuntimeHost, PluginHostLifecycleSupervisor,
     PluginHostRuntime, PluginHostRuntimeFactory, PluginHostRuntimeResult, ProcessPluginRuntimeHost,
     RemoteProxyPluginRuntimeHost, UnavailablePluginRuntimeHost, WasmPluginRuntimeHost,
+};
+pub use plugin_marketplace_service_provider::{
+    bootstrap_local_plugin_marketplace_service, PluginMarketplaceSystemServiceProvider,
 };
 pub use process_service_local::{LocalProcessProvider, ProcessProvider};
 pub use process_service_provider::{bootstrap_local_process_service, ProcessSystemServiceProvider};

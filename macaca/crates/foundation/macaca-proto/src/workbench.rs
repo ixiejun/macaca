@@ -24,6 +24,7 @@ pub mod config;
 pub mod file;
 pub mod hook;
 pub mod interaction;
+pub mod plugin_marketplace;
 pub mod process;
 pub mod sandbox;
 
@@ -260,20 +261,6 @@ macro_rules! workbench_family_module {
     };
 }
 
-workbench_family_module!(
-    plugin_marketplace,
-    "service.plugin_marketplace",
-    "capability.plugin_marketplace",
-    [
-        "plugin_marketplace.add",
-        "plugin_marketplace.remove",
-        "plugin.install",
-        "plugin.uninstall",
-        "plugin.enable",
-        "plugin.disable",
-        "plugin.auth.status"
-    ]
-);
 workbench_family_module!(
     code_intelligence,
     "service.code_intelligence",

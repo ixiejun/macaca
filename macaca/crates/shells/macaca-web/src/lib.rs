@@ -768,6 +768,11 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
         "web-startup-config-service",
     )
     .await?;
+    macaca_runtime_host::bootstrap_local_plugin_marketplace_service(
+        Arc::clone(&service_runtime),
+        "web-startup-plugin-marketplace-service",
+    )
+    .await?;
     macaca_runtime_host::bootstrap_tool_planning_service(
         Arc::clone(&service_runtime),
         Arc::new(macaca_runtime_host::industrial_tool_planning_service()?),

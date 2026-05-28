@@ -212,19 +212,19 @@
 
 ## 11. Plugin Marketplace Lifecycle
 
-- [ ] 11.1 Create or complete `service.plugin_marketplace` descriptor,
+- [x] 11.1 Create or complete `service.plugin_marketplace` descriptor,
   lifecycle, health, snapshot, local provider, mock provider, and unavailable
   provider.
-- [ ] 11.2 Implement marketplace add/remove/upgrade with source policy,
+- [x] 11.2 Implement marketplace add/remove/upgrade with source policy,
   signature, version, and entitlement checks.
-- [ ] 11.3 Implement plugin list/read/install/uninstall/enable/disable/auth
+- [x] 11.3 Implement plugin list/read/install/uninstall/enable/disable/auth
   status.
-- [ ] 11.4 Implement bundled capability registration for services, tools,
+- [x] 11.4 Implement bundled capability registration for services, tools,
   skills, MCP servers, hooks, apps, and app UI metadata.
-- [ ] 11.5 Integrate store/entitlement/license/metering before plugin
+- [x] 11.5 Integrate store/entitlement/license/metering before plugin
   installation and capability activation.
-- [ ] 11.6 Add plugin rollback and uninstall cleanup records.
-- [ ] 11.7 Add tests for unavailable marketplace, denied entitlement,
+- [x] 11.6 Add plugin rollback and uninstall cleanup records.
+- [x] 11.7 Add tests for unavailable marketplace, denied entitlement,
   malformed manifest, disabled-by-admin plugin, bundled capability registration,
   and audit replay.
 
