@@ -211,6 +211,7 @@ ui:
             resources: None,
             context: None,
             service_contract: None,
+            workbench: None,
             autonomy: None,
             ui: None,
         };
@@ -235,6 +236,7 @@ ui:
             resources: None,
             context: None,
             service_contract: None,
+            workbench: None,
             autonomy: None,
             ui: None,
         };
@@ -273,6 +275,7 @@ ui:
             resources: None,
             context: None,
             service_contract: None,
+            workbench: None,
             autonomy: None,
             ui: None,
         };
@@ -313,6 +316,7 @@ ui:
             resources: None,
             context: None,
             service_contract: None,
+            workbench: None,
             autonomy: None,
             ui: None,
         };
@@ -352,6 +356,7 @@ capabilities:
             resources: None,
             context: None,
             service_contract: None,
+            workbench: None,
             autonomy: None,
             ui: None,
         };

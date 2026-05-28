@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::service_capability::AppServiceContractConfig;
 use crate::ui_runtime::AppUiRuntimeConfig;
-use macaca_proto::{AgentId, ApplicationId};
+use macaca_proto::{AgentId, ApplicationId, ApplicationWorkbenchManifestDeclaration};
 
 /// The execution layer of an application.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -363,6 +363,15 @@ pub struct AppManifest {
     /// Optional generic service declaration block for contract-driven routing.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub service_contract: Option<AppServiceContractConfig>,
+    /// Optional generic workbench capability declaration block.
+    ///
+    /// This is the Application Framework-owned contract that lets YAML, WASM,
+    /// GenUI, headless, and workbench-style applications request generic
+    /// substrate services. It is declarative only: service clients, policy,
+    /// sandboxing, plugin/MCP/skill lifecycle, and app protocol still own the
+    /// runtime effects and audit chain.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workbench: Option<ApplicationWorkbenchManifestDeclaration>,
     /// Optional application-owned autonomy declaration block.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub autonomy: Option<AppAutonomyConfig>,
@@ -558,6 +567,7 @@ agents:
                 resources: None,
                 context: None,
                 service_contract: None,
+                workbench: None,
                 autonomy: None,
                 ui: None,
             },

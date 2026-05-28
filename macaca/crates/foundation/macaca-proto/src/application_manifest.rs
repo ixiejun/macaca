@@ -10,6 +10,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
+use crate::ApplicationWorkbenchManifestDeclaration;
 use crate::{
     workbench::sandbox::SandboxRuntimeKind, ApplicationAbilityDescriptor, DeveloperId,
     ExecutionControlPolicy, PackageId, PackageRuntimeKind, PackageType,
@@ -181,6 +182,12 @@ pub struct ApplicationManifestV1 {
     pub compatibility: ApplicationCompatibilityDeclaration,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub execution_control: Option<ExecutionControlPolicy>,
+    /// Generic interactive workbench declarations owned by Application
+    /// Framework.  Services and shells consume this through admission and
+    /// sanitized projections; the OS must never infer these capabilities from
+    /// an application name or product workflow.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workbench: Option<ApplicationWorkbenchManifestDeclaration>,
     /// Abstract tool families requested by the application.
     ///
     /// This is data-only manifest policy. Planning services interpret these
@@ -237,6 +244,7 @@ impl ApplicationManifestV1 {
             plugin_dependencies: Vec::new(),
             compatibility,
             execution_control: None,
+            workbench: None,
             tool_families: Vec::new(),
             toolsets: Vec::new(),
             allowed_tools: Vec::new(),
@@ -276,6 +284,11 @@ impl ApplicationManifestV1 {
         self
     }
 
+    pub fn workbench(mut self, declaration: ApplicationWorkbenchManifestDeclaration) -> Self {
+        self.workbench = Some(declaration);
+        self
+    }
+
     pub fn tool_family(mut self, family: impl Into<String>) -> Self {
         self.tool_families.push(family.into());
         self
@@ -307,7 +320,11 @@ mod tests {
     use super::*;
     use crate::{
         workbench::sandbox::{SandboxRuntimeKind, WORKSPACE_WRITE_PROFILE},
-        AbilityImplementationKind, ApplicationAbilityKind, ExecutionControlCheckpointMode,
+        AbilityImplementationKind, ApplicationAbilityKind,
+        ApplicationWorkbenchCapabilityDeclaration, ApplicationWorkbenchEventSubscription,
+        ApplicationWorkbenchManifestDeclaration, ApplicationWorkbenchMcpDependency,
+        ApplicationWorkbenchServiceDependency, ApplicationWorkbenchSkillBundleDependency,
+        ApplicationWorkbenchUiSurfaceDeclaration, ExecutionControlCheckpointMode,
         ExecutionControlMode, ExecutionControlPolicy, ExecutionControlResumeSource,
         ExecutionControlTrigger,
     };
@@ -434,6 +451,76 @@ mod tests {
         assert_eq!(
             decoded.sandbox_runtime_kinds,
             vec![SandboxRuntimeKind::LocalSandbox]
+        );
+    }
+
+    #[test]
+    fn application_manifest_v1_roundtrips_workbench_declaration() {
+        let workbench = ApplicationWorkbenchManifestDeclaration {
+            capabilities: vec![ApplicationWorkbenchCapabilityDeclaration::required(
+                "file",
+                "Application inspects declared workspace inputs",
+            )],
+            permission_profiles: vec![WORKSPACE_WRITE_PROFILE.into()],
+            tool_families: vec!["review".into()],
+            service_dependencies: vec![ApplicationWorkbenchServiceDependency::required(
+                crate::KernelServiceId::new("service.review"),
+                "Application requests structured review through service boundary",
+            )],
+            mcp_dependencies: vec![ApplicationWorkbenchMcpDependency {
+                server_id: "mcp.generic".into(),
+                lifecycle_scope: "session".into(),
+                optional: true,
+                reason: "Optional contextual tools".into(),
+            }],
+            skill_bundles: vec![ApplicationWorkbenchSkillBundleDependency {
+                bundle_id: "skill.bundle.generic".into(),
+                version_req: None,
+                optional: true,
+                reason: "Optional reusable procedures".into(),
+            }],
+            event_subscriptions: vec![ApplicationWorkbenchEventSubscription {
+                topic: "thread.item".into(),
+                optional: false,
+                reason: "Application protocol streams item updates".into(),
+            }],
+            ui_surfaces: vec![ApplicationWorkbenchUiSurfaceDeclaration {
+                surface_id: "main".into(),
+                schema: "genui.v1".into(),
+                mode: "workspace".into(),
+                required_bridge_capabilities: vec!["service.call".into()],
+                event_subscriptions: vec!["thread.item".into()],
+                metadata: Default::default(),
+            }],
+            ..Default::default()
+        };
+        let manifest = ApplicationManifestV1::new(
+            PackageId::new("application.workbench.manifest.fixture"),
+            DeveloperId::new("developer.fixture"),
+            "Workbench Manifest Fixture",
+            "1.0.0",
+            ApplicationRuntimeProfile::new(PackageRuntimeKind::Yaml, "1"),
+            ApplicationCompatibilityDeclaration::new("0.1.0"),
+        )
+        .ability(ApplicationAbilityDescriptor::new(
+            "ability.fixture.agent",
+            ApplicationAbilityKind::Agent,
+            AbilityImplementationKind::Declarative,
+        ))
+        .workbench(workbench);
+
+        let encoded = serde_json::to_string(&manifest).unwrap();
+        let decoded: ApplicationManifestV1 = serde_json::from_str(&encoded).unwrap();
+        let decoded_workbench = decoded.workbench.unwrap();
+
+        assert_eq!(decoded_workbench.capabilities[0].family, "file");
+        assert_eq!(
+            decoded_workbench.permission_profiles,
+            vec![WORKSPACE_WRITE_PROFILE]
+        );
+        assert_eq!(
+            decoded_workbench.event_subscriptions[0].topic,
+            "thread.item"
         );
     }
 }

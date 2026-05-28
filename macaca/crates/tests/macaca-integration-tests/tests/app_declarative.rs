@@ -101,6 +101,7 @@ fn inline_manifest(name: &str, agent_count: usize) -> AppManifest {
         resources: None,
         context: None,
         service_contract: None,
+        workbench: None,
         ui: None,
         // These declarative application fixtures intentionally exercise the
         // classic manifest path without autonomous runtime declarations. The

@@ -18,6 +18,22 @@ Codex-class coding workflow using generic Macaca OS services.
   lifecycle, approvals, hooks, review findings, and diagnostics SHALL stream as
   typed bounded notifications
 
+### Requirement: Application Framework Manifest Integration
+The Application Framework SHALL let YAML, WASM, GenUI, headless, and
+workbench-style applications declare the same generic workbench capability
+surface through provider-neutral manifest data.
+
+#### Scenario: Admit declared workbench capabilities
+- **WHEN** an application manifest declares workbench capabilities, permission
+  profiles, tool families, service dependencies, optional providers, plugin
+  dependencies, MCP dependencies, skill bundles, event subscriptions, and UI
+  surfaces
+- **THEN** Application Framework admission SHALL validate those declarations
+  without hardcoding application names, product workflows, or provider names
+- **AND** sanitized Application Service metadata SHALL expose only bounded refs,
+  names, and counts for service clients, context, tool planning, app protocol,
+  and shells
+
 ### Requirement: No Application-specific OS Branches
 The system SHALL prove that supporting a Codex-class coding application does not
 introduce application-specific branches below the application layer.

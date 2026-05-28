@@ -298,18 +298,18 @@
 
 ## 16. Application Framework and Manifest Integration
 
-- [ ] 16.1 Extend application manifests to declare workbench capabilities,
+- [x] 16.1 Extend application manifests to declare workbench capabilities,
   permission profiles, tool families, service dependencies, optional provider
   requirements, plugin dependencies, MCP dependencies, skill bundles, and event
   subscriptions.
-- [ ] 16.2 Add manifest admission checks that validate capabilities without
+- [x] 16.2 Add manifest admission checks that validate capabilities without
   hardcoding application names or coding workflows.
-- [ ] 16.3 Add application lifecycle integration so declared capabilities are
+- [x] 16.3 Add application lifecycle integration so declared capabilities are
   projected into service clients, context, tool planning, and app protocol
   subscriptions.
-- [ ] 16.4 Add GenUI/app-owned UI metadata support for workbench surfaces without
+- [x] 16.4 Add GenUI/app-owned UI metadata support for workbench surfaces without
   making frontend own semantics.
-- [ ] 16.5 Add tests for YAML, WASM, GenUI, headless, and workbench-style
+- [x] 16.5 Add tests for YAML, WASM, GenUI, headless, and workbench-style
   applications declaring the same generic capabilities.
 
 ## 17. Shell, Web, CLI, and Frontend Adapters

@@ -501,6 +501,26 @@ pub struct ApplicationMcpOverlayMetadataView {
     pub agents_with_overlay: Vec<String>,
 }
 
+/// Sanitized Application Framework workbench declaration metadata.
+///
+/// The view is intentionally ref/count oriented.  It lets SDK clients, shells,
+/// runtime-host adapters, context/tool planning, and app protocol subscribers
+/// learn what the application declared without receiving raw manifests, prompt
+/// bodies, plugin packages, MCP definitions, skill contents, or credentials.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApplicationWorkbenchMetadataView {
+    pub declared_capabilities: Vec<String>,
+    pub permission_profiles: Vec<String>,
+    pub tool_families: Vec<String>,
+    pub service_dependencies: Vec<String>,
+    pub optional_provider_requirements: Vec<String>,
+    pub plugin_dependencies: Vec<String>,
+    pub mcp_dependencies: Vec<String>,
+    pub skill_bundles: Vec<String>,
+    pub event_subscriptions: Vec<String>,
+    pub ui_surfaces: Vec<String>,
+}
+
 /// Manifest digest metadata for cache keys and audit without raw manifest data.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ApplicationManifestDigestView {
@@ -521,6 +541,7 @@ pub struct ApplicationMetadataView {
     pub context_policy: ApplicationContextPolicyMetadataView,
     pub skill_policy: ApplicationSkillPolicyMetadataView,
     pub mcp_overlay: ApplicationMcpOverlayMetadataView,
+    pub workbench: ApplicationWorkbenchMetadataView,
     pub manifest_digest: Option<ApplicationManifestDigestView>,
     pub diagnostics: Vec<String>,
 }

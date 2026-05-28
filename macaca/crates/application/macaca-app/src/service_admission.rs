@@ -74,12 +74,16 @@ impl ApplicationManifestSpec {
                 }
             }
         }
+        if let Some(workbench) = &manifest.workbench {
+            validate_workbench_declaration(workbench, "application_manifest")?;
+        }
         validate_ui_runtime_config(manifest.ui.as_ref())?;
         tracing::info!(
             app_id = %manifest.id,
             app_name = %manifest.name,
             layer = ?manifest.layer,
             service_contract_declared = manifest.service_contract.is_some(),
+            workbench_declared = manifest.workbench.is_some(),
             ui_runtime_declared = manifest.ui.is_some(),
             "application manifest admitted by service specification"
         );
@@ -171,9 +175,21 @@ impl ApplicationManifestV1Spec {
         for ability in &manifest.abilities {
             merge_report(&mut report, ApplicationAbilitySpec.validate(ability));
         }
+        if let Some(workbench) = &manifest.workbench {
+            if let Err(error) =
+                validate_workbench_declaration(workbench, manifest.package_id.as_str())
+            {
+                report.push(ApplicationAdmissionDiagnostic::new(
+                    "invalid_workbench_declaration",
+                    manifest.package_id.as_str(),
+                    error.to_string(),
+                ));
+            }
+        }
         tracing::info!(
             package_id = %manifest.package_id,
             ability_count = manifest.abilities.len(),
+            workbench_declared = manifest.workbench.is_some(),
             diagnostic_count = report.diagnostics.len(),
             "application manifest v1 admission evaluated"
         );
@@ -220,6 +236,101 @@ impl ApplicationAbilitySpec {
 
 fn merge_report(target: &mut ApplicationAdmissionReport, source: ApplicationAdmissionReport) {
     target.diagnostics.extend(source.diagnostics);
+}
+
+/// Validate a workbench declaration with the Specification pattern.
+///
+/// The spec checks only provider-neutral identifiers and reasons. It does not
+/// resolve concrete providers, inspect package bytes, read plugin/MCP/skill
+/// payloads, or branch on application/workflow names; later services perform
+/// those side-effecting checks through traceable command boundaries.
+fn validate_workbench_declaration(
+    declaration: &macaca_proto::ApplicationWorkbenchManifestDeclaration,
+    subject: &str,
+) -> MacacaResult<()> {
+    for capability in &declaration.capabilities {
+        require_text(&capability.family, "workbench capability family", subject)?;
+        require_text(&capability.reason, "workbench capability reason", subject)?;
+    }
+    for profile in &declaration.permission_profiles {
+        require_text(profile, "workbench permission profile", subject)?;
+    }
+    for family in &declaration.tool_families {
+        require_text(family, "workbench tool family", subject)?;
+    }
+    for service in &declaration.service_dependencies {
+        require_text(
+            service.service.as_str(),
+            "workbench service dependency",
+            subject,
+        )?;
+        require_text(
+            &service.reason,
+            "workbench service dependency reason",
+            subject,
+        )?;
+    }
+    for provider in &declaration.optional_provider_requirements {
+        require_text(
+            &provider.provider_kind,
+            "workbench optional provider kind",
+            subject,
+        )?;
+        require_text(
+            &provider.reason,
+            "workbench optional provider reason",
+            subject,
+        )?;
+    }
+    for plugin in &declaration.plugin_dependencies {
+        require_text(&plugin.plugin_id, "workbench plugin dependency", subject)?;
+        require_text(
+            &plugin.reason,
+            "workbench plugin dependency reason",
+            subject,
+        )?;
+    }
+    for dependency in &declaration.mcp_dependencies {
+        require_text(&dependency.server_id, "workbench mcp dependency", subject)?;
+        require_text(
+            &dependency.reason,
+            "workbench mcp dependency reason",
+            subject,
+        )?;
+    }
+    for bundle in &declaration.skill_bundles {
+        require_text(&bundle.bundle_id, "workbench skill bundle", subject)?;
+        require_text(&bundle.reason, "workbench skill bundle reason", subject)?;
+    }
+    for subscription in &declaration.event_subscriptions {
+        require_text(&subscription.topic, "workbench event subscription", subject)?;
+        require_text(
+            &subscription.reason,
+            "workbench event subscription reason",
+            subject,
+        )?;
+    }
+    for surface in &declaration.ui_surfaces {
+        require_text(&surface.surface_id, "workbench ui surface", subject)?;
+        require_text(&surface.schema, "workbench ui surface schema", subject)?;
+    }
+    tracing::info!(
+        subject,
+        capability_count = declaration.capabilities.len(),
+        service_dependency_count = declaration.service_dependencies.len(),
+        event_subscription_count = declaration.event_subscriptions.len(),
+        "application workbench manifest declaration admitted"
+    );
+    Ok(())
+}
+
+fn require_text(value: &str, field: &str, subject: &str) -> MacacaResult<()> {
+    if value.trim().is_empty() {
+        return Err(MacacaError::Config(format!(
+            "{field} must not be empty for {subject}"
+        )));
+    }
+    Ok(())
 }
 
 /// Project the legacy `AppStatus` view into the ABI lifecycle vocabulary.
@@ -314,6 +425,7 @@ mod tests {
                 optional_services: vec![],
                 service_policy_overrides: Default::default(),
             }),
+            workbench: None,
             autonomy: None,
             ui: None,
         };

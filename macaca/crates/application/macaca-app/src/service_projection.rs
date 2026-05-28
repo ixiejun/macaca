@@ -21,7 +21,7 @@ use macaca_proto::{
     ApplicationServiceAgentView, ApplicationServiceAppView, ApplicationServiceRuntimeView,
     ApplicationSkillPolicyMetadataView, ApplicationToolPolicyMetadataView, ApplicationUiBridgeView,
     ApplicationUiRuntimeView, ApplicationUiSandboxView, ApplicationUiSurfaceView,
-    ApplicationUiThemeView, PackageRuntimeKind,
+    ApplicationUiThemeView, ApplicationWorkbenchMetadataView, PackageRuntimeKind,
 };
 use tracing::info;
 
@@ -123,6 +123,7 @@ pub fn app_manifest_to_metadata_view(
         context_policy,
         skill_policy,
         mcp_overlay,
+        workbench: workbench_metadata_view(&projection.manifest),
         manifest_digest,
         diagnostics,
     }
@@ -512,6 +513,58 @@ fn mcp_overlay_view(legacy: &AppManifest) -> ApplicationMcpOverlayMetadataView {
     }
 }
 
+fn workbench_metadata_view(
+    manifest_v1: &ApplicationManifestV1,
+) -> ApplicationWorkbenchMetadataView {
+    let Some(workbench) = &manifest_v1.workbench else {
+        return ApplicationWorkbenchMetadataView::default();
+    };
+    ApplicationWorkbenchMetadataView {
+        declared_capabilities: workbench
+            .capabilities
+            .iter()
+            .map(|capability| capability.family.clone())
+            .collect(),
+        permission_profiles: workbench.permission_profiles.clone(),
+        tool_families: workbench.tool_families.clone(),
+        service_dependencies: workbench
+            .service_dependencies
+            .iter()
+            .map(|dependency| dependency.service.as_str().to_string())
+            .collect(),
+        optional_provider_requirements: workbench
+            .optional_provider_requirements
+            .iter()
+            .map(|provider| provider.provider_kind.clone())
+            .collect(),
+        plugin_dependencies: workbench
+            .plugin_dependencies
+            .iter()
+            .map(|dependency| dependency.plugin_id.clone())
+            .collect(),
+        mcp_dependencies: workbench
+            .mcp_dependencies
+            .iter()
+            .map(|dependency| dependency.server_id.clone())
+            .collect(),
+        skill_bundles: workbench
+            .skill_bundles
+            .iter()
+            .map(|bundle| bundle.bundle_id.clone())
+            .collect(),
+        event_subscriptions: workbench
+            .event_subscriptions
+            .iter()
+            .map(|subscription| subscription.topic.clone())
+            .collect(),
+        ui_surfaces: workbench
+            .ui_surfaces
+            .iter()
+            .map(|surface| surface.surface_id.clone())
+            .collect(),
+    }
+}
+
 fn digest_view(
     legacy: &AppManifest,
     projection: &LegacyAppManifestProjection,
@@ -654,6 +707,7 @@ mod tests {
             resources: None,
             context: Some(Default::default()),
             service_contract: None,
+            workbench: None,
             autonomy: None,
             ui: None,
         }

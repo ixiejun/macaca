@@ -191,6 +191,21 @@ impl YamlApplicationManifestAdapter {
                 .metadata
                 .insert("legacy.workflows.present".into(), "true".into());
         }
+        if let Some(workbench) = &self.manifest.workbench {
+            if !workbench.is_empty() {
+                projected.workbench = Some(workbench.clone());
+                projected
+                    .tool_families
+                    .extend(workbench.tool_families.iter().cloned());
+                projected
+                    .permission_profiles
+                    .extend(workbench.permission_profiles.iter().cloned());
+                report.push_legacy_only(
+                    application_id.as_str(),
+                    "YAML workbench declaration was projected into Manifest v1 policy metadata.",
+                );
+            }
+        }
 
         for permission in application_permissions(&self.resolved_agents) {
             projected = projected.permission(permission);
@@ -505,6 +520,7 @@ mod tests {
             resources: None,
             context: None,
             service_contract: None,
+            workbench: None,
             autonomy: None,
             ui: None,
         };
@@ -549,6 +565,7 @@ mod tests {
                 optional_services: Vec::new(),
                 service_policy_overrides: Default::default(),
             }),
+            workbench: None,
             autonomy: None,
             ui: None,
         };
