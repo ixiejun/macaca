@@ -20,11 +20,21 @@ use crate::{
 
 pub mod app_protocol;
 pub mod approval;
+pub mod config;
 pub mod file;
 pub mod hook;
 pub mod interaction;
 pub mod process;
 pub mod sandbox;
+
+/// Compatibility module name used by the initial workbench descriptor catalog.
+///
+/// The typed contracts now live in [`config`], but `config_service` remains as a
+/// stable import path for focused SDK clients and shell adapters that were
+/// introduced before the full `service.config` provider landed.
+pub mod config_service {
+    pub use super::config::*;
+}
 
 /// Stable command outcomes shared by all workbench-family services.
 ///
@@ -250,20 +260,6 @@ macro_rules! workbench_family_module {
     };
 }
 
-workbench_family_module!(
-    config_service,
-    "service.config",
-    "capability.config",
-    [
-        "config.read",
-        "config.write",
-        "config.batch_write",
-        "config.schema.read",
-        "requirements.read",
-        "permission_profile.list",
-        "feature_flag.list"
-    ]
-);
 workbench_family_module!(
     plugin_marketplace,
     "service.plugin_marketplace",

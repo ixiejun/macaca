@@ -180,19 +180,19 @@
 
 ## 9. `service.config` and Requirements
 
-- [ ] 9.1 Create `service.config` descriptor, lifecycle, health, snapshot,
+- [x] 9.1 Create `service.config` descriptor, lifecycle, health, snapshot,
   local provider, mock provider, and unavailable provider.
-- [ ] 9.2 Implement layered config read from default, user, project,
+- [x] 9.2 Implement layered config read from default, user, project,
   application, session, requirements, and managed sources.
-- [ ] 9.3 Implement single value write and batch write with atomicity,
+- [x] 9.3 Implement single value write and batch write with atomicity,
   validation, redaction, and optional hot reload.
-- [ ] 9.4 Implement config schema read and generated schema tests.
-- [ ] 9.5 Implement requirements read for allowed approval policies, sandbox
+- [x] 9.4 Implement config schema read and generated schema tests.
+- [x] 9.5 Implement requirements read for allowed approval policies, sandbox
   modes, web/network modes, permissions, managed hook policy, residency,
   feature requirements, and network constraints.
-- [ ] 9.6 Implement permission profile list by cwd/application scope.
-- [ ] 9.7 Implement feature flag list and runtime enablement patching.
-- [ ] 9.8 Add tests for secret redaction, requirement precedence, hot reload,
+- [x] 9.6 Implement permission profile list by cwd/application scope.
+- [x] 9.7 Implement feature flag list and runtime enablement patching.
+- [x] 9.8 Add tests for secret redaction, requirement precedence, hot reload,
   invalid config, and permission profile constraints.
 
 ## 10. `service.llm` Hardening

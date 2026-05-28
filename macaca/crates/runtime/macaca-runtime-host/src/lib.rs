@@ -28,6 +28,8 @@ pub mod autonomy_runtime_config;
 pub mod autonomy_service_provider;
 pub mod autonomy_supervisor;
 pub mod compat;
+pub(crate) mod config_service_commands;
+pub mod config_service_provider;
 pub mod context_service_provider;
 pub mod domain_pack_service_provider;
 pub mod driver_service_provider;
@@ -129,6 +131,8 @@ mod app_protocol_service_provider_tests;
 #[cfg(test)]
 mod approval_service_provider_tests;
 #[cfg(test)]
+mod config_service_provider_tests;
+#[cfg(test)]
 mod file_service_provider_tests;
 #[cfg(test)]
 mod hook_service_provider_tests;
@@ -214,6 +218,7 @@ pub use autonomy_service_provider::{
     ScheduledAgentTaskSystemServiceProvider, SchedulerSystemServiceProvider,
 };
 pub use autonomy_supervisor::AutonomySupervisor;
+pub use config_service_provider::{bootstrap_local_config_service, ConfigSystemServiceProvider};
 pub use context_service_provider::ContextSystemServiceProvider;
 #[allow(deprecated)]
 pub use domain_pack_service_provider::{
