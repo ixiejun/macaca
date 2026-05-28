@@ -12,19 +12,27 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use macaca_kernel::SystemService;
 use macaca_llm::{
-    llm_service_descriptor, LlmChatCommand, LlmChatResult, LlmModelSelectionCommand,
-    LlmModelSelectionResult, LlmProvider, LlmRouteSummary, LlmServiceSnapshot,
-    LlmServiceSnapshotCommand, LLM_CHAT_COMMAND, LLM_MODEL_SELECTION_COMMAND, LLM_SNAPSHOT_COMMAND,
+    llm_service_descriptor, LlmBudgetStatusCommand, LlmCatalogReadCommand, LlmChatCommand,
+    LlmChatResult, LlmContinuationValidateCommand, LlmDegradationExplainCommand,
+    LlmModelSelectionCommand, LlmProvider, LlmRouteSummary, LlmServiceSnapshot,
+    LlmServiceSnapshotCommand, LLM_BUDGET_STATUS_COMMAND, LLM_CHAT_COMMAND,
+    LLM_CONTINUATION_VALIDATE_COMMAND, LLM_DEGRADATION_EXPLAIN_COMMAND, LLM_MODEL_LIST_COMMAND,
+    LLM_MODEL_SELECTION_COMMAND, LLM_PROVIDER_CAPABILITIES_READ_COMMAND, LLM_ROUTE_RESOLVE_COMMAND,
+    LLM_SNAPSHOT_COMMAND,
 };
 use macaca_proto::{
     CleanupPolicy, MacacaError, ServiceCallResult, ServiceCommand, ServiceDescriptor, ServiceError,
     ServiceHealth, ServiceResult, TraceContext,
 };
 
+use crate::llm_service_hardening::{validate_before_dispatch, LlmProviderProfile};
+
 /// Host-owned LLM service provider that wraps an injected LLM strategy.
 pub struct LlmSystemServiceProvider {
-    descriptor: ServiceDescriptor,
-    provider: Arc<dyn LlmProvider>,
+    pub(crate) descriptor: ServiceDescriptor,
+    pub(crate) provider: Option<Arc<dyn LlmProvider>>,
+    pub(crate) profile: LlmProviderProfile,
+    pub(crate) unavailable_reason: Option<String>,
 }
 
 impl LlmSystemServiceProvider {
@@ -34,9 +42,33 @@ impl LlmSystemServiceProvider {
     /// applications can replace the implementation with remote, test, or plugin
     /// backed providers without changing runtime-host code.
     pub fn new(provider: Arc<dyn LlmProvider>) -> Self {
+        let profile = LlmProviderProfile::generic(provider.name());
+        Self::with_profile(provider, profile)
+    }
+
+    /// Create a service adapter with explicit catalog/protocol metadata.
+    ///
+    /// This constructor is the runtime-host composition point for future
+    /// plugin-backed or remote LLM providers.  The service can expose hardened
+    /// diagnostics without forcing the low-level `LlmProvider` trait to become a
+    /// catalog API.
+    pub fn with_profile(provider: Arc<dyn LlmProvider>, profile: LlmProviderProfile) -> Self {
         Self {
             descriptor: llm_service_descriptor(),
-            provider,
+            provider: Some(provider),
+            profile,
+            unavailable_reason: None,
+        }
+    }
+
+    /// Create a Null Object provider that answers diagnostics but rejects chat.
+    pub fn unavailable(reason: impl Into<String>) -> Self {
+        let reason = reason.into();
+        Self {
+            descriptor: llm_service_descriptor(),
+            provider: None,
+            profile: LlmProviderProfile::generic("unavailable"),
+            unavailable_reason: Some(reason),
         }
     }
 
@@ -67,7 +99,8 @@ impl SystemService for LlmSystemServiceProvider {
     async fn start(&self) -> ServiceResult<()> {
         tracing::info!(
             service_id = %self.descriptor.id,
-            provider = self.provider.name(),
+            provider = %self.profile.provider_id,
+            unavailable = self.unavailable_reason.is_some(),
             "llm service provider started"
         );
         Ok(())
@@ -86,6 +119,18 @@ impl SystemService for LlmSystemServiceProvider {
             LLM_CHAT_COMMAND => {
                 let typed: LlmChatCommand = serde_json::from_value(command.payload)
                     .map_err(|err| ServiceError::UnsupportedCommand(err.to_string()))?;
+                if let Some(reason) = &self.unavailable_reason {
+                    tracing::warn!(
+                        trace_id = %typed.trace.trace_id,
+                        reason = %reason,
+                        "llm service rejected chat because provider is unavailable"
+                    );
+                    return Err(ServiceError::AdapterFailure(format!(
+                        "LLM provider unavailable: {reason}"
+                    )));
+                }
+                validate_before_dispatch(&typed.messages, &self.profile.protocol)
+                    .map_err(service_adapter_error)?;
                 tracing::info!(
                     trace_id = %typed.trace.trace_id,
                     session_id = %typed.scope.session_id,
@@ -93,13 +138,15 @@ impl SystemService for LlmSystemServiceProvider {
                     model = %typed.options.model,
                     "llm service dispatching chat command"
                 );
-                let response = self
-                    .provider
+                let provider = self.provider.as_ref().ok_or_else(|| {
+                    ServiceError::AdapterFailure("LLM provider unavailable".into())
+                })?;
+                let response = provider
                     .chat(typed.messages, &typed.options)
                     .await
                     .map_err(service_adapter_error)?;
                 let route = LlmRouteSummary {
-                    provider_id: self.provider.name().into(),
+                    provider_id: provider.name().into(),
                     model: response.model.clone(),
                     source: "provider".into(),
                     fallbacks: Vec::new(),
@@ -117,23 +164,17 @@ impl SystemService for LlmSystemServiceProvider {
             LLM_MODEL_SELECTION_COMMAND => {
                 let typed: LlmModelSelectionCommand = serde_json::from_value(command.payload)
                     .map_err(|err| ServiceError::UnsupportedCommand(err.to_string()))?;
-                let model = typed
-                    .request_model
-                    .or(typed.agent_model)
-                    .or(typed.app_model)
-                    .or(typed.system_model)
-                    .unwrap_or_else(|| "default".into());
-                let result = LlmModelSelectionResult {
-                    selected: LlmRouteSummary {
-                        provider_id: self.provider.name().into(),
-                        model,
-                        source: "provider_snapshot".into(),
-                        fallbacks: typed.fallbacks,
-                    },
-                };
+                let result = self.resolve_route(
+                    typed.request_model,
+                    typed.agent_model,
+                    typed.app_model,
+                    typed.app_provider,
+                    typed.system_model,
+                    typed.fallbacks,
+                )?;
                 tracing::info!(
                     trace_id = %typed.trace.trace_id,
-                    provider = self.provider.name(),
+                    provider = %result.selected.provider_id,
                     "llm service model selection completed"
                 );
                 Ok(Self::service_result(
@@ -144,17 +185,77 @@ impl SystemService for LlmSystemServiceProvider {
             LLM_SNAPSHOT_COMMAND => {
                 let typed: LlmServiceSnapshotCommand = serde_json::from_value(command.payload)
                     .map_err(|err| ServiceError::UnsupportedCommand(err.to_string()))?;
-                let snapshot = LlmServiceSnapshot::healthy(
-                    self.provider.name(),
-                    Some("provider_default".into()),
-                );
+                let snapshot = if let Some(reason) = &self.unavailable_reason {
+                    LlmServiceSnapshot::unavailable(reason.clone())
+                } else {
+                    LlmServiceSnapshot::healthy(
+                        self.profile.provider_id.clone(),
+                        self.profile.default_model.clone(),
+                    )
+                };
                 tracing::info!(
                     trace_id = %typed.trace.trace_id,
-                    provider = self.provider.name(),
+                    provider = %self.profile.provider_id,
                     "llm service snapshot emitted"
                 );
                 Ok(Self::service_result(
                     serde_json::to_value(snapshot).map_err(json_error)?,
+                    typed.trace,
+                ))
+            }
+            LLM_MODEL_LIST_COMMAND => {
+                let typed: LlmCatalogReadCommand = serde_json::from_value(command.payload)
+                    .map_err(|err| ServiceError::UnsupportedCommand(err.to_string()))?;
+                Ok(Self::service_result(
+                    serde_json::to_value(self.handle_model_list(typed.clone())?)
+                        .map_err(json_error)?,
+                    typed.trace,
+                ))
+            }
+            LLM_PROVIDER_CAPABILITIES_READ_COMMAND => {
+                let typed: LlmCatalogReadCommand = serde_json::from_value(command.payload)
+                    .map_err(|err| ServiceError::UnsupportedCommand(err.to_string()))?;
+                Ok(Self::service_result(
+                    serde_json::to_value(self.handle_provider_capabilities(typed.clone())?)
+                        .map_err(json_error)?,
+                    typed.trace,
+                ))
+            }
+            LLM_ROUTE_RESOLVE_COMMAND => {
+                let typed: macaca_llm::LlmRouteResolveCommand =
+                    serde_json::from_value(command.payload)
+                        .map_err(|err| ServiceError::UnsupportedCommand(err.to_string()))?;
+                Ok(Self::service_result(
+                    serde_json::to_value(self.handle_route_resolve(typed.clone())?)
+                        .map_err(json_error)?,
+                    typed.trace,
+                ))
+            }
+            LLM_CONTINUATION_VALIDATE_COMMAND => {
+                let typed: LlmContinuationValidateCommand = serde_json::from_value(command.payload)
+                    .map_err(|err| ServiceError::UnsupportedCommand(err.to_string()))?;
+                Ok(Self::service_result(
+                    serde_json::to_value(self.handle_continuation_validate(typed.clone())?)
+                        .map_err(json_error)?,
+                    typed.trace,
+                ))
+            }
+            LLM_BUDGET_STATUS_COMMAND => {
+                let typed: LlmBudgetStatusCommand = serde_json::from_value(command.payload)
+                    .map_err(|err| ServiceError::UnsupportedCommand(err.to_string()))?;
+                Ok(Self::service_result(
+                    serde_json::to_value(self.handle_budget_status(typed.clone())?)
+                        .map_err(json_error)?,
+                    typed.trace,
+                ))
+            }
+            LLM_DEGRADATION_EXPLAIN_COMMAND => {
+                let typed: LlmDegradationExplainCommand =
+                    serde_json::from_value(command.payload)
+                        .map_err(|err| ServiceError::UnsupportedCommand(err.to_string()))?;
+                Ok(Self::service_result(
+                    serde_json::to_value(self.handle_degradation_explain(typed.clone())?)
+                        .map_err(json_error)?,
                     typed.trace,
                 ))
             }

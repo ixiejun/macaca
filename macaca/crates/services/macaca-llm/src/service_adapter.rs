@@ -4,7 +4,13 @@
 //! discovery see the LLM capability surface without changing how existing LLM
 //! providers are selected or called.
 
-use crate::service_contract::{LLM_CHAT_COMMAND, LLM_MODEL_SELECTION_COMMAND, LLM_SERVICE_ID};
+use crate::hardening_contract::{
+    LLM_BUDGET_STATUS_COMMAND, LLM_CONTINUATION_VALIDATE_COMMAND, LLM_DEGRADATION_EXPLAIN_COMMAND,
+    LLM_MODEL_LIST_COMMAND, LLM_PROVIDER_CAPABILITIES_READ_COMMAND, LLM_ROUTE_RESOLVE_COMMAND,
+};
+use crate::service_contract::{
+    LLM_CHAT_COMMAND, LLM_MODEL_SELECTION_COMMAND, LLM_SERVICE_ID, LLM_SNAPSHOT_COMMAND,
+};
 use macaca_proto::{
     CapabilityId, CleanupPolicy, KernelServiceId, ServiceCapability, ServiceDescriptor,
     ServiceHealth, ServiceScope, ServiceType, TraceSchemaRef,
@@ -30,6 +36,10 @@ pub fn llm_service_descriptor() -> ServiceDescriptor {
             CapabilityId::new("capability.llm.snapshot"),
             "Emits sanitized LLM service inventory and health snapshots.",
         ),
+        ServiceCapability::new(
+            CapabilityId::new("capability.llm.hardening"),
+            "Exposes model catalog, provider protocol, continuation validation, budget, and degradation diagnostics.",
+        ),
     ];
     descriptor.health = ServiceHealth::Healthy;
     descriptor.supported_scopes = vec![ServiceScope::Global, ServiceScope::Application("*".into())];
@@ -40,6 +50,32 @@ pub fn llm_service_descriptor() -> ServiceDescriptor {
     descriptor.metadata.insert(
         "command.model_selection".into(),
         LLM_MODEL_SELECTION_COMMAND.into(),
+    );
+    descriptor
+        .metadata
+        .insert("command.snapshot".into(), LLM_SNAPSHOT_COMMAND.into());
+    descriptor
+        .metadata
+        .insert("command.model_list".into(), LLM_MODEL_LIST_COMMAND.into());
+    descriptor.metadata.insert(
+        "command.provider_capabilities_read".into(),
+        LLM_PROVIDER_CAPABILITIES_READ_COMMAND.into(),
+    );
+    descriptor.metadata.insert(
+        "command.route_resolve".into(),
+        LLM_ROUTE_RESOLVE_COMMAND.into(),
+    );
+    descriptor.metadata.insert(
+        "command.continuation_validate".into(),
+        LLM_CONTINUATION_VALIDATE_COMMAND.into(),
+    );
+    descriptor.metadata.insert(
+        "command.budget_status".into(),
+        LLM_BUDGET_STATUS_COMMAND.into(),
+    );
+    descriptor.metadata.insert(
+        "command.degradation_explain".into(),
+        LLM_DEGRADATION_EXPLAIN_COMMAND.into(),
     );
     descriptor.cleanup_policy = CleanupPolicy::None;
     descriptor
@@ -53,7 +89,11 @@ mod tests {
     fn llm_descriptor_exports_contract_shape() {
         let descriptor = llm_service_descriptor();
         assert_eq!(descriptor.service_type.as_str(), "llm");
-        assert_eq!(descriptor.capabilities.len(), 3);
+        assert_eq!(descriptor.capabilities.len(), 4);
         assert!(descriptor.required_permissions.contains(&"llm.call".into()));
+        assert_eq!(
+            descriptor.metadata.get("command.continuation_validate"),
+            Some(&LLM_CONTINUATION_VALIDATE_COMMAND.to_string())
+        );
     }
 }

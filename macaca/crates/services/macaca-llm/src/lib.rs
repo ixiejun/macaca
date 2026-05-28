@@ -31,6 +31,7 @@ pub mod anthropic;
 pub mod coding_plans;
 pub mod cost;
 pub mod dashscope;
+pub mod hardening_contract;
 pub mod openai;
 pub mod openai_compatible;
 pub mod provider;
@@ -46,6 +47,15 @@ pub use anthropic::AnthropicProvider;
 pub use coding_plans::normalize_openai_compatible_base;
 pub use cost::{default_pricing, CostTracker, ModelPricing};
 pub use dashscope::DashScopeProvider;
+pub use hardening_contract::{
+    LlmBudgetStatusCommand, LlmBudgetStatusResult, LlmCatalogReadCommand,
+    LlmContinuationValidateCommand, LlmContinuationValidateResult, LlmDegradationExplainCommand,
+    LlmDegradationExplainResult, LlmDiagnostic, LlmHardenedServiceResponse, LlmModelCatalogEntry,
+    LlmModelCatalogResult, LlmProviderCapabilitiesResult, LlmProviderCapabilityRecord,
+    LlmProviderProtocolMetadata, LlmRetryPolicy, LlmRouteResolveCommand, LlmRouteResolveResult,
+    LLM_BUDGET_STATUS_COMMAND, LLM_CONTINUATION_VALIDATE_COMMAND, LLM_DEGRADATION_EXPLAIN_COMMAND,
+    LLM_MODEL_LIST_COMMAND, LLM_PROVIDER_CAPABILITIES_READ_COMMAND, LLM_ROUTE_RESOLVE_COMMAND,
+};
 pub use openai::OpenAiProvider;
 pub use openai_compatible::OpenAiCompatibleProvider;
 pub use provider::LlmProvider;

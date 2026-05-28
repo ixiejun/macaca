@@ -57,6 +57,7 @@ pub mod interaction_service_provider;
 pub(crate) mod interaction_service_threads;
 pub(crate) mod interaction_service_turns;
 pub mod lease;
+pub mod llm_service_hardening;
 pub mod llm_service_provider;
 pub(crate) mod mcp_descriptor_index;
 pub(crate) mod mcp_invocation_registry;
@@ -140,6 +141,8 @@ mod hook_service_provider_tests;
 mod interaction_service_provider_tests;
 #[cfg(test)]
 mod interaction_service_state_tests;
+#[cfg(test)]
+mod llm_service_provider_hardening_tests;
 #[cfg(test)]
 mod process_service_provider_tests;
 #[cfg(test)]
@@ -257,6 +260,7 @@ pub use interaction_service_provider::{
     interaction_service_command, InteractionLedgerEvent, InteractionSystemServiceProvider,
 };
 pub use lease::McpSessionLease;
+pub use llm_service_hardening::LlmProviderProfile;
 pub use llm_service_provider::LlmSystemServiceProvider;
 #[allow(deprecated)]
 pub use mcp_runtime::{

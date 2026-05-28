@@ -8,9 +8,15 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use macaca_llm::{
-    LlmChatCommand, LlmChatResult, LlmModelSelectionCommand, LlmModelSelectionResult,
-    LlmServiceSnapshot, LlmServiceSnapshotCommand, LLM_CHAT_COMMAND, LLM_MODEL_SELECTION_COMMAND,
-    LLM_SERVICE_ID, LLM_SNAPSHOT_COMMAND,
+    LlmBudgetStatusCommand, LlmBudgetStatusResult, LlmCatalogReadCommand, LlmChatCommand,
+    LlmChatResult, LlmContinuationValidateCommand, LlmContinuationValidateResult,
+    LlmDegradationExplainCommand, LlmDegradationExplainResult, LlmModelCatalogResult,
+    LlmModelSelectionCommand, LlmModelSelectionResult, LlmProviderCapabilitiesResult,
+    LlmRouteResolveCommand, LlmRouteResolveResult, LlmServiceSnapshot, LlmServiceSnapshotCommand,
+    LLM_BUDGET_STATUS_COMMAND, LLM_CHAT_COMMAND, LLM_CONTINUATION_VALIDATE_COMMAND,
+    LLM_DEGRADATION_EXPLAIN_COMMAND, LLM_MODEL_LIST_COMMAND, LLM_MODEL_SELECTION_COMMAND,
+    LLM_PROVIDER_CAPABILITIES_READ_COMMAND, LLM_ROUTE_RESOLVE_COMMAND, LLM_SERVICE_ID,
+    LLM_SNAPSHOT_COMMAND,
 };
 use macaca_proto::{MacacaError, MacacaResult};
 use tracing::{info, warn};
@@ -32,6 +38,36 @@ pub trait SystemLlmClient: Send + Sync {
         &self,
         command: LlmServiceSnapshotCommand,
     ) -> MacacaResult<LlmServiceSnapshot>;
+    /// List sanitized model catalog entries.
+    async fn list_models(
+        &self,
+        command: LlmCatalogReadCommand,
+    ) -> MacacaResult<LlmModelCatalogResult>;
+    /// Read provider capability and protocol metadata.
+    async fn provider_capabilities(
+        &self,
+        command: LlmCatalogReadCommand,
+    ) -> MacacaResult<LlmProviderCapabilitiesResult>;
+    /// Resolve the effective model route with diagnostics.
+    async fn resolve_route(
+        &self,
+        command: LlmRouteResolveCommand,
+    ) -> MacacaResult<LlmRouteResolveResult>;
+    /// Validate tool-result continuation before provider dispatch.
+    async fn validate_continuation(
+        &self,
+        command: LlmContinuationValidateCommand,
+    ) -> MacacaResult<LlmContinuationValidateResult>;
+    /// Read provider-neutral budget status.
+    async fn budget_status(
+        &self,
+        command: LlmBudgetStatusCommand,
+    ) -> MacacaResult<LlmBudgetStatusResult>;
+    /// Explain degradation without leaking raw provider payloads.
+    async fn explain_degradation(
+        &self,
+        command: LlmDegradationExplainCommand,
+    ) -> MacacaResult<LlmDegradationExplainResult>;
 }
 
 /// Null-object LLM client used when no runtime-backed service is installed.
@@ -70,6 +106,54 @@ impl SystemLlmClient for UnavailableSystemLlmClient {
         Ok(LlmServiceSnapshot::unavailable(
             "runtime-backed LLM service is not installed",
         ))
+    }
+
+    async fn list_models(
+        &self,
+        command: LlmCatalogReadCommand,
+    ) -> MacacaResult<LlmModelCatalogResult> {
+        warn!(trace_id = %command.trace.trace_id, "sdk llm client unavailable for model list");
+        Err(MacacaError::Config("LLM service is unavailable".into()))
+    }
+
+    async fn provider_capabilities(
+        &self,
+        command: LlmCatalogReadCommand,
+    ) -> MacacaResult<LlmProviderCapabilitiesResult> {
+        warn!(trace_id = %command.trace.trace_id, "sdk llm client unavailable for provider capabilities");
+        Err(MacacaError::Config("LLM service is unavailable".into()))
+    }
+
+    async fn resolve_route(
+        &self,
+        command: LlmRouteResolveCommand,
+    ) -> MacacaResult<LlmRouteResolveResult> {
+        warn!(trace_id = %command.trace.trace_id, "sdk llm client unavailable for route resolution");
+        Err(MacacaError::Config("LLM service is unavailable".into()))
+    }
+
+    async fn validate_continuation(
+        &self,
+        command: LlmContinuationValidateCommand,
+    ) -> MacacaResult<LlmContinuationValidateResult> {
+        warn!(trace_id = %command.trace.trace_id, "sdk llm client unavailable for continuation validation");
+        Err(MacacaError::Config("LLM service is unavailable".into()))
+    }
+
+    async fn budget_status(
+        &self,
+        command: LlmBudgetStatusCommand,
+    ) -> MacacaResult<LlmBudgetStatusResult> {
+        warn!(trace_id = %command.trace.trace_id, "sdk llm client unavailable for budget status");
+        Err(MacacaError::Config("LLM service is unavailable".into()))
+    }
+
+    async fn explain_degradation(
+        &self,
+        command: LlmDegradationExplainCommand,
+    ) -> MacacaResult<LlmDegradationExplainResult> {
+        warn!(trace_id = %command.trace.trace_id, "sdk llm client unavailable for degradation explanation");
+        Err(MacacaError::Config("LLM service is unavailable".into()))
     }
 }
 
@@ -126,6 +210,89 @@ impl SystemLlmClient for ServiceBackedLlmClient {
             serde_json::to_value(command)?,
         )?
         .with_trace(trace);
+        let result = self.service.call_service(&service_command).await?;
+        serde_json::from_value(result.output).map_err(MacacaError::from)
+    }
+
+    async fn list_models(
+        &self,
+        command: LlmCatalogReadCommand,
+    ) -> MacacaResult<LlmModelCatalogResult> {
+        self.call_typed(LLM_MODEL_LIST_COMMAND, command.trace.clone(), command)
+            .await
+    }
+
+    async fn provider_capabilities(
+        &self,
+        command: LlmCatalogReadCommand,
+    ) -> MacacaResult<LlmProviderCapabilitiesResult> {
+        self.call_typed(
+            LLM_PROVIDER_CAPABILITIES_READ_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn resolve_route(
+        &self,
+        command: LlmRouteResolveCommand,
+    ) -> MacacaResult<LlmRouteResolveResult> {
+        self.call_typed(LLM_ROUTE_RESOLVE_COMMAND, command.trace.clone(), command)
+            .await
+    }
+
+    async fn validate_continuation(
+        &self,
+        command: LlmContinuationValidateCommand,
+    ) -> MacacaResult<LlmContinuationValidateResult> {
+        self.call_typed(
+            LLM_CONTINUATION_VALIDATE_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+
+    async fn budget_status(
+        &self,
+        command: LlmBudgetStatusCommand,
+    ) -> MacacaResult<LlmBudgetStatusResult> {
+        self.call_typed(LLM_BUDGET_STATUS_COMMAND, command.trace.clone(), command)
+            .await
+    }
+
+    async fn explain_degradation(
+        &self,
+        command: LlmDegradationExplainCommand,
+    ) -> MacacaResult<LlmDegradationExplainResult> {
+        self.call_typed(
+            LLM_DEGRADATION_EXPLAIN_COMMAND,
+            command.trace.clone(),
+            command,
+        )
+        .await
+    }
+}
+
+impl ServiceBackedLlmClient {
+    /// Shared typed command bridge for hardened LLM facade methods.
+    ///
+    /// The helper keeps each facade method small while preserving trace
+    /// propagation and the provider-neutral `service.llm` command envelope.
+    async fn call_typed<T, R>(
+        &self,
+        command_name: &'static str,
+        trace: macaca_proto::TraceContext,
+        command: T,
+    ) -> MacacaResult<R>
+    where
+        T: serde::Serialize,
+        R: serde::de::DeserializeOwned,
+    {
+        let service_command =
+            ServiceCallCommand::new(LLM_SERVICE_ID, command_name, serde_json::to_value(command)?)?
+                .with_trace(trace);
         let result = self.service.call_service(&service_command).await?;
         serde_json::from_value(result.output).map_err(MacacaError::from)
     }

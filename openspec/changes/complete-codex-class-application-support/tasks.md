@@ -197,17 +197,17 @@
 
 ## 10. `service.llm` Hardening
 
-- [ ] 10.1 Add model catalog commands for list, provider capabilities, route
+- [x] 10.1 Add model catalog commands for list, provider capabilities, route
   resolution, budget status, and degradation explanation.
-- [ ] 10.2 Add provider protocol metadata contracts for reasoning,
+- [x] 10.2 Add provider protocol metadata contracts for reasoning,
   tool-call/tool-result continuation, service tiers, and retry policy.
-- [ ] 10.3 Implement continuation validation before dispatching tool-result
+- [x] 10.3 Implement continuation validation before dispatching tool-result
   follow-up calls to providers.
-- [ ] 10.4 Fix provider continuation paths that currently fail on missing
+- [x] 10.4 Fix provider continuation paths that currently fail on missing
   provider-specific reasoning continuation metadata.
-- [ ] 10.5 Add structured diagnostics for provider unavailable, unsupported
+- [x] 10.5 Add structured diagnostics for provider unavailable, unsupported
   model, protocol mismatch, budget denied, rate limited, and degradation.
-- [ ] 10.6 Add tests reproducing the DeepSeek thinking-mode continuation error
+- [x] 10.6 Add tests reproducing the DeepSeek thinking-mode continuation error
   and proving structured validation/fix behavior.
 
 ## 11. Plugin Marketplace Lifecycle
