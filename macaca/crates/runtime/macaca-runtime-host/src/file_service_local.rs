@@ -260,22 +260,22 @@ fn resolve_sibling_path(
             "symlink traversal is denied by service.file path policy".into(),
         ));
     }
-    let absolute =
-        if candidate.exists() {
-            candidate.canonicalize().map_err(io_error)?
-        } else if allow_missing_leaf {
-            let parent = candidate
-                .parent()
-                .ok_or_else(|| ServiceError::InvalidArgument("file path has no parent".into()))?;
-            let canonical_parent = parent.canonicalize().map_err(io_error)?;
-            canonical_parent.join(candidate.file_name().ok_or_else(|| {
-                ServiceError::InvalidArgument("file path has no file name".into())
-            })?)
-        } else {
-            return Err(ServiceError::InvalidArgument(
-                "file path does not exist".into(),
-            ));
-        };
+    let absolute = if candidate.exists() {
+        candidate.canonicalize().map_err(io_error)?
+    } else if allow_missing_leaf {
+        // Missing-write targets may also have missing parent directories when
+        // `file.write.create_parent_directories` is true.  Canonicalizing the
+        // parent before the write would reject exactly the generic workspace
+        // creation case that the contract allows.  The path remains safe
+        // because the workspace root is canonical, absolute/traversal
+        // components were rejected above, and existing symlink components were
+        // checked before this branch.
+        candidate
+    } else {
+        return Err(ServiceError::InvalidArgument(
+            "file path does not exist".into(),
+        ));
+    };
     if !absolute.starts_with(&root) {
         return Err(ServiceError::DisabledByPolicy(
             "path escapes workspace root".into(),

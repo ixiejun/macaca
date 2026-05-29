@@ -10,6 +10,8 @@ pub mod agent_runner;
 mod app_ui_csp;
 mod app_ui_llm_bridge;
 pub mod app_ui_routes;
+mod app_ui_workspace_scope;
+mod app_workspace_bootstrap;
 pub mod bootstrap;
 mod capability_catalog;
 pub mod chat_mediator;
@@ -1131,7 +1133,7 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
 
             // Register each app to executor registry
             for (app_id, app_name, app_agent_names) in apps_to_register {
-                let mut app_agents: Vec<AgentInfo> = app_agent_names
+                let app_agents: Vec<AgentInfo> = app_agent_names
                     .iter()
                     .filter_map(|name| agents_by_name.get(name.as_str()).copied())
                     .map(|m| AgentInfo {
@@ -1143,6 +1145,37 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
                         available: true,
                     })
                     .collect();
+                let workspace_agent_names: Vec<String> =
+                    app_agents.iter().map(|agent| agent.name.clone()).collect();
+
+                // Workspace identity belongs to the generic application
+                // platform, not to executor registration.  UI-only and
+                // WASM-only applications still need a Macaca-registered
+                // workspace so app-owned UI bridge calls can inject
+                // `workspace_root` from `workspace.root_dir` instead of
+                // accepting model- or caller-supplied host paths.
+                match crate::app_workspace_bootstrap::prepare_app_workspace(
+                    &config.workspace.root_dir,
+                    &app_id,
+                    &workspace_agent_names,
+                ) {
+                    Ok(workspace) => {
+                        state_ref
+                            .config
+                            .app_workspaces
+                            .write()
+                            .await
+                            .insert(app_id, workspace);
+                    }
+                    Err(e) => {
+                        tracing::error!(
+                            app_id = %app_id.0,
+                            error = %e,
+                            "Failed to prepare application workspace"
+                        );
+                    }
+                }
+
                 if app_agents.is_empty() {
                     // Security boundary enforcement:
                     // Never fall back to global agents when an application has no
@@ -1160,8 +1193,6 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
                     );
                     continue;
                 }
-                let workspace_agent_names: Vec<String> =
-                    app_agents.iter().map(|agent| agent.name.clone()).collect();
 
                 // Register this app to executor registry
                 let _executor = registry_ref
@@ -1171,28 +1202,6 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
 
                 // Recover crashed tasks: rollback InProgress/Assigned → Pending
                 todo_store_for_recovery.rollback_in_progress(&app_id).await;
-
-                // Create workspace directories for this app
-                let workspace =
-                    crate::workspace::AppWorkspace::new(&config.workspace.root_dir, &app_id);
-                match workspace.ensure_dirs(&workspace_agent_names) {
-                    Ok(()) => {
-                        tracing::info!(
-                            app_id = %app_id.0,
-                            workspace = %workspace.root.display(),
-                            "Workspace directories created"
-                        );
-                    }
-                    Err(e) => {
-                        tracing::error!(app_id = %app_id.0, error = %e, "Failed to create workspace directories");
-                    }
-                }
-                state_ref
-                    .config
-                    .app_workspaces
-                    .write()
-                    .await
-                    .insert(app_id, workspace);
 
                 // Auto-start PlanLoop and WorkerLoops for this app so pending
                 // tasks (e.g., PendingReview from before restart) are processed.

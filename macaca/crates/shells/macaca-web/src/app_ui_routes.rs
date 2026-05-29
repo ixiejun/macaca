@@ -31,6 +31,7 @@ use macaca_proto::{
 
 use crate::app_ui_csp::app_ui_html_csp;
 use crate::app_ui_llm_bridge::hydrate_llm_bridge_payload;
+use crate::app_ui_workspace_scope::decorate_workspace_scoped_payload;
 use crate::routes::{err, proto_err, ErrorResponse};
 use crate::state::AppState;
 
@@ -122,8 +123,15 @@ pub async fn post_app_ui_bridge(
 
     let result = match request.capability.as_str() {
         "service.call" => {
-            dispatch_service_call(&state, app_id, &request, trace, &context.declared_services)
-                .await?
+            dispatch_service_call(
+                &state,
+                app_id,
+                &request,
+                trace,
+                &context.declared_services,
+                context.workspace_root.as_deref(),
+            )
+            .await?
         }
         _ => rejected_bridge_result(
             "ui bridge capability is not implemented by this host",
@@ -139,6 +147,7 @@ async fn dispatch_service_call(
     request: &ApplicationUiBridgeRequest,
     trace: TraceContext,
     declared_services: &BTreeSet<String>,
+    workspace_root: Option<&Path>,
 ) -> Result<ApplicationHostCommandResult, RouteError> {
     let Some(service_id) = request
         .service_id
@@ -175,6 +184,12 @@ async fn dispatch_service_call(
         trace.clone(),
     )
     .map_err(|error| err(StatusCode::INTERNAL_SERVER_ERROR, error))?;
+    let payload = decorate_workspace_scoped_payload(
+        service_id.trim(),
+        operation.trim(),
+        payload,
+        workspace_root,
+    );
 
     let mut host_command =
         ApplicationHostCommand::with_trace(ApplicationImport::ServiceCall, payload, trace.clone());
@@ -245,6 +260,7 @@ struct AppUiRouteContext {
     app_dir: PathBuf,
     ui: AppUiRuntimeConfig,
     declared_services: BTreeSet<String>,
+    workspace_root: Option<PathBuf>,
 }
 
 async fn app_ui_context(
@@ -278,22 +294,28 @@ async fn app_ui_context(
             )
         })?;
         let ui = app.manifest.ui.clone().ok_or_else(|| {
-                err(
-                    StatusCode::NOT_FOUND,
-                    "application UI runtime is not declared".into(),
-                )
-            })?;
+            err(
+                StatusCode::NOT_FOUND,
+                "application UI runtime is not declared".into(),
+            )
+        })?;
         let catalog = InMemoryDomainPackCatalog::with_builtin_defaults();
         let declared_services =
-            expand_service_capabilities(app.manifest.service_contract.as_ref(), &catalog)
-                .services;
+            expand_service_capabilities(app.manifest.service_contract.as_ref(), &catalog).services;
         (ui, declared_services)
+    };
+    let workspace_root = {
+        let workspaces = state.config.app_workspaces.read().await;
+        workspaces
+            .get(&app_id)
+            .map(|workspace| workspace.root.clone())
     };
 
     Ok(AppUiRouteContext {
         app_dir: PathBuf::from(app_dir),
         ui,
         declared_services,
+        workspace_root,
     })
 }
 

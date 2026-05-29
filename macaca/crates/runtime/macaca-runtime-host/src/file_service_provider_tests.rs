@@ -98,6 +98,35 @@ async fn write_requires_approval_before_side_effect_when_requested() {
 }
 
 #[tokio::test]
+async fn write_creates_missing_parent_directories_when_requested() {
+    let root = tempfile::tempdir().unwrap();
+    let provider = FileSystemServiceProvider::local();
+
+    let result = decode(
+        provider
+            .call(command(
+                WRITE_COMMAND,
+                FileWriteRequest {
+                    target: path(&root, "frontend/src/App.js"),
+                    content: "export default function App() { return 'Hello'; }".into(),
+                    create_parent_directories: true,
+                    require_approval: false,
+                    approval_ref: None,
+                },
+            ))
+            .await
+            .unwrap()
+            .output,
+    );
+
+    assert_eq!(result.status, WorkbenchCommandStatus::Completed);
+    assert_eq!(
+        std::fs::read_to_string(root.path().join("frontend/src/App.js")).unwrap(),
+        "export default function App() { return 'Hello'; }"
+    );
+}
+
+#[tokio::test]
 async fn write_denies_readonly_existing_file_before_mutation() {
     let root = tempfile::tempdir().unwrap();
     let file_path = root.path().join("readonly.txt");
