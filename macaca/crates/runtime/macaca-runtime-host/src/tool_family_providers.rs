@@ -27,6 +27,7 @@ const TASK_SERVICE_ID: &str = "service.task";
 const TOOL_RUNTIME_ENVIRONMENT_SERVICE_ID: &str = "service.tool.runtime_environment";
 const TOOL_MANAGED_GATEWAY_SERVICE_ID: &str = "service.tool.managed_gateway";
 const TOOL_PLUGIN_SERVICE_ID: &str = "service.plugin";
+const TOOL_FAMILY_AUDIT_NAMESPACE: &str = "service.tool.family";
 
 /// Stable provider-neutral families required by the industrial Tools proposal.
 ///
@@ -95,6 +96,14 @@ pub fn industrial_tool_family_provider_inventory(
             sanitized_metadata.insert("owner_service".into(), spec.owner_service.clone());
             sanitized_metadata.insert("availability_state".into(), spec.availability_state());
             sanitized_metadata.insert("extension_point".into(), spec.extension_point.to_string());
+            // This namespace is stable audit evidence for generic tool-family
+            // descriptors. It is metadata, not a routing branch, so service.tool
+            // can replay which family catalog produced a descriptor without
+            // learning provider-specific payloads or application behavior.
+            sanitized_metadata.insert(
+                "service_namespace".into(),
+                TOOL_FAMILY_AUDIT_NAMESPACE.into(),
+            );
             Ok(IndustrialToolFamilyProviderInventory {
                 family: spec.family.to_string(),
                 owner_service: spec.owner_service,

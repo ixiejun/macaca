@@ -23,6 +23,7 @@ use macaca_proto::{
     ScheduledAgentTaskSummary, SchedulerDeleteJobCommand, SchedulerJobDefinition, SchedulerJobId,
     SchedulerRegisterJobCommand, SchedulerTargetCommand, ServiceDescriptor, ServiceHealth,
     ServiceLifecycleState, TaskId, TraceContext, SCHEDULED_AGENT_TASK_SERVICE_ID,
+    SCHEDULER_SERVICE_ID,
 };
 use macaca_scheduler::{SchedulerService, UnavailableSchedulerProvider};
 use tracing::{info, warn};
@@ -651,7 +652,7 @@ fn scheduler_target_metadata(
     let mut metadata = BTreeMap::new();
     metadata.insert("source".into(), SCHEDULED_AGENT_TASK_SERVICE_ID.into());
     metadata.insert("scheduled_agent_task_id".into(), task_id.as_str().into());
-    metadata.insert("scheduler_run_source".into(), "service.scheduler".into());
+    metadata.insert("scheduler_run_source".into(), SCHEDULER_SERVICE_ID.into());
     for (key, value) in sanitize_metadata(caller_metadata.clone()) {
         if key.starts_with("skill.alias.") && !value.trim().is_empty() {
             metadata.insert(key, value);

@@ -367,17 +367,25 @@
 
 ## 20. Validation and Completion Gates
 
-- [ ] 20.1 Run `openspec validate complete-codex-class-application-support --strict`.
-- [ ] 20.2 Run targeted Rust tests for every touched crate.
-- [ ] 20.3 Run dependency-boundary and serviceization gates.
-- [ ] 20.4 Run audit replay tests for every new service family.
-- [ ] 20.5 Run `/api/chat/v2` regression.
-- [ ] 20.6 Run YAML/WASM/GenUI application regressions.
-- [ ] 20.7 Run industrial tools regressions.
-- [ ] 20.8 Run frontend lint/build if frontend code changes.
+- [x] 20.1 Run `openspec validate complete-codex-class-application-support --strict`.
+- [x] 20.2 Run targeted Rust tests for every touched crate.
+- [x] 20.3 Run dependency-boundary and serviceization gates.
+- [x] 20.4 Run audit replay tests for every new service family.
+- [x] 20.5 Run `/api/chat/v2` regression.
+- [x] 20.6 Run YAML/WASM/GenUI application regressions.
+- [x] 20.7 Run industrial tools regressions.
+- [x] 20.8 Run frontend lint/build if frontend code changes.
 - [ ] 20.9 Run live API proof for the application-neutral Codex-class workflow.
-- [ ] 20.10 Run GitNexus detect changes before commit and record CRITICAL/HIGH
+  - 2026-05-29 validation note: a live `/api/chat/v2` smoke request reached
+    session creation, tool exposure, and a generic shell tool result, but it
+    ended with a DeepSeek provider error
+    `reasoning_content in the thinking mode must be passed back to the API`;
+    keep this gate open until a provider-backed run emits a terminal done event.
+- [x] 20.10 Run GitNexus detect changes before commit and record CRITICAL/HIGH
   warnings as notes.
+  - 2026-05-29 validation note: `gitnexus_detect_changes(scope=all)`
+    reported low risk, 4 changed indexed files, and no affected execution
+    processes.
 - [ ] 20.11 Mark this proposal complete only when all services are real
   provider-backed or explicitly unavailable optional providers, all shell
   adapters remain thin, and the full proof passes.
