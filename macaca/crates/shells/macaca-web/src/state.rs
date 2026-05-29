@@ -263,6 +263,13 @@ pub struct SessionState {
     /// Shared session_id reference for the DelegateTaskTool.
     /// Set to the current session before execute_workflow_steps, cleared after.
     pub delegate_session_id: Arc<tokio::sync::RwLock<Option<String>>>,
+    /// Request-scoped LLM route hints keyed by session id.
+    ///
+    /// This Web-local map is an Adapter cache, not a routing authority. The
+    /// selected string is copied from the generic execution request so
+    /// framework construction can pass it into `service.llm`/`LlmRouter`
+    /// precedence without adding app-specific model logic to agents.
+    pub llm_route_hints: RwLock<HashMap<String, String>>,
     /// Framework-level session store for resumable execution primitives
     /// (e.g. execution_context, plan_notebook).
     pub framework_session_store: Arc<dyn FrameworkSessionStore>,

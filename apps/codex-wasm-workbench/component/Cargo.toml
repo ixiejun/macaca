@@ -1,0 +1,15 @@
+[package]
+name = "codex-wasm-workbench-component"
+version = "0.1.0"
+edition = "2021"
+description = "Application-owned WASM guest for a Macaca Codex-class coding workbench"
+
+[lib]
+crate-type = ["cdylib"]
+path = "src/lib.rs"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"

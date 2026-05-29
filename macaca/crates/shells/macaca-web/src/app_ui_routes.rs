@@ -6,18 +6,21 @@
 //! admitted only through manifest-declared capabilities before being routed to
 //! the existing Application Service host-dispatch boundary.
 
+use std::collections::BTreeSet;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 
 use axum::body::Body;
 use axum::extract::{Path as AxumPath, State};
-use axum::http::{header, HeaderValue, StatusCode};
+use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use axum::response::Response;
 use axum::Json;
 use serde_json::Value;
 use uuid::Uuid;
 
-use macaca_app::ui_runtime::AppUiRuntimeConfig;
+use macaca_app::{
+    expand_service_capabilities, ui_runtime::AppUiRuntimeConfig, InMemoryDomainPackCatalog,
+};
 use macaca_proto::{
     ApplicationHostCommand, ApplicationHostCommandResult, ApplicationHostCommandStatus,
     ApplicationHostDispatchServiceCommand, ApplicationId, ApplicationImport,
@@ -26,6 +29,8 @@ use macaca_proto::{
     WASM_HOST_IMPORT_OPERATION, WASM_HOST_IMPORT_SERVICE_ID,
 };
 
+use crate::app_ui_csp::app_ui_html_csp;
+use crate::app_ui_llm_bridge::hydrate_llm_bridge_payload;
 use crate::routes::{err, proto_err, ErrorResponse};
 use crate::state::AppState;
 
@@ -39,11 +44,14 @@ type RouteError = (StatusCode, Json<ErrorResponse>);
 /// for any application bundle while preventing arbitrary package traversal.
 pub async fn get_app_ui_asset(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     AxumPath((app_id, asset_path)): AxumPath<(String, String)>,
 ) -> Result<Response, RouteError> {
     let app_id = parse_app_id(&app_id)?;
     let asset_path = normalize_package_path(&asset_path)?;
-    let (app_dir, ui) = app_ui_context(&state, app_id).await?;
+    let context = app_ui_context(&state, app_id).await?;
+    let app_dir = context.app_dir;
+    let ui = context.ui;
     ensure_declared_asset(&ui, &asset_path)?;
     let body = read_declared_asset(&app_dir, &asset_path).await?;
     let content_type = content_type_for(&asset_path);
@@ -64,9 +72,12 @@ pub async fn get_app_ui_asset(
     if asset_path.extension().and_then(|value| value.to_str()) == Some("html") {
         response.headers_mut().insert(
             header::CONTENT_SECURITY_POLICY,
-            HeaderValue::from_static(
-                "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'none'; base-uri 'none'; frame-ancestors 'self' http://localhost:3000 http://127.0.0.1:3000",
-            ),
+            HeaderValue::from_str(&app_ui_html_csp(&headers)).map_err(|error| {
+                err(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("failed to construct application UI CSP: {error}"),
+                )
+            })?,
         );
     }
     Ok(response)
@@ -84,7 +95,7 @@ pub async fn post_app_ui_bridge(
     Json(request): Json<ApplicationUiBridgeRequest>,
 ) -> Result<Json<ApplicationUiBridgeResponse>, RouteError> {
     let app_id = parse_app_id(&app_id)?;
-    let (_app_dir, ui) = app_ui_context(&state, app_id).await?;
+    let context = app_ui_context(&state, app_id).await?;
     let trace = bridge_trace(&request);
     tracing::info!(
         app_id = %app_id,
@@ -94,7 +105,7 @@ pub async fn post_app_ui_bridge(
         "application-owned UI bridge command received"
     );
 
-    if !ui.bridge.declares(&request.capability) {
+    if !context.ui.bridge.declares(&request.capability) {
         tracing::warn!(
             app_id = %app_id,
             trace_id = %trace.trace_id,
@@ -110,7 +121,10 @@ pub async fn post_app_ui_bridge(
     }
 
     let result = match request.capability.as_str() {
-        "service.call" => dispatch_service_call(&state, app_id, &request, trace).await?,
+        "service.call" => {
+            dispatch_service_call(&state, app_id, &request, trace, &context.declared_services)
+                .await?
+        }
         _ => rejected_bridge_result(
             "ui bridge capability is not implemented by this host",
             trace,
@@ -124,6 +138,7 @@ async fn dispatch_service_call(
     app_id: ApplicationId,
     request: &ApplicationUiBridgeRequest,
     trace: TraceContext,
+    declared_services: &BTreeSet<String>,
 ) -> Result<ApplicationHostCommandResult, RouteError> {
     let Some(service_id) = request
         .service_id
@@ -145,12 +160,24 @@ async fn dispatch_service_call(
             trace,
         ));
     };
+    if let Some(result) =
+        rejected_undeclared_service_result(service_id.trim(), declared_services, trace.clone())
+    {
+        return Ok(result);
+    }
 
-    let mut host_command = ApplicationHostCommand::with_trace(
-        ApplicationImport::ServiceCall,
-        request.payload.clone(),
+    let payload = hydrate_llm_bridge_payload(
+        app_id,
+        request.session_id.as_deref(),
+        service_id.trim(),
+        operation.trim(),
+        &request.payload,
         trace.clone(),
-    );
+    )
+    .map_err(|error| err(StatusCode::INTERNAL_SERVER_ERROR, error))?;
+
+    let mut host_command =
+        ApplicationHostCommand::with_trace(ApplicationImport::ServiceCall, payload, trace.clone());
     host_command.metadata.insert(
         WASM_HOST_IMPORT_SERVICE_ID.into(),
         service_id.trim().to_string(),
@@ -207,10 +234,23 @@ async fn dispatch_service_call(
     Ok(result)
 }
 
+/// Manifest-derived context needed by application-owned UI routes.
+///
+/// The route layer keeps this context intentionally small: static asset serving
+/// needs the package directory and UI declaration, while bridge calls need the
+/// effective service allowlist expanded from the manifest service contract.
+/// The expansion uses the same data-only domain pack catalog as runtime policy
+/// sync so Web does not invent service semantics or branch on application ids.
+struct AppUiRouteContext {
+    app_dir: PathBuf,
+    ui: AppUiRuntimeConfig,
+    declared_services: BTreeSet<String>,
+}
+
 async fn app_ui_context(
     state: &Arc<AppState>,
     app_id: ApplicationId,
-) -> Result<(PathBuf, AppUiRuntimeConfig), RouteError> {
+) -> Result<AppUiRouteContext, RouteError> {
     let metadata = ApplicationMetadataQueryCommand::application(
         TraceContext::new("web-route-app-ui-metadata"),
         app_id,
@@ -229,20 +269,32 @@ async fn app_ui_context(
     })?;
 
     #[allow(deprecated)]
-    let ui = {
+    let (ui, declared_services) = {
         let registry = state.registry.read().await;
-        registry
-            .get_app(&app_id)
-            .and_then(|app| app.manifest.ui.clone())
-            .ok_or_else(|| {
+        let app = registry.get_app(&app_id).ok_or_else(|| {
+            err(
+                StatusCode::NOT_FOUND,
+                "application is not registered".into(),
+            )
+        })?;
+        let ui = app.manifest.ui.clone().ok_or_else(|| {
                 err(
                     StatusCode::NOT_FOUND,
                     "application UI runtime is not declared".into(),
                 )
-            })?
+            })?;
+        let catalog = InMemoryDomainPackCatalog::with_builtin_defaults();
+        let declared_services =
+            expand_service_capabilities(app.manifest.service_contract.as_ref(), &catalog)
+                .services;
+        (ui, declared_services)
     };
 
-    Ok((PathBuf::from(app_dir), ui))
+    Ok(AppUiRouteContext {
+        app_dir: PathBuf::from(app_dir),
+        ui,
+        declared_services,
+    })
 }
 
 fn parse_app_id(value: &str) -> Result<ApplicationId, RouteError> {
@@ -293,6 +345,30 @@ fn ensure_declared_asset(ui: &AppUiRuntimeConfig, asset_path: &Path) -> Result<(
             "asset path is not declared by the application UI manifest".into(),
         ))
     }
+}
+
+fn rejected_undeclared_service_result(
+    service_id: &str,
+    declared_services: &BTreeSet<String>,
+    trace: TraceContext,
+) -> Option<ApplicationHostCommandResult> {
+    if declared_services.contains(service_id) {
+        return None;
+    }
+    tracing::warn!(
+        service_id,
+        trace_id = %trace.trace_id,
+        declared_service_count = declared_services.len(),
+        "application-owned UI bridge rejected undeclared service call"
+    );
+    let mut result = rejected_bridge_result(
+        "service.call target service is not declared by the application manifest",
+        trace,
+    );
+    result
+        .metadata
+        .insert("service_id".into(), service_id.to_string());
+    Some(result)
 }
 
 async fn read_declared_asset(app_dir: &Path, asset_path: &Path) -> Result<Vec<u8>, RouteError> {
@@ -443,6 +519,36 @@ mod tests {
         let error = normalize_package_path("../secret.txt")
             .expect_err("path traversal must be rejected before filesystem access");
         assert_eq!(error.0, StatusCode::FORBIDDEN);
+    }
+
+    #[test]
+    fn app_ui_bridge_service_policy_rejects_undeclared_service() {
+        let declared = BTreeSet::from(["service.file".to_string()]);
+        let result = rejected_undeclared_service_result(
+            "service.llm",
+            &declared,
+            TraceContext::new("test-ui-bridge-service-policy"),
+        )
+        .expect("undeclared service calls must fail before host dispatch");
+        assert!(matches!(
+            result.status,
+            ApplicationHostCommandStatus::DisabledByPolicy { .. }
+        ));
+        assert_eq!(
+            result.metadata.get("service_id").map(String::as_str),
+            Some("service.llm")
+        );
+    }
+
+    #[test]
+    fn app_ui_bridge_service_policy_allows_declared_service() {
+        let declared = BTreeSet::from(["service.llm".to_string()]);
+        assert!(rejected_undeclared_service_result(
+            "service.llm",
+            &declared,
+            TraceContext::new("test-ui-bridge-service-policy-ok"),
+        )
+        .is_none());
     }
 
     #[test]

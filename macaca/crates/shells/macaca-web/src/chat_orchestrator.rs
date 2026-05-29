@@ -1,7 +1,7 @@
 //! Chat orchestration: SSE streaming, agentic loop, workflow execution,
 //! and process lifecycle (start/stop).
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::convert::Infallible;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
@@ -680,6 +680,75 @@ fn new_session_preparation_for_chat(
     }
 }
 
+/// Resolve bounded route metadata for one application execution request.
+///
+/// This helper is a Web-shell Adapter over the service-owned LLM route
+/// strategy. It never decides provider semantics itself; it only asks the
+/// shared router for the same precedence order used by framework agents and
+/// stores the selected route as replayable session metadata. The prompt is not
+/// passed into this function, which prevents route audit data from capturing
+/// user content.
+async fn resolve_request_route_metadata(
+    state: &Arc<AppState>,
+    app_id: &ApplicationId,
+    session_id: &str,
+    request_model: Option<&str>,
+) -> BTreeMap<String, String> {
+    let app_defaults = {
+        #[allow(deprecated)]
+        let registry = state.registry.read().await;
+        registry
+            .get_app(app_id)
+            .and_then(|app| app.manifest.llm_config.clone())
+    };
+    let selection = state
+        .llm_router
+        .resolve_selection(&macaca_llm::ModelSelectionRequest {
+            request_model: request_model.map(str::to_owned),
+            app_model: app_defaults.as_ref().map(|cfg| cfg.model.clone()),
+            app_provider: app_defaults.as_ref().map(|cfg| cfg.provider.clone()),
+            system_model: (!state.config.default_model.is_empty())
+                .then_some(state.config.default_model.clone()),
+            ..Default::default()
+        });
+
+    let mut metadata = BTreeMap::new();
+    if let Some(model) = request_model.filter(|value| !value.trim().is_empty()) {
+        metadata.insert("requested_model".into(), model.to_string());
+    }
+    match selection {
+        Ok(selection) => {
+            metadata.insert("provider_id".into(), selection.primary.provider);
+            metadata.insert("model".into(), selection.primary.model);
+            metadata.insert("source".into(), selection.source.into());
+            metadata.insert(
+                "fallback_count".into(),
+                selection.fallbacks.len().to_string(),
+            );
+            tracing::info!(
+                app_id = %app_id,
+                session_id,
+                source = selection.source,
+                fallback_count = selection.fallbacks.len(),
+                request_model_present = request_model.is_some(),
+                "resolved request-level LLM route metadata"
+            );
+        }
+        Err(error) => {
+            metadata.insert("diagnostic".into(), "route_unavailable".into());
+            metadata.insert("diagnostic_detail".into(), error.to_string());
+            tracing::warn!(
+                app_id = %app_id,
+                session_id,
+                error = %error,
+                request_model_present = request_model.is_some(),
+                "failed to resolve request-level LLM route metadata"
+            );
+        }
+    }
+    metadata
+}
+
 /// Compatibility fallback for installations where metadata runtime-kind view is
 /// not yet populated but the discovered manifest layer is authoritative.
 async fn is_registry_wasm_layer_app(state: &Arc<AppState>, app_id: &ApplicationId) -> bool {
@@ -885,6 +954,31 @@ pub(crate) async fn post_chat_v2(
         .session_id
         .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
     notify_application_session_start(&state, &app_id, &session_key, &entry_agent_name).await;
+    let request_model_hint = {
+        let trimmed = req.model.trim();
+        (!trimmed.is_empty()).then(|| trimmed.to_string())
+    };
+    if let Some(model_hint) = &request_model_hint {
+        state
+            .sessions
+            .llm_route_hints
+            .write()
+            .await
+            .insert(session_key.clone(), model_hint.clone());
+        tracing::info!(
+            app_id = %app_id,
+            session_id = %session_key,
+            model_hint_present = true,
+            "registered request-level LLM route hint for application execution"
+        );
+    }
+    let request_route_metadata = resolve_request_route_metadata(
+        &state,
+        &app_id,
+        &session_key,
+        request_model_hint.as_deref(),
+    )
+    .await;
 
     // Clean up previous state when creating a new session
     let mut wasm_dispatch = wasm_chat_dispatch_command(
@@ -1028,6 +1122,18 @@ pub(crate) async fn post_chat_v2(
             .host_command
             .metadata
             .insert("session.id".into(), session_key.clone());
+        if let Some(model_hint) = request_model_hint.as_ref() {
+            dispatch
+                .host_command
+                .metadata
+                .insert("llm.request_model".into(), model_hint.clone());
+        }
+        for (key, value) in &request_route_metadata {
+            dispatch
+                .host_command
+                .metadata
+                .insert(format!("llm.route.{key}"), value.clone());
+        }
         // WASM host dispatch can still delegate to app-scoped agents through
         // `macaca:agent/delegate`.  The fast path returns before the framework
         // coordinator setup below, so it must install the same executor event
@@ -1085,6 +1191,7 @@ pub(crate) async fn post_chat_v2(
         let state_for_task = Arc::clone(&state);
         let tx_for_task = tx.clone();
         let forwarder_stop_for_task = Arc::clone(&forwarder_stop);
+        let request_route_metadata_for_task = request_route_metadata.clone();
         tokio::spawn(async move {
             update_agent_activity_by_name(
                 &state_for_task,
@@ -1165,6 +1272,7 @@ pub(crate) async fn post_chat_v2(
                             serde_json::json!({
                                 "status":"completed",
                                 "mode":"wasm_agentless_dispatch",
+                                "llm_route": request_route_metadata_for_task,
                             })
                             .to_string(),
                         )))

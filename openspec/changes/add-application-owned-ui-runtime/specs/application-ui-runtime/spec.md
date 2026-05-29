@@ -87,6 +87,18 @@ capability-governed bridge.
 - **AND** returns a structured policy error to the UI
 - **AND** records the denial in the audit chain.
 
+#### Scenario: UI starts application execution
+
+- **GIVEN** an application manifest declares an execution bridge capability
+- **AND** the application UI is loaded in an app-owned surface
+- **WHEN** the UI submits a user task through the bridge
+- **THEN** the shell starts the generic application execution endpoint for that
+  application
+- **AND** streams session id, trace, service audit, content, error, and done
+  events back to the UI
+- **AND** the shell does not interpret application-specific workflow or business
+  semantics.
+
 ### Requirement: Optional developer UI Kit
 
 Macaca MAY provide a UI Kit and SDK for application developers, but shells SHALL

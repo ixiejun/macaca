@@ -60,6 +60,7 @@ pub mod interaction_service_provider;
 pub(crate) mod interaction_service_threads;
 pub(crate) mod interaction_service_turns;
 pub mod lease;
+pub mod llm_service_catalog;
 pub mod llm_service_hardening;
 pub mod llm_service_provider;
 pub(crate) mod mcp_descriptor_index;
@@ -295,7 +296,7 @@ pub use interaction_service_provider::{
     interaction_service_command, InteractionLedgerEvent, InteractionSystemServiceProvider,
 };
 pub use lease::McpSessionLease;
-pub use llm_service_hardening::LlmProviderProfile;
+pub use llm_service_catalog::{LlmProviderCatalogProfile, LlmProviderProfile};
 pub use llm_service_provider::LlmSystemServiceProvider;
 #[allow(deprecated)]
 pub use mcp_runtime::{

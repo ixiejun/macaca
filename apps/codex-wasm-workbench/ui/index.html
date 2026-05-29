@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Codex WASM Workbench</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="workspace-shell">
+      <section class="topbar" aria-label="Workbench status">
+        <div>
+          <p class="eyebrow">Macaca WASM Application</p>
+          <h1>Codex Workbench</h1>
+          <p class="subtitle">Application-owned coding surface backed by Macaca OS services.</p>
+        </div>
+        <div class="run-status" aria-live="polite">
+          <span id="runState">Ready</span>
+          <span id="sessionBadge">No session</span>
+        </div>
+      </section>
+
+      <section class="composer-panel" aria-label="Coding task composer">
+        <div class="composer-header">
+          <div>
+            <p class="eyebrow">Task</p>
+            <h2>Send a real programming task</h2>
+          </div>
+          <select id="taskTemplate" aria-label="Task template">
+            <option value="">Blank task</option>
+            <option value="Inspect the current workspace git status, identify changed files, and propose the next safe implementation step.">Workspace inspection</option>
+            <option value="Run a focused validation of the Codex WASM workbench application, report service availability, and list missing platform capabilities.">Capability validation</option>
+            <option value="Analyze the current codebase for the smallest generic change needed to improve this application without adding application-specific OS logic.">Architecture analysis</option>
+          </select>
+        </div>
+        <textarea id="taskInput" rows="5" placeholder="Describe the coding task for CODEX-WASM-WORKBENCH..."></textarea>
+        <div class="composer-actions">
+          <div class="model-selector" aria-label="Model route selector">
+            <label>
+              Provider
+              <select id="providerSelect"></select>
+            </label>
+            <label>
+              Model
+              <select id="modelSelect"></select>
+            </label>
+            <span id="routeSummary">Loading model catalog...</span>
+          </div>
+          <button id="submitTaskButton" type="button">Run task</button>
+        </div>
+      </section>
+
+      <section class="service-strip" id="statusStrip" aria-label="Declared services"></section>
+
+      <section class="workspace-grid" aria-label="Coding workbench">
+        <section class="editor-panel">
+          <div class="panel-header">
+            <h2>Execution Stream</h2>
+            <button id="clearButton" type="button">Clear</button>
+          </div>
+          <div id="eventTimeline" class="event-timeline"></div>
+        </section>
+
+        <aside class="side-panel">
+          <section class="thread-panel">
+            <h2>Thread</h2>
+            <ol id="threadItems"></ol>
+          </section>
+          <section class="diagnostics-panel">
+            <h2>Diagnostics</h2>
+            <ul id="diagnosticsList"></ul>
+          </section>
+        </aside>
+      </section>
+
+      <section class="result-panel" aria-label="Execution result">
+        <div class="panel-header">
+          <h2>Result</h2>
+          <span id="tokenSummary">No run yet</span>
+        </div>
+        <pre id="resultOutput"></pre>
+      </section>
+    </main>
+    <script src="./app.js" type="module"></script>
+  </body>
+</html>

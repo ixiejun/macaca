@@ -1,0 +1,324 @@
+name: codex-wasm-workbench
+version: "0.1.0"
+description: "Application-owned Codex-class coding workbench that runs as a WASM application on Macaca OS generic services"
+layer: L2Wasm
+ui_type: custom
+
+entry_agent: coordinator
+entrypoint:
+  type: workflow
+  name: coding-loop
+
+service_contract:
+  required_services:
+    - service.application.host
+    - service.interaction
+    - service.app_protocol
+    - service.file
+    - service.process
+    - service.sandbox
+    - service.approval
+    - service.hook
+    - service.config
+    - service.code_intelligence
+    - service.git
+    - service.review
+    - service.diagnostics
+    - service.llm
+    - service.tool
+  optional_services:
+    - service.mcp
+    - service.skill
+    - service.plugin_marketplace
+    - service.realtime
+    - service.remote_environment
+  service_policy_overrides:
+    service.process:
+      timeout_ms: 300000
+      max_retries: 0
+    service.tool:
+      timeout_ms: 300000
+      max_retries: 1
+
+resources:
+  workflows: workflows/
+  skills: skills/
+
+ui:
+  runtime: web_bundle
+  # The workbench owns the coding workspace chrome instead of appearing as a
+  # session attachment. Macaca still hosts global navigation, service routing,
+  # trace, and audit, while the application bundle owns the center workspace.
+  surface:
+    mode: application
+    chrome: app_owned
+  framework: vanilla
+  entry: ui/index.html
+  assets:
+    - ui/**
+  sandbox:
+    isolation: iframe
+    csp: strict
+    network: declared
+  bridge:
+    required:
+      - service.call
+      - app.execution
+      - app_protocol
+      - trace.emit
+      - ui.render
+    optional:
+      - session.read
+      - theme.read
+  theme:
+    mode: app_owned
+
+workflows:
+  coding-loop:
+    description: "Application-owned coding loop over Macaca generic workbench services"
+    steps:
+      - name: understand
+        agent: coordinator
+        prompt_template: workflows/understand.md
+      - name: plan
+        agent: planner
+        prompt_template: workflows/plan.md
+        depends_on: [understand]
+      - name: implement
+        agent: coder
+        prompt_template: workflows/implement.md
+        depends_on: [plan]
+      - name: review
+        agent: reviewer
+        prompt_template: workflows/review.md
+        depends_on: [implement]
+
+agents:
+  - name: coordinator
+    prompt_template: workflows/understand.md
+    permission_level: system
+    allowed_tools:
+      - service.call
+      - app_protocol
+    capabilities:
+      - name: coding_session_coordination
+        description: "Coordinates application-owned coding workflow while state remains in service.interaction"
+      - name: workbench_event_subscription
+        description: "Subscribes to typed workbench events through service.app_protocol"
+
+  - name: planner
+    prompt_template: workflows/plan.md
+    permission_level: user
+    allowed_tools:
+      - service.call
+    capabilities:
+      - name: code_change_planning
+        description: "Plans changes using provider-neutral code intelligence and file service calls"
+
+  - name: coder
+    prompt_template: workflows/implement.md
+    permission_level: user
+    allowed_tools:
+      - service.call
+    capabilities:
+      - name: patch_authoring
+        description: "Requests file, git, sandbox, process, approval, and hook operations through services"
+
+  - name: reviewer
+    prompt_template: workflows/review.md
+    permission_level: user
+    allowed_tools:
+      - service.call
+    capabilities:
+      - name: structured_review
+        description: "Produces structured findings through service.review and diagnostics summaries"
+
+workbench:
+  capabilities:
+    - family: interaction
+      optional: false
+      reason: "Thread, turn, and item state must be service-owned"
+    - family: app_protocol
+      optional: false
+      reason: "Typed workbench events stream through the protocol gateway"
+    - family: file
+      optional: false
+      reason: "Workspace files are read and patched through service.file"
+    - family: process
+      optional: false
+      reason: "Tests and commands run through service.process"
+    - family: sandbox
+      optional: false
+      reason: "Permission profile resolution happens before process side effects"
+    - family: approval
+      optional: false
+      reason: "Privileged file, process, and patch operations require approval gates"
+    - family: hook
+      optional: false
+      reason: "Pre and post tool hooks are managed by service.hook"
+    - family: config
+      optional: false
+      reason: "Layered requirements and permission profiles come from service.config"
+    - family: code_intelligence
+      optional: false
+      reason: "Code search and symbol context are provider-adapter operations"
+    - family: git
+      optional: false
+      reason: "Patch provenance and rollback markers belong to service.git"
+    - family: review
+      optional: false
+      reason: "Review findings are structured service outputs"
+    - family: diagnostics
+      optional: false
+      reason: "Trace bundles and health summaries come from service.diagnostics"
+    - family: llm
+      optional: false
+      reason: "Provider/model catalog, route resolution, and model dispatch stay in service.llm"
+    - family: mcp
+      optional: true
+      reason: "Optional MCP servers can extend the tool catalog"
+    - family: skill
+      optional: true
+      reason: "Optional skill bundles can contribute reusable coding procedures"
+    - family: plugin_marketplace
+      optional: true
+      reason: "Optional plugins can provide additional app-owned tools or UI"
+    - family: realtime
+      optional: true
+      reason: "Realtime is an optional deployment feature"
+    - family: remote_environment
+      optional: true
+      reason: "Remote environments are optional and must degrade safely"
+
+  permission_profiles:
+    - workspace_write
+
+  tool_families:
+    - file
+    - shell
+    - sandbox
+    - approval
+    - hook
+    - mcp
+    - skill
+    - code_intelligence
+    - git
+    - review
+    - diagnostics
+
+  service_dependencies:
+    - service: service.interaction
+      optional: false
+      reason: "Durable Thread/Turn/Item lifecycle"
+    - service: service.app_protocol
+      optional: false
+      reason: "Bidirectional event transport over focused clients"
+    - service: service.file
+      optional: false
+      reason: "Policy-gated workspace file operations"
+    - service: service.process
+      optional: false
+      reason: "Sandboxed command and PTY operations"
+    - service: service.sandbox
+      optional: false
+      reason: "Permission profile and runtime environment resolution"
+    - service: service.approval
+      optional: false
+      reason: "Approval queue and decision audit"
+    - service: service.hook
+      optional: false
+      reason: "Managed pre/post lifecycle hooks"
+    - service: service.config
+      optional: false
+      reason: "Layered config, requirements, and permission profiles"
+    - service: service.code_intelligence
+      optional: false
+      reason: "Code search and symbol context"
+    - service: service.git
+      optional: false
+      reason: "Git diff, patch, and rollback marker provenance"
+    - service: service.review
+      optional: false
+      reason: "Structured review finding production"
+    - service: service.diagnostics
+      optional: false
+      reason: "Privacy-filtered diagnostics and trace bundles"
+    - service: service.llm
+      optional: false
+      reason: "Backend-owned model catalog and route selection"
+    - service: service.tool
+      optional: false
+      reason: "Model-visible tool planning and invocation"
+    - service: service.mcp
+      optional: true
+      reason: "Optional MCP lifecycle and resources"
+    - service: service.skill
+      optional: true
+      reason: "Optional Skill catalog and provenance"
+    - service: service.plugin_marketplace
+      optional: true
+      reason: "Optional plugin install and bundled capability registration"
+
+  optional_provider_requirements:
+    - provider_kind: service.realtime
+      optional: true
+      reason: "Realtime text/audio can be unavailable without blocking coding workflow"
+    - provider_kind: service.remote_environment
+      optional: true
+      reason: "Remote execution can be unavailable while local sandbox remains usable"
+
+  plugin_dependencies:
+    - plugin_id: plugin.codex-wasm-workbench.optional-tools
+      optional: true
+      reason: "Application-owned optional plugin extension point"
+
+  mcp_dependencies:
+    - server_id: mcp.codex-wasm-workbench.optional-context
+      lifecycle_scope: session
+      optional: true
+      reason: "Application-owned optional MCP context provider"
+
+  skill_bundles:
+    - bundle_id: skill.bundle.codex-wasm-workbench.coding-loop
+      optional: true
+      reason: "Application-owned optional coding-loop procedure bundle"
+
+  event_subscriptions:
+    - topic: thread.item
+      optional: false
+      reason: "Thread items drive the workspace transcript"
+    - topic: process.output
+      optional: false
+      reason: "Command output is bounded and rendered by the app UI"
+    - topic: file.changed
+      optional: false
+      reason: "File changes update the workbench diff panel"
+    - topic: approval.request
+      optional: false
+      reason: "Approval requests are rendered but policy stays service-owned"
+    - topic: hook.result
+      optional: false
+      reason: "Hook results explain pre/post tool decisions"
+    - topic: review.finding
+      optional: false
+      reason: "Review findings render with evidence refs"
+    - topic: diagnostics.bundle
+      optional: false
+      reason: "Diagnostics bundles are exposed as sanitized refs"
+
+  ui_surfaces:
+    - surface_id: main
+      schema: genui.workbench.codex_wasm.v1
+      mode: workspace
+      required_bridge_capabilities:
+        - service.call
+        - app_protocol
+        - trace.emit
+        - ui.render
+      event_subscriptions:
+        - thread.item
+        - process.output
+        - file.changed
+        - approval.request
+        - review.finding
+        - diagnostics.bundle

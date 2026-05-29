@@ -25,13 +25,19 @@ use macaca_proto::{
     ServiceHealth, ServiceResult, TraceContext,
 };
 
-use crate::llm_service_hardening::{validate_before_dispatch, LlmProviderProfile};
+use crate::llm_service_catalog::{LlmProviderCatalogProfile, LlmProviderProfile};
+use crate::llm_service_hardening::validate_before_dispatch;
 
 /// Host-owned LLM service provider that wraps an injected LLM strategy.
 pub struct LlmSystemServiceProvider {
     pub(crate) descriptor: ServiceDescriptor,
     pub(crate) provider: Option<Arc<dyn LlmProvider>>,
     pub(crate) profile: LlmProviderProfile,
+    /// Sanitized catalog snapshot used by `model.list` and provider capability
+    /// commands. Chat dispatch still delegates to the injected provider
+    /// strategy, while catalog reads use this bounded Memento so application
+    /// UIs can render truthful provider/model choices without reading config.
+    pub(crate) catalog: LlmProviderCatalogProfile,
     pub(crate) unavailable_reason: Option<String>,
 }
 
@@ -53,10 +59,26 @@ impl LlmSystemServiceProvider {
     /// diagnostics without forcing the low-level `LlmProvider` trait to become a
     /// catalog API.
     pub fn with_profile(provider: Arc<dyn LlmProvider>, profile: LlmProviderProfile) -> Self {
+        let catalog = LlmProviderCatalogProfile::single(profile.clone());
+        Self::with_catalog(provider, profile, catalog)
+    }
+
+    /// Create a service adapter with a sanitized multi-provider catalog.
+    ///
+    /// Runtime composition roots use this constructor when a router was built
+    /// from configuration. The low-level provider remains replaceable, while
+    /// catalog commands can report all configured providers, including
+    /// unavailable rows, through the same `service.llm` boundary.
+    pub fn with_catalog(
+        provider: Arc<dyn LlmProvider>,
+        profile: LlmProviderProfile,
+        catalog: LlmProviderCatalogProfile,
+    ) -> Self {
         Self {
             descriptor: llm_service_descriptor(),
             provider: Some(provider),
             profile,
+            catalog,
             unavailable_reason: None,
         }
     }
@@ -68,6 +90,7 @@ impl LlmSystemServiceProvider {
             descriptor: llm_service_descriptor(),
             provider: None,
             profile: LlmProviderProfile::generic("unavailable"),
+            catalog: LlmProviderCatalogProfile::single(LlmProviderProfile::generic("unavailable")),
             unavailable_reason: Some(reason),
         }
     }
@@ -136,6 +159,7 @@ impl SystemService for LlmSystemServiceProvider {
                     session_id = %typed.scope.session_id,
                     agent = %typed.scope.agent_name,
                     model = %typed.options.model,
+                    model_hint_present = typed.model_hint.is_some(),
                     "llm service dispatching chat command"
                 );
                 let provider = self.provider.as_ref().ok_or_else(|| {

@@ -7,6 +7,8 @@ mod agent_context_backend;
 mod agent_execution_backend;
 mod agent_execution_evidence;
 pub mod agent_runner;
+mod app_ui_csp;
+mod app_ui_llm_bridge;
 pub mod app_ui_routes;
 pub mod bootstrap;
 mod capability_catalog;
@@ -586,9 +588,22 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
             &macaca_runtime_host::StaticServiceProviderFactory::new(
                 macaca_runtime_host::ServiceProviderInstance::new(
                     macaca_llm::llm_service_descriptor(),
-                    Arc::new(macaca_runtime_host::LlmSystemServiceProvider::new(
-                        Arc::clone(&llm),
-                    )),
+                    Arc::new({
+                        let default_reference = llm_router.default_model_reference();
+                        let profile = if default_reference.trim().is_empty() {
+                            macaca_runtime_host::LlmProviderProfile::generic(llm.name())
+                        } else {
+                            macaca_runtime_host::LlmProviderProfile::generic(llm.name())
+                                .with_default_model(default_reference)
+                        };
+                        macaca_runtime_host::LlmSystemServiceProvider::with_catalog(
+                            Arc::clone(&llm),
+                            profile,
+                            macaca_runtime_host::LlmProviderCatalogProfile::from_config(
+                                &config.llm,
+                            ),
+                        )
+                    }),
                 ),
             ),
             macaca_runtime_host::ServiceProviderFactoryContext::new(),
@@ -992,6 +1007,7 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
                 fork_to_session: tokio::sync::RwLock::new(HashMap::new()),
                 goal_to_session: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
                 delegate_session_id: Arc::clone(&delegate_session_id),
+                llm_route_hints: tokio::sync::RwLock::new(HashMap::new()),
                 framework_session_store: Arc::clone(&framework_session_store),
             },
             config: AppConfig {

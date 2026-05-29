@@ -251,6 +251,17 @@ impl ChatModel for ServiceChatModelAdapter {
         );
         let command =
             macaca_llm::LlmChatCommand::new(self.scope.clone(), trace, llm_messages, llm_options)
+                .map(|command| {
+                    // Preserve the framework-selected route as a provider-neutral
+                    // hint for `service.llm`. The service remains the routing
+                    // authority; the adapter only forwards the model name that
+                    // the agent builder selected for this scoped call.
+                    if let Some(model) = options.model.as_ref().filter(|model| !model.is_empty()) {
+                        command.model_hint(model.clone())
+                    } else {
+                        command
+                    }
+                })
                 .map_err(|err| ModelError::Api(err.to_string()))?;
         let result = self
             .client

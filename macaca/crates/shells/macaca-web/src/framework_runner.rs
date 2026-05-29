@@ -908,7 +908,19 @@ impl FrameworkRunner {
         state: &Arc<AppState>,
         app_id: &ApplicationId,
         agent_name: &str,
+        session_id: Option<&str>,
     ) -> Result<macaca_llm::ModelSelection, String> {
+        let request_model = if let Some(session_id) = session_id {
+            state
+                .sessions
+                .llm_route_hints
+                .read()
+                .await
+                .get(session_id)
+                .cloned()
+        } else {
+            None
+        };
         let agent_model = state
             .kernel
             .get_agent_by_name(agent_name)
@@ -925,12 +937,25 @@ impl FrameworkRunner {
         state
             .llm_router
             .resolve_selection(&macaca_llm::ModelSelectionRequest {
+                request_model: request_model.clone(),
                 agent_model,
                 app_model: app_defaults.as_ref().map(|cfg| cfg.model.clone()),
                 app_provider: app_defaults.as_ref().map(|cfg| cfg.provider.clone()),
                 system_model: (!state.config.default_model.is_empty())
                     .then_some(state.config.default_model.clone()),
                 ..Default::default()
+            })
+            .inspect(|selection| {
+                tracing::info!(
+                    app_id = %app_id,
+                    agent = agent_name,
+                    session_id = session_id.unwrap_or("framework-sessionless"),
+                    route_source = selection.source,
+                    provider = %selection.primary.provider,
+                    model = %selection.primary.model,
+                    request_model_present = request_model.is_some(),
+                    "framework runner resolved LLM model selection"
+                );
             })
             .map_err(|e| e.to_string())
     }
@@ -1325,6 +1350,7 @@ impl WebTracedAgentFactory {
             &self.state,
             &request.identity.app_id,
             &request.identity.agent_name,
+            request.identity.session_id.as_deref(),
         )
         .await?;
         let mut toolkit = crate::framework_toolkit::build_toolkit(

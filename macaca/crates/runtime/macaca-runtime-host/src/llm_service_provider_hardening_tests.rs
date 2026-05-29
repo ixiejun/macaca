@@ -5,6 +5,7 @@
 //! through generic metadata instead of embedding provider-specific branches in
 //! OS code.
 
+use std::collections::HashMap;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
@@ -20,13 +21,14 @@ use macaca_llm::{
     LLM_PROVIDER_CAPABILITIES_READ_COMMAND, LLM_ROUTE_RESOLVE_COMMAND,
 };
 use macaca_proto::{
+    config::{LlmConfig, LlmProviderConfig},
     ApplicationId, LlmMessage, LlmOptions, LlmResponse, MacacaResult, ServiceCommand,
     ServiceCommandName, TokenUsage, ToolCall, TraceContext,
 };
 use serde::de::DeserializeOwned;
 use serde_json::json;
 
-use crate::{LlmProviderProfile, LlmSystemServiceProvider};
+use crate::{LlmProviderCatalogProfile, LlmProviderProfile, LlmSystemServiceProvider};
 
 struct CountingLlmProvider {
     calls: AtomicUsize,
@@ -345,4 +347,118 @@ async fn unavailable_provider_returns_diagnostics_without_provider_payload() {
 
     assert!(!result.providers[0].healthy);
     assert_eq!(result.providers[0].provider_id, "unavailable");
+}
+
+#[tokio::test]
+async fn catalog_reports_configured_available_and_unavailable_providers() {
+    let provider = Arc::new(CountingLlmProvider {
+        calls: AtomicUsize::new(0),
+    });
+    let mut providers = HashMap::new();
+    providers.insert(
+        "available-provider".into(),
+        LlmProviderConfig {
+            api_key_plan: None,
+            api_key: "literal-key-for-test".into(),
+            base_url: "https://example.invalid/v1".into(),
+            default_model: Some("available-model".into()),
+        },
+    );
+    providers.insert(
+        "unavailable-provider".into(),
+        LlmProviderConfig {
+            api_key_plan: None,
+            api_key: "MACACA_TEST_MISSING_LLM_KEY".into(),
+            base_url: "https://example.invalid/v1".into(),
+            default_model: Some("unavailable-model".into()),
+        },
+    );
+    let catalog_profile = LlmProviderCatalogProfile::from_config(&LlmConfig {
+        default_provider: "available-provider".into(),
+        default_model: None,
+        max_tokens_per_request: 4096,
+        rate_limit_rpm: 60,
+        providers,
+    });
+    let service = LlmSystemServiceProvider::with_catalog(
+        provider,
+        LlmProviderProfile::generic("available-provider").with_default_model("available-model"),
+        catalog_profile,
+    );
+
+    let capabilities: macaca_llm::LlmProviderCapabilitiesResult = decode(
+        service
+            .call(command(
+                LLM_PROVIDER_CAPABILITIES_READ_COMMAND,
+                LlmCatalogReadCommand {
+                    scope: scope(),
+                    trace: trace("catalog-configured-caps"),
+                    include_disabled: true,
+                },
+            ))
+            .await
+            .unwrap()
+            .output,
+    );
+
+    assert_eq!(capabilities.providers.len(), 2);
+    assert!(capabilities
+        .providers
+        .iter()
+        .any(|provider| provider.provider_id == "available-provider" && provider.healthy));
+    assert!(capabilities.providers.iter().any(|provider| {
+        provider.provider_id == "unavailable-provider"
+            && !provider.healthy
+            && provider.unavailable_reason.as_deref() == Some("credentials_unavailable")
+    }));
+
+    let models: macaca_llm::LlmModelCatalogResult = decode(
+        service
+            .call(command(
+                LLM_MODEL_LIST_COMMAND,
+                LlmCatalogReadCommand {
+                    scope: scope(),
+                    trace: trace("catalog-configured-models"),
+                    include_disabled: true,
+                },
+            ))
+            .await
+            .unwrap()
+            .output,
+    );
+    assert!(models
+        .models
+        .iter()
+        .any(|model| model.provider_id == "available-provider"
+            && model.model == "available-model"
+            && model.available));
+    assert!(models.models.iter().any(|model| {
+        model.provider_id == "unavailable-provider"
+            && model.model == "unavailable-model"
+            && !model.available
+            && model.unavailable_reason.as_deref() == Some("credentials_unavailable")
+    }));
+
+    let route: macaca_llm::LlmRouteResolveResult = decode(
+        service
+            .call(command(
+                LLM_ROUTE_RESOLVE_COMMAND,
+                LlmRouteResolveCommand {
+                    scope: scope(),
+                    trace: trace("catalog-configured-route"),
+                    request_model: Some("unavailable-provider:unavailable-model".into()),
+                    agent_model: None,
+                    app_model: None,
+                    app_provider: None,
+                    system_model: None,
+                    fallbacks: Vec::new(),
+                    policy: Default::default(),
+                },
+            ))
+            .await
+            .unwrap()
+            .output,
+    );
+    assert_eq!(route.selected.provider_id, "unavailable-provider");
+    assert_eq!(route.diagnostics[0].code, "provider_unavailable");
 }

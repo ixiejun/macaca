@@ -11,68 +11,15 @@ use chrono::Utc;
 use macaca_llm::{
     LlmBudgetStatusCommand, LlmBudgetStatusResult, LlmCatalogReadCommand,
     LlmContinuationValidateCommand, LlmContinuationValidateResult, LlmDegradationExplainCommand,
-    LlmDegradationExplainResult, LlmDiagnostic, LlmModelCatalogEntry, LlmModelCatalogResult,
-    LlmModelSelectionResult, LlmProviderCapabilitiesResult, LlmProviderCapabilityRecord,
-    LlmProviderProtocolMetadata, LlmRouteResolveCommand, LlmRouteResolveResult, LlmRouteSummary,
-    ModelSelectionRequest,
+    LlmDegradationExplainResult, LlmDiagnostic, LlmModelCatalogResult, LlmModelSelectionResult,
+    LlmProviderCapabilitiesResult, LlmProviderCapabilityRecord, LlmProviderProtocolMetadata,
+    LlmRouteResolveCommand, LlmRouteResolveResult, LlmRouteSummary, ModelSelectionRequest,
 };
 use macaca_proto::{LlmMessage, LlmRole, MacacaError, ServiceError, ServiceResult, ToolCall};
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::llm_service_catalog::{catalog_models, LlmProviderProfile};
 use crate::llm_service_provider::LlmSystemServiceProvider;
-
-/// Provider-neutral profile used by the runtime-host Strategy wrapper.
-///
-/// The concrete `LlmProvider` trait intentionally stays small.  This profile
-/// supplies catalog and protocol metadata at the service boundary without
-/// forcing every provider implementation to grow new methods immediately.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LlmProviderProfile {
-    pub provider_id: String,
-    pub default_model: Option<String>,
-    pub models: Vec<String>,
-    pub healthy: bool,
-    pub capabilities: Vec<String>,
-    pub protocol: LlmProviderProtocolMetadata,
-}
-
-impl LlmProviderProfile {
-    /// Build a conservative profile for a generic provider.
-    pub fn generic(provider_id: impl Into<String>) -> Self {
-        let provider_id = provider_id.into();
-        Self {
-            provider_id,
-            default_model: None,
-            models: Vec::new(),
-            healthy: true,
-            capabilities: vec![
-                "chat".into(),
-                "model.list".into(),
-                "route.resolve".into(),
-                "continuation.validate".into(),
-                "budget.status".into(),
-                "degradation.explain".into(),
-            ],
-            protocol: LlmProviderProtocolMetadata::default(),
-        }
-    }
-
-    /// Attach a default model visible through catalog and snapshot commands.
-    pub fn with_default_model(mut self, model: impl Into<String>) -> Self {
-        let model = model.into();
-        if !self.models.contains(&model) {
-            self.models.push(model.clone());
-        }
-        self.default_model = Some(model);
-        self
-    }
-
-    /// Attach provider protocol metadata.
-    pub fn with_protocol(mut self, protocol: LlmProviderProtocolMetadata) -> Self {
-        self.protocol = protocol;
-        self
-    }
-}
 
 impl LlmSystemServiceProvider {
     pub(crate) fn profile(&self) -> LlmProviderProfile {
@@ -99,8 +46,25 @@ impl LlmSystemServiceProvider {
             session_id = %command.scope.session_id,
             "llm service reading model catalog"
         );
-        let profile = self.profile();
-        let models = catalog_models(&profile);
+        let profiles = self.catalog.visible_profiles(command.include_disabled);
+        let models = profiles
+            .iter()
+            .flat_map(|profile| {
+                catalog_models(
+                    profile,
+                    self.catalog.unavailable_reason(&profile.provider_id),
+                )
+            })
+            .collect::<Vec<_>>();
+        let unavailable_count = profiles.iter().filter(|profile| !profile.healthy).count();
+        tracing::info!(
+            trace_id = %command.trace.trace_id,
+            session_id = %command.scope.session_id,
+            model_count = models.len(),
+            provider_count = profiles.len(),
+            unavailable_count,
+            "llm service model catalog read completed"
+        );
         Ok(LlmModelCatalogResult {
             models,
             captured_at: Utc::now(),
@@ -116,15 +80,38 @@ impl LlmSystemServiceProvider {
             session_id = %command.scope.session_id,
             "llm service reading provider capabilities"
         );
-        let profile = self.profile();
+        let profiles = self.catalog.visible_profiles(command.include_disabled);
+        let unavailable_count = profiles.iter().filter(|profile| !profile.healthy).count();
+        tracing::info!(
+            trace_id = %command.trace.trace_id,
+            session_id = %command.scope.session_id,
+            provider_count = profiles.len(),
+            unavailable_count,
+            "llm service provider capability read completed"
+        );
         Ok(LlmProviderCapabilitiesResult {
-            providers: vec![LlmProviderCapabilityRecord {
-                provider_id: profile.provider_id,
-                healthy: profile.healthy && self.unavailable_reason.is_none(),
-                default_model: profile.default_model,
-                capabilities: profile.capabilities,
-                protocol: profile.protocol,
-            }],
+            providers: profiles
+                .into_iter()
+                .map(|profile| {
+                    let unavailable_reason = self.catalog.unavailable_reason(&profile.provider_id);
+                    let healthy = profile.healthy
+                        && self.unavailable_reason.is_none()
+                        && unavailable_reason.is_none();
+                    LlmProviderCapabilityRecord {
+                        provider_id: profile.provider_id,
+                        healthy,
+                        availability: if healthy {
+                            "healthy".into()
+                        } else {
+                            "unavailable".into()
+                        },
+                        unavailable_reason,
+                        default_model: profile.default_model,
+                        capabilities: profile.capabilities,
+                        protocol: profile.protocol,
+                    }
+                })
+                .collect(),
             captured_at: Utc::now(),
         })
     }
@@ -146,9 +133,26 @@ impl LlmSystemServiceProvider {
             command.system_model,
             command.fallbacks,
         )?;
-        let profile = self.profile();
+        let profile = self
+            .catalog
+            .provider(&result.selected.provider_id)
+            .unwrap_or_else(|| self.profile());
         let mut diagnostics: Vec<LlmDiagnostic> =
             self.unavailable_diagnostic().into_iter().collect();
+        if let Some(reason) = self
+            .catalog
+            .unavailable_reason(&result.selected.provider_id)
+        {
+            diagnostics.push(
+                LlmDiagnostic::new(
+                    "provider_unavailable",
+                    "error",
+                    "Selected provider is unavailable for this runtime",
+                )
+                .with_metadata("provider_id", result.selected.provider_id.clone())
+                .with_metadata("reason", reason),
+            );
+        }
         if !profile.models.is_empty() && !profile.models.contains(&result.selected.model) {
             diagnostics.push(
                 LlmDiagnostic::new(
@@ -257,7 +261,9 @@ impl LlmSystemServiceProvider {
         fallbacks: Vec<String>,
     ) -> ServiceResult<LlmModelSelectionResult> {
         let profile = self.profile();
+        let request_target = request_model.as_deref().and_then(split_provider_model);
         let model = first_non_empty([
+            request_target.map(|(_, model)| model),
             request_model.as_deref(),
             agent_model.as_deref(),
             app_model.as_deref(),
@@ -266,8 +272,9 @@ impl LlmSystemServiceProvider {
         ])
         .ok_or_else(|| ServiceError::AdapterFailure("no model route available".into()))?;
         let selected = LlmRouteSummary {
-            provider_id: app_provider
-                .filter(|provider| !provider.trim().is_empty())
+            provider_id: request_target
+                .map(|(provider, _)| provider.to_string())
+                .or_else(|| app_provider.filter(|provider| !provider.trim().is_empty()))
                 .unwrap_or(profile.provider_id),
             model: model.to_string(),
             source: route_source(&ModelSelectionRequest {
@@ -301,37 +308,6 @@ pub(crate) fn validate_before_dispatch(
         )));
     }
     Ok(())
-}
-
-fn catalog_models(profile: &LlmProviderProfile) -> Vec<LlmModelCatalogEntry> {
-    let mut models = profile.models.clone();
-    if models.is_empty() {
-        if let Some(default_model) = &profile.default_model {
-            models.push(default_model.clone());
-        }
-    }
-    if models.is_empty() {
-        models.push("provider_default".into());
-    }
-    models
-        .into_iter()
-        .map(|model| LlmModelCatalogEntry {
-            provider_id: profile.provider_id.clone(),
-            display_name: model.clone(),
-            model,
-            service_tiers: if profile.protocol.supports_service_tiers {
-                vec!["default".into()]
-            } else {
-                Vec::new()
-            },
-            reasoning_efforts: if profile.protocol.supports_reasoning {
-                vec!["low".into(), "medium".into(), "high".into()]
-            } else {
-                Vec::new()
-            },
-            protocol: profile.protocol.clone(),
-        })
-        .collect()
 }
 
 fn validate_continuation(
@@ -406,11 +382,17 @@ fn has_tool_calls(message: &LlmMessage) -> bool {
         .unwrap_or(false)
 }
 
-fn first_non_empty(values: [Option<&str>; 5]) -> Option<&str> {
+fn first_non_empty<const N: usize>(values: [Option<&str>; N]) -> Option<&str> {
     values
         .into_iter()
         .flatten()
         .find(|value| !value.trim().is_empty())
+}
+
+fn split_provider_model(model_ref: &str) -> Option<(&str, &str)> {
+    let (provider, model) = model_ref.split_once(':')?;
+    (!provider.trim().is_empty() && !model.trim().is_empty())
+        .then_some((provider.trim(), model.trim()))
 }
 
 fn route_source(request: &ModelSelectionRequest) -> &'static str {

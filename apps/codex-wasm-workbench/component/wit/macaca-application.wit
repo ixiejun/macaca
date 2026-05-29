@@ -1,0 +1,27 @@
+package macaca:application;
+
+/// Application-owned copy of the Macaca Application Component ABI v0 skeleton.
+///
+/// The source of truth remains Macaca OS. This package-local WIT is included so
+/// the app can be developed and reviewed outside `macaca/` without copying OS
+/// code. The app only targets provider-neutral host imports.
+world application-v0 {
+  export init: func(trace-id: string) -> host-result;
+  export start: func(trace-id: string) -> host-result;
+  export handle-event: func(trace-id: string, event-json: string) -> host-result;
+  export render: func(trace-id: string, request-json: string) -> host-result;
+  export pause: func(trace-id: string) -> host-result;
+  export resume: func(trace-id: string) -> host-result;
+  export shutdown: func(trace-id: string) -> host-result;
+  export upgrade: func(trace-id: string, target-version: string) -> host-result;
+
+  import trace-emit: func(trace-id: string, event-json: string) -> host-result;
+  import ui-render: func(trace-id: string, intent-json: string) -> host-result;
+  import service-call: func(trace-id: string, command-json: string) -> host-result;
+}
+
+record host-result {
+  status: string,
+  reason-code: option<string>,
+  output-json: option<string>,
+}

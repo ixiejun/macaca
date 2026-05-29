@@ -76,6 +76,21 @@ pub struct LlmModelCatalogEntry {
     pub provider_id: String,
     pub model: String,
     pub display_name: String,
+    /// Whether the row can be selected for routing in the current runtime.
+    ///
+    /// Catalog rows are intentionally runtime-relative. A model can be present
+    /// in configuration while the provider is unavailable because credentials,
+    /// optional modules, or remote dependencies are absent. Keeping the flag on
+    /// the row lets app-owned UIs render truthful choices without learning any
+    /// provider secret or shell-local configuration detail.
+    #[serde(default = "default_catalog_available")]
+    pub available: bool,
+    /// Stable sanitized reason code for unavailable rows.
+    ///
+    /// The value must never contain API keys, provider URLs, raw provider
+    /// payloads, or prompt text. It is meant for policy/UI diagnostics only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unavailable_reason: Option<String>,
     pub service_tiers: Vec<String>,
     pub reasoning_efforts: Vec<String>,
     pub protocol: LlmProviderProtocolMetadata,
@@ -86,9 +101,28 @@ pub struct LlmModelCatalogEntry {
 pub struct LlmProviderCapabilityRecord {
     pub provider_id: String,
     pub healthy: bool,
+    /// Bounded availability label used by UIs and audit replay.
+    ///
+    /// `healthy` is retained for compatibility with existing callers. The
+    /// string form is more expressive for catalog UIs and future policy gates
+    /// while still avoiding provider-specific error bodies.
+    #[serde(default = "default_provider_availability")]
+    pub availability: String,
+    /// Stable sanitized unavailable reason code, when availability is not
+    /// healthy. This is deliberately a code, not an exception string.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unavailable_reason: Option<String>,
     pub default_model: Option<String>,
     pub capabilities: Vec<String>,
     pub protocol: LlmProviderProtocolMetadata,
+}
+
+fn default_catalog_available() -> bool {
+    true
+}
+
+fn default_provider_availability() -> String {
+    "healthy".into()
 }
 
 /// Generic request for catalog-style reads.

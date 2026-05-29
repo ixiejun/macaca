@@ -4,7 +4,7 @@ heartbeat_interval_ms = 5000
 agent_timeout_ms = 30000
 
 [llm]
-default_provider = "deepseek"
+default_provider = "volces"
 max_tokens_per_request = 8192
 rate_limit_rpm = 600
 
@@ -45,7 +45,7 @@ default_model = "MiniMax-M2.7"
 api_key_plan = "c91590fd-77bc-4c06-bca2-4ce9f1f2ae0b"
 api_key = ""
 base_url = "https://ark.cn-beijing.volces.com/api/coding/v3"
-default_model = "kimi-k2.5"
+default_model = "deepseek-v4-flash"
 
 # OpenRouter: AI model aggregation platform
 # Supports 100+ models from various providers via OpenAI-compatible API.

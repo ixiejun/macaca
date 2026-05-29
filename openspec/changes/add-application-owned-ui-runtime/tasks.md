@@ -19,3 +19,6 @@
 - [ ] Update stock app manifest with `ui.surface.mode: application` and sync the installed package.
 - [ ] Verify Web UI loads the stock app UI from the app package and no frontend code branches on stock, finance, ticker, or service names.
 - [ ] Run Rust, frontend, and stock app tests.
+- [x] Add a generic app-owned execution bridge so application UI bundles can start `/api/chat/v2` and observe SSE events without the host chat composer.
+- [x] Upgrade `codex-wasm-workbench` UI into a complete coding workbench with task input, execution stream, service audit, diagnostics, and result panes.
+- [x] Declare the workbench execution bridge capability and verify the app-owned UI can submit a real programming task on Macaca OS.
