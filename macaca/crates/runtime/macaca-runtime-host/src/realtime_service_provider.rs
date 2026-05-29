@@ -18,6 +18,11 @@ use macaca_proto::{
 };
 use tracing::{info, warn};
 
+use crate::{
+    ServiceProviderFactoryContext, ServiceProviderInstance, ServiceRuntime,
+    StaticServiceProviderFactory,
+};
+
 #[async_trait]
 pub trait RealtimeProvider: Send + Sync {
     async fn start(&self, request: RealtimeStartRequest) -> ServiceResult<RealtimeServiceResponse>;
@@ -41,6 +46,46 @@ pub struct RealtimeSystemServiceProvider {
     descriptor: ServiceDescriptor,
     provider: Option<Arc<dyn RealtimeProvider>>,
     unavailable_reason: Option<String>,
+}
+
+/// Register and start the optional realtime service as a Null Object provider.
+///
+/// Realtime transports are replaceable optional modules.  Web and other hosts
+/// must still register the service id so generic workbench routing receives a
+/// traceable unavailable response instead of an unknown-service failure when no
+/// concrete realtime Adapter has been configured.
+pub async fn bootstrap_unavailable_realtime_service(
+    runtime: Arc<ServiceRuntime>,
+    trace_id: impl Into<String>,
+    reason: impl Into<String>,
+) -> macaca_proto::MacacaResult<macaca_proto::KernelServiceId> {
+    let service: Arc<dyn SystemService> =
+        Arc::new(RealtimeSystemServiceProvider::unavailable(reason));
+    let descriptor = service.descriptor();
+    let service_id = descriptor.id.clone();
+    let trace = TraceContext::new(trace_id);
+    info!(
+        service_id = %service_id,
+        trace_id = %trace.trace_id,
+        "realtime service registering unavailable provider"
+    );
+    runtime
+        .register_provider(
+            &StaticServiceProviderFactory::new(ServiceProviderInstance::new(descriptor, service)),
+            ServiceProviderFactoryContext::new(),
+        )
+        .await
+        .map_err(runtime_error)?;
+    runtime
+        .start(&service_id, trace.clone())
+        .await
+        .map_err(runtime_error)?;
+    info!(
+        service_id = %service_id,
+        trace_id = %trace.trace_id,
+        "realtime service unavailable provider started"
+    );
+    Ok(service_id)
 }
 
 impl RealtimeSystemServiceProvider {
@@ -160,6 +205,10 @@ impl SystemService for RealtimeSystemServiceProvider {
 
 fn decode<T: serde::de::DeserializeOwned>(value: serde_json::Value) -> ServiceResult<T> {
     serde_json::from_value(value).map_err(|error| ServiceError::InvalidArgument(error.to_string()))
+}
+
+fn runtime_error(error: crate::ServiceRuntimeError) -> macaca_proto::MacacaError {
+    macaca_proto::MacacaError::Config(error.to_string())
 }
 
 #[allow(dead_code)]

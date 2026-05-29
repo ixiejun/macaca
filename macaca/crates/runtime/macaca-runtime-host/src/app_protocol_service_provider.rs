@@ -10,6 +10,7 @@
 //! dispatch to the owning focused client.
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use macaca_kernel::SystemService;
@@ -20,6 +21,11 @@ use macaca_proto::{
 };
 use tokio::sync::{broadcast, RwLock};
 use tracing::{info, warn};
+
+use crate::{
+    ServiceProviderFactoryContext, ServiceProviderInstance, ServiceRuntime,
+    StaticServiceProviderFactory,
+};
 
 pub(crate) const DEFAULT_CONNECTION_LIMIT: usize = 256;
 pub(crate) const DEFAULT_SUBSCRIPTION_LIMIT: usize = 4096;
@@ -34,6 +40,44 @@ pub struct AppProtocolSystemServiceProvider {
     pub(crate) connection_limit: usize,
     pub(crate) subscription_limit: usize,
     unavailable_reason: Option<String>,
+}
+
+/// Register and start the built-in `service.app_protocol` provider.
+///
+/// Runtime-host is the approved Abstract Factory composition point for service
+/// providers.  Keeping this helper beside the provider prevents Web, CLI, SDK,
+/// kernel, or applications from constructing protocol services directly while
+/// still letting each host decide whether to expose a concrete transport.
+pub async fn bootstrap_local_app_protocol_service(
+    runtime: Arc<ServiceRuntime>,
+    trace_id: impl Into<String>,
+) -> macaca_proto::MacacaResult<macaca_proto::KernelServiceId> {
+    let service: Arc<dyn SystemService> = Arc::new(AppProtocolSystemServiceProvider::new());
+    let descriptor = service.descriptor();
+    let service_id = descriptor.id.clone();
+    let trace = TraceContext::new(trace_id);
+    info!(
+        service_id = %service_id,
+        trace_id = %trace.trace_id,
+        "app protocol service registering local provider"
+    );
+    runtime
+        .register_provider(
+            &StaticServiceProviderFactory::new(ServiceProviderInstance::new(descriptor, service)),
+            ServiceProviderFactoryContext::new(),
+        )
+        .await
+        .map_err(runtime_error)?;
+    runtime
+        .start(&service_id, trace.clone())
+        .await
+        .map_err(runtime_error)?;
+    info!(
+        service_id = %service_id,
+        trace_id = %trace.trace_id,
+        "app protocol service local provider started"
+    );
+    Ok(service_id)
 }
 
 impl AppProtocolSystemServiceProvider {
@@ -184,6 +228,16 @@ impl SystemService for AppProtocolSystemServiceProvider {
             HEALTH_READ_COMMAND => self.health_read(command.payload).await,
             JSON_RPC_RECEIVE_COMMAND => self.receive_json_rpc(command.payload).await,
             SNAPSHOT_COMMAND => self.snapshot_command(command.payload).await,
+            // Generic workbench diagnostics call `service.snapshot` across
+            // every registered workbench service.  The typed
+            // `app_protocol.snapshot` command remains the contract command for
+            // protocol clients, while this alias provides a provider-neutral
+            // runtime memento without requiring an app-protocol command frame.
+            "service.snapshot" => Self::result(
+                AppProtocolResponse::Snapshot(self.snapshot(false).await),
+                trace,
+                WorkbenchCommandStatus::Completed,
+            ),
             other => Err(ServiceError::UnsupportedCommand(other.into())),
         }
     }
@@ -207,4 +261,8 @@ impl SystemService for AppProtocolSystemServiceProvider {
             Ok(ServiceHealth::Healthy)
         }
     }
+}
+
+fn runtime_error(error: crate::ServiceRuntimeError) -> macaca_proto::MacacaError {
+    macaca_proto::MacacaError::Config(error.to_string())
 }

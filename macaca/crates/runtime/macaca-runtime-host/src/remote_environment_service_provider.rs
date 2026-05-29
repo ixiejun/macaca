@@ -6,6 +6,7 @@
 //! base OS.
 
 use std::collections::{BTreeMap, HashMap};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use macaca_kernel::SystemService;
@@ -18,11 +19,54 @@ use tokio::sync::RwLock;
 use tracing::{info, warn};
 use uuid::Uuid;
 
+use crate::{
+    ServiceProviderFactoryContext, ServiceProviderInstance, ServiceRuntime,
+    StaticServiceProviderFactory,
+};
+
 /// In-memory remote environment registry used by local hosts and tests.
 pub struct RemoteEnvironmentSystemServiceProvider {
     descriptor: ServiceDescriptor,
     environments: RwLock<HashMap<String, RemoteEnvironmentRecord>>,
     unavailable_reason: Option<String>,
+}
+
+/// Register and start the local `service.remote_environment` registry.
+///
+/// The provider records provider-neutral remote environment metadata only; it
+/// does not embed SSH, container, cloud, or product-specific execution logic.
+/// Concrete remote adapters can later be installed behind the same service
+/// boundary without changing shell or application code.
+pub async fn bootstrap_local_remote_environment_service(
+    runtime: Arc<ServiceRuntime>,
+    trace_id: impl Into<String>,
+) -> macaca_proto::MacacaResult<macaca_proto::KernelServiceId> {
+    let service: Arc<dyn SystemService> = Arc::new(RemoteEnvironmentSystemServiceProvider::local());
+    let descriptor = service.descriptor();
+    let service_id = descriptor.id.clone();
+    let trace = TraceContext::new(trace_id);
+    info!(
+        service_id = %service_id,
+        trace_id = %trace.trace_id,
+        "remote environment service registering local provider"
+    );
+    runtime
+        .register_provider(
+            &StaticServiceProviderFactory::new(ServiceProviderInstance::new(descriptor, service)),
+            ServiceProviderFactoryContext::new(),
+        )
+        .await
+        .map_err(runtime_error)?;
+    runtime
+        .start(&service_id, trace.clone())
+        .await
+        .map_err(runtime_error)?;
+    info!(
+        service_id = %service_id,
+        trace_id = %trace.trace_id,
+        "remote environment service local provider started"
+    );
+    Ok(service_id)
 }
 
 impl RemoteEnvironmentSystemServiceProvider {
@@ -296,6 +340,10 @@ impl SystemService for RemoteEnvironmentSystemServiceProvider {
 
 fn decode<T: serde::de::DeserializeOwned>(value: serde_json::Value) -> ServiceResult<T> {
     serde_json::from_value(value).map_err(|error| ServiceError::InvalidArgument(error.to_string()))
+}
+
+fn runtime_error(error: crate::ServiceRuntimeError) -> macaca_proto::MacacaError {
+    macaca_proto::MacacaError::Config(error.to_string())
 }
 
 fn unavailable_record(reason: String) -> RemoteEnvironmentRecord {

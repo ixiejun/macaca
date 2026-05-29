@@ -147,13 +147,34 @@ impl InteractionSystemServiceProvider {
         payload: serde_json::Value,
     ) -> ServiceResult<ServiceCallResult> {
         let typed: InteractionCommand<InteractionSnapshotRequest> = decode(payload)?;
+        self.snapshot_for_scope(typed.scope.session_id, typed.trace)
+            .await
+    }
+
+    pub(crate) async fn snapshot_default(
+        &self,
+        payload: serde_json::Value,
+    ) -> ServiceResult<ServiceCallResult> {
+        // Generic workbench diagnostics wrap service payloads in
+        // `WorkbenchCommand<Value>`.  Decode that envelope and reuse the same
+        // snapshot builder so the alias cannot drift from `interaction.snapshot`.
+        let typed: InteractionCommand<serde_json::Value> = decode(payload)?;
+        self.snapshot_for_scope(typed.scope.session_id, typed.trace)
+            .await
+    }
+
+    async fn snapshot_for_scope(
+        &self,
+        session_id: String,
+        trace: macaca_proto::TraceContext,
+    ) -> ServiceResult<ServiceCallResult> {
         let store = self.store()?;
         let (threads, turns, items) = store
-            .snapshot_counts(&typed.scope.session_id)
+            .snapshot_counts(&session_id)
             .await
             .map_err(persist_error)?;
         let loaded_threads = store
-            .loaded_threads(&typed.scope.session_id)
+            .loaded_threads(&session_id)
             .await
             .map_err(persist_error)?;
         Self::result(
@@ -164,7 +185,7 @@ impl InteractionSystemServiceProvider {
                 loaded_threads,
                 captured_at: chrono::Utc::now(),
             }),
-            typed.trace,
+            trace,
             WorkbenchCommandStatus::Completed,
             None,
         )

@@ -220,7 +220,9 @@ pub use agent_execution_service_provider::{
     agent_execution_service_descriptor, AgentExecutionBackend, AgentExecutionSystemServiceProvider,
 };
 pub use app_protocol_service_commands::app_protocol_service_command;
-pub use app_protocol_service_provider::AppProtocolSystemServiceProvider;
+pub use app_protocol_service_provider::{
+    bootstrap_local_app_protocol_service, AppProtocolSystemServiceProvider,
+};
 pub use application_hosts::{
     is_application_runtime_unavailable, ApplicationHostRuntime, UnavailableApplicationRuntimeHost,
     UnavailableWasmApplicationHost, WasmApplicationHostFactory,
@@ -352,8 +354,12 @@ pub use plugin_marketplace_service_provider::{
 };
 pub use process_service_local::{LocalProcessProvider, ProcessProvider};
 pub use process_service_provider::{bootstrap_local_process_service, ProcessSystemServiceProvider};
-pub use realtime_service_provider::{RealtimeProvider, RealtimeSystemServiceProvider};
-pub use remote_environment_service_provider::RemoteEnvironmentSystemServiceProvider;
+pub use realtime_service_provider::{
+    bootstrap_unavailable_realtime_service, RealtimeProvider, RealtimeSystemServiceProvider,
+};
+pub use remote_environment_service_provider::{
+    bootstrap_local_remote_environment_service, RemoteEnvironmentSystemServiceProvider,
+};
 pub use review_service_provider::{
     bootstrap_local_review_service, LocalReviewProvider, ReviewProvider,
     ReviewSystemServiceProvider,

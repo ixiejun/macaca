@@ -8,13 +8,17 @@ use macaca_proto::workbench::diagnostics as diag;
 use macaca_proto::workbench::realtime as rt;
 use macaca_proto::workbench::remote_environment as renv;
 use macaca_proto::{
-    BoundedSummary, ServiceCommand, ServiceCommandName, ServiceHealth, TraceContext,
-    WorkbenchCommandResult, WorkbenchCommandStatus,
+    BoundedSummary, KernelServiceId, ServiceBusSource, ServiceCommand, ServiceCommandName,
+    ServiceHealth, TraceContext, WorkbenchCommandResult, WorkbenchCommandStatus,
 };
+use std::sync::Arc;
 
 use crate::{
+    bootstrap_local_app_protocol_service, bootstrap_local_diagnostics_service,
+    bootstrap_local_process_service, bootstrap_local_remote_environment_service,
+    bootstrap_local_sandbox_service, bootstrap_unavailable_realtime_service,
     DiagnosticsSystemServiceProvider, RealtimeSystemServiceProvider,
-    RemoteEnvironmentSystemServiceProvider,
+    RemoteEnvironmentSystemServiceProvider, ServiceRuntime, ServiceRuntimeConfig,
 };
 
 fn command<T: serde::Serialize>(name: &str, payload: T) -> ServiceCommand {
@@ -35,6 +39,65 @@ fn summary(text: &str) -> BoundedSummary {
         truncated: false,
         original_byte_len: Some(text.len() as u64),
         artifact_ref: None,
+    }
+}
+
+async fn call_runtime_snapshot(runtime: &ServiceRuntime, service_id: &str) -> serde_json::Value {
+    runtime
+        .call(
+            &KernelServiceId::new(service_id),
+            ServiceBusSource::new("test.workbench.bootstrap"),
+            command("service.snapshot", serde_json::json!({})),
+        )
+        .await
+        .unwrap_or_else(|error| panic!("{service_id} snapshot should route: {error}"))
+        .output
+        .unwrap_or_else(|| panic!("{service_id} snapshot should return output"))
+}
+
+#[tokio::test]
+async fn workbench_bootstrap_registers_all_web_runtime_services() {
+    let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
+
+    bootstrap_local_app_protocol_service(runtime.clone(), "trace-bootstrap-app-protocol")
+        .await
+        .unwrap();
+    bootstrap_local_process_service(runtime.clone(), "trace-bootstrap-process")
+        .await
+        .unwrap();
+    bootstrap_local_sandbox_service(runtime.clone(), "trace-bootstrap-sandbox")
+        .await
+        .unwrap();
+    bootstrap_local_diagnostics_service(runtime.clone(), "trace-bootstrap-diagnostics")
+        .await
+        .unwrap();
+    bootstrap_unavailable_realtime_service(
+        runtime.clone(),
+        "trace-bootstrap-realtime",
+        "realtime provider is not configured",
+    )
+    .await
+    .unwrap();
+    bootstrap_local_remote_environment_service(runtime.clone(), "trace-bootstrap-remote-env")
+        .await
+        .unwrap();
+
+    // This mirrors the Web workbench's generic status sweep. Each service must
+    // be registered in ServiceRuntime so routing returns provider data or a
+    // structured unavailable result, never an unknown-service error.
+    for service_id in [
+        "service.app_protocol",
+        "service.process",
+        "service.sandbox",
+        "service.diagnostics",
+        "service.realtime",
+        "service.remote_environment",
+    ] {
+        let output = call_runtime_snapshot(&runtime, service_id).await;
+        assert!(
+            output.get("status").is_some(),
+            "{service_id} should return a workbench result envelope"
+        );
     }
 }
 

@@ -749,6 +749,44 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
         )
         .await
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+    // Web is the host composition root, but runtime-host remains the owning
+    // factory for concrete providers.  Register all workbench-family services
+    // here so application WASM host imports and shell diagnostics route through
+    // `ServiceRuntime` instead of encountering unknown service ids.
+    macaca_runtime_host::bootstrap_local_app_protocol_service(
+        Arc::clone(&service_runtime),
+        "web-startup-app-protocol-service",
+    )
+    .await?;
+    macaca_runtime_host::bootstrap_local_process_service(
+        Arc::clone(&service_runtime),
+        "web-startup-process-service",
+    )
+    .await?;
+    macaca_runtime_host::bootstrap_local_sandbox_service(
+        Arc::clone(&service_runtime),
+        "web-startup-sandbox-service",
+    )
+    .await?;
+    macaca_runtime_host::bootstrap_local_diagnostics_service(
+        Arc::clone(&service_runtime),
+        "web-startup-diagnostics-service",
+    )
+    .await?;
+    // Realtime is optional.  Registering an unavailable Null Object provider
+    // preserves traceable, auditable behavior without pretending a transport is
+    // configured or leaking optional-module absence as an unknown service.
+    macaca_runtime_host::bootstrap_unavailable_realtime_service(
+        Arc::clone(&service_runtime),
+        "web-startup-realtime-service",
+        "realtime provider is not configured",
+    )
+    .await?;
+    macaca_runtime_host::bootstrap_local_remote_environment_service(
+        Arc::clone(&service_runtime),
+        "web-startup-remote-environment-service",
+    )
+    .await?;
     macaca_runtime_host::bootstrap_local_file_service(
         Arc::clone(&service_runtime),
         "web-startup-file-service",

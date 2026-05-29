@@ -245,6 +245,12 @@ impl SystemService for InteractionSystemServiceProvider {
             ITEM_LIST_COMMAND => self.item_list(command.payload).await,
             ITEM_WATCH_COMMAND | ITEM_SUBSCRIBE_COMMAND => self.item_watch(command.payload).await,
             SNAPSHOT_COMMAND => self.snapshot(command.payload).await,
+            // The shell workbench performs a generic `service.snapshot` sweep
+            // across every focused workbench client.  The typed
+            // `interaction.snapshot` command remains the ledger contract, and
+            // this alias adapts the generic workbench envelope into a bounded
+            // ledger memento without changing interaction semantics.
+            "service.snapshot" => self.snapshot_default(command.payload).await,
             other => Err(ServiceError::UnsupportedCommand(other.into())),
         }
     }

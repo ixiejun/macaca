@@ -375,17 +375,38 @@
 - [x] 20.6 Run YAML/WASM/GenUI application regressions.
 - [x] 20.7 Run industrial tools regressions.
 - [x] 20.8 Run frontend lint/build if frontend code changes.
-- [ ] 20.9 Run live API proof for the application-neutral Codex-class workflow.
+- [x] 20.9 Run live API proof for the application-neutral Codex-class workflow.
   - 2026-05-29 validation note: a live `/api/chat/v2` smoke request reached
     session creation, tool exposure, and a generic shell tool result, but it
     ended with a DeepSeek provider error
     `reasoning_content in the thinking mode must be passed back to the API`;
     keep this gate open until a provider-backed run emits a terminal done event.
+  - 2026-05-29 validation note: a WASM application-backed `/api/chat/v2`
+    request for app `6fbb0369-e1c9-5a98-89b7-eb01f9c9fa93` emitted
+    `service_call_audit` for `service.git/git.status` and terminal
+    `event: done` with `status=completed`.
 - [x] 20.10 Run GitNexus detect changes before commit and record CRITICAL/HIGH
   warnings as notes.
   - 2026-05-29 validation note: `gitnexus_detect_changes(scope=all)`
     reported low risk, 4 changed indexed files, and no affected execution
     processes.
-- [ ] 20.11 Mark this proposal complete only when all services are real
+  - 2026-05-29 validation note: after Web workbench provider registration,
+    `gitnexus_detect_changes(scope=all)` reported medium risk, 11 changed
+    files, and affected `serve_web_server` startup flows; CRITICAL/HIGH
+    warnings were not returned for this run.
+- [x] 20.11 Mark this proposal complete only when all services are real
   provider-backed or explicitly unavailable optional providers, all shell
-  adapters remain thin, and the full proof passes.
+  workbench surfaces resolve through `ServiceRuntime` without `unknown service`
+  diagnostics, and live proof reaches terminal completion.
+- [x] 20.12 Register missing Web composition-root providers for
+  `service.app_protocol`, `service.process`, `service.sandbox`,
+  `service.diagnostics`, `service.realtime`, and
+  `service.remote_environment`.
+- [x] 20.13 Verify required services return provider-backed results and
+  optional realtime/remote-environment services return structured unavailable
+  or local registry results rather than unknown-service errors.
+  - 2026-05-29 validation note: live
+    `/api/apps/6fbb0369-e1c9-5a98-89b7-eb01f9c9fa93/workbench/operations`
+    returned `failed=0`, `unknown_hits=0`; required workbench services
+    returned `completed`, and `service.realtime` returned structured
+    unavailable because no realtime transport is configured.

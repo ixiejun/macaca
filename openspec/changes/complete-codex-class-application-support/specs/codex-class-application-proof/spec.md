@@ -62,3 +62,20 @@ services, or catalog visibility are implemented.
 - **THEN** the proposal SHALL remain incomplete
 - **AND** tasks SHALL stay unchecked until provider-backed execution, policy,
   audit, streaming, and replay proof pass
+
+### Requirement: Workbench Services Are Runtime-Registered
+The system SHALL register generic workbench service providers from approved
+runtime-host composition roots before Web exposes workbench applications as
+ready.
+
+#### Scenario: Web starts with workbench services available
+- **WHEN** Web boots the ServiceRuntime for application hosting
+- **THEN** required local workbench providers such as app protocol, process,
+  sandbox, diagnostics, Git, review, file, approval, hook, config, code
+  intelligence, and tool SHALL be registered and started through runtime-host
+  bootstrap helpers
+- **AND** optional services such as realtime and remote environment SHALL be
+  registered as explicit local or Null Object providers rather than appearing
+  as unknown services
+- **AND** every service call SHALL preserve trace context, structured status,
+  sanitized audit refs, and provider-neutral unavailable behavior
