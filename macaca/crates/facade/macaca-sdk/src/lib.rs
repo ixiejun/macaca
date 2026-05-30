@@ -8,6 +8,7 @@ pub mod ability_kit;
 pub mod app_protocol_client;
 pub mod application;
 pub mod application_client;
+pub mod application_execution_client;
 pub mod application_kit;
 pub mod application_testkit;
 pub mod autonomy_evolution_client;
@@ -51,6 +52,9 @@ pub mod validation;
 pub mod web3_client;
 pub mod workbench_client;
 
+#[cfg(test)]
+mod application_execution_client_tests;
+
 pub use ability_kit::{AbilityDescriptorBuilder, AbilityKit};
 pub use app_protocol_client::{
     ServiceBackedAppProtocolClient, SystemAppProtocolClient, UnavailableSystemAppProtocolClient,
@@ -60,6 +64,10 @@ pub use application::{
 };
 pub use application_client::{
     ServiceBackedApplicationClient, SystemApplicationClient, UnavailableSystemApplicationClient,
+};
+pub use application_execution_client::{
+    ServiceBackedApplicationExecutionClient, SystemApplicationExecutionClient,
+    UnavailableSystemApplicationExecutionClient,
 };
 pub use application_kit::{
     generate_wasm_guest_bindings, ApplicationKit, ApplicationManifestBuilder,

@@ -478,6 +478,18 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
     let event_log = Arc::new(macaca_persist::EventLog::new(Arc::clone(
         &session_store_impl,
     )));
+    // Register the application execution protocol service at the shared host
+    // composition root.  Web supplies only generic infrastructure (EventLog and
+    // ServiceRuntime); provider strategies remain runtime-host owned and can be
+    // registered later without moving execution loops into the presentation
+    // shell.
+    macaca_runtime_host::bootstrap_application_execution_service(
+        Arc::clone(&service_runtime),
+        Arc::clone(&event_log),
+        macaca_runtime_host::ApplicationExecutionProviderRegistry::new(),
+        "web-startup-application-execution-service",
+    )
+    .await?;
     macaca_runtime_host::bootstrap_interaction_service(
         Arc::clone(&service_runtime),
         Arc::clone(&session_store_shared),

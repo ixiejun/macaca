@@ -2,6 +2,7 @@ pub mod a2a;
 pub mod agent_execution_service;
 pub mod application_abi;
 pub mod application_ability;
+pub mod application_execution;
 pub mod application_manifest;
 pub mod application_service;
 pub mod application_wasm_abi;
@@ -46,6 +47,8 @@ pub mod workbench;
 #[cfg(test)]
 mod a2a_tests;
 #[cfg(test)]
+mod application_execution_tests;
+#[cfg(test)]
 mod evm_tests;
 #[cfg(test)]
 mod plugin_capability_tests;
@@ -66,6 +69,7 @@ pub use a2a::*;
 pub use agent_execution_service::*;
 pub use application_abi::*;
 pub use application_ability::*;
+pub use application_execution::*;
 pub use application_manifest::*;
 pub use application_service::*;
 pub use application_wasm_abi::*;

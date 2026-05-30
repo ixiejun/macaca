@@ -16,6 +16,10 @@ pub mod agent_context_service_provider;
 pub mod agent_execution_service_provider;
 pub(crate) mod app_protocol_service_commands;
 pub mod app_protocol_service_provider;
+mod application_execution_event_store;
+mod application_execution_projection;
+mod application_execution_provider_registry;
+pub mod application_execution_service_provider;
 pub mod application_hosts;
 pub mod application_service_provider;
 pub(crate) mod approval_service_commands;
@@ -142,6 +146,8 @@ pub mod web3_service_provider;
 #[cfg(test)]
 mod app_protocol_service_provider_tests;
 #[cfg(test)]
+mod application_execution_service_provider_tests;
+#[cfg(test)]
 mod approval_service_provider_tests;
 #[cfg(test)]
 mod code_intelligence_service_provider_tests;
@@ -223,6 +229,17 @@ pub use agent_execution_service_provider::{
 pub use app_protocol_service_commands::app_protocol_service_command;
 pub use app_protocol_service_provider::{
     bootstrap_local_app_protocol_service, AppProtocolSystemServiceProvider,
+};
+pub use application_execution_event_store::ApplicationExecutionEventStore;
+pub use application_execution_projection::project_application_execution_state;
+pub use application_execution_provider_registry::{
+    ApplicationExecutionProvider, ApplicationExecutionProviderRegistry,
+    ApplicationExecutionProviderSelection, ApplicationExecutionProviderSelectionRecord,
+};
+pub use application_execution_service_provider::{
+    application_execution_service_descriptor_runtime, application_execution_service_id,
+    bootstrap_application_execution_service, bootstrap_unavailable_application_execution_service,
+    ApplicationExecutionSystemServiceProvider,
 };
 pub use application_hosts::{
     is_application_runtime_unavailable, ApplicationHostRuntime, UnavailableApplicationRuntimeHost,
