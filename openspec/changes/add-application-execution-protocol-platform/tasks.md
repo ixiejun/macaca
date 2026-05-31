@@ -104,7 +104,7 @@
 - [x] 9.2 Add Web route adapters only as thin shells over SDK/SystemFacade or focused clients; expected routes may include start, replay, current-state, control, and gateway ingress endpoints.
 - [x] 9.3 Ensure Web routes parse HTTP/SSE input, call typed clients, map structured results to HTTP/SSE, and never run provider loops or own authoritative execution events.
 - [x] 9.4 Ensure realtime/SSE subscriptions stream persisted events or durable event references after EventLog append.
-- [ ] 9.5 Add route tests proving invalid input returns structured errors, missing trace/session/app scope is rejected, and browser disconnect does not cancel backend execution unless a control command requests cancel.
+- [x] 9.5 Add route tests proving invalid input returns structured errors, missing trace/session/app scope is rejected, and browser disconnect does not cancel backend execution unless a control command requests cancel.
 - [x] 9.6 Add gateway route tests proving external callbacks cannot append events without valid identity, lease, schema, idempotency, and sanitization.
 
 ## 10. Frontend and App-Owned UI Boundary
