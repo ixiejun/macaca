@@ -10,8 +10,9 @@ use macaca_proto::MacacaResult;
 
 use crate::state::AppState;
 use crate::{
-    app_ui_routes, chat_orchestrator, genui_routes, heartbeat_operations_routes, loop_manager,
-    metrics, plugin_routes, routes, session, skill_operations_routes, skill_self_evolution_audit,
+    app_ui_routes, application_execution_gateway_routes, application_execution_routes,
+    chat_orchestrator, genui_routes, heartbeat_operations_routes, loop_manager, metrics,
+    plugin_routes, routes, session, skill_operations_routes, skill_self_evolution_audit,
     tool_routes, workbench_routes,
 };
 
@@ -181,6 +182,46 @@ impl WebRuntimeFacade {
             .route(
                 "/api/apps/{app_id}/genui/events",
                 post(genui_routes::post_genui_event),
+            )
+            .route(
+                "/api/apps/{app_id}/execution/start",
+                post(application_execution_routes::start_execution),
+            )
+            .route(
+                "/api/apps/{app_id}/execution/control",
+                post(application_execution_routes::send_control),
+            )
+            .route(
+                "/api/apps/{app_id}/execution/current-state",
+                get(application_execution_routes::query_current_state),
+            )
+            .route(
+                "/api/apps/{app_id}/execution/replay",
+                get(application_execution_routes::replay_events),
+            )
+            .route(
+                "/api/apps/{app_id}/execution/gateway/events",
+                post(application_execution_gateway_routes::gateway_append_event),
+            )
+            .route(
+                "/api/apps/{app_id}/execution/gateway/heartbeat",
+                post(application_execution_gateway_routes::gateway_heartbeat),
+            )
+            .route(
+                "/api/apps/{app_id}/execution/gateway/snapshot",
+                post(application_execution_gateway_routes::gateway_snapshot),
+            )
+            .route(
+                "/api/apps/{app_id}/execution/gateway/approval",
+                post(application_execution_gateway_routes::gateway_approval),
+            )
+            .route(
+                "/api/apps/{app_id}/execution/gateway/completion",
+                post(application_execution_gateway_routes::gateway_completion),
+            )
+            .route(
+                "/api/apps/{app_id}/execution/gateway/failure",
+                post(application_execution_gateway_routes::gateway_failure),
             )
             .route(
                 "/api/apps/{app_id}/schedules",

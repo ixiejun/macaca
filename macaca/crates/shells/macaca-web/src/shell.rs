@@ -15,9 +15,10 @@ use macaca_proto::{
     TraceContext, Web3Availability, Web3AvailabilityCommand,
 };
 use macaca_sdk::{
-    StaticSystemStatusDataSource, SystemEvmClient, SystemFacade, SystemPluginCapabilityClient,
-    SystemPluginControlClient, SystemPluginHookClient, SystemServiceClient, SystemStatusSnapshot,
-    SystemWeb3Client, TaskBoardQueryCommand, TodoStoreTaskBoardDataSource,
+    StaticSystemStatusDataSource, SystemApplicationExecutionClient, SystemEvmClient, SystemFacade,
+    SystemPluginCapabilityClient, SystemPluginControlClient, SystemPluginHookClient,
+    SystemServiceClient, SystemStatusSnapshot, SystemWeb3Client, TaskBoardQueryCommand,
+    TodoStoreTaskBoardDataSource,
 };
 use macaca_task::TodoStore;
 
@@ -36,6 +37,7 @@ pub struct WebSystemFacadeBundle {
     plugin_control: Arc<dyn SystemPluginControlClient>,
     plugin_capability: Arc<dyn SystemPluginCapabilityClient>,
     plugin_hook: Arc<dyn SystemPluginHookClient>,
+    application_execution: Arc<dyn SystemApplicationExecutionClient>,
 }
 
 impl WebSystemFacadeBundle {
@@ -51,6 +53,7 @@ impl WebSystemFacadeBundle {
         plugin_control: Arc<dyn SystemPluginControlClient>,
         plugin_capability: Arc<dyn SystemPluginCapabilityClient>,
         plugin_hook: Arc<dyn SystemPluginHookClient>,
+        application_execution: Arc<dyn SystemApplicationExecutionClient>,
     ) -> Self {
         Self {
             service,
@@ -59,6 +62,7 @@ impl WebSystemFacadeBundle {
             plugin_control,
             plugin_capability,
             plugin_hook,
+            application_execution,
         }
     }
 
@@ -80,6 +84,16 @@ impl WebSystemFacadeBundle {
     /// Borrow the focused Plugin Hook client for future hook routes/adapters.
     pub fn plugin_hook_client(&self) -> Arc<dyn SystemPluginHookClient> {
         Arc::clone(&self.plugin_hook)
+    }
+
+    /// Borrow the focused Application Execution client for route adapters.
+    ///
+    /// This keeps Web in the Facade role: HTTP handlers receive and validate
+    /// transport scope, then call the SDK. Provider strategy registration,
+    /// EventLog ownership, lease validation, and control delivery stay in the
+    /// runtime-host service implementation.
+    pub fn application_execution_client(&self) -> Arc<dyn SystemApplicationExecutionClient> {
+        Arc::clone(&self.application_execution)
     }
 
     /// Query optional Web3 availability through the focused SDK client.
@@ -340,6 +354,7 @@ mod tests {
             Arc::new(macaca_sdk::UnavailableSystemPluginControlClient),
             Arc::new(macaca_sdk::UnavailableSystemPluginCapabilityClient),
             Arc::new(macaca_sdk::UnavailableSystemPluginHookClient),
+            Arc::new(macaca_sdk::UnavailableSystemApplicationExecutionClient::new()),
         );
 
         let web3 = facade.web3_availability("test-web3").await.unwrap();

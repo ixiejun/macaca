@@ -12,6 +12,10 @@ mod app_ui_llm_bridge;
 pub mod app_ui_routes;
 mod app_ui_workspace_scope;
 mod app_workspace_bootstrap;
+pub mod application_execution_gateway_routes;
+pub mod application_execution_routes;
+#[cfg(test)]
+mod application_execution_routes_tests;
 pub mod bootstrap;
 mod capability_catalog;
 pub mod chat_mediator;
@@ -945,6 +949,10 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
     let plugin_hook_client: Arc<dyn macaca_sdk::SystemPluginHookClient> = Arc::new(
         macaca_sdk::ServiceBackedPluginHookClient::new(Arc::clone(&generic_service_client)),
     );
+    let application_execution_client: Arc<dyn macaca_sdk::SystemApplicationExecutionClient> =
+        Arc::new(macaca_sdk::ServiceBackedApplicationExecutionClient::new(
+            Arc::clone(&generic_service_client),
+        ));
     let system_facade = crate::shell::WebSystemFacadeBundle::new(
         Arc::clone(&generic_service_client),
         Arc::clone(&web3_client),
@@ -952,6 +960,7 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
         Arc::clone(&plugin_control_client),
         Arc::clone(&plugin_capability_client),
         Arc::clone(&plugin_hook_client),
+        Arc::clone(&application_execution_client),
     );
 
     // 10. Build shared state.
