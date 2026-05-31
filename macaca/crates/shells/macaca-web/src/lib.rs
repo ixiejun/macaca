@@ -16,6 +16,7 @@ pub mod application_execution_gateway_routes;
 pub mod application_execution_routes;
 #[cfg(test)]
 mod application_execution_routes_tests;
+pub mod application_execution_stream_routes;
 pub mod bootstrap;
 mod capability_catalog;
 pub mod chat_mediator;

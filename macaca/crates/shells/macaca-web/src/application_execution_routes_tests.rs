@@ -7,13 +7,18 @@
 
 use macaca_proto::{
     ApplicationExecutionControlCommand, ApplicationExecutionControlKind,
-    ApplicationExecutionProviderKind, ApplicationExecutionScope, ApplicationId, TraceContext,
+    ApplicationExecutionEventType, ApplicationExecutionProviderKind, ApplicationExecutionScope,
+    ApplicationId, EventEntry, TraceContext,
 };
 
 use crate::application_execution_gateway_routes::validate_callback_identity;
 use crate::application_execution_routes::{
     build_current_state_scope, build_start_command, validate_command_scope, CurrentStateQuery,
     StartExecutionRequest,
+};
+use crate::application_execution_stream_routes::{
+    build_stream_query, event_entry_to_stream_payload, ExecutionEventStreamQuery,
+    APPLICATION_EXECUTION_EVENT_SOURCE,
 };
 
 fn app_id() -> ApplicationId {
@@ -106,4 +111,82 @@ fn gateway_append_requires_callback_identity() {
 
     assert_eq!(error.0, axum::http::StatusCode::BAD_REQUEST);
     assert!(error.1 .0.error.contains("callback_identity_ref"));
+}
+
+#[test]
+fn event_stream_requires_explicit_trace_scope() {
+    let query = ExecutionEventStreamQuery {
+        session_id: "session-a".into(),
+        trace_id: " ".into(),
+        since: None,
+        limit: None,
+        event_type: None,
+    };
+
+    let error = build_stream_query(&app_id().to_string(), query).unwrap_err();
+
+    assert_eq!(error.0, axum::http::StatusCode::BAD_REQUEST);
+    assert!(error.1 .0.error.contains("trace_id"));
+}
+
+#[test]
+fn event_stream_query_uses_service_owned_source_index() {
+    let application_id = app_id();
+    let query = ExecutionEventStreamQuery {
+        session_id: "session-a".into(),
+        trace_id: "trace-a".into(),
+        since: Some(41),
+        limit: Some(900),
+        event_type: Some(ApplicationExecutionEventType::ProviderHeartbeat),
+    };
+
+    let (_, trace, event_query) = match build_stream_query(&application_id.to_string(), query) {
+        Ok(parts) => parts,
+        Err((status, body)) => panic!("unexpected stream query error: {status} {}", body.0.error),
+    };
+
+    assert_eq!(trace.trace_id, "trace-a");
+    assert_eq!(event_query.session_id, "session-a");
+    assert_eq!(event_query.since_seq, 41);
+    assert_eq!(event_query.limit, 500);
+    assert_eq!(
+        event_query.source.as_deref(),
+        Some(APPLICATION_EXECUTION_EVENT_SOURCE)
+    );
+    assert_eq!(event_query.event_type.as_deref(), Some("ProviderHeartbeat"));
+}
+
+#[test]
+fn event_stream_payload_includes_durable_event_ref() {
+    let entry = EventEntry {
+        seq: 7,
+        timestamp: chrono::Utc::now(),
+        session_id: "session-a".into(),
+        event_type: "ProviderHeartbeat".into(),
+        source: APPLICATION_EXECUTION_EVENT_SOURCE.into(),
+        payload: serde_json::json!({
+            "application_id": app_id().to_string(),
+            "sanitized_payload": {"kind": "summary", "summary": "heartbeat"}
+        }),
+    };
+
+    let payload = event_entry_to_stream_payload(&entry);
+
+    assert_eq!(payload["seq"], 7);
+    assert_eq!(payload["event_ref"]["session_id"], "session-a");
+    assert_eq!(payload["event_ref"]["seq"], 7);
+    assert_eq!(
+        payload["payload"]["sanitized_payload"]["summary"],
+        "heartbeat"
+    );
+}
+
+#[test]
+fn event_stream_adapter_has_no_execution_control_side_effects() {
+    let source = include_str!("application_execution_stream_routes.rs");
+
+    assert!(!source.contains("send_control("));
+    assert!(!source.contains("ApplicationExecutionControlCommand"));
+    assert!(!source.contains("ApplicationExecutionProvider"));
+    assert!(!source.contains("tokio::spawn"));
 }
