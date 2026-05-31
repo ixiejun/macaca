@@ -423,6 +423,28 @@ pub async fn bootstrap_application_execution_service(
     register_application_execution_service(runtime, service, trace_id, true).await
 }
 
+/// Register and start the default EventLog-backed application execution service.
+///
+/// This helper is the approved composition seam for presentation shells that
+/// have only generic host infrastructure available. The runtime-host owns the
+/// default provider registry construction here so Web/CLI adapters do not learn
+/// provider lifecycle semantics or instantiate provider strategy containers.
+/// Future provider stacks can replace this helper with a richer runtime-host
+/// bootstrap without changing shell ownership.
+pub async fn bootstrap_default_application_execution_service(
+    runtime: Arc<crate::ServiceRuntime>,
+    event_log: Arc<EventLog>,
+    trace_id: impl Into<String>,
+) -> macaca_proto::MacacaResult<macaca_proto::KernelServiceId> {
+    bootstrap_application_execution_service(
+        runtime,
+        event_log,
+        ApplicationExecutionProviderRegistry::new(),
+        trace_id,
+    )
+    .await
+}
+
 async fn register_application_execution_service(
     runtime: Arc<crate::ServiceRuntime>,
     service: Arc<dyn SystemService>,

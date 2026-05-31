@@ -246,8 +246,8 @@ pub use application_execution_provider_registry::{
 };
 pub use application_execution_service_provider::{
     application_execution_service_descriptor_runtime, application_execution_service_id,
-    bootstrap_application_execution_service, bootstrap_unavailable_application_execution_service,
-    ApplicationExecutionSystemServiceProvider,
+    bootstrap_application_execution_service, bootstrap_default_application_execution_service,
+    bootstrap_unavailable_application_execution_service, ApplicationExecutionSystemServiceProvider,
 };
 pub use application_hosts::{
     is_application_runtime_unavailable, ApplicationHostRuntime, UnavailableApplicationRuntimeHost,

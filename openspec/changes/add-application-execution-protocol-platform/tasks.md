@@ -131,7 +131,7 @@
 
 - [x] 12.1 Add dependency-boundary tests proving kernel crates do not depend on concrete application execution providers.
 - [x] 12.2 Add dependency-boundary tests proving SDK/SystemFacade does not construct runtime-host providers, Web state, CLI state, database backends, or app runtimes.
-- [ ] 12.3 Add dependency-boundary tests proving Web/CLI/frontend do not own application execution semantics, provider lifecycle, approval/cancel semantics, or EventLog persistence.
+- [x] 12.3 Add dependency-boundary tests proving Web/CLI/frontend do not own application execution semantics, provider lifecycle, approval/cancel semantics, or EventLog persistence.
 - [x] 12.4 Add tests or static guards rejecting application-specific branches in generic service/runtime code, including branches on `codex-wasm-workbench`, Codex names, workflow names, model names, provider names, driver names, gateway names, and business-domain identifiers.
 - [ ] 12.5 Update `macaca/docs/macaca-os-serviceization-allowlist.md` only if this implementation adds, removes, or narrows a real dependency exception; do not update it cosmetically.
 - [ ] 12.6 Update `macaca/docs/macaca-os-architecture-governance.md` and `macaca/docs/macaca-os-microkernel-boundaries.md` only if this implementation adds stable ownership language that is not already covered.

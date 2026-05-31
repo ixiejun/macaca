@@ -483,10 +483,9 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
     // ServiceRuntime); provider strategies remain runtime-host owned and can be
     // registered later without moving execution loops into the presentation
     // shell.
-    macaca_runtime_host::bootstrap_application_execution_service(
+    macaca_runtime_host::bootstrap_default_application_execution_service(
         Arc::clone(&service_runtime),
         Arc::clone(&event_log),
-        macaca_runtime_host::ApplicationExecutionProviderRegistry::new(),
         "web-startup-application-execution-service",
     )
     .await?;
