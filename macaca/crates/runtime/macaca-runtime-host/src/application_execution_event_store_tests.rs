@@ -188,6 +188,36 @@ async fn gateway_append_rejects_stale_lease_before_eventlog_side_effects() {
 }
 
 #[tokio::test]
+async fn gateway_append_rejects_unsupported_schema_before_eventlog_side_effects() {
+    let (_dir, event_log) = event_log();
+    let store = ApplicationExecutionEventStore::new(event_log.clone());
+    let mut event = gateway_event(
+        "session-schema",
+        "run-schema",
+        ApplicationExecutionPayload::summary("unsupported schema"),
+        "gateway-schema-1",
+    );
+    event.schema_version = "application-execution.v0".into();
+    let command = AppendExecutionEventCommand {
+        lease_id: None,
+        callback_identity_ref: "callback-ref".into(),
+        event,
+    };
+
+    let err = store.append_gateway_event(command).await.unwrap_err();
+
+    assert!(matches!(
+        err,
+        ServiceError::InvalidArgument(reason) if reason.contains("unsupported")
+    ));
+    assert_eq!(
+        event_log.latest_seq("session-schema").await,
+        0,
+        "schema validation must run before durable EventLog append"
+    );
+}
+
+#[tokio::test]
 async fn gateway_append_rejects_lease_scope_identity_and_event_type_mismatch() {
     let (_dir, event_log) = event_log();
     let store = ApplicationExecutionEventStore::new(event_log).with_lease(provider_lease(

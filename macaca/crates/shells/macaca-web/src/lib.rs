@@ -13,6 +13,8 @@ pub mod app_ui_routes;
 mod app_ui_workspace_scope;
 mod app_workspace_bootstrap;
 pub mod application_execution_gateway_routes;
+#[cfg(test)]
+mod application_execution_gateway_routes_tests;
 pub mod application_execution_routes;
 #[cfg(test)]
 mod application_execution_routes_tests;
