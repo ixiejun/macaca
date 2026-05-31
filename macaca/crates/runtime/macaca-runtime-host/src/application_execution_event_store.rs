@@ -209,6 +209,20 @@ impl ApplicationExecutionEventStore {
         Ok(event)
     }
 
+    /// Return the previously persisted idempotent event without appending.
+    ///
+    /// Control delivery needs this read-before-side-effect hook so a retry can
+    /// reuse the durable cursor while avoiding a second provider call.  The
+    /// method still applies the same structural validation as append so callers
+    /// cannot turn malformed protocol envelopes into silent cache hits.
+    pub(crate) async fn existing_idempotent_event(
+        &self,
+        event: &ApplicationExecutionEventEnvelope,
+    ) -> Result<Option<ApplicationExecutionEventEnvelope>, ServiceError> {
+        self.validate_event(event)?;
+        Ok(self.find_duplicate(event).await)
+    }
+
     /// Replay persisted protocol events and return the deterministic projection.
     pub async fn replay(
         &self,

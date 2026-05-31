@@ -142,7 +142,7 @@
 - [x] 13.1 Run `openspec validate add-application-execution-protocol-platform --strict`.
 - [x] 13.2 Run targeted proto/foundation tests for application execution DTOs and schema validation.
 - [x] 13.3 Run targeted SDK tests for unavailable client behavior and typed command forwarding.
-- [ ] 13.4 Run targeted runtime-host tests for service descriptor, provider registry, EventLog append/replay, current-state projection, control idempotency, gateway ingress, and provider strategies.
+- [x] 13.4 Run targeted runtime-host tests for service descriptor, provider registry, EventLog append/replay, current-state projection, control idempotency, gateway ingress, and provider strategies.
 - [ ] 13.5 Run integration tests for all three provider kinds.
 - [ ] 13.6 Run Web route tests for start, replay, current state, control, gateway ingress, and subscriber disconnect behavior.
 - [ ] 13.7 Run frontend tests for app-owned UI start/subscribe/replay/control rendering.

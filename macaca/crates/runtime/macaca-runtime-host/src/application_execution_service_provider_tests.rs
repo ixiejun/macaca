@@ -1,3 +1,4 @@
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -332,6 +333,71 @@ async fn gateway_append_is_idempotent_and_replayable() {
     );
 }
 
+#[tokio::test]
+async fn duplicate_control_command_reuses_cursor_without_duplicate_provider_delivery() {
+    let (_dir, event_log) = event_log();
+    let fake_provider = Arc::new(FakeApplicationExecutionProvider::new(
+        "provider-control-idempotent",
+        ApplicationExecutionProviderKind::MacacaHosted,
+    ));
+    let registry = ApplicationExecutionProviderRegistry::new()
+        .register(fake_provider.clone())
+        .unwrap();
+    let provider =
+        ApplicationExecutionSystemServiceProvider::with_event_log(event_log.clone(), registry);
+    let trace = TraceContext::new("trace-control-idempotent");
+    let command = ApplicationExecutionControlCommand {
+        control_id: "control-1".into(),
+        command: ApplicationExecutionControlKind::Cancel,
+        scope: macaca_proto::ApplicationExecutionScope::new(
+            ApplicationId::from_name("control-neutral-application"),
+            "session-control",
+            "run-control",
+            "runtime-test",
+        )
+        .unwrap(),
+        payload: None,
+        idempotency_key: "control-idempotency-1".into(),
+        reason_code: "control.idempotency.test".into(),
+        trace: trace.clone(),
+        policy_context: Default::default(),
+    };
+
+    let first = provider
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new(macaca_proto::APPLICATION_EXECUTION_CONTROL_COMMAND),
+            serde_json::to_value(command.clone()).unwrap(),
+            trace.clone(),
+        ))
+        .await
+        .unwrap();
+    let second = provider
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new(macaca_proto::APPLICATION_EXECUTION_CONTROL_COMMAND),
+            serde_json::to_value(command).unwrap(),
+            trace,
+        ))
+        .await
+        .unwrap();
+    let first: ApplicationExecutionControlResult = serde_json::from_value(first.output).unwrap();
+    let second: ApplicationExecutionControlResult = serde_json::from_value(second.output).unwrap();
+
+    assert_eq!(first.event_cursor, second.event_cursor);
+    assert_eq!(first.status, ApplicationExecutionCommandStatus::Delivered);
+    assert_eq!(second.status, ApplicationExecutionCommandStatus::Duplicate);
+    assert_eq!(
+        fake_provider.control_calls(),
+        1,
+        "duplicate control commands must not be delivered twice to the selected provider"
+    );
+    let replay = event_log.query("session-control", 0, 10).await;
+    assert_eq!(
+        replay.len(),
+        1,
+        "duplicate control commands must not create duplicate durable EventLog rows"
+    );
+}
+
 fn event_log() -> (tempfile::TempDir, Arc<EventLog>) {
     let dir = tempdir().unwrap();
     let redb = Arc::new(RedbStore::open(dir.path().join("application-execution.redb")).unwrap());
@@ -341,6 +407,7 @@ fn event_log() -> (tempfile::TempDir, Arc<EventLog>) {
 struct FakeApplicationExecutionProvider {
     provider_id: String,
     provider_kind: ApplicationExecutionProviderKind,
+    control_calls: Arc<AtomicUsize>,
 }
 
 impl FakeApplicationExecutionProvider {
@@ -348,7 +415,12 @@ impl FakeApplicationExecutionProvider {
         Self {
             provider_id: provider_id.into(),
             provider_kind,
+            control_calls: Arc::new(AtomicUsize::new(0)),
         }
+    }
+
+    fn control_calls(&self) -> usize {
+        self.control_calls.load(Ordering::SeqCst)
     }
 }
 
@@ -396,6 +468,7 @@ impl ApplicationExecutionProvider for FakeApplicationExecutionProvider {
         &self,
         command: ApplicationExecutionControlCommand,
     ) -> Result<ApplicationExecutionControlResult, ServiceError> {
+        self.control_calls.fetch_add(1, Ordering::SeqCst);
         Ok(ApplicationExecutionControlResult {
             status: ApplicationExecutionCommandStatus::Delivered,
             scope: command.scope,

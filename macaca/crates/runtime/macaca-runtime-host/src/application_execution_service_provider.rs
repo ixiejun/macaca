@@ -87,10 +87,7 @@ impl ApplicationExecutionSystemServiceProvider {
     }
 
     fn trace(command: &ServiceCommand) -> ServiceResult<TraceContext> {
-        command
-            .trace
-            .clone()
-            .ok_or(ServiceError::MissingTraceContext)
+        command.trace.clone().ok_or(ServiceError::MissingTraceContext)
     }
 
     fn service_result<T: serde::Serialize>(
@@ -115,9 +112,7 @@ impl ApplicationExecutionSystemServiceProvider {
     }
 
     fn event_store(&self) -> ServiceResult<&ApplicationExecutionEventStore> {
-        self.event_store
-            .as_ref()
-            .ok_or_else(|| ServiceError::ServiceUnavailable(self.reason()))
+        self.event_store.as_ref().ok_or_else(|| ServiceError::ServiceUnavailable(self.reason()))
     }
 
     async fn handle_start(
@@ -215,6 +210,25 @@ impl ApplicationExecutionSystemServiceProvider {
             },
             format!("{}:control-requested", command.idempotency_key),
         );
+        if let Some(existing) = store.existing_idempotent_event(&requested).await? {
+            log_control_route(
+                &command.scope.application_id.to_string(),
+                &command.scope.session_id,
+                &command.scope.run_id,
+                &selection.descriptor.provider_id,
+                selection.descriptor.provider_kind,
+                &command.trace.trace_id,
+                "deduplicated",
+            );
+            return Ok(ApplicationExecutionControlResult {
+                status: ApplicationExecutionCommandStatus::Duplicate,
+                scope: command.scope,
+                provider_id: Some(selection.descriptor.provider_id),
+                provider_kind: selection.descriptor.provider_kind,
+                event_cursor: existing.seq.map(|seq| format!("event/{seq}")),
+                error: None,
+            });
+        }
         let persisted = store.append_idempotent(requested).await?;
         log_control_route(
             &command.scope.application_id.to_string(),
@@ -470,13 +484,9 @@ async fn register_application_execution_service(
         )
         .await
         .map_err(runtime_error)?;
-    runtime
-        .start(&service_id, trace)
-        .await
-        .map_err(runtime_error)?;
+    runtime.start(&service_id, trace).await.map_err(runtime_error)?;
     Ok(service_id)
 }
-
 pub fn application_execution_service_descriptor_runtime() -> ServiceDescriptor {
     application_execution_service_descriptor()
 }
