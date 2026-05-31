@@ -129,8 +129,8 @@
 
 ## 12. Dependency, Governance, and Boundary Gates
 
-- [ ] 12.1 Add dependency-boundary tests proving kernel crates do not depend on concrete application execution providers.
-- [ ] 12.2 Add dependency-boundary tests proving SDK/SystemFacade does not construct runtime-host providers, Web state, CLI state, database backends, or app runtimes.
+- [x] 12.1 Add dependency-boundary tests proving kernel crates do not depend on concrete application execution providers.
+- [x] 12.2 Add dependency-boundary tests proving SDK/SystemFacade does not construct runtime-host providers, Web state, CLI state, database backends, or app runtimes.
 - [ ] 12.3 Add dependency-boundary tests proving Web/CLI/frontend do not own application execution semantics, provider lifecycle, approval/cancel semantics, or EventLog persistence.
 - [ ] 12.4 Add tests or static guards rejecting application-specific branches in generic service/runtime code, including branches on `codex-wasm-workbench`, Codex names, workflow names, model names, provider names, driver names, gateway names, and business-domain identifiers.
 - [ ] 12.5 Update `macaca/docs/macaca-os-serviceization-allowlist.md` only if this implementation adds, removes, or narrows a real dependency exception; do not update it cosmetically.
@@ -146,7 +146,7 @@
 - [ ] 13.5 Run integration tests for all three provider kinds.
 - [ ] 13.6 Run Web route tests for start, replay, current state, control, gateway ingress, and subscriber disconnect behavior.
 - [ ] 13.7 Run frontend tests for app-owned UI start/subscribe/replay/control rendering.
-- [ ] 13.8 Run dependency-boundary tests required by Route C governance.
+- [x] 13.8 Run dependency-boundary tests required by Route C governance.
 - [ ] 13.9 Run the real Workbench validation from Task 11 and record sanitized evidence.
 - [x] 13.10 Run `npx gitnexus detect-changes` where supported, or document the local GitNexus CLI limitation and use available GitNexus impact/context/status checks before commit.
 

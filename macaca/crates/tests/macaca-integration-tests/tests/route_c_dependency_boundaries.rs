@@ -15,6 +15,8 @@
 
 #[path = "route_c_dependency_boundaries/allowlist.rs"]
 mod allowlist;
+#[path = "route_c_dependency_boundaries/application_execution.rs"]
+mod application_execution;
 #[path = "route_c_dependency_boundaries/gate.rs"]
 mod gate;
 

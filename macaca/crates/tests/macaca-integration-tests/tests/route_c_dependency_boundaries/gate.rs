@@ -225,6 +225,29 @@ fn boundary_rules() -> Vec<BoundaryRule> {
             matches: |edge| edge.from == "macaca-kernel" && edge.to_layer == Layer::ServiceProvider,
         },
         BoundaryRule {
+            id: "application-execution-kernel-no-provider-deps",
+            rationale: "Application execution providers live behind service/runtime-host strategies; the kernel must not depend on those concrete provider implementations.",
+            replacement: "carry application execution through provider-neutral protocol DTOs, ServiceRuntime, and SystemFacade clients",
+            matches: |edge| edge.from == "macaca-kernel" && edge.to == "macaca-runtime-host",
+        },
+        BoundaryRule {
+            id: "application-execution-sdk-no-runtime-provider-construction",
+            rationale: "The SDK/SystemFacade may expose typed clients, but it must not construct runtime-host providers, shell state, persistence backends, or application runtimes.",
+            replacement: "return focused service clients or Null Object unavailable clients; keep provider factories in approved runtime-host composition roots",
+            matches: |edge| {
+                edge.from == "macaca-sdk"
+                    && matches!(edge.to, "macaca-runtime-host" | "macaca-web" | "macaca-cli" | "macaca-persist" | "macaca-app")
+            },
+        },
+        BoundaryRule {
+            id: "application-execution-shell-no-semantic-owner",
+            rationale: "CLI application execution support must remain a thin command adapter and must not become an owner for provider lifecycle, EventLog persistence, or application runtime semantics.",
+            replacement: "call macaca-sdk/SystemFacade application execution clients and render structured results",
+            matches: |edge| {
+                edge.from == "macaca-cli" && matches!(edge.to, "macaca-runtime-host" | "macaca-runtime" | "macaca-app")
+            },
+        },
+        BoundaryRule {
             id: "presentation-no-provider-construction-hub",
             rationale: "Presentation shells must adapt user input and render state, not construct provider graphs.",
             replacement: "route through macaca-sdk SystemFacade or service clients",
@@ -265,6 +288,9 @@ fn boundary_rules() -> Vec<BoundaryRule> {
         },
     ]
 }
+
+#[rustfmt::skip]
+pub(crate) fn boundary_rule_ids() -> Vec<&'static str> { boundary_rules().into_iter().map(|rule| rule.id).collect::<Vec<_>>() }
 
 fn run_cargo_metadata() -> Value {
     eprintln!(
