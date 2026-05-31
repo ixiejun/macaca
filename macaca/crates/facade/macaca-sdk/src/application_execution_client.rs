@@ -54,8 +54,7 @@ pub trait SystemApplicationExecutionClient: Send + Sync {
     async fn query_current_state(
         &self,
         trace: TraceContext,
-        session_id: String,
-        run_id: Option<String>,
+        scope: macaca_proto::ApplicationExecutionScope,
     ) -> MacacaResult<ApplicationExecutionCurrentState>;
     async fn provider_health(
         &self,
@@ -176,15 +175,8 @@ impl SystemApplicationExecutionClient for UnavailableSystemApplicationExecutionC
     async fn query_current_state(
         &self,
         trace: TraceContext,
-        session_id: String,
-        run_id: Option<String>,
+        scope: macaca_proto::ApplicationExecutionScope,
     ) -> MacacaResult<ApplicationExecutionCurrentState> {
-        let scope = macaca_proto::ApplicationExecutionScope::new(
-            macaca_proto::ApplicationId::new(),
-            session_id,
-            run_id.unwrap_or_else(|| "unavailable-run".into()),
-            "sdk-null-object",
-        )?;
         Ok(ApplicationExecutionCurrentState {
             scope,
             lifecycle_state: macaca_proto::ApplicationExecutionLifecycleState::Failed,
@@ -359,18 +351,18 @@ impl SystemApplicationExecutionClient for ServiceBackedApplicationExecutionClien
     async fn query_current_state(
         &self,
         trace: TraceContext,
-        session_id: String,
-        run_id: Option<String>,
+        scope: macaca_proto::ApplicationExecutionScope,
     ) -> MacacaResult<ApplicationExecutionCurrentState> {
-        let payload = serde_json::json!({
-            "session_id": session_id,
-            "run_id": run_id,
-        });
+        // `service.application_execution` owns current-state projection from
+        // persisted EventLog rows.  The SDK therefore forwards the full typed
+        // scope instead of inventing missing application/actor identifiers.
+        // This keeps the caller-visible Facade aligned with the runtime-host
+        // Command contract and prevents shell-specific reconstruction logic.
         call_service(
             &self.service,
             APPLICATION_EXECUTION_CURRENT_STATE_COMMAND,
             trace,
-            payload,
+            scope,
         )
         .await
     }

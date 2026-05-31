@@ -16,9 +16,12 @@ pub mod agent_context_service_provider;
 pub mod agent_execution_service_provider;
 pub(crate) mod app_protocol_service_commands;
 pub mod app_protocol_service_provider;
+mod application_execution_event_builder;
 mod application_execution_event_store;
+mod application_execution_gateway_events;
 mod application_execution_projection;
 mod application_execution_provider_registry;
+mod application_execution_service_logs;
 pub mod application_execution_service_provider;
 pub mod application_hosts;
 pub mod application_service_provider;
@@ -146,6 +149,10 @@ pub mod web3_service_provider;
 #[cfg(test)]
 mod app_protocol_service_provider_tests;
 #[cfg(test)]
+mod application_execution_event_store_tests;
+#[cfg(test)]
+mod application_execution_provider_registry_tests;
+#[cfg(test)]
 mod application_execution_service_provider_tests;
 #[cfg(test)]
 mod approval_service_provider_tests;
@@ -234,7 +241,8 @@ pub use application_execution_event_store::ApplicationExecutionEventStore;
 pub use application_execution_projection::project_application_execution_state;
 pub use application_execution_provider_registry::{
     ApplicationExecutionProvider, ApplicationExecutionProviderRegistry,
-    ApplicationExecutionProviderSelection, ApplicationExecutionProviderSelectionRecord,
+    ApplicationExecutionProviderSelection, ApplicationExecutionProviderSelectionCriteria,
+    ApplicationExecutionProviderSelectionPolicy, ApplicationExecutionProviderSelectionRecord,
 };
 pub use application_execution_service_provider::{
     application_execution_service_descriptor_runtime, application_execution_service_id,

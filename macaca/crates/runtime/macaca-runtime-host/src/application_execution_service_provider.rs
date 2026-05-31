@@ -20,11 +20,10 @@ use macaca_proto::{
     ApplicationExecutionControlResult, ApplicationExecutionEventEnvelope,
     ApplicationExecutionEventType, ApplicationExecutionPayload, ApplicationExecutionProviderKind,
     ApplicationExecutionReplayRequest, ApplicationExecutionReplayResult, ApplicationExecutionScope,
-    CleanupPolicy, MacacaError, ReportExecutionCompletionCommand, ReportExecutionFailureCommand,
-    ReportExecutionHeartbeatCommand, RequestExecutionApprovalCommand, ServiceCallResult,
-    ServiceCommand, ServiceDescriptor, ServiceError, ServiceHealth, ServiceResult,
-    StartApplicationExecutionCommand, StartApplicationExecutionResult, TraceContext,
-    APPLICATION_EXECUTION_CONTROL_COMMAND, APPLICATION_EXECUTION_CURRENT_STATE_COMMAND,
+    CleanupPolicy, MacacaError, ServiceCallResult, ServiceCommand, ServiceDescriptor, ServiceError,
+    ServiceHealth, ServiceResult, StartApplicationExecutionCommand,
+    StartApplicationExecutionResult, TraceContext, APPLICATION_EXECUTION_CONTROL_COMMAND,
+    APPLICATION_EXECUTION_CURRENT_STATE_COMMAND,
     APPLICATION_EXECUTION_GATEWAY_APPEND_EVENT_COMMAND,
     APPLICATION_EXECUTION_GATEWAY_APPROVAL_COMMAND,
     APPLICATION_EXECUTION_GATEWAY_COMPLETION_COMMAND,
@@ -33,10 +32,21 @@ use macaca_proto::{
     APPLICATION_EXECUTION_SERVICE_ID, APPLICATION_EXECUTION_SNAPSHOT_COMMAND,
     APPLICATION_EXECUTION_START_COMMAND,
 };
-use tracing::{info, warn};
+use tracing::info;
 
+use crate::application_execution_event_builder::build_event;
 use crate::application_execution_event_store::ApplicationExecutionEventStore;
-use crate::application_execution_provider_registry::ApplicationExecutionProviderRegistry;
+use crate::application_execution_gateway_events::{
+    append_gateway_approval_request, append_gateway_completion, append_gateway_failure,
+    append_gateway_heartbeat,
+};
+use crate::application_execution_provider_registry::{
+    ApplicationExecutionProviderRegistry, ApplicationExecutionProviderSelectionCriteria,
+};
+use crate::application_execution_service_logs::{
+    log_command_received, log_control_route, log_failure, log_gateway_ingress,
+    log_provider_assignment, log_service_lifecycle, log_snapshot,
+};
 
 /// Host-owned application execution service provider.
 pub struct ApplicationExecutionSystemServiceProvider {
@@ -117,10 +127,10 @@ impl ApplicationExecutionSystemServiceProvider {
         let store = self.event_store()?;
         let selection = self
             .provider_registry
-            .select(
-                command.provider_preference.as_ref(),
-                &command.requested_capabilities,
+            .select_with_criteria(
+                ApplicationExecutionProviderSelectionCriteria::from_start_command(&command),
             )
+            .await
             .map_err(|error| ServiceError::ServiceUnavailable(error.reason))?;
         let session_id = command
             .session_id
@@ -155,6 +165,14 @@ impl ApplicationExecutionSystemServiceProvider {
             format!("{}:provider-assigned", command.idempotency_key),
         );
         let persisted = store.append_idempotent(event).await?;
+        log_provider_assignment(
+            &scope.application_id.to_string(),
+            &scope.session_id,
+            &scope.run_id,
+            &selection.descriptor.provider_id,
+            selection.descriptor.provider_kind,
+            &command.trace.trace_id,
+        );
         let mut provider_command = command.clone();
         provider_command.session_id = Some(session_id.clone());
         provider_command.run_id = Some(run_id.clone());
@@ -177,6 +195,7 @@ impl ApplicationExecutionSystemServiceProvider {
         let selection = self
             .provider_registry
             .select(None, &[])
+            .await
             .map_err(|error| ServiceError::ServiceUnavailable(error.reason))?;
         let requested = build_event(
             &command.scope,
@@ -197,6 +216,15 @@ impl ApplicationExecutionSystemServiceProvider {
             format!("{}:control-requested", command.idempotency_key),
         );
         let persisted = store.append_idempotent(requested).await?;
+        log_control_route(
+            &command.scope.application_id.to_string(),
+            &command.scope.session_id,
+            &command.scope.run_id,
+            &selection.descriptor.provider_id,
+            selection.descriptor.provider_kind,
+            &command.trace.trace_id,
+            "requested",
+        );
         let mut result = selection.provider.control(command).await?;
         result.event_cursor = persisted.seq.map(|seq| format!("event/{seq}"));
         Ok(result)
@@ -207,7 +235,15 @@ impl ApplicationExecutionSystemServiceProvider {
         command: AppendExecutionEventCommand,
     ) -> ServiceResult<ApplicationExecutionEventEnvelope> {
         let store = self.event_store()?;
-        store.append_idempotent(command.event).await
+        log_gateway_ingress(
+            &command.event.application_id.to_string(),
+            &command.event.session_id,
+            &command.event.run_id,
+            APPLICATION_EXECUTION_GATEWAY_APPEND_EVENT_COMMAND,
+            &command.event.trace.trace_id,
+            "append_requested",
+        );
+        store.append_gateway_event(command).await
     }
 }
 
@@ -218,22 +254,28 @@ impl SystemService for ApplicationExecutionSystemServiceProvider {
     }
 
     async fn start(&self) -> ServiceResult<()> {
-        info!(
-            service_id = %self.descriptor.id,
-            configured = false,
-            "application execution service unavailable provider started"
+        log_service_lifecycle(
+            self.descriptor.id.as_str(),
+            None,
+            "started",
+            self.event_store.is_some(),
+            self.unavailable_reason.as_deref(),
         );
         Ok(())
     }
 
     async fn call(&self, command: ServiceCommand) -> ServiceResult<ServiceCallResult> {
         let trace = Self::trace(&command)?;
-        warn!(
-            service_id = %self.descriptor.id,
-            command = %command.name,
-            trace_id = %trace.trace_id,
-            reason = %self.reason(),
-            "application execution service returning structured unavailable"
+        log_command_received(
+            self.descriptor.id.as_str(),
+            command.name.as_str(),
+            &trace.trace_id,
+            if self.event_store.is_some() {
+                "configured"
+            } else {
+                "unavailable"
+            },
+            self.unavailable_reason.as_deref(),
         );
         match command.name.as_str() {
             APPLICATION_EXECUTION_START_COMMAND => {
@@ -295,76 +337,35 @@ impl SystemService for ApplicationExecutionSystemServiceProvider {
                     serde_json::from_value(command.payload).map_err(adapter_error)?;
                 Self::service_result(self.append_gateway_event(typed).await?, trace)
             }
-            APPLICATION_EXECUTION_GATEWAY_HEARTBEAT_COMMAND => {
-                let typed: ReportExecutionHeartbeatCommand =
-                    serde_json::from_value(command.payload).map_err(adapter_error)?;
-                let event = build_event(
-                    &typed.scope,
-                    ApplicationExecutionEventType::ProviderHeartbeat,
-                    &typed.provider_id,
-                    typed.provider_kind,
-                    typed.trace,
-                    ApplicationExecutionPayload::summary("provider heartbeat reported"),
-                    format!("heartbeat:{}", typed.reported_at.timestamp_millis()),
-                );
-                Self::service_result(self.event_store()?.append_idempotent(event).await?, trace)
-            }
-            APPLICATION_EXECUTION_GATEWAY_APPROVAL_COMMAND => {
-                let typed: RequestExecutionApprovalCommand =
-                    serde_json::from_value(command.payload).map_err(adapter_error)?;
-                let event = build_event(
-                    &typed.scope,
-                    ApplicationExecutionEventType::ApprovalRequested,
-                    "gateway",
-                    ApplicationExecutionProviderKind::ExternalAppBackend,
-                    typed.trace,
-                    ApplicationExecutionPayload {
-                        summary: typed.prompt.summary,
-                        data: Some(serde_json::json!({"approval_ref": typed.approval_ref})),
-                        payload_ref: typed.prompt.payload_ref,
-                        truncated: typed.prompt.truncated,
-                    },
-                    typed.idempotency_key,
-                );
-                Self::service_result(self.event_store()?.append_idempotent(event).await?, trace)
-            }
-            APPLICATION_EXECUTION_GATEWAY_COMPLETION_COMMAND => {
-                let typed: ReportExecutionCompletionCommand =
-                    serde_json::from_value(command.payload).map_err(adapter_error)?;
-                let event = build_event(
-                    &typed.scope,
-                    ApplicationExecutionEventType::ExecutionCompleted,
-                    "gateway",
-                    ApplicationExecutionProviderKind::ExternalAppBackend,
-                    typed.trace,
-                    typed.result,
-                    typed.idempotency_key,
-                );
-                Self::service_result(self.event_store()?.append_idempotent(event).await?, trace)
-            }
-            APPLICATION_EXECUTION_GATEWAY_FAILURE_COMMAND => {
-                let typed: ReportExecutionFailureCommand =
-                    serde_json::from_value(command.payload).map_err(adapter_error)?;
-                let event = build_event(
-                    &typed.scope,
-                    ApplicationExecutionEventType::ExecutionFailed,
-                    "gateway",
-                    ApplicationExecutionProviderKind::ExternalAppBackend,
-                    typed.trace,
-                    ApplicationExecutionPayload {
-                        summary: typed.error.reason.clone(),
-                        data: Some(serde_json::to_value(typed.error).map_err(adapter_error)?),
-                        payload_ref: None,
-                        truncated: false,
-                    },
-                    typed.idempotency_key,
-                );
-                Self::service_result(self.event_store()?.append_idempotent(event).await?, trace)
-            }
+            APPLICATION_EXECUTION_GATEWAY_HEARTBEAT_COMMAND => Self::service_result(
+                append_gateway_heartbeat(self.event_store()?, command.payload).await?,
+                trace,
+            ),
+            APPLICATION_EXECUTION_GATEWAY_APPROVAL_COMMAND => Self::service_result(
+                append_gateway_approval_request(self.event_store()?, command.payload).await?,
+                trace,
+            ),
+            APPLICATION_EXECUTION_GATEWAY_COMPLETION_COMMAND => Self::service_result(
+                append_gateway_completion(self.event_store()?, command.payload).await?,
+                trace,
+            ),
+            APPLICATION_EXECUTION_GATEWAY_FAILURE_COMMAND => Self::service_result(
+                append_gateway_failure(self.event_store()?, command.payload).await?,
+                trace,
+            ),
             APPLICATION_EXECUTION_SNAPSHOT_COMMAND => {
+                log_snapshot(
+                    APPLICATION_EXECUTION_SNAPSHOT_COMMAND,
+                    &trace.trace_id,
+                    "unavailable",
+                    Some(&self.reason()),
+                );
                 Err(ServiceError::ServiceUnavailable(self.reason()))
             }
-            other => Err(ServiceError::UnsupportedCommand(other.into())),
+            other => {
+                log_failure(other, &trace.trace_id, "unsupported_command");
+                Err(ServiceError::UnsupportedCommand(other.into()))
+            }
         }
     }
 
@@ -389,35 +390,6 @@ impl SystemService for ApplicationExecutionSystemServiceProvider {
     }
 }
 
-fn build_event(
-    scope: &ApplicationExecutionScope,
-    event_type: ApplicationExecutionEventType,
-    provider_id: &str,
-    provider_kind: ApplicationExecutionProviderKind,
-    trace: TraceContext,
-    payload: ApplicationExecutionPayload,
-    idempotency_key: String,
-) -> ApplicationExecutionEventEnvelope {
-    ApplicationExecutionEventEnvelope {
-        application_id: scope.application_id,
-        session_id: scope.session_id.clone(),
-        run_id: scope.run_id.clone(),
-        seq: None,
-        timestamp: chrono::Utc::now(),
-        event_type,
-        trace,
-        actor: scope.actor.clone(),
-        provider_id: provider_id.into(),
-        provider_kind,
-        visibility: "session".into(),
-        causality: Vec::new(),
-        sanitized_payload: payload,
-        payload_ref: None,
-        schema_version: "application-execution.v1".into(),
-        idempotency_key,
-    }
-}
-
 fn adapter_error(error: serde_json::Error) -> ServiceError {
     ServiceError::AdapterFailure(error.to_string())
 }
@@ -435,7 +407,7 @@ pub async fn bootstrap_unavailable_application_execution_service(
         Arc::new(ApplicationExecutionSystemServiceProvider::unavailable(
             "application execution provider stack is not configured",
         ));
-    register_application_execution_service(runtime, service, trace_id).await
+    register_application_execution_service(runtime, service, trace_id, false).await
 }
 
 /// Register and start the EventLog-backed application execution service.
@@ -448,18 +420,25 @@ pub async fn bootstrap_application_execution_service(
     let service: Arc<dyn SystemService> = Arc::new(
         ApplicationExecutionSystemServiceProvider::with_event_log(event_log, provider_registry),
     );
-    register_application_execution_service(runtime, service, trace_id).await
+    register_application_execution_service(runtime, service, trace_id, true).await
 }
 
 async fn register_application_execution_service(
     runtime: Arc<crate::ServiceRuntime>,
     service: Arc<dyn SystemService>,
     trace_id: impl Into<String>,
+    configured: bool,
 ) -> macaca_proto::MacacaResult<macaca_proto::KernelServiceId> {
     let descriptor = service.descriptor();
     let service_id = descriptor.id.clone();
     let trace = TraceContext::new(trace_id);
-    info!(service_id = %service_id, trace_id = %trace.trace_id, "application execution service registering unavailable provider");
+    log_service_lifecycle(
+        service_id.as_str(),
+        Some(&trace.trace_id),
+        "registering",
+        configured,
+        None,
+    );
     runtime
         .register_provider(
             &crate::StaticServiceProviderFactory::new(crate::ServiceProviderInstance::new(
@@ -476,12 +455,10 @@ async fn register_application_execution_service(
     Ok(service_id)
 }
 
-/// Return the service descriptor for tests and runtime catalog code.
 pub fn application_execution_service_descriptor_runtime() -> ServiceDescriptor {
     application_execution_service_descriptor()
 }
 
-/// Return the stable service id for runtime-host code that avoids proto imports.
 pub fn application_execution_service_id() -> &'static str {
     APPLICATION_EXECUTION_SERVICE_ID
 }

@@ -19,9 +19,10 @@ use macaca_proto::{
 use tempfile::tempdir;
 
 use crate::{
-    bootstrap_unavailable_application_execution_service, ApplicationExecutionProvider,
-    ApplicationExecutionProviderRegistry, ApplicationExecutionSystemServiceProvider,
-    ServiceRuntime, ServiceRuntimeConfig,
+    bootstrap_application_execution_service, bootstrap_unavailable_application_execution_service,
+    ApplicationExecutionProvider, ApplicationExecutionProviderRegistry,
+    ApplicationExecutionSystemServiceProvider, DenyAllServiceRuntimePolicy, ServiceRuntime,
+    ServiceRuntimeConfig, ServiceRuntimeError,
 };
 
 #[tokio::test]
@@ -99,6 +100,109 @@ async fn service_runtime_registers_unavailable_provider() {
         serde_json::from_value(reply.output.expect("service reply should include output")).unwrap();
 
     assert_eq!(typed.status, ApplicationExecutionCommandStatus::Unavailable);
+}
+
+#[tokio::test]
+async fn service_runtime_rejects_missing_trace_before_application_execution_dispatch() {
+    let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
+    let service_id =
+        bootstrap_unavailable_application_execution_service(runtime.clone(), "trace-register")
+            .await
+            .unwrap();
+
+    let err = runtime
+        .call(
+            &service_id,
+            ServiceBusSource::new("application-execution-test"),
+            ServiceCommand::without_trace(
+                ServiceCommandName::new(APPLICATION_EXECUTION_START_COMMAND),
+                serde_json::json!({}),
+            ),
+        )
+        .await
+        .unwrap_err();
+
+    assert_eq!(err, ServiceRuntimeError::MissingTraceContext);
+}
+
+#[tokio::test]
+async fn service_runtime_policy_denial_stops_application_execution_side_effects() {
+    let (_dir, event_log) = event_log();
+    let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig {
+        policy: Arc::new(DenyAllServiceRuntimePolicy::new(
+            "application execution blocked by test policy",
+        )),
+        ..Default::default()
+    }));
+    let registry = ApplicationExecutionProviderRegistry::new()
+        .register(Arc::new(FakeApplicationExecutionProvider::new(
+            "provider-policy-test",
+            ApplicationExecutionProviderKind::MacacaHosted,
+        )))
+        .unwrap();
+    let service_id = bootstrap_application_execution_service(
+        runtime.clone(),
+        event_log.clone(),
+        registry,
+        "trace-policy-bootstrap",
+    )
+    .await
+    .unwrap();
+    let trace = TraceContext::new("trace-application-execution-policy");
+    let command = StartApplicationExecutionCommand {
+        application_id: ApplicationId::from_name("application-execution-policy-test"),
+        session_id: Some("session-policy".into()),
+        run_id: Some("run-policy".into()),
+        task_input: ApplicationExecutionPayload::summary("test"),
+        workspace_ref: None,
+        requested_capabilities: Vec::new(),
+        provider_preference: None,
+        trace: trace.clone(),
+        policy_context: Default::default(),
+        tenant_id: None,
+        actor: "runtime-test".into(),
+        idempotency_key: "start-policy-1".into(),
+    };
+
+    let err = runtime
+        .call(
+            &service_id,
+            ServiceBusSource::new("application-execution-test"),
+            ServiceCommand::with_trace(
+                ServiceCommandName::new(APPLICATION_EXECUTION_START_COMMAND),
+                serde_json::to_value(command).unwrap(),
+                trace,
+            ),
+        )
+        .await
+        .unwrap_err();
+
+    assert_eq!(
+        err,
+        ServiceRuntimeError::PolicyDenied("application execution blocked by test policy".into())
+    );
+    assert_eq!(
+        event_log.latest_seq("session-policy").await,
+        0,
+        "policy denial must happen before provider assignment or EventLog append"
+    );
+}
+
+#[tokio::test]
+async fn unknown_application_execution_command_returns_structured_unsupported() {
+    let provider = ApplicationExecutionSystemServiceProvider::unavailable("disabled for test");
+    let err = provider
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new("application_execution.unknown"),
+            serde_json::json!({}),
+            TraceContext::new("trace-application-execution-unknown"),
+        ))
+        .await
+        .unwrap_err();
+
+    assert!(
+        matches!(err, ServiceError::UnsupportedCommand(command) if command == "application_execution.unknown")
+    );
 }
 
 #[tokio::test]

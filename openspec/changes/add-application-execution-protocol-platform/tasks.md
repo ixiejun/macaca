@@ -29,7 +29,7 @@
 - [x] 2.1 Add an application execution focused client under `macaca/crates/facade/macaca-sdk/src/`, following existing workbench/service client patterns and without constructing runtime providers.
 - [x] 2.2 Implement typed methods: `start_execution`, `send_control`, `append_gateway_event` only for authorized gateway contexts, `query_current_state`, `replay_events`, `provider_health`, and `snapshot`.
 - [x] 2.3 Add a Null Object/unavailable client that returns structured unavailable for every method and records sanitized trace context when supplied.
-- [ ] 2.4 Expose the client through the appropriate SDK/SystemFacade assembly path so shells can obtain it without importing runtime-host internals.
+- [x] 2.4 Expose the client through the appropriate SDK/SystemFacade assembly path so shells can obtain it without importing runtime-host internals.
 - [x] 2.5 Add SDK tests proving missing service returns unavailable, command DTOs preserve trace/session/application scope, and the SDK does not branch on provider kind except to carry typed hints.
 
 ## 3. Service Runtime Boundary
@@ -38,28 +38,28 @@
 - [x] 3.2 Add an unavailable `SystemService` implementation for `service.application_execution` in runtime-host that returns structured unavailable for every command.
 - [x] 3.3 Register the unavailable provider in the runtime-host composition root first, then add a bootstrap option for enabling the built-in provider stack.
 - [x] 3.4 Add service descriptor tests proving the service id, command surface, health, lifecycle, and snapshot are deterministic.
-- [ ] 3.5 Add ServiceRuntime call tests proving missing trace is rejected before dispatch, policy denial stops side effects, and unknown commands return structured unsupported.
-- [ ] 3.6 Add structured logs at service registration, start, command receive, policy reject, provider assignment, event append, control route, gateway ingress, snapshot, and failure nodes.
-- [ ] 3.7 Ensure all logs use bounded sanitized fields only and include application id, session id, run id, provider id/kind, command name, trace id, status, and reason code when available.
+- [x] 3.5 Add ServiceRuntime call tests proving missing trace is rejected before dispatch, policy denial stops side effects, and unknown commands return structured unsupported.
+- [x] 3.6 Add structured logs at service registration, start, command receive, policy reject, provider assignment, event append, control route, gateway ingress, snapshot, and failure nodes.
+- [x] 3.7 Ensure all logs use bounded sanitized fields only and include application id, session id, run id, provider id/kind, command name, trace id, status, and reason code when available.
 
 ## 4. EventLog Persistence and Replay
 
 - [x] 4.1 Identify the existing session/EventLog append and replay APIs used by chat, GenUI, trace, and session recovery; reuse them instead of adding a parallel event store.
 - [x] 4.2 Add an `ApplicationExecutionEventStore` adapter owned by runtime-host or persistence service boundary that persists `ApplicationExecutionEventEnvelope` values into the existing durable event mechanism.
 - [x] 4.3 Implement idempotent append by `(application_id, session_id, run_id, idempotency_key)` and stable sequence assignment.
-- [ ] 4.4 Implement schema validation before append; reject invalid event type, missing trace/session/run, stale lease, unsupported schema version, and oversized inline payloads.
-- [ ] 4.5 Implement payload sanitization before append; use bounded summaries, hashes, redacted fields, or `payload_ref` for sensitive/large content.
+- [x] 4.4 Implement schema validation before append; reject invalid event type, missing trace/session/run, stale lease, unsupported schema version, and oversized inline payloads.
+- [x] 4.5 Implement payload sanitization before append; use bounded summaries, hashes, redacted fields, or `payload_ref` for sensitive/large content.
 - [x] 4.6 Implement replay by session/run with from-start, from-cursor, page size, visibility filter, and event type filter.
 - [x] 4.7 Implement current-state projection as a deterministic reducer over replayed events; include pending approvals, active controls, provider heartbeat, latest checkpoint, and terminal outcome.
-- [ ] 4.8 Add tests proving duplicate appends return original event/cursor, replay ordering is deterministic, projection is stable after refresh, and unsafe payloads are rejected or redacted.
+- [x] 4.8 Add tests proving duplicate appends return original event/cursor, replay ordering is deterministic, projection is stable after refresh, and unsafe payloads are rejected or redacted.
 
 ## 5. Provider Strategy Registry
 
-- [ ] 5.1 Define the `ApplicationExecutionProvider` trait in runtime-host or an approved application execution provider module with `describe`, `start`, `control`, `health`, `snapshot`, `resume`, and `shutdown`.
-- [ ] 5.2 Implement an `ApplicationExecutionProviderRegistry` that registers providers by descriptor and selects providers by manifest execution profile, provider preference, capability availability, policy, tenant constraints, and health.
+- [x] 5.1 Define the `ApplicationExecutionProvider` trait in runtime-host or an approved application execution provider module with `describe`, `start`, `control`, `health`, `snapshot`, `resume`, and `shutdown`.
+- [x] 5.2 Implement an `ApplicationExecutionProviderRegistry` that registers providers by descriptor and selects providers by manifest execution profile, provider preference, capability availability, policy, tenant constraints, and health.
 - [x] 5.3 Implement a provider selection result that records all considered providers, rejection reasons, selected provider id/kind, trace id, and policy status without leaking secrets.
 - [x] 5.4 Add admission validation for provider descriptor version, supported commands, supported events, heartbeat policy, checkpoint support, capability declarations, resource profile, and transport kind.
-- [ ] 5.5 Add tests proving selection never branches on application id, workflow name, model name, driver name, gateway name, or business domain.
+- [x] 5.5 Add tests proving selection never branches on application id, workflow name, model name, driver name, gateway name, or business domain.
 - [x] 5.6 Add structured unavailable provider behavior when no provider is registered, no provider supports the required capability, policy denies all providers, or a selected provider is unhealthy.
 
 ## 6. `macaca_hosted` Provider
@@ -148,7 +148,7 @@
 - [ ] 13.7 Run frontend tests for app-owned UI start/subscribe/replay/control rendering.
 - [ ] 13.8 Run dependency-boundary tests required by Route C governance.
 - [ ] 13.9 Run the real Workbench validation from Task 11 and record sanitized evidence.
-- [ ] 13.10 Run `npx gitnexus detect-changes` where supported, or document the local GitNexus CLI limitation and use available GitNexus impact/context/status checks before commit.
+- [x] 13.10 Run `npx gitnexus detect-changes` where supported, or document the local GitNexus CLI limitation and use available GitNexus impact/context/status checks before commit.
 
 ## 14. Completion
 

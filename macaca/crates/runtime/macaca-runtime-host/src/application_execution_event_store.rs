@@ -6,26 +6,36 @@
 //! row, assigns the final sequence, and reconstructs replay/current-state views
 //! from the persisted rows.
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use chrono::Utc;
 use macaca_persist::{AppendEventCommand, EventLog};
 use macaca_proto::{
-    ApplicationExecutionCurrentState, ApplicationExecutionEventEnvelope,
-    ApplicationExecutionReplayRequest, ApplicationExecutionReplayResult, ApplicationExecutionScope,
-    ServiceError,
+    AppendExecutionEventCommand, ApplicationExecutionCurrentState,
+    ApplicationExecutionEventEnvelope, ApplicationExecutionEventType, ApplicationExecutionPayload,
+    ApplicationExecutionProviderLease, ApplicationExecutionReplayRequest,
+    ApplicationExecutionReplayResult, ApplicationExecutionScope, ServiceError,
 };
 use tracing::{info, warn};
 
 use crate::application_execution_projection::project_application_execution_state;
+use crate::application_execution_service_logs::log_event_append;
 
 const EVENT_SOURCE: &str = "service.application_execution";
 const MAX_INLINE_PAYLOAD_BYTES: usize = 32 * 1024;
+const SUPPORTED_SCHEMA_VERSION: &str = "application-execution.v1";
+const MAX_SUMMARY_CHARS: usize = 512;
+const MAX_SANITIZED_JSON_DEPTH: usize = 12;
+const MAX_SANITIZED_ARRAY_ITEMS: usize = 64;
+const REDACTED_VALUE: &str = "[redacted]";
 
 /// EventLog-backed repository for application execution facts.
 #[derive(Clone)]
 pub struct ApplicationExecutionEventStore {
     event_log: Arc<EventLog>,
     max_inline_payload_bytes: usize,
+    leases: BTreeMap<String, ApplicationExecutionProviderLease>,
 }
 
 impl ApplicationExecutionEventStore {
@@ -38,7 +48,114 @@ impl ApplicationExecutionEventStore {
         Self {
             event_log,
             max_inline_payload_bytes: MAX_INLINE_PAYLOAD_BYTES,
+            leases: BTreeMap::new(),
         }
+    }
+
+    /// Add one scoped provider lease to the validation book.
+    ///
+    /// This Builder-style helper is intentionally lightweight because the
+    /// durable lease registry belongs to later external-backend and remote-agent
+    /// provider work.  The EventLog adapter still validates against the lease
+    /// data it is given so tests and future composition roots can exercise the
+    /// same Specification before any append side effect.
+    pub fn with_lease(mut self, lease: ApplicationExecutionProviderLease) -> Self {
+        self.leases.insert(lease.lease_id.clone(), lease);
+        self
+    }
+
+    /// Validate gateway identity/lease data, then append the enclosed event.
+    ///
+    /// `AppendExecutionEventCommand` is the only gateway command that already
+    /// carries a complete event envelope, so this method is the natural Adapter
+    /// boundary for stale-lease and callback-binding checks.  Other gateway
+    /// commands are converted into envelopes by service helpers before they
+    /// reach `append_idempotent`.
+    pub async fn append_gateway_event(
+        &self,
+        command: AppendExecutionEventCommand,
+    ) -> Result<ApplicationExecutionEventEnvelope, ServiceError> {
+        self.validate_gateway_ingress(
+            command.lease_id.as_deref(),
+            &command.callback_identity_ref,
+            Some(&ApplicationExecutionScope {
+                application_id: command.event.application_id,
+                session_id: command.event.session_id.clone(),
+                run_id: command.event.run_id.clone(),
+                tenant_id: None,
+                actor: command.event.actor.clone(),
+            }),
+            Some(&command.event.provider_id),
+            command.event.event_type,
+        )?;
+        self.append_idempotent(command.event).await
+    }
+
+    /// Validate gateway lease and callback binding before helper-built events append.
+    ///
+    /// This is a reusable Specification for gateway DTOs that do not carry a
+    /// full event envelope yet.  It accepts only protocol metadata and returns a
+    /// `ServiceError` before the caller constructs or appends any durable event.
+    pub(crate) fn validate_gateway_ingress(
+        &self,
+        lease_id: Option<&str>,
+        callback_identity_ref: &str,
+        scope: Option<&ApplicationExecutionScope>,
+        provider_id: Option<&str>,
+        event_type: ApplicationExecutionEventType,
+    ) -> Result<(), ServiceError> {
+        if callback_identity_ref.trim().is_empty() {
+            return Err(ServiceError::InvalidArgument(
+                "application execution callback identity is required".into(),
+            ));
+        }
+        let Some(lease_id) = lease_id else {
+            return Ok(());
+        };
+        let Some(lease) = self.leases.get(lease_id) else {
+            return Err(ServiceError::InvalidArgument(
+                "application execution stale lease: lease is not registered".into(),
+            ));
+        };
+        let now = Utc::now();
+        if lease.expires_at <= now || lease.heartbeat_deadline <= now {
+            return Err(ServiceError::InvalidArgument(
+                "application execution stale lease: lease or heartbeat deadline expired".into(),
+            ));
+        }
+        if lease.callback_identity_ref != callback_identity_ref {
+            return Err(ServiceError::InvalidArgument(
+                "application execution callback identity does not match lease".into(),
+            ));
+        }
+        if let Some(provider_id) = provider_id {
+            if lease.provider_id != provider_id {
+                return Err(ServiceError::InvalidArgument(
+                    "application execution provider binding does not match lease".into(),
+                ));
+            }
+        }
+        if let Some(scope) = scope {
+            if lease.scope.application_id != scope.application_id
+                || lease.scope.session_id != scope.session_id
+                || lease.scope.run_id != scope.run_id
+            {
+                return Err(ServiceError::InvalidArgument(
+                    "application execution session/run binding does not match lease".into(),
+                ));
+            }
+        }
+        if !lease.allowed_event_types.is_empty()
+            && !lease
+                .allowed_event_types
+                .iter()
+                .any(|allowed| allowed == &event_type)
+        {
+            return Err(ServiceError::InvalidArgument(
+                "application execution event type is not allowed by lease".into(),
+            ));
+        }
+        Ok(())
     }
 
     /// Append one protocol event idempotently and return the persisted envelope.
@@ -51,6 +168,8 @@ impl ApplicationExecutionEventStore {
         &self,
         mut event: ApplicationExecutionEventEnvelope,
     ) -> Result<ApplicationExecutionEventEnvelope, ServiceError> {
+        self.validate_event(&event)?;
+        self.sanitize_event(&mut event)?;
         self.validate_event(&event)?;
         if let Some(existing) = self.find_duplicate(&event).await {
             info!(
@@ -77,13 +196,15 @@ impl ApplicationExecutionEventStore {
         // treats EventLog.seq as authoritative even if the stored envelope had
         // `seq = None`.  Returning the assigned value here gives callers the
         // immediate cursor they need for replay/control references.
-        info!(
-            application_id = %event.application_id,
-            session_id = %event.session_id,
-            run_id = %event.run_id,
+        log_event_append(
+            &event.application_id.to_string(),
+            &event.session_id,
+            &event.run_id,
+            &event.provider_id,
+            event.provider_kind,
+            &format!("{:?}", event.event_type),
+            &event.trace.trace_id,
             seq,
-            trace_id = %event.trace.trace_id,
-            "application execution event appended to EventLog"
         );
         Ok(event)
     }
@@ -176,6 +297,15 @@ impl ApplicationExecutionEventStore {
         &self,
         event: &ApplicationExecutionEventEnvelope,
     ) -> Result<(), ServiceError> {
+        if event.trace.trace_id.trim().is_empty() {
+            return Err(ServiceError::MissingTraceContext);
+        }
+        if event.schema_version != SUPPORTED_SCHEMA_VERSION {
+            return Err(ServiceError::InvalidArgument(format!(
+                "unsupported application execution event schema version '{}'",
+                event.schema_version
+            )));
+        }
         if event.session_id.trim().is_empty()
             || event.run_id.trim().is_empty()
             || event.actor.trim().is_empty()
@@ -195,6 +325,18 @@ impl ApplicationExecutionEventStore {
                 "application execution event payload exceeds inline limit without payload_ref"
                     .into(),
             ));
+        }
+        Ok(())
+    }
+
+    fn sanitize_event(
+        &self,
+        event: &mut ApplicationExecutionEventEnvelope,
+    ) -> Result<(), ServiceError> {
+        sanitize_payload(&mut event.sanitized_payload)?;
+        if let Some(payload_ref) = event.payload_ref.as_mut() {
+            payload_ref.redaction_profile =
+                normalize_redaction_profile(&payload_ref.redaction_profile);
         }
         Ok(())
     }
@@ -251,4 +393,89 @@ fn cursor(seq: u64) -> String {
 
 fn adapter_error(error: serde_json::Error) -> ServiceError {
     ServiceError::AdapterFailure(error.to_string())
+}
+
+/// Sanitize one bounded payload before it enters EventLog, trace, or realtime.
+///
+/// This is deliberately generic.  It never understands application domains or
+/// provider payload formats; it only enforces OS-wide observability rules such
+/// as bounded summaries and secret-like field redaction.
+fn sanitize_payload(payload: &mut ApplicationExecutionPayload) -> Result<(), ServiceError> {
+    let (summary, summary_truncated) = truncate_chars(&payload.summary, MAX_SUMMARY_CHARS);
+    payload.summary = summary;
+    payload.truncated = payload.truncated || summary_truncated;
+    if let Some(data) = payload.data.as_mut() {
+        sanitize_json_value(data, 0)?;
+    }
+    Ok(())
+}
+
+/// Recursively sanitize structured JSON while preserving useful diagnostics.
+///
+/// The function uses conservative shape limits because EventLog rows are replay
+/// and audit material, not a raw provider payload warehouse.  Oversized strings
+/// and arrays are summarized; sensitive keys are replaced in place.
+fn sanitize_json_value(value: &mut serde_json::Value, depth: usize) -> Result<(), ServiceError> {
+    if depth > MAX_SANITIZED_JSON_DEPTH {
+        *value = serde_json::Value::String("[truncated:depth]".into());
+        return Ok(());
+    }
+    match value {
+        serde_json::Value::Object(map) => {
+            for (key, child) in map.iter_mut() {
+                if is_sensitive_key(key) {
+                    *child = serde_json::Value::String(REDACTED_VALUE.into());
+                } else {
+                    sanitize_json_value(child, depth + 1)?;
+                }
+            }
+        }
+        serde_json::Value::Array(values) => {
+            if values.len() > MAX_SANITIZED_ARRAY_ITEMS {
+                values.truncate(MAX_SANITIZED_ARRAY_ITEMS);
+                values.push(serde_json::Value::String("[truncated:array]".into()));
+            }
+            for child in values {
+                sanitize_json_value(child, depth + 1)?;
+            }
+        }
+        serde_json::Value::String(text) if text.chars().count() > MAX_SUMMARY_CHARS => {
+            let (truncated, _) = truncate_chars(text, MAX_SUMMARY_CHARS);
+            *text = truncated;
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+/// Return whether a JSON object key is unsafe for inline observability.
+fn is_sensitive_key(key: &str) -> bool {
+    let key = key.to_ascii_lowercase();
+    key.contains("secret")
+        || key.contains("token")
+        || key.contains("password")
+        || key.contains("credential")
+        || key.contains("signature")
+        || key.contains("private_key")
+        || key == "prompt"
+        || key.ends_with("_prompt")
+}
+
+/// Truncate by Unicode scalar count so logs stay bounded without byte slicing.
+fn truncate_chars(input: &str, limit: usize) -> (String, bool) {
+    if input.chars().count() <= limit {
+        return (input.to_string(), false);
+    }
+    let mut output: String = input.chars().take(limit).collect();
+    output.push_str("...[truncated]");
+    (output, true)
+}
+
+/// Normalize payload-ref redaction metadata to a bounded, non-empty label.
+fn normalize_redaction_profile(profile: &str) -> String {
+    if profile.trim().is_empty() {
+        "application-execution-default".into()
+    } else {
+        profile.trim().chars().take(128).collect()
+    }
 }

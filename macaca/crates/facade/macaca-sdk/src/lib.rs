@@ -9,6 +9,7 @@ pub mod app_protocol_client;
 pub mod application;
 pub mod application_client;
 pub mod application_execution_client;
+pub mod application_execution_facade;
 pub mod application_kit;
 pub mod application_testkit;
 pub mod autonomy_evolution_client;
@@ -69,6 +70,7 @@ pub use application_execution_client::{
     ServiceBackedApplicationExecutionClient, SystemApplicationExecutionClient,
     UnavailableSystemApplicationExecutionClient,
 };
+pub use application_execution_facade::SystemApplicationExecutionFacadeExt;
 pub use application_kit::{
     generate_wasm_guest_bindings, ApplicationKit, ApplicationManifestBuilder,
     RustWasmBindgenBackend, WasmBindgenBackend, WasmBindgenDiagnostic, WasmBindgenInput,

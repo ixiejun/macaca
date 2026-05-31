@@ -156,6 +156,8 @@ impl ServiceRuntimeDecorator for PolicyRuntimeDecorator {
                     service_id = %context.service_id,
                     source = %context.source,
                     command = %context.command.name,
+                    trace_id = context.command.trace.as_ref().map(|trace| trace.trace_id.as_str()),
+                    status = "allowed",
                     "service runtime policy allowed call"
                 );
                 Ok(())
@@ -165,6 +167,8 @@ impl ServiceRuntimeDecorator for PolicyRuntimeDecorator {
                     service_id = %context.service_id,
                     source = %context.source,
                     command = %context.command.name,
+                    trace_id = context.command.trace.as_ref().map(|trace| trace.trace_id.as_str()),
+                    status = "denied",
                     reason = %reason,
                     "service runtime policy denied call"
                 );
