@@ -8,12 +8,14 @@
 
 use macaca_proto::{
     ApplicationExecutionEventEnvelope, ApplicationExecutionEventType, ApplicationExecutionPayload,
-    ApplicationExecutionProviderKind, ReportExecutionCompletionCommand,
-    ReportExecutionFailureCommand, ReportExecutionHeartbeatCommand,
+    ApplicationExecutionProviderKind, ApplicationExecutionSnapshot,
+    ReportExecutionCompletionCommand, ReportExecutionFailureCommand,
+    ReportExecutionHeartbeatCommand, ReportExecutionSnapshotCommand,
     RequestExecutionApprovalCommand, ServiceError, ServiceResult,
     APPLICATION_EXECUTION_GATEWAY_APPROVAL_COMMAND,
     APPLICATION_EXECUTION_GATEWAY_COMPLETION_COMMAND,
     APPLICATION_EXECUTION_GATEWAY_FAILURE_COMMAND, APPLICATION_EXECUTION_GATEWAY_HEARTBEAT_COMMAND,
+    APPLICATION_EXECUTION_GATEWAY_SNAPSHOT_COMMAND,
 };
 
 use crate::application_execution_event_builder::build_event;
@@ -56,6 +58,65 @@ pub(crate) async fn append_gateway_heartbeat(
         "heartbeat_reported",
     );
     store.append_idempotent(event).await
+}
+
+/// Decode, validate, persist, and return one bounded provider snapshot callback.
+///
+/// Snapshots are Memento-style diagnostics from an external backend or remote
+/// agent.  The gateway stores a durable `ProviderSnapshot` event before the
+/// snapshot is returned so replay and current-state projection remain the
+/// authoritative recovery path.  The snapshot payload is intentionally reduced
+/// to bounded metadata and cursors; raw provider memory, prompts, package bytes,
+/// and implementation-specific state must stay outside this DTO.
+pub(crate) async fn append_gateway_snapshot(
+    store: &ApplicationExecutionEventStore,
+    payload: serde_json::Value,
+) -> ServiceResult<ApplicationExecutionSnapshot> {
+    let typed: ReportExecutionSnapshotCommand =
+        serde_json::from_value(payload).map_err(adapter_error)?;
+    let snapshot = typed.snapshot;
+    let scope = snapshot.scope.clone();
+    let provider_id = snapshot
+        .provider_id
+        .clone()
+        .unwrap_or_else(|| "gateway".into());
+    let event_trace = typed.trace;
+    store.validate_gateway_ingress(
+        typed.lease_id.as_deref(),
+        &typed.callback_identity_ref,
+        Some(&scope),
+        snapshot.provider_id.as_deref(),
+        ApplicationExecutionEventType::ProviderSnapshot,
+    )?;
+    let event = build_event(
+        &scope,
+        ApplicationExecutionEventType::ProviderSnapshot,
+        &provider_id,
+        snapshot.provider_kind,
+        event_trace.clone(),
+        ApplicationExecutionPayload {
+            summary: "provider snapshot reported".into(),
+            data: Some(serde_json::json!({
+                "lifecycle_state": format!("{:?}", snapshot.lifecycle_state),
+                "latest_event_cursor": snapshot.latest_event_cursor.clone(),
+                "latest_checkpoint_ref": snapshot.latest_checkpoint_ref.clone(),
+                "metadata": snapshot.metadata.clone(),
+            })),
+            payload_ref: None,
+            truncated: false,
+        },
+        format!("snapshot:{}", event_trace.trace_id),
+    );
+    log_gateway_ingress(
+        &scope.application_id.to_string(),
+        &scope.session_id,
+        &scope.run_id,
+        APPLICATION_EXECUTION_GATEWAY_SNAPSHOT_COMMAND,
+        &event_trace.trace_id,
+        "snapshot_reported",
+    );
+    store.append_idempotent(event).await?;
+    Ok(snapshot)
 }
 
 /// Decode and append one provider approval-request callback.

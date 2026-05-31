@@ -1,12 +1,7 @@
 //! Runtime-host provider for `service.application_execution`.
 //!
-//! This module is the first host-owned Adapter for the application execution
-//! protocol platform.  It intentionally starts as a Null Object provider: the
-//! service descriptor, lifecycle, trace-required calls, logging, and structured
-//! unavailable results exist before concrete hosted/external/remote execution
-//! strategies are enabled.  Later provider strategies plug in behind this
-//! service boundary without moving application behavior into Web, CLI, SDK, or
-//! the kernel.
+//! This host-owned Adapter exposes descriptor, lifecycle, gateway ingress, and
+//! logs while keeping provider strategies behind service boundaries.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -28,9 +23,9 @@ use macaca_proto::{
     APPLICATION_EXECUTION_GATEWAY_APPROVAL_COMMAND,
     APPLICATION_EXECUTION_GATEWAY_COMPLETION_COMMAND,
     APPLICATION_EXECUTION_GATEWAY_FAILURE_COMMAND, APPLICATION_EXECUTION_GATEWAY_HEARTBEAT_COMMAND,
-    APPLICATION_EXECUTION_PROVIDER_HEALTH_COMMAND, APPLICATION_EXECUTION_REPLAY_COMMAND,
-    APPLICATION_EXECUTION_SERVICE_ID, APPLICATION_EXECUTION_SNAPSHOT_COMMAND,
-    APPLICATION_EXECUTION_START_COMMAND,
+    APPLICATION_EXECUTION_GATEWAY_SNAPSHOT_COMMAND, APPLICATION_EXECUTION_PROVIDER_HEALTH_COMMAND,
+    APPLICATION_EXECUTION_REPLAY_COMMAND, APPLICATION_EXECUTION_SERVICE_ID,
+    APPLICATION_EXECUTION_SNAPSHOT_COMMAND, APPLICATION_EXECUTION_START_COMMAND,
 };
 use tracing::info;
 
@@ -38,7 +33,7 @@ use crate::application_execution_event_builder::build_event;
 use crate::application_execution_event_store::ApplicationExecutionEventStore;
 use crate::application_execution_gateway_events::{
     append_gateway_approval_request, append_gateway_completion, append_gateway_failure,
-    append_gateway_heartbeat,
+    append_gateway_heartbeat, append_gateway_snapshot,
 };
 use crate::application_execution_provider_registry::{
     ApplicationExecutionProviderRegistry, ApplicationExecutionProviderSelectionCriteria,
@@ -87,7 +82,10 @@ impl ApplicationExecutionSystemServiceProvider {
     }
 
     fn trace(command: &ServiceCommand) -> ServiceResult<TraceContext> {
-        command.trace.clone().ok_or(ServiceError::MissingTraceContext)
+        command
+            .trace
+            .clone()
+            .ok_or(ServiceError::MissingTraceContext)
     }
 
     fn service_result<T: serde::Serialize>(
@@ -112,7 +110,9 @@ impl ApplicationExecutionSystemServiceProvider {
     }
 
     fn event_store(&self) -> ServiceResult<&ApplicationExecutionEventStore> {
-        self.event_store.as_ref().ok_or_else(|| ServiceError::ServiceUnavailable(self.reason()))
+        self.event_store
+            .as_ref()
+            .ok_or_else(|| ServiceError::ServiceUnavailable(self.reason()))
     }
 
     async fn handle_start(
@@ -355,6 +355,10 @@ impl SystemService for ApplicationExecutionSystemServiceProvider {
                 append_gateway_heartbeat(self.event_store()?, command.payload).await?,
                 trace,
             ),
+            APPLICATION_EXECUTION_GATEWAY_SNAPSHOT_COMMAND => Self::service_result(
+                append_gateway_snapshot(self.event_store()?, command.payload).await?,
+                trace,
+            ),
             APPLICATION_EXECUTION_GATEWAY_APPROVAL_COMMAND => Self::service_result(
                 append_gateway_approval_request(self.event_store()?, command.payload).await?,
                 trace,
@@ -484,13 +488,13 @@ async fn register_application_execution_service(
         )
         .await
         .map_err(runtime_error)?;
-    runtime.start(&service_id, trace).await.map_err(runtime_error)?;
+    runtime
+        .start(&service_id, trace)
+        .await
+        .map_err(runtime_error)?;
     Ok(service_id)
 }
-pub fn application_execution_service_descriptor_runtime() -> ServiceDescriptor {
-    application_execution_service_descriptor()
-}
-
-pub fn application_execution_service_id() -> &'static str {
-    APPLICATION_EXECUTION_SERVICE_ID
-}
+#[rustfmt::skip]
+pub fn application_execution_service_descriptor_runtime() -> ServiceDescriptor { application_execution_service_descriptor() }
+#[rustfmt::skip]
+pub fn application_execution_service_id() -> &'static str { APPLICATION_EXECUTION_SERVICE_ID }

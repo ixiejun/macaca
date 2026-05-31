@@ -151,6 +151,8 @@ mod app_protocol_service_provider_tests;
 #[cfg(test)]
 mod application_execution_event_store_tests;
 #[cfg(test)]
+mod application_execution_gateway_service_tests;
+#[cfg(test)]
 mod application_execution_provider_registry_tests;
 #[cfg(test)]
 mod application_execution_service_provider_tests;
