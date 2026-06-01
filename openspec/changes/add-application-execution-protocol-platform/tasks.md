@@ -78,8 +78,8 @@
 
 - [x] 7.1 Extend application manifest parsing or execution profile metadata to declare an external backend endpoint, protocol version, callback identity reference, supported controls, heartbeat interval, timeout, and event schema version.
 - [x] 7.2 Implement an external backend provider adapter that validates the manifest declaration before provider registration.
-- [ ] 7.3 On start, call the backend start endpoint with application id, session id, run id, workspace ref, task input/payload ref, callback gateway URL/ref, scoped callback identity reference, allowed event types, allowed controls, heartbeat policy, trace context, and idempotency key.
-- [ ] 7.4 Store provider assignment and lease metadata before returning accepted.
+- [x] 7.3 On start, call the backend start endpoint with application id, session id, run id, workspace ref, task input/payload ref, callback gateway URL/ref, scoped callback identity reference, allowed event types, allowed controls, heartbeat policy, trace context, and idempotency key.
+- [x] 7.4 Store provider assignment and lease metadata before returning accepted.
 - [ ] 7.5 Implement gateway ingress for external backend callbacks: append_event, report_heartbeat, report_snapshot, request_approval, report_completion, and report_failure.
 - [ ] 7.6 Validate callback identity, session/run binding, lease validity, event schema version, idempotency key, allowed event type, payload size, and sanitization before appending any event.
 - [ ] 7.7 Implement control forwarding to the backend control endpoint with command idempotency, timeout, retry policy where safe, structured delivery result, and audit evidence.

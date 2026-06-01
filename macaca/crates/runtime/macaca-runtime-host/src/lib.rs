@@ -19,6 +19,7 @@ pub mod app_protocol_service_provider;
 mod application_execution_event_builder;
 mod application_execution_event_store;
 mod application_execution_external_backend;
+mod application_execution_external_backend_transport;
 mod application_execution_gateway_events;
 mod application_execution_projection;
 mod application_execution_provider_registry;
@@ -244,6 +245,10 @@ pub use app_protocol_service_provider::{
 };
 pub use application_execution_event_store::ApplicationExecutionEventStore;
 pub use application_execution_external_backend::ExternalApplicationBackendProvider;
+pub use application_execution_external_backend_transport::{
+    ExternalApplicationBackendControlRequest, ExternalApplicationBackendStartRequest,
+    ExternalApplicationBackendTransport, HttpExternalApplicationBackendTransport,
+};
 pub use application_execution_projection::project_application_execution_state;
 pub use application_execution_provider_registry::{
     ApplicationExecutionProvider, ApplicationExecutionProviderRegistry,
