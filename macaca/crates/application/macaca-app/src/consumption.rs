@@ -276,6 +276,7 @@ mod tests {
             resources: None,
             context: None,
             service_contract: None,
+            execution_profile: None,
             workbench: None,
             autonomy: None,
             ui: None,

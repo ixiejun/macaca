@@ -4,7 +4,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::service_capability::AppServiceContractConfig;
 use crate::ui_runtime::AppUiRuntimeConfig;
-use macaca_proto::{AgentId, ApplicationId, ApplicationWorkbenchManifestDeclaration};
+use macaca_proto::{
+    AgentId, ApplicationExecutionProfileDeclaration, ApplicationId,
+    ApplicationWorkbenchManifestDeclaration,
+};
 
 /// The execution layer of an application.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -363,6 +366,13 @@ pub struct AppManifest {
     /// Optional generic service declaration block for contract-driven routing.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub service_contract: Option<AppServiceContractConfig>,
+    /// Optional provider-neutral application execution profile.
+    ///
+    /// This profile is declarative only. Application Framework admission and
+    /// runtime-host provider adapters validate it before any transport, lease,
+    /// EventLog, or control-delivery side effect can occur.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution_profile: Option<ApplicationExecutionProfileDeclaration>,
     /// Optional generic workbench capability declaration block.
     ///
     /// This is the Application Framework-owned contract that lets YAML, WASM,
@@ -567,6 +577,7 @@ agents:
                 resources: None,
                 context: None,
                 service_contract: None,
+                execution_profile: None,
                 workbench: None,
                 autonomy: None,
                 ui: None,

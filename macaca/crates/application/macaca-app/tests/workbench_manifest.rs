@@ -4,12 +4,15 @@ use macaca_app::{
 };
 use macaca_proto::{
     AbilityImplementationKind, ApplicationAbilityDescriptor, ApplicationAbilityKind,
-    ApplicationCompatibilityDeclaration, ApplicationManifestV1, ApplicationRuntimeProfile,
-    ApplicationWorkbenchCapabilityDeclaration, ApplicationWorkbenchEventSubscription,
-    ApplicationWorkbenchManifestDeclaration, ApplicationWorkbenchMcpDependency,
-    ApplicationWorkbenchOptionalProviderRequirement, ApplicationWorkbenchPluginDependency,
-    ApplicationWorkbenchServiceDependency, ApplicationWorkbenchSkillBundleDependency,
-    ApplicationWorkbenchUiSurfaceDeclaration, CapabilityId, DeveloperId, KernelServiceId,
+    ApplicationCompatibilityDeclaration, ApplicationExecutionControlKind,
+    ApplicationExecutionHeartbeatPolicy, ApplicationExecutionProfileDeclaration,
+    ApplicationExecutionProviderKind, ApplicationExecutionProviderPreference,
+    ApplicationManifestV1, ApplicationRuntimeProfile, ApplicationWorkbenchCapabilityDeclaration,
+    ApplicationWorkbenchEventSubscription, ApplicationWorkbenchManifestDeclaration,
+    ApplicationWorkbenchMcpDependency, ApplicationWorkbenchOptionalProviderRequirement,
+    ApplicationWorkbenchPluginDependency, ApplicationWorkbenchServiceDependency,
+    ApplicationWorkbenchSkillBundleDependency, ApplicationWorkbenchUiSurfaceDeclaration,
+    CapabilityId, DeveloperId, ExternalApplicationBackendExecutionProfile, KernelServiceId,
     PackageId, PackageRuntimeKind,
 };
 
@@ -115,6 +118,34 @@ fn assert_admitted(report: ApplicationAdmissionReport) {
         "unexpected diagnostics: {:?}",
         report.diagnostics
     );
+}
+
+fn external_execution_profile() -> ApplicationExecutionProfileDeclaration {
+    ApplicationExecutionProfileDeclaration {
+        provider_preference: Some(ApplicationExecutionProviderPreference {
+            provider_kind: ApplicationExecutionProviderKind::ExternalAppBackend,
+            provider_id: Some("provider.external.fixture".into()),
+        }),
+        external_backend: Some(ExternalApplicationBackendExecutionProfile {
+            provider_id: "provider.external.fixture".into(),
+            start_endpoint: "https://backend.example.test/start".into(),
+            control_endpoint: Some("https://backend.example.test/control".into()),
+            protocol_version: "application-execution.v1".into(),
+            callback_gateway_ref: Some("gateway/application-execution".into()),
+            callback_identity_ref: "identity.external.fixture".into(),
+            supported_controls: vec![ApplicationExecutionControlKind::Cancel],
+            heartbeat_policy: ApplicationExecutionHeartbeatPolicy {
+                interval_ms: 1000,
+                timeout_ms: 5000,
+                required: true,
+            },
+            request_timeout_ms: 3000,
+            event_schema_version: "application-execution.v1".into(),
+            capability_declarations: vec![CapabilityId::new("capability.application_execution")],
+            resource_profile: Default::default(),
+        }),
+        metadata: Default::default(),
+    }
 }
 
 #[test]
@@ -225,4 +256,72 @@ fn multiple_application_styles_admit_same_generic_workbench_capabilities() {
             .iter()
             .any(|subscription| subscription.topic == "thread.item"));
     }
+}
+
+#[test]
+fn manifest_v1_admits_external_backend_execution_profile() {
+    let manifest = manifest_for(
+        PackageRuntimeKind::RemoteService,
+        ApplicationAbilityKind::Headless,
+    )
+    .execution_profile(external_execution_profile());
+
+    assert_admitted(ApplicationManifestV1Spec.validate(&manifest));
+    let execution_profile = manifest.execution_profile.as_ref().unwrap();
+    assert_eq!(
+        execution_profile
+            .external_backend
+            .as_ref()
+            .unwrap()
+            .callback_identity_ref,
+        "identity.external.fixture"
+    );
+}
+
+#[test]
+fn yaml_projection_preserves_external_backend_execution_profile() {
+    let yaml = r#"
+name: generic-external-backend-app
+version: "1.0.0"
+layer: L3Declarative
+agents:
+  - name: coordinator
+    prompt_template: "raw prompt must not leak"
+execution_profile:
+  provider_preference:
+    provider_kind: ExternalAppBackend
+    provider_id: provider.external.fixture
+  external_backend:
+    provider_id: provider.external.fixture
+    start_endpoint: https://backend.example.test/start
+    control_endpoint: https://backend.example.test/control
+    protocol_version: application-execution.v1
+    callback_gateway_ref: gateway/application-execution
+    callback_identity_ref: identity.external.fixture
+    supported_controls: [Cancel]
+    heartbeat_policy:
+      interval_ms: 1000
+      timeout_ms: 5000
+      required: true
+    request_timeout_ms: 3000
+    event_schema_version: application-execution.v1
+    capability_declarations:
+      - capability.application_execution
+"#;
+    let legacy: macaca_app::AppManifest = serde_yaml::from_str(yaml).unwrap();
+    let projection = YamlApplicationManifestAdapter::new(legacy).project();
+
+    assert_admitted(ApplicationManifestV1Spec.validate(&projection.manifest));
+    assert_eq!(
+        projection
+            .manifest
+            .execution_profile
+            .as_ref()
+            .unwrap()
+            .external_backend
+            .as_ref()
+            .unwrap()
+            .provider_id,
+        "provider.external.fixture"
+    );
 }

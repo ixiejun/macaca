@@ -206,6 +206,13 @@ impl YamlApplicationManifestAdapter {
                 );
             }
         }
+        if let Some(execution_profile) = &self.manifest.execution_profile {
+            projected.execution_profile = Some(execution_profile.clone());
+            report.push_legacy_only(
+                application_id.as_str(),
+                "YAML application execution profile was projected into Manifest v1 policy metadata.",
+            );
+        }
 
         for permission in application_permissions(&self.resolved_agents) {
             projected = projected.permission(permission);
@@ -520,6 +527,7 @@ mod tests {
             resources: None,
             context: None,
             service_contract: None,
+            execution_profile: None,
             workbench: None,
             autonomy: None,
             ui: None,
@@ -565,6 +573,7 @@ mod tests {
                 optional_services: Vec::new(),
                 service_policy_overrides: Default::default(),
             }),
+            execution_profile: None,
             workbench: None,
             autonomy: None,
             ui: None,

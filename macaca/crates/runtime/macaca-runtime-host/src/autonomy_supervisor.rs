@@ -356,6 +356,7 @@ mod tests {
             resources: None,
             context: None,
             service_contract: None,
+            execution_profile: None,
             workbench: None,
             autonomy: Some(AppAutonomyConfig {
                 heartbeat: Some(AppHeartbeatConfig {

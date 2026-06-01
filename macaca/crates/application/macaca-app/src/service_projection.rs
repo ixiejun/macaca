@@ -707,6 +707,7 @@ mod tests {
             resources: None,
             context: Some(Default::default()),
             service_contract: None,
+            execution_profile: None,
             workbench: None,
             autonomy: None,
             ui: None,

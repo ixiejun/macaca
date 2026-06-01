@@ -77,12 +77,16 @@ impl ApplicationManifestSpec {
         if let Some(workbench) = &manifest.workbench {
             validate_workbench_declaration(workbench, "application_manifest")?;
         }
+        if let Some(execution_profile) = &manifest.execution_profile {
+            execution_profile.validate()?;
+        }
         validate_ui_runtime_config(manifest.ui.as_ref())?;
         tracing::info!(
             app_id = %manifest.id,
             app_name = %manifest.name,
             layer = ?manifest.layer,
             service_contract_declared = manifest.service_contract.is_some(),
+            execution_profile_declared = manifest.execution_profile.is_some(),
             workbench_declared = manifest.workbench.is_some(),
             ui_runtime_declared = manifest.ui.is_some(),
             "application manifest admitted by service specification"
@@ -186,9 +190,19 @@ impl ApplicationManifestV1Spec {
                 ));
             }
         }
+        if let Some(execution_profile) = &manifest.execution_profile {
+            if let Err(error) = execution_profile.validate() {
+                report.push(ApplicationAdmissionDiagnostic::new(
+                    "invalid_application_execution_profile",
+                    manifest.package_id.as_str(),
+                    error.to_string(),
+                ));
+            }
+        }
         tracing::info!(
             package_id = %manifest.package_id,
             ability_count = manifest.abilities.len(),
+            execution_profile_declared = manifest.execution_profile.is_some(),
             workbench_declared = manifest.workbench.is_some(),
             diagnostic_count = report.diagnostics.len(),
             "application manifest v1 admission evaluated"
@@ -425,6 +439,7 @@ mod tests {
                 optional_services: vec![],
                 service_policy_overrides: Default::default(),
             }),
+            execution_profile: None,
             workbench: None,
             autonomy: None,
             ui: None,

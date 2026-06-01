@@ -10,11 +10,11 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::ApplicationWorkbenchManifestDeclaration;
 use crate::{
     workbench::sandbox::SandboxRuntimeKind, ApplicationAbilityDescriptor, DeveloperId,
     ExecutionControlPolicy, PackageId, PackageRuntimeKind, PackageType,
 };
+use crate::{ApplicationExecutionProfileDeclaration, ApplicationWorkbenchManifestDeclaration};
 
 /// Version of the Application Manifest schema.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -182,6 +182,13 @@ pub struct ApplicationManifestV1 {
     pub compatibility: ApplicationCompatibilityDeclaration,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub execution_control: Option<ExecutionControlPolicy>,
+    /// Provider-neutral application execution profile.
+    ///
+    /// This declaration is data-only manifest policy. Runtime-host may adapt it
+    /// into a provider descriptor after admission, but the manifest never owns
+    /// provider lifecycle, leases, EventLog persistence, or transport effects.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution_profile: Option<ApplicationExecutionProfileDeclaration>,
     /// Generic interactive workbench declarations owned by Application
     /// Framework.  Services and shells consume this through admission and
     /// sanitized projections; the OS must never infer these capabilities from
@@ -244,6 +251,7 @@ impl ApplicationManifestV1 {
             plugin_dependencies: Vec::new(),
             compatibility,
             execution_control: None,
+            execution_profile: None,
             workbench: None,
             tool_families: Vec::new(),
             toolsets: Vec::new(),
@@ -281,6 +289,11 @@ impl ApplicationManifestV1 {
 
     pub fn execution_control(mut self, policy: ExecutionControlPolicy) -> Self {
         self.execution_control = Some(policy);
+        self
+    }
+
+    pub fn execution_profile(mut self, profile: ApplicationExecutionProfileDeclaration) -> Self {
+        self.execution_profile = Some(profile);
         self
     }
 
