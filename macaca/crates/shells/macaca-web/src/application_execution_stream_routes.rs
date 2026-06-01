@@ -10,9 +10,11 @@
 use std::convert::Infallible;
 use std::sync::Arc;
 
+use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::sse::{Event, KeepAlive, Sse};
+use axum::response::Response;
 use axum::Json;
 use futures::Stream;
 use macaca_persist::EventLogQuery;
@@ -141,6 +143,41 @@ pub async fn stream_execution_events(
     Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
 }
 
+/// GET /api/apps/{app_id}/execution/events/ws
+pub async fn websocket_execution_events(
+    ws: WebSocketUpgrade,
+    State(state): State<Arc<AppState>>,
+    Path(app_id): Path<String>,
+    Query(query): Query<ExecutionEventStreamQuery>,
+) -> Result<Response, (StatusCode, Json<ErrorResponse>)> {
+    let (application_id, trace, event_query) = build_stream_query(&app_id, query)?;
+    let event_log = state.persist.event_log.clone();
+    let session_id = event_query.session_id.clone();
+    let limit = event_query.limit;
+
+    info!(
+        app_id = %application_id,
+        session_id = %session_id,
+        trace_id = %trace.trace_id,
+        since_seq = event_query.since_seq,
+        limit,
+        "web route opened application execution EventLog WebSocket"
+    );
+
+    Ok(ws.on_upgrade(move |socket| async move {
+        run_websocket_event_observer(
+            socket,
+            event_log,
+            application_id,
+            trace,
+            event_query,
+            session_id,
+            limit,
+        )
+        .await;
+    }))
+}
+
 /// Build the durable EventLog query used by the SSE adapter.
 ///
 /// This helper is deliberately pure and testable.  It applies the route's
@@ -164,6 +201,159 @@ pub(crate) fn build_stream_query(
         .source(Some(APPLICATION_EXECUTION_EVENT_SOURCE.to_string()))
         .event_type(event_type);
     Ok((application_id, trace, event_query))
+}
+
+/// Drive a WebSocket observer from durable EventLog rows.
+///
+/// The WebSocket never receives provider callbacks directly.  It first sends
+/// already persisted rows after the requested cursor, then waits for EventLog
+/// append notifications and queries the same persisted store again.  This
+/// preserves the invariant that browser connectivity can affect rendering but
+/// cannot affect backend execution, EventLog persistence, or current-state
+/// projection.
+async fn run_websocket_event_observer(
+    mut socket: WebSocket,
+    event_log: Arc<macaca_persist::EventLog>,
+    application_id: ApplicationId,
+    trace: TraceContext,
+    event_query: EventLogQuery,
+    session_id: String,
+    limit: usize,
+) {
+    let mut cursor = event_query.since_seq;
+    let mut receiver = event_log.subscribe();
+
+    let initial_batch =
+        query_application_events(&event_log, application_id, event_query.clone()).await;
+    cursor = cursor.max(initial_batch.scanned_cursor);
+    if send_websocket_batch(&mut socket, &initial_batch.entries)
+        .await
+        .is_err()
+    {
+        info!(
+            app_id = %application_id,
+            session_id = %session_id,
+            trace_id = %trace.trace_id,
+            "application execution WebSocket closed during initial replay"
+        );
+        return;
+    }
+    if let Some(last) = initial_batch.entries.last() {
+        cursor = cursor.max(last.seq);
+    }
+
+    loop {
+        tokio::select! {
+            client_message = socket.recv() => {
+                match client_message {
+                    Some(Ok(Message::Close(_))) | None => {
+                        info!(
+                            app_id = %application_id,
+                            session_id = %session_id,
+                            trace_id = %trace.trace_id,
+                            cursor,
+                            "application execution WebSocket subscriber disconnected"
+                        );
+                        break;
+                    }
+                    Some(Ok(Message::Ping(payload))) => {
+                        if socket.send(Message::Pong(payload)).await.is_err() {
+                            break;
+                        }
+                    }
+                    Some(Ok(_)) => {
+                        debug!(
+                            app_id = %application_id,
+                            session_id = %session_id,
+                            trace_id = %trace.trace_id,
+                            "application execution WebSocket ignored client data frame"
+                        );
+                    }
+                    Some(Err(error)) => {
+                        warn!(
+                            app_id = %application_id,
+                            session_id = %session_id,
+                            trace_id = %trace.trace_id,
+                            error = %error,
+                            "application execution WebSocket receive failed"
+                        );
+                        break;
+                    }
+                }
+            }
+            notification = receiver.recv() => {
+                match notification {
+                    Ok((changed_session_id, latest_seq)) => {
+                        if changed_session_id != session_id {
+                            continue;
+                        }
+                        let follow_up_query = event_query.clone().since(cursor).limit(limit);
+                        let batch = query_application_events(
+                            &event_log,
+                            application_id,
+                            follow_up_query,
+                        )
+                        .await;
+                        cursor = cursor.max(batch.scanned_cursor);
+                        if batch.entries.is_empty() {
+                            cursor = cursor.max(latest_seq);
+                            debug!(
+                                app_id = %application_id,
+                                session_id = %session_id,
+                                trace_id = %trace.trace_id,
+                                latest_seq,
+                                "application execution WebSocket notification had no scoped rows"
+                            );
+                            continue;
+                        }
+                        if send_websocket_batch(&mut socket, &batch.entries).await.is_err() {
+                            break;
+                        }
+                        if let Some(last) = batch.entries.last() {
+                            cursor = cursor.max(last.seq);
+                        }
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
+                        warn!(
+                            app_id = %application_id,
+                            session_id = %session_id,
+                            trace_id = %trace.trace_id,
+                            skipped,
+                            "application execution WebSocket lagged and will resume from cursor"
+                        );
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                        warn!(
+                            app_id = %application_id,
+                            session_id = %session_id,
+                            trace_id = %trace.trace_id,
+                            "application execution WebSocket notification channel closed"
+                        );
+                        break;
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Send one persisted EventLog batch to the subscriber.
+///
+/// Each message is an independent durable row payload.  The client can render
+/// it immediately, but replay remains the recovery mechanism because every
+/// message carries the same EventLog coordinate returned by HTTP replay.
+async fn send_websocket_batch(
+    socket: &mut WebSocket,
+    entries: &[EventEntry],
+) -> Result<(), axum::Error> {
+    for entry in entries {
+        socket
+            .send(Message::Text(
+                event_entry_to_stream_payload(entry).to_string().into(),
+            ))
+            .await?;
+    }
+    Ok(())
 }
 
 struct ApplicationEventBatch {

@@ -204,6 +204,10 @@ impl WebRuntimeFacade {
                 get(application_execution_stream_routes::stream_execution_events),
             )
             .route(
+                "/api/apps/{app_id}/execution/events/ws",
+                get(application_execution_stream_routes::websocket_execution_events),
+            )
+            .route(
                 "/api/apps/{app_id}/execution/gateway/events",
                 post(application_execution_gateway_routes::gateway_append_event),
             )

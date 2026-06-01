@@ -18,7 +18,8 @@ const state = {
   providers: [],
   models: [],
   route: null,
-  eventSource: null,
+  eventSocket: null,
+  eventSocketClosing: false,
   debugToolLoop: new URLSearchParams(window.location.search).get("debug_tool_loop") === "1",
 };
 
@@ -35,7 +36,7 @@ const pendingBridgeCalls = new Map();
 function appendEvent(type, data) {
   state.events.push({ type, data, at: new Date().toISOString() });
   if (type === "execution_event") {
-    const event = data?.event || data;
+    const event = normalizeExecutionEvent(data);
     state.eventCursor = event?.seq ? `event/${event.seq}` : state.eventCursor;
     if (event?.event_type === "ExecutionCompleted") {
       state.result = event?.sanitized_payload?.summary || "";
@@ -57,6 +58,26 @@ function appendEvent(type, data) {
   console.info("[codex-wasm-workbench] event", type, data);
   renderTimeline(state);
   renderResult(state);
+}
+
+function appendExecutionEvent(rawEvent) {
+  const event = normalizeExecutionEvent(rawEvent);
+  appendEvent("execution_event", event);
+}
+
+function normalizeExecutionEvent(rawEvent) {
+  // WebSocket messages carry the same durable EventLog row wrapper as the
+  // legacy SSE adapter, while replay returns protocol envelopes directly.  The
+  // UI keeps this Adapter logic local so render code receives one normalized
+  // shape without becoming the owner of protocol projection semantics.
+  const event = rawEvent?.payload || rawEvent?.event || rawEvent;
+  if (rawEvent?.event_ref && event && typeof event === "object") {
+    return { ...event, event_ref: rawEvent.event_ref, seq: event.seq || rawEvent.seq };
+  }
+  if (rawEvent?.seq && event && typeof event === "object" && !event.seq) {
+    return { ...event, seq: rawEvent.seq };
+  }
+  return event;
 }
 
 function callService(serviceId, operation, payload = {}) {
@@ -137,6 +158,7 @@ async function startTask() {
   state.currentState = null;
   state.result = "";
   state.events = [];
+  closeExecutionSocket(false);
   elements.tokenSummary.textContent = "Starting through service.application_execution...";
   renderTimeline(state);
   renderResult(state);
@@ -168,9 +190,9 @@ async function startTask() {
     state.runId = result.run_id || state.runId;
     state.eventCursor = result.event_cursor || state.eventCursor;
     appendEvent("execution_start_result", result);
-    openExecutionStream();
-    await refreshCurrentState();
     await replayEvents();
+    await refreshCurrentState();
+    openExecutionWebSocket();
   } catch (error) {
     appendEvent("bridge_error", { error: error instanceof Error ? error.message : String(error) });
   }
@@ -229,25 +251,47 @@ async function getJson(path) {
   return response.json();
 }
 
-function openExecutionStream() {
+function openExecutionWebSocket() {
   if (!state.sessionId) return;
-  state.eventSource?.close();
+  closeExecutionSocket(false);
   const params = new URLSearchParams({
     session_id: state.sessionId,
-    trace_id: `trace-stream-${state.sessionId}`,
+    trace_id: `trace-websocket-${state.sessionId}`,
   });
   const since = state.eventCursor?.replace("event/", "");
   if (since) params.set("since", since);
-  state.eventSource = new EventSource(`/api/apps/${applicationIdFromLocation()}/execution/events?${params}`);
-  state.eventSource.addEventListener("application_execution_event", (event) => {
+  const url = new URL(`/api/apps/${applicationIdFromLocation()}/execution/events/ws`, window.location.origin);
+  url.protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  url.search = params.toString();
+  const socket = new WebSocket(url);
+  state.eventSocket = socket;
+  socket.addEventListener("open", () => {
+    console.info("[codex-wasm-workbench] websocket opened", { session_id: state.sessionId, since });
+  });
+  socket.addEventListener("message", (event) => {
     try {
-      appendEvent("execution_event", JSON.parse(event.data));
+      appendExecutionEvent(JSON.parse(event.data));
       refreshCurrentState();
     } catch (error) {
       appendEvent("bridge_error", { error: error instanceof Error ? error.message : String(error) });
     }
   });
-  state.eventSource.onerror = () => appendEvent("bridge_error", { error: "execution event stream disconnected" });
+  socket.addEventListener("close", () => {
+    if (state.eventSocket === socket) state.eventSocket = null;
+    if (!state.eventSocketClosing && state.running) {
+      appendEvent("bridge_error", { error: "execution event websocket disconnected" });
+    }
+    state.eventSocketClosing = false;
+  });
+  socket.addEventListener("error", () => {
+    if (state.running) appendEvent("bridge_error", { error: "execution event websocket failed" });
+  });
+}
+
+function closeExecutionSocket(reportDisconnect = false) {
+  if (!state.eventSocket) return;
+  state.eventSocketClosing = !reportDisconnect;
+  state.eventSocket.close();
 }
 
 async function replayEvents() {
@@ -261,11 +305,14 @@ async function replayEvents() {
   const replay = await getJson(`/api/apps/${applicationIdFromLocation()}/execution/replay?${params}`);
   state.currentState = replay.current_state || state.currentState;
   state.eventCursor = replay.next_cursor || state.eventCursor;
-  state.events = (replay.events || []).map((event) => ({
-    type: "execution_event",
-    data: event,
-    at: event.timestamp || new Date().toISOString(),
-  }));
+  state.events = (replay.events || []).map((rawEvent) => {
+    const event = normalizeExecutionEvent(rawEvent);
+    return {
+      type: "execution_event",
+      data: event,
+      at: event.timestamp || new Date().toISOString(),
+    };
+  });
   renderTimeline(state);
   renderResult(state);
 }
@@ -327,6 +374,7 @@ function handleHostMessage(event) {
 }
 
 function clearRun() {
+  closeExecutionSocket(false);
   state.events = [];
   state.result = "";
   state.currentState = null;
@@ -364,9 +412,9 @@ window.addEventListener("message", handleHostMessage);
 renderAll({ state, declaredServices });
 loadModelCatalog();
 if (!state.debugToolLoop && state.sessionId) {
-  openExecutionStream();
-  refreshCurrentState()
-    .then(replayEvents)
+  replayEvents()
+    .then(refreshCurrentState)
+    .then(openExecutionWebSocket)
     .catch((error) => {
       appendEvent("bridge_error", { error: error instanceof Error ? error.message : String(error) });
     });

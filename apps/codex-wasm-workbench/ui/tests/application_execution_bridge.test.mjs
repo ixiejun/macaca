@@ -6,7 +6,7 @@ const source = await readFile(new URL("../app.js", import.meta.url), "utf8");
 
 test("production UI uses service.application_execution APIs instead of browser tool loop", () => {
   assert.match(source, /\/execution\/start/);
-  assert.match(source, /\/execution\/events/);
+  assert.match(source, /\/execution\/events\/ws/);
   assert.match(source, /\/execution\/replay/);
   assert.match(source, /\/execution\/current-state/);
   assert.match(source, /\/execution\/control/);
@@ -17,5 +17,11 @@ test("production UI uses service.application_execution APIs instead of browser t
 test("UI keeps event arrays as render caches reconstructed from replay", () => {
   assert.match(source, /state\.events = \(replay\.events \|\| \[\]\)\.map/);
   assert.match(source, /state\.currentState = replay\.current_state/);
-  assert.match(source, /new EventSource/);
+  assert.match(source, /new WebSocket/);
+  assert.doesNotMatch(source, /new EventSource/);
+});
+
+test("UI refreshes durable replay before opening websocket increments", () => {
+  assert.match(source, /replayEvents\(\)\s*\n\s*\.then\(refreshCurrentState\)\s*\n\s*\.then\(openExecutionWebSocket\)/);
+  assert.match(source, /await replayEvents\(\);\s*\n\s*await refreshCurrentState\(\);\s*\n\s*openExecutionWebSocket\(\);/);
 });

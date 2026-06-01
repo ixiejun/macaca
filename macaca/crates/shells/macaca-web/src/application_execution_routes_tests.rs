@@ -190,3 +190,16 @@ fn event_stream_adapter_has_no_execution_control_side_effects() {
     assert!(!source.contains("ApplicationExecutionProvider"));
     assert!(!source.contains("tokio::spawn"));
 }
+
+#[test]
+fn event_websocket_adapter_is_observer_over_durable_eventlog() {
+    let source = include_str!("application_execution_stream_routes.rs");
+
+    assert!(source.contains("websocket_execution_events"));
+    assert!(source.contains("run_websocket_event_observer"));
+    assert!(source.contains("query_application_events(&event_log"));
+    assert!(source.contains("event_entry_to_stream_payload(entry)"));
+    assert!(source.contains("event_log.subscribe()"));
+    assert!(!source.contains("append_command("));
+    assert!(!source.contains("append_idempotent("));
+}
