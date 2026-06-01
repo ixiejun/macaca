@@ -8,8 +8,8 @@ use crate::{
     ApplicationExecutionEventEnvelope, ApplicationExecutionEventType,
     ApplicationExecutionLifecycleState, ApplicationExecutionPayload,
     ApplicationExecutionProviderKind, ApplicationExecutionScope, ApplicationId, MacacaError,
-    StartApplicationExecutionResult, TraceContext, APPLICATION_EXECUTION_SERVICE_ID,
-    APPLICATION_EXECUTION_START_COMMAND,
+    ReportExecutionHeartbeatCommand, StartApplicationExecutionResult, TraceContext,
+    APPLICATION_EXECUTION_SERVICE_ID, APPLICATION_EXECUTION_START_COMMAND,
 };
 
 fn trace() -> TraceContext {
@@ -133,4 +133,30 @@ fn descriptor_is_registered_but_unavailable_until_provider_bootstrap() {
         descriptor.health,
         crate::ServiceHealth::Unavailable { .. }
     ));
+}
+
+#[test]
+fn gateway_heartbeat_preserves_schema_provider_and_idempotency_metadata() {
+    let command = ReportExecutionHeartbeatCommand {
+        lease_id: Some("lease-protocol-1".into()),
+        callback_identity_ref: "callback.identity.ref".into(),
+        scope: scope(),
+        provider_id: "provider-protocol".into(),
+        provider_kind: ApplicationExecutionProviderKind::ExternalAppBackend,
+        reported_at: Utc::now(),
+        trace: trace(),
+        event_schema_version: "application-execution.v1".into(),
+        idempotency_key: "heartbeat-protocol-1".into(),
+    };
+
+    let decoded: ReportExecutionHeartbeatCommand =
+        serde_json::from_str(&serde_json::to_string(&command).unwrap()).unwrap();
+
+    assert_eq!(decoded.provider_id, "provider-protocol");
+    assert_eq!(
+        decoded.provider_kind,
+        ApplicationExecutionProviderKind::ExternalAppBackend
+    );
+    assert_eq!(decoded.event_schema_version, "application-execution.v1");
+    assert_eq!(decoded.idempotency_key, "heartbeat-protocol-1");
 }

@@ -8,8 +8,7 @@
 
 use macaca_proto::{
     ApplicationExecutionEventEnvelope, ApplicationExecutionEventType, ApplicationExecutionPayload,
-    ApplicationExecutionProviderKind, ApplicationExecutionSnapshot,
-    ReportExecutionCompletionCommand, ReportExecutionFailureCommand,
+    ApplicationExecutionSnapshot, ReportExecutionCompletionCommand, ReportExecutionFailureCommand,
     ReportExecutionHeartbeatCommand, ReportExecutionSnapshotCommand,
     RequestExecutionApprovalCommand, ServiceError, ServiceResult,
     APPLICATION_EXECUTION_GATEWAY_APPROVAL_COMMAND,
@@ -22,6 +21,8 @@ use crate::application_execution_event_builder::build_event;
 use crate::application_execution_event_store::ApplicationExecutionEventStore;
 use crate::application_execution_service_logs::log_gateway_ingress;
 
+const SUPPORTED_GATEWAY_EVENT_SCHEMA_VERSION: &str = "application-execution.v1";
+
 /// Decode and append one provider heartbeat callback.
 pub(crate) async fn append_gateway_heartbeat(
     store: &ApplicationExecutionEventStore,
@@ -33,6 +34,7 @@ pub(crate) async fn append_gateway_heartbeat(
     let provider_id = typed.provider_id.clone();
     let provider_kind = typed.provider_kind;
     let event_trace = typed.trace.clone();
+    validate_gateway_callback_metadata(&typed.event_schema_version, &typed.idempotency_key)?;
     store.validate_gateway_ingress(
         typed.lease_id.as_deref(),
         &typed.callback_identity_ref,
@@ -47,7 +49,7 @@ pub(crate) async fn append_gateway_heartbeat(
         provider_kind,
         event_trace.clone(),
         ApplicationExecutionPayload::summary("provider heartbeat reported"),
-        format!("heartbeat:{}", typed.reported_at.timestamp_millis()),
+        typed.idempotency_key,
     );
     log_gateway_ingress(
         &scope.application_id.to_string(),
@@ -81,6 +83,7 @@ pub(crate) async fn append_gateway_snapshot(
         .clone()
         .unwrap_or_else(|| "gateway".into());
     let event_trace = typed.trace;
+    validate_gateway_callback_metadata(&typed.event_schema_version, &typed.idempotency_key)?;
     store.validate_gateway_ingress(
         typed.lease_id.as_deref(),
         &typed.callback_identity_ref,
@@ -105,7 +108,7 @@ pub(crate) async fn append_gateway_snapshot(
             payload_ref: None,
             truncated: false,
         },
-        format!("snapshot:{}", event_trace.trace_id),
+        typed.idempotency_key,
     );
     log_gateway_ingress(
         &scope.application_id.to_string(),
@@ -128,18 +131,19 @@ pub(crate) async fn append_gateway_approval_request(
         serde_json::from_value(payload).map_err(adapter_error)?;
     let scope = typed.scope.clone();
     let event_trace = typed.trace.clone();
+    validate_gateway_callback_metadata(&typed.event_schema_version, &typed.idempotency_key)?;
     store.validate_gateway_ingress(
         typed.lease_id.as_deref(),
         &typed.callback_identity_ref,
         Some(&scope),
-        None,
+        Some(&typed.provider_id),
         ApplicationExecutionEventType::ApprovalRequested,
     )?;
     let event = build_event(
         &scope,
         ApplicationExecutionEventType::ApprovalRequested,
-        "gateway",
-        ApplicationExecutionProviderKind::ExternalAppBackend,
+        &typed.provider_id,
+        typed.provider_kind,
         event_trace.clone(),
         ApplicationExecutionPayload {
             summary: typed.prompt.summary,
@@ -169,18 +173,19 @@ pub(crate) async fn append_gateway_completion(
         serde_json::from_value(payload).map_err(adapter_error)?;
     let scope = typed.scope.clone();
     let event_trace = typed.trace.clone();
+    validate_gateway_callback_metadata(&typed.event_schema_version, &typed.idempotency_key)?;
     store.validate_gateway_ingress(
         typed.lease_id.as_deref(),
         &typed.callback_identity_ref,
         Some(&scope),
-        None,
+        Some(&typed.provider_id),
         ApplicationExecutionEventType::ExecutionCompleted,
     )?;
     let event = build_event(
         &scope,
         ApplicationExecutionEventType::ExecutionCompleted,
-        "gateway",
-        ApplicationExecutionProviderKind::ExternalAppBackend,
+        &typed.provider_id,
+        typed.provider_kind,
         event_trace.clone(),
         typed.result,
         typed.idempotency_key,
@@ -205,18 +210,19 @@ pub(crate) async fn append_gateway_failure(
         serde_json::from_value(payload).map_err(adapter_error)?;
     let scope = typed.scope.clone();
     let event_trace = typed.trace.clone();
+    validate_gateway_callback_metadata(&typed.event_schema_version, &typed.idempotency_key)?;
     store.validate_gateway_ingress(
         typed.lease_id.as_deref(),
         &typed.callback_identity_ref,
         Some(&scope),
-        None,
+        Some(&typed.provider_id),
         ApplicationExecutionEventType::ExecutionFailed,
     )?;
     let event = build_event(
         &scope,
         ApplicationExecutionEventType::ExecutionFailed,
-        "gateway",
-        ApplicationExecutionProviderKind::ExternalAppBackend,
+        &typed.provider_id,
+        typed.provider_kind,
         event_trace.clone(),
         ApplicationExecutionPayload {
             summary: typed.error.reason.clone(),
@@ -235,6 +241,27 @@ pub(crate) async fn append_gateway_failure(
         "failure_reported",
     );
     store.append_idempotent(event).await
+}
+
+fn validate_gateway_callback_metadata(
+    event_schema_version: &str,
+    idempotency_key: &str,
+) -> ServiceResult<()> {
+    // Helper-built gateway callbacks do not carry a full event envelope, so the
+    // gateway validates the callback-declared schema and retry key before it
+    // constructs any durable event.  This keeps schema rejection and duplicate
+    // protection at the external boundary rather than inside application code.
+    if event_schema_version != SUPPORTED_GATEWAY_EVENT_SCHEMA_VERSION {
+        return Err(ServiceError::InvalidArgument(format!(
+            "unsupported application execution gateway event schema version '{event_schema_version}'"
+        )));
+    }
+    if idempotency_key.trim().is_empty() {
+        return Err(ServiceError::InvalidArgument(
+            "application execution gateway idempotency key is required".into(),
+        ));
+    }
+    Ok(())
 }
 
 fn adapter_error(error: serde_json::Error) -> ServiceError {
