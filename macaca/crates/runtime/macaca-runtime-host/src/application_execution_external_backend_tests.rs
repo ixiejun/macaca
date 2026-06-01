@@ -127,6 +127,33 @@ async fn external_backend_control_forwards_to_control_endpoint_with_trace_scope(
     assert_eq!(request.scope.run_id, "run-external-start");
     assert_eq!(request.control_id, "control-external-1");
     assert_eq!(request.trace.trace_id, "trace-external-control");
+    assert_eq!(request.delivery_attempt, 1);
+    assert!(request
+        .audit_evidence_ref
+        .starts_with("audit.application_execution.external_backend.control."));
+}
+
+#[tokio::test]
+async fn external_backend_control_retries_adapter_failures_with_same_idempotency_key() {
+    let transport = Arc::new(FakeExternalBackendTransport::default());
+    transport.fail_next_control("temporary transport failure");
+    let provider =
+        ExternalApplicationBackendProvider::with_transport(external_profile(), transport.clone())
+            .expect("profile should admit");
+    let _ = provider.start(start_command()).await.unwrap();
+
+    let result = provider.control(control_command()).await.unwrap();
+    let requests = transport.controls();
+
+    assert_eq!(result.status, ApplicationExecutionCommandStatus::Delivered);
+    assert_eq!(requests.len(), 2);
+    assert_eq!(requests[0].delivery_attempt, 1);
+    assert_eq!(requests[1].delivery_attempt, 2);
+    assert_eq!(requests[0].idempotency_key, requests[1].idempotency_key);
+    assert_eq!(
+        requests[0].audit_evidence_ref,
+        requests[1].audit_evidence_ref
+    );
 }
 
 fn start_command() -> StartApplicationExecutionCommand {
@@ -169,15 +196,30 @@ fn control_command() -> ApplicationExecutionControlCommand {
 struct FakeExternalBackendTransport {
     starts: Mutex<Vec<ExternalApplicationBackendStartRequest>>,
     controls: Mutex<Vec<crate::ExternalApplicationBackendControlRequest>>,
+    fail_next_control_reason: Mutex<Option<String>>,
 }
 
 impl FakeExternalBackendTransport {
+    fn fail_next_control(&self, reason: &str) {
+        *self
+            .fail_next_control_reason
+            .lock()
+            .expect("fake transport lock should not be poisoned") = Some(reason.into());
+    }
+
     fn last_start(&self) -> ExternalApplicationBackendStartRequest {
         self.starts
             .lock()
             .expect("fake transport lock should not be poisoned")
             .last()
             .expect("start request should be recorded")
+            .clone()
+    }
+
+    fn controls(&self) -> Vec<crate::ExternalApplicationBackendControlRequest> {
+        self.controls
+            .lock()
+            .expect("fake transport lock should not be poisoned")
             .clone()
     }
 
@@ -212,6 +254,14 @@ impl ExternalApplicationBackendTransport for FakeExternalBackendTransport {
             .lock()
             .expect("fake transport lock should not be poisoned")
             .push(request);
+        if let Some(reason) = self
+            .fail_next_control_reason
+            .lock()
+            .expect("fake transport lock should not be poisoned")
+            .take()
+        {
+            return Err(ServiceError::AdapterFailure(reason));
+        }
         Ok(())
     }
 }

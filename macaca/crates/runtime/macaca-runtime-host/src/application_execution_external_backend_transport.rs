@@ -54,6 +54,19 @@ pub struct ExternalApplicationBackendControlRequest {
     pub payload: Option<ApplicationExecutionPayload>,
     pub lease_id: Option<String>,
     pub idempotency_key: String,
+    /// One-based delivery attempt number assigned by the provider Strategy.
+    ///
+    /// The value lets transports and backend receivers produce ordered audit
+    /// evidence without changing the stable command idempotency key. Retries
+    /// therefore remain safe for generic controls because the receiver can
+    /// de-duplicate by `idempotency_key` while still observing each attempt.
+    pub delivery_attempt: u32,
+    /// Stable audit evidence reference for every delivery attempt of a command.
+    ///
+    /// The provider creates this reference before retrying and reuses it across
+    /// all attempts, giving logs and downstream audit stores a deterministic
+    /// handle without embedding raw command payloads or application semantics.
+    pub audit_evidence_ref: String,
 }
 
 /// Replaceable transport Adapter used by the external backend provider.

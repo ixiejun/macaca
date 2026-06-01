@@ -15,16 +15,19 @@ use async_trait::async_trait;
 use chrono::{Duration as ChronoDuration, Utc};
 use macaca_proto::{
     ApplicationExecutionCommandStatus, ApplicationExecutionControlCommand,
-    ApplicationExecutionControlResult, ApplicationExecutionError, ApplicationExecutionEventType,
+    ApplicationExecutionControlResult, ApplicationExecutionEventType,
     ApplicationExecutionProviderDescriptor, ApplicationExecutionProviderHealth,
     ApplicationExecutionProviderKind, ApplicationExecutionProviderLease, ApplicationExecutionScope,
     ApplicationExecutionSnapshot, ExternalApplicationBackendExecutionProfile, ServiceError,
     StartApplicationExecutionCommand, StartApplicationExecutionResult,
 };
 use tokio::time::{timeout, Duration as TokioDuration};
-use tracing::{info, warn};
+use tracing::info;
 use uuid::Uuid;
 
+use crate::application_execution_external_backend_results::{
+    control_error, service_error_reason, start_invalid_schema, start_provider_failed,
+};
 use crate::application_execution_external_backend_transport::{
     ExternalApplicationBackendControlRequest, ExternalApplicationBackendStartRequest,
     ExternalApplicationBackendTransport, HttpExternalApplicationBackendTransport,
@@ -32,6 +35,7 @@ use crate::application_execution_external_backend_transport::{
 use crate::application_execution_provider_registry::ApplicationExecutionProvider;
 
 const TRANSPORT_KIND: &str = "external_app_backend";
+const CONTROL_DELIVERY_MAX_ATTEMPTS: u32 = 2;
 
 /// Provider adapter built from a manifest-declared external backend profile.
 pub struct ExternalApplicationBackendProvider {
@@ -194,12 +198,18 @@ impl ApplicationExecutionProvider for ExternalApplicationBackendProvider {
         let session_id = command.session_id.clone();
         let run_id = command.run_id.clone();
         let Some(session_value) = session_id.clone() else {
-            return Ok(
-                self.start_invalid_schema(command, "external backend start requires session_id")
-            );
+            return Ok(start_invalid_schema(
+                &self.descriptor.provider_id,
+                command,
+                "external backend start requires session_id",
+            ));
         };
         let Some(run_value) = run_id.clone() else {
-            return Ok(self.start_invalid_schema(command, "external backend start requires run_id"));
+            return Ok(start_invalid_schema(
+                &self.descriptor.provider_id,
+                command,
+                "external backend start requires run_id",
+            ));
         };
         let scope = ApplicationExecutionScope {
             application_id: command.application_id,
@@ -265,8 +275,14 @@ impl ApplicationExecutionProvider for ExternalApplicationBackendProvider {
                     error: None,
                 })
             }
-            Ok(Err(error)) => Ok(self.start_provider_failed(command, error.to_string(), false)),
-            Err(_) => Ok(self.start_provider_failed(
+            Ok(Err(error)) => Ok(start_provider_failed(
+                &self.descriptor.provider_id,
+                command,
+                service_error_reason(error),
+                false,
+            )),
+            Err(_) => Ok(start_provider_failed(
+                &self.descriptor.provider_id,
                 command,
                 "external backend start request timed out",
                 true,
@@ -285,7 +301,8 @@ impl ApplicationExecutionProvider for ExternalApplicationBackendProvider {
             .iter()
             .any(|supported| supported == &command.command)
         {
-            return Ok(self.control_error(
+            return Ok(control_error(
+                &self.descriptor.provider_id,
                 command,
                 ApplicationExecutionCommandStatus::Unsupported,
                 "control kind is not declared by external backend profile",
@@ -293,7 +310,8 @@ impl ApplicationExecutionProvider for ExternalApplicationBackendProvider {
             ));
         }
         let Some(endpoint) = self.profile.control_endpoint.clone() else {
-            return Ok(self.control_error(
+            return Ok(control_error(
+                &self.descriptor.provider_id,
                 command,
                 ApplicationExecutionCommandStatus::Unsupported,
                 "external backend control endpoint is not configured",
@@ -307,7 +325,8 @@ impl ApplicationExecutionProvider for ExternalApplicationBackendProvider {
                 .iter()
                 .any(|allowed| allowed == &command.command)
             {
-                return Ok(self.control_error(
+                return Ok(control_error(
+                    &self.descriptor.provider_id,
                     command,
                     ApplicationExecutionCommandStatus::Denied,
                     "control kind is not allowed by active external backend lease",
@@ -315,17 +334,10 @@ impl ApplicationExecutionProvider for ExternalApplicationBackendProvider {
                 ));
             }
         }
-        let request = ExternalApplicationBackendControlRequest {
-            endpoint,
-            scope: command.scope.clone(),
-            command: command.command,
-            control_id: command.control_id.clone(),
-            reason_code: command.reason_code.clone(),
-            trace: command.trace.clone(),
-            payload: command.payload.clone(),
-            lease_id: lease.as_ref().map(|lease| lease.lease_id.clone()),
-            idempotency_key: command.idempotency_key.clone(),
-        };
+        let audit_evidence_ref = format!(
+            "audit.application_execution.external_backend.control.{}",
+            command.idempotency_key
+        );
         info!(
             application_id = %command.scope.application_id,
             session_id = %command.scope.session_id,
@@ -335,56 +347,62 @@ impl ApplicationExecutionProvider for ExternalApplicationBackendProvider {
             control_id = %command.control_id,
             "external application backend control request dispatching"
         );
-        match timeout(self.request_timeout(), self.transport.control(request)).await {
-            Ok(Ok(())) => Ok(ApplicationExecutionControlResult {
-                status: ApplicationExecutionCommandStatus::Delivered,
-                scope,
-                provider_id: Some(self.descriptor.provider_id.clone()),
-                provider_kind: ApplicationExecutionProviderKind::ExternalAppBackend,
-                event_cursor: None,
-                error: None,
-            }),
-            Ok(Err(error)) => Ok(self.control_error(
-                command,
-                ApplicationExecutionCommandStatus::ProviderFailed,
-                error.to_string(),
-                false,
-            )),
-            Err(_) => Ok(self.control_error(
-                command,
-                ApplicationExecutionCommandStatus::Timeout,
-                "external backend control request timed out",
-                true,
-            )),
+        let mut last_failure = None;
+        // The retry loop is deliberately small and idempotency-key based. The
+        // provider never interprets the control payload or command semantics;
+        // it only resends the same generic protocol envelope with a higher
+        // attempt number and a stable audit evidence reference so the backend
+        // can safely de-duplicate while operators can trace every attempt.
+        for attempt in 1..=CONTROL_DELIVERY_MAX_ATTEMPTS {
+            let request = ExternalApplicationBackendControlRequest {
+                endpoint: endpoint.clone(),
+                scope: command.scope.clone(),
+                command: command.command,
+                control_id: command.control_id.clone(),
+                reason_code: command.reason_code.clone(),
+                trace: command.trace.clone(),
+                payload: command.payload.clone(),
+                lease_id: lease.as_ref().map(|lease| lease.lease_id.clone()),
+                idempotency_key: command.idempotency_key.clone(),
+                delivery_attempt: attempt,
+                audit_evidence_ref: audit_evidence_ref.clone(),
+            };
+            info!(
+                application_id = %command.scope.application_id,
+                session_id = %command.scope.session_id,
+                run_id = %command.scope.run_id,
+                trace_id = %command.trace.trace_id,
+                provider_id = %self.descriptor.provider_id,
+                control_id = %command.control_id,
+                delivery_attempt = attempt,
+                audit_evidence_ref = %audit_evidence_ref,
+                "external application backend control delivery attempt"
+            );
+            match timeout(self.request_timeout(), self.transport.control(request)).await {
+                Ok(Ok(())) => {
+                    return Ok(ApplicationExecutionControlResult {
+                        status: ApplicationExecutionCommandStatus::Delivered,
+                        scope,
+                        provider_id: Some(self.descriptor.provider_id.clone()),
+                        provider_kind: ApplicationExecutionProviderKind::ExternalAppBackend,
+                        event_cursor: None,
+                        error: None,
+                    });
+                }
+                Ok(Err(error)) => last_failure = Some((error.to_string(), false)),
+                Err(_) => {
+                    last_failure = Some(("external backend control request timed out".into(), true))
+                }
+            }
         }
-    }
-
-    async fn snapshot(&self) -> Result<Option<ApplicationExecutionSnapshot>, ServiceError> {
-        Ok(None)
-    }
-}
-
-impl ExternalApplicationBackendProvider {
-    fn start_invalid_schema(
-        &self,
-        command: StartApplicationExecutionCommand,
-        reason: impl Into<String>,
-    ) -> StartApplicationExecutionResult {
-        self.start_error(
-            command,
-            ApplicationExecutionCommandStatus::InvalidSchema,
-            reason,
-            false,
-        )
-    }
-
-    fn start_provider_failed(
-        &self,
-        command: StartApplicationExecutionCommand,
-        reason: impl Into<String>,
-        retryable: bool,
-    ) -> StartApplicationExecutionResult {
-        self.start_error(
+        let (reason, retryable) = last_failure.unwrap_or_else(|| {
+            (
+                "external backend control request failed before delivery".into(),
+                false,
+            )
+        });
+        Ok(control_error(
+            &self.descriptor.provider_id,
             command,
             if retryable {
                 ApplicationExecutionCommandStatus::Timeout
@@ -393,91 +411,11 @@ impl ExternalApplicationBackendProvider {
             },
             reason,
             retryable,
-        )
+        ))
     }
 
-    fn start_error(
-        &self,
-        command: StartApplicationExecutionCommand,
-        status: ApplicationExecutionCommandStatus,
-        reason: impl Into<String>,
-        retryable: bool,
-    ) -> StartApplicationExecutionResult {
-        let session_id = command.session_id.clone();
-        let run_id = command.run_id.clone();
-        let reason = reason.into();
-        warn!(
-            application_id = %command.application_id,
-            trace_id = %command.trace.trace_id,
-            provider_id = %self.descriptor.provider_id,
-            status = ?status,
-            reason = %reason,
-            "external application backend start failed"
-        );
-        StartApplicationExecutionResult {
-            status,
-            session_id: session_id.clone(),
-            run_id: run_id.clone(),
-            provider_id: Some(self.descriptor.provider_id.clone()),
-            provider_kind: ApplicationExecutionProviderKind::ExternalAppBackend,
-            event_cursor: None,
-            control_ref: None,
-            workspace_ref: command.workspace_ref,
-            error: Some(ApplicationExecutionError {
-                code: status,
-                layer: "service.application_execution.external_backend".into(),
-                operation: "start".into(),
-                application_id: Some(command.application_id),
-                session_id,
-                run_id,
-                provider_id: Some(self.descriptor.provider_id.clone()),
-                provider_kind: Some(ApplicationExecutionProviderKind::ExternalAppBackend),
-                trace_id: Some(command.trace.trace_id),
-                reason,
-                retryable,
-            }),
-        }
-    }
-
-    fn control_error(
-        &self,
-        command: ApplicationExecutionControlCommand,
-        status: ApplicationExecutionCommandStatus,
-        reason: impl Into<String>,
-        retryable: bool,
-    ) -> ApplicationExecutionControlResult {
-        let scope = command.scope.clone();
-        let reason = reason.into();
-        warn!(
-            application_id = %scope.application_id,
-            session_id = %scope.session_id,
-            run_id = %scope.run_id,
-            trace_id = %command.trace.trace_id,
-            provider_id = %self.descriptor.provider_id,
-            status = ?status,
-            reason = %reason,
-            "external application backend control failed"
-        );
-        ApplicationExecutionControlResult {
-            status,
-            scope: scope.clone(),
-            provider_id: Some(self.descriptor.provider_id.clone()),
-            provider_kind: ApplicationExecutionProviderKind::ExternalAppBackend,
-            event_cursor: None,
-            error: Some(ApplicationExecutionError {
-                code: status,
-                layer: "service.application_execution.external_backend".into(),
-                operation: "control".into(),
-                application_id: Some(scope.application_id),
-                session_id: Some(scope.session_id),
-                run_id: Some(scope.run_id),
-                provider_id: Some(self.descriptor.provider_id.clone()),
-                provider_kind: Some(ApplicationExecutionProviderKind::ExternalAppBackend),
-                trace_id: Some(command.trace.trace_id),
-                reason,
-                retryable,
-            }),
-        }
+    async fn snapshot(&self) -> Result<Option<ApplicationExecutionSnapshot>, ServiceError> {
+        Ok(None)
     }
 }
 
