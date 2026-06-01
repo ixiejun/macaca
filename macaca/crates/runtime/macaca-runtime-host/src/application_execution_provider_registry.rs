@@ -212,6 +212,42 @@ impl ApplicationExecutionProviderRegistry {
             .collect()
     }
 
+    /// Return descriptors with dynamic provider health applied.
+    ///
+    /// Static descriptors are useful for catalog display, but routing and
+    /// diagnostics must observe provider state such as heartbeat expiry. This
+    /// method preserves the descriptor shape while letting each Strategy report
+    /// bounded health data through its own adapter boundary.
+    pub async fn descriptors_with_health(&self) -> Vec<ApplicationExecutionProviderDescriptor> {
+        let mut descriptors = Vec::new();
+        for provider in &self.providers {
+            let mut descriptor = provider.describe();
+            descriptor.health_state = provider.health().await.unwrap_or_else(|error| {
+                ApplicationExecutionProviderHealth::Unavailable {
+                    reason: error.to_string(),
+                }
+            });
+            descriptors.push(descriptor);
+        }
+        descriptors
+    }
+
+    /// Collect bounded provider snapshots for service diagnostics.
+    ///
+    /// Providers that have no active state return `None`. Errors are surfaced
+    /// as service failures because snapshots participate in audit and recovery
+    /// evidence; silently hiding a broken provider would make stale execution
+    /// state harder to trace.
+    pub async fn snapshots(&self) -> Result<Vec<ApplicationExecutionSnapshot>, ServiceError> {
+        let mut snapshots = Vec::new();
+        for provider in &self.providers {
+            if let Some(snapshot) = provider.snapshot().await? {
+                snapshots.push(snapshot);
+            }
+        }
+        Ok(snapshots)
+    }
+
     /// Select one provider by preference, health, and required capabilities.
     pub async fn select(
         &self,

@@ -1,7 +1,4 @@
-//! Runtime-host provider for `service.application_execution`.
-//!
-//! This host-owned Adapter exposes descriptor, lifecycle, gateway ingress, and
-//! logs while keeping provider strategies behind service boundaries.
+//! Runtime-host Adapter for `service.application_execution`.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -40,8 +37,9 @@ use crate::application_execution_provider_registry::{
 };
 use crate::application_execution_service_logs::{
     log_command_received, log_control_route, log_failure, log_gateway_ingress,
-    log_provider_assignment, log_service_lifecycle, log_snapshot,
+    log_provider_assignment, log_service_lifecycle,
 };
+use crate::application_execution_service_snapshots::collect_provider_snapshots;
 
 /// Host-owned application execution service provider.
 pub struct ApplicationExecutionSystemServiceProvider {
@@ -343,9 +341,10 @@ impl SystemService for ApplicationExecutionSystemServiceProvider {
                 let state = self.event_store()?.current_state(scope).await?;
                 Self::service_result(state, trace)
             }
-            APPLICATION_EXECUTION_PROVIDER_HEALTH_COMMAND => {
-                Self::service_result(self.provider_registry.descriptors(), trace)
-            }
+            APPLICATION_EXECUTION_PROVIDER_HEALTH_COMMAND => Self::service_result(
+                self.provider_registry.descriptors_with_health().await,
+                trace,
+            ),
             APPLICATION_EXECUTION_GATEWAY_APPEND_EVENT_COMMAND => {
                 let typed: AppendExecutionEventCommand =
                     serde_json::from_value(command.payload).map_err(adapter_error)?;
@@ -372,13 +371,13 @@ impl SystemService for ApplicationExecutionSystemServiceProvider {
                 trace,
             ),
             APPLICATION_EXECUTION_SNAPSHOT_COMMAND => {
-                log_snapshot(
-                    APPLICATION_EXECUTION_SNAPSHOT_COMMAND,
-                    &trace.trace_id,
-                    "unavailable",
-                    Some(&self.reason()),
-                );
-                Err(ServiceError::ServiceUnavailable(self.reason()))
+                let snapshots = collect_provider_snapshots(
+                    self.event_store()?,
+                    &self.provider_registry,
+                    trace.clone(),
+                )
+                .await?;
+                Self::service_result(snapshots, trace)
             }
             other => {
                 log_failure(other, &trace.trace_id, "unsupported_command");

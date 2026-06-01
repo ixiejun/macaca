@@ -25,6 +25,7 @@ use tokio::time::{timeout, Duration as TokioDuration};
 use tracing::info;
 use uuid::Uuid;
 
+use crate::application_execution_external_backend_diagnostics::ExternalBackendHeartbeatDiagnostics;
 use crate::application_execution_external_backend_results::{
     control_error, service_error_reason, start_invalid_schema, start_provider_failed,
 };
@@ -182,6 +183,23 @@ impl ExternalApplicationBackendProvider {
                     && lease.scope.run_id == scope.run_id
             })
             .cloned())
+    }
+
+    fn lease_diagnostics(&self) -> Result<ExternalBackendHeartbeatDiagnostics, ServiceError> {
+        let leases = self
+            .active_leases
+            .read()
+            .map_err(|_| {
+                ServiceError::AdapterFailure("external backend lease lock poisoned".into())
+            })?
+            .values()
+            .cloned()
+            .collect();
+        Ok(ExternalBackendHeartbeatDiagnostics::new(
+            Utc::now(),
+            self.profile.heartbeat_policy.required,
+            leases,
+        ))
     }
 }
 
@@ -415,7 +433,39 @@ impl ApplicationExecutionProvider for ExternalApplicationBackendProvider {
     }
 
     async fn snapshot(&self) -> Result<Option<ApplicationExecutionSnapshot>, ServiceError> {
-        Ok(None)
+        let diagnostics = self.lease_diagnostics()?;
+        let snapshot = diagnostics.snapshot(&self.descriptor.provider_id);
+        if let Some(snapshot) = &snapshot {
+            info!(
+                application_id = %snapshot.scope.application_id,
+                session_id = %snapshot.scope.session_id,
+                run_id = %snapshot.scope.run_id,
+                provider_id = %self.descriptor.provider_id,
+                heartbeat_status = snapshot
+                    .metadata
+                    .get("heartbeat_status")
+                    .map(String::as_str)
+                    .unwrap_or("unknown"),
+                failure_event_required = snapshot
+                    .metadata
+                    .get("failure_event_required")
+                    .map(String::as_str)
+                    .unwrap_or("false"),
+                "external application backend diagnostic snapshot evaluated"
+            );
+        }
+        Ok(snapshot)
+    }
+
+    async fn health(&self) -> Result<ApplicationExecutionProviderHealth, ServiceError> {
+        let health = self.lease_diagnostics()?.health();
+        info!(
+            provider_id = %self.descriptor.provider_id,
+            provider_kind = ?self.descriptor.provider_kind,
+            health = ?health,
+            "external application backend dynamic health evaluated"
+        );
+        Ok(health)
     }
 }
 

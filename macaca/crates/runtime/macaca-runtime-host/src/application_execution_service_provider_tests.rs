@@ -8,13 +8,14 @@ use macaca_proto::{
     ApplicationExecutionCommandStatus, ApplicationExecutionControlCommand,
     ApplicationExecutionControlKind, ApplicationExecutionControlResult,
     ApplicationExecutionEventType, ApplicationExecutionHeartbeatPolicy,
-    ApplicationExecutionPayload, ApplicationExecutionProviderDescriptor,
-    ApplicationExecutionProviderHealth, ApplicationExecutionProviderKind,
-    ApplicationExecutionReplayRequest, ApplicationExecutionReplayResult, ApplicationId,
-    CapabilityId, ServiceBusSource, ServiceCommand, ServiceCommandName, ServiceError,
-    StartApplicationExecutionCommand, StartApplicationExecutionResult, TraceContext,
+    ApplicationExecutionLifecycleState, ApplicationExecutionPayload,
+    ApplicationExecutionProviderDescriptor, ApplicationExecutionProviderHealth,
+    ApplicationExecutionProviderKind, ApplicationExecutionReplayRequest,
+    ApplicationExecutionReplayResult, ApplicationExecutionScope, ApplicationExecutionSnapshot,
+    ApplicationId, CapabilityId, ServiceBusSource, ServiceCommand, ServiceCommandName,
+    ServiceError, StartApplicationExecutionCommand, StartApplicationExecutionResult, TraceContext,
     APPLICATION_EXECUTION_REPLAY_COMMAND, APPLICATION_EXECUTION_SERVICE_ID,
-    APPLICATION_EXECUTION_START_COMMAND,
+    APPLICATION_EXECUTION_SNAPSHOT_COMMAND, APPLICATION_EXECUTION_START_COMMAND,
 };
 use tempfile::tempdir;
 
@@ -337,6 +338,46 @@ async fn duplicate_control_command_reuses_cursor_without_duplicate_provider_deli
     );
 }
 
+#[tokio::test]
+async fn service_snapshot_appends_required_provider_stale_failure_event() {
+    let (_dir, event_log) = event_log();
+    let scope = ApplicationExecutionScope::new(
+        ApplicationId::from_name("snapshot-neutral-application"),
+        "session-stale-snapshot",
+        "run-stale-snapshot",
+        "runtime-test",
+    )
+    .unwrap();
+    let stale_provider = Arc::new(
+        FakeApplicationExecutionProvider::new(
+            "provider-stale-snapshot",
+            ApplicationExecutionProviderKind::ExternalAppBackend,
+        )
+        .with_snapshot(stale_snapshot(scope.clone(), "provider-stale-snapshot")),
+    );
+    let registry = ApplicationExecutionProviderRegistry::new()
+        .register(stale_provider)
+        .unwrap();
+    let provider =
+        ApplicationExecutionSystemServiceProvider::with_event_log(event_log.clone(), registry);
+
+    let reply = provider
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new(APPLICATION_EXECUTION_SNAPSHOT_COMMAND),
+            serde_json::json!({}),
+            TraceContext::new("trace-stale-snapshot"),
+        ))
+        .await
+        .unwrap();
+    let snapshots: Vec<ApplicationExecutionSnapshot> =
+        serde_json::from_value(reply.output).unwrap();
+    let rows = event_log.query("session-stale-snapshot", 0, 10).await;
+
+    assert_eq!(snapshots.len(), 1);
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].event_type, "ExecutionFailed");
+}
+
 fn event_log() -> (tempfile::TempDir, Arc<EventLog>) {
     let dir = tempdir().unwrap();
     let redb = Arc::new(RedbStore::open(dir.path().join("application-execution.redb")).unwrap());
@@ -347,6 +388,7 @@ struct FakeApplicationExecutionProvider {
     provider_id: String,
     provider_kind: ApplicationExecutionProviderKind,
     control_calls: Arc<AtomicUsize>,
+    snapshot: Option<ApplicationExecutionSnapshot>,
 }
 
 impl FakeApplicationExecutionProvider {
@@ -355,7 +397,13 @@ impl FakeApplicationExecutionProvider {
             provider_id: provider_id.into(),
             provider_kind,
             control_calls: Arc::new(AtomicUsize::new(0)),
+            snapshot: None,
         }
+    }
+
+    fn with_snapshot(mut self, snapshot: ApplicationExecutionSnapshot) -> Self {
+        self.snapshot = Some(snapshot);
+        self
     }
 
     fn control_calls(&self) -> usize {
@@ -421,6 +469,25 @@ impl ApplicationExecutionProvider for FakeApplicationExecutionProvider {
     async fn snapshot(
         &self,
     ) -> Result<Option<macaca_proto::ApplicationExecutionSnapshot>, ServiceError> {
-        Ok(None)
+        Ok(self.snapshot.clone())
+    }
+}
+
+fn stale_snapshot(
+    scope: ApplicationExecutionScope,
+    provider_id: &str,
+) -> ApplicationExecutionSnapshot {
+    let mut metadata = std::collections::BTreeMap::new();
+    metadata.insert("heartbeat_status".into(), "stale".into());
+    metadata.insert("stale_lease_count".into(), "1".into());
+    metadata.insert("failure_event_required".into(), "true".into());
+    ApplicationExecutionSnapshot {
+        scope,
+        lifecycle_state: ApplicationExecutionLifecycleState::Failed,
+        provider_id: Some(provider_id.into()),
+        provider_kind: ApplicationExecutionProviderKind::ExternalAppBackend,
+        latest_event_cursor: None,
+        latest_checkpoint_ref: None,
+        metadata,
     }
 }

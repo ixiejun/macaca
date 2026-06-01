@@ -4,9 +4,11 @@ use async_trait::async_trait;
 use macaca_proto::{
     ApplicationExecutionCommandStatus, ApplicationExecutionControlCommand,
     ApplicationExecutionControlKind, ApplicationExecutionHeartbeatPolicy,
-    ApplicationExecutionPayload, ApplicationExecutionProviderKind, ApplicationExecutionScope,
-    ApplicationId, CapabilityId, ExternalApplicationBackendExecutionProfile, ServiceError,
-    StartApplicationExecutionCommand, TraceContext,
+    ApplicationExecutionLifecycleState, ApplicationExecutionPayload,
+    ApplicationExecutionProviderHealth, ApplicationExecutionProviderKind,
+    ApplicationExecutionScope, ApplicationId, CapabilityId,
+    ExternalApplicationBackendExecutionProfile, ServiceError, StartApplicationExecutionCommand,
+    TraceContext,
 };
 
 use crate::{
@@ -153,6 +155,50 @@ async fn external_backend_control_retries_adapter_failures_with_same_idempotency
     assert_eq!(
         requests[0].audit_evidence_ref,
         requests[1].audit_evidence_ref
+    );
+}
+
+#[tokio::test]
+async fn external_backend_health_and_snapshot_mark_expired_heartbeat_stale() {
+    let transport = Arc::new(FakeExternalBackendTransport::default());
+    let mut profile = external_profile();
+    profile.heartbeat_policy.timeout_ms = 1;
+    profile.request_timeout_ms = 10_000;
+    let provider = ExternalApplicationBackendProvider::with_transport(profile, transport)
+        .expect("profile should admit");
+    let _ = provider.start(start_command()).await.unwrap();
+
+    tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+
+    let health = provider.health().await.unwrap();
+    let snapshot = provider
+        .snapshot()
+        .await
+        .unwrap()
+        .expect("stale external backend lease should produce diagnostics");
+
+    assert!(matches!(
+        health,
+        ApplicationExecutionProviderHealth::Unavailable { ref reason }
+            if reason.contains("heartbeat deadline expired")
+    ));
+    assert_eq!(
+        snapshot.lifecycle_state,
+        ApplicationExecutionLifecycleState::Failed
+    );
+    assert_eq!(
+        snapshot
+            .metadata
+            .get("heartbeat_status")
+            .map(String::as_str),
+        Some("stale")
+    );
+    assert_eq!(
+        snapshot
+            .metadata
+            .get("failure_event_required")
+            .map(String::as_str),
+        Some("true")
     );
 }
 
