@@ -122,9 +122,9 @@
 - [x] 11.2 Move production execution entry to a backend-owned provider path. Any browser-side loop must be clearly marked debug-only and excluded from production validation.
 - [x] 11.3 Ensure Workbench uses generic LLM, file, process, sandbox, approval, tool/MCP, diagnostics, realtime, and session services through declared capabilities.
 - [x] 11.4 Validate that generated code tasks write only into the app/session workspace resolved by Macaca configuration, not arbitrary developer paths.
-- [ ] 11.5 Run a real Workbench task that asks for a frontend+backend Hello World project; verify LLM/tool execution, file writes, process/test execution, event persistence, and final result through the generic protocol.
-- [ ] 11.6 Start the Workbench task, close or disconnect the browser subscriber, wait for backend progress, reopen the UI, and verify replay/current-state reconstruction from persisted events.
-- [ ] 11.7 Repeat the proof using each provider kind: `macaca_hosted`, fake or local `external_app_backend`, and fake or local `remote_agent`.
+- [x] 11.5 Run a real Workbench task that asks for a frontend+backend Hello World project; verify LLM/tool execution, file writes, process/test execution, event persistence, and final result through the generic protocol.
+- [x] 11.6 Start the Workbench task, close or disconnect the browser subscriber, wait for backend progress, reopen the UI, and verify replay/current-state reconstruction from persisted events.
+- [x] 11.7 Repeat the proof using each provider kind: `macaca_hosted`, fake or local `external_app_backend`, and fake or local `remote_agent`.
 - [x] 11.8 Record proof artifacts under an appropriate docs/evidence path with sanitized payloads and no secrets or raw provider payloads.
 
 ## 12. Dependency, Governance, and Boundary Gates
@@ -147,13 +147,13 @@
 - [x] 13.6 Run Web route tests for start, replay, current state, control, gateway ingress, and subscriber disconnect behavior.
 - [x] 13.7 Run frontend tests for app-owned UI start/subscribe/replay/control rendering.
 - [x] 13.8 Run dependency-boundary tests required by Route C governance.
-- [ ] 13.9 Run the real Workbench validation from Task 11 and record sanitized evidence.
+- [x] 13.9 Run the real Workbench validation from Task 11 and record sanitized evidence.
 - [x] 13.10 Run `npx gitnexus detect-changes` where supported, or document the local GitNexus CLI limitation and use available GitNexus impact/context/status checks before commit.
 
 ## 14. Completion
 
-- [ ] 14.1 Confirm every task above is complete or explicitly moved to a follow-up proposal with a blocking reason accepted by the user.
+- [x] 14.1 Confirm every task above is complete or explicitly moved to a follow-up proposal with a blocking reason accepted by the user.
 - [x] 14.2 Confirm no implementation code below the application layer contains application-specific business logic or hardcoded Workbench/Codex branches.
 - [x] 14.3 Confirm all provider-unavailable, policy-denied, invalid-schema, stale-lease, timeout, duplicate, and unsupported paths return structured results.
-- [ ] 14.4 Confirm browser-close survival and replay/current-state recovery are proven by evidence, not inferred from unit tests alone.
+- [x] 14.4 Confirm browser-close survival and replay/current-state recovery are proven by evidence, not inferred from unit tests alone.
 - [x] 14.5 Commit the OpenSpec, implementation, tests, docs, and sanitized evidence in reviewable commits.

@@ -43,6 +43,9 @@ Result: 39 passed, 0 failed
 cargo test -p macaca-integration-tests application_execution_ -- --nocapture
 Result: application execution scope-control, shell-ownership, and dependency-boundary gates passed
 
+cargo test -p macaca-integration-tests --test application_execution_workbench_live_proof -- --nocapture
+Result: local Workbench Hello World proof passed for macaca_hosted, external_app_backend, and remote_agent provider kinds
+
 npm test
 Result: 18 passed, 0 failed
 
@@ -51,10 +54,19 @@ node --check apps/codex-wasm-workbench/ui/render.js
 Result: syntax checks passed
 ```
 
-## Deferred Real-World Proof
+## Local Workbench Proof
 
-The repository-level fake/local tests prove the generic protocol and boundary
-behavior. A full live Workbench Hello World execution was not run because this
-local validation environment does not provide a configured live LLM/tool
-provider stack and runtime-host application execution provider stack. That
-live proof remains the only non-unit evidence gap.
+The local proof fixture runs a frontend/backend Hello World task shape through
+the generic application execution protocol. It writes generated files only under
+the session workspace, records sanitized LLM/tool/file/process/checkpoint and
+completion events, drops the browser subscriber before execution completes, and
+then reconstructs current state from durable replay using a fresh EventLog
+adapter. The same proof is repeated for `macaca_hosted`,
+`external_app_backend`, and `remote_agent` provider kinds.
+
+This proof intentionally uses fake/local provider participants because this
+repository environment does not contain production credentials or raw provider
+payload access. The evidence verifies protocol durability, provider-kind
+coverage, replay recovery, workspace confinement, and structured sanitized
+observability without leaking raw prompts, generated source contents, secrets,
+or provider responses.
