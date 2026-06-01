@@ -156,6 +156,8 @@ mod app_protocol_service_provider_tests;
 #[cfg(test)]
 mod application_execution_event_store_tests;
 #[cfg(test)]
+mod application_execution_external_backend_e2e_tests;
+#[cfg(test)]
 mod application_execution_external_backend_tests;
 #[cfg(test)]
 mod application_execution_gateway_service_tests;

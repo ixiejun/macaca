@@ -84,7 +84,7 @@
 - [x] 7.6 Validate callback identity, session/run binding, lease validity, event schema version, idempotency key, allowed event type, payload size, and sanitization before appending any event.
 - [x] 7.7 Implement control forwarding to the backend control endpoint with command idempotency, timeout, retry policy where safe, structured delivery result, and audit evidence.
 - [x] 7.8 Implement heartbeat timeout behavior that marks the provider stale, appends structured failure when required, and exposes diagnostics through health/snapshot.
-- [ ] 7.9 Add tests with a fake external backend that starts, writes events through gateway, requests approval, receives approval, completes, handles duplicate callbacks, rejects invalid signatures, and times out on heartbeat loss.
+- [x] 7.9 Add tests with a fake external backend that starts, writes events through gateway, requests approval, receives approval, completes, handles duplicate callbacks, rejects invalid signatures, and times out on heartbeat loss.
 
 ## 8. `remote_agent` Provider
 
