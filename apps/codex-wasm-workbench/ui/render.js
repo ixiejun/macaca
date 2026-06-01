@@ -11,6 +11,9 @@ export const elements = {
   modelSelect: document.querySelector("#modelSelect"),
   routeSummary: document.querySelector("#routeSummary"),
   submitTaskButton: document.querySelector("#submitTaskButton"),
+  approveButton: document.querySelector("#approveButton"),
+  rejectButton: document.querySelector("#rejectButton"),
+  cancelButton: document.querySelector("#cancelButton"),
   clearButton: document.querySelector("#clearButton"),
   eventTimeline: document.querySelector("#eventTimeline"),
   threadItems: document.querySelector("#threadItems"),
@@ -62,6 +65,11 @@ export function renderResult(state) {
   elements.runState.textContent = state.running ? "Running" : "Ready";
   elements.submitTaskButton.disabled = state.running;
   elements.submitTaskButton.textContent = state.running ? "Running..." : "Run task";
+  const hasScope = Boolean(state.sessionId && state.runId);
+  const hasApproval = (state.currentState?.pending_approval_refs || []).length > 0;
+  elements.approveButton.disabled = !hasScope || !hasApproval;
+  elements.rejectButton.disabled = !hasScope || !hasApproval;
+  elements.cancelButton.disabled = !hasScope || !state.running;
   renderModelSelector(state);
   renderThread(state);
   renderDiagnostics(state);
@@ -96,8 +104,9 @@ function renderModelSelector(state) {
 function renderThread(state) {
   const threadItems = [
     state.sessionId ? `Session ${state.sessionId}` : "No execution session yet.",
-    state.running ? "Task is running through the Workbench LLM/tool loop." : "Ready for a real coding task.",
-    "The application orchestrates; Macaca services own side effects, policy, trace, and audit.",
+    state.runId ? `Run ${state.runId}` : "No execution run yet.",
+    state.currentState?.lifecycle_state ? `State ${state.currentState.lifecycle_state}` : "State unavailable.",
+    state.running ? "Task is running through service.application_execution." : "Ready for a real coding task.",
   ];
   elements.threadItems.replaceChildren(...threadItems.map(listItem));
 }
@@ -110,7 +119,8 @@ function renderDiagnostics(state) {
     `Tool results: ${toolResults}`,
     `Errors: ${errors}`,
     state.route ? `Route: ${state.route.provider_id}:${state.route.model}` : "Route: unresolved",
-    state.running ? "Execution loop is open." : "Execution loop is closed.",
+    state.eventCursor ? `Replay cursor: ${state.eventCursor}` : "Replay cursor: none",
+    state.debugToolLoop ? "Debug loop: enabled" : "Debug loop: disabled",
   ];
   elements.diagnosticsList.replaceChildren(...diagnostics.map(listItem));
 }

@@ -64,15 +64,15 @@
 
 ## 6. `macaca_hosted` Provider
 
-- [ ] 6.1 Implement the `macaca_hosted` provider as a runtime-host provider strategy that loads application execution through existing application ABI/runtime-host seams.
-- [ ] 6.2 Start backend-owned execution tasks with cancellation tokens, run/session/workspace envelope, trace context, and service-call capability scope.
-- [ ] 6.3 Route application service calls through declared capabilities and `ServiceRuntime`; never call concrete LLM/file/process/sandbox/tool providers directly from application-specific code.
-- [ ] 6.4 Append `provider.assigned`, `execution.accepted`, `provider.heartbeat`, lifecycle, LLM/tool summary, approval, checkpoint, completion, failure, and cancellation events at key execution nodes.
-- [ ] 6.5 Implement control handling for cancel, approve, reject, pause, resume, retry, and inject_input using generic wait handles/state transitions.
-- [ ] 6.6 Persist checkpoints before long waits and before graceful shutdown when the application/runtime supports checkpointing.
-- [ ] 6.7 Return structured unavailable or unsupported when the application runtime, ABI export, required host import, or service dependency is missing.
-- [ ] 6.8 Add unit tests using a fake hosted app adapter that emits events, blocks on approval, resumes after approval, handles cancel, and completes without browser participation.
-- [ ] 6.9 Add integration tests proving `macaca_hosted` execution continues after the shell subscriber disconnects and replay reconstructs state after reconnect.
+- [x] 6.1 Implement the `macaca_hosted` provider as a runtime-host provider strategy that loads application execution through existing application ABI/runtime-host seams.
+- [x] 6.2 Start backend-owned execution tasks with cancellation tokens, run/session/workspace envelope, trace context, and service-call capability scope.
+- [x] 6.3 Route application service calls through declared capabilities and `ServiceRuntime`; never call concrete LLM/file/process/sandbox/tool providers directly from application-specific code.
+- [x] 6.4 Append `provider.assigned`, `execution.accepted`, `provider.heartbeat`, lifecycle, LLM/tool summary, approval, checkpoint, completion, failure, and cancellation events at key execution nodes.
+- [x] 6.5 Implement control handling for cancel, approve, reject, pause, resume, retry, and inject_input using generic wait handles/state transitions.
+- [x] 6.6 Persist checkpoints before long waits and before graceful shutdown when the application/runtime supports checkpointing.
+- [x] 6.7 Return structured unavailable or unsupported when the application runtime, ABI export, required host import, or service dependency is missing.
+- [x] 6.8 Add unit tests using a fake hosted app adapter that emits events, blocks on approval, resumes after approval, handles cancel, and completes without browser participation.
+- [x] 6.9 Add integration tests proving `macaca_hosted` execution continues after the shell subscriber disconnects and replay reconstructs state after reconnect.
 
 ## 7. `external_app_backend` Provider
 
@@ -88,15 +88,15 @@
 
 ## 8. `remote_agent` Provider
 
-- [ ] 8.1 Define remote agent registration DTOs and provider descriptors using the same provider protocol fields plus remote transport metadata, lease support, capability declarations, and heartbeat policy.
-- [ ] 8.2 Implement a remote agent registry that tracks registered agents, health, capabilities, resource profile, tenant/region constraints, current leases, and last heartbeat.
-- [ ] 8.3 Implement provider selection against remote agents using capability match, health, resource policy, tenant/region constraints, and lease availability.
-- [ ] 8.4 Issue scoped execution leases with expiry, allowed event types, allowed controls, callback identity reference, and trace context.
-- [ ] 8.5 Dispatch start commands over the registered remote transport adapter without importing a concrete remote-agent implementation into the kernel or shell.
-- [ ] 8.6 Implement remote gateway ingress for heartbeat, event append, snapshot, approval request, completion, and failure using the same validation and sanitization rules as external backends plus lease validation.
-- [ ] 8.7 Implement control delivery over the remote control channel and record control.requested, control.delivered, control.completed, or structured failure.
-- [ ] 8.8 Implement stale lease expiry, heartbeat miss handling, provider failure projection, and checkpoint-based resume when supported by descriptor and policy.
-- [ ] 8.9 Add tests with fake remote agents for registration, provider selection, lease issue, event append, heartbeat, control, stale lease rejection, and resume from checkpoint.
+- [x] 8.1 Define remote agent registration DTOs and provider descriptors using the same provider protocol fields plus remote transport metadata, lease support, capability declarations, and heartbeat policy.
+- [x] 8.2 Implement a remote agent registry that tracks registered agents, health, capabilities, resource profile, tenant/region constraints, current leases, and last heartbeat.
+- [x] 8.3 Implement provider selection against remote agents using capability match, health, resource policy, tenant/region constraints, and lease availability.
+- [x] 8.4 Issue scoped execution leases with expiry, allowed event types, allowed controls, callback identity reference, and trace context.
+- [x] 8.5 Dispatch start commands over the registered remote transport adapter without importing a concrete remote-agent implementation into the kernel or shell.
+- [x] 8.6 Implement remote gateway ingress for heartbeat, event append, snapshot, approval request, completion, and failure using the same validation and sanitization rules as external backends plus lease validation.
+- [x] 8.7 Implement control delivery over the remote control channel and record control.requested, control.delivered, control.completed, or structured failure.
+- [x] 8.8 Implement stale lease expiry, heartbeat miss handling, provider failure projection, and checkpoint-based resume when supported by descriptor and policy.
+- [x] 8.9 Add tests with fake remote agents for registration, provider selection, lease issue, event append, heartbeat, control, stale lease rejection, and resume from checkpoint.
 
 ## 9. Service Commands and API Adapters
 
@@ -109,23 +109,23 @@
 
 ## 10. Frontend and App-Owned UI Boundary
 
-- [ ] 10.1 Update frontend/app-owned UI bridge contracts so application UIs can start execution, subscribe/replay, query current state, and send control commands through Macaca APIs.
-- [ ] 10.2 Remove or demote any production browser-owned LLM/tool loop path to debug-only mode; production Workbench execution must use `service.application_execution`.
-- [ ] 10.3 Ensure UI-local arrays such as timeline/event buffers are render caches only and are never described or used as durable source of truth.
-- [ ] 10.4 Add reconnect behavior: when the iframe/app UI mounts with a session id, it queries current state and replays events from the stored cursor.
-- [ ] 10.5 Add cancel/approve/reject/resume UI actions that send typed control commands and render control outcomes from the event stream.
-- [ ] 10.6 Add frontend tests proving the UI starts a task, disconnects/reconnects, replays events, renders pending approval, sends approval, sends cancel, and never calls external app backend authoritative state endpoints directly.
+- [x] 10.1 Update frontend/app-owned UI bridge contracts so application UIs can start execution, subscribe/replay, query current state, and send control commands through Macaca APIs.
+- [x] 10.2 Remove or demote any production browser-owned LLM/tool loop path to debug-only mode; production Workbench execution must use `service.application_execution`.
+- [x] 10.3 Ensure UI-local arrays such as timeline/event buffers are render caches only and are never described or used as durable source of truth.
+- [x] 10.4 Add reconnect behavior: when the iframe/app UI mounts with a session id, it queries current state and replays events from the stored cursor.
+- [x] 10.5 Add cancel/approve/reject/resume UI actions that send typed control commands and render control outcomes from the event stream.
+- [x] 10.6 Add frontend tests proving the UI starts a task, disconnects/reconnects, replays events, renders pending approval, sends approval, sends cancel, and never calls external app backend authoritative state endpoints directly.
 
 ## 11. CODEX-WASM-WORKBENCH Proof Without OS-Specific Logic
 
-- [ ] 11.1 Update `apps/codex-wasm-workbench` manifest to declare the generic application execution bridge/provider requirements required by the new protocol.
-- [ ] 11.2 Move production execution entry to a backend-owned provider path. Any browser-side loop must be clearly marked debug-only and excluded from production validation.
-- [ ] 11.3 Ensure Workbench uses generic LLM, file, process, sandbox, approval, tool/MCP, diagnostics, realtime, and session services through declared capabilities.
-- [ ] 11.4 Validate that generated code tasks write only into the app/session workspace resolved by Macaca configuration, not arbitrary developer paths.
+- [x] 11.1 Update `apps/codex-wasm-workbench` manifest to declare the generic application execution bridge/provider requirements required by the new protocol.
+- [x] 11.2 Move production execution entry to a backend-owned provider path. Any browser-side loop must be clearly marked debug-only and excluded from production validation.
+- [x] 11.3 Ensure Workbench uses generic LLM, file, process, sandbox, approval, tool/MCP, diagnostics, realtime, and session services through declared capabilities.
+- [x] 11.4 Validate that generated code tasks write only into the app/session workspace resolved by Macaca configuration, not arbitrary developer paths.
 - [ ] 11.5 Run a real Workbench task that asks for a frontend+backend Hello World project; verify LLM/tool execution, file writes, process/test execution, event persistence, and final result through the generic protocol.
 - [ ] 11.6 Start the Workbench task, close or disconnect the browser subscriber, wait for backend progress, reopen the UI, and verify replay/current-state reconstruction from persisted events.
 - [ ] 11.7 Repeat the proof using each provider kind: `macaca_hosted`, fake or local `external_app_backend`, and fake or local `remote_agent`.
-- [ ] 11.8 Record proof artifacts under an appropriate docs/evidence path with sanitized payloads and no secrets or raw provider payloads.
+- [x] 11.8 Record proof artifacts under an appropriate docs/evidence path with sanitized payloads and no secrets or raw provider payloads.
 
 ## 12. Dependency, Governance, and Boundary Gates
 
@@ -143,9 +143,9 @@
 - [x] 13.2 Run targeted proto/foundation tests for application execution DTOs and schema validation.
 - [x] 13.3 Run targeted SDK tests for unavailable client behavior and typed command forwarding.
 - [x] 13.4 Run targeted runtime-host tests for service descriptor, provider registry, EventLog append/replay, current-state projection, control idempotency, gateway ingress, and provider strategies.
-- [ ] 13.5 Run integration tests for all three provider kinds.
+- [x] 13.5 Run integration tests for all three provider kinds.
 - [x] 13.6 Run Web route tests for start, replay, current state, control, gateway ingress, and subscriber disconnect behavior.
-- [ ] 13.7 Run frontend tests for app-owned UI start/subscribe/replay/control rendering.
+- [x] 13.7 Run frontend tests for app-owned UI start/subscribe/replay/control rendering.
 - [x] 13.8 Run dependency-boundary tests required by Route C governance.
 - [ ] 13.9 Run the real Workbench validation from Task 11 and record sanitized evidence.
 - [x] 13.10 Run `npx gitnexus detect-changes` where supported, or document the local GitNexus CLI limitation and use available GitNexus impact/context/status checks before commit.
@@ -153,7 +153,7 @@
 ## 14. Completion
 
 - [ ] 14.1 Confirm every task above is complete or explicitly moved to a follow-up proposal with a blocking reason accepted by the user.
-- [ ] 14.2 Confirm no implementation code below the application layer contains application-specific business logic or hardcoded Workbench/Codex branches.
-- [ ] 14.3 Confirm all provider-unavailable, policy-denied, invalid-schema, stale-lease, timeout, duplicate, and unsupported paths return structured results.
+- [x] 14.2 Confirm no implementation code below the application layer contains application-specific business logic or hardcoded Workbench/Codex branches.
+- [x] 14.3 Confirm all provider-unavailable, policy-denied, invalid-schema, stale-lease, timeout, duplicate, and unsupported paths return structured results.
 - [ ] 14.4 Confirm browser-close survival and replay/current-state recovery are proven by evidence, not inferred from unit tests alone.
-- [ ] 14.5 Commit the OpenSpec, implementation, tests, docs, and sanitized evidence in reviewable commits.
+- [x] 14.5 Commit the OpenSpec, implementation, tests, docs, and sanitized evidence in reviewable commits.

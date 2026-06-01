@@ -23,8 +23,10 @@ mod application_execution_external_backend_diagnostics;
 mod application_execution_external_backend_results;
 mod application_execution_external_backend_transport;
 mod application_execution_gateway_events;
+mod application_execution_hosted;
 mod application_execution_projection;
 mod application_execution_provider_registry;
+mod application_execution_remote_agent;
 mod application_execution_service_logs;
 pub mod application_execution_service_provider;
 mod application_execution_service_snapshots;
@@ -162,7 +164,11 @@ mod application_execution_external_backend_tests;
 #[cfg(test)]
 mod application_execution_gateway_service_tests;
 #[cfg(test)]
+mod application_execution_hosted_tests;
+#[cfg(test)]
 mod application_execution_provider_registry_tests;
+#[cfg(test)]
+mod application_execution_remote_agent_tests;
 #[cfg(test)]
 mod application_execution_service_provider_tests;
 #[cfg(test)]
@@ -254,11 +260,20 @@ pub use application_execution_external_backend_transport::{
     ExternalApplicationBackendControlRequest, ExternalApplicationBackendStartRequest,
     ExternalApplicationBackendTransport, HttpExternalApplicationBackendTransport,
 };
+pub use application_execution_hosted::{
+    ApplicationAbiHostedExecutionAdapter, HostedApplicationExecutionAdapter,
+    HostedApplicationExecutionOutcome, MacacaHostedApplicationExecutionProvider,
+};
 pub use application_execution_projection::project_application_execution_state;
 pub use application_execution_provider_registry::{
     ApplicationExecutionProvider, ApplicationExecutionProviderRegistry,
     ApplicationExecutionProviderSelection, ApplicationExecutionProviderSelectionCriteria,
     ApplicationExecutionProviderSelectionPolicy, ApplicationExecutionProviderSelectionRecord,
+};
+pub use application_execution_remote_agent::{
+    RemoteAgentApplicationExecutionProvider, RemoteAgentExecutionTransport,
+    RemoteAgentRegistration, RemoteAgentRegistry, RemoteAgentTransportMetadata,
+    UnavailableRemoteAgentExecutionTransport,
 };
 pub use application_execution_service_provider::{
     application_execution_service_descriptor_runtime, application_execution_service_id,

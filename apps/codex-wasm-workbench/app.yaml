@@ -12,6 +12,7 @@ entrypoint:
 service_contract:
   required_services:
     - service.application.host
+    - service.application_execution
     - service.interaction
     - service.app_protocol
     - service.file
@@ -138,6 +139,9 @@ workbench:
     - family: interaction
       optional: false
       reason: "Thread, turn, and item state must be service-owned"
+    - family: application_execution
+      optional: false
+      reason: "Production execution starts, controls, replay, and current state must use service.application_execution"
     - family: app_protocol
       optional: false
       reason: "Typed workbench events stream through the protocol gateway"
@@ -210,6 +214,9 @@ workbench:
     - service: service.interaction
       optional: false
       reason: "Durable Thread/Turn/Item lifecycle"
+    - service: service.application_execution
+      optional: false
+      reason: "Provider-neutral production execution protocol, controls, durable events, replay, and current-state projection"
     - service: service.app_protocol
       optional: false
       reason: "Bidirectional event transport over focused clients"
@@ -305,6 +312,9 @@ workbench:
     - topic: diagnostics.bundle
       optional: false
       reason: "Diagnostics bundles are exposed as sanitized refs"
+    - topic: application_execution.event
+      optional: false
+      reason: "Durable execution facts are replayed from service.application_execution"
 
   ui_surfaces:
     - surface_id: main
@@ -316,6 +326,7 @@ workbench:
         - trace.emit
         - ui.render
       event_subscriptions:
+        - application_execution.event
         - thread.item
         - process.output
         - file.changed
