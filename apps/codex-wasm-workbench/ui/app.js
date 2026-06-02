@@ -1,3 +1,4 @@
+import { createWorkbenchBridgeCalls } from "./bridge_calls.js";
 import { elements, renderAll, renderResult, renderTimeline } from "./render.js";
 import { createSessionHistoryAdapter } from "./session_history.js";
 import { WorkbenchSessionMementoStore } from "./session_memento.js";
@@ -35,12 +36,17 @@ const hostOrigin = (() => {
 
 const pendingBridgeCalls = new Map();
 const sessionMementos = new WorkbenchSessionMementoStore();
+const { callAppExecution, callSessionRead } = createWorkbenchBridgeCalls({
+  state,
+  pendingBridgeCalls,
+  hostOrigin,
+  bridgeOutput,
+});
 const sessionHistory = createSessionHistoryAdapter({
   state,
-  getJson,
+  callAppExecution,
   callSessionRead,
   normalizeExecutionEvent,
-  applicationIdFromLocation,
   sessionContextEvent,
   sessionMementos,
   renderTimeline,
@@ -179,7 +185,7 @@ async function startTask() {
   renderTimeline(state);
   renderResult(state);
   try {
-    const result = await postJson(`/api/apps/${applicationIdFromLocation()}/execution/start`, {
+    const result = await callAppExecution("start", {
       session_id: state.sessionId,
       run_id: state.runId,
       task_input: {
@@ -252,22 +258,6 @@ async function startDebugToolLoop(prompt) {
   }
 }
 
-async function postJson(path, body) {
-  const response = await fetch(path, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!response.ok) throw new Error(await response.text());
-  return response.json();
-}
-
-async function getJson(path) {
-  const response = await fetch(path);
-  if (!response.ok) throw new Error(await response.text());
-  return response.json();
-}
-
 function openExecutionWebSocket() {
   if (!state.sessionId) return;
   closeExecutionSocket(false);
@@ -311,36 +301,6 @@ function closeExecutionSocket(reportDisconnect = false) {
   state.eventSocket.close();
 }
 
-function callSessionRead(operation, payload = {}) {
-  // App-owned UI bundles run under a strict iframe CSP, so they cannot assume
-  // direct access to shell HTTP endpoints.  The generic `session.read` bridge
-  // lets the host adapt durable session history through declared capabilities
-  // while the Workbench remains the sole owner of how that history is rendered.
-  const commandId = crypto.randomUUID();
-  return new Promise((resolve, reject) => {
-    const timeout = window.setTimeout(() => {
-      pendingBridgeCalls.delete(commandId);
-      reject(new Error(`session.read/${operation} timed out`));
-    }, 120000);
-    pendingBridgeCalls.set(commandId, {
-      resolve: (response) => resolve(bridgeOutput(response)),
-      reject,
-      timeout,
-    });
-    window.parent.postMessage(
-      {
-        type: "macaca.call",
-        command_id: commandId,
-        session_id: state.sessionId,
-        capability: "session.read",
-        operation,
-        payload,
-      },
-      hostOrigin,
-    );
-  });
-}
-
 async function refreshCurrentState() {
   if (!state.sessionId || !state.runId) return;
   const params = new URLSearchParams({
@@ -349,7 +309,7 @@ async function refreshCurrentState() {
     actor: "app-owned-ui",
     trace_id: `trace-current-${state.sessionId}`,
   });
-  state.currentState = await getJson(`/api/apps/${applicationIdFromLocation()}/execution/current-state?${params}`);
+  state.currentState = await callAppExecution("current-state", Object.fromEntries(params));
   state.running = !["Completed", "Failed", "Cancelled"].includes(state.currentState.lifecycle_state);
   sessionMementos.save(state);
   renderResult(state);
@@ -359,7 +319,7 @@ async function sendControl(command, reasonCode) {
   if (!state.sessionId || !state.runId) return;
   const controlId = crypto.randomUUID();
   try {
-    const result = await postJson(`/api/apps/${applicationIdFromLocation()}/execution/control`, {
+    const result = await callAppExecution("control", {
       scope: {
         application_id: applicationIdFromLocation(),
         session_id: state.sessionId,

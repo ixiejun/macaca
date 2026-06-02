@@ -18,10 +18,9 @@ const EXECUTION_EVENT_TYPES = new Set([
 export function createSessionHistoryAdapter(dependencies) {
   const {
     state,
-    getJson,
+    callAppExecution,
     callSessionRead,
     normalizeExecutionEvent,
-    applicationIdFromLocation,
     sessionContextEvent,
     sessionMementos,
     renderTimeline,
@@ -89,13 +88,13 @@ export function createSessionHistoryAdapter(dependencies) {
 
   async function replayEvents({ preserveLocalOnEmpty = false } = {}) {
     if (!state.sessionId) return;
-    const params = new URLSearchParams({
+    const params = {
       session_id: state.sessionId,
       trace_id: `trace-replay-${state.sessionId}`,
       page_size: "100",
-    });
-    if (state.runId) params.set("run_id", state.runId);
-    const replay = await getJson(`/api/apps/${applicationIdFromLocation()}/execution/replay?${params}`).catch((error) => {
+    };
+    if (state.runId) params.run_id = state.runId;
+    const replay = await callAppExecution("replay", params).catch((error) => {
       console.warn("[codex-wasm-workbench] protocol replay failed; falling back to generic session history", {
         session_id: state.sessionId,
         error: error instanceof Error ? error.message : String(error),
