@@ -22,3 +22,4 @@
 - [x] 4.3 Run OpenSpec strict validation and repository diff checks.
 - [x] 4.4 Run GitNexus change detection before commit.
 - [x] 4.5 Send a real backend task to `codex-wasm-workbench` and verify EventLog replay/current-state plus WebSocket delivery after subscriber disconnect.
+- [x] 4.6 Route hosted WASM start through generic `app:start` export invoke and verify the real `codex-wasm-workbench` task completes successfully.

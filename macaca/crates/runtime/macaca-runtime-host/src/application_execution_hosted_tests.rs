@@ -3,18 +3,20 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use macaca_persist::{EventLog, RedbStore};
 use macaca_proto::{
-    ApplicationExecutionCommandStatus, ApplicationExecutionControlCommand,
+    ApplicationAbiError, ApplicationExecutionCommandStatus, ApplicationExecutionControlCommand,
     ApplicationExecutionControlKind, ApplicationExecutionPayload, ApplicationExecutionProviderKind,
     ApplicationExecutionReplayRequest, ApplicationExecutionScope, ApplicationExecutionSnapshot,
-    ApplicationId, CapabilityId, StartApplicationExecutionCommand, TraceContext,
+    ApplicationHostCommand, ApplicationHostCommandResult, ApplicationHostCommandStatus,
+    ApplicationId, ApplicationImport, CapabilityId, PackageRuntimeKind,
+    StartApplicationExecutionCommand, TraceContext,
 };
 use tempfile::tempdir;
 use tokio::sync::Mutex;
 
 use crate::{
-    ApplicationExecutionEventStore, ApplicationExecutionProvider,
-    HostedApplicationExecutionAdapter, HostedApplicationExecutionOutcome,
-    MacacaHostedApplicationExecutionProvider,
+    ApplicationAbiHostedExecutionAdapter, ApplicationExecutionEventStore,
+    ApplicationExecutionProvider, ApplicationHostRuntime, HostedApplicationExecutionAdapter,
+    HostedApplicationExecutionOutcome, MacacaHostedApplicationExecutionProvider,
 };
 
 #[tokio::test]
@@ -108,9 +110,77 @@ async fn hosted_provider_returns_structured_unavailable_when_runtime_is_missing(
     assert!(result.error.unwrap().reason.contains("runtime missing"));
 }
 
+#[tokio::test]
+async fn abi_hosted_start_invokes_generic_wasm_start_export() {
+    let host = Arc::new(CapturingHostRuntime::default());
+    let adapter = ApplicationAbiHostedExecutionAdapter::new(host.clone());
+
+    let outcome = adapter
+        .start(start_command(
+            "session-wasm-export",
+            "run-wasm-export",
+            "hosted-wasm-export-1",
+        ))
+        .await
+        .unwrap();
+
+    assert!(matches!(
+        outcome,
+        HostedApplicationExecutionOutcome::Completed { .. }
+    ));
+    let command = host.last_command.lock().await.clone().unwrap();
+    assert_eq!(
+        command.import,
+        ApplicationImport::Custom("macaca:wasm/invoke".into())
+    );
+    assert_eq!(
+        command.metadata.get("wasm.export").map(String::as_str),
+        Some("app:start")
+    );
+    assert_eq!(
+        command
+            .metadata
+            .get("execution.operation")
+            .map(String::as_str),
+        Some("start")
+    );
+}
+
 struct FakeHostedAdapter {
     outcome: Result<HostedApplicationExecutionOutcome, ServiceErrorProxy>,
     controls: Mutex<Vec<ApplicationExecutionControlKind>>,
+}
+
+#[derive(Default)]
+struct CapturingHostRuntime {
+    last_command: Mutex<Option<ApplicationHostCommand>>,
+}
+
+#[async_trait]
+impl ApplicationHostRuntime for CapturingHostRuntime {
+    fn runtime_kind(&self) -> PackageRuntimeKind {
+        PackageRuntimeKind::WasmComponent
+    }
+
+    /// Capture the exact ABI command emitted by the hosted execution adapter.
+    ///
+    /// The fake host deliberately returns only the provider-neutral success
+    /// status.  It does not emulate Codex, WASM bytes, service providers, or
+    /// business workflow; the test only verifies that hosted execution crosses
+    /// the generic WASM export-invoke seam.
+    async fn dispatch(
+        &self,
+        command: ApplicationHostCommand,
+    ) -> Result<ApplicationHostCommandResult, ApplicationAbiError> {
+        *self.last_command.lock().await = Some(command.clone());
+        Ok(ApplicationHostCommandResult {
+            status: ApplicationHostCommandStatus::Ok,
+            output: serde_json::json!({ "captured": true }),
+            trace: command.trace,
+            policy: None,
+            metadata: Default::default(),
+        })
+    }
 }
 
 impl FakeHostedAdapter {

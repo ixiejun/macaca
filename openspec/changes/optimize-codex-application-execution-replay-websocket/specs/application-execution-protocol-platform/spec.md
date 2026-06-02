@@ -28,3 +28,11 @@ Macaca SHALL persist application execution events before realtime delivery. Real
 - **AND** it SHALL open a WebSocket subscription using the latest durable event cursor
 - **AND** each WebSocket message SHALL refer to an EventLog row that was already persisted by `service.application_execution`
 - **AND** the WebSocket connection SHALL NOT own provider execution, EventLog append, current-state projection, approval semantics, or cancellation semantics.
+
+#### Scenario: Hosted WASM start executes through the application export
+
+- **GIVEN** an L2 WASM application has a declared component artifact and a traceable execution start command
+- **WHEN** `service.application_execution` selects the Macaca-hosted provider for that application
+- **THEN** Macaca SHALL dispatch a generic WASM export invocation for `app:start`
+- **AND** any declared host commands from the component SHALL be routed through the WASM host-import bridge, policy engine, service router, and audit chain
+- **AND** the resulting application execution event history SHALL reach a terminal completed state when all declared host commands complete.

@@ -8,6 +8,7 @@ Macaca's application execution platform already persists authoritative execution
 - Use the **Memento** pattern for refresh recovery: replay/current-state reconstruct the UI cache before any realtime subscription is opened.
 - Use the **Adapter** pattern in `macaca-web`: the Web route adapts HTTP/WebSocket framing to EventLog queries and does not construct providers, append execution events, or interpret Codex task behavior.
 - Use the **Bridge/Adapter** pattern in `macaca-runtime-host`: the default application-execution service now registers the existing generic `MacacaHosted` provider with a service-backed Application Host adapter. The adapter calls `service.application/application.host.dispatch` through `ServiceRuntime`, so real execution attempts are routed through the same policy, trace, service-bus, and audit chain as other OS service calls.
+- Use the **Command** pattern for hosted WASM start: `service.application_execution` converts a start request into a generic WASM export-invoke command (`app:start`) instead of a Codex-specific host import. The component runtime then runs declared host-command metadata through the existing host-import bridge, policy engine, service router, and audit chain.
 - Keep Codex behavior in `apps/codex-wasm-workbench`: the UI submits a generic start command with app-owned task input and renders generic protocol events.
 
 ## Non-Goals
@@ -16,6 +17,7 @@ Macaca's application execution platform already persists authoritative execution
 - No Codex-specific branch in kernel, SDK, runtime-host generic services, or Web shell routes.
 - No replacement of the existing replay/current-state/control API.
 - No raw prompt/provider payload persistence; existing sanitized event rules still apply.
+- No broad admission of arbitrary `ApplicationImport::Custom` values through the WASM host-import bridge; the hosted start path must remain an explicit export-invoke command.
 
 ## Trace And Audit
 
