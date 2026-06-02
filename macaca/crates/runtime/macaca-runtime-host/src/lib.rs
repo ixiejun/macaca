@@ -27,6 +27,7 @@ mod application_execution_hosted;
 mod application_execution_projection;
 mod application_execution_provider_registry;
 mod application_execution_remote_agent;
+mod application_execution_service_host;
 mod application_execution_service_logs;
 pub mod application_execution_service_provider;
 mod application_execution_service_snapshots;
@@ -275,6 +276,7 @@ pub use application_execution_remote_agent::{
     RemoteAgentRegistration, RemoteAgentRegistry, RemoteAgentTransportMetadata,
     UnavailableRemoteAgentExecutionTransport,
 };
+pub use application_execution_service_host::ServiceBackedApplicationHostRuntime;
 pub use application_execution_service_provider::{
     application_execution_service_descriptor_runtime, application_execution_service_id,
     bootstrap_application_execution_service, bootstrap_default_application_execution_service,

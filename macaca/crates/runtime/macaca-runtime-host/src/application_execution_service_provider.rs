@@ -35,6 +35,7 @@ use crate::application_execution_gateway_events::{
 use crate::application_execution_provider_registry::{
     ApplicationExecutionProviderRegistry, ApplicationExecutionProviderSelectionCriteria,
 };
+use crate::application_execution_service_host::default_application_execution_provider_registry;
 use crate::application_execution_service_logs::{
     log_command_received, log_control_route, log_failure, log_gateway_ingress,
     log_provider_assignment, log_service_lifecycle,
@@ -453,13 +454,11 @@ pub async fn bootstrap_default_application_execution_service(
     event_log: Arc<EventLog>,
     trace_id: impl Into<String>,
 ) -> macaca_proto::MacacaResult<macaca_proto::KernelServiceId> {
-    bootstrap_application_execution_service(
-        runtime,
-        event_log,
-        ApplicationExecutionProviderRegistry::new(),
-        trace_id,
-    )
-    .await
+    let provider_registry = default_application_execution_provider_registry(
+        Arc::clone(&runtime),
+        Arc::clone(&event_log),
+    )?;
+    bootstrap_application_execution_service(runtime, event_log, provider_registry, trace_id).await
 }
 
 async fn register_application_execution_service(
