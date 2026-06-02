@@ -22,3 +22,4 @@
 - [x] Add a generic app-owned execution bridge so application UI bundles can start `/api/chat/v2` and observe SSE events without the host chat composer.
 - [x] Upgrade `codex-wasm-workbench` UI into a complete coding workbench with task input, execution stream, service audit, diagnostics, and result panes.
 - [x] Declare the workbench execution bridge capability and verify the app-owned UI can submit a real programming task on Macaca OS.
+- [x] Project app-owned UI bridge sessions into the shell session log using generic bridge scope only, then verify `/api/apps/{app_id}/sessions` includes a bridge-created session after refresh.

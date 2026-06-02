@@ -10,6 +10,7 @@ pub mod agent_runner;
 mod app_ui_csp;
 mod app_ui_llm_bridge;
 pub mod app_ui_routes;
+mod app_ui_session_projection;
 mod app_ui_workspace_scope;
 mod app_workspace_bootstrap;
 pub mod application_execution_gateway_routes;

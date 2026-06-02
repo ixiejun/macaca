@@ -31,6 +31,7 @@ use macaca_proto::{
 
 use crate::app_ui_csp::app_ui_html_csp;
 use crate::app_ui_llm_bridge::hydrate_llm_bridge_payload;
+use crate::app_ui_session_projection::AppUiSessionProjection;
 use crate::app_ui_workspace_scope::decorate_workspace_scoped_payload;
 use crate::routes::{err, proto_err, ErrorResponse};
 use crate::state::AppState;
@@ -120,6 +121,21 @@ pub async fn post_app_ui_bridge(
             rejected_bridge_result("ui bridge capability was not declared", trace),
         )));
     }
+
+    // App-owned UI bundles can use the generic service bridge without the host
+    // chat composer.  Once the bridge capability is admitted, persist a small
+    // shell-visible session memento so refresh and the left session log can
+    // recover the run.  The projection uses only generic bridge routing fields
+    // and never inspects application-owned payload data.
+    AppUiSessionProjection::new(Arc::clone(&state.persist.session_store))
+        .record_bridge_received(&app_id, &request)
+        .await
+        .map_err(|error| {
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("failed to project application UI bridge session: {error}"),
+            )
+        })?;
 
     let result = match request.capability.as_str() {
         "service.call" => {

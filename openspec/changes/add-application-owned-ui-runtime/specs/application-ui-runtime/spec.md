@@ -99,6 +99,20 @@ capability-governed bridge.
 - **AND** the shell does not interpret application-specific workflow or business
   semantics.
 
+#### Scenario: UI bridge session appears in shell session logs
+
+- **GIVEN** an application-owned UI sends an admitted bridge call with a
+  non-empty `session_id`
+- **WHEN** the bridge call is routed through the Web shell
+- **THEN** the shell SHALL create or update a provider-neutral session
+  projection for that application and session
+- **AND** `/api/apps/{app_id}/sessions` SHALL include the projected session
+  after refresh
+- **AND** the projection SHALL use only generic bridge scope and sanitized
+  routing metadata
+- **AND** the shell SHALL NOT inspect application-specific payload fields,
+  workflow names, or business semantics to create the projection.
+
 ### Requirement: Optional developer UI Kit
 
 Macaca MAY provide a UI Kit and SDK for application developers, but shells SHALL

@@ -45,6 +45,21 @@ capabilities and runtime policy before routing.
 Rationale: This preserves the same fail-closed model used by WASM
 `service.call` and makes UI actions traceable.
 
+### Decision 2.1: Bridge sessions are projected into the shell session log
+
+When an app-owned UI bridge request carries a `session_id`, the Web shell
+records a minimal, provider-neutral `StoredSession` projection before routing
+the bridge command. This is a Memento over shell-visible session state, not an
+execution engine: it keeps the left session log refreshable while application
+execution, service calls, and task semantics remain behind service boundaries.
+
+Rationale: App-owned UI bundles can run task loops through generic bridge calls
+without using the host chat composer. Those runs still need a universal shell
+breadcrumb so users can recover the session after refresh. The projection uses
+only generic bridge scope (`app_id`, `session_id`, `capability`, `service_id`,
+`operation`, and trace id) and never branches on application name, workflow, or
+business payload.
+
 ### Decision 3: `@macaca/ui` is optional
 
 Macaca may provide a UI Kit and design tokens, but application bundles are not
