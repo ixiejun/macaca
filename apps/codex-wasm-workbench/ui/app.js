@@ -1,6 +1,6 @@
 import { elements, renderAll, renderResult, renderTimeline } from "./render.js";
+import { createSessionHistoryAdapter } from "./session_history.js";
 import { WorkbenchSessionMementoStore } from "./session_memento.js";
-
 // This entrypoint is an app-owned UI bridge over Macaca's generic application
 // execution protocol.  The browser keeps only render caches and transport
 // handles; authoritative execution facts are started, controlled, persisted,
@@ -35,6 +35,17 @@ const hostOrigin = (() => {
 
 const pendingBridgeCalls = new Map();
 const sessionMementos = new WorkbenchSessionMementoStore();
+const sessionHistory = createSessionHistoryAdapter({
+  state,
+  getJson,
+  callSessionRead,
+  normalizeExecutionEvent,
+  applicationIdFromLocation,
+  sessionContextEvent,
+  sessionMementos,
+  renderTimeline,
+  renderResult,
+});
 
 function appendEvent(type, data) {
   state.events.push({ type, data, at: new Date().toISOString() });
@@ -195,7 +206,7 @@ async function startTask() {
     state.runId = result.run_id || state.runId;
     state.eventCursor = result.event_cursor || state.eventCursor;
     appendEvent("execution_start_result", result);
-    await replayEvents();
+    await sessionHistory.replayEvents();
     await refreshCurrentState();
     openExecutionWebSocket();
   } catch (error) {
@@ -300,87 +311,34 @@ function closeExecutionSocket(reportDisconnect = false) {
   state.eventSocket.close();
 }
 
-async function replayEvents({ preserveLocalOnEmpty = false } = {}) {
-  if (!state.sessionId) return;
-  const params = new URLSearchParams({
-    session_id: state.sessionId,
-    trace_id: `trace-replay-${state.sessionId}`,
-    page_size: "100",
-  });
-  if (state.runId) params.set("run_id", state.runId);
-  const replay = await getJson(`/api/apps/${applicationIdFromLocation()}/execution/replay?${params}`);
-  state.currentState = replay.current_state || state.currentState;
-  state.runId = state.currentState?.run_id || state.currentState?.scope?.run_id || state.runId;
-  state.eventCursor = replay.next_cursor || state.eventCursor;
-  const replayedEvents = (replay.events || []).map((rawEvent) => {
-    const event = normalizeExecutionEvent(rawEvent);
-    return {
-      type: "execution_event",
-      data: event,
-      at: event.timestamp || new Date().toISOString(),
-    };
-  });
-  if (replayedEvents.length > 0) {
-    state.events = replayedEvents;
-  } else if (!preserveLocalOnEmpty || state.events.length === 0) {
-    state.events = await loadGenericSessionHistoryEvents();
-    if (state.events.length === 0) {
-      state.events = [sessionContextEvent("No durable session history is stored for this session yet.")];
-    }
-  }
-  sessionMementos.save(state);
-  renderTimeline(state);
-  renderResult(state);
-}
-
-async function loadGenericSessionHistoryEvents() {
-  // Application-execution replay is the authoritative protocol view when the
-  // selected session was started through `service.application_execution`.
-  // Historical Workbench sessions may instead be legacy shell sessions or
-  // generic app-owned bridge sessions.  This Adapter keeps that compatibility
-  // local to the application UI by reading Macaca's provider-neutral session
-  // history endpoints; it does not ask the OS to understand Codex-specific
-  // execution stream semantics.
-  const [eventHistory, sessionDetail] = await Promise.all([
-    getJson(`/api/sessions/${encodeURIComponent(state.sessionId)}/events?limit=100`).catch((error) => {
-      console.warn("[codex-wasm-workbench] generic session event replay failed", {
+function callSessionRead(operation, payload = {}) {
+  // App-owned UI bundles run under a strict iframe CSP, so they cannot assume
+  // direct access to shell HTTP endpoints.  The generic `session.read` bridge
+  // lets the host adapt durable session history through declared capabilities
+  // while the Workbench remains the sole owner of how that history is rendered.
+  const commandId = crypto.randomUUID();
+  return new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(() => {
+      pendingBridgeCalls.delete(commandId);
+      reject(new Error(`session.read/${operation} timed out`));
+    }, 120000);
+    pendingBridgeCalls.set(commandId, {
+      resolve: (response) => resolve(bridgeOutput(response)),
+      reject,
+      timeout,
+    });
+    window.parent.postMessage(
+      {
+        type: "macaca.call",
+        command_id: commandId,
         session_id: state.sessionId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      return null;
-    }),
-    getJson(`/api/sessions/detail/${encodeURIComponent(state.sessionId)}`).catch((error) => {
-      console.warn("[codex-wasm-workbench] generic session detail replay failed", {
-        session_id: state.sessionId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      return null;
-    }),
-  ]);
-
-  const sessionEvents = (eventHistory?.events || []).map((event) => ({
-    type: "session_event",
-    data: event,
-    at: event.timestamp || event.created_at || new Date().toISOString(),
-  }));
-  const turnEvents = (sessionDetail?.turns || []).map((turn, index) => ({
-    type: "session_turn",
-    data: {
-      index,
-      role: turn.role,
-      status: turn.status || null,
-      content: turn.content,
-      trace_steps: turn.trace_steps || [],
-      meta: turn.meta || null,
-    },
-    at: sessionDetail.updated_at || new Date().toISOString(),
-  }));
-
-  // EventLog rows are the most granular history.  Stored turns are still useful
-  // when a legacy or bridge-projected session has no EventLog rows, so they are
-  // used as a bounded fallback rather than merged into a duplicated stream.
-  if (sessionEvents.length > 0) return sessionEvents;
-  return turnEvents;
+        capability: "session.read",
+        operation,
+        payload,
+      },
+      hostOrigin,
+    );
+  });
 }
 
 async function refreshCurrentState() {
@@ -467,7 +425,7 @@ async function switchSession(nextSessionId, traceId) {
   renderResult(state);
   if (!state.debugToolLoop && state.sessionId) {
     try {
-      await replayEvents({ preserveLocalOnEmpty: true });
+      await sessionHistory.replayEvents({ preserveLocalOnEmpty: true });
       await refreshCurrentState();
       openExecutionWebSocket();
     } catch (error) {
@@ -533,7 +491,7 @@ window.addEventListener("message", handleHostMessage);
 renderAll({ state, declaredServices });
 loadModelCatalog();
 if (!state.debugToolLoop && state.sessionId) {
-  replayEvents()
+  sessionHistory.replayEvents()
     .then(refreshCurrentState)
     .then(openExecutionWebSocket)
     .catch((error) => {
