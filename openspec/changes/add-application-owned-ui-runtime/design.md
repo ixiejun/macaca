@@ -60,6 +60,20 @@ only generic bridge scope (`app_id`, `session_id`, `capability`, `service_id`,
 `operation`, and trace id) and never branches on application name, workflow, or
 business payload.
 
+### Decision 2.2: Host session context is an app-owned UI observer signal
+
+When the Web shell changes the active session for an app-owned UI surface, it
+sends a generic `macaca.session.changed` message to the hosted bundle. This is
+an Observer contract between the shell adapter and the application-owned UI: the
+shell reports only provider-neutral session context, and the application decides
+how to render or restore its own UI state for that session.
+
+Rationale: App-owned UI surfaces are long-lived iframe/WebView instances. If
+the shell only changes its own `currentSession`, the application bundle can keep
+showing stale in-memory execution streams. A generic session-change observer
+keeps host navigation and application presentation synchronized without moving
+application-specific replay, workflow, or stream semantics into Macaca OS.
+
 ### Decision 3: `@macaca/ui` is optional
 
 Macaca may provide a UI Kit and design tokens, but application bundles are not

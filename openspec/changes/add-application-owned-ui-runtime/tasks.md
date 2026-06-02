@@ -23,3 +23,4 @@
 - [x] Upgrade `codex-wasm-workbench` UI into a complete coding workbench with task input, execution stream, service audit, diagnostics, and result panes.
 - [x] Declare the workbench execution bridge capability and verify the app-owned UI can submit a real programming task on Macaca OS.
 - [x] Project app-owned UI bridge sessions into the shell session log using generic bridge scope only, then verify `/api/apps/{app_id}/sessions` includes a bridge-created session after refresh.
+- [x] Notify app-owned UI bundles about active session changes through the generic bridge, then verify the workbench keeps Execution Stream state isolated by session.

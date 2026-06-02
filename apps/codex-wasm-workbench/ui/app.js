@@ -1,4 +1,5 @@
 import { elements, renderAll, renderResult, renderTimeline } from "./render.js";
+import { WorkbenchSessionMementoStore } from "./session_memento.js";
 
 // This entrypoint is an app-owned UI bridge over Macaca's generic application
 // execution protocol.  The browser keeps only render caches and transport
@@ -18,6 +19,7 @@ const state = {
   providers: [],
   models: [],
   route: null,
+  tokenSummary: "No run yet",
   eventSocket: null,
   eventSocketClosing: false,
   debugToolLoop: new URLSearchParams(window.location.search).get("debug_tool_loop") === "1",
@@ -32,6 +34,7 @@ const hostOrigin = (() => {
 })();
 
 const pendingBridgeCalls = new Map();
+const sessionMementos = new WorkbenchSessionMementoStore();
 
 function appendEvent(type, data) {
   state.events.push({ type, data, at: new Date().toISOString() });
@@ -41,7 +44,7 @@ function appendEvent(type, data) {
     if (event?.event_type === "ExecutionCompleted") {
       state.result = event?.sanitized_payload?.summary || "";
       state.running = false;
-      elements.tokenSummary.textContent = "Completed through service.application_execution";
+      setTokenSummary("Completed through service.application_execution");
     }
     if (event?.event_type === "ExecutionFailed" || event?.event_type === "ExecutionCancelled") {
       state.running = false;
@@ -50,12 +53,13 @@ function appendEvent(type, data) {
   if (type === "final_answer") {
     state.result = data?.content || "";
     state.running = false;
-    elements.tokenSummary.textContent = "Completed through debug LLM/tool loop";
+    setTokenSummary("Completed through debug LLM/tool loop");
   }
   if (type === "loop_failed" || type === "bridge_error") {
     state.running = false;
   }
   console.info("[codex-wasm-workbench] event", type, data);
+  sessionMementos.save(state);
   renderTimeline(state);
   renderResult(state);
 }
@@ -159,7 +163,8 @@ async function startTask() {
   state.result = "";
   state.events = [];
   closeExecutionSocket(false);
-  elements.tokenSummary.textContent = "Starting through service.application_execution...";
+  setTokenSummary("Starting through service.application_execution...");
+  sessionMementos.save(state);
   renderTimeline(state);
   renderResult(state);
   try {
@@ -204,7 +209,8 @@ async function startDebugToolLoop(prompt) {
   state.sessionId ||= `workbench-debug-${state.commandId}`;
   state.result = "";
   state.events = [];
-  elements.tokenSummary.textContent = "Running debug-only browser loop...";
+  setTokenSummary("Running debug-only browser loop...");
+  sessionMementos.save(state);
   renderTimeline(state);
   renderResult(state);
   try {
@@ -294,7 +300,7 @@ function closeExecutionSocket(reportDisconnect = false) {
   state.eventSocket.close();
 }
 
-async function replayEvents() {
+async function replayEvents({ preserveLocalOnEmpty = false } = {}) {
   if (!state.sessionId) return;
   const params = new URLSearchParams({
     session_id: state.sessionId,
@@ -304,8 +310,9 @@ async function replayEvents() {
   if (state.runId) params.set("run_id", state.runId);
   const replay = await getJson(`/api/apps/${applicationIdFromLocation()}/execution/replay?${params}`);
   state.currentState = replay.current_state || state.currentState;
+  state.runId = state.currentState?.run_id || state.currentState?.scope?.run_id || state.runId;
   state.eventCursor = replay.next_cursor || state.eventCursor;
-  state.events = (replay.events || []).map((rawEvent) => {
+  const replayedEvents = (replay.events || []).map((rawEvent) => {
     const event = normalizeExecutionEvent(rawEvent);
     return {
       type: "execution_event",
@@ -313,6 +320,12 @@ async function replayEvents() {
       at: event.timestamp || new Date().toISOString(),
     };
   });
+  if (replayedEvents.length > 0) {
+    state.events = replayedEvents;
+  } else if (!preserveLocalOnEmpty || state.events.length === 0) {
+    state.events = [sessionContextEvent("No application-execution replay events are stored for this session yet.")];
+  }
+  sessionMementos.save(state);
   renderTimeline(state);
   renderResult(state);
 }
@@ -327,6 +340,7 @@ async function refreshCurrentState() {
   });
   state.currentState = await getJson(`/api/apps/${applicationIdFromLocation()}/execution/current-state?${params}`);
   state.running = !["Completed", "Failed", "Cancelled"].includes(state.currentState.lifecycle_state);
+  sessionMementos.save(state);
   renderResult(state);
 }
 
@@ -361,6 +375,10 @@ function handleHostMessage(event) {
   if (event.source !== window.parent) return;
   if (hostOrigin !== "*" && event.origin !== hostOrigin) return;
   const message = event.data || {};
+  if (message.type === "macaca.session.changed") {
+    void switchSession(message.session_id || null, message.trace_id || null);
+    return;
+  }
   if (message.type !== "macaca.result") return;
   const pending = pendingBridgeCalls.get(message.command_id);
   if (!pending) return;
@@ -373,14 +391,64 @@ function handleHostMessage(event) {
   }
 }
 
+async function switchSession(nextSessionId, traceId) {
+  const normalizedSessionId = typeof nextSessionId === "string" && nextSessionId.trim() ? nextSessionId.trim() : null;
+  if (normalizedSessionId === state.sessionId) return;
+  console.info("[codex-wasm-workbench] host session context received", {
+    previousSessionId: state.sessionId,
+    nextSessionId: normalizedSessionId,
+    traceId,
+  });
+  sessionMementos.save(state);
+  closeExecutionSocket(false);
+  const snapshot = sessionMementos.restore(normalizedSessionId);
+  state.sessionId = snapshot.sessionId;
+  state.runId = snapshot.runId;
+  state.eventCursor = snapshot.eventCursor;
+  state.currentState = snapshot.currentState;
+  state.events = snapshot.events;
+  state.result = snapshot.result;
+  state.running = snapshot.running;
+  setTokenSummary(snapshot.tokenSummary);
+  renderTimeline(state);
+  renderResult(state);
+  if (!state.debugToolLoop && state.sessionId) {
+    try {
+      await replayEvents({ preserveLocalOnEmpty: true });
+      await refreshCurrentState();
+      openExecutionWebSocket();
+    } catch (error) {
+      appendEvent("bridge_error", { error: error instanceof Error ? error.message : String(error) });
+    }
+  }
+}
+
+function sessionContextEvent(message) {
+  return {
+    type: "session_context",
+    data: {
+      session_id: state.sessionId,
+      run_id: state.runId,
+      message,
+    },
+    at: new Date().toISOString(),
+  };
+}
+
 function clearRun() {
   closeExecutionSocket(false);
   state.events = [];
   state.result = "";
   state.currentState = null;
-  elements.tokenSummary.textContent = "No run yet";
+  setTokenSummary("No run yet");
+  sessionMementos.save(state);
   renderTimeline(state);
   renderResult(state);
+}
+
+function setTokenSummary(value) {
+  state.tokenSummary = value || "No run yet";
+  elements.tokenSummary.textContent = state.tokenSummary;
 }
 
 function applicationIdFromLocation() {

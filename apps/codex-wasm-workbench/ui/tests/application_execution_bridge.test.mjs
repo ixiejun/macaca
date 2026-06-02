@@ -15,10 +15,19 @@ test("production UI uses service.application_execution APIs instead of browser t
 });
 
 test("UI keeps event arrays as render caches reconstructed from replay", () => {
-  assert.match(source, /state\.events = \(replay\.events \|\| \[\]\)\.map/);
+  assert.match(source, /const replayedEvents = \(replay\.events \|\| \[\]\)\.map/);
+  assert.match(source, /state\.events = replayedEvents/);
   assert.match(source, /state\.currentState = replay\.current_state/);
   assert.match(source, /new WebSocket/);
   assert.doesNotMatch(source, /new EventSource/);
+});
+
+test("UI switches app-owned execution streams when host session changes", () => {
+  assert.match(source, /WorkbenchSessionMementoStore/);
+  assert.match(source, /message\.type === "macaca\.session\.changed"/);
+  assert.match(source, /async function switchSession/);
+  assert.match(source, /await replayEvents\(\{ preserveLocalOnEmpty: true \}\)/);
+  assert.match(source, /closeExecutionSocket\(false\)/);
 });
 
 test("UI refreshes durable replay before opening websocket increments", () => {

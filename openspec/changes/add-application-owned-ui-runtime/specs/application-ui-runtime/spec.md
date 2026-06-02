@@ -113,6 +113,18 @@ capability-governed bridge.
 - **AND** the shell SHALL NOT inspect application-specific payload fields,
   workflow names, or business semantics to create the projection.
 
+#### Scenario: Host notifies app-owned UI when the active session changes
+
+- **GIVEN** an application-owned UI bundle is hosted in the Web shell
+- **AND** the shell active session changes to a different non-empty session id
+- **WHEN** the iframe bridge is available
+- **THEN** the shell SHALL send a `macaca.session.changed` message to the
+  hosted bundle
+- **AND** the message SHALL include only generic session context such as
+  `app_id`, `session_id`, `surface_id`, and a trace id
+- **AND** the shell SHALL NOT inspect application-specific execution streams,
+  workflow names, or business payload fields to render the app-owned UI.
+
 ### Requirement: Optional developer UI Kit
 
 Macaca MAY provide a UI Kit and SDK for application developers, but shells SHALL
