@@ -125,6 +125,19 @@ capability-governed bridge.
 - **AND** the shell SHALL NOT inspect application-specific execution streams,
   workflow names, or business payload fields to render the app-owned UI.
 
+#### Scenario: App-owned UI restores generic history for non-protocol sessions
+
+- **GIVEN** an application-owned UI bundle receives a generic shell session id
+- **AND** protocol-specific application-execution replay returns no events for
+  that session
+- **WHEN** durable generic session history exists for the session
+- **THEN** the application-owned UI MAY read generic session EventLog or stored
+  shell-turn history through existing shell/facade endpoints
+- **AND** the application-owned UI SHALL own any presentation-specific mapping
+  of that generic history into its own stream view
+- **AND** Macaca OS SHALL NOT inspect application-specific workflow names,
+  business payload fields, or UI event labels to synthesize that stream.
+
 ### Requirement: Optional developer UI Kit
 
 Macaca MAY provide a UI Kit and SDK for application developers, but shells SHALL

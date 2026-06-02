@@ -323,11 +323,64 @@ async function replayEvents({ preserveLocalOnEmpty = false } = {}) {
   if (replayedEvents.length > 0) {
     state.events = replayedEvents;
   } else if (!preserveLocalOnEmpty || state.events.length === 0) {
-    state.events = [sessionContextEvent("No application-execution replay events are stored for this session yet.")];
+    state.events = await loadGenericSessionHistoryEvents();
+    if (state.events.length === 0) {
+      state.events = [sessionContextEvent("No durable session history is stored for this session yet.")];
+    }
   }
   sessionMementos.save(state);
   renderTimeline(state);
   renderResult(state);
+}
+
+async function loadGenericSessionHistoryEvents() {
+  // Application-execution replay is the authoritative protocol view when the
+  // selected session was started through `service.application_execution`.
+  // Historical Workbench sessions may instead be legacy shell sessions or
+  // generic app-owned bridge sessions.  This Adapter keeps that compatibility
+  // local to the application UI by reading Macaca's provider-neutral session
+  // history endpoints; it does not ask the OS to understand Codex-specific
+  // execution stream semantics.
+  const [eventHistory, sessionDetail] = await Promise.all([
+    getJson(`/api/sessions/${encodeURIComponent(state.sessionId)}/events?limit=100`).catch((error) => {
+      console.warn("[codex-wasm-workbench] generic session event replay failed", {
+        session_id: state.sessionId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }),
+    getJson(`/api/sessions/detail/${encodeURIComponent(state.sessionId)}`).catch((error) => {
+      console.warn("[codex-wasm-workbench] generic session detail replay failed", {
+        session_id: state.sessionId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }),
+  ]);
+
+  const sessionEvents = (eventHistory?.events || []).map((event) => ({
+    type: "session_event",
+    data: event,
+    at: event.timestamp || event.created_at || new Date().toISOString(),
+  }));
+  const turnEvents = (sessionDetail?.turns || []).map((turn, index) => ({
+    type: "session_turn",
+    data: {
+      index,
+      role: turn.role,
+      status: turn.status || null,
+      content: turn.content,
+      trace_steps: turn.trace_steps || [],
+      meta: turn.meta || null,
+    },
+    at: sessionDetail.updated_at || new Date().toISOString(),
+  }));
+
+  // EventLog rows are the most granular history.  Stored turns are still useful
+  // when a legacy or bridge-projected session has no EventLog rows, so they are
+  // used as a bounded fallback rather than merged into a duplicated stream.
+  if (sessionEvents.length > 0) return sessionEvents;
+  return turnEvents;
 }
 
 async function refreshCurrentState() {

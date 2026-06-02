@@ -74,6 +74,21 @@ showing stale in-memory execution streams. A generic session-change observer
 keeps host navigation and application presentation synchronized without moving
 application-specific replay, workflow, or stream semantics into Macaca OS.
 
+### Decision 2.3: App-owned UI may adapt generic session history locally
+
+When a hosted bundle receives a shell session that has no protocol-specific
+application-execution replay rows, the bundle may read generic session history
+such as EventLog rows or stored shell turns and render them as application-local
+history. This is an Adapter fallback owned by the application UI. The shell and
+OS continue to expose only generic session/event contracts and do not inspect or
+translate application-specific execution stream semantics.
+
+Rationale: Some app-owned UI sessions are created by bridge calls or older
+runtime paths before `service.application_execution` replay was available. A
+session switch must not produce an empty workbench when durable generic session
+history exists. Keeping the fallback in the hosted app preserves refreshability
+without making Macaca OS aware of Codex-specific event presentation.
+
 ### Decision 3: `@macaca/ui` is optional
 
 Macaca may provide a UI Kit and design tokens, but application bundles are not

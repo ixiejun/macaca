@@ -22,6 +22,15 @@ test("UI keeps event arrays as render caches reconstructed from replay", () => {
   assert.doesNotMatch(source, /new EventSource/);
 });
 
+test("UI falls back to generic session history when protocol replay is empty", () => {
+  assert.match(source, /async function loadGenericSessionHistoryEvents/);
+  assert.match(source, /getJson\(`\/api\/sessions\/\$\{encodeURIComponent\(state\.sessionId\)\}\/events\?limit=100`\)/);
+  assert.match(source, /getJson\(`\/api\/sessions\/detail\/\$\{encodeURIComponent\(state\.sessionId\)\}`\)/);
+  assert.match(source, /type: "session_event"/);
+  assert.match(source, /type: "session_turn"/);
+  assert.match(source, /state\.events = await loadGenericSessionHistoryEvents\(\)/);
+});
+
 test("UI switches app-owned execution streams when host session changes", () => {
   assert.match(source, /WorkbenchSessionMementoStore/);
   assert.match(source, /message\.type === "macaca\.session\.changed"/);
