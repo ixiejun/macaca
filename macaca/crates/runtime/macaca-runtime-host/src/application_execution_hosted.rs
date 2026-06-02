@@ -129,7 +129,7 @@ impl HostedApplicationExecutionAdapter for ApplicationAbiHostedExecutionAdapter 
                 "task_input_has_payload_ref": command.task_input.payload_ref.is_some(),
                 "idempotency_key": command.idempotency_key,
             }),
-            command.trace,
+            command.trace.clone(),
         );
         host_command
             .metadata
@@ -162,9 +162,39 @@ impl HostedApplicationExecutionAdapter for ApplicationAbiHostedExecutionAdapter 
             .await
             .map_err(|error| ServiceError::AdapterFailure(error.to_string()))?;
         match result.status {
-            ApplicationHostCommandStatus::Ok => Ok(HostedApplicationExecutionOutcome::Completed {
-                summary: "hosted application runtime completed start dispatch".into(),
-            }),
+            ApplicationHostCommandStatus::Ok => {
+                let checkpoint_ref = Some(format!(
+                    "application-execution://checkpoint/{}/{}/hosted-start-accepted",
+                    command
+                        .session_id
+                        .as_deref()
+                        .unwrap_or("session-unassigned"),
+                    command.run_id.as_deref().unwrap_or("run-unassigned")
+                ));
+                info!(
+                    application_id = %command.application_id,
+                    session_id = command.session_id.as_deref().unwrap_or("none"),
+                    run_id = command.run_id.as_deref().unwrap_or("none"),
+                    trace_id = %command.trace.trace_id,
+                    wasm_export = "app:start",
+                    checkpoint_ref = checkpoint_ref.as_deref().unwrap_or("none"),
+                    "Hosted application execution start acknowledged by application runtime"
+                );
+                // A successful `app:start` invocation only proves that the
+                // application boundary accepted the execution envelope. It is
+                // not a terminal task result: real LLM, file, process, tool,
+                // approval, and completion events must be emitted later by the
+                // hosted application runtime or an authorized gateway through
+                // the provider-neutral application execution protocol. Treating
+                // the ACK as `Completed` would make replay/audit lie about work
+                // that has not happened yet, so the adapter returns `Running`
+                // with a generic checkpoint memento that the EventLog can
+                // persist and replay after browser refresh or subscriber loss.
+                Ok(HostedApplicationExecutionOutcome::Running {
+                    checkpoint_ref,
+                    summary: "hosted application runtime accepted start dispatch".into(),
+                })
+            }
             ApplicationHostCommandStatus::RuntimeUnavailable { reason }
             | ApplicationHostCommandStatus::Unavailable { reason } => {
                 Err(ServiceError::ServiceUnavailable(reason))

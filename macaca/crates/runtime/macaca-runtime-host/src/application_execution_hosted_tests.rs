@@ -4,11 +4,11 @@ use async_trait::async_trait;
 use macaca_persist::{EventLog, RedbStore};
 use macaca_proto::{
     ApplicationAbiError, ApplicationExecutionCommandStatus, ApplicationExecutionControlCommand,
-    ApplicationExecutionControlKind, ApplicationExecutionPayload, ApplicationExecutionProviderKind,
-    ApplicationExecutionReplayRequest, ApplicationExecutionScope, ApplicationExecutionSnapshot,
-    ApplicationHostCommand, ApplicationHostCommandResult, ApplicationHostCommandStatus,
-    ApplicationId, ApplicationImport, CapabilityId, PackageRuntimeKind,
-    StartApplicationExecutionCommand, TraceContext,
+    ApplicationExecutionControlKind, ApplicationExecutionEventType, ApplicationExecutionPayload,
+    ApplicationExecutionProviderKind, ApplicationExecutionReplayRequest, ApplicationExecutionScope,
+    ApplicationExecutionSnapshot, ApplicationHostCommand, ApplicationHostCommandResult,
+    ApplicationHostCommandStatus, ApplicationId, ApplicationImport, CapabilityId,
+    PackageRuntimeKind, StartApplicationExecutionCommand, TraceContext,
 };
 use tempfile::tempdir;
 use tokio::sync::Mutex;
@@ -126,7 +126,10 @@ async fn abi_hosted_start_invokes_generic_wasm_start_export() {
 
     assert!(matches!(
         outcome,
-        HostedApplicationExecutionOutcome::Completed { .. }
+        HostedApplicationExecutionOutcome::Running {
+            checkpoint_ref: Some(_),
+            ..
+        }
     ));
     let command = host.last_command.lock().await.clone().unwrap();
     assert_eq!(
@@ -143,6 +146,55 @@ async fn abi_hosted_start_invokes_generic_wasm_start_export() {
             .get("execution.operation")
             .map(String::as_str),
         Some("start")
+    );
+}
+
+#[tokio::test]
+async fn abi_hosted_start_ack_is_replayable_without_terminal_completion() {
+    let (_dir, event_log) = event_log();
+    let store = ApplicationExecutionEventStore::new(event_log.clone());
+    let provider = MacacaHostedApplicationExecutionProvider::new(
+        store,
+        Arc::new(ApplicationAbiHostedExecutionAdapter::new(Arc::new(
+            CapturingHostRuntime::default(),
+        ))),
+        vec![CapabilityId::new("capability.application_execution")],
+    );
+    let start = start_command(
+        "session-wasm-running",
+        "run-wasm-running",
+        "hosted-wasm-running-1",
+    );
+
+    let result = provider.start(start.clone()).await.unwrap();
+
+    assert_eq!(result.status, ApplicationExecutionCommandStatus::Accepted);
+    let replay = ApplicationExecutionEventStore::new(event_log)
+        .replay(ApplicationExecutionReplayRequest {
+            application_id: start.application_id,
+            session_id: "session-wasm-running".into(),
+            run_id: Some("run-wasm-running".into()),
+            from_cursor: None,
+            page_size: 50,
+            event_types: Vec::new(),
+            visibility: None,
+            trace: TraceContext::new("trace-hosted-running-replay"),
+        })
+        .await
+        .unwrap();
+    let event_types = replay
+        .events
+        .iter()
+        .map(|event| event.event_type)
+        .collect::<Vec<_>>();
+
+    assert!(event_types.contains(&ApplicationExecutionEventType::ExecutionAccepted));
+    assert!(event_types.contains(&ApplicationExecutionEventType::ProviderHeartbeat));
+    assert!(event_types.contains(&ApplicationExecutionEventType::CheckpointCreated));
+    assert!(!event_types.contains(&ApplicationExecutionEventType::ExecutionCompleted));
+    assert_eq!(
+        replay.current_state.unwrap().lifecycle_state.is_terminal(),
+        false
     );
 }
 
