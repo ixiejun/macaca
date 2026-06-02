@@ -120,6 +120,8 @@ capability-governed bridge.
 - **WHEN** the iframe bridge is available
 - **THEN** the shell SHALL send a `macaca.session.changed` message to the
   hosted bundle
+- **AND** the shell SHALL include the same generic session id in the iframe
+  entry URL when mounting or remounting the hosted bundle
 - **AND** the message SHALL include only generic session context such as
   `app_id`, `session_id`, `surface_id`, and a trace id
 - **AND** the shell SHALL NOT inspect application-specific execution streams,

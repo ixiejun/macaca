@@ -68,6 +68,11 @@ an Observer contract between the shell adapter and the application-owned UI: the
 shell reports only provider-neutral session context, and the application decides
 how to render or restore its own UI state for that session.
 
+The shell also places the same generic `session_id` in the hosted entry URL when
+mounting or remounting the iframe. This is not a semantic replay channel; it is
+an initial Memento key that lets the application recover after refresh or iframe
+creation races before the observer message is processed.
+
 Rationale: App-owned UI surfaces are long-lived iframe/WebView instances. If
 the shell only changes its own `currentSession`, the application bundle can keep
 showing stale in-memory execution streams. A generic session-change observer
