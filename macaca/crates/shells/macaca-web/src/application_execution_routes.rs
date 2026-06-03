@@ -24,6 +24,7 @@ use macaca_proto::{
     StartApplicationExecutionCommand, StartApplicationExecutionResult, TraceContext,
 };
 
+use crate::app_ui_session_projection::AppUiSessionProjection;
 use crate::routes::{err, proto_err, ErrorResponse};
 use crate::state::AppState;
 
@@ -114,6 +115,21 @@ pub async fn start_execution(
         trace_id = %command.trace.trace_id,
         "web route forwarding application execution start through SDK"
     );
+    // App-owned UI execution sessions are not created through `/api/chat/v2`,
+    // so the shell records a small refreshable session memento before it
+    // forwards the command.  The authoritative execution lifecycle and event
+    // stream remain owned by `service.application_execution`; this projection
+    // exists only so the universal sidebar can recover the session after a
+    // browser refresh.
+    AppUiSessionProjection::new(Arc::clone(&state.persist.session_store))
+        .record_execution_start(&command)
+        .await
+        .map_err(|error| {
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("failed to project application execution session: {error}"),
+            )
+        })?;
     state
         .system_facade
         .application_execution_client()

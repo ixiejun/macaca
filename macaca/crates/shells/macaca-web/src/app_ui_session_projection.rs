@@ -14,7 +14,9 @@ use std::sync::Arc;
 
 use chrono::Utc;
 use macaca_persist::PersistBackend;
-use macaca_proto::{ApplicationId, ApplicationUiBridgeRequest, MacacaResult};
+use macaca_proto::{
+    ApplicationId, ApplicationUiBridgeRequest, MacacaResult, StartApplicationExecutionCommand,
+};
 use tracing::info;
 
 use crate::session::{SessionMeta, StoredSession, StoredTurn, APP_SESSIONS_PREFIX, SESSION_PREFIX};
@@ -92,6 +94,73 @@ impl AppUiSessionProjection {
             operation = ?request.operation,
             trace_id = ?request.trace_id,
             "application UI bridge session projection persisted"
+        );
+        Ok(())
+    }
+
+    /// Ensure an application-execution session exists in the shell session log.
+    ///
+    /// `app.execution/start` bypasses the generic `ui/bridge` endpoint, but it
+    /// still creates an application-owned session that the shell must recover
+    /// after refresh.  This projection records only protocol identity and the
+    /// sanitized task summary; it does not persist raw task data, provider
+    /// payloads, or application-specific workflow semantics.
+    pub(crate) async fn record_execution_start(
+        &self,
+        command: &StartApplicationExecutionCommand,
+    ) -> MacacaResult<()> {
+        let Some(session_id) = command
+            .session_id
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        else {
+            info!(
+                app_id = %command.application_id,
+                run_id = ?command.run_id,
+                trace_id = %command.trace.trace_id,
+                "application execution session projection skipped because session_id is absent"
+            );
+            return Ok(());
+        };
+
+        let now = Utc::now();
+        let session_key = format!("{}{}", SESSION_PREFIX, session_id);
+        let mut stored = match self.store.get(&session_key).await? {
+            Some(bytes) => serde_json::from_slice::<StoredSession>(&bytes)?,
+            None => new_execution_session(command, session_id, now),
+        };
+
+        // The shell memento is refresh authority for the sidebar only.  Richer
+        // execution facts remain owned by `service.application_execution` and
+        // are replayed through the execution event APIs.
+        stored.meta.updated_at = now;
+        stored.meta.status = "running".to_string();
+        if stored.meta.title.is_none() {
+            stored.meta.title = Some(execution_projection_title(command));
+        }
+        if stored.turns.is_empty() && stored.messages.is_empty() {
+            stored.turns.push(execution_projection_turn(command));
+            stored.meta.message_count = stored.turns.len().max(1);
+        }
+
+        let data = serde_json::to_vec(&stored)?;
+        self.store.set(&session_key, &data).await?;
+
+        let app_index_key = format!(
+            "{}{}/{}",
+            APP_SESSIONS_PREFIX, command.application_id.0, session_id
+        );
+        self.store
+            .set(&app_index_key, session_id.as_bytes())
+            .await?;
+
+        info!(
+            app_id = %command.application_id,
+            session_id,
+            run_id = ?command.run_id,
+            trace_id = %command.trace.trace_id,
+            "application execution session projection persisted"
         );
         Ok(())
     }
@@ -181,12 +250,66 @@ fn bridge_projection_turn(request: &ApplicationUiBridgeRequest) -> StoredTurn {
     }
 }
 
+fn new_execution_session(
+    command: &StartApplicationExecutionCommand,
+    session_id: &str,
+    now: chrono::DateTime<Utc>,
+) -> StoredSession {
+    StoredSession {
+        meta: SessionMeta {
+            session_id: session_id.to_string(),
+            app_id: command.application_id.0.to_string(),
+            created_at: now,
+            updated_at: now,
+            message_count: 1,
+            title: Some(execution_projection_title(command)),
+            status: "running".to_string(),
+        },
+        turns: vec![execution_projection_turn(command)],
+        messages: Vec::new(),
+    }
+}
+
+fn execution_projection_title(command: &StartApplicationExecutionCommand) -> String {
+    let summary = command.task_input.summary.trim();
+    if summary.is_empty() {
+        "Application execution".to_string()
+    } else {
+        summary.to_string()
+    }
+}
+
+fn execution_projection_turn(command: &StartApplicationExecutionCommand) -> StoredTurn {
+    let mut content = "Application execution start received".to_string();
+    if let Some(run_id) = command
+        .run_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        content.push_str(&format!("; run_id={run_id}"));
+    }
+    content.push_str(&format!("; trace_id={}", command.trace.trace_id));
+
+    StoredTurn {
+        role: "system".into(),
+        content,
+        status: Some("running".into()),
+        trace_steps: Vec::new(),
+        meta: None,
+        agent_traces: Default::default(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
 
     use macaca_persist::{PersistBackend, RedbStore};
-    use macaca_proto::{ApplicationId, ApplicationUiBridgeRequest};
+    use macaca_proto::{
+        ApplicationExecutionPayload, ApplicationId, ApplicationUiBridgeRequest,
+        StartApplicationExecutionCommand, TraceContext,
+    };
     use serde_json::json;
     use tempfile::tempdir;
     use uuid::Uuid;
@@ -247,6 +370,65 @@ mod tests {
             .expect("index get")
             .expect("index exists");
         assert_eq!(indexed, b"workbench-session-1");
+    }
+
+    #[tokio::test]
+    async fn execution_projection_creates_refreshable_sidebar_session_index() {
+        let (store, _dir) = temp_store();
+        let app_id =
+            ApplicationId(Uuid::parse_str("6fbb0369-e1c9-5a98-89b7-eb01f9c9fa93").unwrap());
+        let command = StartApplicationExecutionCommand {
+            application_id: app_id.clone(),
+            session_id: Some("execution-session-1".into()),
+            run_id: Some("run-execution-session-1".into()),
+            task_input: ApplicationExecutionPayload {
+                summary: "Write a portable hello world application".into(),
+                data: Some(json!({"ignored":"business payload must not be projected"})),
+                payload_ref: None,
+                truncated: false,
+            },
+            workspace_ref: None,
+            requested_capabilities: Vec::new(),
+            provider_preference: None,
+            trace: TraceContext::new("trace-execution-session-1"),
+            policy_context: Default::default(),
+            tenant_id: None,
+            actor: "app-owned-ui".into(),
+            idempotency_key: "execution-session-1:start".into(),
+        };
+
+        AppUiSessionProjection::new(Arc::clone(&store))
+            .record_execution_start(&command)
+            .await
+            .expect("projection writes");
+
+        let stored_bytes = store
+            .get(&format!("{}{}", SESSION_PREFIX, "execution-session-1"))
+            .await
+            .expect("session get")
+            .expect("session exists");
+        let stored: StoredSession = serde_json::from_slice(&stored_bytes).expect("stored session");
+        assert_eq!(stored.meta.app_id, app_id.0.to_string());
+        assert_eq!(stored.meta.session_id, "execution-session-1");
+        assert_eq!(stored.meta.status, "running");
+        assert_eq!(
+            stored.meta.title.as_deref(),
+            Some("Write a portable hello world application")
+        );
+        assert_eq!(stored.turns[0].role, "system");
+        assert!(stored.turns[0].content.contains("run-execution-session-1"));
+        assert!(!stored.turns[0].content.contains("business payload"));
+
+        let index_key = format!(
+            "{}{}/{}",
+            APP_SESSIONS_PREFIX, app_id.0, "execution-session-1"
+        );
+        let indexed = store
+            .get(&index_key)
+            .await
+            .expect("index get")
+            .expect("index exists");
+        assert_eq!(indexed, b"execution-session-1");
     }
 
     #[tokio::test]
