@@ -22,7 +22,7 @@ use crate::llm_wire::{
 };
 use crate::memory::{CompressionConfig, InMemoryWorkingMemory, MemoryCompressor, WorkingMemory};
 use crate::message::{ContentBlock, Msg, MsgContent, Role};
-use crate::model::{ChatModel, ChatOptions, ChatResponse};
+use crate::model::{ChatModel, ChatOptions, ChatResponse, ToolChoice};
 use crate::tool::Toolkit;
 
 // ---------------------------------------------------------------------------
@@ -53,6 +53,15 @@ pub struct ReActAgent {
     compressor: Option<MemoryCompressor>,
     /// Model name passed to ChatOptions (e.g. "qwen3-max", "gpt-4o").
     model_name: Option<String>,
+    /// Optional provider-neutral tool-selection policy for every reasoning turn.
+    ///
+    /// The policy is intentionally generic: callers may require "some tool" for
+    /// evidence-backed work, but this framework layer never branches on an
+    /// application name, workflow name, business domain, or concrete provider.
+    /// The actual tool catalog still comes from the caller-owned Toolkit and
+    /// capability policy, so a required tool decision remains auditable through
+    /// the same trace events as normal ReAct tool calls.
+    tool_choice: Option<ToolChoice>,
 }
 
 impl ReActAgent {
@@ -75,12 +84,25 @@ impl ReActAgent {
             cancel_token: CancellationToken::new(),
             compressor: None,
             model_name: None,
+            tool_choice: None,
         }
     }
 
     /// Set the model name passed to the LLM provider (e.g. "qwen3-max").
     pub fn with_model_name(mut self, name: impl Into<String>) -> Self {
         self.model_name = Some(name.into());
+        self
+    }
+
+    /// Set a provider-neutral tool-selection strategy for reasoning calls.
+    ///
+    /// This is used by higher-level execution policies that already know a
+    /// durable side effect is required, for example an artifact-backed task that
+    /// must write evidence before completion. The agent stores only the generic
+    /// strategy and leaves all tool authorization to the Toolkit/middleware
+    /// chain, preserving the OS/application boundary.
+    pub fn with_tool_choice(mut self, tool_choice: ToolChoice) -> Self {
+        self.tool_choice = Some(tool_choice);
         self
     }
 
@@ -141,16 +163,25 @@ impl ReActAgent {
             let toolkit = self.toolkit.lock().await;
             toolkit.get_definitions()
         };
+        let has_tools = !tool_defs.is_empty();
 
         let options = ChatOptions {
             model: self.model_name.clone(),
-            tools: if tool_defs.is_empty() {
-                None
+            tools: if has_tools { Some(tool_defs) } else { None },
+            tool_choice: if has_tools {
+                self.tool_choice.clone()
             } else {
-                Some(tool_defs)
+                None
             },
             ..Default::default()
         };
+
+        tracing::debug!(
+            agent = %self.name,
+            tool_count = options.tools.as_ref().map(|tools| tools.len()).unwrap_or_default(),
+            tool_choice = ?options.tool_choice,
+            "react_agent.reasoning prepared provider-neutral tool policy"
+        );
 
         let llm_opts = chat_options_to_llm_options(&options);
         let base_messages = messages_from_json_values(&formatted);
@@ -356,6 +387,7 @@ mod tests {
     struct MockChatModel {
         responses: Arc<Mutex<Vec<ChatResponse>>>,
         call_count: Arc<AtomicUsize>,
+        observed_options: Arc<Mutex<Vec<ChatOptions>>>,
     }
 
     impl MockChatModel {
@@ -363,6 +395,7 @@ mod tests {
             Self {
                 responses: Arc::new(Mutex::new(responses)),
                 call_count: Arc::new(AtomicUsize::new(0)),
+                observed_options: Arc::new(Mutex::new(Vec::new())),
             }
         }
 
@@ -377,8 +410,9 @@ mod tests {
         async fn chat(
             &self,
             _messages: Vec<serde_json::Value>,
-            _options: &ChatOptions,
+            options: &ChatOptions,
         ) -> Result<ChatResponse, ModelError> {
+            self.observed_options.lock().await.push(options.clone());
             let idx = self.call_count.fetch_add(1, Ordering::SeqCst);
             let responses = self.responses.lock().await;
             responses
@@ -531,6 +565,63 @@ mod tests {
         assert_eq!(msgs[1].role, Role::Assistant); // tool call stored
         assert_eq!(msgs[2].role, Role::Tool); // tool result
         assert_eq!(msgs[3].role, Role::Assistant); // final reply
+    }
+
+    #[tokio::test]
+    async fn test_tool_choice_is_forwarded_when_tools_are_available() {
+        let mut toolkit = Toolkit::new();
+        toolkit.register(Box::new(EchoTool), None);
+
+        let model = MockChatModel::new(vec![text_response("tool policy observed")]);
+        let observed_options = Arc::clone(&model.observed_options);
+
+        let agent = ReActAgent::new(
+            "bot",
+            "You are helpful.",
+            Arc::new(model),
+            Arc::new(OpenAiFormatter),
+        )
+        .with_toolkit(toolkit)
+        .with_tool_choice(ToolChoice::Required);
+
+        let reply = agent
+            .reply(Msg::user("alice", "write evidence"))
+            .await
+            .unwrap();
+        assert_eq!(reply.get_text(), "tool policy observed");
+
+        let options = observed_options.lock().await;
+        assert_eq!(options.len(), 1);
+        assert_eq!(options[0].tool_choice, Some(ToolChoice::Required));
+        assert!(options[0]
+            .tools
+            .as_ref()
+            .is_some_and(|tools| !tools.is_empty()));
+    }
+
+    #[tokio::test]
+    async fn test_tool_choice_is_suppressed_without_tools() {
+        let model = MockChatModel::new(vec![text_response("no tools")]);
+        let observed_options = Arc::clone(&model.observed_options);
+
+        let agent = ReActAgent::new(
+            "bot",
+            "You are helpful.",
+            Arc::new(model),
+            Arc::new(OpenAiFormatter),
+        )
+        .with_tool_choice(ToolChoice::Required);
+
+        let reply = agent
+            .reply(Msg::user("alice", "plain answer"))
+            .await
+            .unwrap();
+        assert_eq!(reply.get_text(), "no tools");
+
+        let options = observed_options.lock().await;
+        assert_eq!(options.len(), 1);
+        assert_eq!(options[0].tool_choice, None);
+        assert!(options[0].tools.is_none());
     }
 
     // -----------------------------------------------------------------------

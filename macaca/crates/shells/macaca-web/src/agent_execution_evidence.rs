@@ -19,6 +19,8 @@ use macaca_proto::{AgentExecutionEvent, TaskId};
 use tokio::sync::mpsc;
 use tracing::{info, warn};
 
+use crate::application_execution_agent_event_bridge::ApplicationExecutionAgentEventMirror;
+
 const MAX_RECORDED_AGENT_EVENTS: usize = 256;
 
 /// Bounded observer for one Agent Execution run.
@@ -166,6 +168,7 @@ pub(crate) fn observed_agent_execution_events(
     task_id: TaskId,
     agent: String,
     expected_artifact_path: Option<&str>,
+    application_execution_mirror: Option<ApplicationExecutionAgentEventMirror>,
 ) -> (
     mpsc::Sender<AgentExecutionEvent>,
     AgentExecutionEvidenceObserver,
@@ -184,8 +187,16 @@ pub(crate) fn observed_agent_execution_events(
                 executor.broadcast_event(ExecutorEvent::AgentEvent {
                     task_id,
                     agent: agent.clone(),
-                    event,
+                    event: event.clone(),
                 });
+            }
+            if let Some(mirror) = application_execution_mirror.as_ref() {
+                // Application-execution mirroring is best-effort telemetry
+                // persistence. The authoritative agent execution must keep
+                // running even if the application-execution gateway rejects a
+                // duplicate, a stale callback, or a temporarily unavailable
+                // service call. The mirror logs those failures with run scope.
+                mirror.observe(&event).await;
             }
         }
     });

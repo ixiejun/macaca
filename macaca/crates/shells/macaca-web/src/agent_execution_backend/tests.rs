@@ -196,7 +196,54 @@ fn artifact_completion_policy_uses_short_runtime_loop_budget() {
 
     assert_eq!(
         WebAgentExecutionBackend::runtime_agent_max_iters(&command),
-        3
+        12
+    );
+}
+
+#[test]
+fn artifact_completion_policy_requires_authorized_tool_use() {
+    let mut command = AgentExecutionCommand::new(
+        macaca_proto::ApplicationId::from_name("demo"),
+        "session-a",
+        "coordinator",
+        AgentExecutionIntent::Heartbeat,
+        "run artifact work",
+        macaca_proto::TraceContext::new("trace-artifact-tool-choice"),
+    )
+    .unwrap();
+    command.execution_envelope = Some(
+        macaca_proto::AutonomousExecutionEnvelope::compile(
+            macaca_proto::AutonomousExecutionSourceKind::HeartbeatProfile,
+            "run artifact work",
+            &std::collections::BTreeMap::from([(
+                "evidence.expected_artifact_path".into(),
+                "/workspace/agents/a/sentinel.md".into(),
+            )]),
+        )
+        .unwrap(),
+    );
+
+    assert_eq!(
+        WebAgentExecutionBackend::runtime_agent_tool_choice(&command),
+        Some(macaca_framework::model::ToolChoice::Required)
+    );
+}
+
+#[test]
+fn agent_result_completion_policy_keeps_automatic_tool_choice() {
+    let command = AgentExecutionCommand::new(
+        macaca_proto::ApplicationId::from_name("demo"),
+        "session-a",
+        "coordinator",
+        AgentExecutionIntent::TaskWorker,
+        "summarize work",
+        macaca_proto::TraceContext::new("trace-default-tool-choice"),
+    )
+    .unwrap();
+
+    assert_eq!(
+        WebAgentExecutionBackend::runtime_agent_tool_choice(&command),
+        None
     );
 }
 

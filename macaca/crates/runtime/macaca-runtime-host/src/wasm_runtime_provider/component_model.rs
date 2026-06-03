@@ -718,7 +718,16 @@ fn resolve_chat_payload_template(
     export_payload: &serde_json::Value,
 ) -> Option<serde_json::Value> {
     let path = text.strip_prefix("${chat.")?.strip_suffix('}')?;
-    let mut current = export_payload.clone();
+    // Newer hosted-application execution envelopes place user input under a
+    // typed `chat` object so runtime metadata can carry session/run/workspace
+    // fields without colliding with application-owned payload keys.  Older
+    // declarative WASM tests and packages used top-level fields such as
+    // `${chat.input}` -> `payload.input`.  Prefer the explicit `chat` object and
+    // fall back to the legacy top-level shape to preserve existing packages.
+    let mut current = export_payload
+        .get("chat")
+        .cloned()
+        .unwrap_or_else(|| export_payload.clone());
     for part in path.split('.') {
         current = match current {
             serde_json::Value::Object(map) => map.get(part)?.clone(),

@@ -14,12 +14,14 @@ use async_trait::async_trait;
 use macaca_kernel::ApplicationExecutorRegistry;
 use macaca_proto::{
     AgentExecutionCommand, AgentExecutionIntent, ApplicationAgentDelegateCommand,
-    ApplicationAgentDelegateResult, KernelServiceId, ServiceBusSource, ServiceError, ServiceResult,
-    TaskId, AGENT_EXECUTION_SERVICE_ID,
+    ApplicationAgentDelegateResult, ApplicationId, KernelServiceId, ServiceBusSource, ServiceError,
+    ServiceResult, TaskId, AGENT_EXECUTION_SERVICE_ID,
 };
 use macaca_runtime_host::{ApplicationOrchestrationBackend, ServiceRuntime};
 use tokio::sync::{oneshot, RwLock};
 use tokio::time::{timeout, Duration};
+
+use crate::workspace::AppWorkspace;
 
 const DEFAULT_AGENT_DELEGATE_WAIT_MS: u64 = 30_000;
 
@@ -28,6 +30,7 @@ const DEFAULT_AGENT_DELEGATE_WAIT_MS: u64 = 30_000;
 pub(crate) struct WebApplicationOrchestrationBackend {
     executor_registry: Arc<RwLock<Option<Arc<ApplicationExecutorRegistry>>>>,
     service_runtime: Arc<ServiceRuntime>,
+    app_workspaces: Arc<RwLock<std::collections::HashMap<ApplicationId, AppWorkspace>>>,
 }
 
 impl WebApplicationOrchestrationBackend {
@@ -35,11 +38,54 @@ impl WebApplicationOrchestrationBackend {
     pub(crate) fn new(
         executor_registry: Arc<RwLock<Option<Arc<ApplicationExecutorRegistry>>>>,
         service_runtime: Arc<ServiceRuntime>,
+        app_workspaces: Arc<RwLock<std::collections::HashMap<ApplicationId, AppWorkspace>>>,
     ) -> Self {
         Self {
             executor_registry,
             service_runtime,
+            app_workspaces,
         }
+    }
+
+    /// Merge application-provided delegate context with host-owned workspace
+    /// coordinates.
+    ///
+    /// The input context remains application-owned data.  The added
+    /// `workspace` object is generic platform evidence prepared during app
+    /// startup, so agents can write requested artifacts inside the declared
+    /// shared workspace without trusting a browser-supplied path or parsing app
+    /// names.  If the workspace is not registered yet, the original context is
+    /// returned and the execution service will proceed without invented paths.
+    async fn delegated_context_with_workspace(
+        &self,
+        app_id: ApplicationId,
+        context: serde_json::Value,
+    ) -> serde_json::Value {
+        let Some(workspace) = self.app_workspaces.read().await.get(&app_id).cloned() else {
+            tracing::warn!(
+                application_id = %app_id,
+                "application agent delegation continued without registered workspace context"
+            );
+            return context;
+        };
+        let mut object = match context {
+            serde_json::Value::Object(object) => object,
+            other => serde_json::Map::from_iter([("application_context".into(), other)]),
+        };
+        object.insert(
+            "workspace".into(),
+            serde_json::json!({
+                "root_path": workspace.root,
+                "shared_path": workspace.shared,
+                "agents_root_path": workspace.agents_root,
+            }),
+        );
+        tracing::info!(
+            application_id = %app_id,
+            shared_path = %workspace.shared.display(),
+            "application agent delegation attached shared workspace context"
+        );
+        serde_json::Value::Object(object)
     }
 }
 
@@ -75,6 +121,9 @@ impl ApplicationOrchestrationBackend for WebApplicationOrchestrationBackend {
             )));
         }
         let task_id = TaskId::new();
+        let delegated_context = self
+            .delegated_context_with_workspace(app_id, command.context.clone())
+            .await;
         let mut execution_command = AgentExecutionCommand::new(
             app_id,
             session_id.clone(),
@@ -84,10 +133,36 @@ impl ApplicationOrchestrationBackend for WebApplicationOrchestrationBackend {
             command.trace.clone(),
         )
         .map_err(|error| ServiceError::AdapterFailure(error.to_string()))?
-        .with_delegated_context(command.context.clone());
+        .with_delegated_context(delegated_context);
         execution_command.task_id = Some(task_id);
         execution_command.source_agent = command.scope.agent_name.clone();
         execution_command.metadata = command.metadata.clone();
+        if metadata_value_needs_context_promotion(
+            execution_command
+                .metadata
+                .get("application_execution.run_id"),
+        ) {
+            if let Some(run_id) =
+                promoted_application_execution_run_id(&execution_command.delegated_context)
+            {
+                tracing::info!(
+                    application_id = %app_id,
+                    session_id = %session_id,
+                    "application agent delegation promoted application execution run id from delegated context"
+                );
+                execution_command
+                    .metadata
+                    .insert("application_execution.run_id".into(), run_id.to_string());
+            }
+        }
+        execution_command
+            .metadata
+            .entry("application_execution.provider_id".into())
+            .or_insert_with(|| "provider.macaca_hosted".into());
+        execution_command
+            .metadata
+            .entry("application_execution.provider_kind".into())
+            .or_insert_with(|| "MacacaHosted".into());
 
         let service_runtime = Arc::clone(&self.service_runtime);
         let service_command = execution_command
@@ -156,8 +231,50 @@ impl ApplicationOrchestrationBackend for WebApplicationOrchestrationBackend {
     }
 }
 
+/// Decide whether a metadata value should be replaced by trusted delegated
+/// context.
+///
+/// Declarative WASM packages may contain template placeholders in metadata
+/// because older component fixtures only interpolated payloads.  Treating a
+/// literal `${...}` as authoritative splits durable application-execution
+/// mirrors into an unusable run id.  This helper is deliberately generic: it
+/// recognizes only empty/template-shaped metadata and never branches on an app,
+/// workflow, provider, or service name.
+fn metadata_value_needs_context_promotion(value: Option<&String>) -> bool {
+    value
+        .map(|value| {
+            let trimmed = value.trim();
+            trimmed.is_empty() || (trimmed.starts_with("${") && trimmed.ends_with('}'))
+        })
+        .unwrap_or(true)
+}
+
+/// Read the application-execution run id from bounded delegated context.
+///
+/// The Application Service already validated app/session scope before calling
+/// this adapter.  This helper only extracts the optional correlation id used by
+/// the Observer bridge that mirrors `service.agent_execution` progress back
+/// into `service.application_execution`.
+fn promoted_application_execution_run_id(context: &serde_json::Value) -> Option<&str> {
+    context
+        .get("application_execution_run_id")
+        .and_then(serde_json::Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .filter(|value| !(value.starts_with("${") && value.ends_with('}')))
+}
+
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+    use std::sync::Arc;
+
+    use macaca_proto::ApplicationId;
+    use macaca_runtime_host::{ServiceRuntime, ServiceRuntimeConfig};
+    use tokio::sync::RwLock;
+
+    use crate::workspace::AppWorkspace;
+
     #[test]
     fn wasm_delegate_uses_agent_execution_service_not_executor_fast_path() {
         let source = include_str!("wasm_orchestration_backend.rs");
@@ -167,5 +284,52 @@ mod tests {
         assert!(source.contains("AgentExecutionCommand::new"));
         assert!(source.contains("ServiceBusSource::new(\"macaca.web.wasm_orchestration\")"));
         assert!(!source.contains(&executor_fast_path));
+    }
+
+    #[tokio::test]
+    async fn delegated_context_includes_registered_shared_workspace_paths() {
+        let app_id = ApplicationId::from_name("demo");
+        let workspace = AppWorkspace::new("/tmp/macaca-workspace-context-test", &app_id);
+        let app_workspaces = Arc::new(RwLock::new(HashMap::from([(app_id, workspace.clone())])));
+        let backend = super::WebApplicationOrchestrationBackend::new(
+            Arc::new(RwLock::new(None)),
+            Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default())),
+            app_workspaces,
+        );
+
+        let context = backend
+            .delegated_context_with_workspace(app_id, serde_json::json!({"user_input": "task"}))
+            .await;
+
+        assert_eq!(context["user_input"], "task");
+        assert_eq!(
+            context["workspace"]["shared_path"],
+            workspace.shared.to_string_lossy().to_string()
+        );
+    }
+
+    #[test]
+    fn wasm_delegate_promotes_application_execution_run_metadata() {
+        let source = include_str!("wasm_orchestration_backend.rs");
+
+        assert!(source.contains("application_execution.run_id"));
+        assert!(source.contains("application_execution_run_id"));
+        assert!(source.contains("application_execution.provider_id"));
+    }
+
+    #[test]
+    fn wasm_delegate_replaces_unresolved_run_id_template_from_context() {
+        let unresolved = "${chat.run_id}".to_string();
+        let context = serde_json::json!({
+            "application_execution_run_id": "run-visible-1"
+        });
+
+        assert!(super::metadata_value_needs_context_promotion(Some(
+            &unresolved
+        )));
+        assert_eq!(
+            super::promoted_application_execution_run_id(&context),
+            Some("run-visible-1")
+        );
     }
 }

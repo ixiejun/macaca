@@ -34,6 +34,7 @@ use macaca_framework::construction::{
 use macaca_framework::formatter::OpenAiFormatter;
 use macaca_framework::memory::InMemoryWorkingMemory;
 use macaca_framework::message::Msg;
+use macaca_framework::model::ToolChoice;
 use macaca_framework::react_agent::ReActAgent;
 use macaca_framework::tool::{ToolError, ToolMiddleware, ToolResponse, Toolkit};
 use macaca_persist::{AppendEventCommand, EventLog};
@@ -68,6 +69,7 @@ enum FrameworkRunnerBuildMode {
         event_tx: Option<mpsc::Sender<macaca_proto::AgentExecutionEvent>>,
         execution_control: Option<RuntimeExecutionControl>,
         max_iters: usize,
+        tool_choice: Option<ToolChoice>,
     },
     Coordinator {
         sse_tx: mpsc::Sender<Result<Event, Infallible>>,
@@ -200,12 +202,14 @@ impl TracedAgentFactory for WebTracedAgentFactory {
                 event_tx,
                 execution_control,
                 max_iters,
+                tool_choice,
             } => {
                 self.build_runtime_agent(
                     request,
                     event_tx.clone(),
                     execution_control.clone(),
                     *max_iters,
+                    tool_choice.clone(),
                 )
                 .await
             }
@@ -418,6 +422,7 @@ impl FrameworkRunner {
                 event_tx,
                 execution_control: None,
                 max_iters: 25,
+                tool_choice: None,
             },
         };
         factory.build(request).await
@@ -488,6 +493,7 @@ impl FrameworkRunner {
                 event_tx,
                 execution_control: None,
                 max_iters: max_iters.max(1),
+                tool_choice: None,
             },
         };
         factory.build(request).await
@@ -556,6 +562,60 @@ impl FrameworkRunner {
                 event_tx,
                 execution_control: Some(execution_control),
                 max_iters: max_iters.max(1),
+                tool_choice: None,
+            },
+        };
+        factory.build(request).await
+    }
+
+    /// Build a runtime agent with a service-selected execution policy.
+    ///
+    /// The policy arguments are deliberately generic: `max_iters` controls the
+    /// ReAct loop budget and `tool_choice` controls whether the provider should
+    /// be nudged or required to use the authorized Toolkit. The caller decides
+    /// this from provider-neutral execution contracts, not from app-specific
+    /// names, so YAML apps, WASM apps, and future gateway apps can share the
+    /// same behavior.
+    pub(crate) async fn build_runtime_agent_from_context_snapshot_with_execution_policy(
+        state: &Arc<AppState>,
+        context_snapshot: &macaca_proto::AgentContextSnapshot,
+        event_tx: Option<mpsc::Sender<macaca_proto::AgentExecutionEvent>>,
+        execution_control: Option<RuntimeExecutionControl>,
+        max_iters: usize,
+        tool_choice: Option<ToolChoice>,
+    ) -> Result<HookedAgent<ReActAgent>, String> {
+        let task_id = context_snapshot
+            .task_id
+            .unwrap_or_else(macaca_proto::TaskId::new);
+        let capabilities = Self::resolve_agent_capability_set(
+            state,
+            &context_snapshot.application_id,
+            &context_snapshot.target_agent,
+        )
+        .await;
+        let request = Self::build_request_with_system_prompt(
+            state,
+            &context_snapshot.application_id,
+            &context_snapshot.target_agent,
+            Some(context_snapshot.session_id.clone()),
+            task_id,
+            context_snapshot.task_id,
+            AgentBuildIntent::RuntimeAgent,
+            AgentToolConfig {
+                goal_id: context_snapshot.task_id,
+                ..Default::default()
+            },
+            capabilities,
+            context_snapshot.system_prompt.clone(),
+        )
+        .await?;
+        let factory = WebTracedAgentFactory {
+            state: Arc::clone(state),
+            build_mode: FrameworkRunnerBuildMode::Runtime {
+                event_tx,
+                execution_control,
+                max_iters: max_iters.max(1),
+                tool_choice,
             },
         };
         factory.build(request).await
@@ -1490,6 +1550,7 @@ impl WebTracedAgentFactory {
         selection: &macaca_llm::ModelSelection,
         toolkit: Toolkit,
         max_iters: usize,
+        tool_choice: Option<ToolChoice>,
         routing_agent_id: Option<AgentId>,
         skill_capability_catalog: Arc<macaca_context::SkillCapabilityCatalog>,
         mcp_capability_catalog: Arc<macaca_context::McpCapabilityCatalog>,
@@ -1529,7 +1590,7 @@ impl WebTracedAgentFactory {
             context_engine_registry,
         ));
         let formatter = Arc::new(OpenAiFormatter);
-        ReActAgent::new(
+        let mut agent = ReActAgent::new(
             &request.identity.agent_name,
             &request.system_prompt,
             model,
@@ -1538,7 +1599,11 @@ impl WebTracedAgentFactory {
         .with_toolkit(toolkit)
         .with_memory(Box::new(InMemoryWorkingMemory::new()))
         .with_max_iters(max_iters)
-        .with_model_name(selection.primary.reference())
+        .with_model_name(selection.primary.reference());
+        if let Some(tool_choice) = tool_choice {
+            agent = agent.with_tool_choice(tool_choice);
+        }
+        agent
     }
 
     async fn configure_standard_toolkit(
@@ -1628,6 +1693,7 @@ impl WebTracedAgentFactory {
         request: AgentBuildRequest,
         mode: StandardAgentMode,
         max_iters: usize,
+        tool_choice: Option<ToolChoice>,
     ) -> Result<HookedAgent<ReActAgent>, String> {
         let PreparedAgentParts {
             selection,
@@ -1699,6 +1765,7 @@ impl WebTracedAgentFactory {
             &selection,
             toolkit,
             max_iters.max(1),
+            tool_choice.clone(),
             routing_agent_id,
             skill_capability_catalog,
             mcp_capability_catalog,
@@ -1708,6 +1775,14 @@ impl WebTracedAgentFactory {
             Arc::clone(&self.state.context_engine_registry),
         );
         let hooks = Self::build_standard_hooks(mode, task_id, agent_name);
+        tracing::info!(
+            application_id = %request.identity.app_id,
+            agent = %request.identity.agent_name,
+            session_id = request.identity.session_id.as_deref().unwrap_or(""),
+            max_iters = max_iters.max(1),
+            tool_choice = ?tool_choice,
+            "framework_runner.standard_agent built with provider-neutral execution policy"
+        );
         Ok(HookedAgent::new(agent, hooks))
     }
 
@@ -1798,7 +1873,7 @@ impl WebTracedAgentFactory {
         request: AgentBuildRequest,
         executor: Arc<macaca_kernel::executor::ApplicationExecutor>,
     ) -> Result<HookedAgent<ReActAgent>, String> {
-        self.build_standard_agent(request, StandardAgentMode::Executor { executor }, 25)
+        self.build_standard_agent(request, StandardAgentMode::Executor { executor }, 25, None)
             .await
     }
 
@@ -1808,6 +1883,7 @@ impl WebTracedAgentFactory {
         event_tx: Option<mpsc::Sender<macaca_proto::AgentExecutionEvent>>,
         execution_control: Option<RuntimeExecutionControl>,
         max_iters: usize,
+        tool_choice: Option<ToolChoice>,
     ) -> Result<HookedAgent<ReActAgent>, String> {
         self.build_standard_agent(
             request,
@@ -1816,6 +1892,7 @@ impl WebTracedAgentFactory {
                 execution_control,
             },
             max_iters.max(1),
+            tool_choice,
         )
         .await
     }
@@ -1908,6 +1985,7 @@ impl WebTracedAgentFactory {
             &selection,
             toolkit,
             50,
+            None,
             routing_agent_id,
             skill_capability_catalog,
             mcp_capability_catalog,

@@ -48,6 +48,7 @@ pub enum HostedApplicationExecutionOutcome {
     Running {
         checkpoint_ref: Option<String>,
         summary: String,
+        signals: Vec<HostedApplicationExecutionSignal>,
     },
     /// The application reached a generic approval wait point.
     WaitingForApproval {
@@ -57,6 +58,40 @@ pub enum HostedApplicationExecutionOutcome {
     },
     /// The application completed synchronously through the hosted adapter.
     Completed { summary: String },
+}
+
+/// Provider-neutral signal produced by a hosted runtime adapter.
+///
+/// A signal is not a raw WASM or application payload.  It is the sanitized,
+/// protocol-shaped fact that the `MacacaHosted` provider may append to the
+/// durable application-execution EventLog.  Keeping this small translation
+/// object inside runtime-host preserves the Adapter pattern: concrete WASM host
+/// import details stay behind the ABI bridge, while the provider emits only
+/// generic execution events such as tool dispatch, tool completion, and terminal
+/// completion/failure evidence.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HostedApplicationExecutionSignal {
+    pub event_type: ApplicationExecutionEventType,
+    pub payload: ApplicationExecutionPayload,
+    pub idempotency_suffix: String,
+}
+
+impl HostedApplicationExecutionSignal {
+    /// Build one signal with a bounded payload summary and small JSON metadata.
+    pub fn new(
+        event_type: ApplicationExecutionEventType,
+        summary: impl Into<String>,
+        data: Option<serde_json::Value>,
+        idempotency_suffix: impl Into<String>,
+    ) -> Self {
+        let mut payload = ApplicationExecutionPayload::summary(summary);
+        payload.data = data;
+        Self {
+            event_type,
+            payload,
+            idempotency_suffix: idempotency_suffix.into(),
+        }
+    }
 }
 
 /// Adapter implemented by concrete hosted application runtimes.
@@ -110,6 +145,23 @@ impl HostedApplicationExecutionAdapter for ApplicationAbiHostedExecutionAdapter 
         &self,
         command: StartApplicationExecutionCommand,
     ) -> Result<HostedApplicationExecutionOutcome, ServiceError> {
+        // Child WASM host imports need the user-visible application-execution
+        // scope, not the provider-private runtime session.  The HTTP route only
+        // requires a trace id, so this adapter enriches the trace before it
+        // crosses into Application Service.  That keeps scope propagation in
+        // the generic hosted execution boundary and lets any WASM/YAML/GenUI
+        // application reuse the same replay and audit correlation path.
+        let outer_session_id = command
+            .session_id
+            .clone()
+            .unwrap_or_else(|| command.idempotency_key.clone());
+        let outer_run_id = command
+            .run_id
+            .clone()
+            .unwrap_or_else(|| command.idempotency_key.clone());
+        let mut hosted_trace = command.trace.clone();
+        hosted_trace.session_id = Some(outer_session_id.clone());
+        hosted_trace.task_id = Some(outer_run_id.clone());
         // Hosted execution starts are intentionally represented as a generic
         // WASM export invocation instead of a provider/application-specific
         // host import. The Application Service resolves the app-scoped WASM
@@ -127,9 +179,17 @@ impl HostedApplicationExecutionAdapter for ApplicationAbiHostedExecutionAdapter 
                 "requested_capabilities": command.requested_capabilities,
                 "task_input_summary": command.task_input.summary,
                 "task_input_has_payload_ref": command.task_input.payload_ref.is_some(),
+                "chat": {
+                    "input": command.task_input.summary,
+                    "payload_ref": command.task_input.payload_ref,
+                    "workspace_ref": command.workspace_ref,
+                    "session_id": outer_session_id,
+                    "run_id": outer_run_id,
+                    "requested_capabilities": command.requested_capabilities,
+                },
                 "idempotency_key": command.idempotency_key,
             }),
-            command.trace.clone(),
+            hosted_trace,
         );
         host_command
             .metadata
@@ -190,9 +250,11 @@ impl HostedApplicationExecutionAdapter for ApplicationAbiHostedExecutionAdapter 
                 // that has not happened yet, so the adapter returns `Running`
                 // with a generic checkpoint memento that the EventLog can
                 // persist and replay after browser refresh or subscriber loss.
+                let signals = hosted_signals_from_host_result(&result);
                 Ok(HostedApplicationExecutionOutcome::Running {
                     checkpoint_ref,
                     summary: "hosted application runtime accepted start dispatch".into(),
+                    signals,
                 })
             }
             ApplicationHostCommandStatus::RuntimeUnavailable { reason }
@@ -255,6 +317,7 @@ impl HostedApplicationExecutionAdapter for ApplicationAbiHostedExecutionAdapter 
             ApplicationHostCommandStatus::Ok => Ok(HostedApplicationExecutionOutcome::Running {
                 checkpoint_ref: snapshot.latest_checkpoint_ref,
                 summary: "hosted application runtime resumed from snapshot".into(),
+                signals: hosted_signals_from_host_result(&result),
             }),
             ApplicationHostCommandStatus::RuntimeUnavailable { reason }
             | ApplicationHostCommandStatus::Unavailable { reason } => {
@@ -396,6 +459,37 @@ impl MacacaHostedApplicationExecutionProvider {
         Ok(persisted.seq.map(|seq| format!("event/{seq}")))
     }
 
+    /// Persist runtime-adapter signals as application-execution EventLog rows.
+    ///
+    /// Hosted adapters can observe generic ABI/host-import facts, but the
+    /// provider remains the only owner that appends authoritative execution
+    /// events for a run.  This method is the Observer bridge between those two
+    /// layers: it accepts pre-sanitized protocol-shaped signals, stamps them
+    /// with the run scope and provider identity, and appends them idempotently
+    /// under the original start/resume idempotency namespace.
+    async fn append_runtime_signals(
+        &self,
+        scope: &ApplicationExecutionScope,
+        trace: &macaca_proto::TraceContext,
+        idempotency_prefix: &str,
+        signals: Vec<HostedApplicationExecutionSignal>,
+    ) -> Result<Option<String>, ServiceError> {
+        let mut cursor = None;
+        for signal in signals {
+            cursor = self
+                .append_event(
+                    scope,
+                    signal.event_type,
+                    trace.clone(),
+                    signal.payload,
+                    format!("{idempotency_prefix}:{}", signal.idempotency_suffix),
+                )
+                .await?
+                .or(cursor);
+        }
+        Ok(cursor)
+    }
+
     fn start_result(
         &self,
         scope: &ApplicationExecutionScope,
@@ -423,4 +517,117 @@ impl MacacaHostedApplicationExecutionProvider {
 
 fn adapter_error(error: serde_json::Error) -> ServiceError {
     ServiceError::AdapterFailure(error.to_string())
+}
+
+/// Translate ABI host-command results into durable execution-protocol signals.
+///
+/// Component-model WASM artifacts can declare a sequence of host commands.
+/// Those commands may route to ServiceRuntime, Application Service orchestration,
+/// or future provider-neutral imports.  The application-execution provider must
+/// not persist raw host output, but it should record that generic tool/service
+/// work was dispatched and whether the declared work completed, failed, or was
+/// queued for asynchronous continuation.  This helper performs that bounded
+/// translation without looking at application names, workflow names, provider
+/// names, model names, or business-domain fields.
+fn hosted_signals_from_host_result(
+    result: &macaca_proto::ApplicationHostCommandResult,
+) -> Vec<HostedApplicationExecutionSignal> {
+    let Some(results) = result
+        .output
+        .get("host_command_results")
+        .and_then(serde_json::Value::as_array)
+    else {
+        return Vec::new();
+    };
+    let mut signals = Vec::new();
+    let mut completed = 0usize;
+    let mut failed = 0usize;
+    let mut queued = 0usize;
+    for (index, row) in results.iter().enumerate() {
+        let status = host_command_status_label(row);
+        let metadata = row
+            .get("metadata")
+            .and_then(serde_json::Value::as_object)
+            .cloned()
+            .unwrap_or_default();
+        let service_id = metadata
+            .get("service_id")
+            .or_else(|| metadata.get("service.id"))
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("unknown");
+        let reason_code = metadata
+            .get("reason_code")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("unknown");
+        let task_id = row
+            .pointer("/output/output/task_id")
+            .and_then(serde_json::Value::as_str)
+            .or_else(|| {
+                row.pointer("/output/task_id")
+                    .and_then(serde_json::Value::as_str)
+            });
+        let delegated_status = row
+            .pointer("/output/output/status")
+            .and_then(serde_json::Value::as_str)
+            .or_else(|| {
+                row.pointer("/output/status")
+                    .and_then(serde_json::Value::as_str)
+            });
+
+        let effective_status = delegated_status.unwrap_or(status);
+        match effective_status.to_ascii_lowercase().as_str() {
+            "queued" => queued += 1,
+            "completed" | "ok" => completed += 1,
+            _ => failed += 1,
+        }
+        signals.push(HostedApplicationExecutionSignal::new(
+            ApplicationExecutionEventType::ToolCallCompleted,
+            "hosted application declared host command completed",
+            Some(serde_json::json!({
+                "index": index,
+                "status": effective_status,
+                "service_id": service_id,
+                "reason_code": reason_code,
+                "task_id": task_id,
+            })),
+            format!("host-command-{index}-completed"),
+        ));
+    }
+    if !results.is_empty() {
+        let terminal = if failed > 0 {
+            Some((
+                ApplicationExecutionEventType::ExecutionFailed,
+                "hosted application declared host commands failed",
+                "host-commands-failed",
+            ))
+        } else if queued == 0 && completed == results.len() {
+            Some((
+                ApplicationExecutionEventType::ExecutionCompleted,
+                "hosted application declared host commands completed",
+                "host-commands-completed",
+            ))
+        } else {
+            None
+        };
+        if let Some((event_type, summary, suffix)) = terminal {
+            signals.push(HostedApplicationExecutionSignal::new(
+                event_type,
+                summary,
+                Some(serde_json::json!({
+                    "host_command_count": results.len(),
+                    "completed": completed,
+                    "failed": failed,
+                    "queued": queued,
+                })),
+                suffix,
+            ));
+        }
+    }
+    signals
+}
+
+fn host_command_status_label(row: &serde_json::Value) -> &str {
+    row.get("status")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("unknown")
 }

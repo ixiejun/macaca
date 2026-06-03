@@ -12,6 +12,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use macaca_framework::agent::Agent;
 use macaca_framework::message::Msg;
+use macaca_framework::model::ToolChoice;
 use macaca_kernel::executor::ExecutorEventFactory;
 use macaca_proto::{
     AgentContextBuildCommand, AgentContextSnapshot, AgentExecutionCommand, AgentExecutionEvent,
@@ -30,12 +31,13 @@ use macaca_tools::{ShellTool, ToolCommand, ToolCommandExecutor};
 use tokio::sync::mpsc;
 
 use crate::agent_execution_evidence::{observed_agent_execution_events, stable_agent_output_hash};
+use crate::application_execution_agent_event_bridge::ApplicationExecutionAgentEventMirror;
 use crate::framework_runner::{FrameworkRunner, RuntimeExecutionControl};
 use crate::runtime_event_bridge::emit_execution_control_events;
 use crate::state::AppState;
 
 const DEFAULT_RUNTIME_AGENT_MAX_ITERS: usize = 25;
-const ARTIFACT_BACKED_RUNTIME_AGENT_MAX_ITERS: usize = 3;
+const ARTIFACT_BACKED_RUNTIME_AGENT_MAX_ITERS: usize = 12;
 
 /// Web-owned implementation of the Agent Execution system service.
 pub(crate) struct WebAgentExecutionBackend {
@@ -205,6 +207,25 @@ impl WebAgentExecutionBackend {
                 ARTIFACT_BACKED_RUNTIME_AGENT_MAX_ITERS
             }
             _ => DEFAULT_RUNTIME_AGENT_MAX_ITERS,
+        }
+    }
+
+    /// Select the provider-neutral model tool policy from the compiled
+    /// completion contract.
+    ///
+    /// Artifact-backed work is only complete after durable evidence changes, so
+    /// the model must enter the authorized Toolkit instead of returning a prose
+    /// answer. The rule intentionally depends only on the generic
+    /// `AutonomousCompletionPolicyKind`; it does not inspect application names,
+    /// workflow names, model names, provider names, or business domains.
+    fn runtime_agent_tool_choice(command: &AgentExecutionCommand) -> Option<ToolChoice> {
+        match command
+            .execution_envelope
+            .as_ref()
+            .map(|envelope| envelope.completion_policy.kind)
+        {
+            Some(AutonomousCompletionPolicyKind::RequireArtifact) => Some(ToolChoice::Required),
+            _ => None,
         }
     }
 
@@ -636,11 +657,16 @@ impl AgentExecutionBackend for WebAgentExecutionBackend {
             .metadata
             .get("evidence.expected_artifact_path")
             .map(String::as_str);
+        let application_execution_mirror = ApplicationExecutionAgentEventMirror::from_command(
+            self.state.system_facade.application_execution_client(),
+            &command,
+        );
         let (agent_event_tx, evidence_observer) = observed_agent_execution_events(
             executor.clone(),
             task_id,
             command.target_agent.clone(),
             expected_artifact_path,
+            application_execution_mirror,
         );
 
         if let Some(command_text) =
@@ -710,28 +736,26 @@ impl AgentExecutionBackend for WebAgentExecutionBackend {
             None => None,
         };
         let max_iters = Self::runtime_agent_max_iters(&command);
-        let agent = match execution_control {
-            Some(execution_control) => {
-                FrameworkRunner::build_runtime_agent_from_context_snapshot_with_execution_control_and_max_iters(
-                    &self.state,
-                    &context_snapshot,
-                    Some(agent_event_tx),
-                    execution_control,
-                    max_iters,
-                )
-                .await
-            }
-            None => {
-                FrameworkRunner::build_runtime_agent_from_context_snapshot_with_max_iters(
-                    &self.state,
-                    &context_snapshot,
-                    Some(agent_event_tx),
-                    max_iters,
-                )
-                .await
-            }
-        }
-        .map_err(ServiceError::AdapterFailure)?;
+        let tool_choice = Self::runtime_agent_tool_choice(&command);
+        tracing::info!(
+            application_id = %command.application_id,
+            session_id = %command.session_id,
+            target_agent = %command.target_agent,
+            max_iters,
+            tool_choice = ?tool_choice,
+            "agent_execution.runtime_agent_policy selected provider-neutral execution controls"
+        );
+        let agent =
+            FrameworkRunner::build_runtime_agent_from_context_snapshot_with_execution_policy(
+                &self.state,
+                &context_snapshot,
+                Some(agent_event_tx),
+                execution_control,
+                max_iters,
+                tool_choice,
+            )
+            .await
+            .map_err(ServiceError::AdapterFailure)?;
 
         let prompt = Self::user_prompt_with_context(&command);
         match agent.reply(Msg::user("user", prompt)).await {

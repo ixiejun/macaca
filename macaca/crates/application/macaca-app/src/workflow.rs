@@ -392,7 +392,20 @@ fn render_tool_policy_block(
     }
 
     if policy.allowed_tools.iter().any(|tool| tool == "file_write") {
-        lines.push("- NEVER use file_write to write source code".into());
+        // `file_write` is a generic workspace capability, not an execution
+        // driver bypass.  Applications such as coding workbenches may
+        // legitimately author files through this tool, but the model must keep
+        // writes inside the application-declared workspace or an explicit
+        // evidence path so service audit, sandbox policy, and replayable
+        // artifacts remain authoritative.
+        lines.push(
+            "- Use `file_write` only for application-declared workspace paths or explicit evidence artifact paths"
+                .into(),
+        );
+        lines.push(
+            "- Never write outside the delegated workspace, and report any path or policy denial"
+                .into(),
+        );
     } else {
         lines.push("- NEVER write source code directly".into());
     }

@@ -119,6 +119,7 @@ impl ApplicationExecutionProvider for MacacaHostedApplicationExecutionProvider {
             HostedApplicationExecutionOutcome::Running {
                 checkpoint_ref,
                 summary,
+                signals,
             } => {
                 if let Some(checkpoint_ref) = checkpoint_ref.clone() {
                     state.latest_checkpoint_ref = Some(checkpoint_ref);
@@ -133,6 +134,15 @@ impl ApplicationExecutionProvider for MacacaHostedApplicationExecutionProvider {
                         .await?
                         .or(cursor);
                 }
+                cursor = self
+                    .append_runtime_signals(
+                        &scope,
+                        &command.trace,
+                        &command.idempotency_key,
+                        signals,
+                    )
+                    .await?
+                    .or(cursor);
                 ApplicationExecutionCommandStatus::Accepted
             }
             HostedApplicationExecutionOutcome::WaitingForApproval {
@@ -334,7 +344,17 @@ impl ApplicationExecutionProvider for MacacaHostedApplicationExecutionProvider {
             HostedApplicationExecutionOutcome::Running {
                 checkpoint_ref,
                 summary: _,
+                signals,
             } => {
+                let signal_cursor = self
+                    .append_runtime_signals(
+                        &snapshot.scope,
+                        &macaca_proto::TraceContext::new("application-execution-hosted-resume"),
+                        &format!("{}:{}", snapshot.scope.session_id, snapshot.scope.run_id),
+                        signals,
+                    )
+                    .await?
+                    .or(cursor.clone());
                 self.runs.write().await.insert(
                     Self::run_key(&snapshot.scope),
                     HostedRunState {
@@ -342,9 +362,10 @@ impl ApplicationExecutionProvider for MacacaHostedApplicationExecutionProvider {
                         lifecycle_state: ApplicationExecutionLifecycleState::Running,
                         latest_checkpoint_ref: checkpoint_ref,
                         pending_approval_ref: None,
-                        latest_event_cursor: cursor.clone(),
+                        latest_event_cursor: signal_cursor.clone(),
                     },
                 );
+                cursor = signal_cursor;
                 ApplicationExecutionLifecycleState::Running
             }
         };

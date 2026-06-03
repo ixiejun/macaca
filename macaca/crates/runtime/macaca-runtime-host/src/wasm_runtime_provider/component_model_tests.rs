@@ -269,6 +269,74 @@ async fn component_model_provider_resolves_typed_chat_payload_fields() {
 }
 
 #[tokio::test]
+async fn component_model_provider_resolves_nested_chat_payload_fields() {
+    let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
+    let service_id = register_mock_service(&runtime, "wasm.component.service.nested-chat").await;
+    let bridge = Arc::new(WasmHostImportBridge::new(
+        Arc::clone(&runtime),
+        WasmHostImportBridgeConfig::default(),
+    ));
+    let mut host_command = ApplicationHostCommand::with_trace(
+        ApplicationImport::ServiceCall,
+        json!({
+            "input": "${chat.input}",
+            "run_id": "${chat.run_id}",
+            "workspace_ref": "${chat.workspace_ref}"
+        }),
+        TraceContext::new("trace-nested-placeholder-replaced-by-runtime"),
+    );
+    host_command
+        .metadata
+        .insert("service.id".into(), service_id.to_string());
+    host_command
+        .metadata
+        .insert("service.operation".into(), "invoke".into());
+    host_command
+        .metadata
+        .insert("capability".into(), "service.call".into());
+    let fixture = component_fixture_bytes_with_host_command(&host_command);
+    let artifact_path = write_fixture_component("declared-host-plan-nested-chat", &fixture);
+    let provider = ComponentModelWasmRuntimeProvider::default().with_host_import_bridge(bridge);
+    let session = provider
+        .create_session(traced_request(
+            "trace-component-declared-plan-nested-chat-provider",
+            &artifact_path,
+        ))
+        .await
+        .unwrap();
+    let mut command = ApplicationHostCommand::with_trace(
+        ApplicationImport::Custom("macaca:wasm/invoke".into()),
+        json!({
+            "chat": {
+                "input": "Create a Rust hello world project",
+                "run_id": "run-nested-chat",
+                "workspace_ref": "workspace://demo/shared"
+            }
+        }),
+        TraceContext::new("trace-component-declared-plan-nested-chat-command"),
+    );
+    command
+        .metadata
+        .insert("wasm.export".into(), "app:start".into());
+
+    let result = session.dispatch(command).await.unwrap();
+
+    assert!(matches!(result.status, ApplicationHostCommandStatus::Ok));
+    assert_eq!(
+        result.output["host_command_results"][0]["output"]["input"],
+        json!("Create a Rust hello world project")
+    );
+    assert_eq!(
+        result.output["host_command_results"][0]["output"]["run_id"],
+        json!("run-nested-chat")
+    );
+    assert_eq!(
+        result.output["host_command_results"][0]["output"]["workspace_ref"],
+        json!("workspace://demo/shared")
+    );
+}
+
+#[tokio::test]
 async fn component_model_provider_interpolates_embedded_display_placeholders() {
     let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
     let service_id = register_mock_service(&runtime, "wasm.component.service.display-chat").await;

@@ -13,6 +13,7 @@ pub mod app_ui_routes;
 mod app_ui_session_projection;
 mod app_ui_workspace_scope;
 mod app_workspace_bootstrap;
+mod application_execution_agent_event_bridge;
 pub mod application_execution_gateway_routes;
 #[cfg(test)]
 mod application_execution_gateway_routes_tests;
@@ -186,9 +187,11 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
         "Autonomy runtime bootstrapped through runtime-host"
     );
     let application_orchestration_registry_ref = Arc::new(tokio::sync::RwLock::new(None));
+    let app_workspaces = Arc::new(tokio::sync::RwLock::new(HashMap::new()));
     let orchestration_backend = Arc::new(WebApplicationOrchestrationBackend::new(
         Arc::clone(&application_orchestration_registry_ref),
         Arc::clone(&service_runtime),
+        Arc::clone(&app_workspaces),
     ));
     let mut app_dirs = HashMap::new();
     let mut skills_dirs = Vec::new();
@@ -1040,7 +1043,7 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
             },
             config: AppConfig {
                 app_dirs: tokio::sync::RwLock::new(app_dirs),
-                app_workspaces: tokio::sync::RwLock::new(HashMap::new()),
+                app_workspaces: Arc::clone(&app_workspaces),
                 default_model,
                 context: config.context.clone(),
                 catalog: tokio::sync::RwLock::new(catalog),

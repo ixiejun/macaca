@@ -280,7 +280,7 @@ pub struct AppConfig {
     /// Map of app_id -> app directory path.
     pub app_dirs: RwLock<HashMap<ApplicationId, PathBuf>>,
     /// Per-app workspace directory structure (populated on app startup).
-    pub app_workspaces: RwLock<HashMap<ApplicationId, AppWorkspace>>,
+    pub app_workspaces: Arc<RwLock<HashMap<ApplicationId, AppWorkspace>>>,
     /// Default model for LLM requests (e.g. "" for DashScope).
     pub default_model: String,
     /// Runtime context-engine configuration.

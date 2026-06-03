@@ -147,6 +147,12 @@ async fn abi_hosted_start_invokes_generic_wasm_start_export() {
             .map(String::as_str),
         Some("start")
     );
+    assert_eq!(command.payload["chat"]["input"], "generic task");
+    assert_eq!(command.payload["chat"]["session_id"], "session-wasm-export");
+    assert_eq!(command.payload["chat"]["run_id"], "run-wasm-export");
+    let trace = command.trace.as_ref().unwrap();
+    assert_eq!(trace.session_id.as_deref(), Some("session-wasm-export"));
+    assert_eq!(trace.task_id.as_deref(), Some("run-wasm-export"));
 }
 
 #[tokio::test]
@@ -198,6 +204,72 @@ async fn abi_hosted_start_ack_is_replayable_without_terminal_completion() {
     );
 }
 
+#[tokio::test]
+async fn abi_hosted_declared_host_command_results_become_durable_execution_events() {
+    let (_dir, event_log) = event_log();
+    let store = ApplicationExecutionEventStore::new(event_log.clone());
+    let provider = MacacaHostedApplicationExecutionProvider::new(
+        store,
+        Arc::new(ApplicationAbiHostedExecutionAdapter::new(Arc::new(
+            CapturingHostRuntime::with_host_command_results(serde_json::json!([
+                {
+                    "index": 0,
+                    "status": "Completed",
+                    "output": {},
+                    "metadata": {
+                        "service_id": "service.git",
+                        "reason_code": "import_completed"
+                    }
+                },
+                {
+                    "index": 1,
+                    "status": "Ok",
+                    "output": {
+                        "output": {
+                            "status": "completed",
+                            "task_id": "task-hosted-delegate-1"
+                        }
+                    },
+                    "metadata": {
+                        "service_id": "service.application",
+                        "reason_code": "import_completed"
+                    }
+                }
+            ])),
+        ))),
+        vec![CapabilityId::new("capability.application_execution")],
+    );
+    let start = start_command(
+        "session-wasm-host-results",
+        "run-wasm-host-results",
+        "hosted-wasm-host-results-1",
+    );
+
+    provider.start(start.clone()).await.unwrap();
+
+    let replay = ApplicationExecutionEventStore::new(event_log)
+        .replay(ApplicationExecutionReplayRequest {
+            application_id: start.application_id,
+            session_id: "session-wasm-host-results".into(),
+            run_id: Some("run-wasm-host-results".into()),
+            from_cursor: None,
+            page_size: 50,
+            event_types: Vec::new(),
+            visibility: None,
+            trace: TraceContext::new("trace-hosted-host-results-replay"),
+        })
+        .await
+        .unwrap();
+    let event_types = replay
+        .events
+        .iter()
+        .map(|event| event.event_type)
+        .collect::<Vec<_>>();
+
+    assert!(event_types.contains(&ApplicationExecutionEventType::ToolCallCompleted));
+    assert!(event_types.contains(&ApplicationExecutionEventType::ExecutionCompleted));
+}
+
 struct FakeHostedAdapter {
     outcome: Result<HostedApplicationExecutionOutcome, ServiceErrorProxy>,
     controls: Mutex<Vec<ApplicationExecutionControlKind>>,
@@ -206,6 +278,16 @@ struct FakeHostedAdapter {
 #[derive(Default)]
 struct CapturingHostRuntime {
     last_command: Mutex<Option<ApplicationHostCommand>>,
+    host_command_results: Option<serde_json::Value>,
+}
+
+impl CapturingHostRuntime {
+    fn with_host_command_results(host_command_results: serde_json::Value) -> Self {
+        Self {
+            last_command: Mutex::new(None),
+            host_command_results: Some(host_command_results),
+        }
+    }
 }
 
 #[async_trait]
@@ -227,7 +309,10 @@ impl ApplicationHostRuntime for CapturingHostRuntime {
         *self.last_command.lock().await = Some(command.clone());
         Ok(ApplicationHostCommandResult {
             status: ApplicationHostCommandStatus::Ok,
-            output: serde_json::json!({ "captured": true }),
+            output: serde_json::json!({
+                "captured": true,
+                "host_command_results": self.host_command_results.clone().unwrap_or_else(|| serde_json::json!([])),
+            }),
             trace: command.trace,
             policy: None,
             metadata: Default::default(),
@@ -281,6 +366,7 @@ impl HostedApplicationExecutionAdapter for FakeHostedAdapter {
         Ok(HostedApplicationExecutionOutcome::Running {
             checkpoint_ref: None,
             summary: "resumed".into(),
+            signals: Vec::new(),
         })
     }
 }

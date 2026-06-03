@@ -9,8 +9,17 @@ entrypoint:
   type: workflow
   name: coding-loop
 
+# The application declares only a deployer-visible model preference.  Runtime
+# Host still owns credential lookup, policy, routing, fallback, trace, and
+# sanitized audit; the WASM package never receives provider credentials and no
+# OS layer branches on this application package.
+llm_config:
+  provider: volces
+  model: deepseek-v4-flash
+
 service_contract:
   required_services:
+    - service.application
     - service.application.host
     - service.application_execution
     - service.interaction
@@ -97,6 +106,7 @@ workflows:
 agents:
   - name: coordinator
     prompt_template: workflows/understand.md
+    model: deepseek-v4-flash
     permission_level: system
     allowed_tools:
       - service.call
@@ -109,8 +119,13 @@ agents:
 
   - name: planner
     prompt_template: workflows/plan.md
+    model: deepseek-v4-flash
     permission_level: user
     allowed_tools:
+      # Application-owned planning may inspect the app workspace through the
+      # generic workspace-scoped file adapter.  Runtime Host still resolves the
+      # concrete workspace root, applies policy, and records trace/audit events.
+      - file_read
       - service.call
     capabilities:
       - name: code_change_planning
@@ -118,8 +133,16 @@ agents:
 
   - name: coder
     prompt_template: workflows/implement.md
+    model: deepseek-v4-flash
     permission_level: user
     allowed_tools:
+      # The Codex-class app owns coding behavior, so its coder explicitly
+      # declares the workspace write tool for the delegated writer path.  Read
+      # and shell/process tools remain separate service capabilities; omitting
+      # them here keeps artifact-producing tasks deterministic and makes
+      # completion evidence depend on file_write audit events rather than a
+      # natural-language summary.
+      - file_write
       - service.call
     capabilities:
       - name: patch_authoring
@@ -127,8 +150,12 @@ agents:
 
   - name: reviewer
     prompt_template: workflows/review.md
+    model: deepseek-v4-flash
     permission_level: user
     allowed_tools:
+      # Reviews need read-only workspace inspection plus service calls for
+      # diagnostics/review summaries; writes stay with the coder role.
+      - file_read
       - service.call
     capabilities:
       - name: structured_review
@@ -211,6 +238,9 @@ workbench:
     - diagnostics
 
   service_dependencies:
+    - service: service.application
+      optional: false
+      reason: "WASM agent delegation enters through Application Service before service.agent_execution"
     - service: service.interaction
       optional: false
       reason: "Durable Thread/Turn/Item lifecycle"
