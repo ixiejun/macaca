@@ -14,6 +14,7 @@ mod app_ui_session_projection;
 mod app_ui_workspace_scope;
 mod app_workspace_bootstrap;
 mod application_execution_agent_event_bridge;
+mod application_execution_agent_event_display;
 pub mod application_execution_gateway_routes;
 #[cfg(test)]
 mod application_execution_gateway_routes_tests;

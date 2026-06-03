@@ -5,6 +5,7 @@ import test from "node:test";
 const source = await readFile(new URL("../app.js", import.meta.url), "utf8");
 const bridgeCallsSource = await readFile(new URL("../bridge_calls.js", import.meta.url), "utf8");
 const sessionHistorySource = await readFile(new URL("../session_history.js", import.meta.url), "utf8");
+const renderSource = await readFile(new URL("../render.js", import.meta.url), "utf8");
 
 test("production UI uses service.application_execution APIs instead of browser tool loop", () => {
   assert.match(bridgeCallsSource, /capability: "app\.execution"/);
@@ -50,5 +51,26 @@ test("UI switches app-owned execution streams when host session changes", () => 
 
 test("UI refreshes durable replay before opening websocket increments", () => {
   assert.match(source, /sessionHistory\.replayEvents\(\)\s*\n\s*\.then\(refreshCurrentState\)\s*\n\s*\.then\(openExecutionWebSocket\)/);
-  assert.match(source, /await sessionHistory\.replayEvents\(\);\s*\n\s*await refreshCurrentState\(\);\s*\n\s*openExecutionWebSocket\(\);/);
+  assert.match(source, /if \(!state\.eventSocket && state\.running\) openExecutionWebSocket\(\);/);
+});
+
+test("UI subscribes to execution events before awaiting hosted start completion", () => {
+  const immediateSocketIndex = source.indexOf("openExecutionWebSocket();");
+  const startBridgeIndex = source.indexOf('const result = await callAppExecution("start"');
+  assert.ok(immediateSocketIndex > 0, "startTask should open the websocket");
+  assert.ok(startBridgeIndex > 0, "startTask should still call the application execution bridge");
+  assert.ok(
+    immediateSocketIndex < startBridgeIndex,
+    "the websocket must open before awaiting the hosted start call so live EventLog rows render while the backend is still running",
+  );
+  assert.match(source, /appendEvent\("stream_connected"/);
+});
+
+test("timeline presenter renders user-readable execution events instead of raw protocol JSON", () => {
+  assert.match(renderSource, /export function presentTimelineEvent/);
+  assert.match(renderSource, /function presentExecutionEvent/);
+  assert.match(renderSource, /data\.display_title \|\| eventTitle/);
+  assert.match(renderSource, /data\.display_body \|\| payload\.summary/);
+  assert.match(renderSource, /document\.createElement\(view\.usePre \? "pre" : "p"\)/);
+  assert.doesNotMatch(renderSource, /body\.textContent = typeof entry\.data === "string" \? entry\.data : JSON\.stringify\(entry\.data, null, 2\)/);
 });

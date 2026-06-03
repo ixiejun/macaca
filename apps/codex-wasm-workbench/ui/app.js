@@ -184,6 +184,13 @@ async function startTask() {
   sessionMementos.save(state);
   renderTimeline(state);
   renderResult(state);
+  // Open the durable EventLog WebSocket before awaiting the start command. The
+  // Macaca-hosted provider may keep the HTTP start call open while WASM host
+  // commands and delegated agents run; waiting for that response would make the
+  // browser subscribe only after the run has already finished.  The websocket is
+  // still render-only: execution authority and persistence remain in
+  // `service.application_execution`, and refresh recovery still uses replay.
+  openExecutionWebSocket();
   try {
     const result = await callAppExecution("start", {
       session_id: state.sessionId,
@@ -214,7 +221,7 @@ async function startTask() {
     appendEvent("execution_start_result", result);
     await sessionHistory.replayEvents();
     await refreshCurrentState();
-    openExecutionWebSocket();
+    if (!state.eventSocket && state.running) openExecutionWebSocket();
   } catch (error) {
     appendEvent("bridge_error", { error: error instanceof Error ? error.message : String(error) });
   }
@@ -274,6 +281,7 @@ function openExecutionWebSocket() {
   state.eventSocket = socket;
   socket.addEventListener("open", () => {
     console.info("[codex-wasm-workbench] websocket opened", { session_id: state.sessionId, since });
+    appendEvent("stream_connected", { session_id: state.sessionId, since: since || null });
   });
   socket.addEventListener("message", (event) => {
     try {

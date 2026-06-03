@@ -661,6 +661,9 @@ impl AgentExecutionBackend for WebAgentExecutionBackend {
             self.state.system_facade.application_execution_client(),
             &command,
         );
+        if let Some(mirror) = application_execution_mirror.as_ref() {
+            mirror.observe_requested(&command).await;
+        }
         let (agent_event_tx, evidence_observer) = observed_agent_execution_events(
             executor.clone(),
             task_id,

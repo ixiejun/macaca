@@ -48,15 +48,131 @@ export function renderTimeline(state) {
     ...state.events.slice(-80).map((entry) => {
       const item = document.createElement("article");
       item.className = `event-card event-${entry.type.replaceAll("_", "-")}`;
+      const view = presentTimelineEvent(entry);
       const title = document.createElement("h3");
-      title.textContent = entry.type;
-      const body = document.createElement("pre");
-      body.textContent = typeof entry.data === "string" ? entry.data : JSON.stringify(entry.data, null, 2);
+      title.textContent = view.title;
+      const body = document.createElement(view.usePre ? "pre" : "p");
+      body.textContent = view.body;
       item.append(title, body);
+      if (view.meta.length > 0) {
+        const meta = document.createElement("ul");
+        meta.className = "event-meta";
+        meta.replaceChildren(...view.meta.map(listItem));
+        item.append(meta);
+      }
       return item;
     }),
   );
   elements.eventTimeline.scrollTop = elements.eventTimeline.scrollHeight;
+}
+
+export function presentTimelineEvent(entry) {
+  // The Workbench Presenter converts provider-neutral protocol envelopes into
+  // user-facing timeline rows.  It deliberately consumes only sanitized display
+  // fields or bounded summaries supplied by Macaca; raw provider prompts,
+  // credentials, manifests, and unbounded tool payloads stay out of the UI.
+  const event = entry?.type === "execution_event" ? entry.data : null;
+  if (event) return presentExecutionEvent(event);
+  if (entry?.type === "stream_connected") {
+    return {
+      title: "Live updates connected",
+      body: "This session is now following backend execution events in real time.",
+      meta: entry.data?.since ? [`Resumed after event ${entry.data.since}`] : [],
+      usePre: false,
+    };
+  }
+  if (entry?.type === "execution_start_result") {
+    return {
+      title: "Task accepted",
+      body: "Macaca accepted the task and assigned a backend execution session.",
+      meta: compactMeta({
+        session: entry.data?.session_id,
+        run: entry.data?.run_id,
+        provider: entry.data?.provider_kind,
+      }),
+      usePre: false,
+    };
+  }
+  if (entry?.type === "bridge_error") {
+    return {
+      title: "Connection issue",
+      body: entry.data?.error || "The workbench bridge reported an error.",
+      meta: [],
+      usePre: false,
+    };
+  }
+  if (entry?.type === "model_catalog") {
+    return {
+      title: "Model catalog loaded",
+      body: `${entry.data?.providers || 0} providers and ${entry.data?.models || 0} models are available.`,
+      meta: [],
+      usePre: false,
+    };
+  }
+  return {
+    title: humanize(entry?.type || "event"),
+    body: typeof entry?.data === "string" ? entry.data : JSON.stringify(entry?.data || {}, null, 2),
+    meta: [],
+    usePre: typeof entry?.data !== "string",
+  };
+}
+
+function presentExecutionEvent(event) {
+  const payload = event.sanitized_payload || {};
+  const data = payload.data || {};
+  const title = data.display_title || eventTitle(event.event_type);
+  const body = data.display_body || payload.summary || "Execution event received.";
+  return {
+    title,
+    body,
+    meta: compactMeta({
+      tool: data.tool_name,
+      file: data.file_path,
+      status: data.status,
+      provider: event.provider_kind,
+      seq: event.seq,
+    }),
+    usePre: false,
+  };
+}
+
+function eventTitle(eventType) {
+  switch (eventType) {
+    case "LlmRequested":
+      return "Task sent to the agent";
+    case "LlmCompleted":
+      return "Assistant response";
+    case "ToolCallRequested":
+      return "Tool call requested";
+    case "ToolCallCompleted":
+      return "Tool call completed";
+    case "ExecutionCompleted":
+      return "Execution completed";
+    case "ExecutionFailed":
+      return "Execution failed";
+    case "ProviderAssigned":
+      return "Provider assigned";
+    case "ProviderHeartbeat":
+      return "Execution progress";
+    default:
+      return humanize(eventType || "execution event");
+  }
+}
+
+function compactMeta(values) {
+  return Object.entries(values)
+    .filter(([, value]) => value !== null && value !== undefined && value !== "")
+    .map(([key, value]) => `${humanize(key)}: ${value}`);
+}
+
+function humanize(value) {
+  return String(value)
+    .replaceAll("_", " ")
+    .replaceAll("-", " ")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^./, (char) => char.toUpperCase());
 }
 
 export function renderResult(state) {

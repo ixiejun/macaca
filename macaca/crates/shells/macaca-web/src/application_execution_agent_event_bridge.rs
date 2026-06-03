@@ -22,6 +22,11 @@ use macaca_proto::{
 use macaca_sdk::SystemApplicationExecutionClient;
 use tracing::{info, warn};
 
+use crate::application_execution_agent_event_display::{
+    display_excerpt, driver_trace_summary, merge_display, tool_file_path, tool_input_summary,
+    tool_output_summary,
+};
+
 const APPLICATION_EXECUTION_SCHEMA_VERSION: &str = "application-execution.v1";
 const INTERNAL_CALLBACK_IDENTITY_REF: &str =
     "identity.internal.application_execution.agent_event_bridge";
@@ -112,12 +117,47 @@ impl ApplicationExecutionAgentEventMirror {
         })
     }
 
+    /// Persist the initial user-facing task handoff as a bounded LLM request.
+    ///
+    /// AgentExecution does not expose raw provider requests, and Macaca
+    /// governance forbids storing raw prompts in observability surfaces.  This
+    /// event therefore records only the app/user task excerpt that was already
+    /// supplied through the typed command plus length/hash audit coordinates.
+    /// It gives reconnecting UIs a meaningful first row without leaking system
+    /// prompt, model-provider payloads, or unbounded context.
+    pub(crate) async fn observe_requested(&self, command: &AgentExecutionCommand) {
+        let ordinal = self.next_ordinal.fetch_add(1, Ordering::SeqCst);
+        let data = serde_json::json!({
+            "display_title": "Task sent to the agent",
+            "display_body": display_excerpt(&command.user_prompt),
+            "input_excerpt": display_excerpt(&command.user_prompt),
+            "input_hash": stable_hash(&command.user_prompt),
+            "input_len": command.user_prompt.len(),
+            "target_agent": command.target_agent,
+        });
+        self.append(
+            ApplicationExecutionEventType::LlmRequested,
+            payload("agent execution task accepted by runtime agent", data),
+            format!("agent-llm-requested-{ordinal}"),
+        )
+        .await;
+    }
+
     /// Persist one sanitized mirror event through the application-execution
     /// gateway.  Errors are logged and swallowed because telemetry mirroring
     /// must not fail the authoritative agent run.
     pub(crate) async fn observe(&self, event: &AgentExecutionEvent) {
         let ordinal = self.next_ordinal.fetch_add(1, Ordering::SeqCst);
         let (event_type, payload, suffix) = self.map_agent_event(event, ordinal);
+        self.append(event_type, payload, suffix).await;
+    }
+
+    async fn append(
+        &self,
+        event_type: ApplicationExecutionEventType,
+        payload: ApplicationExecutionPayload,
+        suffix: String,
+    ) {
         let envelope = ApplicationExecutionEventEnvelope {
             application_id: self.scope.application_id,
             session_id: self.scope.session_id.clone(),
@@ -180,6 +220,11 @@ impl ApplicationExecutionAgentEventMirror {
                 payload(
                     "agent execution progress observed",
                     serde_json::json!({
+                        "display_title": "Agent is reasoning",
+                        "display_body": content
+                            .as_ref()
+                            .map(|value| display_excerpt(value))
+                            .unwrap_or_else(|| format!("Thinking through iteration {iteration}.")),
                         "stage": "thinking",
                         "iteration": iteration,
                         "content_hash": content.as_ref().map(|value| stable_hash(value)),
@@ -196,11 +241,18 @@ impl ApplicationExecutionAgentEventMirror {
                 ApplicationExecutionEventType::ToolCallRequested,
                 payload(
                     "agent execution tool call requested",
-                    serde_json::json!({
+                    merge_display(
+                        serde_json::json!({
+                            "display_title": format!("Tool requested: {tool_name}"),
+                            "display_body": tool_input_summary(tool_name, tool_input),
+                        }),
+                        serde_json::json!({
                         "tool_name": tool_name,
                         "call_id": call_id,
+                        "file_path": tool_file_path(tool_input),
                         "input_hash": stable_json_hash(tool_input),
-                    }),
+                        }),
+                    ),
                 ),
                 format!("agent-tool-call-{ordinal}"),
             ),
@@ -212,12 +264,18 @@ impl ApplicationExecutionAgentEventMirror {
                 ApplicationExecutionEventType::ToolCallCompleted,
                 payload(
                     "agent execution tool call completed",
-                    serde_json::json!({
+                    merge_display(
+                        serde_json::json!({
+                            "display_title": format!("Tool completed: {tool_name}"),
+                            "display_body": tool_output_summary(tool_name, output, *is_error),
+                        }),
+                        serde_json::json!({
                         "tool_name": tool_name,
                         "is_error": is_error.unwrap_or(false),
                         "output_hash": stable_hash(output),
                         "output_len": output.len(),
-                    }),
+                        }),
+                    ),
                 ),
                 format!("agent-tool-result-{ordinal}"),
             ),
@@ -226,6 +284,9 @@ impl ApplicationExecutionAgentEventMirror {
                 payload(
                     "agent execution assistant message observed",
                     serde_json::json!({
+                        "display_title": "Assistant response",
+                        "display_body": display_excerpt(content),
+                        "assistant_excerpt": display_excerpt(content),
                         "content_hash": stable_hash(content),
                         "content_len": content.len(),
                     }),
@@ -237,6 +298,8 @@ impl ApplicationExecutionAgentEventMirror {
                 payload(
                     "agent execution driver trace observed",
                     serde_json::json!({
+                        "display_title": format!("Driver event: {driver_name}"),
+                        "display_body": driver_trace_summary(trace),
                         "driver_name": driver_name,
                         "trace_hash": stable_json_hash(trace),
                         "trace_event_type": trace.get("event_type").and_then(serde_json::Value::as_str),
@@ -259,6 +322,15 @@ impl ApplicationExecutionAgentEventMirror {
                             "agent execution failed"
                         },
                         serde_json::json!({
+                            "display_title": if *success { "Execution completed" } else { "Execution failed" },
+                            "display_body": error
+                                .as_ref()
+                                .map(|value| display_excerpt(value))
+                                .unwrap_or_else(|| if *success {
+                                    "The agent finished the task and Macaca recorded the completion evidence.".to_string()
+                                } else {
+                                    "The agent reported a failure without a detailed error.".to_string()
+                                }),
                             "success": success,
                             "error_hash": error.as_ref().map(|value| stable_hash(value)),
                             "error_len": error.as_ref().map(|value| value.len()),
@@ -364,11 +436,49 @@ mod tests {
         assert_eq!(event_type, ApplicationExecutionEventType::ToolCallCompleted);
         let data = payload.data.expect("sanitized payload data");
         assert_eq!(data["tool_name"], "file_write");
+        assert_eq!(data["display_title"], "Tool completed: file_write");
+        assert!(data["display_body"]
+            .as_str()
+            .is_some_and(|value| value.contains("shared/main.rs")));
         assert!(data.get("output_hash").is_some());
         assert!(data.get("output_len").is_some());
         assert!(
             !data.to_string().contains("secret"),
             "application execution events must not persist raw tool output"
         );
+    }
+
+    #[test]
+    fn mirror_adds_bounded_display_content_for_user_visible_agent_steps() {
+        let client = Arc::new(UnavailableSystemApplicationExecutionClient::new());
+        let mut command = AgentExecutionCommand::new(
+            macaca_proto::ApplicationId::from_name("demo"),
+            "session-a",
+            "coordinator",
+            AgentExecutionIntent::WasmDelegate,
+            "run app-owned task",
+            macaca_proto::TraceContext::new("trace-wasm-delegate-display"),
+        )
+        .unwrap();
+        command
+            .metadata
+            .insert("application_execution.run_id".into(), "run-a".into());
+        let mirror = ApplicationExecutionAgentEventMirror::from_command(client, &command).unwrap();
+
+        let (event_type, payload, _) = mirror.map_agent_event(
+            &AgentExecutionEvent::Assistant {
+                content: "Created Cargo.toml and src/main.rs for the Rust hello world project."
+                    .into(),
+            },
+            1,
+        );
+
+        assert_eq!(event_type, ApplicationExecutionEventType::LlmCompleted);
+        let data = payload.data.expect("sanitized payload data");
+        assert_eq!(data["display_title"], "Assistant response");
+        assert!(data["assistant_excerpt"]
+            .as_str()
+            .is_some_and(|value| value.contains("Cargo.toml")));
+        assert!(data.get("content_hash").is_some());
     }
 }
