@@ -101,7 +101,7 @@ impl WebRuntimeFacade {
             .route("/api/sessions/{app_id}", get(session::get_session))
             .route(
                 "/api/sessions/detail/{session_id}",
-                get(session::get_session_by_id),
+                get(session::get_session_by_id).delete(session::delete_session),
             )
             .route(
                 "/api/sessions/stream/{session_id}",
