@@ -294,14 +294,14 @@ function renderDisplayBody(view) {
   return body;
 }
 
-function renderMarkdownDocument(markdown) {
+export function renderMarkdownDocument(markdown) {
   // The renderer is deliberately small and DOM-based.  It creates elements with
   // text nodes instead of injecting HTML, which lets the Workbench beautify
   // user-visible markdown while preserving the shell/application security
   // boundary.
   const root = document.createElement("div");
   root.className = "markdown-body";
-  const lines = String(markdown || "").split(/\r?\n/);
+  const lines = normalizeMarkdownLines(markdown);
   let paragraph = [];
   let list = null;
   let codeLines = null;
@@ -310,7 +310,7 @@ function renderMarkdownDocument(markdown) {
   const flushParagraph = () => {
     if (paragraph.length === 0) return;
     const p = document.createElement("p");
-    appendInlineMarkdown(p, paragraph.join(" "));
+    appendInlineMarkdown(p, paragraph.join("\n"));
     root.append(p);
     paragraph = [];
   };
@@ -320,7 +320,8 @@ function renderMarkdownDocument(markdown) {
     list = null;
   };
 
-  for (const line of lines) {
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
     const fence = line.match(/^```(.*)$/);
     if (fence) {
       if (codeLines) {
@@ -342,6 +343,21 @@ function renderMarkdownDocument(markdown) {
     }
     if (codeLines) {
       codeLines.push(line);
+      continue;
+    }
+    if (isMarkdownRule(line)) {
+      flushParagraph();
+      flushList();
+      const rule = document.createElement("hr");
+      root.append(rule);
+      continue;
+    }
+    if (isMarkdownTableStart(lines, index)) {
+      flushParagraph();
+      flushList();
+      const { table, nextIndex } = renderMarkdownTable(lines, index);
+      root.append(table);
+      index = nextIndex - 1;
       continue;
     }
     if (!line.trim()) {
@@ -368,6 +384,18 @@ function renderMarkdownDocument(markdown) {
       list.append(li);
       continue;
     }
+    const ordered = line.match(/^\s*\d+\.\s+(.+)$/);
+    if (ordered) {
+      flushParagraph();
+      if (!list || list.tagName !== "OL") {
+        flushList();
+        list = document.createElement("ol");
+      }
+      const li = document.createElement("li");
+      appendInlineMarkdown(li, ordered[1]);
+      list.append(li);
+      continue;
+    }
     paragraph.push(line.trim());
   }
   flushParagraph();
@@ -380,6 +408,92 @@ function renderMarkdownDocument(markdown) {
     root.append(pre);
   }
   return root;
+}
+
+function normalizeMarkdownLines(markdown) {
+  // Some model providers emit a prose prefix and immediately open a fenced code
+  // block on the same physical line, for example `Files: ``` shared/tree`.
+  // Splitting fence markers onto standalone logical lines lets the block parser
+  // preserve the following file tree or source code as a real code block instead
+  // of treating each backtick-delimited fragment as inline code.
+  const normalized = [];
+  let inFence = false;
+  for (const rawLine of String(markdown || "").split(/\r?\n/)) {
+    let line = rawLine;
+    while (line.includes("```")) {
+      const fenceIndex = line.indexOf("```");
+      const before = line.slice(0, fenceIndex).trimEnd();
+      if (before) normalized.push(before);
+      const after = line.slice(fenceIndex + 3).trimStart();
+      if (inFence) {
+        normalized.push("```");
+        inFence = false;
+        line = after;
+        continue;
+      }
+      const languageOnly = after && /^[A-Za-z0-9_-]+$/.test(after);
+      normalized.push(languageOnly ? `\`\`\`${after}` : "```");
+      inFence = true;
+      if (!after || languageOnly) {
+        line = "";
+      } else {
+        line = after;
+      }
+    }
+    normalized.push(line);
+  }
+  return normalized;
+}
+
+function isMarkdownRule(line) {
+  return /^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(line);
+}
+
+function isMarkdownTableStart(lines, index) {
+  return isTableRow(lines[index]) && isTableSeparator(lines[index + 1] || "");
+}
+
+function isTableRow(line) {
+  return /^\s*\|.*\|\s*$/.test(line || "");
+}
+
+function isTableSeparator(line) {
+  return /^\s*\|?(\s*:?-{3,}:?\s*\|)+\s*:?-{3,}:?\s*\|?\s*$/.test(line || "");
+}
+
+function renderMarkdownTable(lines, startIndex) {
+  const table = document.createElement("table");
+  const thead = document.createElement("thead");
+  const tbody = document.createElement("tbody");
+  const headerRow = document.createElement("tr");
+  for (const cell of splitTableCells(lines[startIndex])) {
+    const th = document.createElement("th");
+    appendInlineMarkdown(th, cell);
+    headerRow.append(th);
+  }
+  thead.append(headerRow);
+  let index = startIndex + 2;
+  while (index < lines.length && isTableRow(lines[index])) {
+    const tr = document.createElement("tr");
+    for (const cell of splitTableCells(lines[index])) {
+      const td = document.createElement("td");
+      appendInlineMarkdown(td, cell);
+      tr.append(td);
+    }
+    tbody.append(tr);
+    index += 1;
+  }
+  table.append(thead, tbody);
+  return { table, nextIndex: index };
+}
+
+function splitTableCells(line) {
+  return String(line || "")
+    .trim()
+    .replace(/^\|/, "")
+    .replace(/\|$/, "")
+    .split("|")
+    .map((cell) => cell.trim());
 }
 
 function appendInlineMarkdown(parent, text) {

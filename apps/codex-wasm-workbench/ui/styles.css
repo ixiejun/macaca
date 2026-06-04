@@ -247,7 +247,7 @@ pre {
   font-size: 13px;
   line-height: 1.5;
   margin-top: 8px;
-  white-space: pre-wrap;
+  white-space: pre-line;
 }
 
 .markdown-body h3,
@@ -263,6 +263,17 @@ pre {
   margin-top: 8px;
 }
 
+.markdown-body ol {
+  margin-top: 8px;
+}
+
+.markdown-body li {
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 6px;
+}
+
 .markdown-body code {
   background: #0d1216;
   border: 1px solid var(--line);
@@ -275,13 +286,48 @@ pre {
   background: #0d1216;
   border: 1px solid var(--line);
   border-radius: 8px;
+  line-height: 1.45;
   padding: 12px;
+  white-space: pre;
 }
 
 .markdown-body pre code {
   background: transparent;
   border: 0;
+  display: block;
   padding: 0;
+  white-space: pre;
+}
+
+.markdown-body table {
+  border-collapse: collapse;
+  display: block;
+  font-size: 13px;
+  margin-top: 10px;
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.markdown-body th,
+.markdown-body td {
+  border: 1px solid var(--line);
+  color: var(--text);
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.markdown-body th {
+  background: #111820;
+  color: #d9f7e8;
+  font-weight: 700;
+}
+
+.markdown-body hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 14px 0 0;
 }
 
 .markdown-body a {
