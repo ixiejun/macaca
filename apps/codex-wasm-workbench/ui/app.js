@@ -36,6 +36,21 @@ const hostOrigin = (() => {
 
 const pendingBridgeCalls = new Map();
 const sessionMementos = new WorkbenchSessionMementoStore();
+if (!state.sessionId) {
+  // Refresh can recreate the iframe before the shell posts the current session
+  // context.  Recovering the latest local Memento gives the Workbench a stable
+  // session id for immediate durable replay while keeping execution authority
+  // in `service.application_execution`.
+  const latestSnapshot = sessionMementos.restore(null);
+  state.sessionId = latestSnapshot.sessionId;
+  state.runId = latestSnapshot.runId;
+  state.eventCursor = latestSnapshot.eventCursor;
+  state.currentState = latestSnapshot.currentState;
+  state.events = latestSnapshot.events;
+  state.result = latestSnapshot.result;
+  state.running = latestSnapshot.running;
+  state.tokenSummary = latestSnapshot.tokenSummary || state.tokenSummary;
+}
 const { callAppExecution, callSessionRead } = createWorkbenchBridgeCalls({
   state,
   pendingBridgeCalls,

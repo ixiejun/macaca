@@ -8,9 +8,11 @@
 // is captured and restored.
 
 export class WorkbenchSessionMementoStore {
-  constructor({ fallbackSessionId = "workbench-sessionless" } = {}) {
+  constructor({ fallbackSessionId = "workbench-sessionless", storageKey = "codex-wasm-workbench.session-mementos.v1" } = {}) {
     this.fallbackSessionId = fallbackSessionId;
+    this.storageKey = storageKey;
     this.snapshots = new Map();
+    this.loadFromStorage();
   }
 
   // Resolve a stable map key for optional host session context.  Sessionless
@@ -36,14 +38,16 @@ export class WorkbenchSessionMementoStore {
       eventCursor: state.eventCursor || null,
       currentState: cloneJson(state.currentState || null),
       tokenSummary: state.tokenSummary || null,
+      savedAt: new Date().toISOString(),
     });
+    this.persistToStorage();
   }
 
   // Restore a previously captured session, or create a clean view for a session
   // that has no Workbench-local memento yet.  This keeps every sidebar session
   // visually distinct even before richer backend replay is attached.
   restore(sessionId) {
-    const key = this.keyFor(sessionId);
+    const key = this.keyFor(sessionId || this.latestSessionId());
     const saved = this.snapshots.get(key);
     if (saved) return cloneJson(saved);
     return {
@@ -57,6 +61,49 @@ export class WorkbenchSessionMementoStore {
       currentState: null,
       tokenSummary: sessionId ? "No local stream replay for this session yet" : "No run yet",
     };
+  }
+
+  latestSessionId() {
+    // The latest non-fallback snapshot lets an application-owned iframe recover
+    // a selected execution session after a browser refresh race where the host
+    // has not yet delivered `macaca.session.changed`.  This remains a local UI
+    // Memento only; durable execution truth is still replayed from Macaca's
+    // application-execution service once the session id is known.
+    const snapshots = [...this.snapshots.values()].filter((snapshot) => snapshot.sessionId);
+    snapshots.sort((a, b) => Date.parse(b.savedAt || "") - Date.parse(a.savedAt || ""));
+    return snapshots[0]?.sessionId || null;
+  }
+
+  loadFromStorage() {
+    try {
+      const raw = window.localStorage.getItem(this.storageKey);
+      if (!raw) return;
+      const decoded = JSON.parse(raw);
+      for (const [key, snapshot] of Object.entries(decoded.snapshots || {})) {
+        this.snapshots.set(key, snapshot);
+      }
+    } catch (error) {
+      console.warn("[codex-wasm-workbench] session memento restore failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  persistToStorage() {
+    try {
+      const entries = [...this.snapshots.entries()]
+        .filter(([, snapshot]) => snapshot.sessionId)
+        .sort(([, left], [, right]) => Date.parse(right.savedAt || "") - Date.parse(left.savedAt || ""))
+        .slice(0, 20);
+      window.localStorage.setItem(
+        this.storageKey,
+        JSON.stringify({ snapshots: Object.fromEntries(entries) }),
+      );
+    } catch (error) {
+      console.warn("[codex-wasm-workbench] session memento persist failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 }
 

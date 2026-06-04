@@ -6,6 +6,7 @@ const source = await readFile(new URL("../app.js", import.meta.url), "utf8");
 const bridgeCallsSource = await readFile(new URL("../bridge_calls.js", import.meta.url), "utf8");
 const sessionHistorySource = await readFile(new URL("../session_history.js", import.meta.url), "utf8");
 const renderSource = await readFile(new URL("../render.js", import.meta.url), "utf8");
+const styleSource = await readFile(new URL("../styles.css", import.meta.url), "utf8");
 
 test("production UI uses service.application_execution APIs instead of browser tool loop", () => {
   assert.match(bridgeCallsSource, /capability: "app\.execution"/);
@@ -82,4 +83,11 @@ test("timeline presenter keeps the complete visible stream and markdown body", (
   assert.doesNotMatch(renderSource, /slice\(-80\)/);
   assert.match(renderSource, /format: "markdown"/);
   assert.match(renderSource, /appendInlineMarkdown/);
+});
+
+test("markdown display wraps long generated content instead of forcing horizontal scrolling", () => {
+  assert.match(styleSource, /\.markdown-body pre[\s\S]*white-space: pre-wrap/);
+  assert.match(styleSource, /\.markdown-body pre[\s\S]*overflow-wrap: anywhere/);
+  assert.match(styleSource, /\.markdown-body table[\s\S]*table-layout: fixed/);
+  assert.match(styleSource, /\.markdown-body th,[\s\S]*word-break: break-word/);
 });
