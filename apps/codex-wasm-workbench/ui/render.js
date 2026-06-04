@@ -411,11 +411,12 @@ export function renderMarkdownDocument(markdown) {
 }
 
 function normalizeMarkdownLines(markdown) {
-  // Some model providers emit a prose prefix and immediately open a fenced code
-  // block on the same physical line, for example `Files: ``` shared/tree`.
-  // Splitting fence markers onto standalone logical lines lets the block parser
-  // preserve the following file tree or source code as a real code block instead
-  // of treating each backtick-delimited fragment as inline code.
+  // Some model providers emit several markdown constructs on one physical line,
+  // for example `Done --- ## Files ``` tree`.  This Adapter normalizes only
+  // presentation structure: fences, horizontal rules, headings, and compact
+  // pipe tables become logical lines before the DOM renderer consumes them.
+  // It does not interpret application semantics or mutate the model's visible
+  // content, preserving the app boundary while making the stream readable.
   const normalized = [];
   let inFence = false;
   for (const rawLine of String(markdown || "").split(/\r?\n/)) {
@@ -423,7 +424,7 @@ function normalizeMarkdownLines(markdown) {
     while (line.includes("```")) {
       const fenceIndex = line.indexOf("```");
       const before = line.slice(0, fenceIndex).trimEnd();
-      if (before) normalized.push(before);
+      if (before) normalized.push(...splitInlineMarkdownStructure(before));
       const after = line.slice(fenceIndex + 3).trimStart();
       if (inFence) {
         normalized.push("```");
@@ -440,9 +441,56 @@ function normalizeMarkdownLines(markdown) {
         line = after;
       }
     }
-    normalized.push(line);
+    if (inFence) {
+      normalized.push(line);
+    } else {
+      normalized.push(...splitInlineMarkdownStructure(line));
+    }
   }
   return normalized;
+}
+
+function splitInlineMarkdownStructure(line) {
+  // Hosted LLM output often optimizes for a compact chat transcript and emits
+  // `---`, headings, or simple pipe tables inline.  The renderer treats those
+  // tokens as layout hints only when they have markdown-like spacing around
+  // them, so ordinary prose that contains hyphens or pipes remains untouched.
+  const expandedTables = expandCompactPipeTable(line);
+  const parts = [];
+  for (const segment of expandedTables) {
+    parts.push(...splitInlineRulesAndHeadings(segment));
+  }
+  return parts;
+}
+
+function splitInlineRulesAndHeadings(line) {
+  const text = String(line || "");
+  if (!text.trim()) return [text];
+  const tokens = [];
+  const pattern = /(?:^|\s)(---|\#{1,3}\s+[^#]+?)(?=(?:\s---|\s#{1,3}\s+|$))/g;
+  let offset = 0;
+  for (const match of text.matchAll(pattern)) {
+    const tokenStart = match.index + (match[0].startsWith(" ") ? 1 : 0);
+    const before = text.slice(offset, tokenStart).trim();
+    if (before) tokens.push(before);
+    tokens.push(match[1].trim());
+    offset = tokenStart + match[1].length;
+  }
+  const after = text.slice(offset).trim();
+  if (after) tokens.push(after);
+  return tokens.length > 0 ? tokens : [line];
+}
+
+function expandCompactPipeTable(line) {
+  const text = String(line || "").trim();
+  if (!text.includes("||") || !/\|\s*-{3,}/.test(text)) return [line];
+  const rows = text
+    .split(/\s*\|\|\s*/g)
+    .map((row) => row.trim())
+    .filter(Boolean)
+    .map((row) => row.startsWith("|") ? row : `| ${row}`)
+    .map((row) => row.endsWith("|") ? row : `${row} |`);
+  return rows.length >= 2 ? rows : [line];
 }
 
 function isMarkdownRule(line) {

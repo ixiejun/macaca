@@ -71,3 +71,18 @@ test("markdown renderer builds tables as block elements", () => {
   assert.match(tables[0].textContent, /后端/);
   assert.match(tables[0].textContent, /Yew/);
 });
+
+test("markdown renderer separates inline rules and headings from prose", () => {
+  const root = renderMarkdownDocument("应用已创建完毕！ --- ## 项目结构\n```text\nhello-world/\n``` ## 启动方式");
+  assert.equal(collectTags(root, "hr").length, 1);
+  assert.equal(collectTags(root, "h4").length, 2);
+  assert.equal(collectTags(root, "pre").length, 1);
+});
+
+test("markdown renderer expands compact pipe tables emitted on one line", () => {
+  const root = renderMarkdownDocument("前后端交互 | 组件 | 技术 | 说明 ||------|------|------|| 前端 | HTML5 | fetch 调用 API || 后端 | PHP | 返回 JSON");
+  const tables = collectTags(root, "table");
+  assert.equal(tables.length, 1);
+  assert.match(tables[0].textContent, /前后端交互/);
+  assert.match(tables[0].textContent, /返回 JSON/);
+});
