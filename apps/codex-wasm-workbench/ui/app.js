@@ -186,10 +186,8 @@ async function startTask() {
     await startDebugToolLoop(prompt);
     return;
   }
+  const commandId = beginNewExecutionSession();
   state.running = true;
-  state.commandId = crypto.randomUUID();
-  state.sessionId ||= `workbench-${state.commandId}`;
-  state.runId = `run-${state.commandId}`;
   state.eventCursor = null;
   state.currentState = null;
   state.result = "";
@@ -227,8 +225,8 @@ async function startTask() {
       },
       tenant_id: null,
       actor: "app-owned-ui",
-      idempotency_key: state.commandId,
-      trace_id: `trace-${state.commandId}`,
+      idempotency_key: commandId,
+      trace_id: `trace-${commandId}`,
     });
     state.sessionId = result.session_id || state.sessionId;
     state.runId = result.run_id || state.runId;
@@ -242,10 +240,29 @@ async function startTask() {
   }
 }
 
+function beginNewExecutionSession() {
+  // A selected sidebar session is a read/replay context, not the identity for
+  // the next task.  Earlier versions reused `state.sessionId` with `||=`, which
+  // made every new prompt after refresh append events to the latest restored
+  // session.  This Factory-style helper creates a fresh provider-neutral
+  // execution identity for each submitted task, while first saving the current
+  // viewed session as a local Memento so users can return to it from the shell.
+  const commandId = crypto.randomUUID();
+  if (state.sessionId) sessionMementos.save(state);
+  state.commandId = commandId;
+  state.sessionId = `workbench-${commandId}`;
+  state.runId = `run-${commandId}`;
+  console.info("[codex-wasm-workbench] new execution session allocated", {
+    session_id: state.sessionId,
+    run_id: state.runId,
+    command_id: commandId,
+  });
+  return commandId;
+}
+
 async function startDebugToolLoop(prompt) {
   state.running = true;
-  state.commandId = crypto.randomUUID();
-  state.sessionId ||= `workbench-debug-${state.commandId}`;
+  beginNewDebugSession();
   state.result = "";
   state.events = [];
   setTokenSummary("Running debug-only browser loop...");
@@ -278,6 +295,23 @@ async function startDebugToolLoop(prompt) {
   } catch (error) {
     appendEvent("bridge_error", { error: error instanceof Error ? error.message : String(error) });
   }
+}
+
+function beginNewDebugSession() {
+  // The debug loop follows the same session isolation rule as production
+  // application execution.  It remains an app-local development path, but every
+  // submitted task still receives a fresh replay key so browser refreshes never
+  // merge unrelated prompts into the previously selected session.
+  const commandId = crypto.randomUUID();
+  if (state.sessionId) sessionMementos.save(state);
+  state.commandId = commandId;
+  state.sessionId = `workbench-debug-${commandId}`;
+  state.runId = null;
+  console.info("[codex-wasm-workbench] new debug session allocated", {
+    session_id: state.sessionId,
+    command_id: commandId,
+  });
+  return commandId;
 }
 
 function openExecutionWebSocket() {

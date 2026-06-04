@@ -67,6 +67,14 @@ test("UI subscribes to execution events before awaiting hosted start completion"
   assert.match(source, /appendEvent\("stream_connected"/);
 });
 
+test("each submitted task receives a fresh execution session", () => {
+  assert.match(source, /function beginNewExecutionSession/);
+  assert.match(source, /state\.sessionId = `workbench-\$\{commandId\}`/);
+  assert.match(source, /state\.runId = `run-\$\{commandId\}`/);
+  assert.match(source, /const commandId = beginNewExecutionSession\(\);/);
+  assert.doesNotMatch(source, /state\.sessionId \|\|= `workbench-/);
+});
+
 test("timeline presenter renders user-readable execution events instead of raw protocol JSON", () => {
   assert.match(renderSource, /export function presentTimelineEvent/);
   assert.match(renderSource, /function presentExecutionEvent/);
