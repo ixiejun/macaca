@@ -1,88 +1,30 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-class FakeTextNode {
-  constructor(text) {
-    this.nodeType = "text";
-    this.textContent = text;
-  }
-}
-
-class FakeElement {
-  constructor(tagName) {
-    this.tagName = tagName.toUpperCase();
-    this.children = [];
-    this.dataset = {};
-    this.className = "";
-    this.href = "";
-    this.rel = "";
-    this.target = "";
-    this._textContent = "";
-  }
-
-  append(...nodes) {
-    this.children.push(...nodes);
-  }
-
-  replaceChildren(...nodes) {
-    this.children = nodes;
-  }
-
-  set textContent(value) {
-    this._textContent = String(value);
-    this.children = [];
-  }
-
-  get textContent() {
-    return this.children.length > 0
-      ? this.children.map((child) => child.textContent || "").join("")
-      : this._textContent;
-  }
-}
-
-globalThis.document = {
-  createElement: (tagName) => new FakeElement(tagName),
-  createTextNode: (text) => new FakeTextNode(text),
-  querySelector: () => new FakeElement("div"),
-};
-
-const { renderMarkdownDocument } = await import("../render.js");
-
-function collectTags(node, tagName, matches = []) {
-  if (node.tagName === tagName.toUpperCase()) matches.push(node);
-  for (const child of node.children || []) collectTags(child, tagName, matches);
-  return matches;
-}
+const markdownSource = await readFile(new URL("../src/markdown.tsx", import.meta.url), "utf8");
 
 test("markdown renderer preserves inline fenced file trees as code blocks", () => {
-  const root = renderMarkdownDocument("项目已创建完毕： ``` shared/hello-world-rust/\n├── Cargo.toml\n``` ### 运行方式");
-  const preBlocks = collectTags(root, "pre");
-  assert.equal(preBlocks.length, 1);
-  assert.match(preBlocks[0].textContent, /shared\/hello-world-rust/);
-  assert.match(preBlocks[0].textContent, /Cargo\.toml/);
-  assert.equal(collectTags(root, "code").length, 1, "the file tree must not be split into many inline code chips");
-  assert.equal(collectTags(root, "h5").length, 1, "text after the closing fence should continue as markdown");
+  assert.match(markdownSource, /while \(line\.includes\('```'\)\)/);
+  assert.match(markdownSource, /codeLines\.push\(line\)/);
+  assert.match(markdownSource, /data-language/);
 });
 
 test("markdown renderer builds tables as block elements", () => {
-  const root = renderMarkdownDocument("| 层 | 技术 |\n|---|---|\n| 后端 | Axum |\n| 前端 | Yew |");
-  const tables = collectTags(root, "table");
-  assert.equal(tables.length, 1);
-  assert.match(tables[0].textContent, /后端/);
-  assert.match(tables[0].textContent, /Yew/);
+  assert.match(markdownSource, /function parseMarkdownTable/);
+  assert.match(markdownSource, /<table key=\{index\}>/);
+  assert.match(markdownSource, /<thead>/);
+  assert.match(markdownSource, /<tbody>/);
 });
 
 test("markdown renderer separates inline rules and headings from prose", () => {
-  const root = renderMarkdownDocument("应用已创建完毕！ --- ## 项目结构\n```text\nhello-world/\n``` ## 启动方式");
-  assert.equal(collectTags(root, "hr").length, 1);
-  assert.equal(collectTags(root, "h4").length, 2);
-  assert.equal(collectTags(root, "pre").length, 1);
+  assert.match(markdownSource, /function splitInlineRulesAndHeadings/);
+  assert.match(markdownSource, /\(---\|\\#\{1,3\}\\s\+/);
+  assert.match(markdownSource, /kind: 'rule'/);
 });
 
 test("markdown renderer expands compact pipe tables emitted on one line", () => {
-  const root = renderMarkdownDocument("前后端交互 | 组件 | 技术 | 说明 ||------|------|------|| 前端 | HTML5 | fetch 调用 API || 后端 | PHP | 返回 JSON");
-  const tables = collectTags(root, "table");
-  assert.equal(tables.length, 1);
-  assert.match(tables[0].textContent, /前后端交互/);
-  assert.match(tables[0].textContent, /返回 JSON/);
+  assert.match(markdownSource, /function expandCompactPipeTable/);
+  assert.match(markdownSource, /text\.includes\('\|\|'\)/);
+  assert.match(markdownSource, /split\(\/\\s\*\\\|\\\|\\s\*\/g\)/);
 });

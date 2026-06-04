@@ -289,6 +289,6 @@ test("loop state transitions reject invalid terminal transitions", () => {
 });
 
 test("workbench source does not contain static Hello World project templates", () => {
-  const source = readFileSync(new URL("../app.js", import.meta.url), "utf8");
+  const source = readFileSync(new URL("../src/WorkbenchApp.tsx", import.meta.url), "utf8");
   assert.doesNotMatch(source, /helloWorldProjectFiles|write_hello_world_project|codex-wasm-hello-world-demo/);
 });

@@ -62,8 +62,8 @@ ui:
   surface:
     mode: application
     chrome: app_owned
-  framework: vanilla
-  entry: ui/index.html
+  framework: react
+  entry: ui/dist/index.html
   assets:
     - ui/**
   sandbox:
