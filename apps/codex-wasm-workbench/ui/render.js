@@ -45,14 +45,13 @@ export function renderTimeline(state) {
     return;
   }
   elements.eventTimeline.replaceChildren(
-    ...state.events.slice(-80).map((entry) => {
+    ...state.events.map((entry) => {
       const item = document.createElement("article");
       item.className = `event-card event-${entry.type.replaceAll("_", "-")}`;
       const view = presentTimelineEvent(entry);
       const title = document.createElement("h3");
       title.textContent = view.title;
-      const body = document.createElement(view.usePre ? "pre" : "p");
-      body.textContent = view.body;
+      const body = renderDisplayBody(view);
       item.append(title, body);
       if (view.meta.length > 0) {
         const meta = document.createElement("ul");
@@ -101,6 +100,34 @@ export function presentTimelineEvent(entry) {
       usePre: false,
     };
   }
+  if (entry?.type === "assistant_response") {
+    return {
+      title: entry.data?.tool_calls?.length ? "Assistant requested tools" : "Assistant response",
+      body: [entry.data?.reasoning_content, entry.data?.content].filter(Boolean).join("\n\n") || "No assistant text was emitted.",
+      meta: compactMeta({
+        model: entry.data?.model,
+        tools: (entry.data?.tool_calls || []).map((toolCall) => toolCall.name).join(", "),
+      }),
+      format: "markdown",
+      usePre: false,
+    };
+  }
+  if (entry?.type === "tool_result") {
+    const result = entry.data?.result || {};
+    const display = result.display || {};
+    return {
+      title: display.title || `${entry.data?.tool || "Tool"} ${entry.data?.status || "completed"}`,
+      body: display.body || result.output?.text || JSON.stringify(result, null, 2),
+      meta: compactMeta({
+        tool: entry.data?.tool,
+        operation: result.operation,
+        file: display.file_path,
+        status: result.status || entry.data?.status,
+      }),
+      format: display.format || "markdown",
+      usePre: display.format === "json",
+    };
+  }
   if (entry?.type === "model_catalog") {
     return {
       title: "Model catalog loaded",
@@ -121,7 +148,13 @@ function presentExecutionEvent(event) {
   const payload = event.sanitized_payload || {};
   const data = payload.data || {};
   const title = data.display_title || eventTitle(event.event_type);
-  const body = data.display_body || payload.summary || "Execution event received.";
+  const body =
+    data.display_body ||
+    data.display_markdown ||
+    data.content ||
+    data.output ||
+    payload.summary ||
+    "Execution event received.";
   return {
     title,
     body,
@@ -132,7 +165,8 @@ function presentExecutionEvent(event) {
       provider: event.provider_kind,
       seq: event.seq,
     }),
-    usePre: false,
+    format: data.display_format || (data.display_markdown ? "markdown" : "text"),
+    usePre: data.display_format === "json",
   };
 }
 
@@ -176,7 +210,7 @@ function humanize(value) {
 }
 
 export function renderResult(state) {
-  elements.resultOutput.textContent = state.result || "No assistant result yet.";
+  elements.resultOutput.replaceChildren(renderMarkdownDocument(state.result || "No assistant result yet."));
   elements.sessionBadge.textContent = state.sessionId ? `Session ${state.sessionId.slice(0, 8)}` : "No session";
   elements.runState.textContent = state.running ? "Running" : "Ready";
   elements.submitTaskButton.disabled = state.running;
@@ -251,4 +285,127 @@ function listItem(value) {
   const item = document.createElement("li");
   item.textContent = value;
   return item;
+}
+
+function renderDisplayBody(view) {
+  if (view.format === "markdown") return renderMarkdownDocument(view.body);
+  const body = document.createElement(view.usePre ? "pre" : "p");
+  body.textContent = view.body;
+  return body;
+}
+
+function renderMarkdownDocument(markdown) {
+  // The renderer is deliberately small and DOM-based.  It creates elements with
+  // text nodes instead of injecting HTML, which lets the Workbench beautify
+  // user-visible markdown while preserving the shell/application security
+  // boundary.
+  const root = document.createElement("div");
+  root.className = "markdown-body";
+  const lines = String(markdown || "").split(/\r?\n/);
+  let paragraph = [];
+  let list = null;
+  let codeLines = null;
+  let codeLanguage = "";
+
+  const flushParagraph = () => {
+    if (paragraph.length === 0) return;
+    const p = document.createElement("p");
+    appendInlineMarkdown(p, paragraph.join(" "));
+    root.append(p);
+    paragraph = [];
+  };
+  const flushList = () => {
+    if (!list) return;
+    root.append(list);
+    list = null;
+  };
+
+  for (const line of lines) {
+    const fence = line.match(/^```(.*)$/);
+    if (fence) {
+      if (codeLines) {
+        const pre = document.createElement("pre");
+        const code = document.createElement("code");
+        if (codeLanguage) code.dataset.language = codeLanguage;
+        code.textContent = codeLines.join("\n");
+        pre.append(code);
+        root.append(pre);
+        codeLines = null;
+        codeLanguage = "";
+      } else {
+        flushParagraph();
+        flushList();
+        codeLines = [];
+        codeLanguage = fence[1].trim();
+      }
+      continue;
+    }
+    if (codeLines) {
+      codeLines.push(line);
+      continue;
+    }
+    if (!line.trim()) {
+      flushParagraph();
+      flushList();
+      continue;
+    }
+    const heading = line.match(/^(#{1,3})\s+(.+)$/);
+    if (heading) {
+      flushParagraph();
+      flushList();
+      const level = String(heading[1]).length + 2;
+      const h = document.createElement(`h${level}`);
+      appendInlineMarkdown(h, heading[2]);
+      root.append(h);
+      continue;
+    }
+    const bullet = line.match(/^\s*[-*]\s+(.+)$/);
+    if (bullet) {
+      flushParagraph();
+      list ||= document.createElement("ul");
+      const li = document.createElement("li");
+      appendInlineMarkdown(li, bullet[1]);
+      list.append(li);
+      continue;
+    }
+    paragraph.push(line.trim());
+  }
+  flushParagraph();
+  flushList();
+  if (codeLines) {
+    const pre = document.createElement("pre");
+    const code = document.createElement("code");
+    code.textContent = codeLines.join("\n");
+    pre.append(code);
+    root.append(pre);
+  }
+  return root;
+}
+
+function appendInlineMarkdown(parent, text) {
+  const pattern = /(`[^`]+`|\*\*[^*]+\*\*|\[[^\]]+\]\([^)]+\))/g;
+  let offset = 0;
+  for (const match of String(text).matchAll(pattern)) {
+    if (match.index > offset) parent.append(document.createTextNode(text.slice(offset, match.index)));
+    const token = match[0];
+    if (token.startsWith("`")) {
+      const code = document.createElement("code");
+      code.textContent = token.slice(1, -1);
+      parent.append(code);
+    } else if (token.startsWith("**")) {
+      const strong = document.createElement("strong");
+      strong.textContent = token.slice(2, -2);
+      parent.append(strong);
+    } else {
+      const link = token.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+      const anchor = document.createElement("a");
+      anchor.textContent = link?.[1] || token;
+      anchor.href = link?.[2] || "#";
+      anchor.rel = "noreferrer";
+      anchor.target = "_blank";
+      parent.append(anchor);
+    }
+    offset = match.index + token.length;
+  }
+  if (offset < text.length) parent.append(document.createTextNode(text.slice(offset)));
 }

@@ -47,6 +47,16 @@ export class WorkbenchToolLoopController {
       const chatResult = await this.llmClient.chat({ messages: transcript, tools: activeTools, model });
       const response = extractLlmResponse(chatResult);
       const toolCalls = response.tool_calls ?? [];
+      this.emit("assistant_response", {
+        content: response.content ?? "",
+        reasoning_content: response.reasoning_content ?? null,
+        model: response.model,
+        tool_calls: toolCalls.map((toolCall) => ({
+          id: toolCall.id,
+          name: toolCall.name,
+          arguments: toolCall.arguments ?? {},
+        })),
+      });
 
       if (toolCalls.length === 0) {
         transcript.push(createAssistantMessage(response));
@@ -100,6 +110,7 @@ export class WorkbenchToolLoopController {
             tool_call_id: repeated.tool_call_id,
             tool: toolCall.name,
             status: "repeated_tool_call_blocked",
+            result: parseToolResult(repeated.content),
           });
           if (!batchSignatures.has(signature) && shouldForceFinalAfterRepeat(previousResult)) {
             forceFinalAnswer = true;
@@ -119,6 +130,7 @@ export class WorkbenchToolLoopController {
           tool_call_id: toolResult.tool_call_id,
           tool: toolCall.name,
           status: safeStatus(toolResult.content),
+          result: parseToolResult(toolResult.content),
         });
       }
       transitionLoopState(loopState, LOOP_STATES.TOOL_RESULT, {

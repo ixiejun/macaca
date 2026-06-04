@@ -39,6 +39,48 @@ async fn append_redacts_sensitive_payload_before_replay() {
 }
 
 #[tokio::test]
+async fn append_preserves_large_display_fields_within_inline_event_limit() {
+    let (_dir, event_log) = event_log();
+    let store = ApplicationExecutionEventStore::new(event_log);
+    let display_body = format!(
+        "# Assistant output\n\n{}\n\n```rust\nfn main() {{ println!(\"hello\"); }}\n```",
+        "visible line\n".repeat(120)
+    );
+    let event = gateway_event(
+        "session-display",
+        "run-display",
+        ApplicationExecutionPayload {
+            summary: "assistant response".into(),
+            data: Some(serde_json::json!({
+                "display_title": "Assistant response",
+                "display_format": "markdown",
+                "display_body": display_body,
+                "ordinary_field": "x".repeat(2_000)
+            })),
+            payload_ref: None,
+            truncated: false,
+        },
+        "gateway-display-1",
+    );
+
+    let event = store.append_idempotent(event).await.unwrap();
+    let data = event.sanitized_payload.data.unwrap();
+
+    assert!(
+        data["display_body"]
+            .as_str()
+            .is_some_and(|value| value.contains("fn main()")),
+        "user-visible display fields should preserve complete markdown within the EventLog inline budget"
+    );
+    assert!(
+        data["ordinary_field"]
+            .as_str()
+            .is_some_and(|value| value.chars().count() < 2_000),
+        "non-display fields must remain bounded by the generic summary limit"
+    );
+}
+
+#[tokio::test]
 async fn append_rejects_oversized_inline_payload_without_ref() {
     let (_dir, event_log) = event_log();
     let store = ApplicationExecutionEventStore::new(event_log);

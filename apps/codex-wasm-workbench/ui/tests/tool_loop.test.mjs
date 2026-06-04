@@ -264,7 +264,17 @@ test("assistant tool calls and sanitized results are appended to continuation tr
   assert.equal(transcript.at(-2).tool_calls[0].id, "call_1");
   assert.equal(transcript.at(-1).role, "Tool");
   assert.equal(transcript.at(-1).tool_call_id, "call_1");
-  assert.ok(JSON.parse(transcript.at(-1).content).output.truncated);
+  const parsedToolResult = JSON.parse(transcript.at(-1).content);
+  assert.equal(parsedToolResult.output.truncated, false);
+  assert.equal(parsedToolResult.output.text, "created\n".repeat(200));
+});
+
+test("explicit tool-output budgets can still produce bounded operational summaries", () => {
+  const bounded = sanitizeToolOutput("created\n".repeat(200), {
+    preserveFull: false,
+  });
+
+  assert.equal(bounded.truncated, true);
 });
 
 test("loop state transitions reject invalid terminal transitions", () => {

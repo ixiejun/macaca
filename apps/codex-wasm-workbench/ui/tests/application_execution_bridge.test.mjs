@@ -34,7 +34,7 @@ test("UI falls back to generic session history when protocol replay is empty", (
   assert.match(sessionHistorySource, /!preserveLocalOnEmpty \|\| !hasLocalExecutionEvents\(\)/);
   assert.match(bridgeCallsSource, /function callSessionRead/);
   assert.match(bridgeCallsSource, /capability: "session\.read"/);
-  assert.match(sessionHistorySource, /callSessionRead\("events", \{ session_id: state\.sessionId, limit: 100 \}\)/);
+  assert.match(sessionHistorySource, /callSessionRead\("events", \{ session_id: state\.sessionId, limit: 1000 \}\)/);
   assert.match(sessionHistorySource, /callSessionRead\("detail", \{ session_id: state\.sessionId \}\)/);
   assert.match(sessionHistorySource, /type: "session_event"/);
   assert.match(sessionHistorySource, /type: "session_turn"/);
@@ -70,7 +70,16 @@ test("timeline presenter renders user-readable execution events instead of raw p
   assert.match(renderSource, /export function presentTimelineEvent/);
   assert.match(renderSource, /function presentExecutionEvent/);
   assert.match(renderSource, /data\.display_title \|\| eventTitle/);
-  assert.match(renderSource, /data\.display_body \|\| payload\.summary/);
-  assert.match(renderSource, /document\.createElement\(view\.usePre \? "pre" : "p"\)/);
+  assert.match(renderSource, /data\.display_body \|\|/);
+  assert.match(renderSource, /payload\.summary \|\|/);
+  assert.match(renderSource, /function renderMarkdownDocument/);
+  assert.match(renderSource, /renderDisplayBody\(view\)/);
   assert.doesNotMatch(renderSource, /body\.textContent = typeof entry\.data === "string" \? entry\.data : JSON\.stringify\(entry\.data, null, 2\)/);
+});
+
+test("timeline presenter keeps the complete visible stream and markdown body", () => {
+  assert.match(renderSource, /\.\.\.state\.events\.map/);
+  assert.doesNotMatch(renderSource, /slice\(-80\)/);
+  assert.match(renderSource, /format: "markdown"/);
+  assert.match(renderSource, /appendInlineMarkdown/);
 });

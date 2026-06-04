@@ -23,8 +23,8 @@ use macaca_sdk::SystemApplicationExecutionClient;
 use tracing::{info, warn};
 
 use crate::application_execution_agent_event_display::{
-    display_excerpt, driver_trace_summary, merge_display, tool_file_path, tool_input_summary,
-    tool_output_summary,
+    display_excerpt, display_full, driver_trace_summary, merge_display, tool_file_path,
+    tool_input_summary, tool_output_summary,
 };
 
 const APPLICATION_EXECUTION_SCHEMA_VERSION: &str = "application-execution.v1";
@@ -223,8 +223,9 @@ impl ApplicationExecutionAgentEventMirror {
                         "display_title": "Agent is reasoning",
                         "display_body": content
                             .as_ref()
-                            .map(|value| display_excerpt(value))
+                            .map(|value| display_full(value))
                             .unwrap_or_else(|| format!("Thinking through iteration {iteration}.")),
+                        "display_format": "markdown",
                         "stage": "thinking",
                         "iteration": iteration,
                         "content_hash": content.as_ref().map(|value| stable_hash(value)),
@@ -245,6 +246,7 @@ impl ApplicationExecutionAgentEventMirror {
                         serde_json::json!({
                             "display_title": format!("Tool requested: {tool_name}"),
                             "display_body": tool_input_summary(tool_name, tool_input),
+                            "display_format": "markdown",
                         }),
                         serde_json::json!({
                         "tool_name": tool_name,
@@ -268,6 +270,7 @@ impl ApplicationExecutionAgentEventMirror {
                         serde_json::json!({
                             "display_title": format!("Tool completed: {tool_name}"),
                             "display_body": tool_output_summary(tool_name, output, *is_error),
+                            "display_format": "markdown",
                         }),
                         serde_json::json!({
                         "tool_name": tool_name,
@@ -285,8 +288,9 @@ impl ApplicationExecutionAgentEventMirror {
                     "agent execution assistant message observed",
                     serde_json::json!({
                         "display_title": "Assistant response",
-                        "display_body": display_excerpt(content),
-                        "assistant_excerpt": display_excerpt(content),
+                        "display_body": display_full(content),
+                        "display_format": "markdown",
+                        "assistant_content": display_full(content),
                         "content_hash": stable_hash(content),
                         "content_len": content.len(),
                     }),
@@ -325,7 +329,7 @@ impl ApplicationExecutionAgentEventMirror {
                             "display_title": if *success { "Execution completed" } else { "Execution failed" },
                             "display_body": error
                                 .as_ref()
-                                .map(|value| display_excerpt(value))
+                                .map(|value| display_full(value))
                                 .unwrap_or_else(|| if *success {
                                     "The agent finished the task and Macaca recorded the completion evidence.".to_string()
                                 } else {
@@ -476,7 +480,7 @@ mod tests {
         assert_eq!(event_type, ApplicationExecutionEventType::LlmCompleted);
         let data = payload.data.expect("sanitized payload data");
         assert_eq!(data["display_title"], "Assistant response");
-        assert!(data["assistant_excerpt"]
+        assert!(data["assistant_content"]
             .as_str()
             .is_some_and(|value| value.contains("Cargo.toml")));
         assert!(data.get("content_hash").is_some());

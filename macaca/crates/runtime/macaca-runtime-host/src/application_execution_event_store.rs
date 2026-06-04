@@ -26,6 +26,7 @@ const EVENT_SOURCE: &str = "service.application_execution";
 const MAX_INLINE_PAYLOAD_BYTES: usize = 32 * 1024;
 const SUPPORTED_SCHEMA_VERSION: &str = "application-execution.v1";
 const MAX_SUMMARY_CHARS: usize = 512;
+const MAX_DISPLAY_FIELD_CHARS: usize = 24 * 1024;
 const MAX_SANITIZED_JSON_DEPTH: usize = 12;
 const MAX_SANITIZED_ARRAY_ITEMS: usize = 64;
 const REDACTED_VALUE: &str = "[redacted]";
@@ -40,10 +41,6 @@ pub struct ApplicationExecutionEventStore {
 
 impl ApplicationExecutionEventStore {
     /// Build a repository around the shared host EventLog.
-    ///
-    /// The EventLog remains the durable owner.  This type is a small Adapter
-    /// that validates protocol-specific invariants before delegating append and
-    /// replay to the existing persistence service.
     pub fn new(event_log: Arc<EventLog>) -> Self {
         Self {
             event_log,
@@ -53,24 +50,12 @@ impl ApplicationExecutionEventStore {
     }
 
     /// Add one scoped provider lease to the validation book.
-    ///
-    /// This Builder-style helper is intentionally lightweight because the
-    /// durable lease registry belongs to later external-backend and remote-agent
-    /// provider work.  The EventLog adapter still validates against the lease
-    /// data it is given so tests and future composition roots can exercise the
-    /// same Specification before any append side effect.
     pub fn with_lease(mut self, lease: ApplicationExecutionProviderLease) -> Self {
         self.leases.insert(lease.lease_id.clone(), lease);
         self
     }
 
     /// Validate gateway identity/lease data, then append the enclosed event.
-    ///
-    /// `AppendExecutionEventCommand` is the only gateway command that already
-    /// carries a complete event envelope, so this method is the natural Adapter
-    /// boundary for stale-lease and callback-binding checks.  Other gateway
-    /// commands are converted into envelopes by service helpers before they
-    /// reach `append_idempotent`.
     pub async fn append_gateway_event(
         &self,
         command: AppendExecutionEventCommand,
@@ -419,28 +404,28 @@ fn sanitize_payload(payload: &mut ApplicationExecutionPayload) -> Result<(), Ser
     payload.summary = summary;
     payload.truncated = payload.truncated || summary_truncated;
     if let Some(data) = payload.data.as_mut() {
-        sanitize_json_value(data, 0)?;
+        sanitize_json_value(data, 0, None)?;
     }
     Ok(())
 }
 
-/// Recursively sanitize structured JSON while preserving useful diagnostics.
-///
-/// The function uses conservative shape limits because EventLog rows are replay
-/// and audit material, not a raw provider payload warehouse.  Oversized strings
-/// and arrays are summarized; sensitive keys are replaced in place.
-fn sanitize_json_value(value: &mut serde_json::Value, depth: usize) -> Result<(), ServiceError> {
+/// Recursively sanitize structured JSON while preserving display diagnostics.
+fn sanitize_json_value(
+    value: &mut serde_json::Value,
+    depth: usize,
+    key: Option<&str>,
+) -> Result<(), ServiceError> {
     if depth > MAX_SANITIZED_JSON_DEPTH {
         *value = serde_json::Value::String("[truncated:depth]".into());
         return Ok(());
     }
     match value {
         serde_json::Value::Object(map) => {
-            for (key, child) in map.iter_mut() {
-                if is_sensitive_key(key) {
+            for (child_key, child) in map.iter_mut() {
+                if is_sensitive_key(child_key) {
                     *child = serde_json::Value::String(REDACTED_VALUE.into());
                 } else {
-                    sanitize_json_value(child, depth + 1)?;
+                    sanitize_json_value(child, depth + 1, Some(child_key))?;
                 }
             }
         }
@@ -450,16 +435,31 @@ fn sanitize_json_value(value: &mut serde_json::Value, depth: usize) -> Result<()
                 values.push(serde_json::Value::String("[truncated:array]".into()));
             }
             for child in values {
-                sanitize_json_value(child, depth + 1)?;
+                sanitize_json_value(child, depth + 1, key)?;
             }
         }
-        serde_json::Value::String(text) if text.chars().count() > MAX_SUMMARY_CHARS => {
-            let (truncated, _) = truncate_chars(text, MAX_SUMMARY_CHARS);
+        serde_json::Value::String(text) if text.chars().count() > string_limit_for_key(key) => {
+            let (truncated, _) = truncate_chars(text, string_limit_for_key(key));
             *text = truncated;
         }
         _ => {}
     }
     Ok(())
+}
+
+fn string_limit_for_key(key: Option<&str>) -> usize {
+    if key.is_some_and(is_display_payload_key) {
+        MAX_DISPLAY_FIELD_CHARS
+    } else {
+        MAX_SUMMARY_CHARS
+    }
+}
+
+fn is_display_payload_key(key: &str) -> bool {
+    matches!(
+        key,
+        "display_body" | "display_markdown" | "assistant_content"
+    )
 }
 
 /// Return whether a JSON object key is unsafe for inline observability.

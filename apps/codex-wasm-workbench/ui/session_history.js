@@ -44,7 +44,7 @@ export function createSessionHistoryAdapter(dependencies) {
     // history endpoints; it does not ask the OS to understand Codex-specific
     // execution stream semantics.
     const [eventHistory, sessionDetail] = await Promise.all([
-      callSessionRead("events", { session_id: state.sessionId, limit: 100 }).catch((error) => {
+      callSessionRead("events", { session_id: state.sessionId, limit: 1000 }).catch((error) => {
         console.warn("[codex-wasm-workbench] generic session event replay failed", {
           session_id: state.sessionId,
           error: error instanceof Error ? error.message : String(error),
@@ -91,7 +91,7 @@ export function createSessionHistoryAdapter(dependencies) {
     const params = {
       session_id: state.sessionId,
       trace_id: `trace-replay-${state.sessionId}`,
-      page_size: "100",
+      page_size: "1000",
     };
     if (state.runId) params.run_id = state.runId;
     const replay = await callAppExecution("replay", params).catch((error) => {

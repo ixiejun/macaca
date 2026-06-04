@@ -55,6 +55,7 @@ export async function routeToolCall({
         service_id: descriptor.serviceId,
         operation: args.operation,
         output: sanitizeToolOutput(response),
+        display: buildToolDisplay(args.operation, args.payload ?? {}, response),
       });
     }
     return createToolResultMessage(toolCall.id, {
@@ -62,6 +63,7 @@ export async function routeToolCall({
       service_id: descriptor.serviceId,
       operation: args.operation,
       output: sanitizeToolOutput(response),
+      display: buildToolDisplay(args.operation, args.payload ?? {}, response),
     });
   } catch (error) {
     return createToolResultMessage(toolCall.id, {
@@ -72,6 +74,28 @@ export async function routeToolCall({
       output: sanitizeError(error),
     });
   }
+}
+
+function buildToolDisplay(operation, payload, response) {
+  // The display contract is application-local presentation metadata.  It does
+  // not alter Macaca service semantics and it avoids hardcoding business
+  // workflows: any file.write operation can expose the exact user-visible file
+  // path and content that the model intentionally submitted to the generic file
+  // service.
+  if (operation !== "file.write") {
+    return {
+      title: `${operation} completed`,
+      body: JSON.stringify(response ?? null, null, 2),
+      format: "json",
+    };
+  }
+  const path = payload?.target?.path || payload?.path || "unknown";
+  return {
+    title: `Wrote ${path}`,
+    body: String(payload?.content ?? ""),
+    format: "markdown",
+    file_path: path,
+  };
 }
 
 function serviceCallSucceeded(response) {

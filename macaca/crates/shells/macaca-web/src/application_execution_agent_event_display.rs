@@ -64,6 +64,21 @@ pub(crate) fn display_excerpt(value: &str) -> String {
     }
 }
 
+/// Return full user-visible display text after lightweight secret masking.
+///
+/// The application execution EventLog still enforces its own per-row payload
+/// size limit and recursive secret-key redaction.  This helper simply avoids the
+/// UI-specific short excerpt for content that the agent has already emitted as
+/// user-facing assistant text, reasoning progress, or tool output.
+pub(crate) fn display_full(value: &str) -> String {
+    let masked = mask_secret_like_tokens(value);
+    if masked.trim().is_empty() {
+        "No displayable content was provided.".into()
+    } else {
+        masked
+    }
+}
+
 /// Summarize tool input without persisting raw tool arguments.
 ///
 /// File-oriented tools receive a special path summary because users need to see
@@ -76,6 +91,15 @@ pub(crate) fn tool_input_summary(tool_name: &str, tool_input: &serde_json::Value
             .and_then(serde_json::Value::as_str)
             .map(str::len)
             .unwrap_or(0);
+        if let Some(content) = tool_input
+            .get("content")
+            .and_then(serde_json::Value::as_str)
+        {
+            return format!(
+                "Preparing `{tool_name}` for `{path}` ({bytes} content bytes).\n\n```text\n{}\n```",
+                display_full(content)
+            );
+        }
         return format!("Preparing `{tool_name}` for `{path}` ({bytes} content bytes).");
     }
     format!(
@@ -93,6 +117,11 @@ pub(crate) fn tool_file_path(tool_input: &serde_json::Value) -> Option<String> {
         .get("path")
         .or_else(|| tool_input.get("file_path"))
         .and_then(serde_json::Value::as_str)
+        .or_else(|| {
+            tool_input
+                .pointer("/target/path")
+                .and_then(serde_json::Value::as_str)
+        })
         .filter(|value| !value.trim().is_empty())
         .map(ToOwned::to_owned)
 }
@@ -161,7 +190,7 @@ fn mask_secret_like_tokens(content: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{display_excerpt, MAX_DISPLAY_CHARS};
+    use super::{display_excerpt, display_full, MAX_DISPLAY_CHARS};
 
     #[test]
     fn display_excerpt_is_bounded_for_application_execution_ui_payloads() {
@@ -179,5 +208,34 @@ mod tests {
         assert!(excerpt.contains("sk-...****"));
         assert!(excerpt.contains("Bearer...****"));
         assert!(!excerpt.contains("abcdefghijklmnopqrstuvwxyz"));
+    }
+
+    #[test]
+    fn display_full_preserves_user_visible_markdown_without_excerpt_truncation() {
+        let markdown = format!(
+            "# Result\n\n{}\n\n```rust\nfn main() {{ println!(\"hello\"); }}\n```",
+            "line\n".repeat(120)
+        );
+        let full = display_full(&markdown);
+
+        assert!(full.contains("```rust"));
+        assert!(full.contains("fn main()"));
+        assert!(
+            full.len() > MAX_DISPLAY_CHARS,
+            "full display content should not use the short excerpt limit"
+        );
+    }
+
+    #[test]
+    fn tool_input_summary_includes_complete_file_content_for_file_payloads() {
+        let input = serde_json::json!({
+            "target": { "path": "shared/src/main.rs" },
+            "content": "fn main() {\n    println!(\"hello\");\n}"
+        });
+        let summary = super::tool_input_summary("macaca_file", &input);
+
+        assert!(summary.contains("shared/src/main.rs"));
+        assert!(summary.contains("fn main()"));
+        assert!(summary.contains("println!"));
     }
 }
