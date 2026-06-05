@@ -32,6 +32,7 @@ test("markdown renderer wraps GFM tables in a readable scroll region", () => {
   assert.match(markdownSource, /markdown-table-scroll/);
   assert.match(markdownSource, /headingWithTableHeader/);
   assert.match(markdownSource, /function formatTableRow/);
+  assert.match(markdownSource, /isFormattedTableRow\(part\) \? \[part\] : splitCompactHeadingsAndRules\(part\)/);
   assert.match(markdownSource, /cells\.every\(\(cell\) =>/);
   assert.match(markdownSource, /cells\.map\(\(\) => '---'\)/);
   assert.match(styleSource, /\.markdown-table-scroll[\s\S]*overflow: auto/);

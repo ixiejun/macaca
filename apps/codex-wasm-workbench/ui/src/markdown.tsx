@@ -73,7 +73,7 @@ function splitCompactMarkdownLine(line: string): string[] {
   if (!text.trim()) return [text];
   return expandCompactPipeTable(text)
     .flatMap(splitCompactFenceBoundaries)
-    .flatMap(splitCompactHeadingsAndRules);
+    .flatMap((part) => (isFormattedTableRow(part) ? [part] : splitCompactHeadingsAndRules(part)));
 }
 
 function splitCompactFenceBoundaries(line: string): string[] {
@@ -139,4 +139,8 @@ function formatTableRow(row: string): string {
     return `| ${cells.map(() => '---').join(' | ')} |`;
   }
   return `| ${cells.join(' | ')} |`;
+}
+
+function isFormattedTableRow(row: string): boolean {
+  return /^\|\s*.+\s*\|$/.test(String(row || '').trim());
 }
