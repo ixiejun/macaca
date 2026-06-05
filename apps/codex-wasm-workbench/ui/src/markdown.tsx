@@ -110,7 +110,33 @@ function expandCompactPipeTable(line: string): string[] {
     .split(/\s*\|\|\s*/g)
     .map((row) => row.trim())
     .filter(Boolean);
-  return rows.length >= 2
-    ? rows.map((row) => `${row.startsWith('|') ? '' : '| '}${row}${row.endsWith('|') ? '' : ' |'}`)
-    : [line];
+  if (rows.length < 2) return [line];
+
+  const normalizedRows: string[] = [];
+  const firstRow = rows[0];
+  const headingWithTableHeader = firstRow.match(/^(#{1,6}\s+[^|]+?)\s*\|\s*(.+)$/);
+
+  if (headingWithTableHeader) {
+    normalizedRows.push(headingWithTableHeader[1].trim());
+    normalizedRows.push(formatTableRow(headingWithTableHeader[2]));
+  } else {
+    normalizedRows.push(formatTableRow(firstRow));
+  }
+
+  normalizedRows.push(...rows.slice(1).map(formatTableRow));
+  return normalizedRows;
+}
+
+function formatTableRow(row: string): string {
+  const cells = String(row || '')
+    .replace(/^\|/, '')
+    .replace(/\|$/, '')
+    .split('|')
+    .map((cell) => cell.trim())
+    .filter(Boolean);
+  if (cells.length === 0) return '| |';
+  if (cells.every((cell) => /^:?-{3,}:?$/.test(cell))) {
+    return `| ${cells.map(() => '---').join(' | ')} |`;
+  }
+  return `| ${cells.join(' | ')} |`;
 }

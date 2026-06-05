@@ -30,6 +30,10 @@ test("markdown renderer keeps Workbench logic as a presentation adapter", () => 
 test("markdown renderer wraps GFM tables in a readable scroll region", () => {
   assert.match(markdownSource, /function MarkdownTable/);
   assert.match(markdownSource, /markdown-table-scroll/);
+  assert.match(markdownSource, /headingWithTableHeader/);
+  assert.match(markdownSource, /function formatTableRow/);
+  assert.match(markdownSource, /cells\.every\(\(cell\) =>/);
+  assert.match(markdownSource, /cells\.map\(\(\) => '---'\)/);
   assert.match(styleSource, /\.markdown-table-scroll[\s\S]*overflow: auto/);
   assert.match(styleSource, /\.markdown-body table[\s\S]*min-width: 620px/);
   assert.match(styleSource, /\.markdown-body th[\s\S]*text-transform: uppercase/);
