@@ -62,6 +62,8 @@ test("timeline presenter renders user-readable execution events and markdown", (
   assert.match(presenterSource, /Writing file:/);
   assert.match(presenterSource, /function eventSummary/);
   assert.match(presenterSource, /function eventTone/);
+  assert.match(presenterSource, /function isMarkdownDisplay/);
+  assert.match(presenterSource, /data\.display_format === 'markdown'/);
   assert.match(presenterSource, /data\.display_body/);
   assert.match(timelineSource, /event-summary/);
   assert.match(timelineSource, /Trace details/);

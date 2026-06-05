@@ -165,7 +165,7 @@ function normalizeMarkdownLines(markdown: string): string[] {
     while (line.includes('```')) {
       const fenceIndex = line.indexOf('```');
       const before = line.slice(0, fenceIndex).trimEnd();
-      if (before) normalized.push(...splitInlineMarkdownStructure(before));
+      if (before) normalized.push(...(inFence ? [before] : splitInlineMarkdownStructure(before)));
       const after = line.slice(fenceIndex + 3).trimStart();
       if (inFence) {
         normalized.push('```');
@@ -176,7 +176,7 @@ function normalizeMarkdownLines(markdown: string): string[] {
       const languageOnly = after && /^[A-Za-z0-9_-]+$/.test(after);
       normalized.push(languageOnly ? `\`\`\`${after}` : '```');
       inFence = true;
-      line = !after || languageOnly ? '' : after;
+      line = !after || languageOnly ? '' : splitCompactFenceTail(after);
     }
     normalized.push(...(inFence ? [line] : splitInlineMarkdownStructure(line)));
   }
@@ -184,14 +184,14 @@ function normalizeMarkdownLines(markdown: string): string[] {
 }
 
 function splitInlineMarkdownStructure(line: string): string[] {
-  return expandCompactPipeTable(line).flatMap(splitInlineRulesAndHeadings);
+  return expandCompactPipeTable(line).flatMap(splitInlineRulesAndHeadings).flatMap(splitCompactFieldRows);
 }
 
 function splitInlineRulesAndHeadings(line: string): string[] {
   const text = String(line || '');
   if (!text.trim()) return [text];
   const tokens: string[] = [];
-  const pattern = /(?:^|\s)(---|\#{1,3}\s+[^#]+?)(?=(?:\s---|\s#{1,3}\s+|$))/g;
+  const pattern = /(?:^|\s)(---|\#{1,3}\s+[\s\S]+?)(?=(?:\s---|\s#{1,3}\s+|\s```|$))/g;
   let offset = 0;
   for (const match of text.matchAll(pattern)) {
     const tokenStart = match.index + (match[0].startsWith(' ') ? 1 : 0);
@@ -203,6 +203,18 @@ function splitInlineRulesAndHeadings(line: string): string[] {
   const after = text.slice(offset).trim();
   if (after) tokens.push(after);
   return tokens.length > 0 ? tokens : [line];
+}
+
+function splitCompactFenceTail(afterFence: string): string {
+  return afterFence.replace(/\s+(---|#{1,3}\s+)/g, '\n$1');
+}
+
+function splitCompactFieldRows(line: string): string[] {
+  const text = String(line || '').trim();
+  if (!text.includes(' | ') || !/(\*\*[^*]+\*\*|[|｜-]{3,})/.test(text)) return [line];
+  const parts = text.split(/\s+\|\s+/g).map((part) => part.trim()).filter(Boolean);
+  if (parts.length < 3) return [line];
+  return parts.map((part) => (/^\|/.test(part) ? part : `- ${part}`));
 }
 
 function expandCompactPipeTable(line: string): string[] {

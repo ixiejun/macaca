@@ -94,7 +94,7 @@ function presentExecutionEvent(event: ExecutionEvent): PresentedTimelineEvent {
       time: event.timestamp ? formatTime(event.timestamp) : '',
     }),
     details: eventDetails(event, data),
-    format: data.display_format === 'json' ? 'json' : data.display_markdown ? 'markdown' : 'text',
+    format: data.display_format === 'json' ? 'json' : isMarkdownDisplay(data) ? 'markdown' : 'text',
     tone: eventTone(event, data),
     usePre: data.display_format === 'json',
   };
@@ -198,6 +198,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function asRecord(value: unknown): Record<string, unknown> {
   return isRecord(value) ? value : {};
+}
+
+function isMarkdownDisplay(data: Record<string, unknown>): boolean {
+  return data.display_format === 'markdown' || typeof data.display_markdown === 'string';
 }
 
 function stringValue(value: unknown): string {
