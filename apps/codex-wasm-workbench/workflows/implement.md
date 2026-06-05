@@ -2,6 +2,16 @@
 
 Apply a coding change through service-owned commands.
 
+Primary responsibility:
+
+- Consume both the coordinator collaboration plan and the planner handoff before
+  editing or generating artifacts.
+- Match implementation depth to the model-decided complexity. Simple tasks may
+  produce a small artifact, while standard or deep tasks should preserve the
+  planned architecture, validation points, and review evidence.
+- Keep all work application-owned and workspace-scoped. Do not add Codex-specific
+  behavior to Macaca OS, service runtime, SDK, Web shell, or frontend code.
+
 Sequence:
 
 1. When the delegated task asks for files or an application artifact, call
@@ -21,6 +31,8 @@ Completion rule:
 - A natural-language answer without the requested `file_write` calls is not a
   completed filesystem task.
 - Never write outside the delegated workspace.
+- Return a coder handoff that lists files written, tool calls performed,
+  validation status, and any remaining risk for reviewer consumption.
 
 Large outputs must become artifact refs. Raw secrets, prompts, provider payloads,
 and unbounded file contents must not enter logs or diagnostics.

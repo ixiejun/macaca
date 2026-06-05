@@ -85,7 +85,7 @@ ui:
 
 workflows:
   coding-loop:
-    description: "Application-owned coding loop over Macaca generic workbench services"
+    description: "Application-owned model-decided four-agent coding loop over Macaca generic workbench services"
     steps:
       - name: understand
         agent: coordinator
@@ -113,7 +113,7 @@ agents:
       - app_protocol
     capabilities:
       - name: coding_session_coordination
-        description: "Coordinates application-owned coding workflow while state remains in service.interaction"
+        description: "Uses model judgment to classify task complexity and coordinate the application-owned coding workflow while state remains in service.interaction"
       - name: workbench_event_subscription
         description: "Subscribes to typed workbench events through service.app_protocol"
 
@@ -129,7 +129,7 @@ agents:
       - service.call
     capabilities:
       - name: code_change_planning
-        description: "Plans changes using provider-neutral code intelligence and file service calls"
+        description: "Consumes coordinator handoffs and plans changes using provider-neutral code intelligence and file service calls"
 
   - name: coder
     prompt_template: workflows/implement.md
@@ -146,7 +146,7 @@ agents:
       - service.call
     capabilities:
       - name: patch_authoring
-        description: "Requests file, git, sandbox, process, approval, and hook operations through services"
+        description: "Consumes coordinator and planner handoffs, then requests file, git, sandbox, process, approval, and hook operations through services"
 
   - name: reviewer
     prompt_template: workflows/review.md
@@ -159,7 +159,7 @@ agents:
       - service.call
     capabilities:
       - name: structured_review
-        description: "Produces structured findings through service.review and diagnostics summaries"
+        description: "Consumes prior agent handoffs and produces structured findings through service.review and diagnostics summaries"
 
 workbench:
   capabilities:
