@@ -68,12 +68,14 @@ test("timeline presenter renders user-readable execution events and markdown", (
   assert.match(timelineSource, /event-summary/);
   assert.match(timelineSource, /Trace details/);
   assert.match(markdownSource, /export function MarkdownView/);
-  assert.match(markdownSource, /function normalizeMarkdownLines/);
+  assert.match(markdownSource, /ReactMarkdown/);
+  assert.match(markdownSource, /normalizeWorkbenchMarkdown/);
 });
 
 test("markdown display wraps generated content instead of forcing horizontal scrolling", () => {
   assert.match(styleSource, /\.markdown-body pre[\s\S]*white-space: pre-wrap/);
   assert.match(styleSource, /\.markdown-body pre[\s\S]*overflow-wrap: anywhere/);
-  assert.match(styleSource, /\.markdown-body table[\s\S]*table-layout: fixed/);
+  assert.match(styleSource, /\.markdown-table-scroll[\s\S]*overflow: auto/);
+  assert.match(styleSource, /\.markdown-body table[\s\S]*table-layout: auto/);
   assert.match(styleSource, /\.markdown-body th,[\s\S]*word-break: break-word/);
 });
