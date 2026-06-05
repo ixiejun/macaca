@@ -113,14 +113,20 @@ function expandCompactPipeTable(line: string): string[] {
   if (rows.length < 2) return [line];
 
   const normalizedRows: string[] = [];
-  const firstRow = rows[0];
-  const headingWithTableHeader = firstRow.match(/^(#{1,6}\s+[^|]+?)\s*\|\s*(.+)$/);
+  const firstRowCells = splitTableCells(rows[0]);
+  const separatorCells = splitTableCells(rows[1]);
+  const headingWithTableHeader = rows[0].match(/^(#{1,6}\s+[^|]+?)\s*\|\s*(.+)$/);
 
   if (headingWithTableHeader) {
     normalizedRows.push(headingWithTableHeader[1].trim());
     normalizedRows.push(formatTableRow(headingWithTableHeader[2]));
+  } else if (isSeparatorCells(separatorCells) && firstRowCells.length > separatorCells.length) {
+    const headingCellCount = firstRowCells.length - separatorCells.length;
+    const heading = firstRowCells.slice(0, headingCellCount).join(' | ');
+    normalizedRows.push(formatCompactTableHeading(heading));
+    normalizedRows.push(formatTableRow(firstRowCells.slice(headingCellCount).join(' | ')));
   } else {
-    normalizedRows.push(formatTableRow(firstRow));
+    normalizedRows.push(formatTableRow(rows[0]));
   }
 
   normalizedRows.push(...rows.slice(1).map(formatTableRow));
@@ -128,14 +134,9 @@ function expandCompactPipeTable(line: string): string[] {
 }
 
 function formatTableRow(row: string): string {
-  const cells = String(row || '')
-    .replace(/^\|/, '')
-    .replace(/\|$/, '')
-    .split('|')
-    .map((cell) => cell.trim())
-    .filter(Boolean);
+  const cells = splitTableCells(row);
   if (cells.length === 0) return '| |';
-  if (cells.every((cell) => /^:?-{3,}:?$/.test(cell))) {
+  if (isSeparatorCells(cells)) {
     return `| ${cells.map(() => '---').join(' | ')} |`;
   }
   return `| ${cells.join(' | ')} |`;
@@ -143,4 +144,23 @@ function formatTableRow(row: string): string {
 
 function isFormattedTableRow(row: string): boolean {
   return /^\|\s*.+\s*\|$/.test(String(row || '').trim());
+}
+
+function splitTableCells(row: string): string[] {
+  return String(row || '')
+    .replace(/^\|/, '')
+    .replace(/\|$/, '')
+    .split('|')
+    .map((cell) => cell.trim())
+    .filter(Boolean);
+}
+
+function isSeparatorCells(cells: string[]): boolean {
+  return cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/.test(cell));
+}
+
+function formatCompactTableHeading(heading: string): string {
+  const text = String(heading || '').replace(/^[-*]\s+/, '').trim();
+  if (!text) return '';
+  return /^#{1,6}\s+/.test(text) ? text : `### ${text}`;
 }
