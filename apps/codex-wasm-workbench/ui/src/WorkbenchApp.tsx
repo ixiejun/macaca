@@ -2,8 +2,8 @@ import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { declaredServices, taskTemplates } from './constants';
 import { callAppExecution, callService, callSessionRead, createBridgeRuntime, resolveBridgeMessage } from './bridge';
 import { MarkdownView } from './markdown';
-import { presentTimelineEvent } from './presenter';
 import { createInitialState, normalizeExecutionEvent, workbenchReducer } from './state';
+import { Timeline } from './timeline';
 import type { ModelInfo, ModelRoute, ProviderInfo, TimelineEntry, WorkbenchState } from './types';
 import { WorkbenchSessionMementoStore } from '../session_memento.js';
 
@@ -392,22 +392,6 @@ export function WorkbenchApp() {
         <div id="resultOutput"><MarkdownView markdown={state.result || 'No assistant result yet.'} /></div>
       </section>
     </main>
-  );
-}
-
-function Timeline({ events }: { events: TimelineEntry[] }) {
-  if (events.length === 0) return <div className="event-timeline"><p className="empty">Submit a task to stream execution events.</p></div>;
-  return <div className="event-timeline">{events.map((entry, index) => <TimelineCard entry={entry} key={`${entry.type}:${entry.at}:${index}`} />)}</div>;
-}
-
-function TimelineCard({ entry }: { entry: TimelineEntry }) {
-  const view = presentTimelineEvent(entry);
-  return (
-    <article className={`event-card event-${entry.type.replaceAll('_', '-')}`}>
-      <h3>{view.title}</h3>
-      {view.format === 'markdown' ? <MarkdownView markdown={view.body} /> : view.usePre ? <pre>{view.body}</pre> : <p>{view.body}</p>}
-      {view.meta.length > 0 && <ul className="event-meta">{view.meta.map((item) => <li key={item}>{item}</li>)}</ul>}
-    </article>
   );
 }
 

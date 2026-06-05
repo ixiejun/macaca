@@ -7,30 +7,36 @@ export function presentTimelineEvent(entry: TimelineEntry): PresentedTimelineEve
     const data = entry.data as Record<string, unknown> | null;
     return {
       title: 'Live updates connected',
+      summary: 'The event stream is attached to the backend session.',
       body: 'This session is now following backend execution events in real time.',
       meta: data?.since ? [`Resumed after event ${String(data.since)}`] : [],
+      tone: 'progress',
     };
   }
   if (entry.type === 'execution_start_result') {
     const data = entry.data as Record<string, unknown> | null;
     return {
       title: 'Task accepted',
+      summary: 'The backend created or reused an execution run for this task.',
       body: 'Macaca accepted the task and assigned a backend execution session.',
       meta: compactMeta({ session: data?.session_id, run: data?.run_id, provider: data?.provider_kind }),
+      tone: 'success',
     };
   }
   if (entry.type === 'bridge_error') {
     const data = entry.data as Record<string, unknown> | null;
-    return { title: 'Connection issue', body: String(data?.error || 'The workbench bridge reported an error.'), meta: [] };
+    return { title: 'Connection issue', summary: 'The app-owned UI could not complete one bridge operation.', body: String(data?.error || 'The workbench bridge reported an error.'), meta: [], tone: 'danger' };
   }
   if (entry.type === 'assistant_response') {
     const data = entry.data as Record<string, unknown> | null;
     const toolCalls = Array.isArray(data?.tool_calls) ? data.tool_calls as Array<{ name?: string }> : [];
     return {
       title: toolCalls.length ? 'Assistant requested tools' : 'Assistant response',
+      summary: toolCalls.length ? `The assistant requested ${toolCalls.length} tool call${toolCalls.length === 1 ? '' : 's'}.` : 'The assistant produced a user-visible response.',
       body: [data?.reasoning_content, data?.content].filter(Boolean).join('\n\n') || 'No assistant text was emitted.',
       meta: compactMeta({ model: data?.model, tools: toolCalls.map((toolCall) => toolCall.name).join(', ') }),
       format: 'markdown',
+      tone: toolCalls.length ? 'progress' : 'success',
     };
   }
   if (entry.type === 'tool_result') {
@@ -39,15 +45,17 @@ export function presentTimelineEvent(entry: TimelineEntry): PresentedTimelineEve
     const display = isRecord(result.display) ? result.display : {};
     return {
       title: String(display.title || `${String(data?.tool || 'Tool')} ${String(data?.status || 'completed')}`),
+      summary: summarizeToolResult(String(data?.tool || ''), String(data?.status || result.status || 'completed'), display),
       body: String(display.body || asRecord(result.output)?.text || JSON.stringify(result, null, 2)),
       meta: compactMeta({ tool: data?.tool, operation: result.operation, file: display.file_path, status: result.status || data?.status }),
       format: display.format === 'json' ? 'json' : 'markdown',
+      tone: String(result.status || data?.status || '').includes('error') ? 'danger' : 'success',
       usePre: display.format === 'json',
     };
   }
   if (entry.type === 'model_catalog') {
     const data = entry.data as Record<string, unknown> | null;
-    return { title: 'Model catalog loaded', body: `${data?.providers || 0} providers and ${data?.models || 0} models are available.`, meta: [] };
+    return { title: 'Model catalog loaded', summary: 'The app-owned UI can now offer model route choices.', body: `${data?.providers || 0} providers and ${data?.models || 0} models are available.`, meta: [], tone: 'success' };
   }
   return {
     title: humanize(entry.type || 'event'),
@@ -60,7 +68,7 @@ export function presentTimelineEvent(entry: TimelineEntry): PresentedTimelineEve
 function presentExecutionEvent(event: ExecutionEvent): PresentedTimelineEvent {
   const payload = event.sanitized_payload || {};
   const data = payload.data || {};
-  const title = String(data.display_title || eventTitle(event.event_type));
+  const title = eventCardTitle(event, data);
   const body = String(
     data.display_body
       || data.display_markdown
@@ -69,19 +77,89 @@ function presentExecutionEvent(event: ExecutionEvent): PresentedTimelineEvent {
       || payload.summary
       || 'Execution event received.',
   );
+  const toolName = stringValue(data.tool_name);
+  const filePath = stringValue(data.file_path);
   return {
     title,
+    summary: eventSummary(event, data, payload.summary),
     body,
     meta: compactMeta({
-      tool: data.tool_name,
-      file: data.file_path,
+      stage: data.stage,
+      tool: toolName,
+      file: filePath ? shortPath(filePath) : '',
       status: data.status,
+      actor: event.actor,
       provider: event.provider_kind,
       seq: event.seq,
+      time: event.timestamp ? formatTime(event.timestamp) : '',
     }),
+    details: eventDetails(event, data),
     format: data.display_format === 'json' ? 'json' : data.display_markdown ? 'markdown' : 'text',
+    tone: eventTone(event, data),
     usePre: data.display_format === 'json',
   };
+}
+
+function eventCardTitle(event: ExecutionEvent, data: Record<string, unknown>): string {
+  const displayTitle = stringValue(data.display_title);
+  const toolName = stringValue(data.tool_name);
+  const filePath = stringValue(data.file_path);
+  if (event.event_type === 'ToolCallRequested' && toolName === 'file_write' && filePath) return `Writing file: ${shortPath(filePath)}`;
+  if (event.event_type === 'ToolCallCompleted' && toolName === 'file_write' && filePath) return `File saved: ${shortPath(filePath)}`;
+  if (displayTitle) return displayTitle;
+  return eventTitle(event.event_type);
+}
+
+function eventSummary(event: ExecutionEvent, data: Record<string, unknown>, fallback?: string): string {
+  const toolName = stringValue(data.tool_name);
+  const filePath = stringValue(data.file_path);
+  if (event.event_type === 'LlmRequested') return 'The user task and execution instructions were sent to the coding agent.';
+  if (event.event_type === 'ProviderHeartbeat' && stringValue(data.stage) === 'thinking') return `The agent is reasoning through iteration ${String(data.iteration ?? '0')}.`;
+  if (event.event_type === 'ToolCallRequested' && toolName) return summarizeToolRequest(toolName, filePath, data);
+  if (event.event_type === 'ToolCallCompleted' && toolName) return summarizeToolCompletion(toolName, filePath, data);
+  if (event.event_type === 'LlmCompleted') return 'The assistant produced a response for this task.';
+  if (event.event_type === 'ExecutionCompleted') return 'The backend marked this execution run as complete.';
+  if (event.event_type === 'ExecutionFailed') return 'The backend reported that execution failed.';
+  return String(fallback || 'Execution progress was recorded.');
+}
+
+function summarizeToolRequest(toolName: string, filePath: string, data: Record<string, unknown>): string {
+  if (toolName === 'file_write' && filePath) {
+    const bytes = Number(data.content_bytes || extractByteCount(stringValue(data.display_body)));
+    return `The agent is preparing to write ${shortPath(filePath)}${bytes ? ` with ${formatBytes(bytes)} of content` : ''}.`;
+  }
+  return `The agent requested ${toolName}.`;
+}
+
+function summarizeToolCompletion(toolName: string, filePath: string, data: Record<string, unknown>): string {
+  if (toolName === 'file_write' && filePath) return `The file ${shortPath(filePath)} was written successfully.`;
+  if (data.is_error === true) return `${toolName} completed with an error.`;
+  return `${toolName} completed successfully.`;
+}
+
+function summarizeToolResult(toolName: string, status: string, display: Record<string, unknown>): string {
+  const filePath = stringValue(display.file_path);
+  if (toolName === 'file_write' && filePath) return `The file ${shortPath(filePath)} was written successfully.`;
+  return `${toolName || 'Tool'} reported ${status || 'completed'}.`;
+}
+
+function eventDetails(event: ExecutionEvent, data: Record<string, unknown>): string[] {
+  return compactMeta({
+    event_type: event.event_type,
+    session: event.session_id,
+    run: event.run_id,
+    input_hash: data.input_hash,
+    output_hash: data.output_hash,
+    input_length: data.input_len,
+    output_length: data.output_len,
+  });
+}
+
+function eventTone(event: ExecutionEvent, data: Record<string, unknown>): PresentedTimelineEvent['tone'] {
+  if (event.event_type === 'ExecutionFailed' || data.is_error === true) return 'danger';
+  if (event.event_type === 'ExecutionCompleted' || event.event_type === 'ToolCallCompleted' || event.event_type === 'LlmCompleted') return 'success';
+  if (event.event_type === 'ToolCallRequested' || event.event_type === 'LlmRequested' || event.event_type === 'ProviderHeartbeat') return 'progress';
+  return 'neutral';
 }
 
 function eventTitle(eventType?: string): string {
@@ -120,4 +198,28 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function asRecord(value: unknown): Record<string, unknown> {
   return isRecord(value) ? value : {};
+}
+
+function stringValue(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
+function shortPath(path: string): string {
+  return path.split('/').filter(Boolean).slice(-3).join('/');
+}
+
+function extractByteCount(text: string): number {
+  const match = text.match(/\((\d+)\s+content bytes\)/);
+  return match ? Number(match[1]) : 0;
+}
+
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  return `${(bytes / 1024).toFixed(bytes >= 10240 ? 0 : 1)} KB`;
+}
+
+function formatTime(timestamp: string): string {
+  const date = new Date(timestamp);
+  return Number.isNaN(date.getTime()) ? timestamp : date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }

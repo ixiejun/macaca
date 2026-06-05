@@ -5,6 +5,7 @@ import test from "node:test";
 const appSource = await readFile(new URL("../src/WorkbenchApp.tsx", import.meta.url), "utf8");
 const bridgeSource = await readFile(new URL("../src/bridge.ts", import.meta.url), "utf8");
 const presenterSource = await readFile(new URL("../src/presenter.ts", import.meta.url), "utf8");
+const timelineSource = await readFile(new URL("../src/timeline.tsx", import.meta.url), "utf8");
 const markdownSource = await readFile(new URL("../src/markdown.tsx", import.meta.url), "utf8");
 const styleSource = await readFile(new URL("../styles.css", import.meta.url), "utf8");
 const indexSource = await readFile(new URL("../index.html", import.meta.url), "utf8");
@@ -57,8 +58,13 @@ test("React UI switches app-owned execution streams when host session changes", 
 test("timeline presenter renders user-readable execution events and markdown", () => {
   assert.match(presenterSource, /export function presentTimelineEvent/);
   assert.match(presenterSource, /function presentExecutionEvent/);
-  assert.match(presenterSource, /data\.display_title \|\| eventTitle/);
+  assert.match(presenterSource, /function eventCardTitle/);
+  assert.match(presenterSource, /Writing file:/);
+  assert.match(presenterSource, /function eventSummary/);
+  assert.match(presenterSource, /function eventTone/);
   assert.match(presenterSource, /data\.display_body/);
+  assert.match(timelineSource, /event-summary/);
+  assert.match(timelineSource, /Trace details/);
   assert.match(markdownSource, /export function MarkdownView/);
   assert.match(markdownSource, /function normalizeMarkdownLines/);
 });

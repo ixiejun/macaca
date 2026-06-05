@@ -218,6 +218,90 @@ label {
   padding: 16px;
 }
 
+.event-card-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 10px;
+}
+
+.event-state-dot {
+  background: var(--accent);
+  border-radius: 999px;
+  box-shadow: 0 0 0 4px var(--accent-soft);
+  flex: 0 0 auto;
+  height: 10px;
+  margin-top: 4px;
+  width: 10px;
+}
+
+.event-kicker {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  margin: 0 0 3px;
+  text-transform: uppercase;
+}
+
+.event-summary {
+  background: rgba(13, 18, 22, 0.72);
+  border: 1px solid rgba(159, 176, 190, 0.18);
+  border-radius: 8px;
+  color: #dce8ef;
+  font-size: 14px;
+  line-height: 1.55;
+  margin-top: 12px;
+  overflow-wrap: anywhere;
+  padding: 10px 12px;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.event-body {
+  margin-top: 12px;
+}
+
+.event-body-text,
+.event-body-pre {
+  margin-top: 12px;
+}
+
+.event-tone-success {
+  border-left-color: #49d38f;
+}
+
+.event-tone-success .event-state-dot {
+  background: #49d38f;
+  box-shadow: 0 0 0 4px rgba(73, 211, 143, 0.14);
+}
+
+.event-tone-progress {
+  border-left-color: #54a7ff;
+}
+
+.event-tone-progress .event-state-dot {
+  background: #54a7ff;
+  box-shadow: 0 0 0 4px rgba(84, 167, 255, 0.14);
+}
+
+.event-tone-warning {
+  border-left-color: #f1b84b;
+}
+
+.event-tone-warning .event-state-dot {
+  background: #f1b84b;
+  box-shadow: 0 0 0 4px rgba(241, 184, 75, 0.16);
+}
+
+.event-tone-danger {
+  border-left-color: var(--danger);
+}
+
+.event-tone-danger .event-state-dot {
+  background: var(--danger);
+  box-shadow: 0 0 0 4px rgba(240, 107, 107, 0.16);
+}
+
 .event-error,
 .event-bridge-error {
   border-left-color: var(--danger);
@@ -406,6 +490,41 @@ pre {
   font-size: 11px;
   margin: 0;
   padding: 4px 8px;
+}
+
+.event-details {
+  border-top: 1px solid rgba(159, 176, 190, 0.16);
+  margin-top: 12px;
+  padding-top: 10px;
+}
+
+.event-details summary {
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.event-details ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+}
+
+.event-details li {
+  background: rgba(13, 18, 22, 0.6);
+  border: 1px solid rgba(159, 176, 190, 0.18);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  margin: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  padding: 5px 7px;
+  word-break: break-word;
 }
 
 .result-panel {

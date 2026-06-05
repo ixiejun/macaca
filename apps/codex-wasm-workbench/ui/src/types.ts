@@ -21,7 +21,9 @@ export type ExecutionEvent = {
   session_id?: string;
   run_id?: string;
   seq?: number;
+  timestamp?: string;
   event_type?: string;
+  actor?: string;
   provider_kind?: string;
   sanitized_payload?: {
     summary?: string;
@@ -58,9 +60,12 @@ export type WorkbenchState = {
 
 export type PresentedTimelineEvent = {
   title: string;
+  summary?: string;
   body: string;
   meta: string[];
+  details?: string[];
   format?: 'markdown' | 'text' | 'json';
+  tone?: 'neutral' | 'progress' | 'success' | 'warning' | 'danger';
   usePre?: boolean;
 };
 

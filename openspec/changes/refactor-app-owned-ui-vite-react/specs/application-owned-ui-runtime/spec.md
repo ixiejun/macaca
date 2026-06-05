@@ -20,3 +20,22 @@ static bundle entry that Macaca can host through the generic UI runtime.
   application name, workflow name, or business payload
 - **AND** application-specific presentation logic SHALL remain inside the
   application package.
+
+### Requirement: Application-owned event presentation
+
+Application-owned UI bundles SHALL be allowed to transform generic execution
+events into human-readable presentation cards inside the application package
+without moving application-specific rendering semantics into Macaca OS or the
+host frontend shell.
+
+#### Scenario: App-owned UI renders readable execution cards
+
+- **GIVEN** an application-owned UI receives sanitized provider-neutral
+  execution events from Macaca
+- **WHEN** the UI displays those events to a user
+- **THEN** the UI MAY derive presentation-only titles, summaries, status tones,
+  metadata chips, markdown bodies, and trace detail sections
+- **AND** the UI SHALL keep the original sanitized event content available in
+  the rendered body or details
+- **AND** Macaca OS SHALL continue to own only generic event persistence,
+  replay, websocket delivery, trace, and audit.

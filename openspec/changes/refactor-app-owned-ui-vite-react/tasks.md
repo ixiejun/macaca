@@ -10,3 +10,5 @@
   manifest to point at that bundle.
 - [x] 1.5 Verify the app-owned bundle with local build, UI contract tests, and
   runtime static asset checks.
+- [x] 1.6 Improve app-owned execution event rendering with readable summaries,
+  status tones, metadata chips, markdown bodies, and trace detail sections.
