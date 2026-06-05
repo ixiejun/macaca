@@ -105,8 +105,9 @@ function splitCompactHeadingsAndRules(line: string): string[] {
 
 function expandCompactPipeTable(line: string): string[] {
   const text = String(line || '').trim();
-  if (!text.includes('||') || !/\|\s*:?-{3,}:?\s*\|/.test(text)) return [line];
-  const rows = text
+  const compactText = normalizeLooseCompactTableDelimiters(text);
+  if (!compactText.includes('||') || !/\|\s*:?-{3,}:?\s*\|/.test(compactText)) return [line];
+  const rows = compactText
     .split(/\s*\|\|\s*/g)
     .map((row) => row.trim())
     .filter(Boolean);
@@ -115,26 +116,27 @@ function expandCompactPipeTable(line: string): string[] {
   const normalizedRows: string[] = [];
   const firstRowCells = splitTableCells(rows[0]);
   const separatorCells = splitTableCells(rows[1]);
+  const expectedCellCount = isSeparatorCells(separatorCells) ? separatorCells.length : 0;
   const headingWithTableHeader = rows[0].match(/^(#{1,6}\s+[^|]+?)\s*\|\s*(.+)$/);
 
   if (headingWithTableHeader) {
     normalizedRows.push(headingWithTableHeader[1].trim());
-    normalizedRows.push(formatTableRow(headingWithTableHeader[2]));
-  } else if (isSeparatorCells(separatorCells) && firstRowCells.length > separatorCells.length) {
-    const headingCellCount = firstRowCells.length - separatorCells.length;
+    normalizedRows.push(formatTableRow(headingWithTableHeader[2], expectedCellCount));
+  } else if (expectedCellCount > 0 && firstRowCells.length > expectedCellCount) {
+    const headingCellCount = firstRowCells.length - expectedCellCount;
     const heading = firstRowCells.slice(0, headingCellCount).join(' | ');
     normalizedRows.push(formatCompactTableHeading(heading));
-    normalizedRows.push(formatTableRow(firstRowCells.slice(headingCellCount).join(' | ')));
+    normalizedRows.push(formatTableRow(firstRowCells.slice(headingCellCount).join(' | '), expectedCellCount));
   } else {
-    normalizedRows.push(formatTableRow(rows[0]));
+    normalizedRows.push(formatTableRow(rows[0], expectedCellCount));
   }
 
-  normalizedRows.push(...rows.slice(1).map(formatTableRow));
+  normalizedRows.push(...rows.slice(1).map((row) => formatTableRow(row, expectedCellCount)));
   return normalizedRows;
 }
 
-function formatTableRow(row: string): string {
-  const cells = splitTableCells(row);
+function formatTableRow(row: string, expectedCellCount = 0): string {
+  const cells = mergeOverflowTableCells(splitTableCells(row), expectedCellCount);
   if (cells.length === 0) return '| |';
   if (isSeparatorCells(cells)) {
     return `| ${cells.map(() => '---').join(' | ')} |`;
@@ -163,4 +165,15 @@ function formatCompactTableHeading(heading: string): string {
   const text = String(heading || '').replace(/^[-*]\s+/, '').trim();
   if (!text) return '';
   return /^#{1,6}\s+/.test(text) ? text : `### ${text}`;
+}
+
+function normalizeLooseCompactTableDelimiters(markdown: string): string {
+  return String(markdown || '').replace(/\|\s+\|(?=\s*(?:\*\*|:?-{3,}:?))/g, '||');
+}
+
+function mergeOverflowTableCells(cells: string[], expectedCellCount: number): string[] {
+  if (!expectedCellCount || cells.length <= expectedCellCount) return cells;
+  const fixedCells = cells.slice(0, expectedCellCount - 1);
+  fixedCells.push(cells.slice(expectedCellCount - 1).join(' \\| '));
+  return fixedCells;
 }
