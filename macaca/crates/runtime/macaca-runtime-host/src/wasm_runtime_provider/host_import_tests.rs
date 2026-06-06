@@ -119,6 +119,12 @@ async fn wasm_host_import_task_create_goal_routes_to_task_service_boundary() {
 
     assert!(matches!(result.status, ApplicationHostCommandStatus::Ok));
     assert_eq!(result.output["description"], json!("Plan BTC analysis"));
+    assert_eq!(result.output["app_id"], json!("app-wasm"));
+    assert_eq!(result.output["session_id"], json!("session-wasm-task"));
+    assert_eq!(
+        result.output["trace"]["trace_id"],
+        json!("trace-wasm-task-create-goal")
+    );
     assert_eq!(
         result.metadata.get("service_id").map(String::as_str),
         Some(task_service_id.as_str())

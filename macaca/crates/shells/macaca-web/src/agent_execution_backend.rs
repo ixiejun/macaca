@@ -15,8 +15,8 @@ use macaca_framework::message::Msg;
 use macaca_framework::model::ToolChoice;
 use macaca_kernel::executor::ExecutorEventFactory;
 use macaca_proto::{
-    AgentContextBuildCommand, AgentContextSnapshot, AgentExecutionCommand, AgentExecutionEvent,
-    AgentExecutionIntent, AgentExecutionResult, AgentExecutionStatus,
+    AgentActivity, AgentContextBuildCommand, AgentContextSnapshot, AgentExecutionCommand,
+    AgentExecutionEvent, AgentExecutionIntent, AgentExecutionResult, AgentExecutionStatus,
     AutonomousCompletionPolicyKind, ExecutionControlCheckpointMode, ExecutionControlCommandResult,
     ExecutionControlPolicy, ExecutionControlRegisterExecutionCommand,
     ExecutionControlResolutionStatus, ExecutionControlResolvePolicyCommand,
@@ -160,6 +160,85 @@ impl WebAgentExecutionBackend {
             .get("suppress_executor_lifecycle")
             .map(|value| value != "true")
             .unwrap_or(true)
+    }
+
+    /// Synchronize service-owned agent execution with the kernel status view.
+    ///
+    /// The Agent Execution service is the generic owner of delegated runtime
+    /// execution.  Shell dashboards and app-owned UIs read coarse status through
+    /// the kernel status tracker, so this Adapter updates the app-declared agent
+    /// by name whenever this backend starts, completes, or fails a service run.
+    /// The helper does not inspect application ids, app names, workflow names, or
+    /// business payloads; it only uses the provider-neutral target agent carried
+    /// by the typed `AgentExecutionCommand`.
+    async fn update_kernel_agent_activity(
+        &self,
+        command: &AgentExecutionCommand,
+        activity: AgentActivity,
+    ) {
+        if let Some(manifest) = self
+            .state
+            .kernel
+            .get_agent_by_name(&command.target_agent)
+            .await
+        {
+            self.state
+                .kernel
+                .update_agent_activity(&manifest.id, activity)
+                .await;
+        } else {
+            tracing::warn!(
+                application_id = %command.application_id,
+                session_id = %command.session_id,
+                target_agent = %command.target_agent,
+                "agent execution could not update kernel activity because target agent is not registered"
+            );
+        }
+    }
+
+    /// Mark one delegated service execution as running in the kernel status view.
+    ///
+    /// This status update is paired with executor lifecycle broadcasts.  When a
+    /// caller suppresses lifecycle events, another orchestration path is expected
+    /// to own the visible activity updates as well, which avoids double-writes in
+    /// legacy executor-driven flows.
+    async fn mark_kernel_agent_working(
+        &self,
+        command: &AgentExecutionCommand,
+        task_id: TaskId,
+        emit_lifecycle: bool,
+    ) {
+        if !emit_lifecycle {
+            return;
+        }
+        self.update_kernel_agent_activity(
+            command,
+            AgentActivity::Working {
+                context: format!("Executing delegated task {}", task_id),
+            },
+        )
+        .await;
+    }
+
+    /// Mark one delegated service execution as terminal in the kernel status view.
+    ///
+    /// Successful runs return the agent to Idle.  Failed runs preserve a bounded
+    /// error message so status consumers can explain why an agent is not idle
+    /// without needing to parse raw model/provider payloads.
+    async fn mark_kernel_agent_terminal(
+        &self,
+        command: &AgentExecutionCommand,
+        emit_lifecycle: bool,
+        error: Option<String>,
+    ) {
+        if !emit_lifecycle {
+            return;
+        }
+        let activity = match error {
+            Some(message) => AgentActivity::Error { message },
+            None => AgentActivity::Idle,
+        };
+        self.update_kernel_agent_activity(command, activity).await;
     }
 
     /// Verify that trusted Agent Context supplied HEARTBEAT.md evidence.
@@ -652,6 +731,8 @@ impl AgentExecutionBackend for WebAgentExecutionBackend {
                 executor.broadcast_event(event_factory.started());
             }
         }
+        self.mark_kernel_agent_working(&command, task_id, emit_lifecycle)
+            .await;
 
         let expected_artifact_path = command
             .metadata
@@ -688,6 +769,8 @@ impl AgentExecutionBackend for WebAgentExecutionBackend {
                                 .broadcast_event(event_factory.completed_with_result(task_result));
                         }
                     }
+                    self.mark_kernel_agent_terminal(&command, emit_lifecycle, None)
+                        .await;
                     let mut result = AgentExecutionResult::completed(
                         &AgentExecutionCommand {
                             task_id: Some(task_id),
@@ -715,6 +798,8 @@ impl AgentExecutionBackend for WebAgentExecutionBackend {
                             executor.broadcast_event(event_factory.failed(error.clone()));
                         }
                     }
+                    self.mark_kernel_agent_terminal(&command, emit_lifecycle, Some(error.clone()))
+                        .await;
                     return Ok(Self::failed_result(
                         &command,
                         task_id,
@@ -770,6 +855,8 @@ impl AgentExecutionBackend for WebAgentExecutionBackend {
                         executor.broadcast_event(event_factory.completed_with_result(task_result));
                     }
                 }
+                self.mark_kernel_agent_terminal(&command, emit_lifecycle, None)
+                    .await;
                 let mut result = AgentExecutionResult::completed(
                     &AgentExecutionCommand {
                         task_id: Some(task_id),
@@ -793,6 +880,8 @@ impl AgentExecutionBackend for WebAgentExecutionBackend {
                         executor.broadcast_event(event_factory.failed(error.clone()));
                     }
                 }
+                self.mark_kernel_agent_terminal(&command, emit_lifecycle, Some(error.clone()))
+                    .await;
                 Ok(Self::failed_result(
                     &command,
                     task_id,

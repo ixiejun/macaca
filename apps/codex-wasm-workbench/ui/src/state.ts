@@ -22,6 +22,8 @@ export function createInitialState(): WorkbenchState {
     route: null,
     tokenSummary: 'No run yet',
     debugToolLoop: params.get('debug_tool_loop') === '1',
+    taskBoard: [],
+    agents: [],
   };
 }
 

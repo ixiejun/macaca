@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { declaredServices, taskTemplates } from './constants';
 import { callAppExecution, callService, callSessionRead, createBridgeRuntime, resolveBridgeMessage } from './bridge';
+import { CollaborationPanel } from './collaboration_panel';
 import { MarkdownView } from './markdown';
 import { createInitialState, normalizeExecutionEvent, workbenchReducer } from './state';
 import { Timeline } from './timeline';
-import type { ModelInfo, ModelRoute, ProviderInfo, TimelineEntry, WorkbenchState } from './types';
+import type { AgentStatusItem, ModelInfo, ModelRoute, ProviderInfo, TaskBoardItem, TimelineEntry, WorkbenchState } from './types';
 import { WorkbenchSessionMementoStore } from '../session_memento.js';
 
 export function WorkbenchApp() {
@@ -53,12 +54,26 @@ export function WorkbenchApp() {
 
   useEffect(() => {
     if (!state.debugToolLoop && state.sessionId) {
-      void replayEvents().then(refreshCurrentState).then(openExecutionWebSocket).catch((error) => appendEvent('bridge_error', { error: errorMessage(error) }));
+      void replayEvents().then(refreshCurrentState).then(refreshCollaborationState).then(openExecutionWebSocket).catch((error) => appendEvent('bridge_error', { error: errorMessage(error) }));
     }
     // This effect should run only for the first restored session. Later session
     // changes are handled by `switchSession`, which saves the previous Memento.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [Boolean(state.sessionId)]);
+
+  useEffect(() => {
+    if (!state.sessionId) return undefined;
+    const refresh = () => {
+      void refreshCollaborationState().catch((error) => appendEvent('bridge_error', { error: errorMessage(error) }));
+    };
+    refresh();
+    const timer = window.setInterval(refresh, state.running ? 2500 : 7500);
+    return () => window.clearInterval(timer);
+    // The interval is intentionally scoped to session/running state.  The
+    // refresh function reads mutable refs so the bridge payload always carries
+    // the current session without recreating timers on every event.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.sessionId, state.running]);
 
   const providerModels = useMemo(
     () => state.models.filter((model) => model.provider_id === selectedProvider && model.available !== false),
@@ -156,6 +171,7 @@ export function WorkbenchApp() {
       appendEvent('execution_start_result', result);
       await replayEvents();
       await refreshCurrentState();
+      await refreshCollaborationState();
       if (!socketRef.current && stateRef.current.running) openExecutionWebSocket();
     } catch (error) {
       appendEvent('bridge_error', { error: errorMessage(error) });
@@ -219,6 +235,7 @@ export function WorkbenchApp() {
       try {
         appendEvent('execution_event', normalizeExecutionEvent(JSON.parse(event.data)));
         void refreshCurrentState();
+        void refreshCollaborationState();
       } catch (error) {
         appendEvent('bridge_error', { error: errorMessage(error) });
       }
@@ -288,6 +305,22 @@ export function WorkbenchApp() {
     });
   }
 
+  async function refreshCollaborationState() {
+    if (!stateRef.current.sessionId) return;
+    const [taskOutput, agentOutput] = await Promise.all([
+      callSessionRead(bridgeRef.current, 'task-board', { session_id: stateRef.current.sessionId }),
+      callSessionRead(bridgeRef.current, 'agents', { session_id: stateRef.current.sessionId }),
+    ]);
+    const tasks = Array.isArray(taskOutput.todos) ? taskOutput.todos as TaskBoardItem[] : [];
+    const agents = Array.isArray(agentOutput) ? agentOutput as AgentStatusItem[] : [];
+    applyPatch({ taskBoard: tasks, agents });
+    console.info('[codex-wasm-workbench] macaca collaboration state refreshed', {
+      session_id: stateRef.current.sessionId,
+      task_count: tasks.length,
+      agent_count: agents.length,
+    });
+  }
+
   async function sendControl(command: string, reasonCode: string) {
     if (!stateRef.current.sessionId || !stateRef.current.runId) return;
     const controlId = crypto.randomUUID();
@@ -341,6 +374,7 @@ export function WorkbenchApp() {
       try {
         await replayEvents();
         await refreshCurrentState();
+        await refreshCollaborationState();
         openExecutionWebSocket();
       } catch (error) {
         appendEvent('bridge_error', { error: errorMessage(error) });
@@ -387,7 +421,7 @@ export function WorkbenchApp() {
           <div className="panel-header"><h2>Execution Stream</h2><button className="secondary-action compact-action" type="button" onClick={clearRun}>Clear</button></div>
           <Timeline events={state.events} />
         </section>
-        <aside className="side-panel"><Thread state={state} /><Diagnostics state={state} /></aside>
+        <aside className="side-panel"><Thread state={state} /><CollaborationPanel tasks={state.taskBoard} agents={state.agents} /><Diagnostics state={state} /></aside>
       </section>
       <section className="result-panel" aria-label="Execution result">
         <div className="panel-header"><h2>Result</h2><span>{state.tokenSummary}</span></div>

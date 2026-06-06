@@ -510,6 +510,12 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
         "web-startup-interaction-service",
     )
     .await?;
+    macaca_runtime_host::bootstrap_local_task_service(
+        Arc::clone(&service_runtime),
+        Arc::clone(&todo_store),
+        "web-startup-task-service",
+    )
+    .await?;
     let entitlement_store: Arc<dyn macaca_persist::EntitlementStore> =
         Arc::new(macaca_persist::InMemoryEntitlementStore::new());
     let payment_store: Arc<dyn macaca_persist::PaymentStore> =

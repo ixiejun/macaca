@@ -7,11 +7,13 @@ const bridgeSource = await readFile(new URL("../src/bridge.ts", import.meta.url)
 const presenterSource = await readFile(new URL("../src/presenter.ts", import.meta.url), "utf8");
 const stateSource = await readFile(new URL("../src/state.ts", import.meta.url), "utf8");
 const timelineSource = await readFile(new URL("../src/timeline.tsx", import.meta.url), "utf8");
+const collaborationSource = await readFile(new URL("../src/collaboration_panel.tsx", import.meta.url), "utf8");
 const markdownSource = await readFile(new URL("../src/markdown.tsx", import.meta.url), "utf8");
 const styleSource = await readFile(new URL("../styles.css", import.meta.url), "utf8");
 const indexSource = await readFile(new URL("../index.html", import.meta.url), "utf8");
 const appYamlSource = await readFile(new URL("../../app.yaml", import.meta.url), "utf8");
 const viteConfigSource = await readFile(new URL("../vite.config.ts", import.meta.url), "utf8");
+const hostBridgeSource = await readFile(new URL("../../../../frontend/lib/app-ui-bridge.ts", import.meta.url), "utf8");
 
 test("workbench UI is a Vite React TypeScript app-owned bundle", () => {
   assert.match(indexSource, /<div id="root"><\/div>/);
@@ -54,6 +56,22 @@ test("React UI switches app-owned execution streams when host session changes", 
   assert.match(appSource, /async function switchSession/);
   assert.match(appSource, /await replayEvents\(\)/);
   assert.match(appSource, /closeExecutionSocket\(false\)/);
+});
+
+test("Workbench collaboration panel reads Macaca-owned task and agent state", () => {
+  assert.match(appSource, /refreshCollaborationState/);
+  assert.match(appSource, /callSessionRead\(bridgeRef\.current, 'task-board'/);
+  assert.match(appSource, /callSessionRead\(bridgeRef\.current, 'agents'/);
+  assert.match(appSource, /CollaborationPanel tasks=\{state\.taskBoard\} agents=\{state\.agents\}/);
+  assert.match(collaborationSource, /Macaca-owned task and agent collaboration state/);
+  assert.match(collaborationSource, /Task board is empty/);
+  assert.match(collaborationSource, /No active task reported/);
+  assert.match(hostBridgeSource, /message\.operation === 'task-board'/);
+  assert.ok(hostBridgeSource.includes("`/api/apps/${options.app.id}/todos?${query.toString()}`"));
+  assert.match(hostBridgeSource, /message\.operation === 'agents'/);
+  assert.ok(hostBridgeSource.includes("`/api/apps/${options.app.id}/agents?${query.toString()}`"));
+  assert.doesNotMatch(collaborationSource, /execution_event/);
+  assert.doesNotMatch(collaborationSource, /CODEX-WASM-WORKBENCH task/);
 });
 
 test("Workbench timeline deduplicates replayed and websocket execution events", () => {
@@ -126,4 +144,9 @@ test("markdown display wraps prose while keeping dense tables inspectable", () =
   assert.match(styleSource, /\.markdown-body th:first-child,[\s\S]*white-space: nowrap/);
   assert.match(styleSource, /\.markdown-body th:nth-child\(2\),[\s\S]*min-width: 260px/);
   assert.match(styleSource, /\.markdown-body td code,[\s\S]*overflow-wrap: anywhere/);
+});
+
+test("workbench panels can shrink so wide content scrolls inside the panel", () => {
+  assert.match(styleSource, /\.editor-panel,\s*\.thread-panel,\s*\.diagnostics-panel,\s*\.result-panel,\s*\.side-panel[\s\S]*min-width: 0/);
+  assert.match(styleSource, /\.markdown-raw-table[\s\S]*white-space: pre;/);
 });

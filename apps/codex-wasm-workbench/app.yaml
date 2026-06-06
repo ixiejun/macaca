@@ -23,6 +23,7 @@ service_contract:
     - service.application.host
     - service.application_execution
     - service.interaction
+    - service.task
     - service.app_protocol
     - service.file
     - service.process
@@ -166,6 +167,9 @@ workbench:
     - family: interaction
       optional: false
       reason: "Thread, turn, and item state must be service-owned"
+    - family: task
+      optional: false
+      reason: "Agent collaboration tasks must be admitted and queryable through Macaca Task Service"
     - family: application_execution
       optional: false
       reason: "Production execution starts, controls, replay, and current state must use service.application_execution"

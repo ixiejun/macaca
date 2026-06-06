@@ -739,19 +739,16 @@ fn default_operation_for_import(import: &ApplicationImport) -> Option<&'static s
 /// Convert compact guest orchestration payloads into typed service commands.
 ///
 /// Declarative WASM metadata should not need to know host-owned app/session
-/// identity or trace shapes.  For `macaca:agent/delegate`, the guest declares
-/// only the work intent (`target_agent`, `prompt`, and bounded `context`), and
-/// the bridge injects the Application Service envelope from trusted metadata.
+/// identity or trace shapes.  The bridge acts as an Adapter at the ABI boundary:
+/// guests declare provider-neutral work intent, while trusted host metadata
+/// supplies application/session identity, trace, and command envelopes required
+/// by Macaca services.  This keeps demo and third-party WASM applications honest:
+/// they can use `macaca:task/*` and `macaca:agent/delegate` without bypassing the
+/// OS task and agent execution services or hardcoding runtime internals.
 fn hydrate_orchestration_service_payload(
     command: &WasmHostImportCommand,
     trace: &TraceContext,
 ) -> Value {
-    if command.import_name != ApplicationImport::AgentDelegate.as_name() {
-        return command.payload.clone();
-    }
-    if command.payload.get("trace").is_some() && command.payload.get("scope").is_some() {
-        return command.payload.clone();
-    }
     let app_id = command.metadata.get("app.id").cloned().unwrap_or_default();
     let session_id = command
         .metadata
@@ -764,6 +761,37 @@ fn hydrate_orchestration_service_payload(
         .get("agent.name")
         .cloned()
         .unwrap_or_else(|| "wasm-guest".into());
+    if command.import_name == ApplicationImport::TaskCreateGoal.as_name() {
+        if command.payload.get("app_id").is_some() && command.payload.get("description").is_some() {
+            return command.payload.clone();
+        }
+        return serde_json::json!({
+            "app_id": app_id,
+            "session_id": session_id,
+            "description": command.payload.get("description")
+                .or_else(|| command.payload.get("goal"))
+                .or_else(|| command.payload.get("task"))
+                .cloned()
+                .unwrap_or(Value::Null),
+            "trace": trace,
+        });
+    }
+    if command.import_name == ApplicationImport::TaskQuery.as_name() {
+        if command.payload.get("app_id").is_some() && command.payload.get("session_id").is_some() {
+            return command.payload.clone();
+        }
+        return serde_json::json!({
+            "app_id": app_id,
+            "session_id": session_id,
+            "trace": trace,
+        });
+    }
+    if command.import_name != ApplicationImport::AgentDelegate.as_name() {
+        return command.payload.clone();
+    }
+    if command.payload.get("trace").is_some() && command.payload.get("scope").is_some() {
+        return command.payload.clone();
+    }
     serde_json::json!({
         "trace": trace,
         "scope": {

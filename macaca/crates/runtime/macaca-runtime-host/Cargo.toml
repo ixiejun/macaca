@@ -20,6 +20,7 @@ macaca-heartbeat = { workspace = true }
 macaca-skill = { workspace = true }
 macaca-app = { workspace = true }
 macaca-tools = { workspace = true }
+macaca-task = { workspace = true }
 macaca-framework = { path = "../macaca-framework", features = ["macaca-compat"] }
 
 serde = { workspace = true }

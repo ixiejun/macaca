@@ -42,6 +42,30 @@ export type CurrentExecutionState = {
   pending_approval_refs?: string[];
 };
 
+export type TaskBoardItem = {
+  id?: string | { value?: string } | { 0?: string };
+  title?: string;
+  description?: string;
+  assigned_agent?: string;
+  status?: string;
+  priority?: number;
+  sequence_number?: number;
+  updated_at?: string;
+};
+
+export type AgentStatusItem = {
+  id?: string;
+  name?: string;
+  state?: string;
+  activity?: {
+    type?: string;
+    context?: string | null;
+    detail?: string | null;
+  };
+  current_task?: string | null;
+  is_active?: boolean;
+};
+
 export type WorkbenchState = {
   running: boolean;
   commandId: string | null;
@@ -56,6 +80,8 @@ export type WorkbenchState = {
   route: ModelRoute | null;
   tokenSummary: string;
   debugToolLoop: boolean;
+  taskBoard: TaskBoardItem[];
+  agents: AgentStatusItem[];
 };
 
 export type PresentedTimelineEvent = {

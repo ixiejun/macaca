@@ -141,6 +141,7 @@ pub(crate) mod skill_service_provider_semantic_review;
 pub(crate) mod skill_service_provider_state;
 pub mod store_entitlement_admission;
 pub mod store_service_provider;
+pub mod task_service_provider;
 pub mod tool_family_providers;
 pub mod tool_service_availability;
 pub mod tool_service_environment;
@@ -469,6 +470,11 @@ pub use service_runtime_event::{
 };
 pub use skill_service_provider::SkillSystemServiceProvider;
 pub use store_service_provider::{store_service_descriptor, StoreSystemServiceProvider};
+pub use task_service_provider::{
+    bootstrap_local_task_service, TaskSystemServiceProvider, TASK_CLAIM_COMMAND,
+    TASK_CREATE_GOAL_COMMAND, TASK_QUERY_COMMAND, TASK_RESUME_COORDINATOR_COMMAND,
+    TASK_REVIEW_COMMAND, TASK_SNAPSHOT_COMMAND, TASK_START_COMMAND, TASK_SUBMIT_REVIEW_COMMAND,
+};
 pub use tool_family_providers::{
     industrial_tool_family_provider_contributor, industrial_tool_family_provider_inventory,
     industrial_tool_family_toolsets, industrial_tool_planning_service,

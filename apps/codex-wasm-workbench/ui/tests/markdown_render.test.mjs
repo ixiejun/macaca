@@ -125,6 +125,8 @@ test("markdown renderer wraps GFM tables in a readable scroll region", () => {
   assert.match(markdownSource, /\.join\('\\n'\)/);
   assert.match(styleSource, /\.markdown-table-scroll[\s\S]*overflow-x: auto/);
   assert.match(styleSource, /\.markdown-raw-table[\s\S]*overflow: auto/);
+  assert.match(styleSource, /\.markdown-raw-table[\s\S]*white-space: pre;/);
+  assert.match(styleSource, /\.markdown-raw-table[\s\S]*word-break: normal/);
   assert.match(styleSource, /\.markdown-raw-table-item[\s\S]*list-style: none/);
   assert.match(styleSource, /\.markdown-raw-table[\s\S]*font-family: ui-monospace/);
   assert.match(styleSource, /\.markdown-body table[\s\S]*min-width: 720px/);
