@@ -34,7 +34,12 @@ use super::telemetry::{
 
 const TASK_SERVICE_ID: &str = "service.task";
 const TASK_CREATE_GOAL_OPERATION: &str = "task.create_goal";
+const TASK_CREATE_ASSIGNMENT_OPERATION: &str = "task.create_assignment";
 const TASK_QUERY_OPERATION: &str = "task.query";
+const TASK_CLAIM_OPERATION: &str = "task.claim";
+const TASK_START_OPERATION: &str = "task.start";
+const TASK_SUBMIT_REVIEW_OPERATION: &str = "task.submit_review";
+const TASK_REVIEW_OPERATION: &str = "task.review";
 
 /// Runtime configuration for the host import bridge.
 #[derive(Clone)]
@@ -201,6 +206,18 @@ impl WasmHostImportBridge {
         if guest_command.import_name == ApplicationImport::UiRender.as_name() {
             return self.dispatch_ui_render(guest_command, trace).await;
         }
+        let task_lifecycle =
+            if guest_command.import_name == ApplicationImport::AgentDelegate.as_name() {
+                match self
+                    .open_agent_delegate_task_lifecycle(&guest_command, &trace)
+                    .await
+                {
+                    Ok(task_id) => task_id,
+                    Err(result) => return result,
+                }
+            } else {
+                None
+            };
 
         let Some(service_id) = guest_command.target_service.clone() else {
             return self.denied_result(
@@ -232,6 +249,20 @@ impl WasmHostImportBridge {
             .await
         {
             Ok(reply) => {
+                if let Some(task_id) = task_lifecycle.as_deref() {
+                    if let Err(result) = self
+                        .close_agent_delegate_task_lifecycle(
+                            &guest_command,
+                            &trace,
+                            task_id,
+                            true,
+                            "agent delegate completed",
+                        )
+                        .await
+                    {
+                        return result;
+                    }
+                }
                 let output = bound_json(sanitize_json(reply.output), self.config.max_output_bytes);
                 let mut result = ApplicationHostCommandResult::ok(output, Some(trace));
                 result
@@ -278,7 +309,199 @@ impl WasmHostImportBridge {
                 );
                 result
             }
-            Err(error) => self.error_result(&guest_command, error),
+            Err(error) => {
+                if let Some(task_id) = task_lifecycle.as_deref() {
+                    let _ = self
+                        .close_agent_delegate_task_lifecycle(
+                            &guest_command,
+                            &trace,
+                            task_id,
+                            false,
+                            "agent delegate failed before completion",
+                        )
+                        .await;
+                }
+                self.error_result(&guest_command, error)
+            }
+        }
+    }
+
+    /// Create and start a Task Service record for an `agent_delegate` import.
+    ///
+    /// `agent_delegate` is a generic Application ABI operation: a guest asks the
+    /// host to run one app-scoped agent.  The OS must therefore own the durable
+    /// task-board lifecycle for that delegation instead of leaving application
+    /// UIs to synthesize state from trace events.  This Adapter writes only
+    /// provider-neutral task metadata and avoids any application-name or
+    /// workflow-specific branching.
+    async fn open_agent_delegate_task_lifecycle(
+        &self,
+        command: &WasmHostImportCommand,
+        trace: &TraceContext,
+    ) -> Result<Option<String>, ApplicationHostCommandResult> {
+        let Some(app_id) = command.metadata.get("app.id").cloned() else {
+            return Ok(None);
+        };
+        let Some(session_id) = command
+            .metadata
+            .get("session.id")
+            .cloned()
+            .or_else(|| trace.session_id.clone())
+        else {
+            return Ok(None);
+        };
+        let target_agent = command
+            .payload
+            .get("target_agent")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .unwrap_or("agent");
+        let created_by = command
+            .metadata
+            .get("agent.name")
+            .map(String::as_str)
+            .unwrap_or("wasm-guest");
+        let priority = command
+            .metadata
+            .get("priority")
+            .and_then(|value| value.parse::<u8>().ok())
+            .unwrap_or(5);
+        let prompt = command
+            .payload
+            .get("prompt")
+            .and_then(Value::as_str)
+            .unwrap_or("Application requested delegated agent execution.");
+        let task_id = self
+            .route_task_lifecycle_command(
+                command,
+                TASK_CREATE_ASSIGNMENT_OPERATION,
+                serde_json::json!({
+                    "app_id": app_id,
+                    "session_id": session_id,
+                    "agent_name": target_agent,
+                    "created_by": created_by,
+                    "title": format!("Delegate task to {target_agent}"),
+                    "description": prompt,
+                    "acceptance_criteria": [
+                        "The delegated agent reports a traceable completion result.",
+                        "The Task Service records the lifecycle transition for audit and replay."
+                    ],
+                    "priority": priority,
+                    "depends_on": [],
+                    "parent_task": null,
+                    "trace": trace,
+                }),
+                trace,
+            )
+            .await?
+            .and_then(extract_task_id_from_assignment);
+        let Some(task_id) = task_id else {
+            return Ok(None);
+        };
+        self.route_task_lifecycle_command(
+            command,
+            TASK_CLAIM_OPERATION,
+            task_lifecycle_payload(&app_id, &session_id, target_agent, &task_id, trace),
+            trace,
+        )
+        .await?;
+        self.route_task_lifecycle_command(
+            command,
+            TASK_START_OPERATION,
+            task_lifecycle_payload(&app_id, &session_id, target_agent, &task_id, trace),
+            trace,
+        )
+        .await?;
+        Ok(Some(task_id))
+    }
+
+    /// Submit and review the Task Service record for a completed delegation.
+    async fn close_agent_delegate_task_lifecycle(
+        &self,
+        command: &WasmHostImportCommand,
+        trace: &TraceContext,
+        task_id: &str,
+        passed: bool,
+        summary: &str,
+    ) -> Result<(), ApplicationHostCommandResult> {
+        let Some(app_id) = command.metadata.get("app.id").cloned() else {
+            return Ok(());
+        };
+        let Some(session_id) = command
+            .metadata
+            .get("session.id")
+            .cloned()
+            .or_else(|| trace.session_id.clone())
+        else {
+            return Ok(());
+        };
+        let target_agent = command
+            .payload
+            .get("target_agent")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .unwrap_or("agent");
+        let mut submit_payload =
+            task_lifecycle_payload(&app_id, &session_id, target_agent, task_id, trace);
+        submit_payload["summary"] = Value::String(summary.to_string());
+        self.route_task_lifecycle_command(
+            command,
+            TASK_SUBMIT_REVIEW_OPERATION,
+            submit_payload,
+            trace,
+        )
+        .await?;
+        let review_payload = serde_json::json!({
+            "app_id": app_id,
+            "session_id": session_id,
+            "agent_name": target_agent,
+            "task_id": task_id,
+            "result": {
+                "passed": passed,
+                "feedback": summary,
+                "verified_criteria": [
+                    ["The delegated agent reports a traceable completion result.", passed],
+                    ["The Task Service records the lifecycle transition for audit and replay.", true]
+                ]
+            },
+            "trace": trace,
+        });
+        self.route_task_lifecycle_command(command, TASK_REVIEW_OPERATION, review_payload, trace)
+            .await?;
+        Ok(())
+    }
+
+    /// Route one internal Task Service lifecycle command.
+    ///
+    /// Internal lifecycle calls reuse the same ServiceRuntime decorators as
+    /// guest calls, so policy, audit, trace, and structured unavailable behavior
+    /// stay centralized.  The source command is passed only for policy scope and
+    /// error shaping; no application-specific behavior is inspected here.
+    async fn route_task_lifecycle_command(
+        &self,
+        source: &WasmHostImportCommand,
+        operation: &str,
+        payload: Value,
+        trace: &TraceContext,
+    ) -> Result<Option<Value>, ApplicationHostCommandResult> {
+        match self
+            .router
+            .route(ServiceRouteRequest {
+                app_id: source.metadata.get("app.id").cloned(),
+                tenant_id: source.metadata.get("tenant.id").cloned(),
+                session_id: source.metadata.get("session.id").cloned(),
+                service_id: KernelServiceId::new(TASK_SERVICE_ID),
+                operation: ServiceCommandName::new(operation),
+                payload,
+                metadata: source.metadata.clone(),
+                trace: trace.clone(),
+            })
+            .await
+        {
+            Ok(reply) => Ok(Some(reply.output)),
+            Err(error) => Err(self.error_result(source, error)),
         }
     }
 
@@ -805,6 +1028,40 @@ fn hydrate_orchestration_service_payload(
         "context": command.payload.get("context").cloned().unwrap_or_else(|| serde_json::json!({})),
         "metadata": command.metadata
     })
+}
+
+fn task_lifecycle_payload(
+    app_id: &str,
+    session_id: &str,
+    agent_name: &str,
+    task_id: &str,
+    trace: &TraceContext,
+) -> Value {
+    serde_json::json!({
+        "app_id": app_id,
+        "session_id": session_id,
+        "agent_name": agent_name,
+        "task_id": task_id,
+        "trace": trace,
+    })
+}
+
+fn extract_task_id_from_assignment(output: Value) -> Option<String> {
+    output
+        .get("task")
+        .and_then(|task| task.get("id"))
+        .and_then(extract_task_id_value)
+}
+
+fn extract_task_id_value(value: &Value) -> Option<String> {
+    if let Some(text) = value.as_str() {
+        return Some(text.to_string());
+    }
+    value
+        .as_object()
+        .and_then(|object| object.get("value").or_else(|| object.get("0")))
+        .and_then(Value::as_str)
+        .map(str::to_string)
 }
 
 fn sanitize_json(value: Value) -> Value {

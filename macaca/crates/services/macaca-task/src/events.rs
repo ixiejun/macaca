@@ -52,6 +52,7 @@ impl TaskServiceEvent {
 pub enum TaskServiceEventType {
     GoalReady,
     GoalDecomposed,
+    TaskCreated,
     TaskClaimed,
     TaskStarted,
     ReviewNeeded,

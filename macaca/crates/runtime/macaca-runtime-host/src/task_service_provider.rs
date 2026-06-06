@@ -17,7 +17,7 @@ use macaca_proto::{
     ServiceDescriptor, ServiceError, ServiceHealth, ServiceResult, TraceContext,
 };
 use macaca_task::{
-    ClaimTaskCommand, CreateGoalCommand, InMemoryTaskServiceEventSink,
+    ClaimTaskCommand, CreateGoalCommand, CreateTaskAssignmentCommand, InMemoryTaskServiceEventSink,
     NoopTaskServiceExecutionStrategy, QueryTaskBoardCommand, ResumeCoordinatorCommand,
     ReviewTaskCommand, StartTaskCommand, SubmitReviewCommand, TaskServiceRuntime,
     TaskServiceSnapshotCommand, TodoStore,
@@ -37,6 +37,7 @@ use crate::{
 /// Keeping these constants in the provider avoids stringly-typed branches being
 /// duplicated across WASM, Web bridge, and future CLI adapters.
 pub const TASK_CREATE_GOAL_COMMAND: &str = "task.create_goal";
+pub const TASK_CREATE_ASSIGNMENT_COMMAND: &str = "task.create_assignment";
 pub const TASK_QUERY_COMMAND: &str = "task.query";
 pub const TASK_CLAIM_COMMAND: &str = "task.claim";
 pub const TASK_START_COMMAND: &str = "task.start";
@@ -116,6 +117,15 @@ impl SystemService for TaskSystemServiceProvider {
                 let typed: CreateGoalCommand = Self::decode(command)?;
                 let goal = self.runtime.create_goal(typed).await.map_err(task_error)?;
                 Self::result(goal, trace)
+            }
+            TASK_CREATE_ASSIGNMENT_COMMAND => {
+                let typed: CreateTaskAssignmentCommand = Self::decode(command)?;
+                let task = self
+                    .runtime
+                    .create_task_assignment(typed)
+                    .await
+                    .map_err(task_error)?;
+                Self::result(serde_json::json!({ "task": task }), trace)
             }
             TASK_QUERY_COMMAND => {
                 let typed: QueryTaskBoardCommand = Self::decode(command)?;
@@ -228,6 +238,10 @@ fn task_service_descriptor() -> ServiceDescriptor {
     descriptor.metadata.insert(
         "command.task.create_goal".into(),
         TASK_CREATE_GOAL_COMMAND.into(),
+    );
+    descriptor.metadata.insert(
+        "command.task.create_assignment".into(),
+        TASK_CREATE_ASSIGNMENT_COMMAND.into(),
     );
     descriptor
         .metadata

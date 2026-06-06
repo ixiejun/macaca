@@ -15,8 +15,9 @@ use tracing::{info, warn};
 use macaca_proto::{ApplicationId, TodoGoal, TodoItem, TraceContext};
 
 use crate::commands::{
-    ClaimTaskCommand, CreateGoalCommand, QueryTaskBoardCommand, ResumeCoordinatorCommand,
-    ReviewTaskCommand, StartTaskCommand, SubmitReviewCommand, TaskServiceSnapshotCommand,
+    ClaimTaskCommand, CreateGoalCommand, CreateTaskAssignmentCommand, QueryTaskBoardCommand,
+    ResumeCoordinatorCommand, ReviewTaskCommand, StartTaskCommand, SubmitReviewCommand,
+    TaskServiceSnapshotCommand,
 };
 use crate::events::{
     TaskServiceEvent, TaskServiceEventType, TaskServiceGoalSnapshot, TaskServiceSnapshot,
@@ -173,6 +174,62 @@ where
         Ok(todos)
     }
 
+    /// Create one explicit task assignment in a session-scoped task board.
+    ///
+    /// This path is for orchestrators that already have a concrete handoff to a
+    /// specific agent, such as an Application ABI `agent_delegate` import.  The
+    /// Task Service still owns persistence, sequence allocation, dependency
+    /// handling, snapshot refresh, and audit events; the caller only supplies the
+    /// provider-neutral task metadata.
+    pub async fn create_task_assignment(
+        &self,
+        command: CreateTaskAssignmentCommand,
+    ) -> Result<TodoItem, String> {
+        let agent_name = command.agent_name.trim().to_string();
+        if agent_name.is_empty() {
+            return Err("task service assignment agent cannot be blank".into());
+        }
+        let title = command.title.trim().to_string();
+        if title.is_empty() {
+            return Err("task service assignment title cannot be blank".into());
+        }
+        let space = TaskSpace::for_session(
+            command.app_id.clone(),
+            Some(command.session_id.clone()),
+            Arc::clone(&self.store),
+        );
+        let task = space
+            .create_task_assignment(
+                &agent_name,
+                command.created_by.trim(),
+                title,
+                command.description,
+                command.acceptance_criteria,
+                command.priority,
+                command.depends_on,
+                command.parent_task,
+            )
+            .await;
+        self.emit(TaskServiceEvent::new(
+            command.app_id.clone(),
+            Some(command.session_id.clone()),
+            Some(task.id),
+            task.parent_task,
+            TaskServiceEventType::TaskCreated,
+            command.trace.clone(),
+            serde_json::json!({
+                "task_id": task.id.to_string(),
+                "agent": task.assigned_agent,
+                "status": format!("{:?}", task.status),
+                "sequence_number": task.sequence_number,
+            }),
+        ))
+        .await;
+        self.refresh_snapshot(&command.app_id, Some(&command.session_id))
+            .await;
+        Ok(task)
+    }
+
     /// Claim one task in the session scope.
     pub async fn claim_task(&self, command: ClaimTaskCommand) -> Result<Option<TodoItem>, String> {
         let board = TaskBoard::for_agent(
@@ -181,7 +238,7 @@ where
             Some(command.session_id.clone()),
             Arc::clone(&self.store),
         );
-        let task = board.claim_next_task().await;
+        let task = board.claim_task(&command.task_id).await;
         if let Some(task) = &task {
             self.emit(TaskServiceEvent::new(
                 command.app_id.clone(),
@@ -197,6 +254,14 @@ where
                 }),
             ))
             .await;
+        } else {
+            warn!(
+                app_id = %command.app_id.0,
+                session_id = %command.session_id,
+                agent = %command.agent_name,
+                task_id = %command.task_id,
+                "task service could not claim requested task"
+            );
         }
         self.refresh_snapshot(&command.app_id, Some(&command.session_id))
             .await;
@@ -479,5 +544,85 @@ mod tests {
         assert_eq!(snapshot.goals.len(), 1);
         assert_eq!(snapshot.goals[0].goal_id, goal.id);
         assert!(!sink.snapshot().is_empty());
+    }
+
+    #[tokio::test]
+    async fn explicit_assignment_lifecycle_claims_the_requested_task() {
+        let store = setup().await;
+        let sink = Arc::new(InMemoryTaskServiceEventSink::new());
+        let runtime = TaskServiceRuntime::new(
+            Arc::clone(&store),
+            Arc::new(NoopTaskServiceExecutionStrategy),
+            Arc::clone(&sink) as Arc<dyn TaskServiceEventSink>,
+        );
+        let app_id = ApplicationId::new();
+        let session_id = "session-explicit-assignment";
+        let first = runtime
+            .create_task_assignment(CreateTaskAssignmentCommand {
+                app_id: app_id.clone(),
+                session_id: session_id.into(),
+                agent_name: "builder".into(),
+                created_by: "planner".into(),
+                title: "First independent task".into(),
+                description: "This task intentionally stays pending.".into(),
+                acceptance_criteria: vec!["The task remains pending.".into()],
+                priority: 5,
+                depends_on: vec![],
+                parent_task: None,
+                trace: Some(TraceContext::new("trace-explicit-first")),
+            })
+            .await
+            .unwrap();
+        let second = runtime
+            .create_task_assignment(CreateTaskAssignmentCommand {
+                app_id: app_id.clone(),
+                session_id: session_id.into(),
+                agent_name: "builder".into(),
+                created_by: "planner".into(),
+                title: "Second explicit task".into(),
+                description: "This task should be claimed by id.".into(),
+                acceptance_criteria: vec!["The requested task id is claimed.".into()],
+                priority: 5,
+                depends_on: vec![],
+                parent_task: None,
+                trace: Some(TraceContext::new("trace-explicit-second")),
+            })
+            .await
+            .unwrap();
+
+        let claimed = runtime
+            .claim_task(ClaimTaskCommand {
+                app_id: app_id.clone(),
+                session_id: session_id.into(),
+                agent_name: "builder".into(),
+                task_id: second.id,
+                trace: Some(TraceContext::new("trace-explicit-claim")),
+            })
+            .await
+            .unwrap()
+            .expect("the explicitly requested task should be claimable");
+
+        assert_eq!(claimed.id, second.id);
+        let snapshot = runtime
+            .snapshot(TaskServiceSnapshotCommand {
+                app_id,
+                session_id: Some(session_id.into()),
+                trace: Some(TraceContext::new("trace-explicit-snapshot")),
+            })
+            .await
+            .unwrap();
+        let first_snapshot = snapshot
+            .tasks
+            .iter()
+            .find(|task| task.task_id == first.id)
+            .expect("first task should remain present");
+        let second_snapshot = snapshot
+            .tasks
+            .iter()
+            .find(|task| task.task_id == second.id)
+            .expect("second task should remain present");
+
+        assert_eq!(first_snapshot.status, macaca_proto::TodoStatus::Pending);
+        assert_eq!(second_snapshot.status, macaca_proto::TodoStatus::Assigned);
     }
 }

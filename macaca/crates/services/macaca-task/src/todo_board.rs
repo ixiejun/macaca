@@ -208,6 +208,49 @@ impl TaskBoard {
         None
     }
 
+    /// Claim a specific pending task on this agent board.
+    ///
+    /// Host-side service bridges already receive a durable task id from the
+    /// Task Service when they create explicit assignments.  Re-claiming "the
+    /// next" task after that point is unsafe because another session or another
+    /// task for the same agent can become earlier in sequence order.  This
+    /// method applies the same dependency and lifecycle policy as
+    /// [`claim_next_task`], but anchors the transition to the caller-provided
+    /// task id so orchestration remains traceable and session-isolated.
+    pub async fn claim_task(&self, task_id: &TaskId) -> Option<TodoItem> {
+        let task = self
+            .store
+            .get_todo(&self.app_id, &self.session_id, &self.agent_name, task_id)
+            .await?;
+        if task.status != TodoStatus::Pending {
+            tracing::debug!(
+                agent = %self.agent_name,
+                task_id = %task.id,
+                status = ?task.status,
+                "Task claim ignored because the requested task is not pending"
+            );
+            return None;
+        }
+        let goals = self.store.list_goals(&self.app_id).await;
+        if !self.dependency_resolver.can_claim_task(&task, &goals) {
+            tracing::debug!(
+                agent = %self.agent_name,
+                task_id = %task.id,
+                parent_task = ?task.parent_task,
+                "Task claim ignored because dependencies or parent goal are not ready"
+            );
+            return None;
+        }
+        let Some(next_status) = self.lifecycle_policy.on_claim(&task) else {
+            return None;
+        };
+        let mut claimed = task;
+        claimed.status = next_status;
+        claimed.updated_at = Utc::now();
+        self.store.save_todo(&claimed).await;
+        Some(claimed)
+    }
+
     /// Mark a task as in-progress. Called by the agent after claiming.
     #[deprecated(note = "Use TaskBoard::mark_task_in_progress instead")]
     pub async fn start_task(&self, task_id: &TaskId) -> bool {

@@ -58,6 +58,30 @@ impl QueryTaskBoardCommand {
     }
 }
 
+/// Command to create one explicit task assignment.
+///
+/// This command is used when an upstream orchestrator already selected the
+/// provider-neutral agent handoff sequence and needs the Task Service to own the
+/// durable board record.  It deliberately carries generic task fields only; the
+/// service does not inspect workflow names, application names, or business
+/// payloads.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CreateTaskAssignmentCommand {
+    pub app_id: ApplicationId,
+    pub session_id: String,
+    pub agent_name: String,
+    pub created_by: String,
+    pub title: String,
+    pub description: String,
+    #[serde(default)]
+    pub acceptance_criteria: Vec<String>,
+    pub priority: u8,
+    #[serde(default)]
+    pub depends_on: Vec<TaskId>,
+    pub parent_task: Option<TaskId>,
+    pub trace: Option<TraceContext>,
+}
+
 /// Command to request task claim orchestration.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClaimTaskCommand {

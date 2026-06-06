@@ -1,23 +1,26 @@
 use std::sync::Arc;
 
 use macaca_kernel::MockSystemService;
+use macaca_persist::RedbStore;
 use macaca_proto::{
-    ApplicationHostCommand, ApplicationHostCommandStatus, ApplicationImport, KernelServiceId,
-    ServiceCommandName, ServiceDescriptor, ServiceHealth, ServiceLifecycleState, ServiceType,
-    TraceContext, TraceSchemaRef, UiComponent, UiComponentKind, UiComponentTree, UiIntent,
-    UiRenderSurface, WasmExecutionProfile, WasmRuntimeArtifactRef, WasmRuntimeSessionRequest,
-    APPLICATION_AGENT_DELEGATE_COMMAND, APPLICATION_SERVICE_ID, MCP_SERVICE_ID,
-    MCP_TOOL_INVOKE_COMMAND,
+    ApplicationHostCommand, ApplicationHostCommandStatus, ApplicationId, ApplicationImport,
+    KernelServiceId, ServiceCommandName, ServiceDescriptor, ServiceHealth, ServiceLifecycleState,
+    ServiceType, TodoStatus, TraceContext, TraceSchemaRef, UiComponent, UiComponentKind,
+    UiComponentTree, UiIntent, UiRenderSurface, WasmExecutionProfile, WasmRuntimeArtifactRef,
+    WasmRuntimeSessionRequest, APPLICATION_AGENT_DELEGATE_COMMAND, APPLICATION_SERVICE_ID,
+    MCP_SERVICE_ID, MCP_TOOL_INVOKE_COMMAND,
 };
+use macaca_task::TodoStore;
 use serde_json::json;
+use tempfile::tempdir;
 
 use super::{
     DefaultInProcessWasmRuntimeProvider, WasmApplicationRuntimeProvider, WasmHostImportBridge,
     WasmHostImportBridgeConfig,
 };
 use crate::{
-    ApplicationGenUiSurfaceStore, ServiceProviderInstance, ServiceRuntime, ServiceRuntimeConfig,
-    StaticServiceProviderFactory,
+    task_service_provider::TaskSystemServiceProvider, ApplicationGenUiSurfaceStore,
+    ServiceProviderInstance, ServiceRuntime, ServiceRuntimeConfig, StaticServiceProviderFactory,
 };
 
 #[tokio::test]
@@ -138,9 +141,14 @@ async fn wasm_host_import_task_create_goal_routes_to_task_service_boundary() {
 #[tokio::test]
 async fn wasm_host_import_agent_delegate_routes_to_application_service_boundary() {
     let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
+    let task_store = Arc::new(TodoStore::new(test_store(
+        "wasm-agent-delegate-task-service",
+    )));
+    register_task_service(&runtime, Arc::clone(&task_store)).await;
     let application_service_id = register_mock_service(&runtime, APPLICATION_SERVICE_ID).await;
     let bridge =
         WasmHostImportBridge::new(Arc::clone(&runtime), WasmHostImportBridgeConfig::default());
+    let app_id = ApplicationId::new();
     let mut command = ApplicationHostCommand::with_trace(
         ApplicationImport::AgentDelegate,
         json!({
@@ -150,7 +158,7 @@ async fn wasm_host_import_agent_delegate_routes_to_application_service_boundary(
         }),
         TraceContext::new("trace-wasm-agent-delegate"),
     );
-    command.metadata.insert("app.id".into(), "app-wasm".into());
+    command.metadata.insert("app.id".into(), app_id.to_string());
     command
         .metadata
         .insert("session.id".into(), "session-wasm-agent".into());
@@ -164,7 +172,10 @@ async fn wasm_host_import_agent_delegate_routes_to_application_service_boundary(
 
     assert!(matches!(result.status, ApplicationHostCommandStatus::Ok));
     assert_eq!(result.output["target_agent"], json!("analyst"));
-    assert_eq!(result.output["scope"]["application_id"], json!("app-wasm"));
+    assert_eq!(
+        result.output["scope"]["application_id"],
+        json!(app_id.to_string())
+    );
     assert_eq!(
         result.output["scope"]["session_id"],
         json!("session-wasm-agent")
@@ -181,6 +192,12 @@ async fn wasm_host_import_agent_delegate_routes_to_application_service_boundary(
         result.metadata.get("service.operation").map(String::as_str),
         Some(APPLICATION_AGENT_DELEGATE_COMMAND)
     );
+    let tasks = task_store
+        .list_all_todos_for_session(&app_id, "session-wasm-agent")
+        .await;
+    assert_eq!(tasks.len(), 1);
+    assert_eq!(tasks[0].assigned_agent, "analyst");
+    assert_eq!(tasks[0].status, TodoStatus::Completed);
 }
 
 #[tokio::test]
@@ -563,6 +580,27 @@ async fn register_mock_service(runtime: &ServiceRuntime, service_id: &str) -> Ke
     register_mock_service_with_failure(runtime, service_id, false).await
 }
 
+async fn register_task_service(runtime: &ServiceRuntime, store: Arc<TodoStore>) -> KernelServiceId {
+    let service: Arc<dyn macaca_kernel::SystemService> =
+        Arc::new(TaskSystemServiceProvider::local(store));
+    let descriptor = service.descriptor();
+    let service_id = runtime
+        .register_provider(
+            &StaticServiceProviderFactory::new(ServiceProviderInstance::new(
+                descriptor.clone(),
+                service,
+            )),
+            Default::default(),
+        )
+        .await
+        .unwrap();
+    runtime
+        .start(&service_id, TraceContext::new("trace-task-service-start"))
+        .await
+        .unwrap();
+    service_id
+}
+
 async fn register_mock_service_with_failure(
     runtime: &ServiceRuntime,
     service_id: &str,
@@ -611,6 +649,16 @@ fn traced_request(trace_id: &str) -> WasmRuntimeSessionRequest {
         WasmExecutionProfile::default_wasm_component(),
     )
     .unwrap()
+}
+
+fn test_store(name: &str) -> Arc<dyn macaca_persist::PersistBackend> {
+    let dir = tempdir().expect("tempdir should be available for host import task test");
+    let path = dir.path().join(format!("{name}.redb"));
+    // Keep the temporary directory alive for the test process.  The redb backend
+    // owns an open database handle, and dropping the directory immediately can
+    // remove the file before async assertions finish on some platforms.
+    let _dir = Box::leak(Box::new(dir));
+    Arc::new(RedbStore::open(path).expect("redb store should open for host import task test"))
 }
 
 fn host_import_command(
