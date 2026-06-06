@@ -37,11 +37,14 @@ test("markdown renderer wraps GFM tables in a readable scroll region", () => {
   assert.match(markdownSource, /function formatCompactTableHeading/);
   assert.match(markdownSource, /function isSeparatorCells/);
   assert.match(markdownSource, /function normalizeLooseCompactTableDelimiters/);
+  assert.match(markdownSource, /function expandCompactTableRows/);
+  assert.match(markdownSource, /function flushPendingCompactCells/);
   assert.match(markdownSource, /function mergeOverflowTableCells/);
   assert.match(markdownSource, /cells\.map\(\(\) => '---'\)/);
   assert.match(styleSource, /\.markdown-table-scroll[\s\S]*overflow: auto/);
-  assert.match(styleSource, /\.markdown-body table[\s\S]*min-width: 620px/);
+  assert.match(styleSource, /\.markdown-body table[\s\S]*table-layout: fixed/);
   assert.match(styleSource, /\.markdown-body th[\s\S]*text-transform: uppercase/);
+  assert.match(styleSource, /\.markdown-body td code[\s\S]*white-space: normal/);
   assert.match(styleSource, /\.markdown-body tbody tr:nth-child\(even\) td/);
 });
 

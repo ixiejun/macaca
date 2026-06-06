@@ -470,8 +470,8 @@ pre {
   font-size: 13px;
   line-height: 1.55;
   margin-top: 0;
-  min-width: 620px;
-  table-layout: auto;
+  min-width: min(760px, 100%);
+  table-layout: fixed;
   white-space: normal;
   width: 100%;
 }
@@ -485,6 +485,14 @@ pre {
   padding: 11px 12px;
   text-align: left;
   vertical-align: top;
+  white-space: normal;
+  word-break: normal;
+}
+
+.markdown-body td code,
+.markdown-body th code {
+  display: inline;
+  line-height: 1.45;
   white-space: normal;
   word-break: break-word;
 }

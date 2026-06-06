@@ -106,7 +106,7 @@ function splitCompactHeadingsAndRules(line: string): string[] {
 function expandCompactPipeTable(line: string): string[] {
   const text = String(line || '').trim();
   const compactText = normalizeLooseCompactTableDelimiters(text);
-  if (!compactText.includes('||') || !/\|\s*:?-{3,}:?\s*\|/.test(compactText)) return [line];
+  if (!compactText.includes('|') || !/\|\s*:?-{3,}:?\s*\|/.test(compactText)) return [line];
   const rows = compactText
     .split(/\s*\|\|\s*/g)
     .map((row) => row.trim())
@@ -131,7 +131,7 @@ function expandCompactPipeTable(line: string): string[] {
     normalizedRows.push(formatTableRow(rows[0], expectedCellCount));
   }
 
-  normalizedRows.push(...rows.slice(1).map((row) => formatTableRow(row, expectedCellCount)));
+  normalizedRows.push(...expandCompactTableRows(rows.slice(1), expectedCellCount));
   return normalizedRows;
 }
 
@@ -169,6 +169,65 @@ function formatCompactTableHeading(heading: string): string {
 
 function normalizeLooseCompactTableDelimiters(markdown: string): string {
   return String(markdown || '').replace(/\|\s+\|(?=\s*(?:\*\*|:?-{3,}:?))/g, '||');
+}
+
+/**
+ * Expands table rows that were compacted into one transport line.
+ *
+ * Model output often reaches the Workbench as a single line such as
+ * `| A | B || | --- | --- | 1 | x | 2 | y |`.  `remark-gfm` can render the
+ * table correctly only after those cells become separate physical Markdown
+ * rows.  This helper uses the separator row to infer the stable column count,
+ * then groups subsequent cells into rows of that width.  It does not inspect
+ * domain terms, file names, tools, or application-specific business content;
+ * it is a generic presentation adapter for malformed-but-recoverable GFM.
+ */
+function expandCompactTableRows(rows: string[], expectedCellCount: number): string[] {
+  if (!expectedCellCount) return rows.map((row) => formatTableRow(row, expectedCellCount));
+
+  const expandedRows: string[] = [];
+  const pendingCells: string[] = [];
+
+  for (const row of rows) {
+    const cells = splitTableCells(row);
+    if (cells.length === 0) continue;
+
+    if (isSeparatorCells(cells)) {
+      flushPendingCompactCells(pendingCells, expectedCellCount, expandedRows);
+      expandedRows.push(formatTableRow(cells.join(' | '), expectedCellCount));
+      continue;
+    }
+
+    pendingCells.push(...cells);
+    flushPendingCompactCells(pendingCells, expectedCellCount, expandedRows);
+  }
+
+  flushPendingCompactCells(pendingCells, expectedCellCount, expandedRows, true);
+  return expandedRows;
+}
+
+/**
+ * Moves accumulated compact table cells into normalized Markdown rows.
+ *
+ * The function mutates `pendingCells` intentionally so callers can stream cells
+ * from several compact fragments without allocating intermediate row objects.
+ * Remainder cells are emitted only at the end; that preserves partial data for
+ * user visibility while preventing incomplete fragments from shifting the
+ * following rows during normal processing.
+ */
+function flushPendingCompactCells(
+  pendingCells: string[],
+  expectedCellCount: number,
+  expandedRows: string[],
+  flushRemainder = false,
+) {
+  while (pendingCells.length >= expectedCellCount) {
+    expandedRows.push(formatTableRow(pendingCells.splice(0, expectedCellCount).join(' | '), expectedCellCount));
+  }
+
+  if (flushRemainder && pendingCells.length > 0) {
+    expandedRows.push(formatTableRow(pendingCells.splice(0).join(' | '), expectedCellCount));
+  }
 }
 
 function mergeOverflowTableCells(cells: string[], expectedCellCount: number): string[] {

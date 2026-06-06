@@ -76,6 +76,7 @@ test("markdown display wraps generated content instead of forcing horizontal scr
   assert.match(styleSource, /\.markdown-body pre[\s\S]*white-space: pre-wrap/);
   assert.match(styleSource, /\.markdown-body pre[\s\S]*overflow-wrap: anywhere/);
   assert.match(styleSource, /\.markdown-table-scroll[\s\S]*overflow: auto/);
-  assert.match(styleSource, /\.markdown-body table[\s\S]*table-layout: auto/);
-  assert.match(styleSource, /\.markdown-body th,[\s\S]*word-break: break-word/);
+  assert.match(styleSource, /\.markdown-body table[\s\S]*table-layout: fixed/);
+  assert.match(styleSource, /\.markdown-body th,[\s\S]*word-break: normal/);
+  assert.match(styleSource, /\.markdown-body td code,[\s\S]*word-break: break-word/);
 });
