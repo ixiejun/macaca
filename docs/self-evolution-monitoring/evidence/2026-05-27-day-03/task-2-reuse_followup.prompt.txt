@@ -1,0 +1,2 @@
+Daily self-evolution monitor day-03, task family reuse_followup.
+Create shared/self_evolution_2026-05-27_day-03_reuse_followup.md. Prefer visible workspace Skills if relevant. Verify whether previously materialized Skills are visible, useful, and associated with activation/use/success telemetry. Record exact skill names, stable refs, and telemetry deltas. Keep the artifact application-neutral.

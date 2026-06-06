@@ -1,0 +1,2 @@
+Daily self-evolution monitor day-03, task family audit_summary.
+Create shared/self_evolution_2026-05-27_day-03_audit_summary.md. Summarize today's self-evolution evidence using only stable refs and aggregate counts: task completion, proposal creation, materialization, later reuse, optimization, duplicate merge readiness, archive readiness, rollback refs, and API audit status. Keep the summary application-neutral.

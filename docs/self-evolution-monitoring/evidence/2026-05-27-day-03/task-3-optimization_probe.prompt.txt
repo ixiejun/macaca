@@ -1,0 +1,2 @@
+Daily self-evolution monitor day-03, task family optimization_probe.
+Create shared/self_evolution_2026-05-27_day-03_optimization_probe.md. Review existing self-evolution Skills using telemetry-oriented criteria. If evidence supports an improvement, propose the generic optimization. If not, write a governed no-change decision with the missing metrics. Include rollback fields and audit refs. Keep all content application-neutral.

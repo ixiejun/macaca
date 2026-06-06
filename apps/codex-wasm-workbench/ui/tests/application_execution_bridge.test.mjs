@@ -69,27 +69,61 @@ test("Workbench timeline deduplicates replayed and websocket execution events", 
 test("timeline presenter renders user-readable execution events and markdown", () => {
   assert.match(presenterSource, /export function presentTimelineEvent/);
   assert.match(presenterSource, /function presentExecutionEvent/);
+  assert.match(presenterSource, /function eventBody/);
+  assert.match(presenterSource, /function renderEmbeddedJsonBody/);
+  assert.match(presenterSource, /function extractEmbeddedJsonObject/);
+  assert.match(presenterSource, /function extractJsonStringProperty/);
+  assert.match(presenterSource, /function decodeJsonStringFragment/);
+  assert.match(presenterSource, /JSON\.parse/);
+  assert.match(presenterSource, /function markdownCodeFence/);
+  assert.match(presenterSource, /function inferCodeLanguage/);
   assert.match(presenterSource, /function eventCardTitle/);
   assert.match(presenterSource, /Writing file:/);
   assert.match(presenterSource, /function eventSummary/);
   assert.match(presenterSource, /function eventTone/);
-  assert.match(presenterSource, /function isMarkdownDisplay/);
+  assert.match(presenterSource, /function eventBodyFormat/);
+  assert.match(presenterSource, /function suppressDuplicateBody/);
   assert.match(presenterSource, /data\.display_format === 'markdown'/);
+  assert.match(presenterSource, /event\.event_type === 'LlmCompleted'/);
   assert.match(presenterSource, /data\.display_body/);
   assert.match(timelineSource, /event-summary/);
+  assert.match(timelineSource, /function TimelineOverview/);
+  assert.match(timelineSource, /function timelineCounts/);
+  assert.match(timelineSource, /event-section-header/);
+  assert.match(timelineSource, /function timelineSection/);
   assert.match(timelineSource, /Trace details/);
   assert.match(markdownSource, /export function MarkdownView/);
   assert.match(markdownSource, /ReactMarkdown/);
-  assert.match(markdownSource, /remarkPlugins=\{\[remarkGfm\]\}/);
+  assert.match(markdownSource, /remarkPlugins=\{\[remarkGfm, remarkBreaks\]\}/);
   assert.doesNotMatch(markdownSource, /normalizeWorkbenchMarkdown/);
 });
 
-test("markdown display wraps generated content instead of forcing horizontal scrolling", () => {
+test("timeline presenter turns embedded tool JSON content into fenced code", () => {
+  assert.match(presenterSource, /### Tool parameters/);
+  assert.match(presenterSource, /parameterList/);
+  assert.match(presenterSource, /escapeInlineCode\(humanize\(key\)\)/);
+  assert.match(presenterSource, /function escapeInlineCode/);
+  assert.match(presenterSource, /### Content/);
+  assert.match(presenterSource, /Content preview/);
+  assert.match(presenterSource, /truncated by the event summary/);
+  assert.match(presenterSource, /markdownCodeFence\(language, content\)/);
+  assert.match(presenterSource, /case 'py': return 'python'/);
+  assert.match(presenterSource, /case 'html': return 'html'/);
+  assert.match(presenterSource, /return 'markdown'/);
+  assert.match(presenterSource, /return 'python'/);
+  assert.match(presenterSource, /return renderEmbeddedJsonBody\(rawBody, filePath\) \|\| rawBody/);
+  assert.doesNotMatch(presenterSource, /weather-app/);
+  assert.doesNotMatch(presenterSource, /中国直辖市/);
+});
+
+test("markdown display wraps prose while keeping dense tables inspectable", () => {
   assert.match(styleSource, /\.markdown-body pre[\s\S]*white-space: pre-wrap/);
   assert.match(styleSource, /\.markdown-body pre[\s\S]*overflow-wrap: anywhere/);
   assert.match(styleSource, /\.markdown-table-scroll[\s\S]*overflow-x: auto/);
+  assert.match(styleSource, /\.markdown-raw-table[\s\S]*overflow: auto/);
   assert.match(styleSource, /\.markdown-body table[\s\S]*table-layout: auto/);
-  assert.match(styleSource, /\.markdown-body th,[\s\S]*min-width: 180px/);
-  assert.match(styleSource, /\.markdown-body th,[\s\S]*word-break: keep-all/);
-  assert.match(styleSource, /\.markdown-body td code,[\s\S]*white-space: nowrap/);
+  assert.match(styleSource, /\.markdown-body table[\s\S]*width: 100%/);
+  assert.match(styleSource, /\.markdown-body th:first-child,[\s\S]*white-space: nowrap/);
+  assert.match(styleSource, /\.markdown-body th:nth-child\(2\),[\s\S]*min-width: 260px/);
+  assert.match(styleSource, /\.markdown-body td code,[\s\S]*overflow-wrap: anywhere/);
 });

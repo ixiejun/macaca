@@ -1,0 +1,2 @@
+Daily self-evolution monitor day-03, task family archive_readiness_probe.
+Create shared/self_evolution_2026-05-27_day-03_archive_readiness_probe.md. Evaluate inactive Skill archive readiness. Separate real stale-threshold evidence from forced diagnostic stale-threshold evidence. Record candidate Skills, last-use evidence, protection blockers, rollback requirements, and whether archive is production-ready or diagnostic-only.

@@ -358,7 +358,7 @@ export function WorkbenchApp() {
   return (
     <main className="workspace-shell">
       <section className="topbar" aria-label="Workbench status">
-        <div><p className="eyebrow">Macaca WASM Application</p><h1>Codex Workbench</h1><p className="subtitle">Application-owned coding surface backed by Macaca OS services.</p></div>
+        <div className="topbar-brand"><p className="eyebrow">Macaca WASM Application</p><h1>Codex Workbench</h1><p className="subtitle">Application-owned coding surface backed by Macaca OS services.</p></div>
         <div className="run-status" aria-live="polite"><span>{state.running ? 'Running' : 'Ready'}</span><span>{state.sessionId ? `Session ${state.sessionId.slice(0, 8)}` : 'No session'}</span></div>
       </section>
       <section className="composer-panel" aria-label="Coding task composer">
@@ -373,23 +373,25 @@ export function WorkbenchApp() {
             <label>Model<select id="modelSelect" value={selectedModel} onChange={(event) => { setSelectedModel(event.target.value); void resolveSelectedRoute(selectedProvider, event.target.value); }}>{providerModels.map((model) => <option key={model.model} value={model.model}>{model.display_name || model.model}</option>)}</select></label>
             <span id="routeSummary">{routeSummary}</span>
           </div>
-          <button type="button" disabled={state.running} onClick={startTask}>{state.running ? 'Running...' : 'Run task'}</button>
-          <button type="button" disabled={!hasScope || !hasApproval} onClick={() => void sendControl('Approve', 'ui_approved')}>Approve</button>
-          <button type="button" disabled={!hasScope || !hasApproval} onClick={() => void sendControl('Reject', 'ui_rejected')}>Reject</button>
-          <button type="button" disabled={!hasScope || !state.running} onClick={() => void sendControl('Cancel', 'ui_cancelled')}>Cancel</button>
+          <div className="composer-buttons">
+            <button className="primary-action" type="button" disabled={state.running} onClick={startTask}>{state.running ? 'Running...' : 'Run task'}</button>
+            <button className="secondary-action" type="button" disabled={!hasScope || !hasApproval} onClick={() => void sendControl('Approve', 'ui_approved')}>Approve</button>
+            <button className="secondary-action" type="button" disabled={!hasScope || !hasApproval} onClick={() => void sendControl('Reject', 'ui_rejected')}>Reject</button>
+            <button className="danger-action" type="button" disabled={!hasScope || !state.running} onClick={() => void sendControl('Cancel', 'ui_cancelled')}>Cancel</button>
+          </div>
         </div>
       </section>
       <section className="service-strip" aria-label="Declared services">{declaredServices.map((service) => <span className="status-pill" key={service}>{service}</span>)}</section>
       <section className="workspace-grid" aria-label="Coding workbench">
         <section className="editor-panel">
-          <div className="panel-header"><h2>Execution Stream</h2><button type="button" onClick={clearRun}>Clear</button></div>
+          <div className="panel-header"><h2>Execution Stream</h2><button className="secondary-action compact-action" type="button" onClick={clearRun}>Clear</button></div>
           <Timeline events={state.events} />
         </section>
         <aside className="side-panel"><Thread state={state} /><Diagnostics state={state} /></aside>
       </section>
       <section className="result-panel" aria-label="Execution result">
         <div className="panel-header"><h2>Result</h2><span>{state.tokenSummary}</span></div>
-        <div id="resultOutput"><MarkdownView markdown={state.result || 'No assistant result yet.'} /></div>
+        <div id="resultOutput" className={state.result ? 'has-result' : 'is-empty'}><MarkdownView markdown={state.result || 'No assistant result yet.'} /></div>
       </section>
     </main>
   );

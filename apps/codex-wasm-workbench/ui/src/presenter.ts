@@ -69,7 +69,7 @@ function presentExecutionEvent(event: ExecutionEvent): PresentedTimelineEvent {
   const payload = event.sanitized_payload || {};
   const data = payload.data || {};
   const title = eventCardTitle(event, data);
-  const body = String(
+  const rawBody = String(
     data.display_body
       || data.display_markdown
       || data.content
@@ -77,11 +77,13 @@ function presentExecutionEvent(event: ExecutionEvent): PresentedTimelineEvent {
       || payload.summary
       || 'Execution event received.',
   );
+  const summary = eventSummary(event, data, payload.summary);
   const toolName = stringValue(data.tool_name);
   const filePath = stringValue(data.file_path);
+  const body = eventBody(event, data, rawBody, summary);
   return {
     title,
-    summary: eventSummary(event, data, payload.summary),
+    summary,
     body,
     meta: compactMeta({
       stage: data.stage,
@@ -94,10 +96,181 @@ function presentExecutionEvent(event: ExecutionEvent): PresentedTimelineEvent {
       time: event.timestamp ? formatTime(event.timestamp) : '',
     }),
     details: eventDetails(event, data),
-    format: data.display_format === 'json' ? 'json' : isMarkdownDisplay(data) ? 'markdown' : 'text',
+    format: body === rawBody ? eventBodyFormat(event, data) : 'markdown',
     tone: eventTone(event, data),
-    usePre: data.display_format === 'json',
+    usePre: body === rawBody && data.display_format === 'json',
   };
+}
+
+function eventBody(event: ExecutionEvent, data: Record<string, unknown>, rawBody: string, summary?: string): string {
+  const toolName = stringValue(data.tool_name);
+  const filePath = stringValue(data.file_path);
+  if (event.event_type?.includes('Tool') || toolName) {
+    return renderEmbeddedJsonBody(rawBody, filePath) || rawBody;
+  }
+  return suppressDuplicateBody(rawBody, summary);
+}
+
+function renderEmbeddedJsonBody(body: string, fallbackPath = ''): string {
+  const embedded = extractEmbeddedJsonObject(body);
+  const fragment = embedded ? null : extractJsonStringProperty(body, 'content');
+  const parameters = embedded && isRecord(embedded.value) ? embedded.value : {};
+  const content = stringValue(parameters.content) || fragment?.value || '';
+  if (!content) return '';
+  const filePath = stringValue(parameters.filepath) || stringValue(parameters.file_path) || fallbackPath;
+  const language = inferCodeLanguage(filePath, content);
+  const parameterList = Object.entries(parameters)
+    .filter(([key]) => key !== 'content')
+    .map(([key, value]) => `- \`${escapeInlineCode(humanize(key))}\`: ${formatParameterValue(value)}`);
+  if (!parameterList.length && fallbackPath) parameterList.push(`- \`File\`: \`${escapeInlineCode(shortPath(fallbackPath))}\``);
+  const contentTitle = fragment?.truncated ? '### Content preview' : '### Content';
+  const truncationNote = fragment?.truncated ? 'The content was truncated by the event summary, so this code block shows the available prefix.' : '';
+  const parts = [
+    (embedded?.prefix || fragment?.prefix || '').trim(),
+    parameterList.length ? ['### Tool parameters', '', ...parameterList].join('\n') : '',
+    [contentTitle, '', truncationNote, markdownCodeFence(language, content)].filter(Boolean).join('\n\n'),
+  ].filter(Boolean);
+  return parts.join('\n\n');
+}
+
+function extractEmbeddedJsonObject(text: string): { prefix: string; value: unknown } | null {
+  const source = String(text || '');
+  const start = source.indexOf('{');
+  if (start < 0) return null;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = start; index < source.length; index += 1) {
+    const char = source[index];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === '\\') {
+        escaped = true;
+      } else if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+    if (char === '"') {
+      inString = true;
+    } else if (char === '{') {
+      depth += 1;
+    } else if (char === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        try {
+          return { prefix: source.slice(0, start), value: JSON.parse(source.slice(start, index + 1)) };
+        } catch {
+          return null;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function extractJsonStringProperty(text: string, property: string): { prefix: string; value: string; truncated: boolean } | null {
+  const source = String(text || '');
+  const keyPattern = new RegExp(`"${escapeRegExp(property)}"\\s*:\\s*"`);
+  const match = keyPattern.exec(source);
+  if (!match) return null;
+  const valueStart = (match.index || 0) + match[0].length;
+  let escaped = false;
+  for (let index = valueStart; index < source.length; index += 1) {
+    const char = source[index];
+    if (escaped) {
+      escaped = false;
+    } else if (char === '\\') {
+      escaped = true;
+    } else if (char === '"') {
+      const raw = source.slice(valueStart, index);
+      return { prefix: source.slice(0, source.indexOf('{')), value: decodeJsonStringFragment(raw), truncated: false };
+    }
+  }
+  return {
+    prefix: source.slice(0, source.indexOf('{')),
+    value: decodeJsonStringFragment(source.slice(valueStart).replace(/[".]*$/, '')),
+    truncated: true,
+  };
+}
+
+function decodeJsonStringFragment(value: string): string {
+  try {
+    return JSON.parse(`"${value}"`);
+  } catch {
+    return value
+      .replace(/\\n/g, '\n')
+      .replace(/\\r/g, '\r')
+      .replace(/\\t/g, '\t')
+      .replace(/\\"/g, '"')
+      .replace(/\\\\/g, '\\');
+  }
+}
+
+function markdownCodeFence(language: string, code: string): string {
+  const fence = longestBacktickRun(code) >= 3 ? '````' : '```';
+  return `${fence}${language}\n${code.trimEnd()}\n${fence}`;
+}
+
+function inferCodeLanguage(path: string, content: string): string {
+  const extension = path.split('?')[0].split('#')[0].split('.').pop()?.toLowerCase() || '';
+  switch (extension) {
+    case 'py': return 'python';
+    case 'js': return 'javascript';
+    case 'jsx': return 'jsx';
+    case 'ts': return 'typescript';
+    case 'tsx': return 'tsx';
+    case 'html': return 'html';
+    case 'css': return 'css';
+    case 'json': return 'json';
+    case 'md': return 'markdown';
+    case 'rs': return 'rust';
+    case 'go': return 'go';
+    case 'php': return 'php';
+    case 'sh': return 'bash';
+    case 'yml':
+    case 'yaml': return 'yaml';
+    default: return inferLanguageFromContent(content);
+  }
+}
+
+function inferLanguageFromContent(content: string): string {
+  const text = content.trimStart();
+  if (text.startsWith('<!DOCTYPE html') || text.startsWith('<html')) return 'html';
+  if (text.startsWith('{') || text.startsWith('[')) return 'json';
+  if (/^#.*\bdef\s+\w+\(|\bdef\s+\w+\(|\breturn\b|^if\s+.+:/m.test(text)) return 'python';
+  if (/^from\s+\S+\s+import\s+|^import\s+\S+/m.test(text)) return 'python';
+  if (/^#{1,6}\s+\S|^\s*[-*]\s+\*\*|^\|.+\|\s*$/m.test(text)) return 'markdown';
+  return 'text';
+}
+
+function formatParameterValue(value: unknown): string {
+  if (typeof value === 'string') return `\`${escapeInlineCode(value)}\``;
+  if (typeof value === 'number' || typeof value === 'boolean') return `\`${String(value)}\``;
+  if (value === null || value === undefined) return '`null`';
+  return `\`${escapeInlineCode(JSON.stringify(value))}\``;
+}
+
+function escapeInlineCode(value: string): string {
+  return value.replace(/`/g, '\\`').replace(/\n/g, ' ');
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function longestBacktickRun(value: string): number {
+  return Math.max(0, ...(value.match(/`+/g) || []).map((run) => run.length));
+}
+
+function suppressDuplicateBody(body: string, summary?: string): string {
+  if (!summary) return body;
+  return normalizeDisplayText(body) === normalizeDisplayText(summary) ? '' : body;
+}
+
+function normalizeDisplayText(value: string): string {
+  return String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
 }
 
 function eventCardTitle(event: ExecutionEvent, data: Record<string, unknown>): string {
@@ -200,8 +373,12 @@ function asRecord(value: unknown): Record<string, unknown> {
   return isRecord(value) ? value : {};
 }
 
-function isMarkdownDisplay(data: Record<string, unknown>): boolean {
-  return data.display_format === 'markdown' || typeof data.display_markdown === 'string';
+function eventBodyFormat(event: ExecutionEvent, data: Record<string, unknown>): PresentedTimelineEvent['format'] {
+  if (data.display_format === 'json') return 'json';
+  if (data.display_format === 'markdown') return 'markdown';
+  if (typeof data.display_markdown === 'string') return 'markdown';
+  if (event.event_type === 'LlmCompleted') return 'markdown';
+  return 'text';
 }
 
 function stringValue(value: unknown): string {
