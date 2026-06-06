@@ -26,9 +26,9 @@ use macaca_context::{
 use macaca_driver::{DriverInventoryCommand, DriverLoadServiceCommand, DriverServiceScope};
 use macaca_persist::{AppendEventCommand, EventLogQuery, SessionLineageStore};
 use macaca_proto::{
-    ApplicationDiscoverCommand, ApplicationId, ApplicationMetadataQueryCommand,
-    ApplicationMetadataView, ApplicationServiceAppView, ApplicationServiceScope,
-    ApplicationStatusCommand, ApplicationUiRuntimeView, AutonomyScope,
+    AgentId, AgentManifest, ApplicationDiscoverCommand, ApplicationId,
+    ApplicationMetadataQueryCommand, ApplicationMetadataView, ApplicationServiceAppView,
+    ApplicationServiceScope, ApplicationStatusCommand, ApplicationUiRuntimeView, AutonomyScope,
     CancelScheduledAgentTaskCommand, CreateScheduledAgentTaskCommand, KernelServiceId, MacacaError,
     McpProbeCommand, McpRuntimeStatusView, McpToolPolicySnapshot, ProtoErrorAdapter,
     ScheduledAgentTaskId, ScheduledAgentTaskQueryCommand, ScheduledAgentTaskSchedule,
@@ -142,6 +142,57 @@ fn entry_agent_activity_override(
     } else {
         activity
     }
+}
+
+/// Select the application-scoped agent manifests that should be rendered by Web.
+///
+/// Application Service metadata is the authoritative app boundary for declared
+/// agent names, but the legacy kernel registry can temporarily contain multiple
+/// manifests with the same name during migration windows.  A pure name filter
+/// would leak those global or stale agents into one application's UI.  This
+/// helper implements a small Adapter over the legacy registry: it preserves the
+/// Application Service order, returns at most one manifest per declared name,
+/// and prefers manifests whose id is also bound to the application runtime.
+fn select_app_scoped_agent_manifests(
+    manifests: Vec<AgentManifest>,
+    runtime_agent_ids: &[AgentId],
+    service_agent_names: Option<&[String]>,
+) -> Vec<AgentManifest> {
+    let runtime_agent_ids: std::collections::HashSet<AgentId> =
+        runtime_agent_ids.iter().copied().collect();
+
+    if let Some(service_agent_names) = service_agent_names {
+        let mut selected = Vec::with_capacity(service_agent_names.len());
+        let mut consumed_names = std::collections::HashSet::new();
+
+        for declared_name in service_agent_names {
+            if !consumed_names.insert(declared_name.as_str()) {
+                continue;
+            }
+
+            let preferred = manifests
+                .iter()
+                .find(|manifest| {
+                    manifest.name == *declared_name && runtime_agent_ids.contains(&manifest.id)
+                })
+                .or_else(|| {
+                    manifests
+                        .iter()
+                        .find(|manifest| manifest.name == *declared_name)
+                });
+
+            if let Some(manifest) = preferred {
+                selected.push(manifest.clone());
+            }
+        }
+
+        return selected;
+    }
+
+    manifests
+        .into_iter()
+        .filter(|manifest| runtime_agent_ids.contains(&manifest.id))
+        .collect()
 }
 
 // ---------------------------------------------------------------------------
@@ -481,7 +532,7 @@ pub async fn get_app_agents(
         view.agents
             .iter()
             .map(|agent| agent.name.clone())
-            .collect::<std::collections::HashSet<_>>()
+            .collect::<Vec<_>>()
     });
 
     // Get agent IDs for this app.  The service view is the preferred source
@@ -521,40 +572,34 @@ pub async fn get_app_agents(
         app_has_active_session(&state, &app_id, query.session_id.as_deref()).await;
     let entry_agent_name = app_entry_agent_name(&state, &app_id).await;
 
-    let agents: Vec<AgentInfo> = manifests
-        .into_iter()
-        .filter(|m| {
-            if let Some(names) = service_agent_names.as_ref() {
-                names.contains(&m.name)
-            } else {
-                agent_ids.contains(&m.id)
-            }
-        })
-        .map(|m| {
-            let id_str = m.id.0.to_string();
-            let (raw_activity, current_task) = status_map
-                .get(&id_str)
-                .map(|s| (s.activity.clone(), s.current_task.clone()))
-                .unwrap_or_else(|| (macaca_proto::AgentActivity::Idle, None));
-            let activity = entry_agent_activity_override(
-                entry_agent_name.as_deref(),
-                &m.name,
-                has_active_session,
-                raw_activity,
-            )
-            .into();
+    let agents: Vec<AgentInfo> =
+        select_app_scoped_agent_manifests(manifests, &agent_ids, service_agent_names.as_deref())
+            .into_iter()
+            .map(|m| {
+                let id_str = m.id.0.to_string();
+                let (raw_activity, current_task) = status_map
+                    .get(&id_str)
+                    .map(|s| (s.activity.clone(), s.current_task.clone()))
+                    .unwrap_or_else(|| (macaca_proto::AgentActivity::Idle, None));
+                let activity = entry_agent_activity_override(
+                    entry_agent_name.as_deref(),
+                    &m.name,
+                    has_active_session,
+                    raw_activity,
+                )
+                .into();
 
-            AgentInfo {
-                id: id_str,
-                name: m.name.clone(),
-                state: format!("{:?}", m.state),
-                activity,
-                capabilities: m.capabilities.into_iter().map(|c| c.name).collect(),
-                is_active: m.state == macaca_proto::AgentState::Running,
-                current_task,
-            }
-        })
-        .collect();
+                AgentInfo {
+                    id: id_str,
+                    name: m.name.clone(),
+                    state: format!("{:?}", m.state),
+                    activity,
+                    capabilities: m.capabilities.into_iter().map(|c| c.name).collect(),
+                    is_active: m.state == macaca_proto::AgentState::Running,
+                    current_task,
+                }
+            })
+            .collect();
 
     Ok(Json(agents))
 }
@@ -601,7 +646,7 @@ pub async fn stream_agent_status(
                 view.agents
                     .iter()
                     .map(|agent| agent.name.clone())
-                    .collect::<std::collections::HashSet<_>>()
+                    .collect::<Vec<_>>()
             });
             #[allow(deprecated)]
             let agent_ids = match state_clone.runtime.app_agents(&app_id).await {
@@ -627,15 +672,12 @@ pub async fn stream_agent_status(
             let entry_agent_name = app_entry_agent_name(&state_clone, &app_id).await;
 
             // Build simplified status
-            let agents: Vec<SimpleAgentStatus> = manifests
-                .into_iter()
-                .filter(|m| {
-                    if let Some(names) = service_agent_names.as_ref() {
-                        names.contains(&m.name)
-                    } else {
-                        agent_ids.contains(&m.id)
-                    }
-                })
+            let agents: Vec<SimpleAgentStatus> = select_app_scoped_agent_manifests(
+                manifests,
+                &agent_ids,
+                service_agent_names.as_deref(),
+            )
+            .into_iter()
                 .map(|m| {
                     let id_str = m.id.0.to_string();
                     let raw_activity = status_map.get(&id_str)
@@ -2367,13 +2409,84 @@ mod tests {
     use std::collections::HashMap;
 
     use crate::source_artifact::resolve_source_artifact_ref;
+    use chrono::Utc;
     use macaca_context::{
         ContextAdapterSafetyPolicy, ContextEngineInfo, ContextFallbackPolicy,
         ProviderHealthSnapshot,
     };
+    use macaca_proto::{
+        AgentId, AgentManifest, AgentState, Capability, Permission, PermissionLevel,
+    };
 
-    use super::{external_adapter_runtime_rows, required_session_id, SessionQuery};
+    use super::{
+        external_adapter_runtime_rows, required_session_id, select_app_scoped_agent_manifests,
+        SessionQuery,
+    };
     use crate::state::ExternalAdapterRuntimeInstallation;
+
+    fn test_agent_manifest(name: &str, capability: &str) -> AgentManifest {
+        AgentManifest {
+            id: AgentId::new(),
+            name: name.to_string(),
+            capabilities: vec![Capability {
+                name: capability.to_string(),
+                description: String::new(),
+            }],
+            permission: Permission {
+                level: PermissionLevel::User,
+                allowed_tools: Vec::new(),
+                allowed_paths: Vec::new(),
+                network_access: false,
+            },
+            state: AgentState::Created,
+            created_at: Utc::now(),
+            model: String::new(),
+        }
+    }
+
+    #[test]
+    fn app_scoped_agent_selection_deduplicates_legacy_same_name_agents() {
+        let legacy_coordinator = test_agent_manifest("coordinator", "todo_goal_management");
+        let app_coordinator = test_agent_manifest("coordinator", "coding_session_coordination");
+        let planner = test_agent_manifest("planner", "code_change_planning");
+        let coder = test_agent_manifest("coder", "patch_authoring");
+        let reviewer = test_agent_manifest("reviewer", "structured_review");
+        let legacy_planner = test_agent_manifest("planner", "todo_planning");
+        let runtime_ids = vec![app_coordinator.id, planner.id, coder.id, reviewer.id];
+        let declared_names = vec![
+            "coordinator".to_string(),
+            "planner".to_string(),
+            "coder".to_string(),
+            "reviewer".to_string(),
+        ];
+
+        let selected = select_app_scoped_agent_manifests(
+            vec![
+                legacy_coordinator,
+                planner.clone(),
+                coder.clone(),
+                reviewer.clone(),
+                legacy_planner,
+                app_coordinator.clone(),
+            ],
+            &runtime_ids,
+            Some(&declared_names),
+        );
+
+        assert_eq!(selected.len(), 4);
+        assert_eq!(
+            selected
+                .iter()
+                .map(|agent| agent.name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["coordinator", "planner", "coder", "reviewer"]
+        );
+        assert_eq!(selected[0].id, app_coordinator.id);
+        assert_eq!(
+            selected[0].capabilities[0].name,
+            "coding_session_coordination"
+        );
+    }
 
     #[test]
     fn resolves_short_event_ref_against_requested_session() {
