@@ -5,6 +5,7 @@ import test from "node:test";
 const appSource = await readFile(new URL("../src/WorkbenchApp.tsx", import.meta.url), "utf8");
 const bridgeSource = await readFile(new URL("../src/bridge.ts", import.meta.url), "utf8");
 const presenterSource = await readFile(new URL("../src/presenter.ts", import.meta.url), "utf8");
+const stateSource = await readFile(new URL("../src/state.ts", import.meta.url), "utf8");
 const timelineSource = await readFile(new URL("../src/timeline.tsx", import.meta.url), "utf8");
 const markdownSource = await readFile(new URL("../src/markdown.tsx", import.meta.url), "utf8");
 const styleSource = await readFile(new URL("../styles.css", import.meta.url), "utf8");
@@ -53,6 +54,16 @@ test("React UI switches app-owned execution streams when host session changes", 
   assert.match(appSource, /async function switchSession/);
   assert.match(appSource, /await replayEvents\(\)/);
   assert.match(appSource, /closeExecutionSocket\(false\)/);
+});
+
+test("Workbench timeline deduplicates replayed and websocket execution events", () => {
+  assert.match(stateSource, /export function deduplicateTimelineEvents/);
+  assert.match(stateSource, /export function timelineEventKey/);
+  assert.match(stateSource, /event_ref/);
+  assert.match(stateSource, /execution:seq/);
+  assert.match(stateSource, /idempotency_key/);
+  assert.match(stateSource, /state\.events\.some/);
+  assert.match(stateSource, /deduplicateTimelineEvents\(action\.events\)/);
 });
 
 test("timeline presenter renders user-readable execution events and markdown", () => {
