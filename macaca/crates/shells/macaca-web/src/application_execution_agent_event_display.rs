@@ -173,19 +173,46 @@ pub(crate) fn driver_trace_summary(trace: &serde_json::Value) -> String {
 }
 
 fn mask_secret_like_tokens(content: &str) -> String {
-    content
-        .split_whitespace()
-        .map(|token| {
-            if token.starts_with("sk-") && token.len() > 12 {
-                "sk-...****".to_string()
-            } else if token.starts_with("Bearer") {
-                "Bearer...****".to_string()
-            } else {
-                token.to_string()
-            }
-        })
-        .collect::<Vec<_>>()
-        .join(" ")
+    /*
+     * Preserve the provider-visible document shape while masking obvious
+     * credential-looking tokens.
+     *
+     * This Presenter sits in the Web shell boundary and prepares display text
+     * for durable application-execution events.  The previous implementation
+     * tokenized with `split_whitespace()` and joined with spaces, which
+     * destroyed Markdown line breaks before the app-owned UI could hand the
+     * content to a real Markdown renderer.  This scanner keeps every original
+     * whitespace character, so headings, GFM tables, lists, and code fences are
+     * saved exactly as the user-visible agent output supplied them.
+     */
+    let mut masked = String::with_capacity(content.len());
+    let mut token = String::new();
+
+    for ch in content.chars() {
+        if ch.is_whitespace() {
+            push_masked_token(&mut masked, &token);
+            token.clear();
+            masked.push(ch);
+        } else {
+            token.push(ch);
+        }
+    }
+
+    push_masked_token(&mut masked, &token);
+    masked
+}
+
+fn push_masked_token(output: &mut String, token: &str) {
+    if token.is_empty() {
+        return;
+    }
+    if token.starts_with("sk-") && token.len() > 12 {
+        output.push_str("sk-...****");
+    } else if token.starts_with("Bearer") {
+        output.push_str("Bearer...****");
+    } else {
+        output.push_str(token);
+    }
 }
 
 #[cfg(test)]
@@ -220,10 +247,19 @@ mod tests {
 
         assert!(full.contains("```rust"));
         assert!(full.contains("fn main()"));
+        assert!(full.contains("# Result\n\nline\nline"));
         assert!(
             full.len() > MAX_DISPLAY_CHARS,
             "full display content should not use the short excerpt limit"
         );
+    }
+
+    #[test]
+    fn display_full_preserves_gfm_tables_for_application_execution_ui() {
+        let markdown = "| File | Status |\n|---|---|\n| `shared/main.rs` | ✅ written |\n";
+        let full = display_full(markdown);
+
+        assert_eq!(full, markdown);
     }
 
     #[test]

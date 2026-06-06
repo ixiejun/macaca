@@ -80,7 +80,8 @@ test("timeline presenter renders user-readable execution events and markdown", (
   assert.match(timelineSource, /Trace details/);
   assert.match(markdownSource, /export function MarkdownView/);
   assert.match(markdownSource, /ReactMarkdown/);
-  assert.match(markdownSource, /normalizeWorkbenchMarkdown/);
+  assert.match(markdownSource, /remarkPlugins=\{\[remarkGfm\]\}/);
+  assert.doesNotMatch(markdownSource, /normalizeWorkbenchMarkdown/);
 });
 
 test("markdown display wraps generated content instead of forcing horizontal scrolling", () => {

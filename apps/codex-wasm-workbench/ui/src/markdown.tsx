@@ -3,9 +3,6 @@ import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
 import remarkGfm from 'remark-gfm';
 import 'highlight.js/styles/github-dark.css';
-import { normalizeWorkbenchMarkdown } from './markdown_normalizer';
-
-export { normalizeWorkbenchMarkdown } from './markdown_normalizer';
 
 /**
  * Renders assistant-facing markdown with open-source markdown and syntax
@@ -29,7 +26,7 @@ export function MarkdownView({ markdown }: { markdown: string }) {
         rehypePlugins={[rehypeHighlight]}
         remarkPlugins={[remarkGfm]}
       >
-        {normalizeWorkbenchMarkdown(markdown)}
+        {markdown}
       </ReactMarkdown>
     </div>
   );
