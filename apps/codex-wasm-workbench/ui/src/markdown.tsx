@@ -97,6 +97,8 @@ function splitCompactHeadingsAndRules(line: string): string[] {
   const tokens = text
     .replace(/\s+(---)\s+/g, '\n$1\n')
     .replace(/\s+(#{1,6}\s+)/g, '\n$1')
+    .replace(/\s+(-\s+)/g, '\n$1')
+    .replace(/\s+(\d+\.\s+)/g, '\n$1')
     .split('\n')
     .map((token) => token.trim())
     .filter(Boolean);
@@ -105,8 +107,11 @@ function splitCompactHeadingsAndRules(line: string): string[] {
 
 function expandCompactPipeTable(line: string): string[] {
   const text = String(line || '').trim();
-  const compactText = normalizeLooseCompactTableDelimiters(text);
+  const hasExplicitCompactDelimiter = text.includes('||');
+  const compactText = hasExplicitCompactDelimiter ? normalizeLooseCompactTableDelimiters(text) : text;
   if (!compactText.includes('|') || !/\|\s*:?-{3,}:?\s*\|/.test(compactText)) return [line];
+  if (!hasExplicitCompactDelimiter) return expandInlineCompactPipeTable(compactText, line);
+
   const rows = compactText
     .split(/\s*\|\|\s*/g)
     .map((row) => row.trim())
@@ -172,6 +177,49 @@ function normalizeLooseCompactTableDelimiters(markdown: string): string {
 }
 
 /**
+ * Recovers a GFM table that was flattened into a normal prose line.
+ *
+ * Some provider streams collapse Markdown line breaks while preserving pipe
+ * characters, producing text like `Intro | A | B | |---|---| | 1 | 2 | Tail`.
+ * `remark-gfm` cannot infer table rows from that shape.  This adapter uses the
+ * separator row as the only structural anchor, treats the cells immediately
+ * before it as the header, and groups following cells by the inferred column
+ * count.  Any leftover text is returned as normal Markdown so prose after the
+ * table remains visible instead of being forced into a malformed row.
+ */
+function expandInlineCompactPipeTable(markdown: string, fallbackLine: string): string[] {
+  const separatorMatch = markdown.match(/\|(?:\s*:?-{3,}:?\s*\|){2,}/);
+  if (!separatorMatch || separatorMatch.index === undefined) return [fallbackLine];
+
+  const separatorRow = separatorMatch[0];
+  const expectedCellCount = splitTableCells(separatorRow).length;
+  if (expectedCellCount < 2) return [fallbackLine];
+
+  const beforeSeparator = markdown.slice(0, separatorMatch.index).trim();
+  const afterSeparator = markdown.slice(separatorMatch.index + separatorRow.length).trim();
+  const beforeCells = beforeSeparator
+    .split('|')
+    .map((cell) => cell.trim())
+    .filter(Boolean);
+  if (beforeCells.length <= expectedCellCount) return [fallbackLine];
+
+  const prefix = beforeCells.slice(0, beforeCells.length - expectedCellCount).join(' | ').trim();
+  const header = beforeCells.slice(-expectedCellCount);
+  const expandedRows = [
+    formatTableRow(header.join(' | '), expectedCellCount),
+    formatTableRow(separatorRow, expectedCellCount),
+  ];
+  const tailCells = splitInlineTableCells(afterSeparator);
+  const remainingTail = groupInlineTableCells(tailCells, expectedCellCount, expandedRows);
+
+  return [
+    ...splitCompactHeadingsAndRules(prefix),
+    ...expandedRows,
+    ...splitCompactHeadingsAndRules(remainingTail),
+  ].filter((part) => part.trim().length > 0);
+}
+
+/**
  * Expands table rows that were compacted into one transport line.
  *
  * Model output often reaches the Workbench as a single line such as
@@ -228,6 +276,26 @@ function flushPendingCompactCells(
   if (flushRemainder && pendingCells.length > 0) {
     expandedRows.push(formatTableRow(pendingCells.splice(0).join(' | '), expectedCellCount));
   }
+}
+
+function splitInlineTableCells(markdown: string): string[] {
+  return String(markdown || '')
+    .replace(/^\|/, '')
+    .split('|')
+    .map((cell) => cell.trim())
+    .filter(Boolean);
+}
+
+function groupInlineTableCells(
+  cells: string[],
+  expectedCellCount: number,
+  expandedRows: string[],
+): string {
+  const pending = [...cells];
+  while (pending.length >= expectedCellCount) {
+    expandedRows.push(formatTableRow(pending.splice(0, expectedCellCount).join(' | '), expectedCellCount));
+  }
+  return pending.join(' | ').trim();
 }
 
 function mergeOverflowTableCells(cells: string[], expectedCellCount: number): string[] {
