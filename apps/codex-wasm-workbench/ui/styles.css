@@ -476,7 +476,7 @@ pre {
   font-size: 13px;
   line-height: 1.55;
   margin-top: 0;
-  min-width: 720px;
+  min-width: 920px;
   table-layout: auto;
   white-space: normal;
   width: max-content;
@@ -487,22 +487,22 @@ pre {
   border-bottom: 1px solid rgba(159, 176, 190, 0.18);
   border-right: 1px solid rgba(159, 176, 190, 0.14);
   color: var(--text);
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   padding: 11px 12px;
   text-align: left;
   vertical-align: top;
   white-space: normal;
-  min-width: 140px;
-  max-width: 360px;
-  word-break: normal;
+  min-width: 180px;
+  max-width: 460px;
+  word-break: keep-all;
 }
 
 .markdown-body td code,
 .markdown-body th code {
   display: inline;
   line-height: 1.45;
-  white-space: normal;
-  word-break: break-word;
+  white-space: nowrap;
+  word-break: normal;
 }
 
 .markdown-body th:last-child,
