@@ -71,9 +71,33 @@ function MarkdownTable({ children, ...props }: ComponentProps<'table'>) {
 function splitCompactMarkdownLine(line: string): string[] {
   const text = String(line || '');
   if (!text.trim()) return [text];
-  return expandCompactPipeTable(text)
+  return expandRecoverablePipeTables([text])
     .flatMap(splitCompactFenceBoundaries)
     .flatMap((part) => (isFormattedTableRow(part) ? [part] : splitCompactHeadingsAndRules(part)));
+}
+
+/**
+ * Repeatedly expands recoverable pipe tables in one compact provider line.
+ *
+ * A single assistant response can contain several tables after transport
+ * compaction, for example a file list followed by a verification matrix.  The
+ * first expansion may leave another compact table in the tail text, so this
+ * bounded pass applies the same generic table recovery until the line is stable.
+ * The depth limit keeps the adapter deterministic and prevents malformed
+ * provider text from causing unbounded UI work.
+ */
+function expandRecoverablePipeTables(parts: string[], depth = 0): string[] {
+  if (depth >= 6) return parts;
+
+  let changed = false;
+  const expandedParts = parts.flatMap((part) => {
+    if (isFormattedTableRow(part)) return [part];
+    const expanded = expandCompactPipeTable(part);
+    if (expanded.length !== 1 || expanded[0] !== part) changed = true;
+    return expanded;
+  });
+
+  return changed ? expandRecoverablePipeTables(expandedParts, depth + 1) : expandedParts;
 }
 
 function splitCompactFenceBoundaries(line: string): string[] {
