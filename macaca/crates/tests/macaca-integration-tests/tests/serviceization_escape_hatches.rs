@@ -381,22 +381,16 @@ fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> bool
                     == "crates/runtime/macaca-runtime-host/src/application_service_provider.rs"
         }
         "web-direct-runtime-field" => {
-            relative == "crates/shells/macaca-web/src/state.rs"
-                || (relative == "crates/shells/macaca-web/src/framework_toolkit.rs"
-                    && token.token == "state.registry")
+            // P3 §4.1: deprecated AppState provider fields moved into
+            // `WebShellCompositionBundle`; only bootstrap + approved shell
+            // adapters may touch legacy anchors or SDK LLM clients.
+            relative == "crates/shells/macaca-web/src/lib.rs"
+                || relative == "crates/shells/macaca-web/src/state.rs"
+                || relative == "crates/shells/macaca-web/src/shell_composition_bundle.rs"
+                || relative == "crates/shells/macaca-web/src/application_shell_adapter.rs"
+                || relative == "crates/shells/macaca-web/src/llm_route_shell_adapter.rs"
+                || relative == "crates/shells/macaca-web/src/mcp_shell_adapter.rs"
                 || relative == "crates/shells/macaca-web/src/framework_runner.rs"
-                || relative == "crates/shells/macaca-web/src/chat_orchestrator.rs"
-                || relative == "crates/shells/macaca-web/src/loop_manager.rs"
-                || relative == "crates/shells/macaca-web/src/routes.rs"
-                || relative == "crates/shells/macaca-web/src/skill_mcp.rs"
-                // This route is a diagnostic migration surface: it compares
-                // Skill governance records with the manifest-backed load path
-                // until Application Service exposes the same bounded Skill
-                // policy view. The allowance is token-specific so the module
-                // cannot grow unrelated registry ownership silently.
-                || (relative == "crates/shells/macaca-web/src/skill_self_evolution_audit.rs"
-                    && token.token == "state.registry")
-                || relative == "crates/shells/macaca-web/src/app_ui_routes.rs"
         }
         "hardcoded-agent-role" => {
             // Existing role-name literals are migration debt recorded by the
@@ -495,7 +489,7 @@ fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> bool
                 || relative == "crates/runtime/macaca-runtime-host/src/mcp_service_provider.rs"
                 || relative.starts_with("crates/runtime/macaca-runtime-host/src/mcp_runtime.rs")
                 || relative.starts_with("crates/services/macaca-tools/src/")
-                || relative == "crates/shells/macaca-web/src/skill_mcp.rs"
+                || relative == "crates/shells/macaca-web/src/mcp_shell_adapter.rs"
         }
         "kernel-non-kernel-module" => relative.starts_with("crates/kernel/macaca-kernel/src/"),
         "multi-path-coordination-patch" => matches!(

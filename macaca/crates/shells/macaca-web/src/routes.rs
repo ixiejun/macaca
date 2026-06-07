@@ -120,7 +120,7 @@ async fn app_entry_agent_name(state: &Arc<AppState>, app_id: &ApplicationId) -> 
     // Web routes. New production behavior must use Application Service
     // metadata views rather than reading raw application manifests.
     #[allow(deprecated)]
-    let registry = state.registry.read().await;
+    let registry = crate::application_shell_adapter::registry_read_guard(&state).await;
     registry
         .get_app(app_id)
         .and_then(|app| manifest_entry_agent_name(&app.manifest).map(str::to_string))
@@ -232,17 +232,15 @@ pub async fn get_status(State(state): State<Arc<AppState>>) -> Json<StatusRespon
     {
         views.len()
     } else {
-        #[allow(deprecated)]
-        {
-            state.runtime.list_apps().await.len()
-        }
+        crate::application_shell_adapter::running_app_count(&state).await
     };
+    let llm_provider = crate::llm_route_shell_adapter::status_provider_label(&state).await;
 
     Json(StatusResponse {
         version: env!("CARGO_PKG_VERSION").into(),
         agent_count,
         app_count,
-        llm_provider: state.llm.name().into(),
+        llm_provider,
     })
 }
 
@@ -337,11 +335,9 @@ pub async fn get_apps(State(state): State<Arc<AppState>>) -> Json<Vec<AppInfo>> 
         return Json(views.iter().map(app_info_from_service_view).collect());
     }
 
-    #[allow(deprecated)]
-    let apps = state.runtime.list_apps().await;
+    let apps = crate::application_shell_adapter::list_runtime_apps(&state).await;
     let agent_count = state.kernel.agent_count().await;
-    #[allow(deprecated)]
-    let registry = state.registry.read().await;
+    let registry = crate::application_shell_adapter::registry_read_guard(&state).await;
 
     let infos = apps
         .into_iter()
@@ -411,7 +407,7 @@ pub async fn get_app(
     // Get description from registry
     let description = {
         #[allow(deprecated)]
-        let registry = state.registry.read().await;
+        let registry = crate::application_shell_adapter::registry_read_guard(&state).await;
         registry
             .get_app(&app_id)
             .map(|a| {
@@ -424,8 +420,7 @@ pub async fn get_app(
     };
     let icon = "cube".to_string();
 
-    #[allow(deprecated)]
-    let apps = state.runtime.list_apps().await;
+    let apps = crate::application_shell_adapter::list_runtime_apps(&state).await;
     for (id, name, status) in apps {
         if id == app_id {
             return Ok(Json(AppInfo {
@@ -538,8 +533,7 @@ pub async fn get_app_agents(
     // Get agent IDs for this app.  The service view is the preferred source
     // for app-scoped agent names; the legacy runtime id lookup remains the
     // compatibility fallback needed by existing kernel status APIs.
-    #[allow(deprecated)]
-    let agent_ids = match state.runtime.app_agents(&app_id).await {
+    let agent_ids = match crate::application_shell_adapter::app_agent_ids(&state, &app_id).await {
         Ok(ids) => ids,
         Err(error) if service_agent_names.is_some() => {
             tracing::warn!(
@@ -648,8 +642,8 @@ pub async fn stream_agent_status(
                     .map(|agent| agent.name.clone())
                     .collect::<Vec<_>>()
             });
-            #[allow(deprecated)]
-            let agent_ids = match state_clone.runtime.app_agents(&app_id).await {
+            let agent_ids =
+                match crate::application_shell_adapter::app_agent_ids(&state_clone, &app_id).await {
                 Ok(ids) => ids,
                 Err(_) if service_agent_names.is_some() => Vec::new(),
                 Err(_) => {
@@ -750,19 +744,9 @@ pub async fn reload_apps(
                 error = %error,
                 "Application Service reload failed; falling back to legacy registry"
             );
-            #[allow(deprecated)]
-            {
-                let mut registry = state.registry.write().await;
-                registry
-                    .reload()
-                    .map_err(|e| {
-                        err(
-                            StatusCode::INTERNAL_SERVER_ERROR,
-                            format!("Failed to reload apps: {e}"),
-                        )
-                    })?
-                    .len()
-            }
+            crate::application_shell_adapter::reload_legacy_registry(&state)
+                .await
+                .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e))?
         }
     };
 
@@ -774,12 +758,10 @@ pub async fn reload_apps(
         }));
     }
 
-    #[allow(deprecated)]
-    let apps = state.runtime.list_apps().await;
+    let apps = crate::application_shell_adapter::list_runtime_apps(&state).await;
     let agent_count = state.kernel.agent_count().await;
 
-    #[allow(deprecated)]
-    let registry = state.registry.read().await;
+    let registry = crate::application_shell_adapter::registry_read_guard(&state).await;
     let app_infos: Vec<AppInfo> = apps
         .into_iter()
         .map(|(id, name, status)| {
@@ -901,7 +883,7 @@ pub async fn get_app_skills(
     let app_id = ApplicationId(app_uuid);
 
     let app = {
-        let registry = state.registry.read().await;
+        let registry = crate::application_shell_adapter::registry_read_guard(&state).await;
         registry
             .get_app(&app_id)
             .cloned()

@@ -887,7 +887,7 @@ impl FrameworkRunner {
         system_prompt: String,
     ) -> Result<AgentBuildRequest, String> {
         let app_manifest = {
-            let registry = state.registry.read().await;
+            let registry = crate::application_shell_adapter::registry_read_guard(&state).await;
             registry.get_app(app_id).map(|app| app.manifest.clone())
         };
         let application = app_manifest.as_ref().map(|manifest| {
@@ -937,7 +937,7 @@ impl FrameworkRunner {
         agent_name: &str,
     ) -> AgentCapabilitySet {
         {
-            let registry = state.registry.read().await;
+            let registry = crate::application_shell_adapter::registry_read_guard(&state).await;
             if let Some(app) = registry.get_app(app_id) {
                 if let Some(agent) = app_agent_manifest_view(&app.manifest, agent_name) {
                     return AgentCapabilitySet::from_legacy(
@@ -987,16 +987,15 @@ impl FrameworkRunner {
             .await
             .and_then(|manifest| (!manifest.model.is_empty()).then_some(manifest.model));
 
-        let app_defaults = {
-            let registry = state.registry.read().await;
-            registry
-                .get_app(app_id)
-                .and_then(|app| app.manifest.llm_config.clone())
-        };
+        let app_defaults =
+            crate::application_shell_adapter::manifest_llm_config(state, app_id).await;
 
-        state
-            .llm_router
-            .resolve_selection(&macaca_llm::ModelSelectionRequest {
+        crate::llm_route_shell_adapter::resolve_model_selection(
+            state,
+            app_id,
+            agent_name,
+            session_id,
+            macaca_llm::ModelSelectionRequest {
                 request_model: request_model.clone(),
                 agent_model,
                 app_model: app_defaults.as_ref().map(|cfg| cfg.model.clone()),
@@ -1004,20 +1003,9 @@ impl FrameworkRunner {
                 system_model: (!state.config.default_model.is_empty())
                     .then_some(state.config.default_model.clone()),
                 ..Default::default()
-            })
-            .inspect(|selection| {
-                tracing::info!(
-                    app_id = %app_id,
-                    agent = agent_name,
-                    session_id = session_id.unwrap_or("framework-sessionless"),
-                    route_source = selection.source,
-                    provider = %selection.primary.provider,
-                    model = %selection.primary.model,
-                    request_model_present = request_model.is_some(),
-                    "framework runner resolved LLM model selection"
-                );
-            })
-            .map_err(|e| e.to_string())
+            },
+        )
+        .await
     }
 
     async fn resolve_context_config(
@@ -1026,7 +1014,7 @@ impl FrameworkRunner {
         agent_name: &str,
     ) -> ContextConfig {
         let mut config = state.config.context.clone();
-        let registry = state.registry.read().await;
+        let registry = crate::application_shell_adapter::registry_read_guard(&state).await;
         if let Some(app) = registry.get_app(app_id) {
             let agent_engine = app_agent_manifest_view(&app.manifest, agent_name)
                 .and_then(|agent| agent.context_engine().map(str::to_owned))
@@ -1121,7 +1109,7 @@ impl FrameworkRunner {
         let merged_context =
             FrameworkRunner::resolve_context_config(state, app_id, agent_name).await;
         let app_manifest = {
-            let registry = state.registry.read().await;
+            let registry = crate::application_shell_adapter::registry_read_guard(&state).await;
             registry.get_app(app_id).map(|app| app.manifest.clone())
         };
         let app_dir = {
@@ -2018,7 +2006,7 @@ async fn resolve_agent_skill_policy(
     app_id: &ApplicationId,
     agent_name: &str,
 ) -> SkillPolicy {
-    let registry = state.registry.read().await;
+    let registry = crate::application_shell_adapter::registry_read_guard(&state).await;
     let Some(app) = registry.get_app(app_id) else {
         return SkillPolicy::default();
     };

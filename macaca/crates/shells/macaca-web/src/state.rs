@@ -11,16 +11,13 @@ use axum::response::sse::Event;
 use serde::Serialize;
 use tokio::sync::{mpsc, RwLock};
 
-use macaca_app::{AppRegistry, AppRuntime};
 use macaca_context::{
     ContextAdapterSafetyPolicy, ContextEngineInfo, ContextEngineRegistry, ContextFallbackPolicy,
     ContextProviderRegistry, ProviderHealthLedger,
 };
-use macaca_driver::{DriverRegistry, DriverRuntime};
 use macaca_framework::session::SessionStore as FrameworkSessionStore;
 use macaca_kernel::Kernel;
 use macaca_runtime_host::ApplicationExecutorRegistry;
-use macaca_llm::{LlmProvider, LlmRouter};
 use macaca_persist::{EventLog, PersistBackend};
 use macaca_proto::{config::ContextConfig, ApplicationId, ForkId, LlmMessage};
 use macaca_runtime_host::ServiceRuntime;
@@ -37,6 +34,7 @@ use macaca_tools::ToolCatalog;
 
 use crate::runtime_resume::RuntimeResumeSignal;
 use crate::shell::WebSystemFacadeBundle;
+use crate::shell_composition_bundle::WebShellCompositionBundle;
 use crate::workspace::AppWorkspace;
 
 /// Operator-visible installation record for one external adapter engine.
@@ -298,21 +296,11 @@ pub struct AppConfig {
 pub struct AppState {
     /// The kernel managing all agents.
     pub kernel: Arc<Kernel>,
-    /// Application runtime managing app lifecycle.
+    /// Bootstrap-owned provider anchors accessed only through shell adapters.
     ///
-    /// Deprecated compatibility anchor: new Web call paths should use
-    /// [`Self::application_client`] so application lifecycle behavior crosses
-    /// the same traceable service boundary as other Route C capabilities.
-    #[deprecated(note = "Use AppState::application_client for new application lifecycle paths")]
-    pub runtime: Arc<AppRuntime>,
-    /// Application registry for discovering apps.
-    ///
-    /// Deprecated compatibility anchor retained so older route helpers and
-    /// tests can still inspect manifests during the gradual migration.  The
-    /// service provider receives the same shared registry handle, which keeps
-    /// direct fallback reads consistent with service-backed snapshots.
-    #[deprecated(note = "Use AppState::application_client for new application discovery paths")]
-    pub registry: Arc<RwLock<AppRegistry>>,
+    /// P3 thin-shell migration groups legacy runtime/provider handles here so
+    /// route handlers depend on SDK clients and adapters instead of direct fields.
+    pub composition: WebShellCompositionBundle,
     /// The serviceized Application client used by new Route C call paths.
     pub application_client: Arc<dyn SystemApplicationClient>,
     /// The serviceized LLM client used by new Route C call paths.
@@ -385,36 +373,14 @@ pub struct AppState {
     /// deterministic shutdown and operator diagnostics. The actual background
     /// work remains inside the supervisor task and service providers.
     pub autonomy_runtime: macaca_runtime_host::AutonomyRuntimeBundle,
-    /// The LLM provider (DashScope by default).
-    #[deprecated(note = "Use AppState::llm_client for new LLM call paths")]
-    pub llm: Arc<dyn LlmProvider>,
-    /// Shared router/resolver used by framework-based agents.
-    #[deprecated(note = "Use AppState::llm_client for new model dispatch paths")]
-    pub llm_router: Arc<LlmRouter>,
     /// Composite toolset: built-in tools + executable skill tools + claude code tools.
     pub tools: Arc<dyn ToolCatalog>,
     /// Application executor registry for isolated multi-agent execution.
     pub executor_registry: Arc<ApplicationExecutorRegistry>,
-    /// Canonical web memory runtime used by production tools, active recall, and knowledge digest.
-    ///
-    /// The runtime is optional because memory exposure is still controlled by
-    /// `context.recall.expose_memory_tools`. When present, upper web code must prefer this facade
-    /// over concrete managers so provider/runtime implementations remain swappable.
-    #[deprecated(note = "Use AppState::memory_client for new memory call paths")]
-    pub memory_runtime: Option<Arc<crate::memory_runtime::WebMemoryRuntime>>,
     /// Legacy builtin backing store retained for compatibility and default runtime construction.
     pub workspace_memory: Option<Arc<macaca_memory::TestMemoryManager>>,
     /// Tombstone registry paired with [`Self::workspace_memory`] for digest + `memory_forget` coordination.
     pub workspace_memory_tombstones: Option<Arc<macaca_memory::SharedTombstoneRegistry>>,
-    /// Agent OS level MCP runtime and registry.
-    #[deprecated(note = "Use AppState::mcp_client for new MCP call paths")]
-    pub mcp_runtime: Arc<macaca_runtime_host::McpRuntimeFacade>,
-    /// Driver registry for managing loaded software drivers.
-    #[deprecated(note = "Use AppState::driver_client for new driver call paths")]
-    pub driver_registry: Arc<DriverRegistry>,
-    /// Driver runtime facade for lifecycle, inventory, and tool collection.
-    #[deprecated(note = "Use AppState::driver_client for new driver call paths")]
-    pub driver_runtime: Arc<DriverRuntime>,
     /// Path to the drivers directory (for reload).
     pub drivers_dir: String,
     /// Persistence: session store, todo store, event log, audit logger, run tracer.

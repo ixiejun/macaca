@@ -151,3 +151,13 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `SessionLineageStore` tracing additions | LOW | persist audit trail for lineage save/load; no behavior change | P2.7 |
 | `p2_microkernel_exit_validation` integration tests | LOW | static P2 exit contracts; no production runtime change | P2.8 |
 
+## Iteration 21 additions (task 4.1 — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `AppState` deprecated fields removed | HIGH | routes, chat_orchestrator, framework_runner, loop_manager, lib bootstrap | P3.1 |
+| `WebShellCompositionBundle` | MEDIUM | bootstrap composition root; adapters only approved read path | P3.1 |
+| `application_shell_adapter` / `llm_route_shell_adapter` / `mcp_shell_adapter` | MEDIUM | centralized Adapter pattern for registry/runtime/LLM/MCP legacy seams | P3.1 |
+| `serviceization_escape_hatches` allowlist (tightened) | LOW | removed route-level migration surfaces; violations=0 | P3.1 |
+| `WebMemoryRuntime` (deferred 4.1.4) | MEDIUM | bootstrap + composition bundle; not deleted until memory service fully owns facade | P3.1 |
+

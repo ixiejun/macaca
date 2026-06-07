@@ -509,7 +509,7 @@ async fn legacy_executor_metadata(
 ) -> (String, Vec<String>) {
     #[allow(deprecated)]
     {
-        let registry = state.registry.read().await;
+        let registry = crate::application_shell_adapter::registry_read_guard(&state).await;
         if let Some(app) = registry.get_app(app_id).cloned() {
             let names = AppLoader::resolve_agent_configs(&app.manifest, &app.path)
                 .map(|configs| configs.into_iter().map(|config| config.name).collect())
@@ -585,7 +585,8 @@ async fn wasm_chat_dispatch_command(
 ) -> Option<ApplicationHostDispatchServiceCommand> {
     let command = ApplicationMetadataQueryCommand::application(trace.clone(), *app_id).ok()?;
     let metadata = state.application_client.metadata(command).await.ok()?;
-    let is_registry_wasm_runtime = is_registry_wasm_layer_app(state, app_id).await;
+    let is_registry_wasm_runtime =
+        crate::application_shell_adapter::is_registry_wasm_layer_app(state, app_id).await;
     let is_wasm_runtime = is_registry_wasm_runtime
         || metadata.application.runtime.runtime_kind == Some(PackageRuntimeKind::WasmComponent);
     if !is_wasm_runtime {
@@ -677,88 +678,6 @@ fn new_session_preparation_for_chat(
         (true, true) => NewSessionPreparation::WasmOrchestrationExecutor,
         (true, false) => NewSessionPreparation::WasmHostDispatchOnly,
         (false, _) => NewSessionPreparation::FrameworkExecutor,
-    }
-}
-
-/// Resolve bounded route metadata for one application execution request.
-///
-/// This helper is a Web-shell Adapter over the service-owned LLM route
-/// strategy. It never decides provider semantics itself; it only asks the
-/// shared router for the same precedence order used by framework agents and
-/// stores the selected route as replayable session metadata. The prompt is not
-/// passed into this function, which prevents route audit data from capturing
-/// user content.
-async fn resolve_request_route_metadata(
-    state: &Arc<AppState>,
-    app_id: &ApplicationId,
-    session_id: &str,
-    request_model: Option<&str>,
-) -> BTreeMap<String, String> {
-    let app_defaults = {
-        #[allow(deprecated)]
-        let registry = state.registry.read().await;
-        registry
-            .get_app(app_id)
-            .and_then(|app| app.manifest.llm_config.clone())
-    };
-    let selection = state
-        .llm_router
-        .resolve_selection(&macaca_llm::ModelSelectionRequest {
-            request_model: request_model.map(str::to_owned),
-            app_model: app_defaults.as_ref().map(|cfg| cfg.model.clone()),
-            app_provider: app_defaults.as_ref().map(|cfg| cfg.provider.clone()),
-            system_model: (!state.config.default_model.is_empty())
-                .then_some(state.config.default_model.clone()),
-            ..Default::default()
-        });
-
-    let mut metadata = BTreeMap::new();
-    if let Some(model) = request_model.filter(|value| !value.trim().is_empty()) {
-        metadata.insert("requested_model".into(), model.to_string());
-    }
-    match selection {
-        Ok(selection) => {
-            metadata.insert("provider_id".into(), selection.primary.provider);
-            metadata.insert("model".into(), selection.primary.model);
-            metadata.insert("source".into(), selection.source.into());
-            metadata.insert(
-                "fallback_count".into(),
-                selection.fallbacks.len().to_string(),
-            );
-            tracing::info!(
-                app_id = %app_id,
-                session_id,
-                source = selection.source,
-                fallback_count = selection.fallbacks.len(),
-                request_model_present = request_model.is_some(),
-                "resolved request-level LLM route metadata"
-            );
-        }
-        Err(error) => {
-            metadata.insert("diagnostic".into(), "route_unavailable".into());
-            metadata.insert("diagnostic_detail".into(), error.to_string());
-            tracing::warn!(
-                app_id = %app_id,
-                session_id,
-                error = %error,
-                request_model_present = request_model.is_some(),
-                "failed to resolve request-level LLM route metadata"
-            );
-        }
-    }
-    metadata
-}
-
-/// Compatibility fallback for installations where metadata runtime-kind view is
-/// not yet populated but the discovered manifest layer is authoritative.
-async fn is_registry_wasm_layer_app(state: &Arc<AppState>, app_id: &ApplicationId) -> bool {
-    #[allow(deprecated)]
-    {
-        let registry = state.registry.read().await;
-        registry
-            .get_app(app_id)
-            .map(|app| app.manifest.layer == macaca_app::AppLayer::L2Wasm)
-            .unwrap_or(false)
     }
 }
 
@@ -936,7 +855,7 @@ pub(crate) async fn post_chat_v2(
     } else {
         #[allow(deprecated)]
         {
-            let registry = state.registry.read().await;
+            let registry = crate::application_shell_adapter::registry_read_guard(&state).await;
             registry
                 .get_app(&app_id)
                 .map(|app| {
@@ -972,11 +891,18 @@ pub(crate) async fn post_chat_v2(
             "registered request-level LLM route hint for application execution"
         );
     }
-    let request_route_metadata = resolve_request_route_metadata(
+    let app_defaults =
+        crate::application_shell_adapter::manifest_llm_config(&state, &app_id).await;
+    let system_model = (!state.config.default_model.is_empty())
+        .then(|| state.config.default_model.clone());
+    let request_route_metadata = crate::llm_route_shell_adapter::resolve_request_route_metadata(
         &state,
         &app_id,
         &session_key,
+        &entry_agent_name,
         request_model_hint.as_deref(),
+        app_defaults,
+        system_model,
     )
     .await;
 
@@ -1020,7 +946,12 @@ pub(crate) async fn post_chat_v2(
             NewSessionPreparation::FrameworkExecutor => {
                 match ensure_app_executor(&state, &app_id).await {
                     Ok(()) => {}
-                    Err(error) if is_registry_wasm_layer_app(&state, &app_id).await => {
+                    Err(error)
+                        if crate::application_shell_adapter::is_registry_wasm_layer_app(
+                            &state, &app_id,
+                        )
+                        .await =>
+                    {
                         tracing::info!(
                             app_id = %app_id,
                             error = %error,

@@ -13,6 +13,7 @@ pub mod app_ui_routes;
 mod app_ui_session_projection;
 mod app_ui_workspace_scope;
 mod app_workspace_bootstrap;
+mod application_shell_adapter;
 mod application_agent_delegate_bridge;
 mod application_execution_agent_event_bridge;
 mod application_execution_agent_event_display;
@@ -45,6 +46,8 @@ pub mod heartbeat_operations_routes;
 mod fork_join_shell_adapter;
 mod framework_agent_construction_shell_adapter;
 mod goal_lifecycle_shell_adapter;
+mod llm_route_shell_adapter;
+mod mcp_shell_adapter;
 #[cfg(test)]
 mod unified_delegation_path_tests;
 #[cfg(test)]
@@ -73,6 +76,7 @@ pub mod session;
 mod session_memory_capture;
 pub mod session_replay;
 pub mod shell;
+mod shell_composition_bundle;
 pub mod skill_mcp;
 pub mod skill_operations_routes;
 pub mod skill_self_evolution_audit;
@@ -1011,10 +1015,20 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
             Arc::clone(&runner) as Arc<dyn macaca_runtime_host::AgentRunner>
         ));
 
+        let composition = crate::shell_composition_bundle::WebShellCompositionBundle::new(
+            runtime.clone(),
+            Arc::clone(&registry),
+            llm.clone(),
+            llm_router.clone(),
+            memory_runtime.clone(),
+            Arc::clone(&mcp_runtime),
+            Arc::clone(&driver_registry),
+            Arc::clone(&driver_runtime),
+        );
+
         AppState {
             kernel: kernel.clone(),
-            runtime: runtime.clone(),
-            registry: Arc::clone(&registry),
+            composition,
             application_client: Arc::clone(&application_client),
             llm_client: Arc::clone(&llm_client),
             memory_client: Arc::clone(&memory_client),
@@ -1037,16 +1051,10 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
             system_facade: system_facade.clone(),
             service_runtime: Arc::clone(&service_runtime),
             autonomy_runtime: autonomy_runtime.clone(),
-            llm: llm.clone(),
-            llm_router: llm_router.clone(),
             tools,
             executor_registry: executor_registry.clone(),
-            memory_runtime: memory_runtime.clone(),
             workspace_memory: workspace_memory.clone(),
             workspace_memory_tombstones: workspace_memory_tombstones.clone(),
-            mcp_runtime: Arc::clone(&mcp_runtime),
-            driver_registry: Arc::clone(&driver_registry),
-            driver_runtime: Arc::clone(&driver_runtime),
             drivers_dir: drivers_dir.clone(),
             persist: PersistenceState {
                 session_store,
