@@ -134,3 +134,11 @@
 - **Verified**: `cargo check -p macaca-kernel -p macaca-runtime-host -p macaca-web` (no kernel deprecated warnings); kernel + skill mapping + escape hatch tests green.
 - **GitNexus memo (non-blocking)**: `KernelProviderCompat`/`KernelServiceClientCompat` deletion — CRITICAL/HIGH blast radius recorded in `impact-memo.md` iteration 18.
 - **Next**: P2 §3.6 kernel Cargo.toml dependency eviction; `FrameworkRunner` body still in web (task 4.3.2).
+
+## Iteration 19 (2026-06-07)
+- **P2.6 kernel boundary cleanup (3.6.1–3.6.6)**: `AgentExecutionPort` trait下沉 `macaca-proto`; `SwappableAgentExecutionPort`/`UnavailableAgentExecutionPort` 迁入 `macaca-kernel/src/execution_port.rs`; kernel registry manifest-only (`register_agent(manifest)`); 删除 `kernel/services.rs` 与生产依赖 `macaca-agent`。
+- **Legacy migration**: `LegacyAgentSideRegistry` + `LegacyAgentExecutionAdapter` 保留于 `macaca-agent`; `register_legacy_kernel_agent` 置于 `macaca-sdk`; SDK `for_kernel_with_legacy` 双写 manifest + runtime agent。
+- **Consumers**: kernel_lifecycle, live_fullstack_autodev, e2e_auto_programming, runtime-host dispatch tests, facade tests 已迁移。
+- **Allowlist**: 删除 kernel→driver/gateway/skill 三行（Rust + `macaca-os-serviceization-allowlist.md`）；Route C gate 7 行（仅 web）。
+- **GitNexus memo (non-blocking)**: iteration 19 HIGH blast radius on `AgentExecutionPort` + registry API — recorded in `impact-memo.md`.
+- **Next**: P2 §3.7 persist→context 越界反转; P2 §3.8 退出验证; `FrameworkRunner` body still in web (task 4.3.2).

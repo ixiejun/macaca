@@ -1,7 +1,10 @@
 //! SDK facade and registry adapters.
 
+use std::sync::Arc;
+
 use async_trait::async_trait;
 
+use macaca_agent::LegacyAgentSideRegistry;
 use macaca_kernel::{DefaultKernelFacade, Kernel, KernelFacade};
 use macaca_proto::{AgentId, AgentManifest, MacacaResult};
 
@@ -23,12 +26,27 @@ pub trait AgentRegistryApi: Send + Sync {
 /// Kernel-backed registry adapter.
 pub struct KernelAgentRegistry<'a> {
     kernel: &'a Kernel,
+    legacy_side_registry: Option<&'a LegacyAgentSideRegistry>,
 }
 
 impl<'a> KernelAgentRegistry<'a> {
-    /// Create a kernel registry adapter.
+    /// Create a kernel registry adapter (manifest-only; no legacy runtime wiring).
     pub fn new(kernel: &'a Kernel) -> Self {
-        Self { kernel }
+        Self {
+            kernel,
+            legacy_side_registry: None,
+        }
+    }
+
+    /// Create a kernel registry adapter that also registers runtime agents for legacy execution.
+    pub fn for_kernel_with_legacy(
+        kernel: &'a Kernel,
+        legacy_side_registry: &'a LegacyAgentSideRegistry,
+    ) -> Self {
+        Self {
+            kernel,
+            legacy_side_registry: Some(legacy_side_registry),
+        }
     }
 }
 
@@ -39,7 +57,10 @@ impl AgentRegistryApi for KernelAgentRegistry<'_> {
         agent: DeclarativeAgent,
         manifest: AgentManifest,
     ) -> MacacaResult<AgentId> {
-        self.kernel.register_agent(Box::new(agent), manifest).await
+        if let Some(side_registry) = self.legacy_side_registry {
+            side_registry.register_runtime_agent(Arc::from(Box::new(agent) as Box<dyn macaca_agent::Agent>))?;
+        }
+        self.kernel.register_agent(manifest).await
     }
 }
 
@@ -74,6 +95,17 @@ impl<'a> MacacaSdk<KernelAgentRegistry<'a>> {
     /// Create a facade backed by a kernel registry.
     pub fn for_kernel(kernel: &'a Kernel) -> Self {
         Self::new(KernelAgentRegistry::new(kernel))
+    }
+
+    /// Create a facade that wires legacy runtime agents into the side registry.
+    pub fn for_kernel_with_legacy(
+        kernel: &'a Kernel,
+        legacy_side_registry: &'a LegacyAgentSideRegistry,
+    ) -> Self {
+        Self::new(KernelAgentRegistry::for_kernel_with_legacy(
+            kernel,
+            legacy_side_registry,
+        ))
     }
 }
 
@@ -159,25 +191,27 @@ mod tests {
         }
     }
 
-    fn make_kernel() -> Kernel {
+    fn make_kernel() -> (Kernel, Arc<macaca_agent::LegacyAgentSideRegistry>) {
         let config = KernelConfig {
             max_agents: 16,
             heartbeat_interval_ms: 5000,
             agent_timeout_ms: 30000,
         };
         let llm: Arc<dyn LlmProvider> = Arc::new(MockLlm);
-        let execution_port: Arc<dyn AgentExecutionPort> =
-            Arc::new(LegacyAgentExecutionAdapter::new(
-                llm,
-                Arc::from(Box::new(DefaultToolSet::new()) as Box<dyn ToolCatalog>),
-            ));
-        KernelBuilder::from_execution_port(config, execution_port).build()
+        let adapter = LegacyAgentExecutionAdapter::new(
+            llm,
+            Arc::from(Box::new(DefaultToolSet::new()) as Box<dyn ToolCatalog>),
+        );
+        let side_registry = adapter.side_registry();
+        let execution_port: Arc<dyn AgentExecutionPort> = Arc::new(adapter);
+        let kernel = KernelBuilder::from_execution_port(config, execution_port).build();
+        (kernel, side_registry)
     }
 
     #[tokio::test]
     async fn facade_registers_config_with_kernel() {
-        let kernel = make_kernel();
-        let sdk = MacacaSdk::for_kernel(&kernel);
+        let (kernel, side_registry) = make_kernel();
+        let sdk = MacacaSdk::for_kernel_with_legacy(&kernel, side_registry.as_ref());
         let config = AgentConfig::from_yaml(
             r#"
 name: facade-agent

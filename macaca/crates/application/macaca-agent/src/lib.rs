@@ -16,9 +16,10 @@ pub use agent::Agent;
 pub use basic::{BasicAgent, BasicAgentBuilder};
 pub use capability::{AgentCapabilityNode, AgentCapabilitySet, CapabilitySource};
 pub use execution::{
-    AgentExecutionDispatch, AgentExecutionPort, LegacyAgentExecutionAdapter,
-    ServiceClientAgentExecutionAdapter, SwappableAgentExecutionPort, UnavailableAgentExecutionPort,
+    AgentExecutionDispatch, LegacyAgentExecutionAdapter, LegacyAgentSideRegistry,
+    ServiceClientAgentExecutionAdapter,
 };
+pub use macaca_proto::AgentExecutionPort;
 pub use lifecycle::{
     AgentLifecyclePolicy, AgentLifecycleTransition, AgentTransitionReason,
     DefaultAgentLifecyclePolicy,

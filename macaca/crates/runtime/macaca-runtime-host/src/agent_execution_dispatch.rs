@@ -160,14 +160,10 @@ mod tests {
 
     use async_trait::async_trait;
     use chrono::Utc;
-    use macaca_agent::{
-        Agent, AgentServices, LlmProvider, ToolCatalog, UnavailableAgentExecutionPort,
-    };
-    use macaca_kernel::{KernelBuilder, SystemService};
+    use macaca_kernel::{KernelBuilder, SystemService, UnavailableAgentExecutionPort};
     use macaca_proto::{
         config::KernelConfig, AgentExecutionIntent, AgentExecutionStatus, AgentId, AgentManifest,
-        AgentOutput, AgentState, Capability, Permission, PermissionLevel, ServiceResult,
-        TokenUsage, TraceContext,
+        AgentState, Permission, PermissionLevel, ServiceResult, TokenUsage, TraceContext,
     };
 
     use crate::{
@@ -196,39 +192,6 @@ mod tests {
                     "tokens_used": TokenUsage::default(),
                 }),
             ))
-        }
-    }
-
-    /// Minimal static agent for kernel registration in wiring tests.
-    struct StaticAgent {
-        id: AgentId,
-    }
-
-    #[async_trait]
-    impl Agent for StaticAgent {
-        fn id(&self) -> AgentId {
-            self.id
-        }
-
-        fn capabilities(&self) -> &[Capability] {
-            &[]
-        }
-
-        fn state(&self) -> AgentState {
-            AgentState::Running
-        }
-
-        async fn run(
-            &self,
-            _llm: &dyn LlmProvider,
-            _tools: &dyn ToolCatalog,
-            _services: &AgentServices,
-        ) -> MacacaResult<AgentOutput> {
-            Ok(AgentOutput {
-                result: "legacy-fallback".into(),
-                artifacts: Vec::new(),
-                tokens_used: TokenUsage::default(),
-            })
         }
     }
 
@@ -323,10 +286,11 @@ mod tests {
             created_at: Utc::now(),
             model: String::new(),
         };
+        // Manifest-only registration: execution is delegated to the wired service port.
         kernel
-            .register_agent(Box::new(StaticAgent { id: agent_id }), manifest)
+            .register_agent(manifest)
             .await
-            .expect("register agent");
+            .expect("register agent manifest");
 
         let output = kernel
             .execute_agent(&agent_id)
@@ -371,9 +335,9 @@ mod tests {
             model: String::new(),
         };
         kernel
-            .register_agent(Box::new(StaticAgent { id: agent_id }), manifest)
+            .register_agent(manifest)
             .await
-            .expect("register agent");
+            .expect("register agent manifest");
 
         let output = kernel
             .execute_agent(&agent_id)

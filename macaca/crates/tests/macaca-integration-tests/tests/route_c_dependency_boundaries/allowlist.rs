@@ -12,36 +12,6 @@ use super::gate::AllowlistEntry;
 pub fn entries() -> Vec<AllowlistEntry> {
     vec![
         AllowlistEntry::new(
-            "kernel-no-provider-deps",
-            "macaca-kernel",
-            "macaca-driver",
-            "kernel provider compatibility",
-            "macaca-kernel/Cargo.toml direct dependency used by legacy provider compatibility",
-            "S6",
-            "Driver Service facade",
-            "cargo metadata --no-deps --format-version 1",
-        ),
-        AllowlistEntry::new(
-            "kernel-no-provider-deps",
-            "macaca-kernel",
-            "macaca-gateway",
-            "kernel provider compatibility",
-            "macaca-kernel/Cargo.toml direct dependency used by legacy gateway compatibility",
-            "S8",
-            "Gateway Service facade",
-            "cargo metadata --no-deps --format-version 1",
-        ),
-        AllowlistEntry::new(
-            "kernel-no-provider-deps",
-            "macaca-kernel",
-            "macaca-skill",
-            "kernel provider compatibility",
-            "macaca-kernel/Cargo.toml direct dependency used by legacy skill compatibility",
-            "S6",
-            "Skill/MCP Service facade",
-            "cargo metadata --no-deps --format-version 1",
-        ),
-        AllowlistEntry::new(
             "presentation-no-provider-construction-hub",
             "macaca-web",
             "macaca-driver",

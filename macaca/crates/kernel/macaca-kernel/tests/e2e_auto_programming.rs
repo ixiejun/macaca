@@ -12,13 +12,13 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use macaca_agent::LlmProvider;
-use macaca_agent::{AgentExecutionPort, LegacyAgentExecutionAdapter, ToolCatalog};
+use macaca_agent::{AgentExecutionPort, LegacyAgentExecutionAdapter, LegacyAgentSideRegistry, ToolCatalog};
 use macaca_kernel::{Kernel, KernelBuilder};
 use macaca_proto::config::KernelConfig;
 use macaca_proto::{
     AgentManifest, LlmMessage, LlmOptions, LlmResponse, LlmRole, MacacaResult, TokenUsage,
 };
-use macaca_sdk::{AgentBuilder, AgentConfig, DeclarativeAgent};
+use macaca_sdk::{register_legacy_kernel_agent, AgentBuilder, AgentConfig, DeclarativeAgent};
 use macaca_tools::DefaultToolSet;
 
 // ── Mock LLM for AC1 Auto-Programming ────────────────────────────────────────
@@ -112,15 +112,32 @@ Recommended approach: Single-file Rust HTTP server"#;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-fn make_kernel() -> Kernel {
+fn make_kernel() -> (Kernel, Arc<LegacyAgentSideRegistry>) {
     let config = KernelConfig {
         max_agents: 16,
         heartbeat_interval_ms: 5000,
         agent_timeout_ms: 30000,
     };
     let llm: Arc<dyn LlmProvider> = Arc::new(AutoProgrammingLlm);
-    let execution_port: Arc<dyn AgentExecutionPort> = Arc::new(LegacyAgentExecutionAdapter::new(llm, Arc::from(Box::new(DefaultToolSet::new()) as Box<dyn ToolCatalog>)));
-    KernelBuilder::from_execution_port(config, execution_port).build()
+    let adapter = LegacyAgentExecutionAdapter::new(
+        llm,
+        Arc::from(Box::new(DefaultToolSet::new()) as Box<dyn ToolCatalog>),
+    );
+    let side_registry = adapter.side_registry();
+    let execution_port: Arc<dyn AgentExecutionPort> = Arc::new(adapter);
+    let kernel = KernelBuilder::from_execution_port(config, execution_port).build();
+    (kernel, side_registry)
+}
+
+async fn register_declarative_agent(
+    kernel: &Kernel,
+    side_registry: &LegacyAgentSideRegistry,
+    agent: DeclarativeAgent,
+    manifest: AgentManifest,
+) -> macaca_proto::AgentId {
+    register_legacy_kernel_agent(kernel, side_registry, Box::new(agent), manifest)
+        .await
+        .expect("register declarative agent")
 }
 
 fn code_gen_config() -> AgentConfig {
@@ -168,18 +185,15 @@ fn build_agent_from_config(config: AgentConfig) -> (DeclarativeAgent, AgentManif
 /// the output contains compilable code with an HTTP server.
 #[tokio::test]
 async fn test_ac1_auto_programming_flow() {
-    let kernel = make_kernel();
+    let (kernel, side_registry) = make_kernel();
 
     // Build a code-gen DeclarativeAgent via AgentBuilder
     let config = code_gen_config();
     let (agent, manifest) = build_agent_from_config(config);
     let agent_id = manifest.id;
 
-    // Register with the kernel
-    let registered_id = kernel
-        .register_agent(Box::new(agent), manifest)
-        .await
-        .unwrap();
+    let registered_id =
+        register_declarative_agent(&kernel, side_registry.as_ref(), agent, manifest).await;
     assert_eq!(registered_id, agent_id);
 
     // Execute the agent — simulates "build a todo web app" task
@@ -217,16 +231,13 @@ async fn test_ac1_auto_programming_flow() {
 /// to the LLM, and that the mock responds based on prompt content.
 #[tokio::test]
 async fn test_ac1_agent_receives_prompt() {
-    let kernel = make_kernel();
+    let (kernel, side_registry) = make_kernel();
 
     let config = code_gen_config();
     let (agent, manifest) = build_agent_from_config(config);
     let agent_id = manifest.id;
 
-    kernel
-        .register_agent(Box::new(agent), manifest)
-        .await
-        .unwrap();
+    register_declarative_agent(&kernel, side_registry.as_ref(), agent, manifest).await;
 
     let output = kernel.execute_agent(&agent_id).await.unwrap();
 
@@ -247,10 +258,13 @@ async fn test_ac1_agent_receives_prompt() {
     let (planner, planner_manifest) = build_agent_from_config(planner_cfg);
     let planner_id = planner_manifest.id;
 
-    kernel
-        .register_agent(Box::new(planner), planner_manifest)
-        .await
-        .unwrap();
+    register_declarative_agent(
+        &kernel,
+        side_registry.as_ref(),
+        planner,
+        planner_manifest,
+    )
+    .await;
 
     let planner_output = kernel.execute_agent(&planner_id).await.unwrap();
 
@@ -270,27 +284,27 @@ async fn test_ac1_agent_receives_prompt() {
 /// distinct and correct output — demonstrating multi-agent orchestration.
 #[tokio::test]
 async fn test_ac1_multi_agent_scenario() {
-    let kernel = make_kernel();
+    let (kernel, side_registry) = make_kernel();
 
     // Register planner agent
     let planner_cfg = planner_config();
     let (planner, planner_manifest) = build_agent_from_config(planner_cfg);
     let planner_id = planner_manifest.id;
 
-    kernel
-        .register_agent(Box::new(planner), planner_manifest)
-        .await
-        .unwrap();
+    register_declarative_agent(
+        &kernel,
+        side_registry.as_ref(),
+        planner,
+        planner_manifest,
+    )
+    .await;
 
     // Register code-gen agent
     let coder_cfg = code_gen_config();
     let (coder, coder_manifest) = build_agent_from_config(coder_cfg);
     let coder_id = coder_manifest.id;
 
-    kernel
-        .register_agent(Box::new(coder), coder_manifest)
-        .await
-        .unwrap();
+    register_declarative_agent(&kernel, side_registry.as_ref(), coder, coder_manifest).await;
 
     // Both agents should be registered
     assert_eq!(kernel.agent_count().await, 2);
@@ -332,7 +346,7 @@ async fn test_ac1_multi_agent_scenario() {
 /// Full kernel lifecycle: register -> execute -> unregister -> verify clean state.
 #[tokio::test]
 async fn test_ac1_kernel_full_lifecycle() {
-    let kernel = make_kernel();
+    let (kernel, side_registry) = make_kernel();
 
     // Initially empty
     assert_eq!(kernel.agent_count().await, 0);
@@ -343,10 +357,7 @@ async fn test_ac1_kernel_full_lifecycle() {
     let (agent, manifest) = build_agent_from_config(config);
     let agent_id = manifest.id;
 
-    kernel
-        .register_agent(Box::new(agent), manifest)
-        .await
-        .unwrap();
+    register_declarative_agent(&kernel, side_registry.as_ref(), agent, manifest).await;
     assert_eq!(kernel.agent_count().await, 1);
 
     // Execute successfully
@@ -380,10 +391,7 @@ async fn test_ac1_kernel_full_lifecycle() {
     let (agent2, manifest2) = build_agent_from_config(config2);
     let agent2_id = manifest2.id;
 
-    kernel
-        .register_agent(Box::new(agent2), manifest2)
-        .await
-        .unwrap();
+    register_declarative_agent(&kernel, side_registry.as_ref(), agent2, manifest2).await;
     assert_eq!(kernel.agent_count().await, 1);
 
     let output2 = kernel.execute_agent(&agent2_id).await.unwrap();

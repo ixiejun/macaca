@@ -1,4 +1,5 @@
 pub mod a2a;
+pub mod agent_execution_port;
 pub mod agent_execution_service;
 pub mod application_abi;
 pub mod application_ability;
@@ -68,6 +69,7 @@ mod web3_tests;
 mod workbench_tests;
 
 pub use a2a::*;
+pub use agent_execution_port::*;
 pub use agent_execution_service::*;
 pub use application_abi::*;
 pub use application_ability::*;

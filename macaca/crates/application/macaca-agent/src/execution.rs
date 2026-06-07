@@ -1,148 +1,132 @@
-//! Provider-neutral execution ports for registered agents.
+//! Provider-neutral execution port adapters for registered agents.
 //!
-//! This module keeps the legacy `Agent::run(llm, tools, services)` ABI outside
-//! the kernel.  The kernel should coordinate identity, registry, status, and
-//! scheduling invariants; replaceable provider handles belong behind an
-//! execution port owned by the application-agent boundary until the execution
-//! service contract fully replaces the legacy ABI.
+//! The [`AgentExecutionPort`] trait lives in [`macaca_proto`] so the kernel depends
+//! only on foundation contracts. This module keeps the legacy `Agent::run(llm, tools,
+//! services)` ABI and service-client dispatch outside the microkernel.
 
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
 
 use async_trait::async_trait;
 use macaca_proto::{
-    AgentExecutionCommand, AgentExecutionIntent, AgentExecutionResult, AgentExecutionStatus,
-    AgentId, AgentOutput, ApplicationId, MacacaError, MacacaResult, TokenUsage, TraceContext,
+    AgentExecutionCommand, AgentExecutionIntent, AgentExecutionPort, AgentExecutionResult,
+    AgentExecutionStatus, AgentId, AgentOutput, ApplicationId, MacacaError, MacacaResult,
+    TokenUsage, TraceContext,
 };
-use tokio::sync::RwLock;
 
 use crate::{Agent, AgentServices, LlmProvider, ToolCatalog};
 
+/// Side registry holding runtime [`Agent`] instances for legacy in-process execution.
+///
+/// The kernel registry stores manifests only (identity + metadata). This companion
+/// registry maps `agent_id` → `Arc<dyn Agent>` so [`LegacyAgentExecutionAdapter`] can
+/// resolve runtime objects without the kernel depending on application-agent types.
+#[derive(Default)]
+pub struct LegacyAgentSideRegistry {
+    agents: RwLock<HashMap<AgentId, Arc<dyn Agent>>>,
+}
+
+impl LegacyAgentSideRegistry {
+    /// Creates an empty side registry.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Registers a runtime agent instance keyed by its stable id.
+    pub fn register_runtime_agent(&self, agent: Arc<dyn Agent>) -> MacacaResult<()> {
+        let agent_id = agent.id();
+        let mut agents = self
+            .agents
+            .write()
+            .map_err(|_| MacacaError::Agent("legacy agent side registry lock poisoned".into()))?;
+        agents.insert(agent_id, agent);
+        tracing::info!(agent_id = %agent_id.0, "legacy runtime agent registered in side registry");
+        Ok(())
+    }
+
+    /// Resolves a runtime agent by id.
+    pub fn get_runtime_agent(&self, agent_id: &AgentId) -> Option<Arc<dyn Agent>> {
+        self.agents
+            .read()
+            .ok()
+            .and_then(|agents| agents.get(agent_id).cloned())
+    }
+}
+
 /// Provider-neutral port for dispatching typed commands to `service.agent_execution`.
 ///
-/// This is the outbound port in a Hexagonal layout: `ServiceClientAgentExecutionAdapter`
-/// stays in the application-agent crate while runtime-host or SDK composition roots
-/// supply a concrete dispatcher backed by `ServiceRouter` / `SystemFacade`. The trait
-/// intentionally exposes only the typed command/result pair so kernel code never
-/// imports web shells, LLM providers, or tool catalogs.
+/// Outbound port in a Hexagonal layout: `ServiceClientAgentExecutionAdapter` stays in
+/// this crate while runtime-host composition roots supply a dispatcher backed by
+/// `ServiceRuntime` / `SystemFacade`.
 #[async_trait]
 pub trait AgentExecutionDispatch: Send + Sync {
     /// Dispatch one validated `agent.execute` command through the service runtime.
-    ///
-    /// Implementations must log `service_id`, `command`, and `trace_id` at start and
-    /// must map service-unavailable replies into `MacacaError` without fabricating
-    /// successful `AgentOutput` values.
     async fn dispatch_agent_execution(
         &self,
         command: AgentExecutionCommand,
     ) -> MacacaResult<AgentExecutionResult>;
 }
 
-/// Hot-swappable wrapper around `AgentExecutionPort` for composition-root wiring.
+/// Legacy adapter bridging kernel manifest registry to `Agent::run`.
 ///
-/// Web bootstrap must register agents in the kernel before `service.agent_execution`
-/// is available. This Decorator keeps one stable `Arc` identity on the kernel
-/// while allowing the host to replace the inner port after service providers
-/// start, without re-registering agents or rebuilding the kernel registry.
-pub struct SwappableAgentExecutionPort {
-    inner: RwLock<Arc<dyn AgentExecutionPort>>,
-}
-
-impl SwappableAgentExecutionPort {
-    /// Create a swappable port seeded with the bootstrap execution implementation.
-    pub fn new(initial: Arc<dyn AgentExecutionPort>) -> Arc<Self> {
-        tracing::info!("swappable agent execution port created");
-        Arc::new(Self {
-            inner: RwLock::new(initial),
-        })
-    }
-
-    /// Replace the active execution port after service providers become available.
-    ///
-    /// Callers must ensure the new port routes through `service.agent_execution`
-    /// before relying on kernel `execute_agent` in production paths.
-    pub async fn replace(&self, port: Arc<dyn AgentExecutionPort>) {
-        tracing::info!("swappable agent execution port replacement started");
-        let mut guard = self.inner.write().await;
-        *guard = port;
-        tracing::info!("swappable agent execution port replacement completed");
-    }
-}
-
-#[async_trait]
-impl AgentExecutionPort for SwappableAgentExecutionPort {
-    async fn execute_registered_agent(
-        &self,
-        agent_id: &AgentId,
-        agent: &dyn Agent,
-    ) -> MacacaResult<AgentOutput> {
-        let guard = self.inner.read().await;
-        guard.execute_registered_agent(agent_id, agent).await
-    }
-}
-
-/// Provider-neutral port used by kernel code to execute one registered agent.
-///
-/// This is a small Port pattern boundary: callers pass an already-registered
-/// agent and its stable identifier, while the implementation decides how that
-/// agent is actually run.  Service-era implementations can dispatch typed
-/// commands through a runtime service client; the temporary legacy adapter below
-/// still bridges to `Agent::run` without forcing kernel code to store concrete
-/// provider compatibility bundles.
-#[async_trait]
-pub trait AgentExecutionPort: Send + Sync {
-    /// Execute the supplied agent and return its output.
-    ///
-    /// Implementations must emit trace-friendly logs at key execution points
-    /// and return structured errors when execution is unavailable.  The port is
-    /// intentionally generic and carries no application-specific workflow,
-    /// provider, model, driver, gateway, or business-domain branching.
-    async fn execute_registered_agent(
-        &self,
-        agent_id: &AgentId,
-        agent: &dyn Agent,
-    ) -> MacacaResult<AgentOutput>;
-}
-
-/// Legacy adapter for the current `Agent::run` execution ABI.
-///
-/// The adapter is an explicit Adapter pattern implementation. It contains the
-/// provider-shaped bridge that existing agents still require, while keeping
-/// production kernel state provider-neutral. Once agent execution is fully
-/// serviceized, this adapter can be replaced by a service-client implementation
-/// without changing the kernel registry or status code.
+/// Adapter pattern: provider handles (LLM/tools) and runtime agent instances live
+/// outside the kernel; execution resolves agents from [`LegacyAgentSideRegistry`].
 pub struct LegacyAgentExecutionAdapter {
     llm: Arc<dyn LlmProvider>,
     tools: Arc<dyn ToolCatalog>,
+    side_registry: Arc<LegacyAgentSideRegistry>,
 }
 
 impl LegacyAgentExecutionAdapter {
-    /// Create the adapter from shared provider handles.
-    ///
-    /// Handles are shared so composition roots can own provider lifecycles while
-    /// this adapter only borrows them during execution. The log records the
-    /// provider family name for operational traceability without exposing raw
-    /// prompts, credentials, or provider payloads.
+    /// Shared side registry used by default bootstrap/test wiring.
+    pub fn runtime_registry() -> Arc<LegacyAgentSideRegistry> {
+        static REGISTRY: std::sync::OnceLock<Arc<LegacyAgentSideRegistry>> =
+            std::sync::OnceLock::new();
+        REGISTRY
+            .get_or_init(|| Arc::new(LegacyAgentSideRegistry::new()))
+            .clone()
+    }
+
+    /// Creates an adapter using the shared runtime side registry.
     pub fn new(llm: Arc<dyn LlmProvider>, tools: Arc<dyn ToolCatalog>) -> Self {
+        Self::new_with_registry(llm, tools, Self::runtime_registry())
+    }
+
+    /// Creates an adapter bound to an explicit side registry (tests / composition roots).
+    pub fn new_with_registry(
+        llm: Arc<dyn LlmProvider>,
+        tools: Arc<dyn ToolCatalog>,
+        side_registry: Arc<LegacyAgentSideRegistry>,
+    ) -> Self {
         tracing::info!(
             llm_provider = %llm.name(),
             "legacy agent execution adapter created"
         );
-        Self { llm, tools }
+        Self {
+            llm,
+            tools,
+            side_registry,
+        }
+    }
+
+    /// Returns the side registry used by this adapter.
+    pub fn side_registry(&self) -> Arc<LegacyAgentSideRegistry> {
+        Arc::clone(&self.side_registry)
     }
 }
 
 #[async_trait]
 impl AgentExecutionPort for LegacyAgentExecutionAdapter {
-    async fn execute_registered_agent(
-        &self,
-        agent_id: &AgentId,
-        agent: &dyn Agent,
-    ) -> MacacaResult<AgentOutput> {
+    async fn execute_registered_agent(&self, agent_id: &AgentId) -> MacacaResult<AgentOutput> {
         tracing::info!(
             agent_id = %agent_id.0,
             llm_provider = %self.llm.name(),
             "legacy agent execution adapter started"
         );
+        let agent = self
+            .side_registry
+            .get_runtime_agent(agent_id)
+            .ok_or_else(|| MacacaError::NotFound(format!("runtime agent not found: {agent_id}")))?;
         let services = AgentServices::builder().build();
         let output = agent
             .run(self.llm.as_ref(), self.tools.as_ref(), &services)
@@ -164,14 +148,7 @@ impl AgentExecutionPort for LegacyAgentExecutionAdapter {
     }
 }
 
-/// Service-client execution adapter — preferred production `AgentExecutionPort`.
-///
-/// The adapter implements the Adapter pattern on top of `AgentExecutionDispatch`.
-/// Kernel and composition roots keep depending on `AgentExecutionPort`, while the
-/// actual model/tool/loop work happens inside runtime-host's Agent Execution
-/// service provider. Each kernel invocation is translated into a bounded
-/// `AgentExecutionCommand` with `SdkInvocation` intent so audit tools can
-/// distinguish registry-driven runs from chat or workflow paths.
+/// Service-client execution adapter — preferred production [`AgentExecutionPort`].
 pub struct ServiceClientAgentExecutionAdapter {
     dispatch: Arc<dyn AgentExecutionDispatch>,
     application_id: ApplicationId,
@@ -179,10 +156,6 @@ pub struct ServiceClientAgentExecutionAdapter {
 
 impl ServiceClientAgentExecutionAdapter {
     /// Wire the adapter to a dispatcher and default application envelope.
-    ///
-    /// `application_id` is a provider-neutral envelope used when the kernel
-    /// executes a registered agent without an active application session. Hosts
-    /// that always know the active application should supply the real id here.
     pub fn new(dispatch: Arc<dyn AgentExecutionDispatch>, application_id: ApplicationId) -> Self {
         tracing::info!(
             application_id = %application_id.0,
@@ -197,11 +170,7 @@ impl ServiceClientAgentExecutionAdapter {
 
 #[async_trait]
 impl AgentExecutionPort for ServiceClientAgentExecutionAdapter {
-    async fn execute_registered_agent(
-        &self,
-        agent_id: &AgentId,
-        agent: &dyn Agent,
-    ) -> MacacaResult<AgentOutput> {
+    async fn execute_registered_agent(&self, agent_id: &AgentId) -> MacacaResult<AgentOutput> {
         let target_agent = agent_id.0.to_string();
         let trace = TraceContext::new(format!("kernel-agent-{}", agent_id.0));
         let command = AgentExecutionCommand::new(
@@ -209,7 +178,7 @@ impl AgentExecutionPort for ServiceClientAgentExecutionAdapter {
             format!("kernel-session-{}", agent_id.0),
             target_agent.clone(),
             AgentExecutionIntent::SdkInvocation,
-            format!("execute registered agent {}", agent.id().0),
+            format!("execute registered agent {}", agent_id.0),
             trace.clone(),
         )?;
         tracing::info!(
@@ -226,10 +195,6 @@ impl AgentExecutionPort for ServiceClientAgentExecutionAdapter {
 }
 
 /// Map a typed service result into the kernel-facing `AgentOutput` contract.
-///
-/// The conversion is intentionally conservative: only `Completed` statuses become
-/// success values. Every other status is surfaced as a structured `MacacaError`
-/// with the service reason code preserved for operators and audit replay.
 fn agent_execution_result_to_output(result: &AgentExecutionResult) -> MacacaResult<AgentOutput> {
     match &result.status {
         AgentExecutionStatus::Completed => {
@@ -297,52 +262,9 @@ fn agent_execution_result_to_output(result: &AgentExecutionResult) -> MacacaResu
     }
 }
 
-/// Null Object execution port used when no execution service bridge is wired.
-///
-/// This object preserves service-client construction safety. A kernel can be
-/// assembled before the legacy execution bridge exists, but any attempt to run
-/// an agent receives a clear unavailable error instead of a fake success.
-pub struct UnavailableAgentExecutionPort {
-    reason: String,
-}
-
-impl UnavailableAgentExecutionPort {
-    /// Create a reusable unavailable execution port with an operator-facing
-    /// reason. The reason must stay generic and must not include secrets,
-    /// prompts, manifests, package bytes, or application-specific payloads.
-    pub fn new(reason: impl Into<String>) -> Self {
-        let reason = reason.into();
-        tracing::info!(
-            reason = %reason,
-            "unavailable agent execution port created"
-        );
-        Self { reason }
-    }
-}
-
-#[async_trait]
-impl AgentExecutionPort for UnavailableAgentExecutionPort {
-    async fn execute_registered_agent(
-        &self,
-        agent_id: &AgentId,
-        _agent: &dyn Agent,
-    ) -> MacacaResult<AgentOutput> {
-        tracing::warn!(
-            agent_id = %agent_id.0,
-            reason = %self.reason,
-            "agent execution requested without an execution bridge"
-        );
-        Err(MacacaError::Agent(format!(
-            "Agent execution unavailable: {}",
-            self.reason
-        )))
-    }
-}
-
 #[cfg(test)]
 mod service_client_adapter_tests {
     use super::*;
-    use crate::{Agent, AgentServices, LlmProvider, ToolCatalog};
     use async_trait::async_trait;
     use macaca_proto::{AgentState, Capability};
 
@@ -359,38 +281,6 @@ mod service_client_adapter_tests {
         ) -> MacacaResult<AgentExecutionResult> {
             *self.last_target.lock().expect("lock") = Some(command.target_agent.clone());
             Ok(self.next_result.clone())
-        }
-    }
-
-    struct StaticAgent {
-        id: AgentId,
-    }
-
-    #[async_trait]
-    impl Agent for StaticAgent {
-        fn id(&self) -> AgentId {
-            self.id
-        }
-
-        fn capabilities(&self) -> &[Capability] {
-            &[]
-        }
-
-        fn state(&self) -> AgentState {
-            AgentState::Running
-        }
-
-        async fn run(
-            &self,
-            _llm: &dyn LlmProvider,
-            _tools: &dyn ToolCatalog,
-            _services: &AgentServices,
-        ) -> MacacaResult<AgentOutput> {
-            Ok(AgentOutput {
-                result: "legacy".into(),
-                artifacts: Vec::new(),
-                tokens_used: TokenUsage::default(),
-            })
         }
     }
 
@@ -426,9 +316,8 @@ mod service_client_adapter_tests {
             ApplicationId::from_name("system"),
         );
         let agent_id = AgentId::new();
-        let agent = StaticAgent { id: agent_id };
         let output = adapter
-            .execute_registered_agent(&agent_id, &agent)
+            .execute_registered_agent(&agent_id)
             .await
             .expect("output");
         assert_eq!(output.result, "done");
@@ -454,9 +343,8 @@ mod service_client_adapter_tests {
         let adapter =
             ServiceClientAgentExecutionAdapter::new(dispatch, ApplicationId::from_name("system"));
         let agent_id = AgentId::new();
-        let agent = StaticAgent { id: agent_id };
         let error = adapter
-            .execute_registered_agent(&agent_id, &agent)
+            .execute_registered_agent(&agent_id)
             .await
             .expect_err("must fail");
         assert!(error.to_string().contains("unavailable"));

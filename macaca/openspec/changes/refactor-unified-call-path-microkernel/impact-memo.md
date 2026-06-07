@@ -131,3 +131,14 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `compat.rs` → `skill_mcp_mapping_registry.rs` | LOW | mcp_runtime, McpServerFactory, skill_mcp web path; behavior unchanged | P2.5 |
 | `serviceization_escape_hatches` provider-compat allowlist | LOW | provider_compat path removed; sdk test surfaces added | P2.5 |
 
+## Iteration 19 additions (task 3.6 — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `AgentExecutionPort` (proto migration) | HIGH | kernel, runtime-host, macaca-agent adapters, web bootstrap, integration tests | P2.6 |
+| `Kernel::register_agent(manifest)` **BREAKING** | HIGH | SDK facade, kernel_lifecycle, e2e_auto_programming, live_fullstack_autodev | P2.6 |
+| `SwappableAgentExecutionPort` / `UnavailableAgentExecutionPort` (kernel) | MEDIUM | kernel_builder, web bootstrap, runtime-host dispatch tests | P2.6 |
+| `LegacyAgentSideRegistry` + `register_legacy_kernel_agent` | MEDIUM | approved migration path for in-process Agent::run fixtures | P2.6 |
+| `kernel/services.rs` (deleted) | LOW | no external consumers; execution port moved to kernel + proto | P2.6 |
+| allowlist kernel→driver/gateway/skill rows (deleted) | LOW | Route C gate now 7 web rows; kernel provider edges cleared | P2.6 |
+

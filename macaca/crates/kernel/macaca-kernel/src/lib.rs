@@ -3,6 +3,7 @@
 pub mod alert;
 pub mod audit;
 pub mod capability_registry;
+pub mod execution_port;
 pub mod facade;
 pub mod kernel;
 pub mod kernel_builder;
@@ -19,7 +20,6 @@ pub mod service_bus_bridge;
 pub mod service_call;
 pub mod service_lifecycle;
 pub mod service_registry;
-pub mod services;
 pub mod status;
 pub mod status_transition;
 pub mod system_service;
@@ -29,9 +29,10 @@ pub use capability_registry::{CapabilityRegistry, InMemoryCapabilityRegistry};
 pub use facade::{
     DefaultKernelFacade, InMemoryTraceEventBus, KernelFacade, KernelTraceEvent, TraceEventBus,
 };
+pub use execution_port::{SwappableAgentExecutionPort, UnavailableAgentExecutionPort};
 pub use kernel::Kernel;
 pub use kernel_builder::KernelBuilder;
-pub use macaca_agent::{AgentExecutionPort, UnavailableAgentExecutionPort};
+pub use macaca_proto::AgentExecutionPort;
 pub use orchestrator::AgentOrchestrator;
 pub use persistence::{KernelPersistencePort, UnavailableKernelPersistencePort};
 pub use plugin_registry::{
@@ -49,7 +50,6 @@ pub use service_call::{
 };
 pub use service_lifecycle::{DefaultServiceLifecycleController, ServiceLifecycleController};
 pub use service_registry::{InMemorySystemServiceRegistry, SystemServiceRegistry};
-pub use services::{IpcServiceAdapter, PersistServiceAdapter};
 pub use status::AgentStatusTracker;
 pub use status_transition::AgentStatusTransitionPolicy;
 pub use system_service::{MockSystemService, SystemService};
