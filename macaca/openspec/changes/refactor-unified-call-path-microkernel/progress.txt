@@ -217,3 +217,12 @@
 - **Verified**: `cargo check -p macaca-web`; `cargo test -p macaca-web --lib` 250/250; `route_c_dependency_boundaries_reject_unallowlisted_forbidden_edges` pass; `cargo tree -p macaca-web --depth 1` no driver/llm/memory/persist/skill/task/tools/kernel.
 - **GitNexus memo (non-blocking)**: iteration 27 CRITICAL on bulk import rewrite across macaca-web — recorded in `impact-memo.md`.
 - **Next**: P3 §4.5.1 filesize gate; P4 CLI decoupling; break app/sdk/runtime-host cycle for 4.4.4终态.
+
+## Iteration 28 (2026-06-07)
+- **P3.3 routes split (4.3.6)**: deleted monolithic `routes.rs` (2591 lines); extracted `routes/` module tree (16 files, max 438 lines).
+- **Design patterns**: Facade (`mod.rs`); Adapter per HTTP surface (apps, todos, schedules, session_inspect, drivers, context_runtime); `autonomy_sanitizers` for DTO/sanitizer separation.
+- **Contract tests**: `routes::tests` 39/39; `contract_source::routes_module_sources()` for static scans.
+- **P5 filesize gate (6.1.6)**: `os_layer_file_size_gate` scans `crates/**/src/**/*.rs`; 87-row baseline allowlist; rejects unallowlisted/stale rows.
+- **Verified**: `cargo test -p macaca-web --lib routes` 39/39; `cargo test -p macaca-integration-tests --test os_layer_file_size_gate` pass; VC-gate + escape hatch green.
+- **GitNexus memo (non-blocking)**: iteration 28 CRITICAL on routes Facade split + filesize gate allowlist — recorded in `impact-memo.md`.
+- **Next**: P3 §4.5.1 converge allowlist (framework_toolkit, session, runtime-host giants); P4 CLI decoupling; 4.4.4终态.

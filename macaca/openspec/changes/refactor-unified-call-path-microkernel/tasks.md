@@ -148,6 +148,7 @@
 - [x] 4.3.3 拆分 `chat_orchestrator.rs`(1581) → route adapter / application-service 调用适配 / DTO 映射。（`chat_orchestrator/` 18 模块，最大 ≤500 行；Facade+Adapter；`contract_source::chat_orchestrator_module_sources`）
 - [x] 4.3.4 拆分 `macaca-web/src/lib.rs`(975) → 小型 composition bundle + route 注册。
 - [x] 4.3.5 每次拆分仅做结构移动 + 注释补全，拆分前后 `cargo test -p macaca-web` 绿。
+- [x] 4.3.6 拆分 `macaca-web/src/routes.rs`(2591) → `routes/` Facade 模块树（16 文件，max 438 行）；`cargo test -p macaca-web --lib routes` 39/39。
 
 ### 4.4 删除 web 越界依赖 + allowlist 行
 - [x] 4.4.1 替换完成后逐条移除 `macaca-web/Cargo.toml` 对 `macaca-driver/llm/memory/persist/skill/task/tools` 的直接依赖（经 `macaca-sdk::shell_provider_bridge` + `macaca_runtime_host::persist` 别名）。
@@ -156,7 +157,7 @@
 - [ ] 4.4.4 终态断言：`cargo tree -e normal -p macaca-web --depth 1` 仅 `macaca-sdk`（+ proto DTO/必要 framework 适配）。（**部分**：仍含 app/agent/runtime/context/framework/runtime-host，待 P4/P5 收敛）
 
 ### 4.5 P3 退出验证
-- [ ] 4.5.1 全仓无 >500 行 OS 层源文件（VC-filesize）。
+- [ ] 4.5.1 全仓无 >500 行 OS 层源文件（VC-filesize）。（**部分**：`routes/` 已合规；全仓 87 行 allowlist 债务，gate 已实现）
 - [x] 4.5.2 web 相关 allowlist 清零；VC-gate 绿；`cargo test -p macaca-web --lib` 250/250。
 
 ## 5. P4 — CLI 解耦 + domain pack 外置
@@ -186,7 +187,7 @@
 - [ ] 6.1.3 实现 `no-hardcoded-name` 审计：生产代码无硬编码 agent/app/provider/model/driver/gateway/chain/payment 名（fixtures/tests 除外）。
 - [ ] 6.1.4 实现 `shell-not-semantic-owner` 审计：shell 不得直驱 task/loop、不引用 deprecated direct fields、不持 agent 执行实现。
 - [ ] 6.1.5 实现 `kernel-purity` 审计：kernel 仅依赖 proto/ipc（与 3.6.6 联动）。
-- [ ] 6.1.6 实现 `file-size` 审计：OS 层无 >500 行源文件。
+- [x] 6.1.6 实现 `file-size` 审计：OS 层无 >500 行源文件。（`os_layer_file_size_gate` + 87 行 baseline allowlist；终态 allowlist==0 待收敛）
 
 ### 6.2 逃逸口由"冻结"升级为"删除"
 - [ ] 6.2.1 每个逃逸口对应 service client 全量替换后，删除其 migration module 豁免，使任何引用（含旧引用）CI 失败。
@@ -244,6 +245,7 @@ cargo test -p macaca-task && cargo test -p macaca-runtime-host && cargo test -p 
 # VC-e2e      端到端：/api/chat/v2（YAML + WASM）、fullstack-autodev、route-c 回归矩阵
 cargo test -p macaca-integration-tests
 # VC-filesize OS 层文件 ≤500 行（审计门）
+cargo test -p macaca-integration-tests --test os_layer_file_size_gate -- --nocapture
 # VC-hardcoded 无硬编码 application/provider/model 业务名（审计门）
 # VC-spec     openspec validate --strict
 ```

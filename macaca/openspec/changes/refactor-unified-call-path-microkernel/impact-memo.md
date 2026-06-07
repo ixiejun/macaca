@@ -219,3 +219,11 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `macaca-runtime-host::persist` alias | MEDIUM | shell bootstrap persist types; web already depends on runtime-host | P3.4 |
 | `app→sdk→runtime-host→app` cycle | HIGH | prevents SDK re-export of runtime-host; 4.4.4终态 deferred | P3.4 / P4 |
 | Route C allowlist cleared (7 rows) | LOW | gate now enforces zero allowlist globally; web provider direct edges gone | P3.4 |
+
+## Iteration 28 additions (tasks 4.3.6 + 6.1.6 — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `routes.rs` → `routes/` module split | CRITICAL | bootstrap route table, session/loop_manager/app_ui/workbench imports of `crate::routes::*`; public API preserved via Facade re-exports | P3.3 |
+| `os_layer_file_size_gate` (new) | LOW | integration-tests only; 87-row baseline allowlist; blocks new >500-line production sources | P5 |
+| `framework_toolkit.rs` / `session.rs` (remaining web giants) | HIGH | still on filesize allowlist; next P3 split targets | P3.5 |
