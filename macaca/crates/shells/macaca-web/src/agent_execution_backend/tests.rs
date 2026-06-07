@@ -620,7 +620,7 @@ fn direct_session_pause_resume_channels_stay_inside_approved_adapters() {
 fn legacy_session_pause_resume_paths_are_marked_deprecated() {
     let state_source = include_str!("../state.rs");
     let hook_consumer_source = include_str!("../hook_consumer.rs");
-    let loop_manager_source = include_str!("../loop_manager.rs");
+    let loop_manager_source = crate::loop_manager::contract_source::loop_manager_module_sources();
     let fork_join_adapter = include_str!("../fork_join_shell_adapter.rs");
     let goal_lifecycle_adapter = include_str!("../goal_lifecycle_shell_adapter.rs");
 

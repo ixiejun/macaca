@@ -32,7 +32,7 @@ mod tests {
 
     #[test]
     fn goal_task_path_registers_and_resumes_via_execution_control() {
-        let loop_manager = include_str!("loop_manager.rs");
+        let loop_manager = crate::loop_manager::contract_source::loop_manager_module_sources();
         let goal_adapter = include_str!("goal_lifecycle_shell_adapter.rs");
         let toolkit = include_str!("framework_toolkit.rs");
 
@@ -45,7 +45,7 @@ mod tests {
 
     #[test]
     fn worker_loop_executes_tasks_via_agent_execution_service() {
-        let loop_manager = include_str!("loop_manager.rs");
+        let loop_manager = crate::loop_manager::contract_source::loop_manager_module_sources();
 
         assert!(loop_manager.contains("execute_worker_task_via_agent_service"));
         assert!(loop_manager.contains("run_loop_agent_execution_service_call"));
@@ -74,7 +74,7 @@ mod tests {
 
     #[test]
     fn session_loop_wake_register_shutdown_via_execution_control() {
-        let loop_manager = include_str!("loop_manager.rs");
+        let loop_manager = crate::loop_manager::contract_source::loop_manager_module_sources();
         let session_adapter = include_str!("session_loop_shell_adapter.rs");
         let runtime_coordinator = include_str!(
             "../../../runtime/macaca-runtime-host/src/execution_control_session_loop.rs"

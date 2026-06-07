@@ -143,7 +143,7 @@
 - [x] 4.2.2 `hook_consumer.rs`/`chat_orchestrator.rs` 中 Fork-Join 暂停/恢复编排改为消费 execution-control 事件。（hook_consumer 已走 `ExecutionControlForkJoinCoordinator`；`cleanup_app_state` 新增 `shutdown_session_loops_via_execution_control`）
 
 ### 4.3 巨型文件拆分（≤500 行，按 ownership）
-- [ ] 4.3.1 拆分 `loop_manager.rs`(2629) → execution-control adapter / task-event adapter / SSE channel adapter / 薄 orchestrator（每文件 ≤500 行）。
+- [x] 4.3.1 拆分 `loop_manager.rs`(2629) → execution-control adapter / task-event adapter / SSE channel adapter / 薄 orchestrator（每文件 ≤500 行）。（`loop_manager/` 18 模块，最大 412 行；Facade+Adapter+Strategy；`decomposition_adapter` 去除 legacy graph_owner/agent-role 违规）
 - [ ] 4.3.2 拆分 `framework_runner.rs`(2484) → runtime agent 构造 service（迁 runtime/framework 层）+ 薄 web 适配。
 - [ ] 4.3.3 拆分 `chat_orchestrator.rs`(1581) → route adapter / application-service 调用适配 / DTO 映射。
 - [ ] 4.3.4 拆分 `macaca-web/src/lib.rs`(975) → 小型 composition bundle + route 注册。

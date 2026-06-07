@@ -170,3 +170,13 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `ensure_plan_and_worker_loops` wake paths | HIGH | goal decomposition, worker submit review, review delegate complete, worker loop wake helper | P3.2 |
 | `cleanup_app_state` session-loop shutdown | MEDIUM | post_chat_stop + post_chat_v2 new-session cleanup; audit before local handle removal | P3.2 |
 | `unified_delegation_path_tests` session-loop contract | LOW | static source assertions; no runtime behavior change | P3.2 |
+
+## Iteration 23 additions (task 4.3.1 — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `loop_manager.rs` → `loop_manager/` module split | CRITICAL | routes, orchestration_tools, hook_consumer, chat_orchestrator, unified_delegation_path contract tests | P3.3 |
+| `ensure_plan_and_worker_loops` / `create_goal` (facade) | HIGH | all goal/worker loop entrypoints; public API unchanged via `mod.rs` re-exports | P3.3 |
+| `plan_event_consumer` + Strategy handlers | HIGH | GoalReady/ReviewNeeded/AllTasksDone/AnomalyDetected/GoalCompleted lifecycle | P3.3 |
+| `decomposition_adapter` graph_owner fix | MEDIUM | fallback goal decomposition tasks now `ApplicationExecution` authority | P3.3 |
+| `contract_source::loop_manager_module_sources` | LOW | static contract tests only; concatenates module sources for escape-hatch scans | P3.3 |
