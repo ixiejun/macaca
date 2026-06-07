@@ -240,3 +240,9 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 |---------------|----------------------|------------------------|-------|
 | `session.rs` → `session/` module split | CRITICAL | bootstrap session routes; chat_orchestrator/event_persistence/app_ui_session_projection consumers of `crate::session::*`; public API preserved via Facade re-exports | P3.3 |
 | `task_api_migration_audit` path fix | LOW | loop_manager/routes module paths after prior splits | P3.3 |
+
+## Iteration 31 additions (task 4.3.9 — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `skill_operations_routes.rs` → `skill_operations_routes/` module split | CRITICAL | bootstrap skill-operations route table (9 handlers); `self_evolving_skill_boundaries` directory scan; thin-adapter contract tests | P3.3 |

@@ -91,7 +91,6 @@ pub fn entries() -> Vec<FileSizeAllowlistEntry> {
         FileSizeAllowlistEntry::new("crates/shells/macaca-web/src/context_memory_injection.rs", 592, "P3-web-thin-shell", "P3"),
         FileSizeAllowlistEntry::new("crates/shells/macaca-web/src/context_reporting_model.rs", 608, "P3-web-thin-shell", "P3"),
         FileSizeAllowlistEntry::new("crates/shells/macaca-web/src/skill_mcp.rs", 705, "P3-web-thin-shell", "P3"),
-        FileSizeAllowlistEntry::new("crates/shells/macaca-web/src/skill_operations_routes.rs", 704, "P3-web-thin-shell", "P3"),
         FileSizeAllowlistEntry::new("crates/shells/macaca-web/src/skill_self_evolution_observer.rs", 810, "P3-web-thin-shell", "P3"),
         FileSizeAllowlistEntry::new("crates/tests/macaca-integration-tests/src/pipeline_dry_run.rs", 711, "OS-layer-debt", "P5"),
     ]

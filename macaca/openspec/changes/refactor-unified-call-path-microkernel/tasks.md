@@ -151,6 +151,7 @@
 - [x] 4.3.6 拆分 `macaca-web/src/routes.rs`(2591) → `routes/` Facade 模块树（16 文件，max 438 行）；`cargo test -p macaca-web --lib routes` 39/39。
 - [x] 4.3.7 拆分 `macaca-web/src/framework_toolkit.rs`(1642) → `framework_toolkit/` Facade 模块树（8 文件，max 413 行）；`contract_source::framework_toolkit_module_sources`；`cargo test -p macaca-web --lib framework_toolkit` 9/9。
 - [x] 4.3.8 拆分 `macaca-web/src/session.rs`(1424) → `session/` Facade 模块树（11 文件，max 268 行）；`contract_source::session_module_sources`；`cargo test -p macaca-web --lib session` 10/10；修复 `task_api_migration_audit` / `serviceization_escape_hatches` 路径对齐模块拆分。
+- [x] 4.3.9 拆分 `macaca-web/src/skill_operations_routes.rs`(704) → `skill_operations_routes/` Facade 模块树（11 文件，max ~140 行）；`contract_source::skill_operations_module_sources`；`self_evolving_skill_boundaries` 扫描路径更新为目录；filesize allowlist 移除该行（84 行基线债务）。
 
 ### 4.4 删除 web 越界依赖 + allowlist 行
 - [x] 4.4.1 替换完成后逐条移除 `macaca-web/Cargo.toml` 对 `macaca-driver/llm/memory/persist/skill/task/tools` 的直接依赖（经 `macaca-sdk::shell_provider_bridge` + `macaca_runtime_host::persist` 别名）。

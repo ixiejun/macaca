@@ -80,7 +80,7 @@ fn sdk_does_not_construct_skill_runtime_or_store_providers() {
 fn presentation_shells_do_not_own_skill_curation_semantics() {
     for shell in [
         "crates/shells/macaca-cli/src",
-        "crates/shells/macaca-web/src/skill_operations_routes.rs",
+        "crates/shells/macaca-web/src/skill_operations_routes",
     ] {
         SourceTree::load(shell).assert_absent(&[
             "SkillGovernanceStoreStrategy",

@@ -243,4 +243,13 @@
 - **Filesize allowlist**: removed `session.rs` row (85 baseline rows remain).
 - **Verified**: `cargo test -p macaca-web --lib` pass; `os_layer_file_size_gate` pass; `task_api_migration_audit` pass.
 - **GitNexus memo (non-blocking)**: iteration 30 CRITICAL on session Facade split — recorded in `impact-memo.md`.
-- **Next**: P3 §4.5.1 remaining web giants (`app_ui_routes`, `skill_operations_routes`, runtime-host); P4 CLI decoupling; 4.4.4终态.
+- **Next**: P3 §4.5.1 remaining web giants (`app_ui_routes`, `skill_mcp`, runtime-host); P4 CLI decoupling; 4.4.4终态.
+
+## Iteration 31 (2026-06-07)
+- **P3.3 skill_operations_routes split (4.3.9)**: deleted monolithic `skill_operations_routes.rs` (704 lines); extracted `skill_operations_routes/` module tree (11 files, max ~140 lines).
+- **Design patterns**: Facade (`mod.rs`); Adapter (`adapter.rs` scope/policy/materialization helpers + per-handler HTTP→SDK mapping); Strategy (lifecycle action parsing).
+- **Contract tests**: `skill_operations_routes::tests` 2/2; `contract_source::skill_operations_module_sources()`; `self_evolving_skill_boundaries` path → directory scan.
+- **Filesize allowlist**: removed `skill_operations_routes.rs` row (84 baseline rows remain).
+- **Verified**: `cargo test -p macaca-web --lib skill_operations_routes` 2/2; `os_layer_file_size_gate` pass; `self_evolving_skill_boundaries` 4/4.
+- **GitNexus memo (non-blocking)**: iteration 31 CRITICAL on skill_operations_routes Facade split — recorded in `impact-memo.md`.
+- **Next**: P3 §4.5.1 remaining web giants (`app_ui_routes`, `skill_mcp`, `skill_self_evolution_observer`); P4 CLI decoupling; 4.4.4终态.
