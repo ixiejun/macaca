@@ -51,6 +51,8 @@ mod unified_delegation_path_tests;
 mod unified_agent_execution_provider_tests;
 #[cfg(test)]
 mod unified_workflow_application_abi_tests;
+#[cfg(test)]
+mod unified_audit_replay_convergence_tests;
 pub mod hook_consumer;
 pub mod loop_manager;
 mod memory_runtime;
@@ -927,7 +929,7 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
             Arc::clone(&entitlement_store),
             Arc::clone(&entitlement_facade),
             Arc::clone(&payment_store),
-            macaca_kernel::local_simulated_terms("1", "UNIT"),
+            macaca_proto::local_simulated_terms("1", "UNIT"),
         ),
         "web-startup",
     )

@@ -443,6 +443,7 @@ mod tests {
             workbench: None,
             autonomy: None,
             ui: None,
+            execution_control: None,
         };
         let error = ApplicationManifestSpec.validate(&manifest).unwrap_err();
         assert!(error.to_string().contains("required_services"));

@@ -62,3 +62,40 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `application_agent_delegate_bridge` | MEDIUM | YAML + WASM orchestration second hop to `service.agent_execution` | P1.4 |
 | `WebApplicationOrchestrationBackend::delegate_agent` | MEDIUM | Application Service provider; WASM host imports; YAML workflow | P1.4 |
 | `AgentExecutionIntent::from_delegate_metadata` | LOW | proto wire labels; no application-specific branches | P1.4 |
+
+## Iteration 12 additions (task 2.6 — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `hosted_signals_from_host_result` | HIGH | WASM hosted terminal state; all host commands now equally authoritative | P1.6 |
+| `WebAgentExecutionHostAdapter::resolve_execution_control_policy` | MEDIUM | manifest projection via Application Service metadata; replaces legacy ChatMainThread branch | P1.6 |
+| `ComposedAgentExecutionBackend` (lifecycle emit) | MEDIUM | always emits coarse lifecycle; duplicate suppression markers removed | P1.6 |
+| `ApplicationMetadataView.execution_control` | LOW | new sanitized metadata field; service projection only | P1.6 |
+| `ExecutionControlPolicyResolver` | MEDIUM | override denied without manifest default; all execution intents | P1.6 |
+
+## Iteration 13 additions (task 2.7 — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `unified_audit_replay_convergence_tests` (web) | LOW | static contract + entry-surface inventory; no production behavior change | P1.7 |
+| `unified_audit_replay_convergence_tests` (runtime-host) | LOW | `InMemoryServiceCallAuditSink` replay; validates single terminal provider | P1.7 |
+| `ExecutionControlPolicy` serde defaults | LOW | YAML manifest parsing; `fullstack-autodev` fixture only | P1.7 |
+| `AppManifest.execution_control` test fixtures | LOW | macaca-app unit/integration constructors; compile-time only | P1.7 |
+
+## Iteration 14 additions (task 3.1 — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `A2ACoordinator` / `KernelPaymentStorePort` (deleted) | CRITICAL | legacy kernel payment path removed; canonical path is `PaymentSystemServiceProvider` + `SystemPaymentClient` | P2.1 |
+| `local_simulated_terms` (proto) | LOW | bootstrap + test fixtures in web/runtime-host/sdk; provider-neutral factory | P2.1 |
+| `macaca-kernel::persistence` (payment store removed) | MEDIUM | kernel persistence port now generic KV only; payment mementos owned by persist + payment service | P2.1 |
+| `payment_service_provider` integration tests | LOW | service.call policy denial + invalid transition contracts | P2.1 |
+
+## Iteration 15 additions (task 3.2 — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `Web3Facade` / `Web3Adapter` / `Web3TraceEventSink` (deleted) | CRITICAL | legacy kernel Web3 path removed; canonical path is `Web3SystemServiceProvider` + `SystemWeb3Client` | P2.2 |
+| `DefaultWeb3PolicyEngine` (deleted) | MEDIUM | kernel policy engine removed; service path uses provider admission + entitlement layers | P2.2 |
+| `web3_service_provider` integration tests | LOW | unavailable/mock service.call contracts; no production behavior change | P2.2 |
+| `route_c_bootstrap` Web3 unavailable default | LOW | base OS boots with structured unavailable Web3; unchanged bootstrap seam | P2.2 |

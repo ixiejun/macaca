@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use macaca_proto::{
     AgentContextBuildCommand, AgentContextSnapshot, AgentExecutionCommand, AgentExecutionIntent,
-    ExecutionControlCheckpointMode, ExecutionControlPolicyOverride,
+    ExecutionControlCheckpointMode, ExecutionControlPolicy, ExecutionControlPolicyOverride,
     ExecutionControlResolutionStatus, ExecutionControlResumeSource, ExecutionControlTrigger,
 };
 use macaca_runtime_host::{
@@ -13,7 +13,7 @@ use macaca_runtime_host::{
 };
 
 #[test]
-fn chat_main_thread_uses_deprecated_compat_execution_control_policy() {
+fn chat_main_thread_without_manifest_default_stays_disabled() {
     let command = AgentExecutionCommand::new(
         macaca_proto::ApplicationId::from_name("demo"),
         "session-a",
@@ -24,13 +24,36 @@ fn chat_main_thread_uses_deprecated_compat_execution_control_policy() {
     )
     .unwrap();
 
-    let resolution = resolve_execution_control_policy_local(&command);
+    let resolution = resolve_execution_control_policy_local(&command, None);
+
+    assert_eq!(
+        resolution.status,
+        ExecutionControlResolutionStatus::Disabled
+    );
+}
+
+#[test]
+fn manifest_default_enables_execution_control_for_chat_main_thread() {
+    let command = AgentExecutionCommand::new(
+        macaca_proto::ApplicationId::from_name("demo"),
+        "session-a",
+        "coordinator",
+        macaca_proto::AgentExecutionIntent::ChatMainThread,
+        "create a project goal",
+        macaca_proto::TraceContext::new("trace-chat-main-thread-manifest"),
+    )
+    .unwrap();
+    let app_default = ExecutionControlPolicy::enabled(
+        vec![ExecutionControlTrigger::tool_call_barrier("create_goal")],
+        vec![ExecutionControlResumeSource::goal_lifecycle()],
+        ExecutionControlCheckpointMode::ReferenceOnly,
+    )
+    .allow_command_overrides(false);
+
+    let resolution = resolve_execution_control_policy_local(&command, Some(&app_default));
 
     assert_eq!(resolution.status, ExecutionControlResolutionStatus::Enabled);
-    assert_eq!(
-        resolution.metadata.get("compatibility"),
-        Some(&"legacy_chat_main_thread_goal_pause".to_string())
-    );
+    assert!(resolution.metadata.get("compatibility").is_none());
 }
 
 #[test]
@@ -45,7 +68,7 @@ fn delegated_runtime_execution_without_policy_does_not_install_execution_control
     )
     .unwrap();
 
-    let resolution = resolve_execution_control_policy_local(&command);
+    let resolution = resolve_execution_control_policy_local(&command, None);
 
     assert_eq!(
         resolution.status,
@@ -54,7 +77,32 @@ fn delegated_runtime_execution_without_policy_does_not_install_execution_control
 }
 
 #[test]
-fn delegated_runtime_execution_with_override_installs_execution_control() {
+fn delegated_runtime_execution_with_override_without_manifest_is_denied() {
+    let command = AgentExecutionCommand::new(
+        macaca_proto::ApplicationId::from_name("demo"),
+        "session-a",
+        "backend",
+        macaca_proto::AgentExecutionIntent::TaskWorker,
+        "implement the assigned task",
+        macaca_proto::TraceContext::new("trace-task-worker-control-denied"),
+    )
+    .unwrap()
+    .with_execution_control_override(ExecutionControlPolicyOverride::enable_for_run(
+        vec![ExecutionControlTrigger::tool_call_barrier("create_goal")],
+        vec![ExecutionControlResumeSource::goal_lifecycle()],
+        ExecutionControlCheckpointMode::ReferenceOnly,
+    ));
+
+    let resolution = resolve_execution_control_policy_local(&command, None);
+
+    assert_eq!(
+        resolution.status,
+        ExecutionControlResolutionStatus::Denied
+    );
+}
+
+#[test]
+fn delegated_runtime_execution_with_override_installs_execution_control_when_manifest_allows() {
     let command = AgentExecutionCommand::new(
         macaca_proto::ApplicationId::from_name("demo"),
         "session-a",
@@ -69,8 +117,20 @@ fn delegated_runtime_execution_with_override_installs_execution_control() {
         vec![ExecutionControlResumeSource::goal_lifecycle()],
         ExecutionControlCheckpointMode::ReferenceOnly,
     ));
+    let app_default = ExecutionControlPolicy::enabled(
+        vec![
+            ExecutionControlTrigger::tool_call_barrier("create_goal"),
+            ExecutionControlTrigger::tool_call_barrier("delegate_task"),
+        ],
+        vec![
+            ExecutionControlResumeSource::goal_lifecycle(),
+            ExecutionControlResumeSource::ForkLifecycle,
+        ],
+        ExecutionControlCheckpointMode::ReferenceOnly,
+    )
+    .allow_command_overrides(true);
 
-    let resolution = resolve_execution_control_policy_local(&command);
+    let resolution = resolve_execution_control_policy_local(&command, Some(&app_default));
 
     assert_eq!(resolution.status, ExecutionControlResolutionStatus::Enabled);
 }
@@ -397,13 +457,13 @@ fn execution_backend_consumes_context_snapshot_without_rebuilding_context() {
     let composed = include_str!(
         "../../../../runtime/macaca-runtime-host/src/composed_agent_execution_backend.rs"
     );
-    let framework_port = include_str!("../web_agent_execution_adapters.rs");
+    let construction_adapter = include_str!("../framework_agent_construction_shell_adapter.rs");
     let service_context_call = "build_agent_context_snapshot_via_service";
     let snapshot_runtime_builder = "build_runtime_agent_from_context_snapshot";
     let legacy_runtime_builder = ["FrameworkRunner::build_runtime", "_agent("].concat();
 
     assert!(composed.contains(service_context_call));
-    assert!(framework_port.contains(snapshot_runtime_builder));
+    assert!(construction_adapter.contains(snapshot_runtime_builder));
     assert!(!composed.contains(&legacy_runtime_builder));
 }
 
@@ -520,6 +580,8 @@ fn direct_session_pause_resume_channels_stay_inside_approved_adapters() {
         "web_agent_execution_adapters.rs",
         "chat_orchestrator.rs",
         "framework_runner.rs",
+        "fork_join_shell_adapter.rs",
+        "goal_lifecycle_shell_adapter.rs",
         "hook_consumer.rs",
         "loop_manager.rs",
         "state.rs",
@@ -559,13 +621,16 @@ fn legacy_session_pause_resume_paths_are_marked_deprecated() {
     let state_source = include_str!("../state.rs");
     let hook_consumer_source = include_str!("../hook_consumer.rs");
     let loop_manager_source = include_str!("../loop_manager.rs");
+    let fork_join_adapter = include_str!("../fork_join_shell_adapter.rs");
+    let goal_lifecycle_adapter = include_str!("../goal_lifecycle_shell_adapter.rs");
 
     assert!(state_source.contains("Deprecated compatibility boundary"));
     assert!(state_source.contains("new execution-control ownership should"));
     assert!(hook_consumer_source.contains("service.execution_control"));
-    assert!(hook_consumer_source.contains("Deprecated compatibility boundary"));
-    assert!(loop_manager_source.contains("service-backed execution-control path"));
-    assert!(loop_manager_source.contains("Deprecated compatibility boundary"));
+    assert!(fork_join_adapter.contains("Deprecated compatibility boundary"));
+    assert!(goal_lifecycle_adapter.contains("Deprecated compatibility boundary"));
+    assert!(loop_manager_source.contains("ExecutionControlGoalLifecycleCoordinator"));
+    assert!(loop_manager_source.contains("goal_lifecycle_shell_adapter"));
 }
 
 fn rust_files(root: &Path) -> Vec<PathBuf> {

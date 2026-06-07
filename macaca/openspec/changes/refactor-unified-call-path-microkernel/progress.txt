@@ -77,3 +77,32 @@
 - **Contract tests**: `unified_workflow_application_abi_tests.rs` 6/6; updated `unified_agent_execution_provider_tests` (7/7); `unified_delegation_path` 6/6 unchanged.
 - **Verified**: `cargo check -p macaca-proto -p macaca-runtime-host -p macaca-web`; `cargo test -p macaca-web unified_` 19/19.
 - **Remaining P1**: 2.6 coordination patch removal (gate: audit replay → 1 chain); 2.7 P1 exit validation; `FrameworkRunner` body still in web (task 4.3.2).
+
+## Iteration 12 (2026-06-07)
+- **P1.6 coordination patch removal (2.6)**: deleted `authoritative/non_authoritative/legacy_unmarked` terminal reconciliation in `application_execution_hosted.rs`; removed `graph_owner` compat metadata from `host_import_bridge.rs`; removed `suppress_executor_lifecycle` / `legacy_chat_main_thread_goal_pause` OS branches.
+- **Manifest-driven execution control**: `AppManifest.execution_control` + yaml projection; `fullstack-autodev/app.yaml` declares `create_goal` pause + `goal_lifecycle` resume; web adapter resolves policy via `application_client.metadata()` (not `state.registry`).
+- **Proto projection**: `ApplicationMetadataView.execution_control` exposed through Application Service metadata path.
+- **Contract tests**: updated `agent_execution_backend/tests.rs` for manifest-required overrides + shell adapter allowlist; `serviceization_escape_hatches` green.
+- **Verified**: `cargo check -p macaca-runtime-host -p macaca-web -p macaca-app`; `cargo test -p macaca-web agent_execution_backend` 28/28; `cargo test -p macaca-integration-tests serviceization_escape_hatches_reject` pass.
+- **Remaining P1**: 2.7 P1 exit validation (audit replay single chain + route-c regression); `FrameworkRunner` body still in web (task 4.3.2).
+
+## Iteration 13 (2026-06-07)
+- **P1 exit validation (2.7)**: `unified_audit_replay_convergence_tests.rs` (web 6/6 + runtime-host 3/3); post-convergence report in `audit-replay-baseline.md` (YAML/WASM each 1 chain, down from 3).
+- **Regression fixes (2.7.2)**: `execution_control` YAML variant tags (`!ToolCallBarrier` / `!GoalLifecycle`); `ExecutionControlPolicy` serde defaults in `macaca-proto`; `AppManifest.execution_control` test fixtures; `fullstack-autodev/app.yaml` + missing `personas/frontend/` fixture; `.gitignore` narrowed to `/frontend/` so example-app persona dirs track.
+- **VC-escape (2.7.3)**: `serviceization_escape_hatches_reject_new_production_references` violations=0.
+- **Verified**: `cargo test -p macaca-web unified_audit_replay_convergence` 6/6; `cargo test -p macaca-runtime-host --lib unified_audit_replay_convergence` 3/3; `cargo test -p macaca-integration-tests --test route_c_baseline` 4/4; `cargo test -p macaca-integration-tests --test fullstack_autodev` 10/10 (4 ignored); `cargo test -p macaca-app` 131/131.
+- **P1 complete** (tasks 2.1–2.7). **Next**: P2 kernel purification (3.1.2+); `FrameworkRunner` body still in web (task 4.3.2).
+
+## Iteration 14 (2026-06-07)
+- **P2.1 payment/A2A kernel eviction (3.1.2–3.1.4)**: moved `local_simulated_terms` factory to `macaca-proto/a2a.rs`; updated web bootstrap, runtime-host bootstrap, SDK payment client tests, and payment provider integration tests to use proto contract.
+- **Kernel cleanup (3.1.3)**: deleted `kernel/a2a.rs`, `a2a_event.rs`, `payment_policy.rs`; removed deprecated `KernelPaymentStore*` from `persistence.rs`; dropped `lib.rs` A2A/payment_policy re-exports.
+- **Service-path tests (3.1.4)**: `payment_service_provider.rs` 5/5 (quote/settle/trace/policy-denied/invalid-transition); `macaca-sdk` `UnavailableSystemPaymentClient` 3/3; VC-escape `serviceization_escape_hatches_reject_new_production_references` violations=0.
+- **Verified**: `cargo check -p macaca-kernel -p macaca-proto -p macaca-runtime-host -p macaca-sdk -p macaca-web`; payment + escape hatch tests green.
+- **Next**: P2 §3.2 web3 kernel eviction; `FrameworkRunner` body still in web (task 4.3.2).
+
+## Iteration 15 (2026-06-07)
+- **P2.2 web3 kernel eviction (3.2.1–3.2.4)**: confirmed zero production consumers of `macaca_kernel::web3`; canonical path is `Web3SystemServiceProvider` + `SystemWeb3Client` via Route C bootstrap.
+- **Kernel cleanup (3.2.3)**: deleted `kernel/web3.rs`, `web3_event.rs`, `web3_tests.rs`; removed `lib.rs` Web3 facade/adapter re-exports.
+- **Service-path tests (3.2.4)**: `web3_service_provider.rs` 6/6 (unavailable snapshot/signing/health, mock sign/tx/query/wallets, trace-required); `macaca-sdk` `web3_client` 2/2; VC-escape `serviceization_escape_hatches_reject_new_production_references` violations=0.
+- **Verified**: `cargo check -p macaca-kernel -p macaca-runtime-host -p macaca-sdk -p macaca-web`; web3 + escape hatch tests green.
+- **Next**: P2 §3.3 EVM kernel eviction; `FrameworkRunner` body still in web (task 4.3.2).

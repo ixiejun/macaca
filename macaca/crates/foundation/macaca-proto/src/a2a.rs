@@ -197,6 +197,29 @@ pub struct PaymentTerms {
     pub metadata: BTreeMap<String, String>,
 }
 
+/// Build provider-neutral local simulated payment terms for tests and scaffolds.
+///
+/// This factory centralizes the canonical `local_simulated` rail configuration so
+/// bootstrap code, integration tests, and SDK fixtures share one contract shape
+/// without depending on kernel-owned payment coordinators. The helper is
+/// intentionally parameterised by quantity and asset code so different harnesses
+/// can express budget scenarios while keeping rail semantics stable.
+pub fn local_simulated_terms(
+    quantity: impl Into<String>,
+    asset_code: impl Into<String>,
+) -> PaymentTerms {
+    PaymentTerms {
+        amount: PaymentAmount::new(
+            quantity,
+            PaymentAsset::new(PaymentRail::local_simulated(), asset_code),
+        ),
+        billing_unit: "operation".into(),
+        expires_at: None,
+        requires_explicit_approval: false,
+        metadata: BTreeMap::from([("simulation".into(), "true".into())]),
+    }
+}
+
 /// Command sent by a requester to ask a provider for priced capability terms.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct QuoteRequest {

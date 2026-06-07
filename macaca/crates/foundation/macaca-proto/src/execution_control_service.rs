@@ -128,8 +128,15 @@ pub struct ExecutionControlPolicy {
     pub triggers: Vec<ExecutionControlTrigger>,
     pub resume_sources: Vec<ExecutionControlResumeSource>,
     pub checkpoint_mode: ExecutionControlCheckpointMode,
+    /// Defaults to `false` when omitted from YAML/JSON manifests so application
+    /// authors only declare overrides when they explicitly want them.
+    #[serde(default)]
     pub allow_command_overrides: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timeout_ms: Option<u64>,
+    /// Optional provider-neutral extension metadata.  Defaults to empty so YAML
+    /// manifests do not need to declare an explicit `metadata: {}` block.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub metadata: BTreeMap<String, String>,
 }
 
@@ -179,7 +186,9 @@ pub struct ExecutionControlPolicyOverride {
     pub triggers: Vec<ExecutionControlTrigger>,
     pub resume_sources: Vec<ExecutionControlResumeSource>,
     pub checkpoint_mode: ExecutionControlCheckpointMode,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timeout_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub metadata: BTreeMap<String, String>,
 }
 

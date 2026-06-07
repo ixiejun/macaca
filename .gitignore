@@ -29,8 +29,8 @@ logs/
 .env
 .env.local
 
-# Frontend (has its own git)
-frontend/
+# Frontend (has its own git) — anchor to repo root so example-app `personas/frontend/` is not ignored
+/frontend/
 
 # Large binary files
 *.zip

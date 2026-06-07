@@ -67,31 +67,31 @@
 - [x] 2.5.3 单测：driver catalog/MCP definitions 不可用时不触发旧 runtime fallback。（`production_toolkit_assembly_does_not_register_direct_mcp_clients` + `probe_mcp_capability_inputs_via_client_maps_service_status_views`）
 
 ### 2.6 删除多路径协调补丁（前置：audit replay 已显示单链）
-- [ ] 2.6.1 删除 `runtime-host/application_execution_hosted.rs` 的 `authoritative/non_authoritative/legacy_unmarked` 区分逻辑（约 546–695 行），终态判定回归"所有 host command 同等 authoritative"。
-- [ ] 2.6.2 删除 `wasm_runtime_provider/host_import_bridge.rs` 中 `graph_owner`/`execution.graph_owner` 的"区分真实/兼容"用途（保留纯审计标签如确有审计价值，否则删除）。
-- [ ] 2.6.3 删除 `agent_execution_backend.rs` 的 `should_emit_executor_lifecycle`/`suppress_executor_lifecycle`（单一发事件方后无需去重）。
-- [ ] 2.6.4 删除 `agent_execution_backend.rs` 的 `legacy_execution_control_policy` / `legacy_chat_main_thread_goal_pause`，改由 manifest projection 提供 execution-control policy。
-- [ ] 2.6.5 删除 `application_execution_hosted.rs` 中针对 `queued|pending` 与 legacy 状态的兼容归一化分支中"为兼容路径而存在"的部分（保留协议必须的状态语义）。
-- [ ] 2.6.6 全仓搜索确认 `legacy_unmarked`/`non_authoritative`/`suppress_executor_lifecycle`/`legacy_chat_main_thread_goal_pause` 在生产代码中为 0 命中。
+- [x] 2.6.1 删除 `runtime-host/application_execution_hosted.rs` 的 `authoritative/non_authoritative/legacy_unmarked` 区分逻辑（约 546–695 行），终态判定回归"所有 host command 同等 authoritative"。
+- [x] 2.6.2 删除 `wasm_runtime_provider/host_import_bridge.rs` 中 `graph_owner`/`execution.graph_owner` 的"区分真实/兼容"用途（保留纯审计标签如确有审计价值，否则删除）。
+- [x] 2.6.3 删除 `agent_execution_backend.rs` 的 `should_emit_executor_lifecycle`/`suppress_executor_lifecycle`（单一发事件方后无需去重）。
+- [x] 2.6.4 删除 `agent_execution_backend.rs` 的 `legacy_execution_control_policy` / `legacy_chat_main_thread_goal_pause`，改由 manifest projection 提供 execution-control policy。
+- [x] 2.6.5 删除 `application_execution_hosted.rs` 中针对 `queued|pending` 与 legacy 状态的兼容归一化分支中"为兼容路径而存在"的部分（保留协议必须的状态语义）。
+- [x] 2.6.6 全仓搜索确认 `legacy_unmarked`/`non_authoritative`/`suppress_executor_lifecycle`/`legacy_chat_main_thread_goal_pause` 在生产代码中为 0 命中。
 
 ### 2.7 P1 退出验证
-- [ ] 2.7.1 audit replay：YAML 与 WASM 会话各自只出现**一条** service.call 执行链（对照 0.3 基线，由 >1 收敛为 1）。
-- [ ] 2.7.2 route-c 回归矩阵（`macaca/docs/route-c-regression-matrix.md`）全绿；`/api/chat/v2` 创建/恢复不回归；fullstack-autodev 集成测试绿。
-- [ ] 2.7.3 VC-escape：1.1.7 冻结的协调补丁标记在生产代码清零。
+- [x] 2.7.1 audit replay：YAML 与 WASM 会话各自只出现**一条** service.call 执行链（对照 0.3 基线，由 >1 收敛为 1）。
+- [x] 2.7.2 route-c 回归矩阵（`macaca/docs/route-c-regression-matrix.md`）全绿；`/api/chat/v2` 创建/恢复不回归；fullstack-autodev 集成测试绿。
+- [x] 2.7.3 VC-escape：1.1.7 冻结的协调补丁标记在生产代码清零。
 
 ## 3. P2 — 内核纯净化（驱逐非内核能力 + 解除越界依赖）
 
 ### 3.1 驱逐 Payment / A2A
 - [x] 3.1.1 `[impact-memo]` 盘点 `kernel/a2a.rs`、`a2a_event.rs`、`payment_policy.rs` 的消费者；确认 runtime-host `payment_service_provider.rs`/`payment_adapter.rs`/`payment_admission.rs` 可承接全部能力。（`payment_policy` 实现已迁至 `macaca-proto`；kernel 仅 compat re-export）
-- [ ] 3.1.2 将 payment policy / A2A coordinator 能力迁入 payment service（provider 层），保留结构化 unavailable（service 缺席时）。
-- [ ] 3.1.3 删除 kernel `a2a.rs`、`a2a_event.rs`、`payment_policy.rs` 及 `lib.rs` 中相关 `#[allow(deprecated)]` 导出。
-- [ ] 3.1.4 测试：payment/A2A 经 service.call 路径；payment service 缺席返回结构化 denied/unavailable，不崩溃。
+- [x] 3.1.2 将 payment policy / A2A coordinator 能力迁入 payment service（provider 层），保留结构化 unavailable（service 缺席时）。
+- [x] 3.1.3 删除 kernel `a2a.rs`、`a2a_event.rs`、`payment_policy.rs` 及 `lib.rs` 中相关 `#[allow(deprecated)]` 导出。
+- [x] 3.1.4 测试：payment/A2A 经 service.call 路径；payment service 缺席返回结构化 denied/unavailable，不崩溃。
 
 ### 3.2 驱逐 Web3
-- [ ] 3.2.1 `[impact-memo]` 盘点 `kernel/web3.rs`、`web3_event.rs`、`web3_tests.rs` 消费者；确认现有 web3 service provider（runtime-host）可承接。
-- [ ] 3.2.2 将 Web3 facade/adapter 迁入 web3 optional module/service provider；缺席返回结构化 unavailable。
-- [ ] 3.2.3 删除 kernel `web3.rs`、`web3_event.rs`、`web3_tests.rs` 及 `lib.rs` 导出。
-- [ ] 3.2.4 测试：web3 optional 缺席时 base OS 正常启动/执行/恢复/查询审计。
+- [x] 3.2.1 `[impact-memo]` 盘点 `kernel/web3.rs`、`web3_event.rs`、`web3_tests.rs` 消费者；确认现有 web3 service provider（runtime-host）可承接。（生产代码零外部消费者；canonical 路径为 `Web3SystemServiceProvider` + `SystemWeb3Client`）
+- [x] 3.2.2 将 Web3 facade/adapter 迁入 web3 optional module/service provider；缺席返回结构化 unavailable。（`web3_service_provider.rs` 已含 `UnavailableWeb3Provider`/`MockWeb3Provider` + Route C bootstrap 默认 unavailable）
+- [x] 3.2.3 删除 kernel `web3.rs`、`web3_event.rs`、`web3_tests.rs` 及 `lib.rs` 导出。
+- [x] 3.2.4 测试：web3 optional 缺席时 base OS 正常启动/执行/恢复/查询审计。（`web3_service_provider.rs` 6/6 + SDK `web3_client` 2/2；VC-escape violations=0）
 
 ### 3.3 驱逐 EVM
 - [ ] 3.3.1 `[impact-memo]` 盘点 `kernel/evm.rs`、`evm_adapter.rs`、`evm_event.rs`、`evm_tests.rs` 消费者；确认 `runtime-host/evm_service_provider.rs` 可承接（参考 `optional-evm-substrate-frontier-adapter-boundary.md`）。

@@ -6,7 +6,7 @@ use crate::service_capability::AppServiceContractConfig;
 use crate::ui_runtime::AppUiRuntimeConfig;
 use macaca_proto::{
     AgentId, ApplicationExecutionProfileDeclaration, ApplicationId,
-    ApplicationWorkbenchManifestDeclaration,
+    ApplicationWorkbenchManifestDeclaration, ExecutionControlPolicy,
 };
 
 /// The execution layer of an application.
@@ -393,6 +393,13 @@ pub struct AppManifest {
     /// logic or rendering rules.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ui: Option<AppUiRuntimeConfig>,
+    /// Optional provider-neutral execution-control policy for this application.
+    ///
+    /// Applications declare pause/resume triggers and resume sources here so the
+    /// OS can resolve `service.execution_control` without hard-coded intent
+    /// branches.  The YAML adapter projects this field into Manifest v1.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution_control: Option<ExecutionControlPolicy>,
 }
 
 /// UI type for frontend rendering.
@@ -581,6 +588,7 @@ agents:
                 workbench: None,
                 autonomy: None,
                 ui: None,
+                execution_control: None,
             },
             agent_ids: vec![],
             status: AppStatus::Loaded,
@@ -619,6 +627,45 @@ workflows:
         let sdd = workflows.get("sdd").unwrap();
         assert_eq!(sdd.steps.len(), 2);
         assert_eq!(sdd.steps[1].depends_on, vec!["analyze"]);
+    }
+
+    /// Documents the YAML tag encoding required by `serde_yaml` for externally
+    /// tagged `ExecutionControlTrigger` / `ExecutionControlResumeSource` enums.
+    /// Application manifests MUST use `!Variant` tags so `AppLoader` can parse
+    /// `execution_control` blocks without map/tag ambiguity.
+    #[test]
+    fn execution_control_policy_parses_yaml_variant_tags() {
+        use macaca_proto::{
+            ExecutionControlCheckpointMode, ExecutionControlMode, ExecutionControlPolicy,
+            ExecutionControlResumeSource, ExecutionControlTrigger,
+        };
+
+        let yaml = r#"
+name: execution-control-fixture
+layer: L3Declarative
+execution_control:
+  mode: Enabled
+  triggers:
+    - !ToolCallBarrier
+      tool_name: create_goal
+  resume_sources:
+    - !GoalLifecycle
+  checkpoint_mode: ReferenceOnly
+  allow_command_overrides: false
+"#;
+        let manifest: AppManifest = serde_yaml::from_str(yaml).unwrap();
+        let policy = manifest.execution_control.expect("execution_control block");
+        assert_eq!(policy.mode, ExecutionControlMode::Enabled);
+        assert_eq!(
+            policy.triggers,
+            vec![ExecutionControlTrigger::tool_call_barrier("create_goal")]
+        );
+        assert_eq!(
+            policy.resume_sources,
+            vec![ExecutionControlResumeSource::goal_lifecycle()]
+        );
+        assert_eq!(policy.checkpoint_mode, ExecutionControlCheckpointMode::ReferenceOnly);
+        assert!(!policy.allow_command_overrides);
     }
 
     #[test]

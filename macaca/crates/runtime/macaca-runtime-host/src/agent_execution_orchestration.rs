@@ -133,18 +133,6 @@ pub fn structured_execution_context(command: &AgentExecutionCommand) -> serde_js
     serde_json::Value::Object(context)
 }
 
-/// Whether coarse executor lifecycle events should be emitted for this run.
-///
-/// Migration surface: removed once all callers use a single event owner (P1.6).
-#[must_use]
-pub fn should_emit_executor_lifecycle(command: &AgentExecutionCommand) -> bool {
-    command
-        .metadata
-        .get("suppress_executor_lifecycle")
-        .map(|value| value != "true")
-        .unwrap_or(true)
-}
-
 /// Verify trusted Agent Context supplied `HEARTBEAT.md` evidence.
 #[must_use]
 pub fn has_heartbeat_source_evidence(context_snapshot: &AgentContextSnapshot) -> bool {
@@ -263,65 +251,21 @@ pub fn extract_single_shell_fence(body: &str) -> Option<String> {
     }
 }
 
-/// Deprecated compatibility policy for legacy YAML chat main-thread sessions.
-///
-/// Migration surface: replaced by manifest projection (P1.6).
-#[must_use]
-pub fn legacy_chat_main_thread_execution_control_policy(
-    command: &AgentExecutionCommand,
-) -> Option<ExecutionControlPolicy> {
-    if command.execution_control_override.is_some()
-        || !matches!(
-            command.execution_intent,
-            AgentExecutionIntent::ChatMainThread
-        )
-    {
-        return None;
-    }
-
-    Some(
-        ExecutionControlPolicy::enabled(
-            vec![ExecutionControlTrigger::tool_call_barrier("create_goal")],
-            vec![ExecutionControlResumeSource::goal_lifecycle()],
-            ExecutionControlCheckpointMode::ReferenceOnly,
-        )
-        .allow_command_overrides(false),
-    )
-}
-
 /// Resolve execution-control policy using the same Strategy as the service layer.
 ///
 /// Production hosts should prefer the service-backed resolver; this helper
-/// exists for unit tests and offline policy admission checks.
+/// exists for unit tests and offline policy admission checks.  Application
+/// defaults must come from manifest projection (`ApplicationManifestV1`) rather
+/// than hard-coded OS compatibility branches.
 #[must_use]
 pub fn resolve_execution_control_policy_local(
     command: &AgentExecutionCommand,
+    app_default: Option<&ExecutionControlPolicy>,
 ) -> ExecutionControlResolvedPolicy {
-    let compat_policy = legacy_chat_main_thread_execution_control_policy(command);
-    let command_declared_policy =
-        command
-            .execution_control_override
-            .as_ref()
-            .map(|override_policy| {
-                ExecutionControlPolicy::enabled(
-                    override_policy.triggers.clone(),
-                    override_policy.resume_sources.clone(),
-                    override_policy.checkpoint_mode.clone(),
-                )
-                .allow_command_overrides(true)
-            });
-    let app_policy = compat_policy.as_ref().or(command_declared_policy.as_ref());
-    let mut resolution = ExecutionControlPolicyResolver::resolve(
-        app_policy,
+    ExecutionControlPolicyResolver::resolve(
+        app_default,
         command.execution_control_override.as_ref(),
-    );
-    if compat_policy.is_some() && resolution.status == ExecutionControlResolutionStatus::Enabled {
-        resolution.metadata.insert(
-            "compatibility".into(),
-            "legacy_chat_main_thread_goal_pause".into(),
-        );
-    }
-    resolution
+    )
 }
 
 /// Stable provider-neutral execution id for one service run.
@@ -447,7 +391,7 @@ mod tests {
     };
 
     #[test]
-    fn chat_main_thread_compat_policy_is_enabled() {
+    fn chat_main_thread_without_manifest_default_stays_disabled() {
         let command = AgentExecutionCommand::new(
             macaca_proto::ApplicationId::from_name("demo"),
             "session-a",
@@ -458,13 +402,36 @@ mod tests {
         )
         .unwrap();
 
-        let resolution = resolve_execution_control_policy_local(&command);
+        let resolution = resolve_execution_control_policy_local(&command, None);
+
+        assert_eq!(
+            resolution.status,
+            ExecutionControlResolutionStatus::Disabled
+        );
+    }
+
+    #[test]
+    fn manifest_default_enables_execution_control_for_chat_main_thread() {
+        let command = AgentExecutionCommand::new(
+            macaca_proto::ApplicationId::from_name("demo"),
+            "session-a",
+            "entry-agent",
+            AgentExecutionIntent::ChatMainThread,
+            "create a project goal",
+            TraceContext::new("trace-chat-main-thread-manifest"),
+        )
+        .unwrap();
+        let app_default = ExecutionControlPolicy::enabled(
+            vec![ExecutionControlTrigger::tool_call_barrier("create_goal")],
+            vec![ExecutionControlResumeSource::goal_lifecycle()],
+            ExecutionControlCheckpointMode::ReferenceOnly,
+        )
+        .allow_command_overrides(false);
+
+        let resolution = resolve_execution_control_policy_local(&command, Some(&app_default));
 
         assert_eq!(resolution.status, ExecutionControlResolutionStatus::Enabled);
-        assert_eq!(
-            resolution.metadata.get("compatibility"),
-            Some(&"legacy_chat_main_thread_goal_pause".to_string())
-        );
+        assert!(resolution.metadata.get("compatibility").is_none());
     }
 
     #[test]

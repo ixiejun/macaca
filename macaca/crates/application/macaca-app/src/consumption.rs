@@ -280,6 +280,7 @@ mod tests {
             workbench: None,
             autonomy: None,
             ui: None,
+            execution_control: None,
         }
     }
 

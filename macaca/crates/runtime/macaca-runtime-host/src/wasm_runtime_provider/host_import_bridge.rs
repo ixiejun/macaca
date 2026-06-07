@@ -276,20 +276,9 @@ impl WasmHostImportBridge {
                     .metadata
                     .insert("service_status".into(), sanitize_label(reply.status));
                 if let Some(task_id) = task_lifecycle.as_deref() {
-                    // Agent delegation tasks are the authoritative task graph
-                    // entries for an application-execution run.  The marker is
-                    // a service-owned category, not an application or workflow
-                    // name, so hosted execution can separate real run terminal
-                    // facts from compatibility diagnostics without special
-                    // casing any application.
-                    result.metadata.insert(
-                        "graph_owner".into(),
-                        APPLICATION_EXECUTION_GRAPH_OWNER.into(),
-                    );
-                    result.metadata.insert(
-                        "execution.graph_owner".into(),
-                        APPLICATION_EXECUTION_GRAPH_OWNER.into(),
-                    );
+                    // Record the durable task id on the host-command result so
+                    // replay consumers can correlate import completion with the
+                    // Task Service lifecycle opened earlier in this bridge.
                     result.metadata.insert("task_id".into(), task_id.into());
                 }
                 for (key, value) in reply.metadata {

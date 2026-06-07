@@ -10,15 +10,14 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use macaca_kernel::executor::{ApplicationExecutor, ExecutorEventFactory};
 use macaca_proto::{
-    AgentActivity, AgentExecutionCommand, AgentExecutionEvent,
+    AgentActivity, AgentExecutionCommand, AgentExecutionEvent, ApplicationMetadataQueryCommand,
     ExecutionControlCommandResult, ExecutionControlPolicy,
     ExecutionControlRegisterExecutionCommand, ExecutionControlResolutionStatus,
     ExecutionControlResolvePolicyCommand, ExecutionControlResolvedPolicy, KernelServiceId,
     ServiceBusSource, ServiceError, ServiceResult, TaskId, EXECUTION_CONTROL_SERVICE_ID,
 };
 use macaca_runtime_host::{
-    execution_control_execution_id, execution_control_scope,
-    legacy_chat_main_thread_execution_control_policy, AgentExecutionEvidenceCollector,
+    execution_control_execution_id, execution_control_scope, AgentExecutionEvidenceCollector,
     AgentExecutionHostAdapter, AgentExecutionOutputHasher, OpaqueExecutionControlHandle,
     ServiceBackedFrameworkRuntimeAgentPort,
 };
@@ -89,25 +88,50 @@ impl AgentExecutionHostAdapter for WebAgentExecutionHostAdapter {
         &self,
         command: &AgentExecutionCommand,
     ) -> ServiceResult<ExecutionControlResolvedPolicy> {
-        let compat_policy = legacy_chat_main_thread_execution_control_policy(command);
-        let command_declared_policy =
-            command
-                .execution_control_override
-                .as_ref()
-                .map(|override_policy| {
-                    ExecutionControlPolicy::enabled(
-                        override_policy.triggers.clone(),
-                        override_policy.resume_sources.clone(),
-                        override_policy.checkpoint_mode.clone(),
-                    )
-                    .allow_command_overrides(true)
-                });
-        let app_policy = compat_policy.as_ref().or(command_declared_policy.as_ref());
+        // Adapter pattern: resolve application defaults from Application Service
+        // metadata projection instead of direct registry reads or OS-level intent
+        // branches. Missing metadata yields `None`, which disables execution
+        // control unless an explicit command override is later allowed by policy.
+        let app_default = match ApplicationMetadataQueryCommand::application(
+            command.trace.clone(),
+            command.application_id,
+        ) {
+            Ok(metadata_command) => match self.state.application_client.metadata(metadata_command).await
+            {
+                Ok(view) => view.execution_control,
+                Err(error) => {
+                    tracing::warn!(
+                        application_id = %command.application_id,
+                        session_id = %command.session_id,
+                        error = %error,
+                        "application metadata query failed while resolving execution-control policy"
+                    );
+                    None
+                }
+            },
+            Err(error) => {
+                tracing::warn!(
+                    application_id = %command.application_id,
+                    session_id = %command.session_id,
+                    error = %error,
+                    "application metadata command rejected while resolving execution-control policy"
+                );
+                None
+            }
+        };
+        tracing::info!(
+            application_id = %command.application_id,
+            session_id = %command.session_id,
+            target_agent = %command.target_agent,
+            has_manifest_execution_control = app_default.is_some(),
+            has_command_override = command.execution_control_override.is_some(),
+            "resolving execution-control policy from manifest projection"
+        );
         let execution_id = execution_control_execution_id(command);
         let scope = execution_control_scope(command, execution_id, WEB_AGENT_EXECUTION_BUS_SOURCE)?;
         let service_command = ExecutionControlResolvePolicyCommand {
             scope,
-            app_default: app_policy.cloned(),
+            app_default,
             command_override: command.execution_control_override.clone(),
         }
         .into_service_command()
@@ -124,19 +148,12 @@ impl AgentExecutionHostAdapter for WebAgentExecutionHostAdapter {
         let output = reply.output.ok_or_else(|| {
             ServiceError::AdapterFailure("execution control service returned no policy".into())
         })?;
-        let mut resolution: ExecutionControlResolvedPolicy = serde_json::from_value(output)
+        let resolution: ExecutionControlResolvedPolicy = serde_json::from_value(output)
             .map_err(|error| {
                 ServiceError::AdapterFailure(format!(
                     "execution control policy decode failed: {error}"
                 ))
             })?;
-        if compat_policy.is_some() && resolution.status == ExecutionControlResolutionStatus::Enabled
-        {
-            resolution.metadata.insert(
-                "compatibility".into(),
-                "legacy_chat_main_thread_goal_pause".into(),
-            );
-        }
         emit_execution_control_events(
             &self.state,
             &command.session_id,

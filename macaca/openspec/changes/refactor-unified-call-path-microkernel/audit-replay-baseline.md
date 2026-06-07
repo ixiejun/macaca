@@ -81,3 +81,61 @@ curl -s localhost:3001/api/... # or SDK client
 
 Integration proxy (no LLM): `cargo test -p macaca-runtime-host service_call_audit` and
 `cargo test -p macaca-runtime-host execution_control_fork_join`.
+
+---
+
+## Post-convergence report (iteration 13, task 2.7.1)
+
+Captured: 2026-06-07 after task 2.6 coordination-patch deletion.
+
+Method: static entry-surface inventory + `InMemoryServiceCallAuditSink` replay contract
+tests in `unified_audit_replay_convergence_tests.rs` (web + runtime-host).  Live
+`/api/chat/v2` replay with provider credentials remains deferred to route-c smoke;
+CI contract tests are the authoritative no-network gate for P1 exit.
+
+### YAML session (`/api/chat/v2` — manifest/workflow path)
+
+**Distinct chain count: 1** (converged from 3)
+
+| Chain ID | Entry surface | Terminal provider | Status |
+|----------|---------------|-------------------|--------|
+| `yaml-unified` | `chat_orchestrator` (main thread) **or** `agent_runner` → `application.agent.delegate` **or** `ServiceDelegatedTaskDispatcher` | `service.agent_execution` (`ComposedAgentExecutionBackend`) | **canonical** |
+
+Retired chains (must not reappear in production entry surfaces):
+
+| Retired | Was | Now |
+|---------|-----|-----|
+| `yaml-A` | `legacy_chat_main_thread_goal_pause` shell pause | manifest `execution_control` projection |
+| `yaml-B` | `Kernel::execute_agent` / direct shell execution | `application.agent.delegate` ABI |
+| `yaml-C` | `ApplicationExecutor::delegate_task` worker channel | `service.agent_execution` (`TaskWorker` intent) |
+
+### WASM session (`/api/chat/v2` — application execution protocol)
+
+**Distinct chain count: 1** (converged from 3)
+
+| Chain ID | Entry surface | Terminal provider | Status |
+|----------|---------------|-------------------|--------|
+| `wasm-unified` | `application_execution_hosted` control **or** WASM `host_import_bridge` delegate | `service.agent_execution` (`ComposedAgentExecutionBackend`) | **canonical** |
+
+Retired chains:
+
+| Retired | Was | Now |
+|---------|-----|-----|
+| `wasm-A` | `authoritative` / `non_authoritative` / `legacy_unmarked` terminal split | all host commands equally authoritative |
+| `wasm-B` | `execution.graph_owner` compat metadata on import results | removed; task `graph_owner` field retained for Task Service only |
+| `wasm-C` | worker/plan loop direct executor registry hooks | `service.agent_execution` + `service.execution_control` |
+
+### Coordination patch token inventory (task 2.7.3)
+
+Production code hits for frozen tokens: **0** (gate: `serviceization_escape_hatches`).
+
+### Verification commands (CI, no network)
+
+```bash
+cd macaca
+cargo test -p macaca-web unified_audit_replay_convergence -- --nocapture
+cargo test -p macaca-runtime-host unified_audit_replay_convergence -- --nocapture
+cargo test -p macaca-integration-tests serviceization_escape_hatches -- --nocapture
+cargo test -p macaca-integration-tests route_c_baseline -- --nocapture
+cargo test -p macaca-integration-tests fullstack_autodev -- --nocapture
+```

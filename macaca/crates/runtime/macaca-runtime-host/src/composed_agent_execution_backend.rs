@@ -13,8 +13,7 @@ use tracing::{info, warn};
 use crate::agent_execution_orchestration::{
     build_agent_context_snapshot_via_service, execute_exact_heartbeat_shell,
     failed_execution_result, heartbeat_exact_shell_contract, runtime_agent_max_iters,
-    runtime_agent_tool_choice, should_emit_executor_lifecycle,
-    should_skip_heartbeat_without_source, user_prompt_with_context,
+    runtime_agent_tool_choice, should_skip_heartbeat_without_source, user_prompt_with_context,
 };
 use crate::agent_execution_ports::{
     completed_execution_result, AgentExecutionHostAdapter, AgentExecutionOutputHasher,
@@ -89,9 +88,11 @@ impl AgentExecutionBackend for ComposedAgentExecutionBackend {
             ));
         }
 
-        let emit_lifecycle = should_emit_executor_lifecycle(&command);
+        // Single execution path: ComposedAgentExecutionBackend is the sole owner
+        // of coarse executor lifecycle events for every `service.agent_execution` run.
+        const EMIT_EXECUTOR_LIFECYCLE: bool = true;
         self.host
-            .on_run_started(&command, task_id, emit_lifecycle)
+            .on_run_started(&command, task_id, EMIT_EXECUTOR_LIFECYCLE)
             .await;
         self.host
             .observe_application_execution_requested(&command)
@@ -109,7 +110,7 @@ impl AgentExecutionBackend for ComposedAgentExecutionBackend {
                         .on_run_completed(
                             &command,
                             task_id,
-                            emit_lifecycle,
+                            EMIT_EXECUTOR_LIFECYCLE,
                             "heartbeat exact shell completed",
                         )
                         .await;
@@ -132,7 +133,7 @@ impl AgentExecutionBackend for ComposedAgentExecutionBackend {
                 }
                 Err(error) => {
                     self.host
-                        .on_run_failed(&command, task_id, emit_lifecycle, &error)
+                        .on_run_failed(&command, task_id, EMIT_EXECUTOR_LIFECYCLE, &error)
                         .await;
                     Ok(failed_execution_result(
                         &command,
@@ -183,7 +184,7 @@ impl AgentExecutionBackend for ComposedAgentExecutionBackend {
         {
             Ok(output_text) => {
                 self.host
-                    .on_run_completed(&command, task_id, emit_lifecycle, &output_text)
+                    .on_run_completed(&command, task_id, EMIT_EXECUTOR_LIFECYCLE, &output_text)
                     .await;
                 let output = serde_json::json!({ "output": output_text });
                 Ok(completed_execution_result(
@@ -197,7 +198,7 @@ impl AgentExecutionBackend for ComposedAgentExecutionBackend {
             }
             Err(error) => {
                 self.host
-                    .on_run_failed(&command, task_id, emit_lifecycle, &error)
+                    .on_run_failed(&command, task_id, EMIT_EXECUTOR_LIFECYCLE, &error)
                     .await;
                 Ok(failed_execution_result(
                     &command,
