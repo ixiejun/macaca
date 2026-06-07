@@ -325,3 +325,12 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `macaca-domain-pack-finance` Route C classify | LOW | OptionalModule layer registration for new package crate | P5 |
 | `kernel_purity_gate` | LOW | integration-test only; audits macaca-kernel workspace deps | P5 |
 | `p5_terminal_audit_gates/*` | LOW | named VC gates; migration surfaces mirror escape-hatch freeze | P5 |
+
+## Iteration 41 additions (P5 §6.2 debt inventory + §6.1.7 shell deps + §6.3.1 baseline — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `collect_production_violations` / `ScanOptions` | LOW | integration-test only; freeze vs inventory dual-mode scan | P5 |
+| `migration_debt_baseline` (raw=275) | LOW | CI fails if escape-hatch debt grows/shifts without baseline update | P5 |
+| `shell_dependency_purity_gate` | LOW | macaca-cli terminal + macaca-web frozen 7-crate debt | P5 |
+| `openspec/specs/unified-execution-path` + `microkernel-boundary-purity` | LOW | new baseline specs promoted from change deltas | P5 |

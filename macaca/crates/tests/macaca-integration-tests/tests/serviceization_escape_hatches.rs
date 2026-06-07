@@ -1,9 +1,17 @@
 //! Static serviceization escape-hatch gate.
 //!
 //! This integration test is an executable specification for the freeze-first
-//! refactor plan. It does not remove existing behavior; instead it prevents new
-//! production Rust code from growing direct runtime/provider access while the
-//! owners migrate callers to service clients and facades.
+//! refactor plan. It prevents new production Rust code from growing direct
+//! runtime/provider access while owners migrate callers to service clients.
+//!
+//! Two scan modes (Strategy):
+//! - **Freeze mode** (`honor_migration_surfaces = true`): blocks new violations
+//!   outside approved migration surfaces (P0–P4 default).
+//! - **Debt inventory mode** (`honor_migration_surfaces = false`): counts every
+//!   raw hit for baseline tracking toward P5 §6.2 terminal zero-debt state.
+
+#[path = "serviceization_escape_hatches/migration_debt_baseline.rs"]
+mod migration_debt_baseline;
 
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
@@ -14,6 +22,14 @@ struct ForbiddenToken {
     family: &'static str,
     token: &'static str,
     rationale: &'static str,
+}
+
+/// Controls whether approved migration surfaces suppress token hits during scan.
+#[derive(Debug, Clone, Copy)]
+struct ScanOptions {
+    /// When true, hits inside `is_approved_migration_surface` are ignored (freeze gate).
+    /// When false, every production hit is recorded (debt inventory gate).
+    honor_migration_surfaces: bool,
 }
 
 /// A deterministic violation rendered in sorted order for stable CI output.
@@ -397,6 +413,18 @@ fn should_skip_dir(name: &str) -> bool {
     )
 }
 
+/// Returns true when a Rust path is test/fixture code even if it lives under `src/`.
+///
+/// Inline `#[cfg(test)]` modules are handled separately inside `scan_file`; this helper
+/// covers standalone contract-test sources (`*_tests.rs`, `tests.rs`) that must not be
+/// counted as production for terminal reconciliation-marker assertions.
+fn is_non_production_rust_source(relative: &str) -> bool {
+    relative.contains("/tests/")
+        || relative.ends_with("_tests.rs")
+        || relative.ends_with("tests.rs")
+        || relative.ends_with("/serviceization_escape_hatches.rs")
+}
+
 fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> bool {
     if relative.contains("/tests/")
         || relative.ends_with("_tests.rs")
@@ -559,7 +587,54 @@ fn brace_delta(line: &str) -> i32 {
     })
 }
 
-fn scan_file(root: &Path, path: &Path, tokens: &[ForbiddenToken]) -> Vec<Violation> {
+fn violation_fingerprint(violation: &Violation) -> String {
+    format!(
+        "{}|{}|{}",
+        violation.family,
+        violation.path.display(),
+        violation.token
+    )
+}
+
+/// Scan all production Rust files under `crates/` and return sorted violations.
+fn collect_production_violations(options: ScanOptions) -> Vec<Violation> {
+    let root = workspace_root();
+    let crates_root = root.join("crates");
+    let tokens = forbidden_tokens();
+    let mut files = Vec::new();
+
+    eprintln!(
+        "serviceization_escape_hatches event=scan_start honor_migration_surfaces={} root={}",
+        options.honor_migration_surfaces,
+        crates_root.display()
+    );
+    collect_rust_files(&crates_root, &mut files);
+    files.sort();
+
+    let mut violations = Vec::new();
+    for file in &files {
+        violations.extend(scan_file(
+            &root,
+            file,
+            &tokens,
+            options.honor_migration_surfaces,
+        ));
+    }
+    violations.sort();
+    eprintln!(
+        "serviceization_escape_hatches event=scan_complete files={} violations={}",
+        files.len(),
+        violations.len()
+    );
+    violations
+}
+
+fn scan_file(
+    root: &Path,
+    path: &Path,
+    tokens: &[ForbiddenToken],
+    honor_migration_surfaces: bool,
+) -> Vec<Violation> {
     let relative = path
         .strip_prefix(root)
         .expect("scanned file should be under workspace root")
@@ -608,7 +683,7 @@ fn scan_file(root: &Path, path: &Path, tokens: &[ForbiddenToken]) -> Vec<Violati
         for token in tokens {
             if !line.contains(token.token)
                 || (token.family == "hardcoded-agent-role" && is_comment_only_line(line))
-                || is_approved_migration_surface(&relative, token)
+                || (honor_migration_surfaces && is_approved_migration_surface(&relative, token))
             {
                 continue;
             }
@@ -644,32 +719,94 @@ fn render_violations(violations: &[Violation]) -> String {
 
 #[test]
 fn serviceization_escape_hatches_reject_new_production_references() {
-    let root = workspace_root();
-    let crates_root = root.join("crates");
-    let tokens = forbidden_tokens();
-    let mut files = Vec::new();
-
-    eprintln!(
-        "serviceization_escape_hatches event=scan_start root={}",
-        crates_root.display()
-    );
-    collect_rust_files(&crates_root, &mut files);
-    files.sort();
-
-    let mut violations = Vec::new();
-    for file in &files {
-        violations.extend(scan_file(&root, file, &tokens));
-    }
-    violations.sort();
-    eprintln!(
-        "serviceization_escape_hatches event=scan_complete files={} violations={}",
-        files.len(),
-        violations.len()
-    );
+    let violations = collect_production_violations(ScanOptions {
+        honor_migration_surfaces: true,
+    });
 
     assert!(
         violations.is_empty(),
         "Serviceization escape-hatch freeze violations were found:{}",
+        render_violations(&violations)
+    );
+}
+
+/// Ignored helper — run with `cargo test -p macaca-integration-tests dump_escape_hatch_raw_fingerprints -- --ignored --nocapture`
+/// when `migration_debt_baseline.rs` must be regenerated after deliberate surface retirement.
+#[test]
+#[ignore = "baseline regeneration helper only"]
+fn dump_escape_hatch_raw_fingerprints() {
+    let violations = collect_production_violations(ScanOptions {
+        honor_migration_surfaces: false,
+    });
+    eprintln!(
+        "serviceization_escape_hatches event=dump_raw_inventory count={}",
+        violations.len()
+    );
+    for violation in &violations {
+        eprintln!("{}", violation_fingerprint(violation));
+    }
+}
+
+#[test]
+fn serviceization_escape_hatches_migration_debt_inventory_matches_baseline() {
+    let violations = collect_production_violations(ScanOptions {
+        honor_migration_surfaces: false,
+    });
+
+    assert_eq!(
+        violations.len(),
+        migration_debt_baseline::EXPECTED_RAW_VIOLATION_COUNT,
+        "Raw escape-hatch violation count changed (honor_migration_surfaces=false). \
+         Update migration_debt_baseline.rs after OpenSpec-approved surface retirement.{}",
+        render_violations(&violations)
+    );
+
+    let mut observed_by_family: std::collections::BTreeMap<&str, usize> =
+        std::collections::BTreeMap::new();
+    for violation in &violations {
+        *observed_by_family.entry(violation.family).or_insert(0) += 1;
+    }
+    for (family, expected_count) in migration_debt_baseline::EXPECTED_RAW_VIOLATION_BY_FAMILY {
+        let observed = observed_by_family.get(family).copied().unwrap_or(0);
+        assert_eq!(
+            observed, *expected_count,
+            "Raw escape-hatch family debt changed for {family}: observed={observed} expected={expected_count}. \
+             Update migration_debt_baseline.rs after OpenSpec-approved retirement."
+        );
+    }
+}
+
+#[test]
+fn serviceization_escape_hatches_reconciliation_markers_absent_in_production() {
+    let reconciliation_family = "multi-path-coordination-patch";
+    let reconciliation_tokens = forbidden_tokens()
+        .into_iter()
+        .filter(|token| token.family == reconciliation_family)
+        .collect::<Vec<_>>();
+
+    let root = workspace_root();
+    let crates_root = root.join("crates");
+    let mut files = Vec::new();
+    collect_rust_files(&crates_root, &mut files);
+
+    let mut violations = Vec::new();
+    for file in &files {
+        let relative = file
+            .strip_prefix(&root)
+            .expect("scanned file should be under workspace root")
+            .to_string_lossy()
+            .replace('\\', "/");
+        if is_non_production_rust_source(&relative) {
+            continue;
+        }
+        // Hard assertion: reconciliation markers must not appear in production sources.
+        violations.extend(scan_file(&root, file, &reconciliation_tokens, false));
+    }
+    violations.sort();
+
+    assert!(
+        violations.is_empty(),
+        "Reconciliation markers must be absent from all production code (no migration exemption):{}",
         render_violations(&violations)
     );
 }

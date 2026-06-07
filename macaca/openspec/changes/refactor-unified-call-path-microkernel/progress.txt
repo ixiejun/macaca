@@ -333,3 +333,12 @@
 - **Escape hatch gate**: `autonomy_schedule_management_uses_serviceized_paths_only` uses `read_optional_presentation_source` so backend-only worktrees still enforce macaca-web serviceized routes.
 - **GitNexus memo (non-blocking)**: iteration 40 MEDIUM on route_c optional-dep skip + P5 gate module tree — recorded in `impact-memo.md`.
 - **Next**: 6.2 逃逸口存量清零; filesize allowlist 77→0; 4.4.4 web 依赖终态; OpenSpec baseline 对齐。
+
+## Iteration 41 (2026-06-07)
+- **P5 §6.3.1 OpenSpec baseline 提升**: 固化 `openspec/specs/unified-execution-path`、`microkernel-boundary-purity`；更新 `serviceization-dependency-gate`、`serviceization-escape-hatches`、`web-cli-thin-shell-completion`。
+- **P5 §6.1.7 shell dependency purity gate**: `shell_dependency_purity_gate` — CLI 终态 proto+sdk 硬断言；Web 7 条 workspace 依赖冻结基线（Strangler Fig allowlist）。
+- **P5 §6.2 逃逸口债务门（渐进）**: `serviceization_escape_hatches` 双模式扫描（freeze/inventory）；`migration_debt_baseline.rs` raw=275 + per-family 基线；`reconciliation_markers_absent_in_production` 硬断言。
+- **Design patterns**: Specification by Example（cargo metadata / static scan gates）；Strategy（`ScanOptions.honor_migration_surfaces`）；Frozen Baseline（web shell deps + migration debt inventory）。
+- **Contract tests**: `serviceization_escape_hatches` 4/4 pass (+1 ignored dump helper)；`shell_dependency_purity_gate` 2/2；`kernel_purity_gate` 1/1。
+- **GitNexus memo (non-blocking)**: iteration 41 LOW on escape-hatch scan refactor + shell dep gate — recorded in `impact-memo.md`.
+- **Next**: 6.2.1 逐 family 删除 migration surface；6.3.2 archive；filesize allowlist 77→0；4.4.4 web 依赖终态收敛至 proto+sdk。
