@@ -8,7 +8,9 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use macaca_proto::{ApplicationId, TaskId, TodoGoalStatus, TodoStatus, TraceContext};
+use macaca_proto::{
+    ApplicationId, TaskGraphOwner, TaskId, TodoGoalStatus, TodoStatus, TraceContext,
+};
 
 /// Structured task service lifecycle event.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -83,6 +85,10 @@ pub struct TaskServiceTaskSnapshot {
     pub agent_name: String,
     pub status: TodoStatus,
     pub session_id: Option<String>,
+    /// Service-owned graph classification used by projections and audit tools
+    /// to distinguish authoritative execution tasks from compatibility or
+    /// diagnostic task-board entries.
+    pub graph_owner: TaskGraphOwner,
 }
 
 /// Deterministic Task Service snapshot ordered by stable identifiers.

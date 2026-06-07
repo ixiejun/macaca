@@ -7,7 +7,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use macaca_proto::{ApplicationId, TaskId, TodoReviewResult, TraceContext};
+use macaca_proto::{ApplicationId, TaskGraphOwner, TaskId, TodoReviewResult, TraceContext};
 
 /// Command to submit a high-level goal into the task system.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -79,7 +79,20 @@ pub struct CreateTaskAssignmentCommand {
     #[serde(default)]
     pub depends_on: Vec<TaskId>,
     pub parent_task: Option<TaskId>,
+    /// Service-owned graph classification for this task assignment.
+    ///
+    /// The default is `ApplicationExecution` because this command is the
+    /// explicit service boundary used by application execution adapters such as
+    /// WASM `agent.delegate`.  Legacy task-board writers that call
+    /// `TaskSpace` directly keep the `TaskServiceNative` default on `TodoItem`
+    /// unless they deliberately choose another owner.
+    #[serde(default = "default_assignment_graph_owner")]
+    pub graph_owner: TaskGraphOwner,
     pub trace: Option<TraceContext>,
+}
+
+fn default_assignment_graph_owner() -> TaskGraphOwner {
+    TaskGraphOwner::ApplicationExecution
 }
 
 /// Command to request task claim orchestration.

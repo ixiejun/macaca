@@ -40,6 +40,7 @@ const TASK_CLAIM_OPERATION: &str = "task.claim";
 const TASK_START_OPERATION: &str = "task.start";
 const TASK_SUBMIT_REVIEW_OPERATION: &str = "task.submit_review";
 const TASK_REVIEW_OPERATION: &str = "task.review";
+const APPLICATION_EXECUTION_GRAPH_OWNER: &str = "application_execution";
 
 /// Runtime configuration for the host import bridge.
 #[derive(Clone)]
@@ -274,6 +275,23 @@ impl WasmHostImportBridge {
                 result
                     .metadata
                     .insert("service_status".into(), sanitize_label(reply.status));
+                if let Some(task_id) = task_lifecycle.as_deref() {
+                    // Agent delegation tasks are the authoritative task graph
+                    // entries for an application-execution run.  The marker is
+                    // a service-owned category, not an application or workflow
+                    // name, so hosted execution can separate real run terminal
+                    // facts from compatibility diagnostics without special
+                    // casing any application.
+                    result.metadata.insert(
+                        "graph_owner".into(),
+                        APPLICATION_EXECUTION_GRAPH_OWNER.into(),
+                    );
+                    result.metadata.insert(
+                        "execution.graph_owner".into(),
+                        APPLICATION_EXECUTION_GRAPH_OWNER.into(),
+                    );
+                    result.metadata.insert("task_id".into(), task_id.into());
+                }
                 for (key, value) in reply.metadata {
                     if is_safe_metadata_key(&key) {
                         result.metadata.insert(key, sanitize_label(value));
@@ -390,6 +408,7 @@ impl WasmHostImportBridge {
                     "priority": priority,
                     "depends_on": [],
                     "parent_task": null,
+                    "graph_owner": APPLICATION_EXECUTION_GRAPH_OWNER,
                     "trace": trace,
                 }),
                 trace,

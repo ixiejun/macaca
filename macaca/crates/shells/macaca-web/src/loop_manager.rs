@@ -676,7 +676,7 @@ async fn create_fallback_decomposition_tasks(
             fallback_task_template(phase, &worker.name, goal_description);
         let depends_on = previous.into_iter().collect::<Vec<_>>();
         let item = space
-            .create_task_assignment(
+            .create_task_assignment_with_graph_owner(
                 &worker.name,
                 plan_agent_name,
                 title,
@@ -685,6 +685,7 @@ async fn create_fallback_decomposition_tasks(
                 8u8.saturating_sub(index.min(3) as u8),
                 depends_on,
                 Some(goal_id),
+                macaca_proto::TaskGraphOwner::TaskServiceCompatibility,
             )
             .await;
         previous = Some(item.id);

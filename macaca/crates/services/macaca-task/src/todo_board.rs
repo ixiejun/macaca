@@ -8,7 +8,8 @@ use std::sync::Arc;
 
 use chrono::Utc;
 use macaca_proto::{
-    ApplicationId, TaskId, TodoGoal, TodoGoalStatus, TodoItem, TodoReviewResult, TodoStatus,
+    ApplicationId, TaskGraphOwner, TaskId, TodoGoal, TodoGoalStatus, TodoItem, TodoReviewResult,
+    TodoStatus,
 };
 
 use crate::dependency::{DefaultTaskDependencyResolver, TaskDependencyResolver};
@@ -489,6 +490,42 @@ impl TaskSpace {
         depends_on: Vec<TaskId>,
         parent_task: Option<TaskId>,
     ) -> TodoItem {
+        self.create_task_assignment_with_graph_owner(
+            agent,
+            created_by,
+            title,
+            description,
+            acceptance_criteria,
+            priority,
+            depends_on,
+            parent_task,
+            TaskGraphOwner::TaskServiceNative,
+        )
+        .await
+    }
+
+    /// Create a task assignment with an explicit service-owned graph marker.
+    ///
+    /// The graph owner is not part of application product behavior.  It is a
+    /// Macaca service boundary marker used by task snapshots, audit records,
+    /// and application-execution terminal projection to separate
+    /// authoritative execution tasks from compatibility or diagnostic board
+    /// entries.  Callers must pass service categories only; application names,
+    /// workflow names, provider names, and business-domain identifiers do not
+    /// belong here.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn create_task_assignment_with_graph_owner(
+        &self,
+        agent: &str,
+        created_by: &str,
+        title: impl Into<String>,
+        description: impl Into<String>,
+        acceptance_criteria: Vec<String>,
+        priority: u8,
+        depends_on: Vec<TaskId>,
+        parent_task: Option<TaskId>,
+        graph_owner: TaskGraphOwner,
+    ) -> TodoItem {
         // Auto-assign sequence_number: next after current max for this agent+session
         let max_seq = self
             .store
@@ -506,6 +543,7 @@ impl TaskSpace {
             priority,
         );
         item.sequence_number = seq;
+        item.graph_owner = graph_owner;
         item.acceptance_criteria = acceptance_criteria;
         item.depends_on = depends_on.clone();
         item.parent_task = parent_task;

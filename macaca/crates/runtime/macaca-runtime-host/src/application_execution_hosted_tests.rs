@@ -8,7 +8,7 @@ use macaca_proto::{
     ApplicationExecutionProviderKind, ApplicationExecutionReplayRequest, ApplicationExecutionScope,
     ApplicationExecutionSnapshot, ApplicationHostCommand, ApplicationHostCommandResult,
     ApplicationHostCommandStatus, ApplicationId, ApplicationImport, CapabilityId,
-    PackageRuntimeKind, StartApplicationExecutionCommand, TraceContext,
+    PackageRuntimeKind, StartApplicationExecutionCommand, TaskGraphOwner, TraceContext,
 };
 use tempfile::tempdir;
 use tokio::sync::Mutex;
@@ -268,6 +268,104 @@ async fn abi_hosted_declared_host_command_results_become_durable_execution_event
 
     assert!(event_types.contains(&ApplicationExecutionEventType::ToolCallCompleted));
     assert!(event_types.contains(&ApplicationExecutionEventType::ExecutionCompleted));
+}
+
+#[tokio::test]
+async fn abi_hosted_terminal_state_ignores_non_authoritative_host_command_failures() {
+    let (_dir, event_log) = event_log();
+    let store = ApplicationExecutionEventStore::new(event_log.clone());
+    let provider = MacacaHostedApplicationExecutionProvider::new(
+        store,
+        Arc::new(ApplicationAbiHostedExecutionAdapter::new(Arc::new(
+            CapturingHostRuntime::with_host_command_results(serde_json::json!([
+                {
+                    "index": 0,
+                    "status": "Ok",
+                    "output": {
+                        "output": {
+                            "status": "completed",
+                            "task_id": "task-authoritative-1"
+                        }
+                    },
+                    "metadata": {
+                        "service_id": "service.application",
+                        "reason_code": "import_completed",
+                        "graph_owner": TaskGraphOwner::ApplicationExecution.as_str()
+                    }
+                },
+                {
+                    "index": 1,
+                    "status": "Ok",
+                    "output": {
+                        "output": {
+                            "status": "failed",
+                            "task_id": "task-compatibility-1"
+                        }
+                    },
+                    "metadata": {
+                        "service_id": "service.task",
+                        "reason_code": "compatibility_fallback_failed",
+                        "graph_owner": TaskGraphOwner::TaskServiceCompatibility.as_str()
+                    }
+                },
+                {
+                    "index": 2,
+                    "status": "Pending",
+                    "output": {},
+                    "metadata": {
+                        "service_id": "service.diagnostics",
+                        "reason_code": "diagnostic_pending",
+                        "graph_owner": TaskGraphOwner::DiagnosticOnly.as_str()
+                    }
+                }
+            ])),
+        ))),
+        vec![CapabilityId::new("capability.application_execution")],
+    );
+    let start = start_command(
+        "session-wasm-authoritative-results",
+        "run-wasm-authoritative-results",
+        "hosted-wasm-authoritative-results-1",
+    );
+
+    provider.start(start.clone()).await.unwrap();
+
+    let replay = ApplicationExecutionEventStore::new(event_log)
+        .replay(ApplicationExecutionReplayRequest {
+            application_id: start.application_id,
+            session_id: "session-wasm-authoritative-results".into(),
+            run_id: Some("run-wasm-authoritative-results".into()),
+            from_cursor: None,
+            page_size: 50,
+            event_types: Vec::new(),
+            visibility: None,
+            trace: TraceContext::new("trace-hosted-authoritative-results-replay"),
+        })
+        .await
+        .unwrap();
+    let event_types = replay
+        .events
+        .iter()
+        .map(|event| event.event_type)
+        .collect::<Vec<_>>();
+    let terminal = replay
+        .events
+        .iter()
+        .find(|event| event.event_type == ApplicationExecutionEventType::ExecutionCompleted)
+        .expect("authoritative completion should emit a completed terminal event");
+
+    assert!(event_types.contains(&ApplicationExecutionEventType::ToolCallCompleted));
+    assert!(event_types.contains(&ApplicationExecutionEventType::ExecutionCompleted));
+    assert!(!event_types.contains(&ApplicationExecutionEventType::ExecutionFailed));
+    let terminal_data = terminal
+        .sanitized_payload
+        .data
+        .as_ref()
+        .expect("terminal completion should retain aggregate host-command audit data");
+    assert_eq!(
+        terminal_data["non_authoritative_failed"],
+        serde_json::json!(1)
+    );
 }
 
 struct FakeHostedAdapter {

@@ -543,6 +543,11 @@ fn hosted_signals_from_host_result(
     let mut completed = 0usize;
     let mut failed = 0usize;
     let mut queued = 0usize;
+    let mut authoritative_seen = false;
+    let mut authoritative_completed = 0usize;
+    let mut authoritative_failed = 0usize;
+    let mut authoritative_queued = 0usize;
+    let mut non_authoritative_failed = 0usize;
     for (index, row) in results.iter().enumerate() {
         let status = host_command_status_label(row);
         let metadata = row
@@ -559,6 +564,10 @@ fn hosted_signals_from_host_result(
             .get("reason_code")
             .and_then(serde_json::Value::as_str)
             .unwrap_or("unknown");
+        let graph_owner = host_command_graph_owner(row);
+        let authoritative = graph_owner
+            .map(is_application_execution_graph_owner)
+            .unwrap_or(true);
         let task_id = row
             .pointer("/output/output/task_id")
             .and_then(serde_json::Value::as_str)
@@ -575,10 +584,36 @@ fn hosted_signals_from_host_result(
             });
 
         let effective_status = delegated_status.unwrap_or(status);
-        match effective_status.to_ascii_lowercase().as_str() {
-            "queued" => queued += 1,
-            "completed" | "ok" => completed += 1,
-            _ => failed += 1,
+        let normalized_status = effective_status.to_ascii_lowercase();
+        match normalized_status.as_str() {
+            // Host imports may use either `queued` or `pending` to describe
+            // asynchronous continuation.  Treat both labels as non-terminal
+            // queue states so diagnostic or compatibility evidence cannot be
+            // misclassified as a failure while application-execution work is
+            // still awaiting completion.
+            "queued" | "pending" => {
+                queued += 1;
+                if authoritative {
+                    authoritative_seen = true;
+                    authoritative_queued += 1;
+                }
+            }
+            "completed" | "ok" => {
+                completed += 1;
+                if authoritative {
+                    authoritative_seen = true;
+                    authoritative_completed += 1;
+                }
+            }
+            _ => {
+                failed += 1;
+                if authoritative {
+                    authoritative_seen = true;
+                    authoritative_failed += 1;
+                } else {
+                    non_authoritative_failed += 1;
+                }
+            }
         }
         signals.push(HostedApplicationExecutionSignal::new(
             ApplicationExecutionEventType::ToolCallCompleted,
@@ -589,21 +624,51 @@ fn hosted_signals_from_host_result(
                 "service_id": service_id,
                 "reason_code": reason_code,
                 "task_id": task_id,
+                "graph_owner": graph_owner.unwrap_or("legacy_unmarked"),
+                "authoritative_terminal_source": authoritative,
             })),
             format!("host-command-{index}-completed"),
         ));
     }
     if !results.is_empty() {
-        let terminal = if failed > 0 {
+        // During the migration to a single execution path, older component
+        // host rows may not yet carry a graph-owner marker.  If no row is
+        // marked, preserve the previous behavior by treating all rows as
+        // authoritative.  Once any row is marked, only
+        // `application_execution` rows may drive the terminal run state;
+        // compatibility and diagnostic rows remain visible as replayable
+        // evidence without being allowed to fail an unrelated run.
+        let terminal_completed = if authoritative_seen {
+            authoritative_completed
+        } else {
+            completed
+        };
+        let terminal_failed = if authoritative_seen {
+            authoritative_failed
+        } else {
+            failed
+        };
+        let terminal_queued = if authoritative_seen {
+            authoritative_queued
+        } else {
+            queued
+        };
+        let terminal_count = if authoritative_seen {
+            authoritative_completed + authoritative_failed + authoritative_queued
+        } else {
+            results.len()
+        };
+        let terminal = if terminal_failed > 0 {
             Some((
                 ApplicationExecutionEventType::ExecutionFailed,
-                "hosted application declared host commands failed",
+                "hosted application authoritative host commands failed",
                 "host-commands-failed",
             ))
-        } else if queued == 0 && completed == results.len() {
+        } else if terminal_count > 0 && terminal_queued == 0 && terminal_completed == terminal_count
+        {
             Some((
                 ApplicationExecutionEventType::ExecutionCompleted,
-                "hosted application declared host commands completed",
+                "hosted application authoritative host commands completed",
                 "host-commands-completed",
             ))
         } else {
@@ -618,6 +683,11 @@ fn hosted_signals_from_host_result(
                     "completed": completed,
                     "failed": failed,
                     "queued": queued,
+                    "authoritative_host_command_count": terminal_count,
+                    "authoritative_completed": terminal_completed,
+                    "authoritative_failed": terminal_failed,
+                    "authoritative_queued": terminal_queued,
+                    "non_authoritative_failed": non_authoritative_failed,
                 })),
                 suffix,
             ));
@@ -630,4 +700,27 @@ fn host_command_status_label(row: &serde_json::Value) -> &str {
     row.get("status")
         .and_then(serde_json::Value::as_str)
         .unwrap_or("unknown")
+}
+
+fn host_command_graph_owner(row: &serde_json::Value) -> Option<&str> {
+    row.get("metadata")
+        .and_then(serde_json::Value::as_object)
+        .and_then(|metadata| {
+            metadata
+                .get("execution.graph_owner")
+                .or_else(|| metadata.get("graph_owner"))
+        })
+        .and_then(serde_json::Value::as_str)
+        .or_else(|| {
+            row.pointer("/output/output/graph_owner")
+                .and_then(serde_json::Value::as_str)
+        })
+        .or_else(|| {
+            row.pointer("/output/graph_owner")
+                .and_then(serde_json::Value::as_str)
+        })
+}
+
+fn is_application_execution_graph_owner(owner: &str) -> bool {
+    owner == macaca_proto::TaskGraphOwner::ApplicationExecution.as_str()
 }

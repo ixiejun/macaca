@@ -464,6 +464,52 @@ pub enum TodoStatus {
     Failed,
 }
 
+/// Service-owned classification for a task graph entry.
+///
+/// The value intentionally describes the owning Macaca service boundary instead
+/// of an application, workflow, model, driver, provider, or business domain.
+/// Application-execution projections use this marker to decide which tasks are
+/// authoritative terminal facts for a run, while compatibility and diagnostic
+/// tasks remain visible for audit without being allowed to fail an unrelated
+/// execution.  The default keeps legacy persisted tasks out of the
+/// application-execution terminal path unless a service explicitly marks them
+/// as authoritative.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum TaskGraphOwner {
+    /// Task entries that are authoritative for `service.application_execution`
+    /// run completion and failure projection.
+    ApplicationExecution,
+    /// Existing task-service, scheduler, chat, or goal-loop entries whose
+    /// lifecycle is visible on the board but is not an application-execution
+    /// terminal source unless a higher-level service explicitly binds it.
+    #[default]
+    TaskServiceNative,
+    /// Compatibility fallback entries created while migrating legacy planner
+    /// and Web loop behavior behind the Task Service boundary.
+    TaskServiceCompatibility,
+    /// Diagnostic entries that explain observations or failures but should
+    /// never drive terminal execution state.
+    DiagnosticOnly,
+}
+
+impl TaskGraphOwner {
+    /// Return true when this graph owner may drive application-execution
+    /// terminal aggregation.
+    pub fn is_application_execution_authoritative(self) -> bool {
+        matches!(self, Self::ApplicationExecution)
+    }
+
+    /// Stable label used in service metadata, trace events, and sanitized logs.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::ApplicationExecution => "application_execution",
+            Self::TaskServiceNative => "task_service_native",
+            Self::TaskServiceCompatibility => "task_service_compatibility",
+            Self::DiagnosticOnly => "diagnostic_only",
+        }
+    }
+}
+
 /// A single work item on an agent's task board.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TodoItem {
@@ -476,6 +522,15 @@ pub struct TodoItem {
     pub assigned_agent: String,
     /// Who created it (usually the plan agent / coordinator)
     pub created_by: String,
+    /// Service boundary that owns this task entry for terminal aggregation.
+    ///
+    /// This field is a generic service classification.  It prevents a
+    /// compatibility fallback task or diagnostic task from being interpreted as
+    /// the authoritative terminal state of an application-execution run.  It is
+    /// never allowed to encode application names, workflow names, provider
+    /// names, programming languages, or product-domain semantics.
+    #[serde(default)]
+    pub graph_owner: TaskGraphOwner,
 
     // ── content ──
     pub title: String,
@@ -530,6 +585,7 @@ impl TodoItem {
             session_id,
             assigned_agent: assigned_agent.into(),
             created_by: created_by.into(),
+            graph_owner: TaskGraphOwner::TaskServiceNative,
             title: title.into(),
             description: description.into(),
             acceptance_criteria: Vec::new(),

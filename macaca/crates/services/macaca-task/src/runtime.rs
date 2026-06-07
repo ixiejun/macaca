@@ -199,7 +199,7 @@ where
             Arc::clone(&self.store),
         );
         let task = space
-            .create_task_assignment(
+            .create_task_assignment_with_graph_owner(
                 &agent_name,
                 command.created_by.trim(),
                 title,
@@ -208,8 +208,22 @@ where
                 command.priority,
                 command.depends_on,
                 command.parent_task,
+                command.graph_owner,
             )
             .await;
+        info!(
+            app_id = %command.app_id.0,
+            session_id = %command.session_id,
+            agent = %agent_name,
+            task_id = %task.id,
+            graph_owner = %command.graph_owner.as_str(),
+            trace_id = command
+                .trace
+                .as_ref()
+                .map(|trace| trace.trace_id.as_str())
+                .unwrap_or("none"),
+            "task service assignment admitted"
+        );
         self.emit(TaskServiceEvent::new(
             command.app_id.clone(),
             Some(command.session_id.clone()),
@@ -222,6 +236,7 @@ where
                 "agent": task.assigned_agent,
                 "status": format!("{:?}", task.status),
                 "sequence_number": task.sequence_number,
+                "graph_owner": task.graph_owner.as_str(),
             }),
         ))
         .await;
@@ -456,6 +471,7 @@ where
             agent_name: task.assigned_agent,
             status: task.status,
             session_id: task.session_id,
+            graph_owner: task.graph_owner,
         })
         .collect::<Vec<_>>();
         tasks.sort_by(|left, right| left.task_id.0.cmp(&right.task_id.0));
@@ -569,6 +585,7 @@ mod tests {
                 priority: 5,
                 depends_on: vec![],
                 parent_task: None,
+                graph_owner: macaca_proto::TaskGraphOwner::ApplicationExecution,
                 trace: Some(TraceContext::new("trace-explicit-first")),
             })
             .await
@@ -585,6 +602,7 @@ mod tests {
                 priority: 5,
                 depends_on: vec![],
                 parent_task: None,
+                graph_owner: macaca_proto::TaskGraphOwner::ApplicationExecution,
                 trace: Some(TraceContext::new("trace-explicit-second")),
             })
             .await
@@ -624,5 +642,96 @@ mod tests {
 
         assert_eq!(first_snapshot.status, macaca_proto::TodoStatus::Pending);
         assert_eq!(second_snapshot.status, macaca_proto::TodoStatus::Assigned);
+    }
+
+    #[tokio::test]
+    async fn explicit_assignment_records_application_execution_graph_owner() {
+        let store = setup().await;
+        let sink = Arc::new(InMemoryTaskServiceEventSink::new());
+        let runtime = TaskServiceRuntime::new(
+            Arc::clone(&store),
+            Arc::new(NoopTaskServiceExecutionStrategy),
+            Arc::clone(&sink) as Arc<dyn TaskServiceEventSink>,
+        );
+        let app_id = ApplicationId::new();
+        let session_id = "session-graph-owner";
+
+        let task = runtime
+            .create_task_assignment(CreateTaskAssignmentCommand {
+                app_id: app_id.clone(),
+                session_id: session_id.into(),
+                agent_name: "builder".into(),
+                created_by: "application_execution".into(),
+                title: "Execution-owned task".into(),
+                description: "The assignment is authoritative for the run.".into(),
+                acceptance_criteria: vec!["The graph owner is preserved.".into()],
+                priority: 5,
+                depends_on: vec![],
+                parent_task: None,
+                graph_owner: macaca_proto::TaskGraphOwner::ApplicationExecution,
+                trace: Some(TraceContext::new("trace-graph-owner")),
+            })
+            .await
+            .expect("explicit assignment should be admitted");
+
+        assert_eq!(
+            task.graph_owner,
+            macaca_proto::TaskGraphOwner::ApplicationExecution
+        );
+        let created_event = sink
+            .snapshot()
+            .into_iter()
+            .find(|event| event.task_id == Some(task.id))
+            .expect("task creation should emit a service event");
+        assert_eq!(
+            created_event.payload["graph_owner"],
+            serde_json::json!("application_execution")
+        );
+    }
+
+    #[tokio::test]
+    async fn direct_task_space_assignment_defaults_to_native_graph_owner() {
+        let store = setup().await;
+        let app_id = ApplicationId::new();
+        let space = TaskSpace::for_session(
+            app_id,
+            Some("session-native-owner".into()),
+            Arc::clone(&store),
+        );
+
+        let native = space
+            .create_task_assignment(
+                "planner",
+                "coordinator",
+                "Native task",
+                "Created by the legacy TaskSpace helper.",
+                vec![],
+                5,
+                vec![],
+                None,
+            )
+            .await;
+        let compatibility = space
+            .create_task_assignment_with_graph_owner(
+                "planner",
+                "coordinator",
+                "Compatibility fallback",
+                "Created by a compatibility adapter.",
+                vec![],
+                5,
+                vec![],
+                None,
+                macaca_proto::TaskGraphOwner::TaskServiceCompatibility,
+            )
+            .await;
+
+        assert_eq!(
+            native.graph_owner,
+            macaca_proto::TaskGraphOwner::TaskServiceNative
+        );
+        assert_eq!(
+            compatibility.graph_owner,
+            macaca_proto::TaskGraphOwner::TaskServiceCompatibility
+        );
     }
 }
