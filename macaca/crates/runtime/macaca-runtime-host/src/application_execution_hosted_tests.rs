@@ -8,7 +8,7 @@ use macaca_proto::{
     ApplicationExecutionProviderKind, ApplicationExecutionReplayRequest, ApplicationExecutionScope,
     ApplicationExecutionSnapshot, ApplicationHostCommand, ApplicationHostCommandResult,
     ApplicationHostCommandStatus, ApplicationId, ApplicationImport, CapabilityId,
-    PackageRuntimeKind, StartApplicationExecutionCommand, TaskGraphOwner, TraceContext,
+    PackageRuntimeKind, StartApplicationExecutionCommand, TraceContext,
 };
 use tempfile::tempdir;
 use tokio::sync::Mutex;
@@ -270,6 +270,9 @@ async fn abi_hosted_declared_host_command_results_become_durable_execution_event
     assert!(event_types.contains(&ApplicationExecutionEventType::ExecutionCompleted));
 }
 
+/// Contract test: under the unified call-path model every host-command row is
+/// equally authoritative — a single failed delegated output must emit
+/// `ExecutionFailed` without compatibility/diagnostic graph-owner branches.
 #[tokio::test]
 async fn abi_hosted_terminal_state_fails_when_any_host_command_fails() {
     let (_dir, event_log) = event_log();
@@ -284,13 +287,13 @@ async fn abi_hosted_terminal_state_fails_when_any_host_command_fails() {
                     "output": {
                         "output": {
                             "status": "completed",
-                            "task_id": "task-authoritative-1"
+                            "task_id": "task-host-command-0"
                         }
                     },
                     "metadata": {
                         "service_id": "service.application",
                         "reason_code": "import_completed",
-                        "graph_owner": TaskGraphOwner::ApplicationExecution.as_str()
+                        "graph_owner": "application_execution"
                     }
                 },
                 {
@@ -299,23 +302,13 @@ async fn abi_hosted_terminal_state_fails_when_any_host_command_fails() {
                     "output": {
                         "output": {
                             "status": "failed",
-                            "task_id": "task-compatibility-1"
+                            "task_id": "task-host-command-1"
                         }
                     },
                     "metadata": {
                         "service_id": "service.task",
-                        "reason_code": "compatibility_fallback_failed",
-                        "graph_owner": TaskGraphOwner::TaskServiceCompatibility.as_str()
-                    }
-                },
-                {
-                    "index": 2,
-                    "status": "Pending",
-                    "output": {},
-                    "metadata": {
-                        "service_id": "service.diagnostics",
-                        "reason_code": "diagnostic_pending",
-                        "graph_owner": TaskGraphOwner::DiagnosticOnly.as_str()
+                        "reason_code": "delegated_command_failed",
+                        "graph_owner": "application_execution"
                     }
                 }
             ])),
@@ -323,9 +316,9 @@ async fn abi_hosted_terminal_state_fails_when_any_host_command_fails() {
         vec![CapabilityId::new("capability.application_execution")],
     );
     let start = start_command(
-        "session-wasm-authoritative-results",
-        "run-wasm-authoritative-results",
-        "hosted-wasm-authoritative-results-1",
+        "session-wasm-unified-authority-failure",
+        "run-wasm-unified-authority-failure",
+        "hosted-wasm-unified-authority-failure-1",
     );
 
     provider.start(start.clone()).await.unwrap();
@@ -333,13 +326,13 @@ async fn abi_hosted_terminal_state_fails_when_any_host_command_fails() {
     let replay = ApplicationExecutionEventStore::new(event_log)
         .replay(ApplicationExecutionReplayRequest {
             application_id: start.application_id,
-            session_id: "session-wasm-authoritative-results".into(),
-            run_id: Some("run-wasm-authoritative-results".into()),
+            session_id: "session-wasm-unified-authority-failure".into(),
+            run_id: Some("run-wasm-unified-authority-failure".into()),
             from_cursor: None,
             page_size: 50,
             event_types: Vec::new(),
             visibility: None,
-            trace: TraceContext::new("trace-hosted-authoritative-results-replay"),
+            trace: TraceContext::new("trace-hosted-unified-authority-failure-replay"),
         })
         .await
         .unwrap();

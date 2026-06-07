@@ -553,23 +553,7 @@ fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> bool
                 || relative == "crates/shells/macaca-web/src/mcp_shell_adapter.rs"
         }
         "kernel-non-kernel-module" => relative.starts_with("crates/kernel/macaca-kernel/src/"),
-        "multi-path-coordination-patch" => matches!(
-            relative,
-            "crates/runtime/macaca-runtime-host/src/application_execution_hosted.rs"
-                | "crates/runtime/macaca-runtime-host/src/application_execution_hosted_tests.rs"
-                | "crates/runtime/macaca-runtime-host/src/wasm_runtime_provider/host_import_bridge.rs"
-                // P1.2 composed execution backend — patches removed in task 2.6 after audit replay gate.
-                | "crates/runtime/macaca-runtime-host/src/agent_execution_orchestration.rs"
-                | "crates/shells/macaca-web/src/web_agent_execution_adapters.rs"
-                | "crates/shells/macaca-web/src/agent_execution_backend/mod.rs"
-                | "crates/shells/macaca-web/src/agent_execution_backend/tests/mod.rs"
-                | "crates/shells/macaca-web/src/agent_runner.rs"
-                | "crates/shells/macaca-web/src/loop_manager/mod.rs"
-                | "crates/services/macaca-task/src/runtime.rs"
-                | "crates/services/macaca-task/src/events.rs"
-                | "crates/foundation/macaca-proto/src/types.rs"
-                | "crates/foundation/macaca-proto/src/application_execution_tests.rs"
-        ),
+        // `multi-path-coordination-patch` family retired in iteration 42 — no migration surfaces remain.
         _ => false,
     }
 }

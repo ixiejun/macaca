@@ -342,3 +342,14 @@
 - **Contract tests**: `serviceization_escape_hatches` 4/4 pass (+1 ignored dump helper)；`shell_dependency_purity_gate` 2/2；`kernel_purity_gate` 1/1。
 - **GitNexus memo (non-blocking)**: iteration 41 LOW on escape-hatch scan refactor + shell dep gate — recorded in `impact-memo.md`.
 - **Next**: 6.2.1 逐 family 删除 migration surface；6.3.2 archive；filesize allowlist 77→0；4.4.4 web 依赖终态收敛至 proto+sdk。
+
+## Iteration 42 (2026-06-07)
+- **P5 §6.2.1 逃逸口 family 退役（首批）**: `multi-path-coordination-patch` family 完全退役（2→0）；删除 `is_approved_migration_surface` 中该 family 全部 migration surface 行；`migration_debt_baseline` raw **275→273**（8 families remain）。
+- **ABI hosted test 对齐统一权威模型**: `abi_hosted_terminal_state_fails_when_any_host_command_fails` 移除 `TaskGraphOwner::TaskServiceCompatibility` / `DiagnosticOnly`；`graph_owner` 改为 provider-neutral 字符串；失败路径经 `output.status: "failed"` 触发 `ExecutionFailed`。
+- **P3 filesize — scheduler_client 拆分 (4.3.17)**: `macaca-sdk/src/scheduler_client.rs`(504) → Facade 模块树（主文件 ~418 行 + `scheduler_client/tests.rs` 契约测试）；filesize allowlist **77→76**。
+- **Design patterns**: Specification by Example（debt inventory baseline）；Facade+Adapter+Null Object（scheduler SDK client）；Contract Test 子模块抽取。
+- **P5 §6.3.2 OpenSpec archive（首批）**: archived `update-kernel-to-provider-facade-boundary`、`serviceize-agent-execution-v1`、`refactor-route-c-workspace-topology`、`unify-application-execution-path`（`--skip-specs --yes`；specs 已在 iteration 41 提升）。
+- **P5 §6.3.3**: `openspec validate --all --strict` **192/192** pass（archive 后）。
+- **Contract tests**: `serviceization_escape_hatches` 4/4；`os_layer_file_size_gate` 1/1；`macaca-sdk service_backed_scheduler` 1/1；`macaca-runtime-host abi_hosted_terminal_state` 1/1。
+- **GitNexus memo (non-blocking)**: iteration 42 MEDIUM on `hosted_signals_from_host_result` test rewrite + scheduler_client Facade split — recorded in `impact-memo.md`.
+- **Next**: 6.2.1 下一小族 `application-runtime-direct-start`（2）；6.3.2 继续 archive 其余 Complete changes；filesize allowlist 76→0；4.4.4 web 依赖终态。

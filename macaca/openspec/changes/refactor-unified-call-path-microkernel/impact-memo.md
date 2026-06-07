@@ -334,3 +334,13 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `migration_debt_baseline` (raw=275) | LOW | CI fails if escape-hatch debt grows/shifts without baseline update | P5 |
 | `shell_dependency_purity_gate` | LOW | macaca-cli terminal + macaca-web frozen 7-crate debt | P5 |
 | `openspec/specs/unified-execution-path` + `microkernel-boundary-purity` | LOW | new baseline specs promoted from change deltas | P5 |
+
+## Iteration 42 additions (§6.2.1 multi-path retirement + scheduler_client split + archive batch — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `multi-path-coordination-patch` migration surfaces removal | MEDIUM | freeze gate now fails on any new `graph_owner`/`authoritative`/`suppress_executor_lifecycle` production writes outside tests | P5 |
+| `abi_hosted_terminal_state_fails_when_any_host_command_fails` | MEDIUM | runtime-host contract test only; validates unified authoritative hosted terminal model | P1 |
+| `scheduler_client` Facade split (`scheduler_client/tests.rs`) | LOW | macaca-sdk public API unchanged; filesize gate compliance | P3 |
+| `ServiceBackedSchedulerClient` / `UnavailableSystemSchedulerClient` | LOW | scheduler SDK client; no application-specific branches | P3 |
+| OpenSpec archive batch (4 changes) | LOW | docs-only move to `changes/archive/`; specs already promoted in iteration 41 | P5 |
