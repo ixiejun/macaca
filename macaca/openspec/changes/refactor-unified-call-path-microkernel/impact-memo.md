@@ -160,4 +160,3 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `application_shell_adapter` / `llm_route_shell_adapter` / `mcp_shell_adapter` | MEDIUM | centralized Adapter pattern for registry/runtime/LLM/MCP legacy seams | P3.1 |
 | `serviceization_escape_hatches` allowlist (tightened) | LOW | removed route-level migration surfaces; violations=0 | P3.1 |
 | `WebMemoryRuntime` (deferred 4.1.4) | MEDIUM | bootstrap + composition bundle; not deleted until memory service fully owns facade | P3.1 |
-
