@@ -252,4 +252,13 @@
 - **Filesize allowlist**: removed `skill_operations_routes.rs` row (84 baseline rows remain).
 - **Verified**: `cargo test -p macaca-web --lib skill_operations_routes` 2/2; `os_layer_file_size_gate` pass; `self_evolving_skill_boundaries` 4/4.
 - **GitNexus memo (non-blocking)**: iteration 31 CRITICAL on skill_operations_routes Facade split — recorded in `impact-memo.md`.
-- **Next**: P3 §4.5.1 remaining web giants (`app_ui_routes`, `skill_mcp`, `skill_self_evolution_observer`); P4 CLI decoupling; 4.4.4终态.
+- **Next**: P3 §4.5.1 remaining web giants (`skill_mcp`, `context_memory_injection`, `skill_self_evolution_observer`); P4 CLI decoupling; 4.4.4终态.
+
+## Iteration 32 (2026-06-07)
+- **P3.3 app_ui_routes split (4.3.10)**: deleted monolithic `app_ui_routes.rs` (605 lines); extracted `app_ui_routes/` module tree (9 files, max ~210 lines).
+- **Design patterns**: Facade (`mod.rs`); Adapter (`adapter` path policy + `bridge_adapter` envelope mapping); Strategy (`bridge_handlers` capability dispatch).
+- **Contract tests**: `app_ui_routes::tests` 6/6; `contract_source::app_ui_routes_module_sources()`.
+- **Filesize allowlist**: removed `app_ui_routes.rs` row (83 baseline rows remain).
+- **Verified**: `cargo test -p macaca-web --lib app_ui_routes` 6/6; `os_layer_file_size_gate` pass.
+- **GitNexus memo (non-blocking)**: iteration 32 CRITICAL on app_ui_routes Facade split — recorded in `impact-memo.md`.
+- **Next**: P3 §4.5.1 remaining web giants (`skill_mcp`, `context_memory_injection`, `context_reporting_model`, `skill_self_evolution_observer`); P4 CLI decoupling; 4.4.4终态.

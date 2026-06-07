@@ -246,3 +246,9 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
 |---------------|----------------------|------------------------|-------|
 | `skill_operations_routes.rs` → `skill_operations_routes/` module split | CRITICAL | bootstrap skill-operations route table (9 handlers); `self_evolving_skill_boundaries` directory scan; thin-adapter contract tests | P3.3 |
+
+## Iteration 32 additions (task 4.3.10 — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `app_ui_routes.rs` → `app_ui_routes/` module split | CRITICAL | bootstrap app-ui asset + bridge routes; `app_ui_csp` / `app_ui_session_projection` consumers unchanged | P3.3 |
