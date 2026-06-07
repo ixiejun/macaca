@@ -117,63 +117,9 @@ impl CompactionSummaryEnvelope {
     }
 }
 
-/// Session lineage node kinds tracked by the compaction/fork model.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum LineageKind {
-    Root,
-    CompactionSuccessor,
-    Fork,
-    IsolatedChild,
-}
-
-/// Logical lineage metadata for one session node.
-///
-/// This lets the runtime reason about "root conversation" versus successor,
-/// fork, or isolated child nodes without overloading plain session ids.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct SessionLineage {
-    pub root_session_id: String,
-    pub session_id: String,
-    pub parent_session_id: Option<String>,
-    pub lineage_kind: LineageKind,
-}
-
-impl SessionLineage {
-    /// Construct a root lineage node where the session is its own root.
-    pub fn root(session_id: impl Into<String>) -> Self {
-        let session_id = session_id.into();
-        Self {
-            root_session_id: session_id.clone(),
-            session_id,
-            parent_session_id: None,
-            lineage_kind: LineageKind::Root,
-        }
-    }
-
-    /// Construct a compaction-successor lineage node.
-    pub fn successor(
-        root_session_id: impl Into<String>,
-        parent_session_id: impl Into<String>,
-        session_id: impl Into<String>,
-    ) -> Self {
-        Self {
-            root_session_id: root_session_id.into(),
-            parent_session_id: Some(parent_session_id.into()),
-            session_id: session_id.into(),
-            lineage_kind: LineageKind::CompactionSuccessor,
-        }
-    }
-}
-
-/// Persistable transcript segment metadata associated with a lineage node.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct TranscriptSegment {
-    pub segment_id: String,
-    pub session_id: String,
-    pub predecessor_segment_id: Option<String>,
-    pub lineage: SessionLineage,
-}
+// Lineage DTOs live in `macaca-proto` (shared kernel) so `macaca-persist` can
+// store compaction trees without depending on this service crate.
+pub use macaca_proto::{LineageKind, SessionLineage, TranscriptSegment};
 
 /// Hook payload delivered before/after compaction lifecycle callbacks.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

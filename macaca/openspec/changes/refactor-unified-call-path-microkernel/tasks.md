@@ -121,14 +121,14 @@
 - [x] 3.6.6 终态断言：`cargo tree -e normal -p macaca-kernel --depth 1` 仅显示 `macaca-proto`、`macaca-ipc`（及 workspace 传递依赖）。
 
 ### 3.7 persist → context 越界反转
-- [ ] 3.7.1 `[impact-memo]` 查明 `macaca-persist` 依赖 `macaca-context` 的具体类型/用途。
-- [ ] 3.7.2 抽取 context 持久化所需契约到 `macaca-proto`（或反转为 context 依赖 persist），移除 `persist/Cargo.toml` 对 `macaca-context` 的依赖。
-- [ ] 3.7.3 `cargo metadata` 确认 `macaca-persist → macaca-context` 边消失；persist/context 单测绿。
+- [x] 3.7.1 `[impact-memo]` 查明 `macaca-persist` 依赖 `macaca-context` 的具体类型/用途。
+- [x] 3.7.2 抽取 context 持久化所需契约到 `macaca-proto`（或反转为 context 依赖 persist），移除 `persist/Cargo.toml` 对 `macaca-context` 的依赖。
+- [x] 3.7.3 `cargo metadata` 确认 `macaca-persist → macaca-context` 边消失；persist/context 单测绿。
 
 ### 3.8 P2 退出验证
-- [ ] 3.8.1 kernel `lib.rs` 不再 `pub mod web3/evm/a2a/payment_policy/provider_compat/executor`；kernel 仅含系统不变量模块。
-- [ ] 3.8.2 与 kernel/persist 相关的 allowlist 行清零；VC-gate 全绿。
-- [ ] 3.8.3 optional module（web3/evm/payment）absent 降级测试全绿。
+- [x] 3.8.1 kernel `lib.rs` 不再 `pub mod web3/evm/a2a/payment_policy/provider_compat/executor`；kernel 仅含系统不变量模块。
+- [x] 3.8.2 与 kernel/persist 相关的 allowlist 行清零；VC-gate 全绿。
+- [x] 3.8.3 optional module（web3/evm/payment）absent 降级测试全绿。
 
 ## 4. P3 — Web 瘦身为 thin shell + 文件拆分
 
