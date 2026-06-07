@@ -67,17 +67,15 @@ pub(crate) async fn register_skill_backed_mcp_tools(
     };
     let definitions = macaca_runtime_host::McpServerFactory::with_bundled_mapping_registry()
         .from_skill_snapshot(&snapshot);
-    let context = McpRuntimeContext::for_agent(app_id, session_id, agent_name);
-    let _ = state
-        .mcp_runtime
-        .register_definitions(
-            toolkit,
-            definitions,
-            &McpToolPolicy::default(),
-            &context,
-            None,
-        )
-        .await;
+    crate::mcp_shell_adapter::register_skill_mcp_definitions(
+        state,
+        toolkit,
+        definitions,
+        app_id,
+        agent_name,
+        session_id,
+    )
+    .await;
 }
 
 pub(crate) async fn probe_skill_mcp_servers(snapshot: &SkillSnapshot) -> Vec<SkillMcpStatus> {
@@ -150,7 +148,7 @@ pub(crate) async fn load_or_build_skill_snapshot(
     }
 
     let app = {
-        let registry = state.registry.read().await;
+        let registry = crate::application_shell_adapter::registry_read_guard(&state).await;
         registry.get_app(app_id).cloned()
     }?;
     let workspace_dir = {
@@ -383,7 +381,7 @@ async fn resolve_agent_skill_policy(
     app_id: &ApplicationId,
     agent_name: &str,
 ) -> SkillPolicy {
-    let registry = state.registry.read().await;
+    let registry = crate::application_shell_adapter::registry_read_guard(&state).await;
     let Some(app) = registry.get_app(app_id) else {
         return SkillPolicy::default();
     };

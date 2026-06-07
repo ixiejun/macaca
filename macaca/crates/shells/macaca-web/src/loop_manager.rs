@@ -941,7 +941,7 @@ pub(crate) async fn ensure_plan_and_worker_loops(
 ) {
     // Determine entry/planner agents from declarative config + capabilities.
     let manifest_entry = {
-        let registry = state.registry.read().await;
+        let registry = crate::application_shell_adapter::registry_read_guard(&state).await;
         registry.get_app(app_id).map(|app| {
             app_entry_agent_name(&app.manifest)
                 .unwrap_or("entry_agent")
@@ -1188,7 +1188,10 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                         (vec![], vec![])
                                     };
                                     let prompt = {
-                                        let registry = state_for_consumer.registry.read().await;
+                                        let registry = crate::application_shell_adapter::registry_read_guard(
+                                            &state_for_consumer,
+                                        )
+                                        .await;
                                         if let Some(app) = registry.get_app(&app_id_for_consumer) {
                                             let contract = app_task_planning_contract(
                                                 &app.manifest,

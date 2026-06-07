@@ -550,7 +550,7 @@ async fn load_app_mcp_overlay_definitions(
     app_id: &ApplicationId,
 ) -> Vec<McpServerDefinition> {
     let app = {
-        let registry = state.registry.read().await;
+        let registry = crate::application_shell_adapter::registry_read_guard(&state).await;
         registry.get_app(app_id).cloned()
     };
     let Some(app) = app else {
@@ -804,7 +804,7 @@ async fn emit_mcp_event(
 
 async fn app_agent_names(state: &Arc<AppState>, app_id: &ApplicationId) -> Option<HashSet<String>> {
     let app = {
-        let registry = state.registry.read().await;
+        let registry = crate::application_shell_adapter::registry_read_guard(&state).await;
         registry.get_app(app_id).cloned()
     }?;
 
@@ -832,7 +832,7 @@ async fn resolve_tool_policy(
         .map(|m| m.capabilities.iter().map(|c| c.name.clone()).collect())
         .unwrap_or_default();
     let (manifest_allowed_tools, is_entry_agent) = {
-        let registry = state.registry.read().await;
+        let registry = crate::application_shell_adapter::registry_read_guard(&state).await;
         registry
             .get_app(app_id)
             .and_then(|app| app_agent_manifest_view(&app.manifest, agent_name))

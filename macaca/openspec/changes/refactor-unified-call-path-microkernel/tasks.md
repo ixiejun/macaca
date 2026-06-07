@@ -133,10 +133,10 @@
 ## 4. P3 — Web 瘦身为 thin shell + 文件拆分
 
 ### 4.1 删除 AppState direct provider 字段
-- [ ] 4.1.1 `[impact-memo]` 盘点 `macaca-web/src/state.rs` 全部 deprecated 字段（`runtime`、`registry`、`llm`/`router`、`memory_runtime`、`mcp_runtime`、`driver_runtime`/`driver_registry`）的读取点。
-- [ ] 4.1.2 逐字段替换为 focused SDK client（`SystemFacade` + clients）；每替换一个字段跑相关路由/单测。
-- [ ] 4.1.3 删除 `AppState` 中全部 direct provider 字段；引入小型 shell composition bundle（仅持 SDK clients + SSE/HTTP 适配状态）。
-- [ ] 4.1.4 删除 `macaca-web/src/memory_runtime.rs` 等 shell 内 runtime 持有者（若无消费者）。
+- [x] 4.1.1 `[impact-memo]` 盘点 `macaca-web/src/state.rs` 全部 deprecated 字段（`runtime`、`registry`、`llm`/`router`、`memory_runtime`、`mcp_runtime`、`driver_runtime`/`driver_registry`）的读取点。（见 `appstate-deprecated-field-inventory.md`）
+- [x] 4.1.2 逐字段替换为 focused SDK client（`SystemFacade` + clients）及 shell adapter（`application_shell_adapter` / `llm_route_shell_adapter` / `mcp_shell_adapter`）；路由/框架/loop 消费者已迁移。
+- [x] 4.1.3 删除 `AppState` 中全部 direct provider 字段；引入 `WebShellCompositionBundle`（bootstrap 期 provider anchors）+ `AppState::composition`。
+- [ ] 4.1.4 删除 `macaca-web/src/memory_runtime.rs` 等 shell 内 runtime 持有者（若无消费者）。（**暂缓**：`WebMemoryRuntime` 仍由 bootstrap 构造并注入 composition bundle + memory service provider；待 memory 全量 service 化后删除）
 
 ### 4.2 session loop 下沉
 - [ ] 4.2.1 `loop_manager.rs` 的 plan/worker loop 拉取/唤醒/心跳逻辑迁至 `service.execution_control` + task service；web 仅保留 SSE endpoint 与事件订阅。

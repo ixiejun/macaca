@@ -161,7 +161,7 @@ async fn registry_load_path_check(
     target_skill: &str,
 ) -> Result<CanonicalEvidenceCheck, (StatusCode, Json<ErrorResponse>)> {
     let app = {
-        let registry = state.registry.read().await;
+        let registry = crate::application_shell_adapter::registry_read_guard(&state).await;
         registry
             .get_app(&app_id)
             .cloned()

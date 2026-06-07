@@ -302,7 +302,7 @@ async fn app_ui_context(
 
     #[allow(deprecated)]
     let (ui, declared_services) = {
-        let registry = state.registry.read().await;
+        let registry = crate::application_shell_adapter::registry_read_guard(&state).await;
         let app = registry.get_app(&app_id).ok_or_else(|| {
             err(
                 StatusCode::NOT_FOUND,
