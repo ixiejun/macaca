@@ -3,9 +3,14 @@ name = "macaca-web"
 version.workspace = true
 edition.workspace = true
 
+[features]
+default = ["domain-pack-finance"]
+domain-pack-finance = ["dep:macaca-domain-pack-finance"]
+
 [dependencies]
 macaca-proto = { workspace = true }
 macaca-app = { workspace = true }
+macaca-domain-pack-finance = { workspace = true, optional = true }
 macaca-sdk = { workspace = true }
 macaca-runtime-host = { workspace = true }
 macaca-runtime = { workspace = true }

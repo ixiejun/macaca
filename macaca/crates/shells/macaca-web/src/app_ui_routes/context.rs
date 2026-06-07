@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::http::StatusCode;
-use macaca_app::{expand_service_capabilities, InMemoryDomainPackCatalog};
+use macaca_app::expand_service_capabilities;
 use macaca_proto::{
     ApplicationId, ApplicationMetadataQueryCommand, TraceContext,
 };
@@ -53,9 +53,11 @@ pub(crate) async fn app_ui_context(
                 "application UI runtime is not declared".into(),
             )
         })?;
-        let catalog = InMemoryDomainPackCatalog::with_builtin_defaults();
-        let declared_services =
-            expand_service_capabilities(app.manifest.service_contract.as_ref(), &catalog).services;
+        let declared_services = expand_service_capabilities(
+            app.manifest.service_contract.as_ref(),
+            state.domain_pack_catalog.as_ref(),
+        )
+        .services;
         (ui, declared_services)
     };
     let workspace_root = {

@@ -20,7 +20,9 @@ use macaca_sdk::AgentConfig;
 use tracing::info;
 
 use crate::model::{AgentSource, AppManifest, EntrypointType, InlineAgentConfig};
-use crate::service_capability::{expand_service_capabilities, InMemoryDomainPackCatalog};
+use crate::service_capability::{
+    expand_service_capabilities, DomainPackCatalog, InMemoryDomainPackCatalog,
+};
 
 /// Safe diagnostic emitted while projecting YAML data into Manifest v1.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -104,8 +106,17 @@ impl YamlApplicationManifestAdapter {
         self
     }
 
-    /// Project YAML application data into Manifest v1 and a safe report.
+    /// Project YAML application data into Manifest v1 using an empty catalog.
     pub fn project(self) -> LegacyAppManifestProjection {
+        self.project_with_catalog(&InMemoryDomainPackCatalog::with_builtin_defaults())
+    }
+
+    /// Project YAML application data using a host-installed domain-pack catalog.
+    ///
+    /// WASM runtime ability synthesis expands `service_contract.use_packs`
+    /// through the injected catalog so composition roots can register optional
+    /// domain extensions without embedding pack ids in this adapter.
+    pub fn project_with_catalog(self, catalog: &dyn DomainPackCatalog) -> LegacyAppManifestProjection {
         let application_id = self.manifest.id.to_string();
         let package_id = format!("application.{application_id}");
         let entry = entry_value(&self.manifest);
@@ -227,7 +238,7 @@ impl YamlApplicationManifestAdapter {
         for permission in application_permissions(&self.resolved_agents) {
             projected = projected.permission(permission);
         }
-        for ability in self.projected_abilities(&entry) {
+        for ability in self.projected_abilities(&entry, catalog) {
             projected = projected.ability(ability);
         }
         report.ability_count = projected.abilities.len();
@@ -254,7 +265,11 @@ impl YamlApplicationManifestAdapter {
     /// headless WASM execution ability. This keeps runtime admission and
     /// metadata query surfaces auditable without introducing app-specific
     /// host-side logic.
-    fn projected_abilities(&self, entry: &Option<String>) -> Vec<ApplicationAbilityDescriptor> {
+    fn projected_abilities(
+        &self,
+        entry: &Option<String>,
+        catalog: &dyn DomainPackCatalog,
+    ) -> Vec<ApplicationAbilityDescriptor> {
         let mut abilities = Vec::new();
         for source in &self.manifest.agents {
             match source {
@@ -265,7 +280,7 @@ impl YamlApplicationManifestAdapter {
         for agent in &self.resolved_agents {
             abilities.push(resolved_agent_ability(agent, entry));
         }
-        if let Some(wasm_ability) = self.wasm_runtime_ability() {
+        if let Some(wasm_ability) = self.wasm_runtime_ability(catalog) {
             abilities.push(wasm_ability);
         }
         abilities.sort_by(|a, b| a.id.cmp(&b.id));
@@ -277,13 +292,15 @@ impl YamlApplicationManifestAdapter {
     /// declarations. The synthesized descriptor is intentionally data-only:
     /// it declares runtime intent and service dependencies but does not embed
     /// provider internals, app names, or workflow-specific behavior.
-    fn wasm_runtime_ability(&self) -> Option<ApplicationAbilityDescriptor> {
+    fn wasm_runtime_ability(
+        &self,
+        catalog: &dyn DomainPackCatalog,
+    ) -> Option<ApplicationAbilityDescriptor> {
         if !matches!(self.manifest.layer, crate::model::AppLayer::L2Wasm) {
             return None;
         }
         let contract = self.manifest.service_contract.as_ref()?;
-        let catalog = InMemoryDomainPackCatalog::with_builtin_defaults();
-        let capabilities = expand_service_capabilities(Some(contract), &catalog);
+        let capabilities = expand_service_capabilities(Some(contract), catalog);
         let mut ability = ApplicationAbilityDescriptor::new(
             "ability.runtime.wasm".to_string(),
             ApplicationAbilityKind::Headless,

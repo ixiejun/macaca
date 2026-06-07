@@ -11,6 +11,7 @@ use axum::response::sse::Event;
 use serde::Serialize;
 use tokio::sync::{mpsc, RwLock};
 
+use macaca_app::SharedDomainPackCatalog;
 use macaca_context::{
     ContextAdapterSafetyPolicy, ContextEngineInfo, ContextEngineRegistry, ContextFallbackPolicy,
     ContextProviderRegistry, ProviderHealthLedger,
@@ -301,6 +302,11 @@ pub struct AppState {
     /// P3 thin-shell migration groups legacy runtime/provider handles here so
     /// route handlers depend on SDK clients and adapters instead of direct fields.
     pub composition: WebShellCompositionBundle,
+    /// Host-installed catalog for manifest `use_packs` expansion in UI routes.
+    ///
+    /// This handle mirrors the catalog injected into `AppRuntime` and Application
+    /// Service during bootstrap so shell adapters do not reconstruct pack metadata.
+    pub domain_pack_catalog: SharedDomainPackCatalog,
     /// The serviceized Application client used by new Route C call paths.
     pub application_client: Arc<dyn SystemApplicationClient>,
     /// The serviceized LLM client used by new Route C call paths.

@@ -305,3 +305,13 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `InMemoryDomainPackCatalog::with_builtin_defaults` empty catalog | MEDIUM | manifest capability expansion now reports `unresolved_domain_packs` until composition root registers installed packs | P4 |
 | `service_runtime_wiring` empty domain-pack bootstrap | MEDIUM | base web OS no longer auto-registers finance providers; explicit package wiring required | P4 |
 | `runtime_host_domain_pack_gate` VC-hardcoded scan | LOW | static production-source token gate for runtime-host finance/crypto strings | P4 |
+
+## Iteration 39 additions (composition-root catalog wiring — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `ApplicationSystemServiceProvider::new` + `domain_pack_catalog` param | HIGH | sole production caller `application_discovery`; custom hosts must pass shared catalog | P4 |
+| `AppRuntime::with_domain_pack_catalog` | MEDIUM | `start_app` pack expansion; Application Service sync_wasm_service_policy | P4 |
+| `domain_pack_wiring` + `domain-pack-finance` feature | MEDIUM | web default feature registers finance catalog + 4 providers; `--no-default-features` restores absent-pack semantics | P4 |
+| `AppState.domain_pack_catalog` | MEDIUM | `app_ui_routes/context` allowlist expansion; replaces `with_builtin_defaults()` local catalog | P4 |
+| `service_projection` / `yaml_adapter` catalog-aware APIs | LOW | backward-compatible wrappers still default empty catalog for unit tests | P4 |

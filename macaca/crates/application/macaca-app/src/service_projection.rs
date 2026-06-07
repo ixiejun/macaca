@@ -28,7 +28,7 @@ use tracing::info;
 use crate::consumption::app_entry_agent_name;
 use crate::manifest_v1::{LegacyAppManifestProjection, YamlApplicationManifestAdapter};
 use crate::model::{AgentSource, AppManifest, AppStatus};
-use crate::service_capability::{expand_service_capabilities, InMemoryDomainPackCatalog};
+use crate::service_capability::{expand_service_capabilities, DomainPackCatalog, InMemoryDomainPackCatalog};
 use crate::ui_runtime::{
     AppUiCspMode, AppUiFramework, AppUiNetworkPolicy, AppUiRuntimeKind, AppUiSandboxIsolation,
     AppUiSurfaceChrome, AppUiSurfaceMode, AppUiThemeMode,
@@ -46,8 +46,28 @@ pub fn app_manifest_to_service_app_view(
     app_dir: Option<&Path>,
     status: AppStatus,
 ) -> ApplicationServiceAppView {
-    let projection = YamlApplicationManifestAdapter::new(manifest.clone()).project();
-    manifest_v1_to_service_app_view(&projection.manifest, manifest, app_dir, status)
+    app_manifest_to_service_app_view_with_catalog(
+        manifest,
+        app_dir,
+        status,
+        &InMemoryDomainPackCatalog::with_builtin_defaults(),
+    )
+}
+
+/// Project an application manifest using a host-installed domain-pack catalog.
+///
+/// Composition roots pass the same catalog wired into `AppRuntime` so service
+/// diagnostics, WASM policy sync, and UI allowlists observe identical pack
+/// resolution results.
+pub fn app_manifest_to_service_app_view_with_catalog(
+    manifest: &AppManifest,
+    app_dir: Option<&Path>,
+    status: AppStatus,
+    catalog: &dyn DomainPackCatalog,
+) -> ApplicationServiceAppView {
+    let projection = YamlApplicationManifestAdapter::new(manifest.clone())
+        .project_with_catalog(catalog);
+    manifest_v1_to_service_app_view(&projection.manifest, manifest, app_dir, status, catalog)
 }
 
 /// Project an application manifest into the complete sanitized metadata view.
@@ -65,9 +85,33 @@ pub fn app_manifest_to_metadata_view(
     include_overlay: bool,
     include_digest: bool,
 ) -> ApplicationMetadataView {
-    let projection = YamlApplicationManifestAdapter::new(manifest.clone()).project();
+    app_manifest_to_metadata_view_with_catalog(
+        manifest,
+        app_dir,
+        status,
+        include_abilities,
+        include_policy,
+        include_overlay,
+        include_digest,
+        &InMemoryDomainPackCatalog::with_builtin_defaults(),
+    )
+}
+
+/// Project metadata using a host-installed domain-pack catalog.
+pub fn app_manifest_to_metadata_view_with_catalog(
+    manifest: &AppManifest,
+    app_dir: Option<&Path>,
+    status: AppStatus,
+    include_abilities: bool,
+    include_policy: bool,
+    include_overlay: bool,
+    include_digest: bool,
+    catalog: &dyn DomainPackCatalog,
+) -> ApplicationMetadataView {
+    let projection = YamlApplicationManifestAdapter::new(manifest.clone())
+        .project_with_catalog(catalog);
     let application =
-        manifest_v1_to_service_app_view(&projection.manifest, manifest, app_dir, status);
+        manifest_v1_to_service_app_view(&projection.manifest, manifest, app_dir, status, catalog);
     let entry = entry_view(&projection.manifest, manifest);
     let abilities = if include_abilities {
         projection
@@ -244,14 +288,13 @@ fn manifest_v1_to_service_app_view(
     legacy: &AppManifest,
     app_dir: Option<&Path>,
     status: AppStatus,
+    catalog: &dyn DomainPackCatalog,
 ) -> ApplicationServiceAppView {
     // Resolve effective service capabilities for metadata projection only.
     // This keeps app discovery and UI surfaces deterministic without invoking
     // any runtime providers or executing any service calls.
-    let capabilities = expand_service_capabilities(
-        legacy.service_contract.as_ref(),
-        &InMemoryDomainPackCatalog::with_builtin_defaults(),
-    );
+    let capabilities =
+        expand_service_capabilities(legacy.service_contract.as_ref(), catalog);
     let runtime_kind = Some(manifest_v1.runtime.kind.clone());
     let lifecycle_state = crate::lifecycle_from_app_status(status);
     ApplicationServiceAppView {

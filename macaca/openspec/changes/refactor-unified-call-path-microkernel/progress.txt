@@ -316,3 +316,11 @@
 - **Verified**: `cargo check` pass; `cargo test -p macaca-app` affected tests pass.
 - **GitNexus memo (non-blocking)**: iteration 38 CRITICAL on finance provider extraction — recorded in `impact-memo.md`.
 - **Next**: P5 终态门; composition root catalog wiring for installed packs; 4.4.4终态; remaining allowlist giants (77 rows).
+
+## Iteration 39 (2026-06-07)
+- **P4 composition-root domain-pack catalog + provider wiring**: wired installed catalog through web bootstrap into `AppRuntime`, `ApplicationSystemServiceProvider`, `service_runtime_wiring`, `AppState`, and `app_ui_routes/context`.
+- **Design patterns**: Composition Root (`domain_pack_wiring`); Registry (`SharedDomainPackCatalog`); Abstract Factory (`installed_domain_pack_provider_registrations`); Feature toggle (`domain-pack-finance` default feature on `macaca-web`).
+- **macaca-app**: added `domain_pack_catalog` helpers + `AppRuntime::with_domain_pack_catalog`; `ApplicationSystemServiceProvider::new` now requires shared catalog (**BREAKING** for custom hosts).
+- **Contract tests**: `macaca-web` domain_pack_wiring 2/2; `composition_root_domain_pack_wiring` integration 2/2; `cargo check` pass.
+- **GitNexus memo (non-blocking)**: iteration 39 HIGH on `ApplicationSystemServiceProvider::new` signature + catalog injection blast radius — recorded in `impact-memo.md`.
+- **Next**: P5 终态门; 4.4.4终态; remaining allowlist giants (77 rows).

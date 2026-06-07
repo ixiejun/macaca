@@ -7,6 +7,7 @@ pub(crate) fn composition_bootstrap_module_sources() -> String {
         include_str!("application_discovery.rs"),
         include_str!("bootstrap_ctx.rs"),
         include_str!("bootstrap_path_helpers.rs"),
+        include_str!("domain_pack_wiring.rs"),
         include_str!("config_and_kernel.rs"),
         include_str!("mod.rs"),
         include_str!("post_bootstrap_hooks.rs"),

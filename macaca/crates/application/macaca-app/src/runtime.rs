@@ -10,9 +10,10 @@ use macaca_proto::{AgentId, ApplicationId, MacacaError, MacacaResult};
 use macaca_sdk::AgentConfig;
 use macaca_sdk::MacacaSdk;
 
+use crate::domain_pack_catalog::{empty_domain_pack_catalog, SharedDomainPackCatalog};
 use crate::loader::AppLoader;
 use crate::model::{AppManifest, AppStatus, LoadedApp};
-use crate::service_capability::{expand_service_capabilities, InMemoryDomainPackCatalog};
+use crate::service_capability::expand_service_capabilities;
 
 /// Builder that incrementally validates and assembles application runtime
 /// inputs before registration into [`AppRuntime`].
@@ -84,14 +85,35 @@ impl ApplicationRuntimeFactory for DefaultApplicationRuntimeFactory {
 #[derive(Clone)]
 pub struct AppRuntime {
     apps: Arc<RwLock<HashMap<ApplicationId, LoadedApp>>>,
+    /// Installed domain-pack catalog injected by the composition root.
+    ///
+    /// Capability expansion during `start_app` reads this catalog so manifest
+    /// `use_packs` declarations resolve against host-installed extensions rather
+    /// than hardcoded OS defaults.
+    domain_pack_catalog: SharedDomainPackCatalog,
 }
 
 impl AppRuntime {
-    /// Create a new, empty app runtime.
+    /// Create a new, empty app runtime with an empty domain-pack catalog.
     pub fn new() -> Self {
+        Self::with_domain_pack_catalog(empty_domain_pack_catalog())
+    }
+
+    /// Create a runtime bound to a composition-root catalog instance.
+    pub fn with_domain_pack_catalog(domain_pack_catalog: SharedDomainPackCatalog) -> Self {
+        tracing::info!(
+            catalog_configured = true,
+            "AppRuntime constructed with injected domain-pack catalog"
+        );
         Self {
             apps: Arc::new(RwLock::new(HashMap::new())),
+            domain_pack_catalog,
         }
+    }
+
+    /// Return the shared catalog used for manifest capability expansion.
+    pub fn domain_pack_catalog(&self) -> SharedDomainPackCatalog {
+        Arc::clone(&self.domain_pack_catalog)
     }
 
     /// Load and start a declarative (L3) application from a manifest file.
@@ -139,7 +161,7 @@ impl AppRuntime {
         let configs = builder.resolve_agent_configs()?;
         let capabilities = expand_service_capabilities(
             builder.manifest().service_contract.as_ref(),
-            &InMemoryDomainPackCatalog::with_builtin_defaults(),
+            self.domain_pack_catalog.as_ref(),
         );
         tracing::info!(
             app = %builder.manifest().name,

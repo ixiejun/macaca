@@ -8,6 +8,7 @@ pub mod certification;
 pub mod commercial_package;
 pub mod compatibility_checker;
 pub mod consumption;
+pub mod domain_pack_catalog;
 pub mod dapp_capability;
 pub mod genui;
 pub mod host;
@@ -51,6 +52,9 @@ pub use compatibility_checker::{
     CompatibilityStatus, CompatibilityTraceEvent, PackageCompatibilityChecker,
 };
 #[allow(deprecated)]
+pub use domain_pack_catalog::{
+    compose_installed_domain_pack_catalog, empty_domain_pack_catalog, SharedDomainPackCatalog,
+};
 pub use consumption::{
     app_agent_base_prompt, app_agent_manifest_view, app_agent_prompt_semantics,
     app_entry_agent_name, app_entry_agent_name_or, app_entry_workflow_name,
@@ -102,7 +106,8 @@ pub use service_capability::{
 };
 pub use service_projection::{
     app_manifest_to_heartbeat_agent_views, app_manifest_to_metadata_view,
-    app_manifest_to_service_app_view,
+    app_manifest_to_metadata_view_with_catalog, app_manifest_to_service_app_view,
+    app_manifest_to_service_app_view_with_catalog,
 };
 pub use skills::{global_skills_dir, SkillLoader};
 pub use ui_runtime::*;

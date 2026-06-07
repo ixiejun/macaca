@@ -43,6 +43,8 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
     let payment_store = Arc::clone(ctx.payment_store.as_ref().expect("bootstrap: payment_store"));
     let entitlement_facade = Arc::clone(ctx.entitlement_facade.as_ref().expect("bootstrap: entitlement_facade"));
     let driver_runtime = Arc::clone(ctx.driver_runtime.as_ref().expect("bootstrap: driver_runtime"));
+    let domain_pack_provider_registrations =
+        super::domain_pack_wiring::installed_domain_pack_provider_registrations(Arc::clone(&llm));
 
     // 9a. Initialize audit logger and alert manager.
     let kernel_persistence = Arc::new(RedbKernelPersistenceAdapter::new(Arc::clone(
@@ -403,7 +405,7 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
     // structured unavailable results instead of OS-owned business logic.
     let domain_pack_services = macaca_runtime_host::bootstrap_domain_pack_services(
         Arc::clone(&service_runtime),
-        std::iter::empty::<macaca_runtime_host::DomainPackProviderRegistration>(),
+        domain_pack_provider_registrations,
         "web-startup-domain-pack",
     )
     .await?;

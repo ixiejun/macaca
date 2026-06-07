@@ -12,10 +12,11 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use macaca_app::{
-    app_manifest_to_heartbeat_agent_views, app_manifest_to_metadata_view,
-    app_manifest_to_service_app_view, application_service_descriptor, expand_service_capabilities,
-    AppLoader, AppRegistry, AppRuntime, AppStatus, ApplicationHost, DiscoveredApp,
-    InMemoryDomainPackCatalog, UnavailableApplicationHostBackend,
+    app_manifest_to_heartbeat_agent_views, app_manifest_to_metadata_view_with_catalog,
+    app_manifest_to_service_app_view_with_catalog, application_service_descriptor,
+    expand_service_capabilities, empty_domain_pack_catalog, AppLoader, AppRegistry, AppRuntime,
+    AppStatus, ApplicationHost, DiscoveredApp, SharedDomainPackCatalog,
+    UnavailableApplicationHostBackend,
 };
 use macaca_kernel::{Kernel, SystemService};
 use macaca_proto::{
@@ -72,6 +73,8 @@ pub struct ApplicationSystemServiceProvider {
     descriptor: macaca_proto::ServiceDescriptor,
     registry: Option<Arc<RwLock<AppRegistry>>>,
     runtime: Option<Arc<AppRuntime>>,
+    /// Host-installed catalog shared with `AppRuntime` for pack expansion.
+    domain_pack_catalog: SharedDomainPackCatalog,
     kernel: Option<Arc<Kernel>>,
     wasm_policy_engine: Option<Arc<InMemoryServicePolicyEngine>>,
     wasm_runtime_provider: Option<Arc<dyn WasmApplicationRuntimeProvider>>,
@@ -86,6 +89,7 @@ impl ApplicationSystemServiceProvider {
     pub fn new(
         registry: Arc<RwLock<AppRegistry>>,
         runtime: Arc<AppRuntime>,
+        domain_pack_catalog: SharedDomainPackCatalog,
         kernel: Arc<Kernel>,
         wasm_policy_engine: Arc<InMemoryServicePolicyEngine>,
         wasm_host_import_bridge: WasmHostImportBridge,
@@ -98,10 +102,15 @@ impl ApplicationSystemServiceProvider {
             ComponentModelWasmRuntimeProvider::default()
                 .with_host_import_bridge(Arc::new(wasm_host_import_bridge)),
         );
+        tracing::info!(
+            service_id = %application_service_descriptor().id,
+            "ApplicationSystemServiceProvider wired with composition-root domain-pack catalog"
+        );
         Self {
             descriptor: application_service_descriptor(),
             registry: Some(registry),
             runtime: Some(runtime),
+            domain_pack_catalog,
             kernel: Some(kernel),
             wasm_policy_engine: Some(wasm_policy_engine),
             wasm_runtime_provider: Some(wasm_runtime_provider),
@@ -118,6 +127,7 @@ impl ApplicationSystemServiceProvider {
             descriptor: application_service_descriptor(),
             registry: None,
             runtime: None,
+            domain_pack_catalog: empty_domain_pack_catalog(),
             kernel: None,
             wasm_policy_engine: None,
             wasm_runtime_provider: None,
@@ -252,9 +262,10 @@ impl ApplicationSystemServiceProvider {
             tracing::warn!(app_id = %app_id, "Skipping WASM policy sync because app is not discovered");
             return Ok(());
         };
-        let catalog = InMemoryDomainPackCatalog::with_builtin_defaults();
-        let expanded =
-            expand_service_capabilities(discovered.manifest.service_contract.as_ref(), &catalog);
+        let expanded = expand_service_capabilities(
+            discovered.manifest.service_contract.as_ref(),
+            self.domain_pack_catalog.as_ref(),
+        );
         engine.set_app_override(
             app_id.to_string(),
             ServicePolicyLayer {
@@ -354,18 +365,20 @@ impl ApplicationSystemServiceProvider {
 
     async fn discovered_views(
         registry: &Arc<RwLock<AppRegistry>>,
+        catalog: &SharedDomainPackCatalog,
     ) -> ServiceResult<Vec<ApplicationServiceAppView>> {
         let registry = registry.read().await;
         Ok(registry
             .list_apps()
             .into_iter()
-            .map(discovered_view)
+            .map(|app| discovered_view(&app, catalog.as_ref()))
             .collect())
     }
 
     async fn running_views(
         runtime: &Arc<AppRuntime>,
         registry: Option<&Arc<RwLock<AppRegistry>>>,
+        catalog: &SharedDomainPackCatalog,
     ) -> ServiceResult<Vec<ApplicationServiceAppView>> {
         let apps = runtime.list_apps().await;
         let mut views = Vec::new();
@@ -378,7 +391,14 @@ impl ApplicationSystemServiceProvider {
             };
             let view = discovered
                 .as_ref()
-                .map(|app| app_manifest_to_service_app_view(&app.manifest, Some(&app.path), status))
+                .map(|app| {
+                    app_manifest_to_service_app_view_with_catalog(
+                        &app.manifest,
+                        Some(&app.path),
+                        status,
+                        catalog.as_ref(),
+                    )
+                })
                 .unwrap_or_else(|| minimal_running_view(id, name, status));
             views.push(view);
         }
@@ -421,8 +441,10 @@ impl SystemService for ApplicationSystemServiceProvider {
                     count = discovered.len(),
                     "application service discovery completed"
                 );
-                let views: ApplicationDiscoverResult =
-                    discovered.iter().map(discovered_view).collect();
+                let views: ApplicationDiscoverResult = discovered
+                    .iter()
+                    .map(|app| discovered_view(app, self.domain_pack_catalog.as_ref()))
+                    .collect();
                 Ok(Self::service_result(to_value(views)?, typed.trace))
             }
             APPLICATION_START_COMMAND => {
@@ -442,7 +464,12 @@ impl SystemService for ApplicationSystemServiceProvider {
                     .map_err(service_adapter_error)?;
                 let app_dir = path.parent().unwrap_or_else(|| Path::new("."));
                 let manifest = AppLoader::load_manifest(path).map_err(service_adapter_error)?;
-                let view = manifest_view(&manifest, Some(app_dir), true);
+                let view = manifest_view(
+                    &manifest,
+                    Some(app_dir),
+                    true,
+                    self.domain_pack_catalog.as_ref(),
+                );
                 tracing::info!(
                     trace_id = %typed.trace.trace_id,
                     app_id = %app_id,
@@ -454,8 +481,12 @@ impl SystemService for ApplicationSystemServiceProvider {
             APPLICATION_STATUS_COMMAND => {
                 let typed: ApplicationStatusCommand = decode(command.payload)?;
                 let runtime = self.runtime()?;
-                let result: ApplicationStatusResult =
-                    Self::running_views(&runtime, self.registry.as_ref()).await?;
+                let result: ApplicationStatusResult = Self::running_views(
+                    &runtime,
+                    self.registry.as_ref(),
+                    &self.domain_pack_catalog,
+                )
+                .await?;
                 Ok(Self::service_result(to_value(result)?, typed.trace))
             }
             APPLICATION_METADATA_QUERY_COMMAND => {
@@ -474,7 +505,7 @@ impl SystemService for ApplicationSystemServiceProvider {
                     ServiceError::AdapterFailure(format!("application {app_id} not found"))
                 })?;
                 let status = running_status_for(self.runtime.as_ref(), &app_id).await;
-                let view: ApplicationMetadataResult = app_manifest_to_metadata_view(
+                let view: ApplicationMetadataResult = app_manifest_to_metadata_view_with_catalog(
                     &discovered.manifest,
                     Some(&discovered.path),
                     status,
@@ -482,6 +513,7 @@ impl SystemService for ApplicationSystemServiceProvider {
                     typed.include_policy,
                     typed.include_overlay,
                     typed.include_digest,
+                    self.domain_pack_catalog.as_ref(),
                 );
                 tracing::info!(
                     trace_id = %typed.trace.trace_id,
@@ -522,7 +554,7 @@ impl SystemService for ApplicationSystemServiceProvider {
                 let typed: ApplicationSnapshotCommand = decode(command.payload)?;
                 let discovered = if typed.include_discovered {
                     if let Some(registry) = &self.registry {
-                        Self::discovered_views(registry).await?
+                        Self::discovered_views(registry, &self.domain_pack_catalog).await?
                     } else {
                         Vec::new()
                     }
@@ -531,7 +563,12 @@ impl SystemService for ApplicationSystemServiceProvider {
                 };
                 let running = if typed.include_running {
                     if let Some(runtime) = &self.runtime {
-                        Self::running_views(runtime, self.registry.as_ref()).await?
+                        Self::running_views(
+                            runtime,
+                            self.registry.as_ref(),
+                            &self.domain_pack_catalog,
+                        )
+                        .await?
                     } else {
                         Vec::new()
                     }
@@ -731,21 +768,27 @@ impl SystemService for ApplicationSystemServiceProvider {
     }
 }
 
-fn discovered_view(app: &DiscoveredApp) -> ApplicationServiceAppView {
-    app_manifest_to_service_app_view(&app.manifest, Some(&app.path), AppStatus::Loaded)
+fn discovered_view(app: &DiscoveredApp, catalog: &dyn macaca_app::DomainPackCatalog) -> ApplicationServiceAppView {
+    app_manifest_to_service_app_view_with_catalog(
+        &app.manifest,
+        Some(&app.path),
+        AppStatus::Loaded,
+        catalog,
+    )
 }
 
 fn manifest_view(
     manifest: &macaca_app::AppManifest,
     app_dir: Option<&Path>,
     running: bool,
+    catalog: &dyn macaca_app::DomainPackCatalog,
 ) -> ApplicationServiceAppView {
     let status = if running {
         AppStatus::Running
     } else {
         AppStatus::Loaded
     };
-    app_manifest_to_service_app_view(manifest, app_dir, status)
+    app_manifest_to_service_app_view_with_catalog(manifest, app_dir, status, catalog)
 }
 
 fn minimal_running_view(

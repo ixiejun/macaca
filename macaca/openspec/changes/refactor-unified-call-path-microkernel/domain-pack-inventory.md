@@ -3,7 +3,17 @@
 > Impact memo (GitNexus non-blocking): finance extraction touches `bootstrap_domain_pack_services`,
 > `service_runtime_wiring`, `InMemoryDomainPackCatalog`, and optional `macaca-domain-pack-finance` crate.
 
-## Current state (iteration 38 baseline)
+## Current state (iteration 39 — web composition root wired)
+
+| Location | Role | Production reachable? | Action |
+|----------|------|---------------------|--------|
+| `web/composition_bootstrap/domain_pack_wiring.rs` | `build_installed_domain_pack_catalog` + `installed_domain_pack_provider_registrations` | Yes (feature-gated) | **Keep** |
+| `web/application_discovery.rs` | Injects catalog into `AppRuntime` + Application Service | Yes | **Done** |
+| `web/service_runtime_wiring.rs` | Forwards package registrations to `bootstrap_domain_pack_services` | Yes | **Done** |
+| `web/state.rs` + `app_ui_routes/context.rs` | `AppState.domain_pack_catalog` for UI allowlist | Yes | **Done** |
+| `macaca-app/domain_pack_catalog.rs` | `compose_installed_domain_pack_catalog` / `SharedDomainPackCatalog` | Yes | **Keep** |
+
+## Prior state (iteration 38 baseline)
 
 | Location | Role | Production reachable? | Action |
 |----------|------|---------------------|--------|
@@ -12,7 +22,7 @@
 | `runtime-host/finance_live_data.rs` | Binance/OKX/Coindesk adapters | `#[cfg(test)]` only | **Move** to finance crate |
 | `runtime-host/finance_llm_analysis_provider.rs` | LLM analysis provider | Exported but not bootstrapped | **Move** to finance crate |
 | `runtime-host/lib.rs` | `pub use FinanceLlmAnalysisSystemServiceProvider` | Dead export | **Remove** |
-| `web/service_runtime_wiring.rs` | `bootstrap_builtin_domain_pack_services` | Yes (returns empty) | **Replace** with `bootstrap_domain_pack_services([])` |
+| `web/service_runtime_wiring.rs` | domain-pack bootstrap | Yes | **Done** — uses `installed_domain_pack_provider_registrations` |
 | `macaca-app/service_capability.rs` | `with_builtin_defaults()` registers `pack.finance.v1` | Yes | **Empty default**; finance catalog in package crate |
 | `macaca-app` tests / loaders | `pack.finance.v1` in fixtures | Tests only | **Use** finance crate catalog helper |
 

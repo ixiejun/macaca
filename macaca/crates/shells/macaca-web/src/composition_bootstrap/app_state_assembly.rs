@@ -67,6 +67,11 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
     let context_engine_registry = Arc::clone(ctx.context_engine_registry.as_ref().expect("bootstrap: context_engine_registry"));
     let external_adapter_runtime_registry = Arc::clone(ctx.external_adapter_runtime_registry.as_ref().expect("bootstrap: external_adapter_runtime_registry"));
     let config = ctx.config.clone().expect("bootstrap: config");
+    let domain_pack_catalog = Arc::clone(
+        ctx.domain_pack_catalog
+            .as_ref()
+            .expect("bootstrap: domain_pack_catalog"),
+    );
 
     // 10. Build shared state.
     let state = Arc::new_cyclic(|weak_state| {
@@ -90,6 +95,7 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
         AppState {
             kernel: kernel.clone(),
             composition,
+            domain_pack_catalog: Arc::clone(&domain_pack_catalog),
             application_client: Arc::clone(&application_client),
             llm_client: Arc::clone(&llm_client),
             memory_client: Arc::clone(&memory_client),

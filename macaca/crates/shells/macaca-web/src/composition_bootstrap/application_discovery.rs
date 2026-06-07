@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use tracing::{error, info, warn};
 
-use macaca_app::{AppLoader, AppRegistry, AppRuntime};
+use macaca_app::{AppLoader, AppRegistry, AppRuntime, SharedDomainPackCatalog};
 use macaca_proto::{ApplicationStartCommand, KernelServiceId, MacacaResult, TraceContext};
 use super::bootstrap_path_helpers::autonomy_runtime_config_from_web_config;
 use crate::wasm_orchestration_backend::WebApplicationOrchestrationBackend;
@@ -36,8 +36,15 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
     );
 
 
-    // 5. Start the runtime and load ALL discovered apps.
-    let runtime = Arc::new(AppRuntime::new());
+    // 5. Compose the installed domain-pack catalog before constructing runtime
+    // and Application Service so pack expansion uses the same host-owned view.
+    let domain_pack_catalog: SharedDomainPackCatalog =
+        super::domain_pack_wiring::build_installed_domain_pack_catalog();
+
+    // Start the runtime and load ALL discovered apps.
+    let runtime = Arc::new(AppRuntime::with_domain_pack_catalog(Arc::clone(
+        &domain_pack_catalog,
+    )));
     let registry = Arc::new(tokio::sync::RwLock::new(registry));
     let service_runtime = Arc::new(macaca_runtime_host::ServiceRuntime::new(
         macaca_runtime_host::ServiceRuntimeConfig::default(),
@@ -82,6 +89,7 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
                     Arc::new(macaca_runtime_host::ApplicationSystemServiceProvider::new(
                         Arc::clone(&registry),
                         Arc::clone(&runtime),
+                        Arc::clone(&domain_pack_catalog),
                         Arc::clone(&kernel),
                         wasm_host_import_bridge.policy_engine(),
                         wasm_host_import_bridge.clone(),
@@ -277,6 +285,7 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
     }
 
     ctx.runtime = Some(runtime);
+    ctx.domain_pack_catalog = Some(domain_pack_catalog);
     ctx.registry = Some(registry);
     ctx.discovered = Some(discovered);
     ctx.service_runtime = Some(service_runtime);

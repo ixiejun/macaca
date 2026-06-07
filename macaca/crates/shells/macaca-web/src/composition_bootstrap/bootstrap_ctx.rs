@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use macaca_app::{AppRegistry, AppRuntime};
+use macaca_app::{AppRegistry, AppRuntime, SharedDomainPackCatalog};
 use macaca_sdk::driver::{DriverRegistry, DriverRuntime};
 use macaca_framework::session::SessionStore as FrameworkSessionStore;
 use macaca_sdk::kernel::{audit::AuditLogger, alert::AlertManager, Kernel};
@@ -33,6 +33,8 @@ pub(crate) struct BootstrapCtx {
     pub llm: Option<Arc<dyn LlmProvider>>,
     pub kernel: Option<Arc<Kernel>>,
     pub runtime: Option<Arc<AppRuntime>>,
+    /// Host-installed domain-pack catalog shared across runtime and UI routes.
+    pub domain_pack_catalog: Option<SharedDomainPackCatalog>,
     pub registry: Option<Arc<tokio::sync::RwLock<AppRegistry>>>,
     pub discovered: Option<Vec<macaca_app::DiscoveredApp>>,
     pub service_runtime: Option<Arc<ServiceRuntime>>,
