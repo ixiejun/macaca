@@ -25,8 +25,23 @@ use macaca_proto::{
 };
 
 use crate::routes::{err, ErrorResponse};
+use crate::session_loop_shell_adapter::{
+    register_plan_loop_via_execution_control, register_worker_loops_via_execution_control,
+    wake_plan_loop_and_notify_local, wake_worker_loops_and_notify_local,
+    REASON_SESSION_LOOP_GOAL_DECOMPOSITION_READY, REASON_SESSION_LOOP_REVIEW_DELEGATE_COMPLETE,
+    REASON_SESSION_LOOP_WORKER_SUBMIT_REVIEW,
+};
 use crate::sse::{broadcast_to_app_sessions, save_plan_decision, PlanDecisionEvent};
 use crate::state::AppState;
+
+/// Build the session-loop execution-control coordinator bound to web `AppState`.
+fn session_loop_coordinator(
+    state: &Arc<AppState>,
+) -> macaca_runtime_host::ExecutionControlSessionLoopCoordinator {
+    macaca_runtime_host::ExecutionControlSessionLoopCoordinator::new(Arc::clone(
+        &state.service_runtime,
+    ))
+}
 
 fn planner_scope_session_id(app_id: &ApplicationId, session_id: Option<&str>) -> String {
     session_id
@@ -431,12 +446,24 @@ async fn list_goal_todos_for_scope(
         .collect()
 }
 
-async fn wake_worker_loops(state: &Arc<AppState>, app_id: &ApplicationId) {
-    if let Some(wakers) = state.loops.worker_loop_wakers.read().await.get(app_id) {
-        for waker in wakers {
-            waker.wake();
-        }
-    }
+/// Wake worker loops after recording an auditable execution-control checkpoint.
+async fn wake_worker_loops(
+    state: &Arc<AppState>,
+    app_id: &ApplicationId,
+    session_id: Option<&str>,
+    reason_code: &str,
+    detail: Option<String>,
+) {
+    let coordinator = session_loop_coordinator(state);
+    wake_worker_loops_and_notify_local(
+        state,
+        &coordinator,
+        app_id,
+        session_id,
+        reason_code,
+        detail,
+    )
+    .await;
 }
 
 async fn mark_goal_decomposition_ready(
@@ -464,7 +491,14 @@ async fn mark_goal_decomposition_ready(
         None,
     )
     .await;
-    wake_worker_loops(state, app_id).await;
+    wake_worker_loops(
+        state,
+        app_id,
+        session_id,
+        REASON_SESSION_LOOP_GOAL_DECOMPOSITION_READY,
+        Some(format!("tasks={task_count}")),
+    )
+    .await;
 }
 
 async fn mark_goal_decomposition_failed(
@@ -823,9 +857,16 @@ async fn handle_worker_execution_success(
     )
     .await;
 
-    if let Some(waker) = state.loops.plan_loop_wakers.read().await.get(app_id) {
-        waker.wake();
-    }
+    let coordinator = session_loop_coordinator(state);
+    wake_plan_loop_and_notify_local(
+        state,
+        &coordinator,
+        app_id,
+        task_session,
+        REASON_SESSION_LOOP_WORKER_SUBMIT_REVIEW,
+        Some(task_id.to_string()),
+    )
+    .await;
 
     if mode == WorkerExecutionMode::TaskClaimed {
         tracing::info!(agent = %agent_name, "Task completed, submitted for review");
@@ -995,6 +1036,18 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                     .write()
                     .await
                     .insert(app_id.clone(), plan_waker);
+
+                // Register the PlanLoop controller with execution control before the
+                // event consumer starts handling PlanEvents.  Audit replay must see
+                // register → wake → shutdown ordering even while local wakers remain
+                // the compat seam for in-process macaca-task controllers.
+                let coordinator = session_loop_coordinator(state);
+                register_plan_loop_via_execution_control(
+                    &coordinator,
+                    app_id.clone(),
+                    session_id.clone(),
+                )
+                .await;
 
                 let (event_tx, mut event_rx) =
                     tokio::sync::mpsc::channel::<macaca_task::PlanEvent>(64);
@@ -1480,18 +1533,17 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                         None,
                                     )
                                     .await;
-                                    // Review delegate completed — wake all WorkerLoops so unblocked tasks are claimed immediately
-                                    if let Some(wakers) = state_for_consumer
-                                        .loops
-                                        .worker_loop_wakers
-                                        .read()
-                                        .await
-                                        .get(&app_id_for_consumer)
-                                    {
-                                        for w in wakers {
-                                            w.wake();
-                                        }
-                                    }
+                                    // Review delegate completed — wake worker loops via execution control.
+                                    let coordinator = session_loop_coordinator(&state_for_consumer);
+                                    wake_worker_loops_and_notify_local(
+                                        &state_for_consumer,
+                                        &coordinator,
+                                        &app_id_for_consumer,
+                                        session_id.as_deref(),
+                                        REASON_SESSION_LOOP_REVIEW_DELEGATE_COMPLETE,
+                                        Some(task_id.to_string()),
+                                    )
+                                    .await;
                                     // Broadcast review result as SSE + EventLog
                                     let review_payload = serde_json::json!({
                                         "decision_type": "task_reviewed",
@@ -2131,13 +2183,26 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                     .write()
                     .await
                     .insert(app_id.clone(), shutdowns);
+                let worker_count = worker_wakers.len();
                 state
                     .loops
                     .worker_loop_wakers
                     .write()
                     .await
                     .insert(app_id.clone(), worker_wakers);
-                tracing::info!(app_id = %app_id, "WorkerLoops started for app");
+
+                // Mirror worker-loop registration into execution control so wake/shutdown
+                // paths share the same auditable service boundary as PlanLoop lifecycle.
+                let coordinator = session_loop_coordinator(state);
+                register_worker_loops_via_execution_control(
+                    &coordinator,
+                    app_id.clone(),
+                    session_id.clone(),
+                    worker_count,
+                )
+                .await;
+
+                tracing::info!(app_id = %app_id, worker_count, "WorkerLoops started for app");
             }
         }
     }

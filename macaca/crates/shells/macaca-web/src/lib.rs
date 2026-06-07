@@ -46,6 +46,7 @@ pub mod heartbeat_operations_routes;
 mod fork_join_shell_adapter;
 mod framework_agent_construction_shell_adapter;
 mod goal_lifecycle_shell_adapter;
+mod session_loop_shell_adapter;
 mod llm_route_shell_adapter;
 mod mcp_shell_adapter;
 #[cfg(test)]

@@ -73,12 +73,36 @@ mod tests {
     }
 
     #[test]
+    fn session_loop_wake_register_shutdown_via_execution_control() {
+        let loop_manager = include_str!("loop_manager.rs");
+        let session_adapter = include_str!("session_loop_shell_adapter.rs");
+        let runtime_coordinator = include_str!(
+            "../../../runtime/macaca-runtime-host/src/execution_control_session_loop.rs"
+        );
+        let chat_orchestrator = include_str!("chat_orchestrator.rs");
+
+        assert!(loop_manager.contains("ExecutionControlSessionLoopCoordinator"));
+        assert!(loop_manager.contains("register_plan_loop_via_execution_control"));
+        assert!(loop_manager.contains("register_worker_loops_via_execution_control"));
+        assert!(loop_manager.contains("wake_plan_loop_and_notify_local"));
+        assert!(loop_manager.contains("wake_worker_loops_and_notify_local"));
+        assert!(session_adapter.contains("EXECUTION_CONTROL_SERVICE_ID"));
+        assert!(session_adapter.contains("SESSION_LOOP_TASK_CAPABILITY_ID"));
+        assert!(runtime_coordinator.contains("register_session_loop"));
+        assert!(runtime_coordinator.contains("record_loop_wake"));
+        assert!(runtime_coordinator.contains("record_session_loop_shutdown"));
+        assert!(chat_orchestrator.contains("shutdown_session_loops_via_execution_control"));
+        assert!(chat_orchestrator.contains("REASON_SESSION_LOOP_APPLICATION_CLEANUP"));
+    }
+
+    #[test]
     fn unified_paths_do_not_hardcode_application_role_names() {
         let sources = [
             include_str!("orchestration_tools.rs"),
             include_str!("delegated_task_dispatcher.rs"),
             include_str!("goal_lifecycle_shell_adapter.rs"),
             include_str!("fork_join_shell_adapter.rs"),
+            include_str!("session_loop_shell_adapter.rs"),
         ];
 
         for source in sources {

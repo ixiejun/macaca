@@ -139,8 +139,8 @@
 - [ ] 4.1.4 删除 `macaca-web/src/memory_runtime.rs` 等 shell 内 runtime 持有者（若无消费者）。（**暂缓**：`WebMemoryRuntime` 仍由 bootstrap 构造并注入 composition bundle + memory service provider；待 memory 全量 service 化后删除）
 
 ### 4.2 session loop 下沉
-- [ ] 4.2.1 `loop_manager.rs` 的 plan/worker loop 拉取/唤醒/心跳逻辑迁至 `service.execution_control` + task service；web 仅保留 SSE endpoint 与事件订阅。
-- [ ] 4.2.2 `hook_consumer.rs`/`chat_orchestrator.rs` 中 Fork-Join 暂停/恢复编排改为消费 execution-control 事件。
+- [x] 4.2.1 `loop_manager.rs` 的 plan/worker loop 拉取/唤醒/心跳逻辑迁至 `service.execution_control` + task service；web 仅保留 SSE endpoint 与事件订阅。（`ExecutionControlSessionLoopCoordinator` + `session_loop_shell_adapter`：register/wake/shutdown 经 execution_control audit，本地 waker 为 compat seam）
+- [x] 4.2.2 `hook_consumer.rs`/`chat_orchestrator.rs` 中 Fork-Join 暂停/恢复编排改为消费 execution-control 事件。（hook_consumer 已走 `ExecutionControlForkJoinCoordinator`；`cleanup_app_state` 新增 `shutdown_session_loops_via_execution_control`）
 
 ### 4.3 巨型文件拆分（≤500 行，按 ownership）
 - [ ] 4.3.1 拆分 `loop_manager.rs`(2629) → execution-control adapter / task-event adapter / SSE channel adapter / 薄 orchestrator（每文件 ≤500 行）。

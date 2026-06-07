@@ -160,3 +160,13 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `application_shell_adapter` / `llm_route_shell_adapter` / `mcp_shell_adapter` | MEDIUM | centralized Adapter pattern for registry/runtime/LLM/MCP legacy seams | P3.1 |
 | `serviceization_escape_hatches` allowlist (tightened) | LOW | removed route-level migration surfaces; violations=0 | P3.1 |
 | `WebMemoryRuntime` (deferred 4.1.4) | MEDIUM | bootstrap + composition bundle; not deleted until memory service fully owns facade | P3.1 |
+
+## Iteration 22 additions (task 4.2 — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `ExecutionControlSessionLoopCoordinator` (new) | HIGH | loop_manager register/wake/shutdown; chat_orchestrator cleanup; runtime-host execution_control service | P3.2 |
+| `session_loop_shell_adapter` (new) | MEDIUM | web shell Adapter bridging execution_control audit + legacy plan/worker waker maps | P3.2 |
+| `ensure_plan_and_worker_loops` wake paths | HIGH | goal decomposition, worker submit review, review delegate complete, worker loop wake helper | P3.2 |
+| `cleanup_app_state` session-loop shutdown | MEDIUM | post_chat_stop + post_chat_v2 new-session cleanup; audit before local handle removal | P3.2 |
+| `unified_delegation_path_tests` session-loop contract | LOW | static source assertions; no runtime behavior change | P3.2 |

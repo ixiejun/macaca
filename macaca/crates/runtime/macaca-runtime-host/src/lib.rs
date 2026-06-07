@@ -66,6 +66,7 @@ pub mod executor;
 pub mod execution_control;
 pub mod execution_control_fork_join;
 pub mod execution_control_goal_lifecycle;
+pub mod execution_control_session_loop;
 pub mod framework_runtime_agent_service;
 pub mod execution_control_runtime;
 pub mod execution_control_service_provider;
@@ -375,6 +376,13 @@ pub use execution_control_fork_join::{
 pub use execution_control_goal_lifecycle::{
     ExecutionControlGoalLifecycleCoordinator, GoalLifecycleParentResumeRequest,
     GoalLifecycleParentWaitRequest, GOAL_LIFECYCLE_EXECUTION_CONTROL_SOURCE,
+};
+pub use execution_control_session_loop::{
+    ExecutionControlSessionLoopCoordinator, SessionLoopKind, SessionLoopRegisterRequest,
+    SessionLoopShutdownRequest, SessionLoopWakeRequest, SESSION_LOOP_EXECUTION_CONTROL_SOURCE,
+    SESSION_LOOP_PLAN_REGISTER_EVENT, SESSION_LOOP_PLAN_WAKE_EVENT,
+    SESSION_LOOP_SHUTDOWN_EVENT, SESSION_LOOP_TASK_CAPABILITY_ID,
+    SESSION_LOOP_WORKER_REGISTER_EVENT, SESSION_LOOP_WORKER_WAKE_EVENT,
 };
 pub use execution_control_runtime::{
     ExecutionControlExecutionSnapshot, ExecutionControlObserver, ExecutionControlRuntimeCapability,

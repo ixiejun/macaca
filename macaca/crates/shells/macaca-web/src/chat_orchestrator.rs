@@ -29,6 +29,9 @@ use macaca_proto::{
 
 use crate::event_persistence::spawn_session_event_collector;
 use crate::routes::{default_model, err, ErrorResponse};
+use crate::session_loop_shell_adapter::{
+    shutdown_session_loops_via_execution_control, REASON_SESSION_LOOP_APPLICATION_CLEANUP,
+};
 use crate::runtime_event_bridge::emit_host_command_result_events;
 use crate::session::{
     persist_session_snapshot, AgentTraceCollector, SessionMeta, StoredSession, StoredTurn,
@@ -336,6 +339,21 @@ async fn cleanup_app_state(state: &Arc<AppState>, app_id: &ApplicationId) {
         if cancelled_goals > 0 {
             tracing::info!(app_id = %app_id, cancelled_goals, "Cancelled non-terminal goals during cleanup");
         }
+    }
+
+    // 3.5 Record session-loop shutdown through execution control before tearing down
+    // local waker maps.  This keeps audit replay aligned with goal/fork-join cleanup
+    // paths that already route pause/resume via service.execution_control.
+    {
+        let coordinator = macaca_runtime_host::ExecutionControlSessionLoopCoordinator::new(
+            Arc::clone(&state.service_runtime),
+        );
+        shutdown_session_loops_via_execution_control(
+            &coordinator,
+            app_id,
+            REASON_SESSION_LOOP_APPLICATION_CLEANUP,
+        )
+        .await;
     }
 
     // 4. Signal PlanLoop shutdown and REMOVE handle so it can be restarted

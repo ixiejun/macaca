@@ -159,3 +159,12 @@
 - **Verified**: `cargo check -p macaca-web` green; `cargo test -p macaca-integration-tests serviceization_escape_hatches` violations=0.
 - **GitNexus memo (non-blocking)**: `AppState` field removal — HIGH blast radius on routes/chat/framework paths recorded in `impact-memo.md` iteration 21.
 - **Next**: P3 §4.2 session loop下沉; §4.3 巨型文件拆分; `FrameworkRunner` body still in web (task 4.3.2).
+
+## Iteration 22 (2026-06-07)
+- **P3.2 session loop下沉 (4.2.1–4.2.2)**: added `ExecutionControlSessionLoopCoordinator` (runtime-host Facade + Command DTO) and `session_loop_shell_adapter` (web Adapter).
+- **loop_manager wiring**: plan/worker register on spawn; all wake paths route through `wake_*_and_notify_local` (execution_control audit before legacy waker); worker success + review completion wakes migrated.
+- **chat_orchestrator wiring**: `cleanup_app_state` records `shutdown_session_loops_via_execution_control` before local handle/waker removal.
+- **Contract tests**: `unified_delegation_path_tests` session-loop assertion (6/6 total); `execution_control_session_loop` runtime-host unit tests 3/3.
+- **Verified**: `cargo check -p macaca-web`; `cargo test -p macaca-runtime-host execution_control_session_loop`; `cargo test -p macaca-web unified_delegation_path`; `cargo test -p macaca-integration-tests serviceization_escape_hatches` violations=0.
+- **GitNexus memo (non-blocking)**: iteration 22 HIGH on `loop_manager` wake/register paths + new coordinator — recorded in `impact-memo.md`.
+- **Next**: P3 §4.3 巨型文件拆分 (`loop_manager.rs` ~2620 lines); `FrameworkRunner` body still in web (task 4.3.2).
