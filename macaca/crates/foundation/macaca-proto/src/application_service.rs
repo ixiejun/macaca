@@ -198,6 +198,22 @@ pub struct ApplicationAgentDelegateCommand {
     pub metadata: BTreeMap<String, String>,
 }
 
+impl ApplicationAgentDelegateCommand {
+    /// Convert this typed delegation command into a traced service envelope.
+    ///
+    /// Callers use the Application Service boundary (`service.application`) so
+    /// YAML workflow, WASM host imports, and future remote transports share the
+    /// same audited entrypoint before reaching `service.agent_execution`.
+    pub fn into_service_command(self) -> MacacaResult<crate::ServiceCommand> {
+        let trace = self.trace.clone();
+        Ok(crate::ServiceCommand::with_trace(
+            crate::ServiceCommandName::new(APPLICATION_AGENT_DELEGATE_COMMAND),
+            serde_json::to_value(self)?,
+            trace,
+        ))
+    }
+}
+
 /// Provider-neutral result for app-scoped agent delegation.
 ///
 /// The result is a Memento-friendly summary rather than a raw worker runtime

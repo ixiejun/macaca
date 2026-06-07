@@ -68,3 +68,12 @@
 - **Coverage**: YAML chat (`chat_orchestrator`), YAML workflow (`agent_runner`), WASM delegate (`wasm_orchestration_backend`) → single `ComposedAgentExecutionBackend` via `service.agent_execution`; shared `trace.system_service.agent_execution.v1` + `agent.execute` command.
 - **Verified**: `cargo test -p macaca-web unified_agent_execution_provider` 7/7; `cargo test -p macaca-runtime-host unified_agent_execution_provider` 3/3.
 - **Remaining P1**: 2.4 YAML workflow merge; 2.6 coordination patch removal (gate: audit replay → 1 chain); `FrameworkRunner` body still in web (task 4.3.2).
+
+## Iteration 11 (2026-06-07)
+- **P1.4 YAML workflow merge (2.4)**: `workflow-execution-inventory.md` documents prompt-only `macaca-app/workflow.rs` vs `WebAgentRunner` execution gap.
+- **Application ABI unification**: `WebAgentRunner` now calls `service.application` / `application.agent.delegate` with `execution_intent=yaml_workflow_step` metadata instead of direct `service.agent_execution`.
+- **Shared bridge**: `application_agent_delegate_bridge.rs` (Bridge + Strategy) centralizes delegate→execution dispatch for YAML and WASM; `wasm_orchestration_backend` refactored to use it.
+- **Proto**: `AgentExecutionIntent::metadata_value/from_delegate_metadata`; `ApplicationAgentDelegateCommand::into_service_command`.
+- **Contract tests**: `unified_workflow_application_abi_tests.rs` 6/6; updated `unified_agent_execution_provider_tests` (7/7); `unified_delegation_path` 6/6 unchanged.
+- **Verified**: `cargo check -p macaca-proto -p macaca-runtime-host -p macaca-web`; `cargo test -p macaca-web unified_` 19/19.
+- **Remaining P1**: 2.6 coordination patch removal (gate: audit replay → 1 chain); 2.7 P1 exit validation; `FrameworkRunner` body still in web (task 4.3.2).

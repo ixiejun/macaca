@@ -13,17 +13,19 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use macaca_kernel::ApplicationExecutorRegistry;
 use macaca_proto::{
-    AgentExecutionCommand, AgentExecutionIntent, ApplicationAgentDelegateCommand,
-    ApplicationAgentDelegateResult, ApplicationId, KernelServiceId, ServiceBusSource, ServiceError,
-    ServiceResult, TaskId, AGENT_EXECUTION_SERVICE_ID,
+    AgentExecutionIntent, ApplicationAgentDelegateCommand, ApplicationAgentDelegateResult,
+    ApplicationId, ServiceError, ServiceResult, TaskId,
 };
 use macaca_runtime_host::{ApplicationOrchestrationBackend, ServiceRuntime};
-use tokio::sync::{oneshot, RwLock};
-use tokio::time::{timeout, Duration};
+use tokio::sync::RwLock;
+use tracing::info;
 
+use crate::application_agent_delegate_bridge::{
+    build_execution_command_from_delegate, delegate_result_from_execution_reply,
+    dispatch_agent_execution_via_service, queued_delegate_result,
+    DEFAULT_AGENT_DELEGATE_WAIT_MS,
+};
 use crate::workspace::AppWorkspace;
-
-const DEFAULT_AGENT_DELEGATE_WAIT_MS: u64 = 30_000;
 
 /// Web-owned adapter from Application Service delegation commands to the
 /// app-scoped executor registry.
@@ -124,19 +126,13 @@ impl ApplicationOrchestrationBackend for WebApplicationOrchestrationBackend {
         let delegated_context = self
             .delegated_context_with_workspace(app_id, command.context.clone())
             .await;
-        let mut execution_command = AgentExecutionCommand::new(
+        let mut execution_command = build_execution_command_from_delegate(
+            &command,
             app_id,
-            session_id.clone(),
-            command.target_agent.clone(),
-            AgentExecutionIntent::WasmDelegate,
-            command.prompt.clone(),
-            command.trace.clone(),
-        )
-        .map_err(|error| ServiceError::AdapterFailure(error.to_string()))?
-        .with_delegated_context(delegated_context);
-        execution_command.task_id = Some(task_id);
-        execution_command.source_agent = command.scope.agent_name.clone();
-        execution_command.metadata = command.metadata.clone();
+            &session_id,
+            delegated_context,
+            task_id,
+        )?;
         if metadata_value_needs_context_promotion(
             execution_command
                 .metadata
@@ -145,7 +141,7 @@ impl ApplicationOrchestrationBackend for WebApplicationOrchestrationBackend {
             if let Some(run_id) =
                 promoted_application_execution_run_id(&execution_command.delegated_context)
             {
-                tracing::info!(
+                info!(
                     application_id = %app_id,
                     session_id = %session_id,
                     "application agent delegation promoted application execution run id from delegated context"
@@ -164,70 +160,37 @@ impl ApplicationOrchestrationBackend for WebApplicationOrchestrationBackend {
             .entry("application_execution.provider_kind".into())
             .or_insert_with(|| "MacacaHosted".into());
 
-        let service_runtime = Arc::clone(&self.service_runtime);
-        let service_command = execution_command
-            .into_service_command()
-            .map_err(|error| ServiceError::AdapterFailure(error.to_string()))?;
-        let (reply_tx, reply_rx) = oneshot::channel();
-        tokio::spawn(async move {
-            let reply = service_runtime
-                .call(
-                    &KernelServiceId::new(AGENT_EXECUTION_SERVICE_ID),
-                    ServiceBusSource::new("macaca.web.wasm_orchestration"),
-                    service_command,
-                )
-                .await;
-            let _ = reply_tx.send(reply);
-        });
+        let execution_intent = execution_command.execution_intent.clone();
+        let require_completed =
+            matches!(execution_intent, AgentExecutionIntent::YamlWorkflowStep);
         let wait_ms = command
             .metadata
             .get("wait_timeout_ms")
             .and_then(|value| value.parse::<u64>().ok())
             .unwrap_or(DEFAULT_AGENT_DELEGATE_WAIT_MS);
-        let reply = match timeout(Duration::from_millis(wait_ms), reply_rx).await {
-            Ok(Ok(Ok(reply))) => reply,
-            Ok(Ok(Err(error))) => {
-                return Err(ServiceError::AdapterFailure(error.to_string()));
+
+        let reply = match dispatch_agent_execution_via_service(
+            Arc::clone(&self.service_runtime),
+            execution_command,
+            wait_ms,
+            require_completed,
+        )
+        .await
+        {
+            Ok(reply) => reply,
+            Err(error) if !require_completed => {
+                info!(
+                    application_id = %app_id,
+                    session_id = %session_id,
+                    reason = %error,
+                    "application agent delegation returned queued fallback after wait budget"
+                );
+                return Ok(queued_delegate_result(&command, app_id, session_id, task_id));
             }
-            Ok(Err(_closed)) => {
-                return Err(ServiceError::AdapterFailure(
-                    "agent execution service reply channel closed".into(),
-                ));
-            }
-            Err(_elapsed) => {
-                return Ok(ApplicationAgentDelegateResult {
-                    application_id: app_id,
-                    session_id,
-                    target_agent: command.target_agent,
-                    task_id: Some(task_id.0.to_string()),
-                    success: true,
-                    output: serde_json::json!({
-                        "status": "queued",
-                        "task_id": task_id.0.to_string()
-                    }),
-                    status: "queued".into(),
-                    metadata: std::collections::BTreeMap::from([(
-                        "reason_code".into(),
-                        "delegate_queued".into(),
-                    )]),
-                });
-            }
+            Err(error) => return Err(error),
         };
-        let output = reply.output.ok_or_else(|| {
-            ServiceError::AdapterFailure("agent execution service returned no output".into())
-        })?;
-        let result: macaca_proto::AgentExecutionResult = serde_json::from_value(output)
-            .map_err(|error| ServiceError::AdapterFailure(error.to_string()))?;
-        Ok(ApplicationAgentDelegateResult {
-            application_id: app_id,
-            session_id,
-            target_agent: command.target_agent,
-            task_id: result.task_id.map(|id| id.0.to_string()),
-            success: matches!(result.status, macaca_proto::AgentExecutionStatus::Completed),
-            output: result.output,
-            status: result.status.as_str().into(),
-            metadata: result.metadata,
-        })
+
+        delegate_result_from_execution_reply(&command, app_id, session_id, task_id, reply)
     }
 }
 
@@ -276,13 +239,15 @@ mod tests {
     use crate::workspace::AppWorkspace;
 
     #[test]
-    fn wasm_delegate_uses_agent_execution_service_not_executor_fast_path() {
+    fn wasm_delegate_uses_shared_application_agent_delegate_bridge() {
         let source = include_str!("wasm_orchestration_backend.rs");
+        let bridge = include_str!("application_agent_delegate_bridge.rs");
         let executor_fast_path = [".delegate", "_task("].concat();
 
-        assert!(source.contains("AGENT_EXECUTION_SERVICE_ID"));
-        assert!(source.contains("AgentExecutionCommand::new"));
-        assert!(source.contains("ServiceBusSource::new(\"macaca.web.wasm_orchestration\")"));
+        assert!(source.contains("build_execution_command_from_delegate"));
+        assert!(source.contains("dispatch_agent_execution_via_service"));
+        assert!(bridge.contains("AGENT_EXECUTION_SERVICE_ID"));
+        assert!(bridge.contains("ORCHESTRATION_AGENT_EXECUTION_SOURCE"));
         assert!(!source.contains(&executor_fast_path));
     }
 

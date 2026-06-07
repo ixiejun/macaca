@@ -1,24 +1,27 @@
 //! ServiceRuntime-backed AgentRunner implementation for Macaca Web.
 //!
 //! This adapter keeps the kernel/executor-facing `AgentRunner` trait stable
-//! while routing YAML workflow and application-executor work through
-//! `service.agent_execution` instead of allowing a separate shell-owned agent
-//! runtime path.
+//! while routing YAML workflow steps through the Application Service ABI
+//! (`application.agent.delegate`) before the shared orchestration bridge
+//! forwards work to `service.agent_execution`.  The executor therefore
+//! remains a scheduling shell; execution semantics stay serviceized and auditable.
 
+use std::collections::BTreeMap;
 use std::sync::{Arc, Weak};
 
 use async_trait::async_trait;
 use macaca_kernel::{AgentInfo, AgentRunner, TaskContext, TaskResult};
 use macaca_proto::{
-    AgentExecutionCommand, AgentExecutionEvent, AgentExecutionIntent, AgentExecutionResult,
-    AgentExecutionStatus, ApplicationId, KernelServiceId, ServiceBusSource, TaskId, TraceContext,
-    AGENT_EXECUTION_SERVICE_ID,
+    AgentExecutionEvent, AgentExecutionIntent, ApplicationAgentDelegateCommand,
+    ApplicationAgentDelegateResult, ApplicationId, ApplicationServiceScope, KernelServiceId,
+    ServiceBusSource, TaskId, TraceContext, APPLICATION_SERVICE_ID,
+    AGENT_EXECUTION_INTENT_METADATA_KEY,
 };
 use tracing::info;
 
 use crate::state::AppState;
 
-/// Web-based agent runner backed by framework `ReActAgent` builders.
+/// Web-based agent runner backed by the unified Application Service path.
 pub struct WebAgentRunner {
     /// Weak reference to the shared application state to avoid cycles.
     state: Weak<AppState>,
@@ -38,7 +41,17 @@ impl WebAgentRunner {
             .ok_or_else(|| "AppState has been dropped".to_string())
     }
 
-    async fn execute_via_agent_service(
+    /// Execute one workflow step through the Application Service delegation ABI.
+    ///
+    /// Flow:
+    /// 1. Build a traced `ApplicationAgentDelegateCommand` with YAML workflow intent.
+    /// 2. Call `service.application` / `application.agent.delegate`.
+    /// 3. Application provider forwards to `WebApplicationOrchestrationBackend`.
+    /// 4. Shared bridge dispatches `service.agent_execution` with `YamlWorkflowStep`.
+    ///
+    /// This matches the WASM host import path so audit replay can converge both
+    /// package kinds on one Application ABI entry before agent execution.
+    async fn execute_via_application_delegate(
         &self,
         application_id: &ApplicationId,
         agent_name: &str,
@@ -53,7 +66,8 @@ impl WebAgentRunner {
             agent = agent_name,
             prompt_preview = %prompt.chars().take(80).collect::<String>(),
             has_event_tx = event_tx.is_some(),
-            "Executing agent through agent execution service"
+            service_id = APPLICATION_SERVICE_ID,
+            "Executing workflow step through application agent delegation service"
         );
 
         let session_id = context.as_ref().and_then(|c| c.session_id.clone());
@@ -90,31 +104,46 @@ impl WebAgentRunner {
             })
             .unwrap_or_else(|| serde_json::json!({}));
 
-        let mut command = AgentExecutionCommand::new(
-            *application_id,
-            resolved_session_id.clone(),
-            agent_name,
-            AgentExecutionIntent::YamlWorkflowStep,
-            prompt,
-            trace,
-        )
-        .map_err(|error| error.to_string())?
-        .with_delegated_context(delegated_context);
-        command.task_id = Some(task_id);
-        command
-            .metadata
-            .insert("entrypoint".into(), "kernel.agent_runner".into());
-        command
-            .metadata
-            .insert("suppress_executor_lifecycle".into(), "true".into());
+        let scope = ApplicationServiceScope::session(*application_id, resolved_session_id.clone())
+            .map_err(|error| error.to_string())?;
 
-        let service_command = command
+        let mut metadata = BTreeMap::from([
+            (
+                "entrypoint".into(),
+                "kernel.agent_runner".into(),
+            ),
+            (
+                "suppress_executor_lifecycle".into(),
+                "true".into(),
+            ),
+            (
+                AGENT_EXECUTION_INTENT_METADATA_KEY.into(),
+                AgentExecutionIntent::YamlWorkflowStep
+                    .metadata_value()
+                    .into(),
+            ),
+        ]);
+        if event_tx.is_some() {
+            metadata.insert("stream_agent_events".into(), "true".into());
+        }
+
+        let delegate_command = ApplicationAgentDelegateCommand {
+            trace: trace.clone(),
+            scope,
+            target_agent: agent_name.to_string(),
+            prompt: prompt.to_string(),
+            context: delegated_context,
+            metadata,
+        };
+
+        let service_command = delegate_command
             .into_service_command()
             .map_err(|error| error.to_string())?;
+
         let reply = state
             .service_runtime
             .call(
-                &KernelServiceId::new(AGENT_EXECUTION_SERVICE_ID),
+                &KernelServiceId::new(APPLICATION_SERVICE_ID),
                 ServiceBusSource::new("macaca.web.agent_runner"),
                 service_command,
             )
@@ -123,54 +152,54 @@ impl WebAgentRunner {
 
         let output = reply
             .output
-            .ok_or_else(|| "agent execution service returned no output".to_string())?;
-        let result: AgentExecutionResult =
+            .ok_or_else(|| "application agent delegation returned no output".to_string())?;
+        let result: ApplicationAgentDelegateResult =
             serde_json::from_value(output).map_err(|error| error.to_string())?;
 
-        match result.status {
-            AgentExecutionStatus::Completed => {
-                if let Some(agent_manifest) = state.kernel.get_agent_by_name(agent_name).await {
-                    state
-                        .kernel
-                        .status_tracker()
-                        .set_idle(&agent_manifest.id)
-                        .await;
-                }
+        if result.success {
+            if let Some(agent_manifest) = state.kernel.get_agent_by_name(agent_name).await {
+                state
+                    .kernel
+                    .status_tracker()
+                    .set_idle(&agent_manifest.id)
+                    .await;
+            }
 
-                let output = result
-                    .output
-                    .get("output")
-                    .and_then(|value| value.as_str())
-                    .map(ToOwned::to_owned)
-                    .unwrap_or_else(|| result.output.to_string());
-                Ok(TaskResult {
-                    task_id: result.task_id.unwrap_or(task_id),
-                    success: !output.is_empty(),
-                    output,
-                    error: None,
-                    artifacts: vec![],
-                    completed_at: chrono::Utc::now(),
-                    tokens_used: None,
-                })
+            let output = result
+                .output
+                .get("output")
+                .and_then(|value| value.as_str())
+                .map(ToOwned::to_owned)
+                .unwrap_or_else(|| result.output.to_string());
+            Ok(TaskResult {
+                task_id: result
+                    .task_id
+                    .as_deref()
+                    .and_then(|value| uuid::Uuid::parse_str(value).ok())
+                    .map(TaskId)
+                    .unwrap_or_else(|| task_id),
+                success: !output.is_empty(),
+                output,
+                error: None,
+                artifacts: vec![],
+                completed_at: chrono::Utc::now(),
+                tokens_used: None,
+            })
+        } else {
+            let error = result
+                .output
+                .get("error")
+                .and_then(|value| value.as_str())
+                .map(ToOwned::to_owned)
+                .unwrap_or_else(|| format!("application agent delegation returned {}", result.status));
+            if let Some(agent_manifest) = state.kernel.get_agent_by_name(agent_name).await {
+                state
+                    .kernel
+                    .status_tracker()
+                    .set_error(&agent_manifest.id, &error)
+                    .await;
             }
-            status => {
-                let error = result
-                    .output
-                    .get("error")
-                    .and_then(|value| value.as_str())
-                    .map(ToOwned::to_owned)
-                    .unwrap_or_else(|| {
-                        format!("agent execution service returned {}", status.as_str())
-                    });
-                if let Some(agent_manifest) = state.kernel.get_agent_by_name(agent_name).await {
-                    state
-                        .kernel
-                        .status_tracker()
-                        .set_error(&agent_manifest.id, &error)
-                        .await;
-                }
-                Err(error)
-            }
+            Err(error)
         }
     }
 }
@@ -184,7 +213,7 @@ impl AgentRunner for WebAgentRunner {
         prompt: &str,
         context: Option<TaskContext>,
     ) -> Result<TaskResult, String> {
-        self.execute_via_agent_service(application_id, agent_name, prompt, context, None)
+        self.execute_via_application_delegate(application_id, agent_name, prompt, context, None)
             .await
     }
 
@@ -196,8 +225,14 @@ impl AgentRunner for WebAgentRunner {
         context: Option<TaskContext>,
         event_tx: Option<tokio::sync::mpsc::Sender<AgentExecutionEvent>>,
     ) -> Result<TaskResult, String> {
-        self.execute_via_agent_service(application_id, agent_name, prompt, context, event_tx)
-            .await
+        self.execute_via_application_delegate(
+            application_id,
+            agent_name,
+            prompt,
+            context,
+            event_tx,
+        )
+        .await
     }
 
     async fn list_agents(&self) -> Vec<AgentInfo> {
@@ -231,32 +266,3 @@ impl AgentRunner for WebAgentRunner {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn web_agent_runner_enters_agent_execution_service_boundary() {
-        let source = include_str!("agent_runner.rs");
-        let legacy_runtime_builder = ["FrameworkRunner::build_runtime", "_agent("].concat();
-
-        assert!(source.contains("AGENT_EXECUTION_SERVICE_ID"));
-        assert!(source.contains("AgentExecutionCommand::new"));
-        assert!(source.contains("AgentExecutionIntent::YamlWorkflowStep"));
-        assert!(source.contains("ServiceBusSource::new(\"macaca.web.agent_runner\")"));
-        assert!(!source.contains(&legacy_runtime_builder));
-    }
-
-    #[test]
-    fn yaml_and_wasm_entries_share_agent_execution_trace_schema() {
-        let yaml_entry = include_str!("agent_runner.rs");
-        let wasm_entry = include_str!("wasm_orchestration_backend.rs");
-        let provider = include_str!(
-            "../../../runtime/macaca-runtime-host/src/agent_execution_service_provider.rs"
-        );
-
-        assert!(yaml_entry.contains("AGENT_EXECUTION_SERVICE_ID"));
-        assert!(wasm_entry.contains("AGENT_EXECUTION_SERVICE_ID"));
-        assert!(yaml_entry.contains("AgentExecutionCommand::new"));
-        assert!(wasm_entry.contains("AgentExecutionCommand::new"));
-        assert!(provider.contains("trace.system_service.agent_execution.v1"));
-    }
-}
