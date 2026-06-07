@@ -928,6 +928,7 @@ fn register_agent_tools(
             let app = app_id.clone();
             let goal_to_session = Arc::clone(&state.sessions.goal_to_session);
             let framework_session_store = Arc::clone(&state.sessions.framework_session_store);
+            let service_runtime = Arc::clone(&state.service_runtime);
             let owner_agent = agent_name.to_string();
             toolkit.register(
                 Box::new(SingleToolAdapter::new(Box::new(
@@ -939,6 +940,7 @@ fn register_agent_tools(
                             let app = app.clone();
                             let goal_to_session = Arc::clone(&goal_to_session);
                             let framework_session_store = Arc::clone(&framework_session_store);
+                            let service_runtime = Arc::clone(&service_runtime);
                             let owner_agent = owner_agent.clone();
                             tokio::spawn(async move {
                                 if let Some(session_id) = goal.session_id.clone() {
@@ -946,6 +948,18 @@ fn register_agent_tools(
                                         .write()
                                         .await
                                         .insert(goal.id.to_string(), session_id.clone());
+                                    let goal_coordinator =
+                                        macaca_runtime_host::ExecutionControlGoalLifecycleCoordinator::new(
+                                            service_runtime,
+                                        );
+                                    crate::goal_lifecycle_shell_adapter::register_goal_wait_via_execution_control(
+                                        &goal_coordinator,
+                                        app.clone(),
+                                        session_id.clone(),
+                                        owner_agent.clone(),
+                                        goal.id,
+                                    )
+                                    .await;
                                     let mut ctx = ExecutionContext::new(
                                         session_id.clone(),
                                         app.0.to_string(),

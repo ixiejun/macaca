@@ -45,16 +45,16 @@
 ### 2.2 Agent 执行实现迁出 web shell → runtime-host service provider
 - [x] 2.2.1 `[impact-memo]` 盘点 `macaca/crates/shells/macaca-web/src/agent_execution_backend.rs` 中"模型/工具/loop"执行逻辑（`build_runtime_agent_*` + `agent.reply()` 段，约 836–893 行）。（inventory: 语义层已提取至 `agent_execution_orchestration.rs`；shell 仍保留 `agent.reply()`/FrameworkRunner/SSE/executor 生命周期）
 - [x] 2.2.2 在 `macaca-runtime-host` 的 Agent Execution Service provider（`agent_execution_service_provider.rs`）内承接该执行逻辑：context 经 `service.agent_context`、控制经 `service.execution_control`、模型/工具经 service.call，统一产出 service-call evidence。（`ComposedAgentExecutionBackend` + `agent_execution_orchestration`）
-- [ ] 2.2.3 把 `FrameworkRunner` agent 构造（runtime/framework 关注点）下沉到 `macaca-runtime`/`macaca-framework` 层 service 后面，web 不再直接构造 framework Agent。（`WebFrameworkRuntimeAgentPort` 仍委托 FrameworkRunner，待迁出）
+- [x] 2.2.3 把 `FrameworkRunner` agent 构造（runtime/framework 关注点）下沉到 `macaca-runtime`/`macaca-framework` 层 service 后面，web 不再直接构造 framework Agent。（`ServiceBackedFrameworkRuntimeAgentPort` + `FrameworkAgentConstructionPort`；web 仅 `WebFrameworkAgentConstructionPort` 适配器；`FrameworkRunner` 本体待 4.3.2 迁出）
 - [x] 2.2.4 web 侧 `WebAgentExecutionBackend` 收缩为：仅做 SSE channel 注入 + HTTP/DTO 适配 + 调 `service.agent_execution`；删除 shell 内执行语义。（web 改为 `web_agent_execution_adapters` 端口注入；执行 Template Method 在 runtime-host）
-- [ ] 2.2.5 为迁移后的 Agent Execution Service 写集成测试：YAML 会话与 WASM 会话经**同一** provider 执行；trace/audit 链一致。
+- [x] 2.2.5 为迁移后的 Agent Execution Service 写集成测试：YAML 会话与 WASM 会话经**同一** provider 执行；trace/audit 链一致。（`unified_agent_execution_provider_tests.rs` web 7/7 + runtime-host 3/3）
 
 ### 2.3 执行编排（Fork-Join / worker-loop）迁出 kernel → service
 - [x] 2.3.1 `[impact-memo]` 盘点 `macaca-kernel/src/executor/`（`ApplicationExecutor/ForkManager/AgentRunner/TaskRouter/WorkerSupervisor/CallbackDispatcher/ExecutionQueue/EventBus/event_factory/router/bus/queue/worker/app_executor`）所有对外消费者。（见 `executor-consumer-inventory.md`，47 行，live 耦合集中在 macaca-web）
 - [x] 2.3.2 在 task/execution service（runtime-host 或 `macaca-task`）建立 Fork-Join 暂停/恢复契约，由 `service.execution_control` 承接（对应 design Q3）。（`ExecutionControlForkJoinCoordinator` + web `orchestration_tools`/`hook_consumer`/`fork_join_shell_adapter` 接入；kernel `ForkManager` 状态待 P3 驱逐）
 - [x] 2.3.3 把 `delegate_task` 工具（`macaca-tools/src/orchestration.rs` + web `orchestration_tools.rs`）的执行落点从 kernel executor 改为 `service.agent_execution` / `service.task`。（`ServiceDelegatedTaskDispatcher` + `begin/complete_service_backed_delegation`；fork 生命周期仍经 executor `ForkManager`，待 2.3.2 execution_control 承接）
-- [ ] 2.3.4 web `loop_manager.rs` 的 session loop 拉取/唤醒逻辑改为消费 `service.execution_control` + task service 事件（不直驱 kernel executor）。
-- [ ] 2.3.5 集成测试：协调者 `delegate_task`（Fork-Join）与目标-任务（create_goal→worker）两条委派路径均经统一 service 路径，暂停/恢复语义不回归。
+- [x] 2.3.4 web `loop_manager.rs` 的 session loop 拉取/唤醒逻辑改为消费 `service.execution_control` + task service 事件（不直驱 kernel executor）。（`ExecutionControlGoalLifecycleCoordinator` + `goal_lifecycle_shell_adapter`；PlanLoop `GoalCompleted` + `create_goal` 注册/恢复经 execution_control；worker loop 已走 `service.agent_execution`）
+- [x] 2.3.5 集成测试：协调者 `delegate_task`（Fork-Join）与目标-任务（create_goal→worker）两条委派路径均经统一 service 路径，暂停/恢复语义不回归。（`unified_delegation_path_tests.rs` 契约测试 5/5）
 
 ### 2.4 YAML 路径并轨
 - [ ] 2.4.1 `[impact-memo]` 盘点 `macaca-app/src/workflow.rs` + web `agent_runner.rs` 的 workflow 执行落点。

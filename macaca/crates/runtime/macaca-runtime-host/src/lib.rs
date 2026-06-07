@@ -60,6 +60,8 @@ pub mod env_bridge;
 pub mod evm_service_provider;
 pub mod execution_control;
 pub mod execution_control_fork_join;
+pub mod execution_control_goal_lifecycle;
+pub mod framework_runtime_agent_service;
 pub mod execution_control_runtime;
 pub mod execution_control_service_provider;
 pub mod factory;
@@ -210,6 +212,8 @@ mod sandbox_service_provider_tests;
 #[cfg(test)]
 mod service_router_tests;
 #[cfg(test)]
+mod unified_agent_execution_provider_tests;
+#[cfg(test)]
 mod skill_content_mutation_tests;
 #[cfg(test)]
 mod skill_governance_store_logging_tests;
@@ -270,8 +274,10 @@ pub use agent_execution_orchestration::{
 };
 pub use agent_execution_ports::{
     AgentExecutionEvidenceCollector, AgentExecutionHostAdapter, AgentExecutionOutputHasher,
-    FrameworkRuntimeAgentPort, OpaqueExecutionControlHandle,
+    ConstructedRuntimeAgent, FrameworkAgentConstructionPort, FrameworkRuntimeAgentPort,
+    OpaqueExecutionControlHandle,
 };
+pub use framework_runtime_agent_service::ServiceBackedFrameworkRuntimeAgentPort;
 pub use agent_execution_service_provider::{
     agent_execution_service_descriptor, AgentExecutionBackend, AgentExecutionSystemServiceProvider,
 };
@@ -359,6 +365,10 @@ pub use execution_control::ExecutionControlPolicyResolver;
 pub use execution_control_fork_join::{
     ExecutionControlForkJoinCoordinator, ForkJoinChildForkRequest, ForkJoinParentResumeRequest,
     ForkJoinParentWaitRequest, FORK_JOIN_EXECUTION_CONTROL_SOURCE,
+};
+pub use execution_control_goal_lifecycle::{
+    ExecutionControlGoalLifecycleCoordinator, GoalLifecycleParentResumeRequest,
+    GoalLifecycleParentWaitRequest, GOAL_LIFECYCLE_EXECUTION_CONTROL_SOURCE,
 };
 pub use execution_control_runtime::{
     ExecutionControlExecutionSnapshot, ExecutionControlObserver, ExecutionControlRuntimeCapability,

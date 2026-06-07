@@ -47,3 +47,24 @@
 - **Task 0.3**: `audit-replay-baseline.md` — YAML 3 / WASM 3 pre-convergence chains documented.
 - **Verified**: pending `cargo check -p macaca-runtime-host -p macaca-web` + unit tests this iteration.
 - **Remaining P1**: 2.2.3 FrameworkRunner sink; 2.3.4 loop_manager consumes execution_control events; 2.6 coordination patch removal (gate: audit replay → 1 chain); kernel ForkManager eviction (P3).
+
+## Iteration 8 (2026-06-07)
+- **P1.3 goal-lifecycle execution_control (2.3.4)**: `ExecutionControlGoalLifecycleCoordinator` (runtime-host Facade + Command); `goal_lifecycle_shell_adapter` (web Adapter).
+- **PlanLoop wiring**: `GoalCompleted` → `deliver_goal_resume_and_notify_parent` (execution_control resume + legacy channel compat).
+- **create_goal wiring**: `framework_toolkit` registers `register_goal_wait_via_execution_control` when goal_to_session mapping is recorded.
+- **P1.3 integration contracts (2.3.5)**: `unified_delegation_path_tests.rs` — fork-join delegate_task + goal-task + worker_loop service path assertions (5/5).
+- **Verified**: `cargo test -p macaca-runtime-host --lib execution_control_goal_lifecycle` 5/5; `cargo test -p macaca-web unified_delegation_path` 5/5; `cargo check -p macaca-runtime-host -p macaca-web` green.
+- **Remaining P1**: 2.2.3 FrameworkRunner sink; 2.2.5 agent execution integration tests; 2.4 YAML workflow merge; 2.6 coordination patch removal (gate: audit replay → 1 chain).
+
+## Iteration 9 (2026-06-07)
+- **P1.2 framework runtime agent port (2.2.3)**: `ServiceBackedFrameworkRuntimeAgentPort` (runtime-host Template Method + Adapter); `FrameworkAgentConstructionPort` trait; `WebFrameworkAgentConstructionPort` shell adapter delegates to `FrameworkRunner` compat seam.
+- **Removed**: `WebFrameworkRuntimeAgentPort` — web no longer implements `FrameworkRuntimeAgentPort` directly.
+- **Contract test**: `framework_runtime_agent_port_owned_by_runtime_host_service` in `unified_delegation_path_tests.rs` (6/6 total).
+- **Verified**: `cargo check -p macaca-runtime-host -p macaca-web`; `cargo test -p macaca-runtime-host --lib framework_runtime_agent_service` 2/2; `cargo test -p macaca-web unified_delegation_path` 6/6.
+- **Remaining P1**: 2.2.5 agent execution integration tests; 2.4 YAML workflow merge; 2.6 coordination patch removal (gate: audit replay → 1 chain); `FrameworkRunner` body still in web (task 4.3.2).
+
+## Iteration 10 (2026-06-07)
+- **P1.2 agent execution integration tests (2.2.5)**: `unified_agent_execution_provider_tests.rs` (web contract 7/7 + runtime-host provider integration 3/3).
+- **Coverage**: YAML chat (`chat_orchestrator`), YAML workflow (`agent_runner`), WASM delegate (`wasm_orchestration_backend`) → single `ComposedAgentExecutionBackend` via `service.agent_execution`; shared `trace.system_service.agent_execution.v1` + `agent.execute` command.
+- **Verified**: `cargo test -p macaca-web unified_agent_execution_provider` 7/7; `cargo test -p macaca-runtime-host unified_agent_execution_provider` 3/3.
+- **Remaining P1**: 2.4 YAML workflow merge; 2.6 coordination patch removal (gate: audit replay → 1 chain); `FrameworkRunner` body still in web (task 4.3.2).

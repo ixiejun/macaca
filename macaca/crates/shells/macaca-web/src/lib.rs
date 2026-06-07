@@ -42,6 +42,12 @@ pub mod framework_toolkit;
 pub mod genui_routes;
 pub mod heartbeat_operations_routes;
 mod fork_join_shell_adapter;
+mod framework_agent_construction_shell_adapter;
+mod goal_lifecycle_shell_adapter;
+#[cfg(test)]
+mod unified_delegation_path_tests;
+#[cfg(test)]
+mod unified_agent_execution_provider_tests;
 pub mod hook_consumer;
 pub mod loop_manager;
 mod memory_runtime;
