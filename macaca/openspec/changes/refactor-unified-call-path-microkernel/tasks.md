@@ -53,8 +53,8 @@
 - [x] 2.3.1 `[impact-memo]` 盘点 `macaca-kernel/src/executor/`（`ApplicationExecutor/ForkManager/AgentRunner/TaskRouter/WorkerSupervisor/CallbackDispatcher/ExecutionQueue/EventBus/event_factory/router/bus/queue/worker/app_executor`）所有对外消费者。（见 `executor-consumer-inventory.md`，47 行，live 耦合集中在 macaca-web）
 - [x] 2.3.2 在 task/execution service（runtime-host 或 `macaca-task`）建立 Fork-Join 暂停/恢复契约，由 `service.execution_control` 承接（对应 design Q3）。（`ExecutionControlForkJoinCoordinator` + web `orchestration_tools`/`hook_consumer`/`fork_join_shell_adapter` 接入；kernel `ForkManager` 状态待 P3 驱逐）
 - [x] 2.3.3 把 `delegate_task` 工具（`macaca-tools/src/orchestration.rs` + web `orchestration_tools.rs`）的执行落点从 kernel executor 改为 `service.agent_execution` / `service.task`。（`ServiceDelegatedTaskDispatcher` + `begin/complete_service_backed_delegation`；fork 生命周期仍经 executor `ForkManager`，待 2.3.2 execution_control 承接）
-- [ ] 2.3.4 web `loop_manager.rs` 的 session loop 拉取/唤醒逻辑改为消费 `service.execution_control` + task service 事件（不直驱 kernel executor）。
-- [ ] 2.3.5 集成测试：协调者 `delegate_task`（Fork-Join）与目标-任务（create_goal→worker）两条委派路径均经统一 service 路径，暂停/恢复语义不回归。
+- [x] 2.3.4 web `loop_manager.rs` 的 session loop 拉取/唤醒逻辑改为消费 `service.execution_control` + task service 事件（不直驱 kernel executor）。（`ExecutionControlGoalLifecycleCoordinator` + `goal_lifecycle_shell_adapter`；PlanLoop `GoalCompleted` + `create_goal` 注册/恢复经 execution_control；worker loop 已走 `service.agent_execution`）
+- [x] 2.3.5 集成测试：协调者 `delegate_task`（Fork-Join）与目标-任务（create_goal→worker）两条委派路径均经统一 service 路径，暂停/恢复语义不回归。（`unified_delegation_path_tests.rs` 契约测试 5/5）
 
 ### 2.4 YAML 路径并轨
 - [ ] 2.4.1 `[impact-memo]` 盘点 `macaca-app/src/workflow.rs` + web `agent_runner.rs` 的 workflow 执行落点。

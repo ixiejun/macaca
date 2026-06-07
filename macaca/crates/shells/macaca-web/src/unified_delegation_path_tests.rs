@@ -1,0 +1,72 @@
+//! Contract tests for unified delegation paths (task 2.3.5).
+//!
+//! These tests validate that fork-join (`delegate_task`) and goal-task
+//! (`create_goal` → PlanLoop) paths route pause/resume through
+//! `service.execution_control` and `service.agent_execution` rather than
+//! driving kernel executor semantics directly from loop_manager.
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn delegate_task_path_uses_service_agent_execution_dispatcher() {
+        let orchestration = include_str!("orchestration_tools.rs");
+        let dispatcher = include_str!("delegated_task_dispatcher.rs");
+
+        assert!(orchestration.contains("ServiceDelegatedTaskDispatcher"));
+        assert!(orchestration.contains("ExecutionControlForkJoinCoordinator"));
+        assert!(orchestration.contains(".dispatch("));
+        assert!(dispatcher.contains("AGENT_EXECUTION_SERVICE_ID"));
+        assert!(dispatcher.contains("service.agent_execution"));
+        assert!(dispatcher.contains("begin_service_backed_delegation"));
+    }
+
+    #[test]
+    fn fork_join_resume_uses_execution_control_before_legacy_channel() {
+        let hook_consumer = include_str!("hook_consumer.rs");
+        let fork_adapter = include_str!("fork_join_shell_adapter.rs");
+
+        assert!(hook_consumer.contains("deliver_fork_join_resume_and_notify_parent"));
+        assert!(fork_adapter.contains("deliver_parent_fork_resume"));
+        assert!(fork_adapter.contains("EXECUTION_CONTROL_SERVICE_ID"));
+    }
+
+    #[test]
+    fn goal_task_path_registers_and_resumes_via_execution_control() {
+        let loop_manager = include_str!("loop_manager.rs");
+        let goal_adapter = include_str!("goal_lifecycle_shell_adapter.rs");
+        let toolkit = include_str!("framework_toolkit.rs");
+
+        assert!(loop_manager.contains("ExecutionControlGoalLifecycleCoordinator"));
+        assert!(loop_manager.contains("deliver_goal_resume_and_notify_parent"));
+        assert!(goal_adapter.contains("register_goal_wait_via_execution_control"));
+        assert!(goal_adapter.contains("deliver_parent_goal_resume"));
+        assert!(toolkit.contains("register_goal_wait_via_execution_control"));
+    }
+
+    #[test]
+    fn worker_loop_executes_tasks_via_agent_execution_service() {
+        let loop_manager = include_str!("loop_manager.rs");
+
+        assert!(loop_manager.contains("execute_worker_task_via_agent_service"));
+        assert!(loop_manager.contains("run_loop_agent_execution_service_call"));
+        assert!(loop_manager.contains("AgentExecutionIntent::TaskWorker"));
+        assert!(loop_manager.contains("macaca.web.worker_loop"));
+    }
+
+    #[test]
+    fn unified_paths_do_not_hardcode_application_role_names() {
+        let sources = [
+            include_str!("orchestration_tools.rs"),
+            include_str!("delegated_task_dispatcher.rs"),
+            include_str!("goal_lifecycle_shell_adapter.rs"),
+            include_str!("fork_join_shell_adapter.rs"),
+        ];
+
+        for source in sources {
+            assert!(!source.contains("\"coordinator\""));
+            assert!(!source.contains("\"backend\""));
+            assert!(!source.contains("\"frontend\""));
+            assert!(!source.contains("\"planner\""));
+        }
+    }
+}

@@ -60,6 +60,7 @@ pub mod env_bridge;
 pub mod evm_service_provider;
 pub mod execution_control;
 pub mod execution_control_fork_join;
+pub mod execution_control_goal_lifecycle;
 pub mod execution_control_runtime;
 pub mod execution_control_service_provider;
 pub mod factory;
@@ -359,6 +360,10 @@ pub use execution_control::ExecutionControlPolicyResolver;
 pub use execution_control_fork_join::{
     ExecutionControlForkJoinCoordinator, ForkJoinChildForkRequest, ForkJoinParentResumeRequest,
     ForkJoinParentWaitRequest, FORK_JOIN_EXECUTION_CONTROL_SOURCE,
+};
+pub use execution_control_goal_lifecycle::{
+    ExecutionControlGoalLifecycleCoordinator, GoalLifecycleParentResumeRequest,
+    GoalLifecycleParentWaitRequest, GOAL_LIFECYCLE_EXECUTION_CONTROL_SOURCE,
 };
 pub use execution_control_runtime::{
     ExecutionControlExecutionSnapshot, ExecutionControlObserver, ExecutionControlRuntimeCapability,

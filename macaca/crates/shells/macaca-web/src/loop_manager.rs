@@ -1830,80 +1830,27 @@ pub(crate) async fn ensure_plan_and_worker_loops(
                                 .await;
 
                                 if let Some(sid) = waiting_session {
+                                    // PlanLoop goal completion is a task-service lifecycle signal.
+                                    // Route resume through execution_control (authoritative) and
+                                    // the goal-lifecycle shell adapter (legacy channel compat).
+                                    let goal_coordinator =
+                                        macaca_runtime_host::ExecutionControlGoalLifecycleCoordinator::new(
+                                            Arc::clone(&state_for_consumer.service_runtime),
+                                        );
                                     let sessions =
                                         state_for_consumer.sessions.active_sessions.read().await;
-                                    if let Some(session) = sessions.get(&sid) {
-                                        let resume_reason = crate::runtime_resume::RuntimeResumeSignal::DelegateCompleted {
-                                            task_id: goal_id_str.clone(),
-                                            success: true,
-                                            output: format!("Goal completed: {}", description),
-                                        };
-                                        // Deprecated compatibility boundary:
-                                        // the service-backed execution-control path records
-                                        // policy, checkpoint, resume, and query events through
-                                        // typed service commands. This direct channel handoff is
-                                        // retained only for the older plan-loop goal completion
-                                        // adapter until that path can emit the same service calls.
-                                        session
-                                            .pause_signal
-                                            .store(false, std::sync::atomic::Ordering::SeqCst);
-                                        let _ = session.resume_tx.send(resume_reason).await;
-
-                                        let resumed_payload = serde_json::json!({
-                                            "session_id": sid,
-                                            "task_id": goal_id_str,
-                                            "success": true,
-                                            "goal_completed": true,
-                                        });
-                                        state_for_consumer
-                                            .persist
-                                            .event_log
-                                            .append_command(AppendEventCommand::new(
-                                                &sid,
-                                                "loop_resumed",
-                                                &entry_agent_for_loop,
-                                                resumed_payload.clone(),
-                                            ))
-                                            .await;
-                                        let _ = session
-                                            .sse_tx
-                                            .read()
-                                            .await
-                                            .send(Ok(Event::default()
-                                                .event("loop_resumed")
-                                                .data(resumed_payload.to_string())))
-                                            .await;
-
-                                        let mut exec_ctx = ExecutionContext::new(
-                                            sid.clone(),
-                                            app_id_for_consumer.0.to_string(),
-                                            plan_agent_name_for_loop.clone(),
-                                        );
-                                        let _ = load_module_state(
-                                            state_for_consumer
-                                                .sessions
-                                                .framework_session_store
-                                                .as_ref(),
-                                            &sid,
-                                            &mut exec_ctx,
-                                        )
-                                        .await;
-                                        exec_ctx.mark_resumed(Some(format!(
-                                            "goal_completed:{}",
-                                            goal_id
-                                        )));
-                                        let _ = save_module_state(
-                                            state_for_consumer
-                                                .sessions
-                                                .framework_session_store
-                                                .as_ref(),
-                                            &sid,
-                                            &exec_ctx,
-                                        )
-                                        .await;
-
-                                        tracing::info!(goal_id = %goal_id, session_id = %sid, "Resumed coordinator after goal completion");
-                                    }
+                                    let active_session = sessions.get(&sid);
+                                    crate::goal_lifecycle_shell_adapter::deliver_goal_resume_and_notify_parent(
+                                        &state_for_consumer,
+                                        &goal_coordinator,
+                                        &app_id_for_consumer,
+                                        &sid,
+                                        &entry_agent_for_loop,
+                                        goal_id,
+                                        &description,
+                                        active_session,
+                                    )
+                                    .await;
                                 } else {
                                     tracing::warn!(
                                         goal_id = %goal_id,
