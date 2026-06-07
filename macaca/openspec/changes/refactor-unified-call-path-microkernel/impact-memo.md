@@ -226,4 +226,17 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 |---------------|----------------------|------------------------|-------|
 | `routes.rs` → `routes/` module split | CRITICAL | bootstrap route table, session/loop_manager/app_ui/workbench imports of `crate::routes::*`; public API preserved via Facade re-exports | P3.3 |
 | `os_layer_file_size_gate` (new) | LOW | integration-tests only; 87-row baseline allowlist; blocks new >500-line production sources | P5 |
-| `framework_toolkit.rs` / `session.rs` (remaining web giants) | HIGH | still on filesize allowlist; next P3 split targets | P3.5 |
+| `session.rs` (remaining web giant) | HIGH | still on filesize allowlist; next P3 split target | P3.5 |
+
+## Iteration 29 additions (task 4.3.7 — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `framework_toolkit.rs` → `framework_toolkit/` module split | CRITICAL | `FrameworkRunner::build_toolkit` consumer; unified_delegation_path contract tests; serviceization escape hatch paths | P3.3 |
+
+## Iteration 30 additions (task 4.3.8 — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `session.rs` → `session/` module split | CRITICAL | bootstrap session routes; chat_orchestrator/event_persistence/app_ui_session_projection consumers of `crate::session::*`; public API preserved via Facade re-exports | P3.3 |
+| `task_api_migration_audit` path fix | LOW | loop_manager/routes module paths after prior splits | P3.3 |

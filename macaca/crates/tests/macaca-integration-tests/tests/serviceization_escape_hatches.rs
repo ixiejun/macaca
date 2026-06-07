@@ -432,10 +432,11 @@ fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> bool
                     | "crates/shells/macaca-web/src/chat_orchestrator/route_chat_v2.rs"
                     | "crates/shells/macaca-web/src/framework_runner/build_mode.rs"
                     | "crates/shells/macaca-web/src/framework_runner/sse_emitter_adapter.rs"
-                    | "crates/shells/macaca-web/src/framework_toolkit.rs"
+                    | "crates/shells/macaca-web/src/framework_toolkit/mod.rs"
+                    | "crates/shells/macaca-web/src/framework_toolkit/builder.rs"
                     | "crates/shells/macaca-web/src/loop_manager/mod.rs"
                     | "crates/shells/macaca-web/src/orchestration_tools.rs"
-                    | "crates/shells/macaca-web/src/session.rs"
+                    | "crates/shells/macaca-web/src/session/mod.rs"
                     | "crates/shells/macaca-web/src/workspace.rs"
                     | "crates/shells/macaca-web/src/workspace_knowledge_digest_capability.rs"
             )
@@ -676,8 +677,10 @@ fn autonomy_schedule_management_uses_serviceized_paths_only() {
         "application schedule editor must not expose heartbeat native cadence fields"
     );
 
-    let routes = std::fs::read_to_string(root.join("crates/shells/macaca-web/src/routes.rs"))
-        .expect("routes.rs should be readable");
+    let routes = std::fs::read_to_string(
+        root.join("crates/shells/macaca-web/src/routes/autonomy_schedules.rs"),
+    )
+    .expect("routes/autonomy_schedules.rs should be readable");
     let serviceized_section = routes
         .split("// Serviceized application autonomy schedule routes")
         .nth(1)

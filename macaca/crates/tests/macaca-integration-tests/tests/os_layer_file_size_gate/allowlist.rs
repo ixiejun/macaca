@@ -6,7 +6,7 @@
 
 use super::gate::FileSizeAllowlistEntry;
 
-/// Returns the baseline oversized-file snapshot (generated 2026-06-07, iteration 28).
+/// Returns the baseline oversized-file snapshot (generated 2026-06-07, iteration 29).
 pub fn entries() -> Vec<FileSizeAllowlistEntry> {
     vec![
         FileSizeAllowlistEntry::new("crates/application/macaca-app/src/manifest_v1/yaml_adapter.rs", 614, "OS-layer-debt", "P5"),
@@ -90,8 +90,6 @@ pub fn entries() -> Vec<FileSizeAllowlistEntry> {
         FileSizeAllowlistEntry::new("crates/shells/macaca-web/src/app_ui_routes.rs", 605, "P3-web-thin-shell", "P3"),
         FileSizeAllowlistEntry::new("crates/shells/macaca-web/src/context_memory_injection.rs", 592, "P3-web-thin-shell", "P3"),
         FileSizeAllowlistEntry::new("crates/shells/macaca-web/src/context_reporting_model.rs", 608, "P3-web-thin-shell", "P3"),
-        FileSizeAllowlistEntry::new("crates/shells/macaca-web/src/framework_toolkit.rs", 1642, "P3-web-thin-shell", "P3"),
-        FileSizeAllowlistEntry::new("crates/shells/macaca-web/src/session.rs", 1424, "P3-web-thin-shell", "P3"),
         FileSizeAllowlistEntry::new("crates/shells/macaca-web/src/skill_mcp.rs", 705, "P3-web-thin-shell", "P3"),
         FileSizeAllowlistEntry::new("crates/shells/macaca-web/src/skill_operations_routes.rs", 704, "P3-web-thin-shell", "P3"),
         FileSizeAllowlistEntry::new("crates/shells/macaca-web/src/skill_self_evolution_observer.rs", 810, "P3-web-thin-shell", "P3"),

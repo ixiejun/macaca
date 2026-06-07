@@ -226,3 +226,21 @@
 - **Verified**: `cargo test -p macaca-web --lib routes` 39/39; `cargo test -p macaca-integration-tests --test os_layer_file_size_gate` pass; VC-gate + escape hatch green.
 - **GitNexus memo (non-blocking)**: iteration 28 CRITICAL on routes Facade split + filesize gate allowlist — recorded in `impact-memo.md`.
 - **Next**: P3 §4.5.1 converge allowlist (framework_toolkit, session, runtime-host giants); P4 CLI decoupling; 4.4.4终态.
+
+## Iteration 29 (2026-06-07)
+- **P3.3 framework_toolkit split (4.3.7)**: deleted monolithic `framework_toolkit.rs` (1642 lines); extracted `framework_toolkit/` module tree (8 files, max 413 lines).
+- **Design patterns**: Facade (`mod.rs`); Builder (`builder.rs` orchestrates contributors); Strategy (`policy.rs` capability tiers); Adapter (`mcp_bridge.rs` service→EventLog/SSE); workspace tools scoped by app root.
+- **Contract tests**: `framework_toolkit::tests` 9/9; `contract_source::framework_toolkit_module_sources()` for static scans; `unified_delegation_path_tests` updated.
+- **Filesize allowlist**: removed `framework_toolkit.rs` row (86 baseline rows remain).
+- **Verified**: `cargo test -p macaca-web --lib` 250/250; `cargo test -p macaca-web --lib framework_toolkit` 9/9; `os_layer_file_size_gate` pass.
+- **GitNexus memo (non-blocking)**: iteration 29 CRITICAL on framework_toolkit Facade split — recorded in `impact-memo.md`.
+- **Next**: P3 §4.5.1 split `session.rs` and remaining web giants; P4 CLI decoupling; 4.4.4终态.
+
+## Iteration 30 (2026-06-07)
+- **P3.3 session split (4.3.8)**: deleted monolithic `session.rs` (1424 lines); extracted `session/` module tree (11 files, max 268 lines).
+- **Design patterns**: Facade (`mod.rs`); Visitor (`trace_mapping.rs` AgentExecutionEventVisitor); Observer (`trace_collector.rs`); Unit of Work (`persistence.rs` per-session write lock); thin HTTP Adapters (`list_handlers` / `crud_handlers` / `sse_handlers`).
+- **Contract tests**: `session::tests` 10/10; `contract_source::session_module_sources()`; audit paths updated for `loop_manager/` + `routes/` splits.
+- **Filesize allowlist**: removed `session.rs` row (85 baseline rows remain).
+- **Verified**: `cargo test -p macaca-web --lib` pass; `os_layer_file_size_gate` pass; `task_api_migration_audit` pass.
+- **GitNexus memo (non-blocking)**: iteration 30 CRITICAL on session Facade split — recorded in `impact-memo.md`.
+- **Next**: P3 §4.5.1 remaining web giants (`app_ui_routes`, `skill_operations_routes`, runtime-host); P4 CLI decoupling; 4.4.4终态.

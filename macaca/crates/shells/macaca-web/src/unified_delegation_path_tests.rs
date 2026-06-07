@@ -34,7 +34,7 @@ mod tests {
     fn goal_task_path_registers_and_resumes_via_execution_control() {
         let loop_manager = crate::loop_manager::contract_source::loop_manager_module_sources();
         let goal_adapter = include_str!("goal_lifecycle_shell_adapter.rs");
-        let toolkit = include_str!("framework_toolkit.rs");
+        let toolkit = crate::framework_toolkit::contract_source::framework_toolkit_module_sources();
 
         assert!(loop_manager.contains("ExecutionControlGoalLifecycleCoordinator"));
         assert!(loop_manager.contains("deliver_goal_resume_and_notify_parent"));

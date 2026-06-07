@@ -149,6 +149,8 @@
 - [x] 4.3.4 拆分 `macaca-web/src/lib.rs`(975) → 小型 composition bundle + route 注册。
 - [x] 4.3.5 每次拆分仅做结构移动 + 注释补全，拆分前后 `cargo test -p macaca-web` 绿。
 - [x] 4.3.6 拆分 `macaca-web/src/routes.rs`(2591) → `routes/` Facade 模块树（16 文件，max 438 行）；`cargo test -p macaca-web --lib routes` 39/39。
+- [x] 4.3.7 拆分 `macaca-web/src/framework_toolkit.rs`(1642) → `framework_toolkit/` Facade 模块树（8 文件，max 413 行）；`contract_source::framework_toolkit_module_sources`；`cargo test -p macaca-web --lib framework_toolkit` 9/9。
+- [x] 4.3.8 拆分 `macaca-web/src/session.rs`(1424) → `session/` Facade 模块树（11 文件，max 268 行）；`contract_source::session_module_sources`；`cargo test -p macaca-web --lib session` 10/10；修复 `task_api_migration_audit` / `serviceization_escape_hatches` 路径对齐模块拆分。
 
 ### 4.4 删除 web 越界依赖 + allowlist 行
 - [x] 4.4.1 替换完成后逐条移除 `macaca-web/Cargo.toml` 对 `macaca-driver/llm/memory/persist/skill/task/tools` 的直接依赖（经 `macaca-sdk::shell_provider_bridge` + `macaca_runtime_host::persist` 别名）。
@@ -157,7 +159,7 @@
 - [ ] 4.4.4 终态断言：`cargo tree -e normal -p macaca-web --depth 1` 仅 `macaca-sdk`（+ proto DTO/必要 framework 适配）。（**部分**：仍含 app/agent/runtime/context/framework/runtime-host，待 P4/P5 收敛）
 
 ### 4.5 P3 退出验证
-- [ ] 4.5.1 全仓无 >500 行 OS 层源文件（VC-filesize）。（**部分**：`routes/` 已合规；全仓 87 行 allowlist 债务，gate 已实现）
+- [ ] 4.5.1 全仓无 >500 行 OS 层源文件（VC-filesize）。（**部分**：`routes/`、`framework_toolkit/` 已合规；全仓 86 行 allowlist 债务，gate 已实现）
 - [x] 4.5.2 web 相关 allowlist 清零；VC-gate 绿；`cargo test -p macaca-web --lib` 250/250。
 
 ## 5. P4 — CLI 解耦 + domain pack 外置

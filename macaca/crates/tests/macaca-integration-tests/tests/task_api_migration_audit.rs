@@ -15,13 +15,19 @@ const TARGETS: &[AuditTarget] = &[
         relative_path: "crates/services/macaca-tools/src/todo.rs",
     },
     AuditTarget {
-        relative_path: "crates/shells/macaca-web/src/framework_toolkit.rs",
+        relative_path: "crates/shells/macaca-web/src/framework_toolkit/builder.rs",
     },
     AuditTarget {
-        relative_path: "crates/shells/macaca-web/src/loop_manager.rs",
+        relative_path: "crates/shells/macaca-web/src/framework_toolkit/agent_tools.rs",
     },
     AuditTarget {
-        relative_path: "crates/shells/macaca-web/src/routes.rs",
+        relative_path: "crates/shells/macaca-web/src/loop_manager/plan_loop_orchestrator.rs",
+    },
+    AuditTarget {
+        relative_path: "crates/shells/macaca-web/src/loop_manager/worker_loop_orchestrator.rs",
+    },
+    AuditTarget {
+        relative_path: "crates/shells/macaca-web/src/routes/todos.rs",
     },
     AuditTarget {
         relative_path: "crates/tests/macaca-integration-tests/src/pipeline_dry_run.rs",
