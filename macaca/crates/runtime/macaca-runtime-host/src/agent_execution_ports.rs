@@ -31,6 +31,39 @@ pub trait AgentExecutionEvidenceCollector: Send {
     async fn finish(self: Box<Self>) -> BTreeMap<String, String>;
 }
 
+/// Type-erased ReAct agent produced by a shell-specific construction adapter.
+///
+/// Runtime-host owns the execution loop (`reply`) while the shell adapter owns
+/// how toolkit/model/hooks are wired.  This split keeps framework construction
+/// injectable without pulling shell types into the service provider.
+#[async_trait]
+pub trait ConstructedRuntimeAgent: Send {
+    /// Run one user turn through the framework ReAct loop and return text output.
+    async fn reply_user_prompt(&self, user_prompt: String) -> Result<String, String>;
+}
+
+/// Construction port: materialize a framework ReAct agent from a trusted snapshot.
+///
+/// Shells (Web, CLI, gateway) implement this port to supply host-local composition
+/// dependencies (toolkit assembly, SSE bridges, execution-control middleware).
+/// The Agent Execution Service provider never calls shell types directly.
+#[async_trait]
+pub trait FrameworkAgentConstructionPort: Send + Sync {
+    /// Build one runtime ReAct agent from an Agent Context service snapshot.
+    ///
+    /// The snapshot is authoritative for persona/system prompt; this method must
+    /// not rebuild context and should only wire model/tools/hooks for execution.
+    async fn build_runtime_react_agent(
+        &self,
+        command: &AgentExecutionCommand,
+        context_snapshot: &AgentContextSnapshot,
+        agent_event_tx: mpsc::Sender<AgentExecutionEvent>,
+        execution_control: Option<OpaqueExecutionControlHandle>,
+        max_iters: usize,
+        tool_choice: Option<ToolChoice>,
+    ) -> Result<Box<dyn ConstructedRuntimeAgent>, String>;
+}
+
 /// Framework port: build and run one ReAct agent from a trusted context snapshot.
 #[async_trait]
 pub trait FrameworkRuntimeAgentPort: Send + Sync {

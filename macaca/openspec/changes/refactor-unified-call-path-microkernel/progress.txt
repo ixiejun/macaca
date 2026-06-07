@@ -55,3 +55,10 @@
 - **P1.3 integration contracts (2.3.5)**: `unified_delegation_path_tests.rs` — fork-join delegate_task + goal-task + worker_loop service path assertions (5/5).
 - **Verified**: `cargo test -p macaca-runtime-host --lib execution_control_goal_lifecycle` 5/5; `cargo test -p macaca-web unified_delegation_path` 5/5; `cargo check -p macaca-runtime-host -p macaca-web` green.
 - **Remaining P1**: 2.2.3 FrameworkRunner sink; 2.2.5 agent execution integration tests; 2.4 YAML workflow merge; 2.6 coordination patch removal (gate: audit replay → 1 chain).
+
+## Iteration 9 (2026-06-07)
+- **P1.2 framework runtime agent port (2.2.3)**: `ServiceBackedFrameworkRuntimeAgentPort` (runtime-host Template Method + Adapter); `FrameworkAgentConstructionPort` trait; `WebFrameworkAgentConstructionPort` shell adapter delegates to `FrameworkRunner` compat seam.
+- **Removed**: `WebFrameworkRuntimeAgentPort` — web no longer implements `FrameworkRuntimeAgentPort` directly.
+- **Contract test**: `framework_runtime_agent_port_owned_by_runtime_host_service` in `unified_delegation_path_tests.rs` (6/6 total).
+- **Verified**: `cargo check -p macaca-runtime-host -p macaca-web`; `cargo test -p macaca-runtime-host --lib framework_runtime_agent_service` 2/2; `cargo test -p macaca-web unified_delegation_path` 6/6.
+- **Remaining P1**: 2.2.5 agent execution integration tests; 2.4 YAML workflow merge; 2.6 coordination patch removal (gate: audit replay → 1 chain); `FrameworkRunner` body still in web (task 4.3.2).

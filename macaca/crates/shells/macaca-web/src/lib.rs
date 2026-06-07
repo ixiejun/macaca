@@ -42,6 +42,7 @@ pub mod framework_toolkit;
 pub mod genui_routes;
 pub mod heartbeat_operations_routes;
 mod fork_join_shell_adapter;
+mod framework_agent_construction_shell_adapter;
 mod goal_lifecycle_shell_adapter;
 #[cfg(test)]
 mod unified_delegation_path_tests;

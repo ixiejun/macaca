@@ -45,7 +45,7 @@
 ### 2.2 Agent 执行实现迁出 web shell → runtime-host service provider
 - [x] 2.2.1 `[impact-memo]` 盘点 `macaca/crates/shells/macaca-web/src/agent_execution_backend.rs` 中"模型/工具/loop"执行逻辑（`build_runtime_agent_*` + `agent.reply()` 段，约 836–893 行）。（inventory: 语义层已提取至 `agent_execution_orchestration.rs`；shell 仍保留 `agent.reply()`/FrameworkRunner/SSE/executor 生命周期）
 - [x] 2.2.2 在 `macaca-runtime-host` 的 Agent Execution Service provider（`agent_execution_service_provider.rs`）内承接该执行逻辑：context 经 `service.agent_context`、控制经 `service.execution_control`、模型/工具经 service.call，统一产出 service-call evidence。（`ComposedAgentExecutionBackend` + `agent_execution_orchestration`）
-- [ ] 2.2.3 把 `FrameworkRunner` agent 构造（runtime/framework 关注点）下沉到 `macaca-runtime`/`macaca-framework` 层 service 后面，web 不再直接构造 framework Agent。（`WebFrameworkRuntimeAgentPort` 仍委托 FrameworkRunner，待迁出）
+- [x] 2.2.3 把 `FrameworkRunner` agent 构造（runtime/framework 关注点）下沉到 `macaca-runtime`/`macaca-framework` 层 service 后面，web 不再直接构造 framework Agent。（`ServiceBackedFrameworkRuntimeAgentPort` + `FrameworkAgentConstructionPort`；web 仅 `WebFrameworkAgentConstructionPort` 适配器；`FrameworkRunner` 本体待 4.3.2 迁出）
 - [x] 2.2.4 web 侧 `WebAgentExecutionBackend` 收缩为：仅做 SSE channel 注入 + HTTP/DTO 适配 + 调 `service.agent_execution`；删除 shell 内执行语义。（web 改为 `web_agent_execution_adapters` 端口注入；执行 Template Method 在 runtime-host）
 - [ ] 2.2.5 为迁移后的 Agent Execution Service 写集成测试：YAML 会话与 WASM 会话经**同一** provider 执行；trace/audit 链一致。
 

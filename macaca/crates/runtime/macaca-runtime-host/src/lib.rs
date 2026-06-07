@@ -61,6 +61,7 @@ pub mod evm_service_provider;
 pub mod execution_control;
 pub mod execution_control_fork_join;
 pub mod execution_control_goal_lifecycle;
+pub mod framework_runtime_agent_service;
 pub mod execution_control_runtime;
 pub mod execution_control_service_provider;
 pub mod factory;
@@ -271,8 +272,10 @@ pub use agent_execution_orchestration::{
 };
 pub use agent_execution_ports::{
     AgentExecutionEvidenceCollector, AgentExecutionHostAdapter, AgentExecutionOutputHasher,
-    FrameworkRuntimeAgentPort, OpaqueExecutionControlHandle,
+    ConstructedRuntimeAgent, FrameworkAgentConstructionPort, FrameworkRuntimeAgentPort,
+    OpaqueExecutionControlHandle,
 };
+pub use framework_runtime_agent_service::ServiceBackedFrameworkRuntimeAgentPort;
 pub use agent_execution_service_provider::{
     agent_execution_service_descriptor, AgentExecutionBackend, AgentExecutionSystemServiceProvider,
 };

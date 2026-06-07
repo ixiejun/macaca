@@ -54,6 +54,25 @@ mod tests {
     }
 
     #[test]
+    fn framework_runtime_agent_port_owned_by_runtime_host_service() {
+        let web_adapters = include_str!("web_agent_execution_adapters.rs");
+        let construction_adapter = include_str!("framework_agent_construction_shell_adapter.rs");
+        let runtime_host_service = include_str!(
+            "../../../runtime/macaca-runtime-host/src/framework_runtime_agent_service.rs"
+        );
+
+        assert!(
+            !web_adapters.contains("impl FrameworkRuntimeAgentPort for WebFrameworkRuntimeAgentPort"),
+            "web shell must not implement FrameworkRuntimeAgentPort directly"
+        );
+        assert!(web_adapters.contains("ServiceBackedFrameworkRuntimeAgentPort"));
+        assert!(web_adapters.contains("WebFrameworkAgentConstructionPort"));
+        assert!(construction_adapter.contains("impl FrameworkAgentConstructionPort"));
+        assert!(construction_adapter.contains("build_runtime_agent_from_context_snapshot_with_execution_policy"));
+        assert!(runtime_host_service.contains("impl FrameworkRuntimeAgentPort for ServiceBackedFrameworkRuntimeAgentPort"));
+    }
+
+    #[test]
     fn unified_paths_do_not_hardcode_application_role_names() {
         let sources = [
             include_str!("orchestration_tools.rs"),

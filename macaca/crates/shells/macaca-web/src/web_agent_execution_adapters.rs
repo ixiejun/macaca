@@ -8,11 +8,9 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use macaca_framework::agent::Agent;
-use macaca_framework::message::Msg;
 use macaca_kernel::executor::{ApplicationExecutor, ExecutorEventFactory};
 use macaca_proto::{
-    AgentActivity, AgentContextSnapshot, AgentExecutionCommand, AgentExecutionEvent,
+    AgentActivity, AgentExecutionCommand, AgentExecutionEvent,
     ExecutionControlCommandResult, ExecutionControlPolicy,
     ExecutionControlRegisterExecutionCommand, ExecutionControlResolutionStatus,
     ExecutionControlResolvePolicyCommand, ExecutionControlResolvedPolicy, KernelServiceId,
@@ -21,66 +19,19 @@ use macaca_proto::{
 use macaca_runtime_host::{
     execution_control_execution_id, execution_control_scope,
     legacy_chat_main_thread_execution_control_policy, AgentExecutionEvidenceCollector,
-    AgentExecutionHostAdapter, AgentExecutionOutputHasher, FrameworkRuntimeAgentPort,
-    OpaqueExecutionControlHandle,
+    AgentExecutionHostAdapter, AgentExecutionOutputHasher, OpaqueExecutionControlHandle,
+    ServiceBackedFrameworkRuntimeAgentPort,
 };
 use tokio::sync::mpsc;
 
 use crate::agent_execution_evidence::{observed_agent_execution_events, stable_agent_output_hash};
 use crate::application_execution_agent_event_bridge::ApplicationExecutionAgentEventMirror;
-use crate::framework_runner::{FrameworkRunner, RuntimeExecutionControl};
+use crate::framework_agent_construction_shell_adapter::WebFrameworkAgentConstructionPort;
+use crate::framework_runner::RuntimeExecutionControl;
 use crate::runtime_event_bridge::emit_execution_control_events;
 use crate::state::AppState;
 
 const WEB_AGENT_EXECUTION_BUS_SOURCE: &str = "macaca.web.agent_execution";
-
-/// Framework port that builds and runs ReAct agents through `FrameworkRunner`.
-pub(crate) struct WebFrameworkRuntimeAgentPort {
-    state: Arc<AppState>,
-}
-
-impl WebFrameworkRuntimeAgentPort {
-    pub(crate) fn new(state: Arc<AppState>) -> Self {
-        Self { state }
-    }
-}
-
-#[async_trait]
-impl FrameworkRuntimeAgentPort for WebFrameworkRuntimeAgentPort {
-    async fn run_react_agent(
-        &self,
-        _command: &AgentExecutionCommand,
-        context_snapshot: &AgentContextSnapshot,
-        agent_event_tx: mpsc::Sender<AgentExecutionEvent>,
-        execution_control: Option<OpaqueExecutionControlHandle>,
-        max_iters: usize,
-        tool_choice: Option<macaca_framework::model::ToolChoice>,
-        user_prompt: String,
-    ) -> Result<String, String> {
-        let runtime_control = execution_control.and_then(|handle| {
-            handle
-                .0
-                .downcast::<RuntimeExecutionControl>()
-                .ok()
-                .map(|arc| (*arc).clone())
-        });
-        let agent =
-            FrameworkRunner::build_runtime_agent_from_context_snapshot_with_execution_policy(
-                &self.state,
-                context_snapshot,
-                Some(agent_event_tx),
-                runtime_control,
-                max_iters,
-                tool_choice,
-            )
-            .await?;
-        let reply = agent
-            .reply(Msg::user("user", user_prompt))
-            .await
-            .map_err(|error| error.to_string())?;
-        Ok(reply.get_text())
-    }
-}
 
 /// Host port that wires Web session state, kernel lifecycle, and execution-control services.
 pub(crate) struct WebAgentExecutionHostAdapter {
@@ -422,7 +373,10 @@ pub(crate) fn build_composed_web_agent_execution_backend(
             Arc::clone(&state),
             Arc::clone(&state.service_runtime),
         )),
-        Arc::new(WebFrameworkRuntimeAgentPort::new(state)),
+        Arc::new(ServiceBackedFrameworkRuntimeAgentPort::new(
+            Arc::new(WebFrameworkAgentConstructionPort::new(Arc::clone(&state))),
+            WEB_AGENT_EXECUTION_BUS_SOURCE,
+        )),
         Arc::new(WebAgentExecutionOutputHasher),
     )
 }
