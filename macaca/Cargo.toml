@@ -31,7 +31,10 @@ members = [
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
+authors = ["quantx"]
 license = "MIT"
+repository = "https://github.com/ixiejun/"
+homepage = "https://github.com/ixiejun/"
 rust-version = "1.75"
 
 [workspace.dependencies]
