@@ -5,10 +5,23 @@ use chrono::Utc;
 use macaca_framework::mcp::{McpSessionMode, McpTransportConfig};
 use macaca_framework::tool::{ToolError, ToolHandler, ToolResponse, Toolkit};
 use macaca_proto::config::{ContextConfig, ContextProviderFamilyConfig};
+use macaca_proto::{
+    MacacaError, MacacaResult, McpCleanupCommand, McpDiagnosticsSnapshot,
+    McpDiagnosticsSnapshotCommand, McpExposureRefreshCommand, McpExposureRefreshResult,
+    McpOAuthLoginCommand, McpOAuthStatusCommand, McpOAuthStatusResult, McpProbeCommand,
+    McpRegisterCommand, McpRegisterResult, McpReloadCommand, McpReloadResult,
+    McpResourceListCommand, McpResourceListResult, McpResourceReadCommand, McpResourceReadResult,
+    McpResourceTemplateListResult, McpRuntimeStatusView, McpServerStatusListCommand,
+    McpServerStatusListResult, McpServiceLifecycleScope, McpServiceSnapshot,
+    McpServiceSnapshotCommand, McpStatusCommand, McpStatusResult, McpToolAttachCommand,
+    McpToolAttachResult, McpToolCatalogCommand, McpToolCatalogResult, McpToolInvokeCommand,
+    McpToolInvokeResult, TraceContext,
+};
 use macaca_runtime_host::{
     McpDefinitionSource, McpLifecycleScope, McpRuntimeFacade, McpRuntimeStatus,
     McpRuntimeStatusState, McpServerDefinition, McpToolPolicy,
 };
+use macaca_sdk::SystemMcpClient;
 use macaca_skill::{
     SkillAuthorKind, SkillGovernanceProvenance, SkillGovernanceRecord,
     SkillGovernanceSnapshotResult, SkillLifecycleState, SkillSnapshot, SkillSourceScope,
@@ -97,6 +110,158 @@ fn runtime_tool_catalog_lists_tool_names_sorted_and_deduped() {
 
     let cat = runtime_tool_capability_catalog_from_toolkit(&toolkit);
     assert_eq!(cat.tool_names, vec!["aaa", "zzz"]);
+}
+
+/// Fixture MCP client that returns deterministic probe statuses for Route C tests.
+struct FixtureMcpProbeClient {
+    statuses: Vec<McpRuntimeStatusView>,
+}
+
+#[async_trait]
+impl SystemMcpClient for FixtureMcpProbeClient {
+    async fn register(&self, _command: McpRegisterCommand) -> MacacaResult<McpRegisterResult> {
+        Err(MacacaError::Config("fixture client".into()))
+    }
+
+    async fn probe(&self, _command: McpProbeCommand) -> MacacaResult<McpStatusResult> {
+        Ok(McpStatusResult::new(self.statuses.clone()))
+    }
+
+    async fn tool_catalog(
+        &self,
+        _command: McpToolCatalogCommand,
+    ) -> MacacaResult<McpToolCatalogResult> {
+        Err(MacacaError::Config("fixture client".into()))
+    }
+
+    async fn attach_tools(
+        &self,
+        _command: McpToolAttachCommand,
+    ) -> MacacaResult<McpToolAttachResult> {
+        Err(MacacaError::Config("fixture client".into()))
+    }
+
+    async fn invoke_tool(
+        &self,
+        _command: McpToolInvokeCommand,
+    ) -> MacacaResult<McpToolInvokeResult> {
+        Err(MacacaError::Config("fixture client".into()))
+    }
+
+    async fn status(&self, _command: McpStatusCommand) -> MacacaResult<McpStatusResult> {
+        Err(MacacaError::Config("fixture client".into()))
+    }
+
+    async fn server_status_list(
+        &self,
+        _command: McpServerStatusListCommand,
+    ) -> MacacaResult<McpServerStatusListResult> {
+        Err(MacacaError::Config("fixture client".into()))
+    }
+
+    async fn reload(&self, _command: McpReloadCommand) -> MacacaResult<McpReloadResult> {
+        Err(MacacaError::Config("fixture client".into()))
+    }
+
+    async fn oauth_login(
+        &self,
+        _command: McpOAuthLoginCommand,
+    ) -> MacacaResult<McpOAuthStatusResult> {
+        Err(MacacaError::Config("fixture client".into()))
+    }
+
+    async fn oauth_status(
+        &self,
+        _command: McpOAuthStatusCommand,
+    ) -> MacacaResult<McpOAuthStatusResult> {
+        Err(MacacaError::Config("fixture client".into()))
+    }
+
+    async fn resource_list(
+        &self,
+        _command: McpResourceListCommand,
+    ) -> MacacaResult<McpResourceListResult> {
+        Err(MacacaError::Config("fixture client".into()))
+    }
+
+    async fn resource_template_list(
+        &self,
+        _command: McpResourceListCommand,
+    ) -> MacacaResult<McpResourceTemplateListResult> {
+        Err(MacacaError::Config("fixture client".into()))
+    }
+
+    async fn resource_read(
+        &self,
+        _command: McpResourceReadCommand,
+    ) -> MacacaResult<McpResourceReadResult> {
+        Err(MacacaError::Config("fixture client".into()))
+    }
+
+    async fn diagnostics_snapshot(
+        &self,
+        _command: McpDiagnosticsSnapshotCommand,
+    ) -> MacacaResult<McpDiagnosticsSnapshot> {
+        Err(MacacaError::Config("fixture client".into()))
+    }
+
+    async fn exposure_refresh(
+        &self,
+        _command: McpExposureRefreshCommand,
+    ) -> MacacaResult<McpExposureRefreshResult> {
+        Err(MacacaError::Config("fixture client".into()))
+    }
+
+    async fn snapshot(
+        &self,
+        _command: McpServiceSnapshotCommand,
+    ) -> MacacaResult<McpServiceSnapshot> {
+        Err(MacacaError::Config("fixture client".into()))
+    }
+
+    async fn cleanup(&self, _command: McpCleanupCommand) -> MacacaResult<McpStatusResult> {
+        Err(MacacaError::Config("fixture client".into()))
+    }
+}
+
+#[tokio::test]
+async fn probe_mcp_capability_inputs_via_client_maps_service_status_views() {
+    let client: Arc<dyn SystemMcpClient> = Arc::new(FixtureMcpProbeClient {
+        statuses: vec![
+            McpRuntimeStatusView {
+                server_id: "fixture_ready".into(),
+                transport: "stdio".into(),
+                lifecycle: McpServiceLifecycleScope::Session,
+                session_mode: "stateful".into(),
+                state: "Ready".into(),
+                exposed_tools: vec!["tool_a".into()],
+                failure_reason: None,
+            },
+            McpRuntimeStatusView {
+                server_id: "fixture_disabled".into(),
+                transport: "stdio".into(),
+                lifecycle: McpServiceLifecycleScope::Session,
+                session_mode: "stateful".into(),
+                state: "Disabled".into(),
+                exposed_tools: Vec::new(),
+                failure_reason: None,
+            },
+        ],
+    });
+
+    let (catalog, ready) = probe_mcp_capability_inputs_via_client(
+        &client,
+        TraceContext::new("fixture-mcp-probe"),
+        "agent-a",
+    )
+    .await;
+
+    assert_eq!(ready, vec!["fixture_ready".to_string()]);
+    assert_eq!(catalog.servers.len(), 2);
+    assert_eq!(catalog.servers[0].server_id, "fixture_ready");
+    assert_eq!(catalog.servers[0].exposed_tools, vec!["tool_a".to_string()]);
+    assert_eq!(catalog.servers[1].server_id, "fixture_disabled");
+    assert!(catalog.servers[1].exposed_tools.is_empty());
 }
 
 #[tokio::test]

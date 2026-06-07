@@ -1,10 +1,15 @@
-use super::*;
 use std::path::{Path, PathBuf};
 
 use macaca_proto::{
-    AgentContextBuildCommand, AgentContextSnapshot, AgentExecutionIntent,
+    AgentContextBuildCommand, AgentContextSnapshot, AgentExecutionCommand, AgentExecutionIntent,
     ExecutionControlCheckpointMode, ExecutionControlPolicyOverride,
     ExecutionControlResolutionStatus, ExecutionControlResumeSource, ExecutionControlTrigger,
+};
+use macaca_runtime_host::{
+    execution_control_execution_id, execution_control_scope, extract_single_shell_fence,
+    heartbeat_exact_shell_contract, resolve_execution_control_policy_local,
+    runtime_agent_max_iters, runtime_agent_tool_choice, should_skip_heartbeat_without_source,
+    user_prompt_with_context,
 };
 
 #[test]
@@ -19,7 +24,7 @@ fn chat_main_thread_uses_deprecated_compat_execution_control_policy() {
     )
     .unwrap();
 
-    let resolution = WebAgentExecutionBackend::resolve_execution_control_policy(&command);
+    let resolution = resolve_execution_control_policy_local(&command);
 
     assert_eq!(resolution.status, ExecutionControlResolutionStatus::Enabled);
     assert_eq!(
@@ -40,7 +45,7 @@ fn delegated_runtime_execution_without_policy_does_not_install_execution_control
     )
     .unwrap();
 
-    let resolution = WebAgentExecutionBackend::resolve_execution_control_policy(&command);
+    let resolution = resolve_execution_control_policy_local(&command);
 
     assert_eq!(
         resolution.status,
@@ -65,7 +70,7 @@ fn delegated_runtime_execution_with_override_installs_execution_control() {
         ExecutionControlCheckpointMode::ReferenceOnly,
     ));
 
-    let resolution = WebAgentExecutionBackend::resolve_execution_control_policy(&command);
+    let resolution = resolve_execution_control_policy_local(&command);
 
     assert_eq!(resolution.status, ExecutionControlResolutionStatus::Enabled);
 }
@@ -84,7 +89,7 @@ fn heartbeat_intent_requires_heartbeat_source_evidence() {
     let context_command = AgentContextBuildCommand::from_execution(&command);
     let snapshot = AgentContextSnapshot::minimal(&context_command, "trusted context");
 
-    assert!(WebAgentExecutionBackend::should_skip_heartbeat_without_source(&command, &snapshot));
+    assert!(should_skip_heartbeat_without_source(&command, &snapshot));
 }
 
 #[test]
@@ -107,7 +112,7 @@ fn heartbeat_intent_runs_when_heartbeat_source_evidence_exists() {
         metadata: Default::default(),
     });
 
-    assert!(!WebAgentExecutionBackend::should_skip_heartbeat_without_source(&command, &snapshot));
+    assert!(!should_skip_heartbeat_without_source(&command, &snapshot));
 }
 
 #[test]
@@ -131,7 +136,7 @@ fn evidence_metadata_is_rendered_as_structured_execution_context() {
         "/workspace/agents/a/sentinel.md".into(),
     );
 
-    let prompt = WebAgentExecutionBackend::user_prompt_with_context(&command);
+    let prompt = user_prompt_with_context(&command);
 
     assert!(prompt.contains("Structured evidence context"));
     assert!(prompt.contains("\"delegated_context\""));
@@ -163,7 +168,7 @@ fn execution_envelope_is_rendered_as_highest_priority_contract() {
         .unwrap(),
     );
 
-    let prompt = WebAgentExecutionBackend::user_prompt_with_context(&command);
+    let prompt = user_prompt_with_context(&command);
 
     assert!(prompt.contains("Highest-priority delegated execution contract"));
     assert!(prompt.contains("\"source_kind\": \"heartbeat_profile\""));
@@ -194,10 +199,7 @@ fn artifact_completion_policy_uses_short_runtime_loop_budget() {
         .unwrap(),
     );
 
-    assert_eq!(
-        WebAgentExecutionBackend::runtime_agent_max_iters(&command),
-        12
-    );
+    assert_eq!(runtime_agent_max_iters(&command), 12);
 }
 
 #[test]
@@ -224,7 +226,7 @@ fn artifact_completion_policy_requires_authorized_tool_use() {
     );
 
     assert_eq!(
-        WebAgentExecutionBackend::runtime_agent_tool_choice(&command),
+        runtime_agent_tool_choice(&command),
         Some(macaca_framework::model::ToolChoice::Required)
     );
 }
@@ -241,10 +243,7 @@ fn agent_result_completion_policy_keeps_automatic_tool_choice() {
     )
     .unwrap();
 
-    assert_eq!(
-        WebAgentExecutionBackend::runtime_agent_tool_choice(&command),
-        None
-    );
+    assert_eq!(runtime_agent_tool_choice(&command), None);
 }
 
 #[test]
@@ -259,10 +258,7 @@ fn agent_result_completion_policy_keeps_default_runtime_loop_budget() {
     )
     .unwrap();
 
-    assert_eq!(
-        WebAgentExecutionBackend::runtime_agent_max_iters(&command),
-        25
-    );
+    assert_eq!(runtime_agent_max_iters(&command), 25);
 }
 
 #[test]
@@ -338,8 +334,7 @@ printf ok
         metadata: Default::default(),
     });
 
-    let contract = WebAgentExecutionBackend::heartbeat_exact_shell_contract(&command, &snapshot)
-        .expect("exact contract");
+    let contract = heartbeat_exact_shell_contract(&command, &snapshot).expect("exact contract");
 
     assert_eq!(contract, "printf ok");
 }
@@ -358,7 +353,7 @@ fn non_heartbeat_intents_do_not_require_heartbeat_source_evidence() {
     let context_command = AgentContextBuildCommand::from_execution(&command);
     let snapshot = AgentContextSnapshot::minimal(&context_command, "trusted context");
 
-    assert!(!WebAgentExecutionBackend::should_skip_heartbeat_without_source(&command, &snapshot));
+    assert!(!should_skip_heartbeat_without_source(&command, &snapshot));
 }
 
 #[test]
@@ -372,10 +367,11 @@ fn execution_control_scope_carries_required_trace_and_run_identity() {
         macaca_proto::TraceContext::new("trace-task-worker-control"),
     )
     .unwrap();
-    let execution_id = WebAgentExecutionBackend::execution_control_execution_id(&command);
+    let execution_id = execution_control_execution_id(&command);
 
     let scope =
-        WebAgentExecutionBackend::execution_control_scope(&command, execution_id.clone()).unwrap();
+        execution_control_scope(&command, execution_id.clone(), "macaca.web.agent_execution")
+            .unwrap();
 
     assert_eq!(scope.execution_id, execution_id);
     assert_eq!(scope.session_id, "session-a");
@@ -386,33 +382,45 @@ fn execution_control_scope_carries_required_trace_and_run_identity() {
 
 #[test]
 fn execution_backend_registers_enabled_policy_before_adapter_install() {
-    let source = include_str!("../agent_execution_backend.rs");
+    let host_adapter = include_str!("../web_agent_execution_adapters.rs");
+    let composed = include_str!(
+        "../../../../runtime/macaca-runtime-host/src/composed_agent_execution_backend.rs"
+    );
 
-    assert!(source.contains("register_execution_control(&command, control_policy)"));
-    assert!(source.contains("ExecutionControlRegisterExecutionCommand"));
-    assert!(source.contains("install_execution_control(&command, policy, execution_id)"));
+    assert!(composed.contains("register_execution_control(&command, control_policy)"));
+    assert!(host_adapter.contains("ExecutionControlRegisterExecutionCommand"));
+    assert!(composed.contains("install_execution_control(&command, policy, execution_id)"));
 }
 
 #[test]
 fn execution_backend_consumes_context_snapshot_without_rebuilding_context() {
-    let source = include_str!("../agent_execution_backend.rs");
-    let service_context_call = "build_context_snapshot";
+    let composed = include_str!(
+        "../../../../runtime/macaca-runtime-host/src/composed_agent_execution_backend.rs"
+    );
+    let framework_port = include_str!("../web_agent_execution_adapters.rs");
+    let service_context_call = "build_agent_context_snapshot_via_service";
     let snapshot_runtime_builder = "build_runtime_agent_from_context_snapshot";
     let legacy_runtime_builder = ["FrameworkRunner::build_runtime", "_agent("].concat();
 
-    assert!(source.contains(service_context_call));
-    assert!(source.contains(snapshot_runtime_builder));
-    assert!(!source.contains(&legacy_runtime_builder));
+    assert!(composed.contains(service_context_call));
+    assert!(framework_port.contains(snapshot_runtime_builder));
+    assert!(!composed.contains(&legacy_runtime_builder));
 }
 
 #[test]
 fn execution_backend_returns_context_snapshot_for_audit_replay() {
-    let source = include_str!("../agent_execution_backend.rs");
+    let host_adapter = include_str!("../web_agent_execution_adapters.rs");
+    let composed = include_str!(
+        "../../../../runtime/macaca-runtime-host/src/composed_agent_execution_backend.rs"
+    );
+    let orchestration_source = include_str!(
+        "../../../../runtime/macaca-runtime-host/src/agent_execution_orchestration.rs"
+    );
 
-    assert!(source.contains("result.context_snapshot = Some(context_snapshot)"));
-    assert!(source.contains("AgentExecutionResult::completed"));
-    assert!(source.contains("AgentExecutionStatus::Failed"));
-    assert!(source.contains("ServiceBusSource::new(\"macaca.web.agent_execution\")"));
+    assert!(composed.contains("completed_execution_result"));
+    assert!(composed.contains("failed_execution_result"));
+    assert!(host_adapter.contains("ServiceBusSource::new(WEB_AGENT_EXECUTION_BUS_SOURCE)"));
+    assert!(orchestration_source.contains("AgentExecutionStatus::Failed"));
 }
 
 #[test]
@@ -436,14 +444,16 @@ fn agent_execution_service_registers_skill_self_evolution_decorator() {
 
 #[test]
 fn skill_self_evolution_observation_is_centralized_at_agent_execution_boundary() {
-    let backend_source = include_str!("../agent_execution_backend.rs");
+    let composed_source = include_str!(
+        "../../../../runtime/macaca-runtime-host/src/composed_agent_execution_backend.rs"
+    );
     let chat_source = include_str!("../chat_orchestrator.rs");
     let event_persistence_source = include_str!("../event_persistence.rs");
     let observer_source = include_str!("../skill_self_evolution_observer.rs");
 
     assert!(
-        !backend_source.contains("spawn_skill_self_evolution_observation"),
-        "agent execution backend should return results; the decorator owns observation"
+        !composed_source.contains("spawn_skill_self_evolution_observation"),
+        "composed agent execution backend should return results; the decorator owns observation"
     );
     assert!(
         !chat_source.contains("observe_agent_execution_result_for_skill_self_evolution"),
@@ -461,14 +471,18 @@ fn skill_self_evolution_observation_is_centralized_at_agent_execution_boundary()
 
 #[test]
 fn execution_control_selection_does_not_branch_on_application_or_provider_names() {
-    let backend_source = include_str!("../agent_execution_backend.rs");
+    let host_adapter_source = include_str!("../web_agent_execution_adapters.rs");
+    let orchestration_source = include_str!(
+        "../../../../runtime/macaca-runtime-host/src/agent_execution_orchestration.rs"
+    );
     let runtime_policy_source =
         include_str!("../../../../runtime/macaca-runtime-host/src/execution_control.rs");
     let service_provider_source = include_str!(
         "../../../../runtime/macaca-runtime-host/src/execution_control_service_provider.rs"
     );
     let sources = [
-        ("agent_execution_backend", backend_source),
+        ("web_agent_execution_adapters", host_adapter_source),
+        ("agent_execution_orchestration", orchestration_source),
         ("execution_control_policy", runtime_policy_source),
         (
             "execution_control_service_provider",
@@ -503,7 +517,7 @@ fn direct_session_pause_resume_channels_stay_inside_approved_adapters() {
     let crate_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let src_root = crate_root.join("src");
     let approved_files = [
-        "agent_execution_backend.rs",
+        "web_agent_execution_adapters.rs",
         "chat_orchestrator.rs",
         "framework_runner.rs",
         "hook_consumer.rs",

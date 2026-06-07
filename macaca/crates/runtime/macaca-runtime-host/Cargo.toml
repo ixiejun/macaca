@@ -8,6 +8,7 @@ description = "Agent OS runtime host — MCP runtime manager, skill-backed tool 
 macaca-proto = { workspace = true }
 macaca-ipc = { workspace = true }
 macaca-kernel = { workspace = true }
+macaca-agent = { workspace = true }
 macaca-persist = { workspace = true }
 macaca-llm = { workspace = true }
 macaca-memory = { workspace = true }

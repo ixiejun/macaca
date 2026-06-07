@@ -1,0 +1,42 @@
+# Progress — refactor-unified-call-path-microkernel
+
+## Iteration 1 (2026-06-07)
+- Started Ralph loop after proposal approval.
+- Build fix: removed corrupted `macaca/target` directory; `cargo check -p macaca-kernel` green.
+- **P0 complete**: escape hatch tokens 1.1.1–1.1.7, baseline.md, impact-memo.md, allowlist doc sync, VC-escape + VC-gate green.
+- **P1 partial**: `ServiceClientAgentExecutionAdapter` + `AgentExecutionDispatch` in macaca-agent; `ServiceRuntimeAgentExecutionDispatch` + `kernel_service_client_compat_from_agent_execution_service` in runtime-host (2 unit tests pass).
+- **P2 partial**: `payment_policy` module internalized in kernel lib.rs (subagent).
+- **Blocker**: macaca-web bootstrap creates kernel (LegacyAgentExecutionAdapter) before `service_runtime` + agent execution provider; needs reorder to wire `kernel_service_client_compat_from_agent_execution_service`.
+- Next: 0.3 audit replay baseline, web bootstrap reorder, P1.2–P1.6, P2 eviction.
+
+## Iteration 2 (2026-06-07)
+- **P1 kernel wiring**: `SwappableAgentExecutionPort` (macaca-agent); `Kernel::replace_execution_port`; `wire_kernel_to_agent_execution_service` (runtime-host); web calls hot-swap after agent execution provider starts.
+- Tests: `macaca-runtime-host` agent_execution_dispatch 3/3; `macaca-kernel` execute_agent; `cargo check -p macaca-web` green.
+- Remaining P1: WebAgentExecutionBackend 下沉 runtime-host; 删协调补丁（需 0.3 audit replay 门）; framework_toolkit/registry 直读迁移.
+
+## Iteration 3 (2026-06-07)
+- **P1.5 MCP service path**: `framework_runner` uses `probe_mcp_capability_inputs_via_client`; `chat_orchestrator` session teardown uses `mcp_client.cleanup` (no direct `mcp_runtime.cleanup_session`); new unit test `probe_mcp_capability_inputs_via_client_maps_service_status_views`.
+- **P2 prep (payment_policy)**: implementation moved to `macaca-proto`; kernel re-export only; runtime-host `payment_policy` module + `payment_service_provider` imports updated.
+- **Verified**: `cargo test -p macaca-web capability_catalog` 11/11; `cargo test -p macaca-integration-tests serviceization_escape_hatches` pass; `cargo check -p macaca-web` green.
+- **Remaining mcp_runtime shell reads**: `lib.rs` bootstrap (feeds MCP service provider), `state.rs` deprecated field, dead `skill_mcp::register_skill_backed_mcp_tools`.
+- **Remaining P1 blockers**: WebAgentExecutionBackend still owns framework loop (~898 lines); kernel `ApplicationExecutor` still used by loop_manager/framework_runner/orchestration_tools; coordination patches frozen not removed (0.3 audit replay gate).
+
+## Iteration 4 (2026-06-07)
+- **P1.2 orchestration sink (partial)**: new `macaca-runtime-host/src/agent_execution_orchestration.rs` — context build, prompt composition, heartbeat guards, execution-policy Strategy, execution-control scope, failed result helper; Web backend delegates (~300 lines semantic logic moved).
+- **P1.3 inventory**: `executor-consumer-inventory.md` (47 rows; live executor coupling only in macaca-web).
+- **Verified**: `cargo test -p macaca-runtime-host --lib chat_main_thread` pass; `cargo test -p macaca-web agent_execution_backend` 24/24 pass.
+- **Next**: 2.2.2–2.2.4 full runtime-host backend (FrameworkRunner/agent.reply out of web); 2.3.2–2.3.5 delegate_task → service.agent_execution; 0.3 audit replay baseline before 2.6 patch removal.
+
+## Iteration 5 (2026-06-07)
+- **P1.2 composed backend**: `ComposedAgentExecutionBackend` (runtime-host Template Method) + `agent_execution_ports` (Host/Framework ports) + `web_agent_execution_adapters` (Web Adapter injection). Web no longer owns `execute()` — deleted monolithic `WebAgentExecutionBackend`.
+- **Heartbeat shell** moved to `agent_execution_orchestration::execute_exact_heartbeat_shell`.
+- **Verified**: `cargo test -p macaca-web agent_execution_backend` 24/24; `cargo check -p macaca-runtime-host -p macaca-web` green.
+- **Remaining 2.2.3**: `WebFrameworkRuntimeAgentPort` still calls `FrameworkRunner` (framework construction stays in web until runtime/framework service exists).
+- **Remaining 2.3**: kernel executor queue/fork still used by orchestration_tools; worker path already routes via `WebAgentRunner` → `service.agent_execution`.
+
+## Iteration 6 (2026-06-07)
+- **P1.3 delegate_task service path (2.3.3)**: `ServiceDelegatedTaskDispatcher` (`macaca-web/delegated_task_dispatcher.rs`) routes `delegate_task` tool through `service.agent_execution` (`TaskWorker` intent) instead of `ApplicationExecutor::delegate_task` worker channel.
+- **Kernel bridge**: `ExecutionQueue::admit_running_task`, `ApplicationExecutor::begin_service_backed_delegation`, `complete_service_backed_delegation` (admission + lifecycle events + fork resume).
+- **Provider-neutral delegator label**: replaced hardcoded `"coordinator"` with `GENERIC_DELEGATOR_AGENT = "delegator"`.
+- **Verified**: `cargo check -p macaca-kernel -p macaca-web`; `cargo test -p macaca-kernel --lib test_admit_running_task_respects_concurrency_limit`; `cargo test -p macaca-web delegated_task_dispatcher` 2/2.
+- **Remaining P1**: 2.2.3 FrameworkRunner sink; 2.3.2 execution_control Fork-Join; 2.6 coordination patch removal (0.3 audit replay gate); `suppress_executor_lifecycle` still written by delegate/agent_runner/loop_manager paths.

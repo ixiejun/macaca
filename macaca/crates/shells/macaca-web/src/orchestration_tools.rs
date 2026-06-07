@@ -3,12 +3,23 @@
 use std::sync::Arc;
 
 use futures::FutureExt;
-use macaca_kernel::{ApplicationExecutorRegistry, Kernel};
+use macaca_kernel::{ApplicationExecutorRegistry, Kernel, TaskContext};
+use macaca_runtime_host::ServiceRuntime;
 use macaca_tools::{
     CompositeToolSet, DelegateTaskTool, GetTaskResultTool, ListAgentsTool, Tool, ToolCatalog,
 };
 use tokio::sync::RwLock;
 use tracing::info;
+
+use crate::delegated_task_dispatcher::{
+    DelegateViaAgentServiceRequest, ServiceDelegatedTaskDispatcher,
+};
+
+/// Generic delegator label used when the orchestration tool does not receive an explicit caller agent.
+///
+/// This avoids hardcoding application role names (for example coordinator/planner personas) in the
+/// OS shell while still giving the executor queue an auditable `from_agent` dimension.
+const GENERIC_DELEGATOR_AGENT: &str = "delegator";
 
 /// Toolset and compatibility handles needed while AppState is being built.
 pub(crate) struct WebToolAssembly {
@@ -20,8 +31,10 @@ pub(crate) struct WebToolAssembly {
 /// Build built-in, skill, and orchestration tools without changing callback behavior.
 pub(crate) fn build_web_tools(
     kernel: Arc<Kernel>,
+    service_runtime: Arc<ServiceRuntime>,
     mut all_tools: Vec<Box<dyn Tool>>,
 ) -> WebToolAssembly {
+    let delegated_task_dispatcher = Arc::new(ServiceDelegatedTaskDispatcher::new(service_runtime));
     let executor_registry_ref: Arc<RwLock<Option<Arc<ApplicationExecutorRegistry>>>> =
         Arc::new(RwLock::new(None));
 
@@ -50,10 +63,12 @@ pub(crate) fn build_web_tools(
     let delegate_session_id: Arc<tokio::sync::RwLock<Option<String>>> =
         Arc::new(tokio::sync::RwLock::new(None));
     let registry_for_delegate = Arc::clone(&executor_registry_ref);
+    let dispatcher_for_delegate = Arc::clone(&delegated_task_dispatcher);
     let delegate_tool = DelegateTaskTool::empty_with_session_id(Arc::clone(&delegate_session_id))
         .with_callback(
             move |app_id, to_agent, prompt, priority, parallel, session_id| {
                 let registry = Arc::clone(&registry_for_delegate);
+                let dispatcher = Arc::clone(&dispatcher_for_delegate);
                 async move {
                     let registry_guard = registry.read().await;
                     let registry = registry_guard
@@ -106,22 +121,26 @@ pub(crate) fn build_web_tools(
                         .await
                         .map_err(|e| format!("Fork start failed: {}", e))?;
 
-                    let task_context = session_id.map(|sid| macaca_kernel::TaskContext {
+                    let task_context = session_id.map(|sid| TaskContext {
                         session_id: Some(sid),
                         artifacts: vec![],
                         env: std::collections::HashMap::new(),
                     });
-                    let task_id = executor
-                        .delegate_task(
-                            "coordinator",
-                            &to_agent,
-                            prompt,
-                            priority,
-                            parallel,
-                            task_context,
+                    let task_id = dispatcher
+                        .dispatch(
+                            executor,
+                            DelegateViaAgentServiceRequest {
+                                application_id: app_id.clone(),
+                                from_agent: GENERIC_DELEGATOR_AGENT.to_string(),
+                                to_agent: to_agent.clone(),
+                                prompt,
+                                priority,
+                                parallel,
+                                context: task_context,
+                            },
                         )
                         .await
-                        .map_err(|e| format!("Delegation failed: {}", e))?;
+                        .map_err(|e| format!("Service-backed delegation failed: {}", e))?;
 
                     fork_manager
                         .suspend_fork(fork_id, macaca_proto::TaskId(task_id.0))

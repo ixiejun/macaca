@@ -17,10 +17,14 @@ use macaca_context::{
 };
 use macaca_framework::tool::Toolkit;
 use macaca_proto::config::ContextConfig;
-use macaca_proto::{ApplicationId, TraceContext};
+use macaca_proto::{
+    ApplicationId, McpProbeCommand, McpRuntimeStatusView, McpToolPolicySnapshot, TraceContext,
+    MCP_PROBE_COMMAND, MCP_SERVICE_ID,
+};
 use macaca_runtime_host::{
     McpRuntimeFacade, McpRuntimeStatus, McpRuntimeStatusState, McpToolPolicy,
 };
+use macaca_sdk::SystemMcpClient;
 use macaca_skill::{
     SkillAliasResolveCommand, SkillAliasResolveResult, SkillGovernanceSnapshotCommand,
     SkillGovernanceSnapshotResult, SkillLifecycleState, SkillPolicy, SkillRuntimeFacade,
@@ -134,7 +138,97 @@ pub fn ready_mcp_server_ids(statuses: &[McpRuntimeStatus]) -> Vec<String> {
         .collect()
 }
 
+/// Build a capability catalog from service-owned MCP status views.
+///
+/// This Adapter keeps composer inputs provider-neutral while allowing the MCP
+/// service to own lifecycle/state semantics behind `service.mcp` commands.
+#[must_use]
+pub fn mcp_capability_catalog_from_status_views(
+    views: &[McpRuntimeStatusView],
+) -> McpCapabilityCatalog {
+    let servers: Vec<McpServerCapabilitySummary> = views
+        .iter()
+        .map(|view| McpServerCapabilitySummary {
+            server_id: view.server_id.clone(),
+            transport: view.transport.clone(),
+            lifecycle: format!("{:?}", view.lifecycle),
+            state: view.state.clone(),
+            exposed_tools: view.exposed_tools.clone(),
+        })
+        .collect();
+    let collisions = mcp_tool_collisions(&servers);
+    McpCapabilityCatalog {
+        servers,
+        collisions,
+    }
+}
+
+/// Return ready MCP server ids from service status views.
+#[must_use]
+pub fn ready_mcp_server_ids_from_views(views: &[McpRuntimeStatusView]) -> Vec<String> {
+    views
+        .iter()
+        .filter(|view| view.state.eq_ignore_ascii_case("ready"))
+        .map(|view| view.server_id.clone())
+        .collect()
+}
+
+/// Probe MCP capability inputs through the serviceized MCP client.
+///
+/// Preferred Route C path for composer assembly: decorators, policy gates, and
+/// audit evidence all flow through `service.mcp` instead of direct runtime
+/// facade reads on shell-owned `AppState` fields.
+pub async fn probe_mcp_capability_inputs_via_client(
+    mcp_client: &Arc<dyn SystemMcpClient>,
+    trace: TraceContext,
+    agent_name: &str,
+) -> (McpCapabilityCatalog, Vec<String>) {
+    tracing::info!(
+        trace_id = %trace.trace_id,
+        agent = %agent_name,
+        service_id = MCP_SERVICE_ID,
+        command = MCP_PROBE_COMMAND,
+        "probing MCP capability inputs through service client"
+    );
+    let command = match McpProbeCommand::new(trace, McpToolPolicySnapshot::default()) {
+        Ok(command) => command,
+        Err(error) => {
+            tracing::warn!(
+                agent = %agent_name,
+                error = %error,
+                "mcp probe command rejected; returning empty capability catalog"
+            );
+            return (McpCapabilityCatalog::default(), Vec::new());
+        }
+    };
+    match mcp_client.probe(command).await {
+        Ok(result) => {
+            let ready = ready_mcp_server_ids_from_views(&result.statuses);
+            let catalog = mcp_capability_catalog_from_status_views(&result.statuses);
+            tracing::info!(
+                agent = %agent_name,
+                servers = catalog.servers.len(),
+                ready_servers = ready.len(),
+                "mcp capability probe completed through service client"
+            );
+            (catalog, ready)
+        }
+        Err(error) => {
+            tracing::warn!(
+                agent = %agent_name,
+                error = %error,
+                "mcp service probe failed; returning empty capability catalog"
+            );
+            (McpCapabilityCatalog::default(), Vec::new())
+        }
+    }
+}
+
 /// Async probe facade used when constructing long-lived [`crate::context_reporting_model::ContextReportingChatModel`] instances.
+///
+/// Deprecated migration surface: new call sites must use
+/// [`probe_mcp_capability_inputs_via_client`] so MCP visibility flows through
+/// the service boundary instead of `AppState::mcp_runtime`.
 pub async fn probe_mcp_capability_inputs(
     facade: &Arc<McpRuntimeFacade>,
     policy: &McpToolPolicy,

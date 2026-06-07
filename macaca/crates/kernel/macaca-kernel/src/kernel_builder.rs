@@ -3,7 +3,8 @@
 use std::sync::Arc;
 
 use macaca_agent::{
-    AgentExecutionPort, LegacyAgentExecutionAdapter, UnavailableAgentExecutionPort,
+    AgentExecutionPort, LegacyAgentExecutionAdapter, SwappableAgentExecutionPort,
+    UnavailableAgentExecutionPort,
 };
 use macaca_proto::config::KernelConfig;
 
@@ -140,11 +141,12 @@ impl KernelBuilder {
         tracing::info!(
             max_agents = config.max_agents,
             scheduler_kind = ?self.scheduler_kind,
-            "building kernel through execution port"
+            "building kernel through swappable execution port"
         );
+        let swappable = SwappableAgentExecutionPort::new(self.execution_port);
         Kernel::from_parts(
             config,
-            self.execution_port,
+            swappable,
             SchedulerFactory::build(self.scheduler_kind),
         )
     }

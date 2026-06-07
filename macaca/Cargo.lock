@@ -1714,6 +1714,7 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.18",
  "toml",
+ "tracing",
  "uuid",
 ]
 
@@ -1741,6 +1742,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "dirs",
+ "macaca-agent",
  "macaca-app",
  "macaca-autonomy-evolution",
  "macaca-context",

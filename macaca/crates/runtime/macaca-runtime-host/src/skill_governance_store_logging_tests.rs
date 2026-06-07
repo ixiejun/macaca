@@ -23,19 +23,24 @@ use crate::skill_service_provider_state::SkillProviderGovernanceState;
 
 #[test]
 fn local_governance_store_logs_key_audit_nodes_with_structured_fields() {
+    // Governance append/replay logs live in the dedicated store adapter module after
+    // the Route C split; snapshot logs remain on the provider state module.
+    let governance_store_source = include_str!("skill_service_governance_store.rs");
     let state_source = include_str!("skill_service_provider_state.rs");
     let unavailable_source = include_str!("../../../services/macaca-skill/src/governance_store.rs");
 
-    assert!(state_source
+    assert!(governance_store_source
         .contains("skill governance event appended through local compatibility adapter"));
-    assert!(state_source.contains("event_kind = %governance_event_kind(&event.payload)"));
-    assert!(state_source.contains("provenance_action = ?event.provenance.action"));
-    assert!(state_source.contains("application_id = ?event.scope.application_id"));
-    assert!(state_source
+    assert!(governance_store_source.contains("event_kind = %governance_event_kind(&event.payload)"));
+    assert!(governance_store_source.contains("provenance_action = ?event.provenance.action"));
+    assert!(governance_store_source.contains("application_id = ?event.scope.application_id"));
+    assert!(governance_store_source
         .contains("skill governance read model replayed through local compatibility adapter"));
-    assert!(state_source.contains("records = read_model.records.len()"));
-    assert!(state_source.contains("provenance_events = read_model.provenance_events.len()"));
-    assert!(state_source.contains("aliases = read_model.aliases.len()"));
+    assert!(governance_store_source.contains("records = read_model.records.len()"));
+    assert!(
+        governance_store_source.contains("provenance_events = read_model.provenance_events.len()")
+    );
+    assert!(governance_store_source.contains("aliases = read_model.aliases.len()"));
     assert!(state_source
         .contains("skill governance snapshot built through local compatibility adapter"));
     assert!(state_source.contains("include_archived = include_archived"));

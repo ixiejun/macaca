@@ -205,6 +205,136 @@ fn forbidden_tokens() -> Vec<ForbiddenToken> {
             token: "\"service.heartbeat\"",
             rationale: "heartbeat service ids must flow through protocol DTOs, SDK clients, or runtime-host service registration",
         },
+        // P0 freeze: provider-compat and legacy execution adapters (tasks 1.1.1).
+        ForbiddenToken {
+            family: "provider-compat-construction",
+            token: "KernelProviderCompat",
+            rationale: "kernel provider bundles must be replaced by service-client AgentExecutionPort wiring",
+        },
+        ForbiddenToken {
+            family: "provider-compat-construction",
+            token: "LegacyLlmProvider",
+            rationale: "LLM access must flow through service.agent_execution or LLM service clients",
+        },
+        ForbiddenToken {
+            family: "provider-compat-construction",
+            token: "LegacyToolCatalog",
+            rationale: "tool catalogs must flow through driver/skill/MCP service snapshot commands",
+        },
+        ForbiddenToken {
+            family: "provider-compat-construction",
+            token: "LegacyAgentExecutionAdapter",
+            rationale: "agent execution must use ServiceClientAgentExecutionAdapter against service.agent_execution",
+        },
+        // P0 freeze: additional deprecated AppState direct fields (tasks 1.1.2).
+        ForbiddenToken {
+            family: "web-direct-runtime-field",
+            token: "state.llm",
+            rationale: "Web must use the LLM service client instead of direct provider handles",
+        },
+        ForbiddenToken {
+            family: "web-direct-runtime-field",
+            token: "state.router",
+            rationale: "Web must use service-backed model routing instead of direct router handles",
+        },
+        ForbiddenToken {
+            family: "web-direct-runtime-field",
+            token: "state.memory_runtime",
+            rationale: "Web must use memory/context service clients instead of runtime internals",
+        },
+        ForbiddenToken {
+            family: "web-direct-runtime-field",
+            token: "state.driver_registry",
+            rationale: "Web must use the driver service client instead of registry internals",
+        },
+        ForbiddenToken {
+            family: "web-direct-runtime-field",
+            token: "state.llm_client",
+            rationale: "Web must use focused SDK LLM clients instead of shell-owned provider bridges",
+        },
+        // P0 freeze: direct driver/MCP runtime catalog reads (tasks 1.1.4).
+        ForbiddenToken {
+            family: "direct-runtime-catalog-read",
+            token: "collect_tools()",
+            rationale: "tool catalogs must be fetched through driver service snapshot commands",
+        },
+        ForbiddenToken {
+            family: "direct-runtime-catalog-read",
+            token: ".definitions().await",
+            rationale: "MCP definitions must be fetched through MCP service snapshot commands",
+        },
+        // P0 freeze: kernel non-kernel modules before P2 eviction (tasks 1.1.6).
+        ForbiddenToken {
+            family: "kernel-non-kernel-module",
+            token: "macaca_kernel::web3",
+            rationale: "Web3 must be accessed through optional module or web3 service providers",
+        },
+        ForbiddenToken {
+            family: "kernel-non-kernel-module",
+            token: "macaca_kernel::evm",
+            rationale: "EVM must be accessed through optional module or EVM service providers",
+        },
+        ForbiddenToken {
+            family: "kernel-non-kernel-module",
+            token: "macaca_kernel::a2a",
+            rationale: "A2A must be accessed through payment/A2A service providers",
+        },
+        ForbiddenToken {
+            family: "kernel-non-kernel-module",
+            token: "macaca_kernel::payment_policy",
+            rationale: "payment policy must be owned by payment service providers",
+        },
+        ForbiddenToken {
+            family: "kernel-non-kernel-module",
+            token: "kernel::web3",
+            rationale: "kernel must not grow new Web3 module references",
+        },
+        ForbiddenToken {
+            family: "kernel-non-kernel-module",
+            token: "kernel::evm",
+            rationale: "kernel must not grow new EVM module references",
+        },
+        ForbiddenToken {
+            family: "kernel-non-kernel-module",
+            token: "kernel::a2a",
+            rationale: "kernel must not grow new A2A module references",
+        },
+        ForbiddenToken {
+            family: "kernel-non-kernel-module",
+            token: "kernel::payment_policy",
+            rationale: "kernel must not grow new payment policy references",
+        },
+        // P0 freeze: multi-path coordination patches (tasks 1.1.7).
+        ForbiddenToken {
+            family: "multi-path-coordination-patch",
+            token: "suppress_executor_lifecycle",
+            rationale: "single execution owner makes lifecycle suppression patches unnecessary",
+        },
+        ForbiddenToken {
+            family: "multi-path-coordination-patch",
+            token: "legacy_chat_main_thread_goal_pause",
+            rationale: "execution-control policy must come from manifest projection, not shell patches",
+        },
+        ForbiddenToken {
+            family: "multi-path-coordination-patch",
+            token: "legacy_unmarked",
+            rationale: "hosted execution must not grow additional legacy authority markers",
+        },
+        ForbiddenToken {
+            family: "multi-path-coordination-patch",
+            token: "non_authoritative",
+            rationale: "hosted execution must not grow non-authoritative bypass branches",
+        },
+        ForbiddenToken {
+            family: "multi-path-coordination-patch",
+            token: "TaskGraphOwner::TaskServiceCompatibility",
+            rationale: "task graph ownership must converge on application_execution authority only",
+        },
+        ForbiddenToken {
+            family: "multi-path-coordination-patch",
+            token: "TaskGraphOwner::DiagnosticOnly",
+            rationale: "diagnostic-only graph owners must not become new execution bypasses",
+        },
     ]
 }
 
@@ -348,6 +478,42 @@ fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> bool
                 || relative
                     .starts_with("crates/runtime/macaca-runtime-host/src/autonomy_supervisor/")
         }
+        "provider-compat-construction" => {
+            relative == "crates/kernel/macaca-kernel/src/provider_compat.rs"
+                || relative == "crates/kernel/macaca-kernel/src/kernel_builder.rs"
+                || relative == "crates/kernel/macaca-kernel/src/kernel.rs"
+                || relative == "crates/kernel/macaca-kernel/src/lib.rs"
+                || relative == "crates/application/macaca-agent/src/execution.rs"
+                || relative == "crates/application/macaca-agent/src/lib.rs"
+                || relative == "crates/application/macaca-app/src/runtime.rs"
+                || relative == "crates/application/macaca-app/src/workflow.rs"
+        }
+        "direct-runtime-catalog-read" => {
+            relative.starts_with("crates/services/macaca-driver/src/")
+                || relative == "crates/runtime/macaca-runtime-host/src/driver_service_provider.rs"
+                || relative == "crates/runtime/macaca-runtime-host/src/mcp_service_provider.rs"
+                || relative.starts_with("crates/runtime/macaca-runtime-host/src/mcp_runtime.rs")
+                || relative.starts_with("crates/services/macaca-tools/src/")
+                || relative == "crates/shells/macaca-web/src/skill_mcp.rs"
+        }
+        "kernel-non-kernel-module" => relative.starts_with("crates/kernel/macaca-kernel/src/"),
+        "multi-path-coordination-patch" => matches!(
+            relative,
+            "crates/runtime/macaca-runtime-host/src/application_execution_hosted.rs"
+                | "crates/runtime/macaca-runtime-host/src/application_execution_hosted_tests.rs"
+                | "crates/runtime/macaca-runtime-host/src/wasm_runtime_provider/host_import_bridge.rs"
+                // P1.2 composed execution backend — patches removed in task 2.6 after audit replay gate.
+                | "crates/runtime/macaca-runtime-host/src/agent_execution_orchestration.rs"
+                | "crates/shells/macaca-web/src/web_agent_execution_adapters.rs"
+                | "crates/shells/macaca-web/src/agent_execution_backend.rs"
+                | "crates/shells/macaca-web/src/agent_execution_backend/tests.rs"
+                | "crates/shells/macaca-web/src/agent_runner.rs"
+                | "crates/shells/macaca-web/src/loop_manager.rs"
+                | "crates/services/macaca-task/src/runtime.rs"
+                | "crates/services/macaca-task/src/events.rs"
+                | "crates/foundation/macaca-proto/src/types.rs"
+                | "crates/foundation/macaca-proto/src/application_execution_tests.rs"
+        ),
         _ => false,
     }
 }

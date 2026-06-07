@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use macaca_agent::AgentExecutionPort;
+use macaca_agent::{AgentExecutionPort, SwappableAgentExecutionPort};
 use macaca_proto::config::KernelConfig;
 use macaca_proto::{
     AgentActivity, AgentId, AgentManifest, AgentOutput, AgentState, MacacaError, MacacaResult,
@@ -17,18 +17,19 @@ pub struct Kernel {
     registry: AgentRegistry,
     scheduler: Box<dyn Scheduler>,
     status_tracker: AgentStatusTracker,
-    execution_port: Arc<dyn AgentExecutionPort>,
+    /// Stable swappable port identity used by composition roots during bootstrap.
+    execution_port: Arc<SwappableAgentExecutionPort>,
 }
 
 impl Kernel {
     pub(crate) fn from_parts(
         config: KernelConfig,
-        execution_port: Arc<dyn AgentExecutionPort>,
+        execution_port: Arc<SwappableAgentExecutionPort>,
         scheduler: Box<dyn Scheduler>,
     ) -> Self {
         tracing::info!(
             max_agents = config.max_agents,
-            "kernel created with provider-neutral execution port"
+            "kernel created with swappable provider-neutral execution port"
         );
         Self {
             registry: AgentRegistry::new(config.max_agents),
@@ -36,6 +37,19 @@ impl Kernel {
             status_tracker: AgentStatusTracker::new(),
             execution_port,
         }
+    }
+
+    /// Replace the active execution port after `service.agent_execution` is wired.
+    ///
+    /// Bootstrap hosts may seed the kernel with a legacy adapter for agent
+    /// registration, then hot-swap to `ServiceClientAgentExecutionAdapter` once
+    /// the runtime-host service provider is registered and started.
+    pub async fn replace_execution_port(&self, port: Arc<dyn AgentExecutionPort>) {
+        tracing::info!(
+            service_id = "service.agent_execution",
+            "kernel execution port hot-swap requested"
+        );
+        self.execution_port.replace(port).await;
     }
 
     /// Create a new kernel with the given configuration.

@@ -1,7 +1,7 @@
 //! Runtime-host provider for the Route C Payment Service.
 //!
 //! The provider is a Mediator over provider-neutral A2A contracts, a payment
-//! adapter Strategy, the kernel payment policy Strategy, payment-store
+//! adapter Strategy, a provider-neutral payment policy Strategy, payment-store
 //! Mementos, and trace/audit-friendly logs. It intentionally does not own
 //! Store, Entitlement, optional chain modules, wallet, gateway, or application orchestration
 //! semantics. Future payment providers can replace the adapter without
@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use chrono::Utc;
-use macaca_kernel::{DefaultPaymentPolicyEngine, PaymentPolicyEngine, SystemService};
+use macaca_kernel::SystemService;
 use macaca_persist::{PaymentStateTransition, PaymentStore};
 use macaca_proto::{
     A2AError, CleanupPolicy, KernelServiceId, PaymentIntent, PaymentIntentApproveCommand,
@@ -33,6 +33,7 @@ use crate::payment_admission::{
     PaymentAmountSpec, PaymentRedactionSpec, PaymentScopeSpec, PaymentTraceSpec,
     PaymentTransitionSpec,
 };
+use crate::payment_policy::{DefaultPaymentPolicyEngine, PaymentPolicyEngine};
 use crate::{LocalSimulatedPaymentAdapter, PaymentAdapterStrategy};
 
 /// Payment Service provider hosted by `ServiceRuntime`.

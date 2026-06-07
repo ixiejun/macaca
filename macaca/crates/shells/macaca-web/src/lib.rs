@@ -34,6 +34,7 @@ mod context_message_codec;
 mod context_report_events;
 mod context_reporting_memory;
 mod context_reporting_model;
+mod delegated_task_dispatcher;
 pub mod event_persistence;
 mod external_context_adapter;
 pub mod framework_runner;
@@ -73,6 +74,7 @@ pub mod tool_routes;
 pub mod trace_events;
 mod wasm_orchestration_backend;
 pub mod web3_status;
+mod web_agent_execution_adapters;
 pub mod workbench_routes;
 pub mod workspace;
 mod workspace_knowledge_digest_capability;
@@ -96,12 +98,13 @@ use macaca_kernel::{
 use macaca_llm::{LlmProvider, LlmRouter};
 use macaca_persist::RedbStore;
 use macaca_proto::config::{AutonomyConfig, KernelConfig, MacacaConfig};
-use macaca_proto::{ApplicationStartCommand, KernelServiceId, MacacaResult, TraceContext};
+use macaca_proto::{
+    ApplicationId, ApplicationStartCommand, KernelServiceId, MacacaResult, TraceContext,
+};
 use macaca_skill::{ExecutableSkillToolSet, SkillCatalog};
 use macaca_tools::{DefaultToolSet, Tool};
 
 use crate::agent_context_backend::WebAgentContextBackend;
-use crate::agent_execution_backend::WebAgentExecutionBackend;
 use crate::agent_runner::WebAgentRunner;
 pub use crate::bootstrap::{WebRuntimeFacade, WebServerBuilder};
 use crate::external_context_adapter::install_external_adapters_from_config;
@@ -110,6 +113,7 @@ use crate::persistence_adapter::RedbKernelPersistenceAdapter;
 use crate::skill_self_evolution_execution_observer::SkillSelfEvolutionObservedAgentExecutionBackend;
 use crate::state::{AppConfig, AppState, LoopState, PersistenceState, SessionState};
 use crate::wasm_orchestration_backend::WebApplicationOrchestrationBackend;
+use crate::web_agent_execution_adapters::build_composed_web_agent_execution_backend;
 
 /// Start the Macaca OS web server.
 #[deprecated(note = "Use WebServerBuilder::new().port(port).serve() instead")]
@@ -473,7 +477,8 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
     }
 
     // 8. Initialize orchestration tools.
-    let tool_assembly = build_web_tools(Arc::clone(&kernel), all_tools);
+    let tool_assembly =
+        build_web_tools(Arc::clone(&kernel), Arc::clone(&service_runtime), all_tools);
     let tools = tool_assembly.tools;
     let executor_registry_ref = tool_assembly.executor_registry_ref;
     let delegate_session_id = tool_assembly.delegate_session_id;
@@ -1130,7 +1135,7 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
                     Arc::new(
                         macaca_runtime_host::AgentExecutionSystemServiceProvider::new(Arc::new(
                             SkillSelfEvolutionObservedAgentExecutionBackend::new(
-                                Arc::new(WebAgentExecutionBackend::new(
+                                Arc::new(build_composed_web_agent_execution_backend(
                                     Arc::clone(&state),
                                     Arc::clone(&service_runtime),
                                 )),
@@ -1151,6 +1156,19 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
         )
         .await
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
+
+    // Hot-swap kernel execution onto the unified service path now that
+    // `service.agent_execution` is registered and backed by ComposedAgentExecutionBackend.
+    macaca_runtime_host::wire_kernel_to_agent_execution_service(
+        kernel.as_ref(),
+        Arc::clone(&service_runtime),
+        ApplicationId::from_name("host-kernel-execution"),
+    )
+    .await;
+    info!(
+        service_id = macaca_proto::AGENT_EXECUTION_SERVICE_ID,
+        "Kernel execution port wired to service.agent_execution"
+    );
 
     // 10b. Register all started apps to the executor registry and create workspaces
     {

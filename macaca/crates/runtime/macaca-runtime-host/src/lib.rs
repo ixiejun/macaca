@@ -13,6 +13,9 @@
 //! registration layered on top.
 
 pub mod agent_context_service_provider;
+pub mod agent_execution_dispatch;
+pub mod agent_execution_orchestration;
+pub mod agent_execution_ports;
 pub mod agent_execution_service_provider;
 pub(crate) mod app_protocol_service_commands;
 pub mod app_protocol_service_provider;
@@ -44,6 +47,7 @@ pub mod autonomy_service_provider;
 pub mod autonomy_supervisor;
 pub mod code_intelligence_service_provider;
 pub mod compat;
+pub mod composed_agent_execution_backend;
 pub(crate) mod config_service_commands;
 pub mod config_service_provider;
 pub mod context_service_provider;
@@ -87,6 +91,7 @@ pub mod memory_service_provider;
 pub mod package;
 pub mod payment_adapter;
 pub mod payment_admission;
+pub mod payment_policy;
 pub mod payment_service_provider;
 pub mod plugin;
 pub mod plugin_capability;
@@ -249,6 +254,23 @@ mod tool_service_planning_tests;
 pub use agent_context_service_provider::{
     agent_context_service_descriptor, AgentContextBackend, AgentContextSystemServiceProvider,
 };
+pub use agent_execution_dispatch::{
+    kernel_service_client_compat_from_agent_execution_service, service_client_execution_port,
+    wire_kernel_to_agent_execution_service, ServiceRuntimeAgentExecutionDispatch,
+};
+pub use agent_execution_orchestration::{
+    build_agent_context_snapshot_via_service, execution_control_execution_id,
+    execution_control_scope, extract_single_shell_fence, failed_execution_result,
+    heartbeat_exact_shell_contract, legacy_chat_main_thread_execution_control_policy,
+    resolve_execution_control_policy_local, runtime_agent_max_iters, runtime_agent_tool_choice,
+    should_emit_executor_lifecycle, should_skip_heartbeat_without_source,
+    structured_execution_context, user_prompt_with_context,
+    ARTIFACT_BACKED_RUNTIME_AGENT_MAX_ITERS, DEFAULT_RUNTIME_AGENT_MAX_ITERS,
+};
+pub use agent_execution_ports::{
+    AgentExecutionEvidenceCollector, AgentExecutionHostAdapter, AgentExecutionOutputHasher,
+    FrameworkRuntimeAgentPort, OpaqueExecutionControlHandle,
+};
 pub use agent_execution_service_provider::{
     agent_execution_service_descriptor, AgentExecutionBackend, AgentExecutionSystemServiceProvider,
 };
@@ -310,6 +332,7 @@ pub use code_intelligence_service_provider::{
     bootstrap_local_code_intelligence_service, CodeIntelligenceProvider,
     CodeIntelligenceSystemServiceProvider, LocalCodeIntelligenceProvider,
 };
+pub use composed_agent_execution_backend::ComposedAgentExecutionBackend;
 pub use config_service_provider::{bootstrap_local_config_service, ConfigSystemServiceProvider};
 pub use context_service_provider::ContextSystemServiceProvider;
 pub use diagnostics_service_provider::{
@@ -367,6 +390,7 @@ pub use mcp_service_provider::{mcp_service_descriptor, McpSystemServiceProvider}
 pub use memory_service_provider::MemorySystemServiceProvider;
 pub use package::{runtime_host_mcp_package_descriptor, RuntimeHostPackageRequirement};
 pub use payment_adapter::{LocalSimulatedPaymentAdapter, PaymentAdapterStrategy};
+pub use payment_policy::{DefaultPaymentPolicyEngine, PaymentPolicyDecision, PaymentPolicyEngine};
 pub use payment_service_provider::{payment_service_descriptor, PaymentSystemServiceProvider};
 pub use plugin::{
     plugin_failure_event, DescriptorPluginHost, PluginHost, PluginHostFactory,

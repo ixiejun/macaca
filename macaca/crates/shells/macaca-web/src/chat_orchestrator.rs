@@ -23,8 +23,8 @@ use macaca_proto::{
     ApplicationHostCommand, ApplicationHostCommandStatus, ApplicationHostDispatchServiceCommand,
     ApplicationId, ApplicationImport, ApplicationMetadataQueryCommand, ApplicationServiceScope,
     ApplicationSessionStartCommand, ApplicationSessionStopCommand, ApplicationStatusCommand,
-    KernelServiceId, PackageRuntimeKind, ServiceBusSource, TraceContext,
-    AGENT_EXECUTION_SERVICE_ID,
+    KernelServiceId, McpCleanupCommand, McpServiceScope, PackageRuntimeKind, ServiceBusSource,
+    TraceContext, AGENT_EXECUTION_SERVICE_ID,
 };
 
 use crate::event_persistence::spawn_session_event_collector;
@@ -1563,10 +1563,25 @@ pub(crate) async fn post_chat_v2(
             status,
         )
         .await;
-        let _ = state_for_task
-            .mcp_runtime
-            .cleanup_session(&session_key_for_task)
-            .await;
+        // Route C: session teardown must flow through `service.mcp` so the shell
+        // does not retain a second owner of MCP subprocess leases.
+        let cleanup_command = McpCleanupCommand {
+            trace: TraceContext::new(format!("chat-session-mcp-cleanup:{session_key_for_task}")),
+            scope: McpServiceScope::agent_session(
+                app_id,
+                session_key_for_task.clone(),
+                entry_agent_name.clone(),
+            )
+            .unwrap_or_default(),
+        };
+        if let Err(error) = state_for_task.mcp_client.cleanup(cleanup_command).await {
+            tracing::warn!(
+                session_id = %session_key_for_task,
+                agent = %entry_agent_name,
+                error = %error,
+                "mcp service cleanup failed during chat session teardown"
+            );
+        }
         {
             let mut sessions = state_for_task.sessions.active_sessions.write().await;
             sessions.remove(&session_key_for_task);

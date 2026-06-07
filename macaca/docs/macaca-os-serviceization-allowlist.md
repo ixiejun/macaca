@@ -113,3 +113,22 @@ The repository must have and continuously strengthen dependency-boundary tests. 
 - Workspace crates must belong to clear layers.
 
 A gate failure is an architecture violation, not test noise.
+
+## Active migration allowlist (Route C gate input)
+
+Rust source of truth: `macaca/crates/tests/macaca-integration-tests/tests/route_c_dependency_boundaries/allowlist.rs`.
+
+| Rule | From | To | Owner track | Current caller | Phase | Replacement | Expiry condition | Validation |
+|------|------|-----|-------------|----------------|-------|-------------|------------------|------------|
+| kernel-no-provider-deps | macaca-kernel | macaca-driver | kernel provider compatibility | dev-dep only in Cargo.toml; legacy tests | S6 | Driver Service facade | `cargo metadata` shows no normal edge kernel→driver | `cargo metadata --no-deps --format-version 1` |
+| kernel-no-provider-deps | macaca-kernel | macaca-gateway | kernel provider compatibility | dev-dep only in Cargo.toml | S8 | Gateway Service facade | no normal edge kernel→gateway | same |
+| kernel-no-provider-deps | macaca-kernel | macaca-skill | kernel provider compatibility | dev-dep only in Cargo.toml | S6 | Skill/MCP Service facade | no normal edge kernel→skill | same |
+| presentation-no-provider-construction-hub | macaca-web | macaca-driver | Web thin shell | AppState + framework_toolkit | S6 | Driver Service client | web Cargo.toml drops macaca-driver | same |
+| presentation-no-provider-construction-hub | macaca-web | macaca-llm | Web thin shell | service-client migration | S5 | LLM Service client | web uses SystemLlmClient only | same |
+| presentation-no-provider-construction-hub | macaca-web | macaca-memory | Web thin shell | memory/context compat | S5 | Memory/Context Service client | web uses SystemMemoryClient only | same |
+| presentation-no-provider-construction-hub | macaca-web | macaca-persist | Web thin shell | shell persistence migration | S1/S12 | Persistence Service client | web uses persistence service client | same |
+| presentation-no-provider-construction-hub | macaca-web | macaca-skill | Web thin shell | skill/MCP compat | S6 | Skill/MCP Service client | web uses SystemSkillClient only | same |
+| presentation-no-provider-construction-hub | macaca-web | macaca-task | Web thin shell | session loop migration | S4 | Task Service client | loop_manager uses task service client | same |
+| presentation-no-provider-construction-hub | macaca-web | macaca-tools | Web thin shell | toolkit migration | S6 | Tool/Skill Service client | framework_toolkit uses service snapshots | same |
+
+Terminal target: **0 rows** (P5 gate).

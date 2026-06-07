@@ -12,7 +12,7 @@ use std::sync::{Arc, RwLock};
 use async_trait::async_trait;
 use tracing::{info, warn};
 
-use macaca_proto::{ApplicationId, TodoGoal, TodoItem, TraceContext};
+use macaca_proto::{ApplicationId, TodoGoal, TodoItem, TodoStatus, TraceContext};
 
 use crate::commands::{
     ClaimTaskCommand, CreateGoalCommand, CreateTaskAssignmentCommand, QueryTaskBoardCommand,
@@ -233,6 +233,33 @@ where
             ));
         }
 
+        if command.graph_owner.is_application_execution_authoritative() {
+            info!(
+                app_id = %command.app_id.0,
+                session_id = %command.session_id,
+                graph_id = normalized_graph_id.unwrap_or("none"),
+                trace_id = command
+                    .trace
+                    .as_ref()
+                    .map(|trace| trace.trace_id.as_str())
+                    .unwrap_or("none"),
+                "authoritative task graph admitted"
+            );
+        } else {
+            info!(
+                app_id = %command.app_id.0,
+                session_id = %command.session_id,
+                graph_owner = %command.graph_owner.as_str(),
+                graph_id = normalized_graph_id.unwrap_or("none"),
+                trace_id = command
+                    .trace
+                    .as_ref()
+                    .map(|trace| trace.trace_id.as_str())
+                    .unwrap_or("none"),
+                "compatibility task graph admitted"
+            );
+        }
+
         Ok(())
     }
 
@@ -349,6 +376,20 @@ where
         );
         let task = board.claim_task(&command.task_id).await;
         if let Some(task) = &task {
+            info!(
+                app_id = %command.app_id.0,
+                session_id = %command.session_id,
+                agent = %command.agent_name,
+                task_id = %task.id,
+                graph_owner = %task.graph_owner.as_str(),
+                graph_id = task.graph_id.as_deref().unwrap_or("none"),
+                trace_id = command
+                    .trace
+                    .as_ref()
+                    .map(|trace| trace.trace_id.as_str())
+                    .unwrap_or("none"),
+                "task service task claimed"
+            );
             self.emit(TaskServiceEvent::new(
                 command.app_id.clone(),
                 Some(command.session_id.clone()),
@@ -360,6 +401,8 @@ where
                     "task_id": task.id.to_string(),
                     "agent": task.assigned_agent,
                     "status": format!("{:?}", task.status),
+                    "graph_owner": task.graph_owner.as_str(),
+                    "graph_id": task.graph_id.as_deref(),
                 }),
             ))
             .await;
@@ -387,6 +430,18 @@ where
         );
         let started = board.mark_task_in_progress(&command.task_id).await;
         if started {
+            info!(
+                app_id = %command.app_id.0,
+                session_id = %command.session_id,
+                agent = %command.agent_name,
+                task_id = %command.task_id,
+                trace_id = command
+                    .trace
+                    .as_ref()
+                    .map(|trace| trace.trace_id.as_str())
+                    .unwrap_or("none"),
+                "task service task started"
+            );
             self.emit(TaskServiceEvent::new(
                 command.app_id.clone(),
                 Some(command.session_id.clone()),
@@ -418,6 +473,19 @@ where
             .submit_task_for_review(&command.task_id, command.summary.clone())
             .await;
         if submitted {
+            info!(
+                app_id = %command.app_id.0,
+                session_id = %command.session_id,
+                agent = %command.agent_name,
+                task_id = %command.task_id,
+                summary_len = command.summary.len(),
+                trace_id = command
+                    .trace
+                    .as_ref()
+                    .map(|trace| trace.trace_id.as_str())
+                    .unwrap_or("none"),
+                "task service task submitted for review"
+            );
             self.emit(TaskServiceEvent::new(
                 command.app_id.clone(),
                 Some(command.session_id.clone()),
@@ -454,6 +522,33 @@ where
             .await;
 
         if reviewed {
+            info!(
+                app_id = %command.app_id.0,
+                session_id = ?command.session_id,
+                agent = %command.agent_name,
+                task_id = %command.task_id,
+                passed = command.result.passed,
+                trace_id = command
+                    .trace
+                    .as_ref()
+                    .map(|trace| trace.trace_id.as_str())
+                    .unwrap_or("none"),
+                "task service task reviewed"
+            );
+            if !command.result.passed {
+                warn!(
+                    app_id = %command.app_id.0,
+                    session_id = ?command.session_id,
+                    agent = %command.agent_name,
+                    task_id = %command.task_id,
+                    trace_id = command
+                        .trace
+                        .as_ref()
+                        .map(|trace| trace.trace_id.as_str())
+                        .unwrap_or("none"),
+                    "task service task review failed"
+                );
+            }
             self.emit(TaskServiceEvent::new(
                 command.app_id.clone(),
                 command.session_id.clone(),
@@ -524,6 +619,32 @@ where
 
     async fn refresh_snapshot(&self, app_id: &ApplicationId, session_id: Option<&str>) {
         let snapshot = self.build_snapshot(app_id, session_id).await;
+        let authoritative_tasks = snapshot
+            .tasks
+            .iter()
+            .filter(|task| task.graph_owner.is_application_execution_authoritative())
+            .collect::<Vec<_>>();
+        let authoritative_completed = authoritative_tasks
+            .iter()
+            .filter(|task| task.status == TodoStatus::Completed)
+            .count();
+        let authoritative_failed = authoritative_tasks
+            .iter()
+            .filter(|task| task.status == TodoStatus::Failed)
+            .count();
+        let authoritative_blocked = authoritative_tasks
+            .iter()
+            .filter(|task| task.status == TodoStatus::Blocked)
+            .count();
+        info!(
+            app_id = %app_id.0,
+            session_id = session_id.unwrap_or("none"),
+            authoritative_tasks = authoritative_tasks.len(),
+            authoritative_completed,
+            authoritative_failed,
+            authoritative_blocked,
+            "task graph terminal projected"
+        );
         let mut snapshots = self.snapshots.write().unwrap();
         snapshots.insert(
             (app_id.to_string(), session_id.map(str::to_string)),

@@ -16,7 +16,8 @@ pub mod kernel;
 pub mod kernel_builder;
 pub mod logging;
 pub mod orchestrator;
-pub mod payment_policy;
+// Keep payment policy internal while root-level type re-exports remain stable.
+mod payment_policy;
 pub mod persistence;
 pub mod plugin_registry;
 pub mod policy;

@@ -1525,10 +1525,16 @@ impl WebTracedAgentFactory {
                 }
             },
         );
-        let mcp_policy = macaca_runtime_host::McpToolPolicy::default();
-        let (mcp_cat, ready) =
-            crate::capability_catalog::probe_mcp_capability_inputs(&state.mcp_runtime, &mcp_policy)
-                .await;
+        let mcp_trace = macaca_proto::TraceContext::new(format!(
+            "web-framework-mcp-capability-{}",
+            request.identity.agent_name
+        ));
+        let (mcp_cat, ready) = crate::capability_catalog::probe_mcp_capability_inputs_via_client(
+            &state.mcp_client,
+            mcp_trace,
+            &request.identity.agent_name,
+        )
+        .await;
         let rt_cap = Arc::new(
             crate::capability_catalog::runtime_tool_capability_catalog_from_toolkit(toolkit),
         );

@@ -1,0 +1,428 @@
+//! Web adapters for runtime-host `ComposedAgentExecutionBackend`.
+//!
+//! The Web shell injects framework construction and session-local lifecycle
+//! wiring through these ports so `service.agent_execution` semantics remain
+//! owned by runtime-host per Route C governance.
+
+use std::collections::BTreeMap;
+use std::sync::Arc;
+
+use async_trait::async_trait;
+use macaca_framework::agent::Agent;
+use macaca_framework::message::Msg;
+use macaca_kernel::executor::{ApplicationExecutor, ExecutorEventFactory};
+use macaca_proto::{
+    AgentActivity, AgentContextSnapshot, AgentExecutionCommand, AgentExecutionEvent,
+    ExecutionControlCommandResult, ExecutionControlPolicy,
+    ExecutionControlRegisterExecutionCommand, ExecutionControlResolutionStatus,
+    ExecutionControlResolvePolicyCommand, ExecutionControlResolvedPolicy, KernelServiceId,
+    ServiceBusSource, ServiceError, ServiceResult, TaskId, EXECUTION_CONTROL_SERVICE_ID,
+};
+use macaca_runtime_host::{
+    execution_control_execution_id, execution_control_scope,
+    legacy_chat_main_thread_execution_control_policy, AgentExecutionEvidenceCollector,
+    AgentExecutionHostAdapter, AgentExecutionOutputHasher, FrameworkRuntimeAgentPort,
+    OpaqueExecutionControlHandle,
+};
+use tokio::sync::mpsc;
+
+use crate::agent_execution_evidence::{observed_agent_execution_events, stable_agent_output_hash};
+use crate::application_execution_agent_event_bridge::ApplicationExecutionAgentEventMirror;
+use crate::framework_runner::{FrameworkRunner, RuntimeExecutionControl};
+use crate::runtime_event_bridge::emit_execution_control_events;
+use crate::state::AppState;
+
+const WEB_AGENT_EXECUTION_BUS_SOURCE: &str = "macaca.web.agent_execution";
+
+/// Framework port that builds and runs ReAct agents through `FrameworkRunner`.
+pub(crate) struct WebFrameworkRuntimeAgentPort {
+    state: Arc<AppState>,
+}
+
+impl WebFrameworkRuntimeAgentPort {
+    pub(crate) fn new(state: Arc<AppState>) -> Self {
+        Self { state }
+    }
+}
+
+#[async_trait]
+impl FrameworkRuntimeAgentPort for WebFrameworkRuntimeAgentPort {
+    async fn run_react_agent(
+        &self,
+        _command: &AgentExecutionCommand,
+        context_snapshot: &AgentContextSnapshot,
+        agent_event_tx: mpsc::Sender<AgentExecutionEvent>,
+        execution_control: Option<OpaqueExecutionControlHandle>,
+        max_iters: usize,
+        tool_choice: Option<macaca_framework::model::ToolChoice>,
+        user_prompt: String,
+    ) -> Result<String, String> {
+        let runtime_control = execution_control.and_then(|handle| {
+            handle
+                .0
+                .downcast::<RuntimeExecutionControl>()
+                .ok()
+                .map(|arc| (*arc).clone())
+        });
+        let agent =
+            FrameworkRunner::build_runtime_agent_from_context_snapshot_with_execution_policy(
+                &self.state,
+                context_snapshot,
+                Some(agent_event_tx),
+                runtime_control,
+                max_iters,
+                tool_choice,
+            )
+            .await?;
+        let reply = agent
+            .reply(Msg::user("user", user_prompt))
+            .await
+            .map_err(|error| error.to_string())?;
+        Ok(reply.get_text())
+    }
+}
+
+/// Host port that wires Web session state, kernel lifecycle, and execution-control services.
+pub(crate) struct WebAgentExecutionHostAdapter {
+    state: Arc<AppState>,
+    service_runtime: Arc<macaca_runtime_host::ServiceRuntime>,
+}
+
+impl WebAgentExecutionHostAdapter {
+    pub(crate) fn new(
+        state: Arc<AppState>,
+        service_runtime: Arc<macaca_runtime_host::ServiceRuntime>,
+    ) -> Self {
+        Self {
+            state,
+            service_runtime,
+        }
+    }
+
+    async fn executor_for_app(
+        &self,
+        application_id: &macaca_proto::ApplicationId,
+    ) -> Option<Arc<ApplicationExecutor>> {
+        self.state.executor_registry.get(application_id).await
+    }
+
+    async fn update_kernel_agent_activity(
+        &self,
+        command: &AgentExecutionCommand,
+        activity: AgentActivity,
+    ) {
+        if let Some(manifest) = self
+            .state
+            .kernel
+            .get_agent_by_name(&command.target_agent)
+            .await
+        {
+            self.state
+                .kernel
+                .update_agent_activity(&manifest.id, activity)
+                .await;
+        } else {
+            tracing::warn!(
+                application_id = %command.application_id,
+                session_id = %command.session_id,
+                target_agent = %command.target_agent,
+                "agent execution could not update kernel activity because target agent is not registered"
+            );
+        }
+    }
+}
+
+#[async_trait]
+impl AgentExecutionHostAdapter for WebAgentExecutionHostAdapter {
+    async fn resolve_execution_control_policy(
+        &self,
+        command: &AgentExecutionCommand,
+    ) -> ServiceResult<ExecutionControlResolvedPolicy> {
+        let compat_policy = legacy_chat_main_thread_execution_control_policy(command);
+        let command_declared_policy =
+            command
+                .execution_control_override
+                .as_ref()
+                .map(|override_policy| {
+                    ExecutionControlPolicy::enabled(
+                        override_policy.triggers.clone(),
+                        override_policy.resume_sources.clone(),
+                        override_policy.checkpoint_mode.clone(),
+                    )
+                    .allow_command_overrides(true)
+                });
+        let app_policy = compat_policy.as_ref().or(command_declared_policy.as_ref());
+        let execution_id = execution_control_execution_id(command);
+        let scope = execution_control_scope(command, execution_id, WEB_AGENT_EXECUTION_BUS_SOURCE)?;
+        let service_command = ExecutionControlResolvePolicyCommand {
+            scope,
+            app_default: app_policy.cloned(),
+            command_override: command.execution_control_override.clone(),
+        }
+        .into_service_command()
+        .map_err(|error| ServiceError::AdapterFailure(error.to_string()))?;
+        let reply = self
+            .service_runtime
+            .call(
+                &KernelServiceId::new(EXECUTION_CONTROL_SERVICE_ID),
+                ServiceBusSource::new(WEB_AGENT_EXECUTION_BUS_SOURCE),
+                service_command,
+            )
+            .await
+            .map_err(|error| ServiceError::AdapterFailure(error.to_string()))?;
+        let output = reply.output.ok_or_else(|| {
+            ServiceError::AdapterFailure("execution control service returned no policy".into())
+        })?;
+        let mut resolution: ExecutionControlResolvedPolicy = serde_json::from_value(output)
+            .map_err(|error| {
+                ServiceError::AdapterFailure(format!(
+                    "execution control policy decode failed: {error}"
+                ))
+            })?;
+        if compat_policy.is_some() && resolution.status == ExecutionControlResolutionStatus::Enabled
+        {
+            resolution.metadata.insert(
+                "compatibility".into(),
+                "legacy_chat_main_thread_goal_pause".into(),
+            );
+        }
+        emit_execution_control_events(
+            &self.state,
+            &command.session_id,
+            WEB_AGENT_EXECUTION_BUS_SOURCE,
+            &resolution.events,
+        )
+        .await;
+        Ok(resolution)
+    }
+
+    async fn register_execution_control(
+        &self,
+        command: &AgentExecutionCommand,
+        policy: ExecutionControlResolvedPolicy,
+    ) -> ServiceResult<Option<(ExecutionControlPolicy, String)>> {
+        if policy.status != ExecutionControlResolutionStatus::Enabled {
+            return Ok(None);
+        }
+        let Some(enabled_policy) = policy.policy.clone() else {
+            return Ok(None);
+        };
+        let execution_id = execution_control_execution_id(command);
+        let scope = execution_control_scope(
+            command,
+            execution_id.clone(),
+            WEB_AGENT_EXECUTION_BUS_SOURCE,
+        )?;
+        let service_command = ExecutionControlRegisterExecutionCommand { scope, policy }
+            .into_service_command()
+            .map_err(|error| ServiceError::AdapterFailure(error.to_string()))?;
+        let reply = self
+            .service_runtime
+            .call(
+                &KernelServiceId::new(EXECUTION_CONTROL_SERVICE_ID),
+                ServiceBusSource::new(WEB_AGENT_EXECUTION_BUS_SOURCE),
+                service_command,
+            )
+            .await
+            .map_err(|error| ServiceError::AdapterFailure(error.to_string()))?;
+        if !reply.success {
+            return Err(ServiceError::AdapterFailure(format!(
+                "execution control service rejected registration: {}",
+                reply.status
+            )));
+        }
+        let output = reply.output.ok_or_else(|| {
+            ServiceError::AdapterFailure(
+                "execution control service returned no registration".into(),
+            )
+        })?;
+        let result: ExecutionControlCommandResult =
+            serde_json::from_value(output).map_err(|error| {
+                ServiceError::AdapterFailure(format!(
+                    "execution control registration decode failed: {error}"
+                ))
+            })?;
+        emit_execution_control_events(
+            &self.state,
+            &command.session_id,
+            WEB_AGENT_EXECUTION_BUS_SOURCE,
+            &result.events,
+        )
+        .await;
+        Ok(Some((enabled_policy, execution_id)))
+    }
+
+    async fn install_execution_control(
+        &self,
+        command: &AgentExecutionCommand,
+        policy: ExecutionControlPolicy,
+        execution_id: String,
+    ) -> Option<OpaqueExecutionControlHandle> {
+        if policy.triggers.is_empty() {
+            return None;
+        }
+        let (resume_tx, resume_rx) = mpsc::channel(4);
+        let mut sessions = self.state.sessions.active_sessions.write().await;
+        let session = match sessions.get_mut(&command.session_id) {
+            Some(session) => session,
+            None => {
+                tracing::warn!(
+                    session_id = %command.session_id,
+                    target_agent = %command.target_agent,
+                    "execution control requested without an active session"
+                );
+                return None;
+            }
+        };
+        session.resume_tx = resume_tx;
+        let control = RuntimeExecutionControl::new(
+            Arc::clone(&session.pause_signal),
+            resume_rx,
+            policy,
+            execution_id,
+        );
+        Some(OpaqueExecutionControlHandle(Arc::new(control)))
+    }
+
+    async fn on_run_started(
+        &self,
+        command: &AgentExecutionCommand,
+        task_id: TaskId,
+        emit_lifecycle: bool,
+    ) {
+        if emit_lifecycle {
+            if let Some(executor) = self.executor_for_app(&command.application_id).await {
+                let event_factory =
+                    ExecutorEventFactory::new(task_id, command.target_agent.clone());
+                executor.broadcast_event(event_factory.started());
+            }
+        }
+        if emit_lifecycle {
+            self.update_kernel_agent_activity(
+                command,
+                AgentActivity::Working {
+                    context: format!("Executing delegated task {}", task_id),
+                },
+            )
+            .await;
+        }
+    }
+
+    async fn on_run_completed(
+        &self,
+        command: &AgentExecutionCommand,
+        task_id: TaskId,
+        emit_lifecycle: bool,
+        output_preview: &str,
+    ) {
+        if emit_lifecycle {
+            if let Some(executor) = self.executor_for_app(&command.application_id).await {
+                let event_factory =
+                    ExecutorEventFactory::new(task_id, command.target_agent.clone());
+                let task_result = event_factory.success_result(output_preview.to_string());
+                executor.broadcast_event(event_factory.completed_with_result(task_result));
+            }
+        }
+        if emit_lifecycle {
+            self.update_kernel_agent_activity(command, AgentActivity::Idle)
+                .await;
+        }
+    }
+
+    async fn on_run_failed(
+        &self,
+        command: &AgentExecutionCommand,
+        task_id: TaskId,
+        emit_lifecycle: bool,
+        error: &str,
+    ) {
+        if emit_lifecycle {
+            if let Some(executor) = self.executor_for_app(&command.application_id).await {
+                let event_factory =
+                    ExecutorEventFactory::new(task_id, command.target_agent.clone());
+                executor.broadcast_event(event_factory.failed(error.to_string()));
+            }
+        }
+        if emit_lifecycle {
+            self.update_kernel_agent_activity(
+                command,
+                AgentActivity::Error {
+                    message: error.to_string(),
+                },
+            )
+            .await;
+        }
+    }
+
+    async fn observe_application_execution_requested(&self, command: &AgentExecutionCommand) {
+        let mirror = ApplicationExecutionAgentEventMirror::from_command(
+            self.state.system_facade.application_execution_client(),
+            command,
+        );
+        if let Some(mirror) = mirror.as_ref() {
+            mirror.observe_requested(command).await;
+        }
+    }
+
+    async fn create_evidence_observer(
+        &self,
+        command: &AgentExecutionCommand,
+        task_id: TaskId,
+    ) -> (
+        mpsc::Sender<AgentExecutionEvent>,
+        Box<dyn AgentExecutionEvidenceCollector>,
+    ) {
+        let expected_artifact_path = command
+            .metadata
+            .get("evidence.expected_artifact_path")
+            .map(String::as_str);
+        let application_execution_mirror = ApplicationExecutionAgentEventMirror::from_command(
+            self.state.system_facade.application_execution_client(),
+            command,
+        );
+        let executor = self.executor_for_app(&command.application_id).await;
+        let (tx, observer) = observed_agent_execution_events(
+            executor,
+            task_id,
+            command.target_agent.clone(),
+            expected_artifact_path,
+            application_execution_mirror,
+        );
+        struct WebEvidenceCollector {
+            inner: crate::agent_execution_evidence::AgentExecutionEvidenceObserver,
+        }
+        #[async_trait]
+        impl AgentExecutionEvidenceCollector for WebEvidenceCollector {
+            async fn finish(self: Box<Self>) -> BTreeMap<String, String> {
+                self.inner.finish().await
+            }
+        }
+        (tx, Box::new(WebEvidenceCollector { inner: observer }))
+    }
+}
+
+/// Web output hasher used for audit replay metadata.
+pub(crate) struct WebAgentExecutionOutputHasher;
+
+impl AgentExecutionOutputHasher for WebAgentExecutionOutputHasher {
+    fn stable_output_hash(&self, output: &serde_json::Value) -> String {
+        stable_agent_output_hash(output)
+    }
+}
+
+/// Build the Web-wired composed agent execution backend for service registration.
+pub(crate) fn build_composed_web_agent_execution_backend(
+    state: Arc<AppState>,
+    service_runtime: Arc<macaca_runtime_host::ServiceRuntime>,
+) -> macaca_runtime_host::ComposedAgentExecutionBackend {
+    macaca_runtime_host::ComposedAgentExecutionBackend::new(
+        service_runtime,
+        WEB_AGENT_EXECUTION_BUS_SOURCE,
+        Arc::new(WebAgentExecutionHostAdapter::new(
+            Arc::clone(&state),
+            Arc::clone(&state.service_runtime),
+        )),
+        Arc::new(WebFrameworkRuntimeAgentPort::new(state)),
+        Arc::new(WebAgentExecutionOutputHasher),
+    )
+}

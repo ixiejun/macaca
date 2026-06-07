@@ -16,7 +16,8 @@ pub use agent::Agent;
 pub use basic::{BasicAgent, BasicAgentBuilder};
 pub use capability::{AgentCapabilityNode, AgentCapabilitySet, CapabilitySource};
 pub use execution::{
-    AgentExecutionPort, LegacyAgentExecutionAdapter, UnavailableAgentExecutionPort,
+    AgentExecutionDispatch, AgentExecutionPort, LegacyAgentExecutionAdapter,
+    ServiceClientAgentExecutionAdapter, SwappableAgentExecutionPort, UnavailableAgentExecutionPort,
 };
 pub use lifecycle::{
     AgentLifecyclePolicy, AgentLifecycleTransition, AgentTransitionReason,

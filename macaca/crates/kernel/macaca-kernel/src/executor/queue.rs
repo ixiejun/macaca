@@ -188,6 +188,32 @@ impl ExecutionQueue {
         Ok(task_id)
     }
 
+    /// Admit a task directly into the running set for service-backed execution.
+    ///
+    /// Service-backed delegations bypass the worker dequeue loop but still need
+    /// queue visibility (`get_task_status`) and the same concurrency accounting
+    /// as worker-executed tasks.  Callers outside the kernel worker channel own
+    /// the actual agent execution and must publish completion through the
+    /// executor completion helpers.
+    pub async fn admit_running_task(&self, task: DelegatedTask) -> Result<TaskId, QueueError> {
+        let running_count = self.running.read().await.len();
+        if running_count >= self.max_parallel {
+            return Err(QueueError::ConcurrencyLimitReached {
+                running: running_count,
+                max_parallel: self.max_parallel,
+            });
+        }
+
+        let task_id = task.id;
+        self.running.write().await.insert(task_id, task);
+        tracing::info!(
+            task_id = %task_id,
+            running = running_count + 1,
+            "Task admitted for service-backed execution"
+        );
+        Ok(task_id)
+    }
+
     /// Try to dequeue the next highest priority task.
     ///
     /// Returns `None` if:
@@ -428,6 +454,9 @@ pub enum QueueError {
 
     #[error("Task not found: {0}")]
     TaskNotFound(TaskId),
+
+    #[error("Concurrency limit reached: {running}/{max_parallel}")]
+    ConcurrencyLimitReached { running: usize, max_parallel: usize },
 }
 
 #[cfg(test)]
@@ -489,6 +518,17 @@ mod tests {
 
         // Third should not dequeue due to concurrency limit
         assert!(queue.dequeue().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_admit_running_task_respects_concurrency_limit() {
+        let queue = ExecutionQueue::new(1, 10);
+        queue.admit_running_task(create_test_task(5)).await.unwrap();
+        let second = queue.admit_running_task(create_test_task(3)).await;
+        assert!(matches!(
+            second,
+            Err(QueueError::ConcurrencyLimitReached { .. })
+        ));
     }
 
     #[tokio::test]

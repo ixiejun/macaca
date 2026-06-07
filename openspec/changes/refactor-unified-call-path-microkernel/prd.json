@@ -1,0 +1,74 @@
+{
+  "title": "refactor-unified-call-path-microkernel — 债务清零终态",
+  "stories": [
+    {
+      "id": "US-R00",
+      "title": "P0 基线锚定 + 逃逸口冻结 + allowlist 元数据",
+      "passes": true,
+      "acceptanceCriteria": [
+        "openspec/changes/refactor-unified-call-path-microkernel/baseline.md 记录 gate/dependency tree 基线",
+        "serviceization_escape_hatches.rs 覆盖 1.1.1–1.1.7 全部 token 且现有代码有 migration surface",
+        "allowlist.rs 每行含 owner/caller/phase/expiry；macaca-os-serviceization-allowlist.md 同步",
+        "cargo test -p macaca-integration-tests serviceization_escape_hatches 通过",
+        "cargo test -p macaca-integration-tests route_c_dependency_boundaries_reject_unallowlisted_forbidden_edges 通过"
+      ]
+    },
+    {
+      "id": "US-R01",
+      "title": "P1 统一 Agent 执行为单一 service 路径",
+      "passes": false,
+      "acceptanceCriteria": [
+        "ServiceClientAgentExecutionAdapter 实现并单测（可用/不可用）",
+        "WebAgentExecutionBackend 执行语义下沉 runtime-host；web 仅 SSE/DTO",
+        "delegate_task/workflow 经 service.agent_execution；协调补丁删除",
+        "framework_toolkit 经 service snapshot，无 driver_runtime/mcp_runtime 直读",
+        "生产代码无 legacy_unmarked/suppress_executor_lifecycle/legacy_chat_main_thread_goal_pause"
+      ]
+    },
+    {
+      "id": "US-R02",
+      "title": "P2 内核纯净化 + 越界依赖解除",
+      "passes": false,
+      "acceptanceCriteria": [
+        "kernel 无 web3/evm/a2a/payment_policy/provider_compat/executor 模块",
+        "cargo tree -p macaca-kernel --depth 1 仅 macaca-proto + macaca-ipc（生产）",
+        "macaca-persist 不依赖 macaca-context",
+        "kernel 相关 allowlist 行清零",
+        "optional module absent 降级测试通过"
+      ]
+    },
+    {
+      "id": "US-R03",
+      "title": "P3 Web thin shell + 巨型文件拆分",
+      "passes": false,
+      "acceptanceCriteria": [
+        "AppState 无 direct provider 字段",
+        "macaca-web Cargo.toml 无 driver/llm/memory/persist/skill/task/tools 直接依赖",
+        "web allowlist 7 行清零",
+        "OS 层无 >500 行源文件（loop_manager/framework_runner/chat_orchestrator/lib.rs 已拆分）"
+      ]
+    },
+    {
+      "id": "US-R04",
+      "title": "P4 CLI 解耦 + domain pack 外置",
+      "passes": false,
+      "acceptanceCriteria": [
+        "macaca-cli 仅依赖 macaca-sdk（+ proto）",
+        "CLI allowlist 清零；bootstrap facade 替代 macaca-web internals",
+        "domain_pack/finance_live_data 移出 base runtime-host"
+      ]
+    },
+    {
+      "id": "US-R05",
+      "title": "P5 终态门 + OpenSpec baseline + DoD",
+      "passes": false,
+      "acceptanceCriteria": [
+        "allowlist 行数 == 0 的 terminal gate 通过",
+        "no-direct-provider-call / kernel-purity / file-size 审计门实现并通过",
+        "escape-hatch 存量清零（migration surface 移除后）",
+        "openspec validate refactor-unified-call-path-microkernel --strict 通过",
+        "openspec/specs/ 新增 unified-execution-path、microkernel-boundary-purity 并更新既有 specs"
+      ]
+    }
+  ]
+}

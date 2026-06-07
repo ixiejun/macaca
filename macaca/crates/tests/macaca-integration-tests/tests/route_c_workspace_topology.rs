@@ -44,6 +44,22 @@ fn expected_manifest_suffixes() -> BTreeMap<&'static str, &'static str> {
             "crates/foundation/macaca-persist/Cargo.toml",
         ),
         ("macaca-kernel", "crates/kernel/macaca-kernel/Cargo.toml"),
+        (
+            "macaca-autonomy-evolution",
+            "crates/services/macaca-autonomy-evolution/Cargo.toml",
+        ),
+        (
+            "macaca-heartbeat",
+            "crates/services/macaca-heartbeat/Cargo.toml",
+        ),
+        (
+            "macaca-scheduled-agent-task",
+            "crates/services/macaca-scheduled-agent-task/Cargo.toml",
+        ),
+        (
+            "macaca-scheduler",
+            "crates/services/macaca-scheduler/Cargo.toml",
+        ),
         ("macaca-task", "crates/services/macaca-task/Cargo.toml"),
         ("macaca-llm", "crates/services/macaca-llm/Cargo.toml"),
         ("macaca-memory", "crates/services/macaca-memory/Cargo.toml"),
