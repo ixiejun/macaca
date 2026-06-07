@@ -289,3 +289,12 @@
 - **Verified**: `cargo test -p macaca-web --lib skill_self_evolution_observer` 6/6; `os_layer_file_size_gate` pass.
 - **GitNexus memo (non-blocking)**: iteration 35 CRITICAL on `observe_agent_execution_result_for_skill_self_evolution` / `build_skill_experience_proposal_command` Facade split — recorded in `impact-memo.md`.
 - **Next**: P3 §4.5.1 remaining web giant (`agent_execution_backend/tests.rs`); P4 CLI decoupling; 4.4.4终态.
+
+## Iteration 36 (2026-06-07)
+- **P3.3 agent_execution_backend/tests split (4.3.15)**: deleted monolithic `agent_execution_backend/tests.rs` (656 lines) + migrated `agent_execution_backend.rs` → `agent_execution_backend/mod.rs`; extracted Facade test module tree (10 files under `tests/`, each max ≤153 lines).
+- **Design patterns**: Facade (`tests/mod.rs`); Contract Test (per-domain submodules); Module (`support` shared imports); Guard Clause (`architecture_guards` static scans); Adapter boundary tests (`static_wiring`, `skill_self_evolution_boundary`).
+- **Contract tests**: `cargo test -p macaca-web agent_execution_backend` 29/29; `contract_source::agent_execution_backend_test_module_sources()`; `serviceization_escape_hatches` paths updated; `architecture_guards` skips `/tests/` modules containing scan literals.
+- **Filesize allowlist**: removed `agent_execution_backend/tests.rs` row (**78 baseline rows remain**); **macaca-web P3 giant-file debt cleared**.
+- **Verified**: `os_layer_file_size_gate` pass.
+- **GitNexus memo (non-blocking)**: iteration 36 CRITICAL on `agent_execution_backend/tests` Facade split — recorded in `impact-memo.md`.
+- **Next**: P4 CLI decoupling; 4.4.4终态; remaining non-web allowlist giants (78 rows).

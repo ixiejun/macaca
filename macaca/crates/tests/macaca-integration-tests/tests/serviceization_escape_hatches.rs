@@ -502,8 +502,8 @@ fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> bool
                 // P1.2 composed execution backend — patches removed in task 2.6 after audit replay gate.
                 | "crates/runtime/macaca-runtime-host/src/agent_execution_orchestration.rs"
                 | "crates/shells/macaca-web/src/web_agent_execution_adapters.rs"
-                | "crates/shells/macaca-web/src/agent_execution_backend.rs"
-                | "crates/shells/macaca-web/src/agent_execution_backend/tests.rs"
+                | "crates/shells/macaca-web/src/agent_execution_backend/mod.rs"
+                | "crates/shells/macaca-web/src/agent_execution_backend/tests/mod.rs"
                 | "crates/shells/macaca-web/src/agent_runner.rs"
                 | "crates/shells/macaca-web/src/loop_manager/mod.rs"
                 | "crates/services/macaca-task/src/runtime.rs"

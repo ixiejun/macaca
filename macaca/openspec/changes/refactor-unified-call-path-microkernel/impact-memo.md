@@ -275,3 +275,12 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `skill_self_evolution_observer.rs` → `skill_self_evolution_observer/` module split | CRITICAL | `skill_self_evolution_execution_observer` decorator; `observe_agent_execution_result_for_skill_self_evolution` public export preserved via Facade | P3.3 |
 | `observe_agent_execution_result_for_skill_self_evolution` | HIGH | Agent Execution completion → Skill proposal command path; live self-evolution SSE/EventLog checkpoints | P3.3 |
 | `build_skill_experience_proposal_command` | HIGH | bounded evidence refs, semantic Skill Creator identity, proposal validation gate | P3.3 |
+
+## Iteration 36 additions (task 4.3.15 — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `agent_execution_backend/tests.rs` → `agent_execution_backend/tests/` module split | CRITICAL | unified_agent_execution_provider, unified_audit_replay_convergence, serviceization_escape_hatches contract scans; 29 contract tests preserved | P3.3 |
+| `agent_execution_backend.rs` → `agent_execution_backend/mod.rs` | MEDIUM | `lib.rs` module path unchanged; Facade re-exports not required (tests-only module) | P3.3 |
+| `contract_source::agent_execution_backend_test_module_sources` | LOW | static contract tests only; enumerates test submodule paths for escape-hatch scans | P3.3 |
+| `direct_session_pause_resume_channels_stay_inside_approved_adapters` | LOW | guard test skip logic extended for `/tests/` subtrees after Facade split | P3.3 |
