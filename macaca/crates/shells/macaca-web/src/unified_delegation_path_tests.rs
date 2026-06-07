@@ -79,7 +79,8 @@ mod tests {
         let runtime_coordinator = include_str!(
             "../../../runtime/macaca-runtime-host/src/execution_control_session_loop.rs"
         );
-        let chat_orchestrator = include_str!("chat_orchestrator.rs");
+        let chat_orchestrator =
+            crate::chat_orchestrator::contract_source::chat_orchestrator_module_sources();
 
         assert!(loop_manager.contains("ExecutionControlSessionLoopCoordinator"));
         assert!(loop_manager.contains("register_plan_loop_via_execution_control"));

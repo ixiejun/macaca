@@ -64,7 +64,7 @@ mod tests {
     /// YAML `/api/chat/v2` main-thread chat converges on one agent execution chain.
     #[test]
     fn yaml_chat_session_audit_replay_single_chain() {
-        let chat = include_str!("chat_orchestrator.rs");
+        let chat = crate::chat_orchestrator::contract_source::chat_orchestrator_module_sources();
         let bootstrap = include_str!("bootstrap.rs");
 
         // Canonical chain: chat_orchestrator → service.agent_execution (ComposedAgentExecutionBackend).
@@ -73,7 +73,7 @@ mod tests {
         assert!(chat.contains("AgentExecutionIntent::ChatMainThread"));
         assert!(bootstrap.contains("/api/chat/v2"));
 
-        assert_no_coordination_patches("chat_orchestrator", chat);
+        assert_no_coordination_patches("chat_orchestrator", &chat);
 
         // Retired yaml-A parallel pause patch must not remain.
         assert!(
@@ -197,7 +197,7 @@ mod tests {
     #[test]
     fn chat_v2_route_remains_registered_for_route_c_regression() {
         let bootstrap = include_str!("bootstrap.rs");
-        let chat = include_str!("chat_orchestrator.rs");
+        let chat = crate::chat_orchestrator::contract_source::chat_orchestrator_module_sources();
 
         assert!(bootstrap.contains("/api/chat/v2"));
         assert!(bootstrap.contains("post_chat_v2"));

@@ -190,3 +190,13 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `WebTracedAgentFactory` / emitter adapters | HIGH | SSE/channel/executor trace streaming + execution-control middleware | P3.3 |
 | `build_mode::DriverTraceRoute::label` | LOW | diagnostic route labels; migration debt on `hardcoded-agent-role` allowlist | P3.3 |
 | `contract_source::framework_runner_module_sources` | LOW | static contract tests only; concatenates module sources for escape-hatch scans | P3.3 |
+
+## Iteration 25 additions (task 4.3.3 — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `chat_orchestrator.rs` → `chat_orchestrator/` module split | CRITICAL | bootstrap routes, unified_delegation_path, unified_agent_execution_provider, unified_audit_replay_convergence, agent_execution_backend contract tests | P3.3 |
+| `post_chat_v2` / `run_wasm_chat_fast_path` / `run_framework_chat_path` | HIGH | `/api/chat/v2` SSE entry; WASM vs framework dispatch; session lifecycle + executor event bridges | P3.3 |
+| `executor_event_adapter` shared forwarder | MEDIUM | WASM and framework paths; delegated agent SSE + kernel activity sync | P3.3 |
+| `route_chat_v2.rs` entry-agent fallback | LOW | `"coordinator"` migration debt on `hardcoded-agent-role` allowlist | P3.3 |
+| `contract_source::chat_orchestrator_module_sources` | LOW | static contract tests only; concatenates module sources for escape-hatch scans | P3.3 |

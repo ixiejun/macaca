@@ -429,7 +429,7 @@ fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> bool
                     | "crates/services/macaca-task/src/todo_store.rs"
                     | "crates/services/macaca-tools/src/todo.rs"
                     | "crates/shells/macaca-web/src/capability_catalog.rs"
-                    | "crates/shells/macaca-web/src/chat_orchestrator.rs"
+                    | "crates/shells/macaca-web/src/chat_orchestrator/route_chat_v2.rs"
                     | "crates/shells/macaca-web/src/framework_runner/build_mode.rs"
                     | "crates/shells/macaca-web/src/framework_runner/sse_emitter_adapter.rs"
                     | "crates/shells/macaca-web/src/framework_toolkit.rs"

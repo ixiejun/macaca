@@ -188,3 +188,12 @@
 - **Verified**: `cargo check -p macaca-web`; `cargo test -p macaca-web --lib framework_runner::tests` 13/13; `cargo test -p macaca-integration-tests serviceization_escape_hatches` violations=0.
 - **GitNexus memo (non-blocking)**: iteration 24 CRITICAL on `FrameworkRunner` facade / `build_runtime_agent` split — recorded in `impact-memo.md`.
 - **Next**: P3 §4.3.3 `chat_orchestrator.rs` split.
+
+## Iteration 25 (2026-06-07)
+- **P3.3 chat_orchestrator split (4.3.3)**: deleted monolithic `chat_orchestrator.rs` (~1695 lines); extracted `chat_orchestrator/` module tree (18 files, max ≤500 lines).
+- **Design patterns**: Facade (`mod.rs`); Adapter (`sse_adapter`, `executor_event_adapter`, `session_persistence_adapter`, `application_service_adapter`, `wasm_dispatch_adapter`, `agent_activity_adapter`, `agent_execution_adapter`, `executor_adapter`); route paths (`route_chat_v2`, `wasm_chat_path`, `framework_chat_path`).
+- **Contract tests**: `chat_orchestrator::tests` via `contract_source::chat_orchestrator_module_sources()`; unified_delegation_path, unified_agent_execution_provider, unified_audit_replay_convergence, agent_execution_backend updated.
+- **Escape hatch**: `route_chat_v2.rs` on `hardcoded-agent-role` allowlist (entry-agent `"coordinator"` fallback debt); `chat_orchestrator/` prefix for pause/resume channel ownership.
+- **Verified**: `cargo check -p macaca-web`; `cargo test -p macaca-web chat_orchestrator::tests`; contract test suites; `serviceization_escape_hatches` violations=0.
+- **GitNexus memo (non-blocking)**: iteration 25 CRITICAL on `post_chat_v2` / `run_wasm_chat_fast_path` / `run_framework_chat_path` split — recorded in `impact-memo.md`.
+- **Next**: P3 §4.3.4 `lib.rs` split.

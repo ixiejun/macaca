@@ -507,7 +507,7 @@ fn skill_self_evolution_observation_is_centralized_at_agent_execution_boundary()
     let composed_source = include_str!(
         "../../../../runtime/macaca-runtime-host/src/composed_agent_execution_backend.rs"
     );
-    let chat_source = include_str!("../chat_orchestrator.rs");
+    let chat_source = crate::chat_orchestrator::contract_source::chat_orchestrator_module_sources();
     let event_persistence_source = include_str!("../event_persistence.rs");
     let observer_source = include_str!("../skill_self_evolution_observer.rs");
 
@@ -578,7 +578,7 @@ fn direct_session_pause_resume_channels_stay_inside_approved_adapters() {
     let src_root = crate_root.join("src");
     let approved_files = [
         "web_agent_execution_adapters.rs",
-        "chat_orchestrator.rs",
+        "chat_orchestrator/route_chat_v2.rs",
         "framework_runner/mod.rs",
         "fork_join_shell_adapter.rs",
         "goal_lifecycle_shell_adapter.rs",
@@ -607,7 +607,8 @@ fn direct_session_pause_resume_channels_stay_inside_approved_adapters() {
             .replace('\\', "/");
         let approved = approved_files.iter().any(|allowed| relative == *allowed)
             || relative.starts_with("framework_runner/")
-            || relative.starts_with("loop_manager/");
+            || relative.starts_with("loop_manager/")
+            || relative.starts_with("chat_orchestrator/");
         if !approved {
             violations.push(relative);
         }

@@ -10,7 +10,7 @@ mod tests {
     /// YAML chat (`/api/chat/v2`) must call the shared agent execution service.
     #[test]
     fn yaml_chat_session_uses_unified_agent_execution_service() {
-        let chat = include_str!("chat_orchestrator.rs");
+        let chat = crate::chat_orchestrator::contract_source::chat_orchestrator_module_sources();
         let legacy_builder = ["FrameworkRunner::build_runtime", "_agent("].concat();
 
         assert!(chat.contains("run_chat_main_thread_via_agent_service"));
@@ -69,7 +69,7 @@ mod tests {
     /// YAML and WASM entry surfaces must share the same service command + trace schema.
     #[test]
     fn yaml_and_wasm_share_agent_execute_command_and_trace_schema() {
-        let yaml_chat = include_str!("chat_orchestrator.rs");
+        let yaml_chat = crate::chat_orchestrator::contract_source::chat_orchestrator_module_sources();
         let yaml_workflow = include_str!("agent_runner.rs");
         let wasm_bridge = include_str!("application_agent_delegate_bridge.rs");
         let provider = include_str!(
