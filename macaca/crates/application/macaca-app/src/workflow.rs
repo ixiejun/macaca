@@ -251,6 +251,7 @@ impl WorkflowEngine {
                 workbench: None,
                 autonomy: None,
                 ui: None,
+                execution_control: None,
             },
             workflow_name: DEFAULT_WORKFLOW.into(),
             coordinator: DEFAULT_COORDINATOR.into(),
@@ -280,6 +281,7 @@ impl WorkflowEngine {
                 workbench: None,
                 autonomy: None,
                 ui: None,
+                execution_control: None,
             },
             workflow_name: DEFAULT_WORKFLOW.into(),
             coordinator: DEFAULT_COORDINATOR.into(),
@@ -512,6 +514,7 @@ mod tests {
             workbench: None,
             autonomy: None,
             ui: None,
+            execution_control: None,
         }
     }
 

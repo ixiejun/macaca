@@ -213,6 +213,16 @@ impl YamlApplicationManifestAdapter {
                 "YAML application execution profile was projected into Manifest v1 policy metadata.",
             );
         }
+        if let Some(execution_control) = &self.manifest.execution_control {
+            projected.execution_control = Some(execution_control.clone());
+            info!(
+                application_id = %application_id,
+                mode = ?execution_control.mode,
+                trigger_count = execution_control.triggers.len(),
+                resume_source_count = execution_control.resume_sources.len(),
+                "YAML execution_control projected into Manifest v1"
+            );
+        }
 
         for permission in application_permissions(&self.resolved_agents) {
             projected = projected.permission(permission);

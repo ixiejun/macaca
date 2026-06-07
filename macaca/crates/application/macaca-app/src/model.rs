@@ -6,7 +6,7 @@ use crate::service_capability::AppServiceContractConfig;
 use crate::ui_runtime::AppUiRuntimeConfig;
 use macaca_proto::{
     AgentId, ApplicationExecutionProfileDeclaration, ApplicationId,
-    ApplicationWorkbenchManifestDeclaration,
+    ApplicationWorkbenchManifestDeclaration, ExecutionControlPolicy,
 };
 
 /// The execution layer of an application.
@@ -393,6 +393,13 @@ pub struct AppManifest {
     /// logic or rendering rules.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ui: Option<AppUiRuntimeConfig>,
+    /// Optional provider-neutral execution-control policy for this application.
+    ///
+    /// Applications declare pause/resume triggers and resume sources here so the
+    /// OS can resolve `service.execution_control` without hard-coded intent
+    /// branches.  The YAML adapter projects this field into Manifest v1.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution_control: Option<ExecutionControlPolicy>,
 }
 
 /// UI type for frontend rendering.

@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     ApplicationHostCommand, ApplicationHostCommandResult, ApplicationId, ApplicationLifecycleState,
-    MacacaError, MacacaResult, PackageRuntimeKind, TraceContext,
+    ExecutionControlPolicy, MacacaError, MacacaResult, PackageRuntimeKind, TraceContext,
 };
 
 /// Stable service id used by Application Service registration and SDK clients.
@@ -558,6 +558,10 @@ pub struct ApplicationMetadataView {
     pub skill_policy: ApplicationSkillPolicyMetadataView,
     pub mcp_overlay: ApplicationMcpOverlayMetadataView,
     pub workbench: ApplicationWorkbenchMetadataView,
+    /// Manifest-declared execution-control default policy projected for shells
+    /// and runtime adapters. Absent when the application has not opted in.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution_control: Option<ExecutionControlPolicy>,
     pub manifest_digest: Option<ApplicationManifestDigestView>,
     pub diagnostics: Vec<String>,
 }

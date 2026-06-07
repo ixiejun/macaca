@@ -113,10 +113,6 @@ impl WebAgentRunner {
                 "kernel.agent_runner".into(),
             ),
             (
-                "suppress_executor_lifecycle".into(),
-                "true".into(),
-            ),
-            (
                 AGENT_EXECUTION_INTENT_METADATA_KEY.into(),
                 AgentExecutionIntent::YamlWorkflowStep
                     .metadata_value()

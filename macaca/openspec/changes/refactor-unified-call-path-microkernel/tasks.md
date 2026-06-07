@@ -67,12 +67,12 @@
 - [x] 2.5.3 单测：driver catalog/MCP definitions 不可用时不触发旧 runtime fallback。（`production_toolkit_assembly_does_not_register_direct_mcp_clients` + `probe_mcp_capability_inputs_via_client_maps_service_status_views`）
 
 ### 2.6 删除多路径协调补丁（前置：audit replay 已显示单链）
-- [ ] 2.6.1 删除 `runtime-host/application_execution_hosted.rs` 的 `authoritative/non_authoritative/legacy_unmarked` 区分逻辑（约 546–695 行），终态判定回归"所有 host command 同等 authoritative"。
-- [ ] 2.6.2 删除 `wasm_runtime_provider/host_import_bridge.rs` 中 `graph_owner`/`execution.graph_owner` 的"区分真实/兼容"用途（保留纯审计标签如确有审计价值，否则删除）。
-- [ ] 2.6.3 删除 `agent_execution_backend.rs` 的 `should_emit_executor_lifecycle`/`suppress_executor_lifecycle`（单一发事件方后无需去重）。
-- [ ] 2.6.4 删除 `agent_execution_backend.rs` 的 `legacy_execution_control_policy` / `legacy_chat_main_thread_goal_pause`，改由 manifest projection 提供 execution-control policy。
-- [ ] 2.6.5 删除 `application_execution_hosted.rs` 中针对 `queued|pending` 与 legacy 状态的兼容归一化分支中"为兼容路径而存在"的部分（保留协议必须的状态语义）。
-- [ ] 2.6.6 全仓搜索确认 `legacy_unmarked`/`non_authoritative`/`suppress_executor_lifecycle`/`legacy_chat_main_thread_goal_pause` 在生产代码中为 0 命中。
+- [x] 2.6.1 删除 `runtime-host/application_execution_hosted.rs` 的 `authoritative/non_authoritative/legacy_unmarked` 区分逻辑（约 546–695 行），终态判定回归"所有 host command 同等 authoritative"。
+- [x] 2.6.2 删除 `wasm_runtime_provider/host_import_bridge.rs` 中 `graph_owner`/`execution.graph_owner` 的"区分真实/兼容"用途（保留纯审计标签如确有审计价值，否则删除）。
+- [x] 2.6.3 删除 `agent_execution_backend.rs` 的 `should_emit_executor_lifecycle`/`suppress_executor_lifecycle`（单一发事件方后无需去重）。
+- [x] 2.6.4 删除 `agent_execution_backend.rs` 的 `legacy_execution_control_policy` / `legacy_chat_main_thread_goal_pause`，改由 manifest projection 提供 execution-control policy。
+- [x] 2.6.5 删除 `application_execution_hosted.rs` 中针对 `queued|pending` 与 legacy 状态的兼容归一化分支中"为兼容路径而存在"的部分（保留协议必须的状态语义）。
+- [x] 2.6.6 全仓搜索确认 `legacy_unmarked`/`non_authoritative`/`suppress_executor_lifecycle`/`legacy_chat_main_thread_goal_pause` 在生产代码中为 0 命中。
 
 ### 2.7 P1 退出验证
 - [ ] 2.7.1 audit replay：YAML 与 WASM 会话各自只出现**一条** service.call 执行链（对照 0.3 基线，由 >1 收敛为 1）。

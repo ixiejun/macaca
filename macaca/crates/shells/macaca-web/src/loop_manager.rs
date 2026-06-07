@@ -289,9 +289,6 @@ async fn run_loop_agent_execution_service_call(
     command
         .metadata
         .insert("entrypoint".into(), source.to_string());
-    command
-        .metadata
-        .insert("suppress_executor_lifecycle".into(), "true".into());
 
     let service_command = command
         .into_service_command()

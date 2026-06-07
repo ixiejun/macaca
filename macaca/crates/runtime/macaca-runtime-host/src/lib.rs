@@ -266,9 +266,8 @@ pub use agent_execution_dispatch::{
 pub use agent_execution_orchestration::{
     build_agent_context_snapshot_via_service, execution_control_execution_id,
     execution_control_scope, extract_single_shell_fence, failed_execution_result,
-    heartbeat_exact_shell_contract, legacy_chat_main_thread_execution_control_policy,
-    resolve_execution_control_policy_local, runtime_agent_max_iters, runtime_agent_tool_choice,
-    should_emit_executor_lifecycle, should_skip_heartbeat_without_source,
+    heartbeat_exact_shell_contract, resolve_execution_control_policy_local,
+    runtime_agent_max_iters, runtime_agent_tool_choice, should_skip_heartbeat_without_source,
     structured_execution_context, user_prompt_with_context,
     ARTIFACT_BACKED_RUNTIME_AGENT_MAX_ITERS, DEFAULT_RUNTIME_AGENT_MAX_ITERS,
 };

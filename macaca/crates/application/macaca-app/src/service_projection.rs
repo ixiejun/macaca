@@ -124,6 +124,7 @@ pub fn app_manifest_to_metadata_view(
         skill_policy,
         mcp_overlay,
         workbench: workbench_metadata_view(&projection.manifest),
+        execution_control: projection.manifest.execution_control.clone(),
         manifest_digest,
         diagnostics,
     }

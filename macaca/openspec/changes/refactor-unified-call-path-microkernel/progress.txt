@@ -77,3 +77,11 @@
 - **Contract tests**: `unified_workflow_application_abi_tests.rs` 6/6; updated `unified_agent_execution_provider_tests` (7/7); `unified_delegation_path` 6/6 unchanged.
 - **Verified**: `cargo check -p macaca-proto -p macaca-runtime-host -p macaca-web`; `cargo test -p macaca-web unified_` 19/19.
 - **Remaining P1**: 2.6 coordination patch removal (gate: audit replay → 1 chain); 2.7 P1 exit validation; `FrameworkRunner` body still in web (task 4.3.2).
+
+## Iteration 12 (2026-06-07)
+- **P1.6 coordination patch removal (2.6)**: deleted `authoritative/non_authoritative/legacy_unmarked` terminal reconciliation in `application_execution_hosted.rs`; removed `graph_owner` compat metadata from `host_import_bridge.rs`; removed `suppress_executor_lifecycle` / `legacy_chat_main_thread_goal_pause` OS branches.
+- **Manifest-driven execution control**: `AppManifest.execution_control` + yaml projection; `fullstack-autodev/app.yaml` declares `create_goal` pause + `goal_lifecycle` resume; web adapter resolves policy via `application_client.metadata()` (not `state.registry`).
+- **Proto projection**: `ApplicationMetadataView.execution_control` exposed through Application Service metadata path.
+- **Contract tests**: updated `agent_execution_backend/tests.rs` for manifest-required overrides + shell adapter allowlist; `serviceization_escape_hatches` green.
+- **Verified**: `cargo check -p macaca-runtime-host -p macaca-web -p macaca-app`; `cargo test -p macaca-web agent_execution_backend` 28/28; `cargo test -p macaca-integration-tests serviceization_escape_hatches_reject` pass.
+- **Remaining P1**: 2.7 P1 exit validation (audit replay single chain + route-c regression); `FrameworkRunner` body still in web (task 4.3.2).

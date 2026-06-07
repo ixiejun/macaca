@@ -271,7 +271,7 @@ async fn abi_hosted_declared_host_command_results_become_durable_execution_event
 }
 
 #[tokio::test]
-async fn abi_hosted_terminal_state_ignores_non_authoritative_host_command_failures() {
+async fn abi_hosted_terminal_state_fails_when_any_host_command_fails() {
     let (_dir, event_log) = event_log();
     let store = ApplicationExecutionEventStore::new(event_log.clone());
     let provider = MacacaHostedApplicationExecutionProvider::new(
@@ -351,21 +351,19 @@ async fn abi_hosted_terminal_state_ignores_non_authoritative_host_command_failur
     let terminal = replay
         .events
         .iter()
-        .find(|event| event.event_type == ApplicationExecutionEventType::ExecutionCompleted)
-        .expect("authoritative completion should emit a completed terminal event");
+        .find(|event| event.event_type == ApplicationExecutionEventType::ExecutionFailed)
+        .expect("any host-command failure should emit a failed terminal event");
 
     assert!(event_types.contains(&ApplicationExecutionEventType::ToolCallCompleted));
-    assert!(event_types.contains(&ApplicationExecutionEventType::ExecutionCompleted));
-    assert!(!event_types.contains(&ApplicationExecutionEventType::ExecutionFailed));
+    assert!(event_types.contains(&ApplicationExecutionEventType::ExecutionFailed));
+    assert!(!event_types.contains(&ApplicationExecutionEventType::ExecutionCompleted));
     let terminal_data = terminal
         .sanitized_payload
         .data
         .as_ref()
-        .expect("terminal completion should retain aggregate host-command audit data");
-    assert_eq!(
-        terminal_data["non_authoritative_failed"],
-        serde_json::json!(1)
-    );
+        .expect("terminal failure should retain aggregate host-command audit data");
+    assert_eq!(terminal_data["failed"], serde_json::json!(1));
+    assert_eq!(terminal_data["completed"], serde_json::json!(1));
 }
 
 struct FakeHostedAdapter {
