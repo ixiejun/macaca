@@ -1,7 +1,8 @@
 //! Web shell composition bundle for bootstrap-time provider anchors.
 //!
 //! P3 thin-shell migration moves direct provider fields out of [`crate::state::AppState`]
-//! into this focused bundle. The bundle is constructed once at web bootstrap in `lib.rs`
+//! into this focused bundle. The bundle is constructed once at web bootstrap in
+//! `composition_bootstrap::app_state_assembly`
 //! and must only be accessed by approved shell adapters — never by route handlers directly.
 //!
 //! Design pattern: **Composition Root** + **Facade** boundary. `AppState` keeps SDK clients

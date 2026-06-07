@@ -146,8 +146,8 @@
 - [x] 4.3.1 拆分 `loop_manager.rs`(2629) → execution-control adapter / task-event adapter / SSE channel adapter / 薄 orchestrator（每文件 ≤500 行）。（`loop_manager/` 18 模块，最大 412 行；Facade+Adapter+Strategy；`decomposition_adapter` 去除 legacy graph_owner/agent-role 违规）
 - [x] 4.3.2 拆分 `framework_runner.rs`(2484) → runtime agent 构造 service（迁 runtime/framework 层）+ 薄 web 适配。（`framework_runner/` 23 模块，最大 480 行；Facade+Adapter+Factory；public API 不变；`contract_source::framework_runner_module_sources`）
 - [x] 4.3.3 拆分 `chat_orchestrator.rs`(1581) → route adapter / application-service 调用适配 / DTO 映射。（`chat_orchestrator/` 18 模块，最大 ≤500 行；Facade+Adapter；`contract_source::chat_orchestrator_module_sources`）
-- [ ] 4.3.4 拆分 `macaca-web/src/lib.rs`(975) → 小型 composition bundle + route 注册。
-- [ ] 4.3.5 每次拆分仅做结构移动 + 注释补全，拆分前后 `cargo test -p macaca-web` 绿。
+- [x] 4.3.4 拆分 `macaca-web/src/lib.rs`(975) → 小型 composition bundle + route 注册。
+- [x] 4.3.5 每次拆分仅做结构移动 + 注释补全，拆分前后 `cargo test -p macaca-web` 绿。
 
 ### 4.4 删除 web 越界依赖 + allowlist 行
 - [ ] 4.4.1 替换完成后逐条移除 `macaca-web/Cargo.toml` 对 `macaca-driver/llm/memory/persist/skill/task/tools` 的直接依赖。

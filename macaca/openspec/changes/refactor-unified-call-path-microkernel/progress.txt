@@ -197,3 +197,12 @@
 - **Verified**: `cargo check -p macaca-web`; `cargo test -p macaca-web chat_orchestrator::tests`; contract test suites; `serviceization_escape_hatches` violations=0.
 - **GitNexus memo (non-blocking)**: iteration 25 CRITICAL on `post_chat_v2` / `run_wasm_chat_fast_path` / `run_framework_chat_path` split — recorded in `impact-memo.md`.
 - **Next**: P3 §4.3.4 `lib.rs` split.
+
+## Iteration 26 (2026-06-07)
+- **P3.3 lib.rs split (4.3.4)**: deleted monolithic `lib.rs` bootstrap body (~1417 lines); extracted `composition_bootstrap/` module tree (13 files, max 447 lines); thin `lib.rs` (110 lines).
+- **Design patterns**: Facade (`mod.rs` + `serve.rs`); Composition Root (`bootstrap_ctx` carrier + phased `run` modules); route table remains in `bootstrap.rs` (`WebRuntimeFacade`).
+- **Phase modules**: `config_and_kernel`, `application_discovery`, `tooling_and_persist`, `service_runtime_wiring`, `service_client_facades`, `app_state_assembly`, `post_bootstrap_hooks`, `bootstrap_path_helpers`.
+- **Contract tests**: `contract_source::composition_bootstrap_module_sources()`; unified_agent_execution_provider, unified_audit_replay_convergence, agent_execution_backend updated.
+- **Verified**: `cargo check -p macaca-web`; `cargo test -p macaca-web --lib` 250/250; `cargo test -p macaca-integration-tests serviceization_escape_hatches_reject_new_production_references` violations=0.
+- **GitNexus memo (non-blocking)**: iteration 26 CRITICAL on `serve_web_server` / composition bootstrap split — recorded in `impact-memo.md`.
+- **Next**: P3 §4.4 web 越界依赖 + allowlist 行。

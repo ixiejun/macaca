@@ -485,7 +485,8 @@ fn execution_backend_returns_context_snapshot_for_audit_replay() {
 
 #[test]
 fn agent_execution_service_registers_skill_self_evolution_decorator() {
-    let lib_source = include_str!("../lib.rs");
+    let lib_source =
+        crate::composition_bootstrap::contract_source::composition_bootstrap_module_sources();
     let decorator_source = include_str!("../skill_self_evolution_execution_observer.rs");
 
     assert!(lib_source.contains("SkillSelfEvolutionObservedAgentExecutionBackend"));

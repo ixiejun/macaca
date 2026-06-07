@@ -200,3 +200,12 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `executor_event_adapter` shared forwarder | MEDIUM | WASM and framework paths; delegated agent SSE + kernel activity sync | P3.3 |
 | `route_chat_v2.rs` entry-agent fallback | LOW | `"coordinator"` migration debt on `hardcoded-agent-role` allowlist | P3.3 |
 | `contract_source::chat_orchestrator_module_sources` | LOW | static contract tests only; concatenates module sources for escape-hatch scans | P3.3 |
+
+## Iteration 26 additions (task 4.3.4 — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `lib.rs` → `composition_bootstrap/` module split | CRITICAL | `serve_web_server`, `WebServerBuilder`, bootstrap routes, unified_agent_execution_provider, unified_audit_replay_convergence, agent_execution_backend contract tests | P3.3 |
+| `serve_web_server` phased orchestrator | HIGH | web startup composition root; all service provider registration + `AppState` assembly | P3.3 |
+| `BootstrapCtx` carrier | MEDIUM | cross-phase bootstrap state threading; ordering enforced via `Option` + `expect` | P3.3 |
+| `contract_source::composition_bootstrap_module_sources` | LOW | static contract tests only; concatenates module sources for escape-hatch scans | P3.3 |

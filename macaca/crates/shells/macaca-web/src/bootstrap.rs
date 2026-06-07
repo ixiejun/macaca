@@ -42,7 +42,7 @@ impl WebServerBuilder {
 
     /// Build all runtime state, bind the listener, and serve requests.
     pub async fn serve(self) -> MacacaResult<()> {
-        crate::serve_web_server(self.port).await
+        crate::composition_bootstrap::serve_web_server(self.port).await
     }
 }
 

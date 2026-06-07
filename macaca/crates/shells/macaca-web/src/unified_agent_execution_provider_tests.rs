@@ -53,7 +53,7 @@ mod tests {
     /// Web startup registers exactly one composed backend for the service provider.
     #[test]
     fn web_registers_single_composed_agent_execution_backend() {
-        let lib_source = include_str!("lib.rs");
+        let lib_source = crate::composition_bootstrap::contract_source::composition_bootstrap_module_sources();
         let adapters = include_str!("web_agent_execution_adapters.rs");
         let composed = include_str!(
             "../../../runtime/macaca-runtime-host/src/composed_agent_execution_backend.rs"
@@ -109,7 +109,7 @@ mod tests {
     /// Session entrypoints must not bypass service.agent_execution with parallel backends.
     #[test]
     fn session_entrypoints_do_not_register_parallel_agent_execution_backends() {
-        let lib_source = include_str!("lib.rs");
+        let lib_source = crate::composition_bootstrap::contract_source::composition_bootstrap_module_sources();
         let registration_calls = lib_source
             .lines()
             .filter(|line| {

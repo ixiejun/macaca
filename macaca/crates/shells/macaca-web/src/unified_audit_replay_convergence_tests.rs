@@ -153,7 +153,7 @@ mod tests {
     /// All YAML and WASM entry surfaces register exactly one composed execution backend.
     #[test]
     fn production_registers_single_composed_agent_execution_backend() {
-        let lib_source = include_str!("lib.rs");
+        let lib_source = crate::composition_bootstrap::contract_source::composition_bootstrap_module_sources();
         let registration_calls = lib_source
             .lines()
             .filter(|line| {
