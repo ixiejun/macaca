@@ -21,30 +21,32 @@ mod tests {
         assert!(!chat.contains(&legacy_builder));
     }
 
-    /// YAML workflow steps must call the same service boundary as chat.
+    /// YAML workflow steps must enter through Application Service before agent execution.
     #[test]
-    fn yaml_workflow_session_uses_unified_agent_execution_service() {
+    fn yaml_workflow_session_uses_application_service_delegate_path() {
         let runner = include_str!("agent_runner.rs");
+        let bridge = include_str!("application_agent_delegate_bridge.rs");
         let legacy_builder = ["FrameworkRunner::build_runtime", "_agent("].concat();
 
-        assert!(runner.contains("execute_via_agent_service"));
-        assert!(runner.contains("AGENT_EXECUTION_SERVICE_ID"));
+        assert!(runner.contains("execute_via_application_delegate"));
+        assert!(runner.contains("APPLICATION_SERVICE_ID"));
         assert!(runner.contains("AgentExecutionIntent::YamlWorkflowStep"));
-        assert!(runner.contains("into_service_command()"));
+        assert!(bridge.contains("AGENT_EXECUTION_SERVICE_ID"));
         assert!(runner.contains("ServiceBusSource::new(\"macaca.web.agent_runner\")"));
+        assert!(!runner.contains("KernelServiceId::new(AGENT_EXECUTION_SERVICE_ID)"));
         assert!(!runner.contains(&legacy_builder));
     }
 
-    /// WASM application delegation must call the same service boundary.
+    /// WASM application delegation must call the shared bridge after Application Service.
     #[test]
     fn wasm_session_uses_unified_agent_execution_service() {
         let wasm = include_str!("wasm_orchestration_backend.rs");
+        let bridge = include_str!("application_agent_delegate_bridge.rs");
         let executor_fast_path = [".delegate", "_task("].concat();
 
-        assert!(wasm.contains("AGENT_EXECUTION_SERVICE_ID"));
-        assert!(wasm.contains("AgentExecutionIntent::WasmDelegate"));
-        assert!(wasm.contains("into_service_command()"));
-        assert!(wasm.contains("ServiceBusSource::new(\"macaca.web.wasm_orchestration\")"));
+        assert!(wasm.contains("dispatch_agent_execution_via_service"));
+        assert!(bridge.contains("AGENT_EXECUTION_SERVICE_ID"));
+        assert!(bridge.contains("ORCHESTRATION_AGENT_EXECUTION_SOURCE"));
         assert!(!wasm.contains(&executor_fast_path));
     }
 
@@ -69,16 +71,16 @@ mod tests {
     fn yaml_and_wasm_share_agent_execute_command_and_trace_schema() {
         let yaml_chat = include_str!("chat_orchestrator.rs");
         let yaml_workflow = include_str!("agent_runner.rs");
-        let wasm = include_str!("wasm_orchestration_backend.rs");
+        let wasm_bridge = include_str!("application_agent_delegate_bridge.rs");
         let provider = include_str!(
             "../../../runtime/macaca-runtime-host/src/agent_execution_service_provider.rs"
         );
 
-        for source in [yaml_chat, yaml_workflow, wasm] {
-            assert!(source.contains("AGENT_EXECUTION_SERVICE_ID"));
-            assert!(source.contains("AgentExecutionCommand::new"));
-            assert!(source.contains("into_service_command()"));
-        }
+        assert!(yaml_chat.contains("AGENT_EXECUTION_SERVICE_ID"));
+        assert!(yaml_chat.contains("AgentExecutionCommand::new"));
+        assert!(yaml_workflow.contains("APPLICATION_SERVICE_ID"));
+        assert!(wasm_bridge.contains("AGENT_EXECUTION_SERVICE_ID"));
+        assert!(wasm_bridge.contains("into_service_command()"));
 
         assert!(provider.contains("trace.system_service.agent_execution.v1"));
         assert!(provider.contains("AGENT_EXECUTE_COMMAND"));

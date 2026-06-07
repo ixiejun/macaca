@@ -13,6 +13,7 @@ pub mod app_ui_routes;
 mod app_ui_session_projection;
 mod app_ui_workspace_scope;
 mod app_workspace_bootstrap;
+mod application_agent_delegate_bridge;
 mod application_execution_agent_event_bridge;
 mod application_execution_agent_event_display;
 pub mod application_execution_gateway_routes;
@@ -48,6 +49,8 @@ mod goal_lifecycle_shell_adapter;
 mod unified_delegation_path_tests;
 #[cfg(test)]
 mod unified_agent_execution_provider_tests;
+#[cfg(test)]
+mod unified_workflow_application_abi_tests;
 pub mod hook_consumer;
 pub mod loop_manager;
 mod memory_runtime;

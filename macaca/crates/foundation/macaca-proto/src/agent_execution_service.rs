@@ -43,6 +43,65 @@ pub enum AgentExecutionIntent {
     Custom(String),
 }
 
+/// Metadata key used by `application.agent.delegate` to select execution intent.
+///
+/// The Application Service adapter reads this provider-neutral label and maps it
+/// to `AgentExecutionIntent` before forwarding work to `service.agent_execution`.
+pub const AGENT_EXECUTION_INTENT_METADATA_KEY: &str = "execution_intent";
+
+impl AgentExecutionIntent {
+    /// Serialize one intent into the stable metadata wire label.
+    ///
+    /// Labels are snake_case and intentionally avoid application-specific names so
+    /// YAML, WASM, SDK, and future remote hosts can share the same vocabulary.
+    pub fn metadata_value(&self) -> &'static str {
+        match self {
+            Self::ChatMainThread => "chat_main_thread",
+            Self::WasmDelegate => "wasm_delegate",
+            Self::YamlWorkflowStep => "yaml_workflow_step",
+            Self::TaskWorker => "task_worker",
+            Self::GoalWorker => "goal_worker",
+            Self::Planner => "planner",
+            Self::Reviewer => "reviewer",
+            Self::Heartbeat => "heartbeat",
+            Self::SdkInvocation => "sdk_invocation",
+            Self::GatewayInvocation => "gateway_invocation",
+            Self::Custom(_) => "custom",
+        }
+    }
+
+    /// Resolve one intent from delegate metadata, defaulting to WASM delegation.
+    ///
+    /// Unknown custom labels are preserved as `Custom` so hosts can experiment
+    /// without forking the Application Service contract.
+    pub fn from_delegate_metadata(
+        metadata: &BTreeMap<String, String>,
+    ) -> Self {
+        metadata
+            .get(AGENT_EXECUTION_INTENT_METADATA_KEY)
+            .map(|value| Self::from_metadata_value(value))
+            .unwrap_or(Self::WasmDelegate)
+    }
+
+    /// Parse one metadata wire label into an execution intent.
+    pub fn from_metadata_value(value: &str) -> Self {
+        match value.trim() {
+            "chat_main_thread" => Self::ChatMainThread,
+            "wasm_delegate" => Self::WasmDelegate,
+            "yaml_workflow_step" => Self::YamlWorkflowStep,
+            "task_worker" => Self::TaskWorker,
+            "goal_worker" => Self::GoalWorker,
+            "planner" => Self::Planner,
+            "reviewer" => Self::Reviewer,
+            "heartbeat" => Self::Heartbeat,
+            "sdk_invocation" => Self::SdkInvocation,
+            "gateway_invocation" => Self::GatewayInvocation,
+            other if other.is_empty() => Self::WasmDelegate,
+            other => Self::Custom(other.to_string()),
+        }
+    }
+}
+
 /// Policy and capability facts attached to an execution request.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AgentExecutionPolicyContext {

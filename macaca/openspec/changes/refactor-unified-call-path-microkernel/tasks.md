@@ -57,9 +57,9 @@
 - [x] 2.3.5 集成测试：协调者 `delegate_task`（Fork-Join）与目标-任务（create_goal→worker）两条委派路径均经统一 service 路径，暂停/恢复语义不回归。（`unified_delegation_path_tests.rs` 契约测试 5/5）
 
 ### 2.4 YAML 路径并轨
-- [ ] 2.4.1 `[impact-memo]` 盘点 `macaca-app/src/workflow.rs` + web `agent_runner.rs` 的 workflow 执行落点。
-- [ ] 2.4.2 workflow 步骤执行改为统一调用 Application Service → `service.agent_execution`，不再走 kernel executor 直驱。
-- [ ] 2.4.3 集成测试：YAML workflow 与 WASM app 经同一 Application ABI → service.call 路径（audit replay 单链）。
+- [x] 2.4.1 `[impact-memo]` 盘点 `macaca-app/src/workflow.rs` + web `agent_runner.rs` 的 workflow 执行落点。（见 `workflow-execution-inventory.md`）
+- [x] 2.4.2 workflow 步骤执行改为统一调用 Application Service → `service.agent_execution`，不再走 kernel executor 直驱。（`agent_runner` → `application.agent.delegate` → `application_agent_delegate_bridge`）
+- [x] 2.4.3 集成测试：YAML workflow 与 WASM app 经同一 Application ABI → service.call 路径（audit replay 单链）。（`unified_workflow_application_abi_tests.rs` 6/6 + 更新 `unified_agent_execution_provider_tests`）
 
 ### 2.5 工具可见性统一经 service（消灭 P-TOOLKIT）
 - [x] 2.5.1 `[impact-memo]` 盘点 `macaca-web/src/framework_toolkit.rs` 对 `driver_runtime.collect_tools()`、`mcp_runtime.definitions()` 的直读点。（inventory: toolkit 已走 `driver_client`/`skill_client`/`mcp_client`；剩余 `mcp_runtime` 仅 bootstrap 注入 + dead `skill_mcp`）
