@@ -168,3 +168,13 @@
 - **Verified**: `cargo check -p macaca-web`; `cargo test -p macaca-runtime-host execution_control_session_loop`; `cargo test -p macaca-web unified_delegation_path`; `cargo test -p macaca-integration-tests serviceization_escape_hatches` violations=0.
 - **GitNexus memo (non-blocking)**: iteration 22 HIGH on `loop_manager` wake/register paths + new coordinator — recorded in `impact-memo.md`.
 - **Next**: P3 §4.3 巨型文件拆分 (`loop_manager.rs` ~2620 lines); `FrameworkRunner` body still in web (task 4.3.2).
+
+## Iteration 23 (2026-06-07)
+- **P3.3 loop_manager split (4.3.1)**: deleted monolithic `loop_manager.rs` (~2629 lines); extracted `loop_manager/` module tree (18 files, max 412 lines).
+- **Design patterns**: Facade (`mod.rs` + `loop_orchestrator.rs`); Adapter (`execution_control_adapter`, `agent_execution_adapter`, `worker_execution_adapter`, `decomposition_adapter`, `sse_channel_adapter`); Strategy (`plan_event_consumer` dispatches per `PlanEvent` variant to dedicated handlers).
+- **Plan event handlers**: `plan_loop_orchestrator` (startup only), `plan_event_consumer`, `plan_event_goal_ready`, `plan_event_goal_lifecycle`, `plan_event_handlers`.
+- **Governance fixes**: `decomposition_adapter` removed hardcoded `"frontend"`/`"backend"` capability probes; fallback tasks use `TaskGraphOwner::ApplicationExecution` (not `TaskServiceCompatibility`).
+- **Contract tests**: `unified_delegation_path_tests` + `agent_execution_backend/tests` source-scan via `contract_source::loop_manager_module_sources()`.
+- **Verified**: `cargo check -p macaca-web`; `cargo test -p macaca-web loop_manager::tests` 16/16; `cargo test -p macaca-web unified_delegation_path` 7/7; `cargo test -p macaca-integration-tests serviceization_escape_hatches` violations=0.
+- **GitNexus memo (non-blocking)**: iteration 23 HIGH on `ensure_plan_and_worker_loops` / `create_goal` / plan-event consumer split — recorded in `impact-memo.md`.
+- **Next**: P3 §4.3.2 `framework_runner.rs` split; `FrameworkRunner` body still in web.
