@@ -526,6 +526,42 @@ impl TaskSpace {
         parent_task: Option<TaskId>,
         graph_owner: TaskGraphOwner,
     ) -> TodoItem {
+        self.create_task_assignment_with_graph_scope(
+            agent,
+            created_by,
+            title,
+            description,
+            acceptance_criteria,
+            priority,
+            depends_on,
+            parent_task,
+            graph_owner,
+            None,
+        )
+        .await
+    }
+
+    /// Create a task assignment with an explicit graph owner and graph id.
+    ///
+    /// This lower-level helper is used by service-runtime commands that need
+    /// graph admission guarantees.  `graph_id` is intentionally an opaque
+    /// service-owned correlation key; the Task Service stores it for replay,
+    /// audit, and terminal projection, but never interprets it as application
+    /// business data.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn create_task_assignment_with_graph_scope(
+        &self,
+        agent: &str,
+        created_by: &str,
+        title: impl Into<String>,
+        description: impl Into<String>,
+        acceptance_criteria: Vec<String>,
+        priority: u8,
+        depends_on: Vec<TaskId>,
+        parent_task: Option<TaskId>,
+        graph_owner: TaskGraphOwner,
+        graph_id: Option<String>,
+    ) -> TodoItem {
         // Auto-assign sequence_number: next after current max for this agent+session
         let max_seq = self
             .store
@@ -544,6 +580,7 @@ impl TaskSpace {
         );
         item.sequence_number = seq;
         item.graph_owner = graph_owner;
+        item.graph_id = graph_id;
         item.acceptance_criteria = acceptance_criteria;
         item.depends_on = depends_on.clone();
         item.parent_task = parent_task;

@@ -89,6 +89,12 @@ pub struct TaskServiceTaskSnapshot {
     /// to distinguish authoritative execution tasks from compatibility or
     /// diagnostic task-board entries.
     pub graph_owner: TaskGraphOwner,
+    /// Opaque service-owned graph identity shared by tasks in the same graph.
+    ///
+    /// Snapshots expose this value for replay and audit correlation only.  UI
+    /// and shell code should render it as diagnostic metadata instead of
+    /// deriving business behavior from it.
+    pub graph_id: Option<String>,
 }
 
 /// Deterministic Task Service snapshot ordered by stable identifiers.

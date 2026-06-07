@@ -15,8 +15,8 @@
 
 ## 3. Task Service Single Graph Admission
 
-- [ ] 3.1 Add Task Service tests that reject or compatibility-scope a second authoritative graph for one application execution session.
-- [ ] 3.2 Implement Task Service graph admission rules.
+- [x] 3.1 Add Task Service tests that reject or compatibility-scope a second authoritative graph for one application execution session.
+- [x] 3.2 Implement Task Service graph admission rules.
 - [ ] 3.3 Emit structured logs for graph admitted, graph rejected, compatibility graph admitted, task claimed, task reviewed, task failed, and graph terminal projected.
 - [x] 3.4 Run `cargo test -p macaca-task --lib`.
 
@@ -25,7 +25,7 @@
 - [ ] 4.1 Add a regression test reproducing the Workbench-shaped failure without referencing Workbench by name in service/runtime code.
 - [x] 4.2 Move Web loop fallback decomposition to a Task Service compatibility strategy or adapter command.
 - [x] 4.3 Ensure compatibility fallback failures emit diagnostics but cannot mark application execution terminal failed.
-- [ ] 4.4 Run `cargo test -p macaca-web loop_manager --lib`.
+- [x] 4.4 Run `cargo test -p macaca-web loop_manager --lib`.
 
 ## 5. Hosted Execution Terminal Projection
 

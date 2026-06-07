@@ -148,6 +148,94 @@ where
         Ok(goal)
     }
 
+    /// Normalize an assignment graph id before admission.
+    ///
+    /// Application-execution task assignments form one authoritative graph per
+    /// application execution session.  If an adapter does not provide an opaque
+    /// graph id, the Task Service derives a deterministic service-owned id from
+    /// the session.  The derived value is not an application name, workflow name,
+    /// provider name, or business-domain value; it is only a replay/audit key for
+    /// grouping tasks that belong to the same execution graph.
+    fn normalize_assignment_graph_id(command: &CreateTaskAssignmentCommand) -> Option<String> {
+        let requested = command
+            .graph_id
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string);
+        requested.or_else(|| {
+            command
+                .graph_owner
+                .is_application_execution_authoritative()
+                .then(|| format!("application_execution:{}", command.session_id.trim()))
+        })
+    }
+
+    /// Admit one task into the session's task graph according to ownership.
+    ///
+    /// The rule intentionally models graph admission instead of agent workflow
+    /// semantics: many tasks may join the same authoritative graph, while a
+    /// second authoritative graph id in the same session is rejected.  Compatibility
+    /// and diagnostic graph entries remain admissible because they are audit
+    /// evidence, not application-execution terminal facts.
+    async fn admit_assignment_graph(
+        &self,
+        command: &CreateTaskAssignmentCommand,
+        normalized_graph_id: Option<&str>,
+    ) -> Result<(), String> {
+        let existing = self
+            .store
+            .list_all_todos_for_session(&command.app_id, &command.session_id)
+            .await;
+        let authoritative_conflict = command
+            .graph_owner
+            .is_application_execution_authoritative()
+            .then(|| {
+                existing.into_iter().find(|task| {
+                    task.graph_owner.is_application_execution_authoritative()
+                        && task.graph_id.as_deref().or_else(|| normalized_graph_id)
+                            != normalized_graph_id
+                })
+            })
+            .flatten();
+
+        info!(
+            app_id = %command.app_id.0,
+            session_id = %command.session_id,
+            graph_owner = %command.graph_owner.as_str(),
+            graph_id = normalized_graph_id.unwrap_or("none"),
+            trace_id = command
+                .trace
+                .as_ref()
+                .map(|trace| trace.trace_id.as_str())
+                .unwrap_or("none"),
+            admitted = authoritative_conflict.is_none(),
+            "task graph admission evaluated"
+        );
+
+        if let Some(conflicting_task) = authoritative_conflict {
+            warn!(
+                app_id = %command.app_id.0,
+                session_id = %command.session_id,
+                requested_graph_id = normalized_graph_id.unwrap_or("none"),
+                existing_graph_id = conflicting_task.graph_id.as_deref().unwrap_or("legacy_application_execution"),
+                existing_task_id = %conflicting_task.id,
+                trace_id = command
+                    .trace
+                    .as_ref()
+                    .map(|trace| trace.trace_id.as_str())
+                    .unwrap_or("none"),
+                "task graph admission rejected"
+            );
+            return Err(format!(
+                "task service rejected a second authoritative graph for session {}",
+                command.session_id
+            ));
+        }
+
+        Ok(())
+    }
+
     /// Query a session-scoped task board through the task service boundary.
     pub async fn query_task_board(
         &self,
@@ -193,13 +281,16 @@ where
         if title.is_empty() {
             return Err("task service assignment title cannot be blank".into());
         }
+        let graph_id = Self::normalize_assignment_graph_id(&command);
+        self.admit_assignment_graph(&command, graph_id.as_deref())
+            .await?;
         let space = TaskSpace::for_session(
             command.app_id.clone(),
             Some(command.session_id.clone()),
             Arc::clone(&self.store),
         );
         let task = space
-            .create_task_assignment_with_graph_owner(
+            .create_task_assignment_with_graph_scope(
                 &agent_name,
                 command.created_by.trim(),
                 title,
@@ -209,6 +300,7 @@ where
                 command.depends_on,
                 command.parent_task,
                 command.graph_owner,
+                graph_id.clone(),
             )
             .await;
         info!(
@@ -217,6 +309,7 @@ where
             agent = %agent_name,
             task_id = %task.id,
             graph_owner = %command.graph_owner.as_str(),
+            graph_id = graph_id.as_deref().unwrap_or("none"),
             trace_id = command
                 .trace
                 .as_ref()
@@ -237,6 +330,7 @@ where
                 "status": format!("{:?}", task.status),
                 "sequence_number": task.sequence_number,
                 "graph_owner": task.graph_owner.as_str(),
+                "graph_id": task.graph_id.as_deref(),
             }),
         ))
         .await;
@@ -472,6 +566,7 @@ where
             status: task.status,
             session_id: task.session_id,
             graph_owner: task.graph_owner,
+            graph_id: task.graph_id,
         })
         .collect::<Vec<_>>();
         tasks.sort_by(|left, right| left.task_id.0.cmp(&right.task_id.0));
@@ -586,6 +681,7 @@ mod tests {
                 depends_on: vec![],
                 parent_task: None,
                 graph_owner: macaca_proto::TaskGraphOwner::ApplicationExecution,
+                graph_id: Some("graph-explicit-assignment".into()),
                 trace: Some(TraceContext::new("trace-explicit-first")),
             })
             .await
@@ -603,6 +699,7 @@ mod tests {
                 depends_on: vec![],
                 parent_task: None,
                 graph_owner: macaca_proto::TaskGraphOwner::ApplicationExecution,
+                graph_id: Some("graph-explicit-assignment".into()),
                 trace: Some(TraceContext::new("trace-explicit-second")),
             })
             .await
@@ -669,6 +766,7 @@ mod tests {
                 depends_on: vec![],
                 parent_task: None,
                 graph_owner: macaca_proto::TaskGraphOwner::ApplicationExecution,
+                graph_id: Some("graph-owner".into()),
                 trace: Some(TraceContext::new("trace-graph-owner")),
             })
             .await
@@ -687,6 +785,194 @@ mod tests {
             created_event.payload["graph_owner"],
             serde_json::json!("application_execution")
         );
+        assert_eq!(
+            created_event.payload["graph_id"],
+            serde_json::json!("graph-owner")
+        );
+    }
+
+    #[test]
+    fn assignment_command_accepts_service_owned_graph_owner_labels() {
+        let command: CreateTaskAssignmentCommand = serde_json::from_value(serde_json::json!({
+            "app_id": ApplicationId::new(),
+            "session_id": "session-json-contract",
+            "agent_name": "agent",
+            "created_by": "application_execution",
+            "title": "JSON assignment",
+            "description": "The service runtime command uses stable snake_case labels.",
+            "acceptance_criteria": [],
+            "priority": 5,
+            "depends_on": [],
+            "parent_task": null,
+            "graph_owner": "application_execution",
+            "trace": TraceContext::new("trace-json-contract"),
+        }))
+        .expect("snake_case graph owner labels should decode across ServiceRuntime JSON");
+
+        assert_eq!(
+            command.graph_owner,
+            macaca_proto::TaskGraphOwner::ApplicationExecution
+        );
+        assert!(command.graph_id.is_none());
+    }
+
+    #[tokio::test]
+    async fn authoritative_graph_admission_rejects_second_graph_in_session() {
+        let store = setup().await;
+        let sink = Arc::new(InMemoryTaskServiceEventSink::new());
+        let runtime = TaskServiceRuntime::new(
+            Arc::clone(&store),
+            Arc::new(NoopTaskServiceExecutionStrategy),
+            Arc::clone(&sink) as Arc<dyn TaskServiceEventSink>,
+        );
+        let app_id = ApplicationId::new();
+        let session_id = "session-authoritative-admission";
+
+        let first = runtime
+            .create_task_assignment(CreateTaskAssignmentCommand {
+                app_id: app_id.clone(),
+                session_id: session_id.into(),
+                agent_name: "planner".into(),
+                created_by: "application_execution".into(),
+                title: "Primary graph task".into(),
+                description: "The first authoritative graph owns the session.".into(),
+                acceptance_criteria: vec!["The first graph is admitted.".into()],
+                priority: 5,
+                depends_on: vec![],
+                parent_task: None,
+                graph_owner: macaca_proto::TaskGraphOwner::ApplicationExecution,
+                graph_id: Some("graph-primary".into()),
+                trace: Some(TraceContext::new("trace-primary-graph")),
+            })
+            .await
+            .expect("first authoritative graph should be admitted");
+
+        let same_graph = runtime
+            .create_task_assignment(CreateTaskAssignmentCommand {
+                app_id: app_id.clone(),
+                session_id: session_id.into(),
+                agent_name: "coder".into(),
+                created_by: "application_execution".into(),
+                title: "Same graph task".into(),
+                description: "A second task may join the same graph.".into(),
+                acceptance_criteria: vec!["The same graph id is preserved.".into()],
+                priority: 5,
+                depends_on: vec![first.id],
+                parent_task: None,
+                graph_owner: macaca_proto::TaskGraphOwner::ApplicationExecution,
+                graph_id: Some("graph-primary".into()),
+                trace: Some(TraceContext::new("trace-same-graph")),
+            })
+            .await
+            .expect("same authoritative graph should accept additional tasks");
+
+        let rejected = runtime
+            .create_task_assignment(CreateTaskAssignmentCommand {
+                app_id: app_id.clone(),
+                session_id: session_id.into(),
+                agent_name: "reviewer".into(),
+                created_by: "application_execution".into(),
+                title: "Second graph task".into(),
+                description: "A second authoritative graph must not own the session.".into(),
+                acceptance_criteria: vec!["This graph should be rejected.".into()],
+                priority: 5,
+                depends_on: vec![],
+                parent_task: None,
+                graph_owner: macaca_proto::TaskGraphOwner::ApplicationExecution,
+                graph_id: Some("graph-second".into()),
+                trace: Some(TraceContext::new("trace-second-graph")),
+            })
+            .await;
+
+        assert!(
+            rejected.is_err(),
+            "second authoritative graph id should be rejected"
+        );
+        let snapshot = runtime
+            .snapshot(TaskServiceSnapshotCommand {
+                app_id,
+                session_id: Some(session_id.into()),
+                trace: Some(TraceContext::new("trace-admission-snapshot")),
+            })
+            .await
+            .unwrap();
+        let authoritative_tasks = snapshot
+            .tasks
+            .iter()
+            .filter(|task| task.graph_owner.is_application_execution_authoritative())
+            .collect::<Vec<_>>();
+        assert_eq!(authoritative_tasks.len(), 2);
+        assert_eq!(same_graph.graph_id.as_deref(), Some("graph-primary"));
+    }
+
+    #[tokio::test]
+    async fn compatibility_graph_is_admitted_but_not_authoritative() {
+        let store = setup().await;
+        let sink = Arc::new(InMemoryTaskServiceEventSink::new());
+        let runtime = TaskServiceRuntime::new(
+            Arc::clone(&store),
+            Arc::new(NoopTaskServiceExecutionStrategy),
+            Arc::clone(&sink) as Arc<dyn TaskServiceEventSink>,
+        );
+        let app_id = ApplicationId::new();
+        let session_id = "session-compatibility-admission";
+
+        runtime
+            .create_task_assignment(CreateTaskAssignmentCommand {
+                app_id: app_id.clone(),
+                session_id: session_id.into(),
+                agent_name: "planner".into(),
+                created_by: "application_execution".into(),
+                title: "Authoritative graph task".into(),
+                description: "The execution graph owns terminal state.".into(),
+                acceptance_criteria: vec!["The authoritative graph is admitted.".into()],
+                priority: 5,
+                depends_on: vec![],
+                parent_task: None,
+                graph_owner: macaca_proto::TaskGraphOwner::ApplicationExecution,
+                graph_id: Some("graph-authoritative".into()),
+                trace: Some(TraceContext::new("trace-authoritative-graph")),
+            })
+            .await
+            .expect("authoritative graph should be admitted");
+
+        let compatibility = runtime
+            .create_task_assignment(CreateTaskAssignmentCommand {
+                app_id: app_id.clone(),
+                session_id: session_id.into(),
+                agent_name: "planner".into(),
+                created_by: "task_service_compatibility".into(),
+                title: "Compatibility graph task".into(),
+                description: "Compatibility evidence must remain non-authoritative.".into(),
+                acceptance_criteria: vec!["The compatibility graph is visible for audit.".into()],
+                priority: 5,
+                depends_on: vec![],
+                parent_task: None,
+                graph_owner: macaca_proto::TaskGraphOwner::TaskServiceCompatibility,
+                graph_id: Some("graph-compatibility".into()),
+                trace: Some(TraceContext::new("trace-compatibility-graph")),
+            })
+            .await
+            .expect("compatibility graph should be admitted");
+
+        assert_eq!(
+            compatibility.graph_owner,
+            macaca_proto::TaskGraphOwner::TaskServiceCompatibility
+        );
+        let snapshot = runtime
+            .snapshot(TaskServiceSnapshotCommand {
+                app_id,
+                session_id: Some(session_id.into()),
+                trace: Some(TraceContext::new("trace-compatibility-snapshot")),
+            })
+            .await
+            .unwrap();
+        let authoritative_count = snapshot
+            .tasks
+            .iter()
+            .filter(|task| task.graph_owner.is_application_execution_authoritative())
+            .count();
+        assert_eq!(authoritative_count, 1);
     }
 
     #[tokio::test]

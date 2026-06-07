@@ -475,20 +475,25 @@ pub enum TodoStatus {
 /// application-execution terminal path unless a service explicitly marks them
 /// as authoritative.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
 pub enum TaskGraphOwner {
     /// Task entries that are authoritative for `service.application_execution`
     /// run completion and failure projection.
+    #[serde(alias = "ApplicationExecution")]
     ApplicationExecution,
     /// Existing task-service, scheduler, chat, or goal-loop entries whose
     /// lifecycle is visible on the board but is not an application-execution
     /// terminal source unless a higher-level service explicitly binds it.
     #[default]
+    #[serde(alias = "TaskServiceNative")]
     TaskServiceNative,
     /// Compatibility fallback entries created while migrating legacy planner
     /// and Web loop behavior behind the Task Service boundary.
+    #[serde(alias = "TaskServiceCompatibility")]
     TaskServiceCompatibility,
     /// Diagnostic entries that explain observations or failures but should
     /// never drive terminal execution state.
+    #[serde(alias = "DiagnosticOnly")]
     DiagnosticOnly,
 }
 
@@ -531,6 +536,16 @@ pub struct TodoItem {
     /// names, programming languages, or product-domain semantics.
     #[serde(default)]
     pub graph_owner: TaskGraphOwner,
+    /// Stable identity of the task graph that this task belongs to.
+    ///
+    /// The value is a service-owned execution graph identifier.  It lets the
+    /// Task Service admit many tasks into the same authoritative graph while
+    /// rejecting a second authoritative graph for the same application
+    /// execution session.  The identifier must not contain workflow names,
+    /// application names, provider names, programming languages, or business
+    /// semantics; callers should use run/session scoped opaque ids.
+    #[serde(default)]
+    pub graph_id: Option<String>,
 
     // ── content ──
     pub title: String,
@@ -586,6 +601,7 @@ impl TodoItem {
             assigned_agent: assigned_agent.into(),
             created_by: created_by.into(),
             graph_owner: TaskGraphOwner::TaskServiceNative,
+            graph_id: None,
             title: title.into(),
             description: description.into(),
             acceptance_criteria: Vec::new(),

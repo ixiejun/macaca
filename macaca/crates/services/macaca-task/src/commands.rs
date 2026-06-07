@@ -88,6 +88,15 @@ pub struct CreateTaskAssignmentCommand {
     /// unless they deliberately choose another owner.
     #[serde(default = "default_assignment_graph_owner")]
     pub graph_owner: TaskGraphOwner,
+    /// Optional opaque identity for the execution task graph.
+    ///
+    /// Application adapters should pass a run/session scoped graph id when they
+    /// already know it.  When omitted, the Task Service derives a deterministic
+    /// service-owned id from the session for application-execution assignments.
+    /// The field is deliberately generic and must never encode application
+    /// names, workflow names, provider names, model names, or business domains.
+    #[serde(default)]
+    pub graph_id: Option<String>,
     pub trace: Option<TraceContext>,
 }
 
