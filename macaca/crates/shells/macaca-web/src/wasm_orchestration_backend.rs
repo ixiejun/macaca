@@ -11,7 +11,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use macaca_kernel::ApplicationExecutorRegistry;
+use macaca_runtime_host::ApplicationExecutorRegistry;
 use macaca_proto::{
     AgentExecutionIntent, ApplicationAgentDelegateCommand, ApplicationAgentDelegateResult,
     ApplicationId, ServiceError, ServiceResult, TaskId,

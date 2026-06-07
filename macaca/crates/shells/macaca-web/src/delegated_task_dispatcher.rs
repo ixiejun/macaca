@@ -17,7 +17,7 @@
 
 use std::sync::Arc;
 
-use macaca_kernel::{ApplicationExecutor, TaskContext, TaskId, TaskResult};
+use macaca_runtime_host::{ApplicationExecutor, TaskContext, TaskId, TaskResult};
 use macaca_proto::{
     AgentExecutionCommand, AgentExecutionEvent, AgentExecutionIntent, AgentExecutionResult,
     AgentExecutionStatus, ApplicationId, KernelServiceId, ServiceBusSource, TraceContext,

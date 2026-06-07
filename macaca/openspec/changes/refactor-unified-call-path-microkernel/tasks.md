@@ -94,15 +94,15 @@
 - [x] 3.2.4 测试：web3 optional 缺席时 base OS 正常启动/执行/恢复/查询审计。（`web3_service_provider.rs` 6/6 + SDK `web3_client` 2/2；VC-escape violations=0）
 
 ### 3.3 驱逐 EVM
-- [ ] 3.3.1 `[impact-memo]` 盘点 `kernel/evm.rs`、`evm_adapter.rs`、`evm_event.rs`、`evm_tests.rs` 消费者；确认 `runtime-host/evm_service_provider.rs` 可承接（参考 `optional-evm-substrate-frontier-adapter-boundary.md`）。
-- [ ] 3.3.2 将 EVM facade/adapter（含 `Mock*`/`Unavailable*`）迁入 EVM optional module/service provider。
-- [ ] 3.3.3 删除 kernel `evm.rs`、`evm_adapter.rs`、`evm_event.rs`、`evm_tests.rs` 及 `lib.rs` 导出。
-- [ ] 3.3.4 测试：EVM optional 缺席降级；无 base OS 反向依赖。
+- [x] 3.3.1 `[impact-memo]` 盘点 `kernel/evm.rs`、`evm_adapter.rs`、`evm_event.rs`、`evm_tests.rs` 消费者；确认 `runtime-host/evm_service_provider.rs` 可承接（参考 `optional-evm-substrate-frontier-adapter-boundary.md`）。
+- [x] 3.3.2 将 EVM facade/adapter（含 `Mock*`/`Unavailable*`）迁入 EVM optional module/service provider。
+- [x] 3.3.3 删除 kernel `evm.rs`、`evm_adapter.rs`、`evm_event.rs`、`evm_tests.rs` 及 `lib.rs` 导出。
+- [x] 3.3.4 测试：EVM optional 缺席降级；无 base OS 反向依赖。
 
 ### 3.4 驱逐执行编排 executor（P1 已迁逻辑，此处删 kernel 模块）
-- [ ] 3.4.1 确认 P1 已将 `executor/` 逻辑迁至 service；全仓搜索 kernel `executor::` 的残留生产消费者为 0。
-- [ ] 3.4.2 删除 `kernel/src/executor/` 整目录及 `lib.rs` 中 executor 导出（`ApplicationExecutor/ForkManager/AgentRunner/TaskRouter/...`）。
-- [ ] 3.4.3 测试：kernel 单测不再依赖 executor；task/execution service 测试覆盖原 executor 行为。
+- [x] 3.4.1 确认 P1 已将 `executor/` 逻辑迁至 service；全仓搜索 kernel `executor::` 的残留生产消费者为 0。
+- [x] 3.4.2 删除 `kernel/src/executor/` 整目录及 `lib.rs` 中 executor 导出（`ApplicationExecutor/ForkManager/AgentRunner/TaskRouter/...`）。
+- [x] 3.4.3 测试：kernel 单测不再依赖 executor；task/execution service 测试覆盖原 executor 行为。
 
 ### 3.5 删除 provider 兼容与 compat 构造
 - [ ] 3.5.1 删除 `kernel/provider_compat.rs`（`KernelProviderCompat/LegacyLlmProvider/LegacyToolCatalog`）及 `lib.rs` 导出。

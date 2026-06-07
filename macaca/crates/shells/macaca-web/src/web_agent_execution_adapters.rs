@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use macaca_kernel::executor::{ApplicationExecutor, ExecutorEventFactory};
+use macaca_runtime_host::executor::{ApplicationExecutor, ExecutorEventFactory};
 use macaca_proto::{
     AgentActivity, AgentExecutionCommand, AgentExecutionEvent, ApplicationMetadataQueryCommand,
     ExecutionControlCommandResult, ExecutionControlPolicy,

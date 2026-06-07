@@ -21,8 +21,8 @@ use tokio::sync::{mpsc, RwLock};
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
-use crate::logging::{log_hook_event, log_state_transition, LogContext};
-use crate::persistence::KernelPersistencePort;
+use macaca_kernel::logging::{log_hook_event, log_state_transition, LogContext};
+use macaca_kernel::KernelPersistencePort;
 use macaca_proto::{
     AcceptanceCriteria, ApplicationId, ForkId, ForkState, LlmMessage, TaskId, ValidationResult,
 };

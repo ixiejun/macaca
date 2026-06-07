@@ -17,7 +17,7 @@ use tokio::sync::RwLock;
 use macaca_app::{app_entry_agent_name, AppLoader};
 use macaca_framework::execution::ExecutionContext;
 use macaca_framework::session::{load_module_state, save_module_state};
-use macaca_kernel::{executor::ExecutorEvent, AgentInfo};
+use macaca_runtime_host::{executor::ExecutorEvent, AgentInfo};
 use macaca_proto::{
     AgentExecutionCommand, AgentExecutionIntent, AgentExecutionResult, AgentExecutionStatus,
     ApplicationHostCommand, ApplicationHostCommandStatus, ApplicationHostDispatchServiceCommand,

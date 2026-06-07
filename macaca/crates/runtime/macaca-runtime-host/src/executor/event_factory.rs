@@ -3,7 +3,7 @@
 use chrono::Utc;
 
 use super::{ExecutorEvent, TaskResult};
-use crate::executor::TaskId;
+use super::TaskId;
 
 /// Factory for task-scoped executor lifecycle events.
 #[derive(Debug, Clone)]

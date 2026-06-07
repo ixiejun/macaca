@@ -63,7 +63,7 @@ pub struct FrameworkRunner;
 
 enum FrameworkRunnerBuildMode {
     Executor {
-        executor: Arc<macaca_kernel::executor::ApplicationExecutor>,
+        executor: Arc<macaca_runtime_host::executor::ApplicationExecutor>,
     },
     Runtime {
         event_tx: Option<mpsc::Sender<macaca_proto::AgentExecutionEvent>>,
@@ -121,7 +121,7 @@ struct PreparedAgentParts {
 
 enum StandardAgentMode {
     Executor {
-        executor: Arc<macaca_kernel::executor::ApplicationExecutor>,
+        executor: Arc<macaca_runtime_host::executor::ApplicationExecutor>,
     },
     Runtime {
         event_tx: Option<mpsc::Sender<macaca_proto::AgentExecutionEvent>>,
@@ -132,7 +132,7 @@ enum StandardAgentMode {
 enum DriverTraceRoute {
     Executor {
         state: Arc<AppState>,
-        executor: Arc<macaca_kernel::executor::ApplicationExecutor>,
+        executor: Arc<macaca_runtime_host::executor::ApplicationExecutor>,
         task_id: macaca_proto::TaskId,
         agent_name: String,
         session_id: Option<String>,
@@ -260,7 +260,7 @@ impl FrameworkRunner {
         agent_name: &str,
         session_id: Option<String>,
         task_id: macaca_proto::TaskId,
-        executor: Arc<macaca_kernel::executor::ApplicationExecutor>,
+        executor: Arc<macaca_runtime_host::executor::ApplicationExecutor>,
     ) -> Result<HookedAgent<ReActAgent>, String> {
         Self::build_for_intent(
             state,
@@ -283,7 +283,7 @@ impl FrameworkRunner {
         agent_name: &str,
         session_id: Option<String>,
         task_id: macaca_proto::TaskId,
-        executor: Arc<macaca_kernel::executor::ApplicationExecutor>,
+        executor: Arc<macaca_runtime_host::executor::ApplicationExecutor>,
     ) -> Result<HookedAgent<ReActAgent>, String> {
         Self::build_for_intent(
             state,
@@ -306,7 +306,7 @@ impl FrameworkRunner {
         agent_name: &str,
         session_id: Option<String>,
         task_id: macaca_proto::TaskId,
-        executor: Arc<macaca_kernel::executor::ApplicationExecutor>,
+        executor: Arc<macaca_runtime_host::executor::ApplicationExecutor>,
         goal_id: Option<macaca_proto::TaskId>,
     ) -> Result<HookedAgent<ReActAgent>, String> {
         Self::build_for_intent(
@@ -332,7 +332,7 @@ impl FrameworkRunner {
         agent_name: &str,
         session_id: Option<String>,
         task_id: macaca_proto::TaskId,
-        executor: Arc<macaca_kernel::executor::ApplicationExecutor>,
+        executor: Arc<macaca_runtime_host::executor::ApplicationExecutor>,
         goal_id: Option<macaca_proto::TaskId>,
     ) -> Result<HookedAgent<ReActAgent>, String> {
         Self::build_for_intent(
@@ -357,7 +357,7 @@ impl FrameworkRunner {
         agent_name: &str,
         session_id: Option<String>,
         task_id: macaca_proto::TaskId,
-        executor: Arc<macaca_kernel::executor::ApplicationExecutor>,
+        executor: Arc<macaca_runtime_host::executor::ApplicationExecutor>,
         intent: AgentBuildIntent,
     ) -> Result<HookedAgent<ReActAgent>, String> {
         let tools = match &intent {
@@ -1826,7 +1826,7 @@ impl WebTracedAgentFactory {
                         // post_chat_v2 owns the SSE forwarding for that channel; sending here
                         // as well would duplicate delegated_driver_trace events in the live UI.
                         executor.broadcast_event(
-                            macaca_kernel::executor::ExecutorEvent::AgentEvent {
+                            macaca_runtime_host::executor::ExecutorEvent::AgentEvent {
                                 task_id: *task_id,
                                 agent: agent_name.clone(),
                                 event: macaca_proto::AgentExecutionEvent::DriverTrace {
@@ -1877,7 +1877,7 @@ impl WebTracedAgentFactory {
     async fn build_executor_agent(
         &self,
         request: AgentBuildRequest,
-        executor: Arc<macaca_kernel::executor::ApplicationExecutor>,
+        executor: Arc<macaca_runtime_host::executor::ApplicationExecutor>,
     ) -> Result<HookedAgent<ReActAgent>, String> {
         self.build_standard_agent(request, StandardAgentMode::Executor { executor }, 25, None)
             .await
@@ -2325,7 +2325,7 @@ impl ToolMiddleware for ChannelToolMiddleware {
 /// Hook that emits executor events at the start and end of a `reply` call.
 /// Used by worker agents to push thinking/assistant events to SSE + EventLog.
 pub struct ExecutorEmitterHook {
-    executor: Arc<macaca_kernel::executor::ApplicationExecutor>,
+    executor: Arc<macaca_runtime_host::executor::ApplicationExecutor>,
     task_id: macaca_proto::TaskId,
     agent_name: String,
     iteration: std::sync::atomic::AtomicUsize,
@@ -2336,7 +2336,7 @@ impl Hook for ExecutorEmitterHook {
     async fn pre_reply(&self, msg: Msg) -> macaca_framework::agent::AgentResult<Msg> {
         let iter = self.iteration.fetch_add(1, Ordering::Relaxed);
         self.executor
-            .broadcast_event(macaca_kernel::executor::ExecutorEvent::AgentEvent {
+            .broadcast_event(macaca_runtime_host::executor::ExecutorEvent::AgentEvent {
                 task_id: self.task_id,
                 agent: self.agent_name.clone(),
                 event: macaca_proto::AgentExecutionEvent::Thinking {
@@ -2351,7 +2351,7 @@ impl Hook for ExecutorEmitterHook {
         let text = msg.get_text();
         if !text.is_empty() {
             self.executor
-                .broadcast_event(macaca_kernel::executor::ExecutorEvent::AgentEvent {
+                .broadcast_event(macaca_runtime_host::executor::ExecutorEvent::AgentEvent {
                     task_id: self.task_id,
                     agent: self.agent_name.clone(),
                     event: macaca_proto::AgentExecutionEvent::Assistant { content: text },
@@ -2368,7 +2368,7 @@ impl Hook for ExecutorEmitterHook {
 /// Middleware that emits executor events for every tool invocation.
 /// Used by worker agents to push tool_call/tool_result events to SSE + EventLog.
 pub struct ExecutorToolMiddleware {
-    executor: Arc<macaca_kernel::executor::ApplicationExecutor>,
+    executor: Arc<macaca_runtime_host::executor::ApplicationExecutor>,
     task_id: macaca_proto::TaskId,
     agent_name: String,
 }
@@ -2377,7 +2377,7 @@ pub struct ExecutorToolMiddleware {
 impl ToolMiddleware for ExecutorToolMiddleware {
     async fn before(&self, name: &str, args: &mut serde_json::Value) -> Result<(), ToolError> {
         self.executor
-            .broadcast_event(macaca_kernel::executor::ExecutorEvent::AgentEvent {
+            .broadcast_event(macaca_runtime_host::executor::ExecutorEvent::AgentEvent {
                 task_id: self.task_id,
                 agent: self.agent_name.clone(),
                 event: tool_call_event(name, args),
@@ -2387,7 +2387,7 @@ impl ToolMiddleware for ExecutorToolMiddleware {
 
     async fn after(&self, name: &str, response: &mut ToolResponse) -> Result<(), ToolError> {
         self.executor
-            .broadcast_event(macaca_kernel::executor::ExecutorEvent::AgentEvent {
+            .broadcast_event(macaca_runtime_host::executor::ExecutorEvent::AgentEvent {
                 task_id: self.task_id,
                 agent: self.agent_name.clone(),
                 event: tool_result_event(name, tool_trace_output(response)),

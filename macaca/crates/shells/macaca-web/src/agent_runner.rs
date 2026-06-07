@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 use std::sync::{Arc, Weak};
 
 use async_trait::async_trait;
-use macaca_kernel::{AgentInfo, AgentRunner, TaskContext, TaskResult};
+use macaca_runtime_host::{AgentInfo, AgentRunner, TaskContext, TaskResult};
 use macaca_proto::{
     AgentExecutionEvent, AgentExecutionIntent, ApplicationAgentDelegateCommand,
     ApplicationAgentDelegateResult, ApplicationId, ApplicationServiceScope, KernelServiceId,

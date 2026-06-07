@@ -248,4 +248,32 @@ mod tests {
             .unwrap();
         assert_eq!(snapshot.service_id, EVM_SERVICE_ID);
     }
+
+    #[tokio::test]
+    async fn unavailable_evm_client_fails_closed_for_deploy() {
+        let client = UnavailableSystemEvmClient;
+        let error = client
+            .deploy(EvmContractDeployCommand {
+                trace: TraceContext::new("trace-sdk-evm-unavailable-deploy"),
+                request: macaca_proto::ContractDeployRequest {
+                    request_id: macaca_proto::EvmRequestId::new("request.deploy"),
+                    chain_id: macaca_proto::EvmChainId::new("chain.mock"),
+                    wallet_id: None,
+                    artifact_ref: "artifact".into(),
+                    abi_ref: macaca_proto::ContractAbiRef::new("abi.mock"),
+                    constructor_args_digest: None,
+                    gas_policy: macaca_proto::GasPolicy::default(),
+                    session_id: None,
+                    task_id: None,
+                    requested_at: chrono::Utc::now(),
+                    metadata: std::collections::BTreeMap::new(),
+                },
+            })
+            .await
+            .expect_err("unavailable client must reject deploy");
+        assert!(
+            error.to_string().to_ascii_lowercase().contains("unavailable"),
+            "expected unavailable diagnostic, got: {error}"
+        );
+    }
 }

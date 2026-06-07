@@ -15,7 +15,7 @@ use std::time::Instant;
 use tokio::sync::{mpsc, RwLock};
 use tracing::{debug, error, info, warn};
 
-use crate::persistence::KernelPersistencePort;
+use macaca_kernel::KernelPersistencePort;
 
 /// Worker state for tracking worker health.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

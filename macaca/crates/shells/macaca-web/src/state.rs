@@ -18,7 +18,8 @@ use macaca_context::{
 };
 use macaca_driver::{DriverRegistry, DriverRuntime};
 use macaca_framework::session::SessionStore as FrameworkSessionStore;
-use macaca_kernel::{ApplicationExecutorRegistry, Kernel};
+use macaca_kernel::Kernel;
+use macaca_runtime_host::ApplicationExecutorRegistry;
 use macaca_llm::{LlmProvider, LlmRouter};
 use macaca_persist::{EventLog, PersistBackend};
 use macaca_proto::{config::ContextConfig, ApplicationId, ForkId, LlmMessage};

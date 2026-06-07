@@ -15,7 +15,7 @@ use tokio::sync::{mpsc, RwLock};
 use super::{DelegatedTask, TaskId, TaskResult, TaskStatus};
 use macaca_proto::ApplicationId;
 
-use crate::persistence::KernelPersistencePort;
+use macaca_kernel::KernelPersistencePort;
 
 /// Maximum number of tasks that can be queued.
 const DEFAULT_MAX_QUEUE_SIZE: usize = 100;
