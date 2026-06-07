@@ -41,6 +41,7 @@ pub mod framework_runner;
 pub mod framework_toolkit;
 pub mod genui_routes;
 pub mod heartbeat_operations_routes;
+mod fork_join_shell_adapter;
 pub mod hook_consumer;
 pub mod loop_manager;
 mod memory_runtime;
@@ -477,8 +478,15 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
     }
 
     // 8. Initialize orchestration tools.
-    let tool_assembly =
-        build_web_tools(Arc::clone(&kernel), Arc::clone(&service_runtime), all_tools);
+    let fork_to_session: Arc<
+        tokio::sync::RwLock<std::collections::HashMap<macaca_proto::ForkId, crate::state::ForkSessionMapping>>,
+    > = Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new()));
+    let tool_assembly = build_web_tools(
+        Arc::clone(&kernel),
+        Arc::clone(&service_runtime),
+        Arc::clone(&fork_to_session),
+        all_tools,
+    );
     let tools = tool_assembly.tools;
     let executor_registry_ref = tool_assembly.executor_registry_ref;
     let delegate_session_id = tool_assembly.delegate_session_id;
@@ -1047,7 +1055,7 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
                 conversations: tokio::sync::RwLock::new(HashMap::new()),
                 cancel_flags: tokio::sync::RwLock::new(HashMap::new()),
                 active_sessions: tokio::sync::RwLock::new(HashMap::new()),
-                fork_to_session: tokio::sync::RwLock::new(HashMap::new()),
+                fork_to_session: Arc::clone(&fork_to_session),
                 goal_to_session: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
                 delegate_session_id: Arc::clone(&delegate_session_id),
                 llm_route_hints: tokio::sync::RwLock::new(HashMap::new()),

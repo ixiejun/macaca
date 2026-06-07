@@ -1,40 +1,47 @@
-//! Hook Event Consumer - Listens to fork events and resumes coordinator loops.
+//! Hook Event Consumer - Listens to fork events and resumes parent execution loops.
 //!
-//! This module implements the automatic coordinator notification system.
-//! When a delegated task completes (ForkValidated event), this consumer
-//! finds the waiting coordinator session and sends a resume signal.
+//! This module implements the automatic parent-notification system for fork-join
+//! delegation.  When a delegated task completes (`ForkValidated`) or fails
+//! (`DelegateFailed`), the consumer:
+//! 1. Looks up the `fork_to_session` mapping to find the waiting parent session.
+//! 2. Delivers a fork-lifecycle resume through `service.execution_control` (audit).
+//! 3. Adapts the result into the legacy in-memory resume channel for the parent loop.
 
 use std::collections::HashMap;
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 
 use macaca_kernel::executor::fork_manager::HookEvent;
-use macaca_proto::{ApplicationId, LlmRole};
+use macaca_proto::{TaskId, EXECUTION_CONTROL_SERVICE_ID};
+use macaca_runtime_host::ExecutionControlForkJoinCoordinator;
 use tokio::sync::broadcast::Receiver;
 use tracing::{info, warn};
 
+use crate::fork_join_shell_adapter::{
+    deliver_fork_join_resume_and_notify_parent, extract_fork_assistant_output,
+    REASON_FORK_JOIN_PARENT_RESUME_FAILURE, REASON_FORK_JOIN_PARENT_RESUME_SUCCESS,
+};
 use crate::runtime_resume::RuntimeResumeSignal;
 use crate::state::AppState;
 
 /// Start the hook event consumer background task.
 ///
-/// This task monitors all ApplicationExecutors for hook events.
-/// When a ForkValidated event is received, it:
-/// 1. Looks up the fork_to_session mapping to find the coordinator session
-/// 2. Gets the task result from the fork
-/// 3. Sends a runtime resume signal to the waiting coordinator loop
+/// The consumer polls kernel hook broadcast channels (one per registered application)
+/// and translates terminal fork lifecycle events into execution-control resume
+/// commands plus shell-local wakeups.
 pub async fn start_hook_event_consumer(state: Arc<AppState>) {
     info!("Hook event consumer started");
 
-    // Store receivers for each app to avoid re-subscribing
-    let mut app_receivers: HashMap<ApplicationId, Receiver<HookEvent>> = HashMap::new();
+    let fork_join_coordinator =
+        ExecutionControlForkJoinCoordinator::new(Arc::clone(&state.service_runtime));
+
+    // Store receivers for each app to avoid re-subscribing on every poll tick.
+    let mut app_receivers: HashMap<macaca_proto::ApplicationId, Receiver<HookEvent>> =
+        HashMap::new();
 
     loop {
-        // Get all registered applications
         let executors = state.executor_registry.list_applications().await;
 
-        // Subscribe to new apps
         for (app_id, app_name) in &executors {
             if !app_receivers.contains_key(app_id) {
                 if let Some(executor) = state.executor_registry.get(app_id).await {
@@ -46,7 +53,6 @@ pub async fn start_hook_event_consumer(state: Arc<AppState>) {
             }
         }
 
-        // Remove receivers for apps that no longer exist
         let current_app_ids: std::collections::HashSet<_> =
             executors.iter().map(|(id, _)| id.clone()).collect();
         app_receivers.retain(|app_id, _| {
@@ -57,15 +63,12 @@ pub async fn start_hook_event_consumer(state: Arc<AppState>) {
             keep
         });
 
-        // Check for events from all subscribed apps
         for (app_id, hook_rx) in app_receivers.iter_mut() {
-            // Non-blocking check for events
             loop {
                 match hook_rx.try_recv() {
                     Ok(HookEvent::ForkValidated { fork_id, result: _ }) => {
                         info!(fork_id = %fork_id, app_id = %app_id, "ForkValidated received");
 
-                        // Look up the session mapping
                         let mapping = state
                             .sessions
                             .fork_to_session
@@ -75,67 +78,46 @@ pub async fn start_hook_event_consumer(state: Arc<AppState>) {
                             .cloned();
 
                         if let Some(mapping) = mapping {
-                            // Get the executor and fork manager for this app
                             if let Some(executor) =
                                 state.executor_registry.get(&mapping.app_id).await
                             {
                                 let fork_manager = executor.fork_manager();
-
-                                // Get the fork result
                                 if let Some(fork) = fork_manager.get_fork(fork_id).await {
-                                    // Extract assistant output from fork messages
-                                    let output = fork
-                                        .own_messages
-                                        .iter()
-                                        .filter_map(|m| {
-                                            if matches!(m.role, LlmRole::Assistant) {
-                                                Some(m.content.clone())
-                                            } else {
-                                                None
-                                            }
-                                        })
-                                        .collect::<Vec<_>>()
-                                        .join("\n");
-
+                                    let output =
+                                        extract_fork_assistant_output(&fork.own_messages);
                                     let task_id = fork
                                         .waiting_on_task
-                                        .map(|t| t.0.to_string())
-                                        .unwrap_or_else(|| fork_id.to_string());
+                                        .map(|task| task.0.to_string())
+                                        .unwrap_or_else(|| fork_id.0.to_string());
+                                    let delegate_task_id =
+                                        fork.waiting_on_task.map(|task| TaskId(task.0));
 
-                                    // Find the active session
-                                    let sessions = state.sessions.active_sessions.read().await;
-                                    if let Some(session) = sessions.get(&mapping.session_id) {
-                                        info!(
-                                            session_id = %mapping.session_id,
-                                            task_id = %task_id,
-                                            "Sending resume signal to coordinator"
-                                        );
+                                    let sessions =
+                                        state.sessions.active_sessions.read().await;
+                                    let active_session =
+                                        sessions.get(&mapping.session_id);
 
-                                        // Deprecated compatibility boundary:
-                                        // service-backed execution control now owns policy,
-                                        // registration, and traceable state transitions.
-                                        // This direct channel handoff remains only for
-                                        // legacy fork hooks that cannot yet serialize their
-                                        // in-memory receiver through `service.execution_control`.
-                                        session.pause_signal.store(false, Ordering::SeqCst);
+                                    info!(
+                                        session_id = %mapping.session_id,
+                                        task_id = %task_id,
+                                        service_id = EXECUTION_CONTROL_SERVICE_ID,
+                                        "Delivering fork-join parent resume after validation"
+                                    );
 
-                                        let resume_reason =
-                                            RuntimeResumeSignal::DelegateCompleted {
-                                                task_id,
-                                                success: true,
-                                                output,
-                                            };
-
-                                        if let Err(e) = session.resume_tx.send(resume_reason).await
-                                        {
-                                            warn!(error = %e, "Failed to send resume signal");
-                                        }
-                                    } else {
-                                        warn!(
-                                            session_id = %mapping.session_id,
-                                            "Active session not found for resume"
-                                        );
-                                    }
+                                    deliver_fork_join_resume_and_notify_parent(
+                                        &fork_join_coordinator,
+                                        &mapping,
+                                        fork_id,
+                                        delegate_task_id,
+                                        REASON_FORK_JOIN_PARENT_RESUME_SUCCESS,
+                                        RuntimeResumeSignal::DelegateCompleted {
+                                            task_id,
+                                            success: true,
+                                            output,
+                                        },
+                                        active_session,
+                                    )
+                                    .await;
                                 } else {
                                     warn!(fork_id = %fork_id, "Fork not found when trying to get result");
                                 }
@@ -152,7 +134,6 @@ pub async fn start_hook_event_consumer(state: Arc<AppState>) {
                     }) => {
                         info!(fork_id = %fork_id, task_id = %task_id, "DelegateFailed received");
 
-                        // Look up the session mapping
                         let mapping = state
                             .sessions
                             .fork_to_session
@@ -163,28 +144,28 @@ pub async fn start_hook_event_consumer(state: Arc<AppState>) {
 
                         if let Some(mapping) = mapping {
                             let sessions = state.sessions.active_sessions.read().await;
-                            if let Some(session) = sessions.get(&mapping.session_id) {
-                                info!(
-                                    session_id = %mapping.session_id,
-                                    task_id = %task_id,
-                                    "Sending failure resume signal to coordinator"
-                                );
+                            let active_session = sessions.get(&mapping.session_id);
 
-                                // Deprecated compatibility boundary:
-                                // new pause/resume ownership must enter through
-                                // `service.execution_control`; this branch only adapts
-                                // legacy fork failure hooks into the existing waiting loop.
-                                session.pause_signal.store(false, Ordering::SeqCst);
+                            info!(
+                                session_id = %mapping.session_id,
+                                task_id = %task_id.0,
+                                service_id = EXECUTION_CONTROL_SERVICE_ID,
+                                "Delivering fork-join parent failure resume"
+                            );
 
-                                let resume_reason = RuntimeResumeSignal::DelegateFailed {
+                            deliver_fork_join_resume_and_notify_parent(
+                                &fork_join_coordinator,
+                                &mapping,
+                                fork_id,
+                                Some(TaskId(task_id.0)),
+                                REASON_FORK_JOIN_PARENT_RESUME_FAILURE,
+                                RuntimeResumeSignal::DelegateFailed {
                                     task_id: task_id.0.to_string(),
                                     error,
-                                };
-
-                                if let Err(e) = session.resume_tx.send(resume_reason).await {
-                                    warn!(error = %e, "Failed to send failure resume signal");
-                                }
-                            }
+                                },
+                                active_session,
+                            )
+                            .await;
                         }
                     }
 
@@ -194,7 +175,6 @@ pub async fn start_hook_event_consumer(state: Arc<AppState>) {
                         success,
                         output,
                     }) => {
-                        // Log but don't resume yet - wait for ForkValidated
                         info!(
                             fork_id = %fork_id,
                             task_id = %task_id,
@@ -207,7 +187,6 @@ pub async fn start_hook_event_consumer(state: Arc<AppState>) {
                     Ok(HookEvent::ForkMerged { fork_id }) => {
                         info!(fork_id = %fork_id, "ForkMerged - cleaning up mapping");
 
-                        // Clean up the mapping
                         state
                             .sessions
                             .fork_to_session
@@ -217,12 +196,10 @@ pub async fn start_hook_event_consumer(state: Arc<AppState>) {
                     }
 
                     Ok(other_event) => {
-                        // Log other events for debugging
                         info!(event = ?other_event, "Hook event received");
                     }
 
                     Err(tokio::sync::broadcast::error::TryRecvError::Empty) => {
-                        // No more events, break inner loop
                         break;
                     }
 
@@ -231,7 +208,6 @@ pub async fn start_hook_event_consumer(state: Arc<AppState>) {
                             app_id = %app_id,
                             "Hook broadcast channel closed during normal receiver churn; re-subscribing"
                         );
-                        // Remove this receiver so we re-subscribe next iteration
                         break;
                     }
 
@@ -242,7 +218,6 @@ pub async fn start_hook_event_consumer(state: Arc<AppState>) {
             }
         }
 
-        // Sleep before next poll
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
 }

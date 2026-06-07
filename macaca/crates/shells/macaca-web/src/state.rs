@@ -255,8 +255,10 @@ pub struct SessionState {
     /// Used to resume coordinator loops when delegated tasks complete.
     pub active_sessions: RwLock<HashMap<String, ActiveSession>>,
     /// Mapping from fork_id to session context for hook notifications.
-    /// Used to notify coordinators when their delegated tasks complete.
-    pub fork_to_session: RwLock<HashMap<ForkId, ForkSessionMapping>>,
+    ///
+    /// Shared with orchestration tool callbacks via `Arc` so `delegate_task` can
+    /// register mappings before `AppState` is fully constructed at web bootstrap.
+    pub fork_to_session: Arc<RwLock<HashMap<ForkId, ForkSessionMapping>>>,
     /// Mapping from goal_id to session_id for goal completion notifications.
     /// Used to resume coordinators when their created goals complete.
     pub goal_to_session: Arc<RwLock<HashMap<String, String>>>,
