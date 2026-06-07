@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use chrono::Utc;
-use macaca_kernel::executor::TaskResult;
+use macaca_runtime_host::executor::TaskResult;
 use macaca_proto::{
     AgentExecutionResult, AgentExecutionStatus, ApplicationId, TaskId, TraceContext,
 };
@@ -567,7 +567,7 @@ fn agent_execution_output_text(output: &serde_json::Value) -> String {
 #[cfg(test)]
 mod tests {
     use chrono::Utc;
-    use macaca_kernel::executor::{TaskId, TokenUsage};
+    use macaca_runtime_host::executor::{TaskId, TokenUsage};
 
     use super::*;
 

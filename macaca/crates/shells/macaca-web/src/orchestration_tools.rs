@@ -3,7 +3,8 @@
 use std::sync::Arc;
 
 use futures::FutureExt;
-use macaca_kernel::{ApplicationExecutorRegistry, Kernel, TaskContext};
+use macaca_kernel::Kernel;
+use macaca_runtime_host::{ApplicationExecutorRegistry, TaskContext};
 use macaca_proto::{AcceptanceCriteria, ForkId, TraceContext};
 use macaca_runtime_host::{
     ExecutionControlForkJoinCoordinator, ForkJoinChildForkRequest, ForkJoinParentWaitRequest,
@@ -290,7 +291,7 @@ pub(crate) fn build_web_tools(
 
                 let task_id_uuid = uuid::Uuid::parse_str(&task_or_fork_id)
                     .map_err(|e| format!("Invalid task_id: {}", e))?;
-                let task_id = macaca_kernel::TaskId(task_id_uuid);
+                let task_id = macaca_runtime_host::TaskId(task_id_uuid);
 
                 let status = executor
                     .get_task_status(&task_id)
@@ -298,23 +299,23 @@ pub(crate) fn build_web_tools(
                     .ok_or_else(|| format!("Task '{}' not found", task_id))?;
 
                 let (status_str, output, error) = match status {
-                    macaca_kernel::TaskStatus::Queued => ("queued".to_string(), None, None),
-                    macaca_kernel::TaskStatus::Running => ("running".to_string(), None, None),
-                    macaca_kernel::TaskStatus::Completed => {
+                    macaca_runtime_host::TaskStatus::Queued => ("queued".to_string(), None, None),
+                    macaca_runtime_host::TaskStatus::Running => ("running".to_string(), None, None),
+                    macaca_runtime_host::TaskStatus::Completed => {
                         if let Some(result) = executor.get_task_result(task_id).await {
                             ("completed".to_string(), Some(result.output), result.error)
                         } else {
                             ("completed".to_string(), None, None)
                         }
                     }
-                    macaca_kernel::TaskStatus::Failed => {
+                    macaca_runtime_host::TaskStatus::Failed => {
                         if let Some(result) = executor.get_task_result(task_id).await {
                             ("failed".to_string(), Some(result.output), result.error)
                         } else {
                             ("failed".to_string(), None, Some("Task failed".to_string()))
                         }
                     }
-                    macaca_kernel::TaskStatus::Cancelled => ("cancelled".to_string(), None, None),
+                    macaca_runtime_host::TaskStatus::Cancelled => ("cancelled".to_string(), None, None),
                 };
 
                 Ok(macaca_tools::TaskResultData {

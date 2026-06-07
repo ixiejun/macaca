@@ -109,3 +109,13 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `DefaultEvmPolicyEngine` (deleted) | MEDIUM | kernel policy engine removed; service path uses provider admission + entitlement layers | P2.3 |
 | `evm_service_provider` integration tests | LOW | unavailable/mock service.call contracts; no production behavior change | P2.3 |
 | `route_c_bootstrap` EVM unavailable default | LOW | base OS boots with structured unavailable EVM; unchanged bootstrap seam | P2.3 |
+
+## Iteration 17 additions (task 3.4 — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `executor::*` (kernel → runtime-host) | CRITICAL | macaca-web loop_manager, orchestration_tools, hook_consumer, event_persistence, sse, state; execution_control_fork_join | P2.4 |
+| `ForkManager` / `ApplicationExecutorRegistry` | CRITICAL | delegate_task fork lifecycle, executor registry bootstrap, SSE lifecycle events | P2.4 |
+| `macaca-kernel` executor module (deleted) | HIGH | microkernel purified; scheduling invariants only; persistence/logging ports remain cross-crate seams | P2.4 |
+| `executor_runtime_eviction` integration tests | LOW | contract-only; validates runtime-host public surface + static kernel lib.rs contract | P2.4 |
+| `serviceization_escape_hatches` executor paths | LOW | allowlist updated to runtime-host paths; violations=0 | P2.4 |

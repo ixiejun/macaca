@@ -100,9 +100,9 @@
 - [x] 3.3.4 测试：EVM optional 缺席降级；无 base OS 反向依赖。
 
 ### 3.4 驱逐执行编排 executor（P1 已迁逻辑，此处删 kernel 模块）
-- [ ] 3.4.1 确认 P1 已将 `executor/` 逻辑迁至 service；全仓搜索 kernel `executor::` 的残留生产消费者为 0。
-- [ ] 3.4.2 删除 `kernel/src/executor/` 整目录及 `lib.rs` 中 executor 导出（`ApplicationExecutor/ForkManager/AgentRunner/TaskRouter/...`）。
-- [ ] 3.4.3 测试：kernel 单测不再依赖 executor；task/execution service 测试覆盖原 executor 行为。
+- [x] 3.4.1 确认 P1 已将 `executor/` 逻辑迁至 service；全仓搜索 kernel `executor::` 的残留生产消费者为 0。
+- [x] 3.4.2 删除 `kernel/src/executor/` 整目录及 `lib.rs` 中 executor 导出（`ApplicationExecutor/ForkManager/AgentRunner/TaskRouter/...`）。
+- [x] 3.4.3 测试：kernel 单测不再依赖 executor；task/execution service 测试覆盖原 executor 行为。
 
 ### 3.5 删除 provider 兼容与 compat 构造
 - [ ] 3.5.1 删除 `kernel/provider_compat.rs`（`KernelProviderCompat/LegacyLlmProvider/LegacyToolCatalog`）及 `lib.rs` 导出。

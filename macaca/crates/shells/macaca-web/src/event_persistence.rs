@@ -8,8 +8,8 @@ use std::sync::Arc;
 
 use tokio::task::JoinHandle;
 
-use macaca_kernel::executor::app_executor::ApplicationExecutor;
-use macaca_kernel::executor::ExecutorEvent;
+use macaca_runtime_host::executor::app_executor::ApplicationExecutor;
+use macaca_runtime_host::executor::ExecutorEvent;
 use macaca_persist::{AppendEventCommand, EventLog};
 
 use crate::proto_event_visitors::delegated_persisted_event_name;

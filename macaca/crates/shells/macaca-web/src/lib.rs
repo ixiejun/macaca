@@ -104,9 +104,8 @@ use macaca_app::{AppLoader, AppRegistry, AppRuntime};
 use macaca_framework::session::{
     InMemorySessionStore as FrameworkInMemorySessionStore, SessionStore as FrameworkSessionStore,
 };
-use macaca_kernel::{
-    AgentInfo, ApplicationExecutorRegistry, KernelBuilder, KernelServiceClientCompat,
-};
+use macaca_kernel::{KernelBuilder, KernelServiceClientCompat};
+use macaca_runtime_host::{AgentInfo, ApplicationExecutorRegistry};
 use macaca_llm::{LlmProvider, LlmRouter};
 use macaca_persist::RedbStore;
 use macaca_proto::config::{AutonomyConfig, KernelConfig, MacacaConfig};
@@ -1008,7 +1007,7 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
         // Create the real agent runner with the actual weak state
         let runner = Arc::new(WebAgentRunner::new(weak_state.clone()));
         let executor_registry = Arc::new(ApplicationExecutorRegistry::new(
-            Arc::clone(&runner) as Arc<dyn macaca_kernel::AgentRunner>
+            Arc::clone(&runner) as Arc<dyn macaca_runtime_host::AgentRunner>
         ));
 
         AppState {

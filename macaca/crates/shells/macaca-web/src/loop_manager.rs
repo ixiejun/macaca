@@ -15,8 +15,8 @@ use macaca_app::{app_entry_agent_name, app_task_planning_contract, AppPlanningAg
 use macaca_framework::execution::ExecutionContext;
 use macaca_framework::plan::PlanNotebook;
 use macaca_framework::session::{load_module_state, save_module_state};
-use macaca_kernel::executor::{ApplicationExecutor, ExecutorEvent, ExecutorEventFactory};
-use macaca_kernel::AgentInfo;
+use macaca_runtime_host::executor::{ApplicationExecutor, ExecutorEvent, ExecutorEventFactory};
+use macaca_runtime_host::AgentInfo;
 use macaca_persist::AppendEventCommand;
 use macaca_proto::{
     AgentExecutionCommand, AgentExecutionIntent, AgentExecutionResult, AgentExecutionStatus,
@@ -2193,8 +2193,8 @@ mod tests {
         PlannerFrameworkCallKind, WorkerExecutionMode,
     };
     use macaca_framework::plan::{PlanNotebook, PlanState, SubTaskState};
-    use macaca_kernel::executor::ExecutorEvent;
-    use macaca_kernel::AgentInfo;
+    use macaca_runtime_host::executor::ExecutorEvent;
+    use macaca_runtime_host::AgentInfo;
     use macaca_proto::AgentExecutionIntent;
 
     fn agent(name: &str, capabilities: &[&str]) -> AgentInfo {

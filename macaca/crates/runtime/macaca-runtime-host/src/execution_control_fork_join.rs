@@ -20,7 +20,7 @@
 
 use std::sync::Arc;
 
-use macaca_kernel::executor::ForkManager;
+use crate::executor::ForkManager;
 use macaca_proto::{
     AcceptanceCriteria, ApplicationId, ExecutionControlAwaitResumeCommand,
     ExecutionControlCheckpointMode, ExecutionControlCommandResult, ExecutionControlPauseCommand,
@@ -302,7 +302,7 @@ impl ExecutionControlForkJoinCoordinator {
     pub async fn get_fork(
         fork_manager: &ForkManager,
         fork_id: ForkId,
-    ) -> Option<macaca_kernel::executor::fork_manager::ForkContext> {
+    ) -> Option<crate::executor::fork_manager::ForkContext> {
         fork_manager.get_fork(fork_id).await
     }
 

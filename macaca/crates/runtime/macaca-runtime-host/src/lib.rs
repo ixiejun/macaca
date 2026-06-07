@@ -58,6 +58,12 @@ pub mod entitlement;
 pub mod entitlement_service_provider;
 pub mod env_bridge;
 pub mod evm_service_provider;
+/// Event-driven agent task execution runtime (queue, fork-join, worker dispatch).
+///
+/// Evicted from `macaca-kernel` during P2 microkernel purification. Execution orchestration
+/// is a runtime-host concern: it composes kernel persistence/logging ports with service-backed
+/// agent runners while keeping the microkernel limited to scheduling invariants.
+pub mod executor;
 pub mod execution_control;
 pub mod execution_control_fork_join;
 pub mod execution_control_goal_lifecycle;
@@ -550,4 +556,12 @@ pub use wasm_runtime_provider::{
 pub use web3_service_provider::{
     web3_service_descriptor, MockWeb3Provider, UnavailableWeb3Provider, Web3ProviderStrategy,
     Web3SystemServiceProvider,
+};
+
+pub use executor::{
+    AgentInfo, AgentRunner, ApplicationExecutor, ApplicationExecutorConfig,
+    ApplicationExecutorRegistry, CallbackDispatcher, DelegateResult, DelegatedTask, EventBus,
+    ExecutionQueue, ExecutorCommand, ExecutorEvent, ExecutorEventFactory, ForkContext, ForkManager,
+    HookEvent, MergeResult, RoutingDecision, SystemEvent, TaskContext, TaskExecutor, TaskId,
+    TaskResult, TaskRouter, TaskStatus, TokenUsage,
 };

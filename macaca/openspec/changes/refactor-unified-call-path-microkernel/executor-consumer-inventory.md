@@ -14,6 +14,8 @@ Inventory of **production** references to `macaca-kernel` executor symbols, prod
 **Search date:** 2026-06-07  
 **Symbols:** `ApplicationExecutor`, `ForkManager`, `delegate_task`, `ExecutorEvent`, `ApplicationExecutorRegistry`
 
+> **P2.4 update (iteration 17):** Physical eviction complete. Canonical import path is `macaca_runtime_host::{ApplicationExecutor, ForkManager, ...}` (or `macaca_runtime_host::executor::*`). Production `macaca_kernel::executor` references = **0**. Definitions live under `macaca-runtime-host/src/executor/`.
+
 ## Replacement model (from `design.md` D1, D3, Q3)
 
 | Evicted kernel surface | Target service path |

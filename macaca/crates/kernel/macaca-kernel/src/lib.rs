@@ -3,7 +3,6 @@
 pub mod alert;
 pub mod audit;
 pub mod capability_registry;
-pub mod executor;
 pub mod facade;
 pub mod kernel;
 pub mod kernel_builder;
@@ -61,11 +60,3 @@ pub use status::AgentStatusTracker;
 pub use status_transition::AgentStatusTransitionPolicy;
 pub use system_service::{MockSystemService, SystemService};
 pub use trace_service_adapter::trace_service_descriptor;
-
-pub use executor::{
-    AgentInfo, AgentRunner, ApplicationExecutor, ApplicationExecutorConfig,
-    ApplicationExecutorRegistry, CallbackDispatcher, DelegateResult, DelegatedTask, EventBus,
-    ExecutionQueue, ExecutorCommand, ExecutorEvent, ExecutorEventFactory, ForkContext, ForkManager,
-    HookEvent, MergeResult, RoutingDecision, SystemEvent, TaskContext, TaskExecutor, TaskId,
-    TaskResult, TaskRouter, TaskStatus, TokenUsage,
-};
