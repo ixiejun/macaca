@@ -259,3 +259,11 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 |---------------|----------------------|------------------------|-------|
 | `context_memory_injection.rs` → `context_memory_injection/` module split | CRITICAL | `context_reporting_model::assembly_finalize` recall injectors; public `apply_active_recall` / `apply_preflight_memory` API preserved | P3.3 |
 | `context_reporting_model.rs` → `context_reporting_model/` module split | CRITICAL | `framework_runner/agent_factory_build` `ContextReportingChatModel` consumer; Context Service + legacy assembly paths; ChatModel hot path unchanged | P3.3 |
+
+## Iteration 34 additions (task 4.3.13 — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `skill_mcp.rs` → `skill_mcp/` module split | CRITICAL | `framework_toolkit::load_or_build_skill_snapshot`; `routes/skills_mcp::probe_skill_mcp_servers` + `SkillMcpStatus` API; public `crate::skill_mcp::*` preserved via Facade re-exports | P3.3 |
+| `probe_skill_mcp_servers` | HIGH | `/api/apps/:id/skills` MCP status probe path; integration probe tests | P3.3 |
+| `load_or_build_skill_snapshot` | HIGH | toolkit skill snapshot cache + governed activation telemetry side effects | P3.3 |

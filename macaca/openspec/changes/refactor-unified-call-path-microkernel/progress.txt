@@ -271,3 +271,12 @@
 - **Verified**: `cargo test -p macaca-web --lib context_memory_injection` 3/3; `cargo test -p macaca-web --lib context_reporting_model` 2/2; `os_layer_file_size_gate` pass.
 - **GitNexus memo (non-blocking)**: iteration 33 CRITICAL on context memory/reporting Facade splits — recorded in `impact-memo.md`.
 - **Next**: P3 §4.5.1 remaining web giants (`skill_mcp`, `skill_self_evolution_observer`, `agent_execution_backend/tests.rs`); P4 CLI decoupling; 4.4.4终态.
+
+## Iteration 34 (2026-06-07)
+- **P3.3 skill_mcp split (4.3.13)**: deleted monolithic `skill_mcp.rs` (705 lines); extracted Facade module tree (9 files, each max ≤192 lines).
+- **Design patterns**: Facade (`mod.rs`); Cache-Aside (`snapshot` session snapshot persistence); Strategy (`server_resolution` explicit vs mapping-registry paths); Adapter (`probe` → runtime-host MCP factory + shell adapter); Observer (`governance_telemetry` activation usage recording).
+- **Contract tests**: `skill_mcp::tests` 4/4; `contract_source::skill_mcp_module_sources()` for static scans.
+- **Filesize allowlist**: removed `skill_mcp.rs` row (80 baseline rows remain).
+- **Verified**: `cargo test -p macaca-web --lib skill_mcp` 4/4 (+1 framework_toolkit alias test); `os_layer_file_size_gate` pass.
+- **GitNexus memo (non-blocking)**: iteration 34 CRITICAL on `probe_skill_mcp_servers` / `load_or_build_skill_snapshot` Facade split — recorded in `impact-memo.md`.
+- **Next**: P3 §4.5.1 remaining web giants (`skill_self_evolution_observer`, `agent_execution_backend/tests.rs`); P4 CLI decoupling; 4.4.4终态.
