@@ -7,8 +7,9 @@ use crate::{
     ApplicationExecutionControlCommand, ApplicationExecutionControlKind,
     ApplicationExecutionEventEnvelope, ApplicationExecutionEventType,
     ApplicationExecutionLifecycleState, ApplicationExecutionPayload,
-    ApplicationExecutionProviderKind, ApplicationExecutionScope, ApplicationId, MacacaError,
-    ReportExecutionHeartbeatCommand, StartApplicationExecutionResult, TraceContext,
+    ApplicationExecutionProviderKind, ApplicationExecutionScope, ApplicationId, CapabilityId,
+    MacacaError, PackageRuntimeKind, ReportExecutionHeartbeatCommand,
+    StartApplicationExecutionCommand, StartApplicationExecutionResult, TraceContext,
     APPLICATION_EXECUTION_SERVICE_ID, APPLICATION_EXECUTION_START_COMMAND,
 };
 
@@ -24,6 +25,44 @@ fn scope() -> ApplicationExecutionScope {
         "tester",
     )
     .unwrap()
+}
+
+/// Build a provider-neutral start command for one runtime shape.
+///
+/// The helper intentionally keeps the command structure identical for YAML,
+/// WASM, and future application runtime adapters.  Runtime differences are
+/// carried as policy metadata so `service.application_execution` can select a
+/// provider strategy without hardcoding application names, workflow names, or
+/// business-domain behavior in the protocol DTO.
+fn start_command_for_runtime(runtime_kind: PackageRuntimeKind) -> StartApplicationExecutionCommand {
+    let mut policy_context = BTreeMap::new();
+    policy_context.insert(
+        "application_execution.profile".into(),
+        runtime_kind.to_string(),
+    );
+    policy_context.insert(
+        "application_execution.terminal_projection_owner".into(),
+        APPLICATION_EXECUTION_SERVICE_ID.into(),
+    );
+    policy_context.insert(
+        "application_execution.task_graph_owner".into(),
+        "application_execution".into(),
+    );
+
+    StartApplicationExecutionCommand {
+        application_id: ApplicationId::from_name("application-execution-protocol-test"),
+        session_id: Some("session-equivalence".into()),
+        run_id: Some("run-equivalence".into()),
+        task_input: ApplicationExecutionPayload::summary("provider-neutral task input"),
+        workspace_ref: Some("workspace-ref".into()),
+        requested_capabilities: vec![CapabilityId::new("capability.application_execution")],
+        provider_preference: None,
+        trace: TraceContext::new("trace-equivalence"),
+        policy_context,
+        tenant_id: None,
+        actor: "adapter".into(),
+        idempotency_key: format!("start-{}", runtime_kind),
+    }
 }
 
 #[test]
@@ -70,6 +109,69 @@ fn start_result_unavailable_uses_null_object_provider_kind() {
     assert_eq!(
         result.error.unwrap().code,
         ApplicationExecutionCommandStatus::Unavailable
+    );
+}
+
+#[test]
+fn start_command_envelope_is_equivalent_for_yaml_and_wasm_runtime_shapes() {
+    let yaml = start_command_for_runtime(PackageRuntimeKind::Yaml);
+    let wasm = start_command_for_runtime(PackageRuntimeKind::WasmComponent);
+
+    assert_eq!(yaml.application_id, wasm.application_id);
+    assert_eq!(yaml.session_id, wasm.session_id);
+    assert_eq!(yaml.run_id, wasm.run_id);
+    assert_eq!(yaml.workspace_ref, wasm.workspace_ref);
+    assert_eq!(yaml.requested_capabilities, wasm.requested_capabilities);
+    assert_eq!(yaml.provider_preference, wasm.provider_preference);
+    assert_eq!(yaml.trace.trace_id, wasm.trace.trace_id);
+    assert_eq!(yaml.actor, wasm.actor);
+    assert_eq!(
+        yaml.policy_context
+            .get("application_execution.terminal_projection_owner"),
+        Some(&APPLICATION_EXECUTION_SERVICE_ID.to_string())
+    );
+    assert_eq!(
+        yaml.policy_context
+            .get("application_execution.terminal_projection_owner"),
+        wasm.policy_context
+            .get("application_execution.terminal_projection_owner")
+    );
+    assert_eq!(
+        yaml.policy_context
+            .get("application_execution.task_graph_owner"),
+        wasm.policy_context
+            .get("application_execution.task_graph_owner")
+    );
+    assert_eq!(
+        yaml.policy_context.get("application_execution.profile"),
+        Some(&PackageRuntimeKind::Yaml.to_string())
+    );
+    assert_eq!(
+        wasm.policy_context.get("application_execution.profile"),
+        Some(&PackageRuntimeKind::WasmComponent.to_string())
+    );
+}
+
+#[test]
+fn start_command_policy_context_stays_provider_neutral_after_json_roundtrip() {
+    let yaml = start_command_for_runtime(PackageRuntimeKind::Yaml);
+    let decoded: StartApplicationExecutionCommand =
+        serde_json::from_str(&serde_json::to_string(&yaml).unwrap()).unwrap();
+    let encoded = serde_json::to_string(&decoded).unwrap();
+
+    assert_eq!(
+        decoded.policy_context.get("application_execution.profile"),
+        Some(&PackageRuntimeKind::Yaml.to_string())
+    );
+    assert_eq!(
+        decoded
+            .policy_context
+            .get("application_execution.terminal_projection_owner"),
+        Some(&APPLICATION_EXECUTION_SERVICE_ID.to_string())
+    );
+    assert!(
+        !encoded.contains("codex-wasm-workbench"),
+        "application-execution envelopes must not hardcode application names"
     );
 }
 

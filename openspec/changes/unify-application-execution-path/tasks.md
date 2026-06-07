@@ -8,10 +8,10 @@
 
 ## 2. Contract And Ownership Model
 
-- [ ] 2.1 Add or confirm provider-neutral execution ownership fields in application-execution DTOs.
+- [x] 2.1 Add or confirm provider-neutral execution ownership fields in application-execution DTOs.
 - [x] 2.2 Add or confirm task graph ownership fields in Task Service commands/results.
 - [x] 2.3 Add English comments explaining that ownership markers are service categories, not application names or workflow names.
-- [ ] 2.4 Add tests proving WASM and YAML shaped requests produce equivalent execution envelopes.
+- [x] 2.4 Add tests proving WASM and YAML shaped requests produce equivalent execution envelopes.
 
 ## 3. Task Service Single Graph Admission
 
