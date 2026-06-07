@@ -14,7 +14,7 @@ use macaca_proto::{
     ToolInvokeCommand, TraceContext,
 };
 use macaca_sdk::SystemToolClient;
-use macaca_tools::Tool;
+use macaca_sdk::tools::Tool;
 use serde_json::{json, Value};
 
 /// Framework `Tool` implementation that invokes through `service.tool`.

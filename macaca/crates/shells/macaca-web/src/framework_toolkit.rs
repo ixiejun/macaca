@@ -13,7 +13,7 @@ use async_trait::async_trait;
 use tokio::{fs, process::Command, time::timeout};
 
 use macaca_app::{app_agent_manifest_view, discovered_app_agent_names};
-use macaca_driver::{DriverServiceScope, DriverToolCatalogCommand};
+use macaca_sdk::driver::{DriverServiceScope, DriverToolCatalogCommand};
 use macaca_framework::adapter::{SingleToolAdapter, ToolSetBridge};
 use macaca_framework::execution::ExecutionContext;
 use macaca_framework::session::{load_module_state, save_module_state};
@@ -22,7 +22,7 @@ use macaca_proto::{
     ApplicationId, McpRegisterCommand, McpServicePolicyHints, McpServiceScope,
     McpServiceSnapshotCommand, McpToolCatalogCommand, TraceContext,
 };
-use macaca_skill::{SkillServiceScope, SkillToolCatalogCommand};
+use macaca_sdk::skill::{SkillServiceScope, SkillToolCatalogCommand};
 
 use crate::runtime_event_bridge::emit_runtime_event;
 use crate::state::AppState;
@@ -919,7 +919,7 @@ fn register_agent_tools(
 ) {
     match policy.todo_policy {
         TodoToolPolicy::GoalManager => {
-            let space = Arc::new(macaca_task::TaskSpace::for_session(
+            let space = Arc::new(macaca_sdk::task::TaskSpace::for_session(
                 app_id.clone(),
                 session_id,
                 Arc::clone(&state.persist.todo_store),
@@ -932,7 +932,7 @@ fn register_agent_tools(
             let owner_agent = agent_name.to_string();
             toolkit.register(
                 Box::new(SingleToolAdapter::new(Box::new(
-                    macaca_tools::CreateGoalTool {
+                    macaca_sdk::tools::CreateGoalTool {
                         space: Arc::clone(&space),
                         on_created: None,
                         on_goal_recorded: Some(Arc::new(move |goal: macaca_proto::TodoGoal| {
@@ -1003,20 +1003,20 @@ fn register_agent_tools(
             );
             toolkit.register(
                 Box::new(SingleToolAdapter::new(Box::new(
-                    macaca_tools::CheckTodoProgressTool { space },
+                    macaca_sdk::tools::CheckTodoProgressTool { space },
                 ))),
                 Some("todo"),
             );
         }
         TodoToolPolicy::Planner => {
-            let space = Arc::new(macaca_task::TaskSpace::for_session(
+            let space = Arc::new(macaca_sdk::task::TaskSpace::for_session(
                 app_id.clone(),
                 session_id,
                 Arc::clone(&state.persist.todo_store),
             ));
             toolkit.register(
                 Box::new(SingleToolAdapter::new(Box::new(
-                    macaca_tools::CreateTodoTool {
+                    macaca_sdk::tools::CreateTodoTool {
                         space: Arc::clone(&space),
                         coordinator_name: agent_name.to_string(),
                         disallowed_assignees: policy
@@ -1032,8 +1032,8 @@ fn register_agent_tools(
             );
             toolkit.register(
                 Box::new(SingleToolAdapter::new(Box::new(
-                    macaca_tools::CreateTodosTool {
-                        create_todo: macaca_tools::CreateTodoTool {
+                    macaca_sdk::tools::CreateTodosTool {
+                        create_todo: macaca_sdk::tools::CreateTodoTool {
                             space: Arc::clone(&space),
                             coordinator_name: agent_name.to_string(),
                             disallowed_assignees: policy
@@ -1050,7 +1050,7 @@ fn register_agent_tools(
             );
             toolkit.register(
                 Box::new(SingleToolAdapter::new(Box::new(
-                    macaca_tools::ReviewTodoTool {
+                    macaca_sdk::tools::ReviewTodoTool {
                         space: Arc::clone(&space),
                         on_reviewed: None,
                     },
@@ -1059,7 +1059,7 @@ fn register_agent_tools(
             );
             toolkit.register(
                 Box::new(SingleToolAdapter::new(Box::new(
-                    macaca_tools::CheckTodoProgressTool {
+                    macaca_sdk::tools::CheckTodoProgressTool {
                         space: Arc::clone(&space),
                     },
                 ))),
@@ -1067,7 +1067,7 @@ fn register_agent_tools(
             );
             toolkit.register(
                 Box::new(SingleToolAdapter::new(Box::new(
-                    macaca_tools::ReassignTaskTool {
+                    macaca_sdk::tools::ReassignTaskTool {
                         space: Arc::clone(&space),
                     },
                 ))),
@@ -1079,7 +1079,7 @@ fn register_agent_tools(
             let owner_agent = agent_name.to_string();
             toolkit.register(
                 Box::new(SingleToolAdapter::new(Box::new(
-                    macaca_tools::CreateGoalTool {
+                    macaca_sdk::tools::CreateGoalTool {
                         space,
                         on_created: None,
                         on_goal_recorded: Some(Arc::new(move |goal: macaca_proto::TodoGoal| {
@@ -1133,7 +1133,7 @@ fn register_agent_tools(
         }
         TodoToolPolicy::Worker => {
             // Worker agents: task board tools.
-            let board = Arc::new(macaca_task::TaskBoard::for_agent(
+            let board = Arc::new(macaca_sdk::task::TaskBoard::for_agent(
                 app_id.clone(),
                 agent_name,
                 session_id,
@@ -1141,7 +1141,7 @@ fn register_agent_tools(
             ));
             toolkit.register(
                 Box::new(SingleToolAdapter::new(Box::new(
-                    macaca_tools::ClaimTaskTool {
+                    macaca_sdk::tools::ClaimTaskTool {
                         board: Arc::clone(&board),
                     },
                 ))),
@@ -1149,7 +1149,7 @@ fn register_agent_tools(
             );
             toolkit.register(
                 Box::new(SingleToolAdapter::new(Box::new(
-                    macaca_tools::StartTaskTool {
+                    macaca_sdk::tools::StartTaskTool {
                         board: Arc::clone(&board),
                     },
                 ))),
@@ -1157,7 +1157,7 @@ fn register_agent_tools(
             );
             toolkit.register(
                 Box::new(SingleToolAdapter::new(Box::new(
-                    macaca_tools::UpdateTaskProgressTool {
+                    macaca_sdk::tools::UpdateTaskProgressTool {
                         board: Arc::clone(&board),
                     },
                 ))),
@@ -1165,7 +1165,7 @@ fn register_agent_tools(
             );
             toolkit.register(
                 Box::new(SingleToolAdapter::new(Box::new(
-                    macaca_tools::SubmitTaskForReviewTool {
+                    macaca_sdk::tools::SubmitTaskForReviewTool {
                         board: Arc::clone(&board),
                     },
                 ))),
@@ -1173,7 +1173,7 @@ fn register_agent_tools(
             );
             toolkit.register(
                 Box::new(SingleToolAdapter::new(Box::new(
-                    macaca_tools::ListMyTasksTool { board },
+                    macaca_sdk::tools::ListMyTasksTool { board },
                 ))),
                 Some("todo"),
             );
@@ -1226,7 +1226,7 @@ struct WorkspaceFileReadTool {
 }
 
 #[async_trait]
-impl macaca_tools::Tool for WorkspaceFileReadTool {
+impl macaca_sdk::tools::Tool for WorkspaceFileReadTool {
     fn name(&self) -> &str {
         "file_read"
     }
@@ -1274,7 +1274,7 @@ struct WorkspaceFileWriteTool {
 }
 
 #[async_trait]
-impl macaca_tools::Tool for WorkspaceFileWriteTool {
+impl macaca_sdk::tools::Tool for WorkspaceFileWriteTool {
     fn name(&self) -> &str {
         "file_write"
     }
@@ -1341,7 +1341,7 @@ struct WorkspaceShellTool {
 }
 
 #[async_trait]
-impl macaca_tools::Tool for WorkspaceShellTool {
+impl macaca_sdk::tools::Tool for WorkspaceShellTool {
     fn name(&self) -> &str {
         "shell"
     }

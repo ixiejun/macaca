@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
 use macaca_runtime_host::executor::ExecutorEvent;
-use macaca_persist::PersistStore;
+use macaca_runtime_host::persist::PersistStore;
 use macaca_proto::{AgentExecutionEventVisitor, ApplicationId, LlmMessage};
 
 use crate::routes::{err, ErrorResponse};

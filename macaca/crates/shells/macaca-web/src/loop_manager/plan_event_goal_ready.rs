@@ -188,12 +188,12 @@ planner_notebook_mark_decomposition(
                 &app.manifest,
                 worker_profiles.clone(),
             );
-            macaca_task::build_decomposition_prompt(
+            macaca_sdk::task::build_decomposition_prompt(
                 &description,
                 &contract,
             )
         } else {
-            macaca_task::build_decomposition_prompt(
+            macaca_sdk::task::build_decomposition_prompt(
                 &description,
                 &macaca_app::AppTaskPlanningContract {
                     workflow_name: "default".into(),

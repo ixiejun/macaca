@@ -10,8 +10,8 @@ use macaca_context::{
     RuntimeToolCapabilityCatalog, SkillCapabilityCatalog,
 };
 use macaca_framework::model::{ChatModel, ChatOptions, ChatResponse, ModelError};
-use macaca_memory::SharedTombstoneRegistry;
-use macaca_persist::{EventLog, SessionLineageStore};
+use macaca_sdk::memory::SharedTombstoneRegistry;
+use macaca_runtime_host::persist::{EventLog, SessionLineageStore};
 use macaca_proto::{config::ContextConfig, AgentId, ApplicationId};
 
 use crate::context_memory_injection::{apply_active_recall, apply_preflight_memory};
@@ -44,7 +44,7 @@ use crate::source_artifact::persist_pruned_source_artifacts;
 pub(crate) struct ContextReportingChatModel {
     inner: Arc<dyn ChatModel>,
     event_log: Arc<EventLog>,
-    persist_backend: Arc<dyn macaca_persist::PersistBackend>,
+    persist_backend: Arc<dyn macaca_runtime_host::persist::PersistBackend>,
     app_id: ApplicationId,
     session_id: Option<String>,
     agent_name: String,
@@ -88,7 +88,7 @@ impl ContextReportingChatModel {
     pub(crate) fn new(
         inner: Arc<dyn ChatModel>,
         event_log: Arc<EventLog>,
-        persist_backend: Arc<dyn macaca_persist::PersistBackend>,
+        persist_backend: Arc<dyn macaca_runtime_host::persist::PersistBackend>,
         app_id: ApplicationId,
         session_id: Option<String>,
         agent_name: String,

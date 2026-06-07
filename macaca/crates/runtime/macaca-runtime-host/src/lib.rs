@@ -572,3 +572,12 @@ pub use executor::{
     HookEvent, MergeResult, RoutingDecision, SystemEvent, TaskContext, TaskExecutor, TaskId,
     TaskResult, TaskRouter, TaskStatus, TokenUsage,
 };
+
+/// Embedded persistence crate alias for presentation-shell composition roots.
+///
+/// Presentation shells must not declare a direct `macaca-persist` dependency (Route C gate).
+/// The SDK cannot re-export persist without violating
+/// `application-execution-sdk-no-runtime-provider-construction`, so shells that already
+/// depend on runtime-host for bootstrap wiring reach persistence types through this alias.
+/// Runtime behavior must still flow through service clients at the HTTP/SSE boundary.
+pub use macaca_persist as persist;

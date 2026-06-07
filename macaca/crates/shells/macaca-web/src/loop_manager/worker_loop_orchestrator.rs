@@ -35,7 +35,7 @@ pub(crate) async fn ensure_worker_loops(
             if let Some(executor) = state.executor_registry.get(app_id).await {
                 let agents = executor.list_agents().await;
                 let mut shutdowns: Vec<Arc<std::sync::atomic::AtomicBool>> = Vec::new();
-                let mut worker_wakers: Vec<macaca_task::WorkerLoopWaker> = Vec::new();
+                let mut worker_wakers: Vec<macaca_sdk::task::WorkerLoopWaker> = Vec::new();
 
                 for agent_info in &agents {
                     let agent_name = agent_info.name.clone();
@@ -46,22 +46,22 @@ pub(crate) async fn ensure_worker_loops(
                         continue;
                     }
 
-                    let board = Arc::new(macaca_task::TaskBoard::for_agent(
+                    let board = Arc::new(macaca_sdk::task::TaskBoard::for_agent(
                         app_id.clone(),
                         agent_name.clone(),
                         session_id.clone(),
                         Arc::clone(&state.persist.todo_store),
                     ));
-                    let worker_loop = macaca_task::WorkerLoop::with_components(
+                    let worker_loop = macaca_sdk::task::WorkerLoop::with_components(
                         Arc::clone(&board),
-                        macaca_task::WorkerLoopConfig::default(),
+                        macaca_sdk::task::WorkerLoopConfig::default(),
                     );
                     worker_wakers.push(worker_loop.waker());
                     let shutdown = Arc::new(std::sync::atomic::AtomicBool::new(false));
                     shutdowns.push(Arc::clone(&shutdown));
 
                     let (event_tx, mut event_rx) =
-                        tokio::sync::mpsc::channel::<macaca_task::WorkerEvent>(32);
+                        tokio::sync::mpsc::channel::<macaca_sdk::task::WorkerEvent>(32);
                     let shutdown_clone = Arc::clone(&shutdown);
                     tokio::spawn(async move {
                         worker_loop
@@ -78,7 +78,7 @@ pub(crate) async fn ensure_worker_loops(
                     tokio::spawn(async move {
                         while let Some(event) = event_rx.recv().await {
                             match event {
-                                macaca_task::WorkerEvent::TaskClaimed {
+                                macaca_sdk::task::WorkerEvent::TaskClaimed {
                                     task_id,
                                     title,
                                     description,
@@ -198,7 +198,7 @@ pub(crate) async fn ensure_worker_loops(
                                     )
                                     .await;
                                 }
-                                macaca_task::WorkerEvent::RetryTask {
+                                macaca_sdk::task::WorkerEvent::RetryTask {
                                     task_id,
                                     title,
                                     description,
@@ -250,7 +250,7 @@ pub(crate) async fn ensure_worker_loops(
                                     )
                                     .await;
                                 }
-                                macaca_task::WorkerEvent::Idle => {}
+                                macaca_sdk::task::WorkerEvent::Idle => {}
                             }
                         }
                     });

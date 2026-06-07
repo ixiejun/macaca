@@ -18,7 +18,7 @@ use macaca_runtime_host::{
     SESSION_LOOP_PLAN_WAKE_EVENT, SESSION_LOOP_TASK_CAPABILITY_ID,
     SESSION_LOOP_WORKER_WAKE_EVENT,
 };
-use macaca_task::{PlanLoopWaker, WorkerLoopWaker};
+use macaca_sdk::task::{PlanLoopWaker, WorkerLoopWaker};
 use tracing::{info, warn};
 
 use crate::state::AppState;

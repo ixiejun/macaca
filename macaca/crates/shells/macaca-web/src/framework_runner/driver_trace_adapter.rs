@@ -3,11 +3,11 @@
 use std::convert::Infallible;
 use axum::response::sse::Event;
 use macaca_framework::tool::Toolkit;
-use macaca_persist::{AppendEventCommand, EventLog};
+use macaca_runtime_host::persist::{AppendEventCommand, EventLog};
 use super::build_mode::{DriverTraceRoute, should_forward_driver_trace};
 pub(crate) async fn attach_driver_trace_route(toolkit: &mut Toolkit, route: DriverTraceRoute) {
         let (trace_tx, mut trace_rx) =
-            tokio::sync::mpsc::unbounded_channel::<macaca_tools::TraceEvent>();
+            tokio::sync::mpsc::unbounded_channel::<macaca_sdk::tools::TraceEvent>();
         toolkit.set_event_tx(trace_tx);
 
         tokio::spawn(async move {

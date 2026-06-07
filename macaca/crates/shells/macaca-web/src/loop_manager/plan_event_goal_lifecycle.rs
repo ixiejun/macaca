@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use axum::response::sse::Event;
 use macaca_proto::TaskId;
-use macaca_task::TaskSummary;
+use macaca_sdk::task::TaskSummary;
 
 use super::agent_execution_adapter::{run_planner_framework_call, PlannerFrameworkCallKind};
 use super::plan_event_context::PlanEventConsumerCtx;
@@ -39,7 +39,7 @@ crate::run_trace::emit_for_scope(
     })),
 )
 .await;
-let evaluation_prompt = macaca_task::GoalEvaluator::build_prompt(
+let evaluation_prompt = macaca_sdk::task::GoalEvaluator::build_prompt(
     &goal_description,
     &task_summaries,
     completed_count,
@@ -60,19 +60,19 @@ let evaluation_result = run_planner_framework_call(
 )
 .await
 .map(|reply| {
-    macaca_task::GoalEvaluator::parse_eval_response(&reply)
+    macaca_sdk::task::GoalEvaluator::parse_eval_response(&reply)
 });
 match evaluation_result {
-    Ok(macaca_task::GoalEvaluation::Satisfied { summary }) => {
+    Ok(macaca_sdk::task::GoalEvaluation::Satisfied { summary }) => {
         tracing::info!(goal_id = %goal_id, summary = %summary, "Goal satisfied");
-        let space = macaca_task::TaskSpace::for_session(
+        let space = macaca_sdk::task::TaskSpace::for_session(
             ctx.app_id.clone(),
             None,
             Arc::clone(&ctx.state.persist.todo_store),
         );
         space.complete_goal(&goal_id).await;
         let _ = ctx.event_tx
-            .send(macaca_task::PlanEvent::GoalCompleted {
+            .send(macaca_sdk::task::PlanEvent::GoalCompleted {
                 goal_id: goal_id.clone(),
                 description: goal_description.clone(),
             })
@@ -117,7 +117,7 @@ match evaluation_result {
         )
         .await;
     }
-    Ok(macaca_task::GoalEvaluation::NeedsMoreWork {
+    Ok(macaca_sdk::task::GoalEvaluation::NeedsMoreWork {
         reason,
         suggestions,
     }) => {
@@ -199,7 +199,7 @@ match evaluation_result {
             None,
         )
         .await;
-        let space = macaca_task::TaskSpace::for_session(
+        let space = macaca_sdk::task::TaskSpace::for_session(
             ctx.app_id.clone(),
             None,
             Arc::clone(&ctx.state.persist.todo_store),

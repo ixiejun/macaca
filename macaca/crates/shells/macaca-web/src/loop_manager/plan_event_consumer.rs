@@ -3,7 +3,7 @@
 //! Spawns alongside macaca-task PlanLoop and routes each event to a dedicated
 //! handler module. Keeps `plan_loop_orchestrator` focused on startup only.
 
-use macaca_task::PlanEvent;
+use macaca_sdk::task::PlanEvent;
 
 use super::plan_event_context::PlanEventConsumerCtx;
 use super::plan_event_goal_lifecycle::{

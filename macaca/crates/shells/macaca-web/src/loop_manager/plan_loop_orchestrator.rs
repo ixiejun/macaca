@@ -41,14 +41,14 @@ pub(crate) async fn ensure_plan_loop(
     handles.insert(app_id.clone(), Arc::clone(&shutdown));
 
     let store = Arc::clone(&state.persist.todo_store);
-    let plan_space = Arc::new(macaca_task::TaskSpace::for_session(
+    let plan_space = Arc::new(macaca_sdk::task::TaskSpace::for_session(
         app_id.clone(),
         session_id.clone(),
         Arc::clone(&store),
     ));
-    let plan_loop = macaca_task::PlanLoop::with_components(
+    let plan_loop = macaca_sdk::task::PlanLoop::with_components(
         plan_space,
-        macaca_task::PlanLoopConfig::default(),
+        macaca_sdk::task::PlanLoopConfig::default(),
     );
     let plan_waker = plan_loop.waker();
     state
@@ -63,7 +63,7 @@ pub(crate) async fn ensure_plan_loop(
     let coordinator = session_loop_coordinator(state);
     register_plan_loop_via_execution_control(&coordinator, app_id.clone(), session_id.clone()).await;
 
-    let (event_tx, mut event_rx) = tokio::sync::mpsc::channel::<macaca_task::PlanEvent>(64);
+    let (event_tx, mut event_rx) = tokio::sync::mpsc::channel::<macaca_sdk::task::PlanEvent>(64);
     let event_tx_for_plan_loop = event_tx.clone();
 
     tokio::spawn(async move {

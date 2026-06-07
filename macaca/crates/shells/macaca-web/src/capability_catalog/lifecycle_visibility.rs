@@ -9,7 +9,7 @@
 
 use macaca_context::catalog::constants::FAMILY_SKILL_CAPABILITY;
 use macaca_proto::config::ContextConfig;
-use macaca_skill::SkillLifecycleState;
+use macaca_sdk::skill::SkillLifecycleState;
 
 /// Provider-neutral profile label for non-active skill rows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

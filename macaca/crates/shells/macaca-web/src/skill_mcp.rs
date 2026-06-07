@@ -15,7 +15,7 @@ use macaca_runtime_host::{
     apply_concurrency_isolation, probe_definition_statuses, McpRuntimeContext,
     McpRuntimeStatusState, McpToolPolicy,
 };
-use macaca_skill::{
+use macaca_sdk::skill::{
     SkillGovernanceRecord, SkillGovernanceRecordUsageCommand, SkillGovernanceSnapshotCommand,
     SkillLifecycleState, SkillMcpServerConfig, SkillPolicy, SkillRuntimeFacade, SkillServiceScope,
     SkillSnapshot, SkillSnapshotEntry, SkillSnapshotRequest, SkillSnapshotServiceCommand,
@@ -516,7 +516,7 @@ async fn emit_skill_mcp_event(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use macaca_skill::{SkillInstallSpec, SkillMcpServerConfig, SkillSnapshot};
+    use macaca_sdk::skill::{SkillInstallSpec, SkillMcpServerConfig, SkillSnapshot};
 
     fn snapshot_with_entry(entry: SkillSnapshotEntry) -> SkillSnapshot {
         SkillSnapshot {
@@ -539,7 +539,7 @@ mod tests {
             location: std::path::PathBuf::from("/tmp/SKILL.md"),
             base_dir: std::path::PathBuf::from("/tmp"),
             source: "test".into(),
-            source_scope: macaca_skill::SkillSourceScope::MacacaCentral,
+            source_scope: macaca_sdk::skill::SkillSourceScope::MacacaCentral,
             primary_env: None,
             required_env: Vec::new(),
             install: vec![SkillInstallSpec {
@@ -568,7 +568,7 @@ mod tests {
                     location: std::path::PathBuf::from("/tmp/available/active/SKILL.md"),
                     base_dir: std::path::PathBuf::from("/tmp/available/active"),
                     source: "application".into(),
-                    source_scope: macaca_skill::SkillSourceScope::Application,
+                    source_scope: macaca_sdk::skill::SkillSourceScope::Application,
                     primary_env: None,
                     required_env: Vec::new(),
                     install: Vec::new(),
@@ -582,7 +582,7 @@ mod tests {
                     location: std::path::PathBuf::from("/tmp/available/plain/SKILL.md"),
                     base_dir: std::path::PathBuf::from("/tmp/available/plain"),
                     source: "application".into(),
-                    source_scope: macaca_skill::SkillSourceScope::Application,
+                    source_scope: macaca_sdk::skill::SkillSourceScope::Application,
                     primary_env: None,
                     required_env: Vec::new(),
                     install: Vec::new(),
@@ -594,30 +594,30 @@ mod tests {
             compact: false,
             version: 1,
         };
-        let active_record = macaca_skill::SkillGovernanceRecord {
-            provenance: macaca_skill::SkillGovernanceProvenance::new(
+        let active_record = macaca_sdk::skill::SkillGovernanceRecord {
+            provenance: macaca_sdk::skill::SkillGovernanceProvenance::new(
                 "skill://agent/skill-exp-active",
                 active_name,
                 "skill.evolution",
                 "proposal",
-                macaca_skill::SkillAuthorKind::Agent,
+                macaca_sdk::skill::SkillAuthorKind::Agent,
             ),
-            lifecycle: macaca_skill::SkillLifecycleState::Active,
+            lifecycle: macaca_sdk::skill::SkillLifecycleState::Active,
             pinned: false,
             telemetry: Default::default(),
             diagnostics: Default::default(),
             updated_at: chrono::Utc::now(),
             evidence_ids: vec!["eventlog://run-42".into()],
         };
-        let archived_record = macaca_skill::SkillGovernanceRecord {
-            provenance: macaca_skill::SkillGovernanceProvenance::new(
+        let archived_record = macaca_sdk::skill::SkillGovernanceRecord {
+            provenance: macaca_sdk::skill::SkillGovernanceProvenance::new(
                 "skill://agent/archived",
                 "archived",
                 "skill.evolution",
                 "proposal",
-                macaca_skill::SkillAuthorKind::Agent,
+                macaca_sdk::skill::SkillAuthorKind::Agent,
             ),
-            lifecycle: macaca_skill::SkillLifecycleState::Archived,
+            lifecycle: macaca_sdk::skill::SkillLifecycleState::Archived,
             pinned: false,
             telemetry: Default::default(),
             diagnostics: Default::default(),
@@ -641,7 +641,7 @@ mod tests {
         );
         assert_eq!(
             commands[0].observation.event,
-            macaca_skill::SkillUsageEventKind::Activated
+            macaca_sdk::skill::SkillUsageEventKind::Activated
         );
         assert_eq!(
             commands[0]

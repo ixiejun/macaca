@@ -49,10 +49,10 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
         &session_store_impl,
     )));
     let audit_logger =
-        Arc::new(macaca_kernel::audit::AuditLogger::new(kernel_persistence));
+        Arc::new(macaca_sdk::kernel::audit::AuditLogger::new(kernel_persistence));
     let session_store = session_store_shared;
-    let alert_config = macaca_kernel::alert::AlertConfig::default();
-    let alert_manager = Arc::new(macaca_kernel::alert::AlertManager::new(alert_config));
+    let alert_config = macaca_sdk::kernel::alert::AlertConfig::default();
+    let alert_manager = Arc::new(macaca_sdk::kernel::alert::AlertManager::new(alert_config));
     info!("AuditLogger and AlertManager initialized");
 
     let default_model = llm_router.default_model_reference();
@@ -64,8 +64,8 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
         if config.context.recall.expose_memory_tools {
             let mem_dir = configured_memory_base_path(&data_dir, &config.memory.file_store_path);
             std::fs::create_dir_all(&mem_dir).ok();
-            let factory = macaca_memory::MemoryBackendFactory::new(
-                macaca_memory::MemoryBackendConfig::new(mem_dir.clone())
+            let factory = macaca_sdk::memory::MemoryBackendFactory::new(
+                macaca_sdk::memory::MemoryBackendConfig::new(mem_dir.clone())
                     .session_ttl(Duration::from_secs(
                         config.memory.session_ttl_seconds.max(1),
                     ))
@@ -86,7 +86,7 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
             let profile = factory
                 .configured_profile()
                 .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
-            let tomb = Arc::new(macaca_memory::SharedTombstoneRegistry::new());
+            let tomb = Arc::new(macaca_sdk::memory::SharedTombstoneRegistry::new());
             info!(
                 memory_base_path = %mem_dir.display(),
                 vector_backend = %profile.vector_backend,
@@ -118,7 +118,7 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
             );
             (
                 Some(runtime),
-                None::<Arc<macaca_memory::TestMemoryManager>>,
+                None::<Arc<macaca_sdk::memory::TestMemoryManager>>,
                 Some(Arc::clone(&tomb)),
             )
         } else {
@@ -136,7 +136,7 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
         .register_provider(
             &macaca_runtime_host::StaticServiceProviderFactory::new(
                 macaca_runtime_host::ServiceProviderInstance::new(
-                    macaca_llm::llm_service_descriptor(),
+                    macaca_sdk::llm::llm_service_descriptor(),
                     Arc::new({
                         let default_reference = llm_router.default_model_reference();
                         let profile = if default_reference.trim().is_empty() {
@@ -163,7 +163,7 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
         .register_provider(
             &macaca_runtime_host::StaticServiceProviderFactory::new(
                 macaca_runtime_host::ServiceProviderInstance::new(
-                    macaca_driver::driver_service_descriptor(),
+                    macaca_sdk::driver::driver_service_descriptor(),
                     Arc::new(macaca_runtime_host::DriverSystemServiceProvider::new(
                         Arc::clone(&driver_runtime),
                     )),
@@ -181,7 +181,7 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
         macaca_runtime_host::SkillSystemServiceProvider::new()
             .with_materialized_skill_roots(materialized_skill_roots.clone())
             .with_governance_event_journal_path(governance_event_journal_path.clone())
-            .with_memory_runtime(Arc::clone(runtime) as Arc<dyn macaca_memory::MemoryRuntimeFacade>)
+            .with_memory_runtime(Arc::clone(runtime) as Arc<dyn macaca_sdk::memory::MemoryRuntimeFacade>)
     } else {
         macaca_runtime_host::SkillSystemServiceProvider::new()
             .with_materialized_skill_roots(materialized_skill_roots.clone())
@@ -191,7 +191,7 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
         .register_provider(
             &macaca_runtime_host::StaticServiceProviderFactory::new(
                 macaca_runtime_host::ServiceProviderInstance::new(
-                    macaca_skill::skill_service_descriptor(),
+                    macaca_sdk::skill::skill_service_descriptor(),
                     Arc::new(skill_service_provider),
                 ),
             ),
@@ -214,15 +214,15 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
         .await
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
     if let Some(runtime) = memory_runtime.as_ref() {
-        let memory_service: Arc<dyn macaca_kernel::SystemService> =
+        let memory_service: Arc<dyn macaca_sdk::kernel::SystemService> =
             Arc::new(macaca_runtime_host::MemorySystemServiceProvider::new(
-                Arc::clone(runtime) as Arc<dyn macaca_memory::MemoryFacade>,
+                Arc::clone(runtime) as Arc<dyn macaca_sdk::memory::MemoryFacade>,
             ));
         service_runtime
             .register_provider(
                 &macaca_runtime_host::StaticServiceProviderFactory::new(
                     macaca_runtime_host::ServiceProviderInstance::new(
-                        macaca_memory::memory_service_descriptor(),
+                        macaca_sdk::memory::memory_service_descriptor(),
                         memory_service,
                     ),
                 ),
@@ -232,7 +232,7 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
             .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
         service_runtime
             .start(
-                &KernelServiceId::new(macaca_memory::MEMORY_SERVICE_ID),
+                &KernelServiceId::new(macaca_sdk::memory::MEMORY_SERVICE_ID),
                 TraceContext::new("web-startup-memory-service"),
             )
             .await
@@ -287,21 +287,21 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
     service_runtime
         .start(
-            &KernelServiceId::new(macaca_llm::LLM_SERVICE_ID),
+            &KernelServiceId::new(macaca_sdk::llm::LLM_SERVICE_ID),
             TraceContext::new("web-startup-llm-service"),
         )
         .await
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
     service_runtime
         .start(
-            &KernelServiceId::new(macaca_driver::DRIVER_SERVICE_ID),
+            &KernelServiceId::new(macaca_sdk::driver::DRIVER_SERVICE_ID),
             TraceContext::new("web-startup-driver-service"),
         )
         .await
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
     service_runtime
         .start(
-            &KernelServiceId::new(macaca_skill::SKILL_SERVICE_ID),
+            &KernelServiceId::new(macaca_sdk::skill::SKILL_SERVICE_ID),
             TraceContext::new("web-startup-skill-service"),
         )
         .await

@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use macaca_app::AppLlmConfig;
-use macaca_llm::{
+use macaca_sdk::llm::{
     LlmPolicyHints, LlmRouteResolveCommand, LlmServiceScope, LlmServiceSnapshotCommand,
     ModelSelection, ModelSelectionRequest, ModelTarget,
 };
@@ -185,7 +185,7 @@ pub async fn resolve_request_route_metadata(
 
 /// Convert a service-owned route summary into the legacy `ModelSelection` shape.
 fn route_summary_to_model_selection(
-    summary: &macaca_llm::LlmRouteSummary,
+    summary: &macaca_sdk::llm::LlmRouteSummary,
 ) -> ModelSelection {
     ModelSelection {
         primary: ModelTarget {

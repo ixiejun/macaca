@@ -16,9 +16,9 @@ use macaca_context::{
     ContextProviderRegistry, ProviderHealthLedger,
 };
 use macaca_framework::session::SessionStore as FrameworkSessionStore;
-use macaca_kernel::Kernel;
+use macaca_sdk::kernel::Kernel;
 use macaca_runtime_host::ApplicationExecutorRegistry;
-use macaca_persist::{EventLog, PersistBackend};
+use macaca_runtime_host::persist::{EventLog, PersistBackend};
 use macaca_proto::{config::ContextConfig, ApplicationId, ForkId, LlmMessage};
 use macaca_runtime_host::ServiceRuntime;
 use macaca_sdk::{
@@ -28,9 +28,9 @@ use macaca_sdk::{
     SystemPluginHookClient, SystemScheduledAgentTaskClient, SystemSchedulerClient,
     SystemSkillClient, SystemStoreClient, SystemToolClient, SystemWeb3Client,
 };
-use macaca_skill::SkillCatalog;
-use macaca_task::TodoStore;
-use macaca_tools::ToolCatalog;
+use macaca_sdk::skill::SkillCatalog;
+use macaca_sdk::task::TodoStore;
+use macaca_sdk::tools::ToolCatalog;
 
 use crate::runtime_resume::RuntimeResumeSignal;
 use crate::shell::WebSystemFacadeBundle;
@@ -225,7 +225,7 @@ pub struct PersistenceState {
     /// Append-only event log (redb-backed, durable before SSE send).
     pub event_log: Arc<EventLog>,
     /// Persistent audit logger (records tool executions, delegation, etc.).
-    pub audit_logger: Arc<macaca_kernel::audit::AuditLogger>,
+    pub audit_logger: Arc<macaca_sdk::kernel::audit::AuditLogger>,
     /// Sparse pipeline checkpoints (`run_trace` events + metrics).
     pub run_tracer: Arc<crate::run_trace::RunTracer>,
 }
@@ -237,9 +237,9 @@ pub struct LoopState {
     /// Per-app WorkerLoop shutdown handles (one per worker agent, started alongside PlanLoop).
     pub worker_loop_handles: RwLock<HashMap<ApplicationId, Vec<Arc<AtomicBool>>>>,
     /// Per-app PlanLoop wakers for immediate wakeup on new goals/reviews.
-    pub plan_loop_wakers: RwLock<HashMap<ApplicationId, macaca_task::PlanLoopWaker>>,
+    pub plan_loop_wakers: RwLock<HashMap<ApplicationId, macaca_sdk::task::PlanLoopWaker>>,
     /// Per-app WorkerLoop wakers (one per worker agent) for immediate wakeup on new tasks.
-    pub worker_loop_wakers: RwLock<HashMap<ApplicationId, Vec<macaca_task::WorkerLoopWaker>>>,
+    pub worker_loop_wakers: RwLock<HashMap<ApplicationId, Vec<macaca_sdk::task::WorkerLoopWaker>>>,
     /// Per-app Scheduler shutdown handles (for lazy start on first schedule).
     pub scheduler_handles: RwLock<HashMap<ApplicationId, Arc<AtomicBool>>>,
 }
@@ -289,7 +289,7 @@ pub struct AppConfig {
     /// Skill catalog for progressive disclosure (SKILL.md knowledge skills).
     pub catalog: RwLock<SkillCatalog>,
     /// Alert manager (deduplication + routing to log/webhook channels).
-    pub alert_manager: Arc<macaca_kernel::alert::AlertManager>,
+    pub alert_manager: Arc<macaca_sdk::kernel::alert::AlertManager>,
 }
 
 /// Shared state passed to all route handlers via axum's State extractor.
@@ -378,9 +378,9 @@ pub struct AppState {
     /// Application executor registry for isolated multi-agent execution.
     pub executor_registry: Arc<ApplicationExecutorRegistry>,
     /// Legacy builtin backing store retained for compatibility and default runtime construction.
-    pub workspace_memory: Option<Arc<macaca_memory::TestMemoryManager>>,
+    pub workspace_memory: Option<Arc<macaca_sdk::memory::TestMemoryManager>>,
     /// Tombstone registry paired with [`Self::workspace_memory`] for digest + `memory_forget` coordination.
-    pub workspace_memory_tombstones: Option<Arc<macaca_memory::SharedTombstoneRegistry>>,
+    pub workspace_memory_tombstones: Option<Arc<macaca_sdk::memory::SharedTombstoneRegistry>>,
     /// Path to the drivers directory (for reload).
     pub drivers_dir: String,
     /// Persistence: session store, todo store, event log, audit logger, run tracer.

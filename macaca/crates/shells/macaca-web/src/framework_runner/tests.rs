@@ -10,7 +10,7 @@ mod tests {
     use macaca_framework::message::{ContentBlock, TextBlock};
     use macaca_framework::tool::ToolResponse;
     use macaca_proto::config::{AgentProfileContextConfig, ContextConfig};
-    use macaca_tools::TraceEvent;
+    use macaca_sdk::tools::TraceEvent;
 
     #[test]
     fn truncate_tool_output_respects_utf8_boundaries() {

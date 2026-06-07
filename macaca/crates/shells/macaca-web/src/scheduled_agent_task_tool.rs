@@ -16,7 +16,7 @@ use macaca_proto::{
     ScheduledAgentTaskSchedule, TraceContext,
 };
 use macaca_sdk::SystemScheduledAgentTaskClient;
-use macaca_tools::Tool;
+use macaca_sdk::tools::Tool;
 use serde::Deserialize;
 use serde_json::Value;
 

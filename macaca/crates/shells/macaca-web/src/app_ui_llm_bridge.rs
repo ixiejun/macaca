@@ -6,7 +6,7 @@
 //! becoming a God Object while preserving service ownership of provider/model
 //! semantics.
 
-use macaca_llm::{
+use macaca_sdk::llm::{
     LlmCatalogReadCommand, LlmPolicyHints, LlmRouteResolveCommand, LlmServiceScope,
     LLM_MODEL_LIST_COMMAND, LLM_PROVIDER_CAPABILITIES_READ_COMMAND, LLM_ROUTE_RESOLVE_COMMAND,
     LLM_SERVICE_ID,

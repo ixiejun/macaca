@@ -4,7 +4,7 @@ use macaca_context::{
     ActiveRecallDiagnostics, ContextDecisionReport, ContextDecisionSeverity,
     ContextPreflightRecallConfig, ContextSourceKind, ContextSourceReport,
 };
-use macaca_memory::{MemoryPolicyHints, MemoryPrefetchCommand, MemoryScope};
+use macaca_sdk::memory::{MemoryPolicyHints, MemoryPrefetchCommand, MemoryScope};
 use macaca_proto::{LlmMessage, MemoryEntry, TraceContext};
 use tokio::time::timeout;
 
@@ -374,7 +374,7 @@ mod tests {
     use async_trait::async_trait;
     use chrono::Utc;
     use macaca_context::{ContextOptionsPatch, ContextReportBuilder};
-    use macaca_memory::{
+    use macaca_sdk::memory::{
         MemoryForgetCommand, MemoryGetCommand, MemoryGetResult, MemoryRecallCommand,
         MemoryRecallResult, MemoryRememberCommand, MemoryRememberResult, MemoryServiceSnapshot,
         MemoryServiceSnapshotCommand, MemoryStatusCommand, MemoryStatusReport,
@@ -444,7 +444,7 @@ mod tests {
         ) -> macaca_proto::MacacaResult<MemoryStatusReport> {
             Ok(MemoryStatusReport::healthy(
                 "test-memory-client",
-                macaca_memory::MemoryCapabilitySet::basic_store_search(),
+                macaca_sdk::memory::MemoryCapabilitySet::basic_store_search(),
             ))
         }
 
@@ -455,7 +455,7 @@ mod tests {
             Ok(MemoryServiceSnapshot::new(
                 "test-memory-client",
                 true,
-                macaca_memory::MemoryCapabilitySet::basic_store_search(),
+                macaca_sdk::memory::MemoryCapabilitySet::basic_store_search(),
                 None,
             ))
         }

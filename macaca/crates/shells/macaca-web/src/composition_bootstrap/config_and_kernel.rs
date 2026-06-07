@@ -7,8 +7,8 @@ use std::sync::Arc;
 
 use tracing::info;
 
-use macaca_kernel::{KernelBuilder, UnavailableAgentExecutionPort};
-use macaca_llm::{LlmProvider, LlmRouter};
+use macaca_sdk::kernel::{KernelBuilder, UnavailableAgentExecutionPort};
+use macaca_sdk::llm::{LlmProvider, LlmRouter};
 use macaca_proto::config::{KernelConfig, MacacaConfig};
 use macaca_proto::MacacaResult;
 

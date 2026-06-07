@@ -13,7 +13,7 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
 use macaca_proto::{ApplicationId, TraceContext};
-use macaca_skill::{
+use macaca_sdk::skill::{
     SelfEvolutionEvaluationRecord, SelfEvolutionScore, SkillAliasSnapshotCommand, SkillAuthorKind,
     SkillAutonomousMaterializationRunCommand, SkillAutonomousMaterializationSnapshotCommand,
     SkillCurationDryRunCommand, SkillCurationLifecycleAction, SkillCurationLifecycleCommand,

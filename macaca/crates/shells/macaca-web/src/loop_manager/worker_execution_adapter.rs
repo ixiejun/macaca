@@ -62,7 +62,7 @@ pub(crate) fn worker_success_summary(mode: WorkerExecutionMode, title: &str, out
 
 async fn handle_worker_execution_success(
     state: &Arc<AppState>,
-    board: &macaca_task::TaskBoard,
+    board: &macaca_sdk::task::TaskBoard,
     executor: &ApplicationExecutor,
     app_id: &ApplicationId,
     task_session: Option<&str>,
@@ -130,7 +130,7 @@ async fn handle_worker_execution_success(
 
 async fn handle_worker_execution_failure(
     state: &Arc<AppState>,
-    board: &macaca_task::TaskBoard,
+    board: &macaca_sdk::task::TaskBoard,
     executor: &ApplicationExecutor,
     app_id: &ApplicationId,
     task_session: Option<&str>,
@@ -156,7 +156,7 @@ async fn handle_worker_execution_failure(
 }
 
 async fn handle_worker_execution_timeout(
-    board: &macaca_task::TaskBoard,
+    board: &macaca_sdk::task::TaskBoard,
     executor: &ApplicationExecutor,
     task_id: macaca_proto::TaskId,
     agent_name: &str,
@@ -174,7 +174,7 @@ async fn handle_worker_execution_timeout(
 /// worker execution aligned with WASM, YAML, and planner service traces.
 pub(crate) async fn execute_worker_task_via_agent_service(
     state: &Arc<AppState>,
-    board: &macaca_task::TaskBoard,
+    board: &macaca_sdk::task::TaskBoard,
     executor: &ApplicationExecutor,
     app_id: &ApplicationId,
     session_id: Option<&str>,

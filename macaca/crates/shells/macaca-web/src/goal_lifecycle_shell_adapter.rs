@@ -16,7 +16,7 @@ use std::sync::Arc;
 use axum::response::sse::Event;
 use macaca_framework::execution::ExecutionContext;
 use macaca_framework::session::{load_module_state, save_module_state};
-use macaca_persist::AppendEventCommand;
+use macaca_runtime_host::persist::AppendEventCommand;
 use macaca_proto::{
     ApplicationId, EXECUTION_CONTROL_SERVICE_ID, TaskId, TraceContext,
 };

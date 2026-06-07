@@ -29,7 +29,7 @@ pub(crate) async fn create_goal(
     let store = Arc::clone(&state.persist.todo_store);
     let session_id = body["session_id"].as_str().map(|s| s.to_string());
     let space =
-        macaca_task::TaskSpace::for_session(app_id.clone(), session_id.clone(), Arc::clone(&store));
+        macaca_sdk::task::TaskSpace::for_session(app_id.clone(), session_id.clone(), Arc::clone(&store));
     let goal = space.push_goal(description).await;
 
     crate::run_trace::emit_for_scope(

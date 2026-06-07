@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use chrono::Utc;
-use macaca_memory::{
+use macaca_sdk::memory::{
     ActiveRecallCapability, ActiveRecallRequest, ActiveRecallResult, DefaultActiveRecallStrategy,
     KnowledgeCompileCapability, KnowledgeCompileRequest, KnowledgeCompileResult, KnowledgeCompiler,
     MemoryCapabilitySet, MemoryDeleteRequest, MemoryFacade, MemoryForgetCommand, MemoryGetCommand,
@@ -33,7 +33,7 @@ impl WebMemoryRuntime {
     }
 
     pub fn from_configured_memory(
-        memory: Arc<macaca_memory::ConfiguredMemoryManager>,
+        memory: Arc<macaca_sdk::memory::ConfiguredMemoryManager>,
         provider_profile: impl Into<String>,
     ) -> Self {
         Self::new(Arc::new(ManagerWorkspaceMemoryRuntime::new(
@@ -86,9 +86,9 @@ impl WebMemoryRuntime {
 #[async_trait]
 trait WorkspaceMemoryBackend: Send + Sync {
     async fn remember_text(&self, input: RememberText) -> MacacaResult<MemoryId>;
-    async fn recall(&self, query: RecallQuery) -> MacacaResult<macaca_memory::RecallResult>;
+    async fn recall(&self, query: RecallQuery) -> MacacaResult<macaca_sdk::memory::RecallResult>;
     async fn get_entry(&self, id: &MemoryId) -> MacacaResult<Option<MemoryEntry>>;
-    async fn forget(&self, input: macaca_memory::ForgetMemory) -> MacacaResult<()>;
+    async fn forget(&self, input: macaca_sdk::memory::ForgetMemory) -> MacacaResult<()>;
 }
 
 #[async_trait]
@@ -97,7 +97,7 @@ impl WorkspaceMemoryBackend for TestMemoryManager {
         TestMemoryManager::remember_text(self, input).await
     }
 
-    async fn recall(&self, query: RecallQuery) -> MacacaResult<macaca_memory::RecallResult> {
+    async fn recall(&self, query: RecallQuery) -> MacacaResult<macaca_sdk::memory::RecallResult> {
         TestMemoryManager::recall(self, query).await
     }
 
@@ -105,27 +105,27 @@ impl WorkspaceMemoryBackend for TestMemoryManager {
         TestMemoryManager::get_entry(self, id).await
     }
 
-    async fn forget(&self, input: macaca_memory::ForgetMemory) -> MacacaResult<()> {
+    async fn forget(&self, input: macaca_sdk::memory::ForgetMemory) -> MacacaResult<()> {
         TestMemoryManager::forget(self, input).await
     }
 }
 
 #[async_trait]
-impl WorkspaceMemoryBackend for macaca_memory::ConfiguredMemoryManager {
+impl WorkspaceMemoryBackend for macaca_sdk::memory::ConfiguredMemoryManager {
     async fn remember_text(&self, input: RememberText) -> MacacaResult<MemoryId> {
-        macaca_memory::ConfiguredMemoryManager::remember_text(self, input).await
+        macaca_sdk::memory::ConfiguredMemoryManager::remember_text(self, input).await
     }
 
-    async fn recall(&self, query: RecallQuery) -> MacacaResult<macaca_memory::RecallResult> {
-        macaca_memory::ConfiguredMemoryManager::recall(self, query).await
+    async fn recall(&self, query: RecallQuery) -> MacacaResult<macaca_sdk::memory::RecallResult> {
+        macaca_sdk::memory::ConfiguredMemoryManager::recall(self, query).await
     }
 
     async fn get_entry(&self, id: &MemoryId) -> MacacaResult<Option<MemoryEntry>> {
-        macaca_memory::ConfiguredMemoryManager::get_entry(self, id).await
+        macaca_sdk::memory::ConfiguredMemoryManager::get_entry(self, id).await
     }
 
-    async fn forget(&self, input: macaca_memory::ForgetMemory) -> MacacaResult<()> {
-        macaca_memory::ConfiguredMemoryManager::forget(self, input).await
+    async fn forget(&self, input: macaca_sdk::memory::ForgetMemory) -> MacacaResult<()> {
+        macaca_sdk::memory::ConfiguredMemoryManager::forget(self, input).await
     }
 }
 
@@ -152,7 +152,7 @@ impl ManagerWorkspaceMemoryRuntime {
 #[async_trait]
 impl MemoryRuntimeFacade for ManagerWorkspaceMemoryRuntime {
     async fn remember(&self, request: MemoryWriteRequest) -> MacacaResult<MemoryId> {
-        let mut input = macaca_memory::RememberText::new(request.content)
+        let mut input = macaca_sdk::memory::RememberText::new(request.content)
             .layer(request.layer)
             .metadata(request.metadata);
         if let Some(agent_id) = request.scope.agent_id_value() {
@@ -175,7 +175,7 @@ impl MemoryRuntimeFacade for ManagerWorkspaceMemoryRuntime {
 
     async fn delete(&self, request: MemoryDeleteRequest) -> MacacaResult<()> {
         self.memory
-            .forget(macaca_memory::ForgetMemory { id: request.id })
+            .forget(macaca_sdk::memory::ForgetMemory { id: request.id })
             .await
     }
 
@@ -223,14 +223,14 @@ impl MemoryFacade for ManagerWorkspaceMemoryRuntime {
 
     async fn delete(&self, request: MemoryDeleteRequest) -> MacacaResult<()> {
         self.memory
-            .forget(macaca_memory::ForgetMemory { id: request.id })
+            .forget(macaca_sdk::memory::ForgetMemory { id: request.id })
             .await
     }
 
-    fn status(&self) -> macaca_memory::MemoryStatusReport {
-        macaca_memory::MemoryStatusReport::healthy(
+    fn status(&self) -> macaca_sdk::memory::MemoryStatusReport {
+        macaca_sdk::memory::MemoryStatusReport::healthy(
             self.provider_profile.clone(),
-            macaca_memory::MemoryCapabilitySet {
+            macaca_sdk::memory::MemoryCapabilitySet {
                 store: true,
                 search: true,
                 prompt: true,
@@ -299,15 +299,15 @@ impl MemoryFacade for WebMemoryRuntime {
         MemoryRuntimeFacade::delete(self, request).await
     }
 
-    fn status(&self) -> macaca_memory::MemoryStatusReport {
+    fn status(&self) -> macaca_sdk::memory::MemoryStatusReport {
         // `MemoryFacade::status` is intentionally synchronous because callers
         // use it while producing lightweight service snapshots.  The wrapped
         // `MemoryRuntimeFacade` exposes richer asynchronous diagnostics, so the
         // web adapter returns the stable capability contract advertised by this
         // runtime instead of blocking inside an async status call.
-        macaca_memory::MemoryStatusReport::healthy(
+        macaca_sdk::memory::MemoryStatusReport::healthy(
             "web-memory-runtime",
-            macaca_memory::MemoryCapabilitySet {
+            macaca_sdk::memory::MemoryCapabilitySet {
                 store: true,
                 search: true,
                 prompt: true,

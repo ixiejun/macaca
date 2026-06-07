@@ -8,7 +8,7 @@
 use std::sync::Arc;
 
 use macaca_context::ContextReport;
-use macaca_persist::{AppendEventCommand, EventLog};
+use macaca_runtime_host::persist::{AppendEventCommand, EventLog};
 use serde::{Deserialize, Serialize};
 
 const DEFAULT_PREVIEW_BYTES: usize = 64 * 1024;
@@ -290,7 +290,7 @@ fn truncate_utf8(input: &str, max_bytes: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use macaca_persist::{AppendEventCommand, RedbStore};
+    use macaca_runtime_host::persist::{AppendEventCommand, RedbStore};
 
     #[test]
     fn resolves_short_event_ref_against_requested_session() {

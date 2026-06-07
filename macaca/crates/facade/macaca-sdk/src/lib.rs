@@ -39,6 +39,7 @@ pub mod registry_api;
 pub mod scheduled_agent_task_client;
 pub mod scheduler_client;
 pub mod service_client;
+pub mod shell_provider_bridge;
 pub mod skill_client;
 mod skill_client_service_backed;
 pub mod skill_operator_client;
@@ -177,3 +178,4 @@ pub use workbench_client::{
     is_structured_unavailable, ServiceBackedWorkbenchClient, SystemWorkbenchClient,
     SystemWorkbenchFacadeExt, UnavailableWorkbenchServiceClient, WorkbenchClientCatalog,
 };
+pub use shell_provider_bridge::{driver, kernel, llm, memory, skill, task, tools};

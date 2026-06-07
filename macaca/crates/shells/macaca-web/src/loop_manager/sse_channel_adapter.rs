@@ -6,7 +6,7 @@
 use std::sync::Arc;
 
 use axum::response::sse::Event;
-use macaca_persist::PersistStore;
+use macaca_runtime_host::persist::PersistStore;
 use macaca_proto::ApplicationId;
 
 use crate::sse::{broadcast_to_app_sessions, save_plan_decision, PlanDecisionEvent};

@@ -209,3 +209,13 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `serve_web_server` phased orchestrator | HIGH | web startup composition root; all service provider registration + `AppState` assembly | P3.3 |
 | `BootstrapCtx` carrier | MEDIUM | cross-phase bootstrap state threading; ordering enforced via `Option` + `expect` | P3.3 |
 | `contract_source::composition_bootstrap_module_sources` | LOW | static contract tests only; concatenates module sources for escape-hatch scans | P3.3 |
+
+## Iteration 27 additions (task 4.4.1–4.4.3 — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `shell_provider_bridge` + bulk `macaca-web` import rewrite | CRITICAL | all web modules importing driver/llm/memory/skill/task/tools/kernel types; composition_bootstrap, framework_runner, loop_manager, routes | P3.4 |
+| `macaca-sdk` → `macaca-persist` attempt | HIGH | blocked by `application-execution-sdk-no-runtime-provider-construction`; reverted | P3.4 |
+| `macaca-runtime-host::persist` alias | MEDIUM | shell bootstrap persist types; web already depends on runtime-host | P3.4 |
+| `app→sdk→runtime-host→app` cycle | HIGH | prevents SDK re-export of runtime-host; 4.4.4终态 deferred | P3.4 / P4 |
+| Route C allowlist cleared (7 rows) | LOW | gate now enforces zero allowlist globally; web provider direct edges gone | P3.4 |

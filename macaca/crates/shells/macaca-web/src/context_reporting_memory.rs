@@ -12,7 +12,7 @@ use macaca_context::{
     ActiveRecallBudget, ActiveRecallCapability, ActiveRecallPolicy, DefaultActiveRecallProvider,
     KnowledgeDigestCapability, MemoryPrefetchResult, MemoryRecallQuery,
 };
-use macaca_memory::{MemoryScope, SharedTombstoneRegistry, TombstoneIndex};
+use macaca_sdk::memory::{MemoryScope, SharedTombstoneRegistry, TombstoneIndex};
 use macaca_proto::{config::ContextConfig, AgentId, ApplicationId, MacacaError, MacacaResult};
 
 use crate::workspace_knowledge_digest_capability::WorkspaceKnowledgeDigestCapability;
@@ -63,8 +63,8 @@ pub(crate) fn build_workspace_recall_capability(
     if !cfg.active_vector_memory.enabled {
         return None;
     }
-    let tomb_index: Option<Arc<dyn macaca_memory::TombstoneIndex>> =
-        tombstones.map(|reg| Arc::clone(reg) as Arc<dyn macaca_memory::TombstoneIndex>);
+    let tomb_index: Option<Arc<dyn macaca_sdk::memory::TombstoneIndex>> =
+        tombstones.map(|reg| Arc::clone(reg) as Arc<dyn macaca_sdk::memory::TombstoneIndex>);
     let scope = recall_scope(application_id, session_id, routing_agent_id);
     let source = Arc::new(WorkspaceMemoryRecallSource::new(
         memory_client,
@@ -184,8 +184,8 @@ pub(crate) fn build_workspace_knowledge_digest_capability(
     if !cfg.knowledge_digest.enabled {
         return None;
     }
-    let tomb_index: Option<Arc<dyn macaca_memory::TombstoneIndex>> =
-        tombstones.map(|registry| Arc::clone(registry) as Arc<dyn macaca_memory::TombstoneIndex>);
+    let tomb_index: Option<Arc<dyn macaca_sdk::memory::TombstoneIndex>> =
+        tombstones.map(|registry| Arc::clone(registry) as Arc<dyn macaca_sdk::memory::TombstoneIndex>);
     Some(Arc::new(WorkspaceKnowledgeDigestCapability::new(
         memory_client,
         digest_scope(application_id, session_id),

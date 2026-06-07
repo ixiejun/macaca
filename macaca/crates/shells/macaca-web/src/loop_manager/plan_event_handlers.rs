@@ -178,7 +178,7 @@ crate::run_trace::emit_for_scope(
 ctx.state
     .config
     .alert_manager
-    .fire(macaca_kernel::alert::Alert::warning(
+    .fire(macaca_sdk::kernel::alert::Alert::warning(
         "Task Anomaly",
         message.clone(),
         "plan_loop",

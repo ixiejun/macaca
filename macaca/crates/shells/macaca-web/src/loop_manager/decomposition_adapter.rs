@@ -266,7 +266,7 @@ pub(crate) async fn create_fallback_decomposition_tasks(
         "Planner produced no todos; creating capability-based fallback task chain"
     );
 
-    let space = macaca_task::TaskSpace::for_session(
+    let space = macaca_sdk::task::TaskSpace::for_session(
         app_id.clone(),
         session_id.map(str::to_string),
         Arc::clone(&state.persist.todo_store),

@@ -23,8 +23,8 @@ use macaca_context::{
     CompactionSummaryEnvelope, ContextAdapterSafetyPolicy, ContextEngineInfo,
     ContextFallbackPolicy, LineageKind, ProviderHealthSnapshot, SessionLineage, TranscriptSegment,
 };
-use macaca_driver::{DriverInventoryCommand, DriverLoadServiceCommand, DriverServiceScope};
-use macaca_persist::{AppendEventCommand, EventLogQuery, SessionLineageStore};
+use macaca_sdk::driver::{DriverInventoryCommand, DriverLoadServiceCommand, DriverServiceScope};
+use macaca_runtime_host::persist::{AppendEventCommand, EventLogQuery, SessionLineageStore};
 use macaca_proto::{
     AgentId, AgentManifest, ApplicationDiscoverCommand, ApplicationId,
     ApplicationMetadataQueryCommand, ApplicationMetadataView, ApplicationServiceAppView,
@@ -39,7 +39,7 @@ use macaca_proto::{
     SchedulerTargetCommand, SchedulerUpdateJobCommand, ServiceCommandName, ServiceTargetCommand,
     TraceContext,
 };
-use macaca_skill::{SkillPolicy, SkillRuntimeFacade, SkillSnapshotRequest};
+use macaca_sdk::skill::{SkillPolicy, SkillRuntimeFacade, SkillSnapshotRequest};
 
 use crate::shell::WebShellFacade;
 use crate::skill_mcp::SkillMcpStatus;
@@ -1038,7 +1038,7 @@ pub async fn get_todo_claim_diagnostics(
     };
     let store = Arc::clone(&state.persist.todo_store);
     let todos = store.list_all_todos_for_session(&app_id, sid).await;
-    let diag = macaca_task::diagnose_session_claims(&todos);
+    let diag = macaca_sdk::task::diagnose_session_claims(&todos);
     Ok(Json(
         serde_json::to_value(&diag).unwrap_or(serde_json::json!({})),
     ))
@@ -1055,7 +1055,7 @@ pub async fn get_todo_progress(
             .map_err(|_| err(StatusCode::BAD_REQUEST, "Invalid app_id".into()))?,
     );
     let store = Arc::clone(&state.persist.todo_store);
-    let space = macaca_task::TaskSpace::for_session(app_id, query.session_id, store);
+    let space = macaca_sdk::task::TaskSpace::for_session(app_id, query.session_id, store);
     let p = space.overall_progress().await;
     Ok(Json(serde_json::json!({
         "total": p.total, "pending": p.pending, "assigned": p.assigned,
@@ -1122,9 +1122,9 @@ pub async fn list_schedules(
         uuid::Uuid::parse_str(&app_id)
             .map_err(|_| err(StatusCode::BAD_REQUEST, "Invalid app_id".into()))?,
     );
-    let scheduler = macaca_task::TaskScheduler::new(
+    let scheduler = macaca_sdk::task::TaskScheduler::new(
         Arc::clone(&state.persist.session_store),
-        macaca_task::SchedulerConfig::default(),
+        macaca_sdk::task::SchedulerConfig::default(),
     );
     let entries = scheduler.list(&app_id).await;
     Ok(Json(
@@ -1161,13 +1161,13 @@ pub async fn create_schedule(
         .ok_or_else(|| err(StatusCode::BAD_REQUEST, "Missing 'name' field".into()))?
         .to_owned();
 
-    let action: macaca_task::ScheduleAction = serde_json::from_value(body["action"].clone())
+    let action: macaca_sdk::task::ScheduleAction = serde_json::from_value(body["action"].clone())
         .map_err(|e| err(StatusCode::BAD_REQUEST, format!("Invalid 'action': {e}")))?;
 
     let entry = if let Some(expr) = body["cron_expr"].as_str() {
-        macaca_task::ScheduleEntry::new_cron(app_id.clone(), name, expr, action)
+        macaca_sdk::task::ScheduleEntry::new_cron(app_id.clone(), name, expr, action)
     } else if let Some(secs) = body["interval_secs"].as_u64() {
-        macaca_task::ScheduleEntry::new_interval(app_id.clone(), name, secs, action)
+        macaca_sdk::task::ScheduleEntry::new_interval(app_id.clone(), name, secs, action)
     } else {
         return Err(err(
             StatusCode::BAD_REQUEST,
@@ -1175,9 +1175,9 @@ pub async fn create_schedule(
         ));
     };
 
-    let scheduler = macaca_task::TaskScheduler::new(
+    let scheduler = macaca_sdk::task::TaskScheduler::new(
         Arc::clone(&state.persist.session_store),
-        macaca_task::SchedulerConfig::default(),
+        macaca_sdk::task::SchedulerConfig::default(),
     );
     let created = scheduler.create(entry).await;
 
@@ -1191,12 +1191,12 @@ pub async fn create_schedule(
                 let shutdown = Arc::new(std::sync::atomic::AtomicBool::new(false));
                 handles.insert(app_id.clone(), Arc::clone(&shutdown));
 
-                let sched_runner = macaca_task::TaskScheduler::new(
+                let sched_runner = macaca_sdk::task::TaskScheduler::new(
                     Arc::clone(&state.persist.session_store),
-                    macaca_task::SchedulerConfig::default(),
+                    macaca_sdk::task::SchedulerConfig::default(),
                 );
                 let (sched_event_tx, mut sched_event_rx) =
-                    tokio::sync::mpsc::channel::<macaca_task::ScheduleEvent>(64);
+                    tokio::sync::mpsc::channel::<macaca_sdk::task::ScheduleEvent>(64);
                 let app_id_sched = app_id.clone();
 
                 tokio::spawn(async move {
@@ -1210,22 +1210,22 @@ pub async fn create_schedule(
                 tokio::spawn(async move {
                     while let Some(event) = sched_event_rx.recv().await {
                         match event {
-                            macaca_task::ScheduleEvent::Triggered { action, .. } => match action {
-                                macaca_task::ScheduleAction::CreateGoal { description } => {
-                                    let space = macaca_task::TaskSpace::for_session(
+                            macaca_sdk::task::ScheduleEvent::Triggered { action, .. } => match action {
+                                macaca_sdk::task::ScheduleAction::CreateGoal { description } => {
+                                    let space = macaca_sdk::task::TaskSpace::for_session(
                                         app_id_for_sched.clone(),
                                         None,
                                         Arc::clone(&state_for_sched.persist.todo_store),
                                     );
                                     space.push_goal(description).await;
                                 }
-                                macaca_task::ScheduleAction::CreateTask {
+                                macaca_sdk::task::ScheduleAction::CreateTask {
                                     agent,
                                     title,
                                     description,
                                     priority,
                                 } => {
-                                    let space = macaca_task::TaskSpace::for_session(
+                                    let space = macaca_sdk::task::TaskSpace::for_session(
                                         app_id_for_sched.clone(),
                                         None,
                                         Arc::clone(&state_for_sched.persist.todo_store),
@@ -1275,9 +1275,9 @@ pub async fn get_schedule(
             .map_err(|_| err(StatusCode::BAD_REQUEST, "Invalid schedule_id".into()))?,
     );
 
-    let scheduler = macaca_task::TaskScheduler::new(
+    let scheduler = macaca_sdk::task::TaskScheduler::new(
         Arc::clone(&state.persist.session_store),
-        macaca_task::SchedulerConfig::default(),
+        macaca_sdk::task::SchedulerConfig::default(),
     );
     let entry = scheduler
         .get(&app_id, &id)
@@ -1302,9 +1302,9 @@ pub async fn delete_schedule(
             .map_err(|_| err(StatusCode::BAD_REQUEST, "Invalid schedule_id".into()))?,
     );
 
-    let scheduler = macaca_task::TaskScheduler::new(
+    let scheduler = macaca_sdk::task::TaskScheduler::new(
         Arc::clone(&state.persist.session_store),
-        macaca_task::SchedulerConfig::default(),
+        macaca_sdk::task::SchedulerConfig::default(),
     );
     scheduler.delete(&app_id, &id).await;
     Ok(StatusCode::NO_CONTENT)
@@ -1333,9 +1333,9 @@ pub async fn toggle_schedule(
         )
     })?;
 
-    let scheduler = macaca_task::TaskScheduler::new(
+    let scheduler = macaca_sdk::task::TaskScheduler::new(
         Arc::clone(&state.persist.session_store),
-        macaca_task::SchedulerConfig::default(),
+        macaca_sdk::task::SchedulerConfig::default(),
     );
     let ok = scheduler.set_enabled(&app_id, &id, enabled).await;
     if ok {
@@ -2270,7 +2270,7 @@ pub async fn reload_drivers(
 
     for entry in &report.entries {
         match entry.status {
-            macaca_driver::DriverLoadStatus::Loaded => {
+            macaca_sdk::driver::DriverLoadStatus::Loaded => {
                 tracing::info!(
                     driver = %entry.name,
                     tools = entry.tool_count.unwrap_or_default(),
@@ -2282,7 +2282,7 @@ pub async fn reload_drivers(
                     error: None,
                 });
             }
-            macaca_driver::DriverLoadStatus::Failed => {
+            macaca_sdk::driver::DriverLoadStatus::Failed => {
                 results.push(DriverReloadResult {
                     name: entry.name.clone(),
                     status: "error".to_string(),

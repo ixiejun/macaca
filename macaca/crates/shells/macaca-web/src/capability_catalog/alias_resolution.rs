@@ -9,7 +9,7 @@ use macaca_context::{
     DeclaredCapabilityDependency, SkillCapabilityCatalog, SkillCapabilityGovernanceReport,
     SkillCapabilityRecord, SkillFilterDiagnostic,
 };
-use macaca_skill::{
+use macaca_sdk::skill::{
     FilteredSkill, SkillAliasKind, SkillAliasResolutionStatus, SkillAliasResolveResult,
     SkillGovernanceRecord, SkillGovernanceSnapshotResult, SkillLifecycleState, SkillSnapshot,
     SkillSnapshotEntry,
@@ -314,7 +314,7 @@ mod tests {
     use std::path::PathBuf;
 
     use chrono::Utc;
-    use macaca_skill::{
+    use macaca_sdk::skill::{
         SkillAliasKind, SkillAliasResolutionPolicy, SkillAliasResolutionStatus,
         SkillAliasResolveResult, SkillMcpServerConfig, SkillSnapshot, SkillSnapshotEntry,
         SkillSourceScope,

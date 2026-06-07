@@ -5,7 +5,7 @@ use std::sync::Arc;
 use axum::response::sse::Event;
 use tokio::sync::mpsc;
 use macaca_framework::model::ToolChoice;
-use macaca_persist::EventLog;
+use macaca_runtime_host::persist::EventLog;
 use crate::state::AppState;
 use super::runtime_execution_control::RuntimeExecutionControl;
 pub(crate) enum FrameworkRunnerBuildMode {
@@ -78,7 +78,7 @@ impl DriverTraceRoute {
 /// would persist the same logical operation twice. Concrete driver/provider
 /// traces still pass through because they carry a real `driver_id` or a richer
 /// diagnostic event type.
-pub(crate) fn is_framework_tool_wrapper_trace(trace: &macaca_tools::TraceEvent) -> bool {
+pub(crate) fn is_framework_tool_wrapper_trace(trace: &macaca_sdk::tools::TraceEvent) -> bool {
     trace.driver_id.is_none() && matches!(trace.event_type.as_str(), "tool_call" | "tool_result")
 }
 
@@ -88,6 +88,6 @@ pub(crate) fn is_framework_tool_wrapper_trace(trace: &macaca_tools::TraceEvent) 
 /// sync. It avoids frontend-only hiding and keeps EventLog replay faithful:
 /// semantic tool events remain durable, while redundant framework wrappers are
 /// suppressed before they become driver-trace events.
-pub(crate) fn should_forward_driver_trace(trace: &macaca_tools::TraceEvent) -> bool {
+pub(crate) fn should_forward_driver_trace(trace: &macaca_sdk::tools::TraceEvent) -> bool {
     !is_framework_tool_wrapper_trace(trace)
 }

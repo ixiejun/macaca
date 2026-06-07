@@ -11,7 +11,7 @@ use std::sync::Arc;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::Json;
-use macaca_persist::{AppendEventCommand, EventLog};
+use macaca_runtime_host::persist::{AppendEventCommand, EventLog};
 use macaca_proto::{
     ApplicationGenUiSurfaceCommand, ApplicationServiceScope, TraceContext, UiAction, UiEvent,
     UiEventCommand, UiIntent, UiRenderError, UiRenderSurface,
@@ -229,7 +229,7 @@ mod tests {
     use super::*;
     use std::sync::Arc;
 
-    use macaca_persist::{EventLogQuery, RedbStore};
+    use macaca_runtime_host::persist::{EventLogQuery, RedbStore};
 
     #[test]
     fn genui_required_scope_rejects_missing_session() {

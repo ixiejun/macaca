@@ -25,7 +25,7 @@ use macaca_runtime_host::{
     McpRuntimeFacade, McpRuntimeStatus, McpRuntimeStatusState, McpToolPolicy,
 };
 use macaca_sdk::SystemMcpClient;
-use macaca_skill::{
+use macaca_sdk::skill::{
     SkillAliasResolveCommand, SkillAliasResolveResult, SkillGovernanceSnapshotCommand,
     SkillGovernanceSnapshotResult, SkillLifecycleState, SkillPolicy, SkillRuntimeFacade,
     SkillServiceScope, SkillSnapshot, SkillSnapshotRequest, SkillSnapshotServiceCommand,
@@ -357,9 +357,9 @@ async fn resolve_aliases_for_snapshot(
                     );
                 } else if matches!(
                     result.status,
-                    macaca_skill::SkillAliasResolutionStatus::Denied
-                        | macaca_skill::SkillAliasResolutionStatus::Expired
-                        | macaca_skill::SkillAliasResolutionStatus::LoopPrevented
+                    macaca_sdk::skill::SkillAliasResolutionStatus::Denied
+                        | macaca_sdk::skill::SkillAliasResolutionStatus::Expired
+                        | macaca_sdk::skill::SkillAliasResolutionStatus::LoopPrevented
                 ) {
                     tracing::warn!(
                         requested_skill_id = %result.requested_skill_id,

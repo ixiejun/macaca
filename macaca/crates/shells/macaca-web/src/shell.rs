@@ -20,7 +20,7 @@ use macaca_sdk::{
     SystemServiceClient, SystemStatusSnapshot, SystemWeb3Client, TaskBoardQueryCommand,
     TodoStoreTaskBoardDataSource,
 };
-use macaca_task::TodoStore;
+use macaca_sdk::task::TodoStore;
 
 /// Route-safe facade bundle for Web system surfaces.
 ///
@@ -187,7 +187,7 @@ impl WebShellFacade {
 mod tests {
     use super::*;
     use async_trait::async_trait;
-    use macaca_persist::RedbStore;
+    use macaca_runtime_host::persist::RedbStore;
     use macaca_proto::{
         EvmAvailability, EvmAvailabilityCommand, EvmCallAdmission, EvmContractCallCommand,
         EvmContractDeployCommand, EvmContractReadCommand, EvmDeployAdmission,

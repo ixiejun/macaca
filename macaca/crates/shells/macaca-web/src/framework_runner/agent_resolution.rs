@@ -48,7 +48,7 @@ impl FrameworkRunner {
         app_id: &ApplicationId,
         agent_name: &str,
         session_id: Option<&str>,
-    ) -> Result<macaca_llm::ModelSelection, String> {
+    ) -> Result<macaca_sdk::llm::ModelSelection, String> {
         let request_model = if let Some(session_id) = session_id {
             state
                 .sessions
@@ -74,7 +74,7 @@ impl FrameworkRunner {
             app_id,
             agent_name,
             session_id,
-            macaca_llm::ModelSelectionRequest {
+            macaca_sdk::llm::ModelSelectionRequest {
                 request_model: request_model.clone(),
                 agent_model,
                 app_model: app_defaults.as_ref().map(|cfg| cfg.model.clone()),

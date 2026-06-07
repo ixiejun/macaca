@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use macaca_memory::{MemoryPolicyHints, MemoryRememberCommand, MemoryScope};
+use macaca_sdk::memory::{MemoryPolicyHints, MemoryRememberCommand, MemoryScope};
 use macaca_proto::{ApplicationId, MemoryLayer, TraceContext};
 use tracing::{info, warn};
 
@@ -122,7 +122,7 @@ mod tests {
     use std::sync::Arc;
 
     use async_trait::async_trait;
-    use macaca_memory::{
+    use macaca_sdk::memory::{
         MemoryForgetCommand, MemoryGetCommand, MemoryGetResult, MemoryPrefetchCommand,
         MemoryRecallCommand, MemoryRecallResult, MemoryRememberCommand, MemoryRememberResult,
         MemoryServiceSnapshot, MemoryServiceSnapshotCommand, MemoryStatusCommand,

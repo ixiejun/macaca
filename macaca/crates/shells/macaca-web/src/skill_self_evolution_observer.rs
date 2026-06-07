@@ -14,7 +14,7 @@ use macaca_runtime_host::executor::TaskResult;
 use macaca_proto::{
     AgentExecutionResult, AgentExecutionStatus, ApplicationId, TaskId, TraceContext,
 };
-use macaca_skill::{
+use macaca_sdk::skill::{
     SkillEvolutionCandidateClassification, SkillEvolutionProposalAction, SkillExperienceCandidate,
     SkillExperienceCandidateDestination, SkillExperienceEvidenceGateStatus,
     SkillExperienceProposalCommand, SkillServiceScope,

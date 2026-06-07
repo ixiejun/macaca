@@ -13,7 +13,7 @@ use axum::http::StatusCode;
 use axum::Json;
 use macaca_app::AppLoader;
 use macaca_proto::{ApplicationId, TraceContext};
-use macaca_skill::{
+use macaca_sdk::skill::{
     SkillGovernanceRecord, SkillGovernanceSnapshotCommand, SkillLifecycleState, SkillPolicy,
     SkillRuntimeFacade, SkillServiceScope, SkillSnapshotRequest,
 };

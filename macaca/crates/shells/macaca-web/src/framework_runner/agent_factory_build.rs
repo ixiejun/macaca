@@ -12,7 +12,7 @@ use macaca_framework::memory::InMemoryWorkingMemory;
 use macaca_framework::model::ToolChoice;
 use macaca_framework::react_agent::ReActAgent;
 use macaca_framework::tool::{ToolMiddleware, Toolkit};
-use macaca_persist::EventLog;
+use macaca_runtime_host::persist::EventLog;
 use macaca_proto::config::ContextConfig;
 use macaca_proto::AgentId;
 use tokio::sync::mpsc;
@@ -33,7 +33,7 @@ pub(crate) struct WebTracedAgentFactory {
 }
 
 pub(crate) struct PreparedAgentParts {
-    pub(crate) selection: macaca_llm::ModelSelection,
+    pub(crate) selection: macaca_sdk::llm::ModelSelection,
     pub(crate) toolkit: Toolkit,
 }
 
@@ -206,12 +206,12 @@ impl WebTracedAgentFactory {
         context_client: Arc<dyn macaca_sdk::SystemContextClient>,
         memory_client: Arc<dyn macaca_sdk::SystemMemoryClient>,
         event_log: Arc<EventLog>,
-        persist_backend: Arc<dyn macaca_persist::PersistBackend>,
-        workspace_memory_tombstones: Option<Arc<macaca_memory::SharedTombstoneRegistry>>,
+        persist_backend: Arc<dyn macaca_runtime_host::persist::PersistBackend>,
+        workspace_memory_tombstones: Option<Arc<macaca_sdk::memory::SharedTombstoneRegistry>>,
         merged_context_config: ContextConfig,
         agent_profile_root: Option<std::path::PathBuf>,
         request: &AgentBuildRequest,
-        selection: &macaca_llm::ModelSelection,
+        selection: &macaca_sdk::llm::ModelSelection,
         toolkit: Toolkit,
         max_iters: usize,
         tool_choice: Option<ToolChoice>,
@@ -223,7 +223,7 @@ impl WebTracedAgentFactory {
         provider_health_ledger: Option<Arc<macaca_context::ProviderHealthLedger>>,
         context_engine_registry: Arc<macaca_context::ContextEngineRegistry>,
     ) -> ReActAgent {
-        let llm_scope = macaca_llm::LlmServiceScope::new(
+        let llm_scope = macaca_sdk::llm::LlmServiceScope::new(
             request.identity.app_id,
             request
                 .identity

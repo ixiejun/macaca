@@ -4,13 +4,13 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use macaca_memory::{
+use macaca_sdk::memory::{
     MemoryDeleteRequest, MemoryForgetCommand, MemoryGetCommand, MemoryGetRequest, MemoryScope,
     MemorySearchRequest, SharedTombstoneRegistry,
 };
 use macaca_proto::{ApplicationId, MacacaError, MacacaResult, MemoryId, TraceContext};
 use macaca_sdk::SystemMemoryClient;
-use macaca_tools::Tool;
+use macaca_sdk::tools::Tool;
 use uuid::Uuid;
 
 use crate::memory_runtime::WebMemoryRuntime;
@@ -61,7 +61,7 @@ impl Tool for ServiceWorkspaceMemorySearchTool {
             .and_then(|v| v.as_str())
             .ok_or_else(|| MacacaError::Agent("memory_search requires 'query'".into()))?;
         let limit = bounded_limit(&input, self.default_limit);
-        let command = macaca_memory::MemoryRecallCommand::new(
+        let command = macaca_sdk::memory::MemoryRecallCommand::new(
             self.scope.clone(),
             tool_trace(self.session_id.as_deref(), Some(&self.agent_name)),
             query.to_string(),
@@ -352,7 +352,7 @@ mod tests {
     use super::*;
     use async_trait::async_trait;
     use chrono::Utc;
-    use macaca_memory::{
+    use macaca_sdk::memory::{
         ActiveRecallRequest, ActiveRecallResult, KnowledgeCompileCapability,
         KnowledgeCompileRequest, KnowledgeCompileResult, MemoryRuntimeFacade, MemoryRuntimeStatus,
     };
@@ -366,7 +366,7 @@ mod tests {
     impl MemoryRuntimeFacade for FakeRuntime {
         async fn remember(
             &self,
-            _request: macaca_memory::MemoryWriteRequest,
+            _request: macaca_sdk::memory::MemoryWriteRequest,
         ) -> MacacaResult<MemoryId> {
             Ok(self.entry.id)
         }
@@ -400,7 +400,7 @@ mod tests {
             &self,
             request: KnowledgeCompileRequest,
         ) -> MacacaResult<KnowledgeCompileResult> {
-            Ok(macaca_memory::KnowledgeCompiler::default().compile(request))
+            Ok(macaca_sdk::memory::KnowledgeCompiler::default().compile(request))
         }
 
         async fn status(&self) -> MemoryRuntimeStatus {

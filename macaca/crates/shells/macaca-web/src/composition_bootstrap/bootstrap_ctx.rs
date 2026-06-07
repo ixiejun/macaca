@@ -8,16 +8,16 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use macaca_app::{AppRegistry, AppRuntime};
-use macaca_driver::{DriverRegistry, DriverRuntime};
+use macaca_sdk::driver::{DriverRegistry, DriverRuntime};
 use macaca_framework::session::SessionStore as FrameworkSessionStore;
-use macaca_kernel::{audit::AuditLogger, alert::AlertManager, Kernel};
-use macaca_llm::{LlmProvider, LlmRouter};
-use macaca_memory::TestMemoryManager;
+use macaca_sdk::kernel::{audit::AuditLogger, alert::AlertManager, Kernel};
+use macaca_sdk::llm::{LlmProvider, LlmRouter};
+use macaca_sdk::memory::TestMemoryManager;
 use macaca_proto::config::MacacaConfig;
 use macaca_proto::ApplicationId;
 use macaca_runtime_host::{AutonomyRuntimeBundle, McpRuntimeFacade, ServiceRuntime};
-use macaca_skill::SkillCatalog;
-use macaca_tools::ToolCatalog;
+use macaca_sdk::skill::SkillCatalog;
+use macaca_sdk::tools::ToolCatalog;
 
 use crate::memory_runtime::WebMemoryRuntime;
 use crate::run_trace::RunTracer;
@@ -62,24 +62,24 @@ pub(crate) struct BootstrapCtx {
     pub delegate_session_id: Option<Arc<tokio::sync::RwLock<Option<String>>>>,
     pub data_dir: Option<PathBuf>,
     pub session_db_path: Option<PathBuf>,
-    pub session_store_impl: Option<Arc<macaca_persist::RedbStore>>,
-    pub session_store_shared: Option<Arc<dyn macaca_persist::PersistBackend>>,
-    pub todo_store: Option<Arc<macaca_task::TodoStore>>,
-    pub event_log: Option<Arc<macaca_persist::EventLog>>,
-    pub entitlement_store: Option<Arc<dyn macaca_persist::EntitlementStore>>,
-    pub payment_store: Option<Arc<dyn macaca_persist::PaymentStore>>,
+    pub session_store_impl: Option<Arc<macaca_runtime_host::persist::RedbStore>>,
+    pub session_store_shared: Option<Arc<dyn macaca_runtime_host::persist::PersistBackend>>,
+    pub todo_store: Option<Arc<macaca_sdk::task::TodoStore>>,
+    pub event_log: Option<Arc<macaca_runtime_host::persist::EventLog>>,
+    pub entitlement_store: Option<Arc<dyn macaca_runtime_host::persist::EntitlementStore>>,
+    pub payment_store: Option<Arc<dyn macaca_runtime_host::persist::PaymentStore>>,
     pub entitlement_facade: Option<Arc<macaca_runtime_host::EntitlementRuntimeFacade>>,
     pub run_tracer: Option<Arc<RunTracer>>,
     pub kernel_persistence: Option<Arc<crate::persistence_adapter::RedbKernelPersistenceAdapter>>,
     pub audit_logger: Option<Arc<AuditLogger>>,
-    pub session_store: Option<Arc<dyn macaca_persist::PersistBackend>>,
+    pub session_store: Option<Arc<dyn macaca_runtime_host::persist::PersistBackend>>,
     pub alert_manager: Option<Arc<AlertManager>>,
     pub default_model: Option<String>,
     pub framework_session_store: Option<Arc<dyn FrameworkSessionStore>>,
     pub mcp_runtime: Option<Arc<McpRuntimeFacade>>,
     pub memory_runtime: Option<Arc<WebMemoryRuntime>>,
     pub workspace_memory: Option<Arc<TestMemoryManager>>,
-    pub workspace_memory_tombstones: Option<Arc<macaca_memory::SharedTombstoneRegistry>>,
+    pub workspace_memory_tombstones: Option<Arc<macaca_sdk::memory::SharedTombstoneRegistry>>,
     pub memory_client: Option<Arc<dyn macaca_sdk::SystemMemoryClient>>,
     pub external_adapter_runtime_registry: Option<Arc<ExternalAdapterRuntimeRegistry>>,
     pub context_engine_registry: Option<Arc<macaca_context::ContextEngineRegistry>>,

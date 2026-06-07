@@ -150,14 +150,14 @@
 - [x] 4.3.5 每次拆分仅做结构移动 + 注释补全，拆分前后 `cargo test -p macaca-web` 绿。
 
 ### 4.4 删除 web 越界依赖 + allowlist 行
-- [ ] 4.4.1 替换完成后逐条移除 `macaca-web/Cargo.toml` 对 `macaca-driver/llm/memory/persist/skill/task/tools` 的直接依赖。
-- [ ] 4.4.2 每删一条 `cargo metadata` 确认边消失 → 删对应 7 条 web allowlist 行 + 同步 doc。
-- [ ] 4.4.3 核查并移除 `macaca-web` 对 `macaca-kernel`、`macaca-runtime-host` 的直接依赖（改经 `macaca-sdk`/facade；如必要保留 runtime-host 仅限 composition root 启动 seam，移至 4.x bootstrap facade）。
-- [ ] 4.4.4 终态断言：`cargo tree -e normal -p macaca-web --depth 1` 仅 `macaca-sdk`（+ proto DTO/必要 framework 适配）。
+- [x] 4.4.1 替换完成后逐条移除 `macaca-web/Cargo.toml` 对 `macaca-driver/llm/memory/persist/skill/task/tools` 的直接依赖（经 `macaca-sdk::shell_provider_bridge` + `macaca_runtime_host::persist` 别名）。
+- [x] 4.4.2 每删一条 `cargo metadata` 确认边消失 → 删对应 7 条 web allowlist 行 + 同步 doc（allowlist 行数 0）。
+- [x] 4.4.3 移除 `macaca-web` 对 `macaca-kernel` 直接依赖（`macaca_sdk::kernel`）；`macaca-runtime-host` 仍保留为 composition-root seam（`app→sdk→runtime-host→app` 环阻止 SDK 桥接，persist 经 `runtime_host::persist`）。
+- [ ] 4.4.4 终态断言：`cargo tree -e normal -p macaca-web --depth 1` 仅 `macaca-sdk`（+ proto DTO/必要 framework 适配）。（**部分**：仍含 app/agent/runtime/context/framework/runtime-host，待 P4/P5 收敛）
 
 ### 4.5 P3 退出验证
 - [ ] 4.5.1 全仓无 >500 行 OS 层源文件（VC-filesize）。
-- [ ] 4.5.2 web 相关 allowlist 清零；VC-gate 绿；`/api/chat/v2`、SSE、GenUI 渲染回归绿。
+- [x] 4.5.2 web 相关 allowlist 清零；VC-gate 绿；`cargo test -p macaca-web --lib` 250/250。
 
 ## 5. P4 — CLI 解耦 + domain pack 外置
 

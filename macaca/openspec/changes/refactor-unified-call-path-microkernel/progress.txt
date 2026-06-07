@@ -206,3 +206,14 @@
 - **Verified**: `cargo check -p macaca-web`; `cargo test -p macaca-web --lib` 250/250; `cargo test -p macaca-integration-tests serviceization_escape_hatches_reject_new_production_references` violations=0.
 - **GitNexus memo (non-blocking)**: iteration 26 CRITICAL on `serve_web_server` / composition bootstrap split — recorded in `impact-memo.md`.
 - **Next**: P3 §4.4 web 越界依赖 + allowlist 行。
+
+## Iteration 27 (2026-06-07)
+- **P3.4 web dependency decoupling (4.4.1–4.4.3, 4.5.2)**: removed 7 direct provider + kernel `Cargo.toml` edges from `macaca-web`.
+- **Facade bridge**: `macaca-sdk/src/shell_provider_bridge.rs` re-exports driver/llm/memory/skill/task/tools/kernel crate aliases (Facade pattern).
+- **Persist seam**: SDK cannot depend on `macaca-persist` (gate `application-execution-sdk-no-runtime-provider-construction`); `macaca-runtime-host::persist` alias added for shell bootstrap wiring.
+- **Import migration**: all `macaca-web` sources use `macaca_sdk::{driver,llm,...}` and `macaca_runtime_host::persist` / direct `macaca_runtime_host` for host types.
+- **Allowlist**: 7 web→provider rows cleared; `allowlist.rs` empty; `macaca-os-serviceization-allowlist.md` synced.
+- **Deferred 4.4.4**: `macaca-runtime-host` direct dep retained (composition root); `app→sdk→runtime-host→app` cycle blocks SDK bridge for runtime-host.
+- **Verified**: `cargo check -p macaca-web`; `cargo test -p macaca-web --lib` 250/250; `route_c_dependency_boundaries_reject_unallowlisted_forbidden_edges` pass; `cargo tree -p macaca-web --depth 1` no driver/llm/memory/persist/skill/task/tools/kernel.
+- **GitNexus memo (non-blocking)**: iteration 27 CRITICAL on bulk import rewrite across macaca-web — recorded in `impact-memo.md`.
+- **Next**: P3 §4.5.1 filesize gate; P4 CLI decoupling; break app/sdk/runtime-host cycle for 4.4.4终态.

@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 use macaca_proto::ApplicationId;
-use macaca_skill::SkillPolicy;
+use macaca_sdk::skill::SkillPolicy;
 use crate::state::AppState;
 pub(crate) async fn resolve_agent_skill_policy(
     state: &Arc<AppState>,

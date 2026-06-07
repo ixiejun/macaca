@@ -7,7 +7,7 @@ use axum::response::sse::Event;
 use serde::{Deserialize, Serialize};
 
 use macaca_runtime_host::executor::ExecutorEvent;
-use macaca_persist::{AppendEventCommand, PersistStore};
+use macaca_runtime_host::persist::{AppendEventCommand, PersistStore};
 use macaca_proto::ApplicationId;
 
 use crate::proto_event_visitors::delegated_sse_event_name;

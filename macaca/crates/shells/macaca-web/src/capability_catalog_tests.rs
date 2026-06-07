@@ -22,7 +22,7 @@ use macaca_runtime_host::{
     McpRuntimeStatusState, McpServerDefinition, McpToolPolicy,
 };
 use macaca_sdk::SystemMcpClient;
-use macaca_skill::{
+use macaca_sdk::skill::{
     SkillAuthorKind, SkillGovernanceProvenance, SkillGovernanceRecord,
     SkillGovernanceSnapshotResult, SkillLifecycleState, SkillSnapshot, SkillSourceScope,
     SkillUsageTelemetry,
@@ -303,7 +303,7 @@ fn skill_snapshot(names: &[&str]) -> SkillSnapshot {
         prompt: "".into(),
         skills: names
             .iter()
-            .map(|name| macaca_skill::SkillSnapshotEntry {
+            .map(|name| macaca_sdk::skill::SkillSnapshotEntry {
                 name: (*name).into(),
                 description: format!("{name} skill"),
                 source_location: PathBuf::from(format!("/skills/{name}/SKILL.md")),

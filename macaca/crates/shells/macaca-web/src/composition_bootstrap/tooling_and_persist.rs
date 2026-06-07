@@ -9,10 +9,10 @@ use std::sync::Arc;
 
 use tracing::{error, info};
 
-use macaca_skill::{ExecutableSkillToolSet, SkillCatalog};
-use macaca_tools::Tool;
+use macaca_sdk::skill::{ExecutableSkillToolSet, SkillCatalog};
+use macaca_sdk::tools::Tool;
 use macaca_proto::MacacaResult;
-use macaca_persist::RedbStore;
+use macaca_runtime_host::persist::RedbStore;
 use crate::orchestration_tools::build_web_tools;
 
 use super::bootstrap_ctx::BootstrapCtx;
@@ -38,9 +38,9 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
 
     // 7. Build composite toolset: built-in tools + executable skill tools.
     let mut all_tools: Vec<Box<dyn Tool>> = vec![
-        Box::new(macaca_tools::FileReadTool),
-        Box::new(macaca_tools::FileWriteTool),
-        Box::new(macaca_tools::ShellTool::default()),
+        Box::new(macaca_sdk::tools::FileReadTool),
+        Box::new(macaca_sdk::tools::FileWriteTool),
+        Box::new(macaca_sdk::tools::ShellTool::default()),
     ];
 
     // Load executable skill tools from all app skills directories.
@@ -64,8 +64,8 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
     // that `/api/drivers/reload` picks up new driver tools at runtime.
     let drivers_dir =
         std::env::var("MACACA_DRIVERS_DIR").unwrap_or_else(|_| config.drivers.directory.clone());
-    let driver_registry = Arc::new(macaca_driver::DriverRegistry::new());
-    let driver_runtime = Arc::new(macaca_driver::DriverRuntime::new(
+    let driver_registry = Arc::new(macaca_sdk::driver::DriverRegistry::new());
+    let driver_runtime = Arc::new(macaca_sdk::driver::DriverRuntime::new(
         drivers_dir.clone(),
         Arc::clone(&driver_registry),
     ));
@@ -73,14 +73,14 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
         let report = driver_runtime.load_all().await;
         for entry in &report.entries {
             match entry.status {
-                macaca_driver::DriverLoadStatus::Loaded => {
+                macaca_sdk::driver::DriverLoadStatus::Loaded => {
                     info!(
                         name = %entry.name,
                         tools = entry.tool_count.unwrap_or_default(),
                         "External driver loaded"
                     );
                 }
-                macaca_driver::DriverLoadStatus::Failed => {
+                macaca_sdk::driver::DriverLoadStatus::Failed => {
                     error!(
                         name = %entry.name,
                         error = %entry.error.as_deref().unwrap_or("unknown error"),
@@ -114,11 +114,11 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
     std::fs::create_dir_all(&data_dir).ok();
     let session_db_path = data_dir.join("sessions.db");
     let session_store_impl = Arc::new(RedbStore::open(&session_db_path)?);
-    let session_store_shared: Arc<dyn macaca_persist::PersistBackend> = session_store_impl.clone();
-    let todo_store = Arc::new(macaca_task::TodoStore::new(Arc::clone(
+    let session_store_shared: Arc<dyn macaca_runtime_host::persist::PersistBackend> = session_store_impl.clone();
+    let todo_store = Arc::new(macaca_sdk::task::TodoStore::new(Arc::clone(
         &session_store_shared,
     )));
-    let event_log = Arc::new(macaca_persist::EventLog::new(Arc::clone(
+    let event_log = Arc::new(macaca_runtime_host::persist::EventLog::new(Arc::clone(
         &session_store_impl,
     )));
     // Register the application execution protocol service at the shared host
@@ -145,10 +145,10 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
         "web-startup-task-service",
     )
     .await?;
-    let entitlement_store: Arc<dyn macaca_persist::EntitlementStore> =
-        Arc::new(macaca_persist::InMemoryEntitlementStore::new());
-    let payment_store: Arc<dyn macaca_persist::PaymentStore> =
-        Arc::new(macaca_persist::InMemoryPaymentStore::new());
+    let entitlement_store: Arc<dyn macaca_runtime_host::persist::EntitlementStore> =
+        Arc::new(macaca_runtime_host::persist::InMemoryEntitlementStore::new());
+    let payment_store: Arc<dyn macaca_runtime_host::persist::PaymentStore> =
+        Arc::new(macaca_runtime_host::persist::InMemoryPaymentStore::new());
     let entitlement_facade = Arc::new(
         macaca_runtime_host::EntitlementRuntimeFacade::with_event_log(
             Arc::clone(&entitlement_store),

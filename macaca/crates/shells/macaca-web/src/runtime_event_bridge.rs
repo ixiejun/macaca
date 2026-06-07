@@ -10,9 +10,9 @@ use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
 use axum::response::sse::Event;
-use macaca_persist::AppendEventCommand;
+use macaca_runtime_host::persist::AppendEventCommand;
 use macaca_proto::ExecutionControlEvent;
-use macaca_skill::SkillSnapshot;
+use macaca_sdk::skill::SkillSnapshot;
 use serde_json::json;
 use tokio::sync::{mpsc, RwLock};
 
@@ -258,7 +258,7 @@ mod tests {
         let mut snapshot = SkillSnapshot {
             agent: "agent".into(),
             prompt: "full SKILL.md instructions must never be stored in runtime events".into(),
-            skills: vec![macaca_skill::SkillSnapshotEntry {
+            skills: vec![macaca_sdk::skill::SkillSnapshotEntry {
                 name: "playwright-mcp".into(),
                 description: "Browser".into(),
                 source_location: std::path::PathBuf::from("/tmp/SKILL.md"),
@@ -266,13 +266,13 @@ mod tests {
                 location: std::path::PathBuf::from("/tmp/SKILL.md"),
                 base_dir: std::path::PathBuf::from("/tmp"),
                 source: "test".into(),
-                source_scope: macaca_skill::SkillSourceScope::MacacaCentral,
+                source_scope: macaca_sdk::skill::SkillSourceScope::MacacaCentral,
                 primary_env: None,
                 required_env: Vec::new(),
                 install: Vec::new(),
                 mcp_servers: Vec::new(),
             }],
-            filtered: vec![macaca_skill::FilteredSkill {
+            filtered: vec![macaca_sdk::skill::FilteredSkill {
                 name: "hidden".into(),
                 reason: "policy".into(),
                 source: "test".into(),
@@ -281,7 +281,7 @@ mod tests {
             compact: true,
             version: 1,
         };
-        snapshot.skills.push(macaca_skill::SkillSnapshotEntry {
+        snapshot.skills.push(macaca_sdk::skill::SkillSnapshotEntry {
             name: "duplicate-source".into(),
             description: "Same source".into(),
             source_location: std::path::PathBuf::from("/tmp/OTHER.md"),
@@ -289,7 +289,7 @@ mod tests {
             location: std::path::PathBuf::from("/tmp/OTHER.md"),
             base_dir: std::path::PathBuf::from("/tmp"),
             source: "test".into(),
-            source_scope: macaca_skill::SkillSourceScope::MacacaCentral,
+            source_scope: macaca_sdk::skill::SkillSourceScope::MacacaCentral,
             primary_env: None,
             required_env: Vec::new(),
             install: Vec::new(),

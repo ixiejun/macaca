@@ -3,14 +3,14 @@
 use std::sync::Arc;
 
 use futures::FutureExt;
-use macaca_kernel::Kernel;
+use macaca_sdk::kernel::Kernel;
 use macaca_runtime_host::{ApplicationExecutorRegistry, TaskContext};
 use macaca_proto::{AcceptanceCriteria, ForkId, TraceContext};
 use macaca_runtime_host::{
     ExecutionControlForkJoinCoordinator, ForkJoinChildForkRequest, ForkJoinParentWaitRequest,
     ServiceRuntime,
 };
-use macaca_tools::{
+use macaca_sdk::tools::{
     CompositeToolSet, DelegateTaskTool, GetTaskResultTool, ListAgentsTool, Tool, ToolCatalog,
 };
 use tokio::sync::RwLock;
@@ -282,7 +282,7 @@ pub(crate) fn build_web_tools(
                         macaca_proto::ForkState::Cancelled => ("cancelled".to_string(), None, None),
                     };
 
-                    return Ok(macaca_tools::orchestration::TaskResultData {
+                    return Ok(macaca_sdk::tools::orchestration::TaskResultData {
                         status: status_str,
                         output,
                         error,
@@ -318,7 +318,7 @@ pub(crate) fn build_web_tools(
                     macaca_runtime_host::TaskStatus::Cancelled => ("cancelled".to_string(), None, None),
                 };
 
-                Ok(macaca_tools::TaskResultData {
+                Ok(macaca_sdk::tools::TaskResultData {
                     status: status_str,
                     output,
                     error,

@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 
-use macaca_persist::PersistBackend;
+use macaca_runtime_host::persist::PersistBackend;
 use macaca_proto::ApplicationId;
 use tokio::sync::mpsc::Sender;
 
@@ -25,5 +25,5 @@ pub(crate) struct PlanEventConsumerCtx {
     /// Manifest-resolved entry agent name (excluded from worker candidate list).
     pub entry_agent_name: String,
     /// Channel back into macaca-task PlanLoop for synthetic events (e.g. GoalCompleted).
-    pub event_tx: Sender<macaca_task::PlanEvent>,
+    pub event_tx: Sender<macaca_sdk::task::PlanEvent>,
 }
