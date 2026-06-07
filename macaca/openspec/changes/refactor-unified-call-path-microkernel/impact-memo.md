@@ -99,3 +99,13 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `DefaultWeb3PolicyEngine` (deleted) | MEDIUM | kernel policy engine removed; service path uses provider admission + entitlement layers | P2.2 |
 | `web3_service_provider` integration tests | LOW | unavailable/mock service.call contracts; no production behavior change | P2.2 |
 | `route_c_bootstrap` Web3 unavailable default | LOW | base OS boots with structured unavailable Web3; unchanged bootstrap seam | P2.2 |
+
+## Iteration 16 additions (task 3.3 — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `EvmFacade` / `EvmAdapter` / `EvmTraceEventSink` (deleted) | CRITICAL | legacy kernel EVM path removed; canonical path is `EvmSystemServiceProvider` + `SystemEvmClient` | P2.3 |
+| `MacacaEvmSdk` (deleted) | MEDIUM | deprecated SDK facade removed; service client path is `ServiceBackedEvmClient` | P2.3 |
+| `DefaultEvmPolicyEngine` (deleted) | MEDIUM | kernel policy engine removed; service path uses provider admission + entitlement layers | P2.3 |
+| `evm_service_provider` integration tests | LOW | unavailable/mock service.call contracts; no production behavior change | P2.3 |
+| `route_c_bootstrap` EVM unavailable default | LOW | base OS boots with structured unavailable EVM; unchanged bootstrap seam | P2.3 |

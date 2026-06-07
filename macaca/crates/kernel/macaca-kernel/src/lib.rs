@@ -3,11 +3,6 @@
 pub mod alert;
 pub mod audit;
 pub mod capability_registry;
-pub mod evm;
-pub mod evm_adapter;
-pub mod evm_event;
-#[cfg(test)]
-mod evm_tests;
 pub mod executor;
 pub mod facade;
 pub mod kernel;
@@ -33,11 +28,6 @@ pub mod system_service;
 pub mod trace_service_adapter;
 
 pub use capability_registry::{CapabilityRegistry, InMemoryCapabilityRegistry};
-pub use evm::{DefaultEvmPolicyEngine, EvmAdapter, EvmFacade, EvmPolicyEngine};
-pub use evm_adapter::{MockEvmAdapter, UnavailableEvmAdapter};
-pub use evm_event::{
-    EvmTraceEvent, EvmTraceEventSink, InMemoryEvmTraceEventSink, NoopEvmTraceEventSink,
-};
 pub use facade::{
     DefaultKernelFacade, InMemoryTraceEventBus, KernelFacade, KernelTraceEvent, TraceEventBus,
 };

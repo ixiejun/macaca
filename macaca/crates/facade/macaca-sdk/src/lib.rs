@@ -18,7 +18,6 @@ pub mod config;
 pub mod context_client;
 pub mod driver_client;
 pub mod entitlement_client;
-pub mod evm;
 pub mod evm_client;
 pub mod facade;
 pub mod heartbeat_client;
@@ -95,7 +94,6 @@ pub use driver_client::{
 pub use entitlement_client::{
     ServiceBackedEntitlementClient, SystemEntitlementClient, UnavailableSystemEntitlementClient,
 };
-pub use evm::MacacaEvmSdk;
 pub use evm_client::{ServiceBackedEvmClient, SystemEvmClient, UnavailableSystemEvmClient};
 pub use facade::{AgentRegistryApi, KernelAgentRegistry, KernelPrimitiveSdk, MacacaSdk};
 pub use heartbeat_client::{

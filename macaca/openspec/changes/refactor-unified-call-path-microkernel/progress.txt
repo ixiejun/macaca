@@ -106,3 +106,11 @@
 - **Service-path tests (3.2.4)**: `web3_service_provider.rs` 6/6 (unavailable snapshot/signing/health, mock sign/tx/query/wallets, trace-required); `macaca-sdk` `web3_client` 2/2; VC-escape `serviceization_escape_hatches_reject_new_production_references` violations=0.
 - **Verified**: `cargo check -p macaca-kernel -p macaca-runtime-host -p macaca-sdk -p macaca-web`; web3 + escape hatch tests green.
 - **Next**: P2 §3.3 EVM kernel eviction; `FrameworkRunner` body still in web (task 4.3.2).
+
+## Iteration 16 (2026-06-07)
+- **P2.3 EVM kernel eviction (3.3.1–3.3.4)**: confirmed zero production consumers of `macaca_kernel::evm`; canonical path is `EvmSystemServiceProvider` + `SystemEvmClient` via Route C bootstrap.
+- **Kernel cleanup (3.3.3)**: deleted `kernel/evm.rs`, `evm_adapter.rs`, `evm_event.rs`, `evm_tests.rs`; removed `lib.rs` EVM facade/adapter re-exports.
+- **SDK cleanup**: deleted deprecated `macaca-sdk/src/evm.rs` (`MacacaEvmSdk`); consumers use `SystemEvmClient` / `ServiceBackedEvmClient`.
+- **Service-path tests (3.3.4)**: `evm_service_provider.rs` 5/5 (unavailable snapshot/deploy/health, mock deploy/call/read/gas/receipt/subscribe, trace-required); `macaca-sdk` `evm_client` 2/2; VC-escape `serviceization_escape_hatches_reject_new_production_references` violations=0.
+- **Verified**: `cargo check -p macaca-kernel -p macaca-runtime-host -p macaca-sdk -p macaca-web`; evm + escape hatch tests green.
+- **Next**: P2 §3.4 kernel executor eviction; `FrameworkRunner` body still in web (task 4.3.2).
