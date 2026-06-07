@@ -156,6 +156,7 @@
 - [x] 4.3.11 拆分 `macaca-web/src/context_memory_injection.rs`(592) → `context_memory_injection/` Facade 模块树（6 文件，max ~220 行）；`contract_source::context_memory_injection_module_sources`；`cargo test -p macaca-web --lib context_memory_injection` 3/3；filesize allowlist 移除该行。
 - [x] 4.3.12 拆分 `macaca-web/src/context_reporting_model.rs`(608) → `context_reporting_model/` Facade 模块树（7 文件，max ~222 行）；`assembly_service` / `assembly_legacy` + `assembly_finalize` Template Method；`contract_source::context_reporting_model_module_sources`；`cargo test -p macaca-web --lib context_reporting_model` 2/2；filesize allowlist 移除该行（81 行基线债务）。
 - [x] 4.3.13 拆分 `macaca-web/src/skill_mcp.rs`(705) → `skill_mcp/` Facade 模块树（9 文件，max ~192 行）；Cache-Aside `snapshot` + Strategy `server_resolution` + Adapter `probe` + Observer `governance_telemetry`；`contract_source::skill_mcp_module_sources`；`cargo test -p macaca-web --lib skill_mcp` 4/4；filesize allowlist 移除该行（80 行基线债务）。
+- [x] 4.3.14 拆分 `macaca-web/src/skill_self_evolution_observer.rs`(810) → `skill_self_evolution_observer/` Facade 模块树（9 文件，max ~257 行）；Observer `observer` + Adapter `projection` + Builder `proposal_builder` + Value Object `semantic_signal` + Command forwarder `forwarder`；`contract_source::skill_self_evolution_observer_module_sources`；`cargo test -p macaca-web --lib skill_self_evolution_observer` 6/6；filesize allowlist 移除该行（79 行基线债务）。
 
 ### 4.4 删除 web 越界依赖 + allowlist 行
 - [x] 4.4.1 替换完成后逐条移除 `macaca-web/Cargo.toml` 对 `macaca-driver/llm/memory/persist/skill/task/tools` 的直接依赖（经 `macaca-sdk::shell_provider_bridge` + `macaca_runtime_host::persist` 别名）。
@@ -164,7 +165,7 @@
 - [ ] 4.4.4 终态断言：`cargo tree -e normal -p macaca-web --depth 1` 仅 `macaca-sdk`（+ proto DTO/必要 framework 适配）。（**部分**：仍含 app/agent/runtime/context/framework/runtime-host，待 P4/P5 收敛）
 
 ### 4.5 P3 退出验证
-- [ ] 4.5.1 全仓无 >500 行 OS 层源文件（VC-filesize）。（**部分**：`routes/`、`framework_toolkit/`、`context_memory_injection/`、`context_reporting_model/`、`skill_mcp/` 已合规；全仓 80 行 allowlist 债务，gate 已实现）
+- [ ] 4.5.1 全仓无 >500 行 OS 层源文件（VC-filesize）。（**部分**：`routes/`、`framework_toolkit/`、`context_memory_injection/`、`context_reporting_model/`、`skill_mcp/`、`skill_self_evolution_observer/` 已合规；全仓 79 行 allowlist 债务，gate 已实现）
 - [x] 4.5.2 web 相关 allowlist 清零；VC-gate 绿；`cargo test -p macaca-web --lib` 250/250。
 
 ## 5. P4 — CLI 解耦 + domain pack 外置

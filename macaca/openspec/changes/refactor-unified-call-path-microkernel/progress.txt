@@ -280,3 +280,12 @@
 - **Verified**: `cargo test -p macaca-web --lib skill_mcp` 4/4 (+1 framework_toolkit alias test); `os_layer_file_size_gate` pass.
 - **GitNexus memo (non-blocking)**: iteration 34 CRITICAL on `probe_skill_mcp_servers` / `load_or_build_skill_snapshot` Facade split — recorded in `impact-memo.md`.
 - **Next**: P3 §4.5.1 remaining web giants (`skill_self_evolution_observer`, `agent_execution_backend/tests.rs`); P4 CLI decoupling; 4.4.4终态.
+
+## Iteration 35 (2026-06-07)
+- **P3.3 skill_self_evolution_observer split (4.3.14)**: deleted monolithic `skill_self_evolution_observer.rs` (810 lines); extracted Facade module tree (9 files, each max ≤257 lines).
+- **Design patterns**: Facade (`mod.rs`); Observer (`observer` reacts to `AgentExecutionResult`); Adapter (`projection` maps service DTO → `TaskResult`); Builder (`proposal_builder` assembles bounded `SkillExperienceProposalCommand`); Value Object (`semantic_signal` Skill Creator trigger extraction); Command forwarder (`forwarder` best-effort SDK Skill facade).
+- **Contract tests**: `skill_self_evolution_observer::tests` 6/6; `contract_source::skill_self_evolution_observer_module_sources()` for static scans; `agent_execution_backend/tests.rs` scan path updated.
+- **Filesize allowlist**: removed `skill_self_evolution_observer.rs` row (79 baseline rows remain).
+- **Verified**: `cargo test -p macaca-web --lib skill_self_evolution_observer` 6/6; `os_layer_file_size_gate` pass.
+- **GitNexus memo (non-blocking)**: iteration 35 CRITICAL on `observe_agent_execution_result_for_skill_self_evolution` / `build_skill_experience_proposal_command` Facade split — recorded in `impact-memo.md`.
+- **Next**: P3 §4.5.1 remaining web giant (`agent_execution_backend/tests.rs`); P4 CLI decoupling; 4.4.4终态.

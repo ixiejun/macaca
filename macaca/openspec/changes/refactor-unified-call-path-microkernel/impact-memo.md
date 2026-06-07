@@ -267,3 +267,11 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `skill_mcp.rs` → `skill_mcp/` module split | CRITICAL | `framework_toolkit::load_or_build_skill_snapshot`; `routes/skills_mcp::probe_skill_mcp_servers` + `SkillMcpStatus` API; public `crate::skill_mcp::*` preserved via Facade re-exports | P3.3 |
 | `probe_skill_mcp_servers` | HIGH | `/api/apps/:id/skills` MCP status probe path; integration probe tests | P3.3 |
 | `load_or_build_skill_snapshot` | HIGH | toolkit skill snapshot cache + governed activation telemetry side effects | P3.3 |
+
+## Iteration 35 additions (task 4.3.14 — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `skill_self_evolution_observer.rs` → `skill_self_evolution_observer/` module split | CRITICAL | `skill_self_evolution_execution_observer` decorator; `observe_agent_execution_result_for_skill_self_evolution` public export preserved via Facade | P3.3 |
+| `observe_agent_execution_result_for_skill_self_evolution` | HIGH | Agent Execution completion → Skill proposal command path; live self-evolution SSE/EventLog checkpoints | P3.3 |
+| `build_skill_experience_proposal_command` | HIGH | bounded evidence refs, semantic Skill Creator identity, proposal validation gate | P3.3 |

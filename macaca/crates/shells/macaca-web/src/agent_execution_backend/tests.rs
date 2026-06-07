@@ -510,7 +510,8 @@ fn skill_self_evolution_observation_is_centralized_at_agent_execution_boundary()
     );
     let chat_source = crate::chat_orchestrator::contract_source::chat_orchestrator_module_sources();
     let event_persistence_source = include_str!("../event_persistence.rs");
-    let observer_source = include_str!("../skill_self_evolution_observer.rs");
+    let observer_source =
+        crate::skill_self_evolution_observer::contract_source::skill_self_evolution_observer_module_sources();
 
     assert!(
         !composed_source.contains("spawn_skill_self_evolution_observation"),
