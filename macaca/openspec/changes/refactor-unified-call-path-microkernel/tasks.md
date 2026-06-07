@@ -88,10 +88,10 @@
 - [x] 3.1.4 测试：payment/A2A 经 service.call 路径；payment service 缺席返回结构化 denied/unavailable，不崩溃。
 
 ### 3.2 驱逐 Web3
-- [ ] 3.2.1 `[impact-memo]` 盘点 `kernel/web3.rs`、`web3_event.rs`、`web3_tests.rs` 消费者；确认现有 web3 service provider（runtime-host）可承接。
-- [ ] 3.2.2 将 Web3 facade/adapter 迁入 web3 optional module/service provider；缺席返回结构化 unavailable。
-- [ ] 3.2.3 删除 kernel `web3.rs`、`web3_event.rs`、`web3_tests.rs` 及 `lib.rs` 导出。
-- [ ] 3.2.4 测试：web3 optional 缺席时 base OS 正常启动/执行/恢复/查询审计。
+- [x] 3.2.1 `[impact-memo]` 盘点 `kernel/web3.rs`、`web3_event.rs`、`web3_tests.rs` 消费者；确认现有 web3 service provider（runtime-host）可承接。（生产代码零外部消费者；canonical 路径为 `Web3SystemServiceProvider` + `SystemWeb3Client`）
+- [x] 3.2.2 将 Web3 facade/adapter 迁入 web3 optional module/service provider；缺席返回结构化 unavailable。（`web3_service_provider.rs` 已含 `UnavailableWeb3Provider`/`MockWeb3Provider` + Route C bootstrap 默认 unavailable）
+- [x] 3.2.3 删除 kernel `web3.rs`、`web3_event.rs`、`web3_tests.rs` 及 `lib.rs` 导出。
+- [x] 3.2.4 测试：web3 optional 缺席时 base OS 正常启动/执行/恢复/查询审计。（`web3_service_provider.rs` 6/6 + SDK `web3_client` 2/2；VC-escape violations=0）
 
 ### 3.3 驱逐 EVM
 - [ ] 3.3.1 `[impact-memo]` 盘点 `kernel/evm.rs`、`evm_adapter.rs`、`evm_event.rs`、`evm_tests.rs` 消费者；确认 `runtime-host/evm_service_provider.rs` 可承接（参考 `optional-evm-substrate-frontier-adapter-boundary.md`）。

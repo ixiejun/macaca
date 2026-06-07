@@ -99,3 +99,10 @@
 - **Service-path tests (3.1.4)**: `payment_service_provider.rs` 5/5 (quote/settle/trace/policy-denied/invalid-transition); `macaca-sdk` `UnavailableSystemPaymentClient` 3/3; VC-escape `serviceization_escape_hatches_reject_new_production_references` violations=0.
 - **Verified**: `cargo check -p macaca-kernel -p macaca-proto -p macaca-runtime-host -p macaca-sdk -p macaca-web`; payment + escape hatch tests green.
 - **Next**: P2 §3.2 web3 kernel eviction; `FrameworkRunner` body still in web (task 4.3.2).
+
+## Iteration 15 (2026-06-07)
+- **P2.2 web3 kernel eviction (3.2.1–3.2.4)**: confirmed zero production consumers of `macaca_kernel::web3`; canonical path is `Web3SystemServiceProvider` + `SystemWeb3Client` via Route C bootstrap.
+- **Kernel cleanup (3.2.3)**: deleted `kernel/web3.rs`, `web3_event.rs`, `web3_tests.rs`; removed `lib.rs` Web3 facade/adapter re-exports.
+- **Service-path tests (3.2.4)**: `web3_service_provider.rs` 6/6 (unavailable snapshot/signing/health, mock sign/tx/query/wallets, trace-required); `macaca-sdk` `web3_client` 2/2; VC-escape `serviceization_escape_hatches_reject_new_production_references` violations=0.
+- **Verified**: `cargo check -p macaca-kernel -p macaca-runtime-host -p macaca-sdk -p macaca-web`; web3 + escape hatch tests green.
+- **Next**: P2 §3.3 EVM kernel eviction; `FrameworkRunner` body still in web (task 4.3.2).
