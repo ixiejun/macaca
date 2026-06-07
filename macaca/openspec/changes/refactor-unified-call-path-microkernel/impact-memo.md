@@ -142,3 +142,12 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `kernel/services.rs` (deleted) | LOW | no external consumers; execution port moved to kernel + proto | P2.6 |
 | allowlist kernel→driver/gateway/skill rows (deleted) | LOW | Route C gate now 7 web rows; kernel provider edges cleared | P2.6 |
 
+## Iteration 20 additions (task 3.7 — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `LineageKind` / `SessionLineage` / `TranscriptSegment` (proto migration) | MEDIUM | macaca-persist lineage store, macaca-context compaction, macaca-web routes (re-export unchanged) | P2.7 |
+| `macaca-persist/Cargo.toml` (context dep removed) | LOW | foundation layer dependency direction; dev-dep only for pruning contract test | P2.7 |
+| `SessionLineageStore` tracing additions | LOW | persist audit trail for lineage save/load; no behavior change | P2.7 |
+| `p2_microkernel_exit_validation` integration tests | LOW | static P2 exit contracts; no production runtime change | P2.8 |
+

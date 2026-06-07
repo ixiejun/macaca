@@ -1,24 +1,48 @@
 //! Session lineage persistence for compaction successors and forks.
+//!
+//! `SessionLineageStore` is the **Repository** adapter for lineage DTOs defined
+//! in `macaca-proto::context_lineage`. It serializes value objects to the shared
+//! `PersistBackend` without importing `macaca-context` service logic, preserving
+//! foundation-layer dependency direction mandated by Route C governance.
 
 use std::sync::Arc;
 
-use macaca_context::{LineageKind, SessionLineage, TranscriptSegment};
-use macaca_proto::{MacacaError, MacacaResult};
+use macaca_proto::{LineageKind, MacacaError, MacacaResult, SessionLineage, TranscriptSegment};
+use tracing::{debug, trace};
 
 use crate::PersistBackend;
 
+/// Key namespace prefix for all lineage-related rows in the persistence backend.
 const LINEAGE_PREFIX: &str = "context_lineage";
 
+/// Repository for session lineage trees and transcript segment metadata.
+///
+/// The store writes JSON-encoded [`SessionLineage`] and [`TranscriptSegment`]
+/// value objects under deterministic keys so tip resolution and successor
+/// counting can be performed without loading full conversation transcripts.
 pub struct SessionLineageStore {
     store: Arc<dyn PersistBackend>,
 }
 
 impl SessionLineageStore {
+    /// Wrap a shared persistence backend as a lineage repository.
     pub fn new(store: Arc<dyn PersistBackend>) -> Self {
         Self { store }
     }
 
+    /// Persist one lineage node and update root tip / child index pointers.
+    ///
+    /// This method is idempotent at the key level: repeated saves for the same
+    /// `session_id` overwrite the prior row, while root tip always reflects the
+    /// latest written successor for audit replay convergence.
     pub async fn save_lineage(&self, lineage: &SessionLineage) -> MacacaResult<()> {
+        debug!(
+            service_id = "persist.lineage",
+            session_id = %lineage.session_id,
+            root_session_id = %lineage.root_session_id,
+            lineage_kind = ?lineage.lineage_kind,
+            "persisting session lineage node"
+        );
         let data = serde_json::to_vec(lineage).map_err(json_error)?;
         self.store
             .set(&session_key(&lineage.session_id), &data)
@@ -37,13 +61,23 @@ impl SessionLineageStore {
             .await
     }
 
+    /// Load lineage metadata for one session id, if present.
     pub async fn load_lineage(&self, session_id: &str) -> MacacaResult<Option<SessionLineage>> {
+        trace!(
+            service_id = "persist.lineage",
+            session_id = %session_id,
+            "loading session lineage node"
+        );
         let Some(data) = self.store.get(&session_key(session_id)).await? else {
             return Ok(None);
         };
         serde_json::from_slice(&data).map(Some).map_err(json_error)
     }
 
+    /// Resolve the latest session id for the lineage tree containing `session_id`.
+    ///
+    /// When no lineage row exists the input id is returned unchanged so callers
+    /// can treat unknown sessions as self-rooted without special cases.
     pub async fn resolve_tip(&self, session_id: &str) -> MacacaResult<String> {
         let Some(lineage) = self.load_lineage(session_id).await? else {
             return Ok(session_id.to_string());
@@ -72,6 +106,7 @@ impl SessionLineageStore {
             .count() as u32)
     }
 
+    /// List all lineage nodes indexed under one root session id.
     pub async fn list_root_lineage(
         &self,
         root_session_id: &str,
@@ -96,13 +131,21 @@ impl SessionLineageStore {
         Ok(output)
     }
 
+    /// Persist one transcript segment row linked to a lineage node.
     pub async fn save_segment(&self, segment: &TranscriptSegment) -> MacacaResult<()> {
+        debug!(
+            service_id = "persist.lineage",
+            segment_id = %segment.segment_id,
+            session_id = %segment.session_id,
+            "persisting transcript segment metadata"
+        );
         let data = serde_json::to_vec(segment).map_err(json_error)?;
         self.store
             .set(&segment_key(&segment.segment_id), &data)
             .await
     }
 
+    /// Load one transcript segment by id, if present.
     pub async fn load_segment(&self, segment_id: &str) -> MacacaResult<Option<TranscriptSegment>> {
         let Some(data) = self.store.get(&segment_key(segment_id)).await? else {
             return Ok(None);
@@ -131,6 +174,7 @@ fn segment_key(segment_id: &str) -> String {
     format!("{LINEAGE_PREFIX}/segment/{segment_id}")
 }
 
+/// Stable ordering for lineage listing: root before successors before forks.
 fn lineage_rank(kind: LineageKind) -> u8 {
     match kind {
         LineageKind::Root => 0,
@@ -231,6 +275,10 @@ mod tests {
         assert!(store.load_lineage("root").await.unwrap().is_some());
     }
 
+    /// Cross-crate contract: context pruning must not mutate durable EventLog payloads.
+    ///
+    /// This test intentionally depends on `macaca-context` as a **dev-dependency**
+    /// only. Production `macaca-persist` must remain free of service-layer imports.
     #[tokio::test]
     async fn large_output_pruning_preserves_original_event_payload() {
         let dir = tempfile::tempdir().unwrap();

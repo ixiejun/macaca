@@ -61,10 +61,10 @@ Already near target (no macaca-web direct dep in production tree).
 ### macaca-persist
 
 ```
-macaca-persist → macaca-context, macaca-proto
+macaca-persist → macaca-proto
 ```
 
-Target: remove `macaca-context` edge (P2.7).
+Achieved iteration 20: `macaca-context` production edge removed; lineage DTOs in `macaca-proto::context_lineage`.
 
 ## Escape hatch gate
 

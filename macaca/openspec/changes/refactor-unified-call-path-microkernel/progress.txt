@@ -142,3 +142,11 @@
 - **Allowlist**: 删除 kernel→driver/gateway/skill 三行（Rust + `macaca-os-serviceization-allowlist.md`）；Route C gate 7 行（仅 web）。
 - **GitNexus memo (non-blocking)**: iteration 19 HIGH blast radius on `AgentExecutionPort` + registry API — recorded in `impact-memo.md`.
 - **Next**: P2 §3.7 persist→context 越界反转; P2 §3.8 退出验证; `FrameworkRunner` body still in web (task 4.3.2).
+
+## Iteration 20 (2026-06-07)
+- **P2.7 persist→context boundary inversion (3.7.1–3.7.3)**: extracted `LineageKind`/`SessionLineage`/`TranscriptSegment` to `macaca-proto/src/context_lineage.rs` (Shared Kernel DTO); `macaca-context::compaction` re-exports proto types; `macaca-persist` imports proto only; `macaca-context` moved to dev-dependency for cross-crate pruning contract test.
+- **SessionLineageStore**: added provider-neutral `tracing` on save/load/segment paths; English module docs (Repository pattern).
+- **P2.8 exit validation (3.8.1–3.8.3)**: `p2_microkernel_exit_validation.rs` static contracts (kernel lib purity, persist Cargo.toml, cargo tree); VC-gate 7 web rows green; `package_certification_keeps_web3_and_evm_optional_modules_unavailable_safe` green.
+- **Verified**: `cargo test -p macaca-persist` 4/4; `cargo test -p macaca-context` 38/38; `cargo test -p macaca-proto` 153/153; `p2_microkernel_exit_validation` 3/3; VC-gate + escape hatch green.
+- **GitNexus memo (non-blocking)**: iteration 20 MEDIUM on lineage DTO relocation — recorded in `impact-memo.md`.
+- **Next**: P3 §4.1 AppState field removal; `FrameworkRunner` body still in web (task 4.3.2).
