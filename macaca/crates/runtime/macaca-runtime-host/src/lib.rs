@@ -212,6 +212,8 @@ mod sandbox_service_provider_tests;
 #[cfg(test)]
 mod service_router_tests;
 #[cfg(test)]
+mod unified_agent_execution_provider_tests;
+#[cfg(test)]
 mod skill_content_mutation_tests;
 #[cfg(test)]
 mod skill_governance_store_logging_tests;

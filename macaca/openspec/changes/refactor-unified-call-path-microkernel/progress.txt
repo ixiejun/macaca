@@ -62,3 +62,9 @@
 - **Contract test**: `framework_runtime_agent_port_owned_by_runtime_host_service` in `unified_delegation_path_tests.rs` (6/6 total).
 - **Verified**: `cargo check -p macaca-runtime-host -p macaca-web`; `cargo test -p macaca-runtime-host --lib framework_runtime_agent_service` 2/2; `cargo test -p macaca-web unified_delegation_path` 6/6.
 - **Remaining P1**: 2.2.5 agent execution integration tests; 2.4 YAML workflow merge; 2.6 coordination patch removal (gate: audit replay → 1 chain); `FrameworkRunner` body still in web (task 4.3.2).
+
+## Iteration 10 (2026-06-07)
+- **P1.2 agent execution integration tests (2.2.5)**: `unified_agent_execution_provider_tests.rs` (web contract 7/7 + runtime-host provider integration 3/3).
+- **Coverage**: YAML chat (`chat_orchestrator`), YAML workflow (`agent_runner`), WASM delegate (`wasm_orchestration_backend`) → single `ComposedAgentExecutionBackend` via `service.agent_execution`; shared `trace.system_service.agent_execution.v1` + `agent.execute` command.
+- **Verified**: `cargo test -p macaca-web unified_agent_execution_provider` 7/7; `cargo test -p macaca-runtime-host unified_agent_execution_provider` 3/3.
+- **Remaining P1**: 2.4 YAML workflow merge; 2.6 coordination patch removal (gate: audit replay → 1 chain); `FrameworkRunner` body still in web (task 4.3.2).

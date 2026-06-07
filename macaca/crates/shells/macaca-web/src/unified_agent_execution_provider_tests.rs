@@ -1,0 +1,128 @@
+//! Integration contract tests for unified Agent Execution provider (task 2.2.5).
+//!
+//! These tests assert that YAML chat/workflow sessions and WASM delegate sessions
+//! converge on the single `service.agent_execution` provider backed by
+//! `ComposedAgentExecutionBackend`.  They use static source inspection (no LLM)
+//! so CI can enforce the unified call path without provider credentials.
+
+#[cfg(test)]
+mod tests {
+    /// YAML chat (`/api/chat/v2`) must call the shared agent execution service.
+    #[test]
+    fn yaml_chat_session_uses_unified_agent_execution_service() {
+        let chat = include_str!("chat_orchestrator.rs");
+        let legacy_builder = ["FrameworkRunner::build_runtime", "_agent("].concat();
+
+        assert!(chat.contains("run_chat_main_thread_via_agent_service"));
+        assert!(chat.contains("AGENT_EXECUTION_SERVICE_ID"));
+        assert!(chat.contains("AgentExecutionIntent::ChatMainThread"));
+        assert!(chat.contains("into_service_command()"));
+        assert!(chat.contains("ServiceBusSource::new(\"macaca.web.chat_orchestrator\")"));
+        assert!(!chat.contains(&legacy_builder));
+    }
+
+    /// YAML workflow steps must call the same service boundary as chat.
+    #[test]
+    fn yaml_workflow_session_uses_unified_agent_execution_service() {
+        let runner = include_str!("agent_runner.rs");
+        let legacy_builder = ["FrameworkRunner::build_runtime", "_agent("].concat();
+
+        assert!(runner.contains("execute_via_agent_service"));
+        assert!(runner.contains("AGENT_EXECUTION_SERVICE_ID"));
+        assert!(runner.contains("AgentExecutionIntent::YamlWorkflowStep"));
+        assert!(runner.contains("into_service_command()"));
+        assert!(runner.contains("ServiceBusSource::new(\"macaca.web.agent_runner\")"));
+        assert!(!runner.contains(&legacy_builder));
+    }
+
+    /// WASM application delegation must call the same service boundary.
+    #[test]
+    fn wasm_session_uses_unified_agent_execution_service() {
+        let wasm = include_str!("wasm_orchestration_backend.rs");
+        let executor_fast_path = [".delegate", "_task("].concat();
+
+        assert!(wasm.contains("AGENT_EXECUTION_SERVICE_ID"));
+        assert!(wasm.contains("AgentExecutionIntent::WasmDelegate"));
+        assert!(wasm.contains("into_service_command()"));
+        assert!(wasm.contains("ServiceBusSource::new(\"macaca.web.wasm_orchestration\")"));
+        assert!(!wasm.contains(&executor_fast_path));
+    }
+
+    /// Web startup registers exactly one composed backend for the service provider.
+    #[test]
+    fn web_registers_single_composed_agent_execution_backend() {
+        let lib_source = include_str!("lib.rs");
+        let adapters = include_str!("web_agent_execution_adapters.rs");
+        let composed = include_str!(
+            "../../../runtime/macaca-runtime-host/src/composed_agent_execution_backend.rs"
+        );
+
+        assert!(lib_source.contains("build_composed_web_agent_execution_backend"));
+        assert!(lib_source.contains("AgentExecutionSystemServiceProvider::new"));
+        assert!(lib_source.contains("ComposedAgentExecutionBackend"));
+        assert!(adapters.contains("ServiceBackedFrameworkRuntimeAgentPort"));
+        assert!(composed.contains("impl AgentExecutionBackend for ComposedAgentExecutionBackend"));
+    }
+
+    /// YAML and WASM entry surfaces must share the same service command + trace schema.
+    #[test]
+    fn yaml_and_wasm_share_agent_execute_command_and_trace_schema() {
+        let yaml_chat = include_str!("chat_orchestrator.rs");
+        let yaml_workflow = include_str!("agent_runner.rs");
+        let wasm = include_str!("wasm_orchestration_backend.rs");
+        let provider = include_str!(
+            "../../../runtime/macaca-runtime-host/src/agent_execution_service_provider.rs"
+        );
+
+        for source in [yaml_chat, yaml_workflow, wasm] {
+            assert!(source.contains("AGENT_EXECUTION_SERVICE_ID"));
+            assert!(source.contains("AgentExecutionCommand::new"));
+            assert!(source.contains("into_service_command()"));
+        }
+
+        assert!(provider.contains("trace.system_service.agent_execution.v1"));
+        assert!(provider.contains("AGENT_EXECUTE_COMMAND"));
+    }
+
+    /// Composed backend must emit audit-replay friendly execution results.
+    #[test]
+    fn composed_backend_returns_context_snapshot_for_audit_replay() {
+        let composed = include_str!(
+            "../../../runtime/macaca-runtime-host/src/composed_agent_execution_backend.rs"
+        );
+        let orchestration = include_str!(
+            "../../../runtime/macaca-runtime-host/src/agent_execution_orchestration.rs"
+        );
+        let ports = include_str!(
+            "../../../runtime/macaca-runtime-host/src/agent_execution_ports.rs"
+        );
+
+        assert!(composed.contains("build_agent_context_snapshot_via_service"));
+        assert!(composed.contains("completed_execution_result"));
+        assert!(composed.contains("failed_execution_result"));
+        assert!(orchestration.contains("context_snapshot"));
+        assert!(ports.contains("AgentExecutionEvidenceCollector"));
+    }
+
+    /// Session entrypoints must not bypass service.agent_execution with parallel backends.
+    #[test]
+    fn session_entrypoints_do_not_register_parallel_agent_execution_backends() {
+        let lib_source = include_str!("lib.rs");
+        let registration_calls = lib_source
+            .lines()
+            .filter(|line| {
+                line.contains("build_composed_web_agent_execution_backend(")
+                    && !line.trim_start().starts_with("use ")
+            })
+            .count();
+
+        assert_eq!(
+            registration_calls, 1,
+            "only one composed backend factory registration is allowed"
+        );
+        assert!(
+            !lib_source.contains("WebAgentExecutionBackend"),
+            "legacy shell-owned backend must not be reintroduced"
+        );
+    }
+}

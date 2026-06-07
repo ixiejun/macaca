@@ -47,7 +47,7 @@
 - [x] 2.2.2 在 `macaca-runtime-host` 的 Agent Execution Service provider（`agent_execution_service_provider.rs`）内承接该执行逻辑：context 经 `service.agent_context`、控制经 `service.execution_control`、模型/工具经 service.call，统一产出 service-call evidence。（`ComposedAgentExecutionBackend` + `agent_execution_orchestration`）
 - [x] 2.2.3 把 `FrameworkRunner` agent 构造（runtime/framework 关注点）下沉到 `macaca-runtime`/`macaca-framework` 层 service 后面，web 不再直接构造 framework Agent。（`ServiceBackedFrameworkRuntimeAgentPort` + `FrameworkAgentConstructionPort`；web 仅 `WebFrameworkAgentConstructionPort` 适配器；`FrameworkRunner` 本体待 4.3.2 迁出）
 - [x] 2.2.4 web 侧 `WebAgentExecutionBackend` 收缩为：仅做 SSE channel 注入 + HTTP/DTO 适配 + 调 `service.agent_execution`；删除 shell 内执行语义。（web 改为 `web_agent_execution_adapters` 端口注入；执行 Template Method 在 runtime-host）
-- [ ] 2.2.5 为迁移后的 Agent Execution Service 写集成测试：YAML 会话与 WASM 会话经**同一** provider 执行；trace/audit 链一致。
+- [x] 2.2.5 为迁移后的 Agent Execution Service 写集成测试：YAML 会话与 WASM 会话经**同一** provider 执行；trace/audit 链一致。（`unified_agent_execution_provider_tests.rs` web 7/7 + runtime-host 3/3）
 
 ### 2.3 执行编排（Fork-Join / worker-loop）迁出 kernel → service
 - [x] 2.3.1 `[impact-memo]` 盘点 `macaca-kernel/src/executor/`（`ApplicationExecutor/ForkManager/AgentRunner/TaskRouter/WorkerSupervisor/CallbackDispatcher/ExecutionQueue/EventBus/event_factory/router/bus/queue/worker/app_executor`）所有对外消费者。（见 `executor-consumer-inventory.md`，47 行，live 耦合集中在 macaca-web）
