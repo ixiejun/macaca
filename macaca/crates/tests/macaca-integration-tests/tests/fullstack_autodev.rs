@@ -9,7 +9,8 @@ use async_trait::async_trait;
 
 use macaca_app::loader::AppLoader;
 use macaca_app::{AppLayer, AppRuntime, AppStatus};
-use macaca_kernel::{Kernel, KernelBuilder, KernelServiceClientCompat};
+use macaca_agent::{AgentExecutionPort, LegacyAgentExecutionAdapter, ToolCatalog};
+use macaca_kernel::{Kernel, KernelBuilder};
 use macaca_llm::LlmProvider;
 use macaca_proto::config::KernelConfig;
 use macaca_proto::{LlmMessage, LlmOptions, LlmResponse, MacacaResult, TokenUsage};
@@ -55,14 +56,8 @@ fn make_kernel() -> Kernel {
         agent_timeout_ms: 30000,
     };
     let llm: Arc<dyn LlmProvider> = Arc::new(MockLlm);
-    KernelBuilder::from_service_clients(
-        config,
-        KernelServiceClientCompat::from_agent_provider_boxed_tools(
-            llm,
-            Box::new(DefaultToolSet::new()),
-        ),
-    )
-    .build()
+    let execution_port: Arc<dyn AgentExecutionPort> = Arc::new(LegacyAgentExecutionAdapter::new(llm, Arc::from(Box::new(DefaultToolSet::new()) as Box<dyn ToolCatalog>)));
+    KernelBuilder::from_execution_port(config, execution_port).build()
 }
 
 fn app_dir() -> std::path::PathBuf {

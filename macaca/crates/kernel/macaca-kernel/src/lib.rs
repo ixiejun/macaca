@@ -11,7 +11,6 @@ pub mod orchestrator;
 pub mod persistence;
 pub mod plugin_registry;
 pub mod policy;
-pub mod provider_compat;
 pub mod registry;
 pub mod resource;
 pub mod scheduler;
@@ -31,7 +30,8 @@ pub use facade::{
     DefaultKernelFacade, InMemoryTraceEventBus, KernelFacade, KernelTraceEvent, TraceEventBus,
 };
 pub use kernel::Kernel;
-pub use kernel_builder::{KernelBuilder, KernelServiceClientCompat};
+pub use kernel_builder::KernelBuilder;
+pub use macaca_agent::{AgentExecutionPort, UnavailableAgentExecutionPort};
 pub use orchestrator::AgentOrchestrator;
 pub use persistence::{KernelPersistencePort, UnavailableKernelPersistencePort};
 pub use plugin_registry::{
@@ -39,15 +39,9 @@ pub use plugin_registry::{
     PluginRegistryEntry, PluginRegistrySnapshot,
 };
 pub use policy::{DefaultAllowPolicyEngine, PolicyEngine, StaticDenyPolicyEngine};
-#[allow(deprecated)]
-pub use provider_compat::{
-    AgentExecutionPort, KernelProviderCompat, LegacyLlmProvider, LegacyToolCatalog,
-    UnavailableAgentExecutionPort,
-};
 pub use registry::{AgentEntry, AgentRegistry};
 pub use resource::{InMemoryResourceManager, ResourceManager};
-#[allow(deprecated)]
-pub use scheduler::{Scheduler, SimpleScheduler};
+pub use scheduler::Scheduler;
 pub use scheduler_factory::{SchedulerFactory, SchedulerKind};
 pub use service_bus_bridge::SystemServiceBusHandler;
 pub use service_call::{

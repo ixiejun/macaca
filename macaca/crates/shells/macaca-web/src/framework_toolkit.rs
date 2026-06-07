@@ -325,7 +325,7 @@ pub(crate) async fn build_toolkit(
     )
     .await
     {
-        let skill_definitions = macaca_runtime_host::McpServerFactory::with_default_registry()
+        let skill_definitions = macaca_runtime_host::McpServerFactory::with_bundled_mapping_registry()
             .from_skill_snapshot(&snapshot);
         emit_mcp_starting_events(state, session_id.as_deref(), agent_name, &skill_definitions)
             .await;
@@ -566,7 +566,7 @@ async fn load_app_mcp_overlay_definitions(
     match serde_yaml::from_str::<McpRegistryConfig>(&content)
         .map_err(|e| e.to_string())
         .and_then(|config| {
-            macaca_runtime_host::McpServerFactory::with_default_registry()
+            macaca_runtime_host::McpServerFactory::with_bundled_mapping_registry()
                 .from_registry_config(config, McpDefinitionSource::App)
         }) {
         Ok(definitions) => definitions,

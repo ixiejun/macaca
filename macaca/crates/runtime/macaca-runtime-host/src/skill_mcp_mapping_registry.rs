@@ -1,14 +1,15 @@
-//! Declarative compatibility registry.
+//! Declarative skill-to-MCP mapping registry (Registry pattern).
 //!
-//! Maps skill install specs (`install.package` / `install.bins`) to MCP
-//! server definitions when a skill does not provide an explicit
-//! `mcpServers:` block. This replaces the previous `if
-//! command.contains("playwright")` / `"@playwright/mcp"` hardcoding in
-//! runtime source.
+//! Maps skill install specs (`install.package` / `install.bins`) to MCP server
+//! definitions when a skill does not provide an explicit `mcpServers:` block.
+//! This replaces product-name `if command.contains(...)` branches in runtime
+//! control flow with auditable, host-overridable configuration.
 //!
-//! The bundled mappings live in `resources/compat_mappings.toml` and are
-//! embedded at build time via `include_str!`. Hosts can supply an override
-//! file whose `id` replaces any bundled entry with the same id.
+//! Bundled mappings ship in `resources/compat_mappings.toml` (embedded via
+//! `include_str!`). Hosts may override entries through
+//! `$MACACA_HOME/compat_mappings.toml` or an explicit override path passed to
+//! [`SkillMcpMappingRegistry::load_with_override`]. The on-disk TOML table key
+//! remains `[[compat]]` so existing operator overrides keep working.
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -17,36 +18,43 @@ use std::sync::OnceLock;
 use macaca_framework::mcp::{McpSessionMode, McpTransportConfig};
 use macaca_skill::SkillSnapshotEntry;
 use serde::Deserialize;
+use tracing::{debug, info, warn};
 
 use crate::mcp_runtime::{
     apply_concurrency_isolation, ConcurrencyIsolationPolicy, McpDefinitionSource,
     McpLifecycleScope, McpServerDefinition,
 };
 
-const BUNDLED_COMPAT_TOML: &str = include_str!("../resources/compat_mappings.toml");
+/// Embedded bundled mapping document compiled into the runtime-host binary.
+const BUNDLED_SKILL_MCP_MAPPINGS_TOML: &str =
+    include_str!("../resources/compat_mappings.toml");
 
+/// Root TOML document for skill MCP mapping files.
+///
+/// The serde field name `compat` is retained for backward compatibility with
+/// existing operator override files; it is not an OS "compat layer" module name.
 #[derive(Debug, Clone, Deserialize, Default)]
-struct CompatFile {
+struct SkillMcpMappingFile {
     #[serde(default)]
-    compat: Vec<CompatEntry>,
+    compat: Vec<SkillMcpMappingEntry>,
 }
 
-/// A single compatibility mapping loaded from TOML.
+/// One declarative mapping from skill install metadata to an MCP server template.
 #[derive(Debug, Clone, Deserialize)]
-pub struct CompatEntry {
+pub struct SkillMcpMappingEntry {
     pub id: String,
     #[serde(default)]
     pub match_packages: Vec<String>,
     #[serde(default)]
     pub match_bins: Vec<String>,
-    pub server: CompatServer,
+    pub server: SkillMcpMappingServer,
     #[serde(default)]
-    pub concurrency_isolation: Option<CompatConcurrencyIsolation>,
+    pub concurrency_isolation: Option<SkillMcpConcurrencyIsolation>,
 }
 
-/// Server template embedded in a compatibility entry.
+/// MCP server template embedded in a mapping entry.
 #[derive(Debug, Clone, Deserialize)]
-pub struct CompatServer {
+pub struct SkillMcpMappingServer {
     pub transport: String,
     pub command: String,
     #[serde(default)]
@@ -71,9 +79,9 @@ fn default_session_mode() -> McpSessionMode {
     McpSessionMode::Stateful
 }
 
-/// Declarative concurrency-isolation policy (e.g. ensure `--isolated`).
+/// Declarative concurrency-isolation policy (for example ensure `--isolated`).
 #[derive(Debug, Clone, Deserialize)]
-pub struct CompatConcurrencyIsolation {
+pub struct SkillMcpConcurrencyIsolation {
     #[serde(default)]
     pub command_match: Vec<String>,
     #[serde(default)]
@@ -82,7 +90,8 @@ pub struct CompatConcurrencyIsolation {
     pub skip_if_any_arg_prefix: Vec<String>,
 }
 
-impl CompatConcurrencyIsolation {
+impl SkillMcpConcurrencyIsolation {
+    /// Materialize the runtime policy object used by MCP definition assembly.
     pub fn policy(&self) -> ConcurrencyIsolationPolicy {
         ConcurrencyIsolationPolicy {
             required_args: self.required_args.clone(),
@@ -90,6 +99,7 @@ impl CompatConcurrencyIsolation {
         }
     }
 
+    /// Returns true when `command` matches any configured substring pattern.
     pub fn matches_command(&self, command: &str) -> bool {
         self.command_match
             .iter()
@@ -97,71 +107,110 @@ impl CompatConcurrencyIsolation {
     }
 }
 
-/// In-memory compatibility registry.
+/// In-memory registry of skill install spec → MCP server mappings.
 #[derive(Debug, Clone, Default)]
-pub struct CompatRegistry {
-    entries: Vec<CompatEntry>,
+pub struct SkillMcpMappingRegistry {
+    entries: Vec<SkillMcpMappingEntry>,
 }
 
-impl CompatRegistry {
-    /// Registry built from the bundled TOML shipped with this crate.
+impl SkillMcpMappingRegistry {
+    /// Build the registry from the bundled TOML shipped with this crate.
     pub fn bundled() -> Self {
-        let file: CompatFile =
-            toml::from_str(BUNDLED_COMPAT_TOML).expect("bundled compat_mappings.toml is valid");
+        let file: SkillMcpMappingFile = toml::from_str(BUNDLED_SKILL_MCP_MAPPINGS_TOML)
+            .expect("bundled skill MCP mapping TOML is valid");
+        let entry_count = file.compat.len();
+        info!(
+            entry_count,
+            "loaded bundled skill MCP mapping registry"
+        );
         Self {
             entries: file.compat,
         }
     }
 
-    /// Registry built from an in-memory TOML string (useful for tests / hosts
-    /// that embed configuration in their own config tree).
+    /// Build a registry from an in-memory TOML string (tests / embedded host config).
     pub fn from_toml(text: &str) -> Result<Self, String> {
-        let file: CompatFile = toml::from_str(text).map_err(|e| e.to_string())?;
+        let file: SkillMcpMappingFile = toml::from_str(text).map_err(|e| e.to_string())?;
+        debug!(
+            entry_count = file.compat.len(),
+            "parsed skill MCP mapping registry from TOML"
+        );
         Ok(Self {
             entries: file.compat,
         })
     }
 
-    /// Registry that starts from bundled defaults and layers an optional
-    /// override file (entries with matching `id` replace bundled entries).
+    /// Start from bundled defaults and layer an optional override file.
+    ///
+    /// Override entries with matching `id` replace bundled entries in place.
     pub fn load_with_override(override_path: Option<PathBuf>) -> Self {
         let mut base = Self::bundled();
         if let Some(path) = override_path {
-            if let Ok(text) = std::fs::read_to_string(&path) {
-                if let Ok(file) = toml::from_str::<CompatFile>(&text) {
-                    for entry in file.compat {
-                        base.entries.retain(|existing| existing.id != entry.id);
-                        base.entries.push(entry);
+            match std::fs::read_to_string(&path) {
+                Ok(text) => match toml::from_str::<SkillMcpMappingFile>(&text) {
+                    Ok(file) => {
+                        let override_count = file.compat.len();
+                        for entry in file.compat {
+                            base.entries.retain(|existing| existing.id != entry.id);
+                            debug!(mapping_id = %entry.id, "applied skill MCP mapping override");
+                            base.entries.push(entry);
+                        }
+                        info!(
+                            override_path = %path.display(),
+                            override_count,
+                            total_entries = base.entries.len(),
+                            "merged skill MCP mapping override file"
+                        );
                     }
+                    Err(error) => {
+                        warn!(
+                            override_path = %path.display(),
+                            %error,
+                            "ignored invalid skill MCP mapping override file"
+                        );
+                    }
+                },
+                Err(error) => {
+                    warn!(
+                        override_path = %path.display(),
+                        %error,
+                        "skill MCP mapping override file unreadable"
+                    );
                 }
             }
         }
         base
     }
 
-    pub fn entries(&self) -> &[CompatEntry] {
+    /// Expose the loaded mapping entries for inspection or iteration.
+    pub fn entries(&self) -> &[SkillMcpMappingEntry] {
         &self.entries
     }
 
-    /// Find the first compat entry whose `match_packages` / `match_bins`
-    /// intersect the skill's install list.
-    pub fn resolve_for_skill(&self, skill: &SkillSnapshotEntry) -> Option<&CompatEntry> {
-        self.entries.iter().find(|entry| entry.matches_skill(skill))
+    /// Resolve the first mapping whose package/bin patterns match the skill install list.
+    pub fn resolve_for_skill(&self, skill: &SkillSnapshotEntry) -> Option<&SkillMcpMappingEntry> {
+        let resolved = self.entries.iter().find(|entry| entry.matches_skill(skill));
+        if let Some(entry) = resolved {
+            debug!(
+                skill = %skill.name,
+                mapping_id = %entry.id,
+                "resolved skill MCP mapping from install metadata"
+            );
+        }
+        resolved
     }
 
-    /// Find a declarative concurrency-isolation policy that applies to
-    /// `command` — used when a skill supplies its own `mcpServers:` entry
-    /// whose command still needs the declarative safety net.
+    /// Find a declarative concurrency-isolation policy for an MCP server command.
     pub fn policy_for_command(&self, command: &str) -> Option<ConcurrencyIsolationPolicy> {
         self.entries
             .iter()
             .filter_map(|entry| entry.concurrency_isolation.as_ref())
             .find(|iso| iso.matches_command(command))
-            .map(CompatConcurrencyIsolation::policy)
+            .map(SkillMcpConcurrencyIsolation::policy)
     }
 }
 
-impl CompatEntry {
+impl SkillMcpMappingEntry {
     fn matches_skill(&self, skill: &SkillSnapshotEntry) -> bool {
         skill.install.iter().any(|install| {
             if let Some(pkg) = install.package.as_deref() {
@@ -176,23 +225,33 @@ impl CompatEntry {
         })
     }
 
-    /// Build a fully-resolved MCP server definition from this mapping.
+    /// Build a fully-resolved MCP server definition from this mapping entry.
     ///
-    /// Returns `None` for non-stdio transports, which this compat layer does
-    /// not (yet) generate.
+    /// Returns `None` for non-stdio transports, which this registry does not generate.
     pub fn to_definition(&self, id: String) -> Option<McpServerDefinition> {
         if !self.server.transport.eq_ignore_ascii_case("stdio") {
+            debug!(
+                mapping_id = %self.id,
+                transport = %self.server.transport,
+                "skipping non-stdio skill MCP mapping"
+            );
             return None;
         }
         let policy = self
             .concurrency_isolation
             .as_ref()
-            .map(CompatConcurrencyIsolation::policy);
+            .map(SkillMcpConcurrencyIsolation::policy);
         let args = if let Some(ref p) = policy {
             apply_concurrency_isolation(p, self.server.args.clone())
         } else {
             self.server.args.clone()
         };
+        debug!(
+            mapping_id = %self.id,
+            server_id = %id,
+            command = %self.server.command,
+            "materialized MCP server definition from skill mapping"
+        );
         Some(McpServerDefinition {
             id,
             transport: McpTransportConfig::Stdio {
@@ -212,10 +271,10 @@ impl CompatEntry {
     }
 }
 
-/// Process-wide default compat registry — bundled mappings only.
-pub fn default_registry() -> &'static CompatRegistry {
-    static REGISTRY: OnceLock<CompatRegistry> = OnceLock::new();
-    REGISTRY.get_or_init(CompatRegistry::bundled)
+/// Process-wide default registry containing bundled mappings only.
+pub fn default_skill_mcp_mapping_registry() -> &'static SkillMcpMappingRegistry {
+    static REGISTRY: OnceLock<SkillMcpMappingRegistry> = OnceLock::new();
+    REGISTRY.get_or_init(SkillMcpMappingRegistry::bundled)
 }
 
 #[cfg(test)]
@@ -248,7 +307,7 @@ mod tests {
 
     #[test]
     fn bundled_registry_contains_playwright_mapping() {
-        let registry = CompatRegistry::bundled();
+        let registry = SkillMcpMappingRegistry::bundled();
         let entry = registry
             .resolve_for_skill(&entry_with_pkg("@playwright/mcp"))
             .expect("playwright mapping must be present in bundled toml");
@@ -258,7 +317,7 @@ mod tests {
 
     #[test]
     fn playwright_definition_injects_isolated_flag() {
-        let registry = CompatRegistry::bundled();
+        let registry = SkillMcpMappingRegistry::bundled();
         let entry = registry
             .resolve_for_skill(&entry_with_pkg("@playwright/mcp"))
             .unwrap();
@@ -274,7 +333,7 @@ mod tests {
 
     #[test]
     fn policy_for_command_matches_by_substring() {
-        let registry = CompatRegistry::bundled();
+        let registry = SkillMcpMappingRegistry::bundled();
         assert!(registry.policy_for_command("playwright-mcp").is_some());
         assert!(registry.policy_for_command("unrelated-bin").is_none());
     }
@@ -298,9 +357,9 @@ command_match = ["overridden"]
 required_args = ["--iso2"]
 skip_if_any_arg_prefix = []
 "#;
-        let tmp = std::env::temp_dir().join("macaca-compat-override-test.toml");
+        let tmp = std::env::temp_dir().join("macaca-skill-mcp-mapping-override-test.toml");
         std::fs::write(&tmp, override_toml).unwrap();
-        let registry = CompatRegistry::load_with_override(Some(tmp.clone()));
+        let registry = SkillMcpMappingRegistry::load_with_override(Some(tmp.clone()));
         let entry = registry
             .resolve_for_skill(&entry_with_pkg("@playwright/mcp"))
             .unwrap();

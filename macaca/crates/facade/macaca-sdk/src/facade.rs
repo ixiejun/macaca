@@ -121,7 +121,8 @@ mod tests {
     use super::*;
     use std::sync::Arc;
 
-    use macaca_kernel::{CapabilityRegistry, KernelBuilder, KernelServiceClientCompat};
+    use macaca_agent::{AgentExecutionPort, LegacyAgentExecutionAdapter, ToolCatalog};
+    use macaca_kernel::{CapabilityRegistry, KernelBuilder};
     use macaca_llm::LlmProvider;
     use macaca_proto::config::KernelConfig;
     use macaca_proto::{
@@ -165,14 +166,12 @@ mod tests {
             agent_timeout_ms: 30000,
         };
         let llm: Arc<dyn LlmProvider> = Arc::new(MockLlm);
-        KernelBuilder::from_service_clients(
-            config,
-            KernelServiceClientCompat::from_agent_provider_boxed_tools(
+        let execution_port: Arc<dyn AgentExecutionPort> =
+            Arc::new(LegacyAgentExecutionAdapter::new(
                 llm,
-                Box::new(DefaultToolSet::new()),
-            ),
-        )
-        .build()
+                Arc::from(Box::new(DefaultToolSet::new()) as Box<dyn ToolCatalog>),
+            ));
+        KernelBuilder::from_execution_port(config, execution_port).build()
     }
 
     #[tokio::test]

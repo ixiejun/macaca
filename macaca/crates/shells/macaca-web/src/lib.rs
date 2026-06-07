@@ -104,7 +104,7 @@ use macaca_app::{AppLoader, AppRegistry, AppRuntime};
 use macaca_framework::session::{
     InMemorySessionStore as FrameworkInMemorySessionStore, SessionStore as FrameworkSessionStore,
 };
-use macaca_kernel::{KernelBuilder, KernelServiceClientCompat};
+use macaca_kernel::{KernelBuilder, UnavailableAgentExecutionPort};
 use macaca_runtime_host::{AgentInfo, ApplicationExecutorRegistry};
 use macaca_llm::{LlmProvider, LlmRouter};
 use macaca_persist::RedbStore;
@@ -161,13 +161,14 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
         heartbeat_interval_ms: 5000,
         agent_timeout_ms: 60000,
     };
+    // Seed the kernel with an explicit unavailable execution port. The port is
+    // hot-swapped to `service.agent_execution` after providers register below.
     let kernel = Arc::new(
-        KernelBuilder::from_service_clients(
+        KernelBuilder::from_execution_port(
             kernel_config,
-            KernelServiceClientCompat::from_agent_provider_boxed_tools(
-                Arc::clone(&llm),
-                Box::new(DefaultToolSet::new()),
-            ),
+            Arc::new(UnavailableAgentExecutionPort::new(
+                "bootstrap placeholder until service.agent_execution hot-swap",
+            )),
         )
         .build(),
     );

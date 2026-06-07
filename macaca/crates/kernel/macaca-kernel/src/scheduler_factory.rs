@@ -1,8 +1,6 @@
 //! Scheduler factory primitives.
 
-use crate::scheduler::Scheduler;
-#[allow(deprecated)]
-use crate::scheduler::SimpleScheduler;
+use crate::scheduler::{Scheduler, SimpleScheduler};
 
 /// Kernel scheduler strategy identifier.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -21,8 +19,7 @@ impl Default for SchedulerKind {
 pub struct SchedulerFactory;
 
 impl SchedulerFactory {
-    /// Build a scheduler strategy.
-    #[allow(deprecated)]
+    /// Build a scheduler strategy from a stable kernel identifier.
     pub fn build(kind: SchedulerKind) -> Box<dyn Scheduler> {
         match kind {
             SchedulerKind::Simple => Box::new(SimpleScheduler),

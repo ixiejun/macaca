@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use macaca_agent::{AgentExecutionDispatch, ServiceClientAgentExecutionAdapter};
-use macaca_kernel::{Kernel, KernelServiceClientCompat};
+use macaca_kernel::Kernel;
 use macaca_proto::{
     AgentExecutionCommand, AgentExecutionResult, ApplicationId, KernelServiceId, MacacaError,
     MacacaResult, ServiceBusSource, AGENT_EXECUTION_SERVICE_ID,
@@ -104,17 +104,20 @@ impl AgentExecutionDispatch for ServiceRuntimeAgentExecutionDispatch {
     }
 }
 
-/// Build kernel service-client compatibility from the runtime-host service runtime.
+/// Build a kernel execution port backed by `service.agent_execution`.
 ///
-/// Composition roots can pass the returned value directly to
-/// `KernelBuilder::from_service_clients(...)` and route kernel execution through
-/// `service.agent_execution` without importing shell-specific adapters.
-pub fn kernel_service_client_compat_from_agent_execution_service(
+/// Composition roots pass the returned port to `KernelBuilder::from_execution_port`
+/// so kernel agent dispatch routes through the runtime-host service boundary.
+pub fn kernel_execution_port_from_agent_execution_service(
     runtime: Arc<ServiceRuntime>,
     application_id: ApplicationId,
-) -> KernelServiceClientCompat {
-    let execution_port = service_client_execution_port(runtime, application_id);
-    KernelServiceClientCompat::from_execution_port(execution_port)
+) -> Arc<dyn macaca_agent::AgentExecutionPort> {
+    tracing::info!(
+        service_id = AGENT_EXECUTION_SERVICE_ID,
+        application_id = %application_id,
+        "kernel execution port created from agent execution service"
+    );
+    service_client_execution_port(runtime, application_id)
 }
 
 /// Build the production `ServiceClientAgentExecutionAdapter` for one runtime.
@@ -288,15 +291,13 @@ mod tests {
         let backend = Arc::new(RecordingExecutionBackend::default());
         register_agent_execution_provider(&runtime, backend.clone()).await;
 
-        let kernel = KernelBuilder::from_service_clients(
+        let kernel = KernelBuilder::from_execution_port(
             KernelConfig {
                 max_agents: 4,
                 heartbeat_interval_ms: 1_000,
                 agent_timeout_ms: 5_000,
             },
-            KernelServiceClientCompat::from_execution_port(Arc::new(
-                UnavailableAgentExecutionPort::new("bootstrap placeholder"),
-            )),
+            Arc::new(UnavailableAgentExecutionPort::new("bootstrap placeholder")),
         )
         .build();
 
@@ -336,20 +337,20 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn kernel_service_client_compat_helper_uses_service_client_adapter() {
+    async fn kernel_execution_port_helper_uses_service_client_adapter() {
         let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
         let backend = Arc::new(RecordingExecutionBackend::default());
         register_agent_execution_provider(&runtime, backend.clone()).await;
 
-        let kernel = KernelBuilder::from_service_clients(
+        let kernel = KernelBuilder::from_execution_port(
             KernelConfig {
                 max_agents: 4,
                 heartbeat_interval_ms: 1_000,
                 agent_timeout_ms: 5_000,
             },
-            kernel_service_client_compat_from_agent_execution_service(
+            kernel_execution_port_from_agent_execution_service(
                 Arc::clone(&runtime),
-                ApplicationId::from_name("kernel-service-compat"),
+                ApplicationId::from_name("kernel-execution-port"),
             ),
         )
         .build();

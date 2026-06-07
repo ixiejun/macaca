@@ -2,7 +2,9 @@ use std::collections::HashMap;
 
 use macaca_skill::SkillSnapshot;
 
-use crate::compat::{default_registry, CompatRegistry};
+use crate::skill_mcp_mapping_registry::{
+    default_skill_mcp_mapping_registry, SkillMcpMappingRegistry,
+};
 use crate::env_bridge::McpEnvApplyOutcome;
 use crate::mcp_runtime::{
     definitions_from_skill_snapshot_with_registry, McpDefinitionSource, McpRegistryConfig,
@@ -24,17 +26,18 @@ impl RuntimeEnvBuilder {
 
 /// Thin factory that centralizes MCP definition construction entry points.
 pub struct McpServerFactory<'a> {
-    registry: &'a CompatRegistry,
+    registry: &'a SkillMcpMappingRegistry,
 }
 
 impl<'a> McpServerFactory<'a> {
-    pub fn new(registry: &'a CompatRegistry) -> Self {
+    pub fn new(registry: &'a SkillMcpMappingRegistry) -> Self {
         Self { registry }
     }
 
-    pub fn with_default_registry() -> Self {
+    /// Factory bound to the process-wide bundled skill MCP mapping registry.
+    pub fn with_bundled_mapping_registry() -> Self {
         Self {
-            registry: default_registry(),
+            registry: default_skill_mcp_mapping_registry(),
         }
     }
 
@@ -83,7 +86,7 @@ mcpServers:
         )
         .unwrap();
 
-        let definitions = McpServerFactory::with_default_registry()
+        let definitions = McpServerFactory::with_bundled_mapping_registry()
             .from_registry_config(config, McpDefinitionSource::App)
             .unwrap();
 
@@ -129,7 +132,7 @@ mcpServers:
             version: 1,
         };
 
-        let definitions = McpServerFactory::with_default_registry().from_skill_snapshot(&snapshot);
+        let definitions = McpServerFactory::with_bundled_mapping_registry().from_skill_snapshot(&snapshot);
         assert_eq!(definitions.len(), 2);
         assert!(definitions
             .iter()

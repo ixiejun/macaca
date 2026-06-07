@@ -427,7 +427,8 @@ mod tests {
     use std::sync::Arc;
 
     use async_trait::async_trait;
-    use macaca_kernel::{KernelBuilder, KernelProviderCompat};
+    use macaca_agent::{AgentExecutionPort, LegacyAgentExecutionAdapter, ToolCatalog};
+    use macaca_kernel::KernelBuilder;
     use macaca_llm::LlmProvider;
     use macaca_proto::config::KernelConfig;
     use macaca_proto::{LlmMessage, LlmOptions, LlmResponse, MacacaResult, TokenUsage};
@@ -471,13 +472,12 @@ mod tests {
             heartbeat_interval_ms: 1000,
             agent_timeout_ms: 1000,
         };
-        let kernel = Arc::new(
-            KernelBuilder::from_compat(
-                config,
-                KernelProviderCompat::new(Arc::clone(&llm), Box::new(DefaultToolSet::new())),
-            )
-            .build(),
-        );
+        let execution_port: Arc<dyn AgentExecutionPort> =
+            Arc::new(LegacyAgentExecutionAdapter::new(
+                Arc::clone(&llm),
+                Arc::from(Box::new(DefaultToolSet::new()) as Box<dyn ToolCatalog>),
+            ));
+        let kernel = Arc::new(KernelBuilder::from_execution_port(config, execution_port).build());
         WorkflowEngine::new(kernel, llm)
     }
 

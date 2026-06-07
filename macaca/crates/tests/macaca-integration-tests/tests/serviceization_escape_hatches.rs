@@ -479,14 +479,14 @@ fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> bool
                     .starts_with("crates/runtime/macaca-runtime-host/src/autonomy_supervisor/")
         }
         "provider-compat-construction" => {
-            relative == "crates/kernel/macaca-kernel/src/provider_compat.rs"
-                || relative == "crates/kernel/macaca-kernel/src/kernel_builder.rs"
-                || relative == "crates/kernel/macaca-kernel/src/kernel.rs"
-                || relative == "crates/kernel/macaca-kernel/src/lib.rs"
-                || relative == "crates/application/macaca-agent/src/execution.rs"
+            // P2 §3.5: kernel provider_compat deleted; LegacyAgentExecutionAdapter remains
+            // only in macaca-agent (definition) and approved migration/test surfaces.
+            relative == "crates/application/macaca-agent/src/execution.rs"
                 || relative == "crates/application/macaca-agent/src/lib.rs"
                 || relative == "crates/application/macaca-app/src/runtime.rs"
                 || relative == "crates/application/macaca-app/src/workflow.rs"
+                || relative == "crates/facade/macaca-sdk/src/facade.rs"
+                || relative == "crates/facade/macaca-sdk/src/registry_api.rs"
         }
         "direct-runtime-catalog-read" => {
             relative.starts_with("crates/services/macaca-driver/src/")

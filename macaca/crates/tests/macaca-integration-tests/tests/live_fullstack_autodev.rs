@@ -9,7 +9,8 @@
 use std::sync::Arc;
 
 use macaca_app::loader::AppLoader;
-use macaca_kernel::{Kernel, KernelBuilder, KernelServiceClientCompat};
+use macaca_agent::{AgentExecutionPort, LegacyAgentExecutionAdapter, ToolCatalog};
+use macaca_kernel::{Kernel, KernelBuilder};
 use macaca_llm::{DashScopeProvider, LlmProvider};
 use macaca_proto::config::KernelConfig;
 use macaca_proto::LlmOptions;
@@ -39,14 +40,8 @@ fn make_kernel_with_dashscope() -> Kernel {
         agent_timeout_ms: 60000,
     };
     let llm: Arc<dyn LlmProvider> = Arc::new(DashScopeProvider::new(dashscope_api_key()));
-    KernelBuilder::from_service_clients(
-        config,
-        KernelServiceClientCompat::from_agent_provider_boxed_tools(
-            llm,
-            Box::new(DefaultToolSet::new()),
-        ),
-    )
-    .build()
+    let execution_port: Arc<dyn AgentExecutionPort> = Arc::new(LegacyAgentExecutionAdapter::new(llm, Arc::from(Box::new(DefaultToolSet::new()) as Box<dyn ToolCatalog>)));
+    KernelBuilder::from_execution_port(config, execution_port).build()
 }
 
 // ---------------------------------------------------------------------------

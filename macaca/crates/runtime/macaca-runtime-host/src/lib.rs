@@ -4,9 +4,8 @@
 //! Agent OS host (HTTP, CLI, gateway, background schedulers). It contains:
 //!
 //! - [`mcp_runtime`] — MCP registry, runtime manager and per-scope lifecycle
-//! - [`compat`] — external, declarative compatibility mappings from
-//!   skill packages/binaries to MCP server definitions (no product-name
-//!   hardcoding in control flow)
+//! - [`skill_mcp_mapping_registry`] — declarative skill install spec → MCP
+//!   server mappings (no product-name hardcoding in control flow)
 //!
 //! Framework protocol handling stays in [`macaca_framework::mcp`]; this crate
 //! provides the Agent OS-level registry, policy, status and toolkit
@@ -46,7 +45,7 @@ pub mod autonomy_runtime_config;
 pub mod autonomy_service_provider;
 pub mod autonomy_supervisor;
 pub mod code_intelligence_service_provider;
-pub mod compat;
+pub mod skill_mcp_mapping_registry;
 pub mod composed_agent_execution_backend;
 pub(crate) mod config_service_commands;
 pub mod config_service_provider;
@@ -268,7 +267,7 @@ pub use agent_context_service_provider::{
     agent_context_service_descriptor, AgentContextBackend, AgentContextSystemServiceProvider,
 };
 pub use agent_execution_dispatch::{
-    kernel_service_client_compat_from_agent_execution_service, service_client_execution_port,
+    kernel_execution_port_from_agent_execution_service, service_client_execution_port,
     wire_kernel_to_agent_execution_service, ServiceRuntimeAgentExecutionDispatch,
 };
 pub use agent_execution_orchestration::{
