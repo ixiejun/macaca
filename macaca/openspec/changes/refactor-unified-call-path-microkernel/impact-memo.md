@@ -315,3 +315,13 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `domain_pack_wiring` + `domain-pack-finance` feature | MEDIUM | web default feature registers finance catalog + 4 providers; `--no-default-features` restores absent-pack semantics | P4 |
 | `AppState.domain_pack_catalog` | MEDIUM | `app_ui_routes/context` allowlist expansion; replaces `with_builtin_defaults()` local catalog | P4 |
 | `service_projection` / `yaml_adapter` catalog-aware APIs | LOW | backward-compatible wrappers still default empty catalog for unit tests | P4 |
+
+## Iteration 40 additions (P5 terminal gates 6.1.1–6.1.5 — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `assert_route_c_allowlist_terminal_state` | MEDIUM | fails CI if Route C allowlist regrows; currently 0 rows pass | P5 |
+| `workspace_dependency_edges` optional skip | MEDIUM | feature-gated domain packs no longer false-positive `optional-not-base-required` | P5 |
+| `macaca-domain-pack-finance` Route C classify | LOW | OptionalModule layer registration for new package crate | P5 |
+| `kernel_purity_gate` | LOW | integration-test only; audits macaca-kernel workspace deps | P5 |
+| `p5_terminal_audit_gates/*` | LOW | named VC gates; migration surfaces mirror escape-hatch freeze | P5 |

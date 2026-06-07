@@ -1,0 +1,112 @@
+//! Approved migration surfaces for P5 terminal audit gates.
+//!
+//! Mirrors `serviceization_escape_hatches::is_approved_migration_surface` for the
+//! token families exercised by P5 gates. File-level exemptions are intentional
+//! migration debt markers — new modules cannot inherit directory-wide tolerance.
+
+use super::tokens::ForbiddenToken;
+
+/// Returns true when `relative` may contain `token` during the serviceization convergence.
+pub fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> bool {
+    if relative.contains("/tests/")
+        || relative.ends_with("_tests.rs")
+        || relative.ends_with("tests.rs")
+    {
+        return true;
+    }
+
+    match token.family {
+        "application-runtime-direct-start" => {
+            relative == "crates/application/macaca-app/src/runtime.rs"
+                || relative
+                    == "crates/runtime/macaca-runtime-host/src/application_service_provider.rs"
+        }
+        "web-direct-runtime-field" => {
+            relative == "crates/shells/macaca-web/src/lib.rs"
+                || relative == "crates/shells/macaca-web/src/state.rs"
+                || relative == "crates/shells/macaca-web/src/shell_composition_bundle.rs"
+                || relative == "crates/shells/macaca-web/src/application_shell_adapter.rs"
+                || relative == "crates/shells/macaca-web/src/llm_route_shell_adapter.rs"
+                || relative == "crates/shells/macaca-web/src/mcp_shell_adapter.rs"
+                || relative.starts_with("crates/shells/macaca-web/src/framework_runner/")
+                || relative.starts_with("crates/shells/macaca-web/src/composition_bootstrap/")
+        }
+        "provider-compat-construction" => {
+            relative == "crates/application/macaca-agent/src/execution.rs"
+                || relative == "crates/application/macaca-agent/src/lib.rs"
+                || relative == "crates/application/macaca-app/src/runtime.rs"
+                || relative == "crates/application/macaca-app/src/workflow.rs"
+                || relative == "crates/facade/macaca-sdk/src/facade.rs"
+                || relative == "crates/facade/macaca-sdk/src/registry_api.rs"
+                || relative == "crates/facade/macaca-sdk/src/legacy_kernel_registration.rs"
+        }
+        "direct-runtime-catalog-read" => {
+            relative.starts_with("crates/services/macaca-driver/src/")
+                || relative == "crates/runtime/macaca-runtime-host/src/driver_service_provider.rs"
+                || relative == "crates/runtime/macaca-runtime-host/src/mcp_service_provider.rs"
+                || relative.starts_with("crates/runtime/macaca-runtime-host/src/mcp_runtime.rs")
+                || relative.starts_with("crates/services/macaca-tools/src/")
+                || relative == "crates/shells/macaca-web/src/mcp_shell_adapter.rs"
+        }
+        "shell-semantic-execution-owner" => {
+            // Approved construction adapter — sole shell entry for FrameworkRunner builds
+            // until runtime-host fully owns `FrameworkAgentConstructionPort` (task 4.3.2).
+            relative == "crates/shells/macaca-web/src/framework_agent_construction_shell_adapter.rs"
+                || relative.contains("/agent_execution_backend/tests/")
+                || relative == "crates/shells/macaca-web/src/unified_agent_execution_provider_tests.rs"
+                || relative == "crates/shells/macaca-web/src/unified_audit_replay_convergence_tests.rs"
+                || relative.starts_with("crates/shells/macaca-web/src/framework_runner/traced_builders.rs")
+                || relative == "crates/shells/macaca-web/src/loop_manager/tests.rs"
+        }
+        "hardcoded-agent-role" => matches!(
+            relative,
+            "crates/application/macaca-app/src/consumption.rs"
+                | "crates/application/macaca-app/src/service_projection.rs"
+                | "crates/application/macaca-app/src/workflow.rs"
+                | "crates/facade/macaca-sdk/src/system_facade.rs"
+                | "crates/foundation/macaca-proto/src/agent_execution_service.rs"
+                | "crates/foundation/macaca-proto/src/orchestration.rs"
+                | "crates/foundation/macaca-proto/src/types.rs"
+                | "crates/runtime/macaca-runtime-host/src/executor/app_executor.rs"
+                | "crates/runtime/macaca-runtime-host/src/executor/bus.rs"
+                | "crates/runtime/macaca-runtime-host/src/executor/callback.rs"
+                | "crates/runtime/macaca-runtime-host/src/executor/event_factory.rs"
+                | "crates/runtime/macaca-runtime-host/src/executor/fork_manager.rs"
+                | "crates/runtime/macaca-runtime-host/src/executor/mod.rs"
+                | "crates/runtime/macaca-runtime-host/src/executor/queue.rs"
+                | "crates/runtime/macaca-runtime-host/src/executor/router.rs"
+                | "crates/kernel/macaca-kernel/src/orchestrator.rs"
+                | "crates/runtime/macaca-framework/src/construction.rs"
+                | "crates/runtime/macaca-runtime-host/src/agent_context_service_provider.rs"
+                | "crates/runtime/macaca-runtime-host/src/agent_execution_service_provider.rs"
+                | "crates/services/macaca-memory/src/core/tests.rs"
+                | "crates/services/macaca-task/src/claim_diagnostics.rs"
+                | "crates/services/macaca-task/src/decompose.rs"
+                | "crates/services/macaca-task/src/dependency.rs"
+                | "crates/services/macaca-task/src/lifecycle.rs"
+                | "crates/services/macaca-task/src/plan_loop.rs"
+                | "crates/services/macaca-task/src/scheduler.rs"
+                | "crates/services/macaca-task/src/todo_board.rs"
+                | "crates/services/macaca-task/src/todo_store.rs"
+                | "crates/services/macaca-tools/src/todo.rs"
+                | "crates/shells/macaca-web/src/capability_catalog.rs"
+                | "crates/shells/macaca-web/src/chat_orchestrator/route_chat_v2.rs"
+                | "crates/shells/macaca-web/src/framework_runner/build_mode.rs"
+                | "crates/shells/macaca-web/src/framework_runner/sse_emitter_adapter.rs"
+                | "crates/shells/macaca-web/src/framework_toolkit/mod.rs"
+                | "crates/shells/macaca-web/src/framework_toolkit/builder.rs"
+                | "crates/shells/macaca-web/src/loop_manager/mod.rs"
+                | "crates/shells/macaca-web/src/orchestration_tools.rs"
+                | "crates/shells/macaca-web/src/session/mod.rs"
+                | "crates/shells/macaca-web/src/workspace.rs"
+                | "crates/shells/macaca-web/src/workspace_knowledge_digest_capability.rs"
+        ),
+        "provider-model-routing-name" => {
+            !(relative.starts_with("crates/kernel/")
+                || relative.starts_with("crates/shells/macaca-web/")
+                || relative.starts_with("crates/shells/macaca-cli/"))
+                || relative.starts_with("crates/services/macaca-llm/src/")
+        }
+        _ => false,
+    }
+}

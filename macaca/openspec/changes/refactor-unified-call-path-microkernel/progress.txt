@@ -324,3 +324,12 @@
 - **Contract tests**: `macaca-web` domain_pack_wiring 2/2; `composition_root_domain_pack_wiring` integration 2/2; `cargo check` pass.
 - **GitNexus memo (non-blocking)**: iteration 39 HIGH on `ApplicationSystemServiceProvider::new` signature + catalog injection blast radius — recorded in `impact-memo.md`.
 - **Next**: P5 终态门; 4.4.4终态; remaining allowlist giants (77 rows).
+
+## Iteration 40 (2026-06-07)
+- **P5 terminal gates (6.1.1–6.1.5)**: `assert_route_c_allowlist_terminal_state` (Route C allowlist==0); `kernel_purity_gate` (kernel workspace deps proto+ipc only); `p5_terminal_audit_gates` Facade (no-direct-provider-call / no-hardcoded-name / shell-not-semantic-owner).
+- **Route C gate hardening**: classify `macaca-domain-pack-finance` as OptionalModule; skip `optional=true` Cargo edges so feature-gated domain packs do not violate `optional-not-base-required`.
+- **Design patterns**: Specification by Example (executable gates); Facade (`p5_terminal_audit_gates.rs`); Strategy (per-gate token family filters); Adapter (`framework_agent_construction_shell_adapter` migration surface).
+- **Contract tests**: route_c 3/3; kernel_purity 1/1; p5_terminal_audit 3/3; `cargo check` pass; `os_layer_file_size_gate` pass; `serviceization_escape_hatches` 2/2 (frontend assertions optional when checkout omits `frontend/`).
+- **Escape hatch gate**: `autonomy_schedule_management_uses_serviceized_paths_only` uses `read_optional_presentation_source` so backend-only worktrees still enforce macaca-web serviceized routes.
+- **GitNexus memo (non-blocking)**: iteration 40 MEDIUM on route_c optional-dep skip + P5 gate module tree — recorded in `impact-memo.md`.
+- **Next**: 6.2 逃逸口存量清零; filesize allowlist 77→0; 4.4.4 web 依赖终态; OpenSpec baseline 对齐。

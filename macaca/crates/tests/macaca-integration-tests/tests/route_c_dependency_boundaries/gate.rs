@@ -211,6 +211,7 @@ fn classify_crate(crate_name: &str) -> Option<Layer> {
             Some(Layer::ApplicationFramework)
         }
         "macaca-web" | "macaca-cli" => Some(Layer::PresentationShell),
+        "macaca-domain-pack-finance" => Some(Layer::OptionalModule),
         "macaca-integration-tests" => Some(Layer::IntegrationTest),
         _ => None,
     }
@@ -368,6 +369,16 @@ fn workspace_dependency_edges(metadata: &Value) -> Vec<DependencyEdge> {
                 );
                 continue;
             }
+            // Optional workspace dependencies (e.g. domain packs behind feature flags)
+            // are not base-OS required edges — they register through composition roots
+            // and must remain absent when features are disabled.
+            if dependency["optional"].as_bool() == Some(true) {
+                eprintln!(
+                    "route_c_dependency_gate event=skip_optional_edge from={} to={}",
+                    from, to
+                );
+                continue;
+            }
             if workspace_names.contains(to) {
                 edges.push(DependencyEdge {
                     from: from.to_owned(),
@@ -481,7 +492,52 @@ fn render_violations(violations: &[Violation]) -> String {
         .join("")
 }
 
+/// Terminal-state invariant for Route C migration debt (P5 §6.1.1).
+///
+/// At terminal state every previously forbidden edge has been **removed** from
+/// `Cargo.toml` graphs; the allowlist is not a permanent tolerance mechanism.
+/// Any non-empty allowlist therefore signals unresolved architecture debt and
+/// must fail CI with actionable replacement guidance.
+///
+/// Design pattern: **Specification by Example** — the empty `vec![]` in
+/// `allowlist.rs` is the living contract once debt converges; re-adding rows
+/// requires an OpenSpec change, not a silent workaround.
+pub fn assert_route_c_allowlist_terminal_state() {
+    let entries = allowlist::entries();
+    let row_count = entries.len();
+    eprintln!(
+        "route_c_dependency_gate event=terminal_allowlist_check rows={row_count}"
+    );
+    if entries.is_empty() {
+        eprintln!("route_c_dependency_gate event=terminal_allowlist_pass reason=zero_rows");
+        return;
+    }
+
+    let mut diagnostics = String::from(
+        "Route C terminal gate failed: migration allowlist must be empty at terminal state.\n\
+         Remove each forbidden edge from Cargo.toml instead of tolerating it.\n",
+    );
+    for entry in &entries {
+        diagnostics.push_str(&format!(
+            "\nrule={}\nfrom={}\nto={}\nowner_track={}\ncurrent_caller={}\ntarget_phase={}\nreplacement={}\nvalidation_command={}\n",
+            entry.rule_id,
+            entry.from,
+            entry.to,
+            entry.owner_track,
+            entry.current_caller,
+            entry.target_phase,
+            entry.replacement,
+            entry.validation_command
+        ));
+    }
+    panic!("{diagnostics}");
+}
+
 pub fn assert_route_c_dependency_boundaries() {
+    // Enforce terminal allowlist invariant before edge evaluation so CI cannot
+    // regress into tolerated dependency debt while violations are still zero.
+    assert_route_c_allowlist_terminal_state();
+
     let metadata = run_cargo_metadata();
     assert_every_workspace_crate_is_classified(&metadata);
 

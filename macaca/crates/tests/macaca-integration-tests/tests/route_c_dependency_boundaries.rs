@@ -24,3 +24,9 @@ mod gate;
 fn route_c_dependency_boundaries_reject_unallowlisted_forbidden_edges() {
     gate::assert_route_c_dependency_boundaries();
 }
+
+/// P5 §6.1.1 — explicit terminal assertion that Route C migration allowlist is empty.
+#[test]
+fn route_c_dependency_allowlist_terminal_state_is_zero_rows() {
+    gate::assert_route_c_allowlist_terminal_state();
+}

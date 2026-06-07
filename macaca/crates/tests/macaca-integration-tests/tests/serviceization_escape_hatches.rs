@@ -38,6 +38,37 @@ fn workspace_root() -> PathBuf {
     panic!("failed to locate Macaca workspace root from CARGO_MANIFEST_DIR")
 }
 
+/// Return the repository root that contains both `macaca/` and optional `frontend/`.
+///
+/// The Macaca Cargo workspace lives under `macaca/`, while the Next.js shell is a
+/// sibling checkout. Partial worktrees (backend-only CI agents) may omit `frontend/`;
+/// gates that reference presentation sources must tolerate that absence.
+fn repository_root() -> PathBuf {
+    workspace_root()
+        .parent()
+        .expect("Macaca workspace should live under the repository root")
+        .to_path_buf()
+}
+
+/// Read a presentation source file when the checkout includes it.
+///
+/// Returns `None` when the path is absent so contract tests can enforce backend
+/// invariants in every environment while still validating frontend adapters when
+/// the full monorepo is present.
+fn read_optional_presentation_source(path: &Path) -> Option<String> {
+    if !path.exists() {
+        eprintln!(
+            "serviceization_escape_hatches event=skip_missing_presentation_source path={}",
+            path.display()
+        );
+        return None;
+    }
+    Some(
+        std::fs::read_to_string(path)
+            .unwrap_or_else(|error| panic!("failed to read {}: {error}", path.display())),
+    )
+}
+
 fn forbidden_tokens() -> Vec<ForbiddenToken> {
     vec![
         ForbiddenToken {
@@ -646,36 +677,33 @@ fn serviceization_escape_hatches_reject_new_production_references() {
 #[test]
 fn autonomy_schedule_management_uses_serviceized_paths_only() {
     let root = workspace_root();
-    let frontend_facade = root
-        .parent()
-        .expect("workspace has repository parent")
-        .join("frontend/lib/autonomy.ts");
-    let facade = std::fs::read_to_string(&frontend_facade)
-        .unwrap_or_else(|error| panic!("failed to read {}: {error}", frontend_facade.display()));
-    assert!(
-        facade.contains("/autonomy"),
-        "frontend autonomy facade must call the serviceized /autonomy namespace"
-    );
-    assert!(
-        !facade.contains("/api/apps/${encodeURIComponent(appId)}/schedules"),
-        "frontend autonomy facade must not call the legacy direct schedule namespace"
-    );
-    assert!(
-        !facade.contains("heartbeat_wake"),
-        "frontend schedule mutations must not expose heartbeat native cadence as a Scheduler target"
-    );
-    let schedule_editor = std::fs::read_to_string(
-        root.parent()
-            .expect("workspace has repository parent")
-            .join("frontend/components/autonomy/ScheduleEditorDrawer.tsx"),
-    )
-    .expect("schedule editor should be readable");
-    assert!(
-        !schedule_editor.contains("Heartbeat wake")
-            && !schedule_editor.contains("wake_scope_key")
-            && !schedule_editor.contains("wake_reason_code"),
-        "application schedule editor must not expose heartbeat native cadence fields"
-    );
+    let repo = repository_root();
+    let frontend_facade = repo.join("frontend/lib/autonomy.ts");
+    if let Some(facade) = read_optional_presentation_source(&frontend_facade) {
+        assert!(
+            facade.contains("/autonomy"),
+            "frontend autonomy facade must call the serviceized /autonomy namespace"
+        );
+        assert!(
+            !facade.contains("/api/apps/${encodeURIComponent(appId)}/schedules"),
+            "frontend autonomy facade must not call the legacy direct schedule namespace"
+        );
+        assert!(
+            !facade.contains("heartbeat_wake"),
+            "frontend schedule mutations must not expose heartbeat native cadence as a Scheduler target"
+        );
+    }
+
+    let schedule_editor_path =
+        repo.join("frontend/components/autonomy/ScheduleEditorDrawer.tsx");
+    if let Some(schedule_editor) = read_optional_presentation_source(&schedule_editor_path) {
+        assert!(
+            !schedule_editor.contains("Heartbeat wake")
+                && !schedule_editor.contains("wake_scope_key")
+                && !schedule_editor.contains("wake_reason_code"),
+            "application schedule editor must not expose heartbeat native cadence fields"
+        );
+    }
 
     let routes = std::fs::read_to_string(
         root.join("crates/shells/macaca-web/src/routes/autonomy_schedules.rs"),

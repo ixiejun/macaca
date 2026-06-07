@@ -192,11 +192,11 @@
 ## 6. P5 — 强制门清零 + OpenSpec baseline 对齐
 
 ### 6.1 终态门
-- [ ] 6.1.1 在 `route_c_dependency_boundaries` 增加 terminal 断言：allowlist 行数 == 0（任何残留即失败）。
-- [ ] 6.1.2 实现 `no-direct-provider-call` 审计：每个已服务化能力（llm/memory/context/task/driver/skill/mcp/agent_execution/payment/web3/evm/gateway），生产代码只能经 service client；旁路引用 → 失败。
-- [ ] 6.1.3 实现 `no-hardcoded-name` 审计：生产代码无硬编码 agent/app/provider/model/driver/gateway/chain/payment 名（fixtures/tests 除外）。
-- [ ] 6.1.4 实现 `shell-not-semantic-owner` 审计：shell 不得直驱 task/loop、不引用 deprecated direct fields、不持 agent 执行实现。
-- [ ] 6.1.5 实现 `kernel-purity` 审计：kernel 仅依赖 proto/ipc（与 3.6.6 联动）。
+- [x] 6.1.1 在 `route_c_dependency_boundaries` 增加 terminal 断言：allowlist 行数 == 0（任何残留即失败）。（`assert_route_c_allowlist_terminal_state` + dedicated test；Route C allowlist 已清零）
+- [x] 6.1.2 实现 `no-direct-provider-call` 审计：每个已服务化能力（llm/memory/context/task/driver/skill/mcp/agent_execution/payment/web3/evm/gateway），生产代码只能经 service client；旁路引用 → 失败。（`p5_terminal_audit_gates/no_direct_provider_call` + migration surfaces）
+- [x] 6.1.3 实现 `no-hardcoded-name` 审计：生产代码无硬编码 agent/app/provider/model/driver/gateway/chain/payment 名（fixtures/tests 除外）。（`p5_terminal_audit_gates/no_hardcoded_name`）
+- [x] 6.1.4 实现 `shell-not-semantic-owner` 审计：shell 不得直驱 task/loop、不引用 deprecated direct fields、不持 agent 执行实现。（`p5_terminal_audit_gates/shell_not_semantic_owner` scoped to `crates/shells/`）
+- [x] 6.1.5 实现 `kernel-purity` 审计：kernel 仅依赖 proto/ipc（与 3.6.6 联动）。（`kernel_purity_gate` via `cargo metadata` workspace dep audit）
 - [x] 6.1.6 实现 `file-size` 审计：OS 层无 >500 行源文件。（`os_layer_file_size_gate` + 87 行 baseline allowlist；终态 allowlist==0 待收敛）
 
 ### 6.2 逃逸口由"冻结"升级为"删除"
