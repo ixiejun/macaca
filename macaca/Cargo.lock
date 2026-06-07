@@ -1635,13 +1635,9 @@ dependencies = [
  "chrono",
  "futures",
  "macaca-agent",
- "macaca-driver",
- "macaca-gateway",
  "macaca-ipc",
  "macaca-proto",
  "macaca-sdk",
- "macaca-skill",
- "macaca-task",
  "macaca-tools",
  "reqwest",
  "serde",
@@ -1707,6 +1703,7 @@ dependencies = [
 name = "macaca-proto"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "bincode",
  "chrono",
  "config",

@@ -120,9 +120,6 @@ Rust source of truth: `macaca/crates/tests/macaca-integration-tests/tests/route_
 
 | Rule | From | To | Owner track | Current caller | Phase | Replacement | Expiry condition | Validation |
 |------|------|-----|-------------|----------------|-------|-------------|------------------|------------|
-| kernel-no-provider-deps | macaca-kernel | macaca-driver | kernel provider compatibility | dev-dep only in Cargo.toml; legacy tests | S6 | Driver Service facade | `cargo metadata` shows no normal edge kernel→driver | `cargo metadata --no-deps --format-version 1` |
-| kernel-no-provider-deps | macaca-kernel | macaca-gateway | kernel provider compatibility | dev-dep only in Cargo.toml | S8 | Gateway Service facade | no normal edge kernel→gateway | same |
-| kernel-no-provider-deps | macaca-kernel | macaca-skill | kernel provider compatibility | dev-dep only in Cargo.toml | S6 | Skill/MCP Service facade | no normal edge kernel→skill | same |
 | presentation-no-provider-construction-hub | macaca-web | macaca-driver | Web thin shell | AppState + framework_toolkit | S6 | Driver Service client | web Cargo.toml drops macaca-driver | same |
 | presentation-no-provider-construction-hub | macaca-web | macaca-llm | Web thin shell | service-client migration | S5 | LLM Service client | web uses SystemLlmClient only | same |
 | presentation-no-provider-construction-hub | macaca-web | macaca-memory | Web thin shell | memory/context compat | S5 | Memory/Context Service client | web uses SystemMemoryClient only | same |

@@ -111,31 +111,21 @@ fn lifecycle_controller_rejects_invalid_transition() {
     );
 }
 
+/// Kernel-owned system service descriptors must remain provider-neutral.
+///
+/// Provider-specific descriptors (task/driver/skill/gateway) are validated in their
+/// respective service crates; the microkernel must not depend on those crates.
 #[test]
-fn builtin_adapter_skeletons_export_provider_neutral_descriptors() {
-    let descriptors = vec![
-        macaca_task::task_service_descriptor(),
-        trace_service_descriptor(),
-        macaca_driver::driver_service_descriptor(),
-        macaca_skill::skill_service_descriptor(),
-        macaca_gateway::gateway_service_descriptor(),
-    ];
+fn kernel_trace_service_descriptor_exports_provider_neutral_contract() {
+    let descriptor = trace_service_descriptor();
 
-    for descriptor in descriptors {
-        assert!(!descriptor.id.is_empty());
-        assert!(!descriptor.service_type.as_str().is_empty());
-        assert!(!descriptor.trace_schema.as_str().is_empty());
-        assert!(!descriptor.capabilities.is_empty());
-        assert!(!descriptor.supported_scopes.is_empty());
-        assert_eq!(descriptor.health, ServiceHealth::Healthy);
-    }
-
-    let all_capabilities = vec![
-        CapabilityId::new("capability.task.plan"),
-        CapabilityId::new("capability.trace.emit"),
-        CapabilityId::new("capability.driver.execute"),
-        CapabilityId::new("capability.skill.invoke"),
-        CapabilityId::new("capability.gateway.message"),
-    ];
-    assert_eq!(all_capabilities.len(), 5);
+    assert!(!descriptor.id.is_empty());
+    assert!(!descriptor.service_type.as_str().is_empty());
+    assert!(!descriptor.trace_schema.as_str().is_empty());
+    assert!(!descriptor.capabilities.is_empty());
+    assert!(!descriptor.supported_scopes.is_empty());
+    assert_eq!(descriptor.health, ServiceHealth::Healthy);
+    assert!(descriptor.capabilities.iter().any(|cap| {
+        cap.id == CapabilityId::new("capability.trace.emit")
+    }));
 }

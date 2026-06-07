@@ -6,9 +6,10 @@
 
 use std::sync::Arc;
 
-use macaca_agent::{AgentExecutionPort, SwappableAgentExecutionPort};
 use macaca_proto::config::KernelConfig;
+use macaca_proto::AgentExecutionPort;
 
+use crate::execution_port::SwappableAgentExecutionPort;
 use crate::{Kernel, SchedulerFactory, SchedulerKind};
 
 /// Builder for constructing a [`Kernel`] from explicit runtime dependencies.

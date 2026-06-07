@@ -9,12 +9,13 @@
 use std::sync::Arc;
 
 use macaca_app::loader::AppLoader;
-use macaca_agent::{AgentExecutionPort, LegacyAgentExecutionAdapter, ToolCatalog};
+use macaca_agent::{LegacyAgentExecutionAdapter, LegacyAgentSideRegistry, ToolCatalog};
 use macaca_kernel::{Kernel, KernelBuilder};
+use macaca_proto::AgentExecutionPort;
 use macaca_llm::{DashScopeProvider, LlmProvider};
 use macaca_proto::config::KernelConfig;
 use macaca_proto::LlmOptions;
-use macaca_sdk::{AgentBuilder, AgentPersona};
+use macaca_sdk::{register_legacy_kernel_agent, AgentBuilder, AgentPersona};
 use macaca_skill::SkillCatalog;
 use macaca_tools::DefaultToolSet;
 
@@ -33,15 +34,22 @@ fn dashscope_api_key() -> String {
         .unwrap_or_else(|_| "sk-7720115f25214ebaa4f83d5857224f9a".into())
 }
 
-fn make_kernel_with_dashscope() -> Kernel {
+/// Kernel + legacy side registry for live LLM execution through in-process adapters.
+fn make_kernel_with_dashscope() -> (Kernel, Arc<LegacyAgentSideRegistry>) {
     let config = KernelConfig {
         max_agents: 64,
         heartbeat_interval_ms: 5000,
         agent_timeout_ms: 60000,
     };
     let llm: Arc<dyn LlmProvider> = Arc::new(DashScopeProvider::new(dashscope_api_key()));
-    let execution_port: Arc<dyn AgentExecutionPort> = Arc::new(LegacyAgentExecutionAdapter::new(llm, Arc::from(Box::new(DefaultToolSet::new()) as Box<dyn ToolCatalog>)));
-    KernelBuilder::from_execution_port(config, execution_port).build()
+    let adapter = LegacyAgentExecutionAdapter::new(
+        llm,
+        Arc::from(Box::new(DefaultToolSet::new()) as Box<dyn ToolCatalog>),
+    );
+    let side_registry = adapter.side_registry();
+    let execution_port: Arc<dyn AgentExecutionPort> = Arc::new(adapter);
+    let kernel = KernelBuilder::from_execution_port(config, execution_port).build();
+    (kernel, side_registry)
 }
 
 // ---------------------------------------------------------------------------
@@ -173,7 +181,7 @@ async fn live_fullstack_autodev_architect_qwen3() {
 #[tokio::test]
 #[ignore]
 async fn live_fullstack_autodev_kernel_execution() {
-    let kernel = make_kernel_with_dashscope();
+    let (kernel, side_registry) = make_kernel_with_dashscope();
 
     // 1. Load persona for architect.
     let persona_dir = app_dir().join("personas/architect");
@@ -208,8 +216,7 @@ permission_level: system
     let agent = spec.into_agent();
 
     let agent_id = manifest.id;
-    kernel
-        .register_agent(Box::new(agent), manifest)
+    register_legacy_kernel_agent(&kernel, side_registry.as_ref(), Box::new(agent), manifest)
         .await
         .unwrap();
 

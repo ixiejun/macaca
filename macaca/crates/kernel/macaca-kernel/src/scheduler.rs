@@ -92,51 +92,12 @@ impl Scheduler for SimpleScheduler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use async_trait::async_trait as at;
     use chrono::Utc;
-    use macaca_agent::{AgentServices, LlmProvider};
     use macaca_proto::{
-        AgentManifest, AgentOutput, Capability, Permission, PermissionLevel, TaskId, TaskPriority,
-        TaskStatus, TokenUsage,
+        AgentManifest, Capability, Permission, PermissionLevel, TaskId, TaskPriority, TaskStatus,
     };
-    use macaca_tools::ToolCatalog;
 
     use crate::{SchedulerFactory, SchedulerKind};
-
-    struct MockAgent {
-        id: AgentId,
-        state: AgentState,
-        caps: Vec<Capability>,
-    }
-
-    #[at]
-    impl macaca_agent::Agent for MockAgent {
-        fn id(&self) -> AgentId {
-            self.id
-        }
-        fn capabilities(&self) -> &[Capability] {
-            &self.caps
-        }
-        fn state(&self) -> AgentState {
-            self.state
-        }
-        async fn run(
-            &self,
-            _llm: &dyn LlmProvider,
-            _tools: &dyn ToolCatalog,
-            _services: &AgentServices,
-        ) -> MacacaResult<AgentOutput> {
-            Ok(AgentOutput {
-                result: "ok".into(),
-                artifacts: vec![],
-                tokens_used: TokenUsage {
-                    prompt_tokens: 0,
-                    completion_tokens: 0,
-                    total_tokens: 0,
-                },
-            })
-        }
-    }
 
     fn make_manifest(id: AgentId, state: AgentState, caps: Vec<Capability>) -> AgentManifest {
         AgentManifest {
@@ -177,13 +138,8 @@ mod tests {
             name: "search".into(),
             description: "web search".into(),
         }];
-        let agent = Box::new(MockAgent {
-            id,
-            state: AgentState::Running,
-            caps: caps.clone(),
-        });
         let manifest = make_manifest(id, AgentState::Running, caps);
-        reg.register(agent, manifest).await.unwrap();
+        reg.register(manifest).await.unwrap();
 
         let task = make_task("search the web for Rust");
         let scheduler = SchedulerFactory::build(SchedulerKind::Simple);
@@ -199,13 +155,8 @@ mod tests {
             name: "search".into(),
             description: "".into(),
         }];
-        let agent = Box::new(MockAgent {
-            id,
-            state: AgentState::Suspended,
-            caps: caps.clone(),
-        });
         let manifest = make_manifest(id, AgentState::Suspended, caps);
-        reg.register(agent, manifest).await.unwrap();
+        reg.register(manifest).await.unwrap();
 
         let task = make_task("search something");
         let scheduler = SchedulerFactory::build(SchedulerKind::Simple);
@@ -221,13 +172,8 @@ mod tests {
             name: "write".into(),
             description: "".into(),
         }];
-        let agent = Box::new(MockAgent {
-            id,
-            state: AgentState::Running,
-            caps: caps.clone(),
-        });
         let manifest = make_manifest(id, AgentState::Running, caps);
-        reg.register(agent, manifest).await.unwrap();
+        reg.register(manifest).await.unwrap();
 
         // Task description has no matching capability name.
         let task = make_task("do something unrelated");

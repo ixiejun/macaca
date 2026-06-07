@@ -113,12 +113,12 @@
 - [x] 3.5.6 测试：kernel 不再有 `#[allow(deprecated)]` 导出；`cargo check` 无 deprecated 警告（kernel 范围）。
 
 ### 3.6 解除越界依赖 + 删 allowlist 行
-- [ ] 3.6.1 移除 `kernel/Cargo.toml` 对 `macaca-driver` 依赖（前置：web3/evm/a2a 已驱逐使其无消费者）；`cargo metadata` 确认边消失 → 删 allowlist `kernel→driver` 行 + 同步 doc。
-- [ ] 3.6.2 移除 `kernel/Cargo.toml` 对 `macaca-gateway` 依赖；删 allowlist `kernel→gateway` 行 + doc。
-- [ ] 3.6.3 移除 `kernel/Cargo.toml` 对 `macaca-skill` 依赖；删 allowlist `kernel→skill` 行 + doc。
-- [ ] 3.6.4 核查并移除 `kernel/Cargo.toml` 对 `macaca-task`、`macaca-tools` 依赖（若仍存在）；确认 `cargo metadata` 边消失。
-- [ ] 3.6.5 核查并移除 `kernel/Cargo.toml` 对 `macaca-agent`、`macaca-sdk` 依赖（agent 仅经 `AgentExecutionPort` 契约；sdk 不应被 kernel 依赖）；如需 `AgentExecutionPort`，下沉契约到 `macaca-proto`。
-- [ ] 3.6.6 终态断言：`cargo tree -e normal -p macaca-kernel --depth 1` 仅显示 `macaca-proto`、`macaca-ipc`。
+- [x] 3.6.1 移除 `kernel/Cargo.toml` 对 `macaca-driver` 依赖（前置：web3/evm/a2a 已驱逐使其无消费者）；`cargo metadata` 确认边消失 → 删 allowlist `kernel→driver` 行 + 同步 doc。
+- [x] 3.6.2 移除 `kernel/Cargo.toml` 对 `macaca-gateway` 依赖；删 allowlist `kernel→gateway` 行 + doc。
+- [x] 3.6.3 移除 `kernel/Cargo.toml` 对 `macaca-skill` 依赖；删 allowlist `kernel→skill` 行 + doc。
+- [x] 3.6.4 核查并移除 `kernel/Cargo.toml` 对 `macaca-task`、`macaca-tools` 依赖（若仍存在）；确认 `cargo metadata` 边消失。
+- [x] 3.6.5 核查并移除 `kernel/Cargo.toml` 对 `macaca-agent`、`macaca-sdk` 生产依赖（agent 仅经 `AgentExecutionPort` 契约；`AgentExecutionPort` 下沉 `macaca-proto`；manifest-only registry + `LegacyAgentSideRegistry`）。
+- [x] 3.6.6 终态断言：`cargo tree -e normal -p macaca-kernel --depth 1` 仅显示 `macaca-proto`、`macaca-ipc`（及 workspace 传递依赖）。
 
 ### 3.7 persist → context 越界反转
 - [ ] 3.7.1 `[impact-memo]` 查明 `macaca-persist` 依赖 `macaca-context` 的具体类型/用途。

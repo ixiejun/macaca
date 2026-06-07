@@ -2,8 +2,10 @@
 
 use std::sync::Arc;
 
-use macaca_agent::{AgentExecutionPort, SwappableAgentExecutionPort};
 use macaca_proto::config::KernelConfig;
+use macaca_proto::AgentExecutionPort;
+
+use crate::execution_port::SwappableAgentExecutionPort;
 use macaca_proto::{
     AgentActivity, AgentId, AgentManifest, AgentOutput, AgentState, MacacaError, MacacaResult,
 };
@@ -52,15 +54,11 @@ impl Kernel {
         self.execution_port.replace(port).await;
     }
 
-    /// Register a new agent with the kernel.
-    pub async fn register_agent(
-        &self,
-        agent: Box<dyn macaca_agent::Agent>,
-        manifest: AgentManifest,
-    ) -> MacacaResult<AgentId> {
+    /// Register a new agent manifest with the kernel (identity-only registry).
+    pub async fn register_agent(&self, manifest: AgentManifest) -> MacacaResult<AgentId> {
         let id = manifest.id;
         let name = manifest.name.clone();
-        self.registry.register(agent, manifest).await?;
+        self.registry.register(manifest).await?;
         // Register status tracking
         self.status_tracker.register(id, name).await;
         self.status_tracker
@@ -91,13 +89,15 @@ impl Kernel {
             .set_thinking(agent_id, "executing agent")
             .await;
 
-        let map = self.registry.agents_read().await;
-        let entry = map
-            .get(agent_id)
-            .ok_or_else(|| MacacaError::NotFound(format!("Agent {} not found", agent_id.0)))?;
+        if !self.registry.contains(agent_id).await {
+            return Err(MacacaError::NotFound(format!(
+                "Agent {} not found",
+                agent_id.0
+            )));
+        }
         let output = self
             .execution_port
-            .execute_registered_agent(agent_id, entry.agent.as_ref())
+            .execute_registered_agent(agent_id)
             .await;
 
         // The current compatibility behavior marks agents idle after the
@@ -252,21 +252,21 @@ mod tests {
         }
     }
 
-    fn make_kernel() -> Kernel {
+    fn make_kernel() -> (Kernel, Arc<macaca_agent::LegacyAgentSideRegistry>) {
         let config = KernelConfig {
             max_agents: 16,
             heartbeat_interval_ms: 5000,
             agent_timeout_ms: 30000,
         };
         let llm: Arc<dyn LlmProvider> = Arc::new(MockLlm);
-        let execution_port: Arc<dyn AgentExecutionPort> =
-            Arc::new(LegacyAgentExecutionAdapter::new(
-                llm,
-                Arc::from(
-                    Box::new(macaca_tools::DefaultToolSet::new()) as Box<dyn ToolCatalog>,
-                ),
-            ));
-        crate::KernelBuilder::from_execution_port(config, execution_port).build()
+        let adapter = LegacyAgentExecutionAdapter::new(
+            llm,
+            Arc::from(Box::new(macaca_tools::DefaultToolSet::new()) as Box<dyn ToolCatalog>),
+        );
+        let side_registry = adapter.side_registry();
+        let execution_port: Arc<dyn AgentExecutionPort> = Arc::new(adapter);
+        let kernel = crate::KernelBuilder::from_execution_port(config, execution_port).build();
+        (kernel, side_registry)
     }
 
     fn make_test_agent() -> (AgentId, Box<dyn Agent>, AgentManifest) {
@@ -291,9 +291,12 @@ mod tests {
 
     #[tokio::test]
     async fn register_and_list() {
-        let kernel = make_kernel();
+        let (kernel, side_registry) = make_kernel();
         let (id, agent, manifest) = make_test_agent();
-        kernel.register_agent(agent, manifest).await.unwrap();
+        side_registry
+            .register_runtime_agent(Arc::from(agent))
+            .unwrap();
+        kernel.register_agent(manifest).await.unwrap();
         assert_eq!(kernel.agent_count().await, 1);
         let agents = kernel.list_agents().await;
         assert_eq!(agents[0].id, id);
@@ -301,9 +304,12 @@ mod tests {
 
     #[tokio::test]
     async fn execute_agent_calls_llm() {
-        let kernel = make_kernel();
+        let (kernel, side_registry) = make_kernel();
         let (id, agent, manifest) = make_test_agent();
-        kernel.register_agent(agent, manifest).await.unwrap();
+        side_registry
+            .register_runtime_agent(Arc::from(agent))
+            .unwrap();
+        kernel.register_agent(manifest).await.unwrap();
         let output = kernel.execute_agent(&id).await.unwrap();
         assert_eq!(output.result, "kernel test output");
         assert_eq!(output.tokens_used.total_tokens, 8);
@@ -311,7 +317,7 @@ mod tests {
 
     #[tokio::test]
     async fn execute_missing_agent_returns_error() {
-        let kernel = make_kernel();
+        let (kernel, _side_registry) = make_kernel();
         let err = kernel.execute_agent(&AgentId::new()).await.unwrap_err();
         assert!(matches!(err, MacacaError::NotFound(_)));
     }

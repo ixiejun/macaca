@@ -1,23 +1,15 @@
-//! Agent registry — stores and manages registered agents and their manifests.
+//! Agent registry — manifest-only identity store for registered agents.
 
-use macaca_agent::Agent;
 use macaca_proto::{AgentId, AgentManifest, MacacaError, MacacaResult};
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 use tokio::sync::RwLock;
 
-// ── AgentEntry ────────────────────────────────────────────────────────────────
-
-/// A registered agent paired with its manifest.
-pub struct AgentEntry {
-    pub agent: Box<dyn Agent>,
-    pub manifest: AgentManifest,
-}
-
-// ── AgentRegistry ─────────────────────────────────────────────────────────────
-
-/// Thread-safe registry of all agents known to the kernel.
+/// Thread-safe manifest registry for all agents known to the kernel.
+///
+/// Runtime agent objects are resolved by upper-layer execution ports; the kernel
+/// stores only declarative identity and metadata (K8s-style manifest registry).
 pub struct AgentRegistry {
-    agents: Arc<RwLock<HashMap<AgentId, AgentEntry>>>,
+    manifests: RwLock<HashMap<AgentId, AgentManifest>>,
     max_agents: usize,
 }
 
@@ -25,21 +17,14 @@ impl AgentRegistry {
     /// Create a new registry with the given agent cap.
     pub fn new(max_agents: usize) -> Self {
         Self {
-            agents: Arc::new(RwLock::new(HashMap::new())),
+            manifests: RwLock::new(HashMap::new()),
             max_agents,
         }
     }
 
-    /// Register an agent. Returns the agent's id on success.
-    ///
-    /// Fails with `MacacaError::Agent` if the registry is at capacity or the
-    /// agent id is already registered.
-    pub async fn register(
-        &self,
-        agent: Box<dyn Agent>,
-        manifest: AgentManifest,
-    ) -> MacacaResult<AgentId> {
-        let mut map = self.agents.write().await;
+    /// Register an agent manifest. Returns the agent id on success.
+    pub async fn register(&self, manifest: AgentManifest) -> MacacaResult<AgentId> {
+        let mut map = self.manifests.write().await;
 
         if map.len() >= self.max_agents {
             return Err(MacacaError::Agent(format!(
@@ -56,74 +41,52 @@ impl AgentRegistry {
             )));
         }
 
-        map.insert(id, AgentEntry { agent, manifest });
-        tracing::info!(agent_id = %id.0, "agent registered");
+        map.insert(id, manifest);
+        tracing::info!(agent_id = %id.0, "agent manifest registered");
         Ok(id)
     }
 
     /// Unregister an agent by id.
     pub async fn unregister(&self, id: &AgentId) -> MacacaResult<()> {
-        let mut map = self.agents.write().await;
+        let mut map = self.manifests.write().await;
         if map.remove(id).is_none() {
             return Err(MacacaError::NotFound(format!("Agent {} not found", id.0)));
         }
-        tracing::info!(agent_id = %id.0, "agent unregistered");
+        tracing::info!(agent_id = %id.0, "agent manifest unregistered");
         Ok(())
     }
 
     /// Return the manifest for the given agent id, if present.
     pub async fn get(&self, id: &AgentId) -> MacacaResult<Option<AgentManifest>> {
-        let map = self.agents.read().await;
-        Ok(map.get(id).map(|e| e.manifest.clone()))
+        let map = self.manifests.read().await;
+        Ok(map.get(id).map(|m| m.clone()))
     }
 
     /// Return manifests for all registered agents.
     pub async fn list(&self) -> Vec<AgentManifest> {
-        let map = self.agents.read().await;
-        map.values().map(|e| e.manifest.clone()).collect()
+        let map = self.manifests.read().await;
+        map.values().cloned().collect()
     }
 
     /// Number of currently registered agents.
     pub async fn count(&self) -> usize {
-        self.agents.read().await.len()
+        self.manifests.read().await.len()
     }
 
-    /// Run a closure against the `AgentEntry` for the given id.
-    ///
-    /// Used internally by the kernel to invoke `agent.run(...)` while holding
-    /// only a read lock.
-    pub(crate) async fn with_agent<F, R>(&self, id: &AgentId, f: F) -> MacacaResult<R>
-    where
-        F: FnOnce(&AgentEntry) -> R,
-    {
-        let map = self.agents.read().await;
-        let entry = map
-            .get(id)
-            .ok_or_else(|| MacacaError::NotFound(format!("Agent {} not found", id.0)))?;
-        Ok(f(entry))
-    }
-
-    /// Obtain a read guard to the internal agent map.
-    /// Used by the kernel for async agent execution.
-    pub(crate) async fn agents_read(
-        &self,
-    ) -> tokio::sync::RwLockReadGuard<'_, HashMap<AgentId, AgentEntry>> {
-        self.agents.read().await
+    /// Returns whether a manifest exists for the given id.
+    pub async fn contains(&self, id: &AgentId) -> bool {
+        self.manifests.read().await.contains_key(id)
     }
 }
 
-// ── Tests ─────────────────────────────────────────────────────────────────────
+/// Backward-compatible alias retained for callers referencing `AgentEntry`.
+pub type AgentEntry = AgentManifest;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use async_trait::async_trait;
     use chrono::Utc;
-    use macaca_agent::{AgentServices, LlmProvider};
-    use macaca_proto::{
-        AgentOutput, AgentState, Capability, Permission, PermissionLevel, TokenUsage,
-    };
-    use macaca_tools::ToolCatalog;
+    use macaca_proto::{AgentState, Permission, PermissionLevel};
 
     fn make_manifest(id: AgentId, state: AgentState) -> AgentManifest {
         AgentManifest {
@@ -142,52 +105,12 @@ mod tests {
         }
     }
 
-    struct MockAgent {
-        id: AgentId,
-        state: AgentState,
-    }
-
-    #[async_trait]
-    impl Agent for MockAgent {
-        fn id(&self) -> AgentId {
-            self.id
-        }
-        fn capabilities(&self) -> &[Capability] {
-            &[]
-        }
-        fn state(&self) -> AgentState {
-            self.state
-        }
-        async fn run(
-            &self,
-            _llm: &dyn LlmProvider,
-            _tools: &dyn ToolCatalog,
-            _services: &AgentServices,
-        ) -> MacacaResult<AgentOutput> {
-            Ok(AgentOutput {
-                result: "ok".into(),
-                artifacts: vec![],
-                tokens_used: TokenUsage {
-                    prompt_tokens: 0,
-                    completion_tokens: 0,
-                    total_tokens: 0,
-                },
-            })
-        }
-    }
-
-    fn mock_agent(state: AgentState) -> (AgentId, Box<dyn Agent>, AgentManifest) {
-        let id = AgentId::new();
-        let agent = Box::new(MockAgent { id, state });
-        let manifest = make_manifest(id, state);
-        (id, agent, manifest)
-    }
-
     #[tokio::test]
     async fn register_and_count() {
         let reg = AgentRegistry::new(10);
-        let (id, agent, manifest) = mock_agent(AgentState::Running);
-        let returned_id = reg.register(agent, manifest).await.unwrap();
+        let id = AgentId::new();
+        let manifest = make_manifest(id, AgentState::Running);
+        let returned_id = reg.register(manifest).await.unwrap();
         assert_eq!(returned_id, id);
         assert_eq!(reg.count().await, 1);
     }
@@ -195,8 +118,9 @@ mod tests {
     #[tokio::test]
     async fn get_returns_manifest() {
         let reg = AgentRegistry::new(10);
-        let (id, agent, manifest) = mock_agent(AgentState::Running);
-        reg.register(agent, manifest).await.unwrap();
+        let id = AgentId::new();
+        let manifest = make_manifest(id, AgentState::Running);
+        reg.register(manifest).await.unwrap();
         let got = reg.get(&id).await.unwrap();
         assert!(got.is_some());
         assert_eq!(got.unwrap().id, id);
@@ -205,8 +129,9 @@ mod tests {
     #[tokio::test]
     async fn unregister_removes_agent() {
         let reg = AgentRegistry::new(10);
-        let (id, agent, manifest) = mock_agent(AgentState::Running);
-        reg.register(agent, manifest).await.unwrap();
+        let id = AgentId::new();
+        let manifest = make_manifest(id, AgentState::Running);
+        reg.register(manifest).await.unwrap();
         reg.unregister(&id).await.unwrap();
         assert_eq!(reg.count().await, 0);
     }
@@ -222,10 +147,15 @@ mod tests {
     #[tokio::test]
     async fn max_agents_enforced() {
         let reg = AgentRegistry::new(1);
-        let (_, agent1, manifest1) = mock_agent(AgentState::Running);
-        let (_, agent2, manifest2) = mock_agent(AgentState::Running);
-        reg.register(agent1, manifest1).await.unwrap();
-        let err = reg.register(agent2, manifest2).await.unwrap_err();
+        let id1 = AgentId::new();
+        let id2 = AgentId::new();
+        reg.register(make_manifest(id1, AgentState::Running))
+            .await
+            .unwrap();
+        let err = reg
+            .register(make_manifest(id2, AgentState::Running))
+            .await
+            .unwrap_err();
         assert!(matches!(err, MacacaError::Agent(_)));
     }
 
@@ -234,16 +164,8 @@ mod tests {
         let reg = AgentRegistry::new(10);
         let id = AgentId::new();
         let manifest = make_manifest(id, AgentState::Running);
-        let agent1 = Box::new(MockAgent {
-            id,
-            state: AgentState::Running,
-        });
-        let agent2 = Box::new(MockAgent {
-            id,
-            state: AgentState::Running,
-        });
-        reg.register(agent1, manifest.clone()).await.unwrap();
-        let err = reg.register(agent2, manifest).await.unwrap_err();
+        reg.register(manifest.clone()).await.unwrap();
+        let err = reg.register(manifest).await.unwrap_err();
         assert!(matches!(err, MacacaError::Agent(_)));
     }
 
@@ -251,8 +173,10 @@ mod tests {
     async fn list_returns_all_manifests() {
         let reg = AgentRegistry::new(10);
         for _ in 0..3 {
-            let (_, agent, manifest) = mock_agent(AgentState::Running);
-            reg.register(agent, manifest).await.unwrap();
+            let id = AgentId::new();
+            reg.register(make_manifest(id, AgentState::Running))
+                .await
+                .unwrap();
         }
         assert_eq!(reg.list().await.len(), 3);
     }
