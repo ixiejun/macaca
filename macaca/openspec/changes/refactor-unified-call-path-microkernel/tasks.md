@@ -83,9 +83,9 @@
 
 ### 3.1 驱逐 Payment / A2A
 - [x] 3.1.1 `[impact-memo]` 盘点 `kernel/a2a.rs`、`a2a_event.rs`、`payment_policy.rs` 的消费者；确认 runtime-host `payment_service_provider.rs`/`payment_adapter.rs`/`payment_admission.rs` 可承接全部能力。（`payment_policy` 实现已迁至 `macaca-proto`；kernel 仅 compat re-export）
-- [ ] 3.1.2 将 payment policy / A2A coordinator 能力迁入 payment service（provider 层），保留结构化 unavailable（service 缺席时）。
-- [ ] 3.1.3 删除 kernel `a2a.rs`、`a2a_event.rs`、`payment_policy.rs` 及 `lib.rs` 中相关 `#[allow(deprecated)]` 导出。
-- [ ] 3.1.4 测试：payment/A2A 经 service.call 路径；payment service 缺席返回结构化 denied/unavailable，不崩溃。
+- [x] 3.1.2 将 payment policy / A2A coordinator 能力迁入 payment service（provider 层），保留结构化 unavailable（service 缺席时）。
+- [x] 3.1.3 删除 kernel `a2a.rs`、`a2a_event.rs`、`payment_policy.rs` 及 `lib.rs` 中相关 `#[allow(deprecated)]` 导出。
+- [x] 3.1.4 测试：payment/A2A 经 service.call 路径；payment service 缺席返回结构化 denied/unavailable，不崩溃。
 
 ### 3.2 驱逐 Web3
 - [ ] 3.2.1 `[impact-memo]` 盘点 `kernel/web3.rs`、`web3_event.rs`、`web3_tests.rs` 消费者；确认现有 web3 service provider（runtime-host）可承接。

@@ -929,7 +929,7 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
             Arc::clone(&entitlement_store),
             Arc::clone(&entitlement_facade),
             Arc::clone(&payment_store),
-            macaca_kernel::local_simulated_terms("1", "UNIT"),
+            macaca_proto::local_simulated_terms("1", "UNIT"),
         ),
         "web-startup",
     )

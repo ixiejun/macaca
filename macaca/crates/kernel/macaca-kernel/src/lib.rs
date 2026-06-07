@@ -1,7 +1,5 @@
 //! `aos-kernel` — agent runtime, scheduler, and orchestrator.
 
-pub mod a2a;
-pub mod a2a_event;
 pub mod alert;
 pub mod audit;
 pub mod capability_registry;
@@ -16,8 +14,6 @@ pub mod kernel;
 pub mod kernel_builder;
 pub mod logging;
 pub mod orchestrator;
-// Keep payment policy internal while root-level type re-exports remain stable.
-mod payment_policy;
 pub mod persistence;
 pub mod plugin_registry;
 pub mod policy;
@@ -52,12 +48,7 @@ pub use facade::{
 pub use kernel::Kernel;
 pub use kernel_builder::{KernelBuilder, KernelServiceClientCompat};
 pub use orchestrator::AgentOrchestrator;
-pub use payment_policy::{DefaultPaymentPolicyEngine, PaymentPolicyDecision, PaymentPolicyEngine};
-#[allow(deprecated)]
-pub use persistence::{
-    InMemoryKernelPaymentStore, KernelPaymentStateTransition, KernelPaymentStorePort,
-    KernelPersistencePort, UnavailableKernelPersistencePort,
-};
+pub use persistence::{KernelPersistencePort, UnavailableKernelPersistencePort};
 pub use plugin_registry::{
     is_valid_transition as is_valid_plugin_lifecycle_transition, PluginRegistry,
     PluginRegistryEntry, PluginRegistrySnapshot,
@@ -92,17 +83,6 @@ pub use web3_event::{
     InMemoryWeb3TraceEventSink, NoopWeb3TraceEventSink, Web3TraceEvent, Web3TraceEventSink,
 };
 
-// Re-export executor types.  The A2A symbols are deliberately kept as
-// deprecated compatibility anchors so downstream migrations can locate the old
-// kernel-owned payment path; the re-export itself should not produce warnings.
-#[allow(deprecated)]
-pub use a2a::{
-    local_simulated_terms, A2ACoordinator, A2APaymentFacade, A2AProtocolAdapter,
-    LocalSimulatedA2AAdapter,
-};
-pub use a2a_event::{
-    A2APaymentEvent, A2APaymentEventSink, InMemoryA2APaymentEventSink, NoopA2APaymentEventSink,
-};
 pub use executor::{
     AgentInfo, AgentRunner, ApplicationExecutor, ApplicationExecutorConfig,
     ApplicationExecutorRegistry, CallbackDispatcher, DelegateResult, DelegatedTask, EventBus,

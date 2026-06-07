@@ -321,7 +321,7 @@ mod tests {
                 entitlement_store,
                 entitlement_facade,
                 payment_store,
-                macaca_kernel::local_simulated_terms("1", "UNIT"),
+                macaca_proto::local_simulated_terms("1", "UNIT"),
             ),
         )
     }

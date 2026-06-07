@@ -331,7 +331,7 @@ mod tests {
                 output: serde_json::to_value(QuoteResponse {
                     quote_id: macaca_proto::QuoteId::new("quote.sdk"),
                     request: typed.request,
-                    terms: macaca_kernel::local_simulated_terms("1", "UNIT"),
+                    terms: macaca_proto::local_simulated_terms("1", "UNIT"),
                     quoted_at: Utc::now(),
                     metadata: BTreeMap::new(),
                 })

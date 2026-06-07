@@ -92,3 +92,10 @@
 - **VC-escape (2.7.3)**: `serviceization_escape_hatches_reject_new_production_references` violations=0.
 - **Verified**: `cargo test -p macaca-web unified_audit_replay_convergence` 6/6; `cargo test -p macaca-runtime-host --lib unified_audit_replay_convergence` 3/3; `cargo test -p macaca-integration-tests --test route_c_baseline` 4/4; `cargo test -p macaca-integration-tests --test fullstack_autodev` 10/10 (4 ignored); `cargo test -p macaca-app` 131/131.
 - **P1 complete** (tasks 2.1–2.7). **Next**: P2 kernel purification (3.1.2+); `FrameworkRunner` body still in web (task 4.3.2).
+
+## Iteration 14 (2026-06-07)
+- **P2.1 payment/A2A kernel eviction (3.1.2–3.1.4)**: moved `local_simulated_terms` factory to `macaca-proto/a2a.rs`; updated web bootstrap, runtime-host bootstrap, SDK payment client tests, and payment provider integration tests to use proto contract.
+- **Kernel cleanup (3.1.3)**: deleted `kernel/a2a.rs`, `a2a_event.rs`, `payment_policy.rs`; removed deprecated `KernelPaymentStore*` from `persistence.rs`; dropped `lib.rs` A2A/payment_policy re-exports.
+- **Service-path tests (3.1.4)**: `payment_service_provider.rs` 5/5 (quote/settle/trace/policy-denied/invalid-transition); `macaca-sdk` `UnavailableSystemPaymentClient` 3/3; VC-escape `serviceization_escape_hatches_reject_new_production_references` violations=0.
+- **Verified**: `cargo check -p macaca-kernel -p macaca-proto -p macaca-runtime-host -p macaca-sdk -p macaca-web`; payment + escape hatch tests green.
+- **Next**: P2 §3.2 web3 kernel eviction; `FrameworkRunner` body still in web (task 4.3.2).
