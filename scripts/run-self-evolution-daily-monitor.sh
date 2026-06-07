@@ -16,7 +16,7 @@ DAY_NUMBER=""
 TASKS_PER_DAY="6"
 DEFAULT_STALE_DAYS="30"
 FORCED_STALE_DAYS="0"
-OUT_DIR="docs/self-evolution-monitoring"
+OUT_DIR="macaca/docs/self-evolution-monitoring"
 MODEL=""
 ENGINE="framework"
 WAIT_SECONDS="30"
@@ -34,7 +34,7 @@ Options:
   --tasks-per-day <N>         Number of task families to run, 1-6. Default: 6.
   --default-stale-days <N>    Production curation stale threshold. Default: 30.
   --forced-stale-days <N>     Diagnostic stale threshold. Default: 0.
-  --out-dir <PATH>            Monitoring report root. Default: docs/self-evolution-monitoring
+  --out-dir <PATH>            Monitoring report root. Default: macaca/docs/self-evolution-monitoring
   --model <MODEL>             Optional chat model name. Omitted by default.
   --engine <ENGINE>           Chat engine name passed through Web. Default: framework
   --wait-seconds <N>          Observer flush wait after task batch. Default: 30

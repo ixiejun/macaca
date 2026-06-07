@@ -27,7 +27,7 @@ run_cargo() {
   run_step "$name" cargo test --manifest-path "$MACACA_DIR/Cargo.toml" "$@"
 }
 
-run_step "openspec:${CHANGE_ID}" openspec validate "$CHANGE_ID" --strict
+run_step "openspec:${CHANGE_ID}" bash -lc "cd '$MACACA_DIR' && openspec validate '$CHANGE_ID' --strict"
 
 run_cargo "workbench_contracts:proto" -p macaca-proto workbench
 run_cargo "workbench_contracts:sdk" -p macaca-sdk workbench
