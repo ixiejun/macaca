@@ -120,7 +120,7 @@ async fn start_declarative_app_registers_agents() {
     let kernel = make_kernel();
     let manifest = inline_manifest("test-app", 2);
 
-    let app_id = runtime.start_app(manifest, ".", &kernel).await.unwrap();
+    let app_id = runtime.bootstrap_manifest(manifest, ".", &kernel).await.unwrap();
 
     // Verify app status
     let status = runtime.app_status(&app_id).await.unwrap();
@@ -145,7 +145,7 @@ async fn stop_app_unregisters_agents() {
     let kernel = make_kernel();
     let manifest = inline_manifest("stop-app", 1);
 
-    let app_id = runtime.start_app(manifest, ".", &kernel).await.unwrap();
+    let app_id = runtime.bootstrap_manifest(manifest, ".", &kernel).await.unwrap();
     assert_eq!(kernel.agent_count().await, 1);
 
     runtime.stop_app(&app_id, &kernel).await.unwrap();
@@ -162,11 +162,11 @@ async fn multiple_apps_coexist() {
     let kernel = make_kernel();
 
     let app_a = runtime
-        .start_app(inline_manifest("app-a", 2), ".", &kernel)
+        .bootstrap_manifest(inline_manifest("app-a", 2), ".", &kernel)
         .await
         .unwrap();
     let app_b = runtime
-        .start_app(inline_manifest("app-b", 3), ".", &kernel)
+        .bootstrap_manifest(inline_manifest("app-b", 3), ".", &kernel)
         .await
         .unwrap();
 
@@ -191,7 +191,7 @@ async fn stop_and_remove_app() {
     let kernel = make_kernel();
     let manifest = inline_manifest("removable", 1);
 
-    let app_id = runtime.start_app(manifest, ".", &kernel).await.unwrap();
+    let app_id = runtime.bootstrap_manifest(manifest, ".", &kernel).await.unwrap();
     assert_eq!(runtime.app_count().await, 1);
 
     runtime.stop_app(&app_id, &kernel).await.unwrap();
@@ -207,10 +207,10 @@ async fn duplicate_app_rejected() {
     let manifest = inline_manifest("dup", 1);
 
     runtime
-        .start_app(manifest.clone(), ".", &kernel)
+        .bootstrap_manifest(manifest.clone(), ".", &kernel)
         .await
         .unwrap();
-    let err = runtime.start_app(manifest, ".", &kernel).await.unwrap_err();
+    let err = runtime.bootstrap_manifest(manifest, ".", &kernel).await.unwrap_err();
     assert!(err.to_string().contains("already loaded"));
 }
 
@@ -221,7 +221,7 @@ async fn remove_running_app_fails() {
     let kernel = make_kernel();
 
     let app_id = runtime
-        .start_app(inline_manifest("still-running", 1), ".", &kernel)
+        .bootstrap_manifest(inline_manifest("still-running", 1), ".", &kernel)
         .await
         .unwrap();
     let err = runtime.remove_app(&app_id).await.unwrap_err();

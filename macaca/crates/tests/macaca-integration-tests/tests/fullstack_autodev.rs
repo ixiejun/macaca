@@ -109,7 +109,7 @@ async fn app_starts_with_three_agents() {
     let manifest_path = app_dir().join("app.yaml");
 
     let app_id = runtime
-        .start_app_from_file(&manifest_path, &kernel)
+        .bootstrap_manifest_from_path(&manifest_path, &kernel)
         .await
         .unwrap();
 
@@ -366,7 +366,7 @@ async fn e2e_fullstack_autodev_architect_executes() {
     let manifest_path = app_dir().join("app.yaml");
 
     let app_id = runtime
-        .start_app_from_file(&manifest_path, &kernel)
+        .bootstrap_manifest_from_path(&manifest_path, &kernel)
         .await
         .unwrap();
 

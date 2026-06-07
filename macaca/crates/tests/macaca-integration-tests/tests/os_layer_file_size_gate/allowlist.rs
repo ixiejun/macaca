@@ -11,7 +11,6 @@ pub fn entries() -> Vec<FileSizeAllowlistEntry> {
     vec![
         FileSizeAllowlistEntry::new("crates/application/macaca-app/src/manifest_v1/yaml_adapter.rs", 614, "OS-layer-debt", "P5"),
         FileSizeAllowlistEntry::new("crates/application/macaca-app/src/model.rs", 764, "OS-layer-debt", "P5"),
-        FileSizeAllowlistEntry::new("crates/application/macaca-app/src/runtime.rs", 580, "OS-layer-debt", "P5"),
         FileSizeAllowlistEntry::new("crates/application/macaca-app/src/service_projection.rs", 847, "OS-layer-debt", "P5"),
         FileSizeAllowlistEntry::new("crates/application/macaca-app/src/workflow.rs", 625, "OS-layer-debt", "P5"),
         FileSizeAllowlistEntry::new("crates/facade/macaca-sdk/src/mcp_client.rs", 578, "OS-layer-debt", "P5"),

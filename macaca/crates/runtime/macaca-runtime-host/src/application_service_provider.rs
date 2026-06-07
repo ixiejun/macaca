@@ -457,9 +457,9 @@ impl SystemService for ApplicationSystemServiceProvider {
                     )
                 })?;
                 let path = Path::new(manifest_path);
-                #[allow(deprecated)]
+                // Provider-internal bootstrap — external callers must use Application Service.
                 let app_id = runtime
-                    .start_app_from_file(path, &kernel)
+                    .bootstrap_manifest_from_path(path, &kernel)
                     .await
                     .map_err(service_adapter_error)?;
                 let app_dir = path.parent().unwrap_or_else(|| Path::new("."));

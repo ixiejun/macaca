@@ -159,7 +159,7 @@
 - [x] 4.3.14 拆分 `macaca-web/src/skill_self_evolution_observer.rs`(810) → `skill_self_evolution_observer/` Facade 模块树（9 文件，max ~257 行）；Observer `observer` + Adapter `projection` + Builder `proposal_builder` + Value Object `semantic_signal` + Command forwarder `forwarder`；`contract_source::skill_self_evolution_observer_module_sources`；`cargo test -p macaca-web --lib skill_self_evolution_observer` 6/6；filesize allowlist 移除该行（79 行基线债务）。
 - [x] 4.3.15 拆分 `macaca-web/src/agent_execution_backend/tests.rs`(656) → `agent_execution_backend/` Facade 模块树（`mod.rs` + `tests/` 10 文件，max ~153 行）；Contract Test 子模块（`execution_control_policy` / `heartbeat_evidence` / `execution_envelope` / `heartbeat_shell_contract` / `static_wiring` / `skill_self_evolution_boundary` / `architecture_guards`）+ `support` 共享 imports + `contract_source::agent_execution_backend_test_module_sources`；`cargo test -p macaca-web agent_execution_backend` 29/29；filesize allowlist 移除该行（78 行基线债务）；**macaca-web P3 巨型文件债务清零**。
 - [x] 4.3.16 拆分 `macaca-cli/src/skill_operations.rs`(682) → `skill_operations/` Facade 模块树（11 文件，max ~137 行）；Facade+Adapter+Null Object+Strategy；`contract_source::skill_operations_module_sources`；`cargo test -p macaca-cli skill_operations` 6/6；filesize allowlist 移除该行（**77 行基线债务**）；**macaca-cli P4 巨型文件债务清零**。
-- [x] 4.3.17 拆分 `macaca-sdk/src/scheduler_client.rs`(504) → `scheduler_client/` Facade 模块树（`mod.rs` + `tests/` 契约子模块，主文件 ~418 行）；Facade+Adapter+Null Object；`cargo test -p macaca-sdk --lib service_backed_scheduler` 1/1；filesize allowlist 移除该行（**76 行基线债务**）。
+- [x] 4.3.17 拆分 `macaca-sdk/src/scheduler_client.rs`(504) → `scheduler_client/` Facade 模块树（`mod.rs` + `tests/` 契约子模块，主文件 ~418 行）；Facade+Adapter+Null Object；`cargo test -p macaca-sdk --lib service_backed_scheduler` 1/1；filesize allowlist 移除该行（**75 行基线债务**，iteration 43 再移除 `runtime.rs`）。
 
 ### 4.4 删除 web 越界依赖 + allowlist 行
 - [x] 4.4.1 替换完成后逐条移除 `macaca-web/Cargo.toml` 对 `macaca-driver/llm/memory/persist/skill/task/tools` 的直接依赖（经 `macaca-sdk::shell_provider_bridge` + `macaca_runtime_host::persist` 别名）。
@@ -168,7 +168,7 @@
 - [ ] 4.4.4 终态断言：`cargo tree -e normal -p macaca-web --depth 1` 仅 `macaca-sdk`（+ proto DTO/必要 framework 适配）。（**部分**：仍含 app/agent/runtime/context/framework/runtime-host，待 P4/P5 收敛）
 
 ### 4.5 P3 退出验证
-- [ ] 4.5.1 全仓无 >500 行 OS 层源文件（VC-filesize）。（**部分**：macaca-web + macaca-cli 巨型文件已全部拆分合规；全仓 **76** 行 allowlist 债务（非 shell crate），gate 已实现）
+- [ ] 4.5.1 全仓无 >500 行 OS 层源文件（VC-filesize）。（**部分**：macaca-web + macaca-cli 巨型文件已全部拆分合规；全仓 **75** 行 allowlist 债务（非 shell crate），gate 已实现）
 - [x] 4.5.2 web 相关 allowlist 清零；VC-gate 绿；`cargo test -p macaca-web --lib` 250/250。
 
 ## 5. P4 — CLI 解耦 + domain pack 外置
@@ -198,11 +198,11 @@
 - [x] 6.1.3 实现 `no-hardcoded-name` 审计：生产代码无硬编码 agent/app/provider/model/driver/gateway/chain/payment 名（fixtures/tests 除外）。（`p5_terminal_audit_gates/no_hardcoded_name`）
 - [x] 6.1.4 实现 `shell-not-semantic-owner` 审计：shell 不得直驱 task/loop、不引用 deprecated direct fields、不持 agent 执行实现。（`p5_terminal_audit_gates/shell_not_semantic_owner` scoped to `crates/shells/`）
 - [x] 6.1.5 实现 `kernel-purity` 审计：kernel 仅依赖 proto/ipc（与 3.6.6 联动）。（`kernel_purity_gate` via `cargo metadata` workspace dep audit）
-- [x] 6.1.6 实现 `file-size` 审计：OS 层无 >500 行源文件。（`os_layer_file_size_gate` + **76** 行 baseline allowlist；终态 allowlist==0 待收敛）
+- [x] 6.1.6 实现 `file-size` 审计：OS 层无 >500 行源文件。（`os_layer_file_size_gate` + **75** 行 baseline allowlist；终态 allowlist==0 待收敛）
 - [x] 6.1.7 实现 `shell-dependency-purity` 审计：CLI 终态仅 proto+sdk；Web 冻结 7 条 workspace 依赖基线，禁止新增。（`shell_dependency_purity_gate` via `cargo metadata`）
 
 ### 6.2 逃逸口由"冻结"升级为"删除"
-- [ ] 6.2.1 每个逃逸口对应 service client 全量替换后，删除其 migration module 豁免，使任何引用（含旧引用）CI 失败。（**渐进**：`migration_debt_baseline.rs` 冻结 raw=**273**；**已退役** `multi-path-coordination-patch`（2→0）；下一小族 `application-runtime-direct-start`（2））
+- [ ] 6.2.1 每个逃逸口对应 service client 全量替换后，删除其 migration module 豁免，使任何引用（含旧引用）CI 失败。（**渐进**：`migration_debt_baseline.rs` 冻结 raw=**273**；**已退役** `multi-path-coordination-patch`（2→0）、`application-runtime-direct-start`（2→0）；下一小族 `autonomy-loop-boundary`（6））
 - [x] 6.2.2 `serviceization_escape_hatches.rs` 双模式门：freeze 模式 violations=0；debt inventory 模式 raw=**273** + per-family baseline；reconciliation markers 生产代码硬断言 0。（`reconciliation_markers_absent_in_production` + `migration_debt_inventory_matches_baseline`）
 
 ### 6.3 OpenSpec baseline 对齐

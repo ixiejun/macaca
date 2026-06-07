@@ -353,3 +353,12 @@
 - **Contract tests**: `serviceization_escape_hatches` 4/4；`os_layer_file_size_gate` 1/1；`macaca-sdk service_backed_scheduler` 1/1；`macaca-runtime-host abi_hosted_terminal_state` 1/1。
 - **GitNexus memo (non-blocking)**: iteration 42 MEDIUM on `hosted_signals_from_host_result` test rewrite + scheduler_client Facade split — recorded in `impact-memo.md`.
 - **Next**: 6.2.1 下一小族 `application-runtime-direct-start`（2）；6.3.2 继续 archive 其余 Complete changes；filesize allowlist 76→0；4.4.4 web 依赖终态。
+
+## Iteration 43 (2026-06-07)
+- **P5 §6.2.1 逃逸口 family 退役**: `application-runtime-direct-start` family 完全退役（2→0）；`start_app`/`start_app_from_file` 重命名为 provider-neutral `bootstrap_manifest`/`bootstrap_manifest_from_path`；删除 migration surface 豁免；`migration_debt_baseline` raw **273 净不变**（`provider-compat-construction` 5→7 因 `runtime/tests.rs` 拆分；7 families remain）。
+- **Application Service 路径对齐**: `application_service_provider.rs` `APPLICATION_START_COMMAND` 改调 `bootstrap_manifest_from_path`；集成测试同步更新。
+- **P3 filesize — runtime.rs 拆分**: `macaca-app/src/runtime.rs`(603) → 主文件 ~292 行 + `runtime/tests.rs` 契约单测；filesize allowlist **76→75**（`runtime.rs` 已合规移除）。
+- **Design patterns**: Builder+Factory（`AppRuntimeBuilder`/`DefaultApplicationRuntimeFactory`）；Strangler Fig（forbidden-token 冻结 + migration surface 逐族删除）；Specification by Example（debt inventory baseline）。
+- **Contract tests**: `macaca-app` runtime tests；`serviceization_escape_hatches` 4/4；`os_layer_file_size_gate` 1/1 待验证。
+- **GitNexus memo (non-blocking)**: iteration 43 MEDIUM on `bootstrap_manifest*` rename + Application Service provider call path — recorded in `impact-memo.md`.
+- **Next**: 6.2.1 下一小族 `autonomy-loop-boundary`（6）；6.3.2 继续 archive；filesize allowlist 75→0；4.4.4 web 依赖终态。

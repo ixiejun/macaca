@@ -344,3 +344,12 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `scheduler_client` Facade split (`scheduler_client/tests.rs`) | LOW | macaca-sdk public API unchanged; filesize gate compliance | P3 |
 | `ServiceBackedSchedulerClient` / `UnavailableSystemSchedulerClient` | LOW | scheduler SDK client; no application-specific branches | P3 |
 | OpenSpec archive batch (4 changes) | LOW | docs-only move to `changes/archive/`; specs already promoted in iteration 41 | P5 |
+
+## Iteration 43 additions (§6.2.1 application-runtime-direct-start retirement + runtime.rs split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `bootstrap_manifest` / `bootstrap_manifest_from_path` | MEDIUM | replaces deprecated `start_app*`; Application Service provider + integration tests + unit tests | P1/P5 |
+| `application-runtime-direct-start` migration surfaces removal | MEDIUM | freeze gate now fails on any new `AppRuntime::start_app`/`start_app_from_file` production writes | P5 |
+| `runtime.rs` + `runtime/tests.rs` split | LOW | macaca-app public API rename; filesize gate compliance (~292 lines main file) | P3 |
+| `APPLICATION_START_COMMAND` handler | LOW | runtime-host provider internal bootstrap only; traced service path unchanged | P1 |

@@ -16,11 +16,7 @@ pub fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> 
     }
 
     match token.family {
-        "application-runtime-direct-start" => {
-            relative == "crates/application/macaca-app/src/runtime.rs"
-                || relative
-                    == "crates/runtime/macaca-runtime-host/src/application_service_provider.rs"
-        }
+        // `application-runtime-direct-start` family retired in iteration 43 — no migration surfaces remain.
         "web-direct-runtime-field" => {
             relative == "crates/shells/macaca-web/src/lib.rs"
                 || relative == "crates/shells/macaca-web/src/state.rs"
