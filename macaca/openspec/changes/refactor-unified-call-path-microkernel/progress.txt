@@ -262,3 +262,12 @@
 - **Verified**: `cargo test -p macaca-web --lib app_ui_routes` 6/6; `os_layer_file_size_gate` pass.
 - **GitNexus memo (non-blocking)**: iteration 32 CRITICAL on app_ui_routes Facade split — recorded in `impact-memo.md`.
 - **Next**: P3 §4.5.1 remaining web giants (`skill_mcp`, `context_memory_injection`, `context_reporting_model`, `skill_self_evolution_observer`); P4 CLI decoupling; 4.4.4终态.
+
+## Iteration 33 (2026-06-07)
+- **P3.3 context_memory_injection + context_reporting_model split (4.3.11/4.3.12)**: deleted monolithic `context_memory_injection.rs` (592 lines) and `context_reporting_model.rs` (608 lines); extracted Facade module trees (6 + 7 files, each max ≤222 lines).
+- **Design patterns**: Facade (`mod.rs`); Strategy (`active_recall` / `preflight_recall` injectors); Adapter (`adapter` report/message mapping); Template Method (`assembly_finalize` shared post-assembly step); service vs legacy assembly paths (`assembly_service` / `assembly_legacy`).
+- **Contract tests**: `context_memory_injection::tests` 3/3; `context_reporting_model::tests` 2/2; `contract_source` helpers for static scans.
+- **Filesize allowlist**: removed `context_memory_injection.rs` + `context_reporting_model.rs` rows (81 baseline rows remain).
+- **Verified**: `cargo test -p macaca-web --lib context_memory_injection` 3/3; `cargo test -p macaca-web --lib context_reporting_model` 2/2; `os_layer_file_size_gate` pass.
+- **GitNexus memo (non-blocking)**: iteration 33 CRITICAL on context memory/reporting Facade splits — recorded in `impact-memo.md`.
+- **Next**: P3 §4.5.1 remaining web giants (`skill_mcp`, `skill_self_evolution_observer`, `agent_execution_backend/tests.rs`); P4 CLI decoupling; 4.4.4终态.

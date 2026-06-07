@@ -252,3 +252,10 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
 |---------------|----------------------|------------------------|-------|
 | `app_ui_routes.rs` → `app_ui_routes/` module split | CRITICAL | bootstrap app-ui asset + bridge routes; `app_ui_csp` / `app_ui_session_projection` consumers unchanged | P3.3 |
+
+## Iteration 33 additions (task 4.3.11/4.3.12 — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `context_memory_injection.rs` → `context_memory_injection/` module split | CRITICAL | `context_reporting_model::assembly_finalize` recall injectors; public `apply_active_recall` / `apply_preflight_memory` API preserved | P3.3 |
+| `context_reporting_model.rs` → `context_reporting_model/` module split | CRITICAL | `framework_runner/agent_factory_build` `ContextReportingChatModel` consumer; Context Service + legacy assembly paths; ChatModel hot path unchanged | P3.3 |
