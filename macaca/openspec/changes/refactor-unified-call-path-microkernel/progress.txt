@@ -40,3 +40,10 @@
 - **Provider-neutral delegator label**: replaced hardcoded `"coordinator"` with `GENERIC_DELEGATOR_AGENT = "delegator"`.
 - **Verified**: `cargo check -p macaca-kernel -p macaca-web`; `cargo test -p macaca-kernel --lib test_admit_running_task_respects_concurrency_limit`; `cargo test -p macaca-web delegated_task_dispatcher` 2/2.
 - **Remaining P1**: 2.2.3 FrameworkRunner sink; 2.3.2 execution_control Fork-Join; 2.6 coordination patch removal (0.3 audit replay gate); `suppress_executor_lifecycle` still written by delegate/agent_runner/loop_manager paths.
+
+## Iteration 7 (2026-06-07)
+- **P1.3 Fork-Join execution_control (2.3.2)**: `ExecutionControlForkJoinCoordinator` in runtime-host (Facade + Command); pause register + resume deliver via `service.execution_control`.
+- **Web wiring**: `orchestration_tools` uses coordinator for fork create/suspend + `register_parent_fork_wait`; `fork_join_shell_adapter` + `hook_consumer` call `deliver_parent_fork_resume` before legacy channel adapter; `fork_to_session` shared map registered on delegate_task.
+- **Task 0.3**: `audit-replay-baseline.md` — YAML 3 / WASM 3 pre-convergence chains documented.
+- **Verified**: pending `cargo check -p macaca-runtime-host -p macaca-web` + unit tests this iteration.
+- **Remaining P1**: 2.2.3 FrameworkRunner sink; 2.3.4 loop_manager consumes execution_control events; 2.6 coordination patch removal (gate: audit replay → 1 chain); kernel ForkManager eviction (P3).

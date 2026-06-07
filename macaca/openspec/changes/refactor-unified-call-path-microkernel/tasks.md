@@ -13,7 +13,7 @@
 
 - [x] 0.1 运行并记录基线：`openspec list`、`openspec spec list --long`、`cargo test -p macaca-integration-tests route_c_dependency_boundaries_reject_unallowlisted_forbidden_edges -- --nocapture`（记录当前 100 production edge / 10 allowlist）。
 - [x] 0.2 运行并记录 `cargo tree -e normal -p macaca-kernel --depth 1`、`-p macaca-web`、`-p macaca-cli`、`-p macaca-persist` 作为依赖基线快照（写入本 change 的 `baseline.md` 备忘）。
-- [ ] 0.3 建立"单路径 audit replay 基线"：对 `/api/chat/v2` 一次 YAML 会话与一次 WASM 会话各跑一次，导出 service-call audit replay（by session_id），记录当前出现的执行链数量（预期 >1，作为收敛前对照）。
+- [x] 0.3 建立"单路径 audit replay 基线"：对 `/api/chat/v2` 一次 YAML 会话与一次 WASM 会话各跑一次，导出 service-call audit replay（by session_id），记录当前出现的执行链数量（预期 >1，作为收敛前对照）。（见 `audit-replay-baseline.md`：YAML 3 链、WASM 3 链，静态盘点 + replay 命令面）
 - [x] 0.4 在 `design.md` Open Questions Q1/Q2/Q3 上做最终决策并记录（web3/evm 复用现有 provider；persist→context 反转方式；execution-control 承接 Fork-Join 契约）。
 
 ## 1. P0 — 冻结逃逸口（阻止债务增长）
@@ -51,7 +51,7 @@
 
 ### 2.3 执行编排（Fork-Join / worker-loop）迁出 kernel → service
 - [x] 2.3.1 `[impact-memo]` 盘点 `macaca-kernel/src/executor/`（`ApplicationExecutor/ForkManager/AgentRunner/TaskRouter/WorkerSupervisor/CallbackDispatcher/ExecutionQueue/EventBus/event_factory/router/bus/queue/worker/app_executor`）所有对外消费者。（见 `executor-consumer-inventory.md`，47 行，live 耦合集中在 macaca-web）
-- [ ] 2.3.2 在 task/execution service（runtime-host 或 `macaca-task`）建立 Fork-Join 暂停/恢复契约，由 `service.execution_control` 承接（对应 design Q3）。
+- [x] 2.3.2 在 task/execution service（runtime-host 或 `macaca-task`）建立 Fork-Join 暂停/恢复契约，由 `service.execution_control` 承接（对应 design Q3）。（`ExecutionControlForkJoinCoordinator` + web `orchestration_tools`/`hook_consumer`/`fork_join_shell_adapter` 接入；kernel `ForkManager` 状态待 P3 驱逐）
 - [x] 2.3.3 把 `delegate_task` 工具（`macaca-tools/src/orchestration.rs` + web `orchestration_tools.rs`）的执行落点从 kernel executor 改为 `service.agent_execution` / `service.task`。（`ServiceDelegatedTaskDispatcher` + `begin/complete_service_backed_delegation`；fork 生命周期仍经 executor `ForkManager`，待 2.3.2 execution_control 承接）
 - [ ] 2.3.4 web `loop_manager.rs` 的 session loop 拉取/唤醒逻辑改为消费 `service.execution_control` + task service 事件（不直驱 kernel executor）。
 - [ ] 2.3.5 集成测试：协调者 `delegate_task`（Fork-Join）与目标-任务（create_goal→worker）两条委派路径均经统一 service 路径，暂停/恢复语义不回归。

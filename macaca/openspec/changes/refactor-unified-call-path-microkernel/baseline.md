@@ -70,9 +70,9 @@ Target: remove `macaca-context` edge (P2.7).
 
 - Test: `cargo test -p macaca-integration-tests serviceization_escape_hatches_reject_new_production_references` → **PASS** after P0 token extension (1.1.1–1.1.7).
 
-## Audit replay (0.3 — pending)
+## Audit replay (0.3 — captured iteration 7)
 
-YAML and WASM session service-call replay baselines not yet captured in this iteration. Expected pre-convergence: **>1 execution chain** per session. Record in follow-up before P1.2.6 coordination-patch deletion.
+See `audit-replay-baseline.md`. Pre-convergence inventory: **YAML 3 chains**, **WASM 3 chains** (static code-path audit). Target post-P1: **1 chain** per session before task 2.6 coordination-patch deletion.
 
 ## Design open questions (0.4)
 

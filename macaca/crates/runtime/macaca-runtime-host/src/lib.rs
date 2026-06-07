@@ -59,6 +59,7 @@ pub mod entitlement_service_provider;
 pub mod env_bridge;
 pub mod evm_service_provider;
 pub mod execution_control;
+pub mod execution_control_fork_join;
 pub mod execution_control_runtime;
 pub mod execution_control_service_provider;
 pub mod factory;
@@ -355,6 +356,10 @@ pub use evm_service_provider::{
     UnavailableEvmProvider,
 };
 pub use execution_control::ExecutionControlPolicyResolver;
+pub use execution_control_fork_join::{
+    ExecutionControlForkJoinCoordinator, ForkJoinChildForkRequest, ForkJoinParentResumeRequest,
+    ForkJoinParentWaitRequest, FORK_JOIN_EXECUTION_CONTROL_SOURCE,
+};
 pub use execution_control_runtime::{
     ExecutionControlExecutionSnapshot, ExecutionControlObserver, ExecutionControlRuntimeCapability,
     ExecutionControlRuntimeSnapshot, NoopExecutionControlObserver,
