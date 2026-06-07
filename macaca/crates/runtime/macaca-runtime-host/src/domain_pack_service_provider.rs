@@ -185,127 +185,14 @@ fn runtime_error(error: crate::ServiceRuntimeError) -> MacacaError {
 }
 
 #[cfg(test)]
-#[allow(dead_code)]
-pub(crate) mod finance_fixture {
-    //! Test-only finance fixture helpers.
-    //!
-    //! These constants and validators remain solely for deterministic unit
-    //! tests while package-owned domain-pack providers are introduced outside
-    //! the base runtime host. Production bootstrap never registers them.
-
-    use macaca_proto::{
-        KernelServiceId, ServiceDescriptor, ServiceError, ServiceResult, ServiceType,
-        TraceSchemaRef,
-    };
-    use serde_json::Value;
-
-    /// Stable service id used by the test finance fixture for quote-like data.
-    pub const FINANCE_MARKET_DATA_SERVICE_ID: &str = "service.market_data";
-    /// Stable service id used by the test finance fixture for fundamentals.
-    pub const FINANCE_FINANCIALS_SERVICE_ID: &str = "service.financials";
-    /// Stable service id used by the test finance fixture for summarized news.
-    pub const FINANCE_NEWS_DIGEST_SERVICE_ID: &str = "service.news_digest";
-    /// Stable service id used by the test finance fixture for model analysis.
-    pub const FINANCE_LLM_ANALYSIS_SERVICE_ID: &str = "service.llm.analysis";
-
-    /// Command accepted by deterministic finance fixture information services.
-    pub const FINANCE_LOOKUP_COMMAND: &str = "finance.lookup";
-    /// Command accepted by the LLM-backed finance fixture analysis service.
-    pub const FINANCE_ANALYZE_COMMAND: &str = "finance.analyze";
-
-    /// Build a descriptor for one deterministic finance fixture service.
-    pub(crate) fn finance_descriptor(service_id: &str, service_kind: &str) -> ServiceDescriptor {
-        let mut descriptor = ServiceDescriptor::new(
-            KernelServiceId::new(service_id),
-            ServiceType::new(service_kind),
-            TraceSchemaRef::new("trace.domain_pack.fixture.v1"),
-        );
-        descriptor
-            .metadata
-            .insert("domain_pack_fixture".into(), "pack.finance.v1".into());
-        descriptor
-            .metadata
-            .insert("contract_version".into(), "v1".into());
-        descriptor
-    }
-
-    /// Extract an already-typed symbol from a fixture service payload.
-    ///
-    /// The fixture deliberately validates typed arguments rather than prompts
-    /// so tests preserve the production boundary: applications normalize user
-    /// language before crossing an OS service call.
-    pub(crate) fn extract_symbol(payload: &Value) -> ServiceResult<String> {
-        let Some((field, raw_symbol)) = ["ticker", "symbol"].into_iter().find_map(|field| {
-            payload
-                .get(field)
-                .and_then(Value::as_str)
-                .map(|value| (field, value))
-        }) else {
-            return Err(ServiceError::InvalidArgument(
-                "finance fixture requires typed `symbol` or `ticker` argument".into(),
-            ));
-        };
-        let symbol = raw_symbol.trim().to_ascii_uppercase();
-        if symbol.is_empty()
-            || !(1..=12).contains(&symbol.len())
-            || !symbol.chars().all(|ch| ch.is_ascii_alphanumeric())
-        {
-            return Err(ServiceError::InvalidArgument(format!(
-                "finance fixture `{field}` must be a typed alphanumeric symbol, not a prompt"
-            )));
-        }
-        Ok(symbol)
-    }
-}
-
-#[cfg(test)]
 mod tests {
-    use macaca_proto::ServiceError;
-    use serde_json::json;
-
-    use super::finance_fixture::extract_symbol;
+    use super::DomainPackRuntimeBundle;
 
     #[test]
-    fn extract_symbol_accepts_typed_symbol_field() {
-        let payload = json!({
-            "asset_class": "crypto",
-            "symbol": "BTC"
-        });
-
-        assert_eq!(extract_symbol(&payload).unwrap(), "BTC");
-    }
-
-    #[test]
-    fn extract_symbol_rejects_prompt_shaped_symbol_field() {
-        let payload = json!({
-            "asset_class": "crypto",
-            "symbol": "Analyze BTC/USDT now with available skills",
-            "input": "ignored"
-        });
-
-        assert!(matches!(
-            extract_symbol(&payload),
-            Err(ServiceError::InvalidArgument(message)) if message.contains("symbol")
-        ));
-    }
-
-    #[test]
-    fn extract_symbol_rejects_untyped_chat_input() {
-        let payload = json!({
-            "asset_class": "crypto",
-            "input": "Analyze SOL signal"
-        });
-
-        assert!(matches!(
-            extract_symbol(&payload),
-            Err(ServiceError::InvalidArgument(message)) if message.contains("symbol")
-        ));
-    }
-
-    #[test]
-    fn extract_symbol_accepts_ticker_alias_as_typed_field() {
-        let payload = json!({ "ticker": "AAPL" });
-
-        assert_eq!(extract_symbol(&payload).unwrap(), "AAPL");
+    fn builtin_domain_pack_bootstrap_returns_empty_bundle() {
+        // The deprecated built-in path is an explicit Null Object: optional
+        // domain packs must be registered by composition roots, not the OS.
+        let bundle = DomainPackRuntimeBundle::default();
+        assert!(bundle.started_services.is_empty());
     }
 }

@@ -35,3 +35,4 @@ reqwest = { version = "0.12", features = ["json"] }
 macaca-driver = { workspace = true }
 macaca-skill = { workspace = true }
 macaca-scheduler = { workspace = true }
+macaca-domain-pack-finance = { workspace = true }

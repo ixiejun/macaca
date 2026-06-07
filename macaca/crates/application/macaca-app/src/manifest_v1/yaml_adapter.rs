@@ -605,10 +605,12 @@ mod tests {
         assert!(ability
             .services
             .iter()
-            .any(|service| service.service.as_str() == "service.market_data"));
-        assert!(ability
-            .services
-            .iter()
             .any(|service| service.service.as_str() == "service.custom.required"));
+        assert!(
+            !ability.services.iter().any(|service| {
+                service.service.as_str() == "service.market_data"
+            }),
+            "finance pack services must not expand without an installed catalog entry"
+        );
     }
 }

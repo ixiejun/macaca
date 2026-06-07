@@ -1,0 +1,23 @@
+[package]
+name = "macaca-domain-pack-finance"
+version.workspace = true
+edition.workspace = true
+description = "Optional finance/crypto domain-pack service providers for Macaca Agent OS composition roots."
+
+[dependencies]
+macaca-proto = { workspace = true }
+macaca-kernel = { workspace = true }
+macaca-llm = { workspace = true }
+macaca-app = { workspace = true }
+macaca-runtime-host = { workspace = true }
+
+async-trait = { workspace = true }
+chrono = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+reqwest = { version = "0.12", features = ["json"] }
+rss = "2"
+
+[dev-dependencies]
+tokio = { workspace = true }

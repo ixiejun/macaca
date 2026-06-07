@@ -69,19 +69,13 @@ impl InMemoryDomainPackCatalog {
         self.packs.insert(definition.pack_id.clone(), definition);
     }
 
-    /// Build a minimal built-in catalog used by runtime startup path.
+    /// Build an empty catalog for generic runtime startup paths.
+    ///
+    /// Domain-pack metadata is owned by optional package crates (for example
+    /// `macaca-domain-pack-finance`).  Composition roots register installed
+    /// packs through [`Self::register`] rather than hardcoding pack ids here.
     pub fn with_builtin_defaults() -> Self {
-        let mut catalog = Self::new();
-        catalog.register(DomainPackDefinition {
-            pack_id: "pack.finance.v1".into(),
-            services: BTreeSet::from([
-                "service.market_data".into(),
-                "service.financials".into(),
-                "service.news_digest".into(),
-                "service.llm.analysis".into(),
-            ]),
-        });
-        catalog
+        Self::new()
     }
 }
 
@@ -146,9 +140,13 @@ mod tests {
 
     #[test]
     fn expansion_merges_packs_and_declared_services() {
-        let catalog = InMemoryDomainPackCatalog::with_builtin_defaults();
+        let mut catalog = InMemoryDomainPackCatalog::new();
+        catalog.register(DomainPackDefinition {
+            pack_id: "pack.example.v1".into(),
+            services: BTreeSet::from(["service.market_data".into()]),
+        });
         let declaration = AppServiceContractConfig {
-            use_packs: vec!["pack.finance.v1".into()],
+            use_packs: vec!["pack.example.v1".into()],
             required_services: vec!["service.custom.required".into()],
             optional_services: vec!["service.custom.optional".into()],
             service_policy_overrides: BTreeMap::new(),

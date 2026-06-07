@@ -73,10 +73,6 @@ pub mod execution_control_service_provider;
 pub mod factory;
 pub(crate) mod file_service_local;
 pub mod file_service_provider;
-#[cfg(test)]
-pub(crate) mod finance_live_data;
-#[cfg(test)]
-pub mod finance_llm_analysis_provider;
 pub mod genui_surface_store;
 pub mod git_service_provider;
 pub(crate) mod hook_service_commands;
@@ -394,8 +390,6 @@ pub use execution_control_service_provider::{
 pub use factory::{McpServerFactory, RuntimeEnvBuilder};
 pub use file_service_local::{FileProvider, LocalFileProvider};
 pub use file_service_provider::{bootstrap_local_file_service, FileSystemServiceProvider};
-#[cfg(test)]
-pub use finance_llm_analysis_provider::FinanceLlmAnalysisSystemServiceProvider;
 pub use genui_surface_store::ApplicationGenUiSurfaceStore;
 pub use git_service_provider::{
     bootstrap_local_git_service, GitProvider, GitSystemServiceProvider, LocalGitProvider,

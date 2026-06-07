@@ -16,7 +16,7 @@ use serde_json::{json, Value};
 use tracing::warn;
 
 /// No-key public RSS source used for live crypto news summaries.
-pub(crate) const CRYPTO_NEWS_RSS_URL: &str =
+pub const CRYPTO_NEWS_RSS_URL: &str =
     "https://www.coindesk.com/arc/outboundfeeds/rss/?outputType=xml";
 
 /// Binance 24-hour ticker response used as the no-key live crypto quote source.
@@ -26,25 +26,25 @@ pub(crate) const CRYPTO_NEWS_RSS_URL: &str =
 /// JSON shape consumed by applications.  Keeping the DTO private prevents the
 /// public OS contract from inheriting an exchange-specific schema.
 #[derive(Debug, Deserialize)]
-pub(crate) struct BinanceTicker24h {
+pub struct BinanceTicker24h {
     #[serde(rename = "symbol")]
-    pub(crate) pair_symbol: String,
+    pub pair_symbol: String,
     #[serde(rename = "lastPrice")]
-    pub(crate) last_price: String,
+    pub last_price: String,
     #[serde(rename = "priceChangePercent")]
-    pub(crate) price_change_percent: String,
+    pub price_change_percent: String,
     #[serde(rename = "weightedAvgPrice")]
-    pub(crate) weighted_avg_price: String,
+    pub weighted_avg_price: String,
     #[serde(rename = "highPrice")]
-    pub(crate) high_price: String,
+    pub high_price: String,
     #[serde(rename = "lowPrice")]
-    pub(crate) low_price: String,
+    pub low_price: String,
     #[serde(rename = "volume")]
-    pub(crate) base_volume: String,
+    pub base_volume: String,
     #[serde(rename = "quoteVolume")]
-    pub(crate) quote_volume: String,
+    pub quote_volume: String,
     #[serde(rename = "closeTime")]
-    pub(crate) close_time_millis: i64,
+    pub close_time_millis: i64,
 }
 
 /// OKX ticker response used as a secondary no-key quote source.
@@ -53,35 +53,35 @@ pub(crate) struct BinanceTicker24h {
 /// this type beside the Binance DTO makes the failover path explicit without
 /// allowing exchange-specific field names to leak into application payloads.
 #[derive(Debug, Deserialize)]
-pub(crate) struct OkxTickerEnvelope {
-    pub(crate) code: String,
+pub struct OkxTickerEnvelope {
+    pub code: String,
     #[serde(default)]
-    pub(crate) data: Vec<OkxTicker>,
+    pub data: Vec<OkxTicker>,
 }
 
 /// One OKX ticker row from `/api/v5/market/ticker`.
 #[derive(Debug, Deserialize)]
-pub(crate) struct OkxTicker {
+pub struct OkxTicker {
     #[serde(rename = "instId")]
-    pub(crate) instrument_id: String,
+    pub instrument_id: String,
     #[serde(rename = "last")]
-    pub(crate) last_price: String,
+    pub last_price: String,
     #[serde(rename = "open24h")]
-    pub(crate) open_24h: String,
+    pub open_24h: String,
     #[serde(rename = "high24h")]
-    pub(crate) high_24h: String,
+    pub high_24h: String,
     #[serde(rename = "low24h")]
-    pub(crate) low_24h: String,
+    pub low_24h: String,
     #[serde(rename = "vol24h")]
-    pub(crate) base_volume_24h: String,
+    pub base_volume_24h: String,
     #[serde(rename = "volCcy24h")]
-    pub(crate) quote_volume_24h: String,
+    pub quote_volume_24h: String,
     #[serde(rename = "bidPx")]
-    pub(crate) bid_price: String,
+    pub bid_price: String,
     #[serde(rename = "askPx")]
-    pub(crate) ask_price: String,
+    pub ask_price: String,
     #[serde(rename = "ts")]
-    pub(crate) timestamp_millis: String,
+    pub timestamp_millis: String,
 }
 
 /// Build the reusable HTTP client used by live finance-pack adapters.
@@ -90,7 +90,7 @@ pub(crate) struct OkxTicker {
 /// the host's normal proxy configuration. Local developer networks often need
 /// that proxy to reach exchange APIs; disabling it would turn a healthy data
 /// source into a false runtime outage.
-pub(crate) fn build_finance_http_client() -> reqwest::Client {
+pub fn build_finance_http_client() -> reqwest::Client {
     reqwest::Client::builder()
         .timeout(Duration::from_secs(8))
         .user_agent("macaca-finance-domain-pack/0.1")
@@ -105,7 +105,7 @@ pub(crate) fn build_finance_http_client() -> reqwest::Client {
 }
 
 /// Convert a generic finance symbol into the Binance spot pair used for quotes.
-pub(crate) fn crypto_spot_pair(symbol: &str) -> String {
+pub fn crypto_spot_pair(symbol: &str) -> String {
     let normalized = symbol.trim().to_ascii_uppercase();
     if normalized.ends_with("USDT") {
         normalized
@@ -115,13 +115,13 @@ pub(crate) fn crypto_spot_pair(symbol: &str) -> String {
 }
 
 /// Convert a generic finance symbol into the OKX spot instrument id.
-pub(crate) fn crypto_okx_instrument(symbol: &str) -> String {
+pub fn crypto_okx_instrument(symbol: &str) -> String {
     let normalized = symbol.trim().to_ascii_uppercase();
     format!("{normalized}-USDT")
 }
 
 /// Build the stable finance-pack crypto market snapshot from live exchange data.
-pub(crate) fn crypto_market_output_from_binance(
+pub fn crypto_market_output_from_binance(
     symbol: &str,
     payload: &Value,
     ticker: BinanceTicker24h,
@@ -158,7 +158,7 @@ pub(crate) fn crypto_market_output_from_binance(
 }
 
 /// Build the stable finance-pack crypto market snapshot from OKX ticker data.
-pub(crate) fn crypto_market_output_from_okx(
+pub fn crypto_market_output_from_okx(
     symbol: &str,
     payload: &Value,
     ticker: OkxTicker,
@@ -207,7 +207,7 @@ pub(crate) fn crypto_market_output_from_okx(
 /// RSS document. This helper keeps the lossy transformation explicit: only the
 /// headline text crosses the WASM boundary, while links and provider markup stay
 /// outside the portable application payload.
-pub(crate) fn crypto_news_items_from_rss(symbol: &str, xml: &str) -> ServiceResult<Vec<String>> {
+pub fn crypto_news_items_from_rss(symbol: &str, xml: &str) -> ServiceResult<Vec<String>> {
     let channel = Channel::read_from(Cursor::new(xml.as_bytes())).map_err(|error| {
         ServiceError::ServiceUnavailable(format!(
             "live crypto news feed could not be decoded: {error}"

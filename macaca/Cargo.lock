@@ -1509,6 +1509,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "macaca-domain-pack-finance"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "macaca-app",
+ "macaca-kernel",
+ "macaca-llm",
+ "macaca-proto",
+ "macaca-runtime-host",
+ "reqwest",
+ "rss",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "macaca-driver"
 version = "0.1.0"
 dependencies = [
@@ -1587,6 +1606,7 @@ dependencies = [
  "macaca-agent",
  "macaca-app",
  "macaca-context",
+ "macaca-domain-pack-finance",
  "macaca-driver",
  "macaca-gateway",
  "macaca-ipc",
@@ -1759,7 +1779,6 @@ dependencies = [
  "macaca-task",
  "macaca-tools",
  "reqwest",
- "rss",
  "serde",
  "serde_json",
  "serde_yaml",

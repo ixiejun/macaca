@@ -180,14 +180,14 @@
 - [x] 5.1.5 CLI 命令冒烟测试（status/run/web）通过。（`cargo test -p macaca-cli` 16/16；含 handler smoke + skill_operations boundary tests）
 
 ### 5.2 domain pack 外置
-- [ ] 5.2.1 `[impact-memo]` 盘点 `runtime-host/domain_pack_service_provider.rs`、`finance_live_data.rs`（`service.market_data/financials/news_digest/llm.analysis`、Coindesk/Binance/OKX、`asset_class=="crypto"` 分支）。
-- [ ] 5.2.2 将 finance/crypto domain-pack 实现移出 base runtime-host，注册为 plugin/package service provider（带 descriptor + policy metadata，经 manifest 声明）。
-- [ ] 5.2.3 runtime-host 仅保留 generic `ServiceProviderFactory` + 注册机制；deterministic fixtures 仅保留在测试。
-- [ ] 5.2.4 测试：domain pack 缺席返回结构化 unavailable；base runtime-host 无业务域字符串（VC-hardcoded）。
+- [x] 5.2.1 `[impact-memo]` 盘点 `runtime-host/domain_pack_service_provider.rs`、`finance_live_data.rs`（`service.market_data/financials/news_digest/llm.analysis`、Coindesk/Binance/OKX、`asset_class=="crypto"` 分支）。（见 `domain-pack-inventory.md`）
+- [x] 5.2.2 将 finance/crypto domain-pack 实现移出 base runtime-host，注册为 plugin/package service provider（带 descriptor + policy metadata，经 manifest 声明）。（`macaca-domain-pack-finance` + `finance_domain_pack_registrations`）
+- [x] 5.2.3 runtime-host 仅保留 generic `ServiceProviderFactory` + 注册机制；deterministic fixtures 仅保留在测试。（删除 `finance_live_data.rs` / `finance_llm_analysis_provider.rs`；`bootstrap_builtin_domain_pack_services` 空化）
+- [x] 5.2.4 测试：domain pack 缺席返回结构化 unavailable；base runtime-host 无业务域字符串（VC-hardcoded）。（`domain_pack_finance_package` 2/2 + `runtime_host_domain_pack_gate` 1/1）
 
 ### 5.3 P4 退出验证
 - [x] 5.3.1 `cargo tree -p macaca-cli --depth 1` 仅 `macaca-sdk`（+ proto）；CLI allowlist 清零。（route-c + filesize allowlist 均无 macaca-cli 行；**macaca-cli 巨型文件债务已清零**）
-- [ ] 5.3.2 runtime-host 无 finance/crypto/exchange 业务域代码（VC-hardcoded 扫描）。
+- [x] 5.3.2 runtime-host 无 finance/crypto/exchange 业务域代码（VC-hardcoded 扫描）。（`runtime_host_domain_pack_gate` 扫描 `macaca-runtime-host/src` 生产代码零命中）
 
 ## 6. P5 — 强制门清零 + OpenSpec baseline 对齐
 

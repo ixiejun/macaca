@@ -294,3 +294,14 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `LiveSkillOperationsClient` | MEDIUM | optional live runtime proof path through public Web REST facade; no Web crate linkage | P4 |
 | `contract_source::skill_operations_module_sources` | LOW | static boundary tests only; replaces monolithic `include_str!("skill_operations.rs")` scan | P4 |
 | P4 CLI decoupling inventory (pre-existing) | LOW | no code change required for 5.1.1–5.1.4; inventory documents already-compliant state | P4 |
+
+## Iteration 38 additions (tasks 5.2.1–5.2.4 + 5.3.2 — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `finance_live_data.rs` / `finance_llm_analysis_provider.rs` removal from runtime-host | CRITICAL | WASM `service.call` finance paths; `bootstrap_builtin_domain_pack_services` consumers; web composition bootstrap | P4 |
+| `macaca-domain-pack-finance` new package crate | HIGH | optional composition-root registration; 4 finance service ids + catalog metadata | P4 |
+| `finance_domain_pack_registrations` | HIGH | `ServiceRuntime::register_provider` + `start` for market/financials/news/llm.analysis | P4 |
+| `InMemoryDomainPackCatalog::with_builtin_defaults` empty catalog | MEDIUM | manifest capability expansion now reports `unresolved_domain_packs` until composition root registers installed packs | P4 |
+| `service_runtime_wiring` empty domain-pack bootstrap | MEDIUM | base web OS no longer auto-registers finance providers; explicit package wiring required | P4 |
+| `runtime_host_domain_pack_gate` VC-hardcoded scan | LOW | static production-source token gate for runtime-host finance/crypto strings | P4 |

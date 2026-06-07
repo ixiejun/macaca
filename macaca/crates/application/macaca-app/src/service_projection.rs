@@ -766,7 +766,10 @@ mod tests {
         assert!(view
             .diagnostics
             .iter()
-            .any(|line| line == "effective_service_count=5"));
+            .any(|line| line == "effective_service_count=1"));
+        assert!(view.diagnostics.iter().any(|line| {
+            line == "unresolved_domain_packs=pack.finance.v1"
+        }));
     }
 
     #[test]

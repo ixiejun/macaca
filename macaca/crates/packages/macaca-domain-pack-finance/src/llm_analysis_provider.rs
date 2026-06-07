@@ -1,9 +1,9 @@
-//! LLM-backed analysis service for the generic finance domain pack.
+//! LLM-backed analysis service for the finance domain pack.
 //!
-//! This provider is intentionally a Bridge: WASM applications call the generic
+//! This provider is a Bridge: WASM applications call the generic
 //! `service.llm.analysis` contract, while the adapter delegates model execution
-//! to the host's configured `LlmProvider`. The application never receives API
-//! keys and Macaca never learns application-specific workflow names.
+//! to the host's configured `LlmProvider`.  The application never receives API
+//! keys and the OS never learns application-specific workflow names.
 
 use std::sync::Arc;
 
@@ -17,13 +17,9 @@ use macaca_proto::{
 use serde_json::{json, Value};
 use tracing::{info, warn};
 
-use crate::domain_pack_service_provider::{
-    command_trace,
-    finance_fixture::{
-        extract_symbol, finance_descriptor, FINANCE_ANALYZE_COMMAND,
-        FINANCE_LLM_ANALYSIS_SERVICE_ID,
-    },
-    service_adapter_error, service_result,
+use crate::contract::{
+    extract_symbol, finance_descriptor, finance_service_result, FINANCE_ANALYZE_COMMAND,
+    FINANCE_LLM_ANALYSIS_SERVICE_ID,
 };
 
 /// LLM-backed analysis adapter for the finance domain pack.
@@ -41,11 +37,11 @@ impl FinanceLlmAnalysisSystemServiceProvider {
         }
     }
 
-    /// Build the provider prompt from the already fetched finance evidence.
+    /// Build the provider prompt from already fetched finance evidence.
     ///
-    /// The model is explicitly constrained to the payload so it does not invent
-    /// hidden market access. This keeps traces honest: the host fetches data,
-    /// then the LLM explains only that evidence.
+    /// The model is constrained to the payload so it does not invent hidden
+    /// market access.  The host fetches data first; the LLM explains only that
+    /// evidence in the returned analysis block.
     fn prompt(symbol: &str, payload: &Value) -> Vec<LlmMessage> {
         let signal_mode = payload
             .get("analysis_type")
@@ -92,7 +88,8 @@ impl SystemService for FinanceLlmAnalysisSystemServiceProvider {
     }
 
     async fn call(&self, command: ServiceCommand) -> ServiceResult<ServiceCallResult> {
-        let trace = command_trace(&command)?;
+        let trace =
+            macaca_runtime_host::domain_pack_service_provider::command_trace(&command)?;
         let symbol = extract_symbol(&command.payload)?;
         info!(
             service_id = %self.descriptor.id,
@@ -111,11 +108,6 @@ impl SystemService for FinanceLlmAnalysisSystemServiceProvider {
             return Err(ServiceError::UnsupportedCommand(command.name.to_string()));
         }
         let options = LlmOptions {
-            // Finance signal aggregation receives market data, news, and
-            // delegated agent evidence.  A 900-token cap truncated the final
-            // analysis before the non-advisory signal block could close, so the
-            // service reserves enough output room while still keeping the domain
-            // pack bounded and predictable.
             max_tokens: Some(1800),
             temperature: Some(0.2),
             ..LlmOptions::default()
@@ -124,8 +116,8 @@ impl SystemService for FinanceLlmAnalysisSystemServiceProvider {
             .llm
             .chat(Self::prompt(&symbol, &command.payload), &options)
             .await
-            .map_err(service_adapter_error)?;
-        Ok(service_result(
+            .map_err(macaca_runtime_host::domain_pack_service_provider::service_adapter_error)?;
+        Ok(finance_service_result(
             json!({
                 "symbol": symbol,
                 "analysis": response.content,

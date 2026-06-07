@@ -397,19 +397,19 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
         "web-startup-tool-service",
     )
     .await?;
-    // Built-in domain-pack services are registered at the generic service
-    // boundary, not in any individual application path.  WASM applications
-    // declare packs and service ids in their manifest; the host simply makes a
-    // reusable service surface available for every contract-driven app.
-    let domain_pack_services = macaca_runtime_host::bootstrap_builtin_domain_pack_services(
+    // Domain-pack providers are optional extensions registered by composition
+    // roots through package crates (for example `macaca-domain-pack-finance`).
+    // The base web shell registers none by default so absent packs surface
+    // structured unavailable results instead of OS-owned business logic.
+    let domain_pack_services = macaca_runtime_host::bootstrap_domain_pack_services(
         Arc::clone(&service_runtime),
-        Arc::clone(&llm),
+        std::iter::empty::<macaca_runtime_host::DomainPackProviderRegistration>(),
         "web-startup-domain-pack",
     )
     .await?;
     info!(
         services = domain_pack_services.started_services.len(),
-        "Built-in domain-pack services bootstrapped through runtime-host"
+        "Domain-pack bootstrap completed through generic runtime-host boundary"
     );
     // S12 thin-shell completion moves S9-S11 service lifecycle ownership into
     // `macaca-runtime-host`.  Web still provides the existing local stores and

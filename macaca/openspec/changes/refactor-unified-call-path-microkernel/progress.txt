@@ -307,3 +307,12 @@
 - **P4 §5.1**: all tasks checked; `cargo tree -e normal -p macaca-cli --depth 1` only proto+sdk OS deps.
 - **GitNexus memo (non-blocking)**: iteration 37 CRITICAL on `skill_operations` Facade split — recorded in `impact-memo.md`.
 - **Next**: P4 §5.2 domain pack 外置; 4.4.4终态; remaining non-shell allowlist giants (77 rows).
+
+## Iteration 38 (2026-06-07)
+- **P4 §5.2 domain pack 外置 + §5.3.2 VC-hardcoded gate (5.2.1–5.2.4, 5.3.2)**: extracted finance domain pack to optional `macaca-domain-pack-finance` crate; removed `finance_live_data.rs` / `finance_llm_analysis_provider.rs` from runtime-host.
+- **Design patterns**: Abstract Factory (`finance_domain_pack_registrations`); Strategy (`FinanceDataSystemServiceProvider` multi-service kind); Bridge (exchange/RSS → service contract); Null Object (`bootstrap_builtin_domain_pack_services` + empty `with_builtin_defaults()` catalog).
+- **Composition root**: `service_runtime_wiring` registers zero domain packs by default; finance package opt-in via `bootstrap_domain_pack_services(..., finance_domain_pack_registrations(llm), ...)`.
+- **Contract tests**: `macaca-domain-pack-finance` 6/6; `domain_pack_finance_package` 2/2; `runtime_host_domain_pack_gate` 1/1; updated `macaca-app` projection tests for unresolved-pack semantics.
+- **Verified**: `cargo check` pass; `cargo test -p macaca-app` affected tests pass.
+- **GitNexus memo (non-blocking)**: iteration 38 CRITICAL on finance provider extraction — recorded in `impact-memo.md`.
+- **Next**: P5 终态门; composition root catalog wiring for installed packs; 4.4.4终态; remaining allowlist giants (77 rows).

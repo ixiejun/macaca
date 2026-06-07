@@ -26,6 +26,7 @@ members = [
     "crates/shells/macaca-web",
     "crates/shells/macaca-cli",
     "crates/tests/macaca-integration-tests",
+    "crates/packages/macaca-domain-pack-finance",
 ]
 
 [workspace.package]
@@ -99,3 +100,4 @@ macaca-skill = { path = "crates/services/macaca-skill" }
 macaca-web = { path = "crates/shells/macaca-web" }
 macaca-framework = { path = "crates/runtime/macaca-framework" }
 macaca-runtime-host = { path = "crates/runtime/macaca-runtime-host" }
+macaca-domain-pack-finance = { path = "crates/packages/macaca-domain-pack-finance" }
