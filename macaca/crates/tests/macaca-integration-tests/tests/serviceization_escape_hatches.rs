@@ -390,7 +390,7 @@ fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> bool
                 || relative == "crates/shells/macaca-web/src/application_shell_adapter.rs"
                 || relative == "crates/shells/macaca-web/src/llm_route_shell_adapter.rs"
                 || relative == "crates/shells/macaca-web/src/mcp_shell_adapter.rs"
-                || relative == "crates/shells/macaca-web/src/framework_runner.rs"
+                || relative.starts_with("crates/shells/macaca-web/src/framework_runner/")
         }
         "hardcoded-agent-role" => {
             // Existing role-name literals are migration debt recorded by the
@@ -430,9 +430,10 @@ fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> bool
                     | "crates/services/macaca-tools/src/todo.rs"
                     | "crates/shells/macaca-web/src/capability_catalog.rs"
                     | "crates/shells/macaca-web/src/chat_orchestrator.rs"
-                    | "crates/shells/macaca-web/src/framework_runner.rs"
+                    | "crates/shells/macaca-web/src/framework_runner/build_mode.rs"
+                    | "crates/shells/macaca-web/src/framework_runner/sse_emitter_adapter.rs"
                     | "crates/shells/macaca-web/src/framework_toolkit.rs"
-                    | "crates/shells/macaca-web/src/loop_manager.rs"
+                    | "crates/shells/macaca-web/src/loop_manager/mod.rs"
                     | "crates/shells/macaca-web/src/orchestration_tools.rs"
                     | "crates/shells/macaca-web/src/session.rs"
                     | "crates/shells/macaca-web/src/workspace.rs"
@@ -503,7 +504,7 @@ fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> bool
                 | "crates/shells/macaca-web/src/agent_execution_backend.rs"
                 | "crates/shells/macaca-web/src/agent_execution_backend/tests.rs"
                 | "crates/shells/macaca-web/src/agent_runner.rs"
-                | "crates/shells/macaca-web/src/loop_manager.rs"
+                | "crates/shells/macaca-web/src/loop_manager/mod.rs"
                 | "crates/services/macaca-task/src/runtime.rs"
                 | "crates/services/macaca-task/src/events.rs"
                 | "crates/foundation/macaca-proto/src/types.rs"

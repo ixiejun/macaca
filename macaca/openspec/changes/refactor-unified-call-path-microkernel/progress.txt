@@ -178,3 +178,13 @@
 - **Verified**: `cargo check -p macaca-web`; `cargo test -p macaca-web loop_manager::tests` 16/16; `cargo test -p macaca-web unified_delegation_path` 7/7; `cargo test -p macaca-integration-tests serviceization_escape_hatches` violations=0.
 - **GitNexus memo (non-blocking)**: iteration 23 HIGH on `ensure_plan_and_worker_loops` / `create_goal` / plan-event consumer split — recorded in `impact-memo.md`.
 - **Next**: P3 §4.3.2 `framework_runner.rs` split; `FrameworkRunner` body still in web.
+
+## Iteration 24 (2026-06-07)
+- **P3.3 framework_runner split (4.3.2)**: deleted monolithic `framework_runner.rs` (~2484 lines); extracted `framework_runner/` module tree (23 files, max 480 lines).
+- **Design patterns**: Facade (`mod.rs`); Adapter (`sse_emitter_adapter`, `channel_emitter_adapter`, `executor_emitter_adapter`, `execution_control_middleware`, `driver_trace_adapter`); Factory (`agent_factory`, `agent_factory_build`, `agent_factory_coordinator`).
+- **Builders/context**: `traced_builders`, `runtime_agent_builders`, `coordinator_builder`, `context_prompt_builder`, `context_snapshot_builder`, `request_composition`, `agent_resolution`, `prompt_helpers`, `skill_policy`.
+- **Contract tests**: `framework_runner::tests` via `contract_source::framework_runner_module_sources()`; `agent_execution_backend/tests` approved_files updated.
+- **Escape hatch**: `build_mode.rs` + `sse_emitter_adapter.rs` on `hardcoded-agent-role` allowlist (DriverTraceRoute label + coordinator trace debt); `web-direct-runtime-field` prefix for `framework_runner/`.
+- **Verified**: `cargo check -p macaca-web`; `cargo test -p macaca-web --lib framework_runner::tests` 13/13; `cargo test -p macaca-integration-tests serviceization_escape_hatches` violations=0.
+- **GitNexus memo (non-blocking)**: iteration 24 CRITICAL on `FrameworkRunner` facade / `build_runtime_agent` split — recorded in `impact-memo.md`.
+- **Next**: P3 §4.3.3 `chat_orchestrator.rs` split.

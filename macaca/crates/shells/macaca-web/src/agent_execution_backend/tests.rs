@@ -579,7 +579,7 @@ fn direct_session_pause_resume_channels_stay_inside_approved_adapters() {
     let approved_files = [
         "web_agent_execution_adapters.rs",
         "chat_orchestrator.rs",
-        "framework_runner.rs",
+        "framework_runner/mod.rs",
         "fork_join_shell_adapter.rs",
         "goal_lifecycle_shell_adapter.rs",
         "hook_consumer.rs",
@@ -605,7 +605,10 @@ fn direct_session_pause_resume_channels_stay_inside_approved_adapters() {
             .unwrap_or(&file)
             .to_string_lossy()
             .replace('\\', "/");
-        if !approved_files.iter().any(|allowed| relative == *allowed) {
+        let approved = approved_files.iter().any(|allowed| relative == *allowed)
+            || relative.starts_with("framework_runner/")
+            || relative.starts_with("loop_manager/");
+        if !approved {
             violations.push(relative);
         }
     }

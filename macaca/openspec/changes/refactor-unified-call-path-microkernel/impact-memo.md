@@ -180,3 +180,13 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `plan_event_consumer` + Strategy handlers | HIGH | GoalReady/ReviewNeeded/AllTasksDone/AnomalyDetected/GoalCompleted lifecycle | P3.3 |
 | `decomposition_adapter` graph_owner fix | MEDIUM | fallback goal decomposition tasks now `ApplicationExecution` authority | P3.3 |
 | `contract_source::loop_manager_module_sources` | LOW | static contract tests only; concatenates module sources for escape-hatch scans | P3.3 |
+
+## Iteration 24 additions (task 4.3.2 — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `framework_runner.rs` → `framework_runner/` module split | CRITICAL | agent_execution_backend, chat_orchestrator, loop_manager, routes, framework_toolkit, unified_delegation_path contract tests | P3.3 |
+| `FrameworkRunner` facade + `build_runtime_agent` | HIGH | all agent construction entrypoints; public API unchanged via `mod.rs` re-exports | P3.3 |
+| `WebTracedAgentFactory` / emitter adapters | HIGH | SSE/channel/executor trace streaming + execution-control middleware | P3.3 |
+| `build_mode::DriverTraceRoute::label` | LOW | diagnostic route labels; migration debt on `hardcoded-agent-role` allowlist | P3.3 |
+| `contract_source::framework_runner_module_sources` | LOW | static contract tests only; concatenates module sources for escape-hatch scans | P3.3 |
