@@ -51,6 +51,8 @@ mod unified_delegation_path_tests;
 mod unified_agent_execution_provider_tests;
 #[cfg(test)]
 mod unified_workflow_application_abi_tests;
+#[cfg(test)]
+mod unified_audit_replay_convergence_tests;
 pub mod hook_consumer;
 pub mod loop_manager;
 mod memory_runtime;

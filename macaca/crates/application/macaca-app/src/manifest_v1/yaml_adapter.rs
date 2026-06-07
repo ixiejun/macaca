@@ -541,6 +541,7 @@ mod tests {
             workbench: None,
             autonomy: None,
             ui: None,
+            execution_control: None,
         };
 
         let projection = YamlApplicationManifestAdapter::new(manifest).project();
@@ -587,6 +588,7 @@ mod tests {
             workbench: None,
             autonomy: None,
             ui: None,
+            execution_control: None,
         };
         let projection = YamlApplicationManifestAdapter::new(manifest).project();
         let ability = projection

@@ -75,9 +75,9 @@
 - [x] 2.6.6 全仓搜索确认 `legacy_unmarked`/`non_authoritative`/`suppress_executor_lifecycle`/`legacy_chat_main_thread_goal_pause` 在生产代码中为 0 命中。
 
 ### 2.7 P1 退出验证
-- [ ] 2.7.1 audit replay：YAML 与 WASM 会话各自只出现**一条** service.call 执行链（对照 0.3 基线，由 >1 收敛为 1）。
-- [ ] 2.7.2 route-c 回归矩阵（`macaca/docs/route-c-regression-matrix.md`）全绿；`/api/chat/v2` 创建/恢复不回归；fullstack-autodev 集成测试绿。
-- [ ] 2.7.3 VC-escape：1.1.7 冻结的协调补丁标记在生产代码清零。
+- [x] 2.7.1 audit replay：YAML 与 WASM 会话各自只出现**一条** service.call 执行链（对照 0.3 基线，由 >1 收敛为 1）。
+- [x] 2.7.2 route-c 回归矩阵（`macaca/docs/route-c-regression-matrix.md`）全绿；`/api/chat/v2` 创建/恢复不回归；fullstack-autodev 集成测试绿。
+- [x] 2.7.3 VC-escape：1.1.7 冻结的协调补丁标记在生产代码清零。
 
 ## 3. P2 — 内核纯净化（驱逐非内核能力 + 解除越界依赖）
 

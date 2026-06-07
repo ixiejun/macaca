@@ -339,6 +339,7 @@ mod tests {
             workbench: None,
             autonomy: None,
             ui: None,
+            execution_control: None,
         }
     }
 
@@ -467,6 +468,7 @@ mod tests {
             workbench: None,
             autonomy: None,
             ui: None,
+            execution_control: None,
         };
         let app_id = runtime.start_app(manifest, ".", &kernel).await.unwrap();
         let agents = runtime.app_agents(&app_id).await.unwrap();
@@ -553,6 +555,7 @@ agents:
             workbench: None,
             autonomy: None,
             ui: None,
+            execution_control: None,
         };
         let app_id = runtime.start_app(manifest, ".", &kernel).await.unwrap();
         let agents = runtime.app_agents(&app_id).await.unwrap();

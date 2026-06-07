@@ -215,6 +215,7 @@ ui:
             workbench: None,
             autonomy: None,
             ui: None,
+            execution_control: None,
         };
         let configs = AppLoader::resolve_agent_configs(&manifest, ".").unwrap();
         assert!(configs.is_empty());
@@ -241,6 +242,7 @@ ui:
             workbench: None,
             autonomy: None,
             ui: None,
+            execution_control: None,
         };
         let configs = AppLoader::resolve_agent_configs(&manifest, ".").unwrap();
         assert!(configs.is_empty());
@@ -281,6 +283,7 @@ ui:
             workbench: None,
             autonomy: None,
             ui: None,
+            execution_control: None,
         };
         let configs = AppLoader::resolve_agent_configs(&manifest, ".").unwrap();
         assert_eq!(configs.len(), 1);
@@ -323,6 +326,7 @@ ui:
             workbench: None,
             autonomy: None,
             ui: None,
+            execution_control: None,
         };
         let configs = AppLoader::resolve_agent_configs(&manifest, ".").unwrap();
         assert_eq!(configs.len(), 1);
@@ -364,6 +368,7 @@ capabilities:
             workbench: None,
             autonomy: None,
             ui: None,
+            execution_control: None,
         };
         let configs = AppLoader::resolve_agent_configs(&manifest, &dir).unwrap();
         assert_eq!(configs.len(), 1);

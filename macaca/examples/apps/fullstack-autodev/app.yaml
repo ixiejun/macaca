@@ -15,13 +15,14 @@ entrypoint:
   name: smart-router
 
 # Pause chat main-thread execution after goal creation until goal lifecycle resumes.
+# serde_yaml requires YAML tags for externally tagged enum variants.
 execution_control:
   mode: Enabled
   triggers:
-    - ToolCallBarrier:
-        tool_name: create_goal
+    - !ToolCallBarrier
+      tool_name: create_goal
   resume_sources:
-    - GoalLifecycle
+    - !GoalLifecycle
   checkpoint_mode: ReferenceOnly
   allow_command_overrides: false
 

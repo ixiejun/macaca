@@ -85,3 +85,10 @@
 - **Contract tests**: updated `agent_execution_backend/tests.rs` for manifest-required overrides + shell adapter allowlist; `serviceization_escape_hatches` green.
 - **Verified**: `cargo check -p macaca-runtime-host -p macaca-web -p macaca-app`; `cargo test -p macaca-web agent_execution_backend` 28/28; `cargo test -p macaca-integration-tests serviceization_escape_hatches_reject` pass.
 - **Remaining P1**: 2.7 P1 exit validation (audit replay single chain + route-c regression); `FrameworkRunner` body still in web (task 4.3.2).
+
+## Iteration 13 (2026-06-07)
+- **P1 exit validation (2.7)**: `unified_audit_replay_convergence_tests.rs` (web 6/6 + runtime-host 3/3); post-convergence report in `audit-replay-baseline.md` (YAML/WASM each 1 chain, down from 3).
+- **Regression fixes (2.7.2)**: `execution_control` YAML variant tags (`!ToolCallBarrier` / `!GoalLifecycle`); `ExecutionControlPolicy` serde defaults in `macaca-proto`; `AppManifest.execution_control` test fixtures; `fullstack-autodev/app.yaml` + missing `personas/frontend/` fixture; `.gitignore` narrowed to `/frontend/` so example-app persona dirs track.
+- **VC-escape (2.7.3)**: `serviceization_escape_hatches_reject_new_production_references` violations=0.
+- **Verified**: `cargo test -p macaca-web unified_audit_replay_convergence` 6/6; `cargo test -p macaca-runtime-host --lib unified_audit_replay_convergence` 3/3; `cargo test -p macaca-integration-tests --test route_c_baseline` 4/4; `cargo test -p macaca-integration-tests --test fullstack_autodev` 10/10 (4 ignored); `cargo test -p macaca-app` 131/131.
+- **P1 complete** (tasks 2.1–2.7). **Next**: P2 kernel purification (3.1.2+); `FrameworkRunner` body still in web (task 4.3.2).
