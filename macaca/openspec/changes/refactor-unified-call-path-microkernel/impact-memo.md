@@ -130,3 +130,4 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `LegacyAgentExecutionAdapter` (test/migration only) | MEDIUM | macaca-agent definition + approved fixtures; production uses service-client port | P2.5 |
 | `compat.rs` → `skill_mcp_mapping_registry.rs` | LOW | mcp_runtime, McpServerFactory, skill_mcp web path; behavior unchanged | P2.5 |
 | `serviceization_escape_hatches` provider-compat allowlist | LOW | provider_compat path removed; sdk test surfaces added | P2.5 |
+
