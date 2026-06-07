@@ -158,6 +158,7 @@
 - [x] 4.3.13 拆分 `macaca-web/src/skill_mcp.rs`(705) → `skill_mcp/` Facade 模块树（9 文件，max ~192 行）；Cache-Aside `snapshot` + Strategy `server_resolution` + Adapter `probe` + Observer `governance_telemetry`；`contract_source::skill_mcp_module_sources`；`cargo test -p macaca-web --lib skill_mcp` 4/4；filesize allowlist 移除该行（80 行基线债务）。
 - [x] 4.3.14 拆分 `macaca-web/src/skill_self_evolution_observer.rs`(810) → `skill_self_evolution_observer/` Facade 模块树（9 文件，max ~257 行）；Observer `observer` + Adapter `projection` + Builder `proposal_builder` + Value Object `semantic_signal` + Command forwarder `forwarder`；`contract_source::skill_self_evolution_observer_module_sources`；`cargo test -p macaca-web --lib skill_self_evolution_observer` 6/6；filesize allowlist 移除该行（79 行基线债务）。
 - [x] 4.3.15 拆分 `macaca-web/src/agent_execution_backend/tests.rs`(656) → `agent_execution_backend/` Facade 模块树（`mod.rs` + `tests/` 10 文件，max ~153 行）；Contract Test 子模块（`execution_control_policy` / `heartbeat_evidence` / `execution_envelope` / `heartbeat_shell_contract` / `static_wiring` / `skill_self_evolution_boundary` / `architecture_guards`）+ `support` 共享 imports + `contract_source::agent_execution_backend_test_module_sources`；`cargo test -p macaca-web agent_execution_backend` 29/29；filesize allowlist 移除该行（78 行基线债务）；**macaca-web P3 巨型文件债务清零**。
+- [x] 4.3.16 拆分 `macaca-cli/src/skill_operations.rs`(682) → `skill_operations/` Facade 模块树（11 文件，max ~137 行）；Facade+Adapter+Null Object+Strategy；`contract_source::skill_operations_module_sources`；`cargo test -p macaca-cli skill_operations` 6/6；filesize allowlist 移除该行（**77 行基线债务**）；**macaca-cli P4 巨型文件债务清零**。
 
 ### 4.4 删除 web 越界依赖 + allowlist 行
 - [x] 4.4.1 替换完成后逐条移除 `macaca-web/Cargo.toml` 对 `macaca-driver/llm/memory/persist/skill/task/tools` 的直接依赖（经 `macaca-sdk::shell_provider_bridge` + `macaca_runtime_host::persist` 别名）。
@@ -166,17 +167,17 @@
 - [ ] 4.4.4 终态断言：`cargo tree -e normal -p macaca-web --depth 1` 仅 `macaca-sdk`（+ proto DTO/必要 framework 适配）。（**部分**：仍含 app/agent/runtime/context/framework/runtime-host，待 P4/P5 收敛）
 
 ### 4.5 P3 退出验证
-- [ ] 4.5.1 全仓无 >500 行 OS 层源文件（VC-filesize）。（**部分**：macaca-web 巨型文件已全部拆分合规；全仓 78 行 allowlist 债务（非 web crate），gate 已实现）
+- [ ] 4.5.1 全仓无 >500 行 OS 层源文件（VC-filesize）。（**部分**：macaca-web + macaca-cli 巨型文件已全部拆分合规；全仓 77 行 allowlist 债务（非 shell crate），gate 已实现）
 - [x] 4.5.2 web 相关 allowlist 清零；VC-gate 绿；`cargo test -p macaca-web --lib` 250/250。
 
 ## 5. P4 — CLI 解耦 + domain pack 外置
 
 ### 5.1 CLI 解耦
-- [ ] 5.1.1 `[impact-memo]` 盘点 `macaca-cli/src/commands.rs`/`command_handlers.rs` 对 `Kernel`/`KernelBuilder`/`GatewayBuilder`/`LlmProvider`/`macaca_web::WebServerBuilder` 的使用。
-- [ ] 5.1.2 CLI run/status 改用 runtime-host bootstrap client 或 SDK status/service inspector，删除 kernel 直接构造。
-- [ ] 5.1.3 `macaca web` 进程启动 seam 移到小型 public bootstrap facade（binary-only entrypoint），删除 `macaca-cli → macaca-web` internals。
-- [ ] 5.1.4 删除 `macaca-cli/Cargo.toml` 对 `macaca-gateway/tools/web` 的直接依赖 + 同步 allowlist/doc。
-- [ ] 5.1.5 CLI 命令冒烟测试（status/run/web）通过。
+- [x] 5.1.1 `[impact-memo]` 盘点 `macaca-cli/src/commands.rs`/`command_handlers.rs` 对 `Kernel`/`KernelBuilder`/`GatewayBuilder`/`LlmProvider`/`macaca_web::WebServerBuilder` 的使用。（见 `cli-decoupling-inventory.md`：零命中；run/status/agents 经 `SystemFacade` + SDK clients）
+- [x] 5.1.2 CLI run/status 改用 runtime-host bootstrap client 或 SDK status/service inspector，删除 kernel 直接构造。（`execute_run_kernel`/`execute_show_status`/`execute_list_agents` 经 `cli_system_facade` + `StaticSystemStatusDataSource`）
+- [x] 5.1.3 `macaca web` 进程启动 seam 移到小型 public bootstrap facade（binary-only entrypoint），删除 `macaca-cli → macaca-web` internals。（`WebServerProcessLauncher` 子进程启动 `macaca-web-server`；契约测试 `web_command_uses_only_public_server_start_seam`）
+- [x] 5.1.4 删除 `macaca-cli/Cargo.toml` 对 `macaca-gateway/tools/web` 的直接依赖 + 同步 allowlist/doc。（`cargo tree -e normal -p macaca-cli --depth 1` 仅 `macaca-proto` + `macaca-sdk` + 通用 crate；route-c allowlist 无 CLI 行）
+- [x] 5.1.5 CLI 命令冒烟测试（status/run/web）通过。（`cargo test -p macaca-cli` 16/16；含 handler smoke + skill_operations boundary tests）
 
 ### 5.2 domain pack 外置
 - [ ] 5.2.1 `[impact-memo]` 盘点 `runtime-host/domain_pack_service_provider.rs`、`finance_live_data.rs`（`service.market_data/financials/news_digest/llm.analysis`、Coindesk/Binance/OKX、`asset_class=="crypto"` 分支）。
@@ -185,7 +186,7 @@
 - [ ] 5.2.4 测试：domain pack 缺席返回结构化 unavailable；base runtime-host 无业务域字符串（VC-hardcoded）。
 
 ### 5.3 P4 退出验证
-- [ ] 5.3.1 `cargo tree -p macaca-cli --depth 1` 仅 `macaca-sdk`（+ proto）；CLI allowlist 清零。
+- [x] 5.3.1 `cargo tree -p macaca-cli --depth 1` 仅 `macaca-sdk`（+ proto）；CLI allowlist 清零。（route-c + filesize allowlist 均无 macaca-cli 行；**macaca-cli 巨型文件债务已清零**）
 - [ ] 5.3.2 runtime-host 无 finance/crypto/exchange 业务域代码（VC-hardcoded 扫描）。
 
 ## 6. P5 — 强制门清零 + OpenSpec baseline 对齐

@@ -298,3 +298,12 @@
 - **Verified**: `os_layer_file_size_gate` pass.
 - **GitNexus memo (non-blocking)**: iteration 36 CRITICAL on `agent_execution_backend/tests` Facade split — recorded in `impact-memo.md`.
 - **Next**: P4 CLI decoupling; 4.4.4终态; remaining non-web allowlist giants (78 rows).
+
+## Iteration 37 (2026-06-07)
+- **P4 CLI decoupling inventory + skill_operations split (5.1.1–5.1.5 + 4.3.16)**: confirmed CLI already decoupled (`cli-decoupling-inventory.md`); deleted monolithic `skill_operations.rs` (682 lines); extracted Facade module tree (11 files, max 137 lines).
+- **Design patterns**: Facade (`mod.rs`); Adapter (`live_client` HTTP transport); Null Object (`UnavailableSystemSkillClient` diagnostic path); Strategy (`SkillCliLifecycleAction` route/SDK mapping); Contract Test (`contract_source` + boundary scan).
+- **Contract tests**: `cargo test -p macaca-cli skill_operations` 6/6; `cargo test -p macaca-cli` 16/16; `os_layer_file_size_gate` pass.
+- **Filesize allowlist**: removed `skill_operations.rs` row (**77 baseline rows remain**); **macaca-cli giant-file debt cleared**.
+- **P4 §5.1**: all tasks checked; `cargo tree -e normal -p macaca-cli --depth 1` only proto+sdk OS deps.
+- **GitNexus memo (non-blocking)**: iteration 37 CRITICAL on `skill_operations` Facade split — recorded in `impact-memo.md`.
+- **Next**: P4 §5.2 domain pack 外置; 4.4.4终态; remaining non-shell allowlist giants (77 rows).

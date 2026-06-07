@@ -284,3 +284,13 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `agent_execution_backend.rs` → `agent_execution_backend/mod.rs` | MEDIUM | `lib.rs` module path unchanged; Facade re-exports not required (tests-only module) | P3.3 |
 | `contract_source::agent_execution_backend_test_module_sources` | LOW | static contract tests only; enumerates test submodule paths for escape-hatch scans | P3.3 |
 | `direct_session_pause_resume_channels_stay_inside_approved_adapters` | LOW | guard test skip logic extended for `/tests/` subtrees after Facade split | P3.3 |
+
+## Iteration 37 additions (tasks 4.3.16 + 5.1.1–5.1.5 — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `skill_operations.rs` → `skill_operations/` module split | CRITICAL | `command_handlers.rs` + `main.rs` consumers of `execute_*` / `SkillCli*` types; public API preserved via Facade re-exports | P4 |
+| `execute_skill_operations_snapshot` / `execute_skill_curation_run` / lifecycle handlers | HIGH | CLI Skill governance operator path; live HTTP adapter vs SDK Null Object dual path | P4 |
+| `LiveSkillOperationsClient` | MEDIUM | optional live runtime proof path through public Web REST facade; no Web crate linkage | P4 |
+| `contract_source::skill_operations_module_sources` | LOW | static boundary tests only; replaces monolithic `include_str!("skill_operations.rs")` scan | P4 |
+| P4 CLI decoupling inventory (pre-existing) | LOW | no code change required for 5.1.1–5.1.4; inventory documents already-compliant state | P4 |
