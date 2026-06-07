@@ -10,7 +10,7 @@ use std::sync::Arc;
 use macaca_app::AppLoader;
 use macaca_framework::tool::Toolkit;
 use macaca_proto::{ApplicationId, TraceContext};
-use macaca_runtime_host::compat::default_registry;
+use macaca_runtime_host::skill_mcp_mapping_registry::default_skill_mcp_mapping_registry;
 use macaca_runtime_host::{
     apply_concurrency_isolation, probe_definition_statuses, McpRuntimeContext,
     McpRuntimeStatusState, McpToolPolicy,
@@ -65,7 +65,7 @@ pub(crate) async fn register_skill_backed_mcp_tools(
     else {
         return;
     };
-    let definitions = macaca_runtime_host::McpServerFactory::with_default_registry()
+    let definitions = macaca_runtime_host::McpServerFactory::with_bundled_mapping_registry()
         .from_skill_snapshot(&snapshot);
     let context = McpRuntimeContext::for_agent(app_id, session_id, agent_name);
     let _ = state
@@ -81,7 +81,7 @@ pub(crate) async fn register_skill_backed_mcp_tools(
 }
 
 pub(crate) async fn probe_skill_mcp_servers(snapshot: &SkillSnapshot) -> Vec<SkillMcpStatus> {
-    let definitions = macaca_runtime_host::McpServerFactory::with_default_registry()
+    let definitions = macaca_runtime_host::McpServerFactory::with_bundled_mapping_registry()
         .from_skill_snapshot(snapshot);
     let statuses = probe_definition_statuses(definitions, &McpToolPolicy::default()).await;
     statuses
@@ -412,7 +412,7 @@ fn resolve_skill_mcp_servers(snapshot: &SkillSnapshot) -> Vec<SkillMcpServerLaun
                 }
             }
         }
-        if let Some(launch) = launch_from_compat_registry(skill) {
+        if let Some(launch) = launch_from_skill_mapping_registry(skill) {
             if seen.insert(format!("{}:{}", launch.skill_name, launch.server_id)) {
                 launches.push(launch);
             }
@@ -436,8 +436,8 @@ fn launch_from_explicit_server(
     })
 }
 
-fn launch_from_compat_registry(skill: &SkillSnapshotEntry) -> Option<SkillMcpServerLaunch> {
-    let registry = default_registry();
+fn launch_from_skill_mapping_registry(skill: &SkillSnapshotEntry) -> Option<SkillMcpServerLaunch> {
+    let registry = default_skill_mcp_mapping_registry();
     let entry = registry.resolve_for_skill(skill)?;
     if !entry.server.transport.eq_ignore_ascii_case("stdio") {
         return None;

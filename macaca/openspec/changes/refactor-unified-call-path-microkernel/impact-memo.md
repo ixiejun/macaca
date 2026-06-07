@@ -119,3 +119,14 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `macaca-kernel` executor module (deleted) | HIGH | microkernel purified; scheduling invariants only; persistence/logging ports remain cross-crate seams | P2.4 |
 | `executor_runtime_eviction` integration tests | LOW | contract-only; validates runtime-host public surface + static kernel lib.rs contract | P2.4 |
 | `serviceization_escape_hatches` executor paths | LOW | allowlist updated to runtime-host paths; violations=0 | P2.4 |
+
+## Iteration 18 additions (task 3.5 — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `KernelProviderCompat` / `provider_compat.rs` (deleted) | CRITICAL | kernel construction, web bootstrap, CLI/SDK test fixtures | P2.5 |
+| `KernelServiceClientCompat` / `from_service_clients` (deleted) | HIGH | runtime-host dispatch, kernel_builder compat path removed | P2.5 |
+| `Kernel::new(config, llm, tools)` (deleted) | HIGH | integration tests migrated to `KernelBuilder::from_execution_port` | P2.5 |
+| `LegacyAgentExecutionAdapter` (test/migration only) | MEDIUM | macaca-agent definition + approved fixtures; production uses service-client port | P2.5 |
+| `compat.rs` → `skill_mcp_mapping_registry.rs` | LOW | mcp_runtime, McpServerFactory, skill_mcp web path; behavior unchanged | P2.5 |
+| `serviceization_escape_hatches` provider-compat allowlist | LOW | provider_compat path removed; sdk test surfaces added | P2.5 |

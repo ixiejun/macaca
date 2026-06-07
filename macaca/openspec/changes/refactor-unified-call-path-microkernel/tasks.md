@@ -105,12 +105,12 @@
 - [x] 3.4.3 测试：kernel 单测不再依赖 executor；task/execution service 测试覆盖原 executor 行为。
 
 ### 3.5 删除 provider 兼容与 compat 构造
-- [ ] 3.5.1 删除 `kernel/provider_compat.rs`（`KernelProviderCompat/LegacyLlmProvider/LegacyToolCatalog`）及 `lib.rs` 导出。
-- [ ] 3.5.2 删除 `kernel/kernel.rs` 的 `Kernel::new(config, llm, tools)` deprecated 构造；唯一构造路径经 `KernelBuilder` + `AgentExecutionPort`（service-client adapter）。
-- [ ] 3.5.3 删除 `kernel_builder.rs` 的 `KernelServiceClientCompat` 等 compat 构造路径。
-- [ ] 3.5.4 删除 `kernel/scheduler.rs` 的 `#[allow(deprecated)]` 项与 `persistence.rs` 的 deprecated payment store。
-- [ ] 3.5.5 删除 `runtime-host/compat.rs`（44 处 compat）中已无消费者的兼容代码；剩余必需项迁正规 module 并去 compat 命名。
-- [ ] 3.5.6 测试：kernel 不再有 `#[allow(deprecated)]` 导出；`cargo check` 无 deprecated 警告（kernel 范围）。
+- [x] 3.5.1 删除 `kernel/provider_compat.rs`（`KernelProviderCompat/LegacyLlmProvider/LegacyToolCatalog`）及 `lib.rs` 导出。
+- [x] 3.5.2 删除 `kernel/kernel.rs` 的 `Kernel::new(config, llm, tools)` deprecated 构造；唯一构造路径经 `KernelBuilder` + `AgentExecutionPort`（service-client adapter）。
+- [x] 3.5.3 删除 `kernel_builder.rs` 的 `KernelServiceClientCompat` 等 compat 构造路径。
+- [x] 3.5.4 删除 `kernel/scheduler.rs` 的 `#[allow(deprecated)]` 项与 `persistence.rs` 的 deprecated payment store。
+- [x] 3.5.5 删除 `runtime-host/compat.rs`（44 处 compat）中已无消费者的兼容代码；剩余必需项迁正规 module 并去 compat 命名。
+- [x] 3.5.6 测试：kernel 不再有 `#[allow(deprecated)]` 导出；`cargo check` 无 deprecated 警告（kernel 范围）。
 
 ### 3.6 解除越界依赖 + 删 allowlist 行
 - [ ] 3.6.1 移除 `kernel/Cargo.toml` 对 `macaca-driver` 依赖（前置：web3/evm/a2a 已驱逐使其无消费者）；`cargo metadata` 确认边消失 → 删 allowlist `kernel→driver` 行 + 同步 doc。

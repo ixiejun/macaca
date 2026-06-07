@@ -26,10 +26,11 @@ pub trait Scheduler: Send + Sync {
 /// one capability whose name appears in the task description (case-insensitive).
 ///
 /// If no capability match is found it falls back to the first `Running` agent.
-#[deprecated(note = "use SchedulerFactory::build(SchedulerKind::Simple) for new kernel code")]
+///
+/// Production callers should obtain this strategy through [`SchedulerFactory::build`]
+/// so scheduler selection stays centralized and traceable.
 pub struct SimpleScheduler;
 
-#[allow(deprecated)]
 #[async_trait]
 impl Scheduler for SimpleScheduler {
     async fn select_agent(
@@ -90,8 +91,6 @@ impl Scheduler for SimpleScheduler {
 
 #[cfg(test)]
 mod tests {
-    #![allow(deprecated)]
-
     use super::*;
     use async_trait::async_trait as at;
     use chrono::Utc;

@@ -6,9 +6,9 @@
 //! runtimes without depending on HTTP scaffolding.
 //!
 //! Product-name handling (e.g. Playwright) is **not** encoded in control
-//! flow here — see [`crate::compat`] for the declarative registry that maps
-//! skill install specs to compatibility MCP definitions and declarative
-//! concurrency-isolation policies.
+//! flow here — see [`crate::skill_mcp_mapping_registry`] for the declarative
+//! registry that maps skill install specs to MCP definitions and concurrency
+//! isolation policies.
 
 use std::collections::{BTreeMap, HashSet};
 use std::path::PathBuf;
@@ -32,7 +32,9 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use tokio::time::timeout;
 
-use crate::compat::{default_registry, CompatRegistry};
+use crate::skill_mcp_mapping_registry::{
+    default_skill_mcp_mapping_registry, SkillMcpMappingRegistry,
+};
 use crate::lease::McpSessionLease;
 use crate::mcp_descriptor_index::{McpToolDescriptorIndex, McpToolDescriptorRoute};
 use crate::mcp_invocation_registry::McpInvocationSessionRegistry;
@@ -566,7 +568,7 @@ impl McpRuntimeManager {
         let config: McpRegistryConfig =
             serde_yaml::from_str(&content).map_err(|e| e.to_string())?;
         let mut definitions = self.definitions.write().await;
-        for definition in crate::factory::McpServerFactory::with_default_registry()
+        for definition in crate::factory::McpServerFactory::with_bundled_mapping_registry()
             .from_registry_config(config, McpDefinitionSource::Global)?
         {
             definitions.insert(definition.id.clone(), definition);
@@ -1262,7 +1264,7 @@ impl McpServerConfigEntry {
     pub(crate) fn into_definition_with_registry(
         self,
         id: String,
-        registry: &CompatRegistry,
+        registry: &SkillMcpMappingRegistry,
     ) -> Result<McpServerDefinition, String> {
         let transport = match self.transport.as_str() {
             "stdio" => {
@@ -1312,7 +1314,7 @@ impl McpServerConfigEntry {
     }
 
     fn into_definition(self, id: String) -> Result<McpServerDefinition, String> {
-        self.into_definition_with_registry(id, default_registry())
+        self.into_definition_with_registry(id, default_skill_mcp_mapping_registry())
     }
 }
 
@@ -1739,14 +1741,14 @@ fn sanitize_error(error: impl Into<String>) -> String {
 /// the process-default compatibility registry.
 #[deprecated(note = "Use `McpServerFactory::from_skill_snapshot` instead.")]
 pub fn definitions_from_skill_snapshot(snapshot: &SkillSnapshot) -> Vec<McpServerDefinition> {
-    definitions_from_skill_snapshot_with_registry(snapshot, default_registry())
+    definitions_from_skill_snapshot_with_registry(snapshot, default_skill_mcp_mapping_registry())
 }
 
 /// Resolve MCP definitions with an explicit compatibility registry (for
 /// tests and hosts that supply their own override layer).
 pub fn definitions_from_skill_snapshot_with_registry(
     snapshot: &SkillSnapshot,
-    registry: &CompatRegistry,
+    registry: &SkillMcpMappingRegistry,
 ) -> Vec<McpServerDefinition> {
     let mut definitions = Vec::new();
     let mut seen = HashSet::new();
@@ -1773,7 +1775,7 @@ pub fn definitions_from_skill_snapshot_with_registry(
 fn definition_from_skill_server(
     skill: &SkillSnapshotEntry,
     server: &SkillMcpServerConfig,
-    registry: &CompatRegistry,
+    registry: &SkillMcpMappingRegistry,
 ) -> Option<McpServerDefinition> {
     if !server.transport.eq_ignore_ascii_case("stdio") {
         return None;

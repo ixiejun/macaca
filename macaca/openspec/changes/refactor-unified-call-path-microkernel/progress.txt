@@ -124,4 +124,13 @@
 - **Runtime-host wiring**: added `pub mod executor` + root re-exports in `lib.rs`; `futures` workspace dep for executor queue; executor internals use `macaca_kernel::KernelPersistencePort` / `logging` ports only (Strangler Fig physical move).
 - **Tests (3.4.3)**: `executor_runtime_eviction.rs` 5/5 (registry, event factory, fork manager + kernel port, static kernel contract, TaskStatus); VC-escape `serviceization_escape_hatches_reject_new_production_references` violations=0; escape hatch allowlist paths updated to `runtime-host/.../executor/`.
 - **Verified**: `cargo check -p macaca-kernel -p macaca-runtime-host -p macaca-web`; executor eviction + escape hatch tests green.
-- **Next**: P2 §3.5 provider_compat cleanup; `FrameworkRunner` body still in web (task 4.3.2).
+- **Next**: P2 §3.6 kernel dependency allowlist cleanup; `FrameworkRunner` body still in web (task 4.3.2).
+
+## Iteration 18 (2026-06-07)
+- **P2.5 provider compat eviction (3.5.1–3.5.6)**: deleted `kernel/provider_compat.rs`; sole kernel construction is `KernelBuilder::from_execution_port` + `AgentExecutionPort`; removed `Kernel::new(config, llm, tools)` and `KernelServiceClientCompat` paths.
+- **Runtime-host rename (3.5.5)**: `compat.rs` → `skill_mcp_mapping_registry.rs` (`SkillMcpMappingRegistry`, `default_skill_mcp_mapping_registry`, `McpServerFactory::with_bundled_mapping_registry`); TOML `[[compat]]` schema retained for operator overrides.
+- **Consumers**: web bootstrap uses `UnavailableAgentExecutionPort` + hot-swap; runtime-host `kernel_execution_port_from_agent_execution_service`; integration tests use `LegacyAgentExecutionAdapter` fixtures.
+- **Escape hatch**: removed deleted `provider_compat.rs` allowlist paths; narrowed `provider-compat-construction` to agent/app/sdk migration surfaces.
+- **Verified**: `cargo check -p macaca-kernel -p macaca-runtime-host -p macaca-web` (no kernel deprecated warnings); kernel + skill mapping + escape hatch tests green.
+- **GitNexus memo (non-blocking)**: `KernelProviderCompat`/`KernelServiceClientCompat` deletion — CRITICAL/HIGH blast radius recorded in `impact-memo.md` iteration 18.
+- **Next**: P2 §3.6 kernel Cargo.toml dependency eviction; `FrameworkRunner` body still in web (task 4.3.2).
