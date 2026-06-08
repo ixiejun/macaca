@@ -523,3 +523,10 @@
 - **Contract tests**: `os_layer_file_size_gate` 1/1；`skill_sanitization_boundary_tests`；`skill_service_provider_tests`。
 - **GitNexus memo (non-blocking)**: iteration 64 LOW on skill provider command dispatch split — recorded in `impact-memo.md`.
 - **Next**: filesize allowlist 48→0（`skill_service_provider_tests` / runtime-host giants / proto config/types）；6.3.2 archive；P5 终态验收。
+
+## Iteration 65 (2026-06-07)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 48→**47**；`skill_service_provider_tests.rs` 1811→模块树（`mod.rs` + `fixtures.rs` Object Mother + `test_doubles.rs` Test Double + 10 个按域拆分的 contract test 子模块）；`pub(super)` 可见性修复；恢复 rollback 测试 `#[tokio::test]`。
+- **Design patterns**: Contract Test + Object Mother + Test Double（`RecordingMemoryRuntime` 记录 memory/knowledge 路由）。
+- **Contract tests**: `os_layer_file_size_gate` 1/1；`skill_service_provider` lib tests 26/26。
+- **GitNexus memo (non-blocking)**: iteration 65 LOW on skill provider contract test module split — recorded in `impact-memo.md`.
+- **Next**: filesize allowlist 47→0（`mcp_runtime.rs` / `app_executor.rs` / proto config/types 等）；6.3.2 archive；P5 终态验收。

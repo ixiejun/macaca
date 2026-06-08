@@ -540,3 +540,10 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `skill_service_provider/{mod,system_service,command_dispatch,runtime_facade_commands,operator_commands,governance_alias_commands,evolution_commands,evaluation_content_commands,delegated_commands}.rs` | LOW | Skill provider adapter module tree; `SkillSystemServiceProvider` public API + `SystemService` contract unchanged | P5 |
 | `skill_sanitization_boundary_tests.rs` include_str paths | LOW | source-guard contract scans split provider modules instead of monolith | P5 |
 | filesize allowlist 49→48 | LOW | debt inventory shrink; 48 oversized files remain | P5 |
+
+## Iteration 65 additions (§4.5.1 skill_service_provider_tests Contract Test split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `skill_service_provider_tests/{mod,fixtures,test_doubles,alias_helpers,governance_evaluation_tests,curation_dry_run_tests,curation_run_snapshot_tests,curation_rollback_tests,alias_tests,experience_proposal_tests,experience_routing_tests,experience_validation_tests,governance_replay_tests}.rs` | LOW | Skill provider contract test module tree; 26 lib tests unchanged; `lib.rs` `mod skill_service_provider_tests` path unchanged | P5 |
+| filesize allowlist 48→47 | LOW | debt inventory shrink; 47 oversized files remain | P5 |
