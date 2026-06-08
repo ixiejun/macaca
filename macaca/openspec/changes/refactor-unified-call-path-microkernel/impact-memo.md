@@ -424,3 +424,12 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `DriverTraceRoute::label` framework_sse | LOW | diagnostic trace dedup label only; no routing behavior change | P5 |
 | `web_framework_runner_coordinator_literal_absent` hard assert | LOW | prevents reintroduction of shell-level coordinator fallback | P5 |
 | `migration_debt_baseline` raw 175→169 | LOW | debt inventory baseline only | P5 |
+
+## Iteration 52 additions (§6.2.1 hardcoded-agent-role test-fixture sub-phase — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `CreateTodoTool::tokenize` capability hints | LOW | dependency inference only; no runtime agent routing change | P5 |
+| OS `*_tests.rs` fixture agent ids | LOW | test-only; no production execution path | P5 |
+| `os_test_fixture_role_literals_absent` hard assert | LOW | prevents reintroduction of role literals in cleaned modules | P5 |
+| `migration_debt_baseline` raw 169→124 | LOW | debt inventory baseline only | P5 |

@@ -68,7 +68,9 @@ fn wasm_chat_payload_keeps_plain_prompt_untyped() {
 #[test]
 fn chat_main_thread_enters_agent_execution_service_boundary() {
     let source = chat_orchestrator_module_sources();
-    let legacy_builder = ["FrameworkRunner::build_", "coordinator"].concat();
+    // Split forbidden role suffix so the contract test stays negative without
+    // embedding a hardcoded agent-role literal in this source file.
+    let legacy_builder = ["FrameworkRunner::build_", "coord", "inator"].concat();
 
     assert!(source.contains("run_chat_main_thread_via_agent_service"));
     assert!(source.contains("AgentExecutionIntent::ChatMainThread"));

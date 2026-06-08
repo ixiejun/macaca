@@ -464,7 +464,7 @@ fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> bool
                     | "crates/services/macaca-task/src/scheduler.rs"
                     | "crates/services/macaca-task/src/todo_board.rs"
                     | "crates/services/macaca-task/src/todo_store.rs"
-                    | "crates/services/macaca-tools/src/todo.rs"
+                    // macaca-tools/todo.rs production capability hints retired iteration 52.
                     | "crates/shells/macaca-web/src/capability_catalog.rs"
                     // route_chat_v2 / framework_runner SSE adapters retired in iteration 51.
                     | "crates/shells/macaca-web/src/framework_toolkit/mod.rs"
@@ -984,6 +984,30 @@ fn serviceization_escape_hatches_web_framework_runner_coordinator_literal_absent
             "crates/shells/macaca-web/src/framework_runner/sse_emitter_adapter.rs",
         ],
         &["\"coordinator\""],
+    );
+}
+
+/// Sub-phase of `hardcoded-agent-role` (iteration 52): OS-layer test fixtures and
+/// `macaca-tools` capability tagging must not embed application role literals.
+#[test]
+fn serviceization_escape_hatches_os_test_fixture_role_literals_absent() {
+    assert_production_paths_literal_tokens_absent(
+        &[
+            "crates/services/macaca-tools/src/todo.rs",
+            "crates/foundation/macaca-persist/src/event_log_tests.rs",
+            "crates/shells/macaca-web/src/session/tests.rs",
+            "crates/shells/macaca-web/src/routes/tests.rs",
+            "crates/shells/macaca-web/src/skill_self_evolution_observer/tests.rs",
+            "crates/shells/macaca-web/src/skill_mcp/tests.rs",
+        ],
+        &[
+            "\"coordinator\"",
+            "\"planner\"",
+            "\"worker\"",
+            "\"backend\"",
+            "\"frontend\"",
+            "\"architect\"",
+        ],
     );
 }
 

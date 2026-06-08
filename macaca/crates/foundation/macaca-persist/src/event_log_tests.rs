@@ -4,6 +4,12 @@ use tempfile::tempdir;
 
 use crate::{AppendEventCommand, EventLog, EventLogQuery, RedbStore};
 
+/// Provider-neutral event-log source label for fixture tests (not an agent role name).
+const FIXTURE_EVENT_SOURCE_ENTRY: &str = "fixture-entry-source";
+/// Provider-neutral indexed-query agent dimension for fixture tests.
+const FIXTURE_AGENT_ALPHA: &str = "fixture-agent-alpha";
+const FIXTURE_AGENT_BETA: &str = "fixture-agent-beta";
+
 async fn test_log() -> EventLog {
     let dir = tempdir().unwrap();
     let db_path = dir.path().join("test.redb");
@@ -19,7 +25,7 @@ async fn append_and_query() {
         .append(
             "sess1",
             "thinking",
-            "coordinator",
+            FIXTURE_EVENT_SOURCE_ENTRY,
             serde_json::json!({"iteration": 1}),
         )
         .await;
@@ -27,7 +33,7 @@ async fn append_and_query() {
         .append(
             "sess1",
             "tool_call",
-            "coordinator",
+            FIXTURE_EVENT_SOURCE_ENTRY,
             serde_json::json!({"tool": "list_agents"}),
         )
         .await;
@@ -114,7 +120,7 @@ async fn append_command_matches_legacy_append_behavior() {
         .append_command(AppendEventCommand::new(
             "sess1",
             "thinking",
-            "coordinator",
+            FIXTURE_EVENT_SOURCE_ENTRY,
             serde_json::json!({"iteration": 1}),
         ))
         .await;
@@ -123,7 +129,7 @@ async fn append_command_matches_legacy_append_behavior() {
     let events = log.query("sess1", 0, 10).await;
     assert_eq!(events.len(), 1);
     assert_eq!(events[0].event_type, "thinking");
-    assert_eq!(events[0].source, "coordinator");
+    assert_eq!(events[0].source, FIXTURE_EVENT_SOURCE_ENTRY);
     assert_eq!(events[0].payload["iteration"], 1);
 }
 
@@ -134,47 +140,52 @@ async fn indexed_query_filters_by_agent() {
         "sess1",
         "tool_call",
         "executor",
-        serde_json::json!({"agent": "backend", "tool": "cargo"}),
+        serde_json::json!({"agent": FIXTURE_AGENT_ALPHA, "tool": "cargo"}),
     ))
     .await;
     log.append_command(AppendEventCommand::new(
         "sess1",
         "tool_call",
         "executor",
-        serde_json::json!({"agent": "frontend", "tool": "npm"}),
+        serde_json::json!({"agent": FIXTURE_AGENT_BETA, "tool": "npm"}),
     ))
     .await;
 
     let events = log
         .query_indexed(
             EventLogQuery::new("sess1")
-                .agent(Some("backend".to_string()))
+                .agent(Some(FIXTURE_AGENT_ALPHA.to_string()))
                 .limit(10),
         )
         .await;
     assert_eq!(events.len(), 1);
-    assert_eq!(events[0].payload["agent"], "backend");
+    assert_eq!(events[0].payload["agent"], FIXTURE_AGENT_ALPHA);
 }
 
 #[tokio::test]
 async fn indexed_query_filters_by_source_and_type() {
     let log = test_log().await;
-    log.append("sess1", "thinking", "coordinator", serde_json::json!({}))
-        .await;
+    log.append(
+        "sess1",
+        "thinking",
+        FIXTURE_EVENT_SOURCE_ENTRY,
+        serde_json::json!({}),
+    )
+    .await;
     log.append("sess1", "run_trace", "plan_loop", serde_json::json!({}))
         .await;
-    log.append("sess1", "run_trace", "worker_loop", serde_json::json!({}))
+    log.append("sess1", "run_trace", "executor_loop", serde_json::json!({}))
         .await;
 
     let source_events = log
         .query_indexed(
             EventLogQuery::new("sess1")
-                .source(Some("coordinator".to_string()))
+                .source(Some(FIXTURE_EVENT_SOURCE_ENTRY.to_string()))
                 .limit(10),
         )
         .await;
     assert_eq!(source_events.len(), 1);
-    assert_eq!(source_events[0].source, "coordinator");
+    assert_eq!(source_events[0].source, FIXTURE_EVENT_SOURCE_ENTRY);
 
     let trace_events = log
         .query_indexed(
@@ -197,7 +208,7 @@ async fn indexed_query_honors_since_and_limit() {
             "sess1",
             "tool_call",
             "executor",
-            serde_json::json!({"agent": "backend", "index": i}),
+            serde_json::json!({"agent": FIXTURE_AGENT_ALPHA, "index": i}),
         ))
         .await;
     }
@@ -207,7 +218,7 @@ async fn indexed_query_honors_since_and_limit() {
             EventLogQuery::new("sess1")
                 .since(2)
                 .limit(2)
-                .agent(Some("backend".to_string())),
+                .agent(Some(FIXTURE_AGENT_ALPHA.to_string())),
         )
         .await;
     assert_eq!(events.len(), 2);

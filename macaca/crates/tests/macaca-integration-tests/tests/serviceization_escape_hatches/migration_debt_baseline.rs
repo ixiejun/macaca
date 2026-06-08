@@ -9,15 +9,15 @@
 //! removal or a new frozen debt row. Regenerate family counts with:
 //! `cargo test -p macaca-integration-tests dump_escape_hatch_raw_fingerprints -- --ignored --nocapture`
 
-/// Total raw hits when migration surfaces are not honored (iteration 51 snapshot).
+/// Total raw hits when migration surfaces are not honored (iteration 52 snapshot).
 ///
-/// `hardcoded-agent-role` sub-phase (−6): web `route_chat_v2` / `build_mode` /
-/// `sse_emitter_adapter` remove `"coordinator"` literals; entry agent resolution
-/// fails closed via `resolve_required_entry_agent_name`.
-pub const EXPECTED_RAW_VIOLATION_COUNT: usize = 169;
+/// `hardcoded-agent-role` sub-phase (−45): `macaca-tools/todo.rs` capability hints
+/// use provider-neutral dimensions; standalone `*_tests.rs` fixtures adopt Object
+/// Mother agent ids (`fixture-*`, `entry-agent`, `plan-agent`, etc.).
+pub const EXPECTED_RAW_VIOLATION_COUNT: usize = 124;
 
 /// Per-family raw hit counts — detects debt shifting between token families.
 pub const EXPECTED_RAW_VIOLATION_BY_FAMILY: &[(&str, usize)] = &[
-    ("hardcoded-agent-role", 48),
+    ("hardcoded-agent-role", 3),
     ("provider-model-routing-name", 121),
 ];

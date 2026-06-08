@@ -50,7 +50,7 @@ fn agent_private_scope_requires_agent_identity() {
             .is_ok()
     );
     assert!(
-        MemoryScope::agent_private_named(ApplicationId::new(), "planner")
+        MemoryScope::agent_private_named(ApplicationId::new(), "fixture-named-agent")
             .validate()
             .is_ok()
     );
@@ -115,7 +115,7 @@ async fn builtin_agent_private_adapter_preserves_agent_isolation() {
 
     planner_memory
         .remember(
-            MemoryWriteRequest::new(planner_scope.clone(), "planner-only invariant")
+            MemoryWriteRequest::new(planner_scope.clone(), "alpha-only invariant")
                 .layer(MemoryLayer::File),
         )
         .await
@@ -124,7 +124,7 @@ async fn builtin_agent_private_adapter_preserves_agent_isolation() {
     let planner_results = planner_memory
         .search(MemorySearchRequest::new(
             planner_scope,
-            "planner-only invariant",
+            "alpha-only invariant",
             10,
         ))
         .await
@@ -132,7 +132,7 @@ async fn builtin_agent_private_adapter_preserves_agent_isolation() {
     let coder_results = coder_memory
         .search(MemorySearchRequest::new(
             coder_scope,
-            "planner-only invariant",
+            "alpha-only invariant",
             10,
         ))
         .await

@@ -53,13 +53,13 @@ fn final_tool_allowlist_removes_late_registered_tools() {
 fn resolve_workspace_path_joins_relative_path_to_workspace_root() {
         let workspace_root = Path::new("/tmp/macaca-workspace");
 
-        let resolved = resolve_workspace_path(workspace_root, "shared/backend/main.go");
+        let resolved = resolve_workspace_path(workspace_root, "shared/service/main.go");
 
         assert_eq!(
             resolved,
             workspace_root
                 .join("shared")
-                .join("backend")
+                .join("service")
                 .join("main.go")
         );
 }
@@ -77,14 +77,14 @@ fn resolve_workspace_path_preserves_absolute_path() {
 #[test]
 fn normalize_tool_input_parses_stringified_json_object() {
         let input = serde_json::Value::String(
-            r#"{"path":"shared/backend/main.go","content":"package main"}"#.into(),
+            r#"{"path":"shared/service/main.go","content":"package main"}"#.into(),
         );
 
         let normalized = normalize_tool_input(&input);
 
         assert_eq!(
             normalized.get("path").and_then(|value| value.as_str()),
-            Some("shared/backend/main.go")
+            Some("shared/service/main.go")
         );
         assert_eq!(
             normalized.get("content").and_then(|value| value.as_str()),

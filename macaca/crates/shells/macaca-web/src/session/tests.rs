@@ -1,5 +1,8 @@
 //! Unit tests for session turn deduplication and trace serialization.
 
+/// Provider-neutral fixture agent id for trace serialization tests (Object Mother).
+const FIXTURE_TRACE_AGENT_ALPHA: &str = "trace-agent-alpha";
+
 use super::trace_mapping::delegated_driver_trace_step;
 use super::turn_model::ensure_running_assistant_turn;
 use super::types::{AgentTrace, StoredTurn};
@@ -51,7 +54,12 @@ fn test_dedup_removes_snapshot_running_turn() {
     let prompt = "hello".to_string();
     let mut turns = vec![
         make_turn("user", "hello", None),
-        make_turn_with_traces("assistant", "partial...", Some("running"), vec!["backend"]),
+        make_turn_with_traces(
+            "assistant",
+            "partial...",
+            Some("running"),
+            vec![FIXTURE_TRACE_AGENT_ALPHA],
+        ),
     ];
 
     // Apply the dedup logic (same as in the success path)
@@ -77,7 +85,7 @@ fn test_dedup_removes_snapshot_running_turn() {
         "assistant",
         "final answer",
         Some("completed"),
-        vec!["backend"],
+        vec![FIXTURE_TRACE_AGENT_ALPHA],
     ));
 
     assert_eq!(turns.len(), 2);
@@ -97,7 +105,7 @@ fn test_dedup_preserves_prior_conversation_turns() {
             "assistant",
             "first answer",
             Some("completed"),
-            vec!["backend"],
+            vec![FIXTURE_TRACE_AGENT_ALPHA],
         ),
         make_turn("user", "second question", None),
         make_turn_with_traces("assistant", "partial...", Some("running"), vec!["tester"]),
@@ -125,7 +133,12 @@ fn test_dedup_noop_when_no_running_turn() {
     let prompt = "hello".to_string();
     let mut turns = vec![
         make_turn("user", "hello", None),
-        make_turn_with_traces("assistant", "done", Some("completed"), vec!["backend"]),
+        make_turn_with_traces(
+            "assistant",
+            "done",
+            Some("completed"),
+            vec![FIXTURE_TRACE_AGENT_ALPHA],
+        ),
     ];
 
     if let Some(pos) = turns.iter().rposition(|t| {
@@ -170,17 +183,19 @@ fn test_agent_trace_serialization_roundtrip() {
         "assistant",
         "answer",
         Some("completed"),
-        vec!["backend", "tester"],
+        vec![FIXTURE_TRACE_AGENT_ALPHA, "tester"],
     );
     let json = serde_json::to_string(&turn).unwrap();
     let deserialized: StoredTurn = serde_json::from_str(&json).unwrap();
 
     assert_eq!(deserialized.agent_traces.len(), 2);
-    assert!(deserialized.agent_traces.contains_key("backend"));
+    assert!(deserialized
+        .agent_traces
+        .contains_key(FIXTURE_TRACE_AGENT_ALPHA));
     assert!(deserialized.agent_traces.contains_key("tester"));
     assert_eq!(
-        deserialized.agent_traces["backend"][0].task_id,
-        "task-backend"
+        deserialized.agent_traces[FIXTURE_TRACE_AGENT_ALPHA][0].task_id,
+        format!("task-{FIXTURE_TRACE_AGENT_ALPHA}")
     );
     assert_eq!(deserialized.agent_traces["tester"][0].status, "completed");
 }

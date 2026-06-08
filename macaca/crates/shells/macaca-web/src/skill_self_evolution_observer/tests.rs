@@ -13,6 +13,10 @@ use super::projection::{agent_execution_output_text, task_result_from_agent_exec
 use super::proposal_builder::build_skill_experience_proposal_command;
 use super::semantic_signal::semantic_trigger_phrases;
 
+/// Provider-neutral fixture agent ids for observer contract tests.
+const FIXTURE_EXECUTOR_AGENT: &str = "fixture-executor-agent";
+const FIXTURE_ENTRY_AGENT: &str = "fixture-entry-agent";
+
 #[test]
 fn command_uses_only_bounded_refs_for_successful_task_completion() {
         let app_id = ApplicationId::new();
@@ -33,7 +37,7 @@ fn command_uses_only_bounded_refs_for_successful_task_completion() {
         let command = build_skill_experience_proposal_command(
             &app_id,
             "session-live-loop",
-            "worker",
+            FIXTURE_EXECUTOR_AGENT,
             &result,
             "trace-live-loop",
         )
@@ -81,7 +85,7 @@ fn command_uses_only_bounded_refs_for_successful_task_completion() {
         assert!(build_skill_experience_proposal_command(
             &app_id,
             "session-empty",
-            "worker",
+            FIXTURE_EXECUTOR_AGENT,
             &result,
             "trace-empty"
         )
@@ -99,7 +103,7 @@ fn command_uses_only_bounded_refs_for_successful_task_completion() {
             application_id: app_id,
             session_id: "session-artifact-evidence".into(),
             task_id: Some(task_id),
-            target_agent: "coordinator".into(),
+            target_agent: FIXTURE_ENTRY_AGENT.into(),
             status: AgentExecutionStatus::Completed,
             output: serde_json::json!({
                 "output": "agent execution completed with a written artifact"
@@ -149,7 +153,7 @@ fn command_uses_only_bounded_refs_for_successful_task_completion() {
         let command = build_skill_experience_proposal_command(
             &app_id,
             "session-semantic-identity",
-            "coordinator",
+            FIXTURE_ENTRY_AGENT,
             &result,
             "trace-semantic-identity",
         )
@@ -201,7 +205,7 @@ fn command_uses_only_bounded_refs_for_successful_task_completion() {
             application_id: app_id,
             session_id: "session-agent-execution".into(),
             task_id: Some(task_id),
-            target_agent: "coordinator".into(),
+            target_agent: FIXTURE_ENTRY_AGENT.into(),
             status: AgentExecutionStatus::Completed,
             output: serde_json::json!({
                 "output": "agent execution completed with reusable evidence"
@@ -232,7 +236,10 @@ fn command_uses_only_bounded_refs_for_successful_task_completion() {
         .expect("completed agent execution should produce a proposal command");
 
         assert_eq!(command.candidate.task_id, task_id.to_string());
-        assert_eq!(command.candidate.agent_name.as_deref(), Some("coordinator"));
+        assert_eq!(
+            command.candidate.agent_name.as_deref(),
+            Some(FIXTURE_ENTRY_AGENT)
+        );
         assert!(
             command
                 .candidate

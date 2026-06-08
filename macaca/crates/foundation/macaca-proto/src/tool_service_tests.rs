@@ -124,7 +124,7 @@ fn service_tool_commands_and_descriptor_are_stable() {
     let command = ToolCatalogPlanCommand {
         trace: TraceContext::new("trace-tool-catalog"),
         application_id: None,
-        agent_name: Some("coordinator".into()),
+        agent_name: Some("fixture-tool-agent".into()),
         requested_toolsets: vec![ToolsetRef::new("research").unwrap()],
         requested_families: vec![ToolFamilyRef::new("web").unwrap()],
         allowed_tools: Vec::new(),

@@ -57,12 +57,15 @@ fn command_exists(command: &str) -> bool {
     std::env::split_paths(&path).any(|dir| dir.join(command).is_file())
 }
 
+/// Provider-neutral fixture agent id for skill MCP activation tests.
+const FIXTURE_SNAPSHOT_AGENT: &str = "fixture-snapshot-agent";
+
 #[test]
 fn activation_usage_commands_only_cover_active_governed_snapshot_skills() {
     let app_id = ApplicationId(uuid::Uuid::new_v4());
     let active_name = "skill-exp-active";
     let snapshot = SkillSnapshot {
-        agent: "coordinator".into(),
+        agent: FIXTURE_SNAPSHOT_AGENT.into(),
         prompt: String::new(),
         skills: vec![
             SkillSnapshotEntry {
@@ -135,7 +138,7 @@ fn activation_usage_commands_only_cover_active_governed_snapshot_skills() {
         &[active_record, archived_record],
         app_id,
         "session-1",
-        "coordinator",
+        FIXTURE_SNAPSHOT_AGENT,
         "trace-skill-visible",
     );
 

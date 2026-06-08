@@ -15,6 +15,10 @@ use super::shared::select_app_scoped_agent_manifests;
 use super::todos::{required_session_id, SessionQuery};
 use crate::state::ExternalAdapterRuntimeInstallation;
 
+/// Provider-neutral fixture agent names for manifest dedup tests (Object Mother).
+const FIXTURE_ENTRY_AGENT: &str = "entry-agent";
+const FIXTURE_PLAN_AGENT: &str = "plan-agent";
+
 fn test_agent_manifest(name: &str, capability: &str) -> AgentManifest {
     AgentManifest {
         id: AgentId::new(),
@@ -37,28 +41,28 @@ fn test_agent_manifest(name: &str, capability: &str) -> AgentManifest {
 
 #[test]
 fn app_scoped_agent_selection_deduplicates_legacy_same_name_agents() {
-    let legacy_coordinator = test_agent_manifest("coordinator", "todo_goal_management");
-    let app_coordinator = test_agent_manifest("coordinator", "coding_session_coordination");
-    let planner = test_agent_manifest("planner", "code_change_planning");
+    let legacy_entry = test_agent_manifest(FIXTURE_ENTRY_AGENT, "todo_goal_management");
+    let app_entry = test_agent_manifest(FIXTURE_ENTRY_AGENT, "coding_session_coordination");
+    let planner = test_agent_manifest(FIXTURE_PLAN_AGENT, "code_change_planning");
     let coder = test_agent_manifest("coder", "patch_authoring");
     let reviewer = test_agent_manifest("reviewer", "structured_review");
-    let legacy_planner = test_agent_manifest("planner", "todo_planning");
-    let runtime_ids = vec![app_coordinator.id, planner.id, coder.id, reviewer.id];
+    let legacy_planner = test_agent_manifest(FIXTURE_PLAN_AGENT, "todo_planning");
+    let runtime_ids = vec![app_entry.id, planner.id, coder.id, reviewer.id];
     let declared_names = vec![
-        "coordinator".to_string(),
-        "planner".to_string(),
+        FIXTURE_ENTRY_AGENT.to_string(),
+        FIXTURE_PLAN_AGENT.to_string(),
         "coder".to_string(),
         "reviewer".to_string(),
     ];
 
     let selected = select_app_scoped_agent_manifests(
         vec![
-            legacy_coordinator,
+            legacy_entry,
             planner.clone(),
             coder.clone(),
             reviewer.clone(),
             legacy_planner,
-            app_coordinator.clone(),
+            app_entry.clone(),
         ],
         &runtime_ids,
         Some(&declared_names),
@@ -70,9 +74,14 @@ fn app_scoped_agent_selection_deduplicates_legacy_same_name_agents() {
             .iter()
             .map(|agent| agent.name.as_str())
             .collect::<Vec<_>>(),
-        vec!["coordinator", "planner", "coder", "reviewer"]
+        vec![
+            FIXTURE_ENTRY_AGENT,
+            FIXTURE_PLAN_AGENT,
+            "coder",
+            "reviewer"
+        ]
     );
-    assert_eq!(selected[0].id, app_coordinator.id);
+    assert_eq!(selected[0].id, app_entry.id);
     assert_eq!(
         selected[0].capabilities[0].name,
         "coding_session_coordination"

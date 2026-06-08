@@ -228,6 +228,9 @@ impl CreateTodoTool {
 
         // Add lightweight multilingual capability hints for profile
         // classification (e.g. foundation dependency inference).
+        //
+        // Hints use provider-neutral capability dimensions only — never
+        // application-specific agent role names (Strategy: capability tagging).
         for (needle, hints) in [
             ("架构", &["architecture", "design"][..]),
             ("设计", &["design"][..]),
@@ -235,8 +238,8 @@ impl CreateTodoTool {
             ("接口", &["interface", "api"][..]),
             ("数据模型", &["data", "model"][..]),
             ("技术风险", &["technical", "risk", "analysis"][..]),
-            ("前端", &["frontend", "ui"][..]),
-            ("后端", &["backend", "api"][..]),
+            ("前端", &["ui", "presentation"][..]),
+            ("后端", &["api", "service"][..]),
         ] {
             if text.contains(needle) {
                 tokens.extend(hints.iter().map(|hint| hint.to_string()));
@@ -250,7 +253,6 @@ impl CreateTodoTool {
         let tokens = Self::tokenize(&profile.join(" "));
         let keywords = [
             "architecture",
-            "architect",
             "design",
             "spec",
             "specification",
@@ -638,6 +640,13 @@ mod tests {
     use macaca_task::TodoStore;
     use tempfile::tempdir;
 
+    /// Provider-neutral fixture agent ids (Object Mother pattern).
+    const FIXTURE_ENTRY_SUPERVISOR: &str = "entry-agent";
+    const FIXTURE_PLAN_AGENT: &str = "plan-agent";
+    const FIXTURE_DESIGN_AGENT: &str = "fixture-design";
+    const FIXTURE_API_AGENT: &str = "fixture-api";
+    const FIXTURE_UI_AGENT: &str = "fixture-ui";
+
     async fn exec_tool(tool: &dyn Tool, input: Value) -> MacacaResult<Value> {
         crate::tool::ToolCommandExecutor::execute_command(
             tool,
@@ -658,8 +667,11 @@ mod tests {
         ));
         let tool = CreateTodoTool {
             space,
-            coordinator_name: "planner".into(),
-            disallowed_assignees: vec!["coordinator".into(), "planner".into()],
+            coordinator_name: FIXTURE_PLAN_AGENT.into(),
+            disallowed_assignees: vec![
+                FIXTURE_ENTRY_SUPERVISOR.into(),
+                FIXTURE_PLAN_AGENT.into(),
+            ],
             assignee_capabilities: HashMap::new(),
             active_goal_id: None,
         };
@@ -667,13 +679,13 @@ mod tests {
         let err = exec_tool(
             &tool,
             json!({
-                "agent": "coordinator",
+                "agent": FIXTURE_ENTRY_SUPERVISOR,
                 "title": "Should fail",
-                "description": "Coordinator must not get TaskBoard work"
+                "description": "Supervisor must not get TaskBoard work"
             }),
         )
         .await
-        .expect_err("coordinator assignment should be rejected");
+        .expect_err("supervisor assignment should be rejected");
 
         assert!(
             err.to_string()
@@ -730,22 +742,22 @@ mod tests {
         ));
         let mut profiles = HashMap::new();
         profiles.insert(
-            "architect".to_string(),
+            FIXTURE_DESIGN_AGENT.to_string(),
             vec![
                 "design_analysis".into(),
                 "architecture specification interface planning".into(),
             ],
         );
         profiles.insert(
-            "backend".to_string(),
+            FIXTURE_API_AGENT.to_string(),
             vec![
-                "backend_development".into(),
-                "go golang rest api server database".into(),
+                "api_development".into(),
+                "rest api server database integration".into(),
             ],
         );
         let tool = CreateTodoTool {
             space: Arc::clone(&space),
-            coordinator_name: "planner".into(),
+            coordinator_name: FIXTURE_PLAN_AGENT.into(),
             disallowed_assignees: vec![],
             assignee_capabilities: profiles,
             active_goal_id: None,
@@ -754,9 +766,9 @@ mod tests {
         let out = exec_tool(
             &tool,
             json!({
-                "agent": "architect",
-                "title": "Implement Go backend API service",
-                "description": "Build REST endpoints and database integration in golang"
+                "agent": FIXTURE_DESIGN_AGENT,
+                "title": "Implement API service layer",
+                "description": "Build REST endpoints and database integration"
             }),
         )
         .await
@@ -764,17 +776,17 @@ mod tests {
 
         assert_eq!(
             out["agent"].as_str().unwrap_or_default(),
-            "architect",
-            "create_todo must preserve planner's explicit assignee"
+            FIXTURE_DESIGN_AGENT,
+            "create_todo must preserve plan agent's explicit assignee"
         );
         assert_eq!(
             out["requested_agent"].as_str().unwrap_or_default(),
-            "architect"
+            FIXTURE_DESIGN_AGENT
         );
         assert!(out["routing_reason"].is_null());
         let all = space.list_all().await;
         assert_eq!(all.len(), 1);
-        assert_eq!(all[0].assigned_agent, "architect");
+        assert_eq!(all[0].assigned_agent, FIXTURE_DESIGN_AGENT);
     }
 
     #[tokio::test]
@@ -790,45 +802,45 @@ mod tests {
         ));
         let mut profiles = HashMap::new();
         profiles.insert(
-            "architect".to_string(),
+            FIXTURE_DESIGN_AGENT.to_string(),
             vec![
                 "architecture_design Define system boundaries and technical constraints".into(),
-                "interface_contract_design Define frontend/backend API and data contracts".into(),
+                "interface_contract_design Define API and data contracts".into(),
             ],
         );
         profiles.insert(
-            "backend".to_string(),
-            vec!["backend_development Implement Go REST API with PostgreSQL".into()],
+            FIXTURE_API_AGENT.to_string(),
+            vec!["api_development Implement REST API with PostgreSQL".into()],
         );
         let tool = CreateTodoTool {
             space: Arc::clone(&space),
-            coordinator_name: "planner".into(),
+            coordinator_name: FIXTURE_PLAN_AGENT.into(),
             disallowed_assignees: vec![],
             assignee_capabilities: profiles,
             active_goal_id: None,
         };
 
         let out = exec_tool(&tool, json!({
-                "agent": "backend",
+                "agent": FIXTURE_API_AGENT,
                 "title": "设计项目架构和API规范",
-                "description": "设计整体项目架构、接口规范、数据模型和前后端契约。输出架构设计文档。"
+                "description": "设计整体项目架构、接口规范、数据模型和契约。输出架构设计文档。"
             }))
             .await
             .expect("create_todo should succeed");
 
         assert_eq!(
             out["agent"].as_str().unwrap_or_default(),
-            "backend",
-            "create_todo must not override planner's explicit assignee"
+            FIXTURE_API_AGENT,
+            "create_todo must not override plan agent's explicit assignee"
         );
         assert_eq!(
             out["requested_agent"].as_str().unwrap_or_default(),
-            "backend"
+            FIXTURE_API_AGENT
         );
         assert!(out["routing_reason"].is_null());
         let all = space.list_all().await;
         assert_eq!(all.len(), 1);
-        assert_eq!(all[0].assigned_agent, "backend");
+        assert_eq!(all[0].assigned_agent, FIXTURE_API_AGENT);
     }
 
     #[tokio::test]
@@ -846,64 +858,64 @@ mod tests {
         ));
         let mut profiles = HashMap::new();
         profiles.insert(
-            "architect".to_string(),
+            FIXTURE_DESIGN_AGENT.to_string(),
             vec!["design_analysis architecture specification".into()],
         );
         profiles.insert(
-            "frontend".to_string(),
-            vec!["frontend_development react nextjs ui".into()],
+            FIXTURE_UI_AGENT.to_string(),
+            vec!["ui_development react nextjs presentation".into()],
         );
         let tool = CreateTodoTool {
             space: Arc::clone(&space),
-            coordinator_name: "planner".into(),
+            coordinator_name: FIXTURE_PLAN_AGENT.into(),
             disallowed_assignees: vec![],
             assignee_capabilities: profiles,
             active_goal_id: Some(goal_id),
         };
 
-        let arch = exec_tool(
+        let design_task = exec_tool(
             &tool,
             json!({
-                "agent": "architect",
+                "agent": FIXTURE_DESIGN_AGENT,
                 "title": "Define architecture and interfaces",
                 "description": "Produce design spec and API contracts"
             }),
         )
         .await
-        .expect("architect task create");
-        let arch_id = macaca_proto::TaskId(
-            uuid::Uuid::parse_str(arch["task_id"].as_str().unwrap_or_default())
-                .expect("arch task id"),
+        .expect("design task create");
+        let design_id = macaca_proto::TaskId(
+            uuid::Uuid::parse_str(design_task["task_id"].as_str().unwrap_or_default())
+                .expect("design task id"),
         );
 
-        let fe = exec_tool(
+        let ui_task = exec_tool(
             &tool,
             json!({
-                "agent": "frontend",
+                "agent": FIXTURE_UI_AGENT,
                 "title": "Implement UI from spec",
-                "description": "Build pages and connect to backend API"
+                "description": "Build pages and connect to API layer"
             }),
         )
         .await
-        .expect("frontend task create");
+        .expect("ui task create");
 
         assert!(
-            fe["auto_inferred_dependencies"]
+            ui_task["auto_inferred_dependencies"]
                 .as_u64()
                 .unwrap_or_default()
                 >= 1,
-            "frontend task should get inferred dependency on architect task"
+            "ui task should get inferred dependency on design task"
         );
 
         let all = space.list_all().await;
-        let fe_task = all
+        let ui_item = all
             .into_iter()
-            .find(|t| t.id.to_string() == fe["task_id"].as_str().unwrap_or_default())
-            .expect("frontend task exists");
-        assert_eq!(fe_task.status, TodoStatus::Blocked);
+            .find(|t| t.id.to_string() == ui_task["task_id"].as_str().unwrap_or_default())
+            .expect("ui task exists");
+        assert_eq!(ui_item.status, TodoStatus::Blocked);
         assert!(
-            fe_task.depends_on.contains(&arch_id),
-            "frontend task should depend on architect task"
+            ui_item.depends_on.contains(&design_id),
+            "ui task should depend on design task"
         );
     }
 
@@ -920,7 +932,7 @@ mod tests {
         ));
         let tool = CreateTodoTool {
             space: Arc::clone(&space),
-            coordinator_name: "planner".into(),
+            coordinator_name: FIXTURE_PLAN_AGENT.into(),
             disallowed_assignees: vec![],
             assignee_capabilities: HashMap::new(),
             active_goal_id: Some(goal_id),
@@ -968,7 +980,7 @@ mod tests {
         let tool = CreateTodosTool {
             create_todo: CreateTodoTool {
                 space: Arc::clone(&space),
-                coordinator_name: "planner".into(),
+                coordinator_name: FIXTURE_PLAN_AGENT.into(),
                 disallowed_assignees: vec![],
                 assignee_capabilities: HashMap::new(),
                 active_goal_id: Some(goal_id),

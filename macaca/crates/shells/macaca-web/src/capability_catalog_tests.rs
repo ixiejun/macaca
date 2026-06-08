@@ -299,7 +299,7 @@ async fn probe_mcp_capability_inputs_matches_facade_probe_without_subprocess_ena
 
 fn skill_snapshot(names: &[&str]) -> SkillSnapshot {
     SkillSnapshot {
-        agent: "architect".into(),
+        agent: "fixture-catalog-agent".into(),
         prompt: "".into(),
         skills: names
             .iter()

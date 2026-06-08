@@ -429,3 +429,11 @@
 - **Contract tests**: `serviceization_escape_hatches` 14/14；`macaca-web` chat_orchestrator tests；`p5_terminal_audit_gates` 3/3；`os_layer_file_size_gate` 1/1。
 - **GitNexus memo (non-blocking)**: iteration 51 LOW on web framework_runner coordinator literal removal — recorded in `impact-memo.md`。
 - **Next**: 6.2.1 `hardcoded-agent-role` 继续分阶段（48 命中）；`provider-model-routing-name`（121）；6.3.2 继续 archive；filesize allowlist 75→0。
+
+## Iteration 52 (2026-06-07)
+- **P5 §6.2.1 逃逸口 family 子阶段**: `hardcoded-agent-role` OS 测试夹具 + `macaca-tools` 生产代码子阶段（48→3 命中）；`todo.rs` capability hints 改为 provider-neutral 维度（ui/api/service）；独立 `*_tests.rs` 采用 Object Mother fixture agent ids；删除 `macaca-tools/todo.rs` migration surface；`migration_debt_baseline` raw **169→124**（`hardcoded-agent-role` 48→3）。
+- **P5 退役 token 硬断言**: 新增 `os_test_fixture_role_literals_absent` 覆盖 6 个已清理模块。
+- **Design patterns**: Object Mother（测试夹具 agent id）；Strategy（capability dimension tagging 替代 role 名）；Specification by Example（family 级硬断言）。
+- **Contract tests**: `serviceization_escape_hatches` 15/15；`macaca-tools` todo tests；`macaca-persist` event_log_tests；`macaca-web` session/routes/skill tests。
+- **GitNexus memo (non-blocking)**: iteration 52 LOW on OS test fixture neutralization — recorded in `impact-memo.md`。
+- **Next**: 6.2.1 `hardcoded-agent-role` 收尾（3 命中：`workflow.rs`/`agent_execution_service.rs`）；`provider-model-routing-name`（121）；filesize allowlist 75→0。

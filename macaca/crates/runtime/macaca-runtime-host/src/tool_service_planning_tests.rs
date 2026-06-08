@@ -93,7 +93,7 @@ async fn planning_separates_visible_hidden_policy_and_conflicts() {
         .build();
     let mut command = ToolCatalogPlanCommand::new(TraceContext::new("trace-plan")).unwrap();
     command.application_id = Some(ApplicationId(uuid::Uuid::new_v4()));
-    command.agent_name = Some("coordinator".into());
+    command.agent_name = Some("fixture-planning-agent".into());
     command.requested_toolsets = vec![ToolsetRef::new("research").unwrap()];
     command.requested_families = vec![ToolFamilyRef::new("communication").unwrap()];
     command.denied_families = vec![ToolFamilyRef::new("communication").unwrap()];
