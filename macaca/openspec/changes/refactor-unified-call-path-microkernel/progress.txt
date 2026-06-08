@@ -516,3 +516,10 @@
 - **Contract tests**: `os_layer_file_size_gate` 1/1；`skill_governance_store_logging_tests` 2/2；`skill_service_*` 39/39。
 - **GitNexus memo (non-blocking)**: iteration 63 LOW on skill state + runtime-host lib facade splits — recorded in `impact-memo.md`.
 - **Next**: filesize allowlist 49→0（runtime-host giants / proto config/types）；6.3.2 archive；P5 终态验收。
+
+## Iteration 64 (2026-06-07)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 49→**48**；`skill_service_provider.rs` 801→模块树（`mod.rs` Facade + `system_service.rs` + `command_dispatch.rs` Command Router + `runtime_facade_commands.rs` + `operator_commands.rs` + `governance_alias_commands.rs` + `evolution_commands.rs` + `evaluation_content_commands.rs` + `delegated_commands.rs` Strategy bridge）；`skill_sanitization_boundary_tests` `include_str!` 路径同步。
+- **Design patterns**: Facade module tree；Command Router；Command handlers per domain；Strategy bridge（curation/lifecycle/materialization delegations）；trace `info!`/`warn!` on command admission/governance/evolution nodes（provider-neutral dimensions only）。
+- **Contract tests**: `os_layer_file_size_gate` 1/1；`skill_sanitization_boundary_tests`；`skill_service_provider_tests`。
+- **GitNexus memo (non-blocking)**: iteration 64 LOW on skill provider command dispatch split — recorded in `impact-memo.md`.
+- **Next**: filesize allowlist 48→0（`skill_service_provider_tests` / runtime-host giants / proto config/types）；6.3.2 archive；P5 终态验收。

@@ -532,3 +532,11 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `skill_service_provider_state/{mod,governance_read_model,lifecycle_mutations,alias_governance,proposal_store,event_vocabulary}.rs` | LOW | Skill provider governance state module tree; `SkillProviderGovernanceState` + `event_id` exports unchanged | P5 |
 | `runtime_host_public_api.rs` + thin `lib.rs` | LOW | runtime-host crate public re-export Facade; downstream `macaca_runtime_host::*` imports unchanged | P5 |
 | filesize allowlist 51→49 | LOW | debt inventory shrink; 49 oversized files remain | P5 |
+
+## Iteration 64 additions (§4.5.1 skill_service_provider Command Router split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `skill_service_provider/{mod,system_service,command_dispatch,runtime_facade_commands,operator_commands,governance_alias_commands,evolution_commands,evaluation_content_commands,delegated_commands}.rs` | LOW | Skill provider adapter module tree; `SkillSystemServiceProvider` public API + `SystemService` contract unchanged | P5 |
+| `skill_sanitization_boundary_tests.rs` include_str paths | LOW | source-guard contract scans split provider modules instead of monolith | P5 |
+| filesize allowlist 49→48 | LOW | debt inventory shrink; 48 oversized files remain | P5 |

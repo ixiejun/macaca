@@ -166,7 +166,14 @@ fn skill_operation_logs_are_source_guarded_against_raw_payload_fields() {
         include_str!("skill_service_provider_curation/mod.rs"),
         include_str!("skill_service_provider_curation/store.rs"),
     );
-    let provider_source = include_str!("skill_service_provider.rs");
+    let provider_source = concat!(
+        include_str!("skill_service_provider/system_service.rs"),
+        include_str!("skill_service_provider/command_dispatch.rs"),
+        include_str!("skill_service_provider/runtime_facade_commands.rs"),
+        include_str!("skill_service_provider/governance_alias_commands.rs"),
+        include_str!("skill_service_provider/evolution_commands.rs"),
+        include_str!("skill_service_provider/evaluation_content_commands.rs"),
+    );
 
     assert!(mutation_source.contains("skill content mutation applied through local strategy"));
     assert!(curation_source.contains("skill curation run completed"));
