@@ -31,7 +31,6 @@ pub fn entries() -> Vec<FileSizeAllowlistEntry> {
         FileSizeAllowlistEntry::new("crates/services/macaca-context/src/engine.rs", 972, "OS-layer-debt", "P5"),
         FileSizeAllowlistEntry::new("crates/services/macaca-scheduled-agent-task/src/local_provider.rs", 1022, "OS-layer-debt", "P5"),
         FileSizeAllowlistEntry::new("crates/services/macaca-scheduler/src/local_provider.rs", 869, "OS-layer-debt", "P5"),
-        FileSizeAllowlistEntry::new("crates/services/macaca-task/src/todo_board.rs", 1155, "OS-layer-debt", "P5"),
         FileSizeAllowlistEntry::new("crates/services/macaca-tools/src/todo.rs", 1244, "OS-layer-debt", "P5"),
         FileSizeAllowlistEntry::new("crates/tests/macaca-integration-tests/src/pipeline_dry_run.rs", 711, "OS-layer-debt", "P5"),
     ]

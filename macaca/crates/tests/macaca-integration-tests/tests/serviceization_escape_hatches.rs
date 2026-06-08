@@ -470,7 +470,7 @@ fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> bool
                     | "crates/services/macaca-task/src/lifecycle.rs"
                     | "crates/services/macaca-task/src/plan_loop/mod.rs"
                     | "crates/services/macaca-task/src/scheduler.rs"
-                    | "crates/services/macaca-task/src/todo_board.rs"
+                    | "crates/services/macaca-task/src/todo_board/tests.rs"
                     | "crates/services/macaca-task/src/todo_store.rs"
                     // macaca-tools/todo.rs production capability hints retired iteration 52.
                     | "crates/shells/macaca-web/src/capability_catalog.rs"

@@ -744,3 +744,14 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `admit_assignment_graph` / `normalize_assignment_graph_id` | MEDIUM | Specification rules for authoritative vs compatibility graph admission | P5 |
 | `runtime/tests.rs` escape-hatch wire-label fixture | LOW | Contract tests avoid retired enum-path literal; raw migration debt baseline stays 0 | P5 |
 | filesize allowlist 26→25 | LOW | debt inventory shrink; 25 oversized files remain | P5 |
+
+## Iteration 88 additions (§4.5.1 macaca-task todo_board Facade split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `todo_board/{mod,cycle_detection,task_board,task_space,tests}.rs` | HIGH | Per-agent TaskBoard + application TaskSpace orchestration; public API `macaca_task::todo_board::*` unchanged via Facade re-exports + `lib.rs` `pub mod todo_board` | P5 |
+| `TaskBoard::claim_next_task` / `claim_task` | HIGH | Worker pull scheduling + session-scoped sequential claim; PlanLoop/WorkerLoop/TaskServiceRuntime consumers | P5 |
+| `TaskSpace::create_task_assignment_with_graph_scope` | HIGH | Plan-side assignment + graph owner/id admission markers for audit/terminal projection | P5 |
+| `detect_cycles` | MEDIUM | Specification guard for dependency graph admission before task persistence | P5 |
+| `todo_board/tests.rs` escape-hatch migration surface | LOW | Contract tests use neutral agent fixtures; production modules agent-name free | P5 |
+| filesize allowlist 25→24 | LOW | debt inventory shrink; 24 oversized files remain | P5 |

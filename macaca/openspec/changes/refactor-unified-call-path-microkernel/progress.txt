@@ -690,3 +690,12 @@
 - **Logging**: `tracing::info` at `TaskServiceRuntime::emit` and command handler audit nodes; contract test agent fixtures neutralized (`builder`→`agent-alpha` 等)。
 - **GitNexus memo (non-blocking)**: iteration 87 HIGH on `TaskServiceRuntime` command handlers + graph admission seam — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: filesize allowlist 25→0（`todo_board.rs` / `agentic_loop.rs` / `todo.rs` 等）；6.3.2 archive；P5 终态验收。
+
+## Iteration 88 (2026-06-08)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 25→**24**；`macaca-task/todo_board.rs` 1155→`todo_board/` Facade 模块树（`mod.rs` + `cycle_detection.rs` + `task_board.rs` + `task_space.rs` + `tests.rs`）。
+- **Design patterns**: Facade module tree；Strategy（lifecycle/dependency policies）；State（todo status transitions）；Specification（`detect_cycles`）；Value Object（`ProgressSummary`）。
+- **Contract tests**: `cargo check -p macaca-task` OK；`cargo test -p macaca-task todo_board::` 9/9；`os_layer_file_size_gate` 1/1；`serviceization_escape_hatches` OK；production modules all ≤500 lines（max `task_space.rs` ~470）。
+- **Escape hatch**: migration surface `todo_board.rs` → `todo_board/tests.rs`（production 子模块无 agent 字面量；contract tests 使用中性 fixture `agent-alpha` 等）。
+- **Logging**: `tracing::info` at TaskBoard claim/start/review/fail and TaskSpace assignment/review/goal/reassign audit nodes。
+- **GitNexus memo (non-blocking)**: iteration 88 HIGH on `TaskBoard::claim_next_task` + `TaskSpace::create_task_assignment_with_graph_scope` cross-crate task orchestration seam — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: filesize allowlist 24→0（`agentic_loop.rs` / `todo.rs` 等）；6.3.2 archive；P5 终态验收。
