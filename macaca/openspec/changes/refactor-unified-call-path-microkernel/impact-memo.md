@@ -873,3 +873,14 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `app_manifest_to_heartbeat_agent_views` | LOW | Heartbeat agent declaration projection; consumed by autonomy dispatch paths | P5 |
 | `service_projection/tests.rs` | LOW | Contract tests with neutral `fixture-*` identifiers | P5 |
 | filesize allowlist 14→13 | LOW | debt inventory shrink; 13 oversized files remain | P5 |
+
+## Iteration 100 additions (§4.5.1 macaca-app workflow Template Method split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `workflow/{types,prompt_strategy,engine,tests}.rs` | MEDIUM | Application Framework workflow engine module tree; public API unchanged via Facade re-exports | P5 |
+| `WorkflowEngine::resolve_coordinator_agent` | MEDIUM | Chain of Responsibility coordinator resolution; consumed by web agent_runner and consumption helpers | P5 |
+| `WorkflowEngine::build_system_prompt` | MEDIUM | Template Method prompt assembly seam; persona vs assistant fallback branching | P5 |
+| `WorkflowPromptStrategy` / `DefaultWorkflowPromptStrategy` | LOW | Strategy extension point for workflow prompt sections | P5 |
+| `workflow/tests.rs` | LOW | Contract tests with neutral `fixture-entry` identifiers | P5 |
+| filesize allowlist 13→12 | LOW | debt inventory shrink; 12 oversized files remain | P5 |

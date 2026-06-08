@@ -804,3 +804,13 @@
 - **Logging**: preserved `tracing::info` on metadata/service-app projection summary audit nodes with provider-neutral app_id/agent_count fields。
 - **GitNexus memo (non-blocking)**: iteration 99 MEDIUM on `app_manifest_to_metadata_view` / `app_manifest_to_service_app_view` manifest admission seam — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: filesize allowlist 13→0（`macaca-app/workflow.rs` / `pipeline_dry_run.rs` / P4 `macaca-framework` 等）；6.3.2 archive；P5 终态验收。
+
+## Iteration 100 (2026-06-08)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 13→**12**；`macaca-app/workflow.rs` 625→`workflow/` Template Method + Strategy 模块树（`workflow.rs` Facade + `types.rs` + `prompt_strategy.rs` + `engine.rs` + `tests.rs`）。
+- **Design patterns**: Facade module tree；Strategy（`WorkflowPromptStrategy` / `DefaultWorkflowPromptStrategy`）；Chain of Responsibility（`resolve_coordinator_agent`）；Template Method（`build_system_prompt`）；Observer（`tracing::{info,debug}` on coordinator resolution and prompt assembly）。
+- **Contract tests**: `cargo check -p macaca-app` OK；`cargo test -p macaca-app workflow::` 6/6；`os_layer_file_size_gate` 1/1；`serviceization_escape_hatches` OK；production modules all ≤500 lines（max `engine.rs` ~225）。
+- **Public API**: `macaca_app::workflow::{WorkflowEngine, WorkflowPromptStrategy, DefaultWorkflowPromptStrategy, ...}` unchanged via Facade re-exports；`lib.rs` `pub mod workflow` unchanged。
+- **Escape hatch**: contract-test fixtures 使用中性 `fixture-entry` 标识符（`tests.rs` 后缀自动豁免）；example app discovery 仅在 tests 中。
+- **Logging**: added `tracing::info` on engine construction and `build_system_prompt` completion with workflow/coordinator/persona_present/prompt_len audit fields。
+- **GitNexus memo (non-blocking)**: iteration 100 MEDIUM on `WorkflowEngine::build_system_prompt` / `resolve_coordinator_agent` YAML workflow admission seam — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: filesize allowlist 12→0（`pipeline_dry_run.rs` / P4 `macaca-framework` 等）；6.3.2 archive；P5 终态验收。
