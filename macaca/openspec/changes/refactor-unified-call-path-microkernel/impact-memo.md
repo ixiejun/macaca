@@ -577,3 +577,10 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 |---------------|----------------------|------------------------|-------|
 | `host_import_tests/{mod,support,service_call_tests,domain_import_tests,audit_genui_tests,admission_guard_tests,policy_sanitization_tests}.rs` | LOW | WASM host-import contract test module tree; 15 lib tests unchanged; `wasm_runtime_provider/mod.rs` `mod host_import_tests` path unchanged | P5 |
 | filesize allowlist 44→43 | LOW | debt inventory shrink; 43 oversized files remain | P5 |
+
+## Iteration 70 additions (§4.5.1 component_model_tests Contract Test split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `component_model_tests/{mod,support,descriptor_admission_tests,host_import_routing_tests,host_command_plan_tests,host_command_orchestration_tests,lifecycle_timeout_tests}.rs` | LOW | Component-model WASM contract test module tree; 12 lib tests unchanged; `wasm_runtime_provider/mod.rs` `mod component_model_tests` path unchanged | P5 |
+| filesize allowlist 43→42 | LOW | debt inventory shrink; 42 oversized files remain | P5 |

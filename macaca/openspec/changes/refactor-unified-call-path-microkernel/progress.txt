@@ -558,3 +558,10 @@
 - **Contract tests**: `os_layer_file_size_gate` 1/1；`wasm_host_import` lib tests 15/15。
 - **GitNexus memo (non-blocking)**: iteration 69 LOW on WASM host-import contract test module split — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: filesize allowlist 43→0（`component_model_tests.rs` / `mcp_runtime.rs` / `app_executor.rs` / proto config/types 等）；6.3.2 archive；P5 终态验收。
+
+## Iteration 70 (2026-06-08)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 43→**42**；`component_model_tests.rs` 652→模块树（`mod.rs` Facade + `support.rs` Object Mother + `descriptor_admission_tests.rs` + `host_import_routing_tests.rs` + `host_command_plan_tests.rs` + `host_command_orchestration_tests.rs` + `lifecycle_timeout_tests.rs` Contract Test 分区）。
+- **Design patterns**: Facade module tree；Object Mother（portable component fixtures）；Contract Test（descriptor/admission/routing/plan/orchestration/lifecycle 分区）；Template Method（placeholder interpolation）；Chain of Responsibility（declared host-command orchestration）。
+- **Contract tests**: `os_layer_file_size_gate` 1/1；`component_model_provider` lib tests 12/12。
+- **GitNexus memo (non-blocking)**: iteration 70 LOW on component-model contract test module split — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: filesize allowlist 42→0（`host_import_bridge.rs` / `mcp_runtime.rs` / `app_executor.rs` / proto config/types 等）；6.3.2 archive；P5 终态验收。
