@@ -565,3 +565,10 @@
 - **Contract tests**: `os_layer_file_size_gate` 1/1；`component_model_provider` lib tests 12/12。
 - **GitNexus memo (non-blocking)**: iteration 70 LOW on component-model contract test module split — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: filesize allowlist 42→0（`host_import_bridge.rs` / `mcp_runtime.rs` / `app_executor.rs` / proto config/types 等）；6.3.2 archive；P5 终态验收。
+
+## Iteration 71 (2026-06-08)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 42→**41**；`host_import_bridge.rs` 1154→模块树（`mod.rs` Facade + `constants.rs` + `construction.rs` + `dispatch.rs` + `task_lifecycle.rs` + `ui_render.rs` + `policy_validation.rs` + `result_shaping.rs` + `routing_support.rs` Bridge/Adapter 分区）。
+- **Design patterns**: Facade module tree；Bridge（WASM ABI → ServiceRuntime）；Adapter（orchestration payload hydration）；Command（`dispatch` entry）；Repository（GenUI `ui.render` store）；Chain of Responsibility（admission validation）；Specification（policy overrides + sanitization）；trace `info!`/`warn!` on admitted/denied/completed nodes。
+- **Contract tests**: `os_layer_file_size_gate` 1/1；`wasm_host_import` lib tests 15/15；`component_model_provider` lib tests 12/12；`unified_audit_replay_convergence` 6/6；`unified_workflow_application_abi` 6/6；多文件 `include_str!` 源扫描同步。
+- **GitNexus memo (non-blocking)**: iteration 71 HIGH on `WasmHostImportBridge::dispatch` WASM audit authority path — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: filesize allowlist 41→0（`mcp_runtime.rs` / `app_executor.rs` / `component_model.rs` / proto config/types 等）；6.3.2 archive；P5 终态验收。

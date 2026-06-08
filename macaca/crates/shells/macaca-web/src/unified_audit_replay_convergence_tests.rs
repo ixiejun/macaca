@@ -115,6 +115,40 @@ mod tests {
         assert_no_coordination_patches("delegated_task_dispatcher", dispatcher);
     }
 
+    /// Concatenate WASM host import bridge module sources for contract scanning.
+    fn host_import_bridge_module_sources() -> String {
+        [
+            include_str!(
+                "../../../runtime/macaca-runtime-host/src/wasm_runtime_provider/host_import_bridge/mod.rs"
+            ),
+            include_str!(
+                "../../../runtime/macaca-runtime-host/src/wasm_runtime_provider/host_import_bridge/constants.rs"
+            ),
+            include_str!(
+                "../../../runtime/macaca-runtime-host/src/wasm_runtime_provider/host_import_bridge/construction.rs"
+            ),
+            include_str!(
+                "../../../runtime/macaca-runtime-host/src/wasm_runtime_provider/host_import_bridge/dispatch.rs"
+            ),
+            include_str!(
+                "../../../runtime/macaca-runtime-host/src/wasm_runtime_provider/host_import_bridge/task_lifecycle.rs"
+            ),
+            include_str!(
+                "../../../runtime/macaca-runtime-host/src/wasm_runtime_provider/host_import_bridge/ui_render.rs"
+            ),
+            include_str!(
+                "../../../runtime/macaca-runtime-host/src/wasm_runtime_provider/host_import_bridge/policy_validation.rs"
+            ),
+            include_str!(
+                "../../../runtime/macaca-runtime-host/src/wasm_runtime_provider/host_import_bridge/result_shaping.rs"
+            ),
+            include_str!(
+                "../../../runtime/macaca-runtime-host/src/wasm_runtime_provider/host_import_bridge/routing_support.rs"
+            ),
+        ]
+        .join("\n")
+    }
+
     /// Concatenate hosted execution module sources for architectural contract scanning.
     fn hosted_execution_module_sources() -> String {
         [
@@ -144,9 +178,7 @@ mod tests {
     #[test]
     fn wasm_session_audit_replay_single_chain() {
         let hosted = hosted_execution_module_sources();
-        let bridge = include_str!(
-            "../../../runtime/macaca-runtime-host/src/wasm_runtime_provider/host_import_bridge.rs"
-        );
+        let bridge = host_import_bridge_module_sources();
         let wasm_backend = include_str!("wasm_orchestration_backend.rs");
         let delegate_bridge = include_str!("application_agent_delegate_bridge.rs");
 
@@ -170,7 +202,7 @@ mod tests {
         );
 
         assert_no_coordination_patches("application_execution_hosted", &hosted);
-        assert_no_coordination_patches("host_import_bridge", bridge);
+        assert_no_coordination_patches("host_import_bridge", &bridge);
     }
 
     /// All YAML and WASM entry surfaces register exactly one composed execution backend.

@@ -20,11 +20,27 @@ mod tests {
         assert!(!runner.contains("KernelServiceId::new(AGENT_EXECUTION_SERVICE_ID)"));
     }
 
+    fn host_import_bridge_module_sources() -> String {
+        [
+            include_str!(
+                "../../../runtime/macaca-runtime-host/src/wasm_runtime_provider/host_import_bridge/mod.rs"
+            ),
+            include_str!(
+                "../../../runtime/macaca-runtime-host/src/wasm_runtime_provider/host_import_bridge/routing_support.rs"
+            ),
+            include_str!(
+                "../../../runtime/macaca-runtime-host/src/wasm_runtime_provider/host_import_bridge/dispatch.rs"
+            ),
+            include_str!(
+                "../../../runtime/macaca-runtime-host/src/wasm_runtime_provider/host_import_bridge/task_lifecycle.rs"
+            ),
+        ]
+        .join("\n")
+    }
+
     #[test]
     fn wasm_host_import_enters_application_service_delegate_command() {
-        let bridge = include_str!(
-            "../../../runtime/macaca-runtime-host/src/wasm_runtime_provider/host_import_bridge.rs"
-        );
+        let bridge = host_import_bridge_module_sources();
 
         assert!(bridge.contains("APPLICATION_SERVICE_ID"));
         assert!(bridge.contains("APPLICATION_AGENT_DELEGATE_COMMAND"));
@@ -45,9 +61,7 @@ mod tests {
     #[test]
     fn yaml_and_wasm_share_application_abi_then_agent_execution_provider() {
         let yaml = include_str!("agent_runner.rs");
-        let wasm = include_str!(
-            "../../../runtime/macaca-runtime-host/src/wasm_runtime_provider/host_import_bridge.rs"
-        );
+        let wasm = host_import_bridge_module_sources();
         let bridge = include_str!("application_agent_delegate_bridge.rs");
         let application_provider = include_str!(
             "../../../runtime/macaca-runtime-host/src/application_service_provider.rs"

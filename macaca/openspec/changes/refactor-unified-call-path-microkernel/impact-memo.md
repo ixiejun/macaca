@@ -584,3 +584,11 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 |---------------|----------------------|------------------------|-------|
 | `component_model_tests/{mod,support,descriptor_admission_tests,host_import_routing_tests,host_command_plan_tests,host_command_orchestration_tests,lifecycle_timeout_tests}.rs` | LOW | Component-model WASM contract test module tree; 12 lib tests unchanged; `wasm_runtime_provider/mod.rs` `mod component_model_tests` path unchanged | P5 |
 | filesize allowlist 43→42 | LOW | debt inventory shrink; 42 oversized files remain | P5 |
+
+## Iteration 71 additions (§4.5.1 host_import_bridge Facade split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `host_import_bridge/{mod,constants,construction,dispatch,task_lifecycle,ui_render,policy_validation,result_shaping,routing_support}.rs` | HIGH | WASM host-import audit authority path; public API `WasmHostImportBridge`/`WasmHostImportBridgeConfig` unchanged via `wasm_runtime_provider/mod.rs` | P5 |
+| `unified_audit_replay_convergence_tests.rs` / `unified_workflow_application_abi_tests.rs` multi-file source scan | LOW | architectural contract scans split modules instead of monolith | P5 |
+| filesize allowlist 42→41 | LOW | debt inventory shrink; 41 oversized files remain | P5 |
