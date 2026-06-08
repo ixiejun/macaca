@@ -755,3 +755,13 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `detect_cycles` | MEDIUM | Specification guard for dependency graph admission before task persistence | P5 |
 | `todo_board/tests.rs` escape-hatch migration surface | LOW | Contract tests use neutral agent fixtures; production modules agent-name free | P5 |
 | filesize allowlist 25→24 | LOW | debt inventory shrink; 24 oversized files remain | P5 |
+
+## Iteration 89 additions (§4.5.1 macaca-runtime agentic_loop Facade split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `agentic_loop/{mod,types,helpers,iteration,execute,pausable,tests}.rs` | HIGH | Core LLM↔tool syscall loop; public API `macaca_runtime::agentic_loop::*` unchanged via Facade re-exports | P5 |
+| `AgenticLoop::execute` / `run_iteration` | HIGH | Kernel/agent_runner execution path; all agent turns flow through this seam | P5 |
+| `PausableAgenticLoop` | MEDIUM | Fork-join pause/resume decorator; internal to runtime (not exported from `lib.rs`) | P5 |
+| `agentic_loop/tests.rs` | LOW | Mock-LLM contract tests; neutral tool names (`shell` as builtin tool id, not agent name) | P5 |
+| filesize allowlist 24→23 | LOW | debt inventory shrink; 23 oversized files remain | P5 |

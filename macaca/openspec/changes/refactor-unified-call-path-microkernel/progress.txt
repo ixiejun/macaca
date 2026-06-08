@@ -699,3 +699,12 @@
 - **Logging**: `tracing::info` at TaskBoard claim/start/review/fail and TaskSpace assignment/review/goal/reassign audit nodes。
 - **GitNexus memo (non-blocking)**: iteration 88 HIGH on `TaskBoard::claim_next_task` + `TaskSpace::create_task_assignment_with_graph_scope` cross-crate task orchestration seam — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: filesize allowlist 24→0（`agentic_loop.rs` / `todo.rs` 等）；6.3.2 archive；P5 终态验收。
+
+## Iteration 89 (2026-06-08)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 24→**23**；`macaca-runtime/agentic_loop.rs` 1266→`agentic_loop/` Facade 模块树（`mod.rs` + `types.rs` + `helpers.rs` + `iteration.rs` + `execute.rs` + `pausable.rs` + `tests.rs`）。
+- **Design patterns**: Facade module tree；Template Method（`run_iteration`）；Observer（event-sink variants + `RuntimeEventSink`）；Decorator（`PausableAgenticLoop`）；Strategy（config-driven context engine selection）。
+- **Contract tests**: `cargo check -p macaca-runtime` OK；`cargo test -p macaca-runtime agentic_loop::` 8/8；`os_layer_file_size_gate` 1/1；`serviceization_escape_hatches` OK；production modules all ≤500 lines（max `execute.rs` ~273）。
+- **Public API**: `macaca_runtime::agentic_loop::{AgenticLoop, LoopResult, RuntimeConfig}` unchanged via Facade re-exports；`lib.rs` `pub mod agentic_loop` unchanged。
+- **Logging**: preserved `tracing::{info,warn,error,debug}` + `#[instrument]` on `execute` and context-report audit nodes。
+- **GitNexus memo (non-blocking)**: iteration 89 HIGH on `AgenticLoop::execute` / `run_iteration` core runtime syscall seam — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: filesize allowlist 23→0（`todo.rs` / `engine.rs` / `local_provider.rs` 等）；6.3.2 archive；P5 终态验收。
