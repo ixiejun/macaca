@@ -515,3 +515,12 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `skill_service_provider_proposal_materialization/{mod,draft_materialization_builder,identity_vocabulary,content_digest_vocabulary}.rs` | LOW | Skill provider module tree; `apply_command` export unchanged | P5 |
 | `application_execution_remote_agent/{registration,transport,registry,provider}.rs` | LOW | remote agent provider module tree; `lib.rs` re-exports unchanged | P5 |
 | filesize allowlist 56→54 | LOW | debt inventory shrink; 54 oversized files remain | P5 |
+
+## Iteration 62 additions (§4.5.1 heartbeat/wasm borderline batch — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `heartbeat_lane/tests/{test_doubles,fixtures,nonblocking_tick,cadence_tick,run_history}.rs` | LOW | HeartbeatLane contract tests only; production lane unchanged | P5 |
+| `default_provider/{mod,session,artifact_loader}.rs` | LOW | WASM default provider module tree; `DefaultInProcessWasmRuntimeProvider` export unchanged | P5 |
+| `hardened_provider/{mod,session,response_mapper}.rs` | LOW | WASM hardened provider module tree; public exports unchanged | P5 |
+| filesize allowlist 54→51 | LOW | debt inventory shrink; 51 oversized files remain | P5 |

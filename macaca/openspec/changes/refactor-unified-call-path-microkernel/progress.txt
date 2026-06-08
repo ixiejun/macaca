@@ -502,3 +502,10 @@
 - **Contract tests**: `os_layer_file_size_gate` 1/1；`macaca-runtime-host` application_execution_remote_agent 2/2；`skill_proposal_materialization_tests` 4/4。
 - **GitNexus memo (non-blocking)**: iteration 61 LOW on runtime-host borderline facade splits — recorded in `impact-memo.md`.
 - **Next**: filesize allowlist 54→0（runtime-host giants / proto config/types / heartbeat_lane tests）；6.3.2 archive；P5 终态验收。
+
+## Iteration 62 (2026-06-07)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 54→**51**；`heartbeat_lane/tests.rs` 571→模块树（`test_doubles.rs` Test Double + `fixtures.rs` Object Mother + `nonblocking_tick`/`cadence_tick`/`run_history` Contract Test）；`default_provider.rs` 532→模块树（`mod.rs` Strategy + `session.rs` State + `artifact_loader.rs` Specification）；`hardened_provider.rs` 574→模块树（`mod.rs` Strategy + `session.rs` Adapter + `response_mapper.rs` Specification）。
+- **Design patterns**: Contract Test extraction；Test Double；Object Mother；Strategy（WASM providers）；State（default session）；Adapter（hardened transport/session）；Specification（artifact loader + response mapper）；trace `info!`/`warn!` on session create / dispatch / daemon mapping。
+- **Contract tests**: `os_layer_file_size_gate` 1/1；`heartbeat_lane::tests` 4/4；`hardened_provider_tests` 7/7。
+- **GitNexus memo (non-blocking)**: iteration 62 LOW on heartbeat/wasm borderline facade splits — recorded in `impact-memo.md`.
+- **Next**: filesize allowlist 51→0（runtime-host giants / proto config/types）；6.3.2 archive；P5 终态验收。
