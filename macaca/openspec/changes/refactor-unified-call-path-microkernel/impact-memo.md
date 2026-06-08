@@ -932,3 +932,13 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `OpenAiChatModel::chat` | LOW | Chat-completions Adapter HTTP transport; consumed by construction and compat paths behind feature flags | P4 |
 | `AnthropicChatModel::chat` | LOW | Messages API Adapter HTTP transport; consumed by construction and compat paths behind feature flags | P4 |
 | filesize allowlist 8→7 | LOW | debt inventory shrink; 7 oversized P4 framework files remain | P4 |
+
+## Iteration 106 additions (§4.5.1 macaca-framework a2a Facade split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `a2a/{types,error,formatter,resolver,tests}.rs` | LOW | Framework A2A protocol module tree; public API unchanged via Facade re-exports | P4 |
+| `A2AFormatter::to_a2a` | LOW | Adapter outbound conversion; strips ThinkingBlock at cross-agent boundary; consumed by pipeline and multi-agent paths | P4 |
+| `A2AFormatter::from_a2a` | LOW | Adapter inbound conversion; validates tool_use/tool_result Data parts; consumed by pipeline and multi-agent paths | P4 |
+| `FileCardResolver::resolve` | LOW | Strategy filesystem discovery backend; extensible via `AgentCardResolver` trait | P4 |
+| filesize allowlist 7→6 | LOW | debt inventory shrink; 6 oversized P4 framework files remain | P4 |

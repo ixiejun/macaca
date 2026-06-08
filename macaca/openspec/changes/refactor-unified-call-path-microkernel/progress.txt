@@ -861,3 +861,12 @@
 - **Escape hatch**: `serviceization_escape_hatches` scan paths extended to `model_impls/openai.rs` + `model_impls/anthropic.rs`（vendor ids remain `concat!` split literals）。
 - **GitNexus memo (non-blocking)**: iteration 105 LOW on `OpenAiChatModel::chat` / `AnthropicChatModel::chat` framework legacy HTTP adapter seam — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: filesize allowlist 7→0（P4 `macaca-framework` 剩余巨型文件，建议 `a2a.rs` 873 行或 `formatter.rs` 1354 行）；6.3.2 archive；P5 终态验收。
+
+## Iteration 106 (2026-06-08)
+- **P4 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 7→**6**；`macaca-framework/a2a.rs` 873→`a2a/` Facade + Adapter/Strategy 模块树（`a2a.rs` Facade + `types.rs` + `error.rs` + `formatter.rs` + `resolver.rs` + `tests/{fixtures,types_tests,formatter_tests,resolver_tests}.rs`）。
+- **Design patterns**: Facade module tree；Adapter（`A2AFormatter` Msg ↔ A2A wire types）；Strategy（`AgentCardResolver` trait + `FileCardResolver` filesystem backend）。
+- **Contract tests**: `cargo check -p macaca-framework` OK；`cargo test -p macaca-framework a2a::` 19/19；`os_layer_file_size_gate` 1/1；production modules all ≤500 lines（max `types.rs` ~199）。
+- **Public API**: `macaca_framework::a2a::{AgentCard, A2AMessage, A2AFormatter, AgentCardResolver, FileCardResolver, A2AError, ...}` unchanged via Facade re-exports；`lib.rs` `pub mod a2a` unchanged。
+- **Logging**: `tracing::debug`/`warn` on `A2AFormatter::to_a2a`/`from_a2a` and `FileCardResolver::resolve` with `target = "macaca_framework::a2a::{formatter,resolver}"` audit fields。
+- **GitNexus memo (non-blocking)**: iteration 106 LOW on `A2AFormatter::to_a2a` / `from_a2a` framework inter-agent message Adapter seam — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: filesize allowlist 6→0（P4 `macaca-framework` 剩余巨型文件，建议 `formatter.rs` 1354 行或 `mcp.rs` 1750 行）；6.3.2 archive；P5 终态验收。
