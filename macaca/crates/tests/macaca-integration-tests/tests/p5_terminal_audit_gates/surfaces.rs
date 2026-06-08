@@ -35,7 +35,6 @@ pub fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> 
             "crates/application/macaca-app/src/consumption.rs"
                 | "crates/application/macaca-app/src/service_projection.rs"
                 | "crates/application/macaca-app/src/workflow.rs"
-                | "crates/facade/macaca-sdk/src/system_facade.rs"
                 | "crates/foundation/macaca-proto/src/agent_execution_service/mod.rs"
                 | "crates/foundation/macaca-proto/src/agent_execution_service/autonomous_envelope.rs"
                 | "crates/foundation/macaca-proto/src/agent_execution_service/command_adapters.rs"

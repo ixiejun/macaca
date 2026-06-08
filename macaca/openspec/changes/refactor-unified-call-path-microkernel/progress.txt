@@ -764,3 +764,13 @@
 - **Logging**: preserved `tracing::{info,warn}` on unavailable mutations, empty read-model responses, and invoke-tool rejection paths with `trace_id` / domain id fields。
 - **GitNexus memo (non-blocking)**: iteration 95 HIGH on `ServiceBackedSkillClient::invoke_tool` generic Skill service syscall seam — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: filesize allowlist 17→0（`system_facade.rs` / `macaca-app` / `pipeline_dry_run.rs` / P4 `macaca-framework` 等）；6.3.2 archive；P5 终态验收。
+
+## Iteration 96 (2026-06-08)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 17→**16**；`macaca-sdk/system_facade.rs` 639→`system_facade/` Facade 模块树（`system_facade.rs` + `types.rs` + `constructors.rs` + `accessors.rs` + `operations.rs` + `tests.rs`）。
+- **Design patterns**: Facade module tree；Strategy（capability-scoped client type parameters）；Builder（`new` / `with_clients` / `with_route_c_*` factories）；Null Object（unavailable default clients）；Observer（`tracing::info` audit nodes on every shell-facing operation）。
+- **Contract tests**: `cargo check -p macaca-sdk` OK；`cargo test -p macaca-sdk system_facade::` 3/3；`os_layer_file_size_gate` 1/1；`serviceization_escape_hatches` OK；production modules all ≤500 lines（max `constructors.rs` ~291）。
+- **Public API**: `macaca_sdk::{SystemFacade, ApprovalDecisionCommand, ...}` unchanged via Facade re-exports；`lib.rs` `pub mod system_facade` unchanged。
+- **Escape hatch**: production `system_facade.rs` 退役 `hardcoded-agent-role` migration surface；contract-test fixtures 保留在 `system_facade/tests.rs`（`tests.rs` 后缀自动豁免）。
+- **Logging**: preserved `tracing::info` on task-board query, status snapshot, service inspection/call, trace replay/tail, package inspection, llm chat, memory recall, context assembly audit nodes。
+- **GitNexus memo (non-blocking)**: iteration 96 HIGH on `SystemFacade::query_task_board` + `call_service` shell syscall seam — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: filesize allowlist 16→0（`macaca-app` / `pipeline_dry_run.rs` / P4 `macaca-framework` 等）；6.3.2 archive；P5 终态验收。

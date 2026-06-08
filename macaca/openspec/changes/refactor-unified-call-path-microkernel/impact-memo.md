@@ -831,3 +831,14 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `skill_operator_client` (sibling `pub(crate) service`) | MEDIUM | Extension trait reuses service-backed client wiring | P5 |
 | `skill_client/tests.rs` | LOW | Contract tests with neutral trace ids; no forbidden role literals | P5 |
 | filesize allowlist 18→17 | LOW | debt inventory shrink; 17 oversized files remain | P5 |
+
+## Iteration 96 additions (§4.5.1 macaca-sdk system_facade Facade split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `system_facade/{types,constructors,accessors,operations,tests}.rs` | HIGH | SDK shell facade module tree; public `SystemFacade` API unchanged via Facade re-exports | P5 |
+| `SystemFacade::query_task_board` | HIGH | Task-board syscall seam; consumed by Web/CLI thin shells via SDK boundary | P5 |
+| `SystemFacade::call_service` | HIGH | Generic service syscall seam; default Null Object returns structured unavailable | P5 |
+| `with_route_c_clients` / `with_route_c_and_autonomy_clients` | MEDIUM | Builder composition points; explicit Strategy client injection | P5 |
+| `system_facade/tests.rs` | LOW | Contract tests with neutral todo fixtures; `hardcoded-agent-role` debt retired from production root | P5 |
+| filesize allowlist 17→16 | LOW | debt inventory shrink; 16 oversized files remain | P5 |
