@@ -962,3 +962,13 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `register_mcp_tools_with_options` | LOW | Bridge Toolkit registration with collision/disabled policies; consumed by runtime-host and web framework toolkit paths | P4 |
 | `McpToolHandler::execute` | LOW | Adapter delegates MCP tool calls into `ToolHandler`; consumed by toolkit registration | P4 |
 | filesize allowlist 5→4 | LOW | debt inventory shrink; 4 oversized P4 framework files remain | P4 |
+
+## Iteration 109 additions (§4.5.1 macaca-framework memory Facade split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `memory/{types,error,working,long_term,config,tokens,compressor,tests}.rs` | LOW | Framework memory module tree; public API unchanged via Facade re-exports | P4 |
+| `WorkingMemory` / `InMemoryWorkingMemory` | LOW | In-session mark-based store; consumed by `react_agent`, `macaca-web/framework_runner` | P4 |
+| `LongTermMemory` / `InMemoryLongTermMemory` | LOW | Cross-session keyword retrieval Strategy; extensible via trait | P4 |
+| `MemoryCompressor::compress_if_needed` | LOW | Template Method LLM summarization; consumed by `react_agent` compression hook | P4 |
+| filesize allowlist 4→3 | LOW | debt inventory shrink; 3 oversized P4 framework files remain | P4 |
