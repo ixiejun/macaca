@@ -746,3 +746,12 @@
 - **Logging**: preserved + extended `tracing::{info,warn,debug}` on due-materialization, job CRUD, lease acquisition, run lifecycle transitions with `service_id` / `provider_id` / `trace_id` / `audit_id` fields。
 - **GitNexus memo (non-blocking)**: iteration 93 HIGH on `InProcessSchedulerProvider::acquire_next_run_lease_with_target` dispatch-boundary syscall seam — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: filesize allowlist 19→0（`macaca-app` / `macaca-sdk` / P4 `macaca-framework` 巨型文件 / `pipeline_dry_run.rs` 等）；6.3.2 archive；P5 终态验收。
+
+## Iteration 94 (2026-06-08)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 19→**18**；`macaca-sdk/mcp_client.rs` 578→`mcp_client/` Facade 模块树（`mcp_client.rs` + `support.rs` + `unavailable.rs` + `service_backed.rs` + `tests.rs`）。
+- **Design patterns**: Facade module tree；Null Object（`UnavailableSystemMcpClient`）；Adapter（`ServiceBackedMcpClient` over `SystemServiceClient`）；Observer（`tracing::{info,warn}` on unavailable/empty-read audit nodes）。
+- **Contract tests**: `cargo check -p macaca-sdk` OK；`cargo test -p macaca-sdk mcp_client::` 1/1；`os_layer_file_size_gate` 1/1；`serviceization_escape_hatches` OK；production modules all ≤500 lines（max `unavailable.rs` ~191）。
+- **Public API**: `macaca_sdk::{SystemMcpClient, ServiceBackedMcpClient, UnavailableSystemMcpClient}` unchanged via Facade re-exports；`lib.rs` `pub mod mcp_client` unchanged。
+- **Logging**: preserved `tracing::{info,warn}` on unavailable mutations, empty read-model responses, and invoke-tool rejection paths with `trace_id` / `tool` fields。
+- **GitNexus memo (non-blocking)**: iteration 94 HIGH on `ServiceBackedMcpClient::invoke_tool` generic service syscall seam — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: filesize allowlist 18→0（`skill_client.rs` / `system_facade.rs` / `macaca-app` / `pipeline_dry_run.rs` / P4 `macaca-framework` 等）；6.3.2 archive；P5 终态验收。

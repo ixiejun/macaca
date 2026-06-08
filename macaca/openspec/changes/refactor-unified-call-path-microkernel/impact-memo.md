@@ -808,3 +808,14 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `DefaultScheduleCalculator::due_times` | MEDIUM | Strategy schedule calculation; cron/interval/one-shot bounded catch-up | P5 |
 | `local_provider/tests.rs` | LOW | Contract tests with neutral service-target fixtures; heartbeat cadence boundary assertions | P5 |
 | filesize allowlist 20→19 | LOW | debt inventory shrink; 19 oversized files remain | P5 |
+
+## Iteration 94 additions (§4.5.1 macaca-sdk mcp_client Facade split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `mcp_client/{support,unavailable,service_backed,tests}.rs` | HIGH | SDK MCP client module tree; public `SystemMcpClient` API unchanged via Facade re-exports | P5 |
+| `ServiceBackedMcpClient::invoke_tool` | HIGH | Generic `SystemServiceClient` syscall seam; consumed by Web/CLI/framework MCP operators | P5 |
+| `UnavailableSystemMcpClient` | MEDIUM | Null Object for composition roots without runtime MCP service | P5 |
+| `mcp_client/support::call` | MEDIUM | Shared JSON service-call bridge for all MCP command DTOs | P5 |
+| `mcp_client/tests.rs` | LOW | Contract test with neutral fixture agent/session ids | P5 |
+| filesize allowlist 19→18 | LOW | debt inventory shrink; 18 oversized files remain | P5 |
