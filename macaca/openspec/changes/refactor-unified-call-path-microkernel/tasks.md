@@ -168,7 +168,7 @@
 - [ ] 4.4.4 终态断言：`cargo tree -e normal -p macaca-web --depth 1` 仅 `macaca-sdk`（+ proto DTO/必要 framework 适配）。（**部分**：仍含 app/agent/runtime/context/framework/runtime-host，待 P4/P5 收敛）
 
 ### 4.5 P3 退出验证
-- [ ] 4.5.1 全仓无 >500 行 OS 层源文件（VC-filesize）。（**部分**：macaca-web + macaca-cli 巨型文件已全部拆分合规；全仓 **71** 行 allowlist 债务（非 shell crate），gate 已实现；iteration 55 退役 `isolated.rs`/`provisioner.rs`/`skill_service_provider_curation.rs`/`plugin_marketplace_service_commands.rs`）
+- [ ] 4.5.1 全仓无 >500 行 OS 层源文件（VC-filesize）。（**部分**：macaca-web + macaca-cli 巨型文件已全部拆分合规；全仓 **65** 行 allowlist 债务（非 shell crate），gate 已实现；iteration 56 退役 `governance/pipeline.rs`/`scheduler.rs`/`todo_store.rs`/`executor/queue.rs`/`entitlement.rs`/`execution_control_service`）
 - [x] 4.5.2 web 相关 allowlist 清零；VC-gate 绿；`cargo test -p macaca-web --lib` 250/250。
 
 ## 5. P4 — CLI 解耦 + domain pack 外置

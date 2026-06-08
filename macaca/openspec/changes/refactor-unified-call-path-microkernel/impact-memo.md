@@ -462,3 +462,13 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `plugin_marketplace_snapshot_decode` Adapter | LOW | snapshot command decode only; marketplace dispatch unchanged | P5 |
 | `skill_sanitization_boundary_tests` include_str concat | LOW | source-guard contract only | P5 |
 | filesize allowlist 75→71 | LOW | debt inventory shrink; 71 oversized files remain | P5 |
+
+## Iteration 56 additions (§4.5.1 borderline batch + execution_control split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `governance/pipeline/tests.rs` extraction | LOW | context governance pipeline tests only | P5 |
+| `macaca-task/{scheduler,todo_store}/tests.rs` | LOW | task service unit tests; production APIs unchanged | P5 |
+| `executor/queue/tests.rs` / `entitlement/tests.rs` | LOW | runtime-host kernel queue + commerce facade tests | P5 |
+| `execution_control_service/{mod,command_adapters}.rs` | LOW | proto contract module tree; `pub use execution_control_service::*` unchanged | P5 |
+| filesize allowlist 71→65 | LOW | debt inventory shrink; 65 oversized files remain | P5 |

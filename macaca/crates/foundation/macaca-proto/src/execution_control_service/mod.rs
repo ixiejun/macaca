@@ -11,10 +11,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    ApplicationId, MacacaError, MacacaResult, ServiceCommand, ServiceCommandName, TaskId,
-    TraceContext,
-};
+use crate::{ApplicationId, MacacaError, MacacaResult, TaskId, TraceContext};
 
 /// Stable service id for the Execution Control system service.
 pub const EXECUTION_CONTROL_SERVICE_ID: &str = "service.execution_control";
@@ -378,124 +375,12 @@ pub struct ExecutionControlCommandResult {
     pub metadata: BTreeMap<String, String>,
 }
 
-impl ExecutionControlResolvePolicyCommand {
-    /// Convert this typed command into a provider-neutral service command.
-    pub fn into_service_command(self) -> MacacaResult<ServiceCommand> {
-        service_command(
-            EXECUTION_CONTROL_RESOLVE_POLICY_COMMAND,
-            self.scope.trace.clone(),
-            self,
-        )
-    }
-}
-
-impl ExecutionControlRegisterExecutionCommand {
-    /// Convert this typed command into a provider-neutral service command.
-    pub fn into_service_command(self) -> MacacaResult<ServiceCommand> {
-        service_command(
-            EXECUTION_CONTROL_REGISTER_EXECUTION_COMMAND,
-            self.scope.trace.clone(),
-            self,
-        )
-    }
-}
-
-impl ExecutionControlPauseCommand {
-    /// Convert this typed command into a provider-neutral service command.
-    pub fn into_service_command(self) -> MacacaResult<ServiceCommand> {
-        service_command(
-            EXECUTION_CONTROL_REQUEST_PAUSE_COMMAND,
-            self.scope.trace.clone(),
-            self,
-        )
-    }
-}
-
-impl ExecutionControlCheckpointCommand {
-    /// Convert this typed command into a provider-neutral service command.
-    pub fn into_service_command(self) -> MacacaResult<ServiceCommand> {
-        service_command(
-            EXECUTION_CONTROL_RECORD_CHECKPOINT_COMMAND,
-            self.scope.trace.clone(),
-            self,
-        )
-    }
-}
-
-impl ExecutionControlAwaitResumeCommand {
-    /// Convert this typed command into a provider-neutral service command.
-    pub fn into_service_command(self) -> MacacaResult<ServiceCommand> {
-        service_command(
-            EXECUTION_CONTROL_AWAIT_RESUME_COMMAND,
-            self.scope.trace.clone(),
-            self,
-        )
-    }
-}
-
-impl ExecutionControlCancelWaitCommand {
-    /// Convert this typed command into a provider-neutral service command.
-    pub fn into_service_command(self) -> MacacaResult<ServiceCommand> {
-        service_command(
-            EXECUTION_CONTROL_CANCEL_WAIT_COMMAND,
-            self.scope.trace.clone(),
-            self,
-        )
-    }
-}
-
-impl ExecutionControlResumeCommand {
-    /// Convert this typed command into a provider-neutral service command.
-    pub fn into_service_command(self) -> MacacaResult<ServiceCommand> {
-        service_command(
-            EXECUTION_CONTROL_REQUEST_RESUME_COMMAND,
-            self.scope.trace.clone(),
-            self,
-        )
-    }
-}
-
-impl ExecutionControlStateCommand {
-    /// Convert this typed command into a provider-neutral service command.
-    pub fn into_service_command(self) -> MacacaResult<ServiceCommand> {
-        service_command(
-            EXECUTION_CONTROL_QUERY_STATE_COMMAND,
-            self.scope.trace.clone(),
-            self,
-        )
-    }
-}
-
-impl ExecutionControlSnapshotCommand {
-    /// Convert this typed command into a provider-neutral service command.
-    pub fn into_service_command(self) -> MacacaResult<ServiceCommand> {
-        service_command(
-            EXECUTION_CONTROL_SNAPSHOT_COMMAND,
-            self.scope.trace.clone(),
-            self,
-        )
-    }
-}
-
-fn service_command<T>(
-    name: &'static str,
-    trace: TraceContext,
-    payload: T,
-) -> MacacaResult<ServiceCommand>
-where
-    T: Serialize,
-{
-    Ok(ServiceCommand::with_trace(
-        ServiceCommandName::new(name),
-        serde_json::to_value(payload)?,
-        trace,
-    ))
-}
-
+/// Trim user-supplied labels before they enter serializable trigger/barrier DTOs.
 fn sanitize_label(value: impl Into<String>) -> String {
     value.into().trim().to_string()
 }
 
+/// Reject empty scope fields so execution-control commands always carry auditable identity.
 fn non_empty(value: String, message: &str) -> MacacaResult<String> {
     let trimmed = value.trim().to_string();
     if trimmed.is_empty() {
@@ -505,41 +390,11 @@ fn non_empty(value: String, message: &str) -> MacacaResult<String> {
     }
 }
 
+/// Adapter layer: typed execution-control commands → provider-neutral `ServiceCommand`.
+///
+/// **Pattern:** Adapter — keeps serde/command-name wiring out of the pure DTO module so
+/// contract types stay stable while transport encoding evolves independently.
+mod command_adapters;
+
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn execution_control_policy_roundtrips() {
-        let policy = ExecutionControlPolicy::enabled(
-            vec![ExecutionControlTrigger::tool_call_barrier("create_goal")],
-            vec![ExecutionControlResumeSource::goal_lifecycle()],
-            ExecutionControlCheckpointMode::ReferenceOnly,
-        )
-        .allow_command_overrides(true);
-
-        let encoded = serde_json::to_string(&policy).unwrap();
-        let decoded: ExecutionControlPolicy = serde_json::from_str(&encoded).unwrap();
-
-        assert_eq!(decoded.mode, ExecutionControlMode::Enabled);
-        assert!(decoded.allow_command_overrides);
-        assert_eq!(decoded.triggers, policy.triggers);
-        assert_eq!(decoded.resume_sources, policy.resume_sources);
-    }
-
-    #[test]
-    fn execution_control_scope_requires_trace() {
-        let mut trace = TraceContext::new("trace-execution-control");
-        trace.trace_id.clear();
-
-        let result = ExecutionControlScope::new(
-            ApplicationId::from_name("demo"),
-            "session-a",
-            "execution-a",
-            trace,
-            "test",
-        );
-
-        assert!(result.is_err());
-    }
-}
+mod tests;
