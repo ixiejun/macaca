@@ -472,3 +472,12 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `executor/queue/tests.rs` / `entitlement/tests.rs` | LOW | runtime-host kernel queue + commerce facade tests | P5 |
 | `execution_control_service/{mod,command_adapters}.rs` | LOW | proto contract module tree; `pub use execution_control_service::*` unchanged | P5 |
 | filesize allowlist 71→65 | LOW | debt inventory shrink; 65 oversized files remain | P5 |
+
+## Iteration 57 additions (§4.5.1 proto/context borderline batch — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `application_manifest/tests.rs` extraction | LOW | proto manifest serde contract tests only | P5 |
+| `macaca-context/memory/tests.rs` extraction | LOW | memory recall governance tests; production DTOs unchanged | P5 |
+| `agent_execution_service/{mod,autonomous_envelope,command_adapters}.rs` | LOW | proto contract module tree; `pub use agent_execution_service::*` unchanged | P5 |
+| filesize allowlist 65→62 | LOW | debt inventory shrink; 62 oversized files remain | P5 |

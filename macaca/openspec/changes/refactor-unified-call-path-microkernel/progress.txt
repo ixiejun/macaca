@@ -467,3 +467,10 @@
 - **Contract tests**: `os_layer_file_size_gate` 1/1；`macaca-proto` execution_control 2/2；`macaca-context` pipeline 6/6；`macaca-task` scheduler 7/7 + todo_store 6/6；`macaca-runtime-host` queue 4/4 + entitlement 4/4。
 - **GitNexus memo (non-blocking)**: iteration 56 LOW on borderline batch + execution_control split — recorded in `impact-memo.md`.
 - **Next**: filesize allowlist 65→0（runtime-host giants / proto config/types）；6.3.2 archive；P5 终态验收。
+
+## Iteration 57 (2026-06-07)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 65→**62**；Contract Test 提取：`application_manifest/tests.rs`、`macaca-context/memory/tests.rs`；`agent_execution_service.rs` → 目录模块 `mod.rs` + `autonomous_envelope.rs`（Specification+Builder）+ `command_adapters.rs`（Adapter）+ `tests.rs`。
+- **Design patterns**: Contract Test extraction；Facade module tree（proto agent_execution_service）；Specification+Builder（autonomous envelope compiler）；Adapter（DTO → `ServiceCommand`）。
+- **Contract tests**: `os_layer_file_size_gate` 1/1；`macaca-proto` application_manifest 6/6 + agent_execution 7/7；`macaca-context` memory 6/6。
+- **GitNexus memo (non-blocking)**: iteration 57 LOW on proto/context borderline splits — recorded in `impact-memo.md`.
+- **Next**: filesize allowlist 62→0（runtime-host giants / proto config/types / heartbeat_service）；6.3.2 archive；P5 终态验收。
