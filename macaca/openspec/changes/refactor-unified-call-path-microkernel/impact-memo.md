@@ -913,3 +913,13 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `HookRegistry::run_pre_reply` / `run_post_reply` | LOW | Chain of Responsibility hook ordering; instance + static hook composition | P4 |
 | `register_static_hook` / `clear_static_hooks` | LOW | Process-wide Singleton hook registry; test-serialized via mutex | P4 |
 | filesize allowlist 10→9 | LOW | debt inventory shrink; 9 oversized P4 framework files remain | P4 |
+
+## Iteration 104 additions (§4.5.1 macaca-framework pipeline Facade split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `pipeline/{core,sequential,fanout,msg_hub,tests}.rs` | LOW | Framework pipeline module tree; public API unchanged via Facade re-exports | P4 |
+| `SequentialPipeline::run` | LOW | Chain of Responsibility agent ordering; consumed by plan, react_agent, construction paths | P4 |
+| `FanoutPipeline::run` / `run_all` | LOW | Strategy + Composite fan-out; concurrent vs sequential dispatch modes | P4 |
+| `MsgHub::run_round` / `run_rounds` | LOW | Mediator round-table broadcast; thinking-strip on observe fan-out | P4 |
+| filesize allowlist 9→8 | LOW | debt inventory shrink; 8 oversized P4 framework files remain | P4 |

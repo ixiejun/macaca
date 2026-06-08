@@ -842,3 +842,12 @@
 - **Logging**: `tracing::debug` on `HookedAgent::reply` pre/post hook boundaries with `target = "macaca_framework::agent::hooked"` audit fields。
 - **GitNexus memo (non-blocking)**: iteration 103 LOW on `HookedAgent` / `HookRegistry` framework agent admission seam — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: filesize allowlist 9→0（P4 `macaca-framework` 剩余巨型文件，建议 `pipeline.rs` 720 行或 `model_impls.rs` 893 行）；6.3.2 archive；P5 终态验收。
+
+## Iteration 104 (2026-06-08)
+- **P4 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 9→**8**；`macaca-framework/pipeline.rs` 720→`pipeline/` Facade + Strategy/Chain of Responsibility/Composite/Mediator 模块树（`pipeline.rs` Facade + `core.rs` + `sequential.rs` + `fanout.rs` + `msg_hub.rs` + `tests/{fixtures,cases}.rs`）。
+- **Design patterns**: Facade module tree；Strategy（`Pipeline` trait + `FanoutPipeline` concurrent/sequential modes）；Chain of Responsibility（`SequentialPipeline` agent chain）；Composite（`FanoutPipeline` multi-agent fan-out）；Mediator + Observer（`MsgHub` round-table broadcast with `observe` fan-out）。
+- **Contract tests**: `cargo check -p macaca-framework` OK；`cargo test -p macaca-framework pipeline::` 13/13；`os_layer_file_size_gate` 1/1；production modules all ≤500 lines（max `msg_hub.rs` ~136）。
+- **Public API**: `macaca_framework::pipeline::{Pipeline, SequentialPipeline, FanoutPipeline, MsgHub}` unchanged via Facade re-exports；`lib.rs` `pub mod pipeline` unchanged。
+- **Logging**: `tracing::debug` on `SequentialPipeline::run`, `FanoutPipeline::run`/`run_all`, and `MsgHub::run_round`/`run_rounds` with `target = "macaca_framework::pipeline"` audit fields。
+- **GitNexus memo (non-blocking)**: iteration 104 LOW on `MsgHub::run_round` / `SequentialPipeline::run` framework pipeline admission seam — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: filesize allowlist 8→0（P4 `macaca-framework` 剩余巨型文件，建议 `model_impls.rs` 893 行或 `a2a.rs` 873 行）；6.3.2 archive；P5 终态验收。
