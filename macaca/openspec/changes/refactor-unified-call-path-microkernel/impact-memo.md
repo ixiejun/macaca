@@ -714,3 +714,23 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `GoalEvaluator::evaluate` | HIGH | Pluggable goal-completion policy; downstream TaskBoard/TodoStore terminal aggregation depends on evaluation semantics | P5 |
 | `PlanEvent` | MEDIUM | Observer channel for decoupled LLM/tool consumers; SSE and workflow hosts subscribe without importing scheduler internals | P5 |
 | filesize allowlist 29→28 | LOW | debt inventory shrink; 28 oversized files remain | P5 |
+
+## Iteration 85 additions (§4.5.1 macaca-skill runtime Facade split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `runtime/{mod,config,types,discovery,filter,prompt,projection,path_policy,tests}.rs` | HIGH | AgentSkills snapshot pipeline; public API `macaca_skill::runtime::*` unchanged via Facade re-exports + `lib.rs` `pub use runtime::*` | P5 |
+| `SkillRuntime::build_snapshot` | HIGH | SDK/runtime-host/shell → per-agent skill catalog + prompt injection; discovery → policy → projection → prompt assembly | P5 |
+| `path_belongs_to_snapshot_skill` | HIGH | File-policy guard for tool reads within projected/canonical skill trees during agentic execution | P5 |
+| `SkillPolicyChain` integration in `filter_entries` | MEDIUM | Allow/deny + metadata gates; filtered diagnostics feed audit surfaces | P5 |
+| filesize allowlist 28→27 | LOW | debt inventory shrink; 27 oversized files remain | P5 |
+
+## Iteration 86 additions (§4.5.1 macaca-skill agent_skill Facade split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `agent_skill/{mod,scope,model,metadata,parser,tests}.rs` | HIGH | agentskills.io SKILL.md domain model; public API `macaca_skill::agent_skill::*` unchanged via Facade re-exports + `lib.rs` `pub use agent_skill::*` | P5 |
+| `AgentSkill::from_path_with_source` | HIGH | Discovery/runtime/catalog tier-1 load; canonical path + source scope precedence metadata | P5 |
+| `AgentSkill::load_content` | MEDIUM | Tier-2 progressive disclosure activation; resource listing for bundled scripts/assets | P5 |
+| `parse_skill_md_full` | HIGH | Runtime discovery + policy gating consume full metadata/invocation parse; macaca/openclaw metadata blocks | P5 |
+| filesize allowlist 27→26 | LOW | debt inventory shrink; 26 oversized files remain | P5 |

@@ -665,3 +665,19 @@
 - **Escape hatch**: `plan_loop/mod.rs` 同步至 `surfaces.rs` + `serviceization_escape_hatches.rs` migration surface allowlist；Contract Test fixture 中性化（`backend`→`agent-alpha`，`architect`→`agent-beta`）。
 - **GitNexus memo (non-blocking)**: iteration 84 HIGH on `PlanLoop::run` heartbeat dispatch + `GoalEvaluator::evaluate` goal-completion seam — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: filesize allowlist 28→0（`macaca-framework` / `agentic_loop` / `todo_board.rs` / `runtime.rs` 等）；6.3.2 archive；P5 终态验收。
+
+## Iteration 85 (2026-06-08)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 28→**27**；`macaca-skill/runtime.rs` 692→`runtime/` Facade 模块树（`mod.rs` + `config.rs` + `types.rs` + `discovery.rs` + `filter.rs` + `prompt.rs` + `projection.rs` + `path_policy.rs` + `tests.rs`）。
+- **Design patterns**: Facade module tree；Memento（`SkillSnapshot`）；Chain of Responsibility（`SkillPolicyChain`）；Strategy（full/compact prompt + source precedence）；Value Object（`SkillRuntimeOptions`, limits, snapshot entries）。
+- **Contract tests**: `cargo check -p macaca-skill` OK；`cargo test -p macaca-skill runtime::` 5/5；`os_layer_file_size_gate` 1/1；`serviceization_escape_hatches` OK；production modules all ≤500 lines（max `discovery.rs` 170）。
+- **Logging**: `tracing::info/debug/warn` at snapshot build, discovery limits, policy counts, prompt truncation, workspace projection.
+- **GitNexus memo (non-blocking)**: iteration 85 HIGH on `SkillRuntime::build_snapshot` + `path_belongs_to_snapshot_skill` file-policy seam — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: filesize allowlist 27→0（`macaca-task/runtime.rs` / `todo_board.rs` / `agentic_loop` 等）；6.3.2 archive；P5 终态验收。
+
+## Iteration 86 (2026-06-08)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 27→**26**；`agent_skill.rs` 676→`agent_skill/` Facade 模块树（`mod.rs` + `scope.rs` + `model.rs` + `metadata.rs` + `parser.rs` + `tests.rs`）。
+- **Design patterns**: Facade module tree；Value Object（`AgentSkill`, metadata DTOs, `SkillSourceScope`）；Builder/Parser（`parser` → `ParsedSkillMd`）；Lazy Loading（tier-1 metadata vs tier-2 `ActivatedSkill`）。
+- **Contract tests**: `cargo check -p macaca-skill` OK；`cargo test -p macaca-skill agent_skill::` 11/11；`os_layer_file_size_gate` 1/1；production modules all ≤500 lines（max `parser.rs` ~230）。
+- **Logging**: `tracing::info/debug` at tier-1 load and tier-2 activation; contract test MCP fixture neutralized (`playwright`→`sample-mcp`).
+- **GitNexus memo (non-blocking)**: iteration 86 HIGH on `AgentSkill::from_path_with_source` + `parse_skill_md_full` cross-crate SKILL.md serde surface — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: filesize allowlist 26→0（`macaca-task/runtime.rs` / `todo_board.rs` / `agentic_loop` 等）；6.3.2 archive；P5 终态验收。
