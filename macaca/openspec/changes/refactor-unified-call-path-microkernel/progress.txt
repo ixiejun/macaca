@@ -586,3 +586,10 @@
 - **Contract tests**: `os_layer_file_size_gate` 1/1；`mcp_service_provider` lib tests 7/7。
 - **GitNexus memo (non-blocking)**: iteration 73 HIGH on `McpSystemServiceProvider::handle_tool_invoke` MCP tool invocation admission + facade side-effect path — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: filesize allowlist 39→0（`mcp_runtime.rs` / `app_executor.rs` / `application_service_provider.rs` / proto config/types 等）；6.3.2 archive；P5 终态验收。
+
+## Iteration 74 (2026-06-08)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 39→**38**；`application_service_provider.rs` 1022→模块树（`mod.rs` Facade + `support.rs` Adapter helpers + `wasm_session.rs` Bridge + `genui_surface.rs` Repository + `lifecycle_queries.rs` + `system_service.rs` lifecycle + `command_dispatch.rs` Command Router + `lifecycle_commands.rs` + `session_commands.rs` + `host_commands.rs` Strategy/Bridge + `tests.rs` Contract Test 分区）。
+- **Design patterns**: Facade module tree；Adapter/Bridge（`macaca-app` delegation + WASM session factory）；Command Router；Repository/Memento（GenUI surface store）；Strategy（`ApplicationOrchestrationBackend` injection）；Null Object（`unavailable()` provider）；trace `info!`/`warn!` on command admission / session / policy sync / delegation nodes。
+- **Contract tests**: `os_layer_file_size_gate` 1/1；`application_service_provider` lib tests 4/4；`unified_workflow_application_abi` 6/6（`include_str!` 路径同步至 `command_dispatch.rs`）。
+- **GitNexus memo (non-blocking)**: iteration 74 HIGH on `ApplicationSystemServiceProvider::handle_host_dispatch` / `ensure_wasm_session` WASM host dispatch + lazy session creation path — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: filesize allowlist 38→0（`mcp_runtime.rs` / `app_executor.rs` / `autonomy_dispatch.rs` / proto config/types 等）；6.3.2 archive；P5 终态验收。

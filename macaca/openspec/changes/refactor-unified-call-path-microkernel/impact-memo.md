@@ -606,3 +606,12 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 |---------------|----------------------|------------------------|-------|
 | `mcp_service_provider/{mod,descriptor,support,system_service,command_dispatch,runtime_facade_commands,tool_invoke_commands,operator_commands,tests}.rs` | HIGH | MCP system service command router + tool invoke admission guards + operator lifecycle delegation; public API `McpSystemServiceProvider`/`mcp_service_descriptor` unchanged via `lib.rs` | P5 |
 | filesize allowlist 40→39 | LOW | debt inventory shrink; 39 oversized files remain | P5 |
+
+## Iteration 74 additions (§4.5.1 application_service_provider Facade split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `application_service_provider/{mod,support,wasm_session,genui_surface,lifecycle_queries,system_service,command_dispatch,lifecycle_commands,session_commands,host_commands,tests}.rs` | HIGH | Application system service command router + WASM lazy session factory + host dispatch + agent delegate orchestration bridge; public API `ApplicationSystemServiceProvider`/`ApplicationOrchestrationBackend` unchanged via `lib.rs` | P5 |
+| `ApplicationSystemServiceProvider::ensure_wasm_session` | HIGH | WASM host dispatch session creation; policy sync on session start | P5 |
+| `ApplicationSystemServiceProvider::handle_host_dispatch` | HIGH | YAML/WASM unified application ABI host command path | P5 |
+| filesize allowlist 39→38 | LOW | debt inventory shrink; 38 oversized files remain | P5 |

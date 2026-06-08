@@ -64,7 +64,7 @@ mod tests {
         let wasm = host_import_bridge_module_sources();
         let bridge = include_str!("application_agent_delegate_bridge.rs");
         let application_provider = include_str!(
-            "../../../runtime/macaca-runtime-host/src/application_service_provider.rs"
+            "../../../runtime/macaca-runtime-host/src/application_service_provider/command_dispatch.rs"
         );
         let execution_provider = include_str!(
             "../../../runtime/macaca-runtime-host/src/agent_execution_service_provider.rs"
