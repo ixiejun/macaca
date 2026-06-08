@@ -694,3 +694,12 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `AgentExecutionEvent` | HIGH | Agentic loop progress → UI/SSE visitor dispatch; serde tag shape consumed by SDK bridges | P5 |
 | `AgentExecutionEventVisitor::accept` | MEDIUM | Visitor dispatch seam for audit sinks and SDK adapters without coupling events to one serialization format | P5 |
 | filesize allowlist 31→30 | LOW | debt inventory shrink; 30 oversized files remain | P5 |
+
+## Iteration 83 additions (§4.5.1 macaca-proto application_service Facade split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `application_service/{mod,constants,scope,lifecycle_commands,delegate,query_commands,ui_bridge,app_views,metadata_views,snapshot,validation}.rs` | HIGH | Provider-neutral Application Service wire DTOs (lifecycle/query/delegate/UI bridge); public API `macaca_proto::application_service::*` unchanged via Facade re-exports + `lib.rs` `pub use application_service::*` | P5 |
+| `ApplicationAgentDelegateCommand::into_service_command` | HIGH | WASM/Web/CLI/workflow host → Application Service → Agent Execution syscall adapter; audited single entrypoint for delegated agent work | P5 |
+| `ApplicationServiceSnapshot` | MEDIUM | Memento replay-safe service state for SDK/runtime-host recovery projections | P5 |
+| filesize allowlist 30→29 | LOW | debt inventory shrink; 29 oversized files remain | P5 |

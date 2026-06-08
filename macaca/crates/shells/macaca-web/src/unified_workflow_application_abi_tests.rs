@@ -80,7 +80,7 @@ mod tests {
     #[test]
     fn application_delegate_command_exposes_into_service_command_helper() {
         let proto = include_str!(
-            "../../../foundation/macaca-proto/src/application_service.rs"
+            "../../../foundation/macaca-proto/src/application_service/delegate.rs"
         );
 
         assert!(proto.contains("impl ApplicationAgentDelegateCommand"));

@@ -650,3 +650,10 @@
 - **Escape hatch**: `types/mod.rs` 同步至 `surfaces.rs` + `serviceization_escape_hatches.rs` migration surface allowlist；`agent_execution_service/` 模块树路径同步；Contract Test 提取后暴露的 26 条 raw inventory 债务（`config/tests.rs`、`types/tests.rs` 及跨 crate `tests.rs` fixture）以中性 agent/model/provider 字面量清零（baseline 0 复绿）。
 - **GitNexus memo (non-blocking)**: iteration 82 HIGH on `TodoItem` / `AgentExecutionEvent` / `AgentExecutionEventVisitor::accept` cross-crate domain serde + execution progress dispatch — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: filesize allowlist 30→0（`macaca-framework` / `agentic_loop` / `application_service` 等）；6.3.2 archive；P5 终态验收。
+
+## Iteration 83 (2026-06-08)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 30→**29**；`application_service.rs` 684→`application_service/` Facade 模块树（`mod.rs` + `constants.rs` + `scope.rs` + `lifecycle_commands.rs` + `delegate.rs` + `query_commands.rs` + `ui_bridge.rs` + `app_views.rs` + `metadata_views.rs` + `snapshot.rs` + `validation.rs`）。
+- **Design patterns**: Facade module tree；Command（lifecycle/query/delegate DTOs）；DTO/View（sanitized metadata + heartbeat/runtime views）；Memento（`ApplicationServiceSnapshot`）；Adapter（`into_service_command` bridge）。
+- **Contract tests**: `cargo check -p macaca-proto` OK；`os_layer_file_size_gate` 1/1；`unified_workflow_application_abi` `include_str!` 路径同步至 `application_service/delegate.rs`；production modules all ≤500 lines（max `lifecycle_commands.rs` 110）。
+- **GitNexus memo (non-blocking)**: iteration 83 HIGH on `ApplicationAgentDelegateCommand::into_service_command` + Application Service wire DTO serde surface — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: filesize allowlist 29→0（`macaca-framework` / `agentic_loop` / `todo_board.rs` 等）；6.3.2 archive；P5 终态验收。
