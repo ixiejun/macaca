@@ -12,7 +12,7 @@ use macaca_proto::{
     SchedulerJobId, SchedulerRunId, SchedulerTargetCommand, ServiceBusSource, TraceContext,
     SCHEDULED_AGENT_TASK_SERVICE_ID,
 };
-use macaca_scheduler::LocalSchedulerProvider;
+use macaca_scheduler::InProcessSchedulerProvider;
 use tracing::{debug, info, warn};
 
 use crate::autonomy_dispatch::AutonomyDispatchStrategies;
@@ -22,7 +22,7 @@ use crate::ServiceRuntime;
 /// Runtime-host Strategy object for one bounded Scheduler supervisor tick.
 pub(crate) struct SchedulerLane {
     runtime: Arc<ServiceRuntime>,
-    scheduler: Arc<LocalSchedulerProvider>,
+    scheduler: Arc<InProcessSchedulerProvider>,
     config: AutonomyRuntimeConfig,
 }
 
@@ -94,7 +94,7 @@ mod tests {
     #[tokio::test]
     async fn tick_once_records_scheduled_agent_task_result_summary() {
         let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
-        let scheduler = Arc::new(macaca_scheduler::LocalSchedulerProvider::new());
+        let scheduler = Arc::new(macaca_scheduler::InProcessSchedulerProvider::new());
         let scheduled_provider = Arc::new(LocalScheduledAgentTaskProvider::new(scheduler.clone()));
         let execution_backend = Arc::new(RecordingAgentExecutionBackend::default());
         let scheduled_service = Arc::new(ScheduledAgentTaskSystemServiceProvider::new(
@@ -168,7 +168,7 @@ impl SchedulerLane {
     /// Build a Scheduler lane from approved runtime-host composition inputs.
     pub(crate) fn new(
         runtime: Arc<ServiceRuntime>,
-        scheduler: Arc<LocalSchedulerProvider>,
+        scheduler: Arc<InProcessSchedulerProvider>,
         config: AutonomyRuntimeConfig,
     ) -> Self {
         Self {

@@ -12,7 +12,7 @@ use macaca_proto::{
 
 use crate::service_contract::HeartbeatService;
 
-use super::LocalHeartbeatProvider;
+use super::InProcessHeartbeatProvider;
 
 fn trace() -> TraceContext {
     TraceContext::new("trace-native-heartbeat-test")
@@ -32,7 +32,7 @@ fn due_profile(profile_id: &str, scope_key: &str) -> HeartbeatProfile {
 
 #[tokio::test]
 async fn native_heartbeat_profile_ticks_without_scheduler_job() {
-    let provider = LocalHeartbeatProvider::new();
+    let provider = InProcessHeartbeatProvider::new();
     provider
         .register_native_profile(due_profile("profile.native.test", "scope.native.test"))
         .unwrap();
@@ -50,7 +50,7 @@ async fn native_heartbeat_profile_ticks_without_scheduler_job() {
 
 #[tokio::test]
 async fn native_heartbeat_tick_records_trace_and_audit_memento() {
-    let provider = LocalHeartbeatProvider::new();
+    let provider = InProcessHeartbeatProvider::new();
     provider
         .register_native_profile(due_profile("profile.native.audit", "scope.native.audit"))
         .unwrap();
@@ -83,7 +83,7 @@ async fn native_heartbeat_tick_records_trace_and_audit_memento() {
 
 #[tokio::test]
 async fn heartbeat_completion_command_records_sanitized_dispatch_outcome() {
-    let provider = LocalHeartbeatProvider::new();
+    let provider = InProcessHeartbeatProvider::new();
     provider
         .register_native_profile(due_profile(
             "profile.native.complete",
@@ -138,7 +138,7 @@ async fn heartbeat_completion_command_records_sanitized_dispatch_outcome() {
 
 #[tokio::test]
 async fn native_heartbeat_tick_respects_cooldown_gate() {
-    let provider = LocalHeartbeatProvider::new();
+    let provider = InProcessHeartbeatProvider::new();
     provider
         .register_native_profile(due_profile(
             "profile.native.cooldown",
@@ -185,7 +185,7 @@ async fn native_heartbeat_tick_respects_cooldown_gate() {
 
 #[tokio::test]
 async fn native_heartbeat_profile_update_changes_policy_and_records_audit() {
-    let provider = LocalHeartbeatProvider::new();
+    let provider = InProcessHeartbeatProvider::new();
     provider
         .register_native_profile(due_profile("profile.native.edit", "scope.native.edit"))
         .unwrap();

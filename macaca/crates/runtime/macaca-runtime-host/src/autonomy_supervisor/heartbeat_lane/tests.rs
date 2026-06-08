@@ -165,7 +165,7 @@ async fn register_static_service(
 
 async fn register_heartbeat_service(
     runtime: &ServiceRuntime,
-    heartbeat: Arc<macaca_heartbeat::LocalHeartbeatProvider>,
+    heartbeat: Arc<macaca_heartbeat::InProcessHeartbeatProvider>,
 ) {
     register_static_service(
         runtime,
@@ -263,7 +263,7 @@ async fn wait_for_recorded_commands(
 }
 
 async fn wait_for_run_state(
-    heartbeat: &macaca_heartbeat::LocalHeartbeatProvider,
+    heartbeat: &macaca_heartbeat::InProcessHeartbeatProvider,
     scope_key: &str,
     expected: HeartbeatRunState,
 ) -> Option<macaca_proto::HeartbeatRunSummary> {
@@ -296,7 +296,7 @@ async fn wait_for_run_state(
 async fn heartbeat_tick_hands_off_agent_dispatch_without_blocking_scheduler_lane() {
     let application_id = ApplicationId::from_name("generic-heartbeat-app");
     let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
-    let heartbeat = Arc::new(macaca_heartbeat::LocalHeartbeatProvider::new());
+    let heartbeat = Arc::new(macaca_heartbeat::InProcessHeartbeatProvider::new());
     let backend = Arc::new(SlowExecutionBackend::default());
     let declaration = ApplicationHeartbeatAgentView {
         application_id,
@@ -351,7 +351,7 @@ async fn heartbeat_tick_hands_off_agent_dispatch_without_blocking_scheduler_lane
 async fn per_agent_profiles_with_distinct_cadences_dispatch_at_separate_ticks() {
     let application_id = ApplicationId::from_name("generic-heartbeat-app");
     let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
-    let heartbeat = Arc::new(macaca_heartbeat::LocalHeartbeatProvider::new());
+    let heartbeat = Arc::new(macaca_heartbeat::InProcessHeartbeatProvider::new());
     let backend = Arc::new(RecordingExecutionBackend::default());
     let operator_profile_id = "profile.application.test.agent.operator.heartbeat";
     let reviewer_profile_id = "profile.application.test.agent.reviewer.heartbeat";
@@ -461,7 +461,7 @@ async fn per_agent_profiles_with_distinct_cadences_dispatch_at_separate_ticks() 
 async fn heartbeat_run_history_records_successful_agent_dispatch_completion() {
     let application_id = ApplicationId::from_name("generic-heartbeat-app");
     let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
-    let heartbeat = Arc::new(macaca_heartbeat::LocalHeartbeatProvider::new());
+    let heartbeat = Arc::new(macaca_heartbeat::InProcessHeartbeatProvider::new());
     let backend = Arc::new(RecordingExecutionBackend::default());
     let profile_id = "profile.application.test.agent.operator.success";
     let scope_key = "application.test.agent:operator.success";
@@ -520,7 +520,7 @@ async fn heartbeat_run_history_records_successful_agent_dispatch_completion() {
 async fn heartbeat_run_history_records_failed_agent_dispatch_completion() {
     let application_id = ApplicationId::from_name("generic-heartbeat-app");
     let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
-    let heartbeat = Arc::new(macaca_heartbeat::LocalHeartbeatProvider::new());
+    let heartbeat = Arc::new(macaca_heartbeat::InProcessHeartbeatProvider::new());
     let profile_id = "profile.application.test.agent.operator.failure";
     let scope_key = "application.test.agent:operator.failure";
 

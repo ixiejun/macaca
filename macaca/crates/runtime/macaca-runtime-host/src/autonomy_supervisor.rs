@@ -20,12 +20,12 @@ use std::time::Duration;
 use chrono::Utc;
 use heartbeat_lane::HeartbeatLane;
 use macaca_app::{app_manifest_to_heartbeat_agent_views, AppManifest};
-use macaca_heartbeat::LocalHeartbeatProvider;
+use macaca_heartbeat::InProcessHeartbeatProvider;
 use macaca_proto::{
     AutonomyScope, HeartbeatCadencePolicy, HeartbeatProfile, HeartbeatProfileId,
     HeartbeatScopeIdentity, MacacaResult, SchedulerRunState, TraceContext,
 };
-use macaca_scheduler::LocalSchedulerProvider;
+use macaca_scheduler::InProcessSchedulerProvider;
 use scheduler_lane::SchedulerLane;
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
@@ -39,8 +39,8 @@ use crate::ServiceRuntime;
 #[derive(Clone)]
 pub struct AutonomySupervisor {
     runtime: Arc<ServiceRuntime>,
-    scheduler: Arc<LocalSchedulerProvider>,
-    heartbeat: Arc<LocalHeartbeatProvider>,
+    scheduler: Arc<InProcessSchedulerProvider>,
+    heartbeat: Arc<InProcessHeartbeatProvider>,
     config: AutonomyRuntimeConfig,
     running: Arc<AtomicBool>,
     worker: Arc<Mutex<Option<JoinHandle<()>>>>,
@@ -50,8 +50,8 @@ impl AutonomySupervisor {
     /// Create a supervisor without starting the background loop.
     pub fn new(
         runtime: Arc<ServiceRuntime>,
-        scheduler: Arc<LocalSchedulerProvider>,
-        heartbeat: Arc<LocalHeartbeatProvider>,
+        scheduler: Arc<InProcessSchedulerProvider>,
+        heartbeat: Arc<InProcessHeartbeatProvider>,
         config: AutonomyRuntimeConfig,
     ) -> Self {
         Self {
@@ -339,7 +339,7 @@ mod tests {
     use macaca_app::{AppLayer, AppManifest};
     use macaca_heartbeat::HeartbeatService;
     use macaca_proto::{ApplicationId, TraceContext};
-    use macaca_scheduler::LocalSchedulerProvider;
+    use macaca_scheduler::InProcessSchedulerProvider;
 
     use super::*;
     use crate::{ServiceRuntime, ServiceRuntimeConfig};
@@ -354,8 +354,8 @@ mod tests {
     #[tokio::test]
     async fn register_application_heartbeat_profile_creates_one_native_profile_per_agent() {
         let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
-        let scheduler = Arc::new(LocalSchedulerProvider::new());
-        let heartbeat = Arc::new(LocalHeartbeatProvider::new());
+        let scheduler = Arc::new(InProcessSchedulerProvider::new());
+        let heartbeat = Arc::new(InProcessHeartbeatProvider::new());
         let mut config = AutonomyRuntimeConfig::default();
         config.heartbeat_tick_interval_ms = 60_000;
         let supervisor =

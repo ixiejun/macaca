@@ -386,3 +386,12 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `LegacyAgentSideRegistry` → `InProcessAgentSideRegistry` | MEDIUM | dual manifest + runtime registration in SDK/kernel tests | P2.5/P5 |
 | `register_legacy_kernel_agent` → `register_in_process_kernel_agent` | LOW | kernel_lifecycle, e2e_auto_programming, live_fullstack_autodev tests | P5 |
 | `provider-compat-construction` migration surfaces removal | LOW | freeze gate fails on any reintroduction of forbidden provider-compat tokens | P5 |
+
+## Iteration 48 additions (§6.2.1 autonomy-service-boundary sub-phase — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `LocalSchedulerProvider` → `InProcessSchedulerProvider` | MEDIUM | macaca-scheduler local_provider, runtime-host autonomy_supervisor/scheduler_lane, autonomy_service_provider, integration tests | P5 |
+| `LocalHeartbeatProvider` → `InProcessHeartbeatProvider` | MEDIUM | macaca-heartbeat local_provider, runtime-host autonomy_supervisor/heartbeat_lane, autonomy_service_provider | P5 |
+| `LocalSchedulerLeasedRun` → `InProcessSchedulerLeasedRun` | LOW | scheduler run_control lease memento only | P5 |
+| `local_autonomy_providers_absent_in_production` hard assert | LOW | freeze gate fails on reintroduction of retired Local* provider symbols | P5 |

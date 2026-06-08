@@ -16,11 +16,11 @@ use macaca_proto::{
 };
 use tracing::{info, warn};
 
-use super::{memento::StoredHeartbeatRun, LocalHeartbeatProvider, LOCAL_PROVIDER_ID};
+use super::{memento::StoredHeartbeatRun, InProcessHeartbeatProvider, LOCAL_PROVIDER_ID};
 use crate::service_contract::HeartbeatService;
 
 #[async_trait]
-impl HeartbeatService for LocalHeartbeatProvider {
+impl HeartbeatService for InProcessHeartbeatProvider {
     fn descriptor(&self) -> ServiceDescriptor {
         self.descriptor.clone()
     }

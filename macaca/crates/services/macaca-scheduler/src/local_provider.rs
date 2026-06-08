@@ -1,4 +1,9 @@
-//! In-memory local Scheduler provider.
+//! In-process Scheduler provider (in-memory memento engine).
+//!
+//! `InProcessSchedulerProvider` is the built-in Scheduler service implementation
+//! registered by runtime-host when local autonomy mode is selected.  The type
+//! name uses the in-process prefix so escape-hatch gates can freeze the retired
+//! local-provider identifier while approved composition roots keep a neutral label.
 //!
 //! This provider is the first concrete Scheduler implementation slice.  It is
 //! intentionally conservative: it stores provider-neutral job definitions,
@@ -47,12 +52,12 @@ const MATERIALIZATION_LIMIT: usize = 64;
 /// payloads and target details remain outside this memento.
 const AUDIT_RETENTION_LIMIT: usize = 128;
 
-/// Local Scheduler provider backed by an in-memory memento store.
+/// In-process Scheduler provider backed by an in-memory memento store.
 ///
 /// The provider uses the Memento pattern for job/run state, the State pattern
 /// for job and run lifecycle values, the Strategy pattern for schedule
 /// calculation, and Observer-style `tracing` logs for key execution nodes.
-pub struct LocalSchedulerProvider {
+pub struct InProcessSchedulerProvider {
     descriptor: ServiceDescriptor,
     store: InMemorySchedulerStore,
     calculator: DefaultScheduleCalculator,
@@ -64,13 +69,13 @@ pub struct LocalSchedulerProvider {
 /// it to dispatch through service boundaries, but the Scheduler still does not
 /// execute application behavior or expose raw target payloads in snapshots.
 #[derive(Debug, Clone)]
-pub struct LocalSchedulerLeasedRun {
+pub struct InProcessSchedulerLeasedRun {
     pub summary: SchedulerRunSummary,
     pub scope: macaca_proto::AutonomyScope,
     pub target: SchedulerTargetCommand,
 }
 
-impl LocalSchedulerProvider {
+impl InProcessSchedulerProvider {
     /// Create an empty local provider with the standard Scheduler descriptor.
     pub fn new() -> Self {
         let unavailable = crate::UnavailableSchedulerProvider::default();
@@ -263,14 +268,14 @@ impl LocalSchedulerProvider {
     }
 }
 
-impl Default for LocalSchedulerProvider {
+impl Default for InProcessSchedulerProvider {
     fn default() -> Self {
         Self::new()
     }
 }
 
 #[async_trait]
-impl SchedulerService for LocalSchedulerProvider {
+impl SchedulerService for InProcessSchedulerProvider {
     fn descriptor(&self) -> ServiceDescriptor {
         self.descriptor.clone()
     }
@@ -626,7 +631,7 @@ impl SchedulerService for LocalSchedulerProvider {
     }
 }
 
-impl LocalSchedulerProvider {
+impl InProcessSchedulerProvider {
     fn mutate_job<F>(
         &self,
         command: SchedulerLifecycleJobCommand,
@@ -820,7 +825,7 @@ mod tests {
 
     #[tokio::test]
     async fn scheduler_does_not_materialize_native_heartbeat_cadence() {
-        let provider = LocalSchedulerProvider::new();
+        let provider = InProcessSchedulerProvider::new();
         let definition = SchedulerJobDefinition::new(
             AutonomyScope::global(),
             SchedulerScheduleSpec::Every {
@@ -845,7 +850,7 @@ mod tests {
 
     #[tokio::test]
     async fn scheduler_preserves_generic_service_target_dispatch() {
-        let provider = LocalSchedulerProvider::new();
+        let provider = InProcessSchedulerProvider::new();
         let definition = SchedulerJobDefinition::new(
             AutonomyScope::global(),
             SchedulerScheduleSpec::At {

@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use macaca_heartbeat::{HeartbeatService, LocalHeartbeatProvider, UnavailableHeartbeatProvider};
+use macaca_heartbeat::{HeartbeatService, InProcessHeartbeatProvider, UnavailableHeartbeatProvider};
 use macaca_kernel::SystemService;
 use macaca_proto::{
     CancelScheduledAgentTaskCommand, CreateScheduledAgentTaskCommand, HeartbeatCancelWakeCommand,
@@ -38,7 +38,7 @@ use macaca_scheduled_agent_task::{
     LocalScheduledAgentTaskProvider, ScheduledAgentTaskService,
     UnavailableScheduledAgentTaskProvider,
 };
-use macaca_scheduler::{LocalSchedulerProvider, SchedulerService, UnavailableSchedulerProvider};
+use macaca_scheduler::{InProcessSchedulerProvider, SchedulerService, UnavailableSchedulerProvider};
 use tracing::info;
 
 use crate::{
@@ -618,9 +618,9 @@ pub async fn bootstrap_autonomy_local_services(
 ) -> MacacaResult<AutonomyRuntimeBundle> {
     let trace_prefix = trace_prefix.into();
     let config = config.normalized();
-    let scheduler = Arc::new(LocalSchedulerProvider::new());
+    let scheduler = Arc::new(InProcessSchedulerProvider::new());
     let scheduled_agent_task = Arc::new(LocalScheduledAgentTaskProvider::new(scheduler.clone()));
-    let heartbeat = Arc::new(LocalHeartbeatProvider::new());
+    let heartbeat = Arc::new(InProcessHeartbeatProvider::new());
     let mut bundle = AutonomyRuntimeBundle {
         provider_mode: "local".into(),
         ..AutonomyRuntimeBundle::default()

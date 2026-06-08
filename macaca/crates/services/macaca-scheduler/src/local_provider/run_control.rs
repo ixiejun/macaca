@@ -17,7 +17,7 @@ use macaca_proto::{
 use tracing::{info, warn};
 
 use super::{
-    LocalSchedulerLeasedRun, LocalSchedulerProvider, LocalSchedulerState, LOCAL_PROVIDER_ID,
+    InProcessSchedulerLeasedRun, InProcessSchedulerProvider, LocalSchedulerState, LOCAL_PROVIDER_ID,
 };
 
 const LEASE_OWNER_KEY: &str = "lease_owner";
@@ -25,7 +25,7 @@ const LEASE_EXPIRES_AT_KEY: &str = "lease_expires_at";
 const RETRY_FOR_RUN_ID_KEY: &str = "retry_for_run_id";
 const RUN_REASON_CODE_KEY: &str = "reason_code";
 
-impl LocalSchedulerProvider {
+impl InProcessSchedulerProvider {
     /// Acquire the next queued run without dispatching its target command.
     ///
     /// This method is a provider-neutral lease primitive.  Future dispatchers
@@ -51,7 +51,7 @@ impl LocalSchedulerProvider {
         &self,
         trace: TraceContext,
         lease_owner: impl Into<String>,
-    ) -> MacacaResult<Option<LocalSchedulerLeasedRun>> {
+    ) -> MacacaResult<Option<InProcessSchedulerLeasedRun>> {
         let lease_owner = normalize_label(lease_owner.into(), "scheduler lease_owner is required")?;
         self.refresh_due_runs(&trace);
         Ok(self.store.write(|state| {
@@ -112,7 +112,7 @@ impl LocalSchedulerProvider {
                 trace_id = trace.trace_id.as_str(),
                 "local scheduler acquired run lease"
             );
-            Some(LocalSchedulerLeasedRun {
+            Some(InProcessSchedulerLeasedRun {
                 summary: run.summary.clone(),
                 scope,
                 target,

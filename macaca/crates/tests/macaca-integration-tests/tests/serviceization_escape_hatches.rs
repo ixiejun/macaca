@@ -215,12 +215,12 @@ fn forbidden_tokens() -> Vec<ForbiddenToken> {
         ForbiddenToken {
             family: "autonomy-service-boundary",
             token: "LocalSchedulerProvider",
-            rationale: "local scheduler engines must remain replaceable service providers",
+            rationale: "local scheduler engines must remain replaceable service providers (retired name; use InProcessSchedulerProvider in approved surfaces)",
         },
         ForbiddenToken {
             family: "autonomy-service-boundary",
             token: "LocalHeartbeatProvider",
-            rationale: "local heartbeat engines must remain replaceable service providers",
+            rationale: "local heartbeat engines must remain replaceable service providers (retired name; use InProcessHeartbeatProvider in approved surfaces)",
         },
         ForbiddenToken {
             family: "autonomy-service-boundary",
@@ -727,6 +727,48 @@ fn serviceization_escape_hatches_migration_debt_inventory_matches_baseline() {
 ///
 /// Retired families keep forbidden-token definitions for freeze-mode growth detection,
 /// but production `src/` must not contain the legacy literals even when migration surfaces
+/// Assert specific retired forbidden tokens are absent from all production code.
+///
+/// Used when a family is retired in sub-phases: only a subset of tokens is renamed
+/// while the family migration surfaces remain for other tokens.
+fn assert_retired_escape_hatch_tokens_absent_in_production(tokens: &[&str]) {
+    let retired_tokens = forbidden_tokens()
+        .into_iter()
+        .filter(|entry| tokens.contains(&entry.token))
+        .collect::<Vec<_>>();
+    assert!(
+        !retired_tokens.is_empty(),
+        "retired token list must match at least one forbidden token: {tokens:?}"
+    );
+
+    let root = workspace_root();
+    let crates_root = root.join("crates");
+    let mut files = Vec::new();
+    collect_rust_files(&crates_root, &mut files);
+
+    let mut violations = Vec::new();
+    for file in &files {
+        let relative = file
+            .strip_prefix(&root)
+            .expect("scanned file should be under workspace root")
+            .to_string_lossy()
+            .replace('\\', "/");
+        if is_non_production_rust_source(&relative) {
+            continue;
+        }
+        violations.extend(scan_file(&root, file, &retired_tokens, false));
+    }
+    violations.sort();
+
+    assert!(
+        violations.is_empty(),
+        "Retired escape-hatch tokens {:?} must be absent from all production code \
+         (no migration exemption):{}",
+        tokens,
+        render_violations(&violations)
+    );
+}
+
 /// were removed — otherwise debt would silently reappear outside runtime-host ownership.
 fn assert_retired_escape_hatch_family_absent_in_production(family: &str) {
     let retired_tokens = forbidden_tokens()
@@ -784,6 +826,17 @@ fn serviceization_escape_hatches_direct_runtime_catalog_read_absent_in_productio
 #[test]
 fn serviceization_escape_hatches_provider_compat_construction_absent_in_production() {
     assert_retired_escape_hatch_family_absent_in_production("provider-compat-construction");
+}
+
+/// Sub-phase of `autonomy-service-boundary` (iteration 48): legacy `Local*Provider`
+/// symbols were renamed to provider-neutral `InProcess*Provider`. The old names must
+/// not reappear outside migration surfaces.
+#[test]
+fn serviceization_escape_hatches_local_autonomy_providers_absent_in_production() {
+    assert_retired_escape_hatch_tokens_absent_in_production(&[
+        "LocalSchedulerProvider",
+        "LocalHeartbeatProvider",
+    ]);
 }
 
 #[test]

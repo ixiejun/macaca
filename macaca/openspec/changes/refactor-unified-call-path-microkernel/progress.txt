@@ -397,3 +397,11 @@
 - **Contract tests**: `serviceization_escape_hatches` 8/8；`p5_terminal_audit_gates` 3/3；`os_layer_file_size_gate` 1/1。
 - **GitNexus memo (non-blocking)**: iteration 47 MEDIUM on `LegacyAgentExecutionAdapter` rename — recorded in `impact-memo.md`.
 - **Next**: 6.2.1 下一小族 `autonomy-service-boundary`（65）分阶段；6.3.2 继续 archive；filesize allowlist 75→0。
+
+## Iteration 48 (2026-06-07)
+- **P5 §6.2.1 逃逸口 family 子阶段**: `autonomy-service-boundary` `Local*Provider` 退役（40→0 命中）；`LocalSchedulerProvider`/`LocalHeartbeatProvider` 重命名为 provider-neutral `InProcessSchedulerProvider`/`InProcessHeartbeatProvider`；`migration_debt_baseline` raw **240→200**（`autonomy-service-boundary` 65→25；3 families remain）。
+- **P5 退役 token 硬断言**: 新增 `local_autonomy_providers_absent_in_production` + `assert_retired_escape_hatch_tokens_absent_in_production` helper。
+- **Design patterns**: Adapter + In-Process Port（built-in scheduler/heartbeat engines）；Strangler Fig（forbidden-token 冻结 + provider-neutral rename）；Specification by Example（debt inventory baseline）。
+- **Contract tests**: `serviceization_escape_hatches` 9/9；`autonomy_scheduler_heartbeat_services` 11/11；`p5_terminal_audit_gates` 3/3；`os_layer_file_size_gate` 1/1。
+- **GitNexus memo (non-blocking)**: iteration 48 MEDIUM on `Local*Provider` → `InProcess*Provider` rename — recorded in `impact-memo.md`.
+- **Next**: 6.2.1 `autonomy-service-boundary` 继续分阶段（`AutonomySupervisor`/`SchedulerSystemServiceProvider`/`HeartbeatSystemServiceProvider`/service id 字面量 25 命中）；6.3.2 继续 archive；filesize allowlist 75→0。

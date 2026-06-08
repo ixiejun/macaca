@@ -1,4 +1,9 @@
-//! In-memory local Heartbeat provider.
+//! In-process Heartbeat provider (in-memory memento engine).
+//!
+//! `InProcessHeartbeatProvider` is the built-in Heartbeat service implementation
+//! registered by runtime-host when local autonomy mode is selected.  The type
+//! name uses the in-process prefix so escape-hatch gates can freeze the retired
+//! local-provider identifier while approved composition roots keep a neutral label.
 //!
 //! The local provider coordinates wake requests, coalescing, gate evaluation,
 //! and bounded run history.  It deliberately does not execute tasks, send
@@ -38,20 +43,20 @@ const DEFAULT_ACTIVE_END_HOUR_UTC: u32 = 24;
 const DEFAULT_NATIVE_PROFILE_ID: &str = "profile.system.autonomy";
 const DEFAULT_NATIVE_SCOPE_KEY: &str = "system.autonomy";
 
-/// Local Heartbeat provider backed by an in-memory memento store.
+/// In-process Heartbeat provider backed by an in-memory memento store.
 ///
 /// The provider uses State for run lifecycle, Memento for snapshots/history,
 /// Strategy for gate evaluation, and Observer-style tracing for key execution
 /// nodes.  The gate strategy is conservative and generic; it never branches on
 /// application, workflow, driver, provider, model, chain, payment, or business
 /// names.
-pub struct LocalHeartbeatProvider {
+pub struct InProcessHeartbeatProvider {
     descriptor: ServiceDescriptor,
     store: InMemoryHeartbeatStore,
     gates: DefaultHeartbeatGateStrategy,
 }
 
-impl LocalHeartbeatProvider {
+impl InProcessHeartbeatProvider {
     /// Create an empty local provider with the standard Heartbeat descriptor.
     pub fn new() -> Self {
         let unavailable = crate::UnavailableHeartbeatProvider::default();
@@ -493,7 +498,7 @@ impl LocalHeartbeatProvider {
     }
 }
 
-impl Default for LocalHeartbeatProvider {
+impl Default for InProcessHeartbeatProvider {
     fn default() -> Self {
         Self::new()
     }

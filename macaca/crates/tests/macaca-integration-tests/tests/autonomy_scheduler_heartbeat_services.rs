@@ -26,7 +26,7 @@ use macaca_runtime_host::{
     AutonomyRuntimeConfig, InMemoryServiceRuntimeEventSink, ServiceProviderFactoryContext,
     ServiceProviderInstance, ServiceRuntime, ServiceRuntimeConfig, StaticServiceProviderFactory,
 };
-use macaca_scheduler::{LocalSchedulerProvider, SchedulerService};
+use macaca_scheduler::{InProcessSchedulerProvider, SchedulerService};
 
 fn generic_target() -> SchedulerTargetCommand {
     SchedulerTargetCommand::Service(ServiceTargetCommand {
@@ -489,7 +489,7 @@ async fn supervisor_start_and_stop_controls_background_loop() {
 
 #[tokio::test]
 async fn local_scheduler_cron_timezone_snapshot_contains_sanitized_audit() {
-    let provider = LocalSchedulerProvider::new();
+    let provider = InProcessSchedulerProvider::new();
     let trace = TraceContext::new("trace-local-scheduler-cron");
     let mut definition = SchedulerJobDefinition::new(
         AutonomyScope::global(),
@@ -539,7 +539,7 @@ async fn local_scheduler_cron_timezone_snapshot_contains_sanitized_audit() {
 
 #[tokio::test]
 async fn local_scheduler_job_management_is_application_scoped_and_lifecycle_aware() {
-    let provider = LocalSchedulerProvider::new();
+    let provider = InProcessSchedulerProvider::new();
     let app_one = ApplicationId(uuid::Uuid::new_v4());
     let app_two = ApplicationId(uuid::Uuid::new_v4());
     let trace = TraceContext::new("trace-local-scheduler-job-management");

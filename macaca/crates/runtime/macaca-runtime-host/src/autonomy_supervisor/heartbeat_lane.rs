@@ -8,7 +8,7 @@
 
 use std::sync::Arc;
 
-use macaca_heartbeat::{HeartbeatService, LocalHeartbeatProvider};
+use macaca_heartbeat::{HeartbeatService, InProcessHeartbeatProvider};
 use macaca_proto::{
     AutonomyScope, HeartbeatCommandResult, HeartbeatCompleteRunCommand, HeartbeatRunState,
     HeartbeatWakeCommand, HeartbeatWakeIntent, MacacaResult, TraceContext,
@@ -23,7 +23,7 @@ use crate::ServiceRuntime;
 /// Runtime-host Strategy object for one bounded Heartbeat supervisor tick.
 pub(crate) struct HeartbeatLane {
     runtime: Arc<ServiceRuntime>,
-    heartbeat: Arc<LocalHeartbeatProvider>,
+    heartbeat: Arc<InProcessHeartbeatProvider>,
     recovery_wake_enabled: bool,
     dispatch_timeout_ms: u64,
 }
@@ -35,7 +35,7 @@ impl HeartbeatLane {
     /// Build a Heartbeat lane from approved runtime-host composition inputs.
     pub(crate) fn new(
         runtime: Arc<ServiceRuntime>,
-        heartbeat: Arc<LocalHeartbeatProvider>,
+        heartbeat: Arc<InProcessHeartbeatProvider>,
         recovery_wake_enabled: bool,
         dispatch_timeout_ms: u64,
     ) -> Self {
