@@ -1,10 +1,14 @@
-//! Runtime-backed implementation of the SDK Skill facade.
+//! Runtime-backed Skill client implemented over the generic SDK service client.
 //!
-//! Keeping the service-backed adapter in its own file prevents the public
-//! `skill_client` contract from becoming a large mixed-responsibility module.
+//! This module is the Adapter half of the SDK Skill facade: it maps typed Skill
+//! command DTOs onto `SystemServiceClient::call_service` without importing Skill
+//! service internals.  The Skill runtime-host remains the sole owner of executable
+//! skill materialization and governance state.
+
+use std::sync::Arc;
 
 use async_trait::async_trait;
-use macaca_proto::{MacacaError, MacacaResult};
+use macaca_proto::MacacaResult;
 use macaca_skill::{
     SkillAliasResolveCommand, SkillAliasResolveResult, SkillAliasSnapshotCommand,
     SkillAliasSnapshotResult, SkillAliasUpsertCommand, SkillAliasUpsertResult,
@@ -30,25 +34,38 @@ use macaca_skill::{
     SkillSnapshotServiceResult, SkillStatusCommand, SkillStatusResult, SkillToolCatalogCommand,
     SkillToolCatalogResult, SkillToolInvokeCommand, SkillToolInvokeResult,
     SKILL_ALIAS_RESOLVE_COMMAND, SKILL_ALIAS_SNAPSHOT_COMMAND, SKILL_ALIAS_UPSERT_COMMAND,
-    SKILL_CLEANUP_COMMAND, SKILL_CURATION_ARCHIVE_COMMAND, SKILL_CURATION_DRY_RUN_COMMAND,
-    SKILL_CURATION_PIN_COMMAND, SKILL_CURATION_QUARANTINE_COMMAND, SKILL_CURATION_REJECT_COMMAND,
-    SKILL_CURATION_RELEASE_QUARANTINE_COMMAND, SKILL_CURATION_RESTORE_COMMAND,
-    SKILL_CURATION_ROLLBACK_COMMAND, SKILL_CURATION_RUN_COMMAND, SKILL_CURATION_SNAPSHOT_COMMAND,
-    SKILL_CURATION_UNPIN_COMMAND, SKILL_EVALUATION_CHECKPOINT_APPEND_COMMAND,
-    SKILL_EVALUATION_REPORT_COMMAND, SKILL_EVALUATION_SCORE_COMMAND,
-    SKILL_EVOLUTION_MATERIALIZATION_OPERATOR_RUN_COMMAND,
+    SKILL_CLEANUP_COMMAND, SKILL_CURATION_DRY_RUN_COMMAND, SKILL_CURATION_ROLLBACK_COMMAND,
+    SKILL_CURATION_RUN_COMMAND, SKILL_CURATION_SNAPSHOT_COMMAND,
+    SKILL_EVALUATION_CHECKPOINT_APPEND_COMMAND, SKILL_EVALUATION_REPORT_COMMAND,
+    SKILL_EVALUATION_SCORE_COMMAND, SKILL_EVOLUTION_MATERIALIZATION_OPERATOR_RUN_COMMAND,
     SKILL_EVOLUTION_MATERIALIZATION_OPERATOR_SNAPSHOT_COMMAND,
     SKILL_EVOLUTION_PROCESSING_RUN_COMMAND, SKILL_EVOLUTION_PROCESSING_SNAPSHOT_COMMAND,
     SKILL_EVOLUTION_PROMOTE_DRAFT_COMMAND, SKILL_EVOLUTION_PROPOSE_FROM_TASK_COMMAND,
     SKILL_EVOLUTION_PROPOSE_PATCH_COMMAND, SKILL_EVOLUTION_REJECT_DRAFT_COMMAND,
     SKILL_EVOLUTION_SNAPSHOT_COMMAND, SKILL_EXECUTABLE_LOAD_COMMAND,
-    SKILL_GOVERNANCE_RECORD_USAGE_COMMAND, SKILL_GOVERNANCE_SNAPSHOT_COMMAND, SKILL_SERVICE_ID,
+    SKILL_GOVERNANCE_RECORD_USAGE_COMMAND, SKILL_GOVERNANCE_SNAPSHOT_COMMAND,
     SKILL_SERVICE_SNAPSHOT_COMMAND, SKILL_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND,
     SKILL_TOOL_CATALOG_COMMAND, SKILL_TOOL_INVOKE_COMMAND,
 };
 
-use crate::service_client::ServiceCallCommand;
-use crate::skill_client::{ServiceBackedSkillClient, SystemSkillClient};
+use crate::service_client::SystemServiceClient;
+
+use super::support::{call, curation_lifecycle_command_name};
+use super::SystemSkillClient;
+
+/// Runtime-backed Skill client implemented over the generic SDK service client.
+#[derive(Clone)]
+pub struct ServiceBackedSkillClient {
+    /// Shared generic service client used by sibling SDK modules (e.g. operator extension).
+    pub(crate) service: Arc<dyn SystemServiceClient>,
+}
+
+impl ServiceBackedSkillClient {
+    /// Create a service-backed client from an existing generic service client.
+    pub fn new(service: Arc<dyn SystemServiceClient>) -> Self {
+        Self { service }
+    }
+}
 
 #[async_trait]
 impl SystemSkillClient for ServiceBackedSkillClient {
@@ -420,43 +437,3 @@ impl SystemSkillClient for ServiceBackedSkillClient {
     }
 }
 
-fn curation_lifecycle_command_name(
-    action: &SkillCurationLifecycleAction,
-) -> MacacaResult<&'static str> {
-    Ok(match action {
-        SkillCurationLifecycleAction::Pin => SKILL_CURATION_PIN_COMMAND,
-        SkillCurationLifecycleAction::Unpin => SKILL_CURATION_UNPIN_COMMAND,
-        SkillCurationLifecycleAction::Archive => SKILL_CURATION_ARCHIVE_COMMAND,
-        SkillCurationLifecycleAction::Restore => SKILL_CURATION_RESTORE_COMMAND,
-        SkillCurationLifecycleAction::Quarantine => SKILL_CURATION_QUARANTINE_COMMAND,
-        SkillCurationLifecycleAction::ReleaseQuarantine => {
-            SKILL_CURATION_RELEASE_QUARANTINE_COMMAND
-        }
-        SkillCurationLifecycleAction::Supersede => {
-            return Err(MacacaError::Config(
-                "supersede requires a SkillCurationSupersedeCommand with alias evidence".into(),
-            ));
-        }
-        SkillCurationLifecycleAction::Reject => SKILL_CURATION_REJECT_COMMAND,
-    })
-}
-
-async fn call<T, R>(
-    service: &std::sync::Arc<dyn crate::service_client::SystemServiceClient>,
-    command_name: &str,
-    trace: macaca_proto::TraceContext,
-    payload: T,
-) -> MacacaResult<R>
-where
-    T: serde::Serialize,
-    R: serde::de::DeserializeOwned,
-{
-    let service_command = ServiceCallCommand::new(
-        SKILL_SERVICE_ID,
-        command_name,
-        serde_json::to_value(payload)?,
-    )?
-    .with_trace(trace);
-    let result = service.call_service(&service_command).await?;
-    serde_json::from_value(result.output).map_err(MacacaError::from)
-}

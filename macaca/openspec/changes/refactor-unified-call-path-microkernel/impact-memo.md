@@ -819,3 +819,15 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `mcp_client/support::call` | MEDIUM | Shared JSON service-call bridge for all MCP command DTOs | P5 |
 | `mcp_client/tests.rs` | LOW | Contract test with neutral fixture agent/session ids | P5 |
 | filesize allowlist 19→18 | LOW | debt inventory shrink; 18 oversized files remain | P5 |
+
+## Iteration 95 additions (§4.5.1 macaca-sdk skill_client Facade split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `skill_client/{support,unavailable,service_backed,tests}.rs` | HIGH | SDK Skill client module tree; public `SystemSkillClient` API unchanged via Facade re-exports | P5 |
+| `ServiceBackedSkillClient::invoke_tool` | HIGH | Generic `SystemServiceClient` syscall seam; consumed by Web/CLI/framework Skill operators | P5 |
+| `UnavailableSystemSkillClient` | MEDIUM | Null Object for composition roots without runtime Skill service | P5 |
+| `skill_client/support::call` | MEDIUM | Shared JSON service-call bridge for all Skill command DTOs | P5 |
+| `skill_operator_client` (sibling `pub(crate) service`) | MEDIUM | Extension trait reuses service-backed client wiring | P5 |
+| `skill_client/tests.rs` | LOW | Contract tests with neutral trace ids; no forbidden role literals | P5 |
+| filesize allowlist 18→17 | LOW | debt inventory shrink; 17 oversized files remain | P5 |

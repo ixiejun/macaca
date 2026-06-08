@@ -41,7 +41,6 @@ pub mod scheduler_client;
 pub mod service_client;
 pub mod shell_provider_bridge;
 pub mod skill_client;
-mod skill_client_service_backed;
 pub mod skill_operator_client;
 pub mod spec;
 pub mod status_client;
