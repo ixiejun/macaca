@@ -547,3 +547,11 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 |---------------|----------------------|------------------------|-------|
 | `skill_service_provider_tests/{mod,fixtures,test_doubles,alias_helpers,governance_evaluation_tests,curation_dry_run_tests,curation_run_snapshot_tests,curation_rollback_tests,alias_tests,experience_proposal_tests,experience_routing_tests,experience_validation_tests,governance_replay_tests}.rs` | LOW | Skill provider contract test module tree; 26 lib tests unchanged; `lib.rs` `mod skill_service_provider_tests` path unchanged | P5 |
 | filesize allowlist 48→47 | LOW | debt inventory shrink; 47 oversized files remain | P5 |
+
+## Iteration 66 additions (§4.5.1 tool_family_providers Abstract Factory split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `tool_family_providers/{mod,constants,family_catalog,descriptor_builder,inventory,planning_factory}.rs` | LOW | Industrial tool-family Abstract Factory module tree; public API via `runtime_host_public_api` unchanged | P5 |
+| `tool_service_boundaries.rs` multi-file source scan | LOW | architectural boundary contract scans split modules instead of monolith | P5 |
+| filesize allowlist 47→46 | LOW | debt inventory shrink; 46 oversized files remain | P5 |

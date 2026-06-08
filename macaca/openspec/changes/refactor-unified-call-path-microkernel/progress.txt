@@ -530,3 +530,10 @@
 - **Contract tests**: `os_layer_file_size_gate` 1/1；`skill_service_provider` lib tests 26/26。
 - **GitNexus memo (non-blocking)**: iteration 65 LOW on skill provider contract test module split — recorded in `impact-memo.md`.
 - **Next**: filesize allowlist 47→0（`mcp_runtime.rs` / `app_executor.rs` / proto config/types 等）；6.3.2 archive；P5 终态验收。
+
+## Iteration 66 (2026-06-07)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 47→**46**；`tool_family_providers.rs` 707→模块树（`mod.rs` Facade + `constants.rs` + `family_catalog.rs` Table Data + `descriptor_builder.rs` Builder + `inventory.rs` + `planning_factory.rs` Abstract Factory）；`tool_service_boundaries` 多文件源扫描同步。
+- **Design patterns**: Facade module tree；Abstract Factory（planning contributor/toolsets/service）；Table Data（family catalog）；Builder（descriptor materialization）；Null Object（unsupported-platform availability）；trace `info!`/`debug!` on inventory/contributor/descriptor assembly。
+- **Contract tests**: `os_layer_file_size_gate` 1/1；`tool_service_boundaries` 1/1；`tool_service_family_provider` lib tests 5/5。
+- **GitNexus memo (non-blocking)**: iteration 66 LOW on tool family provider Abstract Factory split — recorded in `impact-memo.md`.
+- **Next**: filesize allowlist 46→0（`mcp_runtime.rs` / `app_executor.rs` / proto config/types 等）；6.3.2 archive；P5 终态验收。
