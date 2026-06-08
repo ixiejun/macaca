@@ -555,3 +555,10 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `tool_family_providers/{mod,constants,family_catalog,descriptor_builder,inventory,planning_factory}.rs` | LOW | Industrial tool-family Abstract Factory module tree; public API via `runtime_host_public_api` unchanged | P5 |
 | `tool_service_boundaries.rs` multi-file source scan | LOW | architectural boundary contract scans split modules instead of monolith | P5 |
 | filesize allowlist 47→46 | LOW | debt inventory shrink; 46 oversized files remain | P5 |
+
+## Iteration 67 additions (§4.5.1 tool_service_invocation Decorator/Router split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `tool_service_invocation/{mod,admission,dispatch,helpers}.rs` | LOW | Tool invocation router module tree; `ToolInvocationService` public API unchanged; `tool_service_provider` wiring unchanged | P5 |
+| filesize allowlist 46→45 | LOW | debt inventory shrink; 45 oversized files remain | P5 |

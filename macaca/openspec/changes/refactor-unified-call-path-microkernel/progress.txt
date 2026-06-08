@@ -537,3 +537,17 @@
 - **Contract tests**: `os_layer_file_size_gate` 1/1；`tool_service_boundaries` 1/1；`tool_service_family_provider` lib tests 5/5。
 - **GitNexus memo (non-blocking)**: iteration 66 LOW on tool family provider Abstract Factory split — recorded in `impact-memo.md`.
 - **Next**: filesize allowlist 46→0（`mcp_runtime.rs` / `app_executor.rs` / proto config/types 等）；6.3.2 archive；P5 终态验收。
+
+## Iteration 67 (2026-06-07)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 46→**45**；`tool_service_invocation.rs` 678→模块树（`mod.rs` Facade + `admission.rs` Chain of Responsibility + `dispatch.rs` Strategy Router + `helpers.rs` Adapter/Specification）。
+- **Design patterns**: Facade module tree；Chain of Responsibility（admission decorators）；Strategy（route-kind dispatch）；Adapter（workbench reply normalization + owning-service payload）；trace `info!`/`warn!` on admission/dispatch/completion nodes。
+- **Contract tests**: `os_layer_file_size_gate` 1/1；`tool_service_invocation` lib tests 8/8。
+- **GitNexus memo (non-blocking)**: iteration 67 LOW on tool invocation router module split — recorded in `impact-memo.md`.
+- **Next**: filesize allowlist 45→0（`mcp_runtime.rs` / `app_executor.rs` / proto config/types 等）；6.3.2 archive；P5 终态验收。
+
+## Iteration 67 (2026-06-07)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 46→**45**；`tool_service_invocation.rs` 678→模块树（`mod.rs` Facade + `admission.rs` Chain of Responsibility + `dispatch.rs` Strategy Router + `helpers.rs` Adapter/Specification）。
+- **Design patterns**: Facade module tree；Chain of Responsibility（admission decorators）；Strategy（route-kind dispatch）；Adapter（workbench reply normalization + owning-service payload）；trace `info!`/`warn!` on admission/dispatch/completion nodes。
+- **Contract tests**: `os_layer_file_size_gate` 1/1；`tool_service_invocation` lib tests pass。
+- **GitNexus memo (non-blocking)**: iteration 67 LOW on tool invocation router module split — recorded in `impact-memo.md`.
+- **Next**: filesize allowlist 45→0（`mcp_runtime.rs` / `app_executor.rs` / proto config/types 等）；6.3.2 archive；P5 终态验收。
