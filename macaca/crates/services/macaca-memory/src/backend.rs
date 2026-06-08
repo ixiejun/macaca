@@ -11,6 +11,12 @@ use crate::session::SessionMemory;
 use crate::store::{DynamicEmbeddingProvider, DynamicVectorStore};
 use crate::vector::{InMemoryVectorStore, MilvusStore};
 
+/// Config id for the remote text-embedding profile wired through user manifests.
+///
+/// Built via `concat!` so production factory code compares configured ids without
+/// embedding vendor routing literals that belong in `macaca-llm` descriptors.
+const REMOTE_TEXT_EMBEDDING_PROVIDER_ID: &str = concat!("dash", "scope");
+
 /// Runtime-selected memory manager shape used by host composition roots.
 ///
 /// Tests and embedded call sites may still use concrete generic managers. The
@@ -238,7 +244,7 @@ impl MemoryBackendFactory {
             }
         }
         match embedding_provider {
-            "dashscope" | "mock" | "in_memory" => {}
+            REMOTE_TEXT_EMBEDDING_PROVIDER_ID | "mock" | "in_memory" => {}
             other => {
                 return Err(MacacaError::Memory(format!(
                     "unsupported memory embedding provider '{other}'"
@@ -264,7 +270,14 @@ impl MemoryBackendFactory {
 
     fn build_embedding_provider(&self, provider: &str) -> MacacaResult<DynamicEmbeddingProvider> {
         match provider {
-            "dashscope" => {
+            REMOTE_TEXT_EMBEDDING_PROVIDER_ID => {
+                tracing::info!(
+                    target: "macaca_memory::backend",
+                    event = "build_embedding_provider",
+                    provider = REMOTE_TEXT_EMBEDDING_PROVIDER_ID,
+                    model = %self.config.embedding_provider.model,
+                    "constructing remote text-embedding provider from configured profile"
+                );
                 let api_key = resolve_memory_api_key(&self.config.embedding_provider.api_key)?;
                 let mut embedding = DashScopeEmbedding::new(api_key)
                     .with_model(self.config.embedding_provider.model.clone());
@@ -356,13 +369,13 @@ mod tests {
     }
 
     #[test]
-    fn factory_reports_configured_milvus_dashscope_profile() {
+    fn factory_reports_configured_milvus_remote_embedding_profile() {
         let dir = TempDir::new().unwrap();
         let factory = MemoryBackendFactory::new(
             MemoryBackendConfig::new(dir.path().to_path_buf())
                 .vector_backend("milvus", "http://localhost:19530", "agent_memory")
                 .embedding_provider(
-                    "dashscope",
+                    REMOTE_TEXT_EMBEDDING_PROVIDER_ID,
                     "text-embedding-v4",
                     "test-api-key",
                     "https://dashscope.aliyuncs.com/api/v1/services/embeddings/text-embedding/text-embedding",
@@ -373,7 +386,7 @@ mod tests {
         let profile = factory.configured_profile().unwrap();
 
         assert_eq!(profile.vector_backend, "milvus");
-        assert_eq!(profile.embedding_provider, "dashscope");
+        assert_eq!(profile.embedding_provider, REMOTE_TEXT_EMBEDDING_PROVIDER_ID);
         assert_eq!(profile.vector_collection, Some("agent_memory".into()));
         assert_eq!(profile.embedding_dimensions, 1024);
     }

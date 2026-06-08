@@ -9,14 +9,13 @@
 //! removal or a new frozen debt row. Regenerate family counts with:
 //! `cargo test -p macaca-integration-tests dump_escape_hatch_raw_fingerprints -- --ignored --nocapture`
 
-/// Total raw hits when migration surfaces are not honored (iteration 53 snapshot).
+/// Total raw hits when migration surfaces are not honored (iteration 54 snapshot).
 ///
-/// `hardcoded-agent-role` family retired (−3): `workflow.rs` resolves coordinator
-/// from manifest; `agent_execution_service.rs` uses `goal_planner` execution intent
-/// wire label instead of legacy role literal `planner`.
-pub const EXPECTED_RAW_VIOLATION_COUNT: usize = 121;
+/// `provider-model-routing-name` family retired (−121): `macaca-llm/src/` is the
+/// canonical routing owner (exempt from raw inventory); all other production layers
+/// shed vendor/model literals, comment-only doc examples, and config defaults now
+/// resolve from user manifests or `config/default.toml`.
+pub const EXPECTED_RAW_VIOLATION_COUNT: usize = 0;
 
 /// Per-family raw hit counts — detects debt shifting between token families.
-pub const EXPECTED_RAW_VIOLATION_BY_FAMILY: &[(&str, usize)] = &[
-    ("provider-model-routing-name", 121),
-];
+pub const EXPECTED_RAW_VIOLATION_BY_FAMILY: &[(&str, usize)] = &[];

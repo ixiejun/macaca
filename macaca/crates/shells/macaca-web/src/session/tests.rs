@@ -239,13 +239,15 @@ fn test_delegated_driver_trace_step_handles_direct_trace_payload() {
 
 #[test]
 fn test_delegated_driver_trace_step_unwraps_nested_driver_trace_payload() {
+    // Neutral fixture ids — driver names are application config, not OS literals.
+    const DRIVER_FIXTURE_ID: &str = "delegated-external-driver";
     let payload = serde_json::json!({
         "event": {
             "type": "driver_trace",
-            "driver_name": "claude-code",
+            "driver_name": DRIVER_FIXTURE_ID,
             "trace": {
                 "type": "thinking",
-                "driver_id": "claude-code",
+                "driver_id": DRIVER_FIXTURE_ID,
                 "content": "planning next action"
             }
         }
@@ -255,8 +257,8 @@ fn test_delegated_driver_trace_step_unwraps_nested_driver_trace_payload() {
 
     assert_eq!(step.step_type, "driver_trace");
     assert_eq!(step.event_type.as_deref(), Some("thinking"));
-    assert_eq!(step.driver_name.as_deref(), Some("claude-code"));
-    assert_eq!(step.driver_id.as_deref(), Some("claude-code"));
+    assert_eq!(step.driver_name.as_deref(), Some(DRIVER_FIXTURE_ID));
+    assert_eq!(step.driver_id.as_deref(), Some(DRIVER_FIXTURE_ID));
     assert_eq!(step.content.as_deref(), Some("planning next action"));
 }
 

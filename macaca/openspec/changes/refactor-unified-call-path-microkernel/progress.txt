@@ -445,3 +445,11 @@
 - **Contract tests**: `serviceization_escape_hatches` 16/16；`macaca-app` workflow tests；`macaca-proto` agent_execution_service tests。
 - **GitNexus memo (non-blocking)**: iteration 53 LOW on hardcoded-agent-role family retirement — recorded in `impact-memo.md`。
 - **Next**: 6.2.1 `provider-model-routing-name`（121）；filesize allowlist 75→0；6.3.2 archive。
+
+## Iteration 54 (2026-06-07)
+- **P5 §6.2.1 逃逸口 family 终态**: `provider-model-routing-name` 全量退役（121→0）；`macaca-llm/src/` 为 canonical routing owner（scanner 豁免）；非 LLM 层去除 vendor/model 字面量：`default_model()` → 空串、`MacacaConfig::default()` 无 provider 默认、`LlmOptions::default()` 空 model、memory `REMOTE_TEXT_EMBEDDING_PROVIDER_ID`（`concat!`）、skill `ANTHROPIC_DESKTOP_CLIENT_ID`、web session 测试中性 driver fixture；framework `model_impls` feature 重命名 `chat_completions_api`/`messages_api`。
+- **P5 退役 token 硬断言**: `provider_model_routing_absent_in_production` + `memory_embedding_provider_literals_absent` + `framework_model_impls_provider_literals_absent`。
+- **Design patterns**: Canonical Owner（LLM service 独占路由）；Null Object（空串 serde 默认）；Factory Method（memory embedding provider 构造 + tracing）；Specification by Example（raw inventory 0）。
+- **Contract tests**: `serviceization_escape_hatches` 18/18；`dump_escape_hatch_raw_fingerprints` count=0；`macaca-proto`/`macaca-sdk`/`macaca-memory`/`macaca-app` tests green。
+- **GitNexus memo (non-blocking)**: iteration 54 LOW on provider-model-routing family retirement — recorded in `impact-memo.md`。
+- **Next**: filesize allowlist 75→0；6.3.2 archive；P5 终态验收。

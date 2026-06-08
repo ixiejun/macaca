@@ -904,7 +904,8 @@ pub struct LlmOptions {
 impl Default for LlmOptions {
     fn default() -> Self {
         Self {
-            model: String::from("gpt-4"),
+            // Empty model defers routing to the LLM service resolver / user config.
+            model: String::new(),
             max_tokens: Some(4096),
             temperature: Some(0.7),
             stop_sequences: Vec::new(),

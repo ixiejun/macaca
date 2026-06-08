@@ -81,8 +81,9 @@ fn default_permission_level() -> String {
     "user".into()
 }
 
+/// Serde placeholder — agent manifests supply the preferred model id at load time.
 fn default_model() -> String {
-    "gpt-4".into()
+    String::new()
 }
 
 impl AgentConfig {
@@ -155,7 +156,7 @@ prompt_template: "You are a coding assistant."
         assert_eq!(config.capabilities.len(), 1);
         assert_eq!(config.capabilities[0].name, "code_gen");
         assert_eq!(config.permission_level, "user");
-        assert_eq!(config.model, "gpt-4");
+        assert!(config.model.is_empty());
     }
 
     #[test]

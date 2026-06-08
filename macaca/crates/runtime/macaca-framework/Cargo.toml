@@ -48,11 +48,20 @@ a2a-client = ["dep:reqwest"]
 a2a-server = ["dep:axum"]
 mcp-http = ["dep:reqwest"]
 persist = ["dep:macaca-persist"]
-openai = ["dep:reqwest"]
-anthropic = ["dep:reqwest"]
+# Provider-neutral feature flags for legacy HTTP chat adapters (avoid vendor id literals in cfg).
+chat_completions_api = ["dep:reqwest"]
+messages_api = ["dep:reqwest"]
 macaca-compat = ["dep:macaca-llm", "dep:macaca-tools", "mcp-http"]
 service-clients = ["dep:macaca-sdk", "dep:macaca-llm"]
-full = ["a2a-client", "a2a-server", "mcp-http", "persist", "openai", "anthropic", "macaca-compat"]
+full = [
+    "a2a-client",
+    "a2a-server",
+    "mcp-http",
+    "persist",
+    "chat_completions_api",
+    "messages_api",
+    "macaca-compat",
+]
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }

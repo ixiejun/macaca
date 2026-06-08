@@ -418,6 +418,16 @@ fn is_non_production_rust_source(relative: &str) -> bool {
         || relative.ends_with("/serviceization_escape_hatches.rs")
 }
 
+/// Returns true when `relative` is inside the LLM service crate source tree.
+///
+/// Provider/model routing literals are owned exclusively by `macaca-llm`
+/// (resolver descriptors, provider adapters, router tests). The escape-hatch gate
+/// exempts this canonical owner so other OS layers cannot grow parallel routing
+/// tables while the LLM service remains the single routing authority.
+fn is_provider_model_routing_canonical_owner(relative: &str) -> bool {
+    relative.starts_with("crates/services/macaca-llm/src/")
+}
+
 fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> bool {
     if relative.contains("/tests/")
         || relative.ends_with("_tests.rs")
@@ -474,20 +484,7 @@ fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> bool
                     | "crates/shells/macaca-web/src/workspace_knowledge_digest_capability.rs"
             )
         }
-        "provider-model-routing-name" => {
-            // Provider/model names are allowed only in the LLM service family,
-            // where resolver descriptors, provider adapters, and LLM tests own
-            // the routing strategy. This rule is intentionally scoped to the
-            // layers called out by the refactor plan: Kernel, Web, and CLI must
-            // consume provider-neutral model-selection DTOs instead of adding
-            // provider-name or model-prefix branches. Existing application
-            // framework and foundation contract literals are handled by later
-            // baseline-alignment work, not by this shell/kernel freeze.
-            !(relative.starts_with("crates/kernel/")
-                || relative.starts_with("crates/shells/macaca-web/")
-                || relative.starts_with("crates/shells/macaca-cli/"))
-                || relative.starts_with("crates/services/macaca-llm/src/")
-        }
+        // `provider-model-routing-name` family retired in iteration 54 — no migration surfaces remain.
         // `autonomy-service-boundary` family retired in iteration 50 — no migration surfaces remain.
         // `autonomy-loop-boundary` family retired in iteration 44 — no migration surfaces remain.
         // `provider-compat-construction` family retired in iteration 47 — no migration surfaces remain.
@@ -606,7 +603,11 @@ fn scan_file(
 
         for token in tokens {
             if !line.contains(token.token)
-                || (token.family == "hardcoded-agent-role" && is_comment_only_line(line))
+                || ((token.family == "hardcoded-agent-role"
+                    || token.family == "provider-model-routing-name")
+                    && is_comment_only_line(line))
+                || (token.family == "provider-model-routing-name"
+                    && is_provider_model_routing_canonical_owner(&relative))
                 || (honor_migration_surfaces && is_approved_migration_surface(&relative, token))
             {
                 continue;
@@ -1002,6 +1003,33 @@ fn serviceization_escape_hatches_hardcoded_agent_role_terminal_literals_absent()
             "\"frontend\"",
             "\"architect\"",
         ],
+    );
+}
+
+/// Terminal guard for `provider-model-routing-name` (iteration 54): production
+/// code outside the LLM service canonical owner must not embed vendor/model literals.
+#[test]
+fn serviceization_escape_hatches_provider_model_routing_absent_in_production() {
+    assert_retired_escape_hatch_family_absent_in_production("provider-model-routing-name");
+}
+
+/// Sub-phase of `provider-model-routing-name` (iteration 54): memory embedding
+/// factory must compare configured provider ids without hard-coded vendor literals.
+#[test]
+fn serviceization_escape_hatches_memory_embedding_provider_literals_absent() {
+    assert_production_paths_literal_tokens_absent(
+        &["crates/services/macaca-memory/src/backend.rs"],
+        &["\"dashscope\""],
+    );
+}
+
+/// Sub-phase of `provider-model-routing-name` (iteration 54): framework legacy
+/// ChatModel adapters must not reintroduce vendor id literals in `name()`.
+#[test]
+fn serviceization_escape_hatches_framework_model_impls_provider_literals_absent() {
+    assert_production_paths_literal_tokens_absent(
+        &["crates/runtime/macaca-framework/src/model_impls.rs"],
+        &["\"openai\"", "\"anthropic\""],
     );
 }
 

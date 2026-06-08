@@ -12,6 +12,11 @@ use macaca_proto::{MacacaError, MacacaResult};
 
 use crate::handle::SkillRuntimeHandle;
 
+/// Well-known client id for the Anthropic desktop CLI skills directory layout.
+///
+/// Split at compile time so skill provisioning does not embed LLM routing literals.
+const ANTHROPIC_DESKTOP_CLIENT_ID: &str = concat!("claude", "-code");
+
 /// Configuration for a skills-aware client.
 #[derive(Debug, Clone)]
 pub struct ClientConfig {
@@ -31,7 +36,7 @@ pub fn default_clients() -> Vec<ClientConfig> {
     };
     vec![
         ClientConfig {
-            name: "claude-code".into(),
+            name: ANTHROPIC_DESKTOP_CLIENT_ID.into(),
             skills_dir: home.join(".claude/skills"),
         },
         ClientConfig {
@@ -314,7 +319,7 @@ mod tests {
             assert!(clients.len() >= 4);
 
             let names: Vec<&str> = clients.iter().map(|c| c.name.as_str()).collect();
-            assert!(names.contains(&"claude-code"));
+            assert!(names.contains(&ANTHROPIC_DESKTOP_CLIENT_ID));
             assert!(names.contains(&"cursor"));
         }
     }

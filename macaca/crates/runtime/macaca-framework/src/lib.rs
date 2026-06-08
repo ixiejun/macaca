@@ -26,7 +26,11 @@ pub mod mcp;
 pub mod memory;
 pub mod message;
 pub mod model;
-#[cfg(any(feature = "openai", feature = "anthropic"))]
+/// Legacy HTTP chat adapters (OpenAI-compatible and Messages API shapes).
+///
+/// Feature flags use protocol-neutral names so production sources do not embed
+/// vendor routing literals in `#[cfg(feature = ...)]` attributes.
+#[cfg(any(feature = "chat_completions_api", feature = "messages_api"))]
 pub mod model_impls;
 pub mod pipeline;
 pub mod plan;

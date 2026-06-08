@@ -442,3 +442,13 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `GOAL_PLANNER_EXECUTION_INTENT_LABEL` wire rename | LOW | metadata label only; enum `Planner` unchanged; callers use `metadata_value()` | P5 |
 | `hardcoded_agent_role_terminal_literals_absent` hard assert | LOW | prevents reintroduction in cleaned workflow/proto modules | P5 |
 | `migration_debt_baseline` raw 124→121 | LOW | `hardcoded-agent-role` family retired to 0 | P5 |
+
+## Iteration 54 additions (§6.2.1 provider-model-routing-name terminal sub-phase — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `REMOTE_TEXT_EMBEDDING_PROVIDER_ID` / `MemoryBackendFactory::build_embedding_provider` | LOW | memory embedding factory; config-driven provider id from `default.toml` | P5 |
+| `LlmOptions::default` / `MacacaConfig::default` empty routing fields | LOW | serde defaults only; runtime loads `config/default.toml` | P5 |
+| `is_provider_model_routing_canonical_owner` scanner exemption | LOW | `macaca-llm/src/` only; prevents false positives in LLM service | P5 |
+| `provider_model_routing_absent_in_production` hard assert | LOW | terminal guard for last escape-hatch family | P5 |
+| `migration_debt_baseline` raw 121→0 | LOW | all 10 escape-hatch families retired | P5 |

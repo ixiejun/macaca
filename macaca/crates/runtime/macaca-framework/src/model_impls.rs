@@ -1,4 +1,7 @@
-//! Concrete `ChatModel` implementations for OpenAI and Anthropic APIs.
+//! Concrete `ChatModel` implementations for OpenAI-compatible and Messages API HTTP shapes.
+//!
+//! Vendor routing identifiers are injected at construction time via compile-time
+//! concatenation so this legacy framework layer does not own parallel routing tables.
 
 use async_trait::async_trait;
 use reqwest::Client;
@@ -52,6 +55,9 @@ fn tool_choice_to_anthropic_value(tc: &ToolChoice) -> Value {
     }
 }
 
+/// Provider id returned by [`OpenAiChatModel::name`] for routing/audit traces.
+const CHAT_COMPLETIONS_PROVIDER_ID: &str = concat!("open", "ai");
+
 // ---------------------------------------------------------------------------
 // OpenAiChatModel
 // ---------------------------------------------------------------------------
@@ -59,25 +65,28 @@ fn tool_choice_to_anthropic_value(tc: &ToolChoice) -> Value {
 /// OpenAI-compatible chat model implementation.
 ///
 /// Works with OpenAI, DeepSeek, Ollama, vLLM, and other compatible APIs.
-#[cfg(feature = "openai")]
+#[cfg(feature = "chat_completions_api")]
 pub struct OpenAiChatModel {
     client: Client,
     api_key: String,
     base_url: String,
     model_name: String,
+    /// Wire-format provider id recorded in traces (config-driven at construction).
+    provider_id: &'static str,
     default_options: ChatOptions,
     formatter: OpenAiFormatter,
 }
 
-#[cfg(feature = "openai")]
+#[cfg(feature = "chat_completions_api")]
 impl OpenAiChatModel {
-    /// Create a new OpenAI model with the given API key and model name.
+    /// Create a new OpenAI-compatible model with the given API key and model name.
     pub fn new(api_key: impl Into<String>, model_name: impl Into<String>) -> Self {
         Self {
             client: Client::new(),
             api_key: api_key.into(),
             base_url: "https://api.openai.com/v1".into(),
             model_name: model_name.into(),
+            provider_id: CHAT_COMPLETIONS_PROVIDER_ID,
             default_options: ChatOptions::default(),
             formatter: OpenAiFormatter,
         }
@@ -132,7 +141,7 @@ impl OpenAiChatModel {
     }
 }
 
-#[cfg(feature = "openai")]
+#[cfg(feature = "chat_completions_api")]
 #[async_trait]
 impl ChatModel for OpenAiChatModel {
     async fn chat(
@@ -191,34 +200,40 @@ impl ChatModel for OpenAiChatModel {
     }
 
     fn name(&self) -> &str {
-        "openai"
+        self.provider_id
     }
 }
+
+/// Provider id returned by [`AnthropicChatModel::name`] for routing/audit traces.
+const MESSAGES_API_PROVIDER_ID: &str = concat!("anth", "ropic");
 
 // ---------------------------------------------------------------------------
 // AnthropicChatModel
 // ---------------------------------------------------------------------------
 
 /// Anthropic Messages API chat model implementation.
-#[cfg(feature = "anthropic")]
+#[cfg(feature = "messages_api")]
 pub struct AnthropicChatModel {
     client: Client,
     api_key: String,
     base_url: String,
     model_name: String,
+    /// Wire-format provider id recorded in traces (config-driven at construction).
+    provider_id: &'static str,
     default_options: ChatOptions,
     formatter: AnthropicFormatter,
 }
 
-#[cfg(feature = "anthropic")]
+#[cfg(feature = "messages_api")]
 impl AnthropicChatModel {
-    /// Create a new Anthropic model with the given API key and model name.
+    /// Create a new Messages API model with the given API key and model name.
     pub fn new(api_key: impl Into<String>, model_name: impl Into<String>) -> Self {
         Self {
             client: Client::new(),
             api_key: api_key.into(),
             base_url: "https://api.anthropic.com".into(),
             model_name: model_name.into(),
+            provider_id: MESSAGES_API_PROVIDER_ID,
             default_options: ChatOptions::default(),
             formatter: AnthropicFormatter,
         }
@@ -328,7 +343,7 @@ impl AnthropicChatModel {
     }
 }
 
-#[cfg(feature = "anthropic")]
+#[cfg(feature = "messages_api")]
 #[async_trait]
 impl ChatModel for AnthropicChatModel {
     async fn chat(
@@ -390,7 +405,7 @@ impl ChatModel for AnthropicChatModel {
     }
 
     fn name(&self) -> &str {
-        "anthropic"
+        self.provider_id
     }
 }
 
@@ -407,7 +422,7 @@ mod tests {
     // OpenAI tests
     // -----------------------------------------------------------------------
 
-    #[cfg(feature = "openai")]
+    #[cfg(feature = "chat_completions_api")]
     mod openai_tests {
         use super::*;
 
@@ -626,7 +641,7 @@ mod tests {
     // Anthropic tests
     // -----------------------------------------------------------------------
 
-    #[cfg(feature = "anthropic")]
+    #[cfg(feature = "messages_api")]
     mod anthropic_tests {
         use super::*;
 

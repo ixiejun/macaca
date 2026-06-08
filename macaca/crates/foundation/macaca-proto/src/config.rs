@@ -1300,7 +1300,8 @@ impl Default for MacacaConfig {
                 agent_timeout_ms: 30000,
             },
             llm: LlmConfig {
-                default_provider: "anthropic".into(),
+                // Provider/model routing resolves from config/default.toml, not struct defaults.
+                default_provider: String::new(),
                 default_model: None,
                 max_tokens_per_request: 8192,
                 rate_limit_rpm: 60,
@@ -1318,7 +1319,7 @@ impl Default for MacacaConfig {
                     collection_name: "agent_memory".into(),
                 },
                 embedding: EmbeddingConfig {
-                    provider: "dashscope".into(),
+                    provider: String::new(),
                     model: "text-embedding-v4".into(),
                     api_key: "DASHSCOPE_API_KEY".into(),
                     dimensions: 1024,

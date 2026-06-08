@@ -302,8 +302,9 @@ impl AppCapabilitySet {
     }
 }
 
+/// Serde placeholder — manifests and `config/default.toml` supply the real model id.
 fn default_model() -> String {
-    "gpt-4".into()
+    String::new()
 }
 
 fn default_permission() -> String {
