@@ -952,3 +952,13 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `DashScopeFormatter::parse_response` | LOW | OpenAI-compatible + native output Adapter; dual-path response decoding | P4 |
 | `AnthropicFormatter::format` / `parse_response` | LOW | Messages API Adapter; system-prompt extraction via `extract_system` | P4 |
 | filesize allowlist 6→5 | LOW | debt inventory shrink; 5 oversized P4 framework files remain | P4 |
+
+## Iteration 108 additions (§4.5.1 macaca-framework mcp Facade split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `mcp/{error,types,core,parse,stdio,http,factory,adapter,registration,tests}.rs` | LOW | Framework MCP protocol module tree; public API unchanged via Facade re-exports | P4 |
+| `client_from_transport` | LOW | Factory transport selection; consumed by `macaca-runtime-host/mcp_runtime` and integration tests | P4 |
+| `register_mcp_tools_with_options` | LOW | Bridge Toolkit registration with collision/disabled policies; consumed by runtime-host and web framework toolkit paths | P4 |
+| `McpToolHandler::execute` | LOW | Adapter delegates MCP tool calls into `ToolHandler`; consumed by toolkit registration | P4 |
+| filesize allowlist 5→4 | LOW | debt inventory shrink; 4 oversized P4 framework files remain | P4 |

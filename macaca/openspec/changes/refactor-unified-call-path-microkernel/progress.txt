@@ -879,3 +879,12 @@
 - **Logging**: `tracing::debug`/`warn` on `format`/`parse_response` entry points in `openai.rs`, `dashscope.rs`, `anthropic.rs` with `target = "macaca_framework::formatter::{openai,dashscope,anthropic}"` audit fields。
 - **GitNexus memo (non-blocking)**: iteration 107 LOW on `OpenAiFormatter::format` / `parse_response` framework LLM wire Adapter seam — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: filesize allowlist 5→0（P4 `macaca-framework` 剩余巨型文件，建议 `mcp.rs` 1750 行或 `memory.rs` 1303 行）；6.3.2 archive；P5 终态验收。
+
+## Iteration 108 (2026-06-08)
+- **P4 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 5→**4**；`macaca-framework/mcp.rs` 1750→`mcp/` Facade + Strategy/Factory/Adapter/Bridge 模块树（`mcp.rs` Facade + `error.rs` + `types.rs` + `core.rs` + `parse.rs` + `stdio.rs` + `http.rs` + `factory.rs` + `adapter.rs` + `registration.rs` + `tests/{mock,types_tests,client_tests,parse_tests,registration_tests,http_tests}.rs`）。
+- **Design patterns**: Facade module tree；Strategy（`McpClient` trait）；Factory（`client_from_transport`）；Adapter（`StdioMcpClient` / `HttpMcpClient` / `McpToolHandler`）；Bridge（`register_mcp_tools*` Toolkit integration）。
+- **Contract tests**: `cargo check -p macaca-framework` OK；`cargo test -p macaca-framework --features mcp-http mcp::` 20/20；`os_layer_file_size_gate` 1/1；production modules all ≤500 lines（max `stdio.rs` ~385）。
+- **Public API**: `macaca_framework::mcp::{McpClient, McpError, StdioMcpClient, HttpMcpClient, client_from_transport, register_mcp_tools, ...}` unchanged via Facade re-exports；`lib.rs` `pub mod mcp` unchanged。
+- **Logging**: `tracing::debug`/`warn` on connect/list_tools/call_tool/register_mcp_tools/parse_call_result with `target = "macaca_framework::mcp::{stdio,http,factory,adapter,registration,parse}"` audit fields。
+- **GitNexus memo (non-blocking)**: iteration 108 LOW on `register_mcp_tools_with_options` / `client_from_transport` framework MCP admission seam — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: filesize allowlist 4→0（P4 `macaca-framework` 剩余巨型文件，建议 `memory.rs` 1303 行或 `plan.rs` 934 行）；6.3.2 archive；P5 终态验收。
