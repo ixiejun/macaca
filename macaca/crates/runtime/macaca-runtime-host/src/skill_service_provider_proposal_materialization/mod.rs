@@ -6,9 +6,17 @@
 //! existing content-mutation Strategy, and promotes governance metadata only
 //! after the write succeeds.  It never branches on application or workflow
 //! names, and it never logs or returns the generated `SKILL.md` body.
+//!
+//! Module layout (Facade + Strategy + Builder + Specification vocabulary):
+//! - `mod.rs` — traced command adapter and orchestration Strategy on governance state
+//! - `draft_materialization_builder.rs` — Builder that turns sanitized proposals into bounded drafts
+//! - `identity_vocabulary.rs` — deterministic slug and semantic token Specification helpers
+//! - `content_digest_vocabulary.rs` — bounded digest and mutation metadata Value Object helpers
 
-use std::collections::BTreeMap;
-use std::path::PathBuf;
+mod content_digest_vocabulary;
+mod draft_materialization_builder;
+mod identity_vocabulary;
+
 use std::sync::Arc;
 
 use macaca_proto::{ServiceCallResult, ServiceError, ServiceResult, TraceContext};
@@ -25,7 +33,16 @@ use crate::skill_service_codec::{decode, service_result, to_value};
 use crate::skill_service_content_mutation::LocalSkillContentMutationStrategy;
 use crate::skill_service_provider_state::SkillProviderGovernanceState;
 
+pub(crate) use content_digest_vocabulary::materialization_mutation_metadata;
+pub(crate) use draft_materialization_builder::{
+    SkillDraftMaterialization, SkillDraftMaterializationBuilder,
+};
+
 /// Decode and apply a traced proposal materialization command.
+///
+/// This is the service-runtime entry point: it decodes the JSON payload into a
+/// typed command, delegates to the governance-state Strategy, and wraps the
+/// outcome in a traced `ServiceCallResult` for the Skill provider facade.
 pub(crate) async fn apply_command(
     state: &Arc<SkillProviderGovernanceState>,
     content_mutation: &LocalSkillContentMutationStrategy,
@@ -217,6 +234,11 @@ impl SkillProviderGovernanceState {
     }
 
     /// Return the proposal only if processing has explicitly marked it ready.
+    ///
+    /// Readiness is a conjunction of three service-owned gates: the proposal
+    /// record must exist, remain in draft lifecycle, and carry a processing lane
+    /// state of `ReadyForMaterialization`.  Any failure returns a structured
+    /// denial rather than an internal error so callers can audit the reason.
     async fn ready_materialization_proposal(
         &self,
         command: &SkillProposalMaterializationCommand,
@@ -257,6 +279,10 @@ impl SkillProviderGovernanceState {
     }
 
     /// Store target identity refs on the proposal before promotion reads it.
+    ///
+    /// Promotion reads proposal metadata to attach provenance.  Writing digest
+    /// and materialization refs here keeps the Builder pure while still giving
+    /// downstream governance a stable audit trail.
     async fn prepare_proposal_materialization_target(
         &self,
         command: &SkillProposalMaterializationCommand,
@@ -275,291 +301,4 @@ impl SkillProviderGovernanceState {
                 .insert("content_digest_ref".into(), draft.content_digest.clone());
         }
     }
-}
-
-/// Bounded materialized draft produced by the Builder.
-struct SkillDraftMaterialization {
-    skill_id: String,
-    name: String,
-    identity_source: &'static str,
-    identity_used_fallback: bool,
-    relative_path: PathBuf,
-    content: Vec<u8>,
-    content_digest: String,
-    materialization_ref: String,
-}
-
-/// Model-facing identity derived for a materialized Skill package.
-///
-/// Proposal ids remain the immutable audit identity, but the frontmatter name is
-/// the handle the model sees when deciding whether a future task should activate
-/// the Skill.  Keeping this small value object inside the Builder preserves the
-/// service boundary: identity derivation is part of package construction, while
-/// mutation, policy, rollback, and promotion stay in their existing strategies.
-struct MaterializedSkillIdentity {
-    name: String,
-    source: &'static str,
-    used_fallback: bool,
-}
-
-/// Builder that isolates proposal-to-`SKILL.md` content construction.
-///
-/// Keeping this as a dedicated Builder prevents the provider Strategy from
-/// mixing readiness checks, mutation orchestration, and markdown rendering. The
-/// Builder consumes only sanitized proposal fields and emits bounded UTF-8
-/// bytes for the existing mutation Strategy to validate again.
-struct SkillDraftMaterializationBuilder<'a> {
-    proposal: &'a SkillExperienceProposalRecord,
-}
-
-impl<'a> SkillDraftMaterializationBuilder<'a> {
-    fn new(proposal: &'a SkillExperienceProposalRecord) -> Self {
-        Self { proposal }
-    }
-
-    fn build(&self) -> SkillDraftMaterialization {
-        let identity = materialized_skill_identity(self.proposal);
-        let name = identity.name;
-        let skill_id = self
-            .proposal
-            .target_skill_id
-            .clone()
-            .unwrap_or_else(|| format!("skill://agent/{name}"));
-        let description = yaml_quoted(&skill_creator_description(self.proposal));
-        let procedure = bounded_block(&self.proposal.reusable_procedure, 4_096);
-        let when_to_use = bounded_line(&self.proposal.reusable_procedure, 240);
-        let content = format!(
-            "---\nname: {name}\ndescription: {description}\n---\n\n# {name}\n\n## When To Use\nUse this skill when a future task matches this bounded procedure: {when_to_use}\n\n## Procedure\n{procedure}\n\n## Verification\n- Confirm terminal task evidence is still present before relying on this skill.\n- Record new evidence refs when the procedure changes.\n\n## Provenance\n- Proposal ref: `{}`\n- Task ref: `{}`\n- Trace ref: `{}`\n",
-            self.proposal.proposal_id, self.proposal.task_id, self.proposal.trace_id
-        )
-        .into_bytes();
-        let content_digest = stable_content_digest(&content);
-        SkillDraftMaterialization {
-            skill_id,
-            name,
-            identity_source: identity.source,
-            identity_used_fallback: identity.used_fallback,
-            relative_path: PathBuf::from("SKILL.md"),
-            materialization_ref: format!(
-                "skill.materialization://{}",
-                content_digest
-                    .strip_prefix("skill-draft-digest://")
-                    .unwrap_or(&content_digest)
-            ),
-            content,
-            content_digest,
-        }
-    }
-}
-
-fn materialization_mutation_metadata(
-    proposal: &SkillExperienceProposalRecord,
-    draft: &SkillDraftMaterialization,
-) -> BTreeMap<String, String> {
-    let mut metadata = BTreeMap::new();
-    metadata.insert("proposal_id".into(), proposal.proposal_id.clone());
-    metadata.insert("task_id".into(), proposal.task_id.clone());
-    metadata.insert("content_digest_ref".into(), draft.content_digest.clone());
-    metadata
-}
-
-/// Build the only model-visible trigger field guaranteed to be loaded before a
-/// Skill body is selected.
-///
-/// Skill Creator guidance treats `description` as the primary discovery surface.
-/// The materialization Builder therefore writes a concise "Use when..." trigger
-/// sentence and leaves task ids, proposal ids, and trace refs in provenance
-/// fields rather than the selector text.
-fn skill_creator_description(proposal: &SkillExperienceProposalRecord) -> String {
-    let semantic_context = proposal
-        .target_skill_name
-        .as_deref()
-        .map(slugify)
-        .filter(|name| !name.is_empty())
-        .or_else(|| semantic_skill_name_from_text(&proposal.reusable_procedure))
-        .or_else(|| semantic_skill_name_from_text(&proposal.bounded_summary))
-        .unwrap_or_else(|| "governed-skill-procedure".into());
-    bounded_line(
-        &format!(
-            "Use when a future task needs the governed reusable procedure for {semantic_context}; rely on linked evidence refs, registry visibility, telemetry, curation, approval, and rollback before reuse."
-        ),
-        320,
-    )
-}
-
-fn proposal_skill_name(proposal: &SkillExperienceProposalRecord) -> String {
-    proposal
-        .target_skill_name
-        .as_deref()
-        .map(slugify)
-        .filter(|name| !name.is_empty())
-        .unwrap_or_else(|| slugify(&proposal.proposal_id))
-}
-
-fn materialized_skill_identity(
-    proposal: &SkillExperienceProposalRecord,
-) -> MaterializedSkillIdentity {
-    if let Some(name) = proposal
-        .target_skill_name
-        .as_deref()
-        .map(slugify)
-        .filter(|name| !name.is_empty())
-    {
-        return MaterializedSkillIdentity {
-            name,
-            source: "target_skill_name",
-            used_fallback: false,
-        };
-    }
-
-    if let Some(name) = semantic_skill_name_from_text(&proposal.reusable_procedure) {
-        return MaterializedSkillIdentity {
-            name,
-            source: "reusable_procedure",
-            used_fallback: false,
-        };
-    }
-
-    if let Some(name) = semantic_skill_name_from_text(&proposal.bounded_summary) {
-        return MaterializedSkillIdentity {
-            name,
-            source: "bounded_summary",
-            used_fallback: false,
-        };
-    }
-
-    MaterializedSkillIdentity {
-        name: proposal_skill_name(proposal),
-        source: "proposal_id_fallback",
-        used_fallback: true,
-    }
-}
-
-/// Extract a short deterministic slug from sanitized proposal evidence.
-///
-/// This is intentionally a local Specification rather than an LLM call.  The
-/// materialization service must be reproducible, provider-neutral, and safe to
-/// run during unattended autonomous operation.  Stop words remove generic
-/// evidence language, while the remaining tokens preserve task concepts that
-/// make model-facing Skill selection possible.
-fn semantic_skill_name_from_text(value: &str) -> Option<String> {
-    const MAX_TOKENS: usize = 8;
-    let mut tokens = Vec::new();
-    let mut current = String::new();
-
-    for character in value.chars() {
-        if character.is_ascii_alphanumeric() {
-            current.push(character.to_ascii_lowercase());
-        } else if !current.is_empty() {
-            push_semantic_token(&mut tokens, &current, MAX_TOKENS);
-            current.clear();
-        }
-    }
-    if !current.is_empty() {
-        push_semantic_token(&mut tokens, &current, MAX_TOKENS);
-    }
-
-    if tokens.len() < 2 {
-        return None;
-    }
-    Some(slugify(&tokens.join("-")))
-}
-
-fn push_semantic_token(tokens: &mut Vec<String>, token: &str, max_tokens: usize) {
-    if tokens.len() >= max_tokens || token.len() < 4 || is_identity_stop_word(token) {
-        return;
-    }
-    if token.chars().all(|character| character.is_ascii_digit()) {
-        return;
-    }
-    if !tokens.iter().any(|existing| existing == token) {
-        tokens.push(token.to_string());
-    }
-}
-
-fn is_identity_stop_word(token: &str) -> bool {
-    matches!(
-        token,
-        "this"
-            | "that"
-            | "when"
-            | "with"
-            | "from"
-            | "into"
-            | "future"
-            | "task"
-            | "tasks"
-            | "skill"
-            | "skills"
-            | "agent"
-            | "agents"
-            | "verified"
-            | "evidence"
-            | "record"
-            | "records"
-            | "bounded"
-            | "reusable"
-            | "procedure"
-            | "procedures"
-            | "output"
-            | "verify"
-            | "inspect"
-            | "confirm"
-            | "artifact"
-            | "artifacts"
-            | "service"
-            | "owned"
-            | "follow"
-            | "followup"
-    )
-}
-
-fn slugify(value: &str) -> String {
-    let mut slug = String::new();
-    let mut previous_dash = false;
-    for character in value.chars() {
-        if character.is_ascii_alphanumeric() {
-            slug.push(character.to_ascii_lowercase());
-            previous_dash = false;
-        } else if !previous_dash {
-            slug.push('-');
-            previous_dash = true;
-        }
-        if slug.len() >= 80 {
-            break;
-        }
-    }
-    let slug = slug.trim_matches('-').to_string();
-    if slug.is_empty() {
-        "materialized-skill".into()
-    } else {
-        slug
-    }
-}
-
-fn bounded_line(value: &str, max_chars: usize) -> String {
-    value
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
-        .chars()
-        .take(max_chars)
-        .collect()
-}
-
-fn bounded_block(value: &str, max_chars: usize) -> String {
-    value.trim().chars().take(max_chars).collect()
-}
-
-fn yaml_quoted(value: &str) -> String {
-    format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
-}
-
-fn stable_content_digest(bytes: &[u8]) -> String {
-    let mut hash = 0xcbf29ce484222325u64;
-    for byte in bytes {
-        hash ^= *byte as u64;
-        hash = hash.wrapping_mul(0x100000001b3);
-    }
-    format!("skill-draft-digest://fnv1a64:{hash:016x}")
 }

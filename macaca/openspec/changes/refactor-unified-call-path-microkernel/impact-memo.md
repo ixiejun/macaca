@@ -507,3 +507,11 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `local_provider/{run_lifecycle,native_cadence,completion_sanitizer}.rs` | LOW | heartbeat service provider module tree; public `InProcessHeartbeatProvider` API unchanged | P5 |
 | `local_provider.rs` facade shrink (562→172 lines) | LOW | composition root only; command_handler/gates/memento unchanged | P5 |
 | filesize allowlist 57→56 | LOW | debt inventory shrink; 56 oversized files remain | P5 |
+
+## Iteration 61 additions (§4.5.1 runtime-host borderline batch — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `skill_service_provider_proposal_materialization/{mod,draft_materialization_builder,identity_vocabulary,content_digest_vocabulary}.rs` | LOW | Skill provider module tree; `apply_command` export unchanged | P5 |
+| `application_execution_remote_agent/{registration,transport,registry,provider}.rs` | LOW | remote agent provider module tree; `lib.rs` re-exports unchanged | P5 |
+| filesize allowlist 56→54 | LOW | debt inventory shrink; 54 oversized files remain | P5 |

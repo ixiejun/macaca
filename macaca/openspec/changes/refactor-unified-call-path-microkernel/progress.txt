@@ -495,3 +495,10 @@
 - **Contract tests**: `os_layer_file_size_gate` 1/1；`macaca-heartbeat` local_provider 5/5。
 - **GitNexus memo (non-blocking)**: iteration 60 LOW on heartbeat local_provider facade split — recorded in `impact-memo.md`.
 - **Next**: filesize allowlist 56→0（runtime-host giants / proto config/types / scheduled-agent local_provider）；6.3.2 archive；P5 终态验收。
+
+## Iteration 61 (2026-06-07)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 56→**54**；`skill_service_provider_proposal_materialization.rs` 565→模块树（`mod.rs` Strategy 编排 + `draft_materialization_builder.rs` Builder + `identity_vocabulary.rs` Specification + `content_digest_vocabulary.rs` Value Object）；`application_execution_remote_agent.rs` 567→模块树（`registration.rs` DTO + `transport.rs` Adapter + `registry.rs` Registry + `provider.rs` Strategy）。
+- **Design patterns**: Facade module tree；Strategy（materialization + remote provider）；Builder（draft materialization）；Adapter（remote transport）；Registry（remote agent selection）；Specification（identity vocabulary）；Null Object（unavailable transport）；trace `info!`/`warn!` on registration / lease / materialization gates。
+- **Contract tests**: `os_layer_file_size_gate` 1/1；`macaca-runtime-host` application_execution_remote_agent 2/2；`skill_proposal_materialization_tests` 4/4。
+- **GitNexus memo (non-blocking)**: iteration 61 LOW on runtime-host borderline facade splits — recorded in `impact-memo.md`.
+- **Next**: filesize allowlist 54→0（runtime-host giants / proto config/types / heartbeat_lane tests）；6.3.2 archive；P5 终态验收。

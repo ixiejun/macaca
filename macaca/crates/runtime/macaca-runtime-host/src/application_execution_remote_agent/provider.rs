@@ -1,11 +1,9 @@
-//! Remote-agent application execution provider strategy.
+//! Remote-agent ApplicationExecutionProvider Strategy.
 //!
-//! Remote agents are external runtime participants that execute under a
-//! Macaca-issued scoped lease.  This module keeps remote-agent concerns behind
-//! an Adapter/Strategy boundary: registration, health, selection, lease issue,
-//! transport dispatch, gateway validation, and control delivery are all generic
-//! protocol operations.  No kernel, shell, or application-specific code is
-//! imported here.
+//! The provider orchestrates registry selection, lease issuance, transport
+//! dispatch, and event-store append operations.  Each public method emits trace
+//! logs with provider-neutral dimensions so operators can audit remote execution
+//! without inspecting application payloads.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -21,9 +19,8 @@ use macaca_proto::{
     ApplicationExecutionPayload, ApplicationExecutionProviderDescriptor,
     ApplicationExecutionProviderHealth, ApplicationExecutionProviderKind,
     ApplicationExecutionProviderLease, ApplicationExecutionScope, ApplicationExecutionSnapshot,
-    CapabilityId, ServiceError, StartApplicationExecutionCommand, StartApplicationExecutionResult,
+    ServiceError, StartApplicationExecutionCommand, StartApplicationExecutionResult,
 };
-use tokio::sync::RwLock;
 use tracing::{info, warn};
 use uuid::Uuid;
 
@@ -31,209 +28,13 @@ use crate::application_execution_event_builder::build_event;
 use crate::application_execution_event_store::ApplicationExecutionEventStore;
 use crate::application_execution_provider_registry::ApplicationExecutionProvider;
 
+use super::registration::RemoteAgentRegistration;
+use super::registry::RemoteAgentRegistry;
+use super::transport::RemoteAgentExecutionTransport;
+
 const REMOTE_PROVIDER_ID: &str = "provider.remote_agent";
 const REMOTE_PROTOCOL_VERSION: &str = "application-execution.v1";
 const REMOTE_TRANSPORT_KIND: &str = "remote_agent";
-
-/// Remote transport metadata declared by a remote-agent registration.
-///
-/// The value is intentionally opaque and provider-neutral.  A future plugin,
-/// local IPC bridge, HTTP adapter, or message-bus adapter can interpret it
-/// inside its transport implementation without changing service semantics.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RemoteAgentTransportMetadata {
-    pub transport_kind: String,
-    pub endpoint_ref: String,
-    pub callback_identity_ref: String,
-    pub region: Option<String>,
-}
-
-/// Registration DTO for one remote agent worker.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RemoteAgentRegistration {
-    pub agent_id: String,
-    pub protocol_version: String,
-    pub transport: RemoteAgentTransportMetadata,
-    pub supported_controls: Vec<ApplicationExecutionControlKind>,
-    pub supported_events: Vec<ApplicationExecutionEventType>,
-    pub heartbeat_policy: ApplicationExecutionHeartbeatPolicy,
-    pub checkpoint_support: bool,
-    pub capability_declarations: Vec<CapabilityId>,
-    pub resource_profile: BTreeMap<String, String>,
-    pub health_state: ApplicationExecutionProviderHealth,
-    pub max_leases: usize,
-    pub tenant_id: Option<String>,
-}
-
-impl RemoteAgentRegistration {
-    /// Validate admission metadata before the remote agent can receive work.
-    pub fn validate(&self) -> Result<(), ServiceError> {
-        if self.agent_id.trim().is_empty()
-            || self.protocol_version.trim().is_empty()
-            || self.transport.transport_kind.trim().is_empty()
-            || self.transport.endpoint_ref.trim().is_empty()
-            || self.transport.callback_identity_ref.trim().is_empty()
-            || self.supported_events.is_empty()
-            || self.max_leases == 0
-        {
-            return Err(ServiceError::InvalidArgument(
-                "remote agent registration is incomplete".into(),
-            ));
-        }
-        Ok(())
-    }
-}
-
-/// Transport adapter used to dispatch starts and controls to remote agents.
-#[async_trait]
-pub trait RemoteAgentExecutionTransport: Send + Sync {
-    /// Dispatch a start command over the remote transport boundary.
-    async fn start(
-        &self,
-        agent: RemoteAgentRegistration,
-        lease: ApplicationExecutionProviderLease,
-        command: StartApplicationExecutionCommand,
-    ) -> Result<ApplicationExecutionCommandStatus, ServiceError>;
-
-    /// Deliver a control command to a leased remote agent.
-    async fn control(
-        &self,
-        agent: RemoteAgentRegistration,
-        lease: ApplicationExecutionProviderLease,
-        command: ApplicationExecutionControlCommand,
-    ) -> Result<ApplicationExecutionCommandStatus, ServiceError>;
-}
-
-/// Null remote transport used when a composition root has no concrete adapter.
-#[derive(Debug, Default)]
-pub struct UnavailableRemoteAgentExecutionTransport;
-
-#[async_trait]
-impl RemoteAgentExecutionTransport for UnavailableRemoteAgentExecutionTransport {
-    async fn start(
-        &self,
-        _agent: RemoteAgentRegistration,
-        _lease: ApplicationExecutionProviderLease,
-        _command: StartApplicationExecutionCommand,
-    ) -> Result<ApplicationExecutionCommandStatus, ServiceError> {
-        Err(ServiceError::ServiceUnavailable(
-            "remote agent transport adapter is not configured".into(),
-        ))
-    }
-
-    async fn control(
-        &self,
-        _agent: RemoteAgentRegistration,
-        _lease: ApplicationExecutionProviderLease,
-        _command: ApplicationExecutionControlCommand,
-    ) -> Result<ApplicationExecutionCommandStatus, ServiceError> {
-        Err(ServiceError::ServiceUnavailable(
-            "remote agent transport adapter is not configured".into(),
-        ))
-    }
-}
-
-/// Health and lease registry for remote agents.
-#[derive(Default)]
-pub struct RemoteAgentRegistry {
-    agents: RwLock<BTreeMap<String, RemoteAgentRegistration>>,
-    leases: RwLock<BTreeMap<String, ApplicationExecutionProviderLease>>,
-}
-
-impl RemoteAgentRegistry {
-    /// Build an empty registry.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Register one remote agent after descriptor-style validation.
-    pub async fn register(&self, agent: RemoteAgentRegistration) -> Result<(), ServiceError> {
-        agent.validate()?;
-        info!(
-            agent_id = %agent.agent_id,
-            transport_kind = %agent.transport.transport_kind,
-            capabilities = agent.capability_declarations.len(),
-            "remote agent registration admitted"
-        );
-        self.agents
-            .write()
-            .await
-            .insert(agent.agent_id.clone(), agent);
-        Ok(())
-    }
-
-    async fn select(
-        &self,
-        command: &StartApplicationExecutionCommand,
-    ) -> Result<RemoteAgentRegistration, ServiceError> {
-        let agents = self.agents.read().await;
-        let leases = self.leases.read().await;
-        for agent in agents.values() {
-            if let Some(tenant_id) = &agent.tenant_id {
-                if command.tenant_id.as_ref() != Some(tenant_id) {
-                    continue;
-                }
-            }
-            if matches!(
-                agent.health_state,
-                ApplicationExecutionProviderHealth::Unavailable { .. }
-            ) {
-                continue;
-            }
-            let active_lease_count = leases
-                .values()
-                .filter(|lease| {
-                    lease.provider_id == agent.agent_id && lease.expires_at > Utc::now()
-                })
-                .count();
-            if active_lease_count >= agent.max_leases {
-                continue;
-            }
-            let capability_match = command.requested_capabilities.iter().all(|required| {
-                agent
-                    .capability_declarations
-                    .iter()
-                    .any(|declared| declared == required)
-            });
-            if capability_match {
-                return Ok(agent.clone());
-            }
-        }
-        Err(ServiceError::ServiceUnavailable(
-            "no healthy remote agent matched capability, tenant, and lease constraints".into(),
-        ))
-    }
-
-    async fn store_lease(&self, lease: ApplicationExecutionProviderLease) {
-        self.leases
-            .write()
-            .await
-            .insert(lease.lease_id.clone(), lease);
-    }
-
-    async fn lease_for_scope(
-        &self,
-        scope: &ApplicationExecutionScope,
-    ) -> Option<ApplicationExecutionProviderLease> {
-        self.leases
-            .read()
-            .await
-            .values()
-            .find(|lease| {
-                lease.scope.application_id == scope.application_id
-                    && lease.scope.session_id == scope.session_id
-                    && lease.scope.run_id == scope.run_id
-            })
-            .cloned()
-    }
-
-    async fn agent_for_lease(
-        &self,
-        lease: &ApplicationExecutionProviderLease,
-    ) -> Option<RemoteAgentRegistration> {
-        self.agents.read().await.get(&lease.provider_id).cloned()
-    }
-}
 
 /// Remote-agent provider strategy exposed to the application execution service.
 pub struct RemoteAgentApplicationExecutionProvider {
@@ -295,6 +96,7 @@ impl RemoteAgentApplicationExecutionProvider {
         }
     }
 
+    /// Derive the execution scope after the service layer assigns session/run ids.
     fn scope_from_start(
         command: &StartApplicationExecutionCommand,
     ) -> Result<ApplicationExecutionScope, ServiceError> {
@@ -317,6 +119,7 @@ impl RemoteAgentApplicationExecutionProvider {
         })
     }
 
+    /// Issue a scoped lease bounded by the selected agent heartbeat policy.
     fn build_lease(
         &self,
         agent: &RemoteAgentRegistration,
@@ -336,6 +139,7 @@ impl RemoteAgentApplicationExecutionProvider {
         }
     }
 
+    /// Append one idempotent execution event and return its cursor ref.
     async fn append_event(
         &self,
         scope: &ApplicationExecutionScope,
@@ -370,7 +174,7 @@ impl RemoteAgentApplicationExecutionProvider {
                 "remote agent gateway ingress requires a lease id".into(),
             ));
         };
-        let Some(lease) = self.registry.leases.read().await.get(&lease_id).cloned() else {
+        let Some(lease) = self.registry.lease_by_id(&lease_id).await else {
             return Err(ServiceError::InvalidArgument(
                 "remote agent gateway ingress rejected stale lease".into(),
             ));
@@ -539,7 +343,7 @@ impl ApplicationExecutionProvider for RemoteAgentApplicationExecutionProvider {
     }
 
     async fn snapshot(&self) -> Result<Option<ApplicationExecutionSnapshot>, ServiceError> {
-        let lease = self.registry.leases.read().await.values().last().cloned();
+        let lease = self.registry.latest_lease().await;
         Ok(lease.map(|lease| ApplicationExecutionSnapshot {
             scope: lease.scope,
             lifecycle_state: if lease.heartbeat_deadline <= Utc::now() {
@@ -556,7 +360,7 @@ impl ApplicationExecutionProvider for RemoteAgentApplicationExecutionProvider {
     }
 
     async fn health(&self) -> Result<ApplicationExecutionProviderHealth, ServiceError> {
-        if self.registry.agents.read().await.is_empty() {
+        if !self.registry.has_agents().await {
             Ok(ApplicationExecutionProviderHealth::Unavailable {
                 reason: "no remote agents registered".into(),
             })
