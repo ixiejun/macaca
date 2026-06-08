@@ -488,3 +488,10 @@
 - **Contract tests**: `os_layer_file_size_gate` 1/1；`macaca-proto` heartbeat_service 5/5；`macaca-proto` tool_service 4/4。
 - **GitNexus memo (non-blocking)**: iteration 59 LOW on proto heartbeat/tool facade splits — recorded in `impact-memo.md`.
 - **Next**: filesize allowlist 57→0（runtime-host giants / proto config/types / macaca-heartbeat local_provider）；6.3.2 archive；P5 终态验收。
+
+## Iteration 60 (2026-06-07)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 57→**56**；`macaca-heartbeat/local_provider.rs` 562→172 行；提取 `run_lifecycle.rs`（State 模式 run 生命周期）、`native_cadence.rs`（Command 单 tick 编排）、`completion_sanitizer.rs`（Specification 元数据脱敏）。
+- **Design patterns**: Facade module tree（已有 command_handler/gates/memento 基础上扩展）；State（run lifecycle）；Command（native cadence tick）；Specification（completion metadata sanitizer）；trace `info!` on profile register / tick / lifecycle transition。
+- **Contract tests**: `os_layer_file_size_gate` 1/1；`macaca-heartbeat` local_provider 5/5。
+- **GitNexus memo (non-blocking)**: iteration 60 LOW on heartbeat local_provider facade split — recorded in `impact-memo.md`.
+- **Next**: filesize allowlist 56→0（runtime-host giants / proto config/types / scheduled-agent local_provider）；6.3.2 archive；P5 终态验收。

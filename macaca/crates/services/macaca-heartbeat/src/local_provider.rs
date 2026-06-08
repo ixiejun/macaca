@@ -12,29 +12,27 @@
 //! policy, resource, entitlement, trace, and audit boundaries are installed.
 
 mod command_handler;
+mod completion_sanitizer;
 mod gates;
 mod memento;
+mod native_cadence;
+mod run_lifecycle;
 #[cfg(test)]
 mod tests;
 
-use std::collections::BTreeMap;
-
-use chrono::{DateTime, Duration, Utc};
+use chrono::{Duration, Utc};
 use macaca_proto::{
-    AutonomyAuditCorrelation, AutonomyScope, AutonomyServiceErrorKind, AutonomyStructuredError,
-    HeartbeatCadencePolicy, HeartbeatCommandResult, HeartbeatCompleteRunCommand,
-    HeartbeatGateDecision, HeartbeatProfile, HeartbeatProfileId, HeartbeatRunId, HeartbeatRunState,
-    HeartbeatScopeIdentity, HeartbeatServiceSnapshot, HeartbeatWakeCommand,
-    HeartbeatWakeDisposition, HeartbeatWakeIntent, MacacaError, MacacaResult, ServiceDescriptor,
-    ServiceHealth, ServiceLifecycleState, TraceContext, HEARTBEAT_SERVICE_ID,
+    AutonomyScope, HeartbeatCadencePolicy, HeartbeatProfile, HeartbeatProfileId,
+    HeartbeatRunState, HeartbeatScopeIdentity, HeartbeatServiceSnapshot, MacacaResult,
+    ServiceDescriptor, ServiceHealth, ServiceLifecycleState, HEARTBEAT_SERVICE_ID,
 };
 use tracing::info;
 
 use crate::service_contract::HeartbeatService;
 use gates::DefaultHeartbeatGateStrategy;
-use memento::{InMemoryHeartbeatStore, StoredHeartbeatProfile, StoredHeartbeatRun};
+use memento::{InMemoryHeartbeatStore, StoredHeartbeatProfile};
 
-const LOCAL_PROVIDER_ID: &str = "local.in_memory";
+pub(super) const LOCAL_PROVIDER_ID: &str = "local.in_memory";
 const DEFAULT_COOLDOWN_MS: i64 = 30_000;
 pub(super) const PROFILE_COOLDOWN_MS_KEY: &str = "heartbeat.profile.cooldown_ms";
 pub(super) const PROFILE_ID_METADATA_KEY: &str = "heartbeat.profile_id";
@@ -91,7 +89,7 @@ impl InProcessHeartbeatProvider {
         }
     }
 
-    fn snapshot_inner(&self) -> HeartbeatServiceSnapshot {
+    pub(super) fn snapshot_inner(&self) -> HeartbeatServiceSnapshot {
         self.store.read(|state| {
             let pending_wakes = state
                 .runs
@@ -165,398 +163,10 @@ impl InProcessHeartbeatProvider {
         Ok(())
     }
 
-    /// Evaluate native heartbeat profiles once and process due profiles.
-    ///
-    /// The method is a deterministic single-tick entrypoint used by
-    /// runtime-host HeartbeatLane and tests. It records mementos through the
-    /// normal wake path and dispatches no application-specific behavior.
-    pub async fn tick_native_profiles_once(
-        &self,
-        trace: TraceContext,
-    ) -> MacacaResult<Vec<HeartbeatCommandResult>> {
-        let due_profiles = self.store.write(|state| {
-            let now = Utc::now();
-            state
-                .profiles
-                .values_mut()
-                .filter_map(|profile| profile.due_at(now).map(|_| profile.profile.clone()))
-                .collect::<Vec<_>>()
-        });
-        let mut results = Vec::new();
-        for profile in due_profiles {
-            let profile_id = profile.profile_id.clone();
-            let mut wake = HeartbeatWakeCommand::new(
-                trace.clone(),
-                profile.scope_identity.scope.clone(),
-                profile.scope_identity.scope_key.clone(),
-                HeartbeatWakeIntent::NativeCadence {
-                    profile_id: profile_id.clone(),
-                },
-            )?;
-            // Copy bounded profile metadata into the wake command before gate
-            // evaluation. This is the only place where profile policy crosses
-            // from Heartbeat memento state into a wake decision; it keeps gate
-            // Strategies generic and avoids any application-specific branch.
-            wake.metadata = profile.metadata.clone();
-            wake.metadata.insert(
-                PROFILE_ID_METADATA_KEY.into(),
-                profile.profile_id.as_str().to_string(),
-            );
-            if let Some(cooldown_ms) = profile.cooldown_ms {
-                wake.metadata
-                    .insert(PROFILE_COOLDOWN_MS_KEY.into(), cooldown_ms.to_string());
-            }
-            let result = self.wake(wake).await?;
-            let mut result = result;
-            for (key, value) in &profile.metadata {
-                result.metadata.insert(key.clone(), value.clone());
-            }
-            if let Some(app_id) = profile.scope_identity.scope.application_id {
-                result
-                    .metadata
-                    .insert("application_id".into(), app_id.to_string());
-            }
-            if let Some(session_id) = profile.scope_identity.scope.session_id.as_ref() {
-                result
-                    .metadata
-                    .insert("session_id".into(), session_id.clone());
-            }
-            result
-                .metadata
-                .insert("scope_key".into(), profile.scope_identity.scope_key.clone());
-            if let Some(run_id) = result.run_id.clone() {
-                self.store.write(|state| {
-                    if let Some(stored) = state.profiles.get_mut(&profile_id) {
-                        stored.last_tick_at = Some(Utc::now());
-                        stored.last_run_id = Some(run_id.clone());
-                        stored.safe_status = if result.accepted {
-                            "native heartbeat cadence accepted".into()
-                        } else {
-                            "native heartbeat cadence gated".into()
-                        };
-                    }
-                });
-                if result.accepted {
-                    self.mark_run_running(trace.clone(), run_id.clone())?;
-                }
-            }
-            info!(
-                service_id = HEARTBEAT_SERVICE_ID,
-                provider_id = LOCAL_PROVIDER_ID,
-                profile_id = profile_id.as_str(),
-                accepted = result.accepted,
-                trace_id = trace.trace_id.as_str(),
-                "local heartbeat native profile tick processed"
-            );
-            results.push(result);
-        }
-        Ok(results)
-    }
-
-    fn result(
-        &self,
-        trace: TraceContext,
-        run_id: Option<HeartbeatRunId>,
-        state: Option<HeartbeatRunState>,
-        disposition: HeartbeatWakeDisposition,
-        gates: Vec<HeartbeatGateDecision>,
-        accepted: bool,
-        audit_id: Option<String>,
-    ) -> HeartbeatCommandResult {
-        HeartbeatCommandResult {
-            run_id,
-            state,
-            disposition,
-            gates,
-            accepted,
-            error: None,
-            trace,
-            audit_id,
-            metadata: BTreeMap::new(),
-        }
-    }
-
-    fn error_result(
-        &self,
-        trace: TraceContext,
-        kind: AutonomyServiceErrorKind,
-        reason_code: &'static str,
-        safe_message: impl Into<String>,
-    ) -> HeartbeatCommandResult {
-        let correlation = AutonomyAuditCorrelation::from_trace(trace.clone()).ok();
-        HeartbeatCommandResult {
-            run_id: None,
-            state: None,
-            disposition: HeartbeatWakeDisposition::Skipped,
-            gates: Vec::new(),
-            accepted: false,
-            error: correlation.map(|correlation| AutonomyStructuredError {
-                kind,
-                reason_code: reason_code.into(),
-                safe_message: safe_message.into(),
-                correlation,
-                metadata: BTreeMap::new(),
-            }),
-            trace,
-            audit_id: None,
-            metadata: BTreeMap::new(),
-        }
-    }
-
-    /// Mark an accepted wake as entering the future dispatch boundary.
-    ///
-    /// The method records lifecycle evidence only. It does not call task,
-    /// application, plugin, notification, or external provider code.
-    pub fn mark_run_running(
-        &self,
-        trace: TraceContext,
-        run_id: HeartbeatRunId,
-    ) -> MacacaResult<HeartbeatCommandResult> {
-        self.transition_run(
-            trace,
-            run_id,
-            HeartbeatRunState::Running,
-            "running",
-            |run, now| {
-                run.summary.started_at = Some(now);
-                run.summary.safe_status = "heartbeat dispatch boundary entered".into();
-            },
-        )
-    }
-
-    /// Mark a heartbeat run as completed successfully.
-    pub fn mark_run_succeeded(
-        &self,
-        trace: TraceContext,
-        run_id: HeartbeatRunId,
-    ) -> MacacaResult<HeartbeatCommandResult> {
-        self.transition_run(
-            trace,
-            run_id,
-            HeartbeatRunState::Succeeded,
-            "succeeded",
-            |run, now| {
-                run.summary.finished_at = Some(now);
-                run.summary.safe_status = "heartbeat run completed".into();
-            },
-        )
-    }
-
-    /// Apply a terminal completion reported by an external runtime observer.
-    ///
-    /// Heartbeat does not execute agents, tasks, plugins, or application
-    /// workflows. This method records only the sanitized terminal state reported
-    /// by Runtime Host after such a boundary returns. The metadata allowlist is
-    /// intentionally about platform execution evidence, not application
-    /// semantics, so all applications share the same audit surface.
-    pub fn complete_run(
-        &self,
-        command: HeartbeatCompleteRunCommand,
-    ) -> MacacaResult<HeartbeatCommandResult> {
-        let metadata = sanitized_completion_metadata(command.metadata);
-        let reason_code = normalize_label(
-            command.reason_code,
-            "heartbeat completion reason is required",
-        )?;
-        let state = command.state;
-        self.transition_run(
-            command.trace,
-            command.run_id,
-            state.clone(),
-            "complete",
-            |run, now| {
-                run.summary.finished_at = Some(now);
-                run.summary.safe_status = match state {
-                    HeartbeatRunState::Succeeded => "heartbeat delegated dispatch completed".into(),
-                    HeartbeatRunState::Failed => "heartbeat delegated dispatch failed".into(),
-                    HeartbeatRunState::Skipped => "heartbeat delegated dispatch skipped".into(),
-                    _ => "heartbeat delegated dispatch completion recorded".into(),
-                };
-                run.summary
-                    .metadata
-                    .insert("dispatch.reason_code".into(), reason_code);
-                run.summary.metadata.extend(metadata);
-            },
-        )
-    }
-
-    /// Mark a heartbeat run as failed with a sanitized reason code.
-    pub fn mark_run_failed(
-        &self,
-        trace: TraceContext,
-        run_id: HeartbeatRunId,
-        reason_code: impl Into<String>,
-    ) -> MacacaResult<HeartbeatCommandResult> {
-        let reason_code =
-            normalize_label(reason_code.into(), "heartbeat failure reason is required")?;
-        self.transition_run(
-            trace,
-            run_id,
-            HeartbeatRunState::Failed,
-            "failed",
-            |run, now| {
-                run.summary.finished_at = Some(now);
-                run.summary.safe_status = "heartbeat run failed".into();
-                run.summary
-                    .metadata
-                    .insert("failure_reason_code".into(), reason_code.clone());
-            },
-        )
-    }
-
-    /// Mark a heartbeat run as intentionally skipped.
-    pub fn mark_run_skipped(
-        &self,
-        trace: TraceContext,
-        run_id: HeartbeatRunId,
-        reason_code: impl Into<String>,
-    ) -> MacacaResult<HeartbeatCommandResult> {
-        let reason_code = normalize_label(reason_code.into(), "heartbeat skip reason is required")?;
-        self.transition_run(
-            trace,
-            run_id,
-            HeartbeatRunState::Skipped,
-            "skipped",
-            |run, now| {
-                run.summary.finished_at = Some(now);
-                run.summary.disposition = HeartbeatWakeDisposition::Skipped;
-                run.summary.safe_status = "heartbeat run skipped".into();
-                run.summary
-                    .metadata
-                    .insert("skip_reason_code".into(), reason_code.clone());
-            },
-        )
-    }
-
-    fn transition_run<F>(
-        &self,
-        trace: TraceContext,
-        run_id: HeartbeatRunId,
-        next_state: HeartbeatRunState,
-        action: &'static str,
-        mutate: F,
-    ) -> MacacaResult<HeartbeatCommandResult>
-    where
-        F: FnOnce(&mut StoredHeartbeatRun, DateTime<Utc>),
-    {
-        Ok(self.store.write(|state| {
-            let audit_id = state.record_audit(match next_state {
-                HeartbeatRunState::Running => "run.running",
-                HeartbeatRunState::Succeeded => "run.succeeded",
-                HeartbeatRunState::Failed => "run.failed",
-                HeartbeatRunState::Skipped => "run.skipped",
-                HeartbeatRunState::Requested => "run.requested",
-                HeartbeatRunState::Coalesced => "run.coalesced",
-                HeartbeatRunState::Gated => "run.gated",
-            });
-            let transition = {
-                let Some(run) = state.runs.get_mut(&run_id) else {
-                    return self.error_result(
-                        trace,
-                        AutonomyServiceErrorKind::InvalidRequest,
-                        "run_not_found",
-                        "heartbeat run was not found",
-                    );
-                };
-                let now = Utc::now();
-                run.summary.state = next_state.clone();
-                run.summary.audit_id = Some(audit_id.clone());
-                mutate(run, now);
-                (
-                    run.summary.wake_scope_key.clone(),
-                    run.summary.disposition.clone(),
-                    run.summary.gates.clone(),
-                )
-            };
-            if matches!(
-                next_state,
-                HeartbeatRunState::Succeeded
-                    | HeartbeatRunState::Failed
-                    | HeartbeatRunState::Skipped
-            ) {
-                state.pending_by_scope.remove(&transition.0);
-            }
-            info!(
-                service_id = HEARTBEAT_SERVICE_ID,
-                provider_id = LOCAL_PROVIDER_ID,
-                run_id = run_id.as_str(),
-                action,
-                audit_id = audit_id.as_str(),
-                trace_id = trace.trace_id.as_str(),
-                "local heartbeat run lifecycle transition completed"
-            );
-            self.result(
-                trace,
-                Some(run_id),
-                Some(next_state),
-                transition.1,
-                transition.2,
-                false,
-                Some(audit_id),
-            )
-        }))
-    }
 }
 
 impl Default for InProcessHeartbeatProvider {
     fn default() -> Self {
         Self::new()
     }
-}
-
-fn normalize_label(value: String, message: &'static str) -> MacacaResult<String> {
-    let value = value.trim().to_string();
-    if value.is_empty() {
-        return Err(MacacaError::Config(message.into()));
-    }
-    Ok(value)
-}
-
-fn sanitized_completion_metadata(metadata: BTreeMap<String, String>) -> BTreeMap<String, String> {
-    const MAX_KEY_LEN: usize = 96;
-    const MAX_VALUE_LEN: usize = 256;
-    const MAX_ENTRIES: usize = 24;
-    const ALLOWED_PREFIXES: &[&str] = &[
-        "agent_execution.",
-        "execution_envelope.",
-        "dispatch.",
-        "evidence.",
-        "heartbeat.",
-    ];
-    const REJECTED_FRAGMENTS: &[&str] = &[
-        "prompt",
-        "raw",
-        "secret",
-        "credential",
-        "private",
-        "manifest",
-        "package_bytes",
-        "provider_output",
-    ];
-
-    let mut sanitized = BTreeMap::new();
-    for (key, value) in metadata {
-        if sanitized.len() >= MAX_ENTRIES {
-            break;
-        }
-        let key = key.trim();
-        let value = value.trim();
-        if key.is_empty()
-            || value.is_empty()
-            || key.len() > MAX_KEY_LEN
-            || !ALLOWED_PREFIXES
-                .iter()
-                .any(|prefix| key.starts_with(prefix))
-            || REJECTED_FRAGMENTS
-                .iter()
-                .any(|fragment| key.to_ascii_lowercase().contains(fragment))
-        {
-            continue;
-        }
-        sanitized.insert(
-            key.to_string(),
-            value.chars().take(MAX_VALUE_LEN).collect::<String>(),
-        );
-    }
-    sanitized
 }

@@ -499,3 +499,11 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `heartbeat_service/tests.rs` | LOW | wake/complete-run trace + adapter contract tests only | P5 |
 | `tool_service/{mod,descriptor_vocabulary}.rs` | LOW | industrial tool descriptor/plan vocabulary split; public exports unchanged | P5 |
 | filesize allowlist 59→57 | LOW | debt inventory shrink; 57 oversized files remain | P5 |
+
+## Iteration 60 additions (§4.5.1 macaca-heartbeat local_provider batch — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `local_provider/{run_lifecycle,native_cadence,completion_sanitizer}.rs` | LOW | heartbeat service provider module tree; public `InProcessHeartbeatProvider` API unchanged | P5 |
+| `local_provider.rs` facade shrink (562→172 lines) | LOW | composition root only; command_handler/gates/memento unchanged | P5 |
+| filesize allowlist 57→56 | LOW | debt inventory shrink; 56 oversized files remain | P5 |
