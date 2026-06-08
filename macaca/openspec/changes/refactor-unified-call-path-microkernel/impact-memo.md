@@ -765,3 +765,13 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `PausableAgenticLoop` | MEDIUM | Fork-join pause/resume decorator; internal to runtime (not exported from `lib.rs`) | P5 |
 | `agentic_loop/tests.rs` | LOW | Mock-LLM contract tests; neutral tool names (`shell` as builtin tool id, not agent name) | P5 |
 | filesize allowlist 24→23 | LOW | debt inventory shrink; 23 oversized files remain | P5 |
+
+## Iteration 90 additions (§4.5.1 macaca-tools todo Facade split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `todo/{mod,callbacks,worker_board,create_todo,create_todos,plan_space,tests}.rs` | HIGH | LLM-facing task-board tools; public API `macaca_tools::todo::*` unchanged via Facade re-exports | P5 |
+| `CreateTodoTool::create_one` | HIGH | Plan decomposition syscall; dependency inference + deduplication; consumed by `CreateTodosTool` batch path | P5 |
+| `ReviewTodoTool` / `CreateGoalTool` callbacks | MEDIUM | Observer hooks for PlanLoop startup and run_trace without shell coupling | P5 |
+| `todo/tests.rs` escape-hatch migration surface | LOW | Contract tests use Object Mother fixture agent ids; production modules role-literal free | P5 |
+| filesize allowlist 23→22 | LOW | debt inventory shrink; 22 oversized files remain | P5 |

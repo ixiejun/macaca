@@ -62,7 +62,7 @@ pub fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> 
                 | "crates/services/macaca-task/src/scheduler.rs"
                 | "crates/services/macaca-task/src/todo_board/tests.rs"
                 | "crates/services/macaca-task/src/todo_store.rs"
-                | "crates/services/macaca-tools/src/todo.rs"
+                | "crates/services/macaca-tools/src/todo/tests.rs"
                 | "crates/shells/macaca-web/src/capability_catalog.rs"
                 | "crates/shells/macaca-web/src/chat_orchestrator/route_chat_v2.rs"
                 | "crates/shells/macaca-web/src/framework_runner/build_mode.rs"

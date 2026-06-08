@@ -12,7 +12,16 @@ struct ForbiddenPattern {
 
 const TARGETS: &[AuditTarget] = &[
     AuditTarget {
-        relative_path: "crates/services/macaca-tools/src/todo.rs",
+        relative_path: "crates/services/macaca-tools/src/todo/worker_board.rs",
+    },
+    AuditTarget {
+        relative_path: "crates/services/macaca-tools/src/todo/create_todo.rs",
+    },
+    AuditTarget {
+        relative_path: "crates/services/macaca-tools/src/todo/create_todos.rs",
+    },
+    AuditTarget {
+        relative_path: "crates/services/macaca-tools/src/todo/plan_space.rs",
     },
     AuditTarget {
         relative_path: "crates/shells/macaca-web/src/framework_toolkit/builder.rs",

@@ -1041,7 +1041,8 @@ fn serviceization_escape_hatches_framework_model_impls_provider_literals_absent(
 fn serviceization_escape_hatches_os_test_fixture_role_literals_absent() {
     assert_production_paths_literal_tokens_absent(
         &[
-            "crates/services/macaca-tools/src/todo.rs",
+            "crates/services/macaca-tools/src/todo/create_todo.rs",
+            "crates/services/macaca-tools/src/todo/tests.rs",
             "crates/foundation/macaca-persist/src/event_log_tests.rs",
             "crates/shells/macaca-web/src/session/tests.rs",
             "crates/shells/macaca-web/src/routes/tests.rs",
