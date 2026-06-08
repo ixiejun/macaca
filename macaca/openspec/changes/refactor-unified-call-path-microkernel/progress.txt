@@ -851,3 +851,13 @@
 - **Logging**: `tracing::debug` on `SequentialPipeline::run`, `FanoutPipeline::run`/`run_all`, and `MsgHub::run_round`/`run_rounds` with `target = "macaca_framework::pipeline"` audit fields。
 - **GitNexus memo (non-blocking)**: iteration 104 LOW on `MsgHub::run_round` / `SequentialPipeline::run` framework pipeline admission seam — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: filesize allowlist 8→0（P4 `macaca-framework` 剩余巨型文件，建议 `model_impls.rs` 893 行或 `a2a.rs` 873 行）；6.3.2 archive；P5 终态验收。
+
+## Iteration 105 (2026-06-08)
+- **P4 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 8→**7**；`macaca-framework/model_impls.rs` 893→`model_impls/` Facade + Adapter/Strategy 模块树（`model_impls.rs` Facade + `helpers.rs` + `openai.rs` + `anthropic.rs` + `tests/{openai_tests,anthropic_tests,helper_tests}.rs`）。
+- **Design patterns**: Facade module tree；Adapter（`OpenAiChatModel` / `AnthropicChatModel` HTTP wire → `ChatModel`）；Strategy（`Formatter` response parsing）；shared helper utilities for option merge + tool-choice wire encoding。
+- **Contract tests**: `cargo check -p macaca-framework` OK；`cargo test -p macaca-framework --features chat_completions_api,messages_api model_impls` 26/26；`os_layer_file_size_gate` 1/1；`serviceization_escape_hatches_framework_model_impls_provider_literals_absent` pass；production modules all ≤500 lines（max `anthropic_tests.rs` ~192）。
+- **Public API**: `macaca_framework::model_impls::{OpenAiChatModel, AnthropicChatModel}` unchanged via Facade re-exports；`lib.rs` `pub mod model_impls` unchanged。
+- **Logging**: `tracing::debug`/`warn` on `OpenAiChatModel::chat` and `AnthropicChatModel::chat` with `target = "macaca_framework::model_impls::{openai,anthropic}"` audit fields。
+- **Escape hatch**: `serviceization_escape_hatches` scan paths extended to `model_impls/openai.rs` + `model_impls/anthropic.rs`（vendor ids remain `concat!` split literals）。
+- **GitNexus memo (non-blocking)**: iteration 105 LOW on `OpenAiChatModel::chat` / `AnthropicChatModel::chat` framework legacy HTTP adapter seam — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: filesize allowlist 7→0（P4 `macaca-framework` 剩余巨型文件，建议 `a2a.rs` 873 行或 `formatter.rs` 1354 行）；6.3.2 archive；P5 终态验收。

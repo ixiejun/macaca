@@ -1029,7 +1029,11 @@ fn serviceization_escape_hatches_memory_embedding_provider_literals_absent() {
 #[test]
 fn serviceization_escape_hatches_framework_model_impls_provider_literals_absent() {
     assert_production_paths_literal_tokens_absent(
-        &["crates/runtime/macaca-framework/src/model_impls.rs"],
+        &[
+            "crates/runtime/macaca-framework/src/model_impls.rs",
+            "crates/runtime/macaca-framework/src/model_impls/openai.rs",
+            "crates/runtime/macaca-framework/src/model_impls/anthropic.rs",
+        ],
         &["\"openai\"", "\"anthropic\""],
     );
 }
