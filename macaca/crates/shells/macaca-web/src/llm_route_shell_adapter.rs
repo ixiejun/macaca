@@ -42,7 +42,7 @@ pub async fn status_provider_label(state: &Arc<AppState>) -> String {
         trace: TraceContext::new("web-shell-adapter-llm-status"),
         include_inventory: false,
     };
-    match state.llm_client.snapshot(command).await {
+    match state.service_llm_client().snapshot(command).await {
         Ok(snapshot) if snapshot.healthy => {
             let label = snapshot
                 .providers
@@ -97,7 +97,7 @@ pub async fn resolve_model_selection(
         policy: LlmPolicyHints::default(),
     };
 
-    match state.llm_client.resolve_route(command).await {
+    match state.service_llm_client().resolve_route(command).await {
         Ok(result) => {
             let selection = route_summary_to_model_selection(&result.selected);
             info!(

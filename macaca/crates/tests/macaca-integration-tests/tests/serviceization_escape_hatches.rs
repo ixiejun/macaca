@@ -435,18 +435,7 @@ fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> bool
 
     match token.family {
         // `application-runtime-direct-start` family retired in iteration 43 — no migration surfaces remain.
-        "web-direct-runtime-field" => {
-            // P3 §4.1: deprecated AppState provider fields moved into
-            // `WebShellCompositionBundle`; only bootstrap + approved shell
-            // adapters may touch legacy anchors or SDK LLM clients.
-            relative == "crates/shells/macaca-web/src/lib.rs"
-                || relative == "crates/shells/macaca-web/src/state.rs"
-                || relative == "crates/shells/macaca-web/src/shell_composition_bundle.rs"
-                || relative == "crates/shells/macaca-web/src/application_shell_adapter.rs"
-                || relative == "crates/shells/macaca-web/src/llm_route_shell_adapter.rs"
-                || relative == "crates/shells/macaca-web/src/mcp_shell_adapter.rs"
-                || relative.starts_with("crates/shells/macaca-web/src/framework_runner/")
-        }
+        // `web-direct-runtime-field` family retired in iteration 45 — no migration surfaces remain.
         "hardcoded-agent-role" => {
             // Existing role-name literals are migration debt recorded by the
             // serviceization audit. The allow rule is intentionally file-level,
@@ -797,6 +786,11 @@ fn serviceization_escape_hatches_reconciliation_markers_absent_in_production() {
 #[test]
 fn serviceization_escape_hatches_autonomy_loop_boundary_absent_in_production() {
     assert_retired_escape_hatch_family_absent_in_production("autonomy-loop-boundary");
+}
+
+#[test]
+fn serviceization_escape_hatches_web_direct_runtime_field_absent_in_production() {
+    assert_retired_escape_hatch_family_absent_in_production("web-direct-runtime-field");
 }
 
 #[test]

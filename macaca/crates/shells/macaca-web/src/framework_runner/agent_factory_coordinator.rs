@@ -15,7 +15,7 @@ pub(crate) async fn build_coordinator_agent(
     factory: WebTracedAgentFactory,
     request: AgentBuildRequest,
 ) -> Result<(HookedAgent<ReActAgent>, tokio_util::sync::CancellationToken), String> {
-    let llm_client = Arc::clone(&factory.state.llm_client);
+    let llm_client = factory.state.service_llm_client();
     let context_client = Arc::clone(&factory.state.context_client);
     let PreparedAgentParts {
         selection,

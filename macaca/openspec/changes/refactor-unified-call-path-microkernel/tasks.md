@@ -202,8 +202,8 @@
 - [x] 6.1.7 实现 `shell-dependency-purity` 审计：CLI 终态仅 proto+sdk；Web 冻结 7 条 workspace 依赖基线，禁止新增。（`shell_dependency_purity_gate` via `cargo metadata`）
 
 ### 6.2 逃逸口由"冻结"升级为"删除"
-- [ ] 6.2.1 每个逃逸口对应 service client 全量替换后，删除其 migration module 豁免，使任何引用（含旧引用）CI 失败。（**渐进**：`migration_debt_baseline.rs` 冻结 raw=**267**；**已退役** `multi-path-coordination-patch`（2→0）、`application-runtime-direct-start`（2→0）、`autonomy-loop-boundary`（6→0）；下一小族 `autonomy-service-boundary`（65））
-- [x] 6.2.2 `serviceization_escape_hatches.rs` 双模式门：freeze 模式 violations=0；debt inventory 模式 raw=**267** + per-family baseline；reconciliation markers 生产代码硬断言 0。（`reconciliation_markers_absent_in_production` + `autonomy_loop_boundary_absent_in_production` + `migration_debt_inventory_matches_baseline`）
+- [ ] 6.2.1 每个逃逸口对应 service client 全量替换后，删除其 migration module 豁免，使任何引用（含旧引用）CI 失败。（**渐进**：`migration_debt_baseline.rs` 冻结 raw=**259**；**已退役** `multi-path-coordination-patch`（2→0）、`application-runtime-direct-start`（2→0）、`autonomy-loop-boundary`（6→0）、`web-direct-runtime-field`（8→0）；下一小族 `autonomy-service-boundary`（65））
+- [x] 6.2.2 `serviceization_escape_hatches.rs` 双模式门：freeze 模式 violations=0；debt inventory 模式 raw=**259** + per-family baseline；reconciliation markers 生产代码硬断言 0。（`reconciliation_markers_absent_in_production` + `autonomy_loop_boundary_absent_in_production` + `web_direct_runtime_field_absent_in_production` + `migration_debt_inventory_matches_baseline`）
 
 ### 6.3 OpenSpec baseline 对齐
 - [x] 6.3.1 将本 change 落地后的终态固化进 `openspec/specs/`：`unified-execution-path`、`microkernel-boundary-purity`、更新 `serviceization-dependency-gate`/`serviceization-escape-hatches`/`web-cli-thin-shell-completion`。

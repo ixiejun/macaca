@@ -87,6 +87,7 @@ pub mod skill_self_evolution_observer;
 mod skill_usage_telemetry;
 mod source_artifact;
 pub mod sse;
+mod app_state_service_accessors;
 pub mod state;
 pub mod tool_routes;
 pub mod trace_events;

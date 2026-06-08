@@ -371,3 +371,12 @@
 - **Contract tests**: `serviceization_escape_hatches` 5/5；`autonomy_scheduler_heartbeat_services` 待验证。
 - **GitNexus memo (non-blocking)**: iteration 44 MEDIUM on `dispatch_*` autonomy tick rename — recorded in `impact-memo.md`.
 - **Next**: 6.2.1 下一小族 `autonomy-service-boundary`（65）；6.3.2 继续 archive；filesize allowlist 75→0；4.4.4 web 依赖终态。
+
+## Iteration 45 (2026-06-07)
+- **P5 §6.2.1 逃逸口 family 退役**: `web-direct-runtime-field` family 完全退役（8→0）；shell 适配器改经 `AppState::service_llm_client()` Facade 访问 `service.llm`；删除 migration surface 豁免；`migration_debt_baseline` raw **267→259**（5 families remain）。
+- **Facade 模块**: 新增 `app_state_service_accessors.rs`；`llm_route_shell_adapter` + `framework_runner/agent_factory_*` 同步迁移。
+- **P5 退役族硬断言**: 新增 `web_direct_runtime_field_absent_in_production` 契约测试。
+- **Design patterns**: Facade（`service_llm_client` accessor）；Strangler Fig（forbidden-token 冻结 + migration surface 逐族删除）；Specification by Example（debt inventory baseline）。
+- **Contract tests**: `serviceization_escape_hatches` 6/6；`p5_terminal_audit_gates` 3/3；`os_layer_file_size_gate` 1/1。
+- **GitNexus memo (non-blocking)**: iteration 45 MEDIUM on `service_llm_client` facade + framework runner LLM wiring — recorded in `impact-memo.md`.
+- **Next**: 6.2.1 下一小族 `autonomy-service-boundary`（65）；6.3.2 继续 archive；filesize allowlist 75→0；4.4.4 web 依赖终态。

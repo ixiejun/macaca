@@ -17,16 +17,7 @@ pub fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> 
 
     match token.family {
         // `application-runtime-direct-start` family retired in iteration 43 — no migration surfaces remain.
-        "web-direct-runtime-field" => {
-            relative == "crates/shells/macaca-web/src/lib.rs"
-                || relative == "crates/shells/macaca-web/src/state.rs"
-                || relative == "crates/shells/macaca-web/src/shell_composition_bundle.rs"
-                || relative == "crates/shells/macaca-web/src/application_shell_adapter.rs"
-                || relative == "crates/shells/macaca-web/src/llm_route_shell_adapter.rs"
-                || relative == "crates/shells/macaca-web/src/mcp_shell_adapter.rs"
-                || relative.starts_with("crates/shells/macaca-web/src/framework_runner/")
-                || relative.starts_with("crates/shells/macaca-web/src/composition_bootstrap/")
-        }
+        // `web-direct-runtime-field` family retired in iteration 45 — no migration surfaces remain.
         "provider-compat-construction" => {
             relative == "crates/application/macaca-agent/src/execution.rs"
                 || relative == "crates/application/macaca-agent/src/lib.rs"

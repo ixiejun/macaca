@@ -361,3 +361,11 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `dispatch_scheduler_lane_tick` / `dispatch_heartbeat_lane_tick` / `dispatch_recovery_wake` | MEDIUM | replaces legacy `run_*_tick_once` supervisor APIs; autonomy service provider + integration tests | P1/P5 |
 | `autonomy-loop-boundary` migration surfaces removal | MEDIUM | freeze gate fails on any new ad-hoc scheduler/heartbeat/recovery loop bypass in production | P5 |
 | `assert_retired_escape_hatch_family_absent_in_production` | LOW | contract-test helper only; hard assertion for retired families | P5 |
+
+## Iteration 45 additions (§6.2.1 web-direct-runtime-field retirement — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `AppState::service_llm_client` | MEDIUM | replaces direct `llm_client` field reads in shell adapters + framework runner agent factory paths | P3/P5 |
+| `web-direct-runtime-field` migration surfaces removal | MEDIUM | freeze gate fails on any new deprecated AppState runtime-field access in production shell code | P5 |
+| `llm_route_shell_adapter` / `agent_factory_build` / `agent_factory_coordinator` | LOW | LLM routing + ReAct agent construction; behavior unchanged, access path only | P3 |

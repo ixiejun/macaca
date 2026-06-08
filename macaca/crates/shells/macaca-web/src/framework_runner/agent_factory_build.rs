@@ -370,7 +370,7 @@ impl WebTracedAgentFactory {
             .ok_or_else(|| "standard build request missing task_id".to_string())?;
         let session_id = request.identity.session_id.clone();
         let agent_name = request.identity.agent_name.clone();
-        let llm_client = Arc::clone(&self.state.llm_client);
+        let llm_client = self.state.service_llm_client();
         let context_client = Arc::clone(&self.state.context_client);
 
         Self::configure_standard_toolkit(

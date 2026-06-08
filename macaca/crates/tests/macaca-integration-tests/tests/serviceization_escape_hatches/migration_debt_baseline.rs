@@ -9,12 +9,11 @@
 //! removal or a new frozen debt row. Regenerate family counts with:
 //! `cargo test -p macaca-integration-tests dump_escape_hatch_raw_fingerprints -- --ignored --nocapture`
 
-/// Total raw hits when migration surfaces are not honored (iteration 44 snapshot).
+/// Total raw hits when migration surfaces are not honored (iteration 45 snapshot).
 ///
-/// `autonomy-loop-boundary` retired (−6): supervisor tick APIs renamed to
-/// `dispatch_*` provider-neutral entry points so freeze/inventory scanners no longer
-/// count canonical runtime-host ownership as migration debt.
-pub const EXPECTED_RAW_VIOLATION_COUNT: usize = 267;
+/// `web-direct-runtime-field` retired (−8): shell adapters route LLM access through
+/// `AppState::service_llm_client()` facade instead of deprecated direct field spellings.
+pub const EXPECTED_RAW_VIOLATION_COUNT: usize = 259;
 
 /// Per-family raw hit counts — detects debt shifting between token families.
 pub const EXPECTED_RAW_VIOLATION_BY_FAMILY: &[(&str, usize)] = &[
@@ -23,5 +22,4 @@ pub const EXPECTED_RAW_VIOLATION_BY_FAMILY: &[(&str, usize)] = &[
     ("hardcoded-agent-role", 54),
     ("provider-compat-construction", 7),
     ("provider-model-routing-name", 121),
-    ("web-direct-runtime-field", 8),
 ];
