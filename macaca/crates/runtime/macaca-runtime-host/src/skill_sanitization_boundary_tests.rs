@@ -162,7 +162,10 @@ async fn mutation_route_result_does_not_echo_raw_content_or_full_skill_body() {
 #[test]
 fn skill_operation_logs_are_source_guarded_against_raw_payload_fields() {
     let mutation_source = include_str!("skill_service_content_mutation.rs");
-    let curation_source = include_str!("skill_service_provider_curation.rs");
+    let curation_source = concat!(
+        include_str!("skill_service_provider_curation/mod.rs"),
+        include_str!("skill_service_provider_curation/store.rs"),
+    );
     let provider_source = include_str!("skill_service_provider.rs");
 
     assert!(mutation_source.contains("skill content mutation applied through local strategy"));

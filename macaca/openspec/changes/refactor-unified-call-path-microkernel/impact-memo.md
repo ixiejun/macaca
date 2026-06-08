@@ -452,3 +452,13 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `is_provider_model_routing_canonical_owner` scanner exemption | LOW | `macaca-llm/src/` only; prevents false positives in LLM service | P5 |
 | `provider_model_routing_absent_in_production` hard assert | LOW | terminal guard for last escape-hatch family | P5 |
 | `migration_debt_baseline` raw 121→0 | LOW | all 10 escape-hatch families retired | P5 |
+
+## Iteration 55 additions (§4.5.1 filesize borderline batch — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `isolated/tests.rs` / `provisioner/tests.rs` extraction | LOW | test-only relocation; production API unchanged | P5 |
+| `skill_service_provider_curation/{mod,store}.rs` split | LOW | skill curation command path; `skill_service_provider` dispatch unchanged | P5 |
+| `plugin_marketplace_snapshot_decode` Adapter | LOW | snapshot command decode only; marketplace dispatch unchanged | P5 |
+| `skill_sanitization_boundary_tests` include_str concat | LOW | source-guard contract only | P5 |
+| filesize allowlist 75→71 | LOW | debt inventory shrink; 71 oversized files remain | P5 |

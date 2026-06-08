@@ -453,3 +453,10 @@
 - **Contract tests**: `serviceization_escape_hatches` 18/18；`dump_escape_hatch_raw_fingerprints` count=0；`macaca-proto`/`macaca-sdk`/`macaca-memory`/`macaca-app` tests green。
 - **GitNexus memo (non-blocking)**: iteration 54 LOW on provider-model-routing family retirement — recorded in `impact-memo.md`。
 - **Next**: filesize allowlist 75→0；6.3.2 archive；P5 终态验收。
+
+## Iteration 55 (2026-06-07)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 75→**71**；`isolated.rs`/`provisioner.rs` 契约测试提取至 `tests.rs`（Contract Test 模式）；`skill_service_provider_curation.rs` → `mod.rs`+`store.rs`（Command+Store/Memento）；`plugin_marketplace_service_commands.rs` 快照解码提取至 `plugin_marketplace_snapshot_decode.rs`（Adapter）；`skill_sanitization_boundary_tests` `include_str!` 路径同步。
+- **Design patterns**: Contract Test extraction；Facade+Store split；Adapter（workbench envelope → typed snapshot DTO）；trace `debug!` on decode branches.
+- **Contract tests**: `os_layer_file_size_gate` 1/1；`macaca-memory` isolated 8/8；`macaca-skill` provisioner 8/8；`skill_sanitization_boundary_tests` source-guard pass.
+- **GitNexus memo (non-blocking)**: iteration 55 LOW on borderline filesize splits — recorded in `impact-memo.md`.
+- **Next**: filesize allowlist 71→0（下一批 borderline / runtime-host giants）；6.3.2 archive；P5 终态验收。

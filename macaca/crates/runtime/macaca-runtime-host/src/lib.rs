@@ -109,6 +109,7 @@ pub mod plugin_hosts;
 pub(crate) mod plugin_marketplace_service_commands;
 pub mod plugin_marketplace_service_provider;
 pub(crate) mod plugin_marketplace_service_support;
+pub(crate) mod plugin_marketplace_snapshot_decode;
 pub(crate) mod process_service_local;
 pub mod process_service_provider;
 pub(crate) mod process_service_records;

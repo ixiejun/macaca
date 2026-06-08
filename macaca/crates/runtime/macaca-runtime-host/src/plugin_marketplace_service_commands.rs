@@ -11,13 +11,13 @@
 use chrono::Utc;
 use macaca_proto::workbench::plugin_marketplace::*;
 use macaca_proto::{
-    PluginListCommand, PluginTargetCommand, ServiceResult, TraceContext, WorkbenchCommand,
-    WorkbenchCommandResult, WorkbenchCommandStatus,
+    PluginListCommand, PluginTargetCommand, ServiceResult, TraceContext, WorkbenchCommandResult,
+    WorkbenchCommandStatus,
 };
-use serde_json::Value;
 use tracing::{info, warn};
 
 use crate::plugin_marketplace_service_support::*;
+use crate::plugin_marketplace_snapshot_decode::decode_snapshot_payload;
 use crate::PluginMarketplaceSystemServiceProvider;
 
 impl PluginMarketplaceSystemServiceProvider {
@@ -490,28 +490,4 @@ impl PluginMarketplaceSystemServiceProvider {
             None,
         )
     }
-}
-
-fn decode_snapshot_payload(value: Value) -> ServiceResult<PluginMarketplaceSnapshotCommand> {
-    // Shell workbench diagnostics send a generic `WorkbenchCommand<Value>`
-    // envelope for every service.  Marketplace-specific callers may still send
-    // the typed snapshot command directly.  Supporting both shapes keeps the
-    // service contract typed while preserving one generic diagnostics path.
-    if value.is_null() {
-        return Ok(PluginMarketplaceSnapshotCommand {
-            include_audit_tail: false,
-        });
-    }
-    if let Ok(command) = serde_json::from_value::<PluginMarketplaceSnapshotCommand>(value.clone()) {
-        return Ok(command);
-    }
-    if let Ok(envelope) = serde_json::from_value::<WorkbenchCommand<Value>>(value.clone()) {
-        if envelope.payload.is_null() {
-            return Ok(PluginMarketplaceSnapshotCommand {
-                include_audit_tail: false,
-            });
-        }
-        return decode(envelope.payload);
-    }
-    decode(value)
 }
