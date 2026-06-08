@@ -26,7 +26,7 @@ fn local_governance_store_logs_key_audit_nodes_with_structured_fields() {
     // Governance append/replay logs live in the dedicated store adapter module after
     // the Route C split; snapshot logs remain on the provider state module.
     let governance_store_source = include_str!("skill_service_governance_store.rs");
-    let state_source = include_str!("skill_service_provider_state.rs");
+    let state_source = include_str!("skill_service_provider_state/governance_read_model.rs");
     let unavailable_source = include_str!("../../../services/macaca-skill/src/governance_store.rs");
 
     assert!(governance_store_source

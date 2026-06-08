@@ -509,3 +509,10 @@
 - **Contract tests**: `os_layer_file_size_gate` 1/1；`heartbeat_lane::tests` 4/4；`hardened_provider_tests` 7/7。
 - **GitNexus memo (non-blocking)**: iteration 62 LOW on heartbeat/wasm borderline facade splits — recorded in `impact-memo.md`.
 - **Next**: filesize allowlist 51→0（runtime-host giants / proto config/types）；6.3.2 archive；P5 终态验收。
+
+## Iteration 63 (2026-06-07)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 51→**49**；`skill_service_provider_state.rs` 588→模块树（`mod.rs` Facade + `governance_read_model.rs` Read Model + `lifecycle_mutations.rs` State + `alias_governance.rs` + `proposal_store.rs` + `event_vocabulary.rs` Specification）；`lib.rs` 583→265 + `runtime_host_public_api.rs` Facade re-export 面（模块声明与 `pub use` 分离）。
+- **Design patterns**: Facade module tree；State（governance lifecycle）；Read Model（snapshots/telemetry）；Specification（event id + snapshot filters）；Strategy bridge（append_event → governance store）；trace `info!`/`warn!`/`debug!` on snapshot/alias/lifecycle/materialization nodes。
+- **Contract tests**: `os_layer_file_size_gate` 1/1；`skill_governance_store_logging_tests` 2/2；`skill_service_*` 39/39。
+- **GitNexus memo (non-blocking)**: iteration 63 LOW on skill state + runtime-host lib facade splits — recorded in `impact-memo.md`.
+- **Next**: filesize allowlist 49→0（runtime-host giants / proto config/types）；6.3.2 archive；P5 终态验收。
