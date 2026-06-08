@@ -450,7 +450,7 @@ fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> bool
                     | "crates/application/macaca-app/src/service_projection.rs"
                     | "crates/facade/macaca-sdk/src/system_facade.rs"
                     | "crates/foundation/macaca-proto/src/orchestration.rs"
-                    | "crates/foundation/macaca-proto/src/types.rs"
+                    | "crates/foundation/macaca-proto/src/types/mod.rs"
                     | "crates/runtime/macaca-runtime-host/src/executor/app_executor/mod.rs"
                     | "crates/runtime/macaca-runtime-host/src/executor/bus.rs"
                     | "crates/runtime/macaca-runtime-host/src/executor/callback.rs"
@@ -993,7 +993,9 @@ fn serviceization_escape_hatches_hardcoded_agent_role_terminal_literals_absent()
     assert_production_paths_literal_tokens_absent(
         &[
             "crates/application/macaca-app/src/workflow.rs",
-            "crates/foundation/macaca-proto/src/agent_execution_service.rs",
+            "crates/foundation/macaca-proto/src/agent_execution_service/mod.rs",
+            "crates/foundation/macaca-proto/src/agent_execution_service/autonomous_envelope.rs",
+            "crates/foundation/macaca-proto/src/agent_execution_service/command_adapters.rs",
         ],
         &[
             "\"coordinator\"",

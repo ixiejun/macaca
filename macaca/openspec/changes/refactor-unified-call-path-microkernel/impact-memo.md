@@ -684,3 +684,13 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `MacacaConfig::load` | HIGH | `config/default.toml` + `AOS_*` environment override merge → full OS bootstrap config surface | P5 |
 | `MacacaConfig::load_default` | HIGH | Default-path loader used by shells/SDK at startup; falls back to struct defaults on missing file | P5 |
 | filesize allowlist 32→31 | LOW | debt inventory shrink; 31 oversized files remain | P5 |
+
+## Iteration 82 additions (§4.5.1 macaca-proto types Facade split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `types/{mod,identity,planning,agent,task,todo,memory,messaging,llm,execution,tests}.rs` | HIGH | Cross-crate domain model serde types (TodoItem, Task, LlmMessage, AgentExecutionEvent, etc.); public API `macaca_proto::types::*` unchanged via Facade re-exports + `lib.rs` `pub use types::*` | P5 |
+| `TodoItem` | HIGH | Task board persistence + PlanLoop/WorkerLoop scheduling + web SSE projection; `graph_owner`/`graph_id` terminal aggregation semantics | P5 |
+| `AgentExecutionEvent` | HIGH | Agentic loop progress → UI/SSE visitor dispatch; serde tag shape consumed by SDK bridges | P5 |
+| `AgentExecutionEventVisitor::accept` | MEDIUM | Visitor dispatch seam for audit sinks and SDK adapters without coupling events to one serialization format | P5 |
+| filesize allowlist 31→30 | LOW | debt inventory shrink; 30 oversized files remain | P5 |

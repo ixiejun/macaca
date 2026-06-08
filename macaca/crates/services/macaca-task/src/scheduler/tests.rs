@@ -68,7 +68,7 @@
     fn test_cron_compute_next_run() {
         let app_id = ApplicationId::new();
         let action = ScheduleAction::CreateTask {
-            agent: "backend".into(),
+            agent: "agent-alpha".into(),
             title: "Daily report".into(),
             description: "Generate daily report".into(),
             priority: 5,

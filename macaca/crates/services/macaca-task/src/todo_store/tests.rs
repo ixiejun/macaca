@@ -22,8 +22,8 @@
         let item = TodoItem::new(
             app_id.clone(),
             None,
-            "backend",
-            "coordinator",
+            "agent-alpha",
+            "agent-entry",
             "Write API",
             "Create REST API",
             8,
@@ -32,7 +32,7 @@
 
         store.save_todo(&item).await;
 
-        let loaded = store.get_todo(&app_id, &None, "backend", &task_id).await;
+        let loaded = store.get_todo(&app_id, &None, "agent-alpha", &task_id).await;
         assert!(loaded.is_some());
         let loaded = loaded.unwrap();
         assert_eq!(loaded.title, "Write API");
@@ -47,7 +47,7 @@
         let item1 = TodoItem::new(
             app_id.clone(),
             None,
-            "backend",
+            "agent-alpha",
             "coord",
             "Task 1",
             "Desc 1",
@@ -56,7 +56,7 @@
         let mut item2 = TodoItem::new(
             app_id.clone(),
             None,
-            "backend",
+            "agent-alpha",
             "coord",
             "Task 2",
             "Desc 2",
@@ -66,7 +66,7 @@
         let item3 = TodoItem::new(
             app_id.clone(),
             None,
-            "frontend",
+            "agent-beta",
             "coord",
             "Task 3",
             "Desc 3",
@@ -77,14 +77,14 @@
         store.save_todo(&item2).await;
         store.save_todo(&item3).await;
 
-        let backend_todos = store.list_agent_todos(&app_id, &None, "backend").await;
-        assert_eq!(backend_todos.len(), 2);
+        let alpha_todos = store.list_agent_todos(&app_id, &None, "agent-alpha").await;
+        assert_eq!(alpha_todos.len(), 2);
 
-        let frontend_todos = store.list_agent_todos(&app_id, &None, "frontend").await;
-        assert_eq!(frontend_todos.len(), 1);
+        let beta_todos = store.list_agent_todos(&app_id, &None, "agent-beta").await;
+        assert_eq!(beta_todos.len(), 1);
 
         let pending = store
-            .list_agent_todos_by_status(&app_id, &None, "backend", TodoStatus::Pending)
+            .list_agent_todos_by_status(&app_id, &None, "agent-alpha", TodoStatus::Pending)
             .await;
         assert_eq!(pending.len(), 1);
         assert_eq!(pending[0].title, "Task 1");
@@ -98,7 +98,7 @@
         let mut item = TodoItem::new(
             app_id.clone(),
             None,
-            "backend",
+            "agent-alpha",
             "coord",
             "Running task",
             "Desc",
@@ -110,7 +110,7 @@
         store.rollback_in_progress(&app_id).await;
 
         let loaded = store
-            .get_todo(&app_id, &None, "backend", &item.id)
+            .get_todo(&app_id, &None, "agent-alpha", &item.id)
             .await
             .unwrap();
         assert_eq!(loaded.status, TodoStatus::Pending);
@@ -146,7 +146,7 @@
         let item_a = TodoItem::new(
             app_id.clone(),
             sess_a.clone(),
-            "backend",
+            "agent-alpha",
             "coord",
             "Task A",
             "Desc",
@@ -155,7 +155,7 @@
         let item_b = TodoItem::new(
             app_id.clone(),
             sess_b.clone(),
-            "backend",
+            "agent-alpha",
             "coord",
             "Task B",
             "Desc",

@@ -104,7 +104,7 @@ fn create_command_round_trips_through_service_command() {
         ScheduledAgentTaskSchedule::Every {
             interval_ms: 120_000,
         },
-        "worker",
+        "task-runner",
         "Prepare a status digest.",
     )
     .unwrap()
@@ -119,7 +119,7 @@ fn create_command_round_trips_through_service_command() {
 
     let decoded: CreateScheduledAgentTaskCommand =
         serde_json::from_value(service_command.payload).unwrap();
-    assert_eq!(decoded.target_agent, "worker");
+    assert_eq!(decoded.target_agent, "task-runner");
     assert_eq!(decoded.user_prompt, "Prepare a status digest.");
     assert_eq!(decoded.delegated_context["format"], "summary");
 }

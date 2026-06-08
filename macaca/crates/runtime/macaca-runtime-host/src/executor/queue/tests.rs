@@ -9,8 +9,8 @@
         DelegatedTask {
             id: TaskId::new(),
             application_id: ApplicationId::new(),
-            from_agent: "coordinator".into(),
-            to_agent: "backend".into(),
+            from_agent: "entry-agent".into(),
+            to_agent: "task-agent".into(),
             prompt: "Test task".into(),
             priority,
             parallel: false,

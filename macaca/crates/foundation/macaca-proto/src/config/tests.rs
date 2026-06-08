@@ -58,13 +58,13 @@ fn llm_provider_config_builder_matches_manual_construction() {
         api_key_plan: Some("PLAN_KEY".into()),
         api_key: "PAYGO_KEY".into(),
         base_url: "https://example.com/v1".into(),
-        default_model: Some("gpt-test".into()),
+        default_model: Some("model-alpha".into()),
     };
 
     let built = LlmProviderConfigBuilder::new("https://example.com/v1")
         .api_key_plan("PLAN_KEY")
         .api_key("PAYGO_KEY")
-        .default_model("gpt-test")
+        .default_model("model-alpha")
         .build();
 
     assert_eq!(built.api_key_plan, manual.api_key_plan);
@@ -109,7 +109,7 @@ fn load_external_context_adapter_config_from_toml() {
             collection_name = "agent_memory"
 
             [memory.embedding]
-            provider = "dashscope"
+            provider = "provider-alpha"
             model = "text-embedding-v4"
             api_key = "KEY"
             dimensions = 1024
