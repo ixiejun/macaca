@@ -635,3 +635,10 @@
 - **Contract tests**: `os_layer_file_size_gate` 1/1；`mcp_runtime` lib tests 22/22；production + test modules all ≤500 lines（max `manager_invoke.rs` 431，`tests/invocation.rs` 318）。
 - **GitNexus memo (non-blocking)**: iteration 80 HIGH on `invoke_tool` / `register_definition_tools` / `McpRuntimeFacade::invoke_tool` MCP service-backed tool invocation + descriptor registration path — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: filesize allowlist 32→0（`macaca-proto` config/types 等）；6.3.2 archive；P5 终态验收。
+
+## Iteration 81 (2026-06-08)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 32→**31**；`config.rs` 1573→`config/` Facade 模块树（`mod.rs` + `root.rs` + `autonomy.rs` + `workspace.rs` + `context/` 子模块 + `kernel.rs` + `llm.rs` + `memory.rs` + `drivers.rs` + `mcp.rs` + `infrastructure.rs` + `builder.rs` + `tests.rs` Contract Test 分区）。
+- **Design patterns**: Facade module tree；domain-driven config split；pub re-exports preserve `macaca_proto::config::*` + `MacacaConfigBuilder`/`LlmProviderConfigBuilder` in `lib.rs`。
+- **Contract tests**: `cargo test -p macaca-proto config` 10/10；`os_layer_file_size_gate` 1/1；production + test modules all ≤500 lines。
+- **GitNexus memo (non-blocking)**: iteration 81 HIGH on `MacacaConfig::load` / `MacacaConfig::load_default` TOML + `AOS_*` env override deserialization path — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: filesize allowlist 31→0（`macaca-proto` types 等）；6.3.2 archive；P5 终态验收。

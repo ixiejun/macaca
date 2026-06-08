@@ -675,3 +675,12 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `McpRuntimeManager::invoke_tool` | HIGH | Internal invoke orchestration + session registry + client factory Strategy injection | P5 |
 | `register_definition_tools` | HIGH | Toolkit registration + descriptor index upsert + `on_close` Observer lease release | P5 |
 | filesize allowlist 33→32 | LOW | debt inventory shrink; 32 oversized files remain | P5 |
+
+## Iteration 81 additions (§4.5.1 macaca-proto config Facade split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `config/{mod,root,autonomy,workspace,context/,kernel,llm,memory,drivers,mcp,infrastructure,builder,tests}.rs` | HIGH | Root TOML/env config deserialization + domain serde types; public API `macaca_proto::config::*` unchanged via Facade re-exports | P5 |
+| `MacacaConfig::load` | HIGH | `config/default.toml` + `AOS_*` environment override merge → full OS bootstrap config surface | P5 |
+| `MacacaConfig::load_default` | HIGH | Default-path loader used by shells/SDK at startup; falls back to struct defaults on missing file | P5 |
+| filesize allowlist 32→31 | LOW | debt inventory shrink; 31 oversized files remain | P5 |
