@@ -814,3 +814,13 @@
 - **Logging**: added `tracing::info` on engine construction and `build_system_prompt` completion with workflow/coordinator/persona_present/prompt_len audit fields。
 - **GitNexus memo (non-blocking)**: iteration 100 MEDIUM on `WorkflowEngine::build_system_prompt` / `resolve_coordinator_agent` YAML workflow admission seam — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: filesize allowlist 12→0（`pipeline_dry_run.rs` / P4 `macaca-framework` 等）；6.3.2 archive；P5 终态验收。
+
+## Iteration 101 (2026-06-08)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 12→**11**；`macaca-integration-tests/pipeline_dry_run.rs` 711→`pipeline_dry_run/` Facade + Template Method 模块树（`pipeline_dry_run.rs` Facade + `config.rs` + `report.rs` + `trace.rs` + `llm.rs` + `store.rs` + `fixtures.rs` + `agentic.rs` + `runner.rs` + `stages/*.rs`）。
+- **Design patterns**: Facade module tree；Template Method（`runner` orchestrates five stages）；Command（each `stages/*` module）；Memento（`PipelineReport`）；Observer（stderr trace + `tracing::{info,debug}` on stage/agentic events）；Test Double（`ScriptedLlm` fixtures）。
+- **Contract tests**: `cargo check -p macaca-integration-tests` OK；`cargo test -p macaca-integration-tests --test pipeline_dry_run` 1/1；`os_layer_file_size_gate` 1/1；`route_c_baseline` OK；production modules all ≤500 lines（max `agentic_worker_review.rs` ~189）。
+- **Public API**: `macaca_integration_tests::pipeline_dry_run::{run_full_pipeline_dry_run, run_full_pipeline_dry_run_with_config, PipelineDryRunConfig, PipelineReport, response_text, response_with_tools}` unchanged via Facade re-exports；`lib.rs` `pub mod pipeline_dry_run` unchanged。
+- **Escape hatch**: harness fixtures 使用中性 `harness-assignee` / `harness-coordinator` / `harness-planner` 标识符（`fixtures.rs`）；非 OS crate 集成测试 harness。
+- **Logging**: added `tracing::{info,debug}` on pipeline start/end, stage boundaries, store open, and agentic event drain with `target = "pipeline_dry_run"` audit fields。
+- **GitNexus memo (non-blocking)**: iteration 101 LOW on `run_full_pipeline_dry_run_with_config` integration-test harness seam — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: filesize allowlist 11→0（P4 `macaca-framework` 巨型文件）；6.3.2 archive；P5 终态验收。

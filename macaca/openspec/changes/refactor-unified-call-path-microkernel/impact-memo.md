@@ -884,3 +884,13 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `WorkflowPromptStrategy` / `DefaultWorkflowPromptStrategy` | LOW | Strategy extension point for workflow prompt sections | P5 |
 | `workflow/tests.rs` | LOW | Contract tests with neutral `fixture-entry` identifiers | P5 |
 | filesize allowlist 13→12 | LOW | debt inventory shrink; 12 oversized files remain | P5 |
+
+## Iteration 101 additions (§4.5.1 pipeline_dry_run Facade split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `pipeline_dry_run/{runner,stages,agentic,trace,fixtures}.rs` | LOW | Integration-test harness module tree; public API unchanged via Facade re-exports | P5 |
+| `run_full_pipeline_dry_run_with_config` | LOW | Five-stage OS primitive dry-run orchestrator; consumed by `pipeline_dry_run` and `route_c_baseline` tests | P5 |
+| `run_agentic_traced` | LOW | Observer wrapper over `AgenticLoop::execute_with_events`; harness-only | P5 |
+| `fixtures.rs` harness identifiers | LOW | Neutral `harness-*` agent names; not OS-layer business logic | P5 |
+| filesize allowlist 12→11 | LOW | debt inventory shrink; 11 oversized files remain (all P4 macaca-framework) | P5 |
