@@ -545,9 +545,9 @@
 - **GitNexus memo (non-blocking)**: iteration 67 LOW on tool invocation router module split — recorded in `impact-memo.md`.
 - **Next**: filesize allowlist 45→0（`mcp_runtime.rs` / `app_executor.rs` / proto config/types 等）；6.3.2 archive；P5 终态验收。
 
-## Iteration 67 (2026-06-07)
-- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 46→**45**；`tool_service_invocation.rs` 678→模块树（`mod.rs` Facade + `admission.rs` Chain of Responsibility + `dispatch.rs` Strategy Router + `helpers.rs` Adapter/Specification）。
-- **Design patterns**: Facade module tree；Chain of Responsibility（admission decorators）；Strategy（route-kind dispatch）；Adapter（workbench reply normalization + owning-service payload）；trace `info!`/`warn!` on admission/dispatch/completion nodes。
-- **Contract tests**: `os_layer_file_size_gate` 1/1；`tool_service_invocation` lib tests pass。
-- **GitNexus memo (non-blocking)**: iteration 67 LOW on tool invocation router module split — recorded in `impact-memo.md`.
-- **Next**: filesize allowlist 45→0（`mcp_runtime.rs` / `app_executor.rs` / proto config/types 等）；6.3.2 archive；P5 终态验收。
+## Iteration 68 (2026-06-07)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 45→**44**；`application_execution_hosted.rs` 648→模块树（`mod.rs` Facade + `types.rs` + `abi_adapter.rs` Adapter + `host_signal_translator.rs` Observer + `provider.rs` Strategy/Memento + `provider_impl.rs`）。
+- **Design patterns**: Facade module tree；Strategy（`HostedApplicationExecutionAdapter`）；Adapter（ABI bridge）；Observer（host-command signal translation）；Memento（`HostedRunState` cache）；trace `info!`/`warn!` on start/control/shutdown nodes。
+- **Contract tests**: `os_layer_file_size_gate` 1/1；`application_execution_hosted` lib tests 6/6；`unified_audit_replay_convergence_tests` 多文件源扫描同步。
+- **GitNexus memo (non-blocking)**: iteration 68 HIGH on `application_execution_hosted::*` WASM audit authority paths — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: filesize allowlist 44→0（`mcp_runtime.rs` / `app_executor.rs` / proto config/types 等）；6.3.2 archive；P5 终态验收。

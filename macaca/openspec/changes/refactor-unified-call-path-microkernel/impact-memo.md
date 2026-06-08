@@ -562,3 +562,11 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 |---------------|----------------------|------------------------|-------|
 | `tool_service_invocation/{mod,admission,dispatch,helpers}.rs` | LOW | Tool invocation router module tree; `ToolInvocationService` public API unchanged; `tool_service_provider` wiring unchanged | P5 |
 | filesize allowlist 46→45 | LOW | debt inventory shrink; 45 oversized files remain | P5 |
+
+## Iteration 68 additions (§4.5.1 application_execution_hosted Facade split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `application_execution_hosted/{mod,types,abi_adapter,host_signal_translator,provider,provider_impl}.rs` | HIGH | WASM/YAML audit authority paths; public API via `runtime_host_public_api` unchanged | P5 |
+| `unified_audit_replay_convergence_tests.rs` multi-file source scan | LOW | architectural contract scans split modules instead of monolith | P5 |
+| filesize allowlist 45→44 | LOW | debt inventory shrink; 44 oversized files remain | P5 |

@@ -115,12 +115,35 @@ mod tests {
         assert_no_coordination_patches("delegated_task_dispatcher", dispatcher);
     }
 
+    /// Concatenate hosted execution module sources for architectural contract scanning.
+    fn hosted_execution_module_sources() -> String {
+        [
+            include_str!(
+                "../../../runtime/macaca-runtime-host/src/application_execution_hosted/mod.rs"
+            ),
+            include_str!(
+                "../../../runtime/macaca-runtime-host/src/application_execution_hosted/types.rs"
+            ),
+            include_str!(
+                "../../../runtime/macaca-runtime-host/src/application_execution_hosted/abi_adapter.rs"
+            ),
+            include_str!(
+                "../../../runtime/macaca-runtime-host/src/application_execution_hosted/host_signal_translator.rs"
+            ),
+            include_str!(
+                "../../../runtime/macaca-runtime-host/src/application_execution_hosted/provider.rs"
+            ),
+            include_str!(
+                "../../../runtime/macaca-runtime-host/src/application_execution_hosted/provider_impl.rs"
+            ),
+        ]
+        .join("\n")
+    }
+
     /// WASM host import and orchestration backend converge on the shared delegate bridge.
     #[test]
     fn wasm_session_audit_replay_single_chain() {
-        let hosted = include_str!(
-            "../../../runtime/macaca-runtime-host/src/application_execution_hosted.rs"
-        );
+        let hosted = hosted_execution_module_sources();
         let bridge = include_str!(
             "../../../runtime/macaca-runtime-host/src/wasm_runtime_provider/host_import_bridge.rs"
         );
@@ -146,7 +169,7 @@ mod tests {
             "host import bridge must not emit graph_owner compatibility metadata"
         );
 
-        assert_no_coordination_patches("application_execution_hosted", hosted);
+        assert_no_coordination_patches("application_execution_hosted", &hosted);
         assert_no_coordination_patches("host_import_bridge", bridge);
     }
 

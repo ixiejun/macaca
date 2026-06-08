@@ -18,9 +18,8 @@ use tracing::{info, warn};
 
 use crate::application_execution_provider_registry::ApplicationExecutionProvider;
 
-use super::{
-    HostedApplicationExecutionOutcome, HostedRunState, MacacaHostedApplicationExecutionProvider,
-};
+use super::provider::MacacaHostedApplicationExecutionProvider;
+use super::types::{HostedApplicationExecutionOutcome, HostedRunState};
 
 #[async_trait]
 impl ApplicationExecutionProvider for MacacaHostedApplicationExecutionProvider {
