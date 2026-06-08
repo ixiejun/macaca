@@ -659,7 +659,9 @@ pub async fn bootstrap_autonomy_local_services(
         .await?;
     if config.recovery_wake_enabled {
         supervisor
-            .run_recovery_wake_once(TraceContext::new(format!("{trace_prefix}-recovery-wake")))
+            .dispatch_recovery_wake(TraceContext::new(format!(
+                "{trace_prefix}-recovery-wake"
+            )))
             .await?;
     }
     bundle.supervisor = Some(supervisor);

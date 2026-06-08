@@ -9,16 +9,15 @@
 //! removal or a new frozen debt row. Regenerate family counts with:
 //! `cargo test -p macaca-integration-tests dump_escape_hatch_raw_fingerprints -- --ignored --nocapture`
 
-/// Total raw hits when migration surfaces are not honored (iteration 43 snapshot).
+/// Total raw hits when migration surfaces are not honored (iteration 44 snapshot).
 ///
-/// Net count unchanged at 273: `application-runtime-direct-start` retired (−2) while
-/// `runtime/tests.rs` extraction surfaced two `LegacyAgentExecutionAdapter` literals (+2)
-/// in the debt-inventory scanner (standalone `tests.rs` under `src/` is not `#[cfg(test)]`-scoped).
-pub const EXPECTED_RAW_VIOLATION_COUNT: usize = 273;
+/// `autonomy-loop-boundary` retired (−6): supervisor tick APIs renamed to
+/// `dispatch_*` provider-neutral entry points so freeze/inventory scanners no longer
+/// count canonical runtime-host ownership as migration debt.
+pub const EXPECTED_RAW_VIOLATION_COUNT: usize = 267;
 
 /// Per-family raw hit counts — detects debt shifting between token families.
 pub const EXPECTED_RAW_VIOLATION_BY_FAMILY: &[(&str, usize)] = &[
-    ("autonomy-loop-boundary", 6),
     ("autonomy-service-boundary", 65),
     ("direct-runtime-catalog-read", 12),
     ("hardcoded-agent-role", 54),

@@ -353,3 +353,11 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `application-runtime-direct-start` migration surfaces removal | MEDIUM | freeze gate now fails on any new `AppRuntime::start_app`/`start_app_from_file` production writes | P5 |
 | `runtime.rs` + `runtime/tests.rs` split | LOW | macaca-app public API rename; filesize gate compliance (~292 lines main file) | P3 |
 | `APPLICATION_START_COMMAND` handler | LOW | runtime-host provider internal bootstrap only; traced service path unchanged | P1 |
+
+## Iteration 44 additions (§6.2.1 autonomy-loop-boundary retirement — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `dispatch_scheduler_lane_tick` / `dispatch_heartbeat_lane_tick` / `dispatch_recovery_wake` | MEDIUM | replaces legacy `run_*_tick_once` supervisor APIs; autonomy service provider + integration tests | P1/P5 |
+| `autonomy-loop-boundary` migration surfaces removal | MEDIUM | freeze gate fails on any new ad-hoc scheduler/heartbeat/recovery loop bypass in production | P5 |
+| `assert_retired_escape_hatch_family_absent_in_production` | LOW | contract-test helper only; hard assertion for retired families | P5 |

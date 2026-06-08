@@ -523,12 +523,7 @@ fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> bool
                 || relative == "crates/runtime/macaca-runtime-host/src/lib.rs"
                 || relative.starts_with("crates/facade/macaca-sdk/src/")
         }
-        "autonomy-loop-boundary" => {
-            relative == "crates/runtime/macaca-runtime-host/src/autonomy_service_provider.rs"
-                || relative == "crates/runtime/macaca-runtime-host/src/autonomy_supervisor.rs"
-                || relative
-                    .starts_with("crates/runtime/macaca-runtime-host/src/autonomy_supervisor/")
-        }
+        // `autonomy-loop-boundary` family retired in iteration 44 — no migration surfaces remain.
         "provider-compat-construction" => {
             // P2 §3.5–3.6: kernel provider_compat deleted; legacy in-process execution
             // adapters remain only in macaca-agent (definition) and approved migration surfaces.
@@ -756,12 +751,15 @@ fn serviceization_escape_hatches_migration_debt_inventory_matches_baseline() {
     }
 }
 
-#[test]
-fn serviceization_escape_hatches_reconciliation_markers_absent_in_production() {
-    let reconciliation_family = "multi-path-coordination-patch";
-    let reconciliation_tokens = forbidden_tokens()
+/// Hard assertion helper for retired escape-hatch families (Strangler Fig terminal state).
+///
+/// Retired families keep forbidden-token definitions for freeze-mode growth detection,
+/// but production `src/` must not contain the legacy literals even when migration surfaces
+/// were removed — otherwise debt would silently reappear outside runtime-host ownership.
+fn assert_retired_escape_hatch_family_absent_in_production(family: &str) {
+    let retired_tokens = forbidden_tokens()
         .into_iter()
-        .filter(|token| token.family == reconciliation_family)
+        .filter(|token| token.family == family)
         .collect::<Vec<_>>();
 
     let root = workspace_root();
@@ -779,16 +777,26 @@ fn serviceization_escape_hatches_reconciliation_markers_absent_in_production() {
         if is_non_production_rust_source(&relative) {
             continue;
         }
-        // Hard assertion: reconciliation markers must not appear in production sources.
-        violations.extend(scan_file(&root, file, &reconciliation_tokens, false));
+        violations.extend(scan_file(&root, file, &retired_tokens, false));
     }
     violations.sort();
 
     assert!(
         violations.is_empty(),
-        "Reconciliation markers must be absent from all production code (no migration exemption):{}",
+        "Retired escape-hatch family `{family}` must be absent from all production code \
+         (no migration exemption):{}",
         render_violations(&violations)
     );
+}
+
+#[test]
+fn serviceization_escape_hatches_reconciliation_markers_absent_in_production() {
+    assert_retired_escape_hatch_family_absent_in_production("multi-path-coordination-patch");
+}
+
+#[test]
+fn serviceization_escape_hatches_autonomy_loop_boundary_absent_in_production() {
+    assert_retired_escape_hatch_family_absent_in_production("autonomy-loop-boundary");
 }
 
 #[test]

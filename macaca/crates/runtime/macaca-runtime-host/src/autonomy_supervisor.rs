@@ -227,8 +227,16 @@ impl AutonomySupervisor {
         Ok(registered > 0)
     }
 
-    /// Execute one bounded Scheduler tick for deterministic tests and manual wakeups.
-    pub async fn run_scheduler_tick_once(&self, trace: TraceContext) -> MacacaResult<usize> {
+    /// Dispatch one bounded Scheduler lane tick through the supervisor-owned lane adapter.
+    ///
+    /// This is the canonical entry for deterministic contract tests and service-provider
+    /// manual wakeups. Ad-hoc scheduler loop bypasses are blocked by the autonomy-loop
+    /// freeze gate so timer ownership stays inside runtime-host supervision.
+    pub async fn dispatch_scheduler_lane_tick(&self, trace: TraceContext) -> MacacaResult<usize> {
+        tracing::info!(
+            trace_id = trace.trace_id.as_str(),
+            "autonomy supervisor dispatching scheduler lane tick"
+        );
         SchedulerLane::new(
             Arc::clone(&self.runtime),
             Arc::clone(&self.scheduler),
@@ -238,8 +246,15 @@ impl AutonomySupervisor {
         .await
     }
 
-    /// Execute one native Heartbeat cadence tick.
-    pub async fn run_heartbeat_tick_once(&self, trace: TraceContext) -> MacacaResult<bool> {
+    /// Dispatch one native Heartbeat lane cadence tick through the supervisor-owned lane adapter.
+    ///
+    /// Heartbeat cadence evaluation and wake coalescing remain inside `HeartbeatLane`; the
+    /// supervisor only sequences lane dispatch so timer ownership stays centralized.
+    pub async fn dispatch_heartbeat_lane_tick(&self, trace: TraceContext) -> MacacaResult<bool> {
+        tracing::info!(
+            trace_id = trace.trace_id.as_str(),
+            "autonomy supervisor dispatching heartbeat lane tick"
+        );
         HeartbeatLane::new(
             Arc::clone(&self.runtime),
             Arc::clone(&self.heartbeat),
@@ -250,8 +265,17 @@ impl AutonomySupervisor {
         .await
     }
 
-    /// Emit one provider-neutral recovery wake when enabled.
-    pub async fn run_recovery_wake_once(&self, trace: TraceContext) -> MacacaResult<bool> {
+    /// Dispatch one provider-neutral recovery wake when the runtime config enables it.
+    ///
+    /// Recovery wakes are emitted during bootstrap and by the background loop indirectly;
+    /// this explicit dispatch supports audited one-shot recovery without exposing ad-hoc
+    /// recovery-loop entry points to non-supervisor callers.
+    pub async fn dispatch_recovery_wake(&self, trace: TraceContext) -> MacacaResult<bool> {
+        tracing::info!(
+            trace_id = trace.trace_id.as_str(),
+            recovery_wake_enabled = self.config.recovery_wake_enabled,
+            "autonomy supervisor dispatching recovery wake"
+        );
         HeartbeatLane::new(
             Arc::clone(&self.runtime),
             Arc::clone(&self.heartbeat),
@@ -271,14 +295,14 @@ impl AutonomySupervisor {
             if !self.running.load(Ordering::SeqCst) {
                 break;
             }
-            if let Err(error) = self.run_scheduler_tick_once(trace.clone()).await {
+            if let Err(error) = self.dispatch_scheduler_lane_tick(trace.clone()).await {
                 warn!(
                     trace_id = trace.trace_id.as_str(),
                     error = %error,
                     "autonomy supervisor scheduler tick failed"
                 );
             }
-            if let Err(error) = self.run_heartbeat_tick_once(trace.clone()).await {
+            if let Err(error) = self.dispatch_heartbeat_lane_tick(trace.clone()).await {
                 warn!(
                     trace_id = trace.trace_id.as_str(),
                     error = %error,

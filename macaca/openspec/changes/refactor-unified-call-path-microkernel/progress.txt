@@ -361,4 +361,13 @@
 - **Design patterns**: Builder+Factory（`AppRuntimeBuilder`/`DefaultApplicationRuntimeFactory`）；Strangler Fig（forbidden-token 冻结 + migration surface 逐族删除）；Specification by Example（debt inventory baseline）。
 - **Contract tests**: `macaca-app` runtime tests；`serviceization_escape_hatches` 4/4；`os_layer_file_size_gate` 1/1 待验证。
 - **GitNexus memo (non-blocking)**: iteration 43 MEDIUM on `bootstrap_manifest*` rename + Application Service provider call path — recorded in `impact-memo.md`.
-- **Next**: 6.2.1 下一小族 `autonomy-loop-boundary`（6）；6.3.2 继续 archive；filesize allowlist 75→0；4.4.4 web 依赖终态。
+- **Next**: 6.2.1 下一小族 `autonomy-service-boundary`（65）；6.3.2 继续 archive；filesize allowlist 75→0；4.4.4 web 依赖终态。
+
+## Iteration 44 (2026-06-07)
+- **P5 §6.2.1 逃逸口 family 退役**: `autonomy-loop-boundary` family 完全退役（6→0）；`run_*_tick_once` 重命名为 provider-neutral `dispatch_scheduler_lane_tick` / `dispatch_heartbeat_lane_tick` / `dispatch_recovery_wake`；删除 migration surface 豁免；`migration_debt_baseline` raw **273→267**（6 families remain）。
+- **Autonomy supervisor 路径对齐**: `autonomy_service_provider.rs` bootstrap recovery wake 改调 `dispatch_recovery_wake`；集成测试 `autonomy_scheduler_heartbeat_services.rs` 同步更新。
+- **P5 退役族硬断言**: 抽取 `assert_retired_escape_hatch_family_absent_in_production` helper；新增 `autonomy_loop_boundary_absent_in_production` 契约测试。
+- **Design patterns**: Facade+Lane Adapter（`SchedulerLane`/`HeartbeatLane` via supervisor dispatch）；Strangler Fig（forbidden-token 冻结 + provider-neutral rename）；Specification by Example（debt inventory baseline）。
+- **Contract tests**: `serviceization_escape_hatches` 5/5；`autonomy_scheduler_heartbeat_services` 待验证。
+- **GitNexus memo (non-blocking)**: iteration 44 MEDIUM on `dispatch_*` autonomy tick rename — recorded in `impact-memo.md`.
+- **Next**: 6.2.1 下一小族 `autonomy-service-boundary`（65）；6.3.2 继续 archive；filesize allowlist 75→0；4.4.4 web 依赖终态。

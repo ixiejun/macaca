@@ -235,7 +235,7 @@ async fn supervisor_tick_dispatches_generic_service_command() {
         .unwrap();
 
     let dispatched = supervisor
-        .run_scheduler_tick_once(TraceContext::new("trace-autonomy-manual-tick"))
+        .dispatch_scheduler_lane_tick(TraceContext::new("trace-autonomy-manual-tick"))
         .await
         .unwrap();
     assert_eq!(dispatched, 1);
@@ -314,7 +314,7 @@ async fn supervisor_runs_scheduler_lane_without_heartbeat_cadence() {
         .unwrap();
 
     let dispatched = supervisor
-        .run_scheduler_tick_once(TraceContext::new("trace-autonomy-scheduler-lane-tick"))
+        .dispatch_scheduler_lane_tick(TraceContext::new("trace-autonomy-scheduler-lane-tick"))
         .await
         .unwrap();
 
@@ -339,7 +339,7 @@ async fn supervisor_runs_heartbeat_lane_without_scheduler_due_runs() {
     let supervisor = bundle.supervisor.expect("local mode returns supervisor");
 
     let accepted = supervisor
-        .run_heartbeat_tick_once(TraceContext::new("trace-autonomy-heartbeat-lane-tick"))
+        .dispatch_heartbeat_lane_tick(TraceContext::new("trace-autonomy-heartbeat-lane-tick"))
         .await
         .unwrap();
 
@@ -426,11 +426,11 @@ async fn supervisor_emits_heartbeat_scheduled_and_recovery_wakes() {
     let supervisor = bundle.supervisor.expect("local mode returns supervisor");
 
     assert!(supervisor
-        .run_heartbeat_tick_once(TraceContext::new("trace-autonomy-heartbeat-tick"))
+        .dispatch_heartbeat_lane_tick(TraceContext::new("trace-autonomy-heartbeat-tick"))
         .await
         .unwrap());
     let recovery_accepted = supervisor
-        .run_recovery_wake_once(TraceContext::new("trace-autonomy-heartbeat-recovery"))
+        .dispatch_recovery_wake(TraceContext::new("trace-autonomy-heartbeat-recovery"))
         .await
         .unwrap();
     assert!(!recovery_accepted);

@@ -202,8 +202,8 @@
 - [x] 6.1.7 实现 `shell-dependency-purity` 审计：CLI 终态仅 proto+sdk；Web 冻结 7 条 workspace 依赖基线，禁止新增。（`shell_dependency_purity_gate` via `cargo metadata`）
 
 ### 6.2 逃逸口由"冻结"升级为"删除"
-- [ ] 6.2.1 每个逃逸口对应 service client 全量替换后，删除其 migration module 豁免，使任何引用（含旧引用）CI 失败。（**渐进**：`migration_debt_baseline.rs` 冻结 raw=**273**；**已退役** `multi-path-coordination-patch`（2→0）、`application-runtime-direct-start`（2→0）；下一小族 `autonomy-loop-boundary`（6））
-- [x] 6.2.2 `serviceization_escape_hatches.rs` 双模式门：freeze 模式 violations=0；debt inventory 模式 raw=**273** + per-family baseline；reconciliation markers 生产代码硬断言 0。（`reconciliation_markers_absent_in_production` + `migration_debt_inventory_matches_baseline`）
+- [ ] 6.2.1 每个逃逸口对应 service client 全量替换后，删除其 migration module 豁免，使任何引用（含旧引用）CI 失败。（**渐进**：`migration_debt_baseline.rs` 冻结 raw=**267**；**已退役** `multi-path-coordination-patch`（2→0）、`application-runtime-direct-start`（2→0）、`autonomy-loop-boundary`（6→0）；下一小族 `autonomy-service-boundary`（65））
+- [x] 6.2.2 `serviceization_escape_hatches.rs` 双模式门：freeze 模式 violations=0；debt inventory 模式 raw=**267** + per-family baseline；reconciliation markers 生产代码硬断言 0。（`reconciliation_markers_absent_in_production` + `autonomy_loop_boundary_absent_in_production` + `migration_debt_inventory_matches_baseline`）
 
 ### 6.3 OpenSpec baseline 对齐
 - [x] 6.3.1 将本 change 落地后的终态固化进 `openspec/specs/`：`unified-execution-path`、`microkernel-boundary-purity`、更新 `serviceization-dependency-gate`/`serviceization-escape-hatches`/`web-cli-thin-shell-completion`。
@@ -245,7 +245,7 @@ cd macaca
 cargo check
 # VC-gate     依赖边界门（含 allowlist=0 终态）
 cargo test -p macaca-integration-tests route_c_dependency_boundaries_reject_unallowlisted_forbidden_edges -- --nocapture
-# VC-escape   逃逸口门（freeze=0；debt inventory baseline=273）
+# VC-escape   逃逸口门（freeze=0；debt inventory baseline=267）
 cargo test -p macaca-integration-tests --test serviceization_escape_hatches -- --nocapture
 # VC-shell-deps  shell workspace 依赖纯度门
 cargo test -p macaca-integration-tests --test shell_dependency_purity_gate -- --nocapture
