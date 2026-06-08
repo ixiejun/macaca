@@ -894,3 +894,12 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `run_agentic_traced` | LOW | Observer wrapper over `AgenticLoop::execute_with_events`; harness-only | P5 |
 | `fixtures.rs` harness identifiers | LOW | Neutral `harness-*` agent names; not OS-layer business logic | P5 |
 | filesize allowlist 12→11 | LOW | debt inventory shrink; 11 oversized files remain (all P4 macaca-framework) | P5 |
+
+## Iteration 102 additions (§4.5.1 macaca-framework message Facade split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `message/{blocks,content,role,envelope,tests}.rs` | LOW | Framework message module tree; public API unchanged via Facade re-exports | P4 |
+| `Msg::new` / `Msg::tool_result` | LOW | Message envelope factories; consumed by agent, pipeline, memory, formatter, a2a, web adapters | P4 |
+| `MsgContent::strip_thinking` | LOW | Cross-agent broadcast filter; consumed by pipeline and a2a paths | P4 |
+| filesize allowlist 11→10 | LOW | debt inventory shrink; 10 oversized P4 framework files remain | P4 |

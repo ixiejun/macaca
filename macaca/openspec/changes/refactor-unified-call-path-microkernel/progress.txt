@@ -824,3 +824,12 @@
 - **Logging**: added `tracing::{info,debug}` on pipeline start/end, stage boundaries, store open, and agentic event drain with `target = "pipeline_dry_run"` audit fields。
 - **GitNexus memo (non-blocking)**: iteration 101 LOW on `run_full_pipeline_dry_run_with_config` integration-test harness seam — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: filesize allowlist 11→0（P4 `macaca-framework` 巨型文件）；6.3.2 archive；P5 终态验收。
+
+## Iteration 102 (2026-06-08)
+- **P4 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 11→**10**；`macaca-framework/message.rs` 631→`message/` Facade + Composite/Strategy/Builder 模块树（`message.rs` Facade + `blocks.rs` + `content.rs` + `role.rs` + `envelope.rs` + `tests.rs`）。
+- **Design patterns**: Facade module tree；Composite（`ContentBlock` tagged enum）；Strategy（`MsgContent` uniform accessors）；Builder（`Msg` factories + `with_metadata`）；Value Object（`Role`）；Decorator/filter（`strip_thinking` broadcast sanitization）。
+- **Contract tests**: `cargo check -p macaca-framework` OK；`cargo test -p macaca-framework message::` 18/18；`os_layer_file_size_gate` 1/1；production modules all ≤500 lines（max `tests.rs` ~290）。
+- **Public API**: `macaca_framework::message::{Msg, MsgContent, Role, ContentBlock, ...}` unchanged via Facade re-exports；`lib.rs` `pub mod message` unchanged。
+- **Logging**: added `tracing::debug` on `Msg::new`, `Msg::tool_result`, and `MsgContent::strip_thinking` with `target = "macaca_framework::message"` audit fields。
+- **GitNexus memo (non-blocking)**: iteration 102 LOW on `Msg` / `MsgContent` framework message admission seam — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: filesize allowlist 10→0（P4 `macaca-framework` 剩余巨型文件，建议 `agent.rs` 675 行）；6.3.2 archive；P5 终态验收。
