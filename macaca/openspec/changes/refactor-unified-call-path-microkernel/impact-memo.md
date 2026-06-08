@@ -665,3 +665,13 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `ApplicationExecutor::worker_loop` | HIGH | Command processing → `AgentRunner` invocation → result persistence → fork resume → SSE broadcast | P5 |
 | `ApplicationExecutor::begin_service_backed_delegation` | MEDIUM | Transitional service-path admission without worker command channel | P5 |
 | filesize allowlist 34→33 | LOW | debt inventory shrink; 33 oversized files remain | P5 |
+
+## Iteration 80 additions (§4.5.1 mcp_runtime Facade split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `mcp_runtime/{mod,types,policy,facade,manager,manager_invoke,probe,descriptors,config_entry,registration,client,helpers,skill_definitions,tests/}.rs` | HIGH | MCP registry/runtime glue: definition catalog, probe, service-backed invoke, toolkit registration, lease cleanup; public API `McpRuntimeFacade`/`McpRuntimeManager` unchanged via `lib.rs` | P5 |
+| `McpRuntimeFacade::invoke_tool` | HIGH | Service-backed Template Method: policy gate → descriptor route → lease → protocol client call → sanitized audit metadata | P5 |
+| `McpRuntimeManager::invoke_tool` | HIGH | Internal invoke orchestration + session registry + client factory Strategy injection | P5 |
+| `register_definition_tools` | HIGH | Toolkit registration + descriptor index upsert + `on_close` Observer lease release | P5 |
+| filesize allowlist 33→32 | LOW | debt inventory shrink; 32 oversized files remain | P5 |

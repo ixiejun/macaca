@@ -628,3 +628,10 @@
 - **Contract tests**: `os_layer_file_size_gate` 1/1；`app_executor` lib tests 7/7；`executor_runtime_eviction` 5/5；escape-hatch path allowlists 同步至 `app_executor/mod.rs`。
 - **GitNexus memo (non-blocking)**: iteration 79 HIGH on `delegate_task` / `supervisor_loop` / `worker_loop` application execution orchestration + fork resume path — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: filesize allowlist 33→0（`mcp_runtime.rs` / proto config/types 等）；6.3.2 archive；P5 终态验收。
+
+## Iteration 80 (2026-06-08)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 33→**32**；`mcp_runtime.rs` 2575→模块树（`mod.rs` Facade + `types.rs` Value Object + `policy.rs` + `facade.rs` + `manager.rs` + `manager_invoke.rs` Template Method + `probe.rs` + `descriptors.rs` + `config_entry.rs` Adapter + `registration.rs` + `client.rs` Strategy + `helpers.rs` + `skill_definitions.rs` + `tests/` Contract Test 分区）。
+- **Design patterns**: Facade module tree；Strategy（`McpClientFactory`）；Adapter（YAML/skill→definition）；Registry（invocation + descriptor index）；Template Method（service-backed invoke）；Observer（toolkit `on_close` lease release）；trace `info!`/`warn!`/`error!` on invoke/probe/register/cleanup nodes。
+- **Contract tests**: `os_layer_file_size_gate` 1/1；`mcp_runtime` lib tests 22/22；production + test modules all ≤500 lines（max `manager_invoke.rs` 431，`tests/invocation.rs` 318）。
+- **GitNexus memo (non-blocking)**: iteration 80 HIGH on `invoke_tool` / `register_definition_tools` / `McpRuntimeFacade::invoke_tool` MCP service-backed tool invocation + descriptor registration path — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: filesize allowlist 32→0（`macaca-proto` config/types 等）；6.3.2 archive；P5 终态验收。

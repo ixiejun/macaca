@@ -31,7 +31,6 @@ pub fn entries() -> Vec<FileSizeAllowlistEntry> {
         FileSizeAllowlistEntry::new("crates/runtime/macaca-framework/src/react_agent.rs", 1040, "P4-framework", "P4"),
         FileSizeAllowlistEntry::new("crates/runtime/macaca-framework/src/tool.rs", 1042, "P4-framework", "P4"),
         FileSizeAllowlistEntry::new("crates/runtime/macaca-runtime/src/agentic_loop.rs", 1266, "OS-layer-debt", "P5"),
-        FileSizeAllowlistEntry::new("crates/runtime/macaca-runtime-host/src/mcp_runtime.rs", 2575, "P4-runtime-host", "P4"),
         FileSizeAllowlistEntry::new("crates/services/macaca-context/src/engine.rs", 972, "OS-layer-debt", "P5"),
         FileSizeAllowlistEntry::new("crates/services/macaca-scheduled-agent-task/src/local_provider.rs", 1022, "OS-layer-debt", "P5"),
         FileSizeAllowlistEntry::new("crates/services/macaca-scheduler/src/local_provider.rs", 869, "OS-layer-debt", "P5"),
