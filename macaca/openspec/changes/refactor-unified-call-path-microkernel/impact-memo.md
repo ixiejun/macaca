@@ -490,3 +490,12 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `resilient/tests.rs` extraction | LOW | LLM Decorator retry/fallback contract tests; production wrapper unchanged | P5 |
 | `scheduled_agent_task_service/{mod,command_adapters}.rs` | LOW | proto contract module tree; `pub use scheduled_agent_task_service::*` unchanged | P5 |
 | filesize allowlist 62→59 | LOW | debt inventory shrink; 59 oversized files remain | P5 |
+
+## Iteration 59 additions (§4.5.1 proto heartbeat/tool facade batch — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `heartbeat_service/{mod,domain_vocabulary,profile_command_builders,command_adapters}.rs` | LOW | proto contract module tree; `pub use heartbeat_service::*` unchanged | P5 |
+| `heartbeat_service/tests.rs` | LOW | wake/complete-run trace + adapter contract tests only | P5 |
+| `tool_service/{mod,descriptor_vocabulary}.rs` | LOW | industrial tool descriptor/plan vocabulary split; public exports unchanged | P5 |
+| filesize allowlist 59→57 | LOW | debt inventory shrink; 57 oversized files remain | P5 |

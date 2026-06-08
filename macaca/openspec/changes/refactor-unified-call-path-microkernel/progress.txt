@@ -480,4 +480,11 @@
 - **Design patterns**: Contract Test extraction；Facade module tree（proto scheduled_agent_task_service）；Adapter（DTO → `ServiceCommand`）；Object Mother（redacted summary test fixture）。
 - **Contract tests**: `os_layer_file_size_gate` 1/1；`macaca-skill` governance_store 3/3；`macaca-llm` resilient 12/12；`macaca-proto` scheduled_agent 4/4。
 - **GitNexus memo (non-blocking)**: iteration 58 LOW on skill/llm/proto borderline splits — recorded in `impact-memo.md`.
-- **Next**: filesize allowlist 59→0（runtime-host giants / proto config/types / tool_service / heartbeat_service）；6.3.2 archive；P5 终态验收。
+- **Next**: filesize allowlist 59→0（runtime-host giants / proto config/types / local_provider）；6.3.2 archive；P5 终态验收。
+
+## Iteration 59 (2026-06-07)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 59→**57**；`heartbeat_service.rs` → 目录模块 `mod.rs` + `domain_vocabulary.rs`（Value Object cluster）+ `profile_command_builders.rs`（Builder）+ `command_adapters.rs`（Adapter）+ `tests.rs`（Contract Test）；`tool_service.rs` → 目录模块 `mod.rs` + `descriptor_vocabulary.rs`（Value Object cluster）。
+- **Design patterns**: Facade module tree；Adapter（DTO → `ServiceCommand`）；Builder（profile mutation）；Value Object cluster（domain/descriptor vocabulary）；Contract Test extraction。
+- **Contract tests**: `os_layer_file_size_gate` 1/1；`macaca-proto` heartbeat_service 5/5；`macaca-proto` tool_service 4/4。
+- **GitNexus memo (non-blocking)**: iteration 59 LOW on proto heartbeat/tool facade splits — recorded in `impact-memo.md`.
+- **Next**: filesize allowlist 57→0（runtime-host giants / proto config/types / macaca-heartbeat local_provider）；6.3.2 archive；P5 终态验收。

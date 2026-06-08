@@ -18,8 +18,6 @@ pub fn entries() -> Vec<FileSizeAllowlistEntry> {
         FileSizeAllowlistEntry::new("crates/facade/macaca-sdk/src/system_facade.rs", 639, "OS-layer-debt", "P5"),
         FileSizeAllowlistEntry::new("crates/foundation/macaca-proto/src/application_service.rs", 684, "foundation-proto", "P5"),
         FileSizeAllowlistEntry::new("crates/foundation/macaca-proto/src/config.rs", 1573, "foundation-proto", "P5"),
-        FileSizeAllowlistEntry::new("crates/foundation/macaca-proto/src/heartbeat_service.rs", 558, "foundation-proto", "P5"),
-        FileSizeAllowlistEntry::new("crates/foundation/macaca-proto/src/tool_service.rs", 545, "foundation-proto", "P5"),
         FileSizeAllowlistEntry::new("crates/foundation/macaca-proto/src/types.rs", 1514, "foundation-proto", "P5"),
         FileSizeAllowlistEntry::new("crates/runtime/macaca-framework/src/a2a.rs", 873, "P4-framework", "P4"),
         FileSizeAllowlistEntry::new("crates/runtime/macaca-framework/src/agent.rs", 675, "P4-framework", "P4"),
