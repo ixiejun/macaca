@@ -599,3 +599,10 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 |---------------|----------------------|------------------------|-------|
 | `component_model/{mod,provider,session,session_host,session_lifecycle,template_engine,support}.rs` | HIGH | WASM Component Model export invoke + declared host-command orchestration + host-import bridge delegation; public API `ComponentModelWasmRuntimeProvider` unchanged via `wasm_runtime_provider/mod.rs` | P5 |
 | filesize allowlist 41→40 | LOW | debt inventory shrink; 40 oversized files remain | P5 |
+
+## Iteration 73 additions (§4.5.1 mcp_service_provider Facade split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `mcp_service_provider/{mod,descriptor,support,system_service,command_dispatch,runtime_facade_commands,tool_invoke_commands,operator_commands,tests}.rs` | HIGH | MCP system service command router + tool invoke admission guards + operator lifecycle delegation; public API `McpSystemServiceProvider`/`mcp_service_descriptor` unchanged via `lib.rs` | P5 |
+| filesize allowlist 40→39 | LOW | debt inventory shrink; 39 oversized files remain | P5 |

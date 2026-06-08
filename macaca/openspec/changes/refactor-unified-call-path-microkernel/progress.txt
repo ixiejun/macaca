@@ -579,3 +579,10 @@
 - **Contract tests**: `os_layer_file_size_gate` 1/1；`component_model_provider` lib tests 12/12；`wasm_host_import` lib tests 15/15。
 - **GitNexus memo (non-blocking)**: iteration 72 HIGH on `ComponentModelWasmExecutionSession::dispatch` WASM export + declared host-command orchestration path — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: filesize allowlist 40→0（`mcp_runtime.rs` / `app_executor.rs` / `mcp_service_provider.rs` / proto config/types 等）；6.3.2 archive；P5 终态验收。
+
+## Iteration 73 (2026-06-08)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 40→**39**；`mcp_service_provider.rs` 1048→模块树（`mod.rs` Facade + `descriptor.rs` Factory + `support.rs` Adapter helpers + `system_service.rs` lifecycle + `command_dispatch.rs` Command Router + `runtime_facade_commands.rs` + `tool_invoke_commands.rs` Chain of Responsibility + `operator_commands.rs` + `tests.rs` Contract Test 分区）。
+- **Design patterns**: Facade module tree；Factory（`mcp_service_descriptor`）；Command Router；Adapter（`McpOperatorLifecycle` / `McpRuntimeFacade` delegation）；Chain of Responsibility（tool invoke admission guards）；Null Object（`unavailable()` provider）；trace `info!`/`warn!` on command admission / rejection / completion nodes。
+- **Contract tests**: `os_layer_file_size_gate` 1/1；`mcp_service_provider` lib tests 7/7。
+- **GitNexus memo (non-blocking)**: iteration 73 HIGH on `McpSystemServiceProvider::handle_tool_invoke` MCP tool invocation admission + facade side-effect path — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: filesize allowlist 39→0（`mcp_runtime.rs` / `app_executor.rs` / `application_service_provider.rs` / proto config/types 等）；6.3.2 archive；P5 终态验收。
