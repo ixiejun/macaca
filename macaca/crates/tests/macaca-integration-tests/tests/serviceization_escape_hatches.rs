@@ -1043,6 +1043,7 @@ fn serviceization_escape_hatches_os_test_fixture_role_literals_absent() {
         &[
             "crates/services/macaca-tools/src/todo/create_todo.rs",
             "crates/services/macaca-tools/src/todo/tests.rs",
+            "crates/services/macaca-scheduled-agent-task/src/local_provider/tests.rs",
             "crates/foundation/macaca-persist/src/event_log_tests.rs",
             "crates/shells/macaca-web/src/session/tests.rs",
             "crates/shells/macaca-web/src/routes/tests.rs",

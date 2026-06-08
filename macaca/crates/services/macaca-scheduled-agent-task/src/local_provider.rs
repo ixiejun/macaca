@@ -1,4 +1,4 @@
-//! In-memory local Scheduled Agent Task provider.
+//! In-memory local Scheduled Agent Task provider (**Facade** module root).
 //!
 //! The local provider is the first concrete implementation of
 //! `service.scheduled_agent_task`.  It uses the Memento pattern for prompt
@@ -7,6 +7,19 @@
 //! nodes.  The provider is intentionally application-agnostic: it never branches
 //! on application names, workflow names, provider names, model names, driver
 //! names, gateway names, chains, payment names, or business domains.
+//!
+//! # Module tree (P5 iteration 92)
+//! - `support` — constants + structured error builders
+//! - `state` — in-memory memento/state mutations
+//! - `metadata` — scheduler metadata sanitization
+//! - `tests` — contract tests
+
+mod metadata;
+mod state;
+mod support;
+
+#[cfg(test)]
+mod tests;
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock};
@@ -14,26 +27,20 @@ use std::sync::{Arc, RwLock};
 use async_trait::async_trait;
 use chrono::Utc;
 use macaca_proto::{
-    AgentExecutionIntent, AgentExecutionPolicyContext, AgentExecutionTargetCommand, ApplicationId,
-    AutonomyAuditCorrelation, AutonomyPayloadRef, AutonomyServiceErrorKind,
-    AutonomyStructuredError, CancelScheduledAgentTaskCommand, CreateScheduledAgentTaskCommand,
+    AutonomyServiceErrorKind, CancelScheduledAgentTaskCommand, CreateScheduledAgentTaskCommand,
     MacacaResult, RecordScheduledAgentTaskResultCommand, ResolveScheduledAgentTaskPayloadCommand,
-    ScheduledAgentTaskCommandResult, ScheduledAgentTaskId, ScheduledAgentTaskQueryCommand,
-    ScheduledAgentTaskResolvedPayload, ScheduledAgentTaskServiceSnapshot,
-    ScheduledAgentTaskSummary, SchedulerDeleteJobCommand, SchedulerJobDefinition, SchedulerJobId,
-    SchedulerRegisterJobCommand, SchedulerTargetCommand, ServiceDescriptor, ServiceHealth,
-    ServiceLifecycleState, TaskId, TraceContext, SCHEDULED_AGENT_TASK_SERVICE_ID,
-    SCHEDULER_SERVICE_ID,
+    ScheduledAgentTaskCommandResult, ScheduledAgentTaskQueryCommand,
+    ScheduledAgentTaskServiceSnapshot, ScheduledAgentTaskSummary, SchedulerDeleteJobCommand,
+    SchedulerRegisterJobCommand, ServiceDescriptor, ServiceHealth, ServiceLifecycleState,
+    TraceContext, SCHEDULED_AGENT_TASK_SERVICE_ID,
 };
 use macaca_scheduler::{SchedulerService, UnavailableSchedulerProvider};
 use tracing::{info, warn};
 
-use crate::audit::{LocalAuditRecorder, ScheduledAgentTaskAuditRecord};
-use crate::payload_store::InMemoryPayloadStore;
 use crate::service_contract::ScheduledAgentTaskService;
 
-/// Local provider identifier used in sanitized snapshots.
-const LOCAL_PROVIDER_ID: &str = "local.in_memory";
+use state::LocalScheduledAgentTaskState;
+use support::{error_result, LOCAL_PROVIDER_ID};
 
 /// Local Scheduled Agent Task provider backed by in-memory mementos.
 pub struct LocalScheduledAgentTaskProvider {
@@ -63,6 +70,7 @@ impl LocalScheduledAgentTaskProvider {
         }
     }
 
+    /// Read-only access to in-memory state under the provider lock.
     fn read<R>(&self, f: impl FnOnce(&LocalScheduledAgentTaskState) -> R) -> R {
         let guard = self
             .store
@@ -71,6 +79,7 @@ impl LocalScheduledAgentTaskProvider {
         f(&guard)
     }
 
+    /// Mutable access to in-memory state under the provider lock.
     fn write<R>(&self, f: impl FnOnce(&mut LocalScheduledAgentTaskState) -> R) -> R {
         let mut guard = self
             .store
@@ -79,6 +88,7 @@ impl LocalScheduledAgentTaskProvider {
         f(&mut guard)
     }
 
+    /// Build a sanitized health/snapshot view for diagnostics consumers.
     fn snapshot_inner(&self) -> ScheduledAgentTaskServiceSnapshot {
         self.read(|state| ScheduledAgentTaskServiceSnapshot {
             service_id: SCHEDULED_AGENT_TASK_SERVICE_ID.into(),
@@ -95,31 +105,6 @@ impl LocalScheduledAgentTaskProvider {
             captured_at: Utc::now(),
             metadata: BTreeMap::new(),
         })
-    }
-
-    fn structured_error(
-        trace: TraceContext,
-        kind: AutonomyServiceErrorKind,
-        reason_code: impl Into<String>,
-        safe_message: impl Into<String>,
-    ) -> MacacaResult<AutonomyStructuredError> {
-        Ok(AutonomyStructuredError {
-            kind,
-            reason_code: reason_code.into(),
-            safe_message: safe_message.into(),
-            correlation: AutonomyAuditCorrelation::from_trace(trace)?,
-            metadata: BTreeMap::new(),
-        })
-    }
-
-    fn error_result(
-        trace: TraceContext,
-        kind: AutonomyServiceErrorKind,
-        reason_code: impl Into<String>,
-        safe_message: impl Into<String>,
-    ) -> MacacaResult<ScheduledAgentTaskCommandResult> {
-        let error = Self::structured_error(trace.clone(), kind, reason_code, safe_message)?;
-        Ok(ScheduledAgentTaskCommandResult::rejected(trace, error))
     }
 }
 
@@ -157,7 +142,7 @@ impl ScheduledAgentTaskService for LocalScheduledAgentTaskProvider {
                 trace_id = trace.trace_id.as_str(),
                 "scheduled agent task create rejected because application scope is missing"
             );
-            return Self::error_result(
+            return error_result(
                 trace,
                 AutonomyServiceErrorKind::InvalidRequest,
                 "missing_application_scope",
@@ -303,7 +288,7 @@ impl ScheduledAgentTaskService for LocalScheduledAgentTaskProvider {
         }) {
             Some(values) => values,
             None => {
-                return Self::error_result(
+                return error_result(
                     trace,
                     AutonomyServiceErrorKind::InvalidRequest,
                     "scheduled_task_not_found",
@@ -327,6 +312,13 @@ impl ScheduledAgentTaskService for LocalScheduledAgentTaskProvider {
             None
         };
         let audit_id = self.write(|state| state.cancel_task(&command.task_id, &trace));
+        info!(
+            service_id = SCHEDULED_AGENT_TASK_SERVICE_ID,
+            provider_id = LOCAL_PROVIDER_ID,
+            task_id = command.task_id.as_str(),
+            trace_id = trace.trace_id.as_str(),
+            "scheduled agent task cancel completed"
+        );
         Ok(ScheduledAgentTaskCommandResult {
             accepted: scheduler_result
                 .as_ref()
@@ -348,7 +340,7 @@ impl ScheduledAgentTaskService for LocalScheduledAgentTaskProvider {
     async fn resolve_payload(
         &self,
         command: ResolveScheduledAgentTaskPayloadCommand,
-    ) -> MacacaResult<Option<ScheduledAgentTaskResolvedPayload>> {
+    ) -> MacacaResult<Option<macaca_proto::ScheduledAgentTaskResolvedPayload>> {
         info!(
             service_id = SCHEDULED_AGENT_TASK_SERVICE_ID,
             provider_id = LOCAL_PROVIDER_ID,
@@ -387,636 +379,5 @@ impl ScheduledAgentTaskService for LocalScheduledAgentTaskProvider {
             );
         }
         Ok(result)
-    }
-}
-
-#[derive(Debug)]
-struct PreparedScheduledAgentTask {
-    task_id: ScheduledAgentTaskId,
-    definition: SchedulerJobDefinition,
-    payload_ref: AutonomyPayloadRef,
-    payload_digest: Option<String>,
-}
-
-#[derive(Default)]
-struct LocalScheduledAgentTaskState {
-    next_task_sequence: u64,
-    tasks: BTreeMap<ScheduledAgentTaskId, StoredScheduledAgentTask>,
-    payloads: InMemoryPayloadStore,
-    audit: LocalAuditRecorder,
-}
-
-impl LocalScheduledAgentTaskState {
-    fn prepare_task(
-        &mut self,
-        application_id: ApplicationId,
-        command: CreateScheduledAgentTaskCommand,
-    ) -> MacacaResult<PreparedScheduledAgentTask> {
-        self.next_task_sequence += 1;
-        let task_id =
-            ScheduledAgentTaskId::new(format!("scheduled-agent-task-{}", self.next_task_sequence))?;
-        let safe_name = command.metadata.get("schedule.name").map(String::as_str);
-        let payload_ref = self.payloads.insert(
-            task_id.as_str(),
-            command.user_prompt,
-            command.delegated_context,
-            safe_name,
-        )?;
-        let payload_digest = payload_ref.content_digest.clone();
-        let session_id = command
-            .scope
-            .session_id
-            .clone()
-            .unwrap_or_else(|| format!("scheduled-agent-task:{}", task_id.as_str()));
-        let target = SchedulerTargetCommand::AgentExecution(AgentExecutionTargetCommand {
-            application_id,
-            session_id,
-            task_id: command.scope.task_id,
-            target_agent: Some(command.target_agent.clone()),
-            execution_intent: AgentExecutionIntent::TaskWorker,
-            payload_ref: payload_ref.clone(),
-            metadata: scheduler_target_metadata(&task_id, &payload_digest, &command.metadata),
-        });
-        let mut definition = SchedulerJobDefinition::new(
-            command.scope.clone(),
-            command.schedule.clone().into_scheduler_spec(),
-            target,
-        )?;
-        definition.metadata = scheduler_job_metadata(&task_id, &payload_digest, &command.metadata);
-        let now = Utc::now();
-        let summary = ScheduledAgentTaskSummary {
-            task_id: task_id.clone(),
-            scope: command.scope,
-            schedule: command.schedule,
-            target_agent: command.target_agent.clone(),
-            execution_intent: AgentExecutionIntent::TaskWorker,
-            scheduler_job_id: None,
-            payload_ref: payload_ref.clone(),
-            payload_digest: payload_digest.clone(),
-            redacted_summary: payload_ref.redacted_summary.clone(),
-            lifecycle_state: "active".into(),
-            last_run_id: None,
-            last_result_status: None,
-            trace_id: Some(command.trace.trace_id.clone()),
-            audit_id: None,
-            created_at: now,
-            updated_at: now,
-            metadata: sanitize_metadata(command.metadata),
-        };
-        let mut audit_record =
-            ScheduledAgentTaskAuditRecord::new("created", command.trace.trace_id, "created");
-        audit_record.task_id = Some(task_id.as_str().into());
-        audit_record.payload_digest = payload_digest.clone();
-        audit_record.target_agent = Some(command.target_agent);
-        let audit_id = self.audit.record(audit_record);
-        let mut summary = summary;
-        summary.audit_id = Some(audit_id);
-        self.tasks.insert(
-            task_id.clone(),
-            StoredScheduledAgentTask {
-                application_id,
-                session_id: match &definition.target {
-                    SchedulerTargetCommand::AgentExecution(target) => target.session_id.clone(),
-                    _ => String::new(),
-                },
-                task_ref: definition.scope.task_id,
-                policy: command.policy.execution_policy,
-                summary,
-            },
-        );
-        Ok(PreparedScheduledAgentTask {
-            task_id,
-            definition,
-            payload_ref,
-            payload_digest,
-        })
-    }
-
-    fn attach_scheduler_job(
-        &mut self,
-        task_id: &ScheduledAgentTaskId,
-        scheduler_job_id: Option<SchedulerJobId>,
-        scheduler_audit_id: Option<String>,
-        trace: &TraceContext,
-    ) -> Option<String> {
-        let task = self.tasks.get_mut(task_id)?;
-        task.summary.scheduler_job_id = scheduler_job_id.clone();
-        task.summary.updated_at = Utc::now();
-        let mut audit_record = ScheduledAgentTaskAuditRecord::new(
-            "scheduler_registered",
-            &trace.trace_id,
-            "registered",
-        );
-        audit_record.task_id = Some(task_id.as_str().into());
-        audit_record.scheduler_job_id = scheduler_job_id.as_ref().map(|id| id.as_str().into());
-        audit_record.payload_digest = task.summary.payload_digest.clone();
-        audit_record.target_agent = Some(task.summary.target_agent.clone());
-        if let Some(scheduler_audit_id) = scheduler_audit_id {
-            audit_record
-                .metadata
-                .insert("scheduler_audit_id".into(), scheduler_audit_id);
-        }
-        let audit_id = self.audit.record(audit_record);
-        task.summary.audit_id = Some(audit_id.clone());
-        Some(audit_id)
-    }
-
-    fn cancel_task(
-        &mut self,
-        task_id: &ScheduledAgentTaskId,
-        trace: &TraceContext,
-    ) -> Option<String> {
-        let task = self.tasks.get_mut(task_id)?;
-        task.summary.lifecycle_state = "cancelled".into();
-        task.summary.updated_at = Utc::now();
-        let mut audit_record =
-            ScheduledAgentTaskAuditRecord::new("cancelled", &trace.trace_id, "cancelled");
-        audit_record.task_id = Some(task_id.as_str().into());
-        audit_record.scheduler_job_id = task
-            .summary
-            .scheduler_job_id
-            .as_ref()
-            .map(|id| id.as_str().into());
-        audit_record.payload_digest = task.summary.payload_digest.clone();
-        audit_record.target_agent = Some(task.summary.target_agent.clone());
-        let audit_id = self.audit.record(audit_record);
-        task.summary.audit_id = Some(audit_id.clone());
-        Some(audit_id)
-    }
-
-    fn resolve_payload(
-        &self,
-        command: ResolveScheduledAgentTaskPayloadCommand,
-    ) -> Option<ScheduledAgentTaskResolvedPayload> {
-        let payload = self.payloads.get(&command.payload_ref.reference)?;
-        let (task_id, task) = self.tasks.iter().find(|(_, task)| {
-            task.summary.payload_ref.reference == command.payload_ref.reference
-        })?;
-        Some(ScheduledAgentTaskResolvedPayload {
-            task_id: task_id.clone(),
-            application_id: task.application_id,
-            session_id: task.session_id.clone(),
-            task_ref: task.task_ref,
-            target_agent: task.summary.target_agent.clone(),
-            execution_intent: task.summary.execution_intent.clone(),
-            user_prompt: payload.prompt.clone(),
-            delegated_context: payload.delegated_context.clone(),
-            policy: task.policy.clone(),
-            payload_ref: command.payload_ref,
-            payload_digest: Some(payload.digest.clone()),
-            trace: command.trace,
-            audit_id: task.summary.audit_id.clone(),
-            metadata: task.summary.metadata.clone(),
-        })
-    }
-
-    fn record_result(
-        &mut self,
-        command: RecordScheduledAgentTaskResultCommand,
-    ) -> MacacaResult<ScheduledAgentTaskCommandResult> {
-        let Some(task) = self.tasks.get_mut(&command.task_id) else {
-            return LocalScheduledAgentTaskProvider::error_result(
-                command.trace,
-                AutonomyServiceErrorKind::InvalidRequest,
-                "scheduled_task_not_found",
-                "scheduled agent task was not found",
-            );
-        };
-        if let Some(scheduler_job_id) = command.scheduler_job_id.clone() {
-            task.summary
-                .scheduler_job_id
-                .get_or_insert(scheduler_job_id);
-        }
-        task.summary.last_run_id = Some(command.scheduler_run_id.clone());
-        task.summary.last_result_status = Some(command.result_status.clone());
-        task.summary.trace_id = Some(command.trace.trace_id.clone());
-        task.summary.updated_at = Utc::now();
-        let mut audit_record = ScheduledAgentTaskAuditRecord::new(
-            "result_recorded",
-            &command.trace.trace_id,
-            command.result_status.clone(),
-        );
-        audit_record.task_id = Some(command.task_id.as_str().into());
-        audit_record.scheduler_job_id = task
-            .summary
-            .scheduler_job_id
-            .as_ref()
-            .map(|id| id.as_str().into());
-        audit_record.scheduler_run_id = Some(command.scheduler_run_id.as_str().into());
-        audit_record.payload_digest = task.summary.payload_digest.clone();
-        audit_record.target_agent = Some(task.summary.target_agent.clone());
-        if let Some(agent_execution_trace_id) = command.agent_execution_trace_id {
-            audit_record
-                .metadata
-                .insert("agent_execution_trace_id".into(), agent_execution_trace_id);
-        }
-        if let Some(result_audit_id) = command.result_audit_id {
-            audit_record
-                .metadata
-                .insert("result_audit_id".into(), result_audit_id);
-        }
-        audit_record
-            .metadata
-            .extend(sanitize_metadata(command.metadata));
-        let audit_id = self.audit.record(audit_record);
-        task.summary.audit_id = Some(audit_id.clone());
-        Ok(ScheduledAgentTaskCommandResult {
-            accepted: true,
-            task_id: Some(command.task_id),
-            scheduler_job_id: task.summary.scheduler_job_id.clone(),
-            scheduler_run_id: Some(command.scheduler_run_id),
-            payload_ref: Some(task.summary.payload_ref.clone()),
-            payload_digest: task.summary.payload_digest.clone(),
-            trace: command.trace,
-            audit_id: Some(audit_id),
-            summary: Some(task.summary.clone()),
-            error: None,
-            metadata: BTreeMap::new(),
-        })
-    }
-}
-
-struct StoredScheduledAgentTask {
-    application_id: ApplicationId,
-    session_id: String,
-    task_ref: Option<TaskId>,
-    policy: AgentExecutionPolicyContext,
-    summary: ScheduledAgentTaskSummary,
-}
-
-fn scheduler_target_metadata(
-    task_id: &ScheduledAgentTaskId,
-    payload_digest: &Option<String>,
-    caller_metadata: &BTreeMap<String, String>,
-) -> BTreeMap<String, String> {
-    let mut metadata = BTreeMap::new();
-    metadata.insert("source".into(), SCHEDULED_AGENT_TASK_SERVICE_ID.into());
-    metadata.insert("scheduled_agent_task_id".into(), task_id.as_str().into());
-    metadata.insert("scheduler_run_source".into(), SCHEDULER_SERVICE_ID.into());
-    for (key, value) in sanitize_metadata(caller_metadata.clone()) {
-        if key.starts_with("skill.alias.") && !value.trim().is_empty() {
-            metadata.insert(key, value);
-        }
-    }
-    if let Some(digest) = payload_digest {
-        metadata.insert("payload_digest".into(), digest.clone());
-    }
-    metadata
-}
-
-fn scheduler_job_metadata(
-    task_id: &ScheduledAgentTaskId,
-    payload_digest: &Option<String>,
-    caller_metadata: &BTreeMap<String, String>,
-) -> BTreeMap<String, String> {
-    let mut metadata = sanitize_metadata(caller_metadata.clone());
-    metadata.insert("source".into(), SCHEDULED_AGENT_TASK_SERVICE_ID.into());
-    metadata.insert("scheduled_agent_task_id".into(), task_id.as_str().into());
-    if let Some(digest) = payload_digest {
-        metadata.insert("payload_digest".into(), digest.clone());
-    }
-    metadata
-}
-
-fn sanitize_metadata(metadata: BTreeMap<String, String>) -> BTreeMap<String, String> {
-    metadata
-        .into_iter()
-        .filter(|(key, _)| {
-            let lowered = key.to_ascii_lowercase();
-            !lowered.contains("prompt")
-                && !lowered.contains("secret")
-                && !lowered.contains("token")
-                && !lowered.contains("credential")
-                && !lowered.contains("private_key")
-        })
-        .collect()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use macaca_proto::{
-        AutonomyScope, RecordScheduledAgentTaskResultCommand, ScheduledAgentTaskSchedule,
-        SchedulerCommandResult, SchedulerJobLifecycleState, SchedulerRunId, SchedulerRunState,
-    };
-    use tokio::sync::Mutex;
-
-    #[derive(Default)]
-    struct RecordingScheduler {
-        jobs: Mutex<Vec<SchedulerJobDefinition>>,
-    }
-
-    #[async_trait]
-    impl SchedulerService for RecordingScheduler {
-        fn descriptor(&self) -> ServiceDescriptor {
-            UnavailableSchedulerProvider::default().descriptor()
-        }
-
-        async fn health(
-            &self,
-            trace: TraceContext,
-        ) -> MacacaResult<macaca_proto::SchedulerServiceSnapshot> {
-            UnavailableSchedulerProvider::default().health(trace).await
-        }
-
-        async fn snapshot(
-            &self,
-            command: macaca_proto::SchedulerQueryCommand,
-        ) -> MacacaResult<macaca_proto::SchedulerServiceSnapshot> {
-            UnavailableSchedulerProvider::default()
-                .snapshot(command)
-                .await
-        }
-
-        async fn register_job(
-            &self,
-            command: SchedulerRegisterJobCommand,
-        ) -> MacacaResult<SchedulerCommandResult> {
-            self.jobs.lock().await.push(command.definition);
-            Ok(SchedulerCommandResult {
-                job_id: Some(SchedulerJobId::new("job-recorded").unwrap()),
-                run_id: None,
-                lifecycle: Some(SchedulerJobLifecycleState::Active),
-                run_state: None,
-                accepted: true,
-                error: None,
-                trace: command.trace,
-                audit_id: Some("audit.scheduler.job.registered.test".into()),
-                metadata: BTreeMap::new(),
-            })
-        }
-
-        async fn update_job(
-            &self,
-            command: macaca_proto::SchedulerUpdateJobCommand,
-        ) -> MacacaResult<SchedulerCommandResult> {
-            UnavailableSchedulerProvider::default()
-                .update_job(command)
-                .await
-        }
-
-        async fn pause_job(
-            &self,
-            command: macaca_proto::SchedulerLifecycleJobCommand,
-        ) -> MacacaResult<SchedulerCommandResult> {
-            UnavailableSchedulerProvider::default()
-                .pause_job(command)
-                .await
-        }
-
-        async fn resume_job(
-            &self,
-            command: macaca_proto::SchedulerLifecycleJobCommand,
-        ) -> MacacaResult<SchedulerCommandResult> {
-            UnavailableSchedulerProvider::default()
-                .resume_job(command)
-                .await
-        }
-
-        async fn delete_job(
-            &self,
-            command: SchedulerDeleteJobCommand,
-        ) -> MacacaResult<SchedulerCommandResult> {
-            Ok(SchedulerCommandResult {
-                job_id: Some(command.job_id),
-                run_id: None,
-                lifecycle: Some(SchedulerJobLifecycleState::Deleted),
-                run_state: Some(SchedulerRunState::Cancelled),
-                accepted: true,
-                error: None,
-                trace: command.trace,
-                audit_id: Some("audit.scheduler.job.deleted.test".into()),
-                metadata: BTreeMap::new(),
-            })
-        }
-
-        async fn trigger_job(
-            &self,
-            command: macaca_proto::SchedulerJobCommand,
-        ) -> MacacaResult<SchedulerCommandResult> {
-            UnavailableSchedulerProvider::default()
-                .trigger_job(command)
-                .await
-        }
-
-        async fn get_job(
-            &self,
-            command: macaca_proto::SchedulerGetJobCommand,
-        ) -> MacacaResult<Option<macaca_proto::SchedulerJobSummary>> {
-            UnavailableSchedulerProvider::default()
-                .get_job(command)
-                .await
-        }
-
-        async fn list_jobs(
-            &self,
-            command: macaca_proto::SchedulerListJobsCommand,
-        ) -> MacacaResult<Vec<macaca_proto::SchedulerJobSummary>> {
-            UnavailableSchedulerProvider::default()
-                .list_jobs(command)
-                .await
-        }
-
-        async fn get_run(
-            &self,
-            command: macaca_proto::SchedulerQueryCommand,
-        ) -> MacacaResult<SchedulerCommandResult> {
-            UnavailableSchedulerProvider::default()
-                .get_run(command)
-                .await
-        }
-
-        async fn list_runs(
-            &self,
-            command: macaca_proto::SchedulerQueryCommand,
-        ) -> MacacaResult<Vec<macaca_proto::SchedulerRunSummary>> {
-            UnavailableSchedulerProvider::default()
-                .list_runs(command)
-                .await
-        }
-    }
-
-    fn create_command(raw_prompt: &str) -> CreateScheduledAgentTaskCommand {
-        let mut metadata = BTreeMap::new();
-        metadata.insert("schedule.name".into(), "Daily safe summary".into());
-        CreateScheduledAgentTaskCommand::new(
-            TraceContext::new("trace-scheduled-agent-task-provider-test"),
-            AutonomyScope::application(ApplicationId::from_name("scheduled-task-provider-test")),
-            ScheduledAgentTaskSchedule::Every {
-                interval_ms: 60_000,
-            },
-            "worker",
-            raw_prompt,
-        )
-        .unwrap()
-        .with_metadata(metadata)
-    }
-
-    fn create_command_with_skill_alias(raw_prompt: &str) -> CreateScheduledAgentTaskCommand {
-        let mut command = create_command(raw_prompt);
-        command.metadata.insert(
-            "skill.alias.requested_id".into(),
-            "skill://agent/legacy-task-skill".into(),
-        );
-        command.metadata.insert(
-            "prompt.secret".into(),
-            "RAW_PROMPT_METADATA_SHOULD_NOT_LEAK".into(),
-        );
-        command
-    }
-
-    #[tokio::test]
-    async fn create_stores_prompt_in_payload_store_and_registers_agent_execution_target() {
-        let scheduler = Arc::new(RecordingScheduler::default());
-        let provider = LocalScheduledAgentTaskProvider::new(scheduler.clone());
-        let raw_prompt = "RAW_PROMPT_SHOULD_NOT_LEAK: analyze and record.";
-
-        let result = provider
-            .create_task(create_command(raw_prompt))
-            .await
-            .unwrap();
-
-        assert!(result.accepted);
-        assert!(result.audit_id.is_some());
-        assert_eq!(
-            result.scheduler_job_id.as_ref().unwrap().as_str(),
-            "job-recorded"
-        );
-        let summary_json = serde_json::to_string(&result.summary).unwrap();
-        assert!(!summary_json.contains(raw_prompt));
-        assert!(summary_json.contains("Daily safe summary"));
-        assert!(summary_json.contains("digest.scheduled_agent_task"));
-
-        let jobs = scheduler.jobs.lock().await;
-        assert_eq!(jobs.len(), 1);
-        match &jobs[0].target {
-            SchedulerTargetCommand::AgentExecution(target) => {
-                assert_eq!(target.target_agent.as_deref(), Some("worker"));
-                assert!(target.payload_ref.content_digest.is_some());
-                let encoded = serde_json::to_string(target).unwrap();
-                assert!(!encoded.contains(raw_prompt));
-            }
-            other => panic!("expected agent execution target, got {other:?}"),
-        }
-    }
-
-    #[tokio::test]
-    async fn create_preserves_sanitized_skill_alias_refs_for_scheduler_dispatch() {
-        let scheduler = Arc::new(RecordingScheduler::default());
-        let provider = LocalScheduledAgentTaskProvider::new(scheduler.clone());
-
-        let result = provider
-            .create_task(create_command_with_skill_alias(
-                "RAW_PROMPT_STAYS_IN_PAYLOAD_STORE",
-            ))
-            .await
-            .unwrap();
-
-        assert!(result.accepted);
-        let jobs = scheduler.jobs.lock().await;
-        match &jobs[0].target {
-            SchedulerTargetCommand::AgentExecution(target) => {
-                assert_eq!(
-                    target.metadata["skill.alias.requested_id"],
-                    "skill://agent/legacy-task-skill"
-                );
-                assert!(!target.metadata.contains_key("prompt.secret"));
-            }
-            other => panic!("expected agent execution target, got {other:?}"),
-        }
-    }
-
-    #[tokio::test]
-    async fn resolve_payload_returns_prompt_only_through_service_boundary() {
-        let scheduler = Arc::new(RecordingScheduler::default());
-        let provider = LocalScheduledAgentTaskProvider::new(scheduler);
-        let raw_prompt = "RAW_PROMPT_AVAILABLE_ONLY_AFTER_RESOLVE";
-        let result = provider
-            .create_task(create_command(raw_prompt))
-            .await
-            .unwrap();
-
-        let resolved = provider
-            .resolve_payload(
-                ResolveScheduledAgentTaskPayloadCommand::new(
-                    TraceContext::new("trace-resolve"),
-                    result.payload_ref.unwrap(),
-                )
-                .unwrap(),
-            )
-            .await
-            .unwrap()
-            .unwrap();
-
-        assert_eq!(resolved.user_prompt, raw_prompt);
-        assert_eq!(resolved.target_agent, "worker");
-        assert!(resolved
-            .payload_digest
-            .unwrap()
-            .starts_with("digest.scheduled_agent_task"));
-    }
-
-    #[tokio::test]
-    async fn record_result_updates_redacted_summary_last_run_fields() {
-        let scheduler = Arc::new(RecordingScheduler::default());
-        let provider = LocalScheduledAgentTaskProvider::new(scheduler);
-        let raw_prompt = "RAW_PROMPT_MUST_STAY_IN_PAYLOAD_STORE";
-        let create = provider
-            .create_task(create_command(raw_prompt))
-            .await
-            .unwrap();
-        let task_id = create.task_id.clone().unwrap();
-        let run_id = SchedulerRunId::new("run-recorded").unwrap();
-
-        let result = provider
-            .record_result(
-                RecordScheduledAgentTaskResultCommand::new(
-                    TraceContext::new("trace-record-result"),
-                    task_id.clone(),
-                    run_id.clone(),
-                    "succeeded",
-                )
-                .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        assert!(result.accepted);
-        let summary = provider
-            .get_task(
-                ScheduledAgentTaskQueryCommand::new(
-                    TraceContext::new("trace-get-recorded-result"),
-                    create.summary.clone().unwrap().scope,
-                    Some(task_id),
-                )
-                .unwrap(),
-            )
-            .await
-            .unwrap()
-            .unwrap();
-
-        assert_eq!(summary.last_run_id, Some(run_id));
-        assert_eq!(summary.last_result_status.as_deref(), Some("succeeded"));
-        assert!(!serde_json::to_string(&summary)
-            .unwrap()
-            .contains(raw_prompt));
-        assert!(result
-            .audit_id
-            .as_deref()
-            .unwrap_or_default()
-            .starts_with("audit.scheduled_agent_task."));
-    }
-
-    #[tokio::test]
-    async fn unavailable_provider_does_not_fake_success() {
-        let provider = crate::UnavailableScheduledAgentTaskProvider::default();
-        let result = provider
-            .create_task(create_command("safe prompt"))
-            .await
-            .unwrap();
-
-        assert!(!result.accepted);
-        assert!(result.error.is_some());
-        assert!(result.scheduler_job_id.is_none());
     }
 }

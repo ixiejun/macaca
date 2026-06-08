@@ -786,3 +786,14 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `SummaryContextEngine::assemble` | MEDIUM | Compaction decorator over pruning; lifecycle hook notification seam | P5 |
 | `engine/tests.rs` | LOW | Contract tests with neutral agent/model fixtures; no application-specific engine ids | P5 |
 | filesize allowlist 22→21 | LOW | debt inventory shrink; 21 oversized files remain | P5 |
+
+## Iteration 92 additions (§4.5.1 macaca-scheduled-agent-task local_provider Facade split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `local_provider/{support,metadata,state,tests}.rs` | HIGH | Scheduled-agent-task service provider module tree; public `LocalScheduledAgentTaskProvider` API unchanged via Facade | P5 |
+| `LocalScheduledAgentTaskProvider::create_task` | HIGH | Scheduler registration syscall; payload memento + redacted summary seam; consumed by autonomy runtime-host | P5 |
+| `LocalScheduledAgentTaskState::prepare_task` | MEDIUM | Memento payload store + scheduler job definition builder; no application-specific branches | P5 |
+| `sanitize_metadata` / `scheduler_target_metadata` | LOW | Specification metadata redaction for scheduler dispatch | P5 |
+| `local_provider/tests.rs` | LOW | Contract tests with neutral application/agent fixtures; prompt leak assertions only | P5 |
+| filesize allowlist 21→20 | LOW | debt inventory shrink; 20 oversized files remain | P5 |

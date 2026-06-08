@@ -728,3 +728,12 @@
 - **Dependency**: `macaca-context` adds workspace `tracing` for structured audit logs on engine hot paths。
 - **GitNexus memo (non-blocking)**: iteration 91 HIGH on `ContextRuntimeFacade::assemble` + `ContextEngineRegistry::resolve_or_legacy` pre-LLM context syscall seam — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: filesize allowlist 21→0（`local_provider.rs` 等）；6.3.2 archive；P5 终态验收。
+
+## Iteration 92 (2026-06-08)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 21→**20**；`macaca-scheduled-agent-task/local_provider.rs` 1022→`local_provider/` Facade 模块树（`local_provider.rs` + `support.rs` + `metadata.rs` + `state.rs` + `tests.rs`）。
+- **Design patterns**: Facade module tree；Memento（`InMemoryPayloadStore` + payload refs）；State（`LocalScheduledAgentTaskState`）；Specification（`sanitize_metadata`）；Observer（`tracing::{info,warn}` on create/cancel/health audit nodes）。
+- **Contract tests**: `cargo check -p macaca-scheduled-agent-task` OK；`cargo test -p macaca-scheduled-agent-task local_provider::` 5/5；`os_layer_file_size_gate` 1/1；`serviceization_escape_hatches` OK；production modules all ≤500 lines（max `local_provider.rs` ~383）。
+- **Public API**: `macaca_scheduled_agent_task::LocalScheduledAgentTaskProvider` unchanged via Facade；`lib.rs` `pub mod local_provider` unchanged。
+- **Logging**: preserved + extended `tracing::{info,warn}` on create/cancel/health paths with `service_id` / `provider_id` / `trace_id` / `task_id` audit fields。
+- **GitNexus memo (non-blocking)**: iteration 92 HIGH on `LocalScheduledAgentTaskProvider::create_task` scheduler-registration syscall seam — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: filesize allowlist 20→0（`macaca-scheduler/local_provider.rs` 等）；6.3.2 archive；P5 终态验收。
