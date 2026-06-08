@@ -703,3 +703,14 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `ApplicationAgentDelegateCommand::into_service_command` | HIGH | WASM/Web/CLI/workflow host → Application Service → Agent Execution syscall adapter; audited single entrypoint for delegated agent work | P5 |
 | `ApplicationServiceSnapshot` | MEDIUM | Memento replay-safe service state for SDK/runtime-host recovery projections | P5 |
 | filesize allowlist 30→29 | LOW | debt inventory shrink; 29 oversized files remain | P5 |
+
+## Iteration 84 additions (§4.5.1 macaca-task plan_loop Facade split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `plan_loop/{mod,config,events,loop_runner,goal_evaluator,tests}.rs` | HIGH | Event-driven goal scheduler; public API `macaca_task::plan_loop::*` unchanged via Facade re-exports + `lib.rs` `pub mod plan_loop` | P5 |
+| `PlanLoop::run` | HIGH | Heartbeat-driven scheduling loop → `PlanEvent` emission; web/SDK `on_created` callback must start loop on any goal-creation path | P5 |
+| `PlanLoopWaker` | MEDIUM | Async wake/sleep seam for cooperative shutdown and external resume without polling busy-loop | P5 |
+| `GoalEvaluator::evaluate` | HIGH | Pluggable goal-completion policy; downstream TaskBoard/TodoStore terminal aggregation depends on evaluation semantics | P5 |
+| `PlanEvent` | MEDIUM | Observer channel for decoupled LLM/tool consumers; SSE and workflow hosts subscribe without importing scheduler internals | P5 |
+| filesize allowlist 29→28 | LOW | debt inventory shrink; 28 oversized files remain | P5 |

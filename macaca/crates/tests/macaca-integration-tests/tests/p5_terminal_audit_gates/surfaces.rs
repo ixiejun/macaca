@@ -58,7 +58,7 @@ pub fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> 
                 | "crates/services/macaca-task/src/decompose.rs"
                 | "crates/services/macaca-task/src/dependency.rs"
                 | "crates/services/macaca-task/src/lifecycle.rs"
-                | "crates/services/macaca-task/src/plan_loop.rs"
+                | "crates/services/macaca-task/src/plan_loop/mod.rs"
                 | "crates/services/macaca-task/src/scheduler.rs"
                 | "crates/services/macaca-task/src/todo_board.rs"
                 | "crates/services/macaca-task/src/todo_store.rs"

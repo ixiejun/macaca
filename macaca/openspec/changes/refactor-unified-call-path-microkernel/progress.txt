@@ -657,3 +657,11 @@
 - **Contract tests**: `cargo check -p macaca-proto` OK；`os_layer_file_size_gate` 1/1；`unified_workflow_application_abi` `include_str!` 路径同步至 `application_service/delegate.rs`；production modules all ≤500 lines（max `lifecycle_commands.rs` 110）。
 - **GitNexus memo (non-blocking)**: iteration 83 HIGH on `ApplicationAgentDelegateCommand::into_service_command` + Application Service wire DTO serde surface — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: filesize allowlist 29→0（`macaca-framework` / `agentic_loop` / `todo_board.rs` 等）；6.3.2 archive；P5 终态验收。
+
+## Iteration 84 (2026-06-08)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 29→**28**；`plan_loop.rs` 687→`plan_loop/` Facade 模块树（`mod.rs` + `config.rs` + `events.rs` + `loop_runner.rs` + `goal_evaluator.rs` + `tests.rs`）。
+- **Design patterns**: Facade module tree；Observer（`PlanEvent` channel decouples scheduler from LLM consumers）；Template Method（`run_with_default_template`）；Strategy（`GoalEvaluator` pluggable completion policy）；Value Object（`PlanLoopConfig`, `TaskSummary`, `GoalEvaluation`）。
+- **Contract tests**: `cargo check -p macaca-task` OK；`cargo test -p macaca-task plan_loop` OK；`os_layer_file_size_gate` 1/1；`serviceization_escape_hatches` OK；production modules all ≤500 lines（max `loop_runner.rs` ~288）。
+- **Escape hatch**: `plan_loop/mod.rs` 同步至 `surfaces.rs` + `serviceization_escape_hatches.rs` migration surface allowlist；Contract Test fixture 中性化（`backend`→`agent-alpha`，`architect`→`agent-beta`）。
+- **GitNexus memo (non-blocking)**: iteration 84 HIGH on `PlanLoop::run` heartbeat dispatch + `GoalEvaluator::evaluate` goal-completion seam — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: filesize allowlist 28→0（`macaca-framework` / `agentic_loop` / `todo_board.rs` / `runtime.rs` 等）；6.3.2 archive；P5 终态验收。
