@@ -734,3 +734,13 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `AgentSkill::load_content` | MEDIUM | Tier-2 progressive disclosure activation; resource listing for bundled scripts/assets | P5 |
 | `parse_skill_md_full` | HIGH | Runtime discovery + policy gating consume full metadata/invocation parse; macaca/openclaw metadata blocks | P5 |
 | filesize allowlist 27→26 | LOW | debt inventory shrink; 26 oversized files remain | P5 |
+
+## Iteration 87 additions (§4.5.1 macaca-task runtime Facade split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `runtime/{mod,strategy,event_sink,graph_admission,goal_commands,assignment_commands,task_lifecycle_commands,coordinator_commands,snapshot,tests}.rs` | HIGH | Task Service command facade; public API `macaca_task::runtime::*` unchanged via Facade re-exports + `lib.rs` `pub mod runtime` | P5 |
+| `TaskServiceRuntime::create_task_assignment` + graph admission | HIGH | Web/SDK → task graph ownership + authoritative execution boundary; snapshot terminal aggregation | P5 |
+| `admit_assignment_graph` / `normalize_assignment_graph_id` | MEDIUM | Specification rules for authoritative vs compatibility graph admission | P5 |
+| `runtime/tests.rs` escape-hatch wire-label fixture | LOW | Contract tests avoid retired enum-path literal; raw migration debt baseline stays 0 | P5 |
+| filesize allowlist 26→25 | LOW | debt inventory shrink; 25 oversized files remain | P5 |

@@ -681,3 +681,12 @@
 - **Logging**: `tracing::info/debug` at tier-1 load and tier-2 activation; contract test MCP fixture neutralized (`playwright`→`sample-mcp`).
 - **GitNexus memo (non-blocking)**: iteration 86 HIGH on `AgentSkill::from_path_with_source` + `parse_skill_md_full` cross-crate SKILL.md serde surface — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: filesize allowlist 26→0（`macaca-task/runtime.rs` / `todo_board.rs` / `agentic_loop` 等）；6.3.2 archive；P5 终态验收。
+
+## Iteration 87 (2026-06-08)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 26→**25**；`macaca-task/runtime.rs` 1144→`runtime/` Facade 模块树（`mod.rs` + `strategy.rs` + `event_sink.rs` + `graph_admission.rs` + `goal_commands.rs` + `assignment_commands.rs` + `task_lifecycle_commands.rs` + `coordinator_commands.rs` + `snapshot.rs` + `tests.rs`）。
+- **Design patterns**: Facade module tree；Strategy（`TaskServiceExecutionStrategy`）；Command（lifecycle DTO handlers）；Observer（`TaskServiceEventSink`）；Memento（in-memory snapshot cache）；Specification（graph admission rules）。
+- **Contract tests**: `cargo check -p macaca-task` OK；`cargo test -p macaca-task runtime::` 7/7；`os_layer_file_size_gate` 1/1；`serviceization_escape_hatches` OK；production modules all ≤500 lines（max `task_lifecycle_commands.rs` ~220）。
+- **Escape hatch**: Contract Test 提取至独立 `runtime/tests.rs` 后 raw scanner 暴露 `TaskGraphOwner::TaskServiceCompatibility` 字面量；以 serde wire-label 反序列化 fixture 清零（baseline 保持 0）。
+- **Logging**: `tracing::info` at `TaskServiceRuntime::emit` and command handler audit nodes; contract test agent fixtures neutralized (`builder`→`agent-alpha` 等)。
+- **GitNexus memo (non-blocking)**: iteration 87 HIGH on `TaskServiceRuntime` command handlers + graph admission seam — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: filesize allowlist 25→0（`todo_board.rs` / `agentic_loop.rs` / `todo.rs` 等）；6.3.2 archive；P5 终态验收。
