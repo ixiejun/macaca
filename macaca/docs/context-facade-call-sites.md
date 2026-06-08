@@ -14,7 +14,7 @@ This note satisfies the umbrella plan requirement to catalogue **major** assembl
 | Location | Behaviour |
 |---------|-----------|
 | `macaca-framework/src/react_agent.rs` | Invokes façade with empty provider vec (compat shim) |
-| `macaca-context/src/engine.rs` | `LegacyContextEngine` + `ContextRuntimeFacade::{builtins, legacy}` internals |
+| `macaca-context/src/engine/` | `LegacyContextEngine` + `ContextRuntimeFacade::{builtins, legacy}` internals (Facade module tree) |
 | `macaca-context/src/adapter.rs` | Unit tests invoking `LegacyContextEngine` |
 
 Guidance: new OS features SHOULD register `ContextProvider` families rather than patching `LegacyContextEngine` transcript assembly directly.

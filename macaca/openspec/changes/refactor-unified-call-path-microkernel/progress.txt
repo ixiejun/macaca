@@ -718,3 +718,13 @@
 - **Logging**: preserved `tracing::info` on deduplication/goal-linked create_todo；added audit nodes on `create_goal` / `review_todo` / `reassign_task`。
 - **GitNexus memo (non-blocking)**: iteration 90 HIGH on `CreateTodoTool::create_one` + plan/worker tool syscall seam — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: filesize allowlist 22→0（`engine.rs` / `local_provider.rs` 等）；6.3.2 archive；P5 终态验收。
+
+## Iteration 91 (2026-06-08)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 22→**21**；`macaca-context/engine.rs` 972→`engine/` Facade 模块树（`mod.rs` + `types.rs` + `legacy.rs` + `windowed.rs` + `pruning.rs` + `summary.rs` + `registry.rs` + `facade.rs` + `helpers.rs` + `tests.rs`）。
+- **Design patterns**: Facade module tree；Strategy（`ContextEngine` implementations）；Registry（`ContextEngineRegistry`）；Chain of Responsibility（`ContextRuntimeFacade` fallback）；Decorator（`SummaryContextEngine` wraps pruning）；Adapter（`PruningContextEngine` + `ContextRenderable`）。
+- **Contract tests**: `cargo check -p macaca-context` OK；`cargo test -p macaca-context engine::` 8/8；`os_layer_file_size_gate` 1/1；`serviceization_escape_hatches` OK；production modules all ≤500 lines（max `types.rs` ~157）。
+- **Public API**: `macaca_context::engine::*` unchanged via Facade re-exports；`lib.rs` `pub mod engine` unchanged。
+- **Logging**: added `tracing::{info,warn,debug}` audit nodes on `ContextRuntimeFacade::assemble`（success + fallback）、`WindowedContextEngine` trim、`SummaryContextEngine` compaction、`ContextEngineRegistry::register`。
+- **Dependency**: `macaca-context` adds workspace `tracing` for structured audit logs on engine hot paths。
+- **GitNexus memo (non-blocking)**: iteration 91 HIGH on `ContextRuntimeFacade::assemble` + `ContextEngineRegistry::resolve_or_legacy` pre-LLM context syscall seam — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: filesize allowlist 21→0（`local_provider.rs` 等）；6.3.2 archive；P5 终态验收。

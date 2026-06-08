@@ -6,7 +6,7 @@
 
 use super::gate::FileSizeAllowlistEntry;
 
-/// Returns the baseline oversized-file snapshot (generated 2026-06-08, iteration 87).
+/// Returns the baseline oversized-file snapshot (generated 2026-06-08, iteration 91).
 pub fn entries() -> Vec<FileSizeAllowlistEntry> {
     vec![
         FileSizeAllowlistEntry::new("crates/application/macaca-app/src/manifest_v1/yaml_adapter.rs", 614, "OS-layer-debt", "P5"),
@@ -27,7 +27,6 @@ pub fn entries() -> Vec<FileSizeAllowlistEntry> {
         FileSizeAllowlistEntry::new("crates/runtime/macaca-framework/src/plan.rs", 934, "P4-framework", "P4"),
         FileSizeAllowlistEntry::new("crates/runtime/macaca-framework/src/react_agent.rs", 1040, "P4-framework", "P4"),
         FileSizeAllowlistEntry::new("crates/runtime/macaca-framework/src/tool.rs", 1042, "P4-framework", "P4"),
-        FileSizeAllowlistEntry::new("crates/services/macaca-context/src/engine.rs", 972, "OS-layer-debt", "P5"),
         FileSizeAllowlistEntry::new("crates/services/macaca-scheduled-agent-task/src/local_provider.rs", 1022, "OS-layer-debt", "P5"),
         FileSizeAllowlistEntry::new("crates/services/macaca-scheduler/src/local_provider.rs", 869, "OS-layer-debt", "P5"),
         FileSizeAllowlistEntry::new("crates/tests/macaca-integration-tests/src/pipeline_dry_run.rs", 711, "OS-layer-debt", "P5"),

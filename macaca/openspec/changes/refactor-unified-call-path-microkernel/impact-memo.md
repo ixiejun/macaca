@@ -775,3 +775,14 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `ReviewTodoTool` / `CreateGoalTool` callbacks | MEDIUM | Observer hooks for PlanLoop startup and run_trace without shell coupling | P5 |
 | `todo/tests.rs` escape-hatch migration surface | LOW | Contract tests use Object Mother fixture agent ids; production modules role-literal free | P5 |
 | filesize allowlist 23→22 | LOW | debt inventory shrink; 22 oversized files remain | P5 |
+
+## Iteration 91 additions (§4.5.1 macaca-context engine Facade split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `engine/{mod,types,legacy,windowed,pruning,summary,registry,facade,helpers,tests}.rs` | HIGH | Pre-LLM context assembly syscall; public API `macaca_context::engine::*` unchanged via Facade re-exports | P5 |
+| `ContextRuntimeFacade::assemble` | HIGH | Engine selection + fallback chain; consumed by runtime, composer facade, adapter conformance tests | P5 |
+| `ContextEngineRegistry::resolve_or_legacy` | MEDIUM | Builtin + overlay engine resolution; diagnostics via `list_builtin_engine_infos` | P5 |
+| `SummaryContextEngine::assemble` | MEDIUM | Compaction decorator over pruning; lifecycle hook notification seam | P5 |
+| `engine/tests.rs` | LOW | Contract tests with neutral agent/model fixtures; no application-specific engine ids | P5 |
+| filesize allowlist 22→21 | LOW | debt inventory shrink; 21 oversized files remain | P5 |
