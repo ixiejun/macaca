@@ -870,3 +870,12 @@
 - **Logging**: `tracing::debug`/`warn` on `A2AFormatter::to_a2a`/`from_a2a` and `FileCardResolver::resolve` with `target = "macaca_framework::a2a::{formatter,resolver}"` audit fields。
 - **GitNexus memo (non-blocking)**: iteration 106 LOW on `A2AFormatter::to_a2a` / `from_a2a` framework inter-agent message Adapter seam — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: filesize allowlist 6→0（P4 `macaca-framework` 剩余巨型文件，建议 `formatter.rs` 1354 行或 `mcp.rs` 1750 行）；6.3.2 archive；P5 终态验收。
+
+## Iteration 107 (2026-06-08)
+- **P4 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 6→**5**；`macaca-framework/formatter.rs` 1354→`formatter/` Facade + Strategy/Adapter 模块树（`formatter.rs` Facade + `error.rs` + `core.rs` + `openai_common.rs` + `openai.rs` + `dashscope.rs` + `anthropic.rs` + `tests/{openai_tests,dashscope_tests,anthropic_tests,edge_case_tests}.rs`）。
+- **Design patterns**: Facade module tree；Strategy（`Formatter` trait）；Adapter（`OpenAiFormatter` / `DashScopeFormatter` / `AnthropicFormatter` per-provider wire shapes）；shared `openai_common` DRY for OpenAI-compatible encode/decode。
+- **Contract tests**: `cargo check -p macaca-framework` OK；`cargo test -p macaca-framework formatter::` 36/36；`os_layer_file_size_gate` 1/1；production modules all ≤500 lines（max `anthropic.rs` ~230）。
+- **Public API**: `macaca_framework::formatter::{Formatter, FormatterError, OpenAiFormatter, DashScopeFormatter, AnthropicFormatter}` unchanged via Facade re-exports；`lib.rs` `pub mod formatter` unchanged。
+- **Logging**: `tracing::debug`/`warn` on `format`/`parse_response` entry points in `openai.rs`, `dashscope.rs`, `anthropic.rs` with `target = "macaca_framework::formatter::{openai,dashscope,anthropic}"` audit fields。
+- **GitNexus memo (non-blocking)**: iteration 107 LOW on `OpenAiFormatter::format` / `parse_response` framework LLM wire Adapter seam — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: filesize allowlist 5→0（P4 `macaca-framework` 剩余巨型文件，建议 `mcp.rs` 1750 行或 `memory.rs` 1303 行）；6.3.2 archive；P5 终态验收。

@@ -942,3 +942,13 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `A2AFormatter::from_a2a` | LOW | Adapter inbound conversion; validates tool_use/tool_result Data parts; consumed by pipeline and multi-agent paths | P4 |
 | `FileCardResolver::resolve` | LOW | Strategy filesystem discovery backend; extensible via `AgentCardResolver` trait | P4 |
 | filesize allowlist 7→6 | LOW | debt inventory shrink; 6 oversized P4 framework files remain | P4 |
+
+## Iteration 107 additions (§4.5.1 macaca-framework formatter Facade split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `formatter/{core,error,openai_common,openai,dashscope,anthropic,tests}.rs` | LOW | Framework LLM wire-format module tree; public API unchanged via Facade re-exports | P4 |
+| `OpenAiFormatter::format` / `parse_response` | LOW | OpenAI Chat Completions Adapter; consumed by `model_impls/openai`, `react_agent`, `memory` | P4 |
+| `DashScopeFormatter::parse_response` | LOW | OpenAI-compatible + native output Adapter; dual-path response decoding | P4 |
+| `AnthropicFormatter::format` / `parse_response` | LOW | Messages API Adapter; system-prompt extraction via `extract_system` | P4 |
+| filesize allowlist 6→5 | LOW | debt inventory shrink; 5 oversized P4 framework files remain | P4 |
