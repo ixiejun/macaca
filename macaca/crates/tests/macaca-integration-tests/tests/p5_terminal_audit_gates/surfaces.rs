@@ -39,7 +39,7 @@ pub fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> 
                 | "crates/foundation/macaca-proto/src/agent_execution_service.rs"
                 | "crates/foundation/macaca-proto/src/orchestration.rs"
                 | "crates/foundation/macaca-proto/src/types.rs"
-                | "crates/runtime/macaca-runtime-host/src/executor/app_executor.rs"
+                | "crates/runtime/macaca-runtime-host/src/executor/app_executor/mod.rs"
                 | "crates/runtime/macaca-runtime-host/src/executor/bus.rs"
                 | "crates/runtime/macaca-runtime-host/src/executor/callback.rs"
                 | "crates/runtime/macaca-runtime-host/src/executor/event_factory.rs"

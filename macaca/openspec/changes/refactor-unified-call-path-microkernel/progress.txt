@@ -621,3 +621,10 @@
 - **Contract tests**: `os_layer_file_size_gate` 1/1；`fork_manager` lib tests 2/2；`executor_runtime_eviction` 5/5；escape-hatch path allowlists 同步至 `fork_manager/mod.rs`。
 - **GitNexus memo (non-blocking)**: iteration 78 HIGH on `create_fork` / `resume_fork_by_task` / `merge_fork` fork-join orchestration + persistence restore path — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: filesize allowlist 34→0（`mcp_runtime.rs` / `app_executor.rs` / proto config/types 等）；6.3.2 archive；P5 终态验收。
+
+## Iteration 79 (2026-06-08)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 34→**33**；`app_executor.rs` 1401→模块树（`mod.rs` Facade + `types.rs` Value Object + `executor.rs` + `delegation.rs` Template Method + `queries.rs` + `health.rs` + `supervisor.rs` Supervisor + `worker_loop.rs` + `registry.rs` + `tests.rs` Contract Test 分区）。
+- **Design patterns**: Facade module tree；Supervisor（自动重启 + cooldown 重置）；Template Method（worker-command vs service-backed delegation）；Observer（broadcast executor events + hook forwarder）；Registry（`ApplicationExecutorRegistry`）；Memento（`KernelPersistencePort` queue/fork restore）；trace `info!`/`warn!`/`error!` on delegate/shutdown/supervisor/worker execution nodes。
+- **Contract tests**: `os_layer_file_size_gate` 1/1；`app_executor` lib tests 7/7；`executor_runtime_eviction` 5/5；escape-hatch path allowlists 同步至 `app_executor/mod.rs`。
+- **GitNexus memo (non-blocking)**: iteration 79 HIGH on `delegate_task` / `supervisor_loop` / `worker_loop` application execution orchestration + fork resume path — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: filesize allowlist 33→0（`mcp_runtime.rs` / proto config/types 等）；6.3.2 archive；P5 终态验收。

@@ -654,3 +654,14 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `ForkManager::merge_fork` | HIGH | Parent merge summary generation + terminal state transition + `ForkMerged` hook | P5 |
 | `ForkManager::restore_forks` | MEDIUM | Post-restart Memento replay via `KernelPersistencePort::list_keys` prefix scan | P5 |
 | filesize allowlist 35→34 | LOW | debt inventory shrink; 34 oversized files remain | P5 |
+
+## Iteration 79 additions (§4.5.1 app_executor Facade split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `app_executor/{mod,types,executor,delegation,queries,health,supervisor,worker_loop,registry,tests}.rs` | HIGH | Per-application execution sandbox: task delegation, worker supervisor, service-backed admission, fork resume; public API `ApplicationExecutor`/`ApplicationExecutorRegistry` unchanged via `executor/mod.rs` | P5 |
+| `ApplicationExecutor::delegate_task` | HIGH | Task admission → queue enqueue → worker command dispatch → lifecycle events | P5 |
+| `ApplicationExecutor::supervisor_loop` | HIGH | Worker spawn/restart with channel swap + cooldown reset + max restart enforcement | P5 |
+| `ApplicationExecutor::worker_loop` | HIGH | Command processing → `AgentRunner` invocation → result persistence → fork resume → SSE broadcast | P5 |
+| `ApplicationExecutor::begin_service_backed_delegation` | MEDIUM | Transitional service-path admission without worker command channel | P5 |
+| filesize allowlist 34→33 | LOW | debt inventory shrink; 33 oversized files remain | P5 |

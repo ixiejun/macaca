@@ -451,7 +451,7 @@ fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> bool
                     | "crates/facade/macaca-sdk/src/system_facade.rs"
                     | "crates/foundation/macaca-proto/src/orchestration.rs"
                     | "crates/foundation/macaca-proto/src/types.rs"
-                    | "crates/runtime/macaca-runtime-host/src/executor/app_executor.rs"
+                    | "crates/runtime/macaca-runtime-host/src/executor/app_executor/mod.rs"
                     | "crates/runtime/macaca-runtime-host/src/executor/bus.rs"
                     | "crates/runtime/macaca-runtime-host/src/executor/callback.rs"
                     | "crates/runtime/macaca-runtime-host/src/executor/event_factory.rs"
