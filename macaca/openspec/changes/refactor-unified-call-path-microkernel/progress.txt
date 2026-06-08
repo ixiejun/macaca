@@ -413,3 +413,11 @@
 - **Contract tests**: `serviceization_escape_hatches` 12/12；`autonomy_scheduler_heartbeat_services` 11/11；`p5_terminal_audit_gates` 3/3；`os_layer_file_size_gate` 1/1。
 - **GitNexus memo (non-blocking)**: iteration 49 MEDIUM on autonomy host adapter + lifecycle coordinator rename — recorded in `impact-memo.md`.
 - **Next**: 6.2.1 完全退役 `autonomy-service-boundary` family（proto 2 命中 → 删 migration surfaces + 硬断言）；`hardcoded-agent-role`（54）；`provider-model-routing-name`（121）；6.3.2 继续 archive；filesize allowlist 75→0。
+
+## Iteration 50 (2026-06-07)
+- **P5 §6.2.1 逃逸口 family 终态**: `autonomy-service-boundary` 完全退役（7th retired family）；删除 migration surfaces；`"service.scheduler"`/`"service.heartbeat"` 从 `forbidden_tokens` 移除（proto 独占）；`migration_debt_baseline` raw **177→175**（2 families remain：`hardcoded-agent-role` 54、`provider-model-routing-name` 121）。
+- **P5 退役 token 硬断言**: 新增 `autonomy_service_boundary_absent_in_production`（family 级）；`autonomy_service_id_literals_absent_outside_proto` 改为 `assert_production_literal_tokens_absent_outside_allowed_paths` 直接字面量扫描。
+- **Design patterns**: Strangler Fig（migration surface 删除 + debt baseline 收敛）；Specification by Example（family 级硬断言 + literal guard）；Registry（proto 独占 service id 常量）。
+- **Contract tests**: `serviceization_escape_hatches` 13/13；`autonomy_scheduler_heartbeat_services` 11/11；`p5_terminal_audit_gates` 3/3；`os_layer_file_size_gate` 1/1。
+- **GitNexus memo (non-blocking)**: iteration 50 LOW on autonomy-service-boundary family retirement — recorded in `impact-memo.md`。
+- **Next**: 6.2.1 下一 major family `hardcoded-agent-role`（54）；`provider-model-routing-name`（121）；6.3.2 继续 archive；filesize allowlist 75→0。

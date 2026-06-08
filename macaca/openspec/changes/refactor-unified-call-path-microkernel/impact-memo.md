@@ -405,3 +405,12 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `AutonomySupervisor` → `AutonomyLifecycleCoordinator` | MEDIUM | runtime-host autonomy_supervisor, autonomy_service_provider bundle wiring | P5 |
 | `"service.scheduler"` / `"service.heartbeat"` → proto constants | LOW | autonomy_dispatch, heartbeat_agent_dispatch metadata provenance | P5 |
 | `autonomy_host_adapters_absent_in_production` / `autonomy_supervisor_absent_in_production` / `autonomy_service_id_literals_absent_outside_proto` | LOW | hard asserts for retired autonomy-service-boundary tokens | P5 |
+
+## Iteration 50 additions (§6.2.1 autonomy-service-boundary family retirement — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `autonomy-service-boundary` migration surfaces removal | LOW | freeze gate fails on any reintroduction of legacy autonomy composition symbols | P5 |
+| `"service.scheduler"` / `"service.heartbeat"` removed from `forbidden_tokens` | LOW | proto owns canonical constants; literal guard via `assert_production_literal_tokens_absent_outside_allowed_paths` | P5 |
+| `autonomy_service_boundary_absent_in_production` family hard assert | LOW | terminal Strangler Fig state for 7th retired escape-hatch family | P5 |
+| `migration_debt_baseline` raw 177→175 | LOW | debt inventory baseline only; no production runtime behavior change | P5 |

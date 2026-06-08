@@ -225,8 +225,11 @@ fn forbidden_tokens() -> Vec<ForbiddenToken> {
         ForbiddenToken {
             family: "autonomy-service-boundary",
             token: "AutonomySupervisor",
-            rationale: "autonomy loops must remain lifecycle-managed runtime-host infrastructure",
+            rationale: "autonomy loops must remain lifecycle-managed runtime-host infrastructure (retired name; use AutonomyLifecycleCoordinator)",
         },
+        // Service id string literals (`"service.scheduler"` / `"service.heartbeat"`) were
+        // removed from this family in iteration 50. Proto owns canonical constants;
+        // growth outside proto is guarded by `autonomy_service_id_literals_absent_outside_proto`.
         ForbiddenToken {
             family: "autonomy-loop-boundary",
             token: "run_scheduler_tick_once",
@@ -241,16 +244,6 @@ fn forbidden_tokens() -> Vec<ForbiddenToken> {
             family: "autonomy-loop-boundary",
             token: "run_recovery_wake_once",
             rationale: "recovery wake loops must be owned by runtime-host autonomy supervisor",
-        },
-        ForbiddenToken {
-            family: "autonomy-service-boundary",
-            token: "\"service.scheduler\"",
-            rationale: "scheduler service ids must flow through protocol DTOs, SDK clients, or runtime-host service registration",
-        },
-        ForbiddenToken {
-            family: "autonomy-service-boundary",
-            token: "\"service.heartbeat\"",
-            rationale: "heartbeat service ids must flow through protocol DTOs, SDK clients, or runtime-host service registration",
         },
         // P0 freeze: provider-compat and legacy execution adapters (tasks 1.1.1).
         ForbiddenToken {
@@ -499,19 +492,7 @@ fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> bool
                 || relative.starts_with("crates/shells/macaca-cli/"))
                 || relative.starts_with("crates/services/macaca-llm/src/")
         }
-        "autonomy-service-boundary" => {
-            relative.starts_with("crates/foundation/macaca-proto/src/")
-                || relative.starts_with("crates/services/macaca-scheduler/src/")
-                || relative.starts_with("crates/services/macaca-heartbeat/src/")
-                || relative == "crates/runtime/macaca-runtime-host/src/autonomy_dispatch.rs"
-                || relative == "crates/runtime/macaca-runtime-host/src/autonomy_runtime_config.rs"
-                || relative == "crates/runtime/macaca-runtime-host/src/autonomy_service_provider.rs"
-                || relative == "crates/runtime/macaca-runtime-host/src/autonomy_supervisor.rs"
-                || relative
-                    .starts_with("crates/runtime/macaca-runtime-host/src/autonomy_supervisor/")
-                || relative == "crates/runtime/macaca-runtime-host/src/lib.rs"
-                || relative.starts_with("crates/facade/macaca-sdk/src/")
-        }
+        // `autonomy-service-boundary` family retired in iteration 50 — no migration surfaces remain.
         // `autonomy-loop-boundary` family retired in iteration 44 — no migration surfaces remain.
         // `provider-compat-construction` family retired in iteration 47 — no migration surfaces remain.
         // `direct-runtime-catalog-read` family retired in iteration 46 — no migration surfaces remain.
@@ -735,6 +716,63 @@ fn assert_retired_escape_hatch_tokens_absent_in_production(tokens: &[&str]) {
     assert_retired_escape_hatch_tokens_absent_in_production_with_allowed_paths(tokens, &[]);
 }
 
+/// Scans production Rust sources for exact substring literals outside approved
+/// path prefixes.
+///
+/// Used when retired literals are no longer listed in [`forbidden_tokens`] (e.g.
+/// service id strings owned exclusively by proto constants) but must still be
+/// prevented from reappearing in dispatch/runtime layers.
+fn assert_production_literal_tokens_absent_outside_allowed_paths(
+    literals: &[&str],
+    allowed_path_prefixes: &[&str],
+) {
+    let root = workspace_root();
+    let crates_root = root.join("crates");
+    let mut files = Vec::new();
+    collect_rust_files(&crates_root, &mut files);
+
+    let mut hits = Vec::new();
+    for file in &files {
+        let relative = file
+            .strip_prefix(&root)
+            .expect("scanned file should be under workspace root")
+            .to_string_lossy()
+            .replace('\\', "/");
+        if is_non_production_rust_source(&relative) {
+            continue;
+        }
+        if allowed_path_prefixes
+            .iter()
+            .any(|prefix| relative.starts_with(prefix))
+        {
+            continue;
+        }
+        let content = std::fs::read_to_string(file)
+            .unwrap_or_else(|error| panic!("failed to read {}: {error}", file.display()));
+        for (index, line) in content.lines().enumerate() {
+            for literal in literals {
+                if line.contains(literal) {
+                    hits.push(format!(
+                        "\nfamily=literal-guard\nfile={}:{}\ntoken={}\n",
+                        relative,
+                        index + 1,
+                        literal
+                    ));
+                }
+            }
+        }
+    }
+    hits.sort();
+
+    assert!(
+        hits.is_empty(),
+        "Production literal tokens {:?} must be absent outside {:?}:{}",
+        literals,
+        allowed_path_prefixes,
+        hits.join("")
+    );
+}
+
 /// Like [`assert_retired_escape_hatch_tokens_absent_in_production`], but permits
 /// literal hits under approved path prefixes (e.g. proto constant definitions).
 fn assert_retired_escape_hatch_tokens_absent_in_production_with_allowed_paths(
@@ -785,6 +823,10 @@ fn assert_retired_escape_hatch_tokens_absent_in_production_with_allowed_paths(
     );
 }
 
+/// Assert every forbidden token in a retired family is absent from production code.
+///
+/// Retired families keep token definitions for freeze-mode growth detection, but
+/// production `src/` must not contain legacy literals even when migration surfaces
 /// were removed — otherwise debt would silently reappear outside runtime-host ownership.
 fn assert_retired_escape_hatch_family_absent_in_production(family: &str) {
     let retired_tokens = forbidden_tokens()
@@ -879,10 +921,21 @@ fn serviceization_escape_hatches_autonomy_supervisor_absent_in_production() {
 fn serviceization_escape_hatches_autonomy_service_id_literals_absent_outside_proto() {
     // Proto owns the canonical service id string constants; all other production
     // callers must reference SCHEDULER_SERVICE_ID / HEARTBEAT_SERVICE_ID instead.
-    assert_retired_escape_hatch_tokens_absent_in_production_with_allowed_paths(
+    // These literals were removed from `forbidden_tokens` in iteration 50, so the
+    // guard uses direct literal scanning instead of the retired-token helper.
+    assert_production_literal_tokens_absent_outside_allowed_paths(
         &["\"service.scheduler\"", "\"service.heartbeat\""],
         &["crates/foundation/macaca-proto/src/"],
     );
+}
+
+/// Terminal state for `autonomy-service-boundary` (iteration 50): all legacy
+/// autonomy composition symbols and service id literals are retired; production
+/// must use `Host*ServiceAdapter`, `InProcess*Provider`, `AutonomyLifecycleCoordinator`,
+/// and proto `*_SERVICE_ID` constants only.
+#[test]
+fn serviceization_escape_hatches_autonomy_service_boundary_absent_in_production() {
+    assert_retired_escape_hatch_family_absent_in_production("autonomy-service-boundary");
 }
 
 #[test]
