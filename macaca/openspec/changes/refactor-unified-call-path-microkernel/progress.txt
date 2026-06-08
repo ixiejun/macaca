@@ -607,3 +607,10 @@
 - **Contract tests**: `os_layer_file_size_gate` 1/1；`autonomy_scheduler_heartbeat_services` 11/11。
 - **GitNexus memo (non-blocking)**: iteration 76 HIGH on `bootstrap_autonomy_local_services` supervisor start + recovery wake + `HostSchedulerServiceAdapter::call` command router path — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: filesize allowlist 36→0（`mcp_runtime.rs` / `app_executor.rs` / `heartbeat_agent_dispatch.rs` / proto config/types 等）；6.3.2 archive；P5 终态验收。
+
+## Iteration 77 (2026-06-08)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 36→**35**；`heartbeat_agent_dispatch.rs` 1023→模块树（`mod.rs` Facade + `summary.rs` Value Object + `support.rs` Specification helpers + `strategy.rs` Strategy/Observer + `tests/{fixtures,contract_tests}.rs` Contract Test 分区）。
+- **Design patterns**: Facade module tree；Value Object（`HeartbeatAgentDispatchSummary`）；Strategy（`HeartbeatAgentDispatchStrategy`）；Observer（`record_completion` → Heartbeat service Memento）；Specification（`declaration_matches_wake` + evidence gate）；Memento（manifest declaration query via Application Service）；trace `info!`/`warn!` on declaration query / dispatch / evidence verification / completion nodes。
+- **Contract tests**: `os_layer_file_size_gate` 1/1；`heartbeat_agent_dispatch` lib tests 7/7。
+- **GitNexus memo (non-blocking)**: iteration 77 HIGH on `dispatch_after_accepted_wake` / `dispatch_agent` manifest-driven heartbeat → agent execution syscall + evidence gate path — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: filesize allowlist 35→0（`mcp_runtime.rs` / `app_executor.rs` / `fork_manager.rs` / proto config/types 等）；6.3.2 archive；P5 终态验收。

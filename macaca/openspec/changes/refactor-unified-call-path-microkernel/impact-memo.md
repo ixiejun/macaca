@@ -624,3 +624,22 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `dispatch_agent_execution` | HIGH | Scheduled agent task payload resolution → `service.agent_execution` invocation → `AgentExecutionEvidenceGate` evaluation | P5 |
 | `resolve_scheduled_agent_payload` | HIGH | `service.scheduled_agent_task` Memento boundary; Scheduler never reads raw prompts | P5 |
 | filesize allowlist 38→37 | LOW | debt inventory shrink; 37 oversized files remain | P5 |
+
+## Iteration 76 additions (§4.5.1 autonomy_service_provider Facade split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `autonomy_service_provider/{mod,support,scheduler_adapter,scheduled_agent_task_adapter,heartbeat_adapter,bootstrap}.rs` | HIGH | Autonomy composition-root bootstrap + Scheduler/Heartbeat/ScheduledAgentTask `SystemService` adapters; public API unchanged via `runtime_host_public_api.rs` | P5 |
+| `bootstrap_autonomy_local_services` | HIGH | Local provider construction + supervisor start + optional recovery wake dispatch | P5 |
+| `HostSchedulerServiceAdapter::call` | HIGH | Scheduler command router across register/update/pause/resume/trigger/query syscall surface | P5 |
+| filesize allowlist 37→36 | LOW | debt inventory shrink; 36 oversized files remain | P5 |
+
+## Iteration 77 additions (§4.5.1 heartbeat_agent_dispatch Facade split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `heartbeat_agent_dispatch/{mod,summary,support,strategy,tests}.rs` | HIGH | Manifest-declared heartbeat wake → Application Service declaration query → Agent Execution syscall + evidence gate; public API `HeartbeatAgentDispatchSummary`/`HeartbeatAgentDispatchStrategy` unchanged via `heartbeat_lane.rs` | P5 |
+| `dispatch_after_accepted_wake` | HIGH | Accepted wake orchestration: declaration filter, enablement/diagnostic skip, bounded dispatch loop | P5 |
+| `dispatch_agent` | HIGH | Skill alias resolution + autonomous execution envelope compile + `service.agent_execution` call + `AgentExecutionEvidenceGate` | P5 |
+| `record_completion` | MEDIUM | Observer callback through `service.heartbeat` for terminal dispatch memento | P5 |
+| filesize allowlist 36→35 | LOW | debt inventory shrink; 35 oversized files remain | P5 |
