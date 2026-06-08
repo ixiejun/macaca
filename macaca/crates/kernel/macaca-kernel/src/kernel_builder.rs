@@ -75,7 +75,7 @@ impl KernelBuilder {
 mod tests {
     use super::*;
     use async_trait::async_trait;
-    use macaca_agent::{LegacyAgentExecutionAdapter, LlmProvider, ToolCatalog};
+    use macaca_agent::{InProcessAgentExecutionPort, LlmProvider, ToolCatalog};
     use macaca_proto::{LlmMessage, LlmOptions, LlmResponse, MacacaResult, TokenUsage};
     use macaca_tools::DefaultToolSet;
 
@@ -115,7 +115,7 @@ mod tests {
             agent_timeout_ms: 30000,
         };
         let llm: Arc<dyn LlmProvider> = Arc::new(MockLlm);
-        let execution_port: Arc<dyn AgentExecutionPort> = Arc::new(LegacyAgentExecutionAdapter::new(
+        let execution_port: Arc<dyn AgentExecutionPort> = Arc::new(InProcessAgentExecutionPort::new(
             llm,
             Arc::from(Box::new(DefaultToolSet::new()) as Box<dyn ToolCatalog>),
         ));

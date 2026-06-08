@@ -427,7 +427,7 @@ mod tests {
     use std::sync::Arc;
 
     use async_trait::async_trait;
-    use macaca_agent::{AgentExecutionPort, LegacyAgentExecutionAdapter, ToolCatalog};
+    use macaca_agent::{AgentExecutionPort, InProcessAgentExecutionPort, ToolCatalog};
     use macaca_kernel::KernelBuilder;
     use macaca_llm::LlmProvider;
     use macaca_proto::config::KernelConfig;
@@ -473,7 +473,7 @@ mod tests {
             agent_timeout_ms: 1000,
         };
         let execution_port: Arc<dyn AgentExecutionPort> =
-            Arc::new(LegacyAgentExecutionAdapter::new(
+            Arc::new(InProcessAgentExecutionPort::new(
                 Arc::clone(&llm),
                 Arc::from(Box::new(DefaultToolSet::new()) as Box<dyn ToolCatalog>),
             ));

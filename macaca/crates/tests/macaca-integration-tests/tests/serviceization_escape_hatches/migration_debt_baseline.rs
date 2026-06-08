@@ -9,16 +9,15 @@
 //! removal or a new frozen debt row. Regenerate family counts with:
 //! `cargo test -p macaca-integration-tests dump_escape_hatch_raw_fingerprints -- --ignored --nocapture`
 
-/// Total raw hits when migration surfaces are not honored (iteration 46 snapshot).
+/// Total raw hits when migration surfaces are not honored (iteration 47 snapshot).
 ///
-/// `direct-runtime-catalog-read` retired (−12): driver/MCP catalog reads renamed to
-/// provider-neutral `snapshot_tool_catalog` / `snapshot_server_definitions` APIs.
-pub const EXPECTED_RAW_VIOLATION_COUNT: usize = 247;
+/// `provider-compat-construction` retired (−7): `LegacyAgentExecutionAdapter` renamed to
+/// provider-neutral `InProcessAgentExecutionPort` / `InProcessAgentSideRegistry`.
+pub const EXPECTED_RAW_VIOLATION_COUNT: usize = 240;
 
 /// Per-family raw hit counts — detects debt shifting between token families.
 pub const EXPECTED_RAW_VIOLATION_BY_FAMILY: &[(&str, usize)] = &[
     ("autonomy-service-boundary", 65),
     ("hardcoded-agent-role", 54),
-    ("provider-compat-construction", 7),
     ("provider-model-routing-name", 121),
 ];

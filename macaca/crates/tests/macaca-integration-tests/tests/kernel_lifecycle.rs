@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use macaca_agent::{LegacyAgentExecutionAdapter, LegacyAgentSideRegistry, ToolCatalog};
+use macaca_agent::{InProcessAgentExecutionPort, InProcessAgentSideRegistry, ToolCatalog};
 use macaca_kernel::{Kernel, KernelBuilder};
 use macaca_proto::AgentExecutionPort;
 use macaca_llm::LlmProvider;
@@ -15,7 +15,7 @@ use macaca_proto::{
     TokenUsage,
 };
 use macaca_sdk::{
-    register_legacy_kernel_agent, AgentBuilder, AgentConfig, DeclarativeAgent, MacacaSdk,
+    register_in_process_kernel_agent, AgentBuilder, AgentConfig, DeclarativeAgent, MacacaSdk,
 };
 use macaca_tools::DefaultToolSet;
 
@@ -57,15 +57,15 @@ impl LlmProvider for MockLlm {
 /// Builds a kernel with legacy in-process execution and returns the paired side registry.
 ///
 /// Manifest-only kernel registration stores identity metadata; runtime [`Agent`] instances
-/// live in [`LegacyAgentSideRegistry`] and are resolved by [`LegacyAgentExecutionAdapter`].
-fn make_kernel() -> (Kernel, Arc<LegacyAgentSideRegistry>) {
+/// live in [`InProcessAgentSideRegistry`] and are resolved by [`InProcessAgentExecutionPort`].
+fn make_kernel() -> (Kernel, Arc<InProcessAgentSideRegistry>) {
     let config = KernelConfig {
         max_agents: 16,
         heartbeat_interval_ms: 5000,
         agent_timeout_ms: 30000,
     };
     let llm: Arc<dyn LlmProvider> = Arc::new(MockLlm);
-    let adapter = LegacyAgentExecutionAdapter::new(
+    let adapter = InProcessAgentExecutionPort::new(
         llm,
         Arc::from(Box::new(DefaultToolSet::new()) as Box<dyn ToolCatalog>),
     );
@@ -112,7 +112,7 @@ async fn declarative_agent_full_lifecycle() {
     let agent_id = manifest.id;
 
     // Register manifest in kernel and runtime agent in the legacy side registry.
-    register_legacy_kernel_agent(&kernel, side_registry.as_ref(), Box::new(agent), manifest)
+    register_in_process_kernel_agent(&kernel, side_registry.as_ref(), Box::new(agent), manifest)
         .await
         .unwrap();
     assert_eq!(kernel.agent_count().await, 1);
@@ -143,7 +143,7 @@ async fn register_multiple_agents() {
         let config = sample_agent_config(&format!("agent-{i}"));
         let (agent, manifest) = build_declarative_agent(config);
         let id = manifest.id;
-        register_legacy_kernel_agent(&kernel, side_registry.as_ref(), Box::new(agent), manifest)
+        register_in_process_kernel_agent(&kernel, side_registry.as_ref(), Box::new(agent), manifest)
             .await
             .unwrap();
         ids.push(id);
@@ -185,7 +185,7 @@ async fn sdk_facade_register_config_end_to_end() {
     let (kernel, side_registry) = make_kernel();
     let config = sample_agent_config("sdk-agent");
 
-    let id = MacacaSdk::for_kernel_with_legacy(&kernel, side_registry.as_ref())
+    let id = MacacaSdk::for_kernel_with_in_process(&kernel, side_registry.as_ref())
         .register_config(config)
         .await
         .unwrap();

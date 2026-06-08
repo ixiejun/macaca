@@ -389,3 +389,11 @@
 - **Contract tests**: `serviceization_escape_hatches` 7/7；`p5_terminal_audit_gates` 3/3；`os_layer_file_size_gate` 1/1。
 - **GitNexus memo (non-blocking)**: iteration 46 MEDIUM on driver/MCP catalog snapshot rename — recorded in `impact-memo.md`.
 - **Next**: 6.2.1 下一小族 `autonomy-service-boundary`（65）分阶段；`provider-compat-construction`（7）；6.3.2 继续 archive；filesize allowlist 75→0。
+
+## Iteration 47 (2026-06-07)
+- **P5 §6.2.1 逃逸口 family 退役**: `provider-compat-construction` family 完全退役（7→0）；`LegacyAgentExecutionAdapter`/`LegacyAgentSideRegistry` 重命名为 provider-neutral `InProcessAgentExecutionPort`/`InProcessAgentSideRegistry`；拆至 `in_process_execution.rs`；SDK `register_in_process_kernel_agent` + `for_kernel_with_in_process`；删除 migration surface 豁免；`migration_debt_baseline` raw **247→240**（3 families remain）。
+- **P5 退役族硬断言**: 新增 `provider_compat_construction_absent_in_production` 契约测试。
+- **Design patterns**: Adapter + Hexagonal Port（in-process vs service-client execution）；Strangler Fig（forbidden-token 退役）；Dual Registry（manifest + side registry for tests）。
+- **Contract tests**: `serviceization_escape_hatches` 8/8；`p5_terminal_audit_gates` 3/3；`os_layer_file_size_gate` 1/1。
+- **GitNexus memo (non-blocking)**: iteration 47 MEDIUM on `LegacyAgentExecutionAdapter` rename — recorded in `impact-memo.md`.
+- **Next**: 6.2.1 下一小族 `autonomy-service-boundary`（65）分阶段；6.3.2 继续 archive；filesize allowlist 75→0。

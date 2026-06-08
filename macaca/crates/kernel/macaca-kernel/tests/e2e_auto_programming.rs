@@ -12,13 +12,13 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use macaca_agent::LlmProvider;
-use macaca_agent::{AgentExecutionPort, LegacyAgentExecutionAdapter, LegacyAgentSideRegistry, ToolCatalog};
+use macaca_agent::{AgentExecutionPort, InProcessAgentExecutionPort, InProcessAgentSideRegistry, ToolCatalog};
 use macaca_kernel::{Kernel, KernelBuilder};
 use macaca_proto::config::KernelConfig;
 use macaca_proto::{
     AgentManifest, LlmMessage, LlmOptions, LlmResponse, LlmRole, MacacaResult, TokenUsage,
 };
-use macaca_sdk::{register_legacy_kernel_agent, AgentBuilder, AgentConfig, DeclarativeAgent};
+use macaca_sdk::{register_in_process_kernel_agent, AgentBuilder, AgentConfig, DeclarativeAgent};
 use macaca_tools::DefaultToolSet;
 
 // ── Mock LLM for AC1 Auto-Programming ────────────────────────────────────────
@@ -112,14 +112,14 @@ Recommended approach: Single-file Rust HTTP server"#;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-fn make_kernel() -> (Kernel, Arc<LegacyAgentSideRegistry>) {
+fn make_kernel() -> (Kernel, Arc<InProcessAgentSideRegistry>) {
     let config = KernelConfig {
         max_agents: 16,
         heartbeat_interval_ms: 5000,
         agent_timeout_ms: 30000,
     };
     let llm: Arc<dyn LlmProvider> = Arc::new(AutoProgrammingLlm);
-    let adapter = LegacyAgentExecutionAdapter::new(
+    let adapter = InProcessAgentExecutionPort::new(
         llm,
         Arc::from(Box::new(DefaultToolSet::new()) as Box<dyn ToolCatalog>),
     );
@@ -131,11 +131,11 @@ fn make_kernel() -> (Kernel, Arc<LegacyAgentSideRegistry>) {
 
 async fn register_declarative_agent(
     kernel: &Kernel,
-    side_registry: &LegacyAgentSideRegistry,
+    side_registry: &InProcessAgentSideRegistry,
     agent: DeclarativeAgent,
     manifest: AgentManifest,
 ) -> macaca_proto::AgentId {
-    register_legacy_kernel_agent(kernel, side_registry, Box::new(agent), manifest)
+    register_in_process_kernel_agent(kernel, side_registry, Box::new(agent), manifest)
         .await
         .expect("register declarative agent")
 }

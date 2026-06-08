@@ -187,7 +187,7 @@ mod tests {
     use async_trait::async_trait;
     use chrono::Utc;
     use macaca_agent::{
-        Agent, AgentServices, LegacyAgentExecutionAdapter, LlmProvider, ToolCatalog,
+        Agent, AgentServices, InProcessAgentExecutionPort, LlmProvider, ToolCatalog,
     };
     use macaca_proto::{
         AgentState, Capability, LlmMessage, LlmOptions, LlmResponse, Permission, PermissionLevel,
@@ -252,14 +252,14 @@ mod tests {
         }
     }
 
-    fn make_kernel() -> (Kernel, Arc<macaca_agent::LegacyAgentSideRegistry>) {
+    fn make_kernel() -> (Kernel, Arc<macaca_agent::InProcessAgentSideRegistry>) {
         let config = KernelConfig {
             max_agents: 16,
             heartbeat_interval_ms: 5000,
             agent_timeout_ms: 30000,
         };
         let llm: Arc<dyn LlmProvider> = Arc::new(MockLlm);
-        let adapter = LegacyAgentExecutionAdapter::new(
+        let adapter = InProcessAgentExecutionPort::new(
             llm,
             Arc::from(Box::new(macaca_tools::DefaultToolSet::new()) as Box<dyn ToolCatalog>),
         );

@@ -377,3 +377,12 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `snapshot_tool_catalog` / `DriverRegistry` / `DriverRuntime` | MEDIUM | replaces `collect_tools()` in driver service provider catalog assembly; shells already use `SystemDriverClient` | P2/P5 |
 | `snapshot_server_definitions` / `McpRuntimeFacade` / `McpRuntimeManager` | MEDIUM | replaces `.definitions().await` in MCP service provider snapshot path; shells use `SystemMcpClient` | P2/P5 |
 | `direct-runtime-catalog-read` migration surfaces removal | LOW | freeze gate fails on any new direct runtime catalog reads in production | P5 |
+
+## Iteration 47 additions (§6.2.1 provider-compat-construction retirement — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `LegacyAgentExecutionAdapter` → `InProcessAgentExecutionPort` | MEDIUM | macaca-agent, SDK facade/registry, kernel/integration test fixtures; production uses `ServiceClientAgentExecutionAdapter` | P2.5/P5 |
+| `LegacyAgentSideRegistry` → `InProcessAgentSideRegistry` | MEDIUM | dual manifest + runtime registration in SDK/kernel tests | P2.5/P5 |
+| `register_legacy_kernel_agent` → `register_in_process_kernel_agent` | LOW | kernel_lifecycle, e2e_auto_programming, live_fullstack_autodev tests | P5 |
+| `provider-compat-construction` migration surfaces removal | LOW | freeze gate fails on any reintroduction of forbidden provider-compat tokens | P5 |

@@ -18,15 +18,7 @@ pub fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> 
     match token.family {
         // `application-runtime-direct-start` family retired in iteration 43 — no migration surfaces remain.
         // `web-direct-runtime-field` family retired in iteration 45 — no migration surfaces remain.
-        "provider-compat-construction" => {
-            relative == "crates/application/macaca-agent/src/execution.rs"
-                || relative == "crates/application/macaca-agent/src/lib.rs"
-                || relative == "crates/application/macaca-app/src/runtime.rs"
-                || relative == "crates/application/macaca-app/src/workflow.rs"
-                || relative == "crates/facade/macaca-sdk/src/facade.rs"
-                || relative == "crates/facade/macaca-sdk/src/registry_api.rs"
-                || relative == "crates/facade/macaca-sdk/src/legacy_kernel_registration.rs"
-        }
+        // `provider-compat-construction` family retired in iteration 47 — no migration surfaces remain.
         // `direct-runtime-catalog-read` family retired in iteration 46 — no migration surfaces remain.
         "shell-semantic-execution-owner" => {
             // Approved construction adapter — sole shell entry for FrameworkRunner builds

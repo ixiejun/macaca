@@ -9,13 +9,13 @@
 use std::sync::Arc;
 
 use macaca_app::loader::AppLoader;
-use macaca_agent::{LegacyAgentExecutionAdapter, LegacyAgentSideRegistry, ToolCatalog};
+use macaca_agent::{InProcessAgentExecutionPort, InProcessAgentSideRegistry, ToolCatalog};
 use macaca_kernel::{Kernel, KernelBuilder};
 use macaca_proto::AgentExecutionPort;
 use macaca_llm::{DashScopeProvider, LlmProvider};
 use macaca_proto::config::KernelConfig;
 use macaca_proto::LlmOptions;
-use macaca_sdk::{register_legacy_kernel_agent, AgentBuilder, AgentPersona};
+use macaca_sdk::{register_in_process_kernel_agent, AgentBuilder, AgentPersona};
 use macaca_skill::SkillCatalog;
 use macaca_tools::DefaultToolSet;
 
@@ -35,14 +35,14 @@ fn dashscope_api_key() -> String {
 }
 
 /// Kernel + legacy side registry for live LLM execution through in-process adapters.
-fn make_kernel_with_dashscope() -> (Kernel, Arc<LegacyAgentSideRegistry>) {
+fn make_kernel_with_dashscope() -> (Kernel, Arc<InProcessAgentSideRegistry>) {
     let config = KernelConfig {
         max_agents: 64,
         heartbeat_interval_ms: 5000,
         agent_timeout_ms: 60000,
     };
     let llm: Arc<dyn LlmProvider> = Arc::new(DashScopeProvider::new(dashscope_api_key()));
-    let adapter = LegacyAgentExecutionAdapter::new(
+    let adapter = InProcessAgentExecutionPort::new(
         llm,
         Arc::from(Box::new(DefaultToolSet::new()) as Box<dyn ToolCatalog>),
     );
@@ -216,7 +216,7 @@ permission_level: system
     let agent = spec.into_agent();
 
     let agent_id = manifest.id;
-    register_legacy_kernel_agent(&kernel, side_registry.as_ref(), Box::new(agent), manifest)
+    register_in_process_kernel_agent(&kernel, side_registry.as_ref(), Box::new(agent), manifest)
         .await
         .unwrap();
 

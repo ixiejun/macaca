@@ -21,7 +21,7 @@ pub mod entitlement_client;
 pub mod evm_client;
 pub mod facade;
 pub mod heartbeat_client;
-pub mod legacy_kernel_registration;
+pub mod in_process_kernel_registration;
 pub mod interaction_client;
 pub mod llm_client;
 pub mod mcp_client;
@@ -98,7 +98,7 @@ pub use entitlement_client::{
 };
 pub use evm_client::{ServiceBackedEvmClient, SystemEvmClient, UnavailableSystemEvmClient};
 pub use facade::{AgentRegistryApi, KernelAgentRegistry, KernelPrimitiveSdk, MacacaSdk};
-pub use legacy_kernel_registration::register_legacy_kernel_agent;
+pub use in_process_kernel_registration::register_in_process_kernel_agent;
 pub use heartbeat_client::{
     ServiceBackedHeartbeatClient, SystemHeartbeatClient, UnavailableSystemHeartbeatClient,
 };

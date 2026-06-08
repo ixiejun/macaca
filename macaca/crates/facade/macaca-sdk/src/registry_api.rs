@@ -32,7 +32,7 @@ mod tests {
     use std::sync::Arc;
 
     use async_trait::async_trait;
-    use macaca_agent::{AgentExecutionPort, LegacyAgentExecutionAdapter, ToolCatalog};
+    use macaca_agent::{AgentExecutionPort, InProcessAgentExecutionPort, ToolCatalog};
     use macaca_kernel::KernelBuilder;
     use macaca_llm::LlmProvider;
     use macaca_proto::config::KernelConfig;
@@ -74,7 +74,7 @@ mod tests {
         };
         let llm: Arc<dyn LlmProvider> = Arc::new(MockLlm);
         let execution_port: Arc<dyn AgentExecutionPort> =
-            Arc::new(LegacyAgentExecutionAdapter::new(
+            Arc::new(InProcessAgentExecutionPort::new(
                 llm,
                 Arc::from(Box::new(DefaultToolSet::new()) as Box<dyn ToolCatalog>),
             ));

@@ -1,11 +1,12 @@
-//! Provider-neutral execution port adapters for registered agents.
+//! Service-client execution port adapters for registered agents.
 //!
 //! The [`AgentExecutionPort`] trait lives in [`macaca_proto`] so the kernel depends
-//! only on foundation contracts. This module keeps the legacy `Agent::run(llm, tools,
-//! services)` ABI and service-client dispatch outside the microkernel.
+//! only on foundation contracts. Production wiring uses [`ServiceClientAgentExecutionAdapter`]
+//! to dispatch typed commands through `service.agent_execution`.
+//!
+//! For in-process test fixtures see [`crate::InProcessAgentExecutionPort`].
 
-use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use macaca_proto::{
@@ -13,45 +14,6 @@ use macaca_proto::{
     AgentExecutionStatus, AgentId, AgentOutput, ApplicationId, MacacaError, MacacaResult,
     TokenUsage, TraceContext,
 };
-
-use crate::{Agent, AgentServices, LlmProvider, ToolCatalog};
-
-/// Side registry holding runtime [`Agent`] instances for legacy in-process execution.
-///
-/// The kernel registry stores manifests only (identity + metadata). This companion
-/// registry maps `agent_id` → `Arc<dyn Agent>` so [`LegacyAgentExecutionAdapter`] can
-/// resolve runtime objects without the kernel depending on application-agent types.
-#[derive(Default)]
-pub struct LegacyAgentSideRegistry {
-    agents: RwLock<HashMap<AgentId, Arc<dyn Agent>>>,
-}
-
-impl LegacyAgentSideRegistry {
-    /// Creates an empty side registry.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Registers a runtime agent instance keyed by its stable id.
-    pub fn register_runtime_agent(&self, agent: Arc<dyn Agent>) -> MacacaResult<()> {
-        let agent_id = agent.id();
-        let mut agents = self
-            .agents
-            .write()
-            .map_err(|_| MacacaError::Agent("legacy agent side registry lock poisoned".into()))?;
-        agents.insert(agent_id, agent);
-        tracing::info!(agent_id = %agent_id.0, "legacy runtime agent registered in side registry");
-        Ok(())
-    }
-
-    /// Resolves a runtime agent by id.
-    pub fn get_runtime_agent(&self, agent_id: &AgentId) -> Option<Arc<dyn Agent>> {
-        self.agents
-            .read()
-            .ok()
-            .and_then(|agents| agents.get(agent_id).cloned())
-    }
-}
 
 /// Provider-neutral port for dispatching typed commands to `service.agent_execution`.
 ///
@@ -65,87 +27,6 @@ pub trait AgentExecutionDispatch: Send + Sync {
         &self,
         command: AgentExecutionCommand,
     ) -> MacacaResult<AgentExecutionResult>;
-}
-
-/// Legacy adapter bridging kernel manifest registry to `Agent::run`.
-///
-/// Adapter pattern: provider handles (LLM/tools) and runtime agent instances live
-/// outside the kernel; execution resolves agents from [`LegacyAgentSideRegistry`].
-pub struct LegacyAgentExecutionAdapter {
-    llm: Arc<dyn LlmProvider>,
-    tools: Arc<dyn ToolCatalog>,
-    side_registry: Arc<LegacyAgentSideRegistry>,
-}
-
-impl LegacyAgentExecutionAdapter {
-    /// Shared side registry used by default bootstrap/test wiring.
-    pub fn runtime_registry() -> Arc<LegacyAgentSideRegistry> {
-        static REGISTRY: std::sync::OnceLock<Arc<LegacyAgentSideRegistry>> =
-            std::sync::OnceLock::new();
-        REGISTRY
-            .get_or_init(|| Arc::new(LegacyAgentSideRegistry::new()))
-            .clone()
-    }
-
-    /// Creates an adapter using the shared runtime side registry.
-    pub fn new(llm: Arc<dyn LlmProvider>, tools: Arc<dyn ToolCatalog>) -> Self {
-        Self::new_with_registry(llm, tools, Self::runtime_registry())
-    }
-
-    /// Creates an adapter bound to an explicit side registry (tests / composition roots).
-    pub fn new_with_registry(
-        llm: Arc<dyn LlmProvider>,
-        tools: Arc<dyn ToolCatalog>,
-        side_registry: Arc<LegacyAgentSideRegistry>,
-    ) -> Self {
-        tracing::info!(
-            llm_provider = %llm.name(),
-            "legacy agent execution adapter created"
-        );
-        Self {
-            llm,
-            tools,
-            side_registry,
-        }
-    }
-
-    /// Returns the side registry used by this adapter.
-    pub fn side_registry(&self) -> Arc<LegacyAgentSideRegistry> {
-        Arc::clone(&self.side_registry)
-    }
-}
-
-#[async_trait]
-impl AgentExecutionPort for LegacyAgentExecutionAdapter {
-    async fn execute_registered_agent(&self, agent_id: &AgentId) -> MacacaResult<AgentOutput> {
-        tracing::info!(
-            agent_id = %agent_id.0,
-            llm_provider = %self.llm.name(),
-            "legacy agent execution adapter started"
-        );
-        let agent = self
-            .side_registry
-            .get_runtime_agent(agent_id)
-            .ok_or_else(|| MacacaError::NotFound(format!("runtime agent not found: {agent_id}")))?;
-        let services = AgentServices::builder().build();
-        let output = agent
-            .run(self.llm.as_ref(), self.tools.as_ref(), &services)
-            .await;
-        match &output {
-            Ok(result) => tracing::info!(
-                agent_id = %agent_id.0,
-                artifacts = result.artifacts.len(),
-                total_tokens = result.tokens_used.total_tokens,
-                "legacy agent execution adapter finished"
-            ),
-            Err(error) => tracing::warn!(
-                agent_id = %agent_id.0,
-                error = %error,
-                "legacy agent execution adapter failed"
-            ),
-        }
-        output
-    }
 }
 
 /// Service-client execution adapter — preferred production [`AgentExecutionPort`].

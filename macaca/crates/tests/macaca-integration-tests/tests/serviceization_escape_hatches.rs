@@ -513,17 +513,7 @@ fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> bool
                 || relative.starts_with("crates/facade/macaca-sdk/src/")
         }
         // `autonomy-loop-boundary` family retired in iteration 44 — no migration surfaces remain.
-        "provider-compat-construction" => {
-            // P2 §3.5–3.6: kernel provider_compat deleted; legacy in-process execution
-            // adapters remain only in macaca-agent (definition) and approved migration surfaces.
-            relative == "crates/application/macaca-agent/src/execution.rs"
-                || relative == "crates/application/macaca-agent/src/lib.rs"
-                || relative == "crates/application/macaca-app/src/runtime.rs"
-                || relative == "crates/application/macaca-app/src/workflow.rs"
-                || relative == "crates/facade/macaca-sdk/src/facade.rs"
-                || relative == "crates/facade/macaca-sdk/src/registry_api.rs"
-                || relative == "crates/facade/macaca-sdk/src/legacy_kernel_registration.rs"
-        }
+        // `provider-compat-construction` family retired in iteration 47 — no migration surfaces remain.
         // `direct-runtime-catalog-read` family retired in iteration 46 — no migration surfaces remain.
         "kernel-non-kernel-module" => relative.starts_with("crates/kernel/macaca-kernel/src/"),
         // `multi-path-coordination-patch` family retired in iteration 42 — no migration surfaces remain.
@@ -789,6 +779,11 @@ fn serviceization_escape_hatches_web_direct_runtime_field_absent_in_production()
 #[test]
 fn serviceization_escape_hatches_direct_runtime_catalog_read_absent_in_production() {
     assert_retired_escape_hatch_family_absent_in_production("direct-runtime-catalog-read");
+}
+
+#[test]
+fn serviceization_escape_hatches_provider_compat_construction_absent_in_production() {
+    assert_retired_escape_hatch_family_absent_in_production("provider-compat-construction");
 }
 
 #[test]

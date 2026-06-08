@@ -7,7 +7,7 @@ use async_trait::async_trait;
 
 use macaca_app::model::{AgentSource, CapabilityRef, InlineAgentConfig};
 use macaca_app::{AppLayer, AppManifest, AppRuntime, AppStatus};
-use macaca_agent::{AgentExecutionPort, LegacyAgentExecutionAdapter, ToolCatalog};
+use macaca_agent::{AgentExecutionPort, InProcessAgentExecutionPort, ToolCatalog};
 use macaca_kernel::{Kernel, KernelBuilder};
 use macaca_llm::LlmProvider;
 use macaca_proto::config::KernelConfig;
@@ -56,7 +56,7 @@ fn make_kernel() -> Kernel {
         agent_timeout_ms: 30000,
     };
     let llm: Arc<dyn LlmProvider> = Arc::new(MockLlm);
-    let execution_port: Arc<dyn AgentExecutionPort> = Arc::new(LegacyAgentExecutionAdapter::new(llm, Arc::from(Box::new(DefaultToolSet::new()) as Box<dyn ToolCatalog>)));
+    let execution_port: Arc<dyn AgentExecutionPort> = Arc::new(InProcessAgentExecutionPort::new(llm, Arc::from(Box::new(DefaultToolSet::new()) as Box<dyn ToolCatalog>)));
     KernelBuilder::from_execution_port(config, execution_port).build()
 }
 
