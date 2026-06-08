@@ -600,3 +600,10 @@
 - **Contract tests**: `os_layer_file_size_gate` 1/1；`autonomy_dispatch` lib tests 4/4；`scheduled_agent_task_boundaries` 源扫描路径同步至 `autonomy_dispatch/` 目录。
 - **GitNexus memo (non-blocking)**: iteration 75 HIGH on `dispatch_agent_execution` scheduled agent payload resolve + agent execution syscall + evidence gate path — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: filesize allowlist 37→0（`mcp_runtime.rs` / `app_executor.rs` / `autonomy_service_provider.rs` / proto config/types 等）；6.3.2 archive；P5 终态验收。
+
+## Iteration 76 (2026-06-08)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 37→**36**；`autonomy_service_provider.rs` 745→模块树（`mod.rs` Facade + `support.rs` Adapter helpers + `scheduler_adapter.rs` + `scheduled_agent_task_adapter.rs` + `heartbeat_adapter.rs` Command Router + `bootstrap.rs` Abstract Factory 分区）。
+- **Design patterns**: Facade module tree；Adapter/Bridge（`SystemService` ↔ typed provider DTOs）；Command Router（per-service `call` match tables）；Null Object（`unavailable()` providers）；Abstract Factory（`bootstrap_autonomy_*` composition root）；trace `info!` on command admission / provider register-start / bootstrap completion nodes。
+- **Contract tests**: `os_layer_file_size_gate` 1/1；`autonomy_scheduler_heartbeat_services` 11/11。
+- **GitNexus memo (non-blocking)**: iteration 76 HIGH on `bootstrap_autonomy_local_services` supervisor start + recovery wake + `HostSchedulerServiceAdapter::call` command router path — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: filesize allowlist 36→0（`mcp_runtime.rs` / `app_executor.rs` / `heartbeat_agent_dispatch.rs` / proto config/types 等）；6.3.2 archive；P5 终态验收。
