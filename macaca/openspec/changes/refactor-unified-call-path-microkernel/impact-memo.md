@@ -481,3 +481,12 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `macaca-context/memory/tests.rs` extraction | LOW | memory recall governance tests; production DTOs unchanged | P5 |
 | `agent_execution_service/{mod,autonomous_envelope,command_adapters}.rs` | LOW | proto contract module tree; `pub use agent_execution_service::*` unchanged | P5 |
 | filesize allowlist 65→62 | LOW | debt inventory shrink; 62 oversized files remain | P5 |
+
+## Iteration 58 additions (§4.5.1 skill/llm/proto borderline batch — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `governance_store/tests.rs` extraction | LOW | skill governance store contract tests only | P5 |
+| `resilient/tests.rs` extraction | LOW | LLM Decorator retry/fallback contract tests; production wrapper unchanged | P5 |
+| `scheduled_agent_task_service/{mod,command_adapters}.rs` | LOW | proto contract module tree; `pub use scheduled_agent_task_service::*` unchanged | P5 |
+| filesize allowlist 62→59 | LOW | debt inventory shrink; 59 oversized files remain | P5 |

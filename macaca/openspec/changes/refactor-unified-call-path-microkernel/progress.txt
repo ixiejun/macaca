@@ -474,3 +474,10 @@
 - **Contract tests**: `os_layer_file_size_gate` 1/1；`macaca-proto` application_manifest 6/6 + agent_execution 7/7；`macaca-context` memory 6/6。
 - **GitNexus memo (non-blocking)**: iteration 57 LOW on proto/context borderline splits — recorded in `impact-memo.md`.
 - **Next**: filesize allowlist 62→0（runtime-host giants / proto config/types / heartbeat_service）；6.3.2 archive；P5 终态验收。
+
+## Iteration 58 (2026-06-07)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 62→**59**；Contract Test 提取：`governance_store/tests.rs`、`resilient/tests.rs`；`scheduled_agent_task_service.rs` → 目录模块 `mod.rs` + `command_adapters.rs`（Adapter）+ `tests.rs`。
+- **Design patterns**: Contract Test extraction；Facade module tree（proto scheduled_agent_task_service）；Adapter（DTO → `ServiceCommand`）；Object Mother（redacted summary test fixture）。
+- **Contract tests**: `os_layer_file_size_gate` 1/1；`macaca-skill` governance_store 3/3；`macaca-llm` resilient 12/12；`macaca-proto` scheduled_agent 4/4。
+- **GitNexus memo (non-blocking)**: iteration 58 LOW on skill/llm/proto borderline splits — recorded in `impact-memo.md`.
+- **Next**: filesize allowlist 59→0（runtime-host giants / proto config/types / tool_service / heartbeat_service）；6.3.2 archive；P5 终态验收。
