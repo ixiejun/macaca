@@ -593,3 +593,10 @@
 - **Contract tests**: `os_layer_file_size_gate` 1/1；`application_service_provider` lib tests 4/4；`unified_workflow_application_abi` 6/6（`include_str!` 路径同步至 `command_dispatch.rs`）。
 - **GitNexus memo (non-blocking)**: iteration 74 HIGH on `ApplicationSystemServiceProvider::handle_host_dispatch` / `ensure_wasm_session` WASM host dispatch + lazy session creation path — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: filesize allowlist 38→0（`mcp_runtime.rs` / `app_executor.rs` / `autonomy_dispatch.rs` / proto config/types 等）；6.3.2 archive；P5 终态验收。
+
+## Iteration 75 (2026-06-08)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 38→**37**；`autonomy_dispatch.rs` 931→模块树（`mod.rs` Facade + `outcome.rs` Value Object + `strategies.rs` Command Router + `agent_execution_dispatch.rs` Strategy/Memento + `service_dispatch.rs` Adapter + `tests.rs` Contract Test 分区）。
+- **Design patterns**: Facade module tree；Value Object（`AutonomyDispatchOutcome`）；Strategy + Command Router（`AutonomyDispatchStrategies::dispatch`）；Memento（scheduled payload resolve）；Adapter（service/heartbeat syscall）；Specification（`AgentExecutionEvidenceGate`）；trace `info!`/`warn!` on payload resolve / agent execution / evidence verification nodes。
+- **Contract tests**: `os_layer_file_size_gate` 1/1；`autonomy_dispatch` lib tests 4/4；`scheduled_agent_task_boundaries` 源扫描路径同步至 `autonomy_dispatch/` 目录。
+- **GitNexus memo (non-blocking)**: iteration 75 HIGH on `dispatch_agent_execution` scheduled agent payload resolve + agent execution syscall + evidence gate path — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: filesize allowlist 37→0（`mcp_runtime.rs` / `app_executor.rs` / `autonomy_service_provider.rs` / proto config/types 等）；6.3.2 archive；P5 终态验收。

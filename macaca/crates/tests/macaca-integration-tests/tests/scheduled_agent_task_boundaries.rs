@@ -361,7 +361,7 @@ fn scheduled_agent_task_os_layer_has_no_business_or_provider_literals() {
         root.join("crates/foundation/macaca-proto/src/scheduled_agent_task_service.rs"),
         root.join("crates/facade/macaca-sdk/src/scheduled_agent_task_client.rs"),
         root.join("crates/services/macaca-scheduled-agent-task/src"),
-        root.join("crates/runtime/macaca-runtime-host/src/autonomy_dispatch.rs"),
+        root.join("crates/runtime/macaca-runtime-host/src/autonomy_dispatch"),
         root.join("crates/shells/macaca-web/src/scheduled_agent_task_tool.rs"),
     ];
     let forbidden_tokens = [

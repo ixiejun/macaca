@@ -615,3 +615,12 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `ApplicationSystemServiceProvider::ensure_wasm_session` | HIGH | WASM host dispatch session creation; policy sync on session start | P5 |
 | `ApplicationSystemServiceProvider::handle_host_dispatch` | HIGH | YAML/WASM unified application ABI host command path | P5 |
 | filesize allowlist 39→38 | LOW | debt inventory shrink; 38 oversized files remain | P5 |
+
+## Iteration 75 additions (§4.5.1 autonomy_dispatch Facade split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `autonomy_dispatch/{mod,outcome,strategies,agent_execution_dispatch,service_dispatch,tests}.rs` | HIGH | Scheduler target dispatch Strategy router + scheduled agent payload Memento resolve + agent execution syscall + evidence gate; public API `AutonomyDispatchOutcome`/`AutonomyDispatchStrategies` unchanged via `lib.rs` | P5 |
+| `dispatch_agent_execution` | HIGH | Scheduled agent task payload resolution → `service.agent_execution` invocation → `AgentExecutionEvidenceGate` evaluation | P5 |
+| `resolve_scheduled_agent_payload` | HIGH | `service.scheduled_agent_task` Memento boundary; Scheduler never reads raw prompts | P5 |
+| filesize allowlist 38→37 | LOW | debt inventory shrink; 37 oversized files remain | P5 |
