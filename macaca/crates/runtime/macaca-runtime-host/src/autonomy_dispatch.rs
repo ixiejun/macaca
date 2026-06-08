@@ -15,7 +15,7 @@ use macaca_proto::{
     ResolveScheduledAgentTaskPayloadCommand, ScheduledAgentTaskResolvedPayload,
     SchedulerTargetCommand, ServiceBusSource, ServiceCommand, ServiceCommandName, TraceContext,
     AGENT_EXECUTION_SERVICE_ID, HEARTBEAT_SERVICE_ID, SCHEDULED_AGENT_TASK_RESOLVE_PAYLOAD_COMMAND,
-    SCHEDULED_AGENT_TASK_SERVICE_ID,
+    SCHEDULED_AGENT_TASK_SERVICE_ID, SCHEDULER_SERVICE_ID,
 };
 use tokio::time::timeout;
 use tracing::{info, warn};
@@ -321,7 +321,7 @@ mod tests {
         assert_eq!(command.user_prompt, "Analyze the market and record result.");
         assert_eq!(
             command.metadata["scheduler_run_source"],
-            "service.scheduler"
+            SCHEDULER_SERVICE_ID
         );
         assert_eq!(command.metadata["payload_digest"], "digest.prompt.123");
         assert_eq!(
@@ -617,12 +617,13 @@ impl<'a> AutonomyDispatchStrategies<'a> {
                 command.metadata.insert(key.clone(), value.clone());
             }
         }
+        // Route provenance through proto constants so service ids stay canonical and auditable.
         command
             .metadata
-            .insert("source".into(), "service.scheduler".into());
+            .insert("source".into(), SCHEDULER_SERVICE_ID.into());
         command
             .metadata
-            .insert("scheduler_run_source".into(), "service.scheduler".into());
+            .insert("scheduler_run_source".into(), SCHEDULER_SERVICE_ID.into());
         command.metadata.insert(
             "scheduled_agent_task_id".into(),
             resolved.task_id.as_str().into(),

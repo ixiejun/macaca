@@ -405,3 +405,11 @@
 - **Contract tests**: `serviceization_escape_hatches` 9/9；`autonomy_scheduler_heartbeat_services` 11/11；`p5_terminal_audit_gates` 3/3；`os_layer_file_size_gate` 1/1。
 - **GitNexus memo (non-blocking)**: iteration 48 MEDIUM on `Local*Provider` → `InProcess*Provider` rename — recorded in `impact-memo.md`.
 - **Next**: 6.2.1 `autonomy-service-boundary` 继续分阶段（`AutonomySupervisor`/`SchedulerSystemServiceProvider`/`HeartbeatSystemServiceProvider`/service id 字面量 25 命中）；6.3.2 继续 archive；filesize allowlist 75→0。
+
+## Iteration 49 (2026-06-07)
+- **P5 §6.2.1 逃逸口 family 子阶段**: `autonomy-service-boundary` host adapter + supervisor + service id 字面量退役（23→0 命中）；`SchedulerSystemServiceProvider`/`HeartbeatSystemServiceProvider` → `HostSchedulerServiceAdapter`/`HostHeartbeatServiceAdapter`；`AutonomySupervisor` → `AutonomyLifecycleCoordinator`；`"service.scheduler"`/`"service.heartbeat"` → `SCHEDULER_SERVICE_ID`/`HEARTBEAT_SERVICE_ID`；`migration_debt_baseline` raw **200→177**（`autonomy-service-boundary` 25→2，仅剩 proto 常量定义；3 families remain）。
+- **P5 退役 token 硬断言**: 新增 `autonomy_host_adapters_absent_in_production`、`autonomy_supervisor_absent_in_production`、`autonomy_service_id_literals_absent_outside_proto`。
+- **Design patterns**: Adapter + Lifecycle Coordinator（runtime-host composition root）；Strangler Fig（forbidden-token 冻结 + provider-neutral rename）；Specification by Example（debt inventory baseline）。
+- **Contract tests**: `serviceization_escape_hatches` 12/12；`autonomy_scheduler_heartbeat_services` 11/11；`p5_terminal_audit_gates` 3/3；`os_layer_file_size_gate` 1/1。
+- **GitNexus memo (non-blocking)**: iteration 49 MEDIUM on autonomy host adapter + lifecycle coordinator rename — recorded in `impact-memo.md`.
+- **Next**: 6.2.1 完全退役 `autonomy-service-boundary` family（proto 2 命中 → 删 migration surfaces + 硬断言）；`hardcoded-agent-role`（54）；`provider-model-routing-name`（121）；6.3.2 继续 archive；filesize allowlist 75→0。

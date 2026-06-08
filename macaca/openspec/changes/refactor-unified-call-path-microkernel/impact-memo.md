@@ -395,3 +395,13 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `LocalHeartbeatProvider` → `InProcessHeartbeatProvider` | MEDIUM | macaca-heartbeat local_provider, runtime-host autonomy_supervisor/heartbeat_lane, autonomy_service_provider | P5 |
 | `LocalSchedulerLeasedRun` → `InProcessSchedulerLeasedRun` | LOW | scheduler run_control lease memento only | P5 |
 | `local_autonomy_providers_absent_in_production` hard assert | LOW | freeze gate fails on reintroduction of retired Local* provider symbols | P5 |
+
+## Iteration 49 additions (§6.2.1 autonomy-service-boundary sub-phase — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `SchedulerSystemServiceProvider` → `HostSchedulerServiceAdapter` | MEDIUM | runtime-host autonomy_service_provider, lib.rs exports, heartbeat_lane tests | P5 |
+| `HeartbeatSystemServiceProvider` → `HostHeartbeatServiceAdapter` | MEDIUM | runtime-host autonomy_service_provider, lib.rs exports, heartbeat_lane tests | P5 |
+| `AutonomySupervisor` → `AutonomyLifecycleCoordinator` | MEDIUM | runtime-host autonomy_supervisor, autonomy_service_provider bundle wiring | P5 |
+| `"service.scheduler"` / `"service.heartbeat"` → proto constants | LOW | autonomy_dispatch, heartbeat_agent_dispatch metadata provenance | P5 |
+| `autonomy_host_adapters_absent_in_production` / `autonomy_supervisor_absent_in_production` / `autonomy_service_id_literals_absent_outside_proto` | LOW | hard asserts for retired autonomy-service-boundary tokens | P5 |

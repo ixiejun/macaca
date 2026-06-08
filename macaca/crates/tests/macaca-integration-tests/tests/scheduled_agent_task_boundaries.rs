@@ -14,8 +14,8 @@ use macaca_proto::{
     SchedulerJobId, SchedulerJobLifecycleState, SchedulerLifecycleJobCommand,
     SchedulerListJobsCommand, SchedulerQueryCommand, SchedulerRegisterJobCommand,
     SchedulerRunState, SchedulerRunSummary, SchedulerServiceSnapshot, SchedulerTargetCommand,
-    SchedulerUpdateJobCommand, ServiceBusSource, ServiceDescriptor, ServiceHealth, TraceContext,
-    SCHEDULED_AGENT_TASK_SERVICE_ID,
+    SchedulerUpdateJobCommand,     ServiceBusSource, ServiceDescriptor, ServiceHealth, TraceContext,
+    SCHEDULED_AGENT_TASK_SERVICE_ID, SCHEDULER_SERVICE_ID,
 };
 use macaca_runtime_host::{
     agent_execution_service_descriptor, autonomy_dispatch::AutonomyDispatchStrategies,
@@ -505,7 +505,7 @@ async fn scheduled_agent_task_create_to_dispatch_chain_preserves_audit_and_redac
     assert_eq!(command.metadata["scheduled_agent_task_audit_id"], audit_id);
     assert_eq!(
         command.metadata["scheduler_run_source"],
-        "service.scheduler"
+        SCHEDULER_SERVICE_ID
     );
     assert!(command.metadata.contains_key("payload_digest"));
 }

@@ -37,7 +37,7 @@ use crate::ServiceRuntime;
 
 /// Host-owned supervisor for explicit local autonomy activation.
 #[derive(Clone)]
-pub struct AutonomySupervisor {
+pub struct AutonomyLifecycleCoordinator {
     runtime: Arc<ServiceRuntime>,
     scheduler: Arc<InProcessSchedulerProvider>,
     heartbeat: Arc<InProcessHeartbeatProvider>,
@@ -46,7 +46,7 @@ pub struct AutonomySupervisor {
     worker: Arc<Mutex<Option<JoinHandle<()>>>>,
 }
 
-impl AutonomySupervisor {
+impl AutonomyLifecycleCoordinator {
     /// Create a supervisor without starting the background loop.
     pub fn new(
         runtime: Arc<ServiceRuntime>,
@@ -359,7 +359,7 @@ mod tests {
         let mut config = AutonomyRuntimeConfig::default();
         config.heartbeat_tick_interval_ms = 60_000;
         let supervisor =
-            AutonomySupervisor::new(runtime, scheduler, Arc::clone(&heartbeat), config);
+            AutonomyLifecycleCoordinator::new(runtime, scheduler, Arc::clone(&heartbeat), config);
         let app_id = ApplicationId::from_name("generic-heartbeat-app");
         let manifest = AppManifest {
             id: app_id,

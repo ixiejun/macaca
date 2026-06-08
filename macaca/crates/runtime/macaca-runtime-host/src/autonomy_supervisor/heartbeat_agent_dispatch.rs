@@ -386,7 +386,8 @@ fn dispatch_metadata(
     declaration: &ApplicationHeartbeatAgentView,
 ) -> BTreeMap<String, String> {
     let mut metadata = BTreeMap::new();
-    metadata.insert("source".into(), "service.heartbeat".into());
+    // Stamp dispatch metadata with the canonical Heartbeat service id from proto DTOs.
+    metadata.insert("source".into(), HEARTBEAT_SERVICE_ID.into());
     metadata.insert("execution_intent".into(), "heartbeat".into());
     metadata.insert("profile_id".into(), declaration.profile_id.clone());
     metadata.insert(
@@ -707,7 +708,7 @@ mod tests {
             AgentExecutionIntent::Heartbeat
         );
         assert_eq!(commands[0].target_agent, "operator");
-        assert_eq!(commands[0].metadata["source"], "service.heartbeat");
+        assert_eq!(commands[0].metadata["source"], HEARTBEAT_SERVICE_ID);
         assert_eq!(
             commands[0].metadata["heartbeat_audit_id"],
             "audit-heartbeat"

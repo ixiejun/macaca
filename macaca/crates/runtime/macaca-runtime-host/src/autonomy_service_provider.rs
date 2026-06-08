@@ -43,7 +43,7 @@ use tracing::info;
 
 use crate::{
     autonomy_runtime_config::{AutonomyProviderMode, AutonomyRuntimeConfig},
-    autonomy_supervisor::AutonomySupervisor,
+    autonomy_supervisor::AutonomyLifecycleCoordinator,
     ServiceProviderFactoryContext, ServiceProviderInstance, ServiceRuntime,
     StaticServiceProviderFactory,
 };
@@ -54,11 +54,11 @@ use crate::{
 /// generic `ServiceCommand`, while the Scheduler provider speaks typed command
 /// DTOs.  The adapter only decodes commands and delegates; actual scheduling
 /// semantics remain owned by the injected provider.
-pub struct SchedulerSystemServiceProvider {
+pub struct HostSchedulerServiceAdapter {
     provider: Arc<dyn SchedulerService>,
 }
 
-impl SchedulerSystemServiceProvider {
+impl HostSchedulerServiceAdapter {
     /// Wrap a concrete or remote Scheduler provider.
     pub fn new(provider: Arc<dyn SchedulerService>) -> Self {
         Self { provider }
@@ -71,7 +71,7 @@ impl SchedulerSystemServiceProvider {
 }
 
 #[async_trait]
-impl SystemService for SchedulerSystemServiceProvider {
+impl SystemService for HostSchedulerServiceAdapter {
     fn descriptor(&self) -> ServiceDescriptor {
         self.provider.descriptor()
     }
@@ -385,11 +385,11 @@ impl SystemService for ScheduledAgentTaskSystemServiceProvider {
 /// commands.  Wake coalescing and gate evaluation remain provider behavior; the
 /// adapter only preserves trace, structured errors, and sanitized result
 /// envelopes.
-pub struct HeartbeatSystemServiceProvider {
+pub struct HostHeartbeatServiceAdapter {
     provider: Arc<dyn HeartbeatService>,
 }
 
-impl HeartbeatSystemServiceProvider {
+impl HostHeartbeatServiceAdapter {
     /// Wrap a concrete or remote Heartbeat provider.
     pub fn new(provider: Arc<dyn HeartbeatService>) -> Self {
         Self { provider }
@@ -402,7 +402,7 @@ impl HeartbeatSystemServiceProvider {
 }
 
 #[async_trait]
-impl SystemService for HeartbeatSystemServiceProvider {
+impl SystemService for HostHeartbeatServiceAdapter {
     fn descriptor(&self) -> ServiceDescriptor {
         self.provider.descriptor()
     }
@@ -534,7 +534,7 @@ impl SystemService for HeartbeatSystemServiceProvider {
 pub struct AutonomyRuntimeBundle {
     pub started_services: Vec<KernelServiceId>,
     pub provider_mode: String,
-    pub supervisor: Option<AutonomySupervisor>,
+    pub supervisor: Option<AutonomyLifecycleCoordinator>,
 }
 
 /// Register fail-closed autonomy providers into an existing service runtime.
@@ -555,7 +555,7 @@ pub async fn bootstrap_autonomy_unavailable_services(
 
     register_and_start(
         Arc::clone(&runtime),
-        Arc::new(SchedulerSystemServiceProvider::unavailable()),
+        Arc::new(HostSchedulerServiceAdapter::unavailable()),
         format!("{trace_prefix}-scheduler-service"),
         &mut bundle,
     )
@@ -569,7 +569,7 @@ pub async fn bootstrap_autonomy_unavailable_services(
     .await?;
     register_and_start(
         runtime,
-        Arc::new(HeartbeatSystemServiceProvider::unavailable()),
+        Arc::new(HostHeartbeatServiceAdapter::unavailable()),
         format!("{trace_prefix}-heartbeat-service"),
         &mut bundle,
     )
@@ -628,7 +628,7 @@ pub async fn bootstrap_autonomy_local_services(
 
     register_and_start(
         Arc::clone(&runtime),
-        Arc::new(SchedulerSystemServiceProvider::new(scheduler.clone())),
+        Arc::new(HostSchedulerServiceAdapter::new(scheduler.clone())),
         format!("{trace_prefix}-scheduler-local-service"),
         &mut bundle,
     )
@@ -644,14 +644,14 @@ pub async fn bootstrap_autonomy_local_services(
     .await?;
     register_and_start(
         Arc::clone(&runtime),
-        Arc::new(HeartbeatSystemServiceProvider::new(heartbeat.clone())),
+        Arc::new(HostHeartbeatServiceAdapter::new(heartbeat.clone())),
         format!("{trace_prefix}-heartbeat-local-service"),
         &mut bundle,
     )
     .await?;
 
     let supervisor =
-        AutonomySupervisor::new(Arc::clone(&runtime), scheduler, heartbeat, config.clone());
+        AutonomyLifecycleCoordinator::new(Arc::clone(&runtime), scheduler, heartbeat, config.clone());
     supervisor
         .start(TraceContext::new(format!(
             "{trace_prefix}-supervisor-start"

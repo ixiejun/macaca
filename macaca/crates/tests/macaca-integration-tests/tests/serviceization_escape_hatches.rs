@@ -732,6 +732,15 @@ fn serviceization_escape_hatches_migration_debt_inventory_matches_baseline() {
 /// Used when a family is retired in sub-phases: only a subset of tokens is renamed
 /// while the family migration surfaces remain for other tokens.
 fn assert_retired_escape_hatch_tokens_absent_in_production(tokens: &[&str]) {
+    assert_retired_escape_hatch_tokens_absent_in_production_with_allowed_paths(tokens, &[]);
+}
+
+/// Like [`assert_retired_escape_hatch_tokens_absent_in_production`], but permits
+/// literal hits under approved path prefixes (e.g. proto constant definitions).
+fn assert_retired_escape_hatch_tokens_absent_in_production_with_allowed_paths(
+    tokens: &[&str],
+    allowed_path_prefixes: &[&str],
+) {
     let retired_tokens = forbidden_tokens()
         .into_iter()
         .filter(|entry| tokens.contains(&entry.token))
@@ -756,15 +765,22 @@ fn assert_retired_escape_hatch_tokens_absent_in_production(tokens: &[&str]) {
         if is_non_production_rust_source(&relative) {
             continue;
         }
+        if allowed_path_prefixes
+            .iter()
+            .any(|prefix| relative.starts_with(prefix))
+        {
+            continue;
+        }
         violations.extend(scan_file(&root, file, &retired_tokens, false));
     }
     violations.sort();
 
     assert!(
         violations.is_empty(),
-        "Retired escape-hatch tokens {:?} must be absent from all production code \
+        "Retired escape-hatch tokens {:?} must be absent from production code outside {:?} \
          (no migration exemption):{}",
         tokens,
+        allowed_path_prefixes,
         render_violations(&violations)
     );
 }
@@ -837,6 +853,36 @@ fn serviceization_escape_hatches_local_autonomy_providers_absent_in_production()
         "LocalSchedulerProvider",
         "LocalHeartbeatProvider",
     ]);
+}
+
+/// Sub-phase of `autonomy-service-boundary` (iteration 49): legacy host adapter
+/// symbols were renamed to provider-neutral `Host*ServiceAdapter`. The old names
+/// must not reappear outside migration surfaces.
+#[test]
+fn serviceization_escape_hatches_autonomy_host_adapters_absent_in_production() {
+    assert_retired_escape_hatch_tokens_absent_in_production(&[
+        "SchedulerSystemServiceProvider",
+        "HeartbeatSystemServiceProvider",
+    ]);
+}
+
+/// Sub-phase of `autonomy-service-boundary` (iteration 49): `AutonomySupervisor`
+/// was renamed to lifecycle-neutral `AutonomyLifecycleCoordinator`.
+#[test]
+fn serviceization_escape_hatches_autonomy_supervisor_absent_in_production() {
+    assert_retired_escape_hatch_tokens_absent_in_production(&["AutonomySupervisor"]);
+}
+
+/// Sub-phase of `autonomy-service-boundary` (iteration 49): scheduler/heartbeat
+/// service id literals must flow through proto constants, not ad-hoc strings.
+#[test]
+fn serviceization_escape_hatches_autonomy_service_id_literals_absent_outside_proto() {
+    // Proto owns the canonical service id string constants; all other production
+    // callers must reference SCHEDULER_SERVICE_ID / HEARTBEAT_SERVICE_ID instead.
+    assert_retired_escape_hatch_tokens_absent_in_production_with_allowed_paths(
+        &["\"service.scheduler\"", "\"service.heartbeat\""],
+        &["crates/foundation/macaca-proto/src/"],
+    );
 }
 
 #[test]

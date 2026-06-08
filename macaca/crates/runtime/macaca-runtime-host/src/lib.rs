@@ -334,10 +334,10 @@ pub use autonomy_evolution_service_provider::AutonomyEvolutionSystemServiceProvi
 pub use autonomy_runtime_config::{AutonomyProviderMode, AutonomyRuntimeConfig};
 pub use autonomy_service_provider::{
     bootstrap_autonomy_local_services, bootstrap_autonomy_services,
-    bootstrap_autonomy_unavailable_services, AutonomyRuntimeBundle, HeartbeatSystemServiceProvider,
-    ScheduledAgentTaskSystemServiceProvider, SchedulerSystemServiceProvider,
+    bootstrap_autonomy_unavailable_services, AutonomyRuntimeBundle, HostHeartbeatServiceAdapter,
+    ScheduledAgentTaskSystemServiceProvider, HostSchedulerServiceAdapter,
 };
-pub use autonomy_supervisor::AutonomySupervisor;
+pub use autonomy_supervisor::AutonomyLifecycleCoordinator;
 pub use code_intelligence_service_provider::{
     bootstrap_local_code_intelligence_service, CodeIntelligenceProvider,
     CodeIntelligenceSystemServiceProvider, LocalCodeIntelligenceProvider,

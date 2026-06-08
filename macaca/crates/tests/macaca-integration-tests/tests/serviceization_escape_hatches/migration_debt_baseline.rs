@@ -9,16 +9,17 @@
 //! removal or a new frozen debt row. Regenerate family counts with:
 //! `cargo test -p macaca-integration-tests dump_escape_hatch_raw_fingerprints -- --ignored --nocapture`
 
-/// Total raw hits when migration surfaces are not honored (iteration 48 snapshot).
+/// Total raw hits when migration surfaces are not honored (iteration 49 snapshot).
 ///
-/// `autonomy-service-boundary` sub-phase (−38): `LocalSchedulerProvider` /
-/// `LocalHeartbeatProvider` renamed to provider-neutral `InProcessSchedulerProvider` /
-/// `InProcessHeartbeatProvider`.
-pub const EXPECTED_RAW_VIOLATION_COUNT: usize = 200;
+/// `autonomy-service-boundary` sub-phase (−23): `SchedulerSystemServiceProvider` /
+/// `HeartbeatSystemServiceProvider` → `Host*ServiceAdapter`; `AutonomySupervisor` →
+/// `AutonomyLifecycleCoordinator`; service id literals → `SCHEDULER_SERVICE_ID` /
+/// `HEARTBEAT_SERVICE_ID` proto constants.
+pub const EXPECTED_RAW_VIOLATION_COUNT: usize = 177;
 
 /// Per-family raw hit counts — detects debt shifting between token families.
 pub const EXPECTED_RAW_VIOLATION_BY_FAMILY: &[(&str, usize)] = &[
-    ("autonomy-service-boundary", 25),
+    ("autonomy-service-boundary", 2),
     ("hardcoded-agent-role", 54),
     ("provider-model-routing-name", 121),
 ];

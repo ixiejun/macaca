@@ -21,7 +21,7 @@ use tokio::time::timeout;
 use super::HeartbeatLane;
 use crate::{
     agent_execution_service_descriptor, AgentExecutionBackend, AgentExecutionSystemServiceProvider,
-    HeartbeatSystemServiceProvider, ServiceProviderFactoryContext, ServiceProviderInstance,
+    HostHeartbeatServiceAdapter, ServiceProviderFactoryContext, ServiceProviderInstance,
     ServiceRuntime, ServiceRuntimeConfig, StaticServiceProviderFactory,
 };
 
@@ -170,7 +170,7 @@ async fn register_heartbeat_service(
     register_static_service(
         runtime,
         heartbeat.descriptor(),
-        Arc::new(HeartbeatSystemServiceProvider::new(heartbeat)),
+        Arc::new(HostHeartbeatServiceAdapter::new(heartbeat)),
     )
     .await;
 }
