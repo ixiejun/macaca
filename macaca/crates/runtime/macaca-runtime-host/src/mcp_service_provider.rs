@@ -454,7 +454,7 @@ impl SystemService for McpSystemServiceProvider {
             MCP_SNAPSHOT_COMMAND => {
                 let typed: McpServiceSnapshotCommand = decode(command.payload)?;
                 let facade = self.facade()?;
-                let definitions = facade.definitions().await;
+                let definitions = facade.snapshot_server_definitions().await;
                 let statuses = facade.probe(&McpToolPolicy::default()).await;
                 let snapshot = snapshot_from_statuses(
                     definitions.len(),

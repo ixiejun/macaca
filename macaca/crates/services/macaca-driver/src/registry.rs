@@ -70,9 +70,18 @@ impl DriverRegistry {
         self.drivers.read().await.len()
     }
 
-    /// Collect all tools from all registered drivers through the canonical registry query path.
-    pub async fn collect_tools(&self) -> Vec<Box<dyn Tool>> {
+    /// Snapshot the aggregated tool catalog from every registered driver.
+    ///
+    /// This is the in-process catalog read path owned by the driver service provider when
+    /// assembling `driver.tool_catalog` responses. Shells, agents, and frameworks must
+    /// obtain tool catalogs through `service.driver` snapshot commands via
+    /// `SystemDriverClient`, not by reaching into `DriverRegistry` directly.
+    pub async fn snapshot_tool_catalog(&self) -> Vec<Box<dyn Tool>> {
         let guard = self.drivers.read().await;
+        tracing::trace!(
+            driver_count = guard.len(),
+            "driver registry emitting tool catalog snapshot"
+        );
         let mut all_tools = Vec::new();
         for driver in guard.values() {
             all_tools.extend(driver.tools());
@@ -81,9 +90,9 @@ impl DriverRegistry {
     }
 
     /// Collect all tools from all registered drivers.
-    #[deprecated(note = "use DriverRegistry::collect_tools()")]
+    #[deprecated(note = "use DriverRegistry::snapshot_tool_catalog()")]
     pub async fn aggregate_tools(&self) -> Vec<Box<dyn Tool>> {
-        self.collect_tools().await
+        self.snapshot_tool_catalog().await
     }
 }
 
@@ -184,7 +193,7 @@ mod tests {
     async fn aggregate_tools_empty() {
         let registry = DriverRegistry::new();
         registry.register(Box::new(DummyDriver::new("a"))).await;
-        let tools = registry.collect_tools().await;
+        let tools = registry.snapshot_tool_catalog().await;
         assert!(tools.is_empty()); // DummyDriver has no tools
     }
 }

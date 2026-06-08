@@ -380,3 +380,12 @@
 - **Contract tests**: `serviceization_escape_hatches` 6/6；`p5_terminal_audit_gates` 3/3；`os_layer_file_size_gate` 1/1。
 - **GitNexus memo (non-blocking)**: iteration 45 MEDIUM on `service_llm_client` facade + framework runner LLM wiring — recorded in `impact-memo.md`.
 - **Next**: 6.2.1 下一小族 `autonomy-service-boundary`（65）；6.3.2 继续 archive；filesize allowlist 75→0；4.4.4 web 依赖终态。
+
+## Iteration 46 (2026-06-07)
+- **P5 §6.2.1 逃逸口 family 退役**: `direct-runtime-catalog-read` family 完全退役（12→0）；`collect_tools()` → `snapshot_tool_catalog`；`.definitions().await` → `snapshot_server_definitions()`；删除 migration surface 豁免；`migration_debt_baseline` raw **259→247**（4 families remain）。
+- **Driver/MCP catalog 路径对齐**: `driver_service_provider` + `mcp_service_provider` 改调 provider-neutral snapshot API；`macaca-driver` registry/runtime 同步重命名。
+- **P5 退役族硬断言**: 新增 `direct_runtime_catalog_read_absent_in_production` 契约测试。
+- **Design patterns**: Snapshot API（Cache-Aside 语义层命名）；Strangler Fig（forbidden-token 冻结 + migration surface 逐族删除）；Specification by Example（debt inventory baseline）。
+- **Contract tests**: `serviceization_escape_hatches` 7/7；`p5_terminal_audit_gates` 3/3；`os_layer_file_size_gate` 1/1。
+- **GitNexus memo (non-blocking)**: iteration 46 MEDIUM on driver/MCP catalog snapshot rename — recorded in `impact-memo.md`.
+- **Next**: 6.2.1 下一小族 `autonomy-service-boundary`（65）分阶段；`provider-compat-construction`（7）；6.3.2 继续 archive；filesize allowlist 75→0。

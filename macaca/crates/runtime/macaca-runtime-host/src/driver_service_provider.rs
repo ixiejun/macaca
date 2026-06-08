@@ -134,7 +134,7 @@ impl SystemService for DriverSystemServiceProvider {
             DRIVER_TOOL_CATALOG_COMMAND => {
                 let typed: DriverToolCatalogCommand = decode(command.payload)?;
                 let runtime = self.runtime()?;
-                let tools = runtime.collect_tools().await;
+                let tools = runtime.snapshot_tool_catalog().await;
                 let descriptors = tools
                     .iter()
                     .map(|tool| {
@@ -169,7 +169,7 @@ impl SystemService for DriverSystemServiceProvider {
             DRIVER_TOOL_INVOKE_COMMAND => {
                 let typed: DriverToolInvokeCommand = decode(command.payload)?;
                 let runtime = self.runtime()?;
-                let tools = runtime.collect_tools().await;
+                let tools = runtime.snapshot_tool_catalog().await;
                 let tool = tools
                     .iter()
                     .find(|tool| tool.name() == typed.invocation.tool_name)

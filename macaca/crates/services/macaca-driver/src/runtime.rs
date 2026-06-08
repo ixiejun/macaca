@@ -111,8 +111,14 @@ impl DriverRuntime {
             .collect()
     }
 
-    pub async fn collect_tools(&self) -> Vec<Box<dyn Tool>> {
-        self.registry.collect_tools().await
+    /// Snapshot the driver-runtime tool catalog for service provider command handlers.
+    ///
+    /// Delegates to [`DriverRegistry::snapshot_tool_catalog`] so catalog assembly stays
+    /// centralized in the registry layer while `DriverRuntime` remains the composition
+    /// anchor injected into `DriverSystemServiceProvider`.
+    pub async fn snapshot_tool_catalog(&self) -> Vec<Box<dyn Tool>> {
+        tracing::trace!("driver runtime delegating tool catalog snapshot to registry");
+        self.registry.snapshot_tool_catalog().await
     }
 }
 

@@ -27,14 +27,7 @@ pub fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> 
                 || relative == "crates/facade/macaca-sdk/src/registry_api.rs"
                 || relative == "crates/facade/macaca-sdk/src/legacy_kernel_registration.rs"
         }
-        "direct-runtime-catalog-read" => {
-            relative.starts_with("crates/services/macaca-driver/src/")
-                || relative == "crates/runtime/macaca-runtime-host/src/driver_service_provider.rs"
-                || relative == "crates/runtime/macaca-runtime-host/src/mcp_service_provider.rs"
-                || relative.starts_with("crates/runtime/macaca-runtime-host/src/mcp_runtime.rs")
-                || relative.starts_with("crates/services/macaca-tools/src/")
-                || relative == "crates/shells/macaca-web/src/mcp_shell_adapter.rs"
-        }
+        // `direct-runtime-catalog-read` family retired in iteration 46 — no migration surfaces remain.
         "shell-semantic-execution-owner" => {
             // Approved construction adapter — sole shell entry for FrameworkRunner builds
             // until runtime-host fully owns `FrameworkAgentConstructionPort` (task 4.3.2).

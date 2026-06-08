@@ -368,9 +368,14 @@ impl McpRuntimeFacade {
         self.manager.upsert_definition(definition).await;
     }
 
+    /// Snapshot registered MCP server definitions for service provider assembly.
+    ///
+    /// External consumers must obtain MCP catalogs through `service.mcp` snapshot
+    /// commands via `SystemMcpClient` instead of reading runtime-host internals.
     #[allow(deprecated)]
-    pub async fn definitions(&self) -> Vec<McpServerDefinition> {
-        self.manager.definitions().await
+    pub async fn snapshot_server_definitions(&self) -> Vec<McpServerDefinition> {
+        tracing::trace!("mcp facade delegating server definition snapshot to manager");
+        self.manager.snapshot_server_definitions().await
     }
 
     #[allow(deprecated)]
@@ -584,14 +589,23 @@ impl McpRuntimeManager {
             .insert(definition.id.clone(), definition);
     }
 
-    #[deprecated(note = "Use `McpRuntimeFacade::definitions` instead.")]
-    pub async fn definitions(&self) -> Vec<McpServerDefinition> {
-        self.definitions.read().await.values().cloned().collect()
+    /// Snapshot the in-memory MCP server definition catalog owned by runtime-host.
+    ///
+    /// Service providers call this when assembling `mcp.snapshot` responses. The
+    /// catalog is a point-in-time view of registered definitions, not a live probe of
+    /// remote MCP server health (use `probe_statuses` for connectivity diagnostics).
+    pub async fn snapshot_server_definitions(&self) -> Vec<McpServerDefinition> {
+        let definitions = self.definitions.read().await;
+        tracing::trace!(
+            definition_count = definitions.len(),
+            "mcp manager emitting server definition snapshot"
+        );
+        definitions.values().cloned().collect()
     }
 
     #[deprecated(note = "Use `McpRuntimeFacade::probe` instead.")]
     pub async fn probe_statuses(&self, policy: &McpToolPolicy) -> Vec<McpRuntimeStatus> {
-        let definitions = self.definitions().await;
+        let definitions = self.snapshot_server_definitions().await;
         probe_definition_statuses(definitions, policy).await
     }
 
@@ -599,7 +613,7 @@ impl McpRuntimeManager {
         &self,
         policy: &McpToolPolicy,
     ) -> Vec<Result<CapabilityToolDescriptor, String>> {
-        let definitions = self.definitions().await;
+        let definitions = self.snapshot_server_definitions().await;
         let mut descriptors = Vec::new();
         for definition in definitions {
             descriptors.extend(descriptors_for_definition(&definition, policy).await);
@@ -624,7 +638,7 @@ impl McpRuntimeManager {
         server_id: Option<&str>,
         policy: &McpToolPolicy,
     ) -> Vec<Result<(String, Vec<McpResourceDef>), String>> {
-        let definitions = self.definitions().await;
+        let definitions = self.snapshot_server_definitions().await;
         let mut results = Vec::new();
         for definition in definitions {
             if server_id.is_some_and(|requested| requested != definition.id) {
@@ -656,7 +670,7 @@ impl McpRuntimeManager {
         server_id: Option<&str>,
         policy: &McpToolPolicy,
     ) -> Vec<Result<(String, Vec<McpResourceTemplateDef>), String>> {
-        let definitions = self.definitions().await;
+        let definitions = self.snapshot_server_definitions().await;
         let mut results = Vec::new();
         for definition in definitions {
             if server_id.is_some_and(|requested| requested != definition.id) {
@@ -997,7 +1011,7 @@ impl McpRuntimeManager {
         policy: &McpToolPolicy,
         context: &McpRuntimeContext,
     ) -> Vec<McpRuntimeStatus> {
-        let definitions = self.definitions().await;
+        let definitions = self.snapshot_server_definitions().await;
         self.register_definitions(toolkit, definitions, policy, context, None)
             .await
     }
@@ -2179,7 +2193,7 @@ mcpServers:
         definition.enabled = false;
         facade.upsert_definition(definition).await;
 
-        let definitions = facade.definitions().await;
+        let definitions = facade.snapshot_server_definitions().await;
         assert_eq!(definitions.len(), 1);
         assert_eq!(definitions[0].id, "disabled");
 

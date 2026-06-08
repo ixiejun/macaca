@@ -369,3 +369,11 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `AppState::service_llm_client` | MEDIUM | replaces direct `llm_client` field reads in shell adapters + framework runner agent factory paths | P3/P5 |
 | `web-direct-runtime-field` migration surfaces removal | MEDIUM | freeze gate fails on any new deprecated AppState runtime-field access in production shell code | P5 |
 | `llm_route_shell_adapter` / `agent_factory_build` / `agent_factory_coordinator` | LOW | LLM routing + ReAct agent construction; behavior unchanged, access path only | P3 |
+
+## Iteration 46 additions (§6.2.1 direct-runtime-catalog-read retirement — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `snapshot_tool_catalog` / `DriverRegistry` / `DriverRuntime` | MEDIUM | replaces `collect_tools()` in driver service provider catalog assembly; shells already use `SystemDriverClient` | P2/P5 |
+| `snapshot_server_definitions` / `McpRuntimeFacade` / `McpRuntimeManager` | MEDIUM | replaces `.definitions().await` in MCP service provider snapshot path; shells use `SystemMcpClient` | P2/P5 |
+| `direct-runtime-catalog-read` migration surfaces removal | LOW | freeze gate fails on any new direct runtime catalog reads in production | P5 |
