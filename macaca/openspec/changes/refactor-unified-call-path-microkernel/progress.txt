@@ -794,3 +794,13 @@
 - **Logging**: capability flatten and manifest admission paths retain provider-neutral serde contracts (no new runtime syscall seams in this DTO split)。
 - **GitNexus memo (non-blocking)**: iteration 98 MEDIUM on `AppManifest`/`AppCapabilitySet` aggregate admission seam — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: filesize allowlist 14→0（`macaca-app/service_projection.rs` / `workflow.rs` / `pipeline_dry_run.rs` / P4 `macaca-framework` 等）；6.3.2 archive；P5 终态验收。
+
+## Iteration 99 (2026-06-08)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 14→**13**；`macaca-app/service_projection.rs` 847→`service_projection/` Projection 模块树（`service_projection.rs` Facade + `projection.rs` + `app_view.rs` + `ui.rs` + `policy.rs` + `heartbeat.rs` + `support.rs` + `tests.rs`）。
+- **Design patterns**: Facade module tree；Projection + Adapter（manifest→service DTO）；Strategy（`DomainPackCatalog` catalog-aware projection）；Observer（`tracing::info` on projection audit nodes）。
+- **Contract tests**: `cargo check -p macaca-app` OK；`cargo test -p macaca-app service_projection::` 5/5；`os_layer_file_size_gate` 1/1；`serviceization_escape_hatches` OK；production modules all ≤500 lines（max `projection.rs` ~174）。
+- **Public API**: `macaca_app::service_projection::{app_manifest_to_metadata_view, app_manifest_to_service_app_view, app_manifest_to_heartbeat_agent_views, ...}` unchanged via Facade re-exports；`lib.rs` `pub mod service_projection` unchanged。
+- **Escape hatch**: contract-test fixtures 使用中性 `fixture-role-alpha`/`fixture-role-missing` 标识符（`tests.rs` 后缀自动豁免）。
+- **Logging**: preserved `tracing::info` on metadata/service-app projection summary audit nodes with provider-neutral app_id/agent_count fields。
+- **GitNexus memo (non-blocking)**: iteration 99 MEDIUM on `app_manifest_to_metadata_view` / `app_manifest_to_service_app_view` manifest admission seam — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: filesize allowlist 13→0（`macaca-app/workflow.rs` / `pipeline_dry_run.rs` / P4 `macaca-framework` 等）；6.3.2 archive；P5 终态验收。

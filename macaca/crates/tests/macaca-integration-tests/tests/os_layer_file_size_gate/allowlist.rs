@@ -6,10 +6,9 @@
 
 use super::gate::FileSizeAllowlistEntry;
 
-/// Returns the baseline oversized-file snapshot (generated 2026-06-08, iteration 98).
+/// Returns the baseline oversized-file snapshot (generated 2026-06-08, iteration 99).
 pub fn entries() -> Vec<FileSizeAllowlistEntry> {
     vec![
-        FileSizeAllowlistEntry::new("crates/application/macaca-app/src/service_projection.rs", 847, "OS-layer-debt", "P5"),
         FileSizeAllowlistEntry::new("crates/application/macaca-app/src/workflow.rs", 625, "OS-layer-debt", "P5"),
         FileSizeAllowlistEntry::new("crates/runtime/macaca-framework/src/a2a.rs", 873, "P4-framework", "P4"),
         FileSizeAllowlistEntry::new("crates/runtime/macaca-framework/src/agent.rs", 675, "P4-framework", "P4"),

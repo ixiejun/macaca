@@ -862,3 +862,14 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `AppCapabilitySet` Composite flatten | MEDIUM | Capability provenance adapter; consumed by admission and projection code paths | P5 |
 | `model/tests.rs` | LOW | Contract tests with neutral `fixture-*` identifiers | P5 |
 | filesize allowlist 15→14 | LOW | debt inventory shrink; 14 oversized files remain | P5 |
+
+## Iteration 99 additions (§4.5.1 macaca-app service_projection Projection split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `service_projection/{projection,app_view,ui,policy,heartbeat,support,tests}.rs` | MEDIUM | Application Framework manifest→service projection module tree; public API unchanged via Facade re-exports | P5 |
+| `app_manifest_to_metadata_view` | MEDIUM | Sanitized metadata admission seam; consumed by web/CLI/gateway service adapters | P5 |
+| `app_manifest_to_service_app_view` | MEDIUM | Service app summary admission seam; consumed by runtime-host and shell read models | P5 |
+| `app_manifest_to_heartbeat_agent_views` | LOW | Heartbeat agent declaration projection; consumed by autonomy dispatch paths | P5 |
+| `service_projection/tests.rs` | LOW | Contract tests with neutral `fixture-*` identifiers | P5 |
+| filesize allowlist 14→13 | LOW | debt inventory shrink; 13 oversized files remain | P5 |
