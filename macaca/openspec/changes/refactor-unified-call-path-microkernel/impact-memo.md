@@ -570,3 +570,10 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `application_execution_hosted/{mod,types,abi_adapter,host_signal_translator,provider,provider_impl}.rs` | HIGH | WASM/YAML audit authority paths; public API via `runtime_host_public_api` unchanged | P5 |
 | `unified_audit_replay_convergence_tests.rs` multi-file source scan | LOW | architectural contract scans split modules instead of monolith | P5 |
 | filesize allowlist 45→44 | LOW | debt inventory shrink; 44 oversized files remain | P5 |
+
+## Iteration 69 additions (§4.5.1 host_import_tests Contract Test split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `host_import_tests/{mod,support,service_call_tests,domain_import_tests,audit_genui_tests,admission_guard_tests,policy_sanitization_tests}.rs` | LOW | WASM host-import contract test module tree; 15 lib tests unchanged; `wasm_runtime_provider/mod.rs` `mod host_import_tests` path unchanged | P5 |
+| filesize allowlist 44→43 | LOW | debt inventory shrink; 43 oversized files remain | P5 |

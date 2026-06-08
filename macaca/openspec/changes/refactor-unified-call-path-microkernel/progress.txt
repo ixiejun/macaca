@@ -551,3 +551,10 @@
 - **Contract tests**: `os_layer_file_size_gate` 1/1；`application_execution_hosted` lib tests 6/6；`unified_audit_replay_convergence_tests` 多文件源扫描同步。
 - **GitNexus memo (non-blocking)**: iteration 68 HIGH on `application_execution_hosted::*` WASM audit authority paths — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: filesize allowlist 44→0（`mcp_runtime.rs` / `app_executor.rs` / proto config/types 等）；6.3.2 archive；P5 终态验收。
+
+## Iteration 69 (2026-06-08)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 44→**43**；`host_import_tests.rs` 708→模块树（`mod.rs` Facade + `support.rs` Object Mother + `service_call_tests.rs` + `domain_import_tests.rs` + `audit_genui_tests.rs` + `admission_guard_tests.rs` + `policy_sanitization_tests.rs` Contract Test 分区）。
+- **Design patterns**: Facade module tree；Object Mother / Test Double（`support.rs`）；Contract Test（按 admission/domain/audit/policy 分区）；Chain of Responsibility 契约（admission guards）；Specification（policy deny + sanitization）。
+- **Contract tests**: `os_layer_file_size_gate` 1/1；`wasm_host_import` lib tests 15/15。
+- **GitNexus memo (non-blocking)**: iteration 69 LOW on WASM host-import contract test module split — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: filesize allowlist 43→0（`component_model_tests.rs` / `mcp_runtime.rs` / `app_executor.rs` / proto config/types 等）；6.3.2 archive；P5 终态验收。
