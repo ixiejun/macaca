@@ -438,9 +438,7 @@ fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> bool
                 relative,
                 "crates/application/macaca-app/src/consumption.rs"
                     | "crates/application/macaca-app/src/service_projection.rs"
-                    | "crates/application/macaca-app/src/workflow.rs"
                     | "crates/facade/macaca-sdk/src/system_facade.rs"
-                    | "crates/foundation/macaca-proto/src/agent_execution_service.rs"
                     | "crates/foundation/macaca-proto/src/orchestration.rs"
                     | "crates/foundation/macaca-proto/src/types.rs"
                     | "crates/runtime/macaca-runtime-host/src/executor/app_executor.rs"
@@ -984,6 +982,26 @@ fn serviceization_escape_hatches_web_framework_runner_coordinator_literal_absent
             "crates/shells/macaca-web/src/framework_runner/sse_emitter_adapter.rs",
         ],
         &["\"coordinator\""],
+    );
+}
+
+/// Terminal guard for `hardcoded-agent-role` (iteration 53): cleaned workflow and
+/// agent-execution proto modules must not reintroduce application role literals.
+#[test]
+fn serviceization_escape_hatches_hardcoded_agent_role_terminal_literals_absent() {
+    assert_production_paths_literal_tokens_absent(
+        &[
+            "crates/application/macaca-app/src/workflow.rs",
+            "crates/foundation/macaca-proto/src/agent_execution_service.rs",
+        ],
+        &[
+            "\"coordinator\"",
+            "\"planner\"",
+            "\"worker\"",
+            "\"backend\"",
+            "\"frontend\"",
+            "\"architect\"",
+        ],
     );
 }
 

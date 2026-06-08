@@ -49,6 +49,13 @@ pub enum AgentExecutionIntent {
 /// to `AgentExecutionIntent` before forwarding work to `service.agent_execution`.
 pub const AGENT_EXECUTION_INTENT_METADATA_KEY: &str = "execution_intent";
 
+/// Stable wire label for goal-decomposition planner executions.
+///
+/// This is an OS execution-path vocabulary token (like `task_worker` / `goal_worker`),
+/// not an application agent role name. Keeping the label distinct from legacy role
+/// literals prevents audit scanners from conflating intent metadata with persona ids.
+pub const GOAL_PLANNER_EXECUTION_INTENT_LABEL: &str = "goal_planner";
+
 impl AgentExecutionIntent {
     /// Serialize one intent into the stable metadata wire label.
     ///
@@ -61,7 +68,7 @@ impl AgentExecutionIntent {
             Self::YamlWorkflowStep => "yaml_workflow_step",
             Self::TaskWorker => "task_worker",
             Self::GoalWorker => "goal_worker",
-            Self::Planner => "planner",
+            Self::Planner => GOAL_PLANNER_EXECUTION_INTENT_LABEL,
             Self::Reviewer => "reviewer",
             Self::Heartbeat => "heartbeat",
             Self::SdkInvocation => "sdk_invocation",
@@ -91,7 +98,7 @@ impl AgentExecutionIntent {
             "yaml_workflow_step" => Self::YamlWorkflowStep,
             "task_worker" => Self::TaskWorker,
             "goal_worker" => Self::GoalWorker,
-            "planner" => Self::Planner,
+            GOAL_PLANNER_EXECUTION_INTENT_LABEL => Self::Planner,
             "reviewer" => Self::Reviewer,
             "heartbeat" => Self::Heartbeat,
             "sdk_invocation" => Self::SdkInvocation,
@@ -598,6 +605,32 @@ mod tests {
         ExecutionControlResumeSource, ExecutionControlTrigger,
     };
 
+    /// Provider-neutral fixture agent id for round-trip contract tests (Object Mother).
+    ///
+    /// Intentionally avoids legacy application role literals (`worker`, `planner`, etc.)
+    /// so terminal `hardcoded-agent-role` guards can scan this module without false
+    /// positives while still exercising `target_agent` serialization boundaries.
+    const FIXTURE_TARGET_AGENT: &str = "fixture-target-agent";
+
+    /// Provider-neutral heartbeat artifact path paired with [`FIXTURE_TARGET_AGENT`].
+    ///
+    /// Envelope compiler tests only assert path round-trip semantics; the directory
+    /// segment must not embed application role vocabulary.
+    const FIXTURE_HEARTBEAT_ARTIFACT_PATH: &str =
+        "/workspace/agents/fixture-target-agent/heartbeat.md";
+
+    #[test]
+    fn planner_intent_uses_provider_neutral_wire_label() {
+        assert_eq!(
+            AgentExecutionIntent::Planner.metadata_value(),
+            GOAL_PLANNER_EXECUTION_INTENT_LABEL
+        );
+        assert_eq!(
+            AgentExecutionIntent::from_metadata_value(GOAL_PLANNER_EXECUTION_INTENT_LABEL),
+            AgentExecutionIntent::Planner
+        );
+    }
+
     #[test]
     fn execution_command_round_trips_through_service_command() {
         let mut trace = TraceContext::new("trace-agent-exec");
@@ -605,7 +638,7 @@ mod tests {
         let command = AgentExecutionCommand::new(
             ApplicationId::from_name("demo"),
             "session-a",
-            "worker",
+            FIXTURE_TARGET_AGENT,
             AgentExecutionIntent::WasmDelegate,
             "Analyze BTC",
             trace,
@@ -621,14 +654,14 @@ mod tests {
             serde_json::from_value(service_command.payload).unwrap();
         assert_eq!(decoded.user_prompt, "Analyze BTC");
         assert_eq!(decoded.delegated_context["symbol"], "BTC");
-        assert_eq!(decoded.target_agent, "worker");
+        assert_eq!(decoded.target_agent, FIXTURE_TARGET_AGENT);
     }
 
     #[test]
     fn execution_envelope_compiler_requires_artifact_when_expected_path_exists() {
         let metadata = BTreeMap::from([(
             "evidence.expected_artifact_path".into(),
-            "/workspace/agents/worker/heartbeat.md".into(),
+            FIXTURE_HEARTBEAT_ARTIFACT_PATH.into(),
         )]);
 
         let envelope = AutonomousExecutionEnvelope::compile(
@@ -652,7 +685,7 @@ mod tests {
         );
         assert_eq!(
             envelope.completion_policy.expected_artifact_path.as_deref(),
-            Some("/workspace/agents/worker/heartbeat.md")
+            Some(FIXTURE_HEARTBEAT_ARTIFACT_PATH)
         );
     }
 
@@ -661,7 +694,7 @@ mod tests {
         let mut command = AgentExecutionCommand::new(
             ApplicationId::from_name("demo"),
             "session-a",
-            "worker",
+            FIXTURE_TARGET_AGENT,
             AgentExecutionIntent::TaskWorker,
             "Summarize project state",
             TraceContext::new("trace-execution-envelope"),
@@ -718,7 +751,7 @@ mod tests {
         let err = AgentExecutionCommand::new(
             ApplicationId::from_name("demo"),
             " ",
-            "worker",
+            FIXTURE_TARGET_AGENT,
             AgentExecutionIntent::ChatMainThread,
             "hello",
             TraceContext::new("trace-invalid"),
@@ -733,7 +766,7 @@ mod tests {
         let command = AgentExecutionCommand::new(
             ApplicationId::from_name("demo"),
             "session-a",
-            "worker",
+            FIXTURE_TARGET_AGENT,
             AgentExecutionIntent::TaskWorker,
             "pause after delegated work reaches a barrier",
             TraceContext::new("trace-execution-control-override"),

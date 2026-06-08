@@ -115,6 +115,5 @@ pub use wasm::WasmComponentApplicationDescriptor;
 pub use web3_capability::AppWeb3CapabilityRequest;
 pub use workflow::{
     DefaultWorkflowPromptStrategy, WorkflowContext, WorkflowEngine, WorkflowPromptContext,
-    WorkflowPromptParts, WorkflowPromptStrategy, WorkflowResult, DEFAULT_COORDINATOR,
-    DEFAULT_WORKFLOW,
+    WorkflowPromptParts, WorkflowPromptStrategy, WorkflowResult, DEFAULT_WORKFLOW,
 };

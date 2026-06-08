@@ -433,3 +433,12 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | OS `*_tests.rs` fixture agent ids | LOW | test-only; no production execution path | P5 |
 | `os_test_fixture_role_literals_absent` hard assert | LOW | prevents reintroduction of role literals in cleaned modules | P5 |
 | `migration_debt_baseline` raw 169→124 | LOW | debt inventory baseline only | P5 |
+
+## Iteration 53 additions (§6.2.1 hardcoded-agent-role terminal sub-phase — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `WorkflowEngine::resolve_coordinator_agent` | LOW | workflow prompt/persona resolution; fail-closed without manifest | P5 |
+| `GOAL_PLANNER_EXECUTION_INTENT_LABEL` wire rename | LOW | metadata label only; enum `Planner` unchanged; callers use `metadata_value()` | P5 |
+| `hardcoded_agent_role_terminal_literals_absent` hard assert | LOW | prevents reintroduction in cleaned workflow/proto modules | P5 |
+| `migration_debt_baseline` raw 124→121 | LOW | `hardcoded-agent-role` family retired to 0 | P5 |

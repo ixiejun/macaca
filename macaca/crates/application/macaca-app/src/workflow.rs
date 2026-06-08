@@ -8,13 +8,18 @@ use macaca_kernel::Kernel;
 use macaca_llm::LlmProvider;
 use macaca_proto::{AgentId, MacacaError, MacacaResult};
 
+use crate::consumption::app_entry_agent_name;
 use crate::model::{AgentSource, AppManifest, EntrypointType, WorkflowDefinition, WorkflowStep};
 
 /// Default workflow name if not specified.
 pub const DEFAULT_WORKFLOW: &str = "default";
 
-/// Default coordinator agent name.
-pub const DEFAULT_COORDINATOR: &str = "architect";
+/// Provider-neutral placeholder used only when rendering skeleton prompts that
+/// intentionally lack a manifest (documentation / compatibility helpers).
+///
+/// Runtime workflow execution MUST resolve the coordinator from manifest workflow
+/// steps or `entry_agent` via [`WorkflowEngine::resolve_coordinator_agent`].
+const SKELETON_PROMPT_AGENT_LABEL: &str = "entry-agent";
 
 /// Structured parts of a workflow prompt. This is an internal compatibility
 /// layer so prompt rendering can evolve without scattering large string blocks.
@@ -166,6 +171,52 @@ impl WorkflowEngine {
         Self { kernel, llm }
     }
 
+    /// Resolve the workflow coordinator agent from manifest declarations.
+    ///
+    /// Resolution order (Chain of Responsibility):
+    /// 1. First step agent in `manifest.workflows[workflow_name]`
+    /// 2. `manifest.entry_agent`
+    ///
+    /// Fails closed when neither source is declared so OS code never invents
+    /// application-specific agent role names as silent fallbacks.
+    pub fn resolve_coordinator_agent(
+        manifest: &AppManifest,
+        workflow_name: &str,
+    ) -> MacacaResult<String> {
+        if let Some(workflow) = manifest
+            .workflows
+            .as_ref()
+            .and_then(|workflows| workflows.get(workflow_name))
+        {
+            if let Some(step) = workflow.steps.first() {
+                let agent = step.agent.trim();
+                if !agent.is_empty() {
+                    tracing::debug!(
+                        workflow = workflow_name,
+                        coordinator = agent,
+                        source = "workflow_first_step",
+                        "resolved workflow coordinator from manifest workflow step"
+                    );
+                    return Ok(agent.to_string());
+                }
+            }
+        }
+
+        if let Some(entry_agent) = app_entry_agent_name(manifest) {
+            tracing::debug!(
+                workflow = workflow_name,
+                coordinator = entry_agent,
+                source = "manifest_entry_agent",
+                "resolved workflow coordinator from manifest entry_agent"
+            );
+            return Ok(entry_agent.to_string());
+        }
+
+        Err(MacacaError::Config(format!(
+            "workflow '{workflow_name}' requires coordinator agent: declare workflows.{workflow_name}.steps[0].agent or manifest.entry_agent"
+        )))
+    }
+
     /// Build the system prompt for a workflow.
     ///
     /// This combines:
@@ -179,17 +230,8 @@ impl WorkflowEngine {
         workflow_name: &str,
         additional_context: Option<&str>,
     ) -> MacacaResult<String> {
-        // Get workflow definition
-        let workflow = manifest
-            .workflows
-            .as_ref()
-            .and_then(|w| w.get(workflow_name));
-
-        // Determine coordinator agent
-        let coordinator = workflow
-            .and_then(|w| w.steps.first())
-            .map(|s| s.agent.as_str())
-            .unwrap_or(DEFAULT_COORDINATOR);
+        // Determine coordinator agent from manifest declarations (fail-closed).
+        let coordinator = Self::resolve_coordinator_agent(manifest, workflow_name)?;
 
         // Try to load persona
         let persona_dir = app_dir.join(format!("personas/{coordinator}"));
@@ -214,12 +256,7 @@ impl WorkflowEngine {
         app_dir: &PathBuf,
         workflow_name: &str,
     ) -> Option<PathBuf> {
-        let workflow = manifest
-            .workflows
-            .as_ref()
-            .and_then(|w| w.get(workflow_name))?;
-
-        let coordinator = workflow.steps.first()?.agent.as_str();
+        let coordinator = Self::resolve_coordinator_agent(manifest, workflow_name).ok()?;
         let persona_dir = app_dir.join(format!("personas/{coordinator}"));
 
         if persona_dir.exists() {
@@ -254,7 +291,7 @@ impl WorkflowEngine {
                 execution_control: None,
             },
             workflow_name: DEFAULT_WORKFLOW.into(),
-            coordinator: DEFAULT_COORDINATOR.into(),
+            coordinator: SKELETON_PROMPT_AGENT_LABEL.into(),
             additional_context: None,
         })
     }
@@ -284,7 +321,7 @@ impl WorkflowEngine {
                 execution_control: None,
             },
             workflow_name: DEFAULT_WORKFLOW.into(),
-            coordinator: DEFAULT_COORDINATOR.into(),
+            coordinator: SKELETON_PROMPT_AGENT_LABEL.into(),
             additional_context: None,
         })
     }
@@ -481,6 +518,9 @@ mod tests {
         WorkflowEngine::new(kernel, llm)
     }
 
+    /// Provider-neutral fixture coordinator for workflow unit tests (Object Mother).
+    const FIXTURE_WORKFLOW_COORDINATOR: &str = "fixture-entry";
+
     fn default_manifest_with_workflow() -> AppManifest {
         let mut workflows = HashMap::new();
         workflows.insert(
@@ -489,7 +529,7 @@ mod tests {
                 description: None,
                 steps: vec![WorkflowStep {
                     name: "coordinate".into(),
-                    agent: DEFAULT_COORDINATOR.into(),
+                    agent: FIXTURE_WORKFLOW_COORDINATOR.into(),
                     prompt_template: None,
                     depends_on: vec![],
                 }],
@@ -550,7 +590,7 @@ mod tests {
         let rendered = DefaultWorkflowPromptStrategy.render(&WorkflowPromptContext {
             manifest: default_manifest_with_workflow(),
             workflow_name: DEFAULT_WORKFLOW.into(),
-            coordinator: DEFAULT_COORDINATOR.into(),
+            coordinator: FIXTURE_WORKFLOW_COORDINATOR.into(),
             additional_context: None,
         });
         assert_eq!(rendered, WorkflowEngine::default_workflow_prompt());
@@ -598,7 +638,7 @@ mod tests {
         let engine = make_engine();
         let manifest = AppManifest {
             agents: vec![AgentSource::Inline(crate::model::InlineAgentConfig {
-                name: DEFAULT_COORDINATOR.into(),
+                name: FIXTURE_WORKFLOW_COORDINATOR.into(),
                 capabilities: vec![],
                 prompt_template: String::new(),
                 model: "mock".into(),

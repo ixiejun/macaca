@@ -437,3 +437,11 @@
 - **Contract tests**: `serviceization_escape_hatches` 15/15；`macaca-tools` todo tests；`macaca-persist` event_log_tests；`macaca-web` session/routes/skill tests。
 - **GitNexus memo (non-blocking)**: iteration 52 LOW on OS test fixture neutralization — recorded in `impact-memo.md`。
 - **Next**: 6.2.1 `hardcoded-agent-role` 收尾（3 命中：`workflow.rs`/`agent_execution_service.rs`）；`provider-model-routing-name`（121）；filesize allowlist 75→0。
+
+## Iteration 53 (2026-06-07)
+- **P5 §6.2.1 逃逸口 family 终态**: `hardcoded-agent-role` 全量退役（3→0）；`workflow.rs` 去除 `DEFAULT_COORDINATOR=architect` → `resolve_coordinator_agent` manifest 链式解析（fail-closed）；`agent_execution_service.rs` Planner intent wire label `planner` → `goal_planner`；删除 `workflow.rs`/`agent_execution_service.rs` migration surfaces；`migration_debt_baseline` raw **124→121**（仅剩 `provider-model-routing-name` 121）。
+- **P5 退役 token 硬断言**: 新增 `hardcoded_agent_role_terminal_literals_absent`。
+- **Design patterns**: Chain of Responsibility（coordinator 解析链）；Value Object（execution intent wire label）；Fail-Closed（无 manifest 声明则报错）。
+- **Contract tests**: `serviceization_escape_hatches` 16/16；`macaca-app` workflow tests；`macaca-proto` agent_execution_service tests。
+- **GitNexus memo (non-blocking)**: iteration 53 LOW on hardcoded-agent-role family retirement — recorded in `impact-memo.md`。
+- **Next**: 6.2.1 `provider-model-routing-name`（121）；filesize allowlist 75→0；6.3.2 archive。
