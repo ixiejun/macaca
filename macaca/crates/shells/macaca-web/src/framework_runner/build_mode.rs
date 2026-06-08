@@ -62,7 +62,8 @@ impl DriverTraceRoute {
         match self {
             DriverTraceRoute::Executor { .. } => "executor",
             DriverTraceRoute::Runtime { .. } => "runtime",
-            DriverTraceRoute::Coordinator { .. } => "coordinator",
+            // Provider-neutral route label for framework SSE trace deduplication.
+            DriverTraceRoute::Coordinator { .. } => "framework_sse",
         }
     }
 }

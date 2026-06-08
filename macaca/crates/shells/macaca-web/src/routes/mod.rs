@@ -34,7 +34,7 @@ mod tests;
 
 // Shared utilities and error helpers
 pub use shared::{AgentStatusQuery, ErrorResponse, root_not_found};
-pub(crate) use shared::{default_model, err, proto_err};
+pub(crate) use shared::{app_entry_agent_name, default_model, err, proto_err};
 
 // System status
 pub use status::{get_status, StatusResponse};

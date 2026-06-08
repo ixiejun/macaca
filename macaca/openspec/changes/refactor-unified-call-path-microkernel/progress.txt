@@ -421,3 +421,11 @@
 - **Contract tests**: `serviceization_escape_hatches` 13/13；`autonomy_scheduler_heartbeat_services` 11/11；`p5_terminal_audit_gates` 3/3；`os_layer_file_size_gate` 1/1。
 - **GitNexus memo (non-blocking)**: iteration 50 LOW on autonomy-service-boundary family retirement — recorded in `impact-memo.md`。
 - **Next**: 6.2.1 下一 major family `hardcoded-agent-role`（54）；`provider-model-routing-name`（121）；6.3.2 继续 archive；filesize allowlist 75→0。
+
+## Iteration 51 (2026-06-07)
+- **P5 §6.2.1 逃逸口 family 子阶段**: `hardcoded-agent-role` web framework_runner/chat 子阶段（6→0 命中）；`route_chat_v2` 去除 `"coordinator"` fallback → `resolve_required_entry_agent_name` fail-closed；`sse_emitter_adapter` EventLog 使用 manifest 解析的 `agent_name`；`build_mode` trace label `"coordinator"` → `"framework_sse"`；删除 3 个 migration surfaces；`migration_debt_baseline` raw **175→169**（`hardcoded-agent-role` 54→48）。
+- **P5 退役 token 硬断言**: 新增 `web_framework_runner_coordinator_literal_absent` + `assert_production_paths_literal_tokens_absent` helper。
+- **Design patterns**: Chain of Responsibility（entry agent 解析链）；Strategy（SSE hook 注入运行时 agent 身份）；Fail-Closed（无 manifest entry_agent 则 400）。
+- **Contract tests**: `serviceization_escape_hatches` 14/14；`macaca-web` chat_orchestrator tests；`p5_terminal_audit_gates` 3/3；`os_layer_file_size_gate` 1/1。
+- **GitNexus memo (non-blocking)**: iteration 51 LOW on web framework_runner coordinator literal removal — recorded in `impact-memo.md`。
+- **Next**: 6.2.1 `hardcoded-agent-role` 继续分阶段（48 命中）；`provider-model-routing-name`（121）；6.3.2 继续 archive；filesize allowlist 75→0。

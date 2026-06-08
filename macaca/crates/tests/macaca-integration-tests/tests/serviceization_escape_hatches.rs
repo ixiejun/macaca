@@ -466,9 +466,7 @@ fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> bool
                     | "crates/services/macaca-task/src/todo_store.rs"
                     | "crates/services/macaca-tools/src/todo.rs"
                     | "crates/shells/macaca-web/src/capability_catalog.rs"
-                    | "crates/shells/macaca-web/src/chat_orchestrator/route_chat_v2.rs"
-                    | "crates/shells/macaca-web/src/framework_runner/build_mode.rs"
-                    | "crates/shells/macaca-web/src/framework_runner/sse_emitter_adapter.rs"
+                    // route_chat_v2 / framework_runner SSE adapters retired in iteration 51.
                     | "crates/shells/macaca-web/src/framework_toolkit/mod.rs"
                     | "crates/shells/macaca-web/src/framework_toolkit/builder.rs"
                     | "crates/shells/macaca-web/src/loop_manager/mod.rs"
@@ -773,6 +771,42 @@ fn assert_production_literal_tokens_absent_outside_allowed_paths(
     );
 }
 
+/// Assert specific production source paths contain no forbidden literal tokens.
+///
+/// Used for sub-phase retirement of `hardcoded-agent-role` debt where only a
+/// handful of modules were cleaned while the family migration surface remains.
+fn assert_production_paths_literal_tokens_absent(relative_paths: &[&str], literals: &[&str]) {
+    let root = workspace_root();
+    let mut hits = Vec::new();
+
+    for relative in relative_paths {
+        let path = root.join(relative);
+        let content = std::fs::read_to_string(&path)
+            .unwrap_or_else(|error| panic!("failed to read {}: {error}", path.display()));
+        for (index, line) in content.lines().enumerate() {
+            for literal in literals {
+                if line.contains(literal) {
+                    hits.push(format!(
+                        "\nfamily=literal-guard\nfile={}:{}\ntoken={}\n",
+                        relative,
+                        index + 1,
+                        literal
+                    ));
+                }
+            }
+        }
+    }
+    hits.sort();
+
+    assert!(
+        hits.is_empty(),
+        "Production paths {:?} must not contain literal tokens {:?}:{}",
+        relative_paths,
+        literals,
+        hits.join("")
+    );
+}
+
 /// Like [`assert_retired_escape_hatch_tokens_absent_in_production`], but permits
 /// literal hits under approved path prefixes (e.g. proto constant definitions).
 fn assert_retired_escape_hatch_tokens_absent_in_production_with_allowed_paths(
@@ -936,6 +970,21 @@ fn serviceization_escape_hatches_autonomy_service_id_literals_absent_outside_pro
 #[test]
 fn serviceization_escape_hatches_autonomy_service_boundary_absent_in_production() {
     assert_retired_escape_hatch_family_absent_in_production("autonomy-service-boundary");
+}
+
+/// Sub-phase of `hardcoded-agent-role` (iteration 51): web framework chat/SSE
+/// paths must resolve entry agents from manifest/service views — never shell
+/// defaults like `"coordinator"`.
+#[test]
+fn serviceization_escape_hatches_web_framework_runner_coordinator_literal_absent() {
+    assert_production_paths_literal_tokens_absent(
+        &[
+            "crates/shells/macaca-web/src/chat_orchestrator/route_chat_v2.rs",
+            "crates/shells/macaca-web/src/framework_runner/build_mode.rs",
+            "crates/shells/macaca-web/src/framework_runner/sse_emitter_adapter.rs",
+        ],
+        &["\"coordinator\""],
+    );
 }
 
 #[test]

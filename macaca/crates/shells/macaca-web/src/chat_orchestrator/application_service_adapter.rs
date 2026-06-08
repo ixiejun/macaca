@@ -13,6 +13,41 @@ use macaca_proto::{
 
 use crate::state::AppState;
 
+/// Resolve the manifest-declared entry agent required for chat dispatch.
+///
+/// Uses a Chain-of-Responsibility fallback:
+/// 1. Application Service metadata/status views (preferred serviceized path).
+/// 2. Deprecated manifest registry projection (`routes::shared`).
+/// 3. Fail closed — the OS shell must not invent application-specific agent names.
+pub(crate) async fn resolve_required_entry_agent_name(
+    state: &Arc<AppState>,
+    app_id: &ApplicationId,
+) -> Result<String, String> {
+    if let Some(name) = service_entry_agent_name(state, app_id).await {
+        tracing::info!(
+            app_id = %app_id,
+            entry_agent = %name,
+            "Resolved entry agent via Application Service"
+        );
+        return Ok(name);
+    }
+
+    if let Some(name) = crate::routes::app_entry_agent_name(state, app_id).await {
+        tracing::warn!(
+            app_id = %app_id,
+            entry_agent = %name,
+            "Resolved entry agent via deprecated manifest registry fallback"
+        );
+        return Ok(name);
+    }
+
+    tracing::error!(
+        app_id = %app_id,
+        "Entry agent resolution failed: application manifest must declare entry_agent"
+    );
+    Err("Application manifest does not declare an entry agent".to_string())
+}
+
 pub(crate) async fn service_entry_agent_name(state: &Arc<AppState>, app_id: &ApplicationId) -> Option<String> {
     match ApplicationMetadataQueryCommand::application(
         TraceContext::new("web-chat-entry-agent-metadata"),
@@ -83,7 +118,7 @@ pub(crate) async fn notify_application_session_start(
             app_id = %app_id,
             session_id,
             error = %error,
-            "Application Service session start failed; continuing coordinator path"
+            "Application Service session start failed; continuing framework chat path"
         ),
     }
 }
@@ -111,7 +146,7 @@ pub(crate) async fn notify_application_session_stop(
             app_id = %app_id,
             session_id,
             error = %error,
-            "Application Service session stop failed after coordinator completion"
+            "Application Service session stop failed after framework chat completion"
         );
     }
 }

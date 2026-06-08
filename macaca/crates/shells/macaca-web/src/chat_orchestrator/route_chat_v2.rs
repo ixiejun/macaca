@@ -11,7 +11,6 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::sse::{Event, Sse};
 use axum::Json;
-use macaca_app::app_entry_agent_name;
 use macaca_proto::{
     ApplicationHostCommand, ApplicationHostDispatchServiceCommand, ApplicationId,
     ApplicationImport, ApplicationServiceScope, TraceContext,
@@ -22,7 +21,7 @@ use crate::routes::{err, ErrorResponse};
 use crate::state::AppState;
 
 use super::application_service_adapter::{
-    notify_application_session_start, service_entry_agent_name,
+    notify_application_session_start, resolve_required_entry_agent_name,
 };
 use super::dto::ChatRequest;
 use super::executor_adapter::{cleanup_app_state, ensure_app_executor};
@@ -52,23 +51,11 @@ pub(crate) async fn post_chat_v2(
         .map_err(|_| err(StatusCode::BAD_REQUEST, "Invalid app_id".into()))?;
     let app_id = ApplicationId(app_uuid);
 
-    // Determine entry agent
-    let entry_agent_name = if let Some(name) = service_entry_agent_name(&state, &app_id).await {
-        name
-    } else {
-        #[allow(deprecated)]
-        {
-            let registry = crate::application_shell_adapter::registry_read_guard(&state).await;
-            registry
-                .get_app(&app_id)
-                .map(|app| {
-                    app_entry_agent_name(&app.manifest)
-                        .unwrap_or("coordinator")
-                        .to_string()
-                })
-                .unwrap_or_else(|| "coordinator".to_string())
-        }
-    };
+    // Entry agent must come from Application Service or manifest projection — never
+    // a shell-level default role name (application-agnostic OS boundary).
+    let entry_agent_name = resolve_required_entry_agent_name(&state, &app_id)
+        .await
+        .map_err(|message| err(StatusCode::BAD_REQUEST, message))?;
 
     // Session key
     let is_new_session = req.session_id.is_none();

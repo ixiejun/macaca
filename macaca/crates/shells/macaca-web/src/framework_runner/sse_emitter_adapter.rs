@@ -21,11 +21,13 @@ pub struct SseEmitterHook {
 impl Hook for SseEmitterHook {
     async fn pre_reply(&self, msg: Msg) -> macaca_framework::agent::AgentResult<Msg> {
         if let (Some(event_log), Some(session_id)) = (&self.event_log, &self.session_id) {
+            // Event log agent attribution follows the manifest-resolved entry agent
+            // carried by the hook adapter (Strategy: inject runtime agent identity).
             event_log
                 .append_command(AppendEventCommand::new(
                     session_id,
                     "thinking",
-                    "coordinator",
+                    &self.agent_name,
                     serde_json::json!({
                         "iteration": 0,
                     }),
@@ -49,7 +51,7 @@ impl Hook for SseEmitterHook {
                 .append_command(AppendEventCommand::new(
                     session_id,
                     "content",
-                    "coordinator",
+                    &self.agent_name,
                     serde_json::json!({
                         "content": text,
                     }),
@@ -59,7 +61,7 @@ impl Hook for SseEmitterHook {
                 .append_command(AppendEventCommand::new(
                     session_id,
                     "done",
-                    "coordinator",
+                    &self.agent_name,
                     serde_json::json!({
                         "model": "",
                         "tokens": { "prompt": 0, "completion": 0, "total": 0 },

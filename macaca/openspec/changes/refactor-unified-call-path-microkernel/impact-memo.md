@@ -414,3 +414,13 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `"service.scheduler"` / `"service.heartbeat"` removed from `forbidden_tokens` | LOW | proto owns canonical constants; literal guard via `assert_production_literal_tokens_absent_outside_allowed_paths` | P5 |
 | `autonomy_service_boundary_absent_in_production` family hard assert | LOW | terminal Strangler Fig state for 7th retired escape-hatch family | P5 |
 | `migration_debt_baseline` raw 177→175 | LOW | debt inventory baseline only; no production runtime behavior change | P5 |
+
+## Iteration 51 additions (§6.2.1 hardcoded-agent-role sub-phase — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `resolve_required_entry_agent_name` | LOW | chat v2 entry agent resolution; fail-closed when manifest lacks entry_agent | P5 |
+| `sse_emitter_adapter` agent_name attribution | LOW | EventLog/SSE events use runtime-resolved agent identity | P5 |
+| `DriverTraceRoute::label` framework_sse | LOW | diagnostic trace dedup label only; no routing behavior change | P5 |
+| `web_framework_runner_coordinator_literal_absent` hard assert | LOW | prevents reintroduction of shell-level coordinator fallback | P5 |
+| `migration_debt_baseline` raw 175→169 | LOW | debt inventory baseline only | P5 |
