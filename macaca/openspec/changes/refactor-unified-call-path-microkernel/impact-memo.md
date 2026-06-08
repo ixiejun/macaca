@@ -643,3 +643,14 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `dispatch_agent` | HIGH | Skill alias resolution + autonomous execution envelope compile + `service.agent_execution` call + `AgentExecutionEvidenceGate` | P5 |
 | `record_completion` | MEDIUM | Observer callback through `service.heartbeat` for terminal dispatch memento | P5 |
 | filesize allowlist 36→35 | LOW | debt inventory shrink; 35 oversized files remain | P5 |
+
+## Iteration 78 additions (§4.5.1 fork_manager Facade split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `fork_manager/{mod,types,manager,lifecycle,validation_merge,persistence,hooks_queries,tests}.rs` | HIGH | Fork-Join child agent lifecycle orchestration + hook broadcast + optional `KernelPersistencePort` restore; public API `ForkManager`/`HookEvent`/`ForkContext` unchanged via `executor/mod.rs` | P5 |
+| `ForkManager::create_fork` | HIGH | Parallel fork limit enforcement + in-memory registry + optional persistence write + `ForkCreated` hook emission | P5 |
+| `ForkManager::resume_fork_by_task` | HIGH | Delegate task completion → fork resume + validation + merge eligibility path | P5 |
+| `ForkManager::merge_fork` | HIGH | Parent merge summary generation + terminal state transition + `ForkMerged` hook | P5 |
+| `ForkManager::restore_forks` | MEDIUM | Post-restart Memento replay via `KernelPersistencePort::list_keys` prefix scan | P5 |
+| filesize allowlist 35→34 | LOW | debt inventory shrink; 34 oversized files remain | P5 |

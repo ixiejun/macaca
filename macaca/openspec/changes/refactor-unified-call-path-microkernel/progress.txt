@@ -614,3 +614,10 @@
 - **Contract tests**: `os_layer_file_size_gate` 1/1；`heartbeat_agent_dispatch` lib tests 7/7。
 - **GitNexus memo (non-blocking)**: iteration 77 HIGH on `dispatch_after_accepted_wake` / `dispatch_agent` manifest-driven heartbeat → agent execution syscall + evidence gate path — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: filesize allowlist 35→0（`mcp_runtime.rs` / `app_executor.rs` / `fork_manager.rs` / proto config/types 等）；6.3.2 archive；P5 终态验收。
+
+## Iteration 78 (2026-06-08)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 35→**34**；`fork_manager.rs` 931→模块树（`mod.rs` Facade + `types.rs` Value Object/State + `manager.rs` + `lifecycle.rs` State transitions + `validation_merge.rs` Specification + `persistence.rs` Memento + `hooks_queries.rs` Observer + `tests.rs` Contract Test 分区）。
+- **Design patterns**: Facade module tree；State（`ForkContext` lifecycle memento）；Observer（`HookEvent` broadcast + `emit_hook_event`）；Specification（`validate_result` acceptance criteria）；Memento（`KernelPersistencePort` restore/cleanup）；trace `info!`/`warn!`/`error!` on create/suspend/resume/merge/persistence nodes。
+- **Contract tests**: `os_layer_file_size_gate` 1/1；`fork_manager` lib tests 2/2；`executor_runtime_eviction` 5/5；escape-hatch path allowlists 同步至 `fork_manager/mod.rs`。
+- **GitNexus memo (non-blocking)**: iteration 78 HIGH on `create_fork` / `resume_fork_by_task` / `merge_fork` fork-join orchestration + persistence restore path — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: filesize allowlist 34→0（`mcp_runtime.rs` / `app_executor.rs` / proto config/types 等）；6.3.2 archive；P5 终态验收。
