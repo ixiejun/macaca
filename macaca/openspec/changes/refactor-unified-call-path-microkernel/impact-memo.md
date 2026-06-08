@@ -852,3 +852,13 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `wasm_runtime_ability` + `DomainPackCatalog` | LOW | Strategy catalog injection for generic WASM ability synthesis | P5 |
 | `yaml_adapter/tests.rs` | LOW | Contract tests with neutral `fixture-*` identifiers | P5 |
 | filesize allowlist 16→15 | LOW | debt inventory shrink; 15 oversized files remain | P5 |
+
+## Iteration 98 additions (§4.5.1 macaca-app model Aggregate Root split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `model/{core,agent_config,autonomy,capability,manifest,workflow,loaded,tests}.rs` | MEDIUM | Application Framework DTO module tree; public `macaca_app::model::*` API unchanged via Facade re-exports | P5 |
+| `AppManifest` aggregate root | MEDIUM | Manifest admission seam; consumed by yaml_adapter, service_projection, runtime load paths | P5 |
+| `AppCapabilitySet` Composite flatten | MEDIUM | Capability provenance adapter; consumed by admission and projection code paths | P5 |
+| `model/tests.rs` | LOW | Contract tests with neutral `fixture-*` identifiers | P5 |
+| filesize allowlist 15→14 | LOW | debt inventory shrink; 14 oversized files remain | P5 |
