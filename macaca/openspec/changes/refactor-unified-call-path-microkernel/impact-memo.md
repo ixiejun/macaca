@@ -842,3 +842,13 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `with_route_c_clients` / `with_route_c_and_autonomy_clients` | MEDIUM | Builder composition points; explicit Strategy client injection | P5 |
 | `system_facade/tests.rs` | LOW | Contract tests with neutral todo fixtures; `hardcoded-agent-role` debt retired from production root | P5 |
 | filesize allowlist 17→16 | LOW | debt inventory shrink; 16 oversized files remain | P5 |
+
+## Iteration 97 additions (§4.5.1 macaca-app yaml_adapter Adapter split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `yaml_adapter/{types,adapter,entry,abilities,projection,tests}.rs` | MEDIUM | Application Framework manifest adapter module tree; public API unchanged via Facade re-exports | P5 |
+| `YamlApplicationManifestAdapter::project_with_catalog` | MEDIUM | YAML→Manifest v1 admission seam; consumed by package/ABI/service_projection adapters | P5 |
+| `wasm_runtime_ability` + `DomainPackCatalog` | LOW | Strategy catalog injection for generic WASM ability synthesis | P5 |
+| `yaml_adapter/tests.rs` | LOW | Contract tests with neutral `fixture-*` identifiers | P5 |
+| filesize allowlist 16→15 | LOW | debt inventory shrink; 15 oversized files remain | P5 |

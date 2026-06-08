@@ -774,3 +774,13 @@
 - **Logging**: preserved `tracing::info` on task-board query, status snapshot, service inspection/call, trace replay/tail, package inspection, llm chat, memory recall, context assembly audit nodes。
 - **GitNexus memo (non-blocking)**: iteration 96 HIGH on `SystemFacade::query_task_board` + `call_service` shell syscall seam — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: filesize allowlist 16→0（`macaca-app` / `pipeline_dry_run.rs` / P4 `macaca-framework` 等）；6.3.2 archive；P5 终态验收。
+
+## Iteration 97 (2026-06-08)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 16→**15**；`macaca-app/manifest_v1/yaml_adapter.rs` 634→`yaml_adapter/` Adapter 模块树（`yaml_adapter.rs` + `types.rs` + `adapter.rs` + `entry.rs` + `abilities.rs` + `projection.rs` + `tests.rs`）。
+- **Design patterns**: Adapter module tree；Memento（`YamlToApplicationManifestV1Report`）；Builder（`new` / `with_resolved_agents`）；Strategy（`DomainPackCatalog` for WASM ability synthesis）；Observer（`tracing::info` on projection audit nodes）。
+- **Contract tests**: `cargo check -p macaca-app` OK；`cargo test -p macaca-app manifest_v1::` 2/2；`os_layer_file_size_gate` 1/1；`serviceization_escape_hatches` OK；production modules all ≤500 lines（max `abilities.rs` ~221）。
+- **Public API**: `macaca_app::manifest_v1::{YamlApplicationManifestAdapter, LegacyAppManifestProjection, ...}` unchanged via Facade re-exports；`mod.rs` unchanged。
+- **Escape hatch**: contract-test fixtures 使用中性 `fixture-role-alpha` 标识符（`tests.rs` 后缀自动豁免）。
+- **Logging**: preserved `tracing::info` on execution_control projection and final YAML→Manifest v1 summary audit nodes。
+- **GitNexus memo (non-blocking)**: iteration 97 MEDIUM on `YamlApplicationManifestAdapter::project_with_catalog` manifest admission seam — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: filesize allowlist 15→0（`macaca-app/model.rs` / `service_projection.rs` / `workflow.rs` / `pipeline_dry_run.rs` / P4 `macaca-framework` 等）；6.3.2 archive；P5 终态验收。
