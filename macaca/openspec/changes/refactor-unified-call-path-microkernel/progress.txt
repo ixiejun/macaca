@@ -737,3 +737,12 @@
 - **Logging**: preserved + extended `tracing::{info,warn}` on create/cancel/health paths with `service_id` / `provider_id` / `trace_id` / `task_id` audit fields。
 - **GitNexus memo (non-blocking)**: iteration 92 HIGH on `LocalScheduledAgentTaskProvider::create_task` scheduler-registration syscall seam — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: filesize allowlist 20→0（`macaca-scheduler/local_provider.rs` 等）；6.3.2 archive；P5 终态验收。
+
+## Iteration 93 (2026-06-08)
+- **P5 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 20→**19**；`macaca-scheduler/local_provider.rs` 874→`local_provider/` Facade 模块树（`local_provider.rs` + `support.rs` + `store.rs` + `materialization.rs` + `service.rs` + `run_control.rs` + `schedule.rs` + `tests.rs`）。
+- **Design patterns**: Facade module tree；Memento（`InMemorySchedulerStore`）；State（job/run lifecycle）；Strategy（`DefaultScheduleCalculator` + `run_control` transitions）；Observer（`tracing::{info,warn,debug}` on materialization/lease/lifecycle audit nodes）。
+- **Contract tests**: `cargo check -p macaca-scheduler` OK；`cargo test -p macaca-scheduler local_provider::` 4/4；`os_layer_file_size_gate` 1/1；`serviceization_escape_hatches` OK；production modules all ≤500 lines（max `run_control.rs` ~454）。
+- **Public API**: `macaca_scheduler::InProcessSchedulerProvider` / `InProcessSchedulerLeasedRun` unchanged via Facade；`lib.rs` `pub mod local_provider` unchanged。
+- **Logging**: preserved + extended `tracing::{info,warn,debug}` on due-materialization, job CRUD, lease acquisition, run lifecycle transitions with `service_id` / `provider_id` / `trace_id` / `audit_id` fields。
+- **GitNexus memo (non-blocking)**: iteration 93 HIGH on `InProcessSchedulerProvider::acquire_next_run_lease_with_target` dispatch-boundary syscall seam — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: filesize allowlist 19→0（`macaca-app` / `macaca-sdk` / P4 `macaca-framework` 巨型文件 / `pipeline_dry_run.rs` 等）；6.3.2 archive；P5 终态验收。

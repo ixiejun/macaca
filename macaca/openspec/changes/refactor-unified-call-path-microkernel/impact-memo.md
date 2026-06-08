@@ -797,3 +797,14 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `sanitize_metadata` / `scheduler_target_metadata` | LOW | Specification metadata redaction for scheduler dispatch | P5 |
 | `local_provider/tests.rs` | LOW | Contract tests with neutral application/agent fixtures; prompt leak assertions only | P5 |
 | filesize allowlist 21→20 | LOW | debt inventory shrink; 20 oversized files remain | P5 |
+
+## Iteration 93 additions (§4.5.1 macaca-scheduler local_provider Facade split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `local_provider/{support,store,materialization,service,tests}.rs` | HIGH | Scheduler service provider module tree; public `InProcessSchedulerProvider` API unchanged via Facade | P5 |
+| `InProcessSchedulerProvider::acquire_next_run_lease_with_target` | HIGH | Dispatch-boundary lease syscall; consumed by runtime-host autonomy supervisor + scheduled-agent-task registration path | P5 |
+| `refresh_due_runs` / `materialize_due_runs_for_dispatch` | MEDIUM | Due-time materialization memento; no application-specific branches | P5 |
+| `DefaultScheduleCalculator::due_times` | MEDIUM | Strategy schedule calculation; cron/interval/one-shot bounded catch-up | P5 |
+| `local_provider/tests.rs` | LOW | Contract tests with neutral service-target fixtures; heartbeat cadence boundary assertions | P5 |
+| filesize allowlist 20→19 | LOW | debt inventory shrink; 19 oversized files remain | P5 |

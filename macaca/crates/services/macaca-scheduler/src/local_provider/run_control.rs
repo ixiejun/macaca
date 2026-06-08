@@ -16,9 +16,9 @@ use macaca_proto::{
 };
 use tracing::{info, warn};
 
-use super::{
-    InProcessSchedulerLeasedRun, InProcessSchedulerProvider, LocalSchedulerState, LOCAL_PROVIDER_ID,
-};
+use super::store::{LocalSchedulerState, StoredRun};
+use super::support::LOCAL_PROVIDER_ID;
+use super::{InProcessSchedulerLeasedRun, InProcessSchedulerProvider};
 
 const LEASE_OWNER_KEY: &str = "lease_owner";
 const LEASE_EXPIRES_AT_KEY: &str = "lease_expires_at";
@@ -224,7 +224,7 @@ impl InProcessSchedulerProvider {
                 };
                 state.runs.insert(
                     retry_run_id.clone(),
-                    super::StoredRun {
+                    StoredRun {
                         summary: retry_summary,
                     },
                 );
@@ -308,7 +308,7 @@ impl InProcessSchedulerProvider {
         mutate: F,
     ) -> MacacaResult<SchedulerCommandResult>
     where
-        F: FnOnce(&mut super::StoredRun, DateTime<Utc>),
+        F: FnOnce(&mut StoredRun, DateTime<Utc>),
     {
         Ok(self.store.write(|state| {
             let audit_id = state.record_audit(match next_state {

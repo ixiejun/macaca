@@ -14,7 +14,8 @@ use chrono::{DateTime, Datelike, Duration, FixedOffset, NaiveDate, Timelike, Utc
 use macaca_proto::{SchedulerJobDefinition, SchedulerMissedRunPolicy, SchedulerScheduleSpec};
 use tracing::warn;
 
-use super::{StoredJob, LOCAL_PROVIDER_ID, MATERIALIZATION_LIMIT};
+use super::store::StoredJob;
+use super::support::{LOCAL_PROVIDER_ID, MATERIALIZATION_LIMIT};
 
 /// Default schedule calculator used by the in-memory local provider.
 ///
