@@ -903,3 +903,13 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `Msg::new` / `Msg::tool_result` | LOW | Message envelope factories; consumed by agent, pipeline, memory, formatter, a2a, web adapters | P4 |
 | `MsgContent::strip_thinking` | LOW | Cross-agent broadcast filter; consumed by pipeline and a2a paths | P4 |
 | filesize allowlist 11→10 | LOW | debt inventory shrink; 10 oversized P4 framework files remain | P4 |
+
+## Iteration 103 additions (§4.5.1 macaca-framework agent Facade split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `agent/{core,error,hooks,static_hooks,hooked,tests}.rs` | LOW | Framework agent module tree; public API unchanged via Facade re-exports | P4 |
+| `HookedAgent::reply` | LOW | Decorator hook orchestration seam; consumed by react_agent, pipeline, construction, web framework_runner | P4 |
+| `HookRegistry::run_pre_reply` / `run_post_reply` | LOW | Chain of Responsibility hook ordering; instance + static hook composition | P4 |
+| `register_static_hook` / `clear_static_hooks` | LOW | Process-wide Singleton hook registry; test-serialized via mutex | P4 |
+| filesize allowlist 10→9 | LOW | debt inventory shrink; 9 oversized P4 framework files remain | P4 |
