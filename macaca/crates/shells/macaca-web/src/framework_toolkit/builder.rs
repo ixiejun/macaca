@@ -8,14 +8,14 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
-use macaca_sdk::framework::adapter::{SingleToolAdapter, ToolSetBridge};
-use macaca_sdk::framework::tool::Toolkit;
 use macaca_proto::{
     ApplicationId, McpServicePolicyHints, McpServiceScope, McpToolCatalogCommand, TraceContext,
 };
 use macaca_sdk::driver::{DriverServiceScope, DriverToolCatalogCommand};
+use macaca_sdk::framework::tool::Toolkit;
 use macaca_sdk::skill::{SkillServiceScope, SkillToolCatalogCommand};
 
+use crate::framework_adapter::{SingleToolAdapter, ToolSetBridge};
 use crate::state::AppState;
 use macaca_sdk::runtime_host::{McpServerDefinition, McpToolPolicy};
 
@@ -287,7 +287,8 @@ pub(crate) async fn build_toolkit(
     )
     .await;
     let mcp_statuses =
-        macaca_sdk::runtime_host::probe_definition_statuses(mcp_definitions.clone(), &mcp_policy).await;
+        macaca_sdk::runtime_host::probe_definition_statuses(mcp_definitions.clone(), &mcp_policy)
+            .await;
     emit_mcp_runtime_events(state, session_id.as_deref(), agent_name, &mcp_statuses).await;
 
     if let Some(snapshot) = crate::skill_mcp::load_or_build_skill_snapshot(
@@ -298,8 +299,9 @@ pub(crate) async fn build_toolkit(
     )
     .await
     {
-        let skill_definitions = macaca_sdk::runtime_host::McpServerFactory::with_bundled_mapping_registry()
-            .from_skill_snapshot(&snapshot);
+        let skill_definitions =
+            macaca_sdk::runtime_host::McpServerFactory::with_bundled_mapping_registry()
+                .from_skill_snapshot(&snapshot);
         emit_mcp_starting_events(state, session_id.as_deref(), agent_name, &skill_definitions)
             .await;
         register_mcp_definitions_with_service(
@@ -311,7 +313,8 @@ pub(crate) async fn build_toolkit(
         )
         .await;
         let skill_statuses =
-            macaca_sdk::runtime_host::probe_definition_statuses(skill_definitions, &mcp_policy).await;
+            macaca_sdk::runtime_host::probe_definition_statuses(skill_definitions, &mcp_policy)
+                .await;
         emit_skill_mcp_alias_events(state, session_id.as_deref(), agent_name, &skill_statuses)
             .await;
         emit_mcp_runtime_events(state, session_id.as_deref(), agent_name, &skill_statuses).await;

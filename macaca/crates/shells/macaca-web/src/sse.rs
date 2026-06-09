@@ -6,9 +6,9 @@ use std::sync::Arc;
 use axum::response::sse::Event;
 use serde::{Deserialize, Serialize};
 
+use macaca_proto::{AgentExecutionEvent, ApplicationId};
 use macaca_sdk::runtime_host::executor::ExecutorEvent;
 use macaca_sdk::runtime_host::persist::{AppendEventCommand, PersistStore};
-use macaca_proto::ApplicationId;
 
 use crate::proto_event_visitors::delegated_sse_event_name;
 use crate::state::AppState;
@@ -231,6 +231,89 @@ pub(crate) fn convert_executor_event_to_sse(event: ExecutorEvent) -> Result<Even
                     .to_string(),
                 )),
             }
+        }
+    }
+}
+
+/// Convert a main-thread agent execution event into the chat SSE contract.
+///
+/// Delegated tasks use `convert_executor_event_to_sse`; the chat coordinator
+/// uses this projection when a service returns provider-neutral agent events.
+/// The shape is intentionally small and mirrors existing frontend event names.
+pub(crate) fn convert_agent_execution_event_to_chat_sse(
+    agent: &str,
+    event: AgentExecutionEvent,
+) -> Result<Event, Infallible> {
+    let agent_tab = agent;
+    match event {
+        AgentExecutionEvent::Thinking { iteration, content } => {
+            Ok(Event::default().event("thinking").data(
+                serde_json::json!({
+                    "agent": agent,
+                    "agent_tab": agent_tab,
+                    "iteration": iteration,
+                    "content": content,
+                })
+                .to_string(),
+            ))
+        }
+        AgentExecutionEvent::ToolCall {
+            tool_name,
+            tool_input,
+            call_id,
+        } => Ok(Event::default().event("tool_call").data(
+            serde_json::json!({
+                "agent": agent,
+                "agent_tab": agent_tab,
+                "tool_name": tool_name,
+                "tool_input": tool_input,
+                "call_id": call_id,
+            })
+            .to_string(),
+        )),
+        AgentExecutionEvent::ToolResult {
+            tool_name,
+            output,
+            is_error,
+        } => Ok(Event::default().event("tool_result").data(
+            serde_json::json!({
+                "agent": agent,
+                "agent_tab": agent_tab,
+                "tool_name": tool_name,
+                "output": output,
+                "is_error": is_error,
+            })
+            .to_string(),
+        )),
+        AgentExecutionEvent::Assistant { content } => Ok(Event::default().event("assistant").data(
+            serde_json::json!({
+                "agent": agent,
+                "agent_tab": agent_tab,
+                "content": content,
+            })
+            .to_string(),
+        )),
+        AgentExecutionEvent::DriverTrace { driver_name, trace } => {
+            Ok(Event::default().event("driver_trace").data(
+                serde_json::json!({
+                    "agent": agent,
+                    "agent_tab": agent_tab,
+                    "driver_name": driver_name,
+                    "event": trace,
+                })
+                .to_string(),
+            ))
+        }
+        AgentExecutionEvent::Completed { success, error } => {
+            Ok(Event::default().event("completed").data(
+                serde_json::json!({
+                    "agent": agent,
+                    "agent_tab": agent_tab,
+                    "success": success,
+                    "error": error,
+                })
+                .to_string(),
+            ))
         }
     }
 }

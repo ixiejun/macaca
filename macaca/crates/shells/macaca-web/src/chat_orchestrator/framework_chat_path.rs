@@ -10,13 +10,15 @@ use std::sync::Arc;
 
 use axum::response::sse::Event;
 use chrono::Utc;
+use macaca_proto::{
+    AgentExecutionEvent, ApplicationId, McpCleanupCommand, McpServiceScope, TraceContext,
+};
 use macaca_sdk::framework::execution::ExecutionContext;
-use macaca_sdk::framework::session::load_module_state;
-use macaca_proto::{ApplicationId, McpCleanupCommand, McpServiceScope, TraceContext};
 use tokio::sync::RwLock;
 
 use crate::event_persistence::spawn_session_event_collector;
 use crate::session::{AgentTraceCollector, StoredSession, StoredTurn, SESSION_PREFIX};
+use crate::sse::convert_agent_execution_event_to_chat_sse;
 use crate::state::AppState;
 
 use super::agent_execution_adapter::run_chat_main_thread_via_agent_service;
@@ -86,12 +88,15 @@ pub(crate) async fn run_framework_chat_path(
             app_id.0.to_string(),
             entry_agent_name.clone(),
         );
-        let _ = load_module_state(
+        if let Some(restored) = crate::framework_state_memento::load_execution_context(
             state_for_task.sessions.framework_session_store.as_ref(),
+            &app_id.0.to_string(),
             &session_key_for_task,
-            &mut exec_ctx,
         )
-        .await;
+        .await
+        {
+            exec_ctx = restored;
+        }
         exec_ctx.mark_running(Some("coordinator_reply_started".into()));
         persist_execution_context(&state_for_task, &exec_ctx).await;
 
@@ -121,16 +126,16 @@ pub(crate) async fn run_framework_chat_path(
         .await;
 
         // Process result
-        let (final_content, status) = match result {
-            Ok(text) => {
+        let (final_content, status, agent_events) = match result {
+            Ok(output) => {
                 tracing::info!(
                     engine = "service.agent_execution",
-                    output_len = text.len(),
+                    output_len = output.len(),
                     "Chat main-thread service execution completed"
                 );
                 exec_ctx.mark_completed(Some("coordinator_completed".into()));
                 persist_execution_context(&state_for_task, &exec_ctx).await;
-                (text, "completed")
+                (output, "completed", Vec::new())
             }
             Err(e) => {
                 let error_msg = format!("Agent error: {e}");
@@ -158,16 +163,20 @@ pub(crate) async fn run_framework_chat_path(
                         .event("error")
                         .data(serde_json::json!({"error": error_msg}).to_string())))
                     .await;
-                (error_msg, "error")
+                (error_msg, "error", Vec::new())
             }
         };
 
         if status != "error" {
-            let _ = tx
-                .send(Ok(Event::default().event("assistant").data(
-                    serde_json::json!({ "content": final_content.clone() }).to_string(),
-                )))
-                .await;
+            let emitted_assistant_from_events =
+                emit_agent_execution_events_as_sse(&tx, &entry_agent_name, &agent_events).await;
+            if !emitted_assistant_from_events {
+                let _ = tx
+                    .send(Ok(Event::default().event("assistant").data(
+                        serde_json::json!({ "content": final_content.clone() }).to_string(),
+                    )))
+                    .await;
+            }
         }
 
         // Update session with final result
@@ -296,5 +305,32 @@ pub(crate) async fn run_framework_chat_path(
             "framework",
         );
     }
+}
 
+async fn emit_agent_execution_events_as_sse(
+    tx: &tokio::sync::mpsc::Sender<Result<Event, Infallible>>,
+    agent: &str,
+    events: &[AgentExecutionEvent],
+) -> bool {
+    let mut emitted_assistant = false;
+    for event in events {
+        if matches!(event, AgentExecutionEvent::Assistant { .. }) {
+            emitted_assistant = true;
+        }
+        if tx
+            .send(convert_agent_execution_event_to_chat_sse(
+                agent,
+                event.clone(),
+            ))
+            .await
+            .is_err()
+        {
+            tracing::warn!(
+                agent = %agent,
+                "chat SSE channel closed while projecting agent execution events"
+            );
+            break;
+        }
+    }
+    emitted_assistant
 }

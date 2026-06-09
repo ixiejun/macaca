@@ -8,12 +8,13 @@ use std::time::Duration;
 
 use tracing::{info, warn};
 
-use macaca_sdk::framework::session::{
-    InMemorySessionStore as FrameworkInMemorySessionStore, SessionStore as FrameworkSessionStore,
-};
-use macaca_proto::{KernelServiceId, MacacaResult, TraceContext};
 use crate::external_context_adapter::install_external_adapters_from_config;
 use crate::persistence_adapter::RedbKernelPersistenceAdapter;
+use macaca_proto::{KernelServiceId, MacacaResult, TraceContext};
+use macaca_sdk::framework::runtime_context::{
+    AgentSessionStore as FrameworkAgentSessionStore,
+    InMemoryAgentSessionStore as FrameworkInMemoryAgentSessionStore,
+};
 
 use super::bootstrap_path_helpers::{
     configured_memory_base_path, materialized_skill_recovery_roots,
@@ -27,22 +28,49 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
     let config = ctx.config.clone().expect("bootstrap: config");
     let llm = Arc::clone(ctx.llm.as_ref().expect("bootstrap: llm"));
     let llm_router = Arc::clone(ctx.llm_router.as_ref().expect("bootstrap: llm_router"));
-    let service_runtime = Arc::clone(ctx.service_runtime.as_ref().expect("bootstrap: service_runtime"));
+    let service_runtime = Arc::clone(
+        ctx.service_runtime
+            .as_ref()
+            .expect("bootstrap: service_runtime"),
+    );
     let skills_dirs = ctx.skills_dirs.clone().expect("bootstrap: skills_dirs");
     let data_dir = ctx.data_dir.clone().expect("bootstrap: data_dir");
-    let session_store_impl =
-        Arc::clone(ctx.session_store_impl.as_ref().expect("bootstrap: session_store_impl"));
+    let session_store_impl = Arc::clone(
+        ctx.session_store_impl
+            .as_ref()
+            .expect("bootstrap: session_store_impl"),
+    );
     let session_store_shared = Arc::clone(
         ctx.session_store_shared
             .as_ref()
             .expect("bootstrap: session_store_shared"),
     );
-    let generic_service_client = Arc::clone(ctx.generic_service_client.as_ref().expect("bootstrap: generic_service_client"));
+    let generic_service_client = Arc::clone(
+        ctx.generic_service_client
+            .as_ref()
+            .expect("bootstrap: generic_service_client"),
+    );
     let event_log = Arc::clone(ctx.event_log.as_ref().expect("bootstrap: event_log"));
-    let entitlement_store = Arc::clone(ctx.entitlement_store.as_ref().expect("bootstrap: entitlement_store"));
-    let payment_store = Arc::clone(ctx.payment_store.as_ref().expect("bootstrap: payment_store"));
-    let entitlement_facade = Arc::clone(ctx.entitlement_facade.as_ref().expect("bootstrap: entitlement_facade"));
-    let driver_runtime = Arc::clone(ctx.driver_runtime.as_ref().expect("bootstrap: driver_runtime"));
+    let entitlement_store = Arc::clone(
+        ctx.entitlement_store
+            .as_ref()
+            .expect("bootstrap: entitlement_store"),
+    );
+    let payment_store = Arc::clone(
+        ctx.payment_store
+            .as_ref()
+            .expect("bootstrap: payment_store"),
+    );
+    let entitlement_facade = Arc::clone(
+        ctx.entitlement_facade
+            .as_ref()
+            .expect("bootstrap: entitlement_facade"),
+    );
+    let driver_runtime = Arc::clone(
+        ctx.driver_runtime
+            .as_ref()
+            .expect("bootstrap: driver_runtime"),
+    );
     let domain_pack_provider_registrations =
         super::domain_pack_wiring::installed_domain_pack_provider_registrations(Arc::clone(&llm));
 
@@ -50,16 +78,17 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
     let kernel_persistence = Arc::new(RedbKernelPersistenceAdapter::new(Arc::clone(
         &session_store_impl,
     )));
-    let audit_logger =
-        Arc::new(macaca_sdk::kernel::audit::AuditLogger::new(kernel_persistence));
+    let audit_logger = Arc::new(macaca_sdk::kernel::audit::AuditLogger::new(
+        kernel_persistence,
+    ));
     let session_store = session_store_shared;
     let alert_config = macaca_sdk::kernel::alert::AlertConfig::default();
     let alert_manager = Arc::new(macaca_sdk::kernel::alert::AlertManager::new(alert_config));
     info!("AuditLogger and AlertManager initialized");
 
     let default_model = llm_router.default_model_reference();
-    let framework_session_store: Arc<dyn FrameworkSessionStore> =
-        Arc::new(FrameworkInMemorySessionStore::new());
+    let framework_session_store: Arc<dyn FrameworkAgentSessionStore> =
+        Arc::new(FrameworkInMemoryAgentSessionStore::new());
     let mcp_runtime = Arc::new(macaca_sdk::runtime_host::McpRuntimeFacade::load_default().await);
 
     let (memory_runtime, workspace_memory, workspace_memory_tombstones) =
@@ -90,12 +119,11 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
                 .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
             let tomb = Arc::new(macaca_sdk::memory::SharedTombstoneRegistry::new());
             info!(
-                service_id = "memory",
-                command = "configure_runtime",
                 memory_base_path = %mem_dir.display(),
                 vector_backend = %profile.vector_backend,
                 vector_collection = ?profile.vector_collection,
-                embedding_configured = !profile.embedding_provider.is_empty(),
+                embedding_provider = %profile.embedding_provider,
+                embedding_model = %profile.embedding_model,
                 embedding_dimensions = profile.embedding_dimensions,
                 "Configured workspace memory runtime"
             );
@@ -114,7 +142,7 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
                 profile.embedding_provider
             );
             let runtime = Arc::new(
-                macaca_sdk::memory::FabricMemoryRuntime::from_configured_memory(
+                crate::memory_runtime::WebMemoryRuntime::from_configured_memory(
                     configured_manager,
                     provider_profile,
                 ),
@@ -184,7 +212,9 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
         macaca_sdk::runtime_host::SkillSystemServiceProvider::new()
             .with_materialized_skill_roots(materialized_skill_roots.clone())
             .with_governance_event_journal_path(governance_event_journal_path.clone())
-            .with_memory_runtime(Arc::clone(runtime) as Arc<dyn macaca_sdk::memory::MemoryRuntimeFacade>)
+            .with_memory_runtime(
+                Arc::clone(runtime) as Arc<dyn macaca_sdk::memory::MemoryRuntimeFacade>
+            )
     } else {
         macaca_sdk::runtime_host::SkillSystemServiceProvider::new()
             .with_materialized_skill_roots(materialized_skill_roots.clone())
@@ -252,9 +282,7 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
         memory_recall: if let Some(runtime) = memory_runtime.as_ref() {
             crate::context_reporting_memory::build_context_service_recall_capability(
                 &config.context,
-                Arc::new(macaca_sdk::DirectFacadeMemoryClient::new(
-                    Arc::clone(runtime) as Arc<dyn macaca_sdk::memory::MemoryFacade>,
-                )) as Arc<dyn macaca_sdk::SystemMemoryClient>,
+                Arc::clone(runtime) as Arc<dyn macaca_sdk::SystemMemoryClient>,
                 workspace_memory_tombstones.as_ref(),
             )
         } else {

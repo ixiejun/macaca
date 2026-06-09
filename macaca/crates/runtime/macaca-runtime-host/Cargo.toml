@@ -22,7 +22,7 @@ macaca-skill = { workspace = true }
 macaca-app = { workspace = true }
 macaca-tools = { workspace = true }
 macaca-task = { workspace = true }
-macaca-framework = { path = "../macaca-framework", features = ["macaca-compat"] }
+macaca-framework = { path = "../macaca-framework" }
 
 serde = { workspace = true }
 serde_json = { workspace = true }

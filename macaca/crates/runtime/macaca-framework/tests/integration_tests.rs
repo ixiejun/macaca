@@ -1,7 +1,7 @@
 //! Cross-module integration tests for macaca-framework.
 //!
 //! These tests exercise the public API across multiple modules:
-//! ReActAgent + Toolkit + Memory, Session persistence, HookedAgent + Pipeline,
+//! ReActAgent + Toolkit, session mementos, HookedAgent + Pipeline,
 //! MsgHub multi-agent conversations, and PlanNotebook lifecycle.
 
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -10,13 +10,14 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use macaca_framework::agent::{Agent, AgentResult, Hook, HookRegistry, HookedAgent};
 use macaca_framework::formatter::OpenAiFormatter;
-use macaca_framework::memory::{InMemoryWorkingMemory, WorkingMemory};
 use macaca_framework::message::{ContentBlock, Msg, Role, TextBlock, ToolUseBlock};
 use macaca_framework::model::{ChatModel, ChatOptions, ChatResponse, ChatUsage, ModelError};
 use macaca_framework::pipeline::{MsgHub, Pipeline, SequentialPipeline};
 use macaca_framework::plan::{PlanNotebook, PlanState, SubTaskState};
 use macaca_framework::react_agent::ReActAgent;
-use macaca_framework::session::{self, InMemorySessionStore, SessionStore};
+use macaca_framework::runtime_context::{
+    AgentSessionStore, AgentState, InMemoryAgentSessionStore, SessionKey,
+};
 use macaca_framework::tool::{ToolError, ToolHandler, ToolResponse, Toolkit};
 use macaca_proto::AgentId;
 use tokio::sync::Mutex;
@@ -231,38 +232,29 @@ async fn test_session_full_lifecycle() {
     let reply = agent.reply(Msg::user("alice", "Hi there")).await.unwrap();
     assert_eq!(reply.get_text(), "Hello, I remember you!");
 
-    // 2) Create a standalone InMemoryWorkingMemory, populate, and save
-    let mut memory = InMemoryWorkingMemory::new();
-    memory.add(Msg::user("alice", "Hi there"), vec![]).await;
-    memory
-        .add(
-            Msg::assistant("session-bot", "Hello, I remember you!"),
-            vec![],
-        )
-        .await;
+    // 2) Persist the durable conversation memento through the canonical store.
+    let mut durable_state = AgentState::empty();
+    durable_state.push_message(Msg::user("alice", "Hi there"));
+    durable_state.push_message(Msg::assistant("session-bot", "Hello, I remember you!"));
 
-    let store = InMemorySessionStore::new();
-    session::save_module_state(&store, "sess-123", &memory)
+    let store = InMemoryAgentSessionStore::new();
+    let key = SessionKey::new("tenant", "app", "sess-123", "session-bot").unwrap();
+    store.save_state(&key, durable_state).await.unwrap();
+
+    // 3) Restore and verify the saved conversation.
+    let restored_state = store
+        .load_state(&key)
         .await
-        .unwrap();
-
-    // 3) Restore into a fresh memory instance
-    let mut restored_memory = InMemoryWorkingMemory::new();
-    session::load_module_state(&store, "sess-123", &mut restored_memory)
-        .await
-        .unwrap();
-
-    // 4) Verify loaded memory contains the conversation
-    let msgs = restored_memory.get_memory(None, None).await;
+        .unwrap()
+        .expect("agent state should exist");
+    let msgs = restored_state.conversation;
     assert_eq!(msgs.len(), 2);
     assert_eq!(msgs[0].get_text(), "Hi there");
-    assert_eq!(msgs[0].role, Role::User);
     assert_eq!(msgs[1].get_text(), "Hello, I remember you!");
-    assert_eq!(msgs[1].role, Role::Assistant);
 
-    // 5) Verify session listing
-    let sessions = store.list_sessions().await.unwrap();
-    assert_eq!(sessions, vec!["sess-123"]);
+    // 4) Verify session listing.
+    let sessions = store.list_keys().await.unwrap();
+    assert_eq!(sessions, vec![key]);
 }
 
 // ===========================================================================
@@ -360,7 +352,7 @@ async fn test_msghub_multi_agent_conversation() {
 }
 
 // ===========================================================================
-// Test 5: PlanNotebook lifecycle + SessionStore persistence
+// Test 5: PlanNotebook lifecycle + AgentState persistence
 // ===========================================================================
 
 #[tokio::test]
@@ -419,16 +411,31 @@ async fn test_plan_notebook_with_agent() {
         Some("Feature shipped!")
     );
 
-    // 7) Save to SessionStore and restore
-    let store = InMemorySessionStore::new();
-    session::save_module_state(&store, "plan-sess", &notebook)
-        .await
+    // 7) Save to the canonical memento store and restore.
+    let store = InMemoryAgentSessionStore::new();
+    let key = SessionKey::new("tenant", "app", "plan-sess", "plan_notebook").unwrap();
+    let mut state = AgentState::empty();
+    state
+        .put_custom_namespace(
+            "framework.plan_notebook",
+            serde_json::to_value(&notebook).unwrap(),
+        )
         .unwrap();
+    store.save_state(&key, state).await.unwrap();
 
-    let mut restored = PlanNotebook::new();
-    session::load_module_state(&store, "plan-sess", &mut restored)
+    let restored_state = store
+        .load_state(&key)
         .await
-        .unwrap();
+        .unwrap()
+        .expect("plan notebook state should exist");
+    let restored: PlanNotebook = serde_json::from_value(
+        restored_state
+            .custom_namespaces
+            .get("framework.plan_notebook")
+            .expect("plan notebook namespace")
+            .clone(),
+    )
+    .unwrap();
 
     // Verify restored state
     assert!(restored.current_plan().is_none());

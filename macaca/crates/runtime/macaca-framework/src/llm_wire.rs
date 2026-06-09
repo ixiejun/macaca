@@ -1,7 +1,7 @@
 //! Bidirectional mapping between OpenAI-style chat JSON and `macaca_proto::LlmMessage`.
 //!
 //! ### Why this module exists (not only `adapter`)
-//! - The `adapter` module is behind the `macaca-compat` feature; the ReAct path needs this bridge
+//! - Shell/runtime-host adapters can reuse this bridge without importing model providers.
 //!   unconditionally so it can call `macaca_context::ContextFacade` with the same carrier types as
 //!   the LLM stack.
 //! - Avoid duplicating half of the JSON parsing logic inside `react_agent`.

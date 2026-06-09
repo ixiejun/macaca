@@ -8,17 +8,15 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use chrono::Utc;
-use macaca_sdk::framework::execution::ExecutionContext;
-use macaca_sdk::framework::session::save_module_state;
 use macaca_proto::ApplicationId;
+use macaca_sdk::framework::execution::ExecutionContext;
 
 use crate::session::{SessionMeta, StoredSession, StoredTurn, APP_SESSIONS_PREFIX, SESSION_PREFIX};
 use crate::state::AppState;
 
 pub(crate) async fn persist_execution_context(state: &Arc<AppState>, context: &ExecutionContext) {
-    let _ = save_module_state(
+    crate::framework_state_memento::save_execution_context(
         state.sessions.framework_session_store.as_ref(),
-        &context.session_id,
         context,
     )
     .await;

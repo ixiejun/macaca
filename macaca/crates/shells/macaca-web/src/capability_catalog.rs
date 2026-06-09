@@ -11,25 +11,25 @@ use std::sync::Arc;
 mod alias_resolution;
 mod lifecycle_visibility;
 
-use macaca_sdk::context::{
-    mcp_tool_collisions, McpCapabilityCatalog, McpServerCapabilitySummary,
-    RuntimeToolCapabilityCatalog, SkillCapabilityCatalog,
-};
-use macaca_sdk::framework::tool::Toolkit;
 use macaca_proto::config::ContextConfig;
 use macaca_proto::{
     ApplicationId, McpProbeCommand, McpRuntimeStatusView, McpToolPolicySnapshot, TraceContext,
     MCP_PROBE_COMMAND, MCP_SERVICE_ID,
 };
+use macaca_sdk::context::{
+    mcp_tool_collisions, McpCapabilityCatalog, McpServerCapabilitySummary,
+    RuntimeToolCapabilityCatalog, SkillCapabilityCatalog,
+};
+use macaca_sdk::framework::tool::Toolkit;
 use macaca_sdk::runtime_host::{
     McpRuntimeFacade, McpRuntimeStatus, McpRuntimeStatusState, McpToolPolicy,
 };
-use macaca_sdk::SystemMcpClient;
 use macaca_sdk::skill::{
     SkillAliasResolveCommand, SkillAliasResolveResult, SkillGovernanceSnapshotCommand,
     SkillGovernanceSnapshotResult, SkillLifecycleState, SkillPolicy, SkillRuntimeFacade,
     SkillServiceScope, SkillSnapshot, SkillSnapshotRequest, SkillSnapshotServiceCommand,
 };
+use macaca_sdk::SystemMcpClient;
 
 use crate::state::AppState;
 
@@ -254,14 +254,13 @@ pub async fn resolve_skill_snapshot_cached(
 ) -> macaca_proto::MacacaResult<SkillSnapshot> {
     let snapshot_module = format!("skill_snapshot/{agent_name}");
     let loaded_snapshot = if let Some(session_id) = session_id {
-        state
-            .sessions
-            .framework_session_store
-            .load(session_id, &snapshot_module)
-            .await
-            .ok()
-            .flatten()
-            .and_then(|value| serde_json::from_value::<SkillSnapshot>(value).ok())
+        crate::framework_state_memento::load_session_namespace::<SkillSnapshot>(
+            state.sessions.framework_session_store.as_ref(),
+            &app_id.0.to_string(),
+            session_id,
+            &snapshot_module,
+        )
+        .await
     } else {
         None
     };
@@ -316,13 +315,14 @@ pub async fn resolve_skill_snapshot_cached(
             let aliases = resolve_aliases_for_snapshot(state, alias_scope, &snapshot).await;
             let snapshot = alias_resolution::apply_to_snapshot(snapshot, &aliases);
             if let Some(session_id) = session_id {
-                if let Ok(value) = serde_json::to_value(&snapshot) {
-                    let _ = state
-                        .sessions
-                        .framework_session_store
-                        .save(session_id, &snapshot_module, value)
-                        .await;
-                }
+                crate::framework_state_memento::save_session_namespace(
+                    state.sessions.framework_session_store.as_ref(),
+                    &app_id.0.to_string(),
+                    session_id,
+                    &snapshot_module,
+                    &snapshot,
+                )
+                .await;
             }
             Ok(snapshot)
         }

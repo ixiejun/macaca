@@ -1,24 +1,5 @@
 //! Standard agent construction: toolkit wiring, capability catalogs, ReAct assembly.
 
-use std::collections::HashSet;
-use std::sync::Arc;
-use macaca_sdk::agent::{AgentServices, AgentTransitionReason};
-use macaca_proto::AgentState;
-use macaca_sdk::framework::adapter::ServiceChatModelAdapter;
-use macaca_sdk::framework::agent::{HookRegistry, HookedAgent};
-use macaca_sdk::framework::construction::{AgentBuildRequest, AgentLifecycleConfig};
-use macaca_sdk::framework::formatter::OpenAiFormatter;
-use macaca_sdk::framework::memory::InMemoryWorkingMemory;
-use macaca_sdk::framework::model::ToolChoice;
-use macaca_sdk::framework::react_agent::ReActAgent;
-use macaca_sdk::framework::tool::{ToolMiddleware, Toolkit};
-use macaca_sdk::runtime_host::persist::EventLog;
-use macaca_proto::config::ContextConfig;
-use macaca_proto::AgentId;
-use tokio::sync::mpsc;
-use crate::context_reporting_model::ContextReportingChatModel;
-use crate::state::AppState;
-use super::FrameworkRunner;
 use super::build_mode::{DriverTraceRoute, StandardAgentMode};
 use super::channel_emitter_adapter::{ChannelEmitterHook, ChannelToolMiddleware};
 use super::driver_trace_adapter::attach_driver_trace_route;
@@ -26,6 +7,24 @@ use super::execution_control_middleware::ExecutionControlMiddleware;
 use super::executor_emitter_adapter::{ExecutorEmitterHook, ExecutorToolMiddleware};
 use super::runtime_execution_control::RuntimeExecutionControl;
 use super::skill_policy::resolve_agent_skill_policy;
+use super::FrameworkRunner;
+use crate::context_reporting_model::ContextReportingChatModel;
+use crate::framework_adapter::ServiceChatModelAdapter;
+use crate::state::AppState;
+use macaca_proto::config::ContextConfig;
+use macaca_proto::AgentId;
+use macaca_proto::AgentState;
+use macaca_sdk::agent::{AgentServices, AgentTransitionReason};
+use macaca_sdk::framework::agent::{HookRegistry, HookedAgent};
+use macaca_sdk::framework::construction::{AgentBuildRequest, AgentLifecycleConfig};
+use macaca_sdk::framework::formatter::OpenAiFormatter;
+use macaca_sdk::framework::model::ToolChoice;
+use macaca_sdk::framework::react_agent::ReActAgent;
+use macaca_sdk::framework::tool::{ToolMiddleware, Toolkit};
+use macaca_sdk::runtime_host::persist::EventLog;
+use std::collections::HashSet;
+use std::sync::Arc;
+use tokio::sync::mpsc;
 
 pub(crate) struct WebTracedAgentFactory {
     pub(crate) state: Arc<AppState>,
@@ -234,10 +233,7 @@ impl WebTracedAgentFactory {
         )
         .expect("framework runner builds agents only after request identity validation");
         let model = Arc::new(ContextReportingChatModel::new(
-            Arc::new(ServiceChatModelAdapter::new(
-                macaca_sdk::llm_service_chat_client_from_system(llm_client),
-                llm_scope,
-            )),
+            Arc::new(ServiceChatModelAdapter::new(llm_client, llm_scope)),
             event_log,
             persist_backend,
             request.identity.app_id,
@@ -264,7 +260,6 @@ impl WebTracedAgentFactory {
             formatter,
         )
         .with_toolkit(toolkit)
-        .with_memory(Box::new(InMemoryWorkingMemory::new()))
         .with_max_iters(max_iters)
         .with_model_name(selection.primary.reference());
         if let Some(tool_choice) = tool_choice {

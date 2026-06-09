@@ -7,18 +7,19 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use macaca_sdk::app::{AppRegistry, AppRuntime, SharedDomainPackCatalog};
-use macaca_sdk::driver::{DriverRegistry, DriverRuntime};
-use macaca_sdk::framework::session::SessionStore as FrameworkSessionStore;
-use macaca_sdk::kernel::{audit::AuditLogger, alert::AlertManager, Kernel};
-use macaca_sdk::llm::{LlmProvider, LlmRouter};
-use macaca_sdk::memory::TestMemoryManager;
 use macaca_proto::config::MacacaConfig;
 use macaca_proto::ApplicationId;
+use macaca_sdk::app::{AppRegistry, AppRuntime, SharedDomainPackCatalog};
+use macaca_sdk::driver::{DriverRegistry, DriverRuntime};
+use macaca_sdk::framework::runtime_context::AgentSessionStore as FrameworkAgentSessionStore;
+use macaca_sdk::kernel::{alert::AlertManager, audit::AuditLogger, Kernel};
+use macaca_sdk::llm::{LlmProvider, LlmRouter};
+use macaca_sdk::memory::TestMemoryManager;
 use macaca_sdk::runtime_host::{AutonomyRuntimeBundle, McpRuntimeFacade, ServiceRuntime};
 use macaca_sdk::skill::SkillCatalog;
 use macaca_sdk::tools::ToolCatalog;
 
+use crate::memory_runtime::WebMemoryRuntime;
 use crate::run_trace::RunTracer;
 use crate::shell::WebSystemFacadeBundle;
 use crate::state::{AppState, ExternalAdapterRuntimeRegistry, ForkSessionMapping};
@@ -38,8 +39,11 @@ pub(crate) struct BootstrapCtx {
     pub discovered: Option<Vec<macaca_sdk::app::DiscoveredApp>>,
     pub service_runtime: Option<Arc<ServiceRuntime>>,
     pub autonomy_runtime: Option<AutonomyRuntimeBundle>,
-    pub application_orchestration_registry_ref:
-        Option<Arc<tokio::sync::RwLock<Option<Arc<macaca_sdk::runtime_host::ApplicationExecutorRegistry>>>>>,
+    pub application_orchestration_registry_ref: Option<
+        Arc<
+            tokio::sync::RwLock<Option<Arc<macaca_sdk::runtime_host::ApplicationExecutorRegistry>>>,
+        >,
+    >,
     pub app_workspaces:
         Option<Arc<tokio::sync::RwLock<HashMap<ApplicationId, crate::workspace::AppWorkspace>>>>,
     pub orchestration_backend: Option<Arc<WebApplicationOrchestrationBackend>>,
@@ -58,8 +62,11 @@ pub(crate) struct BootstrapCtx {
     pub drivers_dir: Option<String>,
     pub fork_to_session:
         Option<Arc<tokio::sync::RwLock<HashMap<macaca_proto::ForkId, ForkSessionMapping>>>>,
-    pub executor_registry_ref:
-        Option<Arc<tokio::sync::RwLock<Option<Arc<macaca_sdk::runtime_host::ApplicationExecutorRegistry>>>>>,
+    pub executor_registry_ref: Option<
+        Arc<
+            tokio::sync::RwLock<Option<Arc<macaca_sdk::runtime_host::ApplicationExecutorRegistry>>>,
+        >,
+    >,
     pub delegate_session_id: Option<Arc<tokio::sync::RwLock<Option<String>>>>,
     pub data_dir: Option<PathBuf>,
     pub session_db_path: Option<PathBuf>,
@@ -76,10 +83,9 @@ pub(crate) struct BootstrapCtx {
     pub session_store: Option<Arc<dyn macaca_sdk::runtime_host::persist::PersistBackend>>,
     pub alert_manager: Option<Arc<AlertManager>>,
     pub default_model: Option<String>,
-    pub framework_session_store: Option<Arc<dyn FrameworkSessionStore>>,
+    pub framework_session_store: Option<Arc<dyn FrameworkAgentSessionStore>>,
     pub mcp_runtime: Option<Arc<McpRuntimeFacade>>,
-    /// Bootstrap-only memory facade used while registering memory/skill/context providers.
-    pub memory_runtime: Option<Arc<macaca_sdk::memory::FabricMemoryRuntime>>,
+    pub memory_runtime: Option<Arc<WebMemoryRuntime>>,
     pub workspace_memory: Option<Arc<TestMemoryManager>>,
     pub workspace_memory_tombstones: Option<Arc<macaca_sdk::memory::SharedTombstoneRegistry>>,
     pub memory_client: Option<Arc<dyn macaca_sdk::SystemMemoryClient>>,

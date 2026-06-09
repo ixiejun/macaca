@@ -38,8 +38,6 @@ macaca-proto = { path = "../../foundation/macaca-proto" }
 macaca-context = { path = "../../services/macaca-context" }
 macaca-agent = { path = "../../application/macaca-agent" }
 macaca-persist = { path = "../../foundation/macaca-persist", optional = true }
-macaca-llm = { path = "../../services/macaca-llm", optional = true }
-macaca-tools = { path = "../../services/macaca-tools", optional = true }
 
 [features]
 default = []
@@ -47,20 +45,7 @@ a2a-client = ["dep:reqwest"]
 a2a-server = ["dep:axum"]
 mcp-http = ["dep:reqwest"]
 persist = ["dep:macaca-persist"]
-# Provider-neutral feature flags for legacy HTTP chat adapters (avoid vendor id literals in cfg).
-chat_completions_api = ["dep:reqwest"]
-messages_api = ["dep:reqwest"]
-macaca-compat = ["dep:macaca-llm", "dep:macaca-tools", "mcp-http"]
-service-clients = ["dep:macaca-llm"]
-full = [
-    "a2a-client",
-    "a2a-server",
-    "mcp-http",
-    "persist",
-    "chat_completions_api",
-    "messages_api",
-    "macaca-compat",
-]
+full = ["a2a-client", "a2a-server", "mcp-http", "persist"]
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }

@@ -6,12 +6,11 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use macaca_sdk::framework::adapter::SingleToolAdapter;
-use macaca_sdk::framework::execution::ExecutionContext;
-use macaca_sdk::framework::session::{load_module_state, save_module_state};
-use macaca_sdk::framework::tool::Toolkit;
 use macaca_proto::ApplicationId;
+use macaca_sdk::framework::execution::ExecutionContext;
+use macaca_sdk::framework::tool::Toolkit;
 
+use crate::framework_adapter::SingleToolAdapter;
 use crate::state::AppState;
 
 use super::policy::{AgentToolPolicy, TodoToolPolicy};
@@ -75,20 +74,23 @@ pub(super) fn register_agent_tools(
                                         app.0.to_string(),
                                         owner_agent.clone(),
                                     );
-                                    let _ = load_module_state(
-                                        framework_session_store.as_ref(),
-                                        &session_id,
-                                        &mut ctx,
-                                    )
-                                    .await;
+                                    if let Some(restored) =
+                                        crate::framework_state_memento::load_execution_context(
+                                            framework_session_store.as_ref(),
+                                            &app.0.to_string(),
+                                            &session_id,
+                                        )
+                                        .await
+                                    {
+                                        ctx = restored;
+                                    }
                                     ctx.mark_paused(Some(format!(
                                         "waiting_goal_completion:{}",
                                         goal.id
                                     )));
-                                    let _ = save_module_state(
+                                    crate::framework_state_memento::save_execution_context(
                                         framework_session_store.as_ref(),
-                                        &session_id,
-                                        &ctx,
+                                        &mut ctx,
                                     )
                                     .await;
                                 }
@@ -204,20 +206,23 @@ pub(super) fn register_agent_tools(
                                         app.0.to_string(),
                                         owner_agent.clone(),
                                     );
-                                    let _ = load_module_state(
-                                        framework_session_store.as_ref(),
-                                        &session_id,
-                                        &mut ctx,
-                                    )
-                                    .await;
+                                    if let Some(restored) =
+                                        crate::framework_state_memento::load_execution_context(
+                                            framework_session_store.as_ref(),
+                                            &app.0.to_string(),
+                                            &session_id,
+                                        )
+                                        .await
+                                    {
+                                        ctx = restored;
+                                    }
                                     ctx.mark_paused(Some(format!(
                                         "waiting_goal_completion:{}",
                                         goal.id
                                     )));
-                                    let _ = save_module_state(
+                                    crate::framework_state_memento::save_execution_context(
                                         framework_session_store.as_ref(),
-                                        &session_id,
-                                        &ctx,
+                                        &mut ctx,
                                     )
                                     .await;
                                 }

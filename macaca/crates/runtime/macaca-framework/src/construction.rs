@@ -95,7 +95,7 @@ pub struct ApplicationPlanningAgentProfile {
 }
 
 impl ApplicationPlanningAgentProfile {
-    pub fn legacy(name: impl Into<String>) -> Self {
+    pub fn default_profile(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
             capabilities: vec!["no capability metadata".into()],
@@ -352,7 +352,7 @@ mod tests {
 
         assert_eq!(request.identity.agent_name, "planner");
         assert_eq!(request.identity, identity);
-        assert_eq!(request.capabilities.flatten_for_legacy_api().len(), 0);
+        assert_eq!(request.capabilities.len(), 0);
         assert!(request.trace.session_id.is_some());
         assert_eq!(
             request

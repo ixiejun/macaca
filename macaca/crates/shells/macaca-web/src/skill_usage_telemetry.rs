@@ -34,38 +34,20 @@ pub(crate) async fn record_governed_skill_successful_task(
     let agent_name = result.target_agent.as_str();
     let snapshot_module = format!("skill_snapshot/{agent_name}");
 
-    let snapshot = match state
-        .sessions
-        .framework_session_store
-        .load(session_id, &snapshot_module)
-        .await
+    let snapshot = match crate::framework_state_memento::load_session_namespace::<SkillSnapshot>(
+        state.sessions.framework_session_store.as_ref(),
+        &result.application_id.0.to_string(),
+        session_id,
+        &snapshot_module,
+    )
+    .await
     {
-        Ok(Some(value)) => match serde_json::from_value::<SkillSnapshot>(value) {
-            Ok(snapshot) => snapshot,
-            Err(error) => {
-                tracing::warn!(
-                    session_id,
-                    agent = agent_name,
-                    error = %error,
-                    "skipping governed Skill task outcome telemetry because cached snapshot could not be decoded"
-                );
-                return;
-            }
-        },
-        Ok(None) => {
+        Some(snapshot) => snapshot,
+        None => {
             tracing::info!(
                 session_id,
                 agent = agent_name,
                 "skipping governed Skill task outcome telemetry because no cached Skill snapshot exists"
-            );
-            return;
-        }
-        Err(error) => {
-            tracing::warn!(
-                session_id,
-                agent = agent_name,
-                error = %error,
-                "skipping governed Skill task outcome telemetry because snapshot cache lookup failed"
             );
             return;
         }

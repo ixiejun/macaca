@@ -1,10 +1,10 @@
 //! `macaca-framework` — Agent framework for Macaca OS.
 //!
-//! A Rust implementation inspired by AgentScope, providing:
+//! A Rust implementation inspired by AgentScope 2.0 concepts, providing:
 //! - Unified message types with rich content blocks
-//! - Agent trait abstraction with hook injection
-//! - ReAct agent with reasoning-action loop
-//! - Working and long-term memory with tag system
+//! - Agent trait abstraction with typed runtime boundaries
+//! - Event-stream-first ReAct agent with reasoning-action loop
+//! - Provider-neutral runtime context, state, and session contracts
 //! - Toolkit with grouping, middleware, and MCP integration
 //! - Pipeline orchestration (Sequential, Fanout, MsgHub)
 //! - Plan notebook for agent self-planning
@@ -12,31 +12,33 @@
 //! - A2A (Agent-to-Agent) protocol support
 
 pub mod a2a;
-#[cfg(feature = "macaca-compat")]
-pub mod adapter;
-#[cfg(feature = "macaca-compat")]
-mod adapter_llm;
 pub mod agent;
+pub mod agent_contracts;
 pub mod construction;
+pub mod event_contract;
 pub mod execution;
 pub mod formatter;
+pub mod harness;
+pub mod harness_contracts;
 /// OpenAI-style chat JSON ⇄ `LlmMessage` bridge (shared carrier for `ContextFacade`).
 pub mod llm_wire;
 pub mod mcp;
-pub mod memory;
+pub mod mcp_content_contract;
+pub mod mcp_contract;
 pub mod message;
+pub mod message_metadata;
+pub mod middleware;
 pub mod model;
-/// Legacy HTTP chat adapters (OpenAI-compatible and Messages API shapes).
-///
-/// Feature flags use protocol-neutral names so production sources do not embed
-/// vendor routing literals in `#[cfg(feature = ...)]` attributes.
-#[cfg(any(feature = "chat_completions_api", feature = "messages_api"))]
-pub mod model_impls;
+pub mod model_contract;
+pub mod model_transport_contract;
+pub mod permission_contract;
 pub mod pipeline;
 pub mod plan;
 pub mod plugin_hooks;
+pub mod protocol_adapters;
+pub mod provider_contract;
 pub mod react_agent;
-pub mod session;
-pub mod state;
+pub mod runtime_context;
 pub mod tool;
+pub mod tool_contract;
 pub mod tracing_utils;

@@ -26,28 +26,29 @@ pub(crate) async fn load_or_build_skill_snapshot(
     const TRACE_ID: &str = "web-skill-mcp-snapshot";
     let snapshot_module = format!("skill_snapshot/{agent_name}");
     if let Some(session_id) = session_id {
-        if let Ok(Some(value)) = state
-            .sessions
-            .framework_session_store
-            .load(session_id, &snapshot_module)
+        if let Some(snapshot) =
+            crate::framework_state_memento::load_session_namespace::<SkillSnapshot>(
+                state.sessions.framework_session_store.as_ref(),
+                &app_id.0.to_string(),
+                session_id,
+                &snapshot_module,
+            )
             .await
         {
-            if let Ok(snapshot) = serde_json::from_value::<SkillSnapshot>(value) {
-                emit_skill_snapshot_event(
-                    state,
-                    session_id,
-                    agent_name,
-                    "skill_snapshot_cache_hit",
-                    &snapshot,
-                    TRACE_ID,
-                )
-                .await;
-                record_governed_skill_snapshot_activation(
-                    state, app_id, agent_name, session_id, &snapshot, TRACE_ID,
-                )
-                .await;
-                return Some(snapshot);
-            }
+            emit_skill_snapshot_event(
+                state,
+                session_id,
+                agent_name,
+                "skill_snapshot_cache_hit",
+                &snapshot,
+                TRACE_ID,
+            )
+            .await;
+            record_governed_skill_snapshot_activation(
+                state, app_id, agent_name, session_id, &snapshot, TRACE_ID,
+            )
+            .await;
+            return Some(snapshot);
         }
     }
 
@@ -145,22 +146,23 @@ pub(crate) async fn load_or_build_skill_snapshot(
         .await;
     }
     if let Some(session_id) = session_id {
-        if let Ok(value) = serde_json::to_value(&snapshot) {
-            let _ = state
-                .sessions
-                .framework_session_store
-                .save(session_id, &snapshot_module, value)
-                .await;
-            emit_skill_snapshot_event(
-                state,
-                session_id,
-                agent_name,
-                "skill_snapshot_cached",
-                &snapshot,
-                TRACE_ID,
-            )
-            .await;
-        }
+        crate::framework_state_memento::save_session_namespace(
+            state.sessions.framework_session_store.as_ref(),
+            &app_id.0.to_string(),
+            session_id,
+            &snapshot_module,
+            &snapshot,
+        )
+        .await;
+        emit_skill_snapshot_event(
+            state,
+            session_id,
+            agent_name,
+            "skill_snapshot_cached",
+            &snapshot,
+            TRACE_ID,
+        )
+        .await;
     }
     Some(snapshot)
 

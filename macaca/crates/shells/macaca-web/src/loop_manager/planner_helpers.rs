@@ -5,11 +5,10 @@
 
 use std::sync::Arc;
 
+use macaca_proto::ApplicationId;
 use macaca_sdk::framework::plan::PlanNotebook;
-use macaca_sdk::framework::session::{load_module_state, save_module_state};
 use macaca_sdk::runtime_host::executor::{ExecutorEvent, ExecutorEventFactory};
 use macaca_sdk::runtime_host::AgentInfo;
-use macaca_proto::ApplicationId;
 
 use crate::state::AppState;
 
@@ -26,18 +25,18 @@ async fn persist_planner_notebook_update(
     update: impl FnOnce(&mut PlanNotebook),
 ) {
     let sid = planner_scope_session_id(app_id, session_id);
-    let mut notebook = PlanNotebook::new();
-    let _ = load_module_state(
+    let mut notebook = crate::framework_state_memento::load_plan_notebook(
         state.sessions.framework_session_store.as_ref(),
+        &app_id.0.to_string(),
         &sid,
-        &mut notebook,
     )
     .await;
 
     update(&mut notebook);
 
-    let _ = save_module_state(
+    crate::framework_state_memento::save_plan_notebook(
         state.sessions.framework_session_store.as_ref(),
+        &app_id.0.to_string(),
         &sid,
         &notebook,
     )

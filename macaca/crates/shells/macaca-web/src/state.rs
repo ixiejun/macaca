@@ -11,17 +11,20 @@ use axum::response::sse::Event;
 use serde::Serialize;
 use tokio::sync::{mpsc, RwLock};
 
+use macaca_proto::{config::ContextConfig, ApplicationId, ForkId, LlmMessage};
 use macaca_sdk::app::SharedDomainPackCatalog;
 use macaca_sdk::context::{
     ContextAdapterSafetyPolicy, ContextEngineInfo, ContextEngineRegistry, ContextFallbackPolicy,
     ContextProviderRegistry, ProviderHealthLedger,
 };
-use macaca_sdk::framework::session::SessionStore as FrameworkSessionStore;
+use macaca_sdk::framework::runtime_context::AgentSessionStore as FrameworkAgentSessionStore;
 use macaca_sdk::kernel::Kernel;
-use macaca_sdk::runtime_host::ApplicationExecutorRegistry;
 use macaca_sdk::runtime_host::persist::{EventLog, PersistBackend};
-use macaca_proto::{config::ContextConfig, ApplicationId, ForkId, LlmMessage};
+use macaca_sdk::runtime_host::ApplicationExecutorRegistry;
 use macaca_sdk::runtime_host::ServiceRuntime;
+use macaca_sdk::skill::SkillCatalog;
+use macaca_sdk::task::TodoStore;
+use macaca_sdk::tools::ToolCatalog;
 use macaca_sdk::{
     SystemApplicationClient, SystemContextClient, SystemDriverClient, SystemEntitlementClient,
     SystemEvmClient, SystemHeartbeatClient, SystemLlmClient, SystemMcpClient, SystemMemoryClient,
@@ -29,9 +32,6 @@ use macaca_sdk::{
     SystemPluginHookClient, SystemScheduledAgentTaskClient, SystemSchedulerClient,
     SystemSkillClient, SystemStoreClient, SystemToolClient, SystemWeb3Client,
 };
-use macaca_sdk::skill::SkillCatalog;
-use macaca_sdk::task::TodoStore;
-use macaca_sdk::tools::ToolCatalog;
 
 use crate::runtime_resume::RuntimeResumeSignal;
 use crate::shell::WebSystemFacadeBundle;
@@ -274,7 +274,7 @@ pub struct SessionState {
     pub llm_route_hints: RwLock<HashMap<String, String>>,
     /// Framework-level session store for resumable execution primitives
     /// (e.g. execution_context, plan_notebook).
-    pub framework_session_store: Arc<dyn FrameworkSessionStore>,
+    pub framework_session_store: Arc<dyn FrameworkAgentSessionStore>,
 }
 
 /// Application configuration: directories, models, skills, alerts.
@@ -405,6 +405,18 @@ pub struct AppState {
     pub external_adapter_runtime_registry: Arc<ExternalAdapterRuntimeRegistry>,
     /// Last-known invocation summaries for `GET /api/context/provider-runtime`.
     pub provider_health_ledger: Arc<ProviderHealthLedger>,
+}
+
+impl AppState {
+    /// Return the focused SDK LLM client used by shell adapters.
+    ///
+    /// This accessor intentionally exposes only the provider-neutral service
+    /// facade. It keeps call sites from reaching into composition-root provider
+    /// handles while preserving the unified `service.call` ownership introduced
+    /// by the protocol microkernel refactor.
+    pub(crate) fn service_llm_client(&self) -> Arc<dyn SystemLlmClient> {
+        Arc::clone(&self.llm_client)
+    }
 }
 
 #[cfg(test)]

@@ -4,7 +4,7 @@
 //! fully serialized as execution-control subscriptions inside the web shell.  This
 //! module bridges task-service goal lifecycle signals into:
 //! 1. Auditable `service.execution_control` resume commands (authoritative).
-//! 2. Legacy in-memory resume channels owned by the waiting parent loop (compat).
+//! 2. In-memory resume channels owned by the waiting parent loop.
 //! 3. Session-visible SSE + event-log evidence for operators.
 //!
 //! The adapter is intentionally application-neutral: it never branches on agent
@@ -14,12 +14,9 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use axum::response::sse::Event;
+use macaca_proto::{ApplicationId, TaskId, TraceContext, EXECUTION_CONTROL_SERVICE_ID};
 use macaca_sdk::framework::execution::ExecutionContext;
-use macaca_sdk::framework::session::{load_module_state, save_module_state};
 use macaca_sdk::runtime_host::persist::AppendEventCommand;
-use macaca_proto::{
-    ApplicationId, EXECUTION_CONTROL_SERVICE_ID, TaskId, TraceContext,
-};
 use macaca_sdk::runtime_host::{
     ExecutionControlGoalLifecycleCoordinator, GoalLifecycleParentResumeRequest,
     GoalLifecycleParentWaitRequest,
@@ -115,7 +112,7 @@ pub async fn deliver_goal_resume_and_notify_parent(
                 goal_id = %goal_id.0,
                 service_id = EXECUTION_CONTROL_SERVICE_ID,
                 error = %error,
-                "Goal-lifecycle execution-control resume failed; continuing legacy shell adapter"
+                "Goal-lifecycle execution-control resume failed; continuing local shell adapter"
             );
         }
     }
@@ -127,14 +124,14 @@ pub async fn deliver_goal_resume_and_notify_parent(
     };
 
     if let Some(session) = active_session {
-        // Deprecated compatibility boundary: local channels remain until loop_manager
-        // fully subscribes to execution-control event streams (task 4.2).
+        // Local channels remain until loop_manager fully subscribes to
+        // execution-control event streams for every parent wait.
         session.pause_signal.store(false, Ordering::SeqCst);
         if let Err(error) = session.resume_tx.send(resume_reason).await {
             warn!(
                 session_id = %session_id,
                 error = %error,
-                "Failed to send legacy runtime resume signal after goal-lifecycle delivery"
+                "Failed to send runtime resume signal after goal-lifecycle delivery"
             );
         }
 
@@ -158,11 +155,9 @@ pub async fn deliver_goal_resume_and_notify_parent(
             .sse_tx
             .read()
             .await
-            .send(Ok(
-                Event::default()
-                    .event("loop_resumed")
-                    .data(resumed_payload.to_string()),
-            ))
+            .send(Ok(Event::default()
+                .event("loop_resumed")
+                .data(resumed_payload.to_string())))
             .await;
 
         let mut exec_ctx = ExecutionContext::new(
@@ -170,16 +165,18 @@ pub async fn deliver_goal_resume_and_notify_parent(
             application_id.0.to_string(),
             parent_agent.to_string(),
         );
-        let _ = load_module_state(
+        if let Some(restored) = crate::framework_state_memento::load_execution_context(
             state.sessions.framework_session_store.as_ref(),
+            &application_id.0.to_string(),
             session_id,
-            &mut exec_ctx,
         )
-        .await;
+        .await
+        {
+            exec_ctx = restored;
+        }
         exec_ctx.mark_resumed(Some(format!("goal_completed:{goal_id}")));
-        let _ = save_module_state(
+        crate::framework_state_memento::save_execution_context(
             state.sessions.framework_session_store.as_ref(),
-            session_id,
             &exec_ctx,
         )
         .await;
@@ -193,7 +190,7 @@ pub async fn deliver_goal_resume_and_notify_parent(
         warn!(
             goal_id = %goal_id,
             session_id = %session_id,
-            "Active session not found for legacy goal-lifecycle resume adapter"
+            "Active session not found for goal-lifecycle resume adapter"
         );
     }
 }

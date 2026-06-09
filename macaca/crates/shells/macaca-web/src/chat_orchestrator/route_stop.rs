@@ -6,9 +6,8 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::sse::Event;
 use axum::Json;
-use macaca_sdk::framework::execution::ExecutionContext;
-use macaca_sdk::framework::session::load_module_state;
 use macaca_proto::ApplicationId;
+use macaca_sdk::framework::execution::ExecutionContext;
 
 use crate::routes::{err, ErrorResponse};
 use crate::state::AppState;
@@ -54,12 +53,15 @@ pub(crate) async fn post_chat_stop(
         .collect();
     for sid in stopped_session_ids {
         let mut ctx = ExecutionContext::new(sid.clone(), app_id.0.to_string(), "unknown");
-        let _ = load_module_state(
+        if let Some(restored) = crate::framework_state_memento::load_execution_context(
             state.sessions.framework_session_store.as_ref(),
+            &app_id.0.to_string(),
             &sid,
-            &mut ctx,
         )
-        .await;
+        .await
+        {
+            ctx = restored;
+        }
         ctx.mark_stopped(Some("user_stop_all_processes".into()));
         persist_execution_context(&state, &ctx).await;
     }

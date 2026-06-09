@@ -87,7 +87,7 @@ impl ChatResponse {
 /// is `None`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ChatOptions {
-    /// Override the model name (e.g. `"gpt-4o"`, `"qwen3-max"`).
+    /// Override the model name with caller-provided descriptor data.
     pub model: Option<String>,
     /// Sampling temperature (0.0 – 2.0).
     pub temperature: Option<f32>,
@@ -151,7 +151,7 @@ pub trait ChatModel: Send + Sync {
         options: &ChatOptions,
     ) -> Result<ChatResponse, ModelError>;
 
-    /// Human-readable provider name (e.g. `"openai"`, `"anthropic"`).
+    /// Human-readable provider name supplied by the LLM service descriptor.
     fn name(&self) -> &str;
 }
 
