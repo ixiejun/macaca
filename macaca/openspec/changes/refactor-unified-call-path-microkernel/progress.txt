@@ -906,3 +906,12 @@
 - **Logging**: `tracing::debug`/`warn` on subtask state transitions, notebook lifecycle, hint generation, and Memento snapshot with `target = "macaca_framework::plan::{aggregate,notebook}"` audit fields。
 - **GitNexus memo (non-blocking)**: iteration 110 LOW on `PlanNotebook::create_plan` / `Plan::start_subtask` framework agent self-planning seam — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: filesize allowlist 2→0（P4 `macaca-framework` 剩余巨型文件，建议 `react_agent.rs` 1040 行或 `tool.rs` 1042 行）；6.3.2 archive；P5 终态验收。
+
+## Iteration 111 (2026-06-08)
+- **P4 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 2→**1**；`macaca-framework/react_agent.rs` 1040→`react_agent/` Facade + Template Method/Builder/Strategy 模块树（`react_agent.rs` Facade + `core.rs` + `loop.rs` + `agent_trait.rs` + `helpers.rs` + `tests/{fixtures,loop_tests,context_tests}.rs`）。
+- **Design patterns**: Facade module tree；Template Method（`loop.rs` reasoning → acting → summarize）；Builder（`core.rs` `with_*` API）；Strategy（`agent_trait.rs` `Agent` trait impl）。
+- **Contract tests**: `cargo check -p macaca-framework` OK；`cargo test -p macaca-framework react_agent::` 17/17；`os_layer_file_size_gate` 1/1；production modules all ≤500 lines（max `loop.rs` ~175）。
+- **Public API**: `macaca_framework::react_agent::ReActAgent` unchanged via Facade re-export；`lib.rs` `pub mod react_agent` unchanged。
+- **Logging**: `tracing::debug`/`warn` on reply loop, reasoning, acting, summarize, interrupt, and cancellation paths with provider-neutral `agent` / `iteration` / `tool_name` audit fields。
+- **GitNexus memo (non-blocking)**: iteration 111 LOW on `ReActAgent::reply` / `reasoning` framework ReAct loop seam — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: filesize allowlist 1→0（P4 `macaca-framework` 剩余 `tool.rs` 1042 行）；6.3.2 archive；P5 终态验收。

@@ -982,3 +982,13 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `PlanNotebook::create_plan` / `finish_plan` | LOW | Memento-backed plan manager; consumed by framework integration tests and web planner paths | P4 |
 | `PlanNotebook::hint` | LOW | Generic system-hint generation for agent next-action guidance; no application-specific routing | P4 |
 | filesize allowlist 3→2 | LOW | debt inventory shrink; 2 oversized P4 framework files remain | P4 |
+
+## Iteration 111 additions (§4.5.1 macaca-framework react_agent Facade split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `react_agent/{core,loop,agent_trait,helpers,tests}.rs` | LOW | Framework ReAct loop module tree; public API unchanged via Facade re-exports | P4 |
+| `ReActAgent::reply` | LOW | Template Method orchestrator; consumed by `macaca-web/framework_runner`, `macaca-runtime` agent construction, integration tests | P4 |
+| `ReActAgent::reasoning` / `acting` / `summarize` | LOW | Think→Act→Observe cycle steps; consumed only by `agent_trait` reply loop | P4 |
+| `ContextFacade::assemble_model_context` (via reasoning) | LOW | OS context assembly boundary shared with `macaca-runtime` / `macaca-web`; empty provider list = legacy equivalent | P4 |
+| filesize allowlist 2→1 | LOW | debt inventory shrink; 1 oversized P4 framework file (`tool.rs`) remains | P4 |
