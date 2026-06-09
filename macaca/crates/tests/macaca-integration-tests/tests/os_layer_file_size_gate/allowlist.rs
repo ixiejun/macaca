@@ -6,9 +6,9 @@
 
 use super::gate::FileSizeAllowlistEntry;
 
-/// Returns the baseline oversized-file snapshot (generated 2026-06-08, iteration 111).
+/// Returns the baseline oversized-file snapshot (generated 2026-06-08, iteration 112).
+///
+/// P4 file-size gate complete: zero allowlist rows.
 pub fn entries() -> Vec<FileSizeAllowlistEntry> {
-    vec![
-        FileSizeAllowlistEntry::new("crates/runtime/macaca-framework/src/tool.rs", 1042, "P4-framework", "P4"),
-    ]
+    vec![]
 }

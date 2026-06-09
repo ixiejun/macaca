@@ -992,3 +992,13 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `ReActAgent::reasoning` / `acting` / `summarize` | LOW | Think→Act→Observe cycle steps; consumed only by `agent_trait` reply loop | P4 |
 | `ContextFacade::assemble_model_context` (via reasoning) | LOW | OS context assembly boundary shared with `macaca-runtime` / `macaca-web`; empty provider list = legacy equivalent | P4 |
 | filesize allowlist 2→1 | LOW | debt inventory shrink; 1 oversized P4 framework file (`tool.rs`) remains | P4 |
+
+## Iteration 112 additions (§4.5.1 macaca-framework tool Facade split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `tool/{response,error,traits,types,toolkit,schema_macro,tests}.rs` | LOW | Framework tool registry module tree; public API unchanged via Facade re-exports | P4 |
+| `Toolkit::call_tool` | LOW | Chain of Responsibility invocation pipeline; consumed by `react_agent`, `macaca-web/framework_runner`, `macaca-runtime-host/mcp_runtime`, MCP adapter | P4 |
+| `Toolkit::register` / `get_definitions` | LOW | Registry + group policy; consumed by framework toolkit assembly paths across web and runtime-host | P4 |
+| `tool_schema!` macro | LOW | Declarative JSON Schema builder; consumed by tool handlers across framework and tools crates | P4 |
+| filesize allowlist 1→0 | LOW | P4 file-size gate complete; zero oversized OS-layer production files in allowlist | P4 |

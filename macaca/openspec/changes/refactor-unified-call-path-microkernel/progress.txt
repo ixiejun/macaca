@@ -915,3 +915,12 @@
 - **Logging**: `tracing::debug`/`warn` on reply loop, reasoning, acting, summarize, interrupt, and cancellation paths with provider-neutral `agent` / `iteration` / `tool_name` audit fields。
 - **GitNexus memo (non-blocking)**: iteration 111 LOW on `ReActAgent::reply` / `reasoning` framework ReAct loop seam — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: filesize allowlist 1→0（P4 `macaca-framework` 剩余 `tool.rs` 1042 行）；6.3.2 archive；P5 终态验收。
+
+## Iteration 112 (2026-06-08)
+- **P4 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 1→**0**；`macaca-framework/tool.rs` 1042→`tool/` Facade + Registry/Strategy/Chain of Responsibility 模块树（`tool.rs` Facade + `response.rs` + `error.rs` + `traits.rs` + `types.rs` + `toolkit.rs` + `schema_macro.rs` + `tests/{fixtures,toolkit_tests,middleware_tests,schema_tests}.rs`）。
+- **Design patterns**: Facade module tree；Registry（`Toolkit`）；Strategy（`ToolHandler`）；Chain of Responsibility（`ToolMiddleware` + `call_tool` pipeline）；Value Object（`ToolResponse` / `ToolGroup`）。
+- **Contract tests**: `cargo check -p macaca-framework` OK；`cargo test -p macaca-framework tool::` 20/20；`os_layer_file_size_gate` 1/1；production modules all ≤500 lines（max `toolkit.rs` ~370）。
+- **Public API**: `macaca_framework::tool::{ToolResponse, ToolError, ToolHandler, ToolMiddleware, ToolkitResource, ToolGroup, RegisteredTool, Toolkit}` + `macaca_framework::tool_schema!` unchanged via Facade re-exports；`lib.rs` `pub mod tool` unchanged。
+- **Logging**: `tracing::debug`/`warn` on register/unregister, group activation, middleware short-circuit, call_tool pipeline, get_definitions, and resource cleanup with `target = "macaca_framework::tool::toolkit"` and provider-neutral `tool_name` / `group` / `reason_code` audit fields。
+- **GitNexus memo (non-blocking)**: iteration 112 LOW on `Toolkit::call_tool` / `register` framework tool registry seam — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: P4 file-size gate complete（allowlist 0）；6.3.2 archive；P5 终态验收。
