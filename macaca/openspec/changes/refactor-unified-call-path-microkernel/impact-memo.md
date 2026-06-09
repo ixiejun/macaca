@@ -972,3 +972,13 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `LongTermMemory` / `InMemoryLongTermMemory` | LOW | Cross-session keyword retrieval Strategy; extensible via trait | P4 |
 | `MemoryCompressor::compress_if_needed` | LOW | Template Method LLM summarization; consumed by `react_agent` compression hook | P4 |
 | filesize allowlist 4→3 | LOW | debt inventory shrink; 3 oversized P4 framework files remain | P4 |
+
+## Iteration 110 additions (§4.5.1 macaca-framework plan Facade split — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `plan/{types,error,aggregate,notebook,tests}.rs` | LOW | Framework agent self-planning module tree; public API unchanged via Facade re-exports | P4 |
+| `Plan::start_subtask` / `finish_subtask` | LOW | State Machine subtask transitions; consumed by `PlanNotebook`, `react_agent`, `macaca-web/planner_helpers` | P4 |
+| `PlanNotebook::create_plan` / `finish_plan` | LOW | Memento-backed plan manager; consumed by framework integration tests and web planner paths | P4 |
+| `PlanNotebook::hint` | LOW | Generic system-hint generation for agent next-action guidance; no application-specific routing | P4 |
+| filesize allowlist 3→2 | LOW | debt inventory shrink; 2 oversized P4 framework files remain | P4 |

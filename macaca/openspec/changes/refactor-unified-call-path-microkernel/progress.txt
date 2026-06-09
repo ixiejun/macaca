@@ -897,3 +897,12 @@
 - **Logging**: `tracing::debug`/`warn` on working-memory mutations, long-term record/retrieve, and compression threshold evaluation with `target = "macaca_framework::memory::{working,long_term,compressor}"` audit fields。
 - **GitNexus memo (non-blocking)**: iteration 109 LOW on `MemoryCompressor::compress_if_needed` / `InMemoryWorkingMemory::add` framework memory service seam — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: filesize allowlist 3→0（P4 `macaca-framework` 剩余巨型文件，建议 `plan.rs` 934 行或 `react_agent.rs` 1040 行）；6.3.2 archive；P5 终态验收。
+
+## Iteration 110 (2026-06-08)
+- **P4 §4.5.1 / §6.1.6 filesize 子阶段**: 边界文件 3→**2**；`macaca-framework/plan.rs` 934→`plan/` Facade + State Machine/Memento 模块树（`plan.rs` Facade + `types.rs` + `error.rs` + `aggregate.rs` + `notebook.rs` + `tests/notebook_tests.rs`）。
+- **Design patterns**: Facade module tree；State Machine（`Plan` subtask transitions with single-InProgress invariant）；Memento（`StateModule` for `PlanNotebook`）；Aggregate（`Plan` + ordered `SubTask` list）；Value Object（`SubTaskState` / `PlanState`）。
+- **Contract tests**: `cargo check -p macaca-framework` OK；`cargo test -p macaca-framework plan::` 19/19；`os_layer_file_size_gate` 1/1；production modules all ≤500 lines（max `notebook_tests.rs` ~450 under `#[cfg(test)]` tree）。
+- **Public API**: `macaca_framework::plan::{PlanNotebook, Plan, PlanState, SubTask, SubTaskState, PlanError}` unchanged via Facade re-exports；`lib.rs` `pub mod plan` unchanged。
+- **Logging**: `tracing::debug`/`warn` on subtask state transitions, notebook lifecycle, hint generation, and Memento snapshot with `target = "macaca_framework::plan::{aggregate,notebook}"` audit fields。
+- **GitNexus memo (non-blocking)**: iteration 110 LOW on `PlanNotebook::create_plan` / `Plan::start_subtask` framework agent self-planning seam — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: filesize allowlist 2→0（P4 `macaca-framework` 剩余巨型文件，建议 `react_agent.rs` 1040 行或 `tool.rs` 1042 行）；6.3.2 archive；P5 终态验收。
