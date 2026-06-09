@@ -1034,3 +1034,10 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 |---------------|----------------------|------------------------|-------|
 | `audit_blind_spot_terminal_gate` | LOW | static replay/bootstrap/router bypass scan + runtime-host replay subprocess VC (1 integration test) | P5 |
 | `assert_audit_blind_spot_terminal_state` | LOW | rejects unaudited `ServiceRouter::new` in production shells/runtime-host; no production code changes | P5 |
+
+## Iteration 117 additions (§9.5 P5 DoD gate matrix — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `p5_dod_terminal_gate_matrix` | LOW | integration-test-only orchestrator; 20 subprocess VC rows; no production code | P5 |
+| `assert_p5_dod_terminal_gate_matrix` | LOW | delegates to existing gate test targets; CI runtime cost increase when matrix runs | P5 |

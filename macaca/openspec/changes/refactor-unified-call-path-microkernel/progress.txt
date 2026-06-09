@@ -953,3 +953,10 @@
 - **Contract tests**: `audit_blind_spot_terminal_state_has_no_replay_gaps` 1/1 orchestrates `service_call_audit` + `service_audit_runtime_bundle` + `service_call_audit_provider` + `unified_audit_replay_convergence` subprocess suites on `macaca-runtime-host`.
 - **GitNexus memo (non-blocking)**: iteration 116 LOW on `audit_blind_spot_terminal_gate` modules only — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: §7.1/7.2 横切注释/日志；§9.4 web sdk-only 终态；§6.3.2 archive。
+
+## Iteration 117 (2026-06-08)
+- **P5 §9.5 unified DoD gate matrix**: added `p5_dod_terminal_gate_matrix`（Facade+Command+Registry）— single VC entry orchestrating 19 terminal gate subprocesses (route_c, filesize, kernel_purity, shell_deps, p5_terminal_audit×4, escape_hatches×2, domain_pack, audit_redaction, external_contract, unified_audit_replay, audit_blind_spot, openspec_validate).
+- **Design patterns**: Facade（one `p5_dod_terminal_gate_matrix_all_gates_green` test）；Command（`cargo test --test <gate>` subprocess per registry row）；Registry（`TERMINAL_GATE_COMMANDS` with gate_id/tasks_ref trace dimensions）。
+- **Contract tests**: `p5_dod_terminal_gate_matrix_all_gates_green` 1/1（long-running: includes replay + npx openspec child gates）。
+- **GitNexus memo (non-blocking)**: iteration 117 LOW on `p5_dod_terminal_gate_matrix` modules only — recorded in `impact-memo.md`。
+- **Next**: §7.1/7.2 横切注释/日志；§9.4 web sdk-only 终态；§6.3.2 archive。
