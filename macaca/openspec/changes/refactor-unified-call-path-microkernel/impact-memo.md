@@ -1027,3 +1027,10 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `should_omit_metadata_map_key` | LOW | flat metadata map filter; replaces duplicate `is_sensitive_key` in execution_control_* | P5 |
 | `audit_redaction_terminal_gate` | LOW | static duplicate-sanitizer scan + proto unit test subprocess (1 VC) | P5 |
 | `openspec_validate_terminal_gate` | LOW | `npx @fission-ai/openspec validate --all --strict` CI subprocess (1 VC) | P5 |
+
+## Iteration 116 additions (§7.4 audit blind-spot gate — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `audit_blind_spot_terminal_gate` | LOW | static replay/bootstrap/router bypass scan + runtime-host replay subprocess VC (1 integration test) | P5 |
+| `assert_audit_blind_spot_terminal_state` | LOW | rejects unaudited `ServiceRouter::new` in production shells/runtime-host; no production code changes | P5 |

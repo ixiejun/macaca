@@ -200,7 +200,7 @@
 - [x] 6.1.5 实现 `kernel-purity` 审计：kernel 仅依赖 proto/ipc（与 3.6.6 联动）。（`kernel_purity_gate` via `cargo metadata` workspace dep audit）
 - [x] 6.1.6 实现 `file-size` 审计：OS 层无 >500 行源文件。（`os_layer_file_size_gate` + `assert_os_layer_file_size_allowlist_terminal_state`；**0** 行 allowlist 终态达成，iteration 112–113）
 - [x] 6.1.7 实现 `shell-dependency-purity` 审计：CLI 终态仅 proto+sdk；Web 冻结 7 条 workspace 依赖基线，禁止新增。（`shell_dependency_purity_gate` via `cargo metadata`）
-- [x] 6.1.8 实现 P5 终态 DoD gate：`unified_audit_replay_terminal_gate`（§9.1 单链 replay）+ `p5_coordination_patch_retirement_gate`（§9.2 协调补丁清零）+ `p5_external_contract_gate`（§9.7 对外契约）+ `audit_redaction_terminal_gate`（§7.3 脱敏）+ `openspec_validate_terminal_gate`（§9.8 OpenSpec validate）。（iteration 114–115）
+- [x] 6.1.8 实现 P5 终态 DoD gate：`unified_audit_replay_terminal_gate`（§9.1 单链 replay）+ `p5_coordination_patch_retirement_gate`（§9.2 协调补丁清零）+ `p5_external_contract_gate`（§9.7 对外契约）+ `audit_redaction_terminal_gate`（§7.3 脱敏）+ `openspec_validate_terminal_gate`（§9.8 OpenSpec validate）+ `audit_blind_spot_terminal_gate`（§7.4 审计盲区）。（iteration 114–116）
 
 ### 6.2 逃逸口由"冻结"升级为"删除"
 - [x] 6.2.1 每个逃逸口对应 service client 全量替换后，删除其 migration module 豁免，使任何引用（含旧引用）CI 失败。（**终态**：`migration_debt_baseline.rs` 冻结 raw=**0**；**全部 10 个 family 已退役**，含 `provider-model-routing-name`（121→0，iteration 54）；`macaca-llm/src/` 为 canonical routing owner，其余层 shed 字面量/空默认/compile-time id）
@@ -216,7 +216,7 @@
 - [ ] 7.1 所有新增/迁移模块补详尽英文注释（功能 + 运行原理 + 权衡）；巨型文件拆分后的新文件逐一覆盖。
 - [ ] 7.2 关键节点日志统一为 provider-neutral 维度；删除以 provider/model/app name 为主键的日志（如 `provider_compat.rs` 风格）。
 - [x] 7.3 全局化脱敏（`sanitize_json`/`is_safe_metadata_key`/`should_omit_metadata_map_key`）到所有 audit/trace/snapshot 出口；`macaca-proto::audit_redaction` 单测 + `audit_redaction_terminal_gate`。（iteration 115）
-- [ ] 7.4 旁路删除后验证"无审计盲区"：所有执行都产出 service-call evidence，可按 trace_id/session_id replay。
+- [x] 7.4 旁路删除后验证"无审计盲区"：所有执行都产出 service-call evidence，可按 trace_id/session_id replay。（`audit_blind_spot_terminal_gate` 1/1：replay 命令面 + web bootstrap 共享 sink + router 契约扫描 + runtime-host 行为子进程；iteration 116）
 
 ## 8. 治理文档同步
 
@@ -273,6 +273,8 @@ cargo test -p macaca-integration-tests --test p5_external_contract_gate -- --noc
 cargo test -p macaca-integration-tests --test audit_redaction_terminal_gate -- --nocapture
 # VC-openspec  OpenSpec strict validate 终态（§9.8）
 cargo test -p macaca-integration-tests --test openspec_validate_terminal_gate -- --nocapture
+# VC-audit-blind-spot  无审计盲区 + trace/session replay 终态（§7.4）
+cargo test -p macaca-integration-tests --test audit_blind_spot_terminal_gate -- --nocapture
 # VC-hardcoded 无硬编码 application/provider/model 业务名（审计门）
 # VC-spec     openspec validate --strict（或由 openspec_validate_terminal_gate 子进程等价覆盖）
 ```
