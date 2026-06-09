@@ -1002,3 +1002,10 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `Toolkit::register` / `get_definitions` | LOW | Registry + group policy; consumed by framework toolkit assembly paths across web and runtime-host | P4 |
 | `tool_schema!` macro | LOW | Declarative JSON Schema builder; consumed by tool handlers across framework and tools crates | P4 |
 | filesize allowlist 1→0 | LOW | P4 file-size gate complete; zero oversized OS-layer production files in allowlist | P4 |
+
+## Iteration 113 additions (§6.1.6 file-size terminal assertion — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `assert_os_layer_file_size_allowlist_terminal_state` | LOW | fails CI if filesize allowlist regrows; currently 0 rows pass | P5 |
+| `os_layer_file_size_gate/gate.rs` boundary pass logging | LOW | diagnostic `eprintln!` only; no production runtime impact | P5 |

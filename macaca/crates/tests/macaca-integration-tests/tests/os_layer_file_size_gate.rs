@@ -10,6 +10,11 @@ mod allowlist;
 mod gate;
 
 #[test]
+fn os_layer_file_size_allowlist_terminal_state_is_zero_rows() {
+    gate::assert_os_layer_file_size_allowlist_terminal_state();
+}
+
+#[test]
 fn os_layer_file_size_gate_reject_unallowlisted_oversized_sources() {
     gate::assert_os_layer_file_size_boundaries();
 }

@@ -135,8 +135,44 @@ fn walkdir_rs_files(dir: &Path) -> Vec<PathBuf> {
     files
 }
 
+/// Terminal-state invariant: migration allowlist must be empty at P5 exit.
+///
+/// Mirrors `assert_route_c_allowlist_terminal_state` — CI must not regress into
+/// tolerated oversized-file debt while the scan reports zero unallowlisted
+/// violations. Design pattern: **Specification by Example** with an explicit
+/// terminal assertion separate from the boundary scan.
+pub fn assert_os_layer_file_size_allowlist_terminal_state() {
+    let entries = allowlist::entries();
+    let row_count = entries.len();
+    eprintln!(
+        "os_layer_file_size_gate event=terminal_allowlist_check rows={row_count}"
+    );
+    if entries.is_empty() {
+        eprintln!(
+            "os_layer_file_size_gate event=terminal_allowlist_pass reason=zero_rows"
+        );
+        return;
+    }
+
+    let mut diagnostics = String::from(
+        "OS-layer file-size terminal gate failed: migration allowlist must be empty \
+         at terminal state.\nSplit each oversized module instead of tolerating it.\n",
+    );
+    for entry in &entries {
+        diagnostics.push_str(&format!(
+            "\npath={}\nline_count={}\nowner_track={}\ntarget_phase={}\n",
+            entry.path, entry.line_count, entry.owner_track, entry.target_phase
+        ));
+    }
+    panic!("{diagnostics}");
+}
+
 /// Main gate entry — panics with actionable diagnostics on policy violation.
 pub fn assert_os_layer_file_size_boundaries() {
+    // Enforce terminal allowlist invariant before scanning so CI cannot regress
+    // into tolerated file-size debt while violations are still zero.
+    assert_os_layer_file_size_allowlist_terminal_state();
+
     let workspace = workspace_root();
     let violations = scan_oversized_sources(&workspace);
 
@@ -181,6 +217,8 @@ pub fn assert_os_layer_file_size_boundaries() {
         );
     }
 
-    // Gate passed: every oversized file is allowlisted and every allowlist row is live.
-    let _ = allowlisted.len();
+    eprintln!(
+        "os_layer_file_size_gate event=boundary_pass oversized_files={} allowlist_rows=0",
+        violation_paths.len()
+    );
 }

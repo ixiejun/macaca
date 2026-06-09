@@ -128,4 +128,15 @@ Rust source of truth: `macaca/crates/tests/macaca-integration-tests/tests/route_
 - `macaca-web → macaca-runtime-host` — composition-root bootstrap seam; blocked from SDK bridge by `macaca-app → macaca-sdk → runtime-host → macaca-app` cycle until cycle break lands.
 - `macaca-web → macaca-app`, `macaca-runtime`, `macaca-context`, `macaca-agent`, `macaca-framework` — framework/application adapter deps; converge in P4/P5.
 
-Terminal target: **0 rows** (P5 gate).
+Terminal target: **0 rows** (P5 gate). **Achieved** (iteration 40): Route C allowlist cleared; `assert_route_c_allowlist_terminal_state` enforces zero rows in CI.
+
+## Active migration allowlist (OS-layer file-size gate input)
+
+Rust source of truth: `macaca/crates/tests/macaca-integration-tests/tests/os_layer_file_size_gate/allowlist.rs`.
+
+| Path | Line count | Owner track | Target phase |
+|------|------------|-------------|--------------|
+
+**P4 §4.5.1 update (2026-06-08):** All oversized OS-layer production `src/**/*.rs` files split below the 500-line constitution. File-size allowlist cleared to **0 rows** (iteration 112); `assert_os_layer_file_size_allowlist_terminal_state` enforces terminal state in CI (iteration 113).
+
+Terminal target: **0 rows** (P5 gate). **Achieved** (iteration 113).

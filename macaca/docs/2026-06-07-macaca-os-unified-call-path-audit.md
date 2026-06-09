@@ -265,3 +265,20 @@ Macaca OS 的协议化骨架（ServiceRuntime/ServiceRouter/ServiceCallExecutor/
 目标态与实施路径见同目录：
 - `2026-06-07-macaca-os-protocol-microkernel-target-design.md`（目标架构设计）
 - `2026-06-07-macaca-os-debt-elimination-refactor-plan.md`（重构方案）
+
+---
+
+## 12. 终态达成注记（归档证据，2026-06-08 更新）
+
+> 本节记录 `refactor-unified-call-path-microkernel` 提案在 P5 阶段的**已达成子项**，作为审计基线快照的补充。原始审计结论（§3、§11）描述的是迁移起点；下列条目经可执行 gate 证明。
+
+| 维度 | 审计起点（§3） | 终态注记（iteration 112–113） | 证明 |
+|------|----------------|-------------------------------|------|
+| Route C allowlist | 10 条 forbidden edge 债务 | **已达成 0 行** | `assert_route_c_allowlist_terminal_state` + `route_c_dependency_boundaries` 3/3 |
+| OS 层文件 ≤500 行 | AGENTS.md 宪法未执行 | **已达成 0 行 filesize allowlist** | `assert_os_layer_file_size_allowlist_terminal_state` + `os_layer_file_size_gate` 2/2 |
+| 逃逸口 migration debt | 散落旁路 | **已达成 raw=0**（10 family 退役） | `serviceization_escape_hatches` freeze + inventory 双模式 |
+| 内核 workspace 依赖 | 反向依赖 provider | **已达成 proto+ipc only** | `kernel_purity_gate` |
+| CLI shell 依赖 | 直连 kernel/gateway | **已达成 proto+sdk** | `shell_dependency_purity_gate` |
+| P5 静态审计门 | 无 | **已实现** no-direct-provider / no-hardcoded-name / shell-not-semantic-owner | `p5_terminal_audit_gates` 3/3 |
+
+**仍未达成（延续 §3 原始结论）：** 单一调用路径完全收敛、web thin-shell 依赖终态（§4.4.4）、横切脱敏/审计盲区（§7）、OpenSpec 主提案 archive（§6.3.2）。

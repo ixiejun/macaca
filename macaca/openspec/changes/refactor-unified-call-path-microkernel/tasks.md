@@ -198,7 +198,7 @@
 - [x] 6.1.3 实现 `no-hardcoded-name` 审计：生产代码无硬编码 agent/app/provider/model/driver/gateway/chain/payment 名（fixtures/tests 除外）。（`p5_terminal_audit_gates/no_hardcoded_name`）
 - [x] 6.1.4 实现 `shell-not-semantic-owner` 审计：shell 不得直驱 task/loop、不引用 deprecated direct fields、不持 agent 执行实现。（`p5_terminal_audit_gates/shell_not_semantic_owner` scoped to `crates/shells/`）
 - [x] 6.1.5 实现 `kernel-purity` 审计：kernel 仅依赖 proto/ipc（与 3.6.6 联动）。（`kernel_purity_gate` via `cargo metadata` workspace dep audit）
-- [x] 6.1.6 实现 `file-size` 审计：OS 层无 >500 行源文件。（`os_layer_file_size_gate` + **12** 行 baseline allowlist；终态 allowlist==0 待收敛）
+- [x] 6.1.6 实现 `file-size` 审计：OS 层无 >500 行源文件。（`os_layer_file_size_gate` + `assert_os_layer_file_size_allowlist_terminal_state`；**0** 行 allowlist 终态达成，iteration 112–113）
 - [x] 6.1.7 实现 `shell-dependency-purity` 审计：CLI 终态仅 proto+sdk；Web 冻结 7 条 workspace 依赖基线，禁止新增。（`shell_dependency_purity_gate` via `cargo metadata`）
 
 ### 6.2 逃逸口由"冻结"升级为"删除"
@@ -219,23 +219,23 @@
 
 ## 8. 治理文档同步
 
-- [ ] 8.1 每删一条 allowlist 同步 `macaca/docs/macaca-os-serviceization-allowlist.md`。
-- [ ] 8.2 终态后更新审计三件套（`2026-06-07-*`）的"已达成"状态注记，作为归档证据。
+- [x] 8.1 每删一条 allowlist 同步 `macaca/docs/macaca-os-serviceization-allowlist.md`。（Route C + file-size allowlist 清零已同步，iteration 113）
+- [x] 8.2 终态后更新审计三件套（`2026-06-07-*`）的"已达成"状态注记，作为归档证据。（`2026-06-07-macaca-os-unified-call-path-audit.md` §12 终态注记，iteration 113）
 
 ## 9. 终态验收（Definition of Done，逐条证明）
 
 - [ ] 9.1 单路径：YAML 与 WASM 应用 agent 执行 audit replay 均为单一 service.call 链（对照 0.3）。
 - [ ] 9.2 协调补丁清零：`graph_owner/authoritative/legacy_unmarked/suppress_executor_lifecycle/legacy_*` 生产代码 0 命中。
-- [ ] 9.3 内核纯净：kernel 无 web3/evm/a2a/payment/executor/provider_compat；`cargo tree -p macaca-kernel` 仅 proto/ipc。
-- [ ] 9.4 越界依赖清零：persist 不依赖 context；web/cli 仅依赖 sdk。
-- [ ] 9.5 allowlist == 0；全部终态门绿。
-- [ ] 9.6 无 >500 行 OS 源文件；domain pack 出 base runtime-host。
+- [x] 9.3 内核纯净：kernel 无 web3/evm/a2a/payment/executor/provider_compat；`cargo tree -p macaca-kernel` 仅 proto/ipc。（`kernel_purity_gate` 1/1）
+- [ ] 9.4 越界依赖清零：persist 不依赖 context；web/cli 仅依赖 sdk。（CLI 终态达成；web 仍冻结 7 条 workspace 依赖基线）
+- [ ] 9.5 allowlist == 0；全部终态门绿。（Route C + filesize allowlist==0；web shell 依赖基线仍冻结）
+- [x] 9.6 无 >500 行 OS 源文件；domain pack 出 base runtime-host。（`os_layer_file_size_gate` 2/2 + `runtime_host_domain_pack_gate`）
 - [ ] 9.7 对外契约不回归：`/api/chat/v2`、SSE、manifest、session 隔离。
 - [ ] 9.8 OpenSpec baseline 反映终态；`openspec validate --strict` 绿。
 
 ## 10. 备注 — GitNexus 影响（非阻塞）
 
-- [ ] 10.1 在本 change 维护一份 `impact-memo.md`，记录各 `[impact-memo]` task 的 blast radius / risk level，仅备忘不阻塞。
+- [x] 10.1 在本 change 维护一份 `impact-memo.md`，记录各 `[impact-memo]` task 的 blast radius / risk level，仅备忘不阻塞。（持续维护至 iteration 113）
 
 ## 13. 验证命令集（VC）
 
@@ -258,8 +258,10 @@ cargo metadata --no-deps --format-version 1
 cargo test -p macaca-task && cargo test -p macaca-runtime-host && cargo test -p macaca-kernel
 # VC-e2e      端到端：/api/chat/v2（YAML + WASM）、fullstack-autodev、route-c 回归矩阵
 cargo test -p macaca-integration-tests
-# VC-filesize OS 层文件 ≤500 行（审计门）
+# VC-filesize OS 层文件 ≤500 行（审计门 + allowlist 终态）
 cargo test -p macaca-integration-tests --test os_layer_file_size_gate -- --nocapture
+# VC-filesize-terminal  filesize allowlist 必须为 0 行
+cargo test -p macaca-integration-tests os_layer_file_size_allowlist_terminal_state_is_zero_rows -- --nocapture
 # VC-hardcoded 无硬编码 application/provider/model 业务名（审计门）
 # VC-spec     openspec validate --strict
 ```
