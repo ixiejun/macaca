@@ -1122,3 +1122,13 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `shell_dependency_purity_gate` web path | LOW | frozen-baseline → hard terminal assertion; 3 tests; DoD matrix +3 gate rows | P5 |
 | `application-execution-sdk-no-runtime-provider-construction` | MEDIUM | rule narrowed post-iter-125; sdk→app/runtime-host approved for Facade bridge | P5 |
 | OpenSpec archive | LOW | `fix-live-skill-operations-shell` moved to archive | P5 |
+
+## Iteration 127 additions (§6.3.1 spec Purpose sync + §9.5 gate count — memo only)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `web-cli-thin-shell-completion` spec Purpose | LOW | baseline doc only; no runtime behavior change | P5 |
+| `serviceization-dependency-gate` spec Purpose | LOW | baseline doc only | P5 |
+| `serviceization-escape-hatches` spec Purpose | LOW | baseline doc only | P5 |
+| `tasks.md` §9.5 gate count 21→22 | LOW | audit trail alignment with `p5_dod_terminal_gate_matrix` registry | P5 |
+| `p5_dod_terminal_gate_matrix` re-run | LOW | 22/22 green confirmation; no code change | P5 |

@@ -1,7 +1,7 @@
 # serviceization-escape-hatches Specification
 
 ## Purpose
-TBD - created by archiving change freeze-serviceization-escape-hatches. Update Purpose after archive.
+Static freeze and retirement governance for serviceization escape hatches: production reference scans, reconciliation-marker absence, and debt-inventory baselines that prove coordination patches and bypass paths shrink toward zero. Baseline aligned to P5 microkernel refactor by `refactor-unified-call-path-microkernel`.
 ## Requirements
 ### Requirement: Static Escape-Hatch Freeze
 The system SHALL reject new production Rust references to known serviceization

@@ -229,7 +229,7 @@
 - [x] 9.2 协调补丁清零：多路径协调补丁 token（`legacy_unmarked`/`non_authoritative`/`suppress_executor_lifecycle`/`legacy_chat_main_thread_goal_pause`/`TaskGraphOwner::TaskServiceCompatibility`/`TaskGraphOwner::DiagnosticOnly`）生产代码 0 命中。（`p5_coordination_patch_retirement_gate` 1/1 + `serviceization_escape_hatches_reconciliation_markers_absent_in_production`；注：`TaskGraphOwner` 领域字段 `graph_owner` 为合法 proto/task 语义，非协调补丁）
 - [x] 9.3 内核纯净：kernel 无 web3/evm/a2a/payment/executor/provider_compat；`cargo tree -p macaca-kernel` 仅 proto/ipc。（`kernel_purity_gate` 1/1）
 - [x] 9.4 越界依赖清零：persist 不依赖 context；web/cli 仅依赖 proto+sdk。（persist→context 终态达成：`p2_microkernel_exit_validation` 3/3；CLI 终态达成；web 终态达成 iteration 125：`macaca-app`/`macaca-runtime-host` 经 SDK `app`/`runtime_host` 桥接；`AgentConfig` 下沉 `macaca-proto` 打破 `app→sdk` 环）
-- [x] 9.5 allowlist == 0；全部终态门绿。（Route C + filesize + web shell workspace allowlist==0；`p5_dod_terminal_gate_matrix` 1/1 编排 21 项终态 gate 子进程全绿；§9.4 终态达成 iteration 125）
+- [x] 9.5 allowlist == 0；全部终态门绿。（Route C + filesize + web shell workspace allowlist==0；`p5_dod_terminal_gate_matrix` 1/1 编排 22 项终态 gate 子进程全绿；§9.4 终态达成 iteration 125；web shell 硬门控 iteration 126；全矩阵复验 iteration 127）
 - [x] 9.6 无 >500 行 OS 源文件；domain pack 出 base runtime-host。（`os_layer_file_size_gate` 2/2 + `runtime_host_domain_pack_gate`）
 - [x] 9.7 对外契约不回归：`/api/chat/v2`、SSE、manifest、session 隔离。（`p5_external_contract_gate` 4/4：chat v2 route + session module + SSE surface + route_c no-network pipeline）
 - [x] 9.8 OpenSpec baseline 反映终态；`openspec validate --all --strict` 绿。（`openspec_validate_terminal_gate` 1/1，iteration 115）

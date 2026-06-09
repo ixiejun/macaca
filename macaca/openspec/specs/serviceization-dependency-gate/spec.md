@@ -1,7 +1,7 @@
 # serviceization-dependency-gate Specification
 
 ## Purpose
-TBD - created by archiving change add-route-c-serviceization-dependency-gate. Update Purpose after archive.
+Executable Route C workspace dependency boundary enforcement for Macaca Agent OS: allowlist governance, forbidden-edge classification, and terminal zero-row migration proof. Baseline aligned to P5 microkernel refactor by `refactor-unified-call-path-microkernel`.
 ## Requirements
 ### Requirement: Macaca SHALL provide an executable Route C dependency boundary gate
 

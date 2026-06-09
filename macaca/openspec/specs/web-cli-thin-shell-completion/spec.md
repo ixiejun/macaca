@@ -1,7 +1,7 @@
 # web-cli-thin-shell-completion Specification
 
 ## Purpose
-TBD - created by archiving change complete-web-cli-thin-shell-v1. Update Purpose after archive.
+Terminal thin-shell presentation boundaries for Macaca Web and CLI: runtime-host-owned provider bootstrap, SDK-only workspace dependencies (`macaca-proto` + `macaca-sdk`), facade-backed capability access, and auditable shell adapters. Extended to P5 terminal state by `refactor-unified-call-path-microkernel` (iteration 125–126).
 ## Requirements
 ### Requirement: Macaca SHALL move service provider bootstrap out of presentation shell ownership
 

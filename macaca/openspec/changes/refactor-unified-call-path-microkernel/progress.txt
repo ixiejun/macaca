@@ -1046,3 +1046,11 @@
 - **Contract tests**: `shell_dependency_purity_gate` 3/3; `route_c_dependency_boundaries` 3/3.
 - **GitNexus memo (non-blocking)**: Route C rule narrowing + shell gate test rename — recorded in `impact-memo.md`.
 - **Next**: §4.1.4 `memory_runtime` deletion deferred; continue 6.3.2 archive of other completed orthogonal changes as they land.
+
+## Iteration 127 (2026-06-07)
+- **P5 §6.3.1 / §9.8 OpenSpec baseline sync — LANDED**: replaced TBD `Purpose` stubs in `web-cli-thin-shell-completion`, `serviceization-dependency-gate`, and `serviceization-escape-hatches` baseline specs with terminal-state descriptions aligned to P5 refactor.
+- **P5 §9.5 DoD gate count alignment**: `tasks.md` §9.5 updated 21→22 gate rows (CLI + web allowlist + web purity shell gates post-iteration 126).
+- **Full matrix re-verification**: `p5_dod_terminal_gate_matrix` 22/22 subprocess gates green (~202s).
+- **Deferred (unchanged)**: §4.1.4 `memory_runtime.rs` deletion — `WebMemoryRuntime` still referenced by bootstrap/composition bundle.
+- **GitNexus memo (non-blocking)**: doc-only Purpose + tasks alignment — recorded in `impact-memo.md`.
+- **Proposal status**: P5 architectural terminal state achieved; main change `refactor-unified-call-path-microkernel` retained (not archived per design).
