@@ -1076,3 +1076,11 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 |---------------|----------------------|------------------------|-------|
 | `shell_provider_bridge::context` | LOW | macaca-sdk re-export; 30 macaca-web files migrated from direct `macaca-context` dep | P5 |
 | `WEB_SHELL_WORKSPACE_DEPENDENCY_DEBT` | LOW | frozen baseline 5→4 rows; gate 2/2 pass | P5 |
+
+## Iteration 122 additions (§4.4.4 macaca-framework SDK bridge — BLOCKED, memo only)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `shell_provider_bridge::framework` attempt | HIGH (blocked) | `cargo check -p macaca-web` fails: cyclic `sdk→framework(service-clients)→sdk`; bridge not landed | P5 |
+| `ServiceChatModelAdapter` | MEDIUM | lives in `macaca-framework` behind `service-clients` which requires `macaca-sdk`; blocks shell framework dep retirement | P5 |
+| Prerequisite | — | extract adapter to SDK or decouple `framework/service-clients` from `macaca-sdk` dep | P5 |

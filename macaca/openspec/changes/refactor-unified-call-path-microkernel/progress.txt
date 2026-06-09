@@ -997,3 +997,10 @@
 - **Contract tests**: `shell_dependency_purity_gate` 2/2; `cargo check -p macaca-web -p macaca-sdk` pass.
 - **GitNexus memo (non-blocking)**: iteration 121 LOW on context bridge + 30-file import migration — recorded in `impact-memo.md`.
 - **Next**: §9.4 retire app/framework/runtime-host; break app/sdk/pack cycle; §6.3.2 archive.
+
+## Iteration 122 (2026-06-08)
+- **P5 §4.4.4 / §9.4 framework SDK bridge attempt — BLOCKED**: adding `macaca-framework` (with `service-clients`) to `macaca-sdk` causes `cargo check -p macaca-web` cyclic dependency: `macaca-sdk → macaca-framework → macaca-sdk` (via `framework/service-clients` optional dep). Isolated `cargo check -p macaca-sdk` passes but full web graph fails.
+- **Prerequisite documented**: extract `ServiceChatModelAdapter` to `macaca-sdk` OR remove `framework→sdk` edge from `service-clients` feature before SDK bridge can land.
+- **Allowlist rationale updated**: `macaca-framework` row now documents cycle blocker and replacement path.
+- **GitNexus memo (non-blocking)**: iteration 122 HIGH (blocked) on framework SDK bridge — recorded in `impact-memo.md`; no production code change committed.
+- **Next**: break sdk↔framework cycle then retry framework bridge; §9.4 retire app/runtime-host; break app/sdk/pack cycle; §6.3.2 archive.

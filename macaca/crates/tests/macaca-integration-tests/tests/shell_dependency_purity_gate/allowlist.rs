@@ -29,8 +29,8 @@ pub const WEB_SHELL_WORKSPACE_DEPENDENCY_DEBT: &[WebShellDependencyDebt] = &[
     },
     WebShellDependencyDebt {
         crate_name: "macaca-framework",
-        rationale: "FrameworkRunner construction adapter until framework service port is SDK-only",
-        replacement: "macaca-sdk framework construction facade",
+        rationale: "FrameworkRunner construction adapter; SDK bridge blocked by sdk→framework(service-clients)→sdk cycle when building macaca-web",
+        replacement: "extract ServiceChatModelAdapter to macaca-sdk or break framework→sdk edge, then macaca-sdk::framework bridge",
     },
     WebShellDependencyDebt {
         crate_name: "macaca-runtime-host",
