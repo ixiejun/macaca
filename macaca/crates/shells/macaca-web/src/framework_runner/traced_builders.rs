@@ -51,7 +51,7 @@ impl FrameworkRunner {
         agent_name: &str,
         session_id: Option<String>,
         task_id: macaca_proto::TaskId,
-        executor: Arc<macaca_runtime_host::executor::ApplicationExecutor>,
+        executor: Arc<macaca_sdk::runtime_host::executor::ApplicationExecutor>,
     ) -> Result<HookedAgent<ReActAgent>, String> {
         Self::build_for_intent(
             state,
@@ -74,7 +74,7 @@ impl FrameworkRunner {
         agent_name: &str,
         session_id: Option<String>,
         task_id: macaca_proto::TaskId,
-        executor: Arc<macaca_runtime_host::executor::ApplicationExecutor>,
+        executor: Arc<macaca_sdk::runtime_host::executor::ApplicationExecutor>,
     ) -> Result<HookedAgent<ReActAgent>, String> {
         Self::build_for_intent(
             state,
@@ -97,7 +97,7 @@ impl FrameworkRunner {
         agent_name: &str,
         session_id: Option<String>,
         task_id: macaca_proto::TaskId,
-        executor: Arc<macaca_runtime_host::executor::ApplicationExecutor>,
+        executor: Arc<macaca_sdk::runtime_host::executor::ApplicationExecutor>,
         goal_id: Option<macaca_proto::TaskId>,
     ) -> Result<HookedAgent<ReActAgent>, String> {
         Self::build_for_intent(
@@ -123,7 +123,7 @@ impl FrameworkRunner {
         agent_name: &str,
         session_id: Option<String>,
         task_id: macaca_proto::TaskId,
-        executor: Arc<macaca_runtime_host::executor::ApplicationExecutor>,
+        executor: Arc<macaca_sdk::runtime_host::executor::ApplicationExecutor>,
         goal_id: Option<macaca_proto::TaskId>,
     ) -> Result<HookedAgent<ReActAgent>, String> {
         Self::build_for_intent(
@@ -148,7 +148,7 @@ impl FrameworkRunner {
         agent_name: &str,
         session_id: Option<String>,
         task_id: macaca_proto::TaskId,
-        executor: Arc<macaca_runtime_host::executor::ApplicationExecutor>,
+        executor: Arc<macaca_sdk::runtime_host::executor::ApplicationExecutor>,
         intent: AgentBuildIntent,
     ) -> Result<HookedAgent<ReActAgent>, String> {
         let tools = match &intent {

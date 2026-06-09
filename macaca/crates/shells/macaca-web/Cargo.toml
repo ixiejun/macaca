@@ -9,9 +9,7 @@ domain-pack-finance = ["macaca-sdk/domain-pack-finance"]
 
 [dependencies]
 macaca-proto = { workspace = true }
-macaca-app = { workspace = true }
 macaca-sdk = { workspace = true }
-macaca-runtime-host = { workspace = true }
 async-trait = { workspace = true }
 axum = { version = "0.8", features = ["ws"] }
 serde = { workspace = true }

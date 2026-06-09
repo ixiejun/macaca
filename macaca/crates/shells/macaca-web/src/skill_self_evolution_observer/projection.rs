@@ -2,7 +2,7 @@
 
 use chrono::Utc;
 use macaca_proto::{AgentExecutionResult, TaskId};
-use macaca_runtime_host::executor::TaskResult;
+use macaca_sdk::runtime_host::executor::TaskResult;
 
 use super::types::{MAX_ARTIFACT_REF_CHARS, MAX_ARTIFACT_REFS};
 

@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 use std::path::Path;
 
 use axum::http::StatusCode;
-use macaca_app::ui_runtime::{
+use macaca_sdk::app::ui_runtime::{
     AppUiBridgeConfig, AppUiPresentationConfig, AppUiRuntimeConfig, AppUiRuntimeKind,
     AppUiSandboxConfig, AppUiSurfaceConfig, AppUiThemeConfig,
 };

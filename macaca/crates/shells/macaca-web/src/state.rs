@@ -11,17 +11,17 @@ use axum::response::sse::Event;
 use serde::Serialize;
 use tokio::sync::{mpsc, RwLock};
 
-use macaca_app::SharedDomainPackCatalog;
+use macaca_sdk::app::SharedDomainPackCatalog;
 use macaca_sdk::context::{
     ContextAdapterSafetyPolicy, ContextEngineInfo, ContextEngineRegistry, ContextFallbackPolicy,
     ContextProviderRegistry, ProviderHealthLedger,
 };
 use macaca_sdk::framework::session::SessionStore as FrameworkSessionStore;
 use macaca_sdk::kernel::Kernel;
-use macaca_runtime_host::ApplicationExecutorRegistry;
-use macaca_runtime_host::persist::{EventLog, PersistBackend};
+use macaca_sdk::runtime_host::ApplicationExecutorRegistry;
+use macaca_sdk::runtime_host::persist::{EventLog, PersistBackend};
 use macaca_proto::{config::ContextConfig, ApplicationId, ForkId, LlmMessage};
-use macaca_runtime_host::ServiceRuntime;
+use macaca_sdk::runtime_host::ServiceRuntime;
 use macaca_sdk::{
     SystemApplicationClient, SystemContextClient, SystemDriverClient, SystemEntitlementClient,
     SystemEvmClient, SystemHeartbeatClient, SystemLlmClient, SystemMcpClient, SystemMemoryClient,
@@ -378,7 +378,7 @@ pub struct AppState {
     /// Dropping this bundle would drop the only handle the web host has for
     /// deterministic shutdown and operator diagnostics. The actual background
     /// work remains inside the supervisor task and service providers.
-    pub autonomy_runtime: macaca_runtime_host::AutonomyRuntimeBundle,
+    pub autonomy_runtime: macaca_sdk::runtime_host::AutonomyRuntimeBundle,
     /// Composite toolset: built-in tools + executable skill tools + claude code tools.
     pub tools: Arc<dyn ToolCatalog>,
     /// Application executor registry for isolated multi-agent execution.

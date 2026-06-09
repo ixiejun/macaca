@@ -7,8 +7,8 @@ use std::sync::Arc;
 
 use macaca_sdk::framework::plan::PlanNotebook;
 use macaca_sdk::framework::session::{load_module_state, save_module_state};
-use macaca_runtime_host::executor::{ExecutorEvent, ExecutorEventFactory};
-use macaca_runtime_host::AgentInfo;
+use macaca_sdk::runtime_host::executor::{ExecutorEvent, ExecutorEventFactory};
+use macaca_sdk::runtime_host::AgentInfo;
 use macaca_proto::ApplicationId;
 
 use crate::state::AppState;

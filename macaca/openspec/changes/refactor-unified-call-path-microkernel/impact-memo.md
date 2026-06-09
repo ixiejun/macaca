@@ -1104,3 +1104,13 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `macaca-domain-pack-finance` dep graph | MEDIUM | removed `macaca-app`/`macaca-runtime-host` edges; now proto+kernel+llm only; breaks prior cycle | P5 |
 | `bootstrap_domain_pack_services` | HIGH | runtime-host service registration hot path; preserved behavior with kernel/proto types | P5 |
 | `WEB_SHELL_WORKSPACE_DEPENDENCY_DEBT` | LOW | frozen baseline 3→2 rows; `macaca-domain-pack-finance` retired from web direct dep | P5 |
+
+## Iteration 125 additions (§4.4.4 / §9.4 web sdk-only terminal — LANDED, memo only)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `declarative_agent_config` (proto) | CRITICAL | `AgentConfig`, validation chain, `agent_manifest_from_declarative_config`; all app loader/runtime/bootstrap paths; SDK config re-export shim | P5 |
+| `macaca-app` dep graph | HIGH | removed production `macaca-sdk`; direct kernel agent registration; entitlement trait segregation | P5 |
+| `shell_provider_bridge::app` / `runtime_host` (sdk) | HIGH | ~90 macaca-web files; composition bootstrap, app UI routes, framework runner, agent execution backend | P5 |
+| `PackageEntitlementAuthorizeClient` | MEDIUM | commercial package entitlement path; test mocks simplified | P5 |
+| `WEB_SHELL_WORKSPACE_DEPENDENCY_DEBT` | LOW | frozen baseline 2→**0** rows; §9.4 terminal state achieved | P5 |

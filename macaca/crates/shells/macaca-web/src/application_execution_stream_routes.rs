@@ -17,7 +17,7 @@ use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::Response;
 use axum::Json;
 use futures::Stream;
-use macaca_runtime_host::persist::EventLogQuery;
+use macaca_sdk::runtime_host::persist::EventLogQuery;
 use macaca_proto::{ApplicationExecutionEventType, ApplicationId, EventEntry, TraceContext};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -213,7 +213,7 @@ pub(crate) fn build_stream_query(
 /// projection.
 async fn run_websocket_event_observer(
     mut socket: WebSocket,
-    event_log: Arc<macaca_runtime_host::persist::EventLog>,
+    event_log: Arc<macaca_sdk::runtime_host::persist::EventLog>,
     application_id: ApplicationId,
     trace: TraceContext,
     event_query: EventLogQuery,
@@ -362,7 +362,7 @@ struct ApplicationEventBatch {
 }
 
 async fn query_application_events(
-    event_log: &macaca_runtime_host::persist::EventLog,
+    event_log: &macaca_sdk::runtime_host::persist::EventLog,
     application_id: ApplicationId,
     query: EventLogQuery,
 ) -> ApplicationEventBatch {

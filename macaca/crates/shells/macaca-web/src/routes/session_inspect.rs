@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use macaca_sdk::context::{
     CompactionSummaryEnvelope, LineageKind, SessionLineage, TranscriptSegment,
 };
-use macaca_runtime_host::persist::{AppendEventCommand, EventLogQuery, SessionLineageStore};
+use macaca_sdk::runtime_host::persist::{AppendEventCommand, EventLogQuery, SessionLineageStore};
 
 use crate::source_artifact::{
     ContextSourceArtifactRepository, SourceArtifactQuery, SourceArtifactResponse,

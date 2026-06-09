@@ -23,7 +23,7 @@ use macaca_sdk::{
     compose_installed_domain_pack_catalog, empty_domain_pack_catalog, SharedDomainPackCatalog,
 };
 use macaca_sdk::llm::LlmProvider;
-use macaca_runtime_host::DomainPackProviderRegistration;
+use macaca_sdk::runtime_host::DomainPackProviderRegistration;
 use tracing::info;
 
 /// Build the catalog of domain packs installed by this web composition root.
@@ -55,7 +55,7 @@ pub(crate) fn build_installed_domain_pack_catalog() -> SharedDomainPackCatalog {
 
 /// Collect provider registrations for every domain pack installed by this host.
 ///
-/// Registrations are forwarded to `macaca_runtime_host::bootstrap_domain_pack_services`
+/// Registrations are forwarded to `macaca_sdk::runtime_host::bootstrap_domain_pack_services`
 /// during service-runtime wiring.  Absent registrations keep service ids
 /// unavailable with structured errors instead of OS-owned business fallbacks.
 pub(crate) fn installed_domain_pack_provider_registrations(

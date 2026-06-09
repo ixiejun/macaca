@@ -11,9 +11,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
-use macaca_runtime_host::executor::fork_manager::HookEvent;
+use macaca_sdk::runtime_host::executor::fork_manager::HookEvent;
 use macaca_proto::{TaskId, EXECUTION_CONTROL_SERVICE_ID};
-use macaca_runtime_host::ExecutionControlForkJoinCoordinator;
+use macaca_sdk::runtime_host::ExecutionControlForkJoinCoordinator;
 use tokio::sync::broadcast::Receiver;
 use tracing::{info, warn};
 

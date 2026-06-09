@@ -187,7 +187,7 @@ impl WebShellFacade {
 mod tests {
     use super::*;
     use async_trait::async_trait;
-    use macaca_runtime_host::persist::RedbStore;
+    use macaca_sdk::runtime_host::persist::RedbStore;
     use macaca_proto::{
         EvmAvailability, EvmAvailabilityCommand, EvmCallAdmission, EvmContractCallCommand,
         EvmContractDeployCommand, EvmContractReadCommand, EvmDeployAdmission,

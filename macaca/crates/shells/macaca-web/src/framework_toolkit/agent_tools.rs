@@ -59,7 +59,7 @@ pub(super) fn register_agent_tools(
                                         .await
                                         .insert(goal.id.to_string(), session_id.clone());
                                     let goal_coordinator =
-                                        macaca_runtime_host::ExecutionControlGoalLifecycleCoordinator::new(
+                                        macaca_sdk::runtime_host::ExecutionControlGoalLifecycleCoordinator::new(
                                             service_runtime,
                                         );
                                     crate::goal_lifecycle_shell_adapter::register_goal_wait_via_execution_control(

@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use macaca_sdk::framework::tool::Toolkit;
 use macaca_proto::ApplicationId;
-use macaca_runtime_host::{probe_definition_statuses, McpRuntimeStatusState, McpToolPolicy};
+use macaca_sdk::runtime_host::{probe_definition_statuses, McpRuntimeStatusState, McpToolPolicy};
 use macaca_sdk::skill::SkillSnapshot;
 
 use crate::state::AppState;
@@ -26,7 +26,7 @@ pub(crate) async fn register_skill_backed_mcp_tools(
     else {
         return;
     };
-    let definitions = macaca_runtime_host::McpServerFactory::with_bundled_mapping_registry()
+    let definitions = macaca_sdk::runtime_host::McpServerFactory::with_bundled_mapping_registry()
         .from_skill_snapshot(&snapshot);
     crate::mcp_shell_adapter::register_skill_mcp_definitions(
         state,
@@ -43,7 +43,7 @@ pub(crate) async fn register_skill_backed_mcp_tools(
 /// Probe skill-declared MCP servers without registering tools (status-only path).
 pub(crate) async fn probe_skill_mcp_servers(snapshot: &SkillSnapshot) -> Vec<SkillMcpStatus> {
 
-    let definitions = macaca_runtime_host::McpServerFactory::with_bundled_mapping_registry()
+    let definitions = macaca_sdk::runtime_host::McpServerFactory::with_bundled_mapping_registry()
         .from_skill_snapshot(snapshot);
     let statuses = probe_definition_statuses(definitions, &McpToolPolicy::default()).await;
     statuses

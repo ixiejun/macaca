@@ -10,7 +10,7 @@ use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
 use axum::response::sse::Event;
-use macaca_runtime_host::persist::AppendEventCommand;
+use macaca_sdk::runtime_host::persist::AppendEventCommand;
 use macaca_proto::ExecutionControlEvent;
 use macaca_sdk::skill::SkillSnapshot;
 use serde_json::json;

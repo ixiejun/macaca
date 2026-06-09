@@ -11,10 +11,10 @@
 
 use std::sync::Arc;
 
-use macaca_app::{AppRegistry, AppRuntime};
+use macaca_sdk::app::{AppRegistry, AppRuntime};
 use macaca_sdk::driver::{DriverRegistry, DriverRuntime};
 use macaca_sdk::llm::{LlmProvider, LlmRouter};
-use macaca_runtime_host::McpRuntimeFacade;
+use macaca_sdk::runtime_host::McpRuntimeFacade;
 
 use crate::memory_runtime::WebMemoryRuntime;
 

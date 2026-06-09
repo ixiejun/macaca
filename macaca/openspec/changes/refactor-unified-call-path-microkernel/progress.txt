@@ -1026,3 +1026,14 @@
 - **Logging**: `tracing::info/debug` on domain-pack bootstrap, catalog compose, and service adapter dispatch via proto `domain_pack_command_trace` / provider registration audit nodes.
 - **GitNexus memo (non-blocking)**: iteration 124 HIGH on contract sink + `bootstrap_domain_pack_services` — recorded in `impact-memo.md` (memo only per user directive).
 - **Next**: §9.4 retire `macaca-app` + `macaca-runtime-host` direct web deps (break remaining cycles); §6.3.2 archive; §4.1.4 `memory_runtime` deletion deferred.
+
+## Iteration 125 (2026-06-08)
+- **P5 §4.4.4 / §9.4 web sdk-only terminal — LANDED**: broke `app→sdk` cycle by sinking declarative agent config (`AgentConfig`, `CapabilityDef`, `AgentSkillsConfig`, validation, `agent_manifest_from_declarative_config`) to `macaca-proto::declarative_agent_config`; removed production `macaca-sdk` dep from `macaca-app`; `macaca-app` bootstrap registers agents directly via kernel manifest builder.
+- **SDK bridges**: `macaca-sdk::shell_provider_bridge::app` + `runtime_host` re-exports; `macaca-web` ~90+ source files migrated from `macaca_app::` / `macaca_runtime_host::` to `macaca_sdk::app::` / `macaca_sdk::runtime_host::`.
+- **Entitlement decoupling**: `PackageEntitlementAuthorizeClient` trait (Interface Segregation) in `macaca-app`; `ServiceBackedApplicationEntitlementAuthorizer` no longer depends on SDK `SystemEntitlementClient` in production.
+- **Gate allowlist**: `WEB_SHELL_WORKSPACE_DEPENDENCY_DEBT` 2→**0** rows; `PERMITTED_SHELL_WORKSPACE_DEPS` = `macaca-proto` + `macaca-sdk`; synced `macaca-os-serviceization-allowlist.md`.
+- **Design patterns**: Shared Kernel (`declarative_agent_config` in proto); Facade (`shell_provider_bridge` app/runtime_host); Interface Segregation (`PackageEntitlementAuthorizeClient`); Chain of Responsibility (config validation); Strangler Fig (allowlist shrink to terminal).
+- **Contract tests**: `shell_dependency_purity_gate` 2/2; `domain_pack_finance_package` 2/2; `cargo tree -e normal -p macaca-web --depth 1` workspace members = proto + sdk only.
+- **Logging**: `tracing::info/debug` on declarative config validation, agent manifest build, and SDK bridge module load paths.
+- **GitNexus memo (non-blocking)**: iteration 125 CRITICAL/HIGH on `AgentConfig` sink + mass web import migration + app/sdk cycle break — recorded in `impact-memo.md` (memo only per user directive).
+- **Next**: §6.3.2 archive related completed changes; §4.1.4 `memory_runtime` deletion deferred.

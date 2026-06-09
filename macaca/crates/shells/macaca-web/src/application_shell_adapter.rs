@@ -7,8 +7,8 @@
 
 use std::sync::Arc;
 
-use macaca_app::{model::AppStatus, AppRegistry};
-use macaca_app::AppLlmConfig;
+use macaca_sdk::app::{model::AppStatus, AppRegistry};
+use macaca_sdk::app::AppLlmConfig;
 use macaca_proto::{ApplicationId, ApplicationStatusCommand, ApplicationServiceScope, TraceContext};
 use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
@@ -105,6 +105,6 @@ pub async fn is_registry_wasm_layer_app(state: &Arc<AppState>, app_id: &Applicat
     let registry = registry_read_guard(state).await;
     registry
         .get_app(app_id)
-        .map(|app| app.manifest.layer == macaca_app::AppLayer::L2Wasm)
+        .map(|app| app.manifest.layer == macaca_sdk::app::AppLayer::L2Wasm)
         .unwrap_or(false)
 }

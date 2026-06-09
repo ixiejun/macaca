@@ -2,9 +2,7 @@
 
 use std::path::Path;
 
-use macaca_proto::{MacacaError, MacacaResult};
-use macaca_sdk::config::CapabilityDef;
-use macaca_sdk::AgentConfig;
+use macaca_proto::{AgentConfig, AgentSkillsConfig, CapabilityDef, MacacaError, MacacaResult};
 
 use crate::model::{AgentSource, AppLayer, AppManifest, InlineAgentConfig};
 use crate::ui_runtime::validate_ui_runtime_config;
@@ -103,7 +101,7 @@ fn inline_to_agent_config(inline: &InlineAgentConfig) -> AgentConfig {
         skills: inline
             .skills
             .as_ref()
-            .map(|skills| macaca_sdk::config::AgentSkillsConfig {
+            .map(|skills| AgentSkillsConfig {
                 allow: skills.allow.clone(),
                 deny: skills.deny.clone(),
             }),

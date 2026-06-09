@@ -8,7 +8,7 @@
 //! 5. Broadcasts SSE + persists plan decisions for traceability.
 
 use axum::response::sse::Event;
-use macaca_app::{app_task_planning_contract, AppPlanningAgentProfile};
+use macaca_sdk::app::{app_task_planning_contract, AppPlanningAgentProfile};
 use macaca_proto::TaskId;
 
 use super::agent_execution_adapter::{
@@ -195,7 +195,7 @@ planner_notebook_mark_decomposition(
         } else {
             macaca_sdk::task::build_decomposition_prompt(
                 &description,
-                &macaca_app::AppTaskPlanningContract {
+                &macaca_sdk::app::AppTaskPlanningContract {
                     workflow_name: "default".into(),
                     entry_agent: ctx.entry_agent_name.clone(),
                     worker_agents: worker_profiles.clone(),

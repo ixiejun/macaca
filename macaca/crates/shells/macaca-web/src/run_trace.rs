@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 
-use macaca_runtime_host::persist::{AppendEventCommand, EventLog};
+use macaca_sdk::runtime_host::persist::{AppendEventCommand, EventLog};
 use macaca_proto::{ApplicationId, RunTracePayload};
 use serde_json::json;
 

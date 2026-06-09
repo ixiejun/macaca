@@ -29,6 +29,8 @@ chrono = { workspace = true }
 thiserror = { workspace = true }
 uuid = { workspace = true }
 macaca-kernel = { workspace = true }
+macaca-app = { workspace = true }
+macaca-runtime-host = { workspace = true }
 macaca-framework = { path = "../../runtime/macaca-framework", features = ["macaca-compat", "service-clients"] }
 macaca-domain-pack-finance = { workspace = true, optional = true }
 [dev-dependencies]

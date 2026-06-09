@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 
-use macaca_runtime_host::persist::PersistBackend;
+use macaca_sdk::runtime_host::persist::PersistBackend;
 use macaca_proto::ApplicationId;
 use tokio::sync::mpsc::Sender;
 

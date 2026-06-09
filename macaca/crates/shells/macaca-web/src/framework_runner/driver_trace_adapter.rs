@@ -3,7 +3,7 @@
 use std::convert::Infallible;
 use axum::response::sse::Event;
 use macaca_sdk::framework::tool::Toolkit;
-use macaca_runtime_host::persist::{AppendEventCommand, EventLog};
+use macaca_sdk::runtime_host::persist::{AppendEventCommand, EventLog};
 use super::build_mode::{DriverTraceRoute, should_forward_driver_trace};
 pub(crate) async fn attach_driver_trace_route(toolkit: &mut Toolkit, route: DriverTraceRoute) {
         let (trace_tx, mut trace_rx) =
@@ -39,7 +39,7 @@ pub(crate) async fn attach_driver_trace_route(toolkit: &mut Toolkit, route: Driv
                         // post_chat_v2 owns the SSE forwarding for that channel; sending here
                         // as well would duplicate delegated_driver_trace events in the live UI.
                         executor.broadcast_event(
-                            macaca_runtime_host::executor::ExecutorEvent::AgentEvent {
+                            macaca_sdk::runtime_host::executor::ExecutorEvent::AgentEvent {
                                 task_id: *task_id,
                                 agent: agent_name.clone(),
                                 event: macaca_proto::AgentExecutionEvent::DriverTrace {

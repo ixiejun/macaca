@@ -23,7 +23,7 @@ use macaca_sdk::context::{
 };
 use macaca_sdk::framework::model::{ChatModel, ChatOptions, ChatResponse, ModelError};
 use macaca_proto::{config::ContextConfig, AgentId, ApplicationId};
-use macaca_runtime_host::persist::EventLog;
+use macaca_sdk::runtime_host::persist::EventLog;
 use macaca_sdk::memory::SharedTombstoneRegistry;
 
 use crate::context_reporting_memory::{
@@ -37,7 +37,7 @@ use crate::context_reporting_memory::{
 pub(crate) struct ContextReportingChatModel {
     pub(super) inner: Arc<dyn ChatModel>,
     pub(super) event_log: Arc<EventLog>,
-    pub(super) persist_backend: Arc<dyn macaca_runtime_host::persist::PersistBackend>,
+    pub(super) persist_backend: Arc<dyn macaca_sdk::runtime_host::persist::PersistBackend>,
     pub(super) app_id: ApplicationId,
     pub(super) session_id: Option<String>,
     pub(super) agent_name: String,
@@ -66,7 +66,7 @@ impl ContextReportingChatModel {
     pub(crate) fn new(
         inner: Arc<dyn ChatModel>,
         event_log: Arc<EventLog>,
-        persist_backend: Arc<dyn macaca_runtime_host::persist::PersistBackend>,
+        persist_backend: Arc<dyn macaca_sdk::runtime_host::persist::PersistBackend>,
         app_id: ApplicationId,
         session_id: Option<String>,
         agent_name: String,
@@ -170,7 +170,7 @@ impl ContextReportingChatModel {
     /// Count compaction successors for diagnostic lineage enrichment.
     pub(super) async fn lineage_compactions(&self, session_id: &str) -> u32 {
         let store =
-            macaca_runtime_host::persist::SessionLineageStore::new(Arc::clone(&self.persist_backend));
+            macaca_sdk::runtime_host::persist::SessionLineageStore::new(Arc::clone(&self.persist_backend));
         store
             .count_compaction_successors(session_id)
             .await

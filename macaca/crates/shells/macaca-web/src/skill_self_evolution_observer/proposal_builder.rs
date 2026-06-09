@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 use macaca_proto::{ApplicationId, TraceContext};
-use macaca_runtime_host::executor::TaskResult;
+use macaca_sdk::runtime_host::executor::TaskResult;
 use macaca_sdk::skill::{
     SkillEvolutionCandidateClassification, SkillEvolutionProposalAction, SkillExperienceCandidate,
     SkillExperienceCandidateDestination, SkillExperienceEvidenceGateStatus,

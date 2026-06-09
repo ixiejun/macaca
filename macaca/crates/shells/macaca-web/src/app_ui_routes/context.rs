@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::http::StatusCode;
-use macaca_app::expand_service_capabilities;
+use macaca_sdk::app::expand_service_capabilities;
 use macaca_proto::{
     ApplicationId, ApplicationMetadataQueryCommand, TraceContext,
 };

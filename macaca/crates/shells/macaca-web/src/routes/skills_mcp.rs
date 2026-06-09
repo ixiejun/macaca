@@ -7,7 +7,7 @@ use axum::http::StatusCode;
 use axum::Json;
 use serde::{Deserialize, Serialize};
 
-use macaca_app::AppLoader;
+use macaca_sdk::app::AppLoader;
 use macaca_proto::{
     ApplicationId, McpProbeCommand, McpRuntimeStatusView, McpToolPolicySnapshot, ProtoErrorAdapter,
     TraceContext,

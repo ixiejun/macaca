@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use macaca_sdk::framework::session::{InMemorySessionStore as FrameworkInMemorySessionStore, SessionStore as FrameworkSessionStore};
-use macaca_runtime_host::ApplicationExecutorRegistry;
+use macaca_sdk::runtime_host::ApplicationExecutorRegistry;
 use macaca_proto::MacacaResult;
 use crate::agent_runner::WebAgentRunner;
 use crate::state::{AppConfig, AppState, LoopState, PersistenceState, SessionState};
@@ -78,7 +78,7 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
         // Create the real agent runner with the actual weak state
         let runner = Arc::new(WebAgentRunner::new(weak_state.clone()));
         let executor_registry = Arc::new(ApplicationExecutorRegistry::new(
-            Arc::clone(&runner) as Arc<dyn macaca_runtime_host::AgentRunner>
+            Arc::clone(&runner) as Arc<dyn macaca_sdk::runtime_host::AgentRunner>
         ));
 
         let composition = crate::shell_composition_bundle::WebShellCompositionBundle::new(

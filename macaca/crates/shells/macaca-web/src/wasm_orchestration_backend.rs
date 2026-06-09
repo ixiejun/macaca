@@ -11,12 +11,12 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use macaca_runtime_host::ApplicationExecutorRegistry;
+use macaca_sdk::runtime_host::ApplicationExecutorRegistry;
 use macaca_proto::{
     AgentExecutionIntent, ApplicationAgentDelegateCommand, ApplicationAgentDelegateResult,
     ApplicationId, ServiceError, ServiceResult, TaskId,
 };
-use macaca_runtime_host::{ApplicationOrchestrationBackend, ServiceRuntime};
+use macaca_sdk::runtime_host::{ApplicationOrchestrationBackend, ServiceRuntime};
 use tokio::sync::RwLock;
 use tracing::info;
 
@@ -233,7 +233,7 @@ mod tests {
     use std::sync::Arc;
 
     use macaca_proto::ApplicationId;
-    use macaca_runtime_host::{ServiceRuntime, ServiceRuntimeConfig};
+    use macaca_sdk::runtime_host::{ServiceRuntime, ServiceRuntimeConfig};
     use tokio::sync::RwLock;
 
     use crate::workspace::AppWorkspace;

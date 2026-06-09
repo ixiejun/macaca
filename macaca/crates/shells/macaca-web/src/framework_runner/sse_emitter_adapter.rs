@@ -7,7 +7,7 @@ use axum::response::sse::Event;
 use macaca_sdk::framework::agent::Hook;
 use macaca_sdk::framework::message::Msg;
 use macaca_sdk::framework::tool::{ToolError, ToolMiddleware, ToolResponse};
-use macaca_runtime_host::persist::{AppendEventCommand, EventLog};
+use macaca_sdk::runtime_host::persist::{AppendEventCommand, EventLog};
 use tokio::sync::mpsc;
 use super::tool_trace::tool_trace_output;
 pub struct SseEmitterHook {

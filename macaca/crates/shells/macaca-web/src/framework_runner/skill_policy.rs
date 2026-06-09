@@ -14,7 +14,7 @@ pub(crate) async fn resolve_agent_skill_policy(
         return SkillPolicy::default();
     };
     for source in &app.manifest.agents {
-        let macaca_app::model::AgentSource::Inline(inline) = source else {
+        let macaca_sdk::app::model::AgentSource::Inline(inline) = source else {
             continue;
         };
         if inline.name != agent_name {

@@ -7,8 +7,8 @@ use std::sync::Arc;
 
 use chrono::Utc;
 use macaca_proto::ApplicationId;
-use macaca_runtime_host::executor::ExecutorEvent;
-use macaca_runtime_host::persist::PersistStore;
+use macaca_sdk::runtime_host::executor::ExecutorEvent;
+use macaca_sdk::runtime_host::persist::PersistStore;
 
 use super::turn_model::{ensure_running_assistant_turn, session_status_from_executor_event, stored_turns_or_messages};
 use super::types::{AgentTrace, AssistantExecutionMeta, SessionMeta, StoredSession, StoredTraceStep, StoredTurn};

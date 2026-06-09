@@ -17,13 +17,13 @@
 
 use std::sync::Arc;
 
-use macaca_runtime_host::{ApplicationExecutor, TaskContext, TaskId, TaskResult};
+use macaca_sdk::runtime_host::{ApplicationExecutor, TaskContext, TaskId, TaskResult};
 use macaca_proto::{
     AgentExecutionCommand, AgentExecutionEvent, AgentExecutionIntent, AgentExecutionResult,
     AgentExecutionStatus, ApplicationId, KernelServiceId, ServiceBusSource, TraceContext,
     AGENT_EXECUTION_SERVICE_ID,
 };
-use macaca_runtime_host::ServiceRuntime;
+use macaca_sdk::runtime_host::ServiceRuntime;
 use tracing::{info, warn};
 
 /// Provider-neutral request to delegate work through the agent execution service.

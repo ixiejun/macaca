@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use macaca_runtime_host::executor::{ApplicationExecutor, ExecutorEventFactory};
+use macaca_sdk::runtime_host::executor::{ApplicationExecutor, ExecutorEventFactory};
 use macaca_proto::{
     AgentActivity, AgentExecutionCommand, AgentExecutionEvent, ApplicationMetadataQueryCommand,
     ExecutionControlCommandResult, ExecutionControlPolicy,
@@ -16,7 +16,7 @@ use macaca_proto::{
     ExecutionControlResolvePolicyCommand, ExecutionControlResolvedPolicy, KernelServiceId,
     ServiceBusSource, ServiceError, ServiceResult, TaskId, EXECUTION_CONTROL_SERVICE_ID,
 };
-use macaca_runtime_host::{
+use macaca_sdk::runtime_host::{
     execution_control_execution_id, execution_control_scope, AgentExecutionEvidenceCollector,
     AgentExecutionHostAdapter, AgentExecutionOutputHasher, OpaqueExecutionControlHandle,
     ServiceBackedFrameworkRuntimeAgentPort,
@@ -35,13 +35,13 @@ const WEB_AGENT_EXECUTION_BUS_SOURCE: &str = "macaca.web.agent_execution";
 /// Host port that wires Web session state, kernel lifecycle, and execution-control services.
 pub(crate) struct WebAgentExecutionHostAdapter {
     state: Arc<AppState>,
-    service_runtime: Arc<macaca_runtime_host::ServiceRuntime>,
+    service_runtime: Arc<macaca_sdk::runtime_host::ServiceRuntime>,
 }
 
 impl WebAgentExecutionHostAdapter {
     pub(crate) fn new(
         state: Arc<AppState>,
-        service_runtime: Arc<macaca_runtime_host::ServiceRuntime>,
+        service_runtime: Arc<macaca_sdk::runtime_host::ServiceRuntime>,
     ) -> Self {
         Self {
             state,
@@ -381,9 +381,9 @@ impl AgentExecutionOutputHasher for WebAgentExecutionOutputHasher {
 /// Build the Web-wired composed agent execution backend for service registration.
 pub(crate) fn build_composed_web_agent_execution_backend(
     state: Arc<AppState>,
-    service_runtime: Arc<macaca_runtime_host::ServiceRuntime>,
-) -> macaca_runtime_host::ComposedAgentExecutionBackend {
-    macaca_runtime_host::ComposedAgentExecutionBackend::new(
+    service_runtime: Arc<macaca_sdk::runtime_host::ServiceRuntime>,
+) -> macaca_sdk::runtime_host::ComposedAgentExecutionBackend {
+    macaca_sdk::runtime_host::ComposedAgentExecutionBackend::new(
         service_runtime,
         WEB_AGENT_EXECUTION_BUS_SOURCE,
         Arc::new(WebAgentExecutionHostAdapter::new(

@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 
-use macaca_runtime_host::executor::ExecutorEvent;
+use macaca_sdk::runtime_host::executor::ExecutorEvent;
 use macaca_proto::AgentActivity;
 
 use crate::state::AppState;

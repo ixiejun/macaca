@@ -243,7 +243,7 @@ if let Some(sid) = waiting_session {
     // Route resume through execution_control (authoritative) and
     // the goal-lifecycle shell adapter (legacy channel compat).
     let goal_coordinator =
-        macaca_runtime_host::ExecutionControlGoalLifecycleCoordinator::new(
+        macaca_sdk::runtime_host::ExecutionControlGoalLifecycleCoordinator::new(
             Arc::clone(&ctx.state.service_runtime),
         );
     let sessions =

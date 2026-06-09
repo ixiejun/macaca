@@ -8,9 +8,9 @@ use std::sync::Arc;
 
 use tokio::task::JoinHandle;
 
-use macaca_runtime_host::executor::app_executor::ApplicationExecutor;
-use macaca_runtime_host::executor::ExecutorEvent;
-use macaca_runtime_host::persist::{AppendEventCommand, EventLog};
+use macaca_sdk::runtime_host::executor::app_executor::ApplicationExecutor;
+use macaca_sdk::runtime_host::executor::ExecutorEvent;
+use macaca_sdk::runtime_host::persist::{AppendEventCommand, EventLog};
 
 use crate::proto_event_visitors::delegated_persisted_event_name;
 use crate::run_trace::{phase, status, RunTracer};

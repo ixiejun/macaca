@@ -9,7 +9,7 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use macaca_app::AppLlmConfig;
+use macaca_sdk::app::AppLlmConfig;
 use macaca_sdk::llm::{
     LlmPolicyHints, LlmRouteResolveCommand, LlmServiceScope, LlmServiceSnapshotCommand,
     ModelSelection, ModelSelectionRequest, ModelTarget,

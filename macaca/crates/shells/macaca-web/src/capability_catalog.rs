@@ -21,7 +21,7 @@ use macaca_proto::{
     ApplicationId, McpProbeCommand, McpRuntimeStatusView, McpToolPolicySnapshot, TraceContext,
     MCP_PROBE_COMMAND, MCP_SERVICE_ID,
 };
-use macaca_runtime_host::{
+use macaca_sdk::runtime_host::{
     McpRuntimeFacade, McpRuntimeStatus, McpRuntimeStatusState, McpToolPolicy,
 };
 use macaca_sdk::SystemMcpClient;

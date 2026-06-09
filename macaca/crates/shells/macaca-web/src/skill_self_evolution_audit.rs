@@ -11,7 +11,7 @@ use std::sync::Arc;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::Json;
-use macaca_app::AppLoader;
+use macaca_sdk::app::AppLoader;
 use macaca_proto::{ApplicationId, TraceContext};
 use macaca_sdk::skill::{
     SkillGovernanceRecord, SkillGovernanceSnapshotCommand, SkillLifecycleState, SkillPolicy,

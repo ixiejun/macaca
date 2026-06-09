@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use axum::response::sse::Event;
-use macaca_runtime_host::persist::EventLog;
+use macaca_sdk::runtime_host::persist::EventLog;
 use serde_json::Value;
 use tokio::sync::mpsc;
 

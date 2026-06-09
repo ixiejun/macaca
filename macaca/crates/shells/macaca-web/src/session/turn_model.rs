@@ -3,7 +3,7 @@
 //! Converts between legacy `messages` arrays and richer `turns` with execution metadata.
 
 use macaca_proto::LlmMessage;
-use macaca_runtime_host::executor::ExecutorEvent;
+use macaca_sdk::runtime_host::executor::ExecutorEvent;
 
 use super::types::{AssistantExecutionMeta, StoredSession, StoredTraceStep, StoredTurn, AgentTrace};
 
@@ -38,7 +38,7 @@ pub(crate) fn session_status_from_executor_event(event: &ExecutorEvent) -> Optio
         ExecutorEvent::TaskFailed { .. } => Some("failed"),
         ExecutorEvent::TaskCancelled { .. } => Some("cancelled"),
         ExecutorEvent::HookEvent { event: hook_event } => {
-            use macaca_runtime_host::executor::fork_manager::HookEvent;
+            use macaca_sdk::runtime_host::executor::fork_manager::HookEvent;
             match hook_event {
                 HookEvent::ForkMerged { .. } => Some("completed"),
                 HookEvent::DelegateFailed { .. } => Some("failed"),

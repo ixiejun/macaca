@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 
-use macaca_runtime_host::executor::ApplicationExecutor;
+use macaca_sdk::runtime_host::executor::ApplicationExecutor;
 use macaca_proto::{AgentExecutionIntent, ApplicationId};
 
 use super::agent_execution_adapter::run_loop_agent_execution_service_call;

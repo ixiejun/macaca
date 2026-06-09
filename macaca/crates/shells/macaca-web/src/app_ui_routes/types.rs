@@ -8,7 +8,7 @@ use std::path::PathBuf;
 
 use axum::http::StatusCode;
 use axum::Json;
-use macaca_app::ui_runtime::AppUiRuntimeConfig;
+use macaca_sdk::app::ui_runtime::AppUiRuntimeConfig;
 
 use crate::routes::ErrorResponse;
 

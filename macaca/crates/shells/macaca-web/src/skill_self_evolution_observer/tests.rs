@@ -6,7 +6,7 @@ use chrono::Utc;
 use macaca_proto::{
     AgentExecutionResult, AgentExecutionStatus, ApplicationId, TraceContext,
 };
-use macaca_runtime_host::executor::{TaskId, TaskResult, TokenUsage};
+use macaca_sdk::runtime_host::executor::{TaskId, TaskResult, TokenUsage};
 use macaca_sdk::skill::SkillExperienceEvidenceGateStatus;
 
 use super::projection::{agent_execution_output_text, task_result_from_agent_execution_result};

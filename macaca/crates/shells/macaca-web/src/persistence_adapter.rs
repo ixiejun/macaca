@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use macaca_sdk::kernel::KernelPersistencePort;
-use macaca_runtime_host::persist::PersistStore;
+use macaca_sdk::runtime_host::persist::PersistStore;
 use macaca_proto::MacacaResult;
 use tracing::{debug, info};
 
@@ -18,12 +18,12 @@ use tracing::{debug, info};
 /// memento operations and records traceable diagnostics around each operation
 /// family so persistence ownership remains auditable.
 pub struct RedbKernelPersistenceAdapter {
-    store: Arc<macaca_runtime_host::persist::RedbStore>,
+    store: Arc<macaca_sdk::runtime_host::persist::RedbStore>,
 }
 
 impl RedbKernelPersistenceAdapter {
     /// Create an adapter over an already-opened Redb store.
-    pub fn new(store: Arc<macaca_runtime_host::persist::RedbStore>) -> Self {
+    pub fn new(store: Arc<macaca_sdk::runtime_host::persist::RedbStore>) -> Self {
         info!("redb kernel persistence adapter initialized");
         Self { store }
     }

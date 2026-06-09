@@ -6,7 +6,6 @@ edition.workspace = true
 [dependencies]
 macaca-proto = { workspace = true }
 macaca-agent = { workspace = true }
-macaca-sdk = { workspace = true }
 macaca-llm = { workspace = true }
 macaca-tools = { workspace = true }
 macaca-kernel = { workspace = true }
@@ -24,3 +23,4 @@ dirs = "5"
 
 [dev-dependencies]
 macaca-persist = { workspace = true }
+macaca-sdk = { workspace = true }

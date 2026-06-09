@@ -5,12 +5,12 @@ use std::sync::Arc;
 use axum::response::sse::Event;
 use tokio::sync::mpsc;
 use macaca_sdk::framework::model::ToolChoice;
-use macaca_runtime_host::persist::EventLog;
+use macaca_sdk::runtime_host::persist::EventLog;
 use crate::state::AppState;
 use super::runtime_execution_control::RuntimeExecutionControl;
 pub(crate) enum FrameworkRunnerBuildMode {
     Executor {
-        executor: Arc<macaca_runtime_host::executor::ApplicationExecutor>,
+        executor: Arc<macaca_sdk::runtime_host::executor::ApplicationExecutor>,
     },
     Runtime {
         event_tx: Option<mpsc::Sender<macaca_proto::AgentExecutionEvent>>,
@@ -25,7 +25,7 @@ pub(crate) enum FrameworkRunnerBuildMode {
 }
 pub(crate) enum StandardAgentMode {
     Executor {
-        executor: Arc<macaca_runtime_host::executor::ApplicationExecutor>,
+        executor: Arc<macaca_sdk::runtime_host::executor::ApplicationExecutor>,
     },
     Runtime {
         event_tx: Option<mpsc::Sender<macaca_proto::AgentExecutionEvent>>,
@@ -36,7 +36,7 @@ pub(crate) enum StandardAgentMode {
 pub(crate) enum DriverTraceRoute {
     Executor {
         state: Arc<AppState>,
-        executor: Arc<macaca_runtime_host::executor::ApplicationExecutor>,
+        executor: Arc<macaca_sdk::runtime_host::executor::ApplicationExecutor>,
         task_id: macaca_proto::TaskId,
         agent_name: String,
         session_id: Option<String>,

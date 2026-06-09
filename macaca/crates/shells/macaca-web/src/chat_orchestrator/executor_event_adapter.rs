@@ -6,7 +6,7 @@
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
-use macaca_runtime_host::executor::ExecutorEvent;
+use macaca_sdk::runtime_host::executor::ExecutorEvent;
 use tokio::sync::RwLock;
 
 use axum::response::sse::Event;

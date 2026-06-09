@@ -9,7 +9,7 @@
 
 use async_trait::async_trait;
 use macaca_proto::{AgentContextBuildCommand, AgentContextSnapshot, ServiceResult};
-use macaca_runtime_host::AgentContextBackend;
+use macaca_sdk::runtime_host::AgentContextBackend;
 use std::sync::Arc;
 
 use crate::framework_runner::FrameworkRunner;

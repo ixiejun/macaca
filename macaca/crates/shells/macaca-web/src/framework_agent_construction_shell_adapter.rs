@@ -17,7 +17,7 @@ use macaca_sdk::framework::message::Msg;
 use macaca_sdk::framework::model::ToolChoice;
 use macaca_sdk::framework::react_agent::ReActAgent;
 use macaca_proto::{AgentContextSnapshot, AgentExecutionCommand, AgentExecutionEvent};
-use macaca_runtime_host::{
+use macaca_sdk::runtime_host::{
     ConstructedRuntimeAgent, FrameworkAgentConstructionPort, OpaqueExecutionControlHandle,
 };
 use tokio::sync::mpsc;

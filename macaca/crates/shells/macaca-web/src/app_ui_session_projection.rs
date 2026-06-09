@@ -13,7 +13,7 @@
 use std::sync::Arc;
 
 use chrono::Utc;
-use macaca_runtime_host::persist::PersistBackend;
+use macaca_sdk::runtime_host::persist::PersistBackend;
 use macaca_proto::{
     ApplicationId, ApplicationUiBridgeRequest, MacacaResult, StartApplicationExecutionCommand,
 };
@@ -305,7 +305,7 @@ fn execution_projection_turn(command: &StartApplicationExecutionCommand) -> Stor
 mod tests {
     use std::sync::Arc;
 
-    use macaca_runtime_host::persist::{PersistBackend, RedbStore};
+    use macaca_sdk::runtime_host::persist::{PersistBackend, RedbStore};
     use macaca_proto::{
         ApplicationExecutionPayload, ApplicationId, ApplicationUiBridgeRequest,
         StartApplicationExecutionCommand, TraceContext,

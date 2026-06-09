@@ -17,7 +17,7 @@ use macaca_sdk::driver::{DriverServiceScope, DriverToolCatalogCommand};
 use macaca_sdk::skill::{SkillServiceScope, SkillToolCatalogCommand};
 
 use crate::state::AppState;
-use macaca_runtime_host::{McpServerDefinition, McpToolPolicy};
+use macaca_sdk::runtime_host::{McpServerDefinition, McpToolPolicy};
 
 use super::agent_tools::register_agent_tools;
 use super::mcp_bridge::{
@@ -287,7 +287,7 @@ pub(crate) async fn build_toolkit(
     )
     .await;
     let mcp_statuses =
-        macaca_runtime_host::probe_definition_statuses(mcp_definitions.clone(), &mcp_policy).await;
+        macaca_sdk::runtime_host::probe_definition_statuses(mcp_definitions.clone(), &mcp_policy).await;
     emit_mcp_runtime_events(state, session_id.as_deref(), agent_name, &mcp_statuses).await;
 
     if let Some(snapshot) = crate::skill_mcp::load_or_build_skill_snapshot(
@@ -298,7 +298,7 @@ pub(crate) async fn build_toolkit(
     )
     .await
     {
-        let skill_definitions = macaca_runtime_host::McpServerFactory::with_bundled_mapping_registry()
+        let skill_definitions = macaca_sdk::runtime_host::McpServerFactory::with_bundled_mapping_registry()
             .from_skill_snapshot(&snapshot);
         emit_mcp_starting_events(state, session_id.as_deref(), agent_name, &skill_definitions)
             .await;
@@ -311,7 +311,7 @@ pub(crate) async fn build_toolkit(
         )
         .await;
         let skill_statuses =
-            macaca_runtime_host::probe_definition_statuses(skill_definitions, &mcp_policy).await;
+            macaca_sdk::runtime_host::probe_definition_statuses(skill_definitions, &mcp_policy).await;
         emit_skill_mcp_alias_events(state, session_id.as_deref(), agent_name, &skill_statuses)
             .await;
         emit_mcp_runtime_events(state, session_id.as_deref(), agent_name, &skill_statuses).await;

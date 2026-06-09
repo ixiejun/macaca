@@ -5,7 +5,7 @@
 //! values into logs or Manifest v1 metadata.
 
 use macaca_proto::ApplicationManifestV1;
-use macaca_sdk::AgentConfig;
+use macaca_proto::AgentConfig;
 
 use crate::model::AppManifest;
 

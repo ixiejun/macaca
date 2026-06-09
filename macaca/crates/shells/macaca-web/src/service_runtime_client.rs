@@ -13,7 +13,7 @@ use macaca_proto::{
     KernelServiceId, MacacaError, MacacaResult, ServiceBusSource, ServiceCommand,
     ServiceCommandName,
 };
-use macaca_runtime_host::ServiceRuntime;
+use macaca_sdk::runtime_host::ServiceRuntime;
 use macaca_sdk::{
     ServiceCallCommand, ServiceCallResult, ServiceInspectionCommand, ServiceInspectionResult,
     SystemServiceClient,

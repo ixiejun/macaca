@@ -17,7 +17,7 @@ use macaca_proto::{
     McpToolAttachResult, McpToolCatalogCommand, McpToolCatalogResult, McpToolInvokeCommand,
     McpToolInvokeResult, TraceContext,
 };
-use macaca_runtime_host::{
+use macaca_sdk::runtime_host::{
     McpDefinitionSource, McpLifecycleScope, McpRuntimeFacade, McpRuntimeStatus,
     McpRuntimeStatusState, McpServerDefinition, McpToolPolicy,
 };

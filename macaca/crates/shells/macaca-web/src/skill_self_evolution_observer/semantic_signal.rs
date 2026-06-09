@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use macaca_runtime_host::executor::TaskResult;
+use macaca_sdk::runtime_host::executor::TaskResult;
 
 use super::types::MAX_SEMANTIC_TRIGGER_PHRASES;
 

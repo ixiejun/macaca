@@ -15,7 +15,7 @@ use std::sync::Arc;
 use macaca_proto::{
     ApplicationId, ForkId, LlmRole, TaskId, TraceContext, EXECUTION_CONTROL_SERVICE_ID,
 };
-use macaca_runtime_host::{
+use macaca_sdk::runtime_host::{
     ExecutionControlForkJoinCoordinator, ForkJoinParentResumeRequest,
 };
 use tracing::{info, warn};

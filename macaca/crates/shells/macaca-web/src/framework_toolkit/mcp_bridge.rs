@@ -10,7 +10,7 @@ use macaca_proto::{
     ApplicationId, McpRegisterCommand, McpServicePolicyHints, McpServiceScope,
     McpServiceSnapshotCommand, TraceContext,
 };
-use macaca_runtime_host::{
+use macaca_sdk::runtime_host::{
     McpDefinitionSource, McpRegistryConfig, McpRuntimeStatus, McpRuntimeStatusState,
     McpServerDefinition,
 };
@@ -176,7 +176,7 @@ pub(super) async fn load_app_mcp_overlay_definitions(
     match serde_yaml::from_str::<McpRegistryConfig>(&content)
         .map_err(|e| e.to_string())
         .and_then(|config| {
-            macaca_runtime_host::McpServerFactory::with_bundled_mapping_registry()
+            macaca_sdk::runtime_host::McpServerFactory::with_bundled_mapping_registry()
                 .from_registry_config(config, McpDefinitionSource::App)
         }) {
         Ok(definitions) => definitions,

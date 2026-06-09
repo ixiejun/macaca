@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use macaca_proto::AgentExecutionResult;
-use macaca_runtime_host::executor::TaskResult;
+use macaca_sdk::runtime_host::executor::TaskResult;
 use macaca_sdk::skill::SkillExperienceProposalCommand;
 
 use crate::state::AppState;

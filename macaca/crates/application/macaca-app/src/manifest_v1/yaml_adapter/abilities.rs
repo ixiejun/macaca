@@ -9,7 +9,7 @@ use macaca_proto::{
     AbilityPermissionDeclaration, AbilityServiceRequirement, ApplicationAbilityDescriptor,
     ApplicationAbilityKind, CapabilityId, KernelServiceId,
 };
-use macaca_sdk::AgentConfig;
+use macaca_proto::AgentConfig;
 
 use crate::model::{AgentSource, AppLayer, InlineAgentConfig};
 use crate::service_capability::{expand_service_capabilities, DomainPackCatalog};

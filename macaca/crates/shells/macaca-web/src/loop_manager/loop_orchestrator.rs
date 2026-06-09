@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 
-use macaca_app::app_entry_agent_name;
+use macaca_sdk::app::app_entry_agent_name;
 use macaca_proto::ApplicationId;
 
 use super::planner_helpers::select_entry_and_plan_agents;

@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use macaca_app::{AppRegistry, AppRuntime, SharedDomainPackCatalog};
+use macaca_sdk::app::{AppRegistry, AppRuntime, SharedDomainPackCatalog};
 use macaca_sdk::driver::{DriverRegistry, DriverRuntime};
 use macaca_sdk::framework::session::SessionStore as FrameworkSessionStore;
 use macaca_sdk::kernel::{audit::AuditLogger, alert::AlertManager, Kernel};
@@ -15,7 +15,7 @@ use macaca_sdk::llm::{LlmProvider, LlmRouter};
 use macaca_sdk::memory::TestMemoryManager;
 use macaca_proto::config::MacacaConfig;
 use macaca_proto::ApplicationId;
-use macaca_runtime_host::{AutonomyRuntimeBundle, McpRuntimeFacade, ServiceRuntime};
+use macaca_sdk::runtime_host::{AutonomyRuntimeBundle, McpRuntimeFacade, ServiceRuntime};
 use macaca_sdk::skill::SkillCatalog;
 use macaca_sdk::tools::ToolCatalog;
 
@@ -36,20 +36,20 @@ pub(crate) struct BootstrapCtx {
     /// Host-installed domain-pack catalog shared across runtime and UI routes.
     pub domain_pack_catalog: Option<SharedDomainPackCatalog>,
     pub registry: Option<Arc<tokio::sync::RwLock<AppRegistry>>>,
-    pub discovered: Option<Vec<macaca_app::DiscoveredApp>>,
+    pub discovered: Option<Vec<macaca_sdk::app::DiscoveredApp>>,
     pub service_runtime: Option<Arc<ServiceRuntime>>,
     pub autonomy_runtime: Option<AutonomyRuntimeBundle>,
     pub application_orchestration_registry_ref:
-        Option<Arc<tokio::sync::RwLock<Option<Arc<macaca_runtime_host::ApplicationExecutorRegistry>>>>>,
+        Option<Arc<tokio::sync::RwLock<Option<Arc<macaca_sdk::runtime_host::ApplicationExecutorRegistry>>>>>,
     pub app_workspaces:
         Option<Arc<tokio::sync::RwLock<HashMap<ApplicationId, crate::workspace::AppWorkspace>>>>,
     pub orchestration_backend: Option<Arc<WebApplicationOrchestrationBackend>>,
     pub app_dirs: Option<HashMap<ApplicationId, PathBuf>>,
     pub skills_dirs: Option<Vec<PathBuf>>,
     pub started_apps: Option<Vec<(ApplicationId, String, Vec<String>)>>,
-    pub service_audit_bundle: Option<macaca_runtime_host::ServiceAuditRuntimeBundle>,
+    pub service_audit_bundle: Option<macaca_sdk::runtime_host::ServiceAuditRuntimeBundle>,
     pub wasm_host_import_bridge:
-        Option<macaca_runtime_host::wasm_runtime_provider::WasmHostImportBridge>,
+        Option<macaca_sdk::runtime_host::wasm_runtime_provider::WasmHostImportBridge>,
     pub generic_service_client: Option<Arc<dyn macaca_sdk::SystemServiceClient>>,
     pub application_client: Option<Arc<dyn macaca_sdk::SystemApplicationClient>>,
     pub catalog: Option<SkillCatalog>,
@@ -60,21 +60,21 @@ pub(crate) struct BootstrapCtx {
     pub fork_to_session:
         Option<Arc<tokio::sync::RwLock<HashMap<macaca_proto::ForkId, ForkSessionMapping>>>>,
     pub executor_registry_ref:
-        Option<Arc<tokio::sync::RwLock<Option<Arc<macaca_runtime_host::ApplicationExecutorRegistry>>>>>,
+        Option<Arc<tokio::sync::RwLock<Option<Arc<macaca_sdk::runtime_host::ApplicationExecutorRegistry>>>>>,
     pub delegate_session_id: Option<Arc<tokio::sync::RwLock<Option<String>>>>,
     pub data_dir: Option<PathBuf>,
     pub session_db_path: Option<PathBuf>,
-    pub session_store_impl: Option<Arc<macaca_runtime_host::persist::RedbStore>>,
-    pub session_store_shared: Option<Arc<dyn macaca_runtime_host::persist::PersistBackend>>,
+    pub session_store_impl: Option<Arc<macaca_sdk::runtime_host::persist::RedbStore>>,
+    pub session_store_shared: Option<Arc<dyn macaca_sdk::runtime_host::persist::PersistBackend>>,
     pub todo_store: Option<Arc<macaca_sdk::task::TodoStore>>,
-    pub event_log: Option<Arc<macaca_runtime_host::persist::EventLog>>,
-    pub entitlement_store: Option<Arc<dyn macaca_runtime_host::persist::EntitlementStore>>,
-    pub payment_store: Option<Arc<dyn macaca_runtime_host::persist::PaymentStore>>,
-    pub entitlement_facade: Option<Arc<macaca_runtime_host::EntitlementRuntimeFacade>>,
+    pub event_log: Option<Arc<macaca_sdk::runtime_host::persist::EventLog>>,
+    pub entitlement_store: Option<Arc<dyn macaca_sdk::runtime_host::persist::EntitlementStore>>,
+    pub payment_store: Option<Arc<dyn macaca_sdk::runtime_host::persist::PaymentStore>>,
+    pub entitlement_facade: Option<Arc<macaca_sdk::runtime_host::EntitlementRuntimeFacade>>,
     pub run_tracer: Option<Arc<RunTracer>>,
     pub kernel_persistence: Option<Arc<crate::persistence_adapter::RedbKernelPersistenceAdapter>>,
     pub audit_logger: Option<Arc<AuditLogger>>,
-    pub session_store: Option<Arc<dyn macaca_runtime_host::persist::PersistBackend>>,
+    pub session_store: Option<Arc<dyn macaca_sdk::runtime_host::persist::PersistBackend>>,
     pub alert_manager: Option<Arc<AlertManager>>,
     pub default_model: Option<String>,
     pub framework_session_store: Option<Arc<dyn FrameworkSessionStore>>,

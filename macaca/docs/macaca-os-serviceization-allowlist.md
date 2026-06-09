@@ -123,10 +123,9 @@ Rust source of truth: `macaca/crates/tests/macaca-integration-tests/tests/route_
 
 **P3 §4.4 update (2026-06-07):** All seven `macaca-web → provider` allowlist rows cleared. Web now reaches driver/llm/memory/persist/skill/task/tools/kernel types through `macaca-sdk::shell_provider_bridge` crate aliases; direct `Cargo.toml` edges removed.
 
-**Remaining web thin-shell debt (frozen in `shell_dependency_purity_gate/allowlist.rs`, tracked in OpenSpec §4.4.4):**
+**Remaining web thin-shell debt:** **None** — `WEB_SHELL_WORKSPACE_DEPENDENCY_DEBT` is empty at §9.4 terminal state (iteration 125). `macaca-web` workspace members: `macaca-proto` + `macaca-sdk` only.
 
-- `macaca-web → macaca-runtime-host` — composition-root bootstrap seam; blocked from SDK bridge by `macaca-app → macaca-sdk → runtime-host → macaca-app` cycle until cycle break lands.
-- `macaca-web → macaca-app` — application runtime bootstrap at composition root.
+**Retired (iteration 125):** `macaca-app` (via `macaca-sdk::app` bridge; cycle broken by sinking `AgentConfig` to `macaca-proto` and removing production `macaca-sdk` dep from `macaca-app`); `macaca-runtime-host` (via `macaca-sdk::runtime_host` bridge; ~90 shell source files migrated).
 
 **Retired (iteration 120):** `macaca-agent` (via `macaca-sdk::agent` bridge); `macaca-runtime` (dead `Cargo.toml` edge, zero source imports).
 
@@ -140,7 +139,9 @@ Rust source of truth: `macaca/crates/tests/macaca-integration-tests/tests/route_
 
 **Resolved prerequisite (iteration 120→124):** iter 120 blocked on `app → sdk → domain-pack-finance → app`; fixed by `macaca_proto::domain_pack_contract` + `macaca_kernel::DomainPackProviderRegistration` so pack depends only on proto/kernel/llm.
 
-Terminal target: **0 rows** (P5 gate). **Achieved** (iteration 40): Route C allowlist cleared; `assert_route_c_allowlist_terminal_state` enforces zero rows in CI.
+**Resolved prerequisite (iteration 124→125):** iter 124 blocked on `app → sdk` cycle preventing SDK bridge for app/runtime-host; fixed by `macaca_proto::declarative_agent_config` (Shared Kernel), direct kernel agent registration in `macaca-app`, and `PackageEntitlementAuthorizeClient` Interface Segregation removing production SDK entitlement coupling.
+
+Terminal target: **0 rows** (P5 gate). **Achieved** (iteration 40): Route C allowlist cleared; `assert_route_c_allowlist_terminal_state` enforces zero rows in CI. **Web shell workspace debt:** **0 rows** (iteration 125); `WEB_SHELL_WORKSPACE_DEPENDENCY_DEBT` empty; `PERMITTED_SHELL_WORKSPACE_DEPS` = `macaca-proto` + `macaca-sdk`.
 
 ## Active migration allowlist (OS-layer file-size gate input)
 

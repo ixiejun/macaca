@@ -12,7 +12,7 @@ use macaca_sdk::framework::memory::InMemoryWorkingMemory;
 use macaca_sdk::framework::model::ToolChoice;
 use macaca_sdk::framework::react_agent::ReActAgent;
 use macaca_sdk::framework::tool::{ToolMiddleware, Toolkit};
-use macaca_runtime_host::persist::EventLog;
+use macaca_sdk::runtime_host::persist::EventLog;
 use macaca_proto::config::ContextConfig;
 use macaca_proto::AgentId;
 use tokio::sync::mpsc;
@@ -206,7 +206,7 @@ impl WebTracedAgentFactory {
         context_client: Arc<dyn macaca_sdk::SystemContextClient>,
         memory_client: Arc<dyn macaca_sdk::SystemMemoryClient>,
         event_log: Arc<EventLog>,
-        persist_backend: Arc<dyn macaca_runtime_host::persist::PersistBackend>,
+        persist_backend: Arc<dyn macaca_sdk::runtime_host::persist::PersistBackend>,
         workspace_memory_tombstones: Option<Arc<macaca_sdk::memory::SharedTombstoneRegistry>>,
         merged_context_config: ContextConfig,
         agent_profile_root: Option<std::path::PathBuf>,
@@ -455,7 +455,7 @@ impl WebTracedAgentFactory {
     pub(crate) async fn build_executor_agent(
         &self,
         request: AgentBuildRequest,
-        executor: Arc<macaca_runtime_host::executor::ApplicationExecutor>,
+        executor: Arc<macaca_sdk::runtime_host::executor::ApplicationExecutor>,
     ) -> Result<HookedAgent<ReActAgent>, String> {
         self.build_standard_agent(request, StandardAgentMode::Executor { executor }, 25, None)
             .await

@@ -12,7 +12,7 @@
 use std::sync::Arc;
 
 use macaca_proto::{ApplicationId, EXECUTION_CONTROL_SERVICE_ID, TraceContext};
-use macaca_runtime_host::{
+use macaca_sdk::runtime_host::{
     ExecutionControlSessionLoopCoordinator, SessionLoopKind, SessionLoopRegisterRequest,
     SessionLoopShutdownRequest, SessionLoopWakeRequest,
     SESSION_LOOP_PLAN_WAKE_EVENT, SESSION_LOOP_TASK_CAPABILITY_ID,

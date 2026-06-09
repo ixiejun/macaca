@@ -10,8 +10,8 @@ use crate::state::AppState;
 /// Build the session-loop execution-control coordinator bound to web `AppState`.
 pub(crate) fn session_loop_coordinator(
     state: &Arc<AppState>,
-) -> macaca_runtime_host::ExecutionControlSessionLoopCoordinator {
-    macaca_runtime_host::ExecutionControlSessionLoopCoordinator::new(Arc::clone(
+) -> macaca_sdk::runtime_host::ExecutionControlSessionLoopCoordinator {
+    macaca_sdk::runtime_host::ExecutionControlSessionLoopCoordinator::new(Arc::clone(
         &state.service_runtime,
     ))
 }

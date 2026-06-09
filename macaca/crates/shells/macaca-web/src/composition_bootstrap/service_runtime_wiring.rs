@@ -60,7 +60,7 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
     let default_model = llm_router.default_model_reference();
     let framework_session_store: Arc<dyn FrameworkSessionStore> =
         Arc::new(FrameworkInMemorySessionStore::new());
-    let mcp_runtime = Arc::new(macaca_runtime_host::McpRuntimeFacade::load_default().await);
+    let mcp_runtime = Arc::new(macaca_sdk::runtime_host::McpRuntimeFacade::load_default().await);
 
     let (memory_runtime, workspace_memory, workspace_memory_tombstones) =
         if config.context.recall.expose_memory_tools {
@@ -137,42 +137,42 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
     };
     service_runtime
         .register_provider(
-            &macaca_runtime_host::StaticServiceProviderFactory::new(
-                macaca_runtime_host::ServiceProviderInstance::new(
+            &macaca_sdk::runtime_host::StaticServiceProviderFactory::new(
+                macaca_sdk::runtime_host::ServiceProviderInstance::new(
                     macaca_sdk::llm::llm_service_descriptor(),
                     Arc::new({
                         let default_reference = llm_router.default_model_reference();
                         let profile = if default_reference.trim().is_empty() {
-                            macaca_runtime_host::LlmProviderProfile::generic(llm.name())
+                            macaca_sdk::runtime_host::LlmProviderProfile::generic(llm.name())
                         } else {
-                            macaca_runtime_host::LlmProviderProfile::generic(llm.name())
+                            macaca_sdk::runtime_host::LlmProviderProfile::generic(llm.name())
                                 .with_default_model(default_reference)
                         };
-                        macaca_runtime_host::LlmSystemServiceProvider::with_catalog(
+                        macaca_sdk::runtime_host::LlmSystemServiceProvider::with_catalog(
                             Arc::clone(&llm),
                             profile,
-                            macaca_runtime_host::LlmProviderCatalogProfile::from_config(
+                            macaca_sdk::runtime_host::LlmProviderCatalogProfile::from_config(
                                 &config.llm,
                             ),
                         )
                     }),
                 ),
             ),
-            macaca_runtime_host::ServiceProviderFactoryContext::new(),
+            macaca_sdk::runtime_host::ServiceProviderFactoryContext::new(),
         )
         .await
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
     service_runtime
         .register_provider(
-            &macaca_runtime_host::StaticServiceProviderFactory::new(
-                macaca_runtime_host::ServiceProviderInstance::new(
+            &macaca_sdk::runtime_host::StaticServiceProviderFactory::new(
+                macaca_sdk::runtime_host::ServiceProviderInstance::new(
                     macaca_sdk::driver::driver_service_descriptor(),
-                    Arc::new(macaca_runtime_host::DriverSystemServiceProvider::new(
+                    Arc::new(macaca_sdk::runtime_host::DriverSystemServiceProvider::new(
                         Arc::clone(&driver_runtime),
                     )),
                 ),
             ),
-            macaca_runtime_host::ServiceProviderFactoryContext::new(),
+            macaca_sdk::runtime_host::ServiceProviderFactoryContext::new(),
         )
         .await
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
@@ -181,55 +181,55 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
     let governance_event_journal_path =
         skill_governance_event_journal_path(&config.workspace.root_dir);
     let skill_service_provider = if let Some(runtime) = memory_runtime.as_ref() {
-        macaca_runtime_host::SkillSystemServiceProvider::new()
+        macaca_sdk::runtime_host::SkillSystemServiceProvider::new()
             .with_materialized_skill_roots(materialized_skill_roots.clone())
             .with_governance_event_journal_path(governance_event_journal_path.clone())
             .with_memory_runtime(Arc::clone(runtime) as Arc<dyn macaca_sdk::memory::MemoryRuntimeFacade>)
     } else {
-        macaca_runtime_host::SkillSystemServiceProvider::new()
+        macaca_sdk::runtime_host::SkillSystemServiceProvider::new()
             .with_materialized_skill_roots(materialized_skill_roots.clone())
             .with_governance_event_journal_path(governance_event_journal_path.clone())
     };
     service_runtime
         .register_provider(
-            &macaca_runtime_host::StaticServiceProviderFactory::new(
-                macaca_runtime_host::ServiceProviderInstance::new(
+            &macaca_sdk::runtime_host::StaticServiceProviderFactory::new(
+                macaca_sdk::runtime_host::ServiceProviderInstance::new(
                     macaca_sdk::skill::skill_service_descriptor(),
                     Arc::new(skill_service_provider),
                 ),
             ),
-            macaca_runtime_host::ServiceProviderFactoryContext::new(),
+            macaca_sdk::runtime_host::ServiceProviderFactoryContext::new(),
         )
         .await
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
     service_runtime
         .register_provider(
-            &macaca_runtime_host::StaticServiceProviderFactory::new(
-                macaca_runtime_host::ServiceProviderInstance::new(
-                    macaca_runtime_host::mcp_service_descriptor(),
-                    Arc::new(macaca_runtime_host::McpSystemServiceProvider::new(
+            &macaca_sdk::runtime_host::StaticServiceProviderFactory::new(
+                macaca_sdk::runtime_host::ServiceProviderInstance::new(
+                    macaca_sdk::runtime_host::mcp_service_descriptor(),
+                    Arc::new(macaca_sdk::runtime_host::McpSystemServiceProvider::new(
                         Arc::clone(&mcp_runtime),
                     )),
                 ),
             ),
-            macaca_runtime_host::ServiceProviderFactoryContext::new(),
+            macaca_sdk::runtime_host::ServiceProviderFactoryContext::new(),
         )
         .await
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
     if let Some(runtime) = memory_runtime.as_ref() {
         let memory_service: Arc<dyn macaca_sdk::kernel::SystemService> =
-            Arc::new(macaca_runtime_host::MemorySystemServiceProvider::new(
+            Arc::new(macaca_sdk::runtime_host::MemorySystemServiceProvider::new(
                 Arc::clone(runtime) as Arc<dyn macaca_sdk::memory::MemoryFacade>,
             ));
         service_runtime
             .register_provider(
-                &macaca_runtime_host::StaticServiceProviderFactory::new(
-                    macaca_runtime_host::ServiceProviderInstance::new(
+                &macaca_sdk::runtime_host::StaticServiceProviderFactory::new(
+                    macaca_sdk::runtime_host::ServiceProviderInstance::new(
                         macaca_sdk::memory::memory_service_descriptor(),
                         memory_service,
                     ),
                 ),
-                macaca_runtime_host::ServiceProviderFactoryContext::new(),
+                macaca_sdk::runtime_host::ServiceProviderFactoryContext::new(),
             )
             .await
             .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
@@ -262,22 +262,22 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
     };
     service_runtime
         .register_provider(
-            &macaca_runtime_host::StaticServiceProviderFactory::new(
-                macaca_runtime_host::ServiceProviderInstance::new(
+            &macaca_sdk::runtime_host::StaticServiceProviderFactory::new(
+                macaca_sdk::runtime_host::ServiceProviderInstance::new(
                     macaca_proto::ServiceDescriptor::new(
                         KernelServiceId::new(macaca_sdk::context::CONTEXT_SERVICE_ID),
                         macaca_proto::ServiceType::new("context"),
                         macaca_proto::TraceSchemaRef::new("trace.system_service.context.v1"),
                     ),
                     Arc::new(
-                        macaca_runtime_host::ContextSystemServiceProvider::with_capabilities(
+                        macaca_sdk::runtime_host::ContextSystemServiceProvider::with_capabilities(
                             (*context_engine_registry).clone(),
                             context_service_capabilities,
                         ),
                     ),
                 ),
             ),
-            macaca_runtime_host::ServiceProviderFactoryContext::new(),
+            macaca_sdk::runtime_host::ServiceProviderFactoryContext::new(),
         )
         .await
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
@@ -320,22 +320,22 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
     // factory for concrete providers.  Register all workbench-family services
     // here so application WASM host imports and shell diagnostics route through
     // `ServiceRuntime` instead of encountering unknown service ids.
-    macaca_runtime_host::bootstrap_local_app_protocol_service(
+    macaca_sdk::runtime_host::bootstrap_local_app_protocol_service(
         Arc::clone(&service_runtime),
         "web-startup-app-protocol-service",
     )
     .await?;
-    macaca_runtime_host::bootstrap_local_process_service(
+    macaca_sdk::runtime_host::bootstrap_local_process_service(
         Arc::clone(&service_runtime),
         "web-startup-process-service",
     )
     .await?;
-    macaca_runtime_host::bootstrap_local_sandbox_service(
+    macaca_sdk::runtime_host::bootstrap_local_sandbox_service(
         Arc::clone(&service_runtime),
         "web-startup-sandbox-service",
     )
     .await?;
-    macaca_runtime_host::bootstrap_local_diagnostics_service(
+    macaca_sdk::runtime_host::bootstrap_local_diagnostics_service(
         Arc::clone(&service_runtime),
         "web-startup-diagnostics-service",
     )
@@ -343,60 +343,60 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
     // Realtime is optional.  Registering an unavailable Null Object provider
     // preserves traceable, auditable behavior without pretending a transport is
     // configured or leaking optional-module absence as an unknown service.
-    macaca_runtime_host::bootstrap_unavailable_realtime_service(
+    macaca_sdk::runtime_host::bootstrap_unavailable_realtime_service(
         Arc::clone(&service_runtime),
         "web-startup-realtime-service",
         "realtime provider is not configured",
     )
     .await?;
-    macaca_runtime_host::bootstrap_local_remote_environment_service(
+    macaca_sdk::runtime_host::bootstrap_local_remote_environment_service(
         Arc::clone(&service_runtime),
         "web-startup-remote-environment-service",
     )
     .await?;
-    macaca_runtime_host::bootstrap_local_file_service(
+    macaca_sdk::runtime_host::bootstrap_local_file_service(
         Arc::clone(&service_runtime),
         "web-startup-file-service",
     )
     .await?;
-    macaca_runtime_host::bootstrap_local_approval_service(
+    macaca_sdk::runtime_host::bootstrap_local_approval_service(
         Arc::clone(&service_runtime),
         "web-startup-approval-service",
     )
     .await?;
-    macaca_runtime_host::bootstrap_local_hook_service(
+    macaca_sdk::runtime_host::bootstrap_local_hook_service(
         Arc::clone(&service_runtime),
         "web-startup-hook-service",
     )
     .await?;
-    macaca_runtime_host::bootstrap_local_config_service(
+    macaca_sdk::runtime_host::bootstrap_local_config_service(
         Arc::clone(&service_runtime),
         "web-startup-config-service",
     )
     .await?;
-    macaca_runtime_host::bootstrap_local_plugin_marketplace_service(
+    macaca_sdk::runtime_host::bootstrap_local_plugin_marketplace_service(
         Arc::clone(&service_runtime),
         "web-startup-plugin-marketplace-service",
     )
     .await?;
-    macaca_runtime_host::bootstrap_local_code_intelligence_service(
+    macaca_sdk::runtime_host::bootstrap_local_code_intelligence_service(
         Arc::clone(&service_runtime),
         "web-startup-code-intelligence-service",
     )
     .await?;
-    macaca_runtime_host::bootstrap_local_git_service(
+    macaca_sdk::runtime_host::bootstrap_local_git_service(
         Arc::clone(&service_runtime),
         "web-startup-git-service",
     )
     .await?;
-    macaca_runtime_host::bootstrap_local_review_service(
+    macaca_sdk::runtime_host::bootstrap_local_review_service(
         Arc::clone(&service_runtime),
         "web-startup-review-service",
     )
     .await?;
-    macaca_runtime_host::bootstrap_tool_planning_service(
+    macaca_sdk::runtime_host::bootstrap_tool_planning_service(
         Arc::clone(&service_runtime),
-        Arc::new(macaca_runtime_host::industrial_tool_planning_service()?),
+        Arc::new(macaca_sdk::runtime_host::industrial_tool_planning_service()?),
         "web-startup-tool-service",
     )
     .await?;
@@ -404,7 +404,7 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
     // roots through package crates (for example `macaca-domain-pack-finance`).
     // The base web shell registers none by default so absent packs surface
     // structured unavailable results instead of OS-owned business logic.
-    let domain_pack_services = macaca_runtime_host::bootstrap_domain_pack_services(
+    let domain_pack_services = macaca_sdk::runtime_host::bootstrap_domain_pack_services(
         Arc::clone(&service_runtime),
         domain_pack_provider_registrations,
         "web-startup-domain-pack",
@@ -418,9 +418,9 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
     // `macaca-runtime-host`.  Web still provides the existing local stores and
     // facade handles, but provider registration/start semantics now cross a
     // typed host bootstrap boundary instead of living in presentation startup.
-    let route_c_optional_services = macaca_runtime_host::bootstrap_route_c_optional_services(
+    let route_c_optional_services = macaca_sdk::runtime_host::bootstrap_route_c_optional_services(
         Arc::clone(&service_runtime),
-        macaca_runtime_host::RouteCOptionalServicesBootstrapInputs::new(
+        macaca_sdk::runtime_host::RouteCOptionalServicesBootstrapInputs::new(
             Arc::clone(&entitlement_store),
             Arc::clone(&entitlement_facade),
             Arc::clone(&payment_store),

@@ -4,7 +4,7 @@
 //! from a parsed legacy manifest and optionally attach resolved agents before
 //! invoking projection.
 
-use macaca_sdk::AgentConfig;
+use macaca_proto::AgentConfig;
 
 use crate::model::AppManifest;
 

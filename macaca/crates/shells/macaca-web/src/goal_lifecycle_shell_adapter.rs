@@ -16,11 +16,11 @@ use std::sync::Arc;
 use axum::response::sse::Event;
 use macaca_sdk::framework::execution::ExecutionContext;
 use macaca_sdk::framework::session::{load_module_state, save_module_state};
-use macaca_runtime_host::persist::AppendEventCommand;
+use macaca_sdk::runtime_host::persist::AppendEventCommand;
 use macaca_proto::{
     ApplicationId, EXECUTION_CONTROL_SERVICE_ID, TaskId, TraceContext,
 };
-use macaca_runtime_host::{
+use macaca_sdk::runtime_host::{
     ExecutionControlGoalLifecycleCoordinator, GoalLifecycleParentResumeRequest,
     GoalLifecycleParentWaitRequest,
 };

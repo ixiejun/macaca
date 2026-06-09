@@ -12,7 +12,7 @@ use tracing::{error, info};
 use macaca_sdk::skill::{ExecutableSkillToolSet, SkillCatalog};
 use macaca_sdk::tools::Tool;
 use macaca_proto::MacacaResult;
-use macaca_runtime_host::persist::RedbStore;
+use macaca_sdk::runtime_host::persist::RedbStore;
 use crate::orchestration_tools::build_web_tools;
 
 use super::bootstrap_ctx::BootstrapCtx;
@@ -114,11 +114,11 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
     std::fs::create_dir_all(&data_dir).ok();
     let session_db_path = data_dir.join("sessions.db");
     let session_store_impl = Arc::new(RedbStore::open(&session_db_path)?);
-    let session_store_shared: Arc<dyn macaca_runtime_host::persist::PersistBackend> = session_store_impl.clone();
+    let session_store_shared: Arc<dyn macaca_sdk::runtime_host::persist::PersistBackend> = session_store_impl.clone();
     let todo_store = Arc::new(macaca_sdk::task::TodoStore::new(Arc::clone(
         &session_store_shared,
     )));
-    let event_log = Arc::new(macaca_runtime_host::persist::EventLog::new(Arc::clone(
+    let event_log = Arc::new(macaca_sdk::runtime_host::persist::EventLog::new(Arc::clone(
         &session_store_impl,
     )));
     // Register the application execution protocol service at the shared host
@@ -126,31 +126,31 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
     // ServiceRuntime); provider strategies remain runtime-host owned and can be
     // registered later without moving execution loops into the presentation
     // shell.
-    macaca_runtime_host::bootstrap_default_application_execution_service(
+    macaca_sdk::runtime_host::bootstrap_default_application_execution_service(
         Arc::clone(&service_runtime),
         Arc::clone(&event_log),
         "web-startup-application-execution-service",
     )
     .await?;
-    macaca_runtime_host::bootstrap_interaction_service(
+    macaca_sdk::runtime_host::bootstrap_interaction_service(
         Arc::clone(&service_runtime),
         Arc::clone(&session_store_shared),
         Some(Arc::clone(&event_log)),
         "web-startup-interaction-service",
     )
     .await?;
-    macaca_runtime_host::bootstrap_local_task_service(
+    macaca_sdk::runtime_host::bootstrap_local_task_service(
         Arc::clone(&service_runtime),
         Arc::clone(&todo_store),
         "web-startup-task-service",
     )
     .await?;
-    let entitlement_store: Arc<dyn macaca_runtime_host::persist::EntitlementStore> =
-        Arc::new(macaca_runtime_host::persist::InMemoryEntitlementStore::new());
-    let payment_store: Arc<dyn macaca_runtime_host::persist::PaymentStore> =
-        Arc::new(macaca_runtime_host::persist::InMemoryPaymentStore::new());
+    let entitlement_store: Arc<dyn macaca_sdk::runtime_host::persist::EntitlementStore> =
+        Arc::new(macaca_sdk::runtime_host::persist::InMemoryEntitlementStore::new());
+    let payment_store: Arc<dyn macaca_sdk::runtime_host::persist::PaymentStore> =
+        Arc::new(macaca_sdk::runtime_host::persist::InMemoryPaymentStore::new());
     let entitlement_facade = Arc::new(
-        macaca_runtime_host::EntitlementRuntimeFacade::with_event_log(
+        macaca_sdk::runtime_host::EntitlementRuntimeFacade::with_event_log(
             Arc::clone(&entitlement_store),
             Arc::clone(&event_log),
         ),

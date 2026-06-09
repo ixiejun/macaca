@@ -6,7 +6,7 @@ mod tests {
         contract_source, is_framework_tool_wrapper_trace, should_forward_driver_trace,
         tool_response_text, truncate_tool_output, ExecutionControlMiddleware, FrameworkRunner,
     };
-    use macaca_app::model::AppContextConfig;
+    use macaca_sdk::app::model::AppContextConfig;
     use macaca_sdk::framework::message::{ContentBlock, TextBlock};
     use macaca_sdk::framework::tool::ToolResponse;
     use macaca_proto::config::{AgentProfileContextConfig, ContextConfig};

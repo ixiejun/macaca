@@ -8,8 +8,8 @@ mod tests {
     };
     use crate::loop_manager::worker_execution_adapter::{worker_success_summary, WorkerExecutionMode};
     use macaca_sdk::framework::plan::{PlanNotebook, PlanState, SubTaskState};
-    use macaca_runtime_host::executor::ExecutorEvent;
-    use macaca_runtime_host::AgentInfo;
+    use macaca_sdk::runtime_host::executor::ExecutorEvent;
+    use macaca_sdk::runtime_host::AgentInfo;
     use macaca_proto::AgentExecutionIntent;
 
     fn agent(name: &str, capabilities: &[&str]) -> AgentInfo {

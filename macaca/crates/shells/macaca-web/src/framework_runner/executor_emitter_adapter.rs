@@ -8,7 +8,7 @@ use macaca_sdk::framework::message::Msg;
 use macaca_sdk::framework::tool::{ToolError, ToolMiddleware, ToolResponse};
 use super::tool_trace::{tool_call_event, tool_result_event, tool_trace_output};
 pub struct ExecutorEmitterHook {
-    pub(crate) executor: Arc<macaca_runtime_host::executor::ApplicationExecutor>,
+    pub(crate) executor: Arc<macaca_sdk::runtime_host::executor::ApplicationExecutor>,
     pub(crate) task_id: macaca_proto::TaskId,
     pub(crate) agent_name: String,
     pub(crate) iteration: std::sync::atomic::AtomicUsize,
@@ -19,7 +19,7 @@ impl Hook for ExecutorEmitterHook {
     async fn pre_reply(&self, msg: Msg) -> macaca_sdk::framework::agent::AgentResult<Msg> {
         let iter = self.iteration.fetch_add(1, Ordering::Relaxed);
         self.executor
-            .broadcast_event(macaca_runtime_host::executor::ExecutorEvent::AgentEvent {
+            .broadcast_event(macaca_sdk::runtime_host::executor::ExecutorEvent::AgentEvent {
                 task_id: self.task_id,
                 agent: self.agent_name.clone(),
                 event: macaca_proto::AgentExecutionEvent::Thinking {
@@ -34,7 +34,7 @@ impl Hook for ExecutorEmitterHook {
         let text = msg.get_text();
         if !text.is_empty() {
             self.executor
-                .broadcast_event(macaca_runtime_host::executor::ExecutorEvent::AgentEvent {
+                .broadcast_event(macaca_sdk::runtime_host::executor::ExecutorEvent::AgentEvent {
                     task_id: self.task_id,
                     agent: self.agent_name.clone(),
                     event: macaca_proto::AgentExecutionEvent::Assistant { content: text },
@@ -51,7 +51,7 @@ impl Hook for ExecutorEmitterHook {
 /// Middleware that emits executor events for every tool invocation.
 /// Used by worker agents to push tool_call/tool_result events to SSE + EventLog.
 pub struct ExecutorToolMiddleware {
-    pub(crate) executor: Arc<macaca_runtime_host::executor::ApplicationExecutor>,
+    pub(crate) executor: Arc<macaca_sdk::runtime_host::executor::ApplicationExecutor>,
     pub(crate) task_id: macaca_proto::TaskId,
     pub(crate) agent_name: String,
 }
@@ -60,7 +60,7 @@ pub struct ExecutorToolMiddleware {
 impl ToolMiddleware for ExecutorToolMiddleware {
     async fn before(&self, name: &str, args: &mut serde_json::Value) -> Result<(), ToolError> {
         self.executor
-            .broadcast_event(macaca_runtime_host::executor::ExecutorEvent::AgentEvent {
+            .broadcast_event(macaca_sdk::runtime_host::executor::ExecutorEvent::AgentEvent {
                 task_id: self.task_id,
                 agent: self.agent_name.clone(),
                 event: tool_call_event(name, args),
@@ -70,7 +70,7 @@ impl ToolMiddleware for ExecutorToolMiddleware {
 
     async fn after(&self, name: &str, response: &mut ToolResponse) -> Result<(), ToolError> {
         self.executor
-            .broadcast_event(macaca_runtime_host::executor::ExecutorEvent::AgentEvent {
+            .broadcast_event(macaca_sdk::runtime_host::executor::ExecutorEvent::AgentEvent {
                 task_id: self.task_id,
                 agent: self.agent_name.clone(),
                 event: tool_result_event(name, tool_trace_output(response)),

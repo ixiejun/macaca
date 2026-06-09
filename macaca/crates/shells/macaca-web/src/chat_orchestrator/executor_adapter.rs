@@ -5,12 +5,12 @@
 
 use std::sync::Arc;
 
-use macaca_app::{AppLoader};
+use macaca_sdk::app::{AppLoader};
 use macaca_proto::{
     ApplicationId, ApplicationMetadataQueryCommand, ApplicationServiceScope,
     ApplicationStatusCommand, TraceContext,
 };
-use macaca_runtime_host::AgentInfo;
+use macaca_sdk::runtime_host::AgentInfo;
 
 use crate::session_loop_shell_adapter::{
     shutdown_session_loops_via_execution_control, REASON_SESSION_LOOP_APPLICATION_CLEANUP,
@@ -74,7 +74,7 @@ pub(crate) async fn cleanup_app_state(state: &Arc<AppState>, app_id: &Applicatio
     // local waker maps.  This keeps audit replay aligned with goal/fork-join cleanup
     // paths that already route pause/resume via service.execution_control.
     {
-        let coordinator = macaca_runtime_host::ExecutionControlSessionLoopCoordinator::new(
+        let coordinator = macaca_sdk::runtime_host::ExecutionControlSessionLoopCoordinator::new(
             Arc::clone(&state.service_runtime),
         );
         shutdown_session_loops_via_execution_control(

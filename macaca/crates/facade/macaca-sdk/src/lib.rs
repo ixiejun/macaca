@@ -189,5 +189,6 @@ pub use domain_pack_bridge::{
 #[cfg(feature = "domain-pack-finance")]
 pub use domain_pack_bridge::{finance_domain_pack_registrations, finance_pack_catalog_definition};
 pub use shell_provider_bridge::{
-    agent, context, driver, framework, kernel, llm, memory, skill, task, tools,
+    agent, app, context, driver, framework, kernel, llm, memory, runtime_host, skill, task,
+    tools,
 };

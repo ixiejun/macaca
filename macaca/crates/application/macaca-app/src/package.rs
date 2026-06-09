@@ -11,7 +11,7 @@ use macaca_proto::{
     ApplicationManifestV1, MacacaResult, PackageCapability, PackageDescriptor, PackageEntry,
     PackageManifest, PackagePermission, PackageRuntime, PackageServiceRequirement,
 };
-use macaca_sdk::AgentConfig;
+use macaca_proto::AgentConfig;
 
 use crate::loader::AppLoader;
 use crate::manifest_v1::YamlApplicationManifestAdapter;

@@ -11,7 +11,7 @@ pub(crate) use macaca_proto::{
     ExecutionControlPolicyOverride, ExecutionControlResolutionStatus,
     ExecutionControlResumeSource, ExecutionControlTrigger,
 };
-pub(crate) use macaca_runtime_host::{
+pub(crate) use macaca_sdk::runtime_host::{
     execution_control_execution_id, execution_control_scope, extract_single_shell_fence,
     heartbeat_exact_shell_contract, resolve_execution_control_policy_local,
     runtime_agent_max_iters, runtime_agent_tool_choice, should_skip_heartbeat_without_source,

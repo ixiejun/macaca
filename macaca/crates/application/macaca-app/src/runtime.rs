@@ -6,9 +6,10 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use macaca_kernel::Kernel;
-use macaca_proto::{AgentId, ApplicationId, MacacaError, MacacaResult};
-use macaca_sdk::AgentConfig;
-use macaca_sdk::MacacaSdk;
+use macaca_proto::{
+    agent_manifest_from_declarative_config, AgentConfig, AgentId, ApplicationId, MacacaError,
+    MacacaResult,
+};
 
 use crate::domain_pack_catalog::{empty_domain_pack_catalog, SharedDomainPackCatalog};
 use crate::loader::AppLoader;
@@ -145,7 +146,7 @@ impl AppRuntime {
     /// Bootstrap a running application from an already-parsed manifest.
     ///
     /// Orchestrates manifest validation, domain-pack capability expansion, agent
-    /// registration via `MacacaSdk`, and in-memory `LoadedApp` insertion.
+    /// kernel manifest registration, and in-memory `LoadedApp` insertion.
     /// Duplicate application IDs are rejected before any kernel side-effects occur.
     pub async fn bootstrap_manifest(
         &self,
@@ -188,9 +189,13 @@ impl AppRuntime {
             "Resolved application effective service capabilities"
         );
         let mut agent_ids = Vec::new();
-        let sdk = MacacaSdk::for_kernel(kernel);
         for config in configs {
-            let id = sdk.register_config(config).await?;
+            let manifest = agent_manifest_from_declarative_config(&config)?;
+            tracing::info!(
+                agent_name = %manifest.name,
+                "AppRuntime bootstrap_manifest: registering declarative agent with kernel"
+            );
+            let id = kernel.register_agent(manifest).await?;
             agent_ids.push(id);
         }
 

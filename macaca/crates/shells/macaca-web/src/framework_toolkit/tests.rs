@@ -11,7 +11,7 @@ use super::workspace_tools::{normalize_tool_input, resolve_workspace_path};
 use async_trait::async_trait;
 use macaca_sdk::framework::mcp::{McpSessionMode, McpTransportConfig};
 use macaca_sdk::framework::tool::{ToolError, ToolHandler, ToolResponse, Toolkit};
-use macaca_runtime_host::{McpLifecycleScope, McpRuntimeStatus, McpRuntimeStatusState};
+use macaca_sdk::runtime_host::{McpLifecycleScope, McpRuntimeStatus, McpRuntimeStatusState};
 
 struct NamedTestTool(&'static str);
 
@@ -202,8 +202,8 @@ fn skill_mcp_alias_event_plan_preserves_ready_and_tool_aliases() {
         );
 }
 
-fn mcp_definition(id: &str, enabled: bool) -> macaca_runtime_host::McpServerDefinition {
-        macaca_runtime_host::McpServerDefinition {
+fn mcp_definition(id: &str, enabled: bool) -> macaca_sdk::runtime_host::McpServerDefinition {
+        macaca_sdk::runtime_host::McpServerDefinition {
             id: id.into(),
             transport: McpTransportConfig::Stdio {
                 command: "sh".into(),
@@ -216,7 +216,7 @@ fn mcp_definition(id: &str, enabled: bool) -> macaca_runtime_host::McpServerDefi
             tool_prefix: None,
             required_bins: Vec::new(),
             enabled,
-            source: macaca_runtime_host::McpDefinitionSource::Global,
+            source: macaca_sdk::runtime_host::McpDefinitionSource::Global,
             concurrency_isolation: None,
         }
 }

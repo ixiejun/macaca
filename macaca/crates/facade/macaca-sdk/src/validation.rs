@@ -1,10 +1,11 @@
-//! Validation chain for SDK agent configuration.
+//! SDK validation chain — thin adapter over the proto declarative config validators.
+//!
+//! Preserves the historical `SdkValidationChain` / `SdkValidator` names for SDK consumers
+//! while delegating rule evaluation to the shared proto contract.
 
-use macaca_proto::{MacacaError, MacacaResult};
+use macaca_proto::{AgentConfig, DeclarativeAgentConfigValidation, MacacaResult};
 
-use crate::config::AgentConfig;
-
-/// A single config validator in the SDK validation chain.
+/// A single config validator in the SDK validation chain (alias of proto validator trait).
 pub trait SdkValidator: Send + Sync {
     /// Validate a config or return a config error.
     fn validate(&self, config: &AgentConfig) -> MacacaResult<()>;
@@ -13,101 +14,52 @@ pub trait SdkValidator: Send + Sync {
 /// Ordered validation chain for SDK config rules.
 #[derive(Default)]
 pub struct SdkValidationChain {
-    validators: Vec<Box<dyn SdkValidator>>,
+    inner: DeclarativeAgentConfigValidation,
 }
 
 impl SdkValidationChain {
     /// Create an empty validation chain.
     pub fn new() -> Self {
         Self {
-            validators: Vec::new(),
+            inner: DeclarativeAgentConfigValidation::new(),
         }
     }
 
     /// Add a validator.
     pub fn with_validator(mut self, validator: impl SdkValidator + 'static) -> Self {
-        self.validators.push(Box::new(validator));
+        self.inner = self.inner.with_validator(SdkValidatorAdapter(validator));
         self
     }
 
-    /// Create the default validation chain.
+    /// Create the default validation chain (proto foundation rules).
     pub fn default_rules() -> Self {
-        Self::new()
-            .with_validator(NameValidator)
-            .with_validator(PermissionLevelValidator)
-            .with_validator(CapabilityNameValidator)
-            .with_validator(TemperatureValidator)
+        Self {
+            inner: DeclarativeAgentConfigValidation::default_rules(),
+        }
     }
 
     /// Run validators in order.
     pub fn validate(&self, config: &AgentConfig) -> MacacaResult<()> {
-        for validator in &self.validators {
-            validator.validate(config)?;
-        }
-        Ok(())
+        self.inner.validate(config)
     }
 }
 
-struct NameValidator;
+/// Bridges SDK-named validators into the proto validation chain.
+struct SdkValidatorAdapter<V>(V);
 
-impl SdkValidator for NameValidator {
+impl<V> macaca_proto::DeclarativeAgentConfigValidator for SdkValidatorAdapter<V>
+where
+    V: SdkValidator,
+{
     fn validate(&self, config: &AgentConfig) -> MacacaResult<()> {
-        if config.name.trim().is_empty() {
-            return Err(MacacaError::Config(
-                "Agent config 'name' must not be empty".into(),
-            ));
-        }
-        Ok(())
-    }
-}
-
-struct PermissionLevelValidator;
-
-impl SdkValidator for PermissionLevelValidator {
-    fn validate(&self, config: &AgentConfig) -> MacacaResult<()> {
-        match config.permission_level.as_str() {
-            "system" | "user" => Ok(()),
-            other => Err(MacacaError::Config(format!(
-                "Invalid permission_level '{other}'. Must be 'system' or 'user'"
-            ))),
-        }
-    }
-}
-
-struct CapabilityNameValidator;
-
-impl SdkValidator for CapabilityNameValidator {
-    fn validate(&self, config: &AgentConfig) -> MacacaResult<()> {
-        for cap in &config.capabilities {
-            if cap.name.trim().is_empty() {
-                return Err(MacacaError::Config(
-                    "Capability name must not be empty".into(),
-                ));
-            }
-        }
-        Ok(())
-    }
-}
-
-struct TemperatureValidator;
-
-impl SdkValidator for TemperatureValidator {
-    fn validate(&self, config: &AgentConfig) -> MacacaResult<()> {
-        if let Some(temp) = config.temperature {
-            if !(0.0..=2.0).contains(&temp) {
-                return Err(MacacaError::Config(format!(
-                    "Temperature {temp} out of range [0.0, 2.0]"
-                )));
-            }
-        }
-        Ok(())
+        self.0.validate(config)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::CapabilityDef;
+    use macaca_proto::CapabilityDef;
 
     fn valid_config() -> AgentConfig {
         AgentConfig {
@@ -144,35 +96,5 @@ mod tests {
             .validate(&config)
             .unwrap_err();
         assert!(err.to_string().contains("name"));
-    }
-
-    #[test]
-    fn default_chain_rejects_invalid_permission() {
-        let mut config = valid_config();
-        config.permission_level = "admin".into();
-        let err = SdkValidationChain::default_rules()
-            .validate(&config)
-            .unwrap_err();
-        assert!(err.to_string().contains("permission_level"));
-    }
-
-    #[test]
-    fn default_chain_rejects_empty_capability_name() {
-        let mut config = valid_config();
-        config.capabilities[0].name.clear();
-        let err = SdkValidationChain::default_rules()
-            .validate(&config)
-            .unwrap_err();
-        assert!(err.to_string().contains("Capability name"));
-    }
-
-    #[test]
-    fn default_chain_rejects_temperature_out_of_range() {
-        let mut config = valid_config();
-        config.temperature = Some(3.0);
-        let err = SdkValidationChain::default_rules()
-            .validate(&config)
-            .unwrap_err();
-        assert!(err.to_string().contains("Temperature"));
     }
 }

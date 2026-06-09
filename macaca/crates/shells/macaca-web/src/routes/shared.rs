@@ -6,7 +6,7 @@ use axum::http::StatusCode;
 use axum::Json;
 use serde::{Deserialize, Serialize};
 
-use macaca_app::app_entry_agent_name as manifest_entry_agent_name;
+use macaca_sdk::app::app_entry_agent_name as manifest_entry_agent_name;
 use macaca_proto::{
     AgentId, AgentManifest, ApplicationId, ApplicationMetadataQueryCommand, MacacaError,
     ProtoErrorAdapter, TraceContext,

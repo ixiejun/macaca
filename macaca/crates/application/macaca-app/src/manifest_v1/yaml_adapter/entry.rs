@@ -5,7 +5,7 @@
 //! application-specific routing logic.
 
 use macaca_proto::ApplicationPermissionDeclaration;
-use macaca_sdk::AgentConfig;
+use macaca_proto::AgentConfig;
 
 use crate::model::{AppManifest, EntrypointType};
 

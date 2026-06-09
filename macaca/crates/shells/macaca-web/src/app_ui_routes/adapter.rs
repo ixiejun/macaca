@@ -6,7 +6,7 @@
 use std::path::{Component, Path, PathBuf};
 
 use axum::http::StatusCode;
-use macaca_app::ui_runtime::AppUiRuntimeConfig;
+use macaca_sdk::app::ui_runtime::AppUiRuntimeConfig;
 use macaca_proto::ApplicationId;
 use uuid::Uuid;
 

@@ -5,8 +5,8 @@
 
 use std::collections::HashSet;
 
-use macaca_runtime_host::skill_mcp_mapping_registry::default_skill_mcp_mapping_registry;
-use macaca_runtime_host::apply_concurrency_isolation;
+use macaca_sdk::runtime_host::skill_mcp_mapping_registry::default_skill_mcp_mapping_registry;
+use macaca_sdk::runtime_host::apply_concurrency_isolation;
 use macaca_sdk::skill::{SkillMcpServerConfig, SkillSnapshot, SkillSnapshotEntry};
 
 use super::types::SkillMcpServerLaunch;

@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use macaca_sdk::framework::tool::Toolkit;
 use macaca_proto::ApplicationId;
-use macaca_runtime_host::{McpRuntimeContext, McpServerDefinition, McpToolPolicy};
+use macaca_sdk::runtime_host::{McpRuntimeContext, McpServerDefinition, McpToolPolicy};
 use tracing::info;
 
 use crate::state::AppState;

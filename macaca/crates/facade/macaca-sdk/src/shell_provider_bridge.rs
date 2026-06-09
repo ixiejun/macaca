@@ -75,3 +75,19 @@ pub use macaca_context as context;
 /// chat adapters consume [`macaca_llm::LlmServiceChatClient`] — not `SystemLlmClient` —
 /// which breaks the historical `sdk ↔ framework` cyclic dependency.
 pub use macaca_framework as framework;
+
+/// Application model, loader, registry, and runtime bootstrap crate alias.
+///
+/// Presentation shells assemble application manifests and loaded-app state through
+/// composition-root paths during Route C migration. The SDK owns `macaca-app` as a
+/// transitive dependency once the `app → sdk` cycle is broken at the proto contract layer;
+/// this alias lets `macaca-web` drop its direct workspace edge while preserving type
+/// identity for HTTP routes, discovery, and bootstrap wiring.
+pub use macaca_app as app;
+
+/// Runtime-host composition root crate alias (bootstrap, persist, executor, MCP).
+///
+/// Shells still construct `ServiceRuntime`, `ApplicationExecutorRegistry`, and persist
+/// backends at the composition root. Re-exporting through the SDK facade keeps the
+/// shell `Cargo.toml` limited to `macaca-proto` + `macaca-sdk` without forking types.
+pub use macaca_runtime_host as runtime_host;

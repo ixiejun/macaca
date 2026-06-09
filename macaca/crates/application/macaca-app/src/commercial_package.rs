@@ -7,11 +7,35 @@
 use macaca_proto::{
     CommerceError, EntitlementAuthorizeCallCommand, EntitlementAuthorizeInstallCommand,
     EntitlementAuthorizeResult, EntitlementAuthorizeStartCommand, EntitlementDecision,
-    EntitlementServiceScope, EntitlementState, PackageManifest, TraceContext,
+    EntitlementServiceScope, EntitlementState, MacacaResult, PackageManifest, TraceContext,
 };
-use macaca_sdk::SystemEntitlementClient;
 use serde::{Deserialize, Serialize};
 use tracing::info;
+
+/// Minimal entitlement authorize client required by [`ServiceBackedApplicationEntitlementAuthorizer`].
+///
+/// This Interface Segregation seam keeps `macaca-app` independent of `macaca-sdk` while still
+/// allowing runtime composition roots to inject SDK `SystemEntitlementClient` implementations.
+#[async_trait::async_trait]
+pub trait PackageEntitlementAuthorizeClient: Send + Sync {
+    /// Authorize a paid package install through the Entitlement service.
+    async fn authorize_install(
+        &self,
+        command: EntitlementAuthorizeInstallCommand,
+    ) -> MacacaResult<EntitlementAuthorizeResult>;
+
+    /// Authorize a paid package runtime start through the Entitlement service.
+    async fn authorize_start(
+        &self,
+        command: EntitlementAuthorizeStartCommand,
+    ) -> MacacaResult<EntitlementAuthorizeResult>;
+
+    /// Authorize a metered capability call through the Entitlement service.
+    async fn authorize_call(
+        &self,
+        command: EntitlementAuthorizeCallCommand,
+    ) -> MacacaResult<EntitlementAuthorizeResult>;
+}
 
 /// Provider-neutral capability-call context used by application package guards.
 ///
@@ -123,7 +147,7 @@ impl<'a> CommercialPackageGuard<'a> {
 /// `macaca-runtime-host::EntitlementRuntimeFacade`.  The application crate
 /// still owns package semantics through [`ApplicationEntitlementAuthorizer`],
 /// while service dispatch, lifecycle, trace, and audit stay behind
-/// `SystemEntitlementClient`.
+/// [`PackageEntitlementAuthorizeClient`].
 pub struct ServiceBackedApplicationEntitlementAuthorizer<C> {
     client: C,
     trace_prefix: String,
@@ -150,7 +174,7 @@ impl<C> ServiceBackedApplicationEntitlementAuthorizer<C> {
 #[async_trait::async_trait]
 impl<C> ApplicationEntitlementAuthorizer for ServiceBackedApplicationEntitlementAuthorizer<C>
 where
-    C: SystemEntitlementClient,
+    C: PackageEntitlementAuthorizeClient,
 {
     async fn authorize_install(
         &self,
@@ -251,15 +275,11 @@ mod tests {
     use async_trait::async_trait;
     use chrono::Utc;
     use macaca_proto::{
-        DeveloperId, EntitlementAuditPage, EntitlementAuditQueryCommand,
-        EntitlementAuthorizeCallCommand, EntitlementAuthorizeInstallCommand,
+        DeveloperId, EntitlementAuthorizeCallCommand, EntitlementAuthorizeInstallCommand,
         EntitlementAuthorizeStartCommand, EntitlementDecisionView, EntitlementId,
-        EntitlementMeteringRecordCommand, EntitlementQueryCommand, EntitlementQueryResult,
-        EntitlementRecord, EntitlementServiceSnapshot, EntitlementSnapshotCommand,
-        EntitlementUpsertCommand, LicenseType, MacacaResult, MeteringEvent, PackageId,
-        PackageManifest, PackageRuntime, PackageRuntimeKind, PackageType,
+        EntitlementRecord, LicenseType, MacacaResult, PackageId, PackageManifest, PackageRuntime,
+        PackageRuntimeKind, PackageType,
     };
-    use macaca_sdk::SystemEntitlementClient;
 
     use super::*;
 
@@ -373,31 +393,10 @@ mod tests {
         );
     }
 
-    struct MockSystemEntitlementClient;
+    struct MockPackageEntitlementAuthorizeClient;
 
     #[async_trait]
-    impl SystemEntitlementClient for MockSystemEntitlementClient {
-        async fn query(
-            &self,
-            _command: EntitlementQueryCommand,
-        ) -> MacacaResult<EntitlementQueryResult> {
-            Ok(None)
-        }
-
-        async fn upsert(
-            &self,
-            command: EntitlementUpsertCommand,
-        ) -> MacacaResult<EntitlementRecord> {
-            Ok(command.record)
-        }
-
-        async fn revoke(
-            &self,
-            _command: macaca_proto::EntitlementRevokeCommand,
-        ) -> MacacaResult<EntitlementRecord> {
-            Ok(record())
-        }
-
+    impl PackageEntitlementAuthorizeClient for MockPackageEntitlementAuthorizeClient {
         async fn authorize_install(
             &self,
             command: EntitlementAuthorizeInstallCommand,
@@ -434,36 +433,12 @@ mod tests {
             )))
         }
 
-        async fn audit(
-            &self,
-            command: EntitlementAuditQueryCommand,
-        ) -> MacacaResult<EntitlementAuditPage> {
-            Ok(EntitlementAuditPage {
-                package_id: command.scope.package_id,
-                decisions: Vec::new(),
-                next_offset: None,
-            })
-        }
-
-        async fn record_metering(
-            &self,
-            command: EntitlementMeteringRecordCommand,
-        ) -> MacacaResult<MeteringEvent> {
-            Ok(command.event)
-        }
-
-        async fn snapshot(
-            &self,
-            _command: EntitlementSnapshotCommand,
-        ) -> MacacaResult<EntitlementServiceSnapshot> {
-            Ok(EntitlementServiceSnapshot::healthy(0, 0, 0))
-        }
     }
 
     #[tokio::test]
     async fn service_backed_authorizer_uses_entitlement_client() {
         let authorizer =
-            ServiceBackedApplicationEntitlementAuthorizer::new(MockSystemEntitlementClient);
+            ServiceBackedApplicationEntitlementAuthorizer::new(MockPackageEntitlementAuthorizeClient);
         let guard = CommercialPackageGuard::new(&authorizer);
 
         let decision = guard

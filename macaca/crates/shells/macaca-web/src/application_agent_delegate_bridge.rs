@@ -14,7 +14,7 @@ use macaca_proto::{
     KernelServiceId, ServiceBusSource, ServiceError, ServiceReply, ServiceResult, TaskId,
     AGENT_EXECUTION_SERVICE_ID,
 };
-use macaca_runtime_host::ServiceRuntime;
+use macaca_sdk::runtime_host::ServiceRuntime;
 use tokio::sync::oneshot;
 use tokio::time::{timeout, Duration};
 use tracing::info;

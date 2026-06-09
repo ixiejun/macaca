@@ -6,7 +6,7 @@
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 
-use macaca_app::AppLoader;
+use macaca_sdk::app::AppLoader;
 use macaca_proto::{ApplicationId, TraceContext};
 use macaca_sdk::skill::{
     SkillGovernanceRecord, SkillGovernanceRecordUsageCommand, SkillGovernanceSnapshotCommand,

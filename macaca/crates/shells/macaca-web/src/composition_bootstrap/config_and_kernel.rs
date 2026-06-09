@@ -32,7 +32,7 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
     //     every stdio MCP child process (which inherits parent env by default)
     //     automatically receives secrets such as FIGMA_API_KEY.
     let mcp_env_outcomes =
-        macaca_runtime_host::RuntimeEnvBuilder::apply_process_env(&config.mcp.env);
+        macaca_sdk::runtime_host::RuntimeEnvBuilder::apply_process_env(&config.mcp.env);
     if !mcp_env_outcomes.is_empty() {
         info!(
             entries = mcp_env_outcomes.len(),

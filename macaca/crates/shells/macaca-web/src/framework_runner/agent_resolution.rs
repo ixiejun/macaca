@@ -2,8 +2,8 @@
 
 use std::sync::Arc;
 use macaca_sdk::agent::AgentCapabilitySet;
-use macaca_app::model::AppContextConfig;
-use macaca_app::app_agent_manifest_view;
+use macaca_sdk::app::model::AppContextConfig;
+use macaca_sdk::app::app_agent_manifest_view;
 use macaca_proto::config::{AgentProfileContextConfig, AgentProfileRootKind, ContextConfig};
 use macaca_proto::{ApplicationId, Capability};
 use crate::state::AppState;
