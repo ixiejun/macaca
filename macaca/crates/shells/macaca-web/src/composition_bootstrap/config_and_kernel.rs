@@ -20,7 +20,12 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
 
     // 1. Load configuration from config/default.toml
     let config = MacacaConfig::load_default();
-    info!(default_provider = %config.llm.default_provider, "Configuration loaded");
+    info!(
+        service_id = "bootstrap.config",
+        command = "load_default",
+        config_scope = "llm",
+        "Configuration loaded"
+    );
 
 
     // 1b. Publish [mcp.env] entries into the current process environment so

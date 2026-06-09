@@ -1041,3 +1041,13 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 |---------------|----------------------|------------------------|-------|
 | `p5_dod_terminal_gate_matrix` | LOW | integration-test-only orchestrator; 20 subprocess VC rows; no production code | P5 |
 | `assert_p5_dod_terminal_gate_matrix` | LOW | delegates to existing gate test targets; CI runtime cost increase when matrix runs | P5 |
+
+## Iteration 118 additions (§7.2 provider-neutral logging — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `provider_neutral_logging_terminal_gate` | LOW | static tracing-field scan across OS shell/runtime-host/framework; 1420 files, 0 violations at terminal state | P5 |
+| `macaca_framework::tracing_utils` macros | LOW | `trace_model_chat!` / agent+tool trace macros now use `agent.id`/`service_id`/`tool.id` only | P5 |
+| `macaca_runtime_host::llm_service_provider` tracing | LOW | provider/model/agent structured log keys removed; observability via `service_id`/`command`/`trace_id` | P5 |
+| `macaca_web` bootstrap + hook tracing | LOW | `app_name`/`default_provider`/`embedding_*` log keys replaced with neutral admission dimensions | P5 |
+| `p5_dod_terminal_gate_matrix` (20 rows) | LOW | matrix registry +1 subprocess row for provider-neutral logging gate | P5 |

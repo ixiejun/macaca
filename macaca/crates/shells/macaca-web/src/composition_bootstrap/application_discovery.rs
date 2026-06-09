@@ -265,19 +265,23 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
                         }
                     }
                     info!(
-                        app_id = %view.id,
-                        app_name = %view.name,
-                        agents = agent_count,
+                        service_id = "application",
+                        command = "start",
+                        application_id = %view.id,
+                        agent_count = agent_count,
                         trace_id = %trace.trace_id,
-                        "App started through Application Service"
+                        "Application started through Application Service"
                     );
                 }
                 Err(e) => {
                     tracing::warn!(
-                        app_name = %app.name,
+                        service_id = "application",
+                        command = "start",
+                        reason_code = "start_failed_continue_bootstrap",
+                        application_id = %app.id,
                         error = %e,
                         trace_id = %trace.trace_id,
-                        "Application Service failed to start app; continuing Web startup"
+                        "Application Service failed to start application; continuing Web startup"
                     );
                 }
             }

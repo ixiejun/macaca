@@ -90,11 +90,12 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
                 .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
             let tomb = Arc::new(macaca_sdk::memory::SharedTombstoneRegistry::new());
             info!(
+                service_id = "memory",
+                command = "configure_runtime",
                 memory_base_path = %mem_dir.display(),
                 vector_backend = %profile.vector_backend,
                 vector_collection = ?profile.vector_collection,
-                embedding_provider = %profile.embedding_provider,
-                embedding_model = %profile.embedding_model,
+                embedding_configured = !profile.embedding_provider.is_empty(),
                 embedding_dimensions = profile.embedding_dimensions,
                 "Configured workspace memory runtime"
             );

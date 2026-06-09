@@ -101,12 +101,13 @@ pub async fn resolve_model_selection(
         Ok(result) => {
             let selection = route_summary_to_model_selection(&result.selected);
             info!(
-                app_id = %app_id,
-                agent = agent_name,
+                service_id = "llm",
+                command = "resolve_route",
+                application_id = %app_id,
+                agent_id = %agent_name,
                 session_id = session_id.unwrap_or("framework-sessionless"),
                 route_source = selection.source,
-                provider = %selection.primary.provider,
-                model = %selection.primary.model,
+                route_reference = %selection.primary.reference(),
                 "llm route shell adapter resolved model selection via service"
             );
             Ok(selection)

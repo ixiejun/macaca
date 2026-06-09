@@ -82,8 +82,9 @@ impl ApplicationManifestSpec {
         }
         validate_ui_runtime_config(manifest.ui.as_ref())?;
         tracing::info!(
-            app_id = %manifest.id,
-            app_name = %manifest.name,
+            service_id = "application.admission",
+            command = "admit_manifest",
+            application_id = %manifest.id,
             layer = ?manifest.layer,
             service_contract_declared = manifest.service_contract.is_some(),
             execution_profile_declared = manifest.execution_profile.is_some(),

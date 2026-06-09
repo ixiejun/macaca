@@ -202,8 +202,10 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
                     // but skip executor registration so request handling cannot
                     // accidentally route into unrelated global workers.
                     tracing::warn!(
-                        app_id = %app_id.0,
-                        app_name = %app_name,
+                        service_id = "application.executor",
+                        command = "register",
+                        reason_code = "no_app_scoped_agents",
+                        application_id = %app_id.0,
                         "No app-scoped agents resolved; skipping executor registration to preserve app isolation"
                     );
                     continue;

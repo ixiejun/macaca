@@ -95,7 +95,9 @@ impl InProcessAgentExecutionPort {
         side_registry: Arc<InProcessAgentSideRegistry>,
     ) -> Self {
         tracing::info!(
-            llm_provider = %llm.name(),
+            service_id = "agent.execution.in_process",
+            command = "port_construct",
+            execution_mode = "in_process",
             "in-process agent execution port created"
         );
         Self {
@@ -115,8 +117,9 @@ impl InProcessAgentExecutionPort {
 impl AgentExecutionPort for InProcessAgentExecutionPort {
     async fn execute_registered_agent(&self, agent_id: &AgentId) -> MacacaResult<AgentOutput> {
         tracing::info!(
+            service_id = "agent.execution.in_process",
+            command = "execute_registered_agent",
             agent_id = %agent_id.0,
-            llm_provider = %self.llm.name(),
             execution_mode = "in_process",
             "in-process agent execution port dispatch started"
         );

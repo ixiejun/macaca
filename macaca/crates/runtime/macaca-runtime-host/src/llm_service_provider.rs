@@ -122,7 +122,7 @@ impl SystemService for LlmSystemServiceProvider {
     async fn start(&self) -> ServiceResult<()> {
         tracing::info!(
             service_id = %self.descriptor.id,
-            provider = %self.profile.provider_id,
+            command = "start",
             unavailable = self.unavailable_reason.is_some(),
             "llm service provider started"
         );
@@ -155,10 +155,11 @@ impl SystemService for LlmSystemServiceProvider {
                 validate_before_dispatch(&typed.messages, &self.profile.protocol)
                     .map_err(service_adapter_error)?;
                 tracing::info!(
+                    service_id = %self.descriptor.id,
+                    command = LLM_CHAT_COMMAND,
                     trace_id = %typed.trace.trace_id,
                     session_id = %typed.scope.session_id,
-                    agent = %typed.scope.agent_name,
-                    model = %typed.options.model,
+                    agent_id = %typed.scope.agent_name,
                     model_hint_present = typed.model_hint.is_some(),
                     "llm service dispatching chat command"
                 );
@@ -197,8 +198,10 @@ impl SystemService for LlmSystemServiceProvider {
                     typed.fallbacks,
                 )?;
                 tracing::info!(
+                    service_id = %self.descriptor.id,
+                    command = LLM_MODEL_SELECTION_COMMAND,
                     trace_id = %typed.trace.trace_id,
-                    provider = %result.selected.provider_id,
+                    route_resolved = true,
                     "llm service model selection completed"
                 );
                 Ok(Self::service_result(
@@ -218,8 +221,9 @@ impl SystemService for LlmSystemServiceProvider {
                     )
                 };
                 tracing::info!(
+                    service_id = %self.descriptor.id,
+                    command = LLM_SNAPSHOT_COMMAND,
                     trace_id = %typed.trace.trace_id,
-                    provider = %self.profile.provider_id,
                     "llm service snapshot emitted"
                 );
                 Ok(Self::service_result(

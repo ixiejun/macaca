@@ -67,9 +67,10 @@ impl ApplicationSystemServiceProvider {
             self.domain_pack_catalog.as_ref(),
         );
         tracing::info!(
+            service_id = "application",
+            command = "start",
             trace_id = %typed.trace.trace_id,
-            app_id = %app_id,
-            app_name = %view.name,
+            application_id = %app_id,
             "application service start completed"
         );
         Ok(Self::service_result(to_value(view)?, typed.trace))

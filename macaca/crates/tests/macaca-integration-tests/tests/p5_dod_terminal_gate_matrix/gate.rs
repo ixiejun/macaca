@@ -155,6 +155,13 @@ const TERMINAL_GATE_COMMANDS: &[TerminalGateCommand] = &[
         test_target: "audit_blind_spot_terminal_gate",
         filter: "audit_blind_spot_terminal_state_has_no_replay_gaps",
     },
+    // §7.2 — provider-neutral tracing dimensions (no app/provider/model log keys).
+    TerminalGateCommand {
+        gate_id: "provider_neutral_logging_terminal",
+        tasks_ref: "§7.2",
+        test_target: "provider_neutral_logging_terminal_gate",
+        filter: "provider_neutral_logging_terminal_state_is_enforced",
+    },
     // §9.8 — OpenSpec strict validate (npx subprocess inside gate).
     TerminalGateCommand {
         gate_id: "openspec_validate_terminal",
@@ -177,6 +184,7 @@ const REQUIRED_GATE_TEST_SOURCES: &[&str] = &[
     "crates/tests/macaca-integration-tests/tests/p5_external_contract_gate.rs",
     "crates/tests/macaca-integration-tests/tests/unified_audit_replay_terminal_gate.rs",
     "crates/tests/macaca-integration-tests/tests/audit_blind_spot_terminal_gate.rs",
+    "crates/tests/macaca-integration-tests/tests/provider_neutral_logging_terminal_gate.rs",
     "crates/tests/macaca-integration-tests/tests/openspec_validate_terminal_gate.rs",
 ];
 

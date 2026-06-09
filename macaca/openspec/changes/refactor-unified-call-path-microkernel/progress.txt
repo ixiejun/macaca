@@ -960,3 +960,12 @@
 - **Contract tests**: `p5_dod_terminal_gate_matrix_all_gates_green` 1/1（long-running: includes replay + npx openspec child gates）。
 - **GitNexus memo (non-blocking)**: iteration 117 LOW on `p5_dod_terminal_gate_matrix` modules only — recorded in `impact-memo.md`。
 - **Next**: §7.1/7.2 横切注释/日志；§9.4 web sdk-only 终态；§6.3.2 archive。
+
+## Iteration 118 (2026-06-08)
+- **P5 §7.2 provider-neutral logging terminal gate**: added `provider_neutral_logging_terminal_gate`（Facade+Specification by Example）— static scan of OS-layer shell/runtime-host/framework production sources for forbidden tracing field tokens (`app_name`/`provider`/`model`/`llm_provider`/`default_provider`/`embedding_provider`/`agent.name` as structured log keys); allowlist paths for canonical provider crates (`macaca-llm`, `macaca-memory`, `macaca-domain-pack-finance`, `framework/model_impls`).
+- **Production log remediation**: replaced provider/app/model-primary tracing keys with `service_id`/`command`/`trace_id`/`reason_code`/`application_id`/`route_reference`/`config_scope`/`embedding_configured` across `macaca-agent`, `macaca-app`, `macaca-web`, `macaca-runtime-host`, `macaca-framework::tracing_utils`.
+- **P5 §9.5 matrix**: registered `provider_neutral_logging_terminal` as 20th gate row in `p5_dod_terminal_gate_matrix`.
+- **Design patterns**: Specification by Example（forbidden tracing token registry + path allowlist）；Facade（integration-test VC entry）；Strangler Fig（incremental log-field migration without application-specific literals）。
+- **Contract tests**: `provider_neutral_logging_terminal_state_is_enforced` 1/1（1420 files scanned, 0 violations）。
+- **GitNexus memo (non-blocking)**: iteration 118 LOW on tracing field migrations + gate modules — recorded in `impact-memo.md`。
+- **Next**: §7.1 横切英文注释；§9.4 web sdk-only 终态；§6.3.2 archive。

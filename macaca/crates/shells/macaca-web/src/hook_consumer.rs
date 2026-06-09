@@ -48,7 +48,12 @@ pub async fn start_hook_event_consumer(state: Arc<AppState>) {
                     let fork_manager = executor.fork_manager();
                     let hook_rx = fork_manager.subscribe_to_hooks();
                     app_receivers.insert(app_id.clone(), hook_rx);
-                    info!(app_id = %app_id, app_name = %app_name, "Subscribed to hook events for app");
+                    info!(
+                        service_id = "execution_control.hooks",
+                        command = "subscribe",
+                        application_id = %app_id,
+                        "Subscribed to hook events for application"
+                    );
                 }
             }
         }
