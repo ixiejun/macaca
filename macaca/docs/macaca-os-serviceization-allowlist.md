@@ -123,10 +123,13 @@ Rust source of truth: `macaca/crates/tests/macaca-integration-tests/tests/route_
 
 **P3 §4.4 update (2026-06-07):** All seven `macaca-web → provider` allowlist rows cleared. Web now reaches driver/llm/memory/persist/skill/task/tools/kernel types through `macaca-sdk::shell_provider_bridge` crate aliases; direct `Cargo.toml` edges removed.
 
-**Remaining web thin-shell debt (not allowlisted, tracked in OpenSpec §4.4.3–4.4.4):**
+**Remaining web thin-shell debt (frozen in `shell_dependency_purity_gate/allowlist.rs`, tracked in OpenSpec §4.4.4):**
 
 - `macaca-web → macaca-runtime-host` — composition-root bootstrap seam; blocked from SDK bridge by `macaca-app → macaca-sdk → runtime-host → macaca-app` cycle until cycle break lands.
-- `macaca-web → macaca-app`, `macaca-runtime`, `macaca-context`, `macaca-agent`, `macaca-framework` — framework/application adapter deps; converge in P4/P5.
+- `macaca-web → macaca-app`, `macaca-context`, `macaca-framework` — framework/application adapter deps; converge in P5.
+- `macaca-web → macaca-domain-pack-finance` (optional feature) — SDK bridge blocked by `app → sdk → domain-pack-finance → app` cycle; remains direct optional dep until cycle break.
+
+**Retired (iteration 120):** `macaca-agent` (via `macaca-sdk::agent` bridge); `macaca-runtime` (dead `Cargo.toml` edge, zero source imports).
 
 Terminal target: **0 rows** (P5 gate). **Achieved** (iteration 40): Route C allowlist cleared; `assert_route_c_allowlist_terminal_state` enforces zero rows in CI.
 

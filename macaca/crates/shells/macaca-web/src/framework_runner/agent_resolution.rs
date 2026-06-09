@@ -1,7 +1,7 @@
 //! Agent capability, model, and context-config resolution helpers.
 
 use std::sync::Arc;
-use macaca_agent::AgentCapabilitySet;
+use macaca_sdk::agent::AgentCapabilitySet;
 use macaca_app::model::AppContextConfig;
 use macaca_app::app_agent_manifest_view;
 use macaca_proto::config::{AgentProfileContextConfig, AgentProfileRootKind, ContextConfig};

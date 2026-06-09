@@ -49,3 +49,11 @@ pub use macaca_tools as tools;
 /// Shells must not own kernel semantics — they only hold `Arc<Kernel>` handles produced
 /// by the composition root and delegate execution through service clients.
 pub use macaca_kernel as kernel;
+
+/// Agent execution port and capability-set crate alias.
+///
+/// Framework construction adapters in presentation shells still need typed access to
+/// `AgentServices`, `AgentCapabilitySet`, and transition reasons while the shell's
+/// `Cargo.toml` converges on sdk-only workspace edges. This alias preserves type identity
+/// without forcing a direct `macaca-agent` dependency on the shell crate.
+pub use macaca_agent as agent;

@@ -2,7 +2,7 @@
 //!
 //! Terminal state: `macaca-web` depends only on `macaca-proto` and `macaca-sdk` among
 //! workspace members. Until composition-root seams are fully absorbed into SDK bridges,
-//! these seven crates remain as documented migration debt. The gate forbids **new**
+//! these five crates remain as documented migration debt. The gate forbids **new**
 //! workspace edges beyond this frozen set.
 
 /// One row of web-shell workspace dependency migration debt.
@@ -18,11 +18,6 @@ pub struct WebShellDependencyDebt {
 /// Frozen baseline — any new workspace dependency on `macaca-web` fails CI immediately.
 pub const WEB_SHELL_WORKSPACE_DEPENDENCY_DEBT: &[WebShellDependencyDebt] = &[
     WebShellDependencyDebt {
-        crate_name: "macaca-agent",
-        rationale: "AgentExecutionPort types and legacy execution adapter seams during SDK bridge migration",
-        replacement: "macaca-sdk::agent_execution client + proto contracts only",
-    },
-    WebShellDependencyDebt {
         crate_name: "macaca-app",
         rationale: "Application runtime bootstrap and manifest projection at composition root",
         replacement: "macaca-sdk::application client + runtime-host bootstrap bundle",
@@ -34,18 +29,13 @@ pub const WEB_SHELL_WORKSPACE_DEPENDENCY_DEBT: &[WebShellDependencyDebt] = &[
     },
     WebShellDependencyDebt {
         crate_name: "macaca-domain-pack-finance",
-        rationale: "Optional domain-pack feature wiring at web composition root",
-        replacement: "runtime-host domain-pack catalog + SDK optional-module client",
+        rationale: "Optional domain-pack feature wiring at web composition root (SDK bridge blocked by app→sdk→pack→app cycle)",
+        replacement: "break app/sdk/pack cycle then macaca-sdk optional domain_pack_finance bridge",
     },
     WebShellDependencyDebt {
         crate_name: "macaca-framework",
         rationale: "FrameworkRunner construction adapter until framework service port is SDK-only",
         replacement: "macaca-sdk framework construction facade",
-    },
-    WebShellDependencyDebt {
-        crate_name: "macaca-runtime",
-        rationale: "Runtime agent types referenced by shell adapters pending full serviceization",
-        replacement: "macaca-sdk runtime view DTOs",
     },
     WebShellDependencyDebt {
         crate_name: "macaca-runtime-host",

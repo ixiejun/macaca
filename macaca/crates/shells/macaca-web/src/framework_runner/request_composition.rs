@@ -1,7 +1,7 @@
 //! Agent build request composition from persona, capabilities, and application semantics.
 
 use std::sync::Arc;
-use macaca_agent::{AgentCapabilitySet, AgentServices};
+use macaca_sdk::agent::{AgentCapabilitySet, AgentServices};
 use macaca_app::{app_agent_manifest_view, app_agent_prompt_semantics};
 use macaca_framework::construction::*;
 use macaca_proto::{ApplicationId, Capability};

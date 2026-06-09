@@ -2,7 +2,7 @@
 
 use std::collections::HashSet;
 use std::sync::Arc;
-use macaca_agent::{AgentServices, AgentTransitionReason};
+use macaca_sdk::agent::{AgentServices, AgentTransitionReason};
 use macaca_proto::AgentState;
 use macaca_framework::adapter::ServiceChatModelAdapter;
 use macaca_framework::agent::{HookRegistry, HookedAgent};

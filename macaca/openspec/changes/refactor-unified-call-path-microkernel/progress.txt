@@ -978,3 +978,13 @@
 - **Contract tests**: `english_documentation_terminal_state_is_enforced` 1/1（33 files scanned, 0 violations）。
 - **GitNexus memo (non-blocking)**: iteration 119 LOW on gate modules + module doc edits — recorded in `impact-memo.md`。
 - **Next**: §9.4 web sdk-only 终态；§6.3.2 archive。
+
+## Iteration 120 (2026-06-08)
+- **P5 §4.4.4 / §9.4 web shell dependency Strangler Fig**: retired 2 of 7 frozen workspace deps — `macaca-agent` via `macaca-sdk::shell_provider_bridge::agent` re-export; `macaca-runtime` removed as dead `Cargo.toml` edge (zero `macaca_runtime::` imports).
+- **Blocked**: `macaca-domain-pack-finance` SDK bridge rejected — `app → sdk → domain-pack-finance → app` cyclic dependency; remains direct optional web dep until cycle break.
+- **framework_runner migration**: 4 files (`agent_factory_build`, `request_composition`, `context_prompt_builder`, `agent_resolution`) now import `macaca_sdk::agent::{...}`.
+- **Gate allowlist**: `WEB_SHELL_WORKSPACE_DEPENDENCY_DEBT` 7→5 rows (`shell_dependency_purity_gate/allowlist.rs`); synced `macaca-os-serviceization-allowlist.md`.
+- **Design patterns**: Facade (`shell_provider_bridge::agent`); Strangler Fig (incremental allowlist shrink); Specification by Example (frozen debt gate).
+- **Contract tests**: `shell_dependency_purity_gate` 2/2; `domain_pack_wiring` 2/2; `cargo check -p macaca-web -p macaca-sdk` pass.
+- **GitNexus memo (non-blocking)**: iteration 120 LOW on SDK bridge + framework_runner import migration — recorded in `impact-memo.md`.
+- **Next**: §9.4 continue retiring app/context/framework/runtime-host; break app/sdk/pack cycle for domain-pack-finance; §6.3.2 archive.

@@ -1060,3 +1060,12 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `composition_bootstrap::contract_source` | LOW | test-only `include_str!` registry; module doc extended for gate compliance | P5 |
 | `macaca_runtime_host::{factory,transport,lease}` | LOW | module-level `//!` documentation only; no behavior change | P5 |
 | `p5_dod_terminal_gate_matrix` (21 rows) | LOW | matrix registry +1 subprocess row for english documentation gate | P5 |
+
+## Iteration 120 additions (§4.4.4 web shell dependency retirement — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `shell_provider_bridge::agent` | LOW | macaca-sdk re-export; 4 framework_runner files migrated from direct `macaca-agent` dep | P5 |
+| `macaca-runtime` web dep removal | LOW | dead Cargo.toml edge only; no source consumers | P5 |
+| `domain-pack-finance` SDK bridge attempt | HIGH (blocked) | `app→sdk→domain-pack-finance→app` cycle prevents SDK bridge; deferred | P5 |
+| `WEB_SHELL_WORKSPACE_DEPENDENCY_DEBT` | LOW | frozen baseline 7→5 rows; gate 2/2 pass | P5 |
