@@ -1093,3 +1093,14 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `ServiceChatModelAdapter` | LOW | now accepts `Arc<dyn LlmServiceChatClient>`; framework `service-clients` no longer depends on SDK | P5 |
 | `llm_service_chat_client_from_system` | LOW | SDK bridge wrapping `SystemLlmClient` for framework agent factory | P5 |
 | `shell_provider_bridge::framework` | LOW | ~40 macaca-web files migrated; allowlist 4→3 | P5 |
+
+## Iteration 124 additions (§4.4.4 domain-pack SDK bridge — LANDED, memo only)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `domain_pack_contract` (proto) | HIGH | `DomainPackDefinition`, `InMemoryDomainPackCatalog`, `compose_installed_domain_pack_catalog`, service capability expansion — all domain-pack consumers | P5 |
+| `DomainPackProviderRegistration` (kernel) | MEDIUM | runtime-host `bootstrap_domain_pack_services`, finance pack bootstrap, Abstract Factory registration seam | P5 |
+| `domain_pack_bridge` (sdk) | LOW | macaca-web `domain_pack_wiring.rs`; optional `domain-pack-finance` feature gate | P5 |
+| `macaca-domain-pack-finance` dep graph | MEDIUM | removed `macaca-app`/`macaca-runtime-host` edges; now proto+kernel+llm only; breaks prior cycle | P5 |
+| `bootstrap_domain_pack_services` | HIGH | runtime-host service registration hot path; preserved behavior with kernel/proto types | P5 |
+| `WEB_SHELL_WORKSPACE_DEPENDENCY_DEBT` | LOW | frozen baseline 3→2 rows; `macaca-domain-pack-finance` retired from web direct dep | P5 |

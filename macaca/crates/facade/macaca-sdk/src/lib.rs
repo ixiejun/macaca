@@ -16,6 +16,7 @@ pub mod autonomy_evolution_client;
 pub mod builder;
 pub mod config;
 pub mod context_client;
+pub mod domain_pack_bridge;
 pub mod driver_client;
 pub mod entitlement_client;
 pub mod evm_client;
@@ -180,6 +181,13 @@ pub use workbench_client::{
     is_structured_unavailable, ServiceBackedWorkbenchClient, SystemWorkbenchClient,
     SystemWorkbenchFacadeExt, UnavailableWorkbenchServiceClient, WorkbenchClientCatalog,
 };
+pub use domain_pack_bridge::{
+    compose_installed_domain_pack_catalog, empty_domain_pack_catalog, expand_service_capabilities,
+    AppServiceContractConfig, DomainPackCatalog, DomainPackDefinition, EffectiveServiceCapabilities,
+    InMemoryDomainPackCatalog, SharedDomainPackCatalog,
+};
+#[cfg(feature = "domain-pack-finance")]
+pub use domain_pack_bridge::{finance_domain_pack_registrations, finance_pack_catalog_definition};
 pub use shell_provider_bridge::{
     agent, context, driver, framework, kernel, llm, memory, skill, task, tools,
 };

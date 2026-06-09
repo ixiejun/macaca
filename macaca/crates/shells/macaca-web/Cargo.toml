@@ -5,12 +5,11 @@ edition.workspace = true
 
 [features]
 default = ["domain-pack-finance"]
-domain-pack-finance = ["dep:macaca-domain-pack-finance"]
+domain-pack-finance = ["macaca-sdk/domain-pack-finance"]
 
 [dependencies]
 macaca-proto = { workspace = true }
 macaca-app = { workspace = true }
-macaca-domain-pack-finance = { workspace = true, optional = true }
 macaca-sdk = { workspace = true }
 macaca-runtime-host = { workspace = true }
 async-trait = { workspace = true }

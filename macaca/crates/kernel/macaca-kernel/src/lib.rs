@@ -3,6 +3,7 @@
 pub mod alert;
 pub mod audit;
 pub mod capability_registry;
+pub mod domain_pack_registration;
 pub mod execution_port;
 pub mod facade;
 pub mod kernel;
@@ -26,6 +27,7 @@ pub mod system_service;
 pub mod trace_service_adapter;
 
 pub use capability_registry::{CapabilityRegistry, InMemoryCapabilityRegistry};
+pub use domain_pack_registration::DomainPackProviderRegistration;
 pub use facade::{
     DefaultKernelFacade, InMemoryTraceEventBus, KernelFacade, KernelTraceEvent, TraceEventBus,
 };

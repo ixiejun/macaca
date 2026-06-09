@@ -3,6 +3,10 @@ name = "macaca-sdk"
 version.workspace = true
 edition.workspace = true
 
+[features]
+default = []
+domain-pack-finance = ["dep:macaca-domain-pack-finance"]
+
 [dependencies]
 macaca-proto = { workspace = true }
 macaca-agent = { workspace = true }
@@ -26,5 +30,6 @@ thiserror = { workspace = true }
 uuid = { workspace = true }
 macaca-kernel = { workspace = true }
 macaca-framework = { path = "../../runtime/macaca-framework", features = ["macaca-compat", "service-clients"] }
+macaca-domain-pack-finance = { workspace = true, optional = true }
 [dev-dependencies]
 tempfile = "3"

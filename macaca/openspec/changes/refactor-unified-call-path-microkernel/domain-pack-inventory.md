@@ -3,7 +3,18 @@
 > Impact memo (GitNexus non-blocking): finance extraction touches `bootstrap_domain_pack_services`,
 > `service_runtime_wiring`, `InMemoryDomainPackCatalog`, and optional `macaca-domain-pack-finance` crate.
 
-## Current state (iteration 39 — web composition root wired)
+## Current state (iteration 124 — SDK bridge + contract sink)
+
+| Location | Role | Production reachable? | Action |
+|----------|------|---------------------|--------|
+| `macaca-proto/domain_pack_contract.rs` | Canonical `DomainPackDefinition`, catalog, capability expansion, trace helpers | Yes | **Keep** (shared kernel) |
+| `macaca-kernel/domain_pack_registration.rs` | `DomainPackProviderRegistration` Abstract Factory product | Yes | **Keep** |
+| `macaca-sdk/domain_pack_bridge.rs` | Optional finance pack re-exports (`domain-pack-finance` feature) | Yes (feature-gated) | **Keep** |
+| `web/composition_bootstrap/domain_pack_wiring.rs` | Imports `macaca_sdk::finance_*` (not direct pack crate) | Yes | **Done** (iter 124) |
+| `macaca-app/domain_pack_catalog.rs` | Thin re-export of proto helpers | Yes | **Compat** shim |
+| `macaca-domain-pack-finance` | Package impl; deps proto+kernel+llm only (no app/runtime-host) | Optional | **Keep** |
+
+## Prior state (iteration 39 — web composition root wired)
 
 | Location | Role | Production reachable? | Action |
 |----------|------|---------------------|--------|

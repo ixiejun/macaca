@@ -6,7 +6,7 @@
 
 use std::collections::BTreeSet;
 
-use macaca_app::DomainPackDefinition;
+use macaca_proto::DomainPackDefinition;
 
 use crate::contract::{
     FINANCE_FINANCIALS_SERVICE_ID, FINANCE_LLM_ANALYSIS_SERVICE_ID, FINANCE_MARKET_DATA_SERVICE_ID,

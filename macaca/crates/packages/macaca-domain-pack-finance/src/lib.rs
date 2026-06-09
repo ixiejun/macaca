@@ -30,7 +30,9 @@ pub use llm_analysis_provider::FinanceLlmAnalysisSystemServiceProvider;
 
 #[cfg(test)]
 mod tests {
-    use macaca_app::{expand_service_capabilities, AppServiceContractConfig, InMemoryDomainPackCatalog};
+    use macaca_proto::{
+        expand_service_capabilities, AppServiceContractConfig, InMemoryDomainPackCatalog,
+    };
     use serde_json::json;
 
     use super::catalog::finance_pack_catalog_definition;

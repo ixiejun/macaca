@@ -127,7 +127,6 @@ Rust source of truth: `macaca/crates/tests/macaca-integration-tests/tests/route_
 
 - `macaca-web → macaca-runtime-host` — composition-root bootstrap seam; blocked from SDK bridge by `macaca-app → macaca-sdk → runtime-host → macaca-app` cycle until cycle break lands.
 - `macaca-web → macaca-app` — application runtime bootstrap at composition root.
-- `macaca-web → macaca-domain-pack-finance` (optional feature) — SDK bridge blocked by `app → sdk → domain-pack-finance → app` cycle; remains direct optional dep until cycle break.
 
 **Retired (iteration 120):** `macaca-agent` (via `macaca-sdk::agent` bridge); `macaca-runtime` (dead `Cargo.toml` edge, zero source imports).
 
@@ -135,7 +134,11 @@ Rust source of truth: `macaca/crates/tests/macaca-integration-tests/tests/route_
 
 **Retired (iteration 123):** `macaca-framework` (via `macaca-sdk::framework` bridge; cycle broken by `LlmServiceChatClient` Interface Segregation in `macaca-llm`; ~40 shell source files migrated).
 
+**Retired (iteration 124):** `macaca-domain-pack-finance` (via `macaca-sdk::domain_pack_bridge` + `domain-pack-finance` feature; cycle broken by sinking domain-pack contract to `macaca-proto`, `DomainPackProviderRegistration` to `macaca-kernel`, and removing `pack → runtime-host → app` edge).
+
 **Resolved prerequisite (iteration 122→123):** iter 122 blocked on `sdk→framework(service-clients)→sdk`; fixed by removing `macaca-sdk` from `framework/service-clients` and introducing `LlmServiceChatClient` + `llm_service_chat_client_from_system` bridge.
+
+**Resolved prerequisite (iteration 120→124):** iter 120 blocked on `app → sdk → domain-pack-finance → app`; fixed by `macaca_proto::domain_pack_contract` + `macaca_kernel::DomainPackProviderRegistration` so pack depends only on proto/kernel/llm.
 
 Terminal target: **0 rows** (P5 gate). **Achieved** (iteration 40): Route C allowlist cleared; `assert_route_c_allowlist_terminal_state` enforces zero rows in CI.
 

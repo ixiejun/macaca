@@ -1,21 +1,24 @@
 //! Generic domain-pack service registration for package-owned providers.
 //!
 //! Domain packs are extension packages, not base runtime-host business logic.
-//! This module therefore owns only the reusable registration mechanics: a host
-//! can provide descriptor-backed [`SystemService`] instances, and the runtime
-//! starts them with trace evidence. Concrete finance, crypto, office, or other
-//! domain behavior must be supplied by a plugin/package composition root.
+//! This module owns reusable registration mechanics: composition roots supply
+//! descriptor-backed [`SystemService`] instances via [`DomainPackProviderRegistration`],
+//! and the runtime starts them with trace evidence.
+//!
+//! # Layering
+//!
+//! - [`DomainPackProviderRegistration`] lives in `macaca-kernel` so package crates
+//!   avoid depending on this runtime-host crate (breaks `pack → runtime-host → app` cycles).
+//! - Trace/result helpers live in `macaca-proto::domain_pack_contract` for the same reason.
+//! - This module keeps bootstrap wiring and re-exports for backward-compatible imports.
 
-use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use macaca_kernel::SystemService;
 use macaca_llm::LlmProvider;
 use macaca_proto::{
-    CleanupPolicy, KernelServiceId, MacacaError, MacacaResult, ServiceCallResult, ServiceCommand,
-    ServiceDescriptor, ServiceError, ServiceResult, TraceContext,
+    domain_pack_command_trace, domain_pack_service_adapter_error, domain_pack_service_result,
+    KernelServiceId, MacacaError, MacacaResult, TraceContext,
 };
-use serde_json::Value;
 use tracing::{info, warn};
 
 use crate::{
@@ -23,85 +26,27 @@ use crate::{
     StaticServiceProviderFactory,
 };
 
-/// Common result builder used by descriptor-owned domain-pack adapters.
-///
-/// The runtime host adds only provider-neutral metadata. Package providers may
-/// add their own bounded metadata inside the output payload, but OS-level
-/// observability must never receive raw provider payloads, secrets, manifests,
-/// package bytes, prompts, or unbounded diagnostic output.
-pub fn service_result(
-    output: Value,
-    trace: TraceContext,
-    provider_class: &'static str,
-) -> ServiceCallResult {
-    let mut metadata = BTreeMap::new();
-    metadata.insert("provider_class".into(), provider_class.into());
-    ServiceCallResult {
-        output,
-        trace,
-        status: "ok".into(),
-        metadata,
-        cleanup_hint: Some(CleanupPolicy::None),
-    }
-}
+/// Re-export the kernel-owned registration product type.
+pub use macaca_kernel::DomainPackProviderRegistration;
 
-/// Extract a trace context or fail before provider logic runs.
-///
-/// Keeping this helper close to the registration boundary makes the invariant
-/// easy to reuse in package-provider tests: every service call must be
-/// trace-addressable before any side effect or external adapter runs.
-pub fn command_trace(command: &ServiceCommand) -> ServiceResult<TraceContext> {
-    command
-        .trace
-        .clone()
-        .ok_or(ServiceError::MissingTraceContext)
-}
-
-/// Descriptor-backed service registration supplied by a plugin/package.
-///
-/// This type is the small Abstract Factory product that the base runtime-host
-/// accepts from a composition root. It keeps the OS generic: the descriptor
-/// carries the package-owned service identity and command surface, while the
-/// runtime-host only registers and starts the already-constructed provider.
-#[derive(Clone)]
-pub struct DomainPackProviderRegistration {
-    descriptor: ServiceDescriptor,
-    service: Arc<dyn SystemService>,
-    trace_suffix: String,
-}
-
-impl DomainPackProviderRegistration {
-    /// Create a new package-owned provider registration.
-    ///
-    /// The trace suffix is intentionally separate from service id. It gives
-    /// package composition roots a stable, audit-friendly boot trace segment
-    /// without requiring the runtime host to parse domain-specific ids.
-    pub fn new(
-        descriptor: ServiceDescriptor,
-        service: Arc<dyn SystemService>,
-        trace_suffix: impl Into<String>,
-    ) -> Self {
-        Self {
-            descriptor,
-            service,
-            trace_suffix: trace_suffix.into(),
-        }
-    }
-}
+/// Re-export proto-owned trace/result helpers for package adapters.
+pub use macaca_proto::{
+    domain_pack_command_trace as command_trace, domain_pack_service_adapter_error as service_adapter_error,
+    domain_pack_service_result as service_result,
+};
 
 /// Started service ids returned by the domain-pack bootstrap boundary.
 #[derive(Clone, Debug, Default)]
 pub struct DomainPackRuntimeBundle {
+    /// Kernel service ids that were registered and started during bootstrap.
     pub started_services: Vec<KernelServiceId>,
 }
 
 /// Register and start package-owned domain-pack service providers.
 ///
-/// The function implements only the generic Adapter/Bridge mechanics. It does
-/// not inspect package names, service ids, asset classes, providers, or domain
-/// payloads. Missing registrations are a valid optional-module state and return
-/// an empty bundle instead of crashing, hanging, silently falling back, or
-/// fabricating successful provider output.
+/// Implements only generic Adapter/Bridge mechanics. Does not inspect package names,
+/// service ids, asset classes, providers, or domain payloads. An empty registration
+/// list is valid optional-module state and returns an empty bundle (Null Object).
 pub async fn bootstrap_domain_pack_services(
     runtime: Arc<ServiceRuntime>,
     registrations: impl IntoIterator<Item = DomainPackProviderRegistration>,
@@ -111,8 +56,12 @@ pub async fn bootstrap_domain_pack_services(
     let mut bundle = DomainPackRuntimeBundle::default();
 
     for registration in registrations {
-        let service_id = registration.descriptor.id.clone();
-        let trace = TraceContext::new(format!("{trace_prefix}-{}", registration.trace_suffix));
+        let descriptor = registration.descriptor().clone();
+        let service_id = descriptor.id.clone();
+        let trace = TraceContext::new(format!(
+            "{trace_prefix}-{}",
+            registration.trace_suffix()
+        ));
         info!(
             service_id = %service_id,
             trace_id = %trace.trace_id,
@@ -121,8 +70,8 @@ pub async fn bootstrap_domain_pack_services(
         runtime
             .register_provider(
                 &StaticServiceProviderFactory::new(ServiceProviderInstance::new(
-                    registration.descriptor,
-                    registration.service,
+                    descriptor,
+                    registration.service(),
                 )),
                 ServiceProviderFactoryContext::new(),
             )
@@ -152,13 +101,9 @@ pub async fn bootstrap_domain_pack_services(
 
 /// Deprecated compatibility entrypoint for the old built-in domain-pack path.
 ///
-/// Base runtime-host no longer owns finance or crypto providers. The signature
-/// remains temporarily so existing composition roots can compile while they are
-/// migrated to pass package-owned [`DomainPackProviderRegistration`] values.
-/// Returning an empty bundle is the explicit Null Object behavior for optional
-/// absence: callers may query services and receive structured unavailable
-/// results from the service runtime instead of receiving synthetic business
-/// output from the OS.
+/// Base runtime-host no longer owns finance or crypto providers. Returning an empty
+/// bundle is explicit Null Object behavior: callers receive structured unavailable
+/// results from the service runtime instead of synthetic business output from the OS.
 #[deprecated(
     since = "0.1.0",
     note = "register package-owned providers with bootstrap_domain_pack_services"
@@ -176,10 +121,6 @@ pub async fn bootstrap_builtin_domain_pack_services(
     Ok(DomainPackRuntimeBundle::default())
 }
 
-pub fn service_adapter_error(error: MacacaError) -> ServiceError {
-    ServiceError::ServiceUnavailable(error.to_string())
-}
-
 fn runtime_error(error: crate::ServiceRuntimeError) -> MacacaError {
     MacacaError::Config(error.to_string())
 }
@@ -190,8 +131,6 @@ mod tests {
 
     #[test]
     fn builtin_domain_pack_bootstrap_returns_empty_bundle() {
-        // The deprecated built-in path is an explicit Null Object: optional
-        // domain packs must be registered by composition roots, not the OS.
         let bundle = DomainPackRuntimeBundle::default();
         assert!(bundle.started_services.is_empty());
     }

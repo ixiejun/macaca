@@ -2,8 +2,8 @@
 //!
 //! Domain packs are OS extensions declared by applications through manifest
 //! `service_contract.use_packs`.  Base `macaca-web` remains pack-neutral; this
-//! module is the single place where optional package crates (for example
-//! `macaca-domain-pack-finance`) are merged into the shared catalog and
+//! module is the single place where optional package crates (reached through
+//! `macaca-sdk::domain_pack_bridge`) are merged into the shared catalog and
 //! translated into `DomainPackProviderRegistration` products for
 //! `bootstrap_domain_pack_services`.
 //!
@@ -12,12 +12,16 @@
 //!   startup and injected into `AppRuntime`, Application Service, and UI routes.
 //! - **Abstract Factory**: package crates expose registration factories; web only
 //!   forwards them without embedding domain semantics.
+//! - **Facade**: finance pack symbols are imported through `macaca-sdk` so the shell
+//!   `Cargo.toml` stays sdk-only for optional packages.
 //! - **Feature toggle**: `domain-pack-finance` gates optional dependencies so
 //!   minimal hosts can compile without finance packages.
 
 use std::sync::Arc;
 
-use macaca_app::{compose_installed_domain_pack_catalog, empty_domain_pack_catalog, SharedDomainPackCatalog};
+use macaca_sdk::{
+    compose_installed_domain_pack_catalog, empty_domain_pack_catalog, SharedDomainPackCatalog,
+};
 use macaca_sdk::llm::LlmProvider;
 use macaca_runtime_host::DomainPackProviderRegistration;
 use tracing::info;
@@ -32,7 +36,7 @@ use tracing::info;
 pub(crate) fn build_installed_domain_pack_catalog() -> SharedDomainPackCatalog {
     #[cfg(feature = "domain-pack-finance")]
     {
-        use macaca_domain_pack_finance::finance_pack_catalog_definition;
+        use macaca_sdk::finance_pack_catalog_definition;
 
         let catalog = compose_installed_domain_pack_catalog([finance_pack_catalog_definition()]);
         info!(
@@ -59,7 +63,7 @@ pub(crate) fn installed_domain_pack_provider_registrations(
 ) -> Vec<DomainPackProviderRegistration> {
     #[cfg(feature = "domain-pack-finance")]
     {
-        use macaca_domain_pack_finance::finance_domain_pack_registrations;
+        use macaca_sdk::finance_domain_pack_registrations;
 
         let registrations = finance_domain_pack_registrations(llm);
         info!(
@@ -79,7 +83,7 @@ pub(crate) fn installed_domain_pack_provider_registrations(
 
 #[cfg(test)]
 mod tests {
-    use macaca_app::{expand_service_capabilities, AppServiceContractConfig, DomainPackCatalog};
+    use macaca_sdk::{expand_service_capabilities, AppServiceContractConfig, DomainPackCatalog};
 
     use super::build_installed_domain_pack_catalog;
 

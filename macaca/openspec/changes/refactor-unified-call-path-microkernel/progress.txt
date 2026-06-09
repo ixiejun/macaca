@@ -1014,3 +1014,15 @@
 - **Contract tests**: `shell_dependency_purity_gate` 2/2; `cargo check -p macaca-web -p macaca-sdk -p macaca-framework` pass.
 - **GitNexus memo (non-blocking)**: iteration 123 LOW on trait extraction + framework bridge — recorded in `impact-memo.md`.
 - **Next**: §9.4 retire app/runtime-host; break app/sdk/pack cycle for domain-pack-finance; §6.3.2 archive.
+
+## Iteration 124 (2026-06-08)
+- **P5 §4.4.4 / §9.4 domain-pack SDK bridge — LANDED**: broke `app→sdk→domain-pack-finance→app` cycle by sinking domain-pack contract DTOs to `macaca-proto::domain_pack_contract` and registration type to `macaca-kernel::DomainPackProviderRegistration`; `macaca-domain-pack-finance` no longer depends on `macaca-runtime-host` or `macaca-app`.
+- **SDK bridge**: `macaca-sdk::domain_pack_bridge` + optional `domain-pack-finance` feature re-exports `finance_pack_catalog_definition`, `finance_domain_pack_registrations`, etc.; `macaca-web` uses SDK symbols via `domain-pack-finance = ["macaca-sdk/domain-pack-finance"]`.
+- **macaca-app thin re-export**: `domain_pack_catalog.rs` / `service_capability.rs` re-export proto helpers for backward compatibility.
+- **runtime-host**: `bootstrap_domain_pack_services` preserved; uses kernel registration + proto trace/result helpers; backward-compat aliases `command_trace` / `service_result` / `service_adapter_error`.
+- **Gate allowlist**: `WEB_SHELL_WORKSPACE_DEPENDENCY_DEBT` 3→**2** rows (`macaca-app`, `macaca-runtime-host`); synced `macaca-os-serviceization-allowlist.md`.
+- **Design patterns**: Contract sink to proto (Shared Kernel); Abstract Factory (`DomainPackProviderRegistration`); Facade (`domain_pack_bridge`); Feature Toggle (optional finance pack); Strangler Fig (allowlist shrink).
+- **Contract tests**: `shell_dependency_purity_gate` 2/2; `domain_pack_finance_package` 2/2; `cargo check -p macaca-web -p macaca-sdk -p macaca-domain-pack-finance -p macaca-runtime-host` pass.
+- **Logging**: `tracing::info/debug` on domain-pack bootstrap, catalog compose, and service adapter dispatch via proto `domain_pack_command_trace` / provider registration audit nodes.
+- **GitNexus memo (non-blocking)**: iteration 124 HIGH on contract sink + `bootstrap_domain_pack_services` — recorded in `impact-memo.md` (memo only per user directive).
+- **Next**: §9.4 retire `macaca-app` + `macaca-runtime-host` direct web deps (break remaining cycles); §6.3.2 archive; §4.1.4 `memory_runtime` deletion deferred.

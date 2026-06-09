@@ -10,8 +10,8 @@ use async_trait::async_trait;
 use chrono::Utc;
 use macaca_kernel::SystemService;
 use macaca_proto::{
-    ServiceCallResult, ServiceCommand, ServiceDescriptor, ServiceError, ServiceHealth,
-    ServiceResult,
+    domain_pack_command_trace, ServiceCallResult, ServiceCommand, ServiceDescriptor, ServiceError,
+    ServiceHealth, ServiceResult,
 };
 use serde_json::{json, Value};
 use tracing::{info, warn};
@@ -251,7 +251,7 @@ impl SystemService for FinanceDataSystemServiceProvider {
     }
 
     async fn call(&self, command: ServiceCommand) -> ServiceResult<ServiceCallResult> {
-        let trace = macaca_runtime_host::domain_pack_service_provider::command_trace(&command)?;
+        let trace = domain_pack_command_trace(&command)?;
         let symbol = extract_symbol(&command.payload)?;
         info!(
             service_id = %self.descriptor.id,

@@ -11,8 +11,9 @@ use async_trait::async_trait;
 use macaca_kernel::SystemService;
 use macaca_llm::LlmProvider;
 use macaca_proto::{
-    LlmMessage, LlmOptions, ServiceCallResult, ServiceCommand, ServiceDescriptor, ServiceError,
-    ServiceHealth, ServiceResult,
+    domain_pack_command_trace, domain_pack_service_adapter_error, LlmMessage, LlmOptions,
+    ServiceCallResult, ServiceCommand, ServiceDescriptor, ServiceError, ServiceHealth,
+    ServiceResult,
 };
 use serde_json::{json, Value};
 use tracing::{info, warn};
@@ -88,8 +89,7 @@ impl SystemService for FinanceLlmAnalysisSystemServiceProvider {
     }
 
     async fn call(&self, command: ServiceCommand) -> ServiceResult<ServiceCallResult> {
-        let trace =
-            macaca_runtime_host::domain_pack_service_provider::command_trace(&command)?;
+        let trace = domain_pack_command_trace(&command)?;
         let symbol = extract_symbol(&command.payload)?;
         info!(
             service_id = %self.descriptor.id,
@@ -116,7 +116,7 @@ impl SystemService for FinanceLlmAnalysisSystemServiceProvider {
             .llm
             .chat(Self::prompt(&symbol, &command.payload), &options)
             .await
-            .map_err(macaca_runtime_host::domain_pack_service_provider::service_adapter_error)?;
+            .map_err(domain_pack_service_adapter_error)?;
         Ok(finance_service_result(
             json!({
                 "symbol": symbol,
