@@ -1037,3 +1037,12 @@
 - **Logging**: `tracing::info/debug` on declarative config validation, agent manifest build, and SDK bridge module load paths.
 - **GitNexus memo (non-blocking)**: iteration 125 CRITICAL/HIGH on `AgentConfig` sink + mass web import migration + app/sdk cycle break — recorded in `impact-memo.md` (memo only per user directive).
 - **Next**: §6.3.2 archive related completed changes; §4.1.4 `memory_runtime` deletion deferred.
+
+## Iteration 126 (2026-06-09)
+- **P5 §6.1.7 shell gate hardening — LANDED**: Web shell upgraded from frozen-baseline mode to terminal purity (mirrors CLI + Route C): `assert_web_shell_workspace_dependency_allowlist_terminal_state` + `assert_web_shell_workspace_dependency_purity`; removed `assert_web_baseline_purity`; `p5_dod_terminal_gate_matrix` registry updated (3 shell gates: CLI + web allowlist + web purity).
+- **Route C gate alignment**: narrowed `application-execution-sdk-no-runtime-provider-construction` to forbid sdk→web/cli/persist only; approved §9.4 Facade edges sdk→`macaca-app` + sdk→`macaca-runtime-host` via `shell_provider_bridge` re-exports (iteration 125 regression fix).
+- **OpenSpec archive (6.3.2 batch 2)**: archived `fix-live-skill-operations-shell` → `2026-06-09-fix-live-skill-operations-shell` (`--skip-specs --yes`).
+- **Design patterns**: Specification by Example (terminal allowlist zero-rows + cargo metadata purity); Facade (SDK bridge edges documented in Route C rule rationale).
+- **Contract tests**: `shell_dependency_purity_gate` 3/3; `route_c_dependency_boundaries` 3/3.
+- **GitNexus memo (non-blocking)**: Route C rule narrowing + shell gate test rename — recorded in `impact-memo.md`.
+- **Next**: §4.1.4 `memory_runtime` deletion deferred; continue 6.3.2 archive of other completed orthogonal changes as they land.

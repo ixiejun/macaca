@@ -1114,3 +1114,11 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `shell_provider_bridge::app` / `runtime_host` (sdk) | HIGH | ~90 macaca-web files; composition bootstrap, app UI routes, framework runner, agent execution backend | P5 |
 | `PackageEntitlementAuthorizeClient` | MEDIUM | commercial package entitlement path; test mocks simplified | P5 |
 | `WEB_SHELL_WORKSPACE_DEPENDENCY_DEBT` | LOW | frozen baseline 2→**0** rows; §9.4 terminal state achieved | P5 |
+
+## Iteration 126 additions (§6.1.7 shell gate hardening + Route C §9.4 alignment, memo only)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `shell_dependency_purity_gate` web path | LOW | frozen-baseline → hard terminal assertion; 3 tests; DoD matrix +3 gate rows | P5 |
+| `application-execution-sdk-no-runtime-provider-construction` | MEDIUM | rule narrowed post-iter-125; sdk→app/runtime-host approved for Facade bridge | P5 |
+| OpenSpec archive | LOW | `fix-live-skill-operations-shell` moved to archive | P5 |

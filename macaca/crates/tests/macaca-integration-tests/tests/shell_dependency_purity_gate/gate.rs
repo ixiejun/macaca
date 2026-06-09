@@ -5,8 +5,9 @@
 //! `macaca-sdk` focused clients and `macaca-proto` DTO contracts.
 //!
 //! Design pattern: **Specification by Example** — `cargo metadata` is the executable
-//! contract, mirroring `kernel_purity_gate`. Web uses a **frozen baseline allowlist**
-//! (Strangler Fig migration) while CLI is already at terminal purity.
+//! contract, mirroring `kernel_purity_gate` and `route_c_dependency_boundaries`.
+//! Both CLI and Web shells are at **terminal purity** (proto + sdk only); the web
+//! migration allowlist must remain empty so CI cannot regress into tolerated debt.
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -122,48 +123,36 @@ fn assert_shell_terminal_purity(shell_crate: &str, observed: &BTreeSet<String>) 
     );
 }
 
-fn assert_web_baseline_purity(observed: &BTreeSet<String>) {
-    let permitted: BTreeSet<&str> = PERMITTED_SHELL_WORKSPACE_DEPS.iter().copied().collect();
-    let baseline: BTreeSet<&str> = WEB_SHELL_WORKSPACE_DEPENDENCY_DEBT
-        .iter()
-        .map(|row| row.crate_name)
-        .collect();
-
+/// P5 §6.1.7 / §9.4 — explicit terminal assertion that web-shell migration allowlist is empty.
+///
+/// Mirrors `assert_route_c_allowlist_terminal_state` and
+/// `assert_os_layer_file_size_allowlist_terminal_state`: CI must not regress into
+/// tolerated workspace-dependency debt while the boundary scan reports zero violations.
+/// Design pattern: **Specification by Example** with a dedicated terminal assertion
+/// separate from the per-shell purity scan.
+pub fn assert_web_shell_workspace_dependency_allowlist_terminal_state() {
+    let row_count = WEB_SHELL_WORKSPACE_DEPENDENCY_DEBT.len();
     eprintln!(
-        "shell_dependency_purity_gate event=web_baseline_check observed={:?} permitted={:?} baseline={:?}",
-        observed, permitted, baseline
+        "shell_dependency_purity_gate event=terminal_allowlist_check shell=macaca-web rows={row_count}"
     );
-
-    let mut unexpected: Vec<&str> = observed
-        .iter()
-        .map(|name| name.as_str())
-        .filter(|name| !permitted.contains(name) && !baseline.contains(name))
-        .collect();
-    unexpected.sort();
-
-    if !unexpected.is_empty() {
-        panic!(
-            "Shell dependency purity gate failed for macaca-web: new forbidden workspace dependencies: {unexpected:?}\n\
-             Allowed migration debt is frozen to baseline rows in shell_dependency_purity_gate/allowlist.rs.\n\
-             Remove the new edge or register debt through OpenSpec before merging."
+    if WEB_SHELL_WORKSPACE_DEPENDENCY_DEBT.is_empty() {
+        eprintln!(
+            "shell_dependency_purity_gate event=terminal_allowlist_pass shell=macaca-web reason=zero_rows"
         );
+        return;
     }
 
-    let mut missing_baseline: Vec<&str> = baseline
-        .iter()
-        .copied()
-        .filter(|name| !observed.contains(*name))
-        .collect();
-    missing_baseline.sort();
-
-    if !missing_baseline.is_empty() {
-        panic!(
-            "Shell dependency purity gate failed for macaca-web: baseline debt retired without updating allowlist: {missing_baseline:?}\n\
-             Delete the corresponding row from shell_dependency_purity_gate/allowlist.rs when a workspace edge is removed."
-        );
+    let mut diagnostics = String::from(
+        "Shell dependency purity gate failed: web migration allowlist must be empty at terminal state.\n\
+         Remove each forbidden workspace edge from macaca-web/Cargo.toml instead of tolerating it.\n",
+    );
+    for row in WEB_SHELL_WORKSPACE_DEPENDENCY_DEBT {
+        diagnostics.push_str(&format!(
+            "  - {} (rationale: {}; replacement: {})\n",
+            row.crate_name, row.rationale, row.replacement
+        ));
     }
-
-    eprintln!("shell_dependency_purity_gate event=web_baseline_pass reason=frozen_debt_matches_observed");
+    panic!("{diagnostics}");
 }
 
 /// CLI shell: hard terminal assertion (proto + sdk only).
@@ -176,12 +165,18 @@ pub fn assert_cli_shell_workspace_dependency_purity() {
     assert_shell_terminal_purity("macaca-cli", &observed);
 }
 
-/// Web shell: frozen baseline — no new workspace edges beyond documented debt.
-pub fn assert_web_shell_workspace_dependency_baseline() {
+/// Web shell: hard terminal assertion (proto + sdk only).
+///
+/// At §9.4 terminal state the web presentation shell must not depend directly on any
+/// workspace crate other than `macaca-proto` and `macaca-sdk`. Capability calls route
+/// through SDK focused clients; transitive edges behind `macaca-sdk` are permitted.
+pub fn assert_web_shell_workspace_dependency_purity() {
+    assert_web_shell_workspace_dependency_allowlist_terminal_state();
+
     let metadata = run_cargo_metadata();
     let observed = shell_workspace_dependency_names(&metadata, "macaca-web");
     eprintln!(
         "shell_dependency_purity_gate event=web_workspace_deps observed={observed:?}"
     );
-    assert_web_baseline_purity(&observed);
+    assert_shell_terminal_purity("macaca-web", &observed);
 }

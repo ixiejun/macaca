@@ -68,7 +68,7 @@ const TERMINAL_GATE_COMMANDS: &[TerminalGateCommand] = &[
         test_target: "kernel_purity_gate",
         filter: "kernel_purity_gate_rejects_forbidden_workspace_dependencies",
     },
-    // §6.1.7 / §9.4 — shell workspace dependency purity (CLI terminal, web frozen baseline).
+    // §6.1.7 / §9.4 — shell workspace dependency purity (CLI + Web terminal proto+sdk).
     TerminalGateCommand {
         gate_id: "shell_dependency_purity_cli",
         tasks_ref: "§6.1.7 / §9.4",
@@ -76,10 +76,16 @@ const TERMINAL_GATE_COMMANDS: &[TerminalGateCommand] = &[
         filter: "shell_dependency_purity_gate_cli_is_terminal_proto_sdk_only",
     },
     TerminalGateCommand {
-        gate_id: "shell_dependency_purity_web_baseline",
+        gate_id: "shell_dependency_purity_web_allowlist_terminal",
         tasks_ref: "§6.1.7 / §9.4",
         test_target: "shell_dependency_purity_gate",
-        filter: "shell_dependency_purity_gate_web_matches_frozen_baseline",
+        filter: "shell_dependency_purity_gate_web_allowlist_terminal_state_is_zero_rows",
+    },
+    TerminalGateCommand {
+        gate_id: "shell_dependency_purity_web",
+        tasks_ref: "§6.1.7 / §9.4",
+        test_target: "shell_dependency_purity_gate",
+        filter: "shell_dependency_purity_gate_web_is_terminal_proto_sdk_only",
     },
     // §6.1.2–6.1.4 — P5 static audit gates (provider bypass, hardcoded names, shell ownership).
     TerminalGateCommand {

@@ -233,11 +233,14 @@ fn boundary_rules() -> Vec<BoundaryRule> {
         },
         BoundaryRule {
             id: "application-execution-sdk-no-runtime-provider-construction",
-            rationale: "The SDK/SystemFacade may expose typed clients, but it must not construct runtime-host providers, shell state, persistence backends, or application runtimes.",
-            replacement: "return focused service clients or Null Object unavailable clients; keep provider factories in approved runtime-host composition roots",
+            rationale: "The SDK/SystemFacade may expose typed clients and shell_provider_bridge crate aliases, but it must not depend on presentation shells, persistence construction, or other provider-factory hubs. Approved §9.4 edges: macaca-sdk → macaca-app and macaca-sdk → macaca-runtime-host for Facade re-exports only (shell_provider_bridge::app / ::runtime_host).",
+            replacement: "return focused service clients or Null Object unavailable clients; keep provider factories in approved runtime-host composition roots; route shell type imports through shell_provider_bridge re-exports",
             matches: |edge| {
                 edge.from == "macaca-sdk"
-                    && matches!(edge.to, "macaca-runtime-host" | "macaca-web" | "macaca-cli" | "macaca-persist" | "macaca-app")
+                    && matches!(
+                        edge.to,
+                        "macaca-web" | "macaca-cli" | "macaca-persist"
+                    )
             },
         },
         BoundaryRule {

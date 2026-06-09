@@ -141,7 +141,9 @@ Rust source of truth: `macaca/crates/tests/macaca-integration-tests/tests/route_
 
 **Resolved prerequisite (iteration 124→125):** iter 124 blocked on `app → sdk` cycle preventing SDK bridge for app/runtime-host; fixed by `macaca_proto::declarative_agent_config` (Shared Kernel), direct kernel agent registration in `macaca-app`, and `PackageEntitlementAuthorizeClient` Interface Segregation removing production SDK entitlement coupling.
 
-Terminal target: **0 rows** (P5 gate). **Achieved** (iteration 40): Route C allowlist cleared; `assert_route_c_allowlist_terminal_state` enforces zero rows in CI. **Web shell workspace debt:** **0 rows** (iteration 125); `WEB_SHELL_WORKSPACE_DEPENDENCY_DEBT` empty; `PERMITTED_SHELL_WORKSPACE_DEPS` = `macaca-proto` + `macaca-sdk`.
+Terminal target: **0 rows** (P5 gate). **Achieved** (iteration 40): Route C allowlist cleared; `assert_route_c_allowlist_terminal_state` enforces zero rows in CI. **Web shell workspace debt:** **0 rows** (iteration 125); `WEB_SHELL_WORKSPACE_DEPENDENCY_DEBT` empty; `PERMITTED_SHELL_WORKSPACE_DEPS` = `macaca-proto` + `macaca-sdk`. **Shell gate hardening** (iteration 126): Web uses hard terminal assertions (`assert_web_shell_workspace_dependency_purity` + zero-rows allowlist check), same as CLI.
+
+**Approved SDK Facade edges** (iteration 125–126, not shell debt): `macaca-sdk` → `macaca-app` and `macaca-sdk` → `macaca-runtime-host` for `shell_provider_bridge` type re-exports only; Route C rule `application-execution-sdk-no-runtime-provider-construction` forbids sdk→web/cli/persist.
 
 ## Active migration allowlist (OS-layer file-size gate input)
 

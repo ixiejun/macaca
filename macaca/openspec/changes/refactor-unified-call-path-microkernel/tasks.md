@@ -199,7 +199,7 @@
 - [x] 6.1.4 实现 `shell-not-semantic-owner` 审计：shell 不得直驱 task/loop、不引用 deprecated direct fields、不持 agent 执行实现。（`p5_terminal_audit_gates/shell_not_semantic_owner` scoped to `crates/shells/`）
 - [x] 6.1.5 实现 `kernel-purity` 审计：kernel 仅依赖 proto/ipc（与 3.6.6 联动）。（`kernel_purity_gate` via `cargo metadata` workspace dep audit）
 - [x] 6.1.6 实现 `file-size` 审计：OS 层无 >500 行源文件。（`os_layer_file_size_gate` + `assert_os_layer_file_size_allowlist_terminal_state`；**0** 行 allowlist 终态达成，iteration 112–113）
-- [x] 6.1.7 实现 `shell-dependency-purity` 审计：CLI 终态仅 proto+sdk；Web 终态仅 proto+sdk。（`shell_dependency_purity_gate` via `cargo metadata`；iteration 125：`WEB_SHELL_WORKSPACE_DEPENDENCY_DEBT` 0 行）
+- [x] 6.1.7 实现 `shell-dependency-purity` 审计：CLI 终态仅 proto+sdk；Web 终态仅 proto+sdk。（`shell_dependency_purity_gate` via `cargo metadata`；iteration 125：`WEB_SHELL_WORKSPACE_DEPENDENCY_DEBT` 0 行；iteration 126：Web 升级为硬终态断言 + allowlist zero-rows gate，与 CLI/Route C 对齐）
 - [x] 6.1.8 实现 P5 终态 DoD gate：`unified_audit_replay_terminal_gate`（§9.1 单链 replay）+ `p5_coordination_patch_retirement_gate`（§9.2 协调补丁清零）+ `p5_external_contract_gate`（§9.7 对外契约）+ `audit_redaction_terminal_gate`（§7.3 脱敏）+ `openspec_validate_terminal_gate`（§9.8 OpenSpec validate）+ `audit_blind_spot_terminal_gate`（§7.4 审计盲区）+ `provider_neutral_logging_terminal_gate`（§7.2 provider-neutral 日志）+ `english_documentation_terminal_gate`（§7.1 英文模块注释）+ `p5_dod_terminal_gate_matrix`（§9.5 统一 DoD 矩阵编排）。（iteration 114–119）
 
 ### 6.2 逃逸口由"冻结"升级为"删除"
@@ -208,7 +208,7 @@
 
 ### 6.3 OpenSpec baseline 对齐
 - [x] 6.3.1 将本 change 落地后的终态固化进 `openspec/specs/`：`unified-execution-path`、`microkernel-boundary-purity`、更新 `serviceization-dependency-gate`/`serviceization-escape-hatches`/`web-cli-thin-shell-completion`。
-- [ ] 6.3.2 分批 archive 相关 completed changes，使 baseline 反映终态。（**部分**：iteration 42 已 archive `update-kernel-to-provider-facade-boundary`、`serviceize-agent-execution-v1`、`refactor-route-c-workspace-topology`、`unify-application-execution-path`；主提案本身不 archive）
+- [x] 6.3.2 分批 archive 相关 completed changes，使 baseline 反映终态。（iteration 42：4 changes；iteration 126：`fix-live-skill-operations-shell`；主提案 `refactor-unified-call-path-microkernel` 本身不 archive）
 - [x] 6.3.3 `openspec validate --all --strict` 全绿。（196/196 pass，iteration 42）
 
 ## 7. 横切 — 注释 / 日志 / trace-audit
