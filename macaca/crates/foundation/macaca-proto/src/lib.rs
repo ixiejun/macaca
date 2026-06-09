@@ -1,3 +1,4 @@
+pub mod audit_redaction;
 pub mod a2a;
 pub mod agent_execution_port;
 pub mod agent_execution_service;
@@ -69,6 +70,7 @@ mod web3_tests;
 #[cfg(test)]
 mod workbench_tests;
 
+pub use audit_redaction::*;
 pub use a2a::*;
 pub use agent_execution_port::*;
 pub use agent_execution_service::*;

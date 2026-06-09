@@ -1018,3 +1018,12 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `coordination_patch_retirement` | LOW | rejects `legacy_unmarked` / `non_authoritative` / `suppress_executor_lifecycle` / `multi-path-coordination-patch` tokens | P5 |
 | `p5_external_contract_gate` | LOW | `/api/chat/v2`, SSE, session, route-c pipeline contract tests (4 cases) | P5 |
 | `p5_terminal_audit_gates` (4 gates) | LOW | coordination patch retirement gate added; p5_terminal_audit_gates 3→4 | P5 |
+
+## Iteration 115 additions (§7.3 audit redaction + §9.8 OpenSpec validate — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `macaca_proto::audit_redaction` | LOW | canonical JSON/metadata redaction; consumed by runtime-host WASM bridge, event store, execution-control | P5 |
+| `should_omit_metadata_map_key` | LOW | flat metadata map filter; replaces duplicate `is_sensitive_key` in execution_control_* | P5 |
+| `audit_redaction_terminal_gate` | LOW | static duplicate-sanitizer scan + proto unit test subprocess (1 VC) | P5 |
+| `openspec_validate_terminal_gate` | LOW | `npx @fission-ai/openspec validate --all --strict` CI subprocess (1 VC) | P5 |

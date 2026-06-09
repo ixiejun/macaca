@@ -12,6 +12,7 @@ use std::sync::Arc;
 use chrono::Utc;
 use macaca_persist::{AppendEventCommand, EventLog};
 use macaca_proto::{
+    audit_redaction::{is_sensitive_json_key, REDACTED_JSON_VALUE},
     AppendExecutionEventCommand, ApplicationExecutionCurrentState,
     ApplicationExecutionEventEnvelope, ApplicationExecutionEventType, ApplicationExecutionPayload,
     ApplicationExecutionProviderLease, ApplicationExecutionReplayRequest,
@@ -29,7 +30,6 @@ const MAX_SUMMARY_CHARS: usize = 512;
 const MAX_DISPLAY_FIELD_CHARS: usize = 24 * 1024;
 const MAX_SANITIZED_JSON_DEPTH: usize = 12;
 const MAX_SANITIZED_ARRAY_ITEMS: usize = 64;
-const REDACTED_VALUE: &str = "[redacted]";
 
 /// EventLog-backed repository for application execution facts.
 #[derive(Clone)]
@@ -422,8 +422,8 @@ fn sanitize_json_value(
     match value {
         serde_json::Value::Object(map) => {
             for (child_key, child) in map.iter_mut() {
-                if is_sensitive_key(child_key) {
-                    *child = serde_json::Value::String(REDACTED_VALUE.into());
+                if is_sensitive_json_key(child_key) {
+                    *child = serde_json::Value::String(REDACTED_JSON_VALUE.into());
                 } else {
                     sanitize_json_value(child, depth + 1, Some(child_key))?;
                 }
@@ -460,19 +460,6 @@ fn is_display_payload_key(key: &str) -> bool {
         key,
         "display_body" | "display_markdown" | "assistant_content"
     )
-}
-
-/// Return whether a JSON object key is unsafe for inline observability.
-fn is_sensitive_key(key: &str) -> bool {
-    let key = key.to_ascii_lowercase();
-    key.contains("secret")
-        || key.contains("token")
-        || key.contains("password")
-        || key.contains("credential")
-        || key.contains("signature")
-        || key.contains("private_key")
-        || key == "prompt"
-        || key.ends_with("_prompt")
 }
 
 /// Truncate by Unicode scalar count so logs stay bounded without byte slicing.

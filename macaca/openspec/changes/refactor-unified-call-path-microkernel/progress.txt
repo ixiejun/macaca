@@ -939,3 +939,10 @@
 - **Contract tests**: `p5_coordination_patch_retirement_gate` 1/1；`unified_audit_replay_single_chain_terminal_state` 1/1（web 6/6 + runtime-host 3/3 via subprocess）；`p5_external_contract_gate` 4/4；`p5_terminal_audit_gates` 4/4。
 - **GitNexus memo (non-blocking)**: iteration 114 LOW on integration-test gate modules only — recorded in `impact-memo.md` (memo only per user directive)。
 - **Next**: §9.4 web sdk-only 终态；§6.3.2 archive related completed changes；§7 横切注释/脱敏/审计盲区；§9.8 openspec validate CLI。
+
+## Iteration 115 (2026-06-08)
+- **P5 §7.3 audit redaction centralization + §9.8 OpenSpec validate gate**: added `macaca-proto::audit_redaction` canonical module (`sanitize_json`, `is_safe_metadata_key`, `should_omit_metadata_map_key`, harness variants); wired runtime-host WASM host-import, guest harness, application execution event store, execution-control metadata sanitizers; added `audit_redaction_terminal_gate` + `openspec_validate_terminal_gate`.
+- **Design patterns**: Strategy（key-classification predicates in proto）；Facade（integration-test VC entry points）；Command（subprocess `cargo test` / `npx openspec` delegation）；Adapter（thin `guest_harness_support::sanitize_json` delegate）。
+- **Contract tests**: `macaca-proto` audit_redaction 6/6；`audit_redaction_terminal_state_is_canonical` 1/1；`openspec_validate_all_strict_terminal_state` 1/1。
+- **GitNexus memo (non-blocking)**: iteration 115 LOW on `audit_redaction` / `should_omit_metadata_map_key` / gate modules — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: §7.1/7.2 横切注释/日志；§7.4 审计盲区 gate；§9.4 web sdk-only 终态；§6.3.2 archive。

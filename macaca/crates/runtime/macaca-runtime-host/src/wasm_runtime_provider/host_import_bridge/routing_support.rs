@@ -8,6 +8,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use macaca_proto::{
+    audit_redaction,
     ApplicationImport, KernelServiceId, ServiceCommandName, TraceContext,
     APPLICATION_AGENT_DELEGATE_COMMAND, APPLICATION_SERVICE_ID, WASM_HOST_IMPORT_CAPABILITY,
     WASM_HOST_IMPORT_OPERATION, WASM_HOST_IMPORT_SERVICE_ID, WasmHostImportCommand,
@@ -208,46 +209,6 @@ pub(super) fn extract_task_id_value(value: &Value) -> Option<String> {
         .map(str::to_string)
 }
 
-/// Recursively redact sensitive keys from service outputs before host export.
-pub(super) fn sanitize_json(value: Value) -> Value {
-    match value {
-        Value::Object(object) => {
-            let mut sanitized = Map::new();
-            for (key, value) in object {
-                let lower = key.to_ascii_lowercase();
-                if lower.contains("raw")
-                    || lower.contains("prompt")
-                    || lower.contains("secret")
-                    || lower.contains("payload")
-                {
-                    continue;
-                }
-                sanitized.insert(key, sanitize_json(value));
-            }
-            Value::Object(sanitized)
-        }
-        Value::Array(items) => Value::Array(items.into_iter().map(sanitize_json).collect()),
-        Value::String(text) => {
-            let lower = text.to_ascii_lowercase();
-            if lower.contains("secret") || lower.contains("prompt") || lower.contains("api_key") {
-                Value::String("[redacted]".into())
-            } else {
-                Value::String(text)
-            }
-        }
-        other => other,
-    }
-}
-
-/// Return whether a metadata key is safe to forward to guest-visible results.
-pub(super) fn is_safe_metadata_key(key: &str) -> bool {
-    let lower = key.to_ascii_lowercase();
-    !(lower.contains("token")
-        || lower.contains("secret")
-        || lower.contains("password")
-        || lower.contains("credential"))
-}
-
 /// Parse comma-separated service id lists from trusted host metadata.
 pub(super) fn parse_csv_services(value: Option<&str>) -> BTreeSet<String> {
     value
@@ -333,3 +294,6 @@ pub(super) fn command_shell(
         metadata: command.metadata,
     }
 }
+
+/// Re-export canonical audit redaction helpers for sibling bridge modules.
+pub(super) use audit_redaction::{is_safe_metadata_key, sanitize_json};

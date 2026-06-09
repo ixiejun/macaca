@@ -13,7 +13,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use macaca_kernel::SystemService;
 use macaca_proto::{
-    CleanupPolicy, ExecutionControlAwaitResumeCommand, ExecutionControlCancelWaitCommand,
+    audit_redaction::should_omit_metadata_map_key, CleanupPolicy,
+    ExecutionControlAwaitResumeCommand, ExecutionControlCancelWaitCommand,
     ExecutionControlCheckpointCommand, ExecutionControlCommandResult, ExecutionControlEvent,
     ExecutionControlPauseCommand, ExecutionControlRegisterExecutionCommand,
     ExecutionControlResolvePolicyCommand, ExecutionControlResumeCommand, ExecutionControlScope,
@@ -321,30 +322,13 @@ fn policy_resolution_event(
     }
 }
 
+/// Drop sensitive metadata keys via the canonical proto redaction Strategy before service export.
 fn sanitize_metadata(metadata: &BTreeMap<String, String>) -> BTreeMap<String, String> {
     metadata
         .iter()
-        .filter(|(key, _)| !is_sensitive_key(key))
+        .filter(|(key, _)| !should_omit_metadata_map_key(key))
         .map(|(key, value)| (key.clone(), sanitize_value(value)))
         .collect()
-}
-
-fn is_sensitive_key(key: &str) -> bool {
-    let normalized = key.to_ascii_lowercase();
-    [
-        "secret",
-        "token",
-        "credential",
-        "private_key",
-        "prompt",
-        "manifest",
-        "payload",
-        "wasm",
-        "package_bytes",
-        "signature",
-    ]
-    .iter()
-    .any(|needle| normalized.contains(needle))
 }
 
 fn sanitize_value(value: &str) -> String {

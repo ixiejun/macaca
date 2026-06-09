@@ -7,12 +7,13 @@
 //! provider-neutral, and reusable across future runtime harness tests.
 
 use macaca_proto::{
+    audit_redaction::{sanitize_json_for_harness, sanitize_string_for_audit},
     ApplicationAbilityKind, ApplicationExport, ApplicationHostCommandResult,
     ApplicationHostCommandStatus, ApplicationImport, TraceContext, WasmAbiRequirement,
     WasmArtifactDigest, WasmComponentArtifactDescriptor, WasmExportDeclaration,
     WasmImportRequirement, WasmRuntimeArtifactRef,
 };
-use serde_json::{Map, Value};
+use serde_json::Value;
 
 use super::guest_harness::WasmExampleFixtureKind;
 
@@ -120,44 +121,15 @@ pub(super) fn operation_for_kind(kind: &WasmExampleFixtureKind) -> &'static str 
 
 /// Recursively sanitize JSON values before they enter logs or fixture reports.
 ///
-/// Local harness tests often build payloads from synthetic data, but the helper
-/// still enforces the same safety posture expected from runtime infrastructure:
-/// sensitive field names are dropped, string contents are redacted, arrays are
-/// walked recursively, and scalar values remain unchanged.
+/// Delegates to the canonical `macaca_proto::audit_redaction` harness policy so
+/// WASM fixture exports and host-import replay share one redaction Strategy.
 pub(super) fn sanitize_json(value: Value) -> Value {
-    match value {
-        Value::Object(map) => Value::Object(
-            map.into_iter()
-                .filter_map(|(key, value)| {
-                    let lower = key.to_ascii_lowercase();
-                    if forbidden_marker(&lower) {
-                        return None;
-                    }
-                    Some((key, sanitize_json(value)))
-                })
-                .collect::<Map<_, _>>(),
-        ),
-        Value::Array(values) => Value::Array(values.into_iter().map(sanitize_json).collect()),
-        Value::String(value) => Value::String(sanitize_text(value)),
-        other => other,
-    }
+    sanitize_json_for_harness(value)
 }
 
 /// Redact sensitive marker words from free-form text.
 pub(super) fn sanitize_text(value: impl Into<String>) -> String {
-    let mut sanitized = value.into();
-    for marker in [
-        "secret",
-        "api_key",
-        "apikey",
-        "private key",
-        "prompt",
-        "env",
-    ] {
-        sanitized = sanitized.replace(marker, "[redacted]");
-        sanitized = sanitized.replace(&marker.to_ascii_uppercase(), "[redacted]");
-    }
-    sanitized
+    sanitize_string_for_audit(value.into())
 }
 
 /// Normalize labels into the conservative character set accepted by fixtures.
@@ -181,13 +153,4 @@ pub(super) fn sanitize_label(value: impl AsRef<str>) -> String {
             }
         })
         .collect()
-}
-
-/// Return whether a JSON object key should be omitted from harness artifacts.
-fn forbidden_marker(value: &str) -> bool {
-    [
-        "raw", "payload", "memory", "secret", "api_key", "apikey", "prompt", "env",
-    ]
-    .iter()
-    .any(|marker| value.contains(marker))
 }
