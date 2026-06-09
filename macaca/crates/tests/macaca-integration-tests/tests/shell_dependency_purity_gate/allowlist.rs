@@ -2,7 +2,7 @@
 //!
 //! Terminal state: `macaca-web` depends only on `macaca-proto` and `macaca-sdk` among
 //! workspace members. Until composition-root seams are fully absorbed into SDK bridges,
-//! these four crates remain as documented migration debt. The gate forbids **new**
+//! these three crates remain as documented migration debt. The gate forbids **new**
 //! workspace edges beyond this frozen set.
 
 /// One row of web-shell workspace dependency migration debt.
@@ -26,11 +26,6 @@ pub const WEB_SHELL_WORKSPACE_DEPENDENCY_DEBT: &[WebShellDependencyDebt] = &[
         crate_name: "macaca-domain-pack-finance",
         rationale: "Optional domain-pack feature wiring at web composition root (SDK bridge blocked by app→sdk→pack→app cycle)",
         replacement: "break app/sdk/pack cycle then macaca-sdk optional domain_pack_finance bridge",
-    },
-    WebShellDependencyDebt {
-        crate_name: "macaca-framework",
-        rationale: "FrameworkRunner construction adapter; SDK bridge blocked by sdk→framework(service-clients)→sdk cycle when building macaca-web",
-        replacement: "extract ServiceChatModelAdapter to macaca-sdk or break framework→sdk edge, then macaca-sdk::framework bridge",
     },
     WebShellDependencyDebt {
         crate_name: "macaca-runtime-host",

@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use macaca_framework::session::{InMemorySessionStore as FrameworkInMemorySessionStore, SessionStore as FrameworkSessionStore};
+use macaca_sdk::framework::session::{InMemorySessionStore as FrameworkInMemorySessionStore, SessionStore as FrameworkSessionStore};
 use macaca_runtime_host::ApplicationExecutorRegistry;
 use macaca_proto::MacacaResult;
 use crate::agent_runner::WebAgentRunner;

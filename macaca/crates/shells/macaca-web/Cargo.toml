@@ -13,7 +13,6 @@ macaca-app = { workspace = true }
 macaca-domain-pack-finance = { workspace = true, optional = true }
 macaca-sdk = { workspace = true }
 macaca-runtime-host = { workspace = true }
-macaca-framework = { path = "../../runtime/macaca-framework", features = ["macaca-compat", "service-clients"] }
 async-trait = { workspace = true }
 axum = { version = "0.8", features = ["ws"] }
 serde = { workspace = true }

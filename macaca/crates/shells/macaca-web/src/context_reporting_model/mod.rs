@@ -21,7 +21,7 @@ use macaca_sdk::context::{
     ContextPreflightRecallConfig, KnowledgeDigestCapability, McpCapabilityCatalog,
     ProviderHealthLedger, RuntimeToolCapabilityCatalog, SkillCapabilityCatalog,
 };
-use macaca_framework::model::{ChatModel, ChatOptions, ChatResponse, ModelError};
+use macaca_sdk::framework::model::{ChatModel, ChatOptions, ChatResponse, ModelError};
 use macaca_proto::{config::ContextConfig, AgentId, ApplicationId};
 use macaca_runtime_host::persist::EventLog;
 use macaca_sdk::memory::SharedTombstoneRegistry;

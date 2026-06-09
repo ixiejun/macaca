@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use tracing::{info, warn};
 
-use macaca_framework::session::{
+use macaca_sdk::framework::session::{
     InMemorySessionStore as FrameworkInMemorySessionStore, SessionStore as FrameworkSessionStore,
 };
 use macaca_proto::{KernelServiceId, MacacaResult, TraceContext};

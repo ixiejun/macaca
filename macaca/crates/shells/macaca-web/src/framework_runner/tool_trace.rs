@@ -1,7 +1,7 @@
 //! Tool response text extraction and trace output truncation.
 
-use macaca_framework::message::ContentBlock;
-use macaca_framework::tool::ToolResponse;
+use macaca_sdk::framework::message::ContentBlock;
+use macaca_sdk::framework::tool::ToolResponse;
 use macaca_proto::AgentExecutionEvent;
 
 pub(crate) const TOOL_TRACE_OUTPUT_MAX_BYTES: usize = 2000;
@@ -24,7 +24,7 @@ pub(crate) fn tool_response_text(response: &ToolResponse) -> String {
         .content
         .iter()
         .filter_map(|block| match block {
-            macaca_framework::message::ContentBlock::Text(text) => Some(text.text.as_str()),
+            macaca_sdk::framework::message::ContentBlock::Text(text) => Some(text.text.as_str()),
             _ => None,
         })
         .collect::<Vec<_>>()

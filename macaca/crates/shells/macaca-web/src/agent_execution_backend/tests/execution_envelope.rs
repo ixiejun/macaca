@@ -88,7 +88,7 @@ fn artifact_completion_policy_requires_authorized_tool_use() {
 
     assert_eq!(
         runtime_agent_tool_choice(&command),
-        Some(macaca_framework::model::ToolChoice::Required)
+        Some(macaca_sdk::framework::model::ToolChoice::Required)
     );
 }
 

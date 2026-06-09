@@ -3,7 +3,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use async_trait::async_trait;
-use macaca_framework::tool::{ToolError, ToolMiddleware, ToolResponse};
+use macaca_sdk::framework::tool::{ToolError, ToolMiddleware, ToolResponse};
 use macaca_proto::{ExecutionControlPolicy, ExecutionControlTrigger};
 use tokio::sync::{mpsc, Mutex};
 use crate::runtime_resume::RuntimeResumeSignal;
@@ -58,8 +58,8 @@ impl ToolMiddleware for ExecutionControlMiddleware {
                 };
                 response
                     .content
-                    .push(macaca_framework::message::ContentBlock::Text(
-                        macaca_framework::message::TextBlock {
+                    .push(macaca_sdk::framework::message::ContentBlock::Text(
+                        macaca_sdk::framework::message::TextBlock {
                             text: format!("\n\n[Goal completed: {}]", context),
                         },
                     ));

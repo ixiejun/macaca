@@ -16,7 +16,7 @@ use macaca_sdk::context::{
     ContextAdapterSafetyPolicy, ContextEngineInfo, ContextEngineRegistry, ContextFallbackPolicy,
     ContextProviderRegistry, ProviderHealthLedger,
 };
-use macaca_framework::session::SessionStore as FrameworkSessionStore;
+use macaca_sdk::framework::session::SessionStore as FrameworkSessionStore;
 use macaca_sdk::kernel::Kernel;
 use macaca_runtime_host::ApplicationExecutorRegistry;
 use macaca_runtime_host::persist::{EventLog, PersistBackend};

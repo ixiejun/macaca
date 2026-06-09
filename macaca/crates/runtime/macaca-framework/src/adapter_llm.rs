@@ -61,7 +61,7 @@ fn chat_response_from_llm(response: macaca_proto::LlmResponse) -> ChatResponse {
 }
 
 /// Bridges `macaca_llm::LlmProvider` to the framework's `ChatModel` trait.
-#[deprecated(note = "Use ServiceChatModelAdapter over macaca_sdk::SystemLlmClient for new code")]
+#[deprecated(note = "Use ServiceChatModelAdapter over LlmServiceChatClient for new code")]
 pub struct LlmProviderAdapter {
     provider: Arc<dyn macaca_llm::LlmProvider>,
 }
@@ -115,7 +115,7 @@ impl ChatModel for LlmProviderAdapter {
 
 /// Bridges `macaca_llm::LlmRouter` to the framework's `ChatModel` trait with
 /// a pre-resolved default route plan.
-#[deprecated(note = "Use ServiceChatModelAdapter over macaca_sdk::SystemLlmClient for new code")]
+#[deprecated(note = "Use ServiceChatModelAdapter over LlmServiceChatClient for new code")]
 pub struct RoutedLlmAdapter {
     router: Arc<macaca_llm::LlmRouter>,
     default_selection: macaca_llm::ModelSelection,
@@ -189,25 +189,36 @@ impl ChatModel for RoutedLlmAdapter {
     }
 }
 
-/// Bridges the serviceized SDK LLM client to the framework's `ChatModel` trait.
+/// Bridges a service-contract LLM chat client to the framework's `ChatModel` trait.
 ///
-/// This adapter is the preferred Route C path.  It uses the Facade pattern:
+/// This adapter is the preferred Route C path. It uses the **Facade** pattern:
 /// framework agents keep depending on `ChatModel`, while model dispatch flows
-/// through `SystemLlmClient` and the LLM Service boundary.  The adapter only
-/// performs message/options conversion and never constructs concrete providers.
+/// through [`macaca_llm::LlmServiceChatClient`] and the LLM service boundary.
+/// The adapter only performs message/options conversion and never constructs
+/// concrete providers. Depending on the narrow chat port (not the full SDK
+/// facade) breaks the historical `macaca-sdk ↔ macaca-framework` cycle.
 #[cfg(feature = "service-clients")]
 pub struct ServiceChatModelAdapter {
-    client: Arc<dyn macaca_sdk::SystemLlmClient>,
+    client: Arc<dyn macaca_llm::LlmServiceChatClient>,
     scope: macaca_llm::LlmServiceScope,
 }
 
 #[cfg(feature = "service-clients")]
 impl ServiceChatModelAdapter {
     /// Create a service-backed chat model for one application/session/agent scope.
+    ///
+    /// `client` must implement the provider-neutral [`LlmServiceChatClient`] port.
+    /// Shell composition roots typically wrap `SystemLlmClient` with the SDK bridge
+    /// before passing the `Arc<dyn LlmServiceChatClient>` handle here.
     pub fn new(
-        client: Arc<dyn macaca_sdk::SystemLlmClient>,
+        client: Arc<dyn macaca_llm::LlmServiceChatClient>,
         scope: macaca_llm::LlmServiceScope,
     ) -> Self {
+        tracing::info!(
+            session_id = %scope.session_id,
+            agent = %scope.agent_name,
+            "framework service chat model adapter constructed for scoped LLM dispatch"
+        );
         Self { client, scope }
     }
 }

@@ -4,7 +4,7 @@
 //! scoped memory recall injection, framework message conversion, and report
 //! persistence to the session event log.
 
-use macaca_framework::model::ChatOptions;
+use macaca_sdk::framework::model::ChatOptions;
 
 use crate::context_memory_injection::{apply_active_recall, apply_preflight_memory};
 use crate::context_message_codec::{llm_messages_to_framework, llm_options_to_framework};

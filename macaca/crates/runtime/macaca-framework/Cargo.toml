@@ -38,7 +38,6 @@ macaca-proto = { path = "../../foundation/macaca-proto" }
 macaca-context = { path = "../../services/macaca-context" }
 macaca-agent = { path = "../../application/macaca-agent" }
 macaca-persist = { path = "../../foundation/macaca-persist", optional = true }
-macaca-sdk = { path = "../../facade/macaca-sdk", optional = true }
 macaca-llm = { path = "../../services/macaca-llm", optional = true }
 macaca-tools = { path = "../../services/macaca-tools", optional = true }
 
@@ -52,7 +51,7 @@ persist = ["dep:macaca-persist"]
 chat_completions_api = ["dep:reqwest"]
 messages_api = ["dep:reqwest"]
 macaca-compat = ["dep:macaca-llm", "dep:macaca-tools", "mcp-http"]
-service-clients = ["dep:macaca-sdk", "dep:macaca-llm"]
+service-clients = ["dep:macaca-llm"]
 full = [
     "a2a-client",
     "a2a-server",

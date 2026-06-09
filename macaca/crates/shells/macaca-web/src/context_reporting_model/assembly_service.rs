@@ -6,7 +6,7 @@
 use macaca_sdk::context::{
     ContextAssembleCommand, ContextAssemblySnapshot, ContextServiceScope,
 };
-use macaca_framework::model::ChatOptions;
+use macaca_sdk::framework::model::ChatOptions;
 
 use crate::context_message_codec::{framework_messages_to_llm, framework_options_to_llm};
 

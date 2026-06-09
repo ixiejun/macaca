@@ -3,7 +3,7 @@
 use std::sync::Arc;
 use macaca_sdk::agent::{AgentCapabilitySet, AgentServices};
 use macaca_app::{app_agent_manifest_view, app_agent_prompt_semantics};
-use macaca_framework::construction::*;
+use macaca_sdk::framework::construction::*;
 use macaca_proto::{ApplicationId, Capability};
 use crate::state::AppState;
 use super::context_prompt_builder;

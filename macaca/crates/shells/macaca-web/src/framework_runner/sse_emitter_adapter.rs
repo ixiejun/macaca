@@ -4,9 +4,9 @@ use std::convert::Infallible;
 use std::sync::Arc;
 use async_trait::async_trait;
 use axum::response::sse::Event;
-use macaca_framework::agent::Hook;
-use macaca_framework::message::Msg;
-use macaca_framework::tool::{ToolError, ToolMiddleware, ToolResponse};
+use macaca_sdk::framework::agent::Hook;
+use macaca_sdk::framework::message::Msg;
+use macaca_sdk::framework::tool::{ToolError, ToolMiddleware, ToolResponse};
 use macaca_runtime_host::persist::{AppendEventCommand, EventLog};
 use tokio::sync::mpsc;
 use super::tool_trace::tool_trace_output;
@@ -19,7 +19,7 @@ pub struct SseEmitterHook {
 
 #[async_trait]
 impl Hook for SseEmitterHook {
-    async fn pre_reply(&self, msg: Msg) -> macaca_framework::agent::AgentResult<Msg> {
+    async fn pre_reply(&self, msg: Msg) -> macaca_sdk::framework::agent::AgentResult<Msg> {
         if let (Some(event_log), Some(session_id)) = (&self.event_log, &self.session_id) {
             // Event log agent attribution follows the manifest-resolved entry agent
             // carried by the hook adapter (Strategy: inject runtime agent identity).
@@ -44,7 +44,7 @@ impl Hook for SseEmitterHook {
         Ok(msg)
     }
 
-    async fn post_reply(&self, msg: Msg) -> macaca_framework::agent::AgentResult<Msg> {
+    async fn post_reply(&self, msg: Msg) -> macaca_sdk::framework::agent::AgentResult<Msg> {
         let text = msg.get_text();
         if let (Some(event_log), Some(session_id)) = (&self.event_log, &self.session_id) {
             event_log

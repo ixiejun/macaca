@@ -6,6 +6,7 @@
 //! these commands to `LlmProvider`, `LlmRouter`, remote services, or test
 //! doubles without changing Web, CLI, framework, or SDK call sites.
 
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use macaca_proto::{
     ApplicationId, LlmMessage, LlmOptions, LlmResponse, MacacaError, MacacaResult, TokenUsage,
@@ -270,6 +271,24 @@ impl LlmServiceEvent {
             metadata,
         }
     }
+}
+
+/// Narrow chat port shared across framework adapters and service clients.
+///
+/// This trait intentionally exposes only the `llm.chat` command surface so
+/// `macaca-framework` can depend on the LLM service boundary without pulling
+/// in the full SDK facade (`SystemLlmClient`). The **Interface Segregation**
+/// pattern prevents `sdk ↔ framework` cyclic Cargo edges while keeping chat
+/// dispatch auditable through typed [`LlmChatCommand`] DTOs and
+/// [`TraceContext`] propagation.
+#[async_trait]
+pub trait LlmServiceChatClient: Send + Sync {
+    /// Dispatch one provider-neutral chat command through the LLM service.
+    ///
+    /// Implementations must preserve `command.trace` for downstream audit and
+    /// must not mutate provider selection semantics — routing remains owned by
+    /// the LLM service runtime, not by framework adapters.
+    async fn chat(&self, command: LlmChatCommand) -> MacacaResult<LlmChatResult>;
 }
 
 fn non_empty(value: String, message: &str) -> MacacaResult<String> {

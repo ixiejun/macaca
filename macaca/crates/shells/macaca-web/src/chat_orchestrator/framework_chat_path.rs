@@ -10,8 +10,8 @@ use std::sync::Arc;
 
 use axum::response::sse::Event;
 use chrono::Utc;
-use macaca_framework::execution::ExecutionContext;
-use macaca_framework::session::load_module_state;
+use macaca_sdk::framework::execution::ExecutionContext;
+use macaca_sdk::framework::session::load_module_state;
 use macaca_proto::{ApplicationId, McpCleanupCommand, McpServiceScope, TraceContext};
 use tokio::sync::RwLock;
 

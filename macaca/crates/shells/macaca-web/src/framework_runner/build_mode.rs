@@ -4,7 +4,7 @@ use std::convert::Infallible;
 use std::sync::Arc;
 use axum::response::sse::Event;
 use tokio::sync::mpsc;
-use macaca_framework::model::ToolChoice;
+use macaca_sdk::framework::model::ToolChoice;
 use macaca_runtime_host::persist::EventLog;
 use crate::state::AppState;
 use super::runtime_execution_control::RuntimeExecutionControl;

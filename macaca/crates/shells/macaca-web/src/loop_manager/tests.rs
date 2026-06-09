@@ -7,7 +7,7 @@ mod tests {
         planner_scope_session_id, select_entry_and_plan_agents,
     };
     use crate::loop_manager::worker_execution_adapter::{worker_success_summary, WorkerExecutionMode};
-    use macaca_framework::plan::{PlanNotebook, PlanState, SubTaskState};
+    use macaca_sdk::framework::plan::{PlanNotebook, PlanState, SubTaskState};
     use macaca_runtime_host::executor::ExecutorEvent;
     use macaca_runtime_host::AgentInfo;
     use macaca_proto::AgentExecutionIntent;

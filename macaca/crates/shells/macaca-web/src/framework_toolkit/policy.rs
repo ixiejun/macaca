@@ -8,7 +8,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use macaca_app::{app_agent_manifest_view, discovered_app_agent_names};
-use macaca_framework::tool::Toolkit;
+use macaca_sdk::framework::tool::Toolkit;
 use macaca_proto::ApplicationId;
 
 use crate::state::AppState;

@@ -66,3 +66,12 @@ pub use macaca_agent as agent;
 /// dependency; this alias lets presentation shells drop the direct workspace edge while
 /// preserving type identity for composition-root wiring and HTTP reporting routes.
 pub use macaca_context as context;
+
+/// Agent framework crate alias (ReAct agents, toolkits, session stores, construction).
+///
+/// Presentation shells still construct framework runners and tool adapters during Route C
+/// migration. The SDK owns `macaca-framework` transitively (with `macaca-compat` and
+/// `service-clients` features) so shells can drop the direct workspace edge. Framework
+/// chat adapters consume [`macaca_llm::LlmServiceChatClient`] — not `SystemLlmClient` —
+/// which breaks the historical `sdk ↔ framework` cyclic dependency.
+pub use macaca_framework as framework;

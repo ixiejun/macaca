@@ -15,7 +15,7 @@ use macaca_sdk::context::{
     mcp_tool_collisions, McpCapabilityCatalog, McpServerCapabilitySummary,
     RuntimeToolCapabilityCatalog, SkillCapabilityCatalog,
 };
-use macaca_framework::tool::Toolkit;
+use macaca_sdk::framework::tool::Toolkit;
 use macaca_proto::config::ContextConfig;
 use macaca_proto::{
     ApplicationId, McpProbeCommand, McpRuntimeStatusView, McpToolPolicySnapshot, TraceContext,

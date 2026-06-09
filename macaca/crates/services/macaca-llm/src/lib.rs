@@ -69,7 +69,7 @@ pub use router::{LlmRouter, ModelSelection, ModelSelectionRequest, ModelTarget};
 pub use service_adapter::llm_service_descriptor;
 pub use service_contract::{
     LlmChatCommand, LlmChatResult, LlmModelSelectionCommand, LlmModelSelectionResult,
-    LlmPolicyHints, LlmProviderInventoryItem, LlmRouteSummary, LlmServiceEvent, LlmServiceScope,
-    LlmServiceSnapshot, LlmServiceSnapshotCommand, LLM_CHAT_COMMAND, LLM_MODEL_SELECTION_COMMAND,
-    LLM_SERVICE_ID, LLM_SNAPSHOT_COMMAND,
+    LlmPolicyHints, LlmProviderInventoryItem, LlmRouteSummary, LlmServiceChatClient,
+    LlmServiceEvent, LlmServiceScope, LlmServiceSnapshot, LlmServiceSnapshotCommand,
+    LLM_CHAT_COMMAND, LLM_MODEL_SELECTION_COMMAND, LLM_SERVICE_ID, LLM_SNAPSHOT_COMMAND,
 };

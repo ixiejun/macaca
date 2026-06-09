@@ -2,8 +2,8 @@ use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
 
 use async_trait::async_trait;
 use chrono::Utc;
-use macaca_framework::mcp::{McpSessionMode, McpTransportConfig};
-use macaca_framework::tool::{ToolError, ToolHandler, ToolResponse, Toolkit};
+use macaca_sdk::framework::mcp::{McpSessionMode, McpTransportConfig};
+use macaca_sdk::framework::tool::{ToolError, ToolHandler, ToolResponse, Toolkit};
 use macaca_proto::config::{ContextConfig, ContextProviderFamilyConfig};
 use macaca_proto::{
     MacacaError, MacacaResult, McpCleanupCommand, McpDiagnosticsSnapshot,

@@ -104,7 +104,10 @@ pub use heartbeat_client::{
 pub use interaction_client::{
     ServiceBackedInteractionClient, SystemInteractionClient, UnavailableSystemInteractionClient,
 };
-pub use llm_client::{ServiceBackedLlmClient, SystemLlmClient, UnavailableSystemLlmClient};
+pub use llm_client::{
+    llm_service_chat_client_from_system, ServiceBackedLlmClient, SystemLlmClient,
+    UnavailableSystemLlmClient,
+};
 pub use macaca_skill::{
     SkillAuthorKind, SkillCurationLifecycleAction, SkillCurationLifecycleCommand,
     SkillCurationRollbackCommand, SkillCurationRunCommand, SkillEvolutionPromoteDraftCommand,
@@ -177,4 +180,6 @@ pub use workbench_client::{
     is_structured_unavailable, ServiceBackedWorkbenchClient, SystemWorkbenchClient,
     SystemWorkbenchFacadeExt, UnavailableWorkbenchServiceClient, WorkbenchClientCatalog,
 };
-pub use shell_provider_bridge::{agent, context, driver, kernel, llm, memory, skill, task, tools};
+pub use shell_provider_bridge::{
+    agent, context, driver, framework, kernel, llm, memory, skill, task, tools,
+};

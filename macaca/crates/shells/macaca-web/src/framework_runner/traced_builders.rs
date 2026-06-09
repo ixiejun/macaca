@@ -1,9 +1,9 @@
 //! Public traced agent builders for executor-backed planner/worker execution.
 
 use std::sync::Arc;
-use macaca_framework::agent::HookedAgent;
-use macaca_framework::construction::{AgentBuildIntent, AgentToolConfig, TracedAgentFactory};
-use macaca_framework::react_agent::ReActAgent;
+use macaca_sdk::framework::agent::HookedAgent;
+use macaca_sdk::framework::construction::{AgentBuildIntent, AgentToolConfig, TracedAgentFactory};
+use macaca_sdk::framework::react_agent::ReActAgent;
 use macaca_proto::ApplicationId;
 use crate::state::AppState;
 use super::agent_factory_build::WebTracedAgentFactory;

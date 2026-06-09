@@ -2,9 +2,9 @@
 
 use std::sync::atomic::Ordering;
 use async_trait::async_trait;
-use macaca_framework::agent::Hook;
-use macaca_framework::message::Msg;
-use macaca_framework::tool::{ToolError, ToolMiddleware, ToolResponse};
+use macaca_sdk::framework::agent::Hook;
+use macaca_sdk::framework::message::Msg;
+use macaca_sdk::framework::tool::{ToolError, ToolMiddleware, ToolResponse};
 use tokio::sync::mpsc;
 use super::tool_trace::{tool_call_event, tool_result_event, tool_trace_output};
 pub struct ChannelEmitterHook {
@@ -14,7 +14,7 @@ pub struct ChannelEmitterHook {
 
 #[async_trait]
 impl Hook for ChannelEmitterHook {
-    async fn pre_reply(&self, msg: Msg) -> macaca_framework::agent::AgentResult<Msg> {
+    async fn pre_reply(&self, msg: Msg) -> macaca_sdk::framework::agent::AgentResult<Msg> {
         let iter = self.iteration.fetch_add(1, Ordering::Relaxed);
         let _ = self
             .tx
@@ -26,7 +26,7 @@ impl Hook for ChannelEmitterHook {
         Ok(msg)
     }
 
-    async fn post_reply(&self, msg: Msg) -> macaca_framework::agent::AgentResult<Msg> {
+    async fn post_reply(&self, msg: Msg) -> macaca_sdk::framework::agent::AgentResult<Msg> {
         let text = msg.get_text();
         if !text.is_empty() {
             let _ = self

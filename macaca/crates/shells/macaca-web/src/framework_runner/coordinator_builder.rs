@@ -3,9 +3,9 @@
 use std::convert::Infallible;
 use std::sync::Arc;
 use axum::response::sse::Event;
-use macaca_framework::agent::HookedAgent;
-use macaca_framework::construction::{AgentBuildIntent, AgentToolConfig};
-use macaca_framework::react_agent::ReActAgent;
+use macaca_sdk::framework::agent::HookedAgent;
+use macaca_sdk::framework::construction::{AgentBuildIntent, AgentToolConfig};
+use macaca_sdk::framework::react_agent::ReActAgent;
 use macaca_proto::ApplicationId;
 use tokio::sync::mpsc;
 use crate::state::AppState;

@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use macaca_framework::tool::Toolkit;
+use macaca_sdk::framework::tool::Toolkit;
 use macaca_proto::ApplicationId;
 use macaca_runtime_host::{probe_definition_statuses, McpRuntimeStatusState, McpToolPolicy};
 use macaca_sdk::skill::SkillSnapshot;

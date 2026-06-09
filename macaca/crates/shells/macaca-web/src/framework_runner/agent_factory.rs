@@ -2,9 +2,9 @@
 
 use std::sync::Arc;
 use async_trait::async_trait;
-use macaca_framework::agent::HookedAgent;
-use macaca_framework::construction::{AgentBuildRequest, TracedAgentFactory};
-use macaca_framework::react_agent::ReActAgent;
+use macaca_sdk::framework::agent::HookedAgent;
+use macaca_sdk::framework::construction::{AgentBuildRequest, TracedAgentFactory};
+use macaca_sdk::framework::react_agent::ReActAgent;
 use super::agent_factory_build::WebTracedAgentFactory;
 use super::build_mode::FrameworkRunnerBuildMode;
 

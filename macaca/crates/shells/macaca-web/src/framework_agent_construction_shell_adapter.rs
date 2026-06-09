@@ -12,10 +12,10 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use macaca_framework::agent::{Agent, HookedAgent};
-use macaca_framework::message::Msg;
-use macaca_framework::model::ToolChoice;
-use macaca_framework::react_agent::ReActAgent;
+use macaca_sdk::framework::agent::{Agent, HookedAgent};
+use macaca_sdk::framework::message::Msg;
+use macaca_sdk::framework::model::ToolChoice;
+use macaca_sdk::framework::react_agent::ReActAgent;
 use macaca_proto::{AgentContextSnapshot, AgentExecutionCommand, AgentExecutionEvent};
 use macaca_runtime_host::{
     ConstructedRuntimeAgent, FrameworkAgentConstructionPort, OpaqueExecutionControlHandle,

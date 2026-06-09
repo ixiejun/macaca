@@ -12,11 +12,11 @@ use macaca_llm::{
     LlmChatResult, LlmContinuationValidateCommand, LlmContinuationValidateResult,
     LlmDegradationExplainCommand, LlmDegradationExplainResult, LlmModelCatalogResult,
     LlmModelSelectionCommand, LlmModelSelectionResult, LlmProviderCapabilitiesResult,
-    LlmRouteResolveCommand, LlmRouteResolveResult, LlmServiceSnapshot, LlmServiceSnapshotCommand,
-    LLM_BUDGET_STATUS_COMMAND, LLM_CHAT_COMMAND, LLM_CONTINUATION_VALIDATE_COMMAND,
-    LLM_DEGRADATION_EXPLAIN_COMMAND, LLM_MODEL_LIST_COMMAND, LLM_MODEL_SELECTION_COMMAND,
-    LLM_PROVIDER_CAPABILITIES_READ_COMMAND, LLM_ROUTE_RESOLVE_COMMAND, LLM_SERVICE_ID,
-    LLM_SNAPSHOT_COMMAND,
+    LlmRouteResolveCommand, LlmRouteResolveResult, LlmServiceChatClient, LlmServiceSnapshot,
+    LlmServiceSnapshotCommand, LLM_BUDGET_STATUS_COMMAND, LLM_CHAT_COMMAND,
+    LLM_CONTINUATION_VALIDATE_COMMAND, LLM_DEGRADATION_EXPLAIN_COMMAND, LLM_MODEL_LIST_COMMAND,
+    LLM_MODEL_SELECTION_COMMAND, LLM_PROVIDER_CAPABILITIES_READ_COMMAND, LLM_ROUTE_RESOLVE_COMMAND,
+    LLM_SERVICE_ID, LLM_SNAPSHOT_COMMAND,
 };
 use macaca_proto::{MacacaError, MacacaResult};
 use tracing::{info, warn};
@@ -273,6 +273,50 @@ impl SystemLlmClient for ServiceBackedLlmClient {
         )
         .await
     }
+}
+
+/// Bridges the full SDK [`SystemLlmClient`] to the narrow [`LlmServiceChatClient`] port.
+///
+/// Framework adapters depend only on `LlmServiceChatClient` so `macaca-framework`
+/// never needs a direct `macaca-sdk` dependency. This **Adapter** wraps the
+/// composition-root `SystemLlmClient` handle and forwards chat commands while
+/// logging the trace id for audit.
+struct LlmServiceChatClientBridge {
+    inner: Arc<dyn SystemLlmClient>,
+}
+
+impl LlmServiceChatClientBridge {
+    /// Wrap a runtime `SystemLlmClient` as the service-contract chat port.
+    ///
+    /// Returns a trait object so `ServiceChatModelAdapter` can accept the handle
+    /// without knowing which concrete SDK client implementation is installed.
+    pub fn wrap(inner: Arc<dyn SystemLlmClient>) -> Arc<dyn LlmServiceChatClient> {
+        tracing::info!("sdk llm service chat bridge wrapping SystemLlmClient for framework dispatch");
+        Arc::new(Self { inner })
+    }
+}
+
+#[async_trait]
+impl LlmServiceChatClient for LlmServiceChatClientBridge {
+    async fn chat(&self, command: LlmChatCommand) -> MacacaResult<LlmChatResult> {
+        tracing::info!(
+            trace_id = %command.trace.trace_id,
+            session_id = %command.scope.session_id,
+            agent = %command.scope.agent_name,
+            "sdk llm service chat bridge forwarding chat command to SystemLlmClient"
+        );
+        self.inner.chat(command).await
+    }
+}
+
+/// Public helper used by presentation shells when wiring framework chat models.
+///
+/// Keeps the bridge construction in one auditable place instead of repeating
+/// adapter boilerplate across `macaca-web` agent factory paths.
+pub fn llm_service_chat_client_from_system(
+    client: Arc<dyn SystemLlmClient>,
+) -> Arc<dyn LlmServiceChatClient> {
+    LlmServiceChatClientBridge::wrap(client)
 }
 
 impl ServiceBackedLlmClient {

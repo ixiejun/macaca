@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use macaca_app::{AppRegistry, AppRuntime, SharedDomainPackCatalog};
 use macaca_sdk::driver::{DriverRegistry, DriverRuntime};
-use macaca_framework::session::SessionStore as FrameworkSessionStore;
+use macaca_sdk::framework::session::SessionStore as FrameworkSessionStore;
 use macaca_sdk::kernel::{audit::AuditLogger, alert::AlertManager, Kernel};
 use macaca_sdk::llm::{LlmProvider, LlmRouter};
 use macaca_sdk::memory::TestMemoryManager;

@@ -4,14 +4,14 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use macaca_sdk::agent::{AgentServices, AgentTransitionReason};
 use macaca_proto::AgentState;
-use macaca_framework::adapter::ServiceChatModelAdapter;
-use macaca_framework::agent::{HookRegistry, HookedAgent};
-use macaca_framework::construction::{AgentBuildRequest, AgentLifecycleConfig};
-use macaca_framework::formatter::OpenAiFormatter;
-use macaca_framework::memory::InMemoryWorkingMemory;
-use macaca_framework::model::ToolChoice;
-use macaca_framework::react_agent::ReActAgent;
-use macaca_framework::tool::{ToolMiddleware, Toolkit};
+use macaca_sdk::framework::adapter::ServiceChatModelAdapter;
+use macaca_sdk::framework::agent::{HookRegistry, HookedAgent};
+use macaca_sdk::framework::construction::{AgentBuildRequest, AgentLifecycleConfig};
+use macaca_sdk::framework::formatter::OpenAiFormatter;
+use macaca_sdk::framework::memory::InMemoryWorkingMemory;
+use macaca_sdk::framework::model::ToolChoice;
+use macaca_sdk::framework::react_agent::ReActAgent;
+use macaca_sdk::framework::tool::{ToolMiddleware, Toolkit};
 use macaca_runtime_host::persist::EventLog;
 use macaca_proto::config::ContextConfig;
 use macaca_proto::AgentId;
@@ -234,7 +234,10 @@ impl WebTracedAgentFactory {
         )
         .expect("framework runner builds agents only after request identity validation");
         let model = Arc::new(ContextReportingChatModel::new(
-            Arc::new(ServiceChatModelAdapter::new(llm_client, llm_scope)),
+            Arc::new(ServiceChatModelAdapter::new(
+                macaca_sdk::llm_service_chat_client_from_system(llm_client),
+                llm_scope,
+            )),
             event_log,
             persist_backend,
             request.identity.app_id,

@@ -6,8 +6,8 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::sse::Event;
 use axum::Json;
-use macaca_framework::execution::ExecutionContext;
-use macaca_framework::session::load_module_state;
+use macaca_sdk::framework::execution::ExecutionContext;
+use macaca_sdk::framework::session::load_module_state;
 use macaca_proto::ApplicationId;
 
 use crate::routes::{err, ErrorResponse};

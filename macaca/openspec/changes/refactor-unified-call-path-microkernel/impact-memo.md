@@ -1084,3 +1084,12 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `shell_provider_bridge::framework` attempt | HIGH (blocked) | `cargo check -p macaca-web` fails: cyclic `sdk→framework(service-clients)→sdk`; bridge not landed | P5 |
 | `ServiceChatModelAdapter` | MEDIUM | lives in `macaca-framework` behind `service-clients` which requires `macaca-sdk`; blocks shell framework dep retirement | P5 |
 | Prerequisite | — | extract adapter to SDK or decouple `framework/service-clients` from `macaca-sdk` dep | P5 |
+
+## Iteration 123 additions (§4.4.4 macaca-framework SDK bridge — LANDED, memo only)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `LlmServiceChatClient` | LOW | new narrow chat port in `macaca-llm/service_contract.rs`; breaks framework→sdk edge | P5 |
+| `ServiceChatModelAdapter` | LOW | now accepts `Arc<dyn LlmServiceChatClient>`; framework `service-clients` no longer depends on SDK | P5 |
+| `llm_service_chat_client_from_system` | LOW | SDK bridge wrapping `SystemLlmClient` for framework agent factory | P5 |
+| `shell_provider_bridge::framework` | LOW | ~40 macaca-web files migrated; allowlist 4→3 | P5 |

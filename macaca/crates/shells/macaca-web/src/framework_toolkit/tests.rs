@@ -9,8 +9,8 @@ mcp_runtime_event_plans, mcp_starting_event_plans, skill_mcp_alias_event_plans,
 use super::policy::enforce_base_tool_allowlist;
 use super::workspace_tools::{normalize_tool_input, resolve_workspace_path};
 use async_trait::async_trait;
-use macaca_framework::mcp::{McpSessionMode, McpTransportConfig};
-use macaca_framework::tool::{ToolError, ToolHandler, ToolResponse, Toolkit};
+use macaca_sdk::framework::mcp::{McpSessionMode, McpTransportConfig};
+use macaca_sdk::framework::tool::{ToolError, ToolHandler, ToolResponse, Toolkit};
 use macaca_runtime_host::{McpLifecycleScope, McpRuntimeStatus, McpRuntimeStatusState};
 
 struct NamedTestTool(&'static str);

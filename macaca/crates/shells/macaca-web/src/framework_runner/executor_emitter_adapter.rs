@@ -3,9 +3,9 @@
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use async_trait::async_trait;
-use macaca_framework::agent::Hook;
-use macaca_framework::message::Msg;
-use macaca_framework::tool::{ToolError, ToolMiddleware, ToolResponse};
+use macaca_sdk::framework::agent::Hook;
+use macaca_sdk::framework::message::Msg;
+use macaca_sdk::framework::tool::{ToolError, ToolMiddleware, ToolResponse};
 use super::tool_trace::{tool_call_event, tool_result_event, tool_trace_output};
 pub struct ExecutorEmitterHook {
     pub(crate) executor: Arc<macaca_runtime_host::executor::ApplicationExecutor>,
@@ -16,7 +16,7 @@ pub struct ExecutorEmitterHook {
 
 #[async_trait]
 impl Hook for ExecutorEmitterHook {
-    async fn pre_reply(&self, msg: Msg) -> macaca_framework::agent::AgentResult<Msg> {
+    async fn pre_reply(&self, msg: Msg) -> macaca_sdk::framework::agent::AgentResult<Msg> {
         let iter = self.iteration.fetch_add(1, Ordering::Relaxed);
         self.executor
             .broadcast_event(macaca_runtime_host::executor::ExecutorEvent::AgentEvent {
@@ -30,7 +30,7 @@ impl Hook for ExecutorEmitterHook {
         Ok(msg)
     }
 
-    async fn post_reply(&self, msg: Msg) -> macaca_framework::agent::AgentResult<Msg> {
+    async fn post_reply(&self, msg: Msg) -> macaca_sdk::framework::agent::AgentResult<Msg> {
         let text = msg.get_text();
         if !text.is_empty() {
             self.executor

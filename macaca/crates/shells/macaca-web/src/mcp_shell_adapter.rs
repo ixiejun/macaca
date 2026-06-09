@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 
-use macaca_framework::tool::Toolkit;
+use macaca_sdk::framework::tool::Toolkit;
 use macaca_proto::ApplicationId;
 use macaca_runtime_host::{McpRuntimeContext, McpServerDefinition, McpToolPolicy};
 use tracing::info;

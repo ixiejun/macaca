@@ -8,8 +8,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
-use macaca_framework::adapter::{SingleToolAdapter, ToolSetBridge};
-use macaca_framework::tool::Toolkit;
+use macaca_sdk::framework::adapter::{SingleToolAdapter, ToolSetBridge};
+use macaca_sdk::framework::tool::Toolkit;
 use macaca_proto::{
     ApplicationId, McpServicePolicyHints, McpServiceScope, McpToolCatalogCommand, TraceContext,
 };

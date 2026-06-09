@@ -6,10 +6,10 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use macaca_framework::adapter::SingleToolAdapter;
-use macaca_framework::execution::ExecutionContext;
-use macaca_framework::session::{load_module_state, save_module_state};
-use macaca_framework::tool::Toolkit;
+use macaca_sdk::framework::adapter::SingleToolAdapter;
+use macaca_sdk::framework::execution::ExecutionContext;
+use macaca_sdk::framework::session::{load_module_state, save_module_state};
+use macaca_sdk::framework::tool::Toolkit;
 use macaca_proto::ApplicationId;
 
 use crate::state::AppState;

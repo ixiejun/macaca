@@ -1,10 +1,10 @@
 //! Runtime agent builders for service-backed execution paths.
 
 use std::sync::Arc;
-use macaca_framework::agent::HookedAgent;
-use macaca_framework::construction::{AgentBuildIntent, AgentToolConfig, TracedAgentFactory};
-use macaca_framework::model::ToolChoice;
-use macaca_framework::react_agent::ReActAgent;
+use macaca_sdk::framework::agent::HookedAgent;
+use macaca_sdk::framework::construction::{AgentBuildIntent, AgentToolConfig, TracedAgentFactory};
+use macaca_sdk::framework::model::ToolChoice;
+use macaca_sdk::framework::react_agent::ReActAgent;
 use macaca_proto::ApplicationId;
 use tokio::sync::mpsc;
 use crate::state::AppState;

@@ -7,8 +7,8 @@ mod tests {
         tool_response_text, truncate_tool_output, ExecutionControlMiddleware, FrameworkRunner,
     };
     use macaca_app::model::AppContextConfig;
-    use macaca_framework::message::{ContentBlock, TextBlock};
-    use macaca_framework::tool::ToolResponse;
+    use macaca_sdk::framework::message::{ContentBlock, TextBlock};
+    use macaca_sdk::framework::tool::ToolResponse;
     use macaca_proto::config::{AgentProfileContextConfig, ContextConfig};
     use macaca_sdk::tools::TraceEvent;
 
