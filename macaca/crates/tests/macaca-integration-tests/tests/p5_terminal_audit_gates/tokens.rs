@@ -207,5 +207,36 @@ pub fn forbidden_tokens() -> Vec<ForbiddenToken> {
             "\"minimax-",
             "model-family prefixes must be descriptor data inside the LLM service"
         ),
+        // --- multi-path-coordination-patch (P1 §2.6 / P5 §9.2) ---
+        token!(
+            "multi-path-coordination-patch",
+            "suppress_executor_lifecycle",
+            "single execution owner makes lifecycle suppression patches unnecessary"
+        ),
+        token!(
+            "multi-path-coordination-patch",
+            "legacy_chat_main_thread_goal_pause",
+            "execution-control policy must come from manifest projection, not shell patches"
+        ),
+        token!(
+            "multi-path-coordination-patch",
+            "legacy_unmarked",
+            "hosted execution must not grow additional legacy authority markers"
+        ),
+        token!(
+            "multi-path-coordination-patch",
+            "non_authoritative",
+            "hosted execution must not grow non-authoritative bypass branches"
+        ),
+        token!(
+            "multi-path-coordination-patch",
+            "TaskGraphOwner::TaskServiceCompatibility",
+            "task graph ownership must converge on application_execution authority only"
+        ),
+        token!(
+            "multi-path-coordination-patch",
+            "TaskGraphOwner::DiagnosticOnly",
+            "diagnostic-only graph owners must not become new execution bypasses"
+        ),
     ]
 }

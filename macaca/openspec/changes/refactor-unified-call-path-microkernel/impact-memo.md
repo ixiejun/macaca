@@ -1009,3 +1009,12 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 |---------------|----------------------|------------------------|-------|
 | `assert_os_layer_file_size_allowlist_terminal_state` | LOW | fails CI if filesize allowlist regrows; currently 0 rows pass | P5 |
 | `os_layer_file_size_gate/gate.rs` boundary pass logging | LOW | diagnostic `eprintln!` only; no production runtime impact | P5 |
+
+## Iteration 114 additions (§9.1/9.2/9.7 P5 terminal gates — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `unified_audit_replay_terminal_gate` | LOW | Command-pattern subprocess VC: web (6) + runtime-host (3) unified audit replay contracts | P5 |
+| `coordination_patch_retirement` | LOW | rejects `legacy_unmarked` / `non_authoritative` / `suppress_executor_lifecycle` / `multi-path-coordination-patch` tokens | P5 |
+| `p5_external_contract_gate` | LOW | `/api/chat/v2`, SSE, session, route-c pipeline contract tests (4 cases) | P5 |
+| `p5_terminal_audit_gates` (4 gates) | LOW | coordination patch retirement gate added; p5_terminal_audit_gates 3→4 | P5 |

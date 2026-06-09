@@ -19,6 +19,8 @@ mod no_direct_provider_call;
 mod no_hardcoded_name;
 #[path = "p5_terminal_audit_gates/shell_not_semantic_owner.rs"]
 mod shell_not_semantic_owner;
+#[path = "p5_terminal_audit_gates/coordination_patch_retirement.rs"]
+mod coordination_patch_retirement;
 
 #[test]
 fn p5_no_direct_provider_call_gate_rejects_bypasses() {
@@ -33,4 +35,9 @@ fn p5_no_hardcoded_name_gate_rejects_os_layer_literals() {
 #[test]
 fn p5_shell_not_semantic_owner_gate_rejects_shell_execution_ownership() {
     shell_not_semantic_owner::assert_shell_not_semantic_owner_gate();
+}
+
+#[test]
+fn p5_coordination_patch_retirement_gate_rejects_multi_path_markers() {
+    coordination_patch_retirement::assert_coordination_patch_retirement_gate();
 }

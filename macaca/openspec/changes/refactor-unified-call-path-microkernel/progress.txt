@@ -932,3 +932,10 @@
 - **Contract tests**: `os_layer_file_size_gate` 2/2；P5 gate matrix（route_c 3/3, kernel_purity 1/1, p5_terminal_audit 3/3, serviceization_escape_hatches 19/19, shell_dependency_purity 2/2）all pass.
 - **GitNexus memo (non-blocking)**: iteration 113 LOW on file-size terminal assertion — recorded in `impact-memo.md` (memo only per user directive).
 - **Next**: §9.1–9.2 single-path + coordination patch zero；§9.4 web sdk-only 终态；§6.3.2 archive；§7 横切注释/脱敏。
+
+## Iteration 114 (2026-06-08)
+- **P5 §9.1/§9.2/§9.7 DoD gates**: added `unified_audit_replay_terminal_gate`（Facade+Command subprocess orchestration）；`p5_coordination_patch_retirement_gate`（Strategy static scan for `multi-path-coordination-patch` family）；`p5_external_contract_gate`（Specification by Example for `/api/chat/v2`/SSE/session + route-c pipeline）。
+- **Design patterns**: Facade module trees；Command（subprocess `cargo test` delegation）；Strategy（token-family static scanner）；Specification by Example（named VC entry points aligned with Route C / file-size terminal gates）。
+- **Contract tests**: `p5_coordination_patch_retirement_gate` 1/1；`unified_audit_replay_single_chain_terminal_state` 1/1（web 6/6 + runtime-host 3/3 via subprocess）；`p5_external_contract_gate` 4/4；`p5_terminal_audit_gates` 4/4。
+- **GitNexus memo (non-blocking)**: iteration 114 LOW on integration-test gate modules only — recorded in `impact-memo.md` (memo only per user directive)。
+- **Next**: §9.4 web sdk-only 终态；§6.3.2 archive related completed changes；§7 横切注释/脱敏/审计盲区；§9.8 openspec validate CLI。
