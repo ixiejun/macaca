@@ -92,7 +92,8 @@ pub use query_pipeline::{
     DefaultMemoryQueryPipeline, MemoryQueryMode, MemoryQueryPipeline, MemoryQueryPipelineResult,
 };
 pub use runtime::{
-    ComposedMemoryRuntime, MemoryRuntimeBuilder, MemoryRuntimeFacade, MemoryRuntimeStatus,
+    ComposedMemoryRuntime, FabricMemoryRuntime, MemoryRuntimeBuilder, MemoryRuntimeFacade,
+    MemoryRuntimeStatus,
 };
 pub use service_adapter::memory_service_descriptor;
 pub use service_contract::{

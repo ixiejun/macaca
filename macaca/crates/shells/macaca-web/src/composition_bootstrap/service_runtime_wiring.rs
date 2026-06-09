@@ -114,7 +114,7 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
                 profile.embedding_provider
             );
             let runtime = Arc::new(
-                crate::memory_runtime::WebMemoryRuntime::from_configured_memory(
+                macaca_sdk::memory::FabricMemoryRuntime::from_configured_memory(
                     configured_manager,
                     provider_profile,
                 ),
@@ -252,7 +252,9 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
         memory_recall: if let Some(runtime) = memory_runtime.as_ref() {
             crate::context_reporting_memory::build_context_service_recall_capability(
                 &config.context,
-                Arc::clone(runtime) as Arc<dyn macaca_sdk::SystemMemoryClient>,
+                Arc::new(macaca_sdk::DirectFacadeMemoryClient::new(
+                    Arc::clone(runtime) as Arc<dyn macaca_sdk::memory::MemoryFacade>,
+                )) as Arc<dyn macaca_sdk::SystemMemoryClient>,
                 workspace_memory_tombstones.as_ref(),
             )
         } else {

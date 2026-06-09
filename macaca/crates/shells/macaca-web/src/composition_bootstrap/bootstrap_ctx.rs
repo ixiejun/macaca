@@ -19,7 +19,6 @@ use macaca_sdk::runtime_host::{AutonomyRuntimeBundle, McpRuntimeFacade, ServiceR
 use macaca_sdk::skill::SkillCatalog;
 use macaca_sdk::tools::ToolCatalog;
 
-use crate::memory_runtime::WebMemoryRuntime;
 use crate::run_trace::RunTracer;
 use crate::shell::WebSystemFacadeBundle;
 use crate::state::{AppState, ExternalAdapterRuntimeRegistry, ForkSessionMapping};
@@ -79,7 +78,8 @@ pub(crate) struct BootstrapCtx {
     pub default_model: Option<String>,
     pub framework_session_store: Option<Arc<dyn FrameworkSessionStore>>,
     pub mcp_runtime: Option<Arc<McpRuntimeFacade>>,
-    pub memory_runtime: Option<Arc<WebMemoryRuntime>>,
+    /// Bootstrap-only memory facade used while registering memory/skill/context providers.
+    pub memory_runtime: Option<Arc<macaca_sdk::memory::FabricMemoryRuntime>>,
     pub workspace_memory: Option<Arc<TestMemoryManager>>,
     pub workspace_memory_tombstones: Option<Arc<macaca_sdk::memory::SharedTombstoneRegistry>>,
     pub memory_client: Option<Arc<dyn macaca_sdk::SystemMemoryClient>>,

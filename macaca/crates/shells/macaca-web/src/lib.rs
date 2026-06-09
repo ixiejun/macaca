@@ -60,7 +60,6 @@ mod unified_workflow_application_abi_tests;
 mod unified_audit_replay_convergence_tests;
 pub mod hook_consumer;
 pub mod loop_manager;
-mod memory_runtime;
 pub mod metrics;
 pub mod orchestration_tools;
 mod persistence_adapter;

@@ -1054,3 +1054,10 @@
 - **Deferred (unchanged)**: §4.1.4 `memory_runtime.rs` deletion — `WebMemoryRuntime` still referenced by bootstrap/composition bundle.
 - **GitNexus memo (non-blocking)**: doc-only Purpose + tasks alignment — recorded in `impact-memo.md`.
 - **Proposal status**: P5 architectural terminal state achieved; main change `refactor-unified-call-path-microkernel` retained (not archived per design).
+
+## Iteration 128 (2026-06-07)
+- **P3 §4.1.4 memory runtime shell eviction — LANDED**: deleted `macaca-web/src/memory_runtime.rs`; runtime adapters moved to `macaca-memory::runtime::manager_adapter` (`FabricMemoryRuntime`, `ManagerBackedMemoryRuntime`); bootstrap uses `macaca_sdk::memory::FabricMemoryRuntime::from_configured_memory`; `DirectFacadeMemoryClient` added to `macaca-sdk` for bootstrap/context recall in-process seam; `WebShellCompositionBundle.memory_runtime` field removed (zero production readers).
+- **Design patterns**: Adapter (manager backend port), Decorator (`FabricMemoryRuntime` over `MemoryRuntimeFacade`), Facade (`DirectFacadeMemoryClient` command translation).
+- **Contract tests**: `memory_runtime_e2e` 1/1; `shell_dependency_purity_gate` 3/3; `context_memory_tools` deprecated-tool test 1/1; `macaca-memory::runtime` unit tests 2/2.
+- **GitNexus memo (non-blocking)**: `WebMemoryRuntime` relocation + composition bundle field removal — recorded in `impact-memo.md`.
+- **Proposal status**: **all `tasks.md` items `[x]`**; P5 terminal gates unchanged green; main change retained (not archived per design).

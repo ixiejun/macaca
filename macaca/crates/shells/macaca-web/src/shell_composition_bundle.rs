@@ -16,8 +16,6 @@ use macaca_sdk::driver::{DriverRegistry, DriverRuntime};
 use macaca_sdk::llm::{LlmProvider, LlmRouter};
 use macaca_sdk::runtime_host::McpRuntimeFacade;
 
-use crate::memory_runtime::WebMemoryRuntime;
-
 /// Bootstrap-owned provider anchors retained during P3 serviceization migration.
 ///
 /// Each field maps to a deprecated `AppState` field removed in task 4.1.3. New production
@@ -33,8 +31,6 @@ pub struct WebShellCompositionBundle {
     pub llm: Arc<dyn LlmProvider>,
     /// In-process LLM router retained until all route resolution uses `SystemLlmClient`.
     pub llm_router: Arc<LlmRouter>,
-    /// Optional web-local memory runtime facade for legacy tool wiring.
-    pub memory_runtime: Option<Arc<WebMemoryRuntime>>,
     /// MCP runtime facade for skill toolkit registration fallback.
     pub mcp_runtime: Arc<McpRuntimeFacade>,
     /// Driver registry constructed at bootstrap.
@@ -53,7 +49,6 @@ impl WebShellCompositionBundle {
         registry: Arc<tokio::sync::RwLock<AppRegistry>>,
         llm: Arc<dyn LlmProvider>,
         llm_router: Arc<LlmRouter>,
-        memory_runtime: Option<Arc<WebMemoryRuntime>>,
         mcp_runtime: Arc<McpRuntimeFacade>,
         driver_registry: Arc<DriverRegistry>,
         driver_runtime: Arc<DriverRuntime>,
@@ -64,7 +59,6 @@ impl WebShellCompositionBundle {
             registry,
             llm,
             llm_router,
-            memory_runtime,
             mcp_runtime,
             driver_registry,
             driver_runtime,

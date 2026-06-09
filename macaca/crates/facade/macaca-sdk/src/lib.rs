@@ -118,7 +118,8 @@ pub use macaca_skill::{
 pub use macaca_task::{TaskServiceSnapshot, TaskServiceSnapshotCommand};
 pub use mcp_client::{ServiceBackedMcpClient, SystemMcpClient, UnavailableSystemMcpClient};
 pub use memory_client::{
-    ServiceBackedMemoryClient, SystemMemoryClient, UnavailableSystemMemoryClient,
+    DirectFacadeMemoryClient, ServiceBackedMemoryClient, SystemMemoryClient,
+    UnavailableSystemMemoryClient,
 };
 pub use package_fixtures::{
     application_platform_agent_fixture, application_platform_genui_fixture,

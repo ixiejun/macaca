@@ -8,10 +8,12 @@
 
 pub mod builder;
 pub mod facade;
+pub mod manager_adapter;
 pub mod status;
 
 pub use builder::MemoryRuntimeBuilder;
 pub use facade::{ComposedMemoryRuntime, MemoryRuntimeFacade};
+pub use manager_adapter::FabricMemoryRuntime;
 pub use status::MemoryRuntimeStatus;
 
 #[cfg(test)]

@@ -21,7 +21,6 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
     let registry = Arc::clone(ctx.registry.as_ref().expect("bootstrap: registry"));
     let llm = Arc::clone(ctx.llm.as_ref().expect("bootstrap: llm"));
     let llm_router = Arc::clone(ctx.llm_router.as_ref().expect("bootstrap: llm_router"));
-    let memory_runtime = ctx.memory_runtime.clone();
     let mcp_runtime = Arc::clone(ctx.mcp_runtime.as_ref().expect("bootstrap: mcp_runtime"));
     let driver_registry = Arc::clone(ctx.driver_registry.as_ref().expect("bootstrap: driver_registry"));
     let driver_runtime = Arc::clone(ctx.driver_runtime.as_ref().expect("bootstrap: driver_runtime"));
@@ -86,7 +85,6 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
             Arc::clone(&registry),
             llm.clone(),
             llm_router.clone(),
-            memory_runtime.clone(),
             Arc::clone(&mcp_runtime),
             Arc::clone(&driver_registry),
             Arc::clone(&driver_runtime),

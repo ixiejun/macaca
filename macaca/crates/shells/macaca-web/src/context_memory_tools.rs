@@ -13,8 +13,6 @@ use macaca_sdk::SystemMemoryClient;
 use macaca_sdk::tools::Tool;
 use uuid::Uuid;
 
-use crate::memory_runtime::WebMemoryRuntime;
-
 /// Build a trace context for model-visible memory tool calls.
 ///
 /// Tools do not receive the host request trace directly, so the adapter creates
@@ -150,7 +148,7 @@ impl Tool for ServiceWorkspaceMemoryForgetTool {
 
 #[deprecated(note = "Use ServiceWorkspaceMemorySearchTool for new memory tool registrations")]
 pub(crate) struct WorkspaceMemorySearchTool {
-    pub(crate) runtime: Arc<WebMemoryRuntime>,
+    pub(crate) runtime: Arc<macaca_sdk::memory::FabricMemoryRuntime>,
     pub(crate) scope: MemoryScope,
     pub(crate) default_limit: u32,
 }
@@ -190,7 +188,7 @@ impl Tool for WorkspaceMemorySearchTool {
 
 #[deprecated(note = "Use ServiceWorkspaceMemoryGetTool for new memory tool registrations")]
 pub(crate) struct WorkspaceMemoryGetTool {
-    pub(crate) runtime: Arc<WebMemoryRuntime>,
+    pub(crate) runtime: Arc<macaca_sdk::memory::FabricMemoryRuntime>,
     pub(crate) scope: MemoryScope,
 }
 
@@ -228,7 +226,7 @@ impl Tool for WorkspaceMemoryGetTool {
 /// Deletes workspace memory row by id **and** records a tombstone for digest/evidence filtering.
 #[deprecated(note = "Use ServiceWorkspaceMemoryForgetTool for new memory tool registrations")]
 pub(crate) struct WorkspaceMemoryForgetTool {
-    pub(crate) runtime: Arc<WebMemoryRuntime>,
+    pub(crate) runtime: Arc<macaca_sdk::memory::FabricMemoryRuntime>,
     pub(crate) scope: MemoryScope,
     pub(crate) tombstones: Arc<SharedTombstoneRegistry>,
 }
@@ -408,8 +406,8 @@ mod tests {
         }
     }
 
-    fn runtime_with_entry(content: &str) -> Arc<WebMemoryRuntime> {
-        Arc::new(WebMemoryRuntime::new(Arc::new(FakeRuntime {
+    fn runtime_with_entry(content: &str) -> Arc<macaca_sdk::memory::FabricMemoryRuntime> {
+        Arc::new(macaca_sdk::memory::FabricMemoryRuntime::new(Arc::new(FakeRuntime {
             entry: MemoryEntry {
                 id: MemoryId::new(),
                 layer: MemoryLayer::Vector,
