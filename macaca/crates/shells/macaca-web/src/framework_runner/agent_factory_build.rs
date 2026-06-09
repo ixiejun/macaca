@@ -112,9 +112,9 @@ impl WebTracedAgentFactory {
         toolkit: &Toolkit,
         context_config: &ContextConfig,
     ) -> (
-        Arc<macaca_context::SkillCapabilityCatalog>,
-        Arc<macaca_context::McpCapabilityCatalog>,
-        Arc<macaca_context::RuntimeToolCapabilityCatalog>,
+        Arc<macaca_sdk::context::SkillCapabilityCatalog>,
+        Arc<macaca_sdk::context::McpCapabilityCatalog>,
+        Arc<macaca_sdk::context::RuntimeToolCapabilityCatalog>,
         Arc<Vec<String>>,
     ) {
         let app_dir = {
@@ -179,7 +179,7 @@ impl WebTracedAgentFactory {
                         error = %error,
                         "skill snapshot failed for capability catalogs; composing empty skill index"
                     );
-                    macaca_context::SkillCapabilityCatalog::default()
+                    macaca_sdk::context::SkillCapabilityCatalog::default()
                 }
             },
         );
@@ -216,12 +216,12 @@ impl WebTracedAgentFactory {
         max_iters: usize,
         tool_choice: Option<ToolChoice>,
         routing_agent_id: Option<AgentId>,
-        skill_capability_catalog: Arc<macaca_context::SkillCapabilityCatalog>,
-        mcp_capability_catalog: Arc<macaca_context::McpCapabilityCatalog>,
-        runtime_tool_capability_catalog: Arc<macaca_context::RuntimeToolCapabilityCatalog>,
+        skill_capability_catalog: Arc<macaca_sdk::context::SkillCapabilityCatalog>,
+        mcp_capability_catalog: Arc<macaca_sdk::context::McpCapabilityCatalog>,
+        runtime_tool_capability_catalog: Arc<macaca_sdk::context::RuntimeToolCapabilityCatalog>,
         ready_mcp_server_ids: Arc<Vec<String>>,
-        provider_health_ledger: Option<Arc<macaca_context::ProviderHealthLedger>>,
-        context_engine_registry: Arc<macaca_context::ContextEngineRegistry>,
+        provider_health_ledger: Option<Arc<macaca_sdk::context::ProviderHealthLedger>>,
+        context_engine_registry: Arc<macaca_sdk::context::ContextEngineRegistry>,
     ) -> ReActAgent {
         let llm_scope = macaca_sdk::llm::LlmServiceScope::new(
             request.identity.app_id,

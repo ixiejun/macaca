@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::source_artifact::resolve_source_artifact_ref;
 use chrono::Utc;
-use macaca_context::{
+use macaca_sdk::context::{
     ContextAdapterSafetyPolicy, ContextEngineInfo, ContextFallbackPolicy,
     ProviderHealthSnapshot,
 };

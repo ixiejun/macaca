@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 
-use macaca_context::{
+use macaca_sdk::context::{
     ActiveRecallDiagnostics, ContextDecisionReport, ContextDecisionSeverity,
     ContextPreflightRecallConfig,
 };
@@ -27,7 +27,7 @@ pub(crate) async fn apply_active_recall(
     scope: MemoryScope,
     preflight_cfg: &ContextPreflightRecallConfig,
     composer_recall_active: bool,
-    assembled: &mut macaca_context::ContextAssembleResult,
+    assembled: &mut macaca_sdk::context::ContextAssembleResult,
     incoming_framework_messages: &[serde_json::Value],
 ) {
     if composer_recall_active {
@@ -125,7 +125,7 @@ pub(crate) async fn apply_active_recall(
             ));
             continue;
         }
-        let candidate_tokens = macaca_context::estimate_text_tokens(&candidate);
+        let candidate_tokens = macaca_sdk::context::estimate_text_tokens(&candidate);
         if used_tokens.saturating_add(candidate_tokens) > preflight_cfg.max_tokens {
             assembled.report.decisions.push(ContextDecisionReport::info(
                 "active_recall_skipped",

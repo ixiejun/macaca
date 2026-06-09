@@ -7,7 +7,7 @@
 
 use std::sync::Arc;
 
-use macaca_context::ContextReport;
+use macaca_sdk::context::ContextReport;
 use macaca_runtime_host::persist::{AppendEventCommand, EventLog};
 use serde::{Deserialize, Serialize};
 
@@ -175,7 +175,7 @@ impl ContextSourceArtifactRepository {
 /// Full sources are already visible in the assembled prompt, but excerpted/summarized/dropped
 /// sources need an EventLog-backed canonical payload so diagnostics can prove pruning was
 /// non-destructive. The check intentionally mirrors the UI's “show retrieval button” predicate.
-fn source_needs_artifact(source: &macaca_context::ContextSourceReport) -> bool {
+fn source_needs_artifact(source: &macaca_sdk::context::ContextSourceReport) -> bool {
     source.pruned_tokens > 0
         || source
             .render_mode
@@ -365,11 +365,11 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let store = Arc::new(RedbStore::open(dir.path().join("events.redb")).unwrap());
         let log = Arc::new(EventLog::new(store));
-        let mut report = macaca_context::ContextReportBuilder::new("pruning")
+        let mut report = macaca_sdk::context::ContextReportBuilder::new("pruning")
             .source(
-                macaca_context::ContextSourceReport::included(
+                macaca_sdk::context::ContextSourceReport::included(
                     "message/0",
-                    macaca_context::ContextSourceKind::ToolResult,
+                    macaca_sdk::context::ContextSourceKind::ToolResult,
                     "tool result",
                     12,
                     2048,

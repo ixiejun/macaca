@@ -1906,7 +1906,6 @@ dependencies = [
  "dirs",
  "futures",
  "macaca-app",
- "macaca-context",
  "macaca-domain-pack-finance",
  "macaca-framework",
  "macaca-proto",

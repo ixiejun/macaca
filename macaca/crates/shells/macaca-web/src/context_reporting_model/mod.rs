@@ -16,7 +16,7 @@ mod tests;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use macaca_context::{
+use macaca_sdk::context::{
     ActiveRecallCapability, ContextBudget, ContextEngineRegistry, ContextEngineSelection,
     ContextPreflightRecallConfig, KnowledgeDigestCapability, McpCapabilityCatalog,
     ProviderHealthLedger, RuntimeToolCapabilityCatalog, SkillCapabilityCatalog,

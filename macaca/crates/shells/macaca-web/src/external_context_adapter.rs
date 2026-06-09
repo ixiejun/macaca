@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use macaca_context::{
+use macaca_sdk::context::{
     ContextAdapterSafetyPolicy, ContextAssembleInput, ContextAssembleResult, ContextEngine,
     ContextEngineRegistry, ContextFallbackPolicy, ExternalAdapterContextEngine,
     ExternalContextAdapter, ExternalContextAdapterInfo,
@@ -230,7 +230,7 @@ mod tests {
     use super::*;
 
     use axum::{routing::post, Json, Router};
-    use macaca_context::{ContextEngineSelection, ContextReportBuilder, ContextRuntimeFacade};
+    use macaca_sdk::context::{ContextEngineSelection, ContextReportBuilder, ContextRuntimeFacade};
     use macaca_proto::config::{
         ContextExternalAdapterFallbackConfig, ContextExternalAdapterSafetyConfig,
     };

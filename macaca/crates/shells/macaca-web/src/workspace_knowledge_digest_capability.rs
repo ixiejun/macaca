@@ -1,14 +1,14 @@
 //! [`WorkspaceKnowledgeDigestCapability`] — Adapter implementing
-//! [`macaca_context::KnowledgeDigestCapability`] on top of the Memory Service client.
+//! [`macaca_sdk::context::KnowledgeDigestCapability`] on top of the Memory Service client.
 //!
 //! ## Flow
 //! 1. Derive the same **retrieval query** string the active-recall provider would use
-//!    (latest user turn text via [`macaca_context::ContextAssembleInput::last_user_message_text`]).
+//!    (latest user turn text via [`macaca_sdk::context::ContextAssembleInput::last_user_message_text`]).
 //! 2. Pull a bounded set of [`macaca_proto::MemoryEntry`] rows through the Memory Service facade.
-//! 3. Map rows into redacted [`macaca_context::KnowledgeDigestItem`] entries, copying
+//! 3. Map rows into redacted [`macaca_sdk::context::KnowledgeDigestItem`] entries, copying
 //!    only **opaque** evidence ids (`ClaimEvidence::source_id`) so digest-vs-raw suppression can align with
 //!    fenced recall rows without leaking full memory payloads into structured reports.
-//! 4. Apply [`macaca_context::filter_digest_items_by_tombstones`] when an optional [`macaca_sdk::memory::TombstoneIndex`] is wired
+//! 4. Apply [`macaca_sdk::context::filter_digest_items_by_tombstones`] when an optional [`macaca_sdk::memory::TombstoneIndex`] is wired
 //!    (shared registry updated by [`crate::context_memory_tools::WorkspaceMemoryForgetTool`] or a governance facade snapshot).
 //!
 //! ## Failure semantics
@@ -19,7 +19,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use macaca_context::{
+use macaca_sdk::context::{
     filter_digest_items_by_tombstones, ContextAssembleInput, ContextSourceProvenance,
     KnowledgeDigestCapability, KnowledgeDigestItem, PrivacyTier,
 };

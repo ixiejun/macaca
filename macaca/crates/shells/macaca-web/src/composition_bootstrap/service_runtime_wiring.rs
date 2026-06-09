@@ -248,7 +248,7 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
             .with_installations(external_adapter_installations),
     );
     let context_engine_registry = Arc::new(configured_external_adapters.registry);
-    let context_service_capabilities = macaca_context::ContextServiceRuntimeCapabilities {
+    let context_service_capabilities = macaca_sdk::context::ContextServiceRuntimeCapabilities {
         memory_recall: if let Some(runtime) = memory_runtime.as_ref() {
             crate::context_reporting_memory::build_context_service_recall_capability(
                 &config.context,
@@ -265,7 +265,7 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
             &macaca_runtime_host::StaticServiceProviderFactory::new(
                 macaca_runtime_host::ServiceProviderInstance::new(
                     macaca_proto::ServiceDescriptor::new(
-                        KernelServiceId::new(macaca_context::CONTEXT_SERVICE_ID),
+                        KernelServiceId::new(macaca_sdk::context::CONTEXT_SERVICE_ID),
                         macaca_proto::ServiceType::new("context"),
                         macaca_proto::TraceSchemaRef::new("trace.system_service.context.v1"),
                     ),
@@ -283,7 +283,7 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
     service_runtime
         .start(
-            &KernelServiceId::new(macaca_context::CONTEXT_SERVICE_ID),
+            &KernelServiceId::new(macaca_sdk::context::CONTEXT_SERVICE_ID),
             TraceContext::new("web-startup-context-service"),
         )
         .await

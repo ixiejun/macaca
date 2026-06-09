@@ -5,7 +5,7 @@
 //! `service.skill` while the Context composer receives a compact, body-free
 //! catalog that already honors the service-owned decision.
 
-use macaca_context::{
+use macaca_sdk::context::{
     DeclaredCapabilityDependency, SkillCapabilityCatalog, SkillCapabilityGovernanceReport,
     SkillCapabilityRecord, SkillFilterDiagnostic,
 };

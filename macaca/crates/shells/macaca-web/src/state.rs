@@ -12,7 +12,7 @@ use serde::Serialize;
 use tokio::sync::{mpsc, RwLock};
 
 use macaca_app::SharedDomainPackCatalog;
-use macaca_context::{
+use macaca_sdk::context::{
     ContextAdapterSafetyPolicy, ContextEngineInfo, ContextEngineRegistry, ContextFallbackPolicy,
     ContextProviderRegistry, ProviderHealthLedger,
 };
@@ -412,7 +412,7 @@ mod tests {
     use super::ExternalAdapterRuntimeRegistry;
     use std::collections::HashSet;
 
-    use macaca_context::ContextEngineInfo;
+    use macaca_sdk::context::ContextEngineInfo;
 
     #[tokio::test]
     async fn external_adapter_runtime_registry_syncs_only_overlay_engines() {

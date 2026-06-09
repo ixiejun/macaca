@@ -2,7 +2,7 @@
 //!
 //! Terminal state: `macaca-web` depends only on `macaca-proto` and `macaca-sdk` among
 //! workspace members. Until composition-root seams are fully absorbed into SDK bridges,
-//! these five crates remain as documented migration debt. The gate forbids **new**
+//! these four crates remain as documented migration debt. The gate forbids **new**
 //! workspace edges beyond this frozen set.
 
 /// One row of web-shell workspace dependency migration debt.
@@ -21,11 +21,6 @@ pub const WEB_SHELL_WORKSPACE_DEPENDENCY_DEBT: &[WebShellDependencyDebt] = &[
         crate_name: "macaca-app",
         rationale: "Application runtime bootstrap and manifest projection at composition root",
         replacement: "macaca-sdk::application client + runtime-host bootstrap bundle",
-    },
-    WebShellDependencyDebt {
-        crate_name: "macaca-context",
-        rationale: "Context reporting assembly until context service client covers all shell adapters",
-        replacement: "macaca-sdk::context client snapshot commands",
     },
     WebShellDependencyDebt {
         crate_name: "macaca-domain-pack-finance",

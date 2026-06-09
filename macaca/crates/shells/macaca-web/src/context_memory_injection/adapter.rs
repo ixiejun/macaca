@@ -4,7 +4,7 @@
 //! snippets below the leading system block so recalled memory never overrides
 //! core instructions.
 
-use macaca_context::{ContextSourceKind, ContextSourceReport};
+use macaca_sdk::context::{ContextSourceKind, ContextSourceReport};
 use macaca_proto::{LlmMessage, MemoryEntry, TraceContext};
 
 /// Build a provider-neutral trace for memory prefetch commands.

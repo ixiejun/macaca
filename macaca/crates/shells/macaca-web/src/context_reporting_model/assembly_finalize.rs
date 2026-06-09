@@ -22,7 +22,7 @@ impl ContextReportingChatModel {
         model: &str,
         incoming_messages: &[serde_json::Value],
         options: &ChatOptions,
-        assembled: &mut macaca_context::ContextAssembleResult,
+        assembled: &mut macaca_sdk::context::ContextAssembleResult,
         lineage_count: u32,
     ) -> (Vec<serde_json::Value>, ChatOptions) {
         assembled.report.lineage_compaction_count = lineage_count;

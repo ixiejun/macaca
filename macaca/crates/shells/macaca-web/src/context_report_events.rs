@@ -1,4 +1,4 @@
-use macaca_context::{ContextDecisionSeverity, ContextReport, ContextSourceReport};
+use macaca_sdk::context::{ContextDecisionSeverity, ContextReport, ContextSourceReport};
 use macaca_runtime_host::persist::{AppendEventCommand, EventLog};
 use macaca_proto::ApplicationId;
 

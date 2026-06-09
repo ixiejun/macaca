@@ -155,10 +155,10 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
                 catalog: tokio::sync::RwLock::new(catalog),
                 alert_manager: alert_manager.clone(),
             },
-            context_provider_registry: Arc::new(macaca_context::ContextProviderRegistry::new()),
+            context_provider_registry: Arc::new(macaca_sdk::context::ContextProviderRegistry::new()),
             context_engine_registry: Arc::clone(&context_engine_registry),
             external_adapter_runtime_registry: Arc::clone(&external_adapter_runtime_registry),
-            provider_health_ledger: Arc::new(macaca_context::ProviderHealthLedger::new()),
+            provider_health_ledger: Arc::new(macaca_sdk::context::ProviderHealthLedger::new()),
         }
     });
 

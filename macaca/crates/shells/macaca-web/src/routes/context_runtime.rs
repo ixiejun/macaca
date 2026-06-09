@@ -6,7 +6,7 @@ use std::sync::Arc;
 use axum::extract::State;
 use axum::Json;
 
-use macaca_context::{
+use macaca_sdk::context::{
     ContextAdapterSafetyPolicy, ContextEngineInfo, ContextFallbackPolicy, ProviderHealthSnapshot,
 };
 
@@ -16,8 +16,8 @@ use crate::state::{AppState, ExternalAdapterRuntimeInstallation};
 pub async fn get_context_provider_runtime(
     State(state): State<Arc<AppState>>,
 ) -> Json<serde_json::Value> {
-    let builtin = macaca_context::list_builtin_family_descriptors();
-    let builtin_engines = macaca_context::list_builtin_engine_infos();
+    let builtin = macaca_sdk::context::list_builtin_family_descriptors();
+    let builtin_engines = macaca_sdk::context::list_builtin_engine_infos();
     let builtin_engine_ids = builtin_engine_id_set(&builtin_engines);
     let registry_rows = state
         .context_provider_registry

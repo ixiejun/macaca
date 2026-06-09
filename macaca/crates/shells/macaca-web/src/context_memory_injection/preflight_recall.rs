@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 
-use macaca_context::{
+use macaca_sdk::context::{
     ContextDecisionReport, ContextDecisionSeverity, ContextPreflightRecallConfig,
     ContextSourceKind, ContextSourceReport,
 };
@@ -24,7 +24,7 @@ pub(crate) async fn apply_preflight_memory(
     memory_client: &Arc<dyn macaca_sdk::SystemMemoryClient>,
     scope: MemoryScope,
     preflight_cfg: &ContextPreflightRecallConfig,
-    assembled: &mut macaca_context::ContextAssembleResult,
+    assembled: &mut macaca_sdk::context::ContextAssembleResult,
     incoming_framework_messages: &[serde_json::Value],
 ) {
     if !preflight_cfg.enabled || !preflight_cfg.allows_tool("memory_search") {
@@ -103,7 +103,7 @@ pub(crate) async fn apply_preflight_memory(
 /// Render and account the preflight memory-search result.
 fn inject_preflight_entries(
     preflight_cfg: &ContextPreflightRecallConfig,
-    assembled: &mut macaca_context::ContextAssembleResult,
+    assembled: &mut macaca_sdk::context::ContextAssembleResult,
     entries: Vec<MemoryEntry>,
 ) {
     if entries.is_empty() {
@@ -115,7 +115,7 @@ fn inject_preflight_entries(
     }
     let rendered = serde_json::to_string_pretty(&entries).unwrap_or_default();
     let truncated = truncate_chars(rendered, preflight_cfg.max_chars);
-    let tok = macaca_context::estimate_text_tokens(&truncated);
+    let tok = macaca_sdk::context::estimate_text_tokens(&truncated);
     insert_after_leading_system(
         &mut assembled.messages,
         LlmMessage::system(format!(

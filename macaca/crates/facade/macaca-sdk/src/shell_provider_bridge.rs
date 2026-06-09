@@ -57,3 +57,12 @@ pub use macaca_kernel as kernel;
 /// `Cargo.toml` converges on sdk-only workspace edges. This alias preserves type identity
 /// without forcing a direct `macaca-agent` dependency on the shell crate.
 pub use macaca_agent as agent;
+
+/// Context assembly, reporting, and capability-catalog crate alias.
+///
+/// Shell adapters that build `ContextAssembleResult`, register context providers, or
+/// surface context-service runtime capabilities still need the concrete context types
+/// during Route C migration. The SDK already owns `macaca-context` as a transitive
+/// dependency; this alias lets presentation shells drop the direct workspace edge while
+/// preserving type identity for composition-root wiring and HTTP reporting routes.
+pub use macaca_context as context;

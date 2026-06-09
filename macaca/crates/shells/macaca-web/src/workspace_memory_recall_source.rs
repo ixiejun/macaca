@@ -1,8 +1,8 @@
-//! Workspace-backed [`macaca_context::MemorySourceProvider`] used by
-//! [`macaca_context::active_recall::DefaultActiveRecallProvider`].
+//! Workspace-backed [`macaca_sdk::context::MemorySourceProvider`] used by
+//! [`macaca_sdk::context::active_recall::DefaultActiveRecallProvider`].
 //!
 //! ## Routing model
-//! [`macaca_context::MemoryRecallQuery`] carries **session / application / agent** hints. The
+//! [`macaca_sdk::context::MemoryRecallQuery`] carries **session / application / agent** hints. The
 //! service-backed memory client performs recall; this adapter enforces conservative visibility
 //! rules so agent-private rows tagged with another [`AgentId`]
 //! cannot surface during recall (fail-closed for cross-agent isolation).
@@ -15,7 +15,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use macaca_context::{
+use macaca_sdk::context::{
     memory_source, ConfidenceScore, ContextSourceProvenance, MemoryRecallItem, MemoryRecallQuery,
     MemorySourceProvider, PrivacyTier,
 };
@@ -171,7 +171,7 @@ mod tests {
     use super::WorkspaceMemoryRecallSource;
     use async_trait::async_trait;
     use chrono::Utc;
-    use macaca_context::{MemoryRecallQuery, MemorySourceProvider};
+    use macaca_sdk::context::{MemoryRecallQuery, MemorySourceProvider};
     use macaca_sdk::memory::{
         MemoryBackendConfig, MemoryBackendFactory, MemoryForgetCommand, MemoryPrefetchCommand,
         MemoryRecallCommand, MemoryRecallResult, MemoryRememberCommand, MemoryRememberResult,

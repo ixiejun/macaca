@@ -146,7 +146,7 @@ impl FrameworkRunner {
         config
     }
 
-    /// Resolves the on-disk directory scanned by [`macaca_context::ProfileFileContextProvider`].
+    /// Resolves the on-disk directory scanned by [`macaca_sdk::context::ProfileFileContextProvider`].
     ///
     /// The path is never interpreted as a workflow name — only as filesystem layout dictated by
     /// [`AgentProfileRootKind`] and the active [`ApplicationId`].

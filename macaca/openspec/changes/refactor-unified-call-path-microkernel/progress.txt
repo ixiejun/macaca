@@ -988,3 +988,12 @@
 - **Contract tests**: `shell_dependency_purity_gate` 2/2; `domain_pack_wiring` 2/2; `cargo check -p macaca-web -p macaca-sdk` pass.
 - **GitNexus memo (non-blocking)**: iteration 120 LOW on SDK bridge + framework_runner import migration — recorded in `impact-memo.md`.
 - **Next**: §9.4 continue retiring app/context/framework/runtime-host; break app/sdk/pack cycle for domain-pack-finance; §6.3.2 archive.
+
+## Iteration 121 (2026-06-08)
+- **P5 §4.4.4 / §9.4 context SDK bridge**: retired `macaca-context` direct workspace dep via `macaca-sdk::shell_provider_bridge::context` re-export (`macaca-context` already transitive through SDK; no cycle).
+- **macaca-web migration**: 30 source files updated from `macaca_context::` to `macaca_sdk::context::` (composition bootstrap, context reporting, capability catalog, framework_runner, routes).
+- **Gate allowlist**: `WEB_SHELL_WORKSPACE_DEPENDENCY_DEBT` 5→4 rows; synced `macaca-os-serviceization-allowlist.md`.
+- **Design patterns**: Facade (`shell_provider_bridge::context`); Strangler Fig (incremental allowlist shrink).
+- **Contract tests**: `shell_dependency_purity_gate` 2/2; `cargo check -p macaca-web -p macaca-sdk` pass.
+- **GitNexus memo (non-blocking)**: iteration 121 LOW on context bridge + 30-file import migration — recorded in `impact-memo.md`.
+- **Next**: §9.4 retire app/framework/runtime-host; break app/sdk/pack cycle; §6.3.2 archive.

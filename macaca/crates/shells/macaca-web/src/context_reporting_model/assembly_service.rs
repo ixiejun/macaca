@@ -3,7 +3,7 @@
 //! Builds a serializable assembly snapshot so the runtime-host provider can
 //! rebuild the provider chain without depending on Web shell types.
 
-use macaca_context::{
+use macaca_sdk::context::{
     ContextAssembleCommand, ContextAssemblySnapshot, ContextServiceScope,
 };
 use macaca_framework::model::ChatOptions;

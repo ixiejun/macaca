@@ -84,7 +84,7 @@ pub(crate) struct BootstrapCtx {
     pub workspace_memory_tombstones: Option<Arc<macaca_sdk::memory::SharedTombstoneRegistry>>,
     pub memory_client: Option<Arc<dyn macaca_sdk::SystemMemoryClient>>,
     pub external_adapter_runtime_registry: Option<Arc<ExternalAdapterRuntimeRegistry>>,
-    pub context_engine_registry: Option<Arc<macaca_context::ContextEngineRegistry>>,
+    pub context_engine_registry: Option<Arc<macaca_sdk::context::ContextEngineRegistry>>,
     pub llm_client: Option<Arc<dyn macaca_sdk::SystemLlmClient>>,
     pub context_client: Option<Arc<dyn macaca_sdk::SystemContextClient>>,
     pub driver_client: Option<Arc<dyn macaca_sdk::SystemDriverClient>>,

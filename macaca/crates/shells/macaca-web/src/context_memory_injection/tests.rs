@@ -2,7 +2,7 @@
 
 use async_trait::async_trait;
 use chrono::Utc;
-use macaca_context::{ContextOptionsPatch, ContextPreflightRecallConfig, ContextReportBuilder};
+use macaca_sdk::context::{ContextOptionsPatch, ContextPreflightRecallConfig, ContextReportBuilder};
 use macaca_proto::{ApplicationId, LlmOptions, LlmRole, MemoryEntry, MemoryId, MemoryLayer, TraceContext};
 use macaca_sdk::memory::{
     MemoryForgetCommand, MemoryGetCommand, MemoryGetResult, MemoryPrefetchCommand,
@@ -107,8 +107,8 @@ fn entry(content: &str) -> MemoryEntry {
     }
 }
 
-fn assembled() -> macaca_context::ContextAssembleResult {
-    macaca_context::ContextAssembleResult {
+fn assembled() -> macaca_sdk::context::ContextAssembleResult {
+    macaca_sdk::context::ContextAssembleResult {
         messages: vec![
             macaca_proto::LlmMessage::system("sys"),
             macaca_proto::LlmMessage::user("find memory"),

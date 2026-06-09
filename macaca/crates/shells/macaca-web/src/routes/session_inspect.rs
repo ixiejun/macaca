@@ -7,7 +7,7 @@ use axum::http::StatusCode;
 use axum::Json;
 use serde::{Deserialize, Serialize};
 
-use macaca_context::{
+use macaca_sdk::context::{
     CompactionSummaryEnvelope, LineageKind, SessionLineage, TranscriptSegment,
 };
 use macaca_runtime_host::persist::{AppendEventCommand, EventLogQuery, SessionLineageStore};

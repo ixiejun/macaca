@@ -1069,3 +1069,10 @@ Recorded during iteration 1; re-run `gitnexus_impact` before each `[impact-memo]
 | `macaca-runtime` web dep removal | LOW | dead Cargo.toml edge only; no source consumers | P5 |
 | `domain-pack-finance` SDK bridge attempt | HIGH (blocked) | `app→sdk→domain-pack-finance→app` cycle prevents SDK bridge; deferred | P5 |
 | `WEB_SHELL_WORKSPACE_DEPENDENCY_DEBT` | LOW | frozen baseline 7→5 rows; gate 2/2 pass | P5 |
+
+## Iteration 121 additions (§4.4.4 macaca-context SDK bridge — memo only, non-blocking)
+
+| Symbol / area | GitNexus risk (memo) | Blast radius (summary) | Phase |
+|---------------|----------------------|------------------------|-------|
+| `shell_provider_bridge::context` | LOW | macaca-sdk re-export; 30 macaca-web files migrated from direct `macaca-context` dep | P5 |
+| `WEB_SHELL_WORKSPACE_DEPENDENCY_DEBT` | LOW | frozen baseline 5→4 rows; gate 2/2 pass | P5 |

@@ -1,5 +1,5 @@
 //! Host-side **Adapter** functions: bridge `macaca-skill`, MCP runtime probes, and the framework
-//! `Toolkit` into neutral [`macaca_context::capability`] DTOs used by composer providers.
+//! `Toolkit` into neutral [`macaca_sdk::context::capability`] DTOs used by composer providers.
 //!
 //! The context crate intentionally avoids depending on skill/MCP crates; this module is the
 //! application-facing composition root that performs the mapping while keeping transport and
@@ -11,7 +11,7 @@ use std::sync::Arc;
 mod alias_resolution;
 mod lifecycle_visibility;
 
-use macaca_context::{
+use macaca_sdk::context::{
     mcp_tool_collisions, McpCapabilityCatalog, McpServerCapabilitySummary,
     RuntimeToolCapabilityCatalog, SkillCapabilityCatalog,
 };

@@ -3,7 +3,7 @@
 use std::sync::Arc;
 use macaca_sdk::agent::AgentCapabilitySet;
 use macaca_app::app_agent_prompt_semantics;
-use macaca_context::{ContextSourceKind, PromptComposer, PromptStability, TrustLevel};
+use macaca_sdk::context::{ContextSourceKind, PromptComposer, PromptStability, TrustLevel};
 use macaca_runtime_host::persist::AppendEventCommand;
 use macaca_proto::ApplicationId;
 use macaca_sdk::AgentPersona;

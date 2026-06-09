@@ -177,4 +177,4 @@ pub use workbench_client::{
     is_structured_unavailable, ServiceBackedWorkbenchClient, SystemWorkbenchClient,
     SystemWorkbenchFacadeExt, UnavailableWorkbenchServiceClient, WorkbenchClientCatalog,
 };
-pub use shell_provider_bridge::{agent, driver, kernel, llm, memory, skill, task, tools};
+pub use shell_provider_bridge::{agent, context, driver, kernel, llm, memory, skill, task, tools};

@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 
-use macaca_context::{
+use macaca_sdk::context::{
     assemble_context_providers, ContextAssembleInput, ContextFacade, ContextFacadeAssemblyPolicy,
     ProviderAssemblyEnvironment, ProviderFactoryInput,
 };
