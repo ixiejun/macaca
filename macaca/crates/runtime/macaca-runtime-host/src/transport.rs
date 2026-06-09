@@ -1,3 +1,13 @@
+//! MCP transport bridge for runtime-host MCP client construction.
+//!
+//! **Bridge + Strategy**: `McpTransport` abstracts how `McpTransportConfig` values become
+//! live `McpClient` handles. `ConfigBackedMcpTransport` is the default adapter that
+//! delegates to `macaca-framework::mcp::client_from_transport`, preserving the existing
+//! config schema while keeping runtime-host free of transport-specific subprocess code.
+//!
+//! Trade-off: one adapter covers stdio/SSE/streamable HTTP today; new transports add a
+//! type here rather than leaking framework client details into service providers.
+
 use macaca_framework::mcp::{
     client_from_transport, McpClient, McpError, McpTimeouts, McpTransportConfig,
 };

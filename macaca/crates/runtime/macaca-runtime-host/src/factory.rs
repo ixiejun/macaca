@@ -1,3 +1,14 @@
+//! Runtime-host factories for MCP environment wiring and server definition assembly.
+//!
+//! **Factory pattern**: centralizes construction of MCP server definitions from registry
+//! config and skill snapshots so shells and service providers do not duplicate mapping
+//! logic. `RuntimeEnvBuilder` applies process-wide MCP environment variables through the
+//! `env_bridge` boundary; `McpServerFactory` binds a `SkillMcpMappingRegistry` strategy
+//! when translating YAML/registry entries into `McpServerDefinition` values.
+//!
+//! Trade-off: factories stay thin (no network I/O) — lifecycle and session ownership
+//! remain in `mcp_runtime` so this module stays testable without spawning subprocesses.
+
 use std::collections::HashMap;
 
 use macaca_skill::SkillSnapshot;

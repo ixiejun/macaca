@@ -969,3 +969,12 @@
 - **Contract tests**: `provider_neutral_logging_terminal_state_is_enforced` 1/1（1420 files scanned, 0 violations）。
 - **GitNexus memo (non-blocking)**: iteration 118 LOW on tracing field migrations + gate modules — recorded in `impact-memo.md`。
 - **Next**: §7.1 横切英文注释；§9.4 web sdk-only 终态；§6.3.2 archive。
+
+## Iteration 119 (2026-06-08)
+- **P5 §7.1 English module documentation terminal gate**: added `english_documentation_terminal_gate`（Facade + Specification by Example + Registry）— scans `composition_bootstrap/`, `p5_dod_terminal_gate_matrix/`, runtime-host split modules (`factory`/`transport`/`lease`), proto/framework/agent/app migration files, and all P5 terminal gate sources; requires ≥3 non-empty `//!` lines and ≥80 chars module doc prose.
+- **Module doc remediation**: extended `macaca-runtime-host` split modules (`factory.rs`, `transport.rs`, `lease.rs`) and `composition_bootstrap/contract_source.rs` with purpose/runtime/trade-off English comments.
+- **P5 §9.5 matrix**: registered `english_documentation_terminal` as 21st gate row in `p5_dod_terminal_gate_matrix`.
+- **Design patterns**: Specification by Example（module doc threshold registry）；Facade（integration-test VC entry）；Registry（explicit file list + directory scans with test-only exclusions）。
+- **Contract tests**: `english_documentation_terminal_state_is_enforced` 1/1（33 files scanned, 0 violations）。
+- **GitNexus memo (non-blocking)**: iteration 119 LOW on gate modules + module doc edits — recorded in `impact-memo.md`。
+- **Next**: §9.4 web sdk-only 终态；§6.3.2 archive。

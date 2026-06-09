@@ -200,7 +200,7 @@
 - [x] 6.1.5 实现 `kernel-purity` 审计：kernel 仅依赖 proto/ipc（与 3.6.6 联动）。（`kernel_purity_gate` via `cargo metadata` workspace dep audit）
 - [x] 6.1.6 实现 `file-size` 审计：OS 层无 >500 行源文件。（`os_layer_file_size_gate` + `assert_os_layer_file_size_allowlist_terminal_state`；**0** 行 allowlist 终态达成，iteration 112–113）
 - [x] 6.1.7 实现 `shell-dependency-purity` 审计：CLI 终态仅 proto+sdk；Web 冻结 7 条 workspace 依赖基线，禁止新增。（`shell_dependency_purity_gate` via `cargo metadata`）
-- [x] 6.1.8 实现 P5 终态 DoD gate：`unified_audit_replay_terminal_gate`（§9.1 单链 replay）+ `p5_coordination_patch_retirement_gate`（§9.2 协调补丁清零）+ `p5_external_contract_gate`（§9.7 对外契约）+ `audit_redaction_terminal_gate`（§7.3 脱敏）+ `openspec_validate_terminal_gate`（§9.8 OpenSpec validate）+ `audit_blind_spot_terminal_gate`（§7.4 审计盲区）+ `provider_neutral_logging_terminal_gate`（§7.2 provider-neutral 日志）+ `p5_dod_terminal_gate_matrix`（§9.5 统一 DoD 矩阵编排）。（iteration 114–118）
+- [x] 6.1.8 实现 P5 终态 DoD gate：`unified_audit_replay_terminal_gate`（§9.1 单链 replay）+ `p5_coordination_patch_retirement_gate`（§9.2 协调补丁清零）+ `p5_external_contract_gate`（§9.7 对外契约）+ `audit_redaction_terminal_gate`（§7.3 脱敏）+ `openspec_validate_terminal_gate`（§9.8 OpenSpec validate）+ `audit_blind_spot_terminal_gate`（§7.4 审计盲区）+ `provider_neutral_logging_terminal_gate`（§7.2 provider-neutral 日志）+ `english_documentation_terminal_gate`（§7.1 英文模块注释）+ `p5_dod_terminal_gate_matrix`（§9.5 统一 DoD 矩阵编排）。（iteration 114–119）
 
 ### 6.2 逃逸口由"冻结"升级为"删除"
 - [x] 6.2.1 每个逃逸口对应 service client 全量替换后，删除其 migration module 豁免，使任何引用（含旧引用）CI 失败。（**终态**：`migration_debt_baseline.rs` 冻结 raw=**0**；**全部 10 个 family 已退役**，含 `provider-model-routing-name`（121→0，iteration 54）；`macaca-llm/src/` 为 canonical routing owner，其余层 shed 字面量/空默认/compile-time id）
@@ -213,7 +213,7 @@
 
 ## 7. 横切 — 注释 / 日志 / trace-audit
 
-- [ ] 7.1 所有新增/迁移模块补详尽英文注释（功能 + 运行原理 + 权衡）；巨型文件拆分后的新文件逐一覆盖。
+- [x] 7.1 所有新增/迁移模块补详尽英文注释（功能 + 运行原理 + 权衡）；巨型文件拆分后的新文件逐一覆盖。（`english_documentation_terminal_gate` 1/1：composition_bootstrap + runtime-host split + terminal gate 源扫描 0 违规；`factory`/`transport`/`lease`/`contract_source` 模块文档补齐；iteration 119）
 - [x] 7.2 关键节点日志统一为 provider-neutral 维度；删除以 provider/model/app name 为主键的日志（如 `provider_compat.rs` 风格）。（`provider_neutral_logging_terminal_gate` 1/1：OS 层 shell/runtime-host/framework 生产 tracing 扫描 1420 文件 0 违规；`tracing_utils` 宏与 web/runtime-host/agent 日志字段对齐 `service_id`/`command`/`trace_id`/`reason_code`；iteration 118）
 - [x] 7.3 全局化脱敏（`sanitize_json`/`is_safe_metadata_key`/`should_omit_metadata_map_key`）到所有 audit/trace/snapshot 出口；`macaca-proto::audit_redaction` 单测 + `audit_redaction_terminal_gate`。（iteration 115）
 - [x] 7.4 旁路删除后验证"无审计盲区"：所有执行都产出 service-call evidence，可按 trace_id/session_id replay。（`audit_blind_spot_terminal_gate` 1/1：replay 命令面 + web bootstrap 共享 sink + router 契约扫描 + runtime-host 行为子进程；iteration 116）
@@ -229,7 +229,7 @@
 - [x] 9.2 协调补丁清零：多路径协调补丁 token（`legacy_unmarked`/`non_authoritative`/`suppress_executor_lifecycle`/`legacy_chat_main_thread_goal_pause`/`TaskGraphOwner::TaskServiceCompatibility`/`TaskGraphOwner::DiagnosticOnly`）生产代码 0 命中。（`p5_coordination_patch_retirement_gate` 1/1 + `serviceization_escape_hatches_reconciliation_markers_absent_in_production`；注：`TaskGraphOwner` 领域字段 `graph_owner` 为合法 proto/task 语义，非协调补丁）
 - [x] 9.3 内核纯净：kernel 无 web3/evm/a2a/payment/executor/provider_compat；`cargo tree -p macaca-kernel` 仅 proto/ipc。（`kernel_purity_gate` 1/1）
 - [ ] 9.4 越界依赖清零：persist 不依赖 context；web/cli 仅依赖 sdk。（persist→context 终态达成：`p2_microkernel_exit_validation` 3/3；CLI 终态达成；web 仍冻结 7 条 workspace 依赖基线）
-- [x] 9.5 allowlist == 0；全部终态门绿。（Route C + filesize allowlist==0；`p5_dod_terminal_gate_matrix` 1/1 编排 20 项终态 gate 子进程全绿；web shell 依赖基线仍冻结 7 条，§9.4 部分达成）
+- [x] 9.5 allowlist == 0；全部终态门绿。（Route C + filesize allowlist==0；`p5_dod_terminal_gate_matrix` 1/1 编排 21 项终态 gate 子进程全绿；web shell 依赖基线仍冻结 7 条，§9.4 部分达成）
 - [x] 9.6 无 >500 行 OS 源文件；domain pack 出 base runtime-host。（`os_layer_file_size_gate` 2/2 + `runtime_host_domain_pack_gate`）
 - [x] 9.7 对外契约不回归：`/api/chat/v2`、SSE、manifest、session 隔离。（`p5_external_contract_gate` 4/4：chat v2 route + session module + SSE surface + route_c no-network pipeline）
 - [x] 9.8 OpenSpec baseline 反映终态；`openspec validate --all --strict` 绿。（`openspec_validate_terminal_gate` 1/1，iteration 115）
@@ -277,6 +277,8 @@ cargo test -p macaca-integration-tests --test openspec_validate_terminal_gate --
 cargo test -p macaca-integration-tests --test audit_blind_spot_terminal_gate -- --nocapture
 # VC-provider-neutral-logging  provider-neutral tracing 终态（§7.2）
 cargo test -p macaca-integration-tests --test provider_neutral_logging_terminal_gate -- --nocapture
+# VC-english-documentation  English module doc 终态（§7.1）
+cargo test -p macaca-integration-tests --test english_documentation_terminal_gate -- --nocapture
 # VC-p5-dod-matrix  P5 终态 DoD 统一门矩阵（§9.5，编排全部终态 gate）
 cargo test -p macaca-integration-tests --test p5_dod_terminal_gate_matrix -- --nocapture
 # VC-hardcoded 无硬编码 application/provider/model 业务名（审计门）

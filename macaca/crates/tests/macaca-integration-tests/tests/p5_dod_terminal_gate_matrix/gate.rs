@@ -162,6 +162,13 @@ const TERMINAL_GATE_COMMANDS: &[TerminalGateCommand] = &[
         test_target: "provider_neutral_logging_terminal_gate",
         filter: "provider_neutral_logging_terminal_state_is_enforced",
     },
+    // §7.1 — English module documentation on P5 migrated/split OS modules.
+    TerminalGateCommand {
+        gate_id: "english_documentation_terminal",
+        tasks_ref: "§7.1",
+        test_target: "english_documentation_terminal_gate",
+        filter: "english_documentation_terminal_state_is_enforced",
+    },
     // §9.8 — OpenSpec strict validate (npx subprocess inside gate).
     TerminalGateCommand {
         gate_id: "openspec_validate_terminal",
@@ -185,6 +192,7 @@ const REQUIRED_GATE_TEST_SOURCES: &[&str] = &[
     "crates/tests/macaca-integration-tests/tests/unified_audit_replay_terminal_gate.rs",
     "crates/tests/macaca-integration-tests/tests/audit_blind_spot_terminal_gate.rs",
     "crates/tests/macaca-integration-tests/tests/provider_neutral_logging_terminal_gate.rs",
+    "crates/tests/macaca-integration-tests/tests/english_documentation_terminal_gate.rs",
     "crates/tests/macaca-integration-tests/tests/openspec_validate_terminal_gate.rs",
 ];
 
