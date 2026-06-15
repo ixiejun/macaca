@@ -1,4 +1,4 @@
-//! Encrypted skill package hook for Route C Phase 08.
+//! Encrypted skill package hook.
 //!
 //! This module does not claim to provide DRM or local tamper resistance. Its
 //! purpose is narrower and auditable: detect encrypted package metadata,

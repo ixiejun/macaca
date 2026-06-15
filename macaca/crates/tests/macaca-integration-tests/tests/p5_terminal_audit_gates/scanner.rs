@@ -1,14 +1,14 @@
 //! Shared static scanner for P5 terminal audit gates (§6.1.2–6.1.4).
 //!
 //! Each gate filters the global forbidden-token catalog by **family** (Strategy)
-//! and scans production Rust sources under `crates/`. Migration surfaces from
+//! and scans production Rust sources under `crates/`. Terminal exception surfaces from
 //! `surfaces.rs` mirror `serviceization_escape_hatches` so P5 gates stay aligned
-//! with the freeze-first refactor while exposing named VC entry points.
+//! with the protocol microkernel boundary while exposing named VC entry points.
 
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
-use super::surfaces::is_approved_migration_surface;
+use super::surfaces::is_approved_terminal_exception_surface;
 use super::tokens::{forbidden_tokens, ForbiddenToken};
 
 /// One deterministic violation for stable CI output.
@@ -124,7 +124,7 @@ fn scan_file(
         for token in tokens {
             if !line.contains(token.token)
                 || (token.family == "hardcoded-agent-role" && is_comment_only_line(line))
-                || is_approved_migration_surface(&relative, token)
+                || is_approved_terminal_exception_surface(&relative, token)
             {
                 continue;
             }
@@ -147,7 +147,7 @@ fn render_violations(violations: &[Violation]) -> String {
         .iter()
         .map(|violation| {
             format!(
-                "\ngate={}\nfamily={}\nfile={}:{}\ntoken={}\nrationale={}\nprocess=Route through the service client/facade for this capability, or register an OpenSpec migration surface.\n",
+                "\ngate={}\nfamily={}\nfile={}:{}\ntoken={}\nrationale={}\nprocess=Route through the service client/facade for this capability, or update the terminal specification with a justified exception.\n",
                 violation.gate_id,
                 violation.family,
                 violation.path.display(),

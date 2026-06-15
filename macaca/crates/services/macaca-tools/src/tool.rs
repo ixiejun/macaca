@@ -8,8 +8,9 @@ use tokio::sync::mpsc::UnboundedSender;
 
 /// A trace event from tool/driver execution.
 ///
-/// Generic structure supporting any driver (Claude Code, custom drivers, etc.).
-/// New fields are all `Option` + `skip_serializing_if` for backward compatibility.
+/// Generic structure supporting any driver or service-backed tool provider.
+/// Optional fields let providers add trace dimensions without breaking serde
+/// decoding for records that do not carry those dimensions.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TraceEvent {
     /// Event semantic type (driver-defined, e.g. "thinking", "tool_call", "compilation", "file_read")
@@ -159,14 +160,7 @@ impl ToolCommandPipeline {
             middleware.before(tool.name(), &command).await?;
         }
 
-        #[allow(deprecated)]
-        let result = match command.context.event_tx.clone() {
-            Some(event_tx) => {
-                tool.execute_streaming(command.input.clone(), Some(event_tx))
-                    .await
-            }
-            None => tool.execute(command.input.clone()).await,
-        };
+        let result = tool.invoke(command.clone()).await;
 
         for middleware in &self.middlewares {
             middleware.after(tool.name(), &command, &result).await?;
@@ -236,35 +230,22 @@ pub trait Tool: Send + Sync {
     fn name(&self) -> &str;
     fn description(&self) -> &str;
 
-    /// JSON Schema describing the tool's input parameters.
-    #[deprecated(note = "use ToolSchemaProvider::tool_schema()")]
-    fn parameters_schema(&self) -> Value;
+    /// JSON Schema describing the tool input parameters.
+    fn tool_schema(&self) -> Value;
 
-    /// Execute the tool and return the result.
-    #[deprecated(note = "use ToolCommandExecutor::execute_command()")]
-    async fn execute(&self, input: Value) -> MacacaResult<Value>;
-
-    /// Execute with streaming events via an unbounded sender.
-    /// Default implementation just calls execute() without streaming.
-    #[deprecated(note = "use ToolCommandExecutor::execute_command()")]
-    #[allow(deprecated)]
-    async fn execute_streaming(
-        &self,
-        input: Value,
-        event_tx: Option<UnboundedSender<TraceEvent>>,
-    ) -> MacacaResult<Value> {
-        let _ = event_tx;
-        self.execute(input).await
-    }
+    /// Execute the tool once after the command pipeline has emitted trace and
+    /// middleware hooks. Implementations read business input from
+    /// [`ToolCommand::input`] and may use [`ToolCommand::context`] for
+    /// provider-neutral metadata or event sinks.
+    async fn invoke(&self, command: ToolCommand) -> MacacaResult<Value>;
 }
 
 impl<T> ToolSchemaProvider for T
 where
     T: Tool + ?Sized,
 {
-    #[allow(deprecated)]
     fn tool_schema(&self) -> Value {
-        self.parameters_schema()
+        Tool::tool_schema(self)
     }
 }
 
@@ -300,45 +281,6 @@ pub trait ToolCatalog: Send + Sync {
                 parameters: tool.tool_schema(),
             })
             .collect()
-    }
-}
-
-/// A collection of tools, addressable by name.
-pub trait ToolSet: Send + Sync {
-    #[deprecated(note = "use ToolCatalog::all_tools()")]
-    fn tools(&self) -> &[Box<dyn Tool>];
-
-    #[deprecated(note = "use ToolCatalog::find_tool()")]
-    #[allow(deprecated)]
-    fn get_tool(&self, name: &str) -> Option<&dyn Tool> {
-        self.tools()
-            .iter()
-            .find(|t| t.name() == name)
-            .map(|t| t.as_ref())
-    }
-
-    /// Convert all tools to LLM-compatible tool definitions.
-    #[deprecated(note = "use ToolCatalog::definitions()")]
-    #[allow(deprecated)]
-    fn to_definitions(&self) -> Vec<ToolDefinition> {
-        self.tools()
-            .iter()
-            .map(|t| ToolDefinition {
-                name: t.name().to_owned(),
-                description: t.description().to_owned(),
-                parameters: t.parameters_schema(),
-            })
-            .collect()
-    }
-}
-
-impl<T> ToolCatalog for T
-where
-    T: ToolSet + ?Sized,
-{
-    #[allow(deprecated)]
-    fn all_tools(&self) -> &[Box<dyn Tool>] {
-        self.tools()
     }
 }
 
@@ -379,9 +321,8 @@ impl Default for CompositeToolSet {
     }
 }
 
-impl ToolSet for CompositeToolSet {
-    #[allow(deprecated)]
-    fn tools(&self) -> &[Box<dyn Tool>] {
+impl ToolCatalog for CompositeToolSet {
+    fn all_tools(&self) -> &[Box<dyn Tool>] {
         &self.tools
     }
 }
@@ -404,12 +345,12 @@ mod tests {
             "Echo the payload"
         }
 
-        fn parameters_schema(&self) -> Value {
+        fn tool_schema(&self) -> Value {
             json!({"type": "object"})
         }
 
-        async fn execute(&self, input: Value) -> MacacaResult<Value> {
-            Ok(input)
+        async fn invoke(&self, command: ToolCommand) -> MacacaResult<Value> {
+            Ok(command.input)
         }
     }
 

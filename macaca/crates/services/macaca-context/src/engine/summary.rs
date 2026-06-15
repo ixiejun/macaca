@@ -21,9 +21,7 @@ use crate::report::{ContextDecisionReport, ContextSourceKind, ContextSourceRepor
 
 use super::helpers::estimate_messages_tokens;
 use super::pruning::PruningContextEngine;
-use super::types::{
-    ContextAssembleInput, ContextAssembleResult, ContextEngine, ContextEngineInfo,
-};
+use super::types::{ContextAssembleInput, ContextAssembleResult, ContextEngine, ContextEngineInfo};
 
 /// Engine that layers compaction semantics on top of pruning.
 #[derive(Clone)]

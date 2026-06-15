@@ -4,39 +4,30 @@
 //! `AppState`. This adapter implements the **Adapter** + **Facade** pattern:
 //! - primary routing via `SystemLlmClient::resolve_route`
 //! - provider label via `SystemLlmClient::snapshot`
-//! - legacy fallback via `WebShellCompositionBundle` when the service is unavailable
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use macaca_sdk::app::AppLlmConfig;
-use macaca_sdk::llm::{
-    LlmPolicyHints, LlmRouteResolveCommand, LlmServiceScope, LlmServiceSnapshotCommand,
-    ModelSelection, ModelSelectionRequest, ModelTarget,
+use macaca_host_composition::app::AppLlmConfig;
+use macaca_host_composition::llm::{ModelSelection, ModelSelectionRequest, ModelTarget};
+use macaca_proto::{
+    ApplicationId, LlmPolicyHints, LlmRouteResolveCommand, LlmRouteSummary, LlmServiceScope,
+    LlmServiceSnapshotCommand, TraceContext,
 };
-use macaca_proto::{ApplicationId, TraceContext};
 use tracing::{info, warn};
 
 use crate::state::AppState;
 
 /// Resolve the operator-facing primary provider label for status routes.
 ///
-/// The label is derived from the LLM service snapshot when healthy; otherwise the adapter
-/// falls back to the bootstrap provider name without inventing routing semantics in routes.
+/// The label is derived from the LLM service snapshot when healthy; otherwise
+/// the adapter returns a provider-neutral service label.
 pub async fn status_provider_label(state: &Arc<AppState>) -> String {
-    let scope = LlmServiceScope::new(
-        ApplicationId::default(),
-        "web-status",
-        "web-shell",
-    )
-    .unwrap_or_else(|_| {
-        LlmServiceScope::new(
-            ApplicationId::default(),
-            "web-status",
-            "status",
-        )
-        .expect("static web status LLM scope must be valid")
-    });
+    let scope = LlmServiceScope::new(ApplicationId::default(), "web-status", "web-shell")
+        .unwrap_or_else(|_| {
+            LlmServiceScope::new(ApplicationId::default(), "web-status", "status")
+                .expect("static web status LLM scope must be valid")
+        });
     let command = LlmServiceSnapshotCommand {
         scope,
         trace: TraceContext::new("web-shell-adapter-llm-status"),
@@ -57,20 +48,20 @@ pub async fn status_provider_label(state: &Arc<AppState>) -> String {
             label
         }
         Ok(_) => {
-            warn!("llm service snapshot unhealthy; using legacy provider label fallback");
-            state.composition.llm.name().into()
+            warn!("llm service snapshot unhealthy; using provider-neutral service label");
+            "service.llm".to_string()
         }
         Err(error) => {
             warn!(
                 error = %error,
-                "llm service snapshot failed; using legacy provider label fallback"
+                "llm service snapshot failed; using provider-neutral service label"
             );
-            state.composition.llm.name().into()
+            "service.llm".to_string()
         }
     }
 }
 
-/// Resolve a framework `ModelSelection` through the LLM service, with router fallback.
+/// Resolve a framework `ModelSelection` through the LLM service.
 pub async fn resolve_model_selection(
     state: &Arc<AppState>,
     app_id: &ApplicationId,
@@ -117,13 +108,9 @@ pub async fn resolve_model_selection(
                 app_id = %app_id,
                 agent = agent_name,
                 error = %error,
-                "llm route shell adapter falling back to legacy router selection"
+                "llm route shell adapter failed to resolve model selection via service"
             );
-            state
-                .composition
-                .llm_router
-                .resolve_selection(&request)
-                .map_err(|router_error| router_error.to_string())
+            Err(error.to_string())
         }
     }
 }
@@ -184,10 +171,8 @@ pub async fn resolve_request_route_metadata(
     metadata
 }
 
-/// Convert a service-owned route summary into the legacy `ModelSelection` shape.
-fn route_summary_to_model_selection(
-    summary: &macaca_sdk::llm::LlmRouteSummary,
-) -> ModelSelection {
+/// Convert a service-owned route summary into the framework `ModelSelection` shape.
+fn route_summary_to_model_selection(summary: &LlmRouteSummary) -> ModelSelection {
     ModelSelection {
         primary: ModelTarget {
             provider: summary.provider_id.clone(),

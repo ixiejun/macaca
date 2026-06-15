@@ -27,7 +27,9 @@ impl SkillProviderGovernanceState {
         let record = records
             .entry(key)
             .and_modify(|record| record.apply(&observation, observed_at))
-            .or_insert_with(|| macaca_skill::SkillGovernanceRecord::from_observation(&observation, observed_at))
+            .or_insert_with(|| {
+                macaca_skill::SkillGovernanceRecord::from_observation(&observation, observed_at)
+            })
             .clone();
         drop(records);
         self.append_event(SkillGovernanceEventRecord::new(
@@ -83,7 +85,7 @@ impl SkillProviderGovernanceState {
             filtered_records = filtered_out,
             successful_tasks = telemetry_aggregate.successful_task_count,
             failed_tasks = telemetry_aggregate.failed_task_count,
-            "skill governance snapshot built through local compatibility adapter"
+            "skill governance snapshot built through local governance store adapter"
         );
 
         SkillGovernanceSnapshotResult {

@@ -161,7 +161,10 @@ execution_control:
         policy.resume_sources,
         vec![ExecutionControlResumeSource::goal_lifecycle()]
     );
-    assert_eq!(policy.checkpoint_mode, ExecutionControlCheckpointMode::ReferenceOnly);
+    assert_eq!(
+        policy.checkpoint_mode,
+        ExecutionControlCheckpointMode::ReferenceOnly
+    );
     assert!(!policy.allow_command_overrides);
 }
 
@@ -207,7 +210,7 @@ fn app_capability_set_flattens_manifest_capabilities() {
     })];
 
     let set = AppCapabilitySet::from_manifest_agents(&agents);
-    let flattened = set.flatten_legacy();
+    let flattened = set.flatten();
     assert_eq!(flattened.len(), 2);
     assert_eq!(flattened[0].name, "capability-design");
     assert_eq!(flattened[1].name, "capability-build");
@@ -248,7 +251,7 @@ fn app_capability_set_preserves_visible_capability_count_across_sources() {
     );
 
     assert_eq!(set.roots().len(), 3);
-    let flattened = set.flatten_legacy();
+    let flattened = set.flatten();
     assert_eq!(flattened.len(), 3);
     assert_eq!(
         flattened

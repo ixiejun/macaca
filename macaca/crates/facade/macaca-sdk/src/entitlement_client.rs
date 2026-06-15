@@ -1,4 +1,4 @@
-//! SDK Entitlement Service client for Route C S9.
+//! SDK Entitlement Service client.
 //!
 //! The client keeps entitlement query, authorization, audit, and metering calls
 //! behind `SystemFacade`.  SDK users do not construct runtime-host facades,

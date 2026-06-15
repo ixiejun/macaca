@@ -41,6 +41,4 @@ mod tests;
 
 pub use executor::ApplicationExecutor;
 pub use registry::ApplicationExecutorRegistry;
-pub use types::{
-    ApplicationExecutorConfig, WorkerHealth, WorkerState, WorkerSupervisorConfig,
-};
+pub use types::{ApplicationExecutorConfig, WorkerHealth, WorkerState, WorkerSupervisorConfig};

@@ -9,7 +9,7 @@ pub mod wasm_bindgen;
 
 use macaca_proto::{
     ApplicationAbilityDescriptor, ApplicationCommerceDeclaration,
-    ApplicationCompatibilityDeclaration, ApplicationManifestV1, ApplicationPermissionDeclaration,
+    ApplicationHostRequirementDeclaration, ApplicationManifestV1, ApplicationPermissionDeclaration,
     ApplicationPluginDependency, ApplicationRuntimeProfile, ApplicationUiDeclaration, DeveloperId,
     PackageId, PackageRuntimeKind,
 };
@@ -44,7 +44,7 @@ pub struct ApplicationManifestBuilder {
     name: String,
     version: String,
     runtime: ApplicationRuntimeProfile,
-    compatibility: ApplicationCompatibilityDeclaration,
+    host_requirements: ApplicationHostRequirementDeclaration,
     abilities: Vec<ApplicationAbilityDescriptor>,
     permissions: Vec<ApplicationPermissionDeclaration>,
     ui: Option<ApplicationUiDeclaration>,
@@ -65,7 +65,7 @@ impl ApplicationManifestBuilder {
             name: name.into(),
             version: version.into(),
             runtime: ApplicationRuntimeProfile::new(PackageRuntimeKind::Yaml, "1"),
-            compatibility: ApplicationCompatibilityDeclaration::new("0.1.0"),
+            host_requirements: ApplicationHostRequirementDeclaration::new("0.1.0"),
             abilities: Vec::new(),
             permissions: Vec::new(),
             ui: None,
@@ -80,7 +80,7 @@ impl ApplicationManifestBuilder {
     }
 
     pub fn min_os_version(mut self, version: impl Into<String>) -> Self {
-        self.compatibility.min_os_version = version.into();
+        self.host_requirements.min_os_version = version.into();
         self
     }
 
@@ -120,7 +120,7 @@ impl ApplicationManifestBuilder {
             self.name,
             self.version,
             self.runtime,
-            self.compatibility,
+            self.host_requirements,
         );
         for ability in self.abilities {
             manifest = manifest.ability(ability);

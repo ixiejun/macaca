@@ -1,8 +1,10 @@
 //! Prompt section and workspace guide loading helpers.
 
-use std::path::Path;
-use macaca_sdk::context::{ContextSourceKind, PromptSection, PromptStability, TrustLevel};
+use macaca_host_composition::context::{
+    ContextSourceKind, PromptSection, PromptStability, TrustLevel,
+};
 use macaca_proto::config::WorkspaceGuideSourcesConfig;
+use std::path::Path;
 pub(crate) fn prompt_section(
     id: impl Into<String>,
     kind: ContextSourceKind,

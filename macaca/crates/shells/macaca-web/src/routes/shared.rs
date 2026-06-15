@@ -6,7 +6,6 @@ use axum::http::StatusCode;
 use axum::Json;
 use serde::{Deserialize, Serialize};
 
-use macaca_sdk::app::app_entry_agent_name as manifest_entry_agent_name;
 use macaca_proto::{
     AgentId, AgentManifest, ApplicationId, ApplicationMetadataQueryCommand, MacacaError,
     ProtoErrorAdapter, TraceContext,
@@ -76,7 +75,7 @@ pub(crate) async fn app_entry_agent_name(
             Err(error) => tracing::warn!(
                 app_id = %app_id,
                 error = %error,
-                "Application metadata query failed; using deprecated raw manifest fallback"
+                "Application metadata query failed; entry agent is unavailable"
             ),
         },
         Err(error) => tracing::warn!(
@@ -85,14 +84,7 @@ pub(crate) async fn app_entry_agent_name(
             "Application metadata query rejected before dispatch"
         ),
     }
-    // Deprecated compatibility fallback: only kept for migration of existing
-    // Web routes. New production behavior must use Application Service
-    // metadata views rather than reading raw application manifests.
-    #[allow(deprecated)]
-    let registry = crate::application_shell_adapter::registry_read_guard(&state).await;
-    registry
-        .get_app(app_id)
-        .and_then(|app| manifest_entry_agent_name(&app.manifest).map(str::to_string))
+    None
 }
 
 pub(crate) fn entry_agent_activity_override(
@@ -116,10 +108,10 @@ pub(crate) fn entry_agent_activity_override(
 /// Select the application-scoped agent manifests that should be rendered by Web.
 ///
 /// Application Service metadata is the authoritative app boundary for declared
-/// agent names, but the legacy kernel registry can temporarily contain multiple
-/// manifests with the same name during migration windows.  A pure name filter
+/// agent names, but the kernel registry can contain multiple manifests with
+/// the same name while applications are reloaded.  A pure name filter
 /// would leak those global or stale agents into one application's UI.  This
-/// helper implements a small Adapter over the legacy registry: it preserves the
+/// helper implements a small Adapter over the registry: it preserves the
 /// Application Service order, returns at most one manifest per declared name,
 /// and prefers manifests whose id is also bound to the application runtime.
 pub(crate) fn select_app_scoped_agent_manifests(

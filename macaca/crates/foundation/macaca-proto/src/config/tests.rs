@@ -13,7 +13,7 @@ fn context_recall_is_disabled_by_default() {
 fn default_config_is_valid() {
     let cfg = MacacaConfig::default();
     assert_eq!(cfg.kernel.max_agents, 16);
-    assert_eq!(cfg.context.default_engine, "legacy");
+    assert_eq!(cfg.context.default_engine, "passthrough");
     assert!(cfg.context.emit_reports);
     assert!(!cfg.context.agent_profile.enabled);
     assert_eq!(cfg.context.workspace_guides.entries.len(), 6);
@@ -148,7 +148,7 @@ fn load_external_context_adapter_config_from_toml() {
             headers = { AUTHORIZATION = "EXTERNAL_CONTEXT_TOKEN" }
 
             [context.external_adapters.fallback]
-            fallback_engine_id = "legacy"
+            fallback_engine_id = "passthrough"
             empty_external_contribution = true
         "#;
 

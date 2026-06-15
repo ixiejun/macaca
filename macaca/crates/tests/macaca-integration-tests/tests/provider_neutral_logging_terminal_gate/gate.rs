@@ -186,9 +186,7 @@ fn assert_no_forbidden_tracing_fields(workspace: &Path) {
         );
     }
 
-    eprintln!(
-        "provider_neutral_logging_terminal_gate event=scan_pass files={file_count}"
-    );
+    eprintln!("provider_neutral_logging_terminal_gate event=scan_pass files={file_count}");
 }
 
 /// Main gate entry — panics when OS-layer logs use provider/app/model primary keys.

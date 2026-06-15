@@ -27,7 +27,7 @@ impl GatewayInboundMessage {
         }
     }
 
-    /// Convert this inbound message to the existing compatibility event.
+    /// Convert this inbound message to the shared gateway event contract.
     pub fn to_task_request_event(&self) -> GatewayEvent {
         GatewayEvent::TaskRequest {
             user_id: self.user_id.clone(),

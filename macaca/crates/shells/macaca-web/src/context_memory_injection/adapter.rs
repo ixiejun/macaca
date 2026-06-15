@@ -4,7 +4,7 @@
 //! snippets below the leading system block so recalled memory never overrides
 //! core instructions.
 
-use macaca_sdk::context::{ContextSourceKind, ContextSourceReport};
+use macaca_host_composition::context::{ContextSourceKind, ContextSourceReport};
 use macaca_proto::{LlmMessage, MemoryEntry, TraceContext};
 
 /// Build a provider-neutral trace for memory prefetch commands.
@@ -15,8 +15,8 @@ pub(crate) fn memory_trace(session_id: Option<&str>, agent_name: Option<&str>) -
     trace
 }
 
-/// Map a recalled memory row into the legacy context source report shape.
-pub(crate) fn legacy_memory_source_report(
+/// Map a recalled memory row into the request-scoped context source report shape.
+pub(crate) fn request_memory_source_report(
     entry: &MemoryEntry,
     label: &str,
     estimated_tokens: u32,

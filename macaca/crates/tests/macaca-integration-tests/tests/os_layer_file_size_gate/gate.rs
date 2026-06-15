@@ -3,10 +3,10 @@
 //! Macaca's constitution caps production Rust sources at 500 lines so ownership
 //! stays obvious and modules remain reviewable. This gate scans every
 //! `crates/**/src/**/*.rs` file, compares line counts against the limit, and
-//! fails on any violation that is not recorded in the migration allowlist.
+//! fails on any violation that is not recorded in the terminal exception inventory.
 //!
 //! Design pattern: **Specification by Example** — the test is the living
-//! contract; the allowlist is explicit migration debt that must monotonically
+//! contract; the exception inventory is explicit architecture debt that must monotonically
 //! shrink until the terminal assertion (`allowlist.len() == 0`) passes.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -32,13 +32,8 @@ pub struct FileSizeAllowlistEntry {
 }
 
 impl FileSizeAllowlistEntry {
-    /// Constructs one migration-debt row used by the executable gate.
-    pub fn new(
-        path: &str,
-        line_count: usize,
-        owner_track: &str,
-        target_phase: &str,
-    ) -> Self {
+    /// Constructs one terminal-debt row used by the executable gate.
+    pub fn new(path: &str, line_count: usize, owner_track: &str, target_phase: &str) -> Self {
         Self {
             path: path.to_string(),
             line_count,
@@ -84,8 +79,8 @@ fn is_os_layer_production_source(path: &Path, workspace: &Path) -> bool {
 
 /// Counts physical lines in a UTF-8 source file (blank lines included).
 fn count_lines(path: &Path) -> usize {
-    let text = fs::read_to_string(path)
-        .unwrap_or_else(|err| panic!("read {}: {err}", path.display()));
+    let text =
+        fs::read_to_string(path).unwrap_or_else(|err| panic!("read {}: {err}", path.display()));
     text.lines().count()
 }
 
@@ -135,27 +130,23 @@ fn walkdir_rs_files(dir: &Path) -> Vec<PathBuf> {
     files
 }
 
-/// Terminal-state invariant: migration allowlist must be empty at P5 exit.
+/// Terminal-state invariant: exception inventory must be empty at P5 exit.
 ///
-/// Mirrors `assert_route_c_allowlist_terminal_state` — CI must not regress into
+/// Mirrors `assert_protocol_service_allowlist_terminal_state` — CI must not regress into
 /// tolerated oversized-file debt while the scan reports zero unallowlisted
 /// violations. Design pattern: **Specification by Example** with an explicit
 /// terminal assertion separate from the boundary scan.
 pub fn assert_os_layer_file_size_allowlist_terminal_state() {
     let entries = allowlist::entries();
     let row_count = entries.len();
-    eprintln!(
-        "os_layer_file_size_gate event=terminal_allowlist_check rows={row_count}"
-    );
+    eprintln!("os_layer_file_size_gate event=terminal_allowlist_check rows={row_count}");
     if entries.is_empty() {
-        eprintln!(
-            "os_layer_file_size_gate event=terminal_allowlist_pass reason=zero_rows"
-        );
+        eprintln!("os_layer_file_size_gate event=terminal_allowlist_pass reason=zero_rows");
         return;
     }
 
     let mut diagnostics = String::from(
-        "OS-layer file-size terminal gate failed: migration allowlist must be empty \
+        "OS-layer file-size terminal gate failed: exception inventory must be empty \
          at terminal state.\nSplit each oversized module instead of tolerating it.\n",
     );
     for entry in &entries {
@@ -184,7 +175,9 @@ pub fn assert_os_layer_file_size_boundaries() {
     let mut unallowlisted = Vec::new();
     for (path, lines) in &violations {
         if !allowlisted.contains_key(path) {
-            unallowlisted.push(format!("{path}: {lines} lines (limit {MAX_OS_LAYER_SOURCE_LINES})"));
+            unallowlisted.push(format!(
+                "{path}: {lines} lines (limit {MAX_OS_LAYER_SOURCE_LINES})"
+            ));
         }
     }
 

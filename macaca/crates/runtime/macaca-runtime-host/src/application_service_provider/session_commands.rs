@@ -3,7 +3,10 @@
 //! **Pattern:** Memento — session views are replayable provider-neutral records
 //! stored in the host-owned session map and returned through typed commands.
 
-use macaca_proto::{ApplicationSessionResumeCommand, ApplicationSessionStartCommand, ApplicationSessionStopCommand, ServiceCommand, ServiceResult};
+use macaca_proto::{
+    ApplicationSessionResumeCommand, ApplicationSessionStartCommand, ApplicationSessionStopCommand,
+    ServiceCommand, ServiceResult,
+};
 
 use super::support::{decode, session_view, to_value};
 use super::ApplicationSystemServiceProvider;

@@ -1,15 +1,8 @@
 //! Skill registry — discovers, loads, and manages installed skills.
 
-use std::collections::HashMap;
-use std::path::Path;
-
-use macaca_proto::{MacacaError, MacacaResult};
-
-use crate::adapter::SkillToolAdapter;
 use crate::definition::SkillDefinition;
-use crate::facade::load_executable_skill_definitions;
 use crate::snapshot::SkillRegistrySnapshot;
-use crate::tool::SkillTool;
+use std::collections::HashMap;
 
 /// Registry of available skills.
 pub struct SkillRegistry {
@@ -60,48 +53,6 @@ impl SkillRegistry {
         for skill in snapshot.skills {
             self.register(skill);
         }
-    }
-
-    /// Load executable skills from a directory.
-    ///
-    /// Discovers `*.yaml` and `*.yml` files and parses them as `SkillDefinition`.
-    /// For SKILL.md knowledge skills, use [`SkillCatalog`](crate::SkillCatalog) instead.
-    ///
-    /// Silently skips files that fail to parse.
-    #[deprecated(
-        note = "Use SkillRegistrySnapshot/reload primitives or a future SkillRegistryLoader facade for migration-safe loading."
-    )]
-    pub async fn load_from_directory(&mut self, dir: impl AsRef<Path>) -> MacacaResult<usize> {
-        let definitions = load_executable_skill_definitions(dir.as_ref()).await?;
-        let count = definitions.len();
-        for definition in definitions {
-            self.register(definition);
-        }
-        Ok(count)
-    }
-
-    /// Create a `Tool` instance from a registered skill.
-    #[deprecated(note = "Use SkillToolAdapter or collect through a tool exposure facade.")]
-    pub fn instantiate_tool(&self, name: &str) -> MacacaResult<SkillTool> {
-        let skill = self
-            .skills
-            .get(name)
-            .ok_or_else(|| MacacaError::NotFound(format!("Skill '{}' not found", name)))?;
-        Ok(SkillTool::from_adapter(SkillToolAdapter::local(
-            skill.clone(),
-        )))
-    }
-
-    /// Create `Tool` instances for all registered skills.
-    #[deprecated(note = "Use SkillToolAdapter or collect through a tool exposure facade.")]
-    pub fn instantiate_all_tools(&self) -> Vec<Box<dyn macaca_tools::Tool>> {
-        self.skills
-            .values()
-            .map(|s| {
-                Box::new(SkillTool::from_adapter(SkillToolAdapter::local(s.clone())))
-                    as Box<dyn macaca_tools::Tool>
-            })
-            .collect()
     }
 }
 
@@ -263,7 +214,7 @@ entry_point:
     }
 
     #[test]
-    fn instantiate_tool() {
+    fn executable_toolset_returns_named_tool() {
         let mut toolset = crate::ExecutableSkillToolSet::new();
         toolset.registry.register(make_skill("my-skill"));
         let tool = toolset.tool("my-skill").unwrap();
@@ -271,7 +222,7 @@ entry_point:
     }
 
     #[test]
-    fn instantiate_all_tools() {
+    fn executable_toolset_exports_all_tools() {
         let mut toolset = crate::ExecutableSkillToolSet::new();
         toolset.registry.register(make_skill("a"));
         toolset.registry.register(make_skill("b"));

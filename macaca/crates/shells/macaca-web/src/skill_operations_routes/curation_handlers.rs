@@ -8,8 +8,8 @@ use std::sync::Arc;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
+use macaca_host_composition::runtime_host::SkillCurationRollbackCommand;
 use macaca_proto::TraceContext;
-use macaca_sdk::skill::SkillCurationRollbackCommand;
 
 use crate::routes::{err, proto_err, ErrorResponse};
 use crate::skill_operations_routes::adapter::{

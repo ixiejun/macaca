@@ -1,71 +1,15 @@
+//! Provider-neutral alert primitives for the microkernel.
+//!
+//! The kernel owns alert identity, severity, deduplication, and the abstract
+//! sink port. Concrete transports such as webhooks are service providers owned
+//! by runtime-host so the microkernel never constructs network clients.
+
+pub use macaca_proto::{Alert, AlertSeverity};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
-
-/// Alert severity levels.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum AlertSeverity {
-    Info,
-    Warning,
-    Critical,
-}
-
-/// An alert to be sent.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Alert {
-    pub severity: AlertSeverity,
-    pub title: String,
-    pub message: String,
-    pub source: String,
-    #[serde(skip)]
-    pub timestamp: Option<std::time::Instant>,
-}
-
-impl Alert {
-    pub fn warning(
-        title: impl Into<String>,
-        message: impl Into<String>,
-        source: impl Into<String>,
-    ) -> Self {
-        Self {
-            severity: AlertSeverity::Warning,
-            title: title.into(),
-            message: message.into(),
-            source: source.into(),
-            timestamp: None,
-        }
-    }
-
-    pub fn critical(
-        title: impl Into<String>,
-        message: impl Into<String>,
-        source: impl Into<String>,
-    ) -> Self {
-        Self {
-            severity: AlertSeverity::Critical,
-            title: title.into(),
-            message: message.into(),
-            source: source.into(),
-            timestamp: None,
-        }
-    }
-
-    pub fn info(
-        title: impl Into<String>,
-        message: impl Into<String>,
-        source: impl Into<String>,
-    ) -> Self {
-        Self {
-            severity: AlertSeverity::Info,
-            title: title.into(),
-            message: message.into(),
-            source: source.into(),
-            timestamp: None,
-        }
-    }
-}
 
 /// Configuration for the alert system.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -73,8 +17,6 @@ pub struct AlertConfig {
     pub enabled: bool,
     /// Deduplication window in seconds (default: 300 = 5 minutes).
     pub dedup_interval_secs: u64,
-    /// Webhook URL for sending alerts (empty = disabled).
-    pub webhook_url: String,
 }
 
 impl Default for AlertConfig {
@@ -82,88 +24,18 @@ impl Default for AlertConfig {
         Self {
             enabled: true,
             dedup_interval_secs: 300,
-            webhook_url: String::new(),
         }
     }
 }
 
-/// Alert channel trait for extensibility.
+/// Provider-neutral alert sink port.
+///
+/// Implementations may be test doubles or adapters that forward alerts into a
+/// service client. Concrete transport providers must live outside the kernel.
 #[async_trait::async_trait]
 pub trait AlertChannel: Send + Sync {
     async fn send(&self, alert: &Alert) -> Result<(), String>;
     fn name(&self) -> &str;
-}
-
-/// Logs alerts using tracing (always available).
-pub struct LogAlertChannel;
-
-#[async_trait::async_trait]
-impl AlertChannel for LogAlertChannel {
-    async fn send(&self, alert: &Alert) -> Result<(), String> {
-        match alert.severity {
-            AlertSeverity::Critical => tracing::error!(
-                severity = "CRITICAL",
-                title = %alert.title,
-                "[ALERT] {}",
-                alert.message
-            ),
-            AlertSeverity::Warning => tracing::warn!(
-                severity = "WARNING",
-                title = %alert.title,
-                "[ALERT] {}",
-                alert.message
-            ),
-            AlertSeverity::Info => tracing::info!(
-                severity = "INFO",
-                title = %alert.title,
-                "[ALERT] {}",
-                alert.message
-            ),
-        }
-        Ok(())
-    }
-
-    fn name(&self) -> &str {
-        "log"
-    }
-}
-
-/// Sends alerts to a webhook URL via HTTP POST.
-pub struct WebhookAlertChannel {
-    url: String,
-    client: reqwest::Client,
-}
-
-impl WebhookAlertChannel {
-    pub fn new(url: impl Into<String>) -> Self {
-        Self {
-            url: url.into(),
-            client: reqwest::Client::new(),
-        }
-    }
-}
-
-#[async_trait::async_trait]
-impl AlertChannel for WebhookAlertChannel {
-    async fn send(&self, alert: &Alert) -> Result<(), String> {
-        let payload = serde_json::json!({
-            "severity": format!("{:?}", alert.severity),
-            "title": alert.title,
-            "message": alert.message,
-            "source": alert.source,
-        });
-        self.client
-            .post(&self.url)
-            .json(&payload)
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
-        Ok(())
-    }
-
-    fn name(&self) -> &str {
-        "webhook"
-    }
 }
 
 /// The alert manager. Handles deduplication and routing to channels.
@@ -176,10 +48,19 @@ pub struct AlertManager {
 
 impl AlertManager {
     pub fn new(config: AlertConfig) -> Self {
-        let mut channels: Vec<Box<dyn AlertChannel>> = vec![Box::new(LogAlertChannel)];
-        if !config.webhook_url.is_empty() {
-            channels.push(Box::new(WebhookAlertChannel::new(&config.webhook_url)));
+        Self {
+            config,
+            channels: Vec::new(),
+            dedup: Arc::new(RwLock::new(HashMap::new())),
         }
+    }
+
+    /// Build a manager with explicit alert sink ports.
+    ///
+    /// This constructor is intentionally port-based. Runtime-host may provide a
+    /// service-client adapter, and tests may provide counters, without making
+    /// the kernel depend on concrete alert transports.
+    pub fn with_channels(config: AlertConfig, channels: Vec<Box<dyn AlertChannel>>) -> Self {
         Self {
             config,
             channels,
@@ -218,7 +99,16 @@ impl AlertManager {
             map.insert(key, Instant::now());
         }
 
-        // Send to all channels
+        tracing::info!(
+            severity = ?alert.severity,
+            source = %alert.source,
+            title = %alert.title,
+            channel_count = self.channels.len(),
+            "kernel alert accepted by provider-neutral manager"
+        );
+
+        // Send to configured abstract channels. Concrete transport remains
+        // outside the kernel and is reached only through this port.
         for channel in &self.channels {
             if let Err(e) = channel.send(&alert).await {
                 tracing::error!(channel = channel.name(), error = %e, "Failed to send alert");
@@ -295,20 +185,11 @@ mod tests {
         let config = AlertConfig {
             enabled,
             dedup_interval_secs: 300,
-            webhook_url: String::new(),
         };
-        // Build manager manually so we can inject the counting channel
-        let channels: Vec<Box<dyn AlertChannel>> = vec![
-            Box::new(LogAlertChannel),
-            Box::new(CountingChannel {
-                count: counter.clone(),
-            }),
-        ];
-        let manager = AlertManager {
-            config,
-            channels,
-            dedup: Arc::new(RwLock::new(HashMap::new())),
-        };
+        let channels: Vec<Box<dyn AlertChannel>> = vec![Box::new(CountingChannel {
+            count: counter.clone(),
+        })];
+        let manager = AlertManager::with_channels(config, channels);
         (manager, counter)
     }
 
@@ -415,16 +296,11 @@ mod tests {
         let config = AlertConfig {
             enabled: true,
             dedup_interval_secs: 0,
-            webhook_url: String::new(),
         };
         let channels: Vec<Box<dyn AlertChannel>> = vec![Box::new(CountingChannel {
             count: counter.clone(),
         })];
-        let manager = AlertManager {
-            config,
-            channels,
-            dedup: Arc::new(RwLock::new(HashMap::new())),
-        };
+        let manager = AlertManager::with_channels(config, channels);
 
         let alert = Alert::info("ZeroWindow", "msg", "src");
         manager.fire(alert.clone()).await;

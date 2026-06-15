@@ -1,9 +1,8 @@
 //! P5 §6.1.4 — shell-not-semantic-owner terminal audit gate.
 //!
-//! Proves presentation shells remain adapters: they must not read deprecated
-//! direct provider fields, start applications outside service commands, or host
-//! in-shell agent execution loops. Composition-bootstrap modules are the only
-//! temporary exception while provider anchors finish migrating behind SDK clients.
+//! Proves presentation shells remain adapters: they must not read retired direct
+//! provider fields, start applications outside service commands, or host
+//! in-shell agent execution loops.
 
 use super::scanner::assert_token_family_gate;
 

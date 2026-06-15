@@ -36,7 +36,7 @@ pub(crate) async fn resolve_required_entry_agent_name(
         tracing::warn!(
             app_id = %app_id,
             entry_agent = %name,
-            "Resolved entry agent via deprecated manifest registry fallback"
+            "Resolved entry agent via manifest registry fallback"
         );
         return Ok(name);
     }
@@ -48,7 +48,10 @@ pub(crate) async fn resolve_required_entry_agent_name(
     Err("Application manifest does not declare an entry agent".to_string())
 }
 
-pub(crate) async fn service_entry_agent_name(state: &Arc<AppState>, app_id: &ApplicationId) -> Option<String> {
+pub(crate) async fn service_entry_agent_name(
+    state: &Arc<AppState>,
+    app_id: &ApplicationId,
+) -> Option<String> {
     match ApplicationMetadataQueryCommand::application(
         TraceContext::new("web-chat-entry-agent-metadata"),
         *app_id,

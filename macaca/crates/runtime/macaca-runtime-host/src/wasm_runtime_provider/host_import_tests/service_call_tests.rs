@@ -2,9 +2,7 @@
 
 use std::sync::Arc;
 
-use macaca_proto::{
-    ApplicationHostCommandStatus, MCP_SERVICE_ID, MCP_TOOL_INVOKE_COMMAND,
-};
+use macaca_proto::{ApplicationHostCommandStatus, MCP_SERVICE_ID, MCP_TOOL_INVOKE_COMMAND};
 use serde_json::json;
 
 use super::super::{

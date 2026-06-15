@@ -269,19 +269,6 @@ impl LlmRouter {
         })
     }
 
-    /// Resolve the provider name from the model string.
-    ///
-    /// Built-in routing rules:
-    /// - `gpt-*`, `o1*`, `o3*` → `"openai"`
-    /// - `claude-*` → `"anthropic"`
-    /// - `qwen*` → `"dashscope"` (covers qwen-*, qwen2-*, qwen3-*, etc.)
-    /// - `deepseek-*` → `"deepseek"`
-    /// - anything else → uses the model string as the provider key
-    #[deprecated(note = "use macaca_llm::ResolverChain::resolve_provider")]
-    pub fn resolve_provider_name(model: &str) -> String {
-        ResolverChain::built_in().resolve_provider(model)
-    }
-
     async fn chat_once(
         &self,
         provider_name: &str,

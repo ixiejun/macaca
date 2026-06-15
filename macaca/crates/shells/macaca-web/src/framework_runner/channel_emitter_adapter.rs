@@ -1,12 +1,12 @@
 //! Channel Adapter: bridges lifecycle and tools to `AgentExecutionEvent` channels.
 
-use std::sync::atomic::Ordering;
-use async_trait::async_trait;
-use macaca_sdk::framework::agent::Hook;
-use macaca_sdk::framework::message::Msg;
-use macaca_sdk::framework::tool::{ToolError, ToolMiddleware, ToolResponse};
-use tokio::sync::mpsc;
 use super::tool_trace::{tool_call_event, tool_result_event, tool_trace_output};
+use async_trait::async_trait;
+use macaca_host_composition::framework::agent::Hook;
+use macaca_host_composition::framework::message::Msg;
+use macaca_host_composition::framework::tool::{ToolError, ToolMiddleware, ToolResponse};
+use std::sync::atomic::Ordering;
+use tokio::sync::mpsc;
 pub struct ChannelEmitterHook {
     pub(crate) tx: mpsc::Sender<macaca_proto::AgentExecutionEvent>,
     pub(crate) iteration: std::sync::atomic::AtomicUsize,
@@ -14,7 +14,10 @@ pub struct ChannelEmitterHook {
 
 #[async_trait]
 impl Hook for ChannelEmitterHook {
-    async fn pre_reply(&self, msg: Msg) -> macaca_sdk::framework::agent::AgentResult<Msg> {
+    async fn pre_reply(
+        &self,
+        msg: Msg,
+    ) -> macaca_host_composition::framework::agent::AgentResult<Msg> {
         let iter = self.iteration.fetch_add(1, Ordering::Relaxed);
         let _ = self
             .tx
@@ -26,7 +29,10 @@ impl Hook for ChannelEmitterHook {
         Ok(msg)
     }
 
-    async fn post_reply(&self, msg: Msg) -> macaca_sdk::framework::agent::AgentResult<Msg> {
+    async fn post_reply(
+        &self,
+        msg: Msg,
+    ) -> macaca_host_composition::framework::agent::AgentResult<Msg> {
         let text = msg.get_text();
         if !text.is_empty() {
             let _ = self

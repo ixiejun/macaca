@@ -13,13 +13,13 @@ use std::collections::HashMap;
 
 use macaca_skill::SkillSnapshot;
 
-use crate::skill_mcp_mapping_registry::{
-    default_skill_mcp_mapping_registry, SkillMcpMappingRegistry,
-};
 use crate::env_bridge::McpEnvApplyOutcome;
 use crate::mcp_runtime::{
     definitions_from_skill_snapshot_with_registry, McpDefinitionSource, McpRegistryConfig,
     McpServerDefinition,
+};
+use crate::skill_mcp_mapping_registry::{
+    default_skill_mcp_mapping_registry, SkillMcpMappingRegistry,
 };
 
 /// Thin builder that keeps process-wide MCP env application behind a stable
@@ -28,10 +28,7 @@ pub struct RuntimeEnvBuilder;
 
 impl RuntimeEnvBuilder {
     pub fn apply_process_env(env: &HashMap<String, String>) -> HashMap<String, McpEnvApplyOutcome> {
-        #[allow(deprecated)]
-        {
-            crate::env_bridge::apply_mcp_env(env)
-        }
+        crate::env_bridge::apply_process_env_entries(env)
     }
 }
 
@@ -143,7 +140,8 @@ mcpServers:
             version: 1,
         };
 
-        let definitions = McpServerFactory::with_bundled_mapping_registry().from_skill_snapshot(&snapshot);
+        let definitions =
+            McpServerFactory::with_bundled_mapping_registry().from_skill_snapshot(&snapshot);
         assert_eq!(definitions.len(), 2);
         assert!(definitions
             .iter()

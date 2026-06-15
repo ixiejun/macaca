@@ -2,13 +2,12 @@
 
 use std::collections::BTreeMap;
 
-use macaca_proto::{ApplicationId, TraceContext};
-use macaca_sdk::runtime_host::executor::TaskResult;
-use macaca_sdk::skill::{
+use macaca_host_composition::runtime_host::{
     SkillEvolutionCandidateClassification, SkillEvolutionProposalAction, SkillExperienceCandidate,
     SkillExperienceCandidateDestination, SkillExperienceEvidenceGateStatus,
     SkillExperienceProposalCommand, SkillServiceScope,
 };
+use macaca_proto::{ApplicationId, TaskResult, TraceContext};
 
 use super::projection::bounded_artifact_ref;
 use super::semantic_signal::SemanticSkillCreatorSignal;
@@ -82,7 +81,7 @@ pub(crate) fn build_skill_experience_proposal_command(
         semantic_target = semantic_signal.target_skill_name.as_deref().unwrap_or(""),
         semantic_phrase_count = semantic_signal.trigger_phrases.len(),
         semantic_signal_fallback = semantic_signal.target_skill_name.is_none(),
-        "Skill self-evolution observer built Skill Creator-compatible semantic trigger signal"
+        "Skill self-evolution observer built Skill Creator aligned semantic trigger signal"
     );
 
     Some(SkillExperienceProposalCommand {

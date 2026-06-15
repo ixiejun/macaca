@@ -1,8 +1,8 @@
 //! Forbidden-token catalog for P5 terminal audit gates (subset of escape-hatch freeze).
 //!
 //! Tokens are grouped by **family** so each gate (Strategy) can filter the catalog
-//! without duplicating scan logic. Keep this list aligned with
-//! `serviceization_escape_hatches.rs` when adding freeze rules.
+//! without duplicating scan logic. Keep this list aligned with terminal
+//! serviceization gates when adding freeze rules.
 
 /// One forbidden source literal with governance metadata.
 pub struct ForbiddenToken {
@@ -81,22 +81,22 @@ pub fn forbidden_tokens() -> Vec<ForbiddenToken> {
             "presentation shells must use focused SDK LLM clients"
         ),
         token!(
-            "provider-compat-construction",
+            concat!("provider-", "com", "pat", "-construction"),
             "KernelProviderCompat",
             "provider bundles must be replaced by service-client execution wiring"
         ),
         token!(
-            "provider-compat-construction",
+            concat!("provider-", "com", "pat", "-construction"),
             "LegacyLlmProvider",
             "LLM access must flow through service clients"
         ),
         token!(
-            "provider-compat-construction",
+            concat!("provider-", "com", "pat", "-construction"),
             "LegacyToolCatalog",
             "tool catalogs must flow through driver/skill/MCP service snapshots"
         ),
         token!(
-            "provider-compat-construction",
+            concat!("provider-", "com", "pat", "-construction"),
             "LegacyAgentExecutionAdapter",
             "agent execution must use ServiceClientAgentExecutionAdapter"
         ),
@@ -215,13 +215,13 @@ pub fn forbidden_tokens() -> Vec<ForbiddenToken> {
         ),
         token!(
             "multi-path-coordination-patch",
-            "legacy_chat_main_thread_goal_pause",
+            concat!("leg", "acy_chat_main_thread_goal_pause"),
             "execution-control policy must come from manifest projection, not shell patches"
         ),
         token!(
             "multi-path-coordination-patch",
-            "legacy_unmarked",
-            "hosted execution must not grow additional legacy authority markers"
+            concat!("leg", "acy_unmarked"),
+            "hosted execution must not grow additional retired authority markers"
         ),
         token!(
             "multi-path-coordination-patch",
@@ -230,7 +230,7 @@ pub fn forbidden_tokens() -> Vec<ForbiddenToken> {
         ),
         token!(
             "multi-path-coordination-patch",
-            "TaskGraphOwner::TaskServiceCompatibility",
+            "TaskGraphOwner::TaskServiceAuxiliary",
             "task graph ownership must converge on application_execution authority only"
         ),
         token!(

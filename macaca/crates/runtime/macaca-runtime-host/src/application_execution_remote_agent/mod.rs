@@ -21,6 +21,4 @@ mod transport;
 pub use provider::RemoteAgentApplicationExecutionProvider;
 pub use registration::{RemoteAgentRegistration, RemoteAgentTransportMetadata};
 pub use registry::RemoteAgentRegistry;
-pub use transport::{
-    RemoteAgentExecutionTransport, UnavailableRemoteAgentExecutionTransport,
-};
+pub use transport::{RemoteAgentExecutionTransport, UnavailableRemoteAgentExecutionTransport};

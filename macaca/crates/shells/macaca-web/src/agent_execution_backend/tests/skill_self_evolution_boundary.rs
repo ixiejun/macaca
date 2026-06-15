@@ -4,7 +4,6 @@
 //! Validates execution control, heartbeat evidence, envelope contracts, and
 //! architecture governance boundaries without application-specific business logic.
 
-
 use super::support::*;
 #[test]
 fn skill_self_evolution_observation_is_centralized_at_agent_execution_boundary() {

@@ -20,7 +20,7 @@ use tempfile::tempdir;
 /// Adapter that exposes the real in-process [`TestMemoryManager`] through the scoped fabric
 /// contract expected by [`MemoryRuntimeFacade`].
 ///
-/// The production web runtime uses the same Adapter pattern: concrete legacy managers are allowed
+/// The production web runtime uses the same Adapter pattern: concrete managers are allowed
 /// as builtin backing stores, but callers interact with the runtime facade.
 struct SharedManagerFacade {
     manager: Arc<TestMemoryManager>,

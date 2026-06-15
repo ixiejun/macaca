@@ -7,9 +7,7 @@
 use macaca_proto::ApplicationId;
 
 use super::heartbeat::app_manifest_to_heartbeat_agent_views;
-use super::projection::{
-    app_manifest_to_metadata_view, app_manifest_to_service_app_view,
-};
+use super::projection::{app_manifest_to_metadata_view, app_manifest_to_service_app_view};
 
 use crate::model::{
     AgentSource, AppAutonomyConfig, AppHeartbeatAgentConfig, AppHeartbeatCadenceConfig,
@@ -58,15 +56,8 @@ fn fixture_manifest() -> AppManifest {
 #[test]
 fn sanitized_metadata_excludes_prompt_and_secret_like_values() {
     let manifest = fixture_manifest();
-    let view = app_manifest_to_metadata_view(
-        &manifest,
-        None,
-        AppStatus::Loaded,
-        true,
-        true,
-        true,
-        true,
-    );
+    let view =
+        app_manifest_to_metadata_view(&manifest, None, AppStatus::Loaded, true, true, true, true);
     let encoded = serde_json::to_string(&view).unwrap();
     assert!(!encoded.contains("SECRET_PROMPT_BODY_SHOULD_NOT_LEAK"));
     assert!(!encoded.contains("provider-model"));
@@ -106,9 +97,10 @@ fn service_app_view_contains_effective_service_diagnostics() {
         .diagnostics
         .iter()
         .any(|line| line == "effective_service_count=1"));
-    assert!(view.diagnostics.iter().any(|line| {
-        line == "unresolved_domain_packs=pack.finance.v1"
-    }));
+    assert!(view
+        .diagnostics
+        .iter()
+        .any(|line| { line == "unresolved_domain_packs=pack.finance.v1" }));
 }
 
 #[test]

@@ -1,9 +1,9 @@
-use macaca_autonomy_evolution::{
+use macaca_proto::TraceContext;
+use macaca_proto::{
     BenchmarkDecision, EvolutionReleaseAction, EvolutionReleaseCommand,
     EvolutionReleasePolicyInput, EvolutionReleaseStatus, EvolutionScope, EvolutionTargetType,
     EvolutionTrustLevel,
 };
-use macaca_proto::TraceContext;
 use macaca_sdk::{SystemAutonomyEvolutionClient, UnavailableSystemAutonomyEvolutionClient};
 
 #[tokio::test]

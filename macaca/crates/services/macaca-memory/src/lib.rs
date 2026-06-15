@@ -1,12 +1,12 @@
 //! aos-memory: three-layer memory system for Agent OS.
 //!
-//! The crate now exposes two layers of API side by side:
-//! - legacy managers/stores (`manager`, `isolated`, `store`, `vector`, ...)
-//! - the new memory fabric core (`core`) introduced as an additive boundary
+//! The crate exposes two stable layers of API side by side:
+//! - concrete managers/stores (`manager`, `isolated`, `store`, `vector`, ...)
+//! - the memory fabric core (`core`) introduced as a provider-neutral boundary
 //!
-//! The fabric layer does not replace the old implementation immediately.
-//! Instead, it wraps builtin managers behind scope-aware traits so callers can
-//! migrate to a generic memory contract without losing backward compatibility.
+//! The fabric layer wraps builtin managers behind scope-aware traits so callers
+//! use a generic memory contract while concrete storage backends continue to
+//! evolve independently.
 
 pub mod artifacts;
 pub mod backend;

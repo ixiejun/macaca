@@ -6,13 +6,13 @@
 
 use macaca_proto::{
     CapabilityId, CleanupPolicy, KernelServiceId, ServiceCapability, ServiceDescriptor,
-    ServiceHealth, ServiceScope, ServiceType, TraceSchemaRef,
+    ServiceHealth, ServiceScope, ServiceType, TraceSchemaRef, TASK_SERVICE_ID,
 };
 
 /// Build the provider-neutral descriptor for the task system service.
 pub fn task_service_descriptor() -> ServiceDescriptor {
     let mut descriptor = ServiceDescriptor::new(
-        KernelServiceId::new("service.task"),
+        KernelServiceId::new(TASK_SERVICE_ID),
         ServiceType::new("task"),
         TraceSchemaRef::new("trace.system_service.task.v1"),
     );

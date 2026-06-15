@@ -6,9 +6,10 @@ use std::sync::Arc;
 use axum::response::sse::Event;
 use serde::{Deserialize, Serialize};
 
+use macaca_host_composition::executor::ExecutorEvent;
+use macaca_host_composition::persist::PersistStore;
+use macaca_proto::AppendEventCommand;
 use macaca_proto::{AgentExecutionEvent, ApplicationId};
-use macaca_sdk::runtime_host::executor::ExecutorEvent;
-use macaca_sdk::runtime_host::persist::{AppendEventCommand, PersistStore};
 
 use crate::proto_event_visitors::delegated_sse_event_name;
 use crate::state::AppState;
@@ -42,24 +43,6 @@ pub(crate) async fn save_plan_decision<S>(
     decisions.push(decision);
     if let Ok(data) = serde_json::to_vec(&decisions) {
         let _ = store.set(&key, &data).await;
-    }
-}
-
-/// Load all plan decisions for an application.
-#[deprecated(
-    note = "app-scoped plan decision reads are legacy; use session EventLog plan_decision events"
-)]
-pub(crate) async fn load_plan_decisions<S>(
-    store: &Arc<S>,
-    app_id: &ApplicationId,
-) -> Vec<PlanDecisionEvent>
-where
-    S: PersistStore + ?Sized,
-{
-    let key = format!("{}{}", PLAN_DECISIONS_PREFIX, app_id);
-    match store.get(&key).await {
-        Ok(Some(data)) => serde_json::from_slice(&data).unwrap_or_default(),
-        _ => Vec::new(),
     }
 }
 
@@ -146,7 +129,7 @@ pub(crate) fn convert_executor_event_to_sse(event: ExecutorEvent) -> Result<Even
         ExecutorEvent::HookEvent { event: hook_event } => {
             // Convert HookEvent to SSE for coordinator notification
             match hook_event {
-                macaca_sdk::runtime_host::executor::fork_manager::HookEvent::DelegateCompleted {
+                macaca_host_composition::executor::fork_manager::HookEvent::DelegateCompleted {
                     fork_id,
                     task_id,
                     success,
@@ -161,7 +144,7 @@ pub(crate) fn convert_executor_event_to_sse(event: ExecutorEvent) -> Result<Even
                     })
                     .to_string(),
                 )),
-                macaca_sdk::runtime_host::executor::fork_manager::HookEvent::DelegateFailed {
+                macaca_host_composition::executor::fork_manager::HookEvent::DelegateFailed {
                     fork_id,
                     task_id,
                     error,
@@ -174,7 +157,7 @@ pub(crate) fn convert_executor_event_to_sse(event: ExecutorEvent) -> Result<Even
                     })
                     .to_string(),
                 )),
-                macaca_sdk::runtime_host::executor::fork_manager::HookEvent::ForkValidated {
+                macaca_host_composition::executor::fork_manager::HookEvent::ForkValidated {
                     fork_id,
                     result,
                 } => Ok(Event::default().event("hook_fork_validated").data(
@@ -185,16 +168,16 @@ pub(crate) fn convert_executor_event_to_sse(event: ExecutorEvent) -> Result<Even
                     })
                     .to_string(),
                 )),
-                macaca_sdk::runtime_host::executor::fork_manager::HookEvent::ForkMerged { fork_id } => {
-                    Ok(Event::default().event("hook_fork_merged").data(
-                        serde_json::json!({
-                            "fork_id": fork_id.to_string(),
-                            "agent_tab": "hook",
-                        })
-                        .to_string(),
-                    ))
-                }
-                macaca_sdk::runtime_host::executor::fork_manager::HookEvent::ForkCreated {
+                macaca_host_composition::executor::fork_manager::HookEvent::ForkMerged {
+                    fork_id,
+                } => Ok(Event::default().event("hook_fork_merged").data(
+                    serde_json::json!({
+                        "fork_id": fork_id.to_string(),
+                        "agent_tab": "hook",
+                    })
+                    .to_string(),
+                )),
+                macaca_host_composition::executor::fork_manager::HookEvent::ForkCreated {
                     fork_id,
                     application_id,
                     agent_name,
@@ -207,7 +190,7 @@ pub(crate) fn convert_executor_event_to_sse(event: ExecutorEvent) -> Result<Even
                     })
                     .to_string(),
                 )),
-                macaca_sdk::runtime_host::executor::fork_manager::HookEvent::ForkWaiting {
+                macaca_host_composition::executor::fork_manager::HookEvent::ForkWaiting {
                     fork_id,
                     delegate_task_id,
                 } => Ok(Event::default().event("hook_fork_waiting").data(
@@ -218,7 +201,7 @@ pub(crate) fn convert_executor_event_to_sse(event: ExecutorEvent) -> Result<Even
                     })
                     .to_string(),
                 )),
-                macaca_sdk::runtime_host::executor::fork_manager::HookEvent::ForkResumed {
+                macaca_host_composition::executor::fork_manager::HookEvent::ForkResumed {
                     fork_id,
                     delegate_result,
                 } => Ok(Event::default().event("hook_fork_resumed").data(

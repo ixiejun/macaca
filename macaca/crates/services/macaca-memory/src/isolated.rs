@@ -236,36 +236,6 @@ impl<V: VectorStore, E: EmbeddingProvider> IsolatedMemoryManager<V, E> {
     pub async fn forget(&self, input: crate::facade::ForgetMemory) -> MacacaResult<()> {
         self.delete_entry(&input.id).await
     }
-
-    /// Store a memory entry through the legacy direct manager API.
-    #[deprecated(note = "use IsolatedMemoryManager::remember_text for new text memories")]
-    pub async fn store(&self, entry: MemoryEntry) -> MacacaResult<MemoryId> {
-        self.store_entry(entry).await
-    }
-
-    /// Retrieve scoped entries through the legacy direct manager API.
-    #[deprecated(note = "use IsolatedMemoryManager::recall with RecallQuery")]
-    pub async fn retrieve(&self, query: &str, limit: usize) -> MacacaResult<Vec<MemoryEntry>> {
-        self.retrieve_entries(query, limit).await
-    }
-
-    /// List scoped entries through the legacy direct manager API.
-    #[deprecated(note = "use IsolatedMemoryManager::list_memories")]
-    pub async fn list(&self, limit: usize) -> MacacaResult<Vec<MemoryEntry>> {
-        self.list_entries(limit).await
-    }
-
-    /// Get a scoped entry through the legacy direct manager API.
-    #[deprecated(note = "use IsolatedMemoryManager::get_memory")]
-    pub async fn get(&self, id: &MemoryId) -> MacacaResult<Option<MemoryEntry>> {
-        self.get_entry(id).await
-    }
-
-    /// Delete a scoped entry through the legacy direct manager API.
-    #[deprecated(note = "use IsolatedMemoryManager::forget")]
-    pub async fn delete(&self, id: &MemoryId) -> MacacaResult<()> {
-        self.delete_entry(id).await
-    }
 }
 
 #[async_trait]
@@ -310,7 +280,6 @@ pub mod naming {
         "shared_memory".into()
     }
 }
-
 
 #[cfg(test)]
 mod tests;

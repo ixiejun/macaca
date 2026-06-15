@@ -1,11 +1,11 @@
 //! Thin orchestrator composing PlanLoop and WorkerLoop startup.
 //!
-//! Resolves entry/planner agents once, migrates legacy todos, then delegates to
+//! Resolves entry/planner agents once, normalizes task ordering, then delegates to
 //! `plan_loop_orchestrator` and `worker_loop_orchestrator` sub-adapters.
 
 use std::sync::Arc;
 
-use macaca_sdk::app::app_entry_agent_name;
+use macaca_host_composition::app::app_entry_agent_name;
 use macaca_proto::ApplicationId;
 
 use super::planner_helpers::select_entry_and_plan_agents;
@@ -38,13 +38,12 @@ pub(crate) async fn ensure_plan_and_worker_loops(
             (entry.clone(), entry)
         };
 
-    // ── Migrate legacy tasks (one-time, idempotent) ──
+    // Normalize task ordering once before loop startup.
     state
         .persist
         .todo_store
         .migrate_sequence_numbers(app_id)
         .await;
-
 
     ensure_plan_loop(
         state,

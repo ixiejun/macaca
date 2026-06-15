@@ -75,8 +75,8 @@ pub async fn run(
         let loop_ = AgenticLoop::new(RuntimeConfig {
             max_iterations: 8,
             tool_timeout: Duration::from_secs(5),
-            context_engine: "legacy".into(),
-            context_fallback_engine: "legacy".into(),
+            context_engine: "passthrough".into(),
+            context_fallback_engine: "passthrough".into(),
             context_budget: ContextBudget::default(),
             context: macaca_proto::config::ContextConfig::default(),
         });

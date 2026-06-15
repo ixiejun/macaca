@@ -4,7 +4,6 @@
 //! Validates execution control, heartbeat evidence, envelope contracts, and
 //! architecture governance boundaries without application-specific business logic.
 
-
 use super::support::*;
 #[test]
 fn heartbeat_intent_requires_heartbeat_source_evidence() {

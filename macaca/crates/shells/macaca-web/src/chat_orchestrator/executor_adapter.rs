@@ -5,12 +5,10 @@
 
 use std::sync::Arc;
 
-use macaca_sdk::app::{AppLoader};
 use macaca_proto::{
-    ApplicationId, ApplicationMetadataQueryCommand, ApplicationServiceScope,
+    AgentInfo, ApplicationId, ApplicationMetadataQueryCommand, ApplicationServiceScope,
     ApplicationStatusCommand, TraceContext,
 };
-use macaca_sdk::runtime_host::AgentInfo;
 
 use crate::session_loop_shell_adapter::{
     shutdown_session_loops_via_execution_control, REASON_SESSION_LOOP_APPLICATION_CLEANUP,
@@ -74,9 +72,10 @@ pub(crate) async fn cleanup_app_state(state: &Arc<AppState>, app_id: &Applicatio
     // local waker maps.  This keeps audit replay aligned with goal/fork-join cleanup
     // paths that already route pause/resume via service.execution_control.
     {
-        let coordinator = macaca_sdk::runtime_host::ExecutionControlSessionLoopCoordinator::new(
-            Arc::clone(&state.service_runtime),
-        );
+        let coordinator =
+            macaca_host_composition::execution_control::ExecutionControlSessionLoopCoordinator::new(
+                Arc::clone(&state.service_runtime),
+            );
         shutdown_session_loops_via_execution_control(
             &coordinator,
             app_id,
@@ -85,31 +84,13 @@ pub(crate) async fn cleanup_app_state(state: &Arc<AppState>, app_id: &Applicatio
         .await;
     }
 
-    // 4. Signal PlanLoop shutdown and REMOVE handle so it can be restarted
-    {
-        let mut handles = state.loops.plan_loop_handles.write().await;
-        if let Some(flag) = handles.remove(app_id) {
-            flag.store(true, std::sync::atomic::Ordering::SeqCst);
-        }
-    }
-    {
-        let mut wakers = state.loops.plan_loop_wakers.write().await;
-        wakers.remove(app_id);
-    }
-
-    // 5. Signal all WorkerLoop shutdowns and REMOVE handles
-    {
-        let mut handles = state.loops.worker_loop_handles.write().await;
-        if let Some(flags) = handles.remove(app_id) {
-            for flag in &flags {
-                flag.store(true, std::sync::atomic::Ordering::SeqCst);
-            }
-        }
-    }
-    {
-        let mut wakers = state.loops.worker_loop_wakers.write().await;
-        wakers.remove(app_id);
-    }
+    // 4. Signal all local task controllers and remove runtime-host handles so
+    // the next session can start from a clean controller set.
+    state
+        .loops
+        .local_runtime
+        .shutdown_application_loops(app_id)
+        .await;
 
     tracing::info!(app_id = %app_id, "Application state cleaned up: loops stopped, agents idle, tasks cancelled");
 }
@@ -123,7 +104,10 @@ pub(crate) async fn cleanup_app_state(state: &Arc<AppState>, app_id: &Applicatio
 ///   back to global coordinator agents would couple shell behavior to unrelated
 ///   framework internals and produce non-auditable execution chains.
 /// - Returning an explicit error keeps behavior deterministic and debuggable.
-pub(crate) async fn ensure_app_executor(state: &Arc<AppState>, app_id: &ApplicationId) -> Result<(), String> {
+pub(crate) async fn ensure_app_executor(
+    state: &Arc<AppState>,
+    app_id: &ApplicationId,
+) -> Result<(), String> {
     if state.executor_registry.get(app_id).await.is_some() {
         return Ok(());
     }
@@ -159,18 +143,6 @@ pub(crate) async fn ensure_app_executor(state: &Arc<AppState>, app_id: &Applicat
             );
             service_executor_metadata(state, app_id).await
         }
-    };
-
-    let (app_name, app_agent_names) = if app_agent_names.is_empty() {
-        #[allow(deprecated)]
-        let legacy = legacy_executor_metadata(state, app_id).await;
-        if legacy.1.is_empty() {
-            (app_name, app_agent_names)
-        } else {
-            legacy
-        }
-    } else {
-        (app_name, app_agent_names)
     };
 
     let all_agents = state.kernel.list_agents().await;
@@ -242,34 +214,8 @@ pub(crate) async fn service_executor_metadata(
             tracing::warn!(
                 app_id = %app_id,
                 error = %error,
-                "Application Service status failed while ensuring executor; using legacy registry fallback"
+                "Application Service status failed while ensuring executor"
             );
-            #[allow(deprecated)]
-            legacy_executor_metadata(state, app_id).await
-        }
-    }
-}
-
-pub(crate) async fn legacy_executor_metadata(
-    state: &Arc<AppState>,
-    app_id: &ApplicationId,
-) -> (String, Vec<String>) {
-    #[allow(deprecated)]
-    {
-        let registry = crate::application_shell_adapter::registry_read_guard(&state).await;
-        if let Some(app) = registry.get_app(app_id).cloned() {
-            let names = AppLoader::resolve_agent_configs(&app.manifest, &app.path)
-                .map(|configs| configs.into_iter().map(|config| config.name).collect())
-                .unwrap_or_else(|error| {
-                    tracing::warn!(
-                        app_id = %app_id,
-                        error = %error,
-                        "Failed to resolve app agent names while ensuring executor"
-                    );
-                    Vec::new()
-                });
-            (app.name, names)
-        } else {
             (app_id.0.to_string(), Vec::new())
         }
     }

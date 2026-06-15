@@ -1,4 +1,4 @@
-//! Provider-neutral Optional EVM / DApp Module contracts for Route C Phase 11.
+//! Provider-neutral Optional EVM / DApp Module contracts.
 //!
 //! This module intentionally defines data contracts only. It does not encode
 //! one chain, provider, wallet, token, DApp, ABI codec, RPC transport, or
@@ -43,10 +43,7 @@ macro_rules! evm_string_value {
     };
 }
 
-evm_string_value!(
-    EvmChainId,
-    "Provider-neutral EVM-compatible chain identifier."
-);
+evm_string_value!(EvmChainId, "Provider-neutral EVM chain identifier.");
 evm_string_value!(
     EvmRequestId,
     "Stable EVM request identifier used for trace and audit."

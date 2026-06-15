@@ -5,12 +5,12 @@
 
 use tracing::info;
 
-use macaca_proto::MacacaResult;
 use crate::bootstrap::WebRuntimeFacade;
+use macaca_proto::MacacaResult;
 
-use super::bootstrap_ctx::BootstrapCtx;
-use super::application_discovery;
 use super::app_state_assembly;
+use super::application_discovery;
+use super::bootstrap_ctx::BootstrapCtx;
 use super::config_and_kernel;
 use super::post_bootstrap_hooks;
 use super::service_runtime_wiring;
@@ -29,7 +29,6 @@ pub(crate) async fn serve_web_server(port: u16) -> MacacaResult<()> {
     let state = ctx.app_state.expect("bootstrap: app_state");
     // 11. Build axum router.
     let app = WebRuntimeFacade::new(state).router();
-
 
     // 12. Start server.
     let addr = format!("0.0.0.0:{port}");

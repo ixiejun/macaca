@@ -11,12 +11,12 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use macaca_host_composition::tools::{Tool, ToolCommand};
 use macaca_proto::{
     ApplicationId, AutonomyScope, CreateScheduledAgentTaskCommand, MacacaError, MacacaResult,
     ScheduledAgentTaskSchedule, TraceContext,
 };
 use macaca_sdk::SystemScheduledAgentTaskClient;
-use macaca_sdk::tools::Tool;
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -108,7 +108,7 @@ impl Tool for ScheduledAgentTaskCreateTool {
         "Create a generic recurring scheduled agent task through service.scheduled_agent_task."
     }
 
-    fn parameters_schema(&self) -> Value {
+    fn tool_schema(&self) -> Value {
         serde_json::json!({
             "type": "object",
             "required": ["target_agent", "task_prompt"],
@@ -142,8 +142,8 @@ impl Tool for ScheduledAgentTaskCreateTool {
         })
     }
 
-    async fn execute(&self, input: Value) -> MacacaResult<Value> {
-        let input: ScheduledAgentTaskToolInput = serde_json::from_value(input)
+    async fn invoke(&self, command: ToolCommand) -> MacacaResult<Value> {
+        let input: ScheduledAgentTaskToolInput = serde_json::from_value(command.input)
             .map_err(|error| MacacaError::Config(error.to_string()))?;
         tracing::info!(
             app_id = %self.application_id,
@@ -271,16 +271,18 @@ mod tests {
             "entry",
         );
 
-        let output = tool
-            .execute(serde_json::json!({
+        let output = macaca_host_composition::tools::ToolCommandExecutor::execute_command(
+            &tool,
+            ToolCommand::new(serde_json::json!({
                 "target_agent": "worker",
                 "task_prompt": "Run a bounded recurring analysis.",
                 "schedule": { "interval_secs": 120 },
                 "metadata": { "schedule.name": "Recurring analysis" },
                 "delegated_context": { "source": "entry-agent" }
-            }))
-            .await
-            .unwrap();
+            })),
+        )
+        .await
+        .unwrap();
 
         assert_eq!(output["accepted"], true);
         let commands = client.commands.lock().unwrap();

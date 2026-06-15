@@ -2,8 +2,8 @@
 
 use macaca_proto::TraceContext;
 use macaca_skill::{
-    SkillExperienceProposalRecord, SkillGovernanceEventPayload, SkillGovernanceEventRecord,
-    SkillGovernanceReadModel, SkillGovernanceSnapshotRefRecord, SkillCurationRunRecord,
+    SkillCurationRunRecord, SkillExperienceProposalRecord, SkillGovernanceEventPayload,
+    SkillGovernanceEventRecord, SkillGovernanceReadModel, SkillGovernanceSnapshotRefRecord,
     SkillProvenanceAction, SkillRollbackRefRecord, SkillServiceScope, SkillUsageEventKind,
 };
 

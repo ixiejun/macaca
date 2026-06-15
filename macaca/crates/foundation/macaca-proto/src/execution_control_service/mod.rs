@@ -118,6 +118,51 @@ impl ExecutionControlResumeSource {
     }
 }
 
+/// Provider-neutral local resume payload for in-process execution-control adapters.
+///
+/// This DTO intentionally contains only bounded execution facts. It is safe for
+/// runtime-host local channels and future remote execution-control event streams
+/// because it does not reference Web, CLI, framework, or application-specific
+/// types.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RuntimeResumeSignal {
+    /// Operator or policy requested a normal resume.
+    Manual,
+    /// Delegated work or a goal lifecycle completed and supplied bounded output.
+    DelegateCompleted {
+        task_id: String,
+        success: bool,
+        output: String,
+    },
+    /// Delegated work failed and supplied a bounded diagnostic.
+    DelegateFailed { task_id: String, error: String },
+    /// The wait timed out according to policy.
+    Timeout,
+}
+
+impl RuntimeResumeSignal {
+    /// Build a successful delegation/goal lifecycle resume signal.
+    pub fn delegate_completed(
+        task_id: impl Into<String>,
+        success: bool,
+        output: impl Into<String>,
+    ) -> Self {
+        Self::DelegateCompleted {
+            task_id: task_id.into(),
+            success,
+            output: output.into(),
+        }
+    }
+
+    /// Build a failed delegation/goal lifecycle resume signal.
+    pub fn delegate_failed(task_id: impl Into<String>, error: impl Into<String>) -> Self {
+        Self::DelegateFailed {
+            task_id: task_id.into(),
+            error: error.into(),
+        }
+    }
+}
+
 /// Application-declared default execution-control policy.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExecutionControlPolicy {

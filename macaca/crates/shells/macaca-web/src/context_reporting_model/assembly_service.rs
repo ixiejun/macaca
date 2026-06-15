@@ -3,10 +3,10 @@
 //! Builds a serializable assembly snapshot so the runtime-host provider can
 //! rebuild the provider chain without depending on Web shell types.
 
-use macaca_sdk::context::{
+use macaca_host_composition::context::{
     ContextAssembleCommand, ContextAssemblySnapshot, ContextServiceScope,
 };
-use macaca_sdk::framework::model::ChatOptions;
+use macaca_host_composition::framework::model::ChatOptions;
 
 use crate::context_message_codec::{framework_messages_to_llm, framework_options_to_llm};
 
@@ -33,12 +33,9 @@ pub(super) async fn assemble_and_emit_report(
                 agent = %model.agent_name,
                 error = %error,
                 command = "context.assemble.service",
-                "context service scope validation failed"
+                "context service scope validation failed; skipping context assembly"
             );
-            #[allow(deprecated)]
-            return model
-                .assemble_and_emit_report_legacy_local(messages, options)
-                .await;
+            return None;
         }
     };
     let mut trace = macaca_proto::TraceContext::new(uuid::Uuid::new_v4().to_string());
@@ -58,12 +55,9 @@ pub(super) async fn assemble_and_emit_report(
                 agent = %model.agent_name,
                 error = %error,
                 command = "context.assemble.service",
-                "context service assemble command validation failed"
+                "context service assemble command validation failed; skipping context assembly"
             );
-            #[allow(deprecated)]
-            return model
-                .assemble_and_emit_report_legacy_local(messages, options)
-                .await;
+            return None;
         }
     };
     command.budget = model.context_budget;
@@ -84,12 +78,9 @@ pub(super) async fn assemble_and_emit_report(
                 agent = %model.agent_name,
                 error = %error,
                 command = "context.assemble.service",
-                "context service assembly failed; falling back to deprecated local assembler"
+                "context service assembly failed; skipping context assembly"
             );
-            #[allow(deprecated)]
-            return model
-                .assemble_and_emit_report_legacy_local(messages, options)
-                .await;
+            return None;
         }
     };
     if let (Some(ledger), Some(summary)) = (

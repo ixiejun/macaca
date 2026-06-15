@@ -8,11 +8,10 @@ use async_trait::async_trait;
 use chrono::Utc;
 use macaca_proto::{
     AutonomyServiceErrorKind, MacacaResult, SchedulerCommandResult, SchedulerDeleteJobCommand,
-    SchedulerGetJobCommand, SchedulerJobCommand, SchedulerJobLifecycleState,
-    SchedulerJobSummary, SchedulerLifecycleJobCommand, SchedulerListJobsCommand,
-    SchedulerQueryCommand, SchedulerRegisterJobCommand, SchedulerRunState,
-    SchedulerRunSummary, SchedulerServiceSnapshot, SchedulerUpdateJobCommand, ServiceDescriptor,
-    TraceContext, SCHEDULER_SERVICE_ID,
+    SchedulerGetJobCommand, SchedulerJobCommand, SchedulerJobLifecycleState, SchedulerJobSummary,
+    SchedulerLifecycleJobCommand, SchedulerListJobsCommand, SchedulerQueryCommand,
+    SchedulerRegisterJobCommand, SchedulerRunState, SchedulerRunSummary, SchedulerServiceSnapshot,
+    SchedulerUpdateJobCommand, ServiceDescriptor, TraceContext, SCHEDULER_SERVICE_ID,
 };
 use tracing::{info, warn};
 
@@ -28,10 +27,7 @@ impl SchedulerService for super::InProcessSchedulerProvider {
         self.descriptor.clone()
     }
 
-    async fn health(
-        &self,
-        trace: TraceContext,
-    ) -> MacacaResult<SchedulerServiceSnapshot> {
+    async fn health(&self, trace: TraceContext) -> MacacaResult<SchedulerServiceSnapshot> {
         info!(
             service_id = SCHEDULER_SERVICE_ID,
             provider_id = LOCAL_PROVIDER_ID,

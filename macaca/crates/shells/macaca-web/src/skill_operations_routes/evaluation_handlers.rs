@@ -9,8 +9,10 @@ use std::sync::Arc;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
+use macaca_host_composition::runtime_host::{
+    SkillEvaluationReportCommand, SkillEvaluationScoreCommand,
+};
 use macaca_proto::TraceContext;
-use macaca_sdk::skill::{SkillEvaluationReportCommand, SkillEvaluationScoreCommand};
 
 use crate::routes::{proto_err, ErrorResponse};
 use crate::skill_operations_routes::adapter::{application_skill_scope, parse_application_id};

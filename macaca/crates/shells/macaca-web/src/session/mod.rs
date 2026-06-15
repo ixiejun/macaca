@@ -29,13 +29,11 @@ mod tests;
 
 // Types and storage keys
 pub(crate) use persistence::{
-    load_agent_traces, persist_session_snapshot, save_agent_traces, update_session_realtime,
-    AGENT_TRACES_PREFIX, APP_SESSIONS_PREFIX, SESSION_PREFIX,
+    persist_session_snapshot, AGENT_TRACES_PREFIX, APP_SESSIONS_PREFIX, SESSION_PREFIX,
 };
 pub(crate) use trace_collector::AgentTraceCollector;
 pub(crate) use turn_model::{
-    build_turns_from_messages, ensure_running_assistant_turn, session_status_from_executor_event,
-    stored_turns_or_messages,
+    build_turns_from_messages, ensure_running_assistant_turn, stored_turns_or_messages,
 };
 pub(crate) use types::{
     AgentTrace, AgentTraceStep, AssistantExecutionMeta, SessionMeta, StoredSession,

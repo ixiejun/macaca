@@ -8,7 +8,9 @@ use axum::Json;
 use serde::Serialize;
 
 use macaca_proto::TraceContext;
-use macaca_sdk::driver::{DriverInventoryCommand, DriverLoadServiceCommand, DriverServiceScope};
+use macaca_sdk::{
+    DriverInventoryCommand, DriverLoadServiceCommand, DriverLoadStatus, DriverServiceScope,
+};
 
 use crate::state::AppState;
 
@@ -98,7 +100,7 @@ pub async fn reload_drivers(
 
     for entry in &report.entries {
         match entry.status {
-            macaca_sdk::driver::DriverLoadStatus::Loaded => {
+            DriverLoadStatus::Loaded => {
                 tracing::info!(
                     driver = %entry.name,
                     tools = entry.tool_count.unwrap_or_default(),
@@ -110,7 +112,7 @@ pub async fn reload_drivers(
                     error: None,
                 });
             }
-            macaca_sdk::driver::DriverLoadStatus::Failed => {
+            DriverLoadStatus::Failed => {
                 results.push(DriverReloadResult {
                     name: entry.name.clone(),
                     status: "error".to_string(),

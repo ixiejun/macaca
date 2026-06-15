@@ -32,15 +32,6 @@ impl Default for ContextFacadeAssemblyPolicy {
 }
 
 impl ContextFacadeAssemblyPolicy {
-    /// Maps legacy call sites that only toggled governance (`None` ⇒ defaults).
-    pub fn legacy_governance_only(governance: Option<ContextGovernanceRuntimeConfig>) -> Self {
-        Self {
-            governance: governance.unwrap_or_default(),
-            trust_governance: None,
-            knowledge_digest: KnowledgeDigestContextConfig::default(),
-        }
-    }
-
     /// Build from merged runtime/app context configuration.
     pub fn from_context_config_parts(
         governance: ContextGovernanceRuntimeConfig,

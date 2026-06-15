@@ -1,4 +1,4 @@
-//! Provider-neutral Payment Service contracts for Route C S10.
+//! Provider-neutral Payment Service contracts.
 //!
 //! The module describes the service-facing command and result surface for
 //! A2A/payment lifecycle work. It intentionally reuses the A2A value objects

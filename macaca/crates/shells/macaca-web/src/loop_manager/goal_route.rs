@@ -5,7 +5,8 @@ use std::sync::Arc;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
-use macaca_proto::ApplicationId;
+use macaca_proto::{ApplicationId, CreateGoalCommand, TraceContext};
+use macaca_sdk::ServiceBackedTaskBoardDataSource;
 
 use super::loop_orchestrator::ensure_plan_and_worker_loops;
 use crate::routes::{err, ErrorResponse};
@@ -26,11 +27,17 @@ pub(crate) async fn create_goal(
             "Missing 'description' field".into(),
         )
     })?;
-    let store = Arc::clone(&state.persist.todo_store);
     let session_id = body["session_id"].as_str().map(|s| s.to_string());
-    let space =
-        macaca_sdk::task::TaskSpace::for_session(app_id.clone(), session_id.clone(), Arc::clone(&store));
-    let goal = space.push_goal(description).await;
+    let task_client = ServiceBackedTaskBoardDataSource::new(state.system_facade.service_client());
+    let goal = task_client
+        .create_goal(CreateGoalCommand::new(
+            app_id.clone(),
+            session_id.clone(),
+            description,
+            Some(TraceContext::new("web-task-create-goal")),
+        ))
+        .await
+        .map_err(|error| err(StatusCode::BAD_REQUEST, error.to_string()))?;
 
     crate::run_trace::emit_for_scope(
         &state.persist.run_tracer,

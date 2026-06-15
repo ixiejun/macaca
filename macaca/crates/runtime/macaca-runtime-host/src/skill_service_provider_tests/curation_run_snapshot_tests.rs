@@ -3,9 +3,8 @@
 use macaca_kernel::SystemService;
 use macaca_proto::TraceContext;
 use macaca_skill::{
-    SkillAliasSnapshotCommand, SkillAliasSnapshotResult, SkillAliasUpsertCommand,
-    SkillAuthorKind, SkillCurationAction, SkillCurationPhase, SkillCurationRunCommand,
-    SkillCurationRunResult,
+    SkillAliasSnapshotCommand, SkillAliasSnapshotResult, SkillAliasUpsertCommand, SkillAuthorKind,
+    SkillCurationAction, SkillCurationPhase, SkillCurationRunCommand, SkillCurationRunResult,
     SkillCurationSnapshotCommand, SkillCurationSnapshotResult, SkillGovernanceRecordUsageCommand,
     SkillGovernanceSnapshotCommand, SkillGovernanceSnapshotResult, SkillSemanticReviewStatus,
     SkillServiceScope, SkillUsageEventKind, SKILL_ALIAS_SNAPSHOT_COMMAND,

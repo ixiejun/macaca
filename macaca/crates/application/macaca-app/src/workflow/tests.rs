@@ -5,64 +5,18 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::Arc;
-
-use async_trait::async_trait;
-use macaca_agent::{AgentExecutionPort, InProcessAgentExecutionPort, ToolCatalog};
-use macaca_kernel::KernelBuilder;
-use macaca_llm::LlmProvider;
-use macaca_proto::config::KernelConfig;
-use macaca_proto::{LlmMessage, LlmOptions, LlmResponse, MacacaResult, TokenUsage};
-use macaca_tools::DefaultToolSet;
 
 use crate::loader::AppLoader;
-use crate::model::{AgentSource, AppLayer, AppManifest, InlineAgentConfig, WorkflowDefinition, WorkflowStep};
+use crate::model::{
+    AgentSource, AppLayer, AppManifest, InlineAgentConfig, WorkflowDefinition, WorkflowStep,
+};
 
 use super::engine::WorkflowEngine;
 use super::prompt_strategy::{DefaultWorkflowPromptStrategy, WorkflowPromptStrategy};
 use super::types::{WorkflowPromptContext, DEFAULT_WORKFLOW};
 
-struct MockLlm;
-
-#[async_trait]
-impl LlmProvider for MockLlm {
-    fn name(&self) -> &str {
-        "mock"
-    }
-
-    async fn chat(
-        &self,
-        _messages: Vec<LlmMessage>,
-        _options: &LlmOptions,
-    ) -> MacacaResult<LlmResponse> {
-        Ok(LlmResponse {
-            content: "ok".into(),
-            reasoning_content: None,
-            model: "mock".into(),
-            usage: TokenUsage {
-                prompt_tokens: 1,
-                completion_tokens: 1,
-                total_tokens: 2,
-            },
-            finish_reason: "stop".into(),
-            tool_calls: None,
-        })
-    }
-}
-
 fn make_engine() -> WorkflowEngine {
-    let llm: Arc<dyn LlmProvider> = Arc::new(MockLlm);
-    let config = KernelConfig {
-        max_agents: 4,
-        heartbeat_interval_ms: 1000,
-        agent_timeout_ms: 1000,
-    };
-    let execution_port: Arc<dyn AgentExecutionPort> = Arc::new(InProcessAgentExecutionPort::new(
-        Arc::clone(&llm),
-        Arc::from(Box::new(DefaultToolSet::new()) as Box<dyn ToolCatalog>),
-    ));
-    let kernel = Arc::new(KernelBuilder::from_execution_port(config, execution_port).build());
-    WorkflowEngine::new(kernel, llm)
+    WorkflowEngine::new()
 }
 
 /// Provider-neutral fixture coordinator for workflow unit tests (Object Mother).

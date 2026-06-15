@@ -1,15 +1,16 @@
-//! Runtime-host provider for the Route C Store Service.
+//! Runtime-host provider for the Store Service.
 //!
 //! Store Service v1 is metadata-first.  It exposes package inspection, resolve,
 //! install, status, and snapshot commands without downloading raw package
 //! payloads or owning payment settlement.  Paid install authorization is
-//! delegated to Entitlement Service semantics through the Phase 08 facade.
+//! delegated to Entitlement Service semantics through a crate-local guard.
 
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use macaca_kernel::SystemService;
+use macaca_persist::{EntitlementStore, EventLog};
 use macaca_proto::{
     CleanupPolicy, KernelServiceId, PackageManifest, PackageRuntime, PackageRuntimeKind,
     PackageType, ServiceCallResult, ServiceCapability, ServiceCommand, ServiceDescriptor,
@@ -24,19 +25,45 @@ use macaca_proto::{
 use tokio::sync::RwLock;
 use tracing::info;
 
-use crate::entitlement::EntitlementRuntimeFacade;
+use crate::entitlement::RuntimeEntitlementGuard;
 use crate::store_entitlement_admission::{FreeOpenFastPathSpec, PackageScopeSpec, StoreTraceSpec};
 
 /// Store Service provider backed by an in-memory metadata index.
 pub struct StoreSystemServiceProvider {
     descriptor: ServiceDescriptor,
-    entitlement: Option<Arc<EntitlementRuntimeFacade>>,
+    entitlement: Option<Arc<RuntimeEntitlementGuard>>,
     packages: RwLock<HashMap<String, StorePackageView>>,
 }
 
 impl StoreSystemServiceProvider {
     /// Create a Store provider that can delegate paid authorization.
-    pub fn new(entitlement: Arc<EntitlementRuntimeFacade>) -> Self {
+    ///
+    /// The provider accepts repository handles rather than a public entitlement
+    /// facade. It builds the guard internally so Store remains a service
+    /// adapter and callers cannot depend on runtime-host authorization internals.
+    pub fn new(
+        entitlement_store: Arc<dyn EntitlementStore>,
+        event_log: Option<Arc<EventLog>>,
+    ) -> Self {
+        let entitlement = match event_log {
+            Some(event_log) => Arc::new(RuntimeEntitlementGuard::with_event_log(
+                entitlement_store,
+                event_log,
+            )),
+            None => Arc::new(RuntimeEntitlementGuard::new(entitlement_store)),
+        };
+        Self {
+            descriptor: store_service_descriptor(),
+            entitlement: Some(entitlement),
+            packages: RwLock::new(HashMap::new()),
+        }
+    }
+
+    /// Create a Store provider from an already-built entitlement guard.
+    ///
+    /// This is crate-local so route bootstrap can share one guard between
+    /// Entitlement and Store services without exposing the guard as public API.
+    pub(crate) fn with_entitlement_guard(entitlement: Arc<RuntimeEntitlementGuard>) -> Self {
         Self {
             descriptor: store_service_descriptor(),
             entitlement: Some(entitlement),

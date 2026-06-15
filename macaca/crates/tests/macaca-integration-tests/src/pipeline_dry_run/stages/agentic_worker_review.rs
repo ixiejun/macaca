@@ -7,14 +7,12 @@ use std::time::Duration;
 
 use macaca_context::ContextBudget;
 use macaca_proto::types::{
-    AgentId, ApplicationId, LlmMessage, LlmOptions, Permission, PermissionLevel, TaskId,
-    TodoItem, TodoStatus, ToolCall,
+    AgentId, ApplicationId, LlmMessage, LlmOptions, Permission, PermissionLevel, TaskId, TodoItem,
+    TodoStatus, ToolCall,
 };
 use macaca_runtime::{AgenticLoop, RuntimeConfig};
 use macaca_task::{TaskBoard, TaskSpace, TodoStore};
-use macaca_tools::{
-    ClaimTaskTool, ReviewTodoTool, StartTaskTool, SubmitTaskForReviewTool,
-};
+use macaca_tools::{ClaimTaskTool, ReviewTodoTool, StartTaskTool, SubmitTaskForReviewTool};
 use serde_json::json;
 use tracing::info;
 use uuid::Uuid;
@@ -134,8 +132,8 @@ pub async fn run(
         let loop_ = AgenticLoop::new(RuntimeConfig {
             max_iterations: 12,
             tool_timeout: Duration::from_secs(5),
-            context_engine: "legacy".into(),
-            context_fallback_engine: "legacy".into(),
+            context_engine: "passthrough".into(),
+            context_fallback_engine: "passthrough".into(),
             context_budget: ContextBudget::default(),
             context: macaca_proto::config::ContextConfig::default(),
         });
@@ -180,10 +178,6 @@ pub async fn run(
     .await;
 
     trace_stage_end(config, res.is_ok(), None);
-    record(
-        "agentic_loop_worker_submit_review_scripted",
-        res,
-        report,
-    );
+    record("agentic_loop_worker_submit_review_scripted", res, report);
     info!(target: "pipeline_dry_run", "stage_agentic_worker_review_end");
 }

@@ -12,8 +12,8 @@ use async_trait::async_trait;
 use macaca_kernel::SystemService;
 use macaca_proto::{
     AgentExecutionCommand, AgentExecutionIntent, AgentExecutionResult, AgentExecutionTargetCommand,
-    ApplicationId, AutonomousExecutionSourceKind, AutonomyPayloadRef, AutonomyScope,
-    CleanupPolicy, ResolveScheduledAgentTaskPayloadCommand, ScheduledAgentTaskId,
+    ApplicationId, AutonomousExecutionSourceKind, AutonomyPayloadRef, AutonomyScope, CleanupPolicy,
+    ResolveScheduledAgentTaskPayloadCommand, ScheduledAgentTaskId,
     ScheduledAgentTaskResolvedPayload, SchedulerTargetCommand, ServiceCallResult, ServiceCommand,
     ServiceDescriptor, ServiceError, ServiceHealth, ServiceResult, ServiceScope, ServiceType,
     TaskId, TraceContext, TraceSchemaRef, SCHEDULED_AGENT_TASK_RESOLVE_PAYLOAD_COMMAND,
@@ -49,10 +49,7 @@ struct RecordingExecutionBackend {
 
 #[async_trait]
 impl AgentExecutionBackend for RecordingExecutionBackend {
-    async fn execute(
-        &self,
-        command: AgentExecutionCommand,
-    ) -> ServiceResult<AgentExecutionResult> {
+    async fn execute(&self, command: AgentExecutionCommand) -> ServiceResult<AgentExecutionResult> {
         self.commands.lock().unwrap().push(command.clone());
         let mut result =
             AgentExecutionResult::completed(&command, serde_json::json!({"accepted": true}));
@@ -110,9 +107,8 @@ impl SystemService for FakeScheduledAgentTaskResolver {
         if command.name.as_str() != SCHEDULED_AGENT_TASK_RESOLVE_PAYLOAD_COMMAND {
             return Err(ServiceError::UnsupportedCommand(command.name.to_string()));
         }
-        let _: ResolveScheduledAgentTaskPayloadCommand =
-            serde_json::from_value(command.payload)
-                .map_err(|error| ServiceError::InvalidArgument(error.to_string()))?;
+        let _: ResolveScheduledAgentTaskPayloadCommand = serde_json::from_value(command.payload)
+            .map_err(|error| ServiceError::InvalidArgument(error.to_string()))?;
         Ok(ServiceCallResult {
             output: serde_json::to_value(Some(self.resolved.clone()))
                 .map_err(|error| ServiceError::AdapterFailure(error.to_string()))?,
@@ -251,9 +247,7 @@ async fn agent_execution_target_resolves_payload_and_invokes_agent_execution_ser
     let outcome = dispatcher
         .dispatch(
             TraceContext::new("trace-scheduled-agent-dispatch"),
-            AutonomyScope::application(ApplicationId::from_name(
-                "scheduled-agent-dispatch-test",
-            )),
+            AutonomyScope::application(ApplicationId::from_name("scheduled-agent-dispatch-test")),
             SchedulerTargetCommand::AgentExecution(target),
         )
         .await
@@ -299,7 +293,7 @@ async fn agent_execution_target_resolves_skill_alias_before_agent_execution() {
     let mut resolved = resolved_payload(payload_ref.clone());
     resolved.metadata.insert(
         "skill.alias.requested_id".into(),
-        "skill://agent/legacy-debug".into(),
+        "skill://agent/superseded-debug".into(),
     );
 
     register_static_service(
@@ -310,7 +304,7 @@ async fn agent_execution_target_resolves_skill_alias_before_agent_execution() {
     .await;
     register_skill_alias(
         &runtime,
-        "skill://agent/legacy-debug",
+        "skill://agent/superseded-debug",
         "skill://agent/current-debug",
     )
     .await;
@@ -333,9 +327,7 @@ async fn agent_execution_target_resolves_skill_alias_before_agent_execution() {
     let outcome = AutonomyDispatchStrategies::new(&runtime, 1_000)
         .dispatch(
             TraceContext::new("trace-scheduled-agent-dispatch-skill-alias"),
-            AutonomyScope::application(ApplicationId::from_name(
-                "scheduled-agent-dispatch-test",
-            )),
+            AutonomyScope::application(ApplicationId::from_name("scheduled-agent-dispatch-test")),
             SchedulerTargetCommand::AgentExecution(target),
         )
         .await
@@ -346,7 +338,7 @@ async fn agent_execution_target_resolves_skill_alias_before_agent_execution() {
     let metadata = &commands[0].metadata;
     assert_eq!(
         metadata["skill.alias.requested_id"],
-        "skill://agent/legacy-debug"
+        "skill://agent/superseded-debug"
     );
     assert_eq!(metadata["skill.alias.resolved"], "true");
     assert_eq!(metadata["skill.alias.status"], "redirected");
@@ -392,9 +384,7 @@ async fn completed_agent_execution_without_result_evidence_is_retryable() {
     let outcome = dispatcher
         .dispatch(
             TraceContext::new("trace-scheduled-agent-dispatch-missing-evidence"),
-            AutonomyScope::application(ApplicationId::from_name(
-                "scheduled-agent-dispatch-test",
-            )),
+            AutonomyScope::application(ApplicationId::from_name("scheduled-agent-dispatch-test")),
             SchedulerTargetCommand::AgentExecution(target),
         )
         .await
@@ -445,9 +435,7 @@ async fn completed_agent_execution_with_result_hash_satisfies_agent_result_polic
     let outcome = dispatcher
         .dispatch(
             TraceContext::new("trace-scheduled-agent-dispatch-output-hash"),
-            AutonomyScope::application(ApplicationId::from_name(
-                "scheduled-agent-dispatch-test",
-            )),
+            AutonomyScope::application(ApplicationId::from_name("scheduled-agent-dispatch-test")),
             SchedulerTargetCommand::AgentExecution(target),
         )
         .await

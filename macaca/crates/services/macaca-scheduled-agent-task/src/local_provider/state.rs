@@ -7,9 +7,9 @@ use std::collections::BTreeMap;
 
 use chrono::Utc;
 use macaca_proto::{
-    AgentExecutionIntent, AgentExecutionPolicyContext, AgentExecutionTargetCommand,
-    ApplicationId, AutonomyServiceErrorKind, AutonomyPayloadRef, CreateScheduledAgentTaskCommand,
-    MacacaResult, RecordScheduledAgentTaskResultCommand, ResolveScheduledAgentTaskPayloadCommand,
+    AgentExecutionIntent, AgentExecutionPolicyContext, AgentExecutionTargetCommand, ApplicationId,
+    AutonomyPayloadRef, AutonomyServiceErrorKind, CreateScheduledAgentTaskCommand, MacacaResult,
+    RecordScheduledAgentTaskResultCommand, ResolveScheduledAgentTaskPayloadCommand,
     ScheduledAgentTaskCommandResult, ScheduledAgentTaskId, ScheduledAgentTaskResolvedPayload,
     ScheduledAgentTaskSummary, SchedulerJobDefinition, SchedulerJobId, SchedulerTargetCommand,
     TaskId, TraceContext,

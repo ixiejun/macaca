@@ -58,7 +58,7 @@ impl SkillMergeEligibilityFacts {
     }
 }
 
-/// One bounded reason why a merge candidate set is incompatible.
+/// One bounded reason why a merge candidate set cannot be merged.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SkillMergeEligibilityIssue {
     pub field: String,
@@ -76,11 +76,11 @@ pub struct SkillMergeEligibilityDecision {
 
 /// Deterministic merge eligibility policy.
 ///
-/// The default policy requires exact compatibility for scope, ownership,
+/// The default policy requires exact matches for scope, ownership,
 /// permissions, trust level, package source, executable semantics, tenant, and
 /// capability signature.  This conservative policy keeps Macaca generic: a
 /// future provider may layer explicit approval overrides, but the baseline
-/// service contract never guesses that incompatible skills are safe to merge.
+/// service contract never guesses that mismatched skills are safe to merge.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SkillMergeEligibilityPolicy {
     pub require_scope_match: bool,

@@ -1,8 +1,8 @@
 //! Workflow prompt **Strategy** implementations and tool-policy renderer.
 //!
 //! Strategies assemble system prompts from structured [`WorkflowPromptParts`].
-//! The default strategy preserves legacy SDD wording while delegating tool rules
-//! to manifest-derived policy via [`render_tool_policy_block`].
+//! The default strategy keeps the generic SDD workflow wording while delegating
+//! tool rules to manifest-derived policy via [`render_tool_policy_block`].
 
 use super::types::{WorkflowPromptContext, WorkflowPromptParts};
 
@@ -31,7 +31,7 @@ pub trait WorkflowPromptStrategy: Send + Sync {
     }
 }
 
-/// Default prompt strategy preserving the historical SDD workflow text.
+/// Default prompt strategy for the generic SDD workflow text.
 ///
 /// When persona files are absent, callers fall back to
 /// [`super::engine::WorkflowEngine::default_assistant_prompt_with_context`].
@@ -73,12 +73,13 @@ impl WorkflowPromptStrategy for DefaultWorkflowPromptStrategy {
 /// Render the tool-policy section from manifest coordinator declarations.
 ///
 /// When execution tools are declared on the coordinator agent, those names drive
-/// the prompt.  A `legacy_default_execute_tool` is only used when the manifest
-/// omits execution tools (skeleton / compatibility paths).
+/// the prompt.  A source-default execution tool is used only when the manifest
+/// omits execution tools and the caller intentionally supplies a neutral
+/// bootstrap default.
 pub(super) fn render_tool_policy_block(
     ctx: &WorkflowPromptContext,
     heading: &str,
-    legacy_default_execute_tool: Option<&str>,
+    source_default_execute_tool: Option<&str>,
 ) -> String {
     let policy = ctx.coordinator_tool_policy();
     let mut lines = Vec::new();
@@ -108,7 +109,7 @@ pub(super) fn render_tool_policy_block(
             );
         }
         lines.push("- If execution fails, report the error and stop".into());
-    } else if let Some(default_tool) = legacy_default_execute_tool {
+    } else if let Some(default_tool) = source_default_execute_tool {
         lines.push(format!("- Use `{default_tool}` for ALL code generation"));
         lines.push(format!(
             "- If `{default_tool}` fails, report the error and stop"

@@ -38,9 +38,9 @@ pub enum TodoStatus {
 /// The value intentionally describes the owning Macaca service boundary instead
 /// of an application, workflow, model, driver, provider, or business domain.
 /// Application-execution projections use this marker to decide which tasks are
-/// authoritative terminal facts for a run, while compatibility and diagnostic
+/// authoritative terminal facts for a run, while auxiliary and diagnostic
 /// tasks remain visible for audit without being allowed to fail an unrelated
-/// execution.  The default keeps legacy persisted tasks out of the
+/// execution.  The default keeps previously persisted tasks out of the
 /// application-execution terminal path unless a service explicitly marks them
 /// as authoritative.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -56,10 +56,10 @@ pub enum TaskGraphOwner {
     #[default]
     #[serde(alias = "TaskServiceNative")]
     TaskServiceNative,
-    /// Compatibility fallback entries created while migrating legacy planner
-    /// and Web loop behavior behind the Task Service boundary.
-    #[serde(alias = "TaskServiceCompatibility")]
-    TaskServiceCompatibility,
+    /// Auxiliary entries that remain visible for audit but are not terminal
+    /// facts for application execution.
+    #[serde(alias = "TaskServiceAuxiliary")]
+    TaskServiceAuxiliary,
     /// Diagnostic entries that explain observations or failures but should
     /// never drive terminal execution state.
     #[serde(alias = "DiagnosticOnly")]
@@ -78,7 +78,7 @@ impl TaskGraphOwner {
         match self {
             Self::ApplicationExecution => "application_execution",
             Self::TaskServiceNative => "task_service_native",
-            Self::TaskServiceCompatibility => "task_service_compatibility",
+            Self::TaskServiceAuxiliary => "task_service_auxiliary",
             Self::DiagnosticOnly => "diagnostic_only",
         }
     }
@@ -99,7 +99,7 @@ pub struct TodoItem {
     /// Service boundary that owns this task entry for terminal aggregation.
     ///
     /// This field is a generic service classification.  It prevents a
-    /// compatibility fallback task or diagnostic task from being interpreted as
+    /// auxiliary task or diagnostic task from being interpreted as
     /// the authoritative terminal state of an application-execution run.  It is
     /// never allowed to encode application names, workflow names, provider
     /// names, programming languages, or product-domain semantics.
@@ -127,7 +127,7 @@ pub struct TodoItem {
     pub status: TodoStatus,
     pub priority: u8,
     /// Execution order within this agent+session scope (1-based, ascending).
-    /// Lower numbers execute first. 0 means unassigned (legacy data).
+    /// Lower numbers execute first. 0 means unassigned persisted data.
     #[serde(default)]
     pub sequence_number: u32,
     pub created_at: DateTime<Utc>,

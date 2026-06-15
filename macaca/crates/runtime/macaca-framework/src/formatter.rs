@@ -6,7 +6,7 @@
 //!
 //! Three built-in formatters are provided:
 //! - [`OpenAiFormatter`] — OpenAI Chat Completions format
-//! - [`DashScopeFormatter`] — Alibaba DashScope (QwenLM) format (OpenAI-compatible variant)
+//! - [`DashScopeFormatter`] — Alibaba DashScope (QwenLM) format (OpenAI wire variant)
 //! - [`AnthropicFormatter`] — Anthropic Messages API format
 
 use crate::message::{
@@ -351,7 +351,7 @@ fn format_openai_msg(msg: &Msg) -> Value {
 
 /// Formats messages for the Alibaba DashScope API.
 ///
-/// DashScope's Qwen models use an OpenAI-compatible interface with minor
+/// DashScope's Qwen models use an OpenAI wire interface with minor
 /// differences in response field names (`input.choices` vs top-level `choices`,
 /// `usage.input_tokens` vs `usage.prompt_tokens`).
 pub struct DashScopeFormatter;
@@ -363,8 +363,8 @@ impl Formatter for DashScopeFormatter {
     }
 
     fn parse_response(&self, raw: Value) -> Result<ChatResponse, FormatterError> {
-        // DashScope wraps choices in `output` for non-compatible endpoint,
-        // but the OpenAI-compatible endpoint matches OpenAI exactly.
+        // DashScope wraps choices in `output` for the native endpoint,
+        // but the OpenAI wire endpoint matches OpenAI exactly.
         // We try OpenAI format first, then fall back to DashScope native.
         if raw.get("choices").is_some() {
             return parse_openai_response(raw);

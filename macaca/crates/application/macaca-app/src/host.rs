@@ -86,7 +86,7 @@ where
         Self { backend }
     }
 
-    /// Dispatch one host import after enforcing Route C trace requirements.
+    /// Dispatch one host import after enforcing application-host trace requirements.
     ///
     /// Every import currently requires trace context because host imports are
     /// observable system actions.  Rejecting before backend dispatch prevents

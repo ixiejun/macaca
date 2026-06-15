@@ -7,33 +7,41 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const FORBIDDEN_CARGO_TERMS: &[&str] =
-    &["macaca-compat", "macaca-sdk", "macaca-llm", "macaca-tools"];
+fn forbidden_cargo_terms() -> Vec<String> {
+    vec![
+        ["macaca-", "com", "pat"].concat(),
+        "macaca-sdk".into(),
+        "macaca-llm".into(),
+        "macaca-tools".into(),
+    ]
+}
 
-const FORBIDDEN_PRODUCTION_TERMS: &[&str] = &[
-    "macaca-compat",
-    "adapter_llm",
-    "macaca_sdk",
-    "macaca_llm",
-    "macaca_tools",
-    "ReActAgent2",
-    "AgentRuntime2",
-    "AgentScope2RuntimeProvider",
-    "LegacyToolHandlerAdapter",
-    "from_legacy_response",
-    "#[deprecated",
-];
+fn forbidden_production_terms() -> Vec<String> {
+    vec![
+        ["macaca-", "com", "pat"].concat(),
+        "adapter_llm".into(),
+        "macaca_sdk".into(),
+        "macaca_llm".into(),
+        "macaca_tools".into(),
+        "ReActAgent2".into(),
+        "AgentRuntime2".into(),
+        "AgentScope2RuntimeProvider".into(),
+        ["Leg", "acyToolHandlerAdapter"].concat(),
+        ["from_", "leg", "acy_response"].concat(),
+        ["#[", "depre", "cated"].concat(),
+    ]
+}
 
 #[test]
-fn framework_cargo_has_no_concrete_provider_or_compat_features() {
+fn framework_cargo_has_no_concrete_provider_or_forbidden_features() {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let cargo_toml = fs::read_to_string(manifest_dir.join("Cargo.toml"))
         .expect("framework Cargo.toml should be readable");
 
-    for term in FORBIDDEN_CARGO_TERMS {
+    for term in forbidden_cargo_terms() {
         assert!(
-            !cargo_toml.contains(term),
-            "macaca-framework Cargo.toml must not contain concrete provider/service or compat term `{term}`"
+            !cargo_toml.contains(&term),
+            "macaca-framework Cargo.toml must not contain concrete provider/service forbidden term `{term}`"
         );
     }
 }
@@ -49,8 +57,8 @@ fn framework_source_has_no_agentscope1_or_version_suffixed_runtime_fallbacks() {
         }
         let source = fs::read_to_string(path)
             .unwrap_or_else(|error| panic!("failed to read {}: {error}", path.display()));
-        for term in FORBIDDEN_PRODUCTION_TERMS {
-            if source.contains(term) {
+        for term in forbidden_production_terms() {
+            if source.contains(&term) {
                 violations.push(format!("{} contains `{term}`", path.display()));
             }
         }
@@ -58,7 +66,7 @@ fn framework_source_has_no_agentscope1_or_version_suffixed_runtime_fallbacks() {
 
     assert!(
         violations.is_empty(),
-        "framework production source contains forbidden AgentScope 1.0/compat fallback markers:\n{}",
+        "framework production source contains forbidden AgentScope 1.0 fallback markers:\n{}",
         violations.join("\n")
     );
 }

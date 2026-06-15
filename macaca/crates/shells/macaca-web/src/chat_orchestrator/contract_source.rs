@@ -12,7 +12,6 @@ pub(crate) fn chat_orchestrator_module_sources() -> String {
         include_str!("framework_chat_path.rs"),
         include_str!("mod.rs"),
         include_str!("route_chat_v2.rs"),
-        include_str!("route_legacy.rs"),
         include_str!("route_stop.rs"),
         include_str!("session_persistence_adapter.rs"),
         include_str!("sse_adapter.rs"),

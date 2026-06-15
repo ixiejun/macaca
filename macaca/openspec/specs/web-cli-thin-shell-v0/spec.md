@@ -22,7 +22,7 @@ Macaca SHALL provide a typed SDK system facade for shell-facing session, task, t
 
 ### Requirement: Macaca SHALL keep Web routes as command adapters
 
-Macaca Web routes SHALL validate transport/request scope, convert HTTP input into typed system commands, call SDK/Application/Kernel facades, and map results back to existing response shapes during gradual migration.
+Macaca Web routes SHALL validate transport/request scope, convert HTTP input into typed system commands, call SDK/Application/Kernel facades, and map results back to stable response shapes without owning system semantics.
 
 #### Scenario: Migrated task board route preserves response shape
 
@@ -80,49 +80,48 @@ Macaca CLI SHALL parse terminal input, format terminal output, and start shell p
 - **THEN** CLI SHALL call SDK facade commands or typed lower-layer facades
 - **AND** CLI SHALL NOT depend on `macaca-web` internals for those semantics
 
-#### Scenario: CLI compatibility helpers remain during migration
+#### Scenario: CLI has no replaced direct helpers
 
-- **WHEN** a deprecated direct CLI helper still exists for compatibility
-- **THEN** it SHALL remain callable until consumers migrate
-- **AND** new migrated command handlers SHALL use non-deprecated facade-backed paths
+- **WHEN** a CLI command has a facade-backed path
+- **THEN** no replaced direct helper SHALL remain in production source
+- **AND** command handlers SHALL use facade-backed paths
 
-### Requirement: Macaca SHALL protect chat, session, trace, and task board regressions during thin shell migration
+### Requirement: Macaca SHALL protect chat, session, trace, and task board regressions during thin shell operation
 
-Macaca SHALL implement Web/CLI thin shell migration additively without regressing chat session creation, chat session resume, real-time trace, historical trace replay, or session-scoped task board behavior.
+Macaca SHALL preserve Web/CLI thin shell behavior without regressing chat session creation, chat session resume, real-time trace, historical trace replay, or session-scoped task board behavior.
 
-#### Scenario: Route C Phase 12 regression checks pass
+#### Scenario: Terminal thin-shell regression checks pass
 
-- **WHEN** Phase 12 verification runs
+- **WHEN** terminal thin-shell verification runs
 - **THEN** `RC-CHAT-001`, `RC-CHAT-002`, `RC-TRACE-001`, `RC-TRACE-002`, and `RC-TASK-001` SHALL remain valid
-- **AND** existing YAML applications, `/api/chat/v2`, task board, trace, resume, session replay, GenUI fallback, Web UI, and CLI behavior SHALL continue to compile and run through existing paths until explicitly migrated
+- **AND** existing YAML applications, `/api/chat/v2`, task board, trace, resume, session replay, GenUI fallback, Web UI, and CLI behavior SHALL continue to compile and run through canonical protocol/service paths
 
-### Requirement: Macaca SHALL deprecate replaced direct presentation-owned semantic paths
+### Requirement: Macaca SHALL delete replaced direct presentation-owned semantic paths
 
-After a direct Web/CLI semantic path is replaced by a facade-backed command path, Macaca SHALL mark the old direct path as deprecated or compatibility-only and guard against new callers.
+After a direct Web/CLI semantic path is replaced by a facade-backed command path, Macaca SHALL remove the old direct path and guard against reintroduction.
 
-#### Scenario: New callers are blocked from deprecated presentation semantic helpers
+#### Scenario: Replaced presentation semantic helpers are absent
 
-- **WHEN** a migration guard or test scans callers after a helper is replaced
-- **THEN** new upper-layer callers SHALL NOT use deprecated direct Web/CLI semantic helpers
-- **AND** compatibility definitions may remain until explicitly removed by a future migration
+- **WHEN** a terminal guard or test scans callers after a helper is replaced
+- **THEN** replaced direct Web/CLI semantic helpers SHALL be absent from production source
+- **AND** upper-layer callers SHALL NOT use replaced direct Web/CLI semantic helpers
 
 ### Requirement: Macaca SHALL log and audit Web/CLI shell command boundaries
 
-Macaca SHALL emit structured logs and trace/audit-compatible records for shell command scope validation, command construction, facade execution, success, structured rejection, and failure.
+Macaca SHALL emit structured logs and replayable trace/audit records for shell command scope validation, command construction, facade execution, success, structured rejection, and failure.
 
 #### Scenario: Rejected shell command is auditable
 
-- **WHEN** a Web route or CLI command rejects a request due to missing scope, permission, policy, unavailable service, malformed input, or compatibility failure
+- **WHEN** a Web route or CLI command rejects a request due to missing scope, permission, policy, unavailable service, malformed input, or facade failure
 - **THEN** logs or trace/audit records SHALL include shell kind, operation, route or command name when available, app id when available, session id when available, task id when available, request id or cursor when available, structured error code, and timestamp
 - **AND** logs SHALL NOT include secrets, private keys, provider credentials, raw payment credentials, raw encrypted package contents, raw unbounded user input, or provider secrets
 
 ### Requirement: Macaca SHALL document new Web/CLI thin shell code with detailed English comments
 
-All new Phase 12 Rust and frontend code SHALL include detailed English comments explaining shell boundaries, command adapters, facade delegation, trace/audit behavior, replay cursors, GenUI rendering guardrails, and explicit non-goals.
+All new Web/CLI thin-shell Rust and frontend code SHALL include detailed English comments explaining shell boundaries, command adapters, facade delegation, trace/audit behavior, replay cursors, GenUI rendering guardrails, and explicit non-goals.
 
 #### Scenario: Maintainer can understand shell boundaries from comments
 
 - **WHEN** a maintainer reads new Web/CLI thin shell modules
-- **THEN** comments SHALL explain which layer owns transport, command construction, facade delegation, system semantics, trace/audit emission, compatibility paths, and non-goals
+- **THEN** comments SHALL explain which layer owns transport, command construction, facade delegation, system semantics, trace/audit emission, and non-goals
 - **AND** comments SHALL explain why Web/CLI must not define session, task, trace, package, service, payment, Web3, EVM, plugin, entitlement, or application UI semantics
-

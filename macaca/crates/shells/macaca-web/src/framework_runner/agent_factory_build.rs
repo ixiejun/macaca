@@ -11,17 +11,17 @@ use super::FrameworkRunner;
 use crate::context_reporting_model::ContextReportingChatModel;
 use crate::framework_adapter::ServiceChatModelAdapter;
 use crate::state::AppState;
+use macaca_host_composition::framework::agent::{HookRegistry, HookedAgent};
+use macaca_host_composition::framework::construction::{
+    AgentBuildRequest, AgentLifecycleConfig, AgentTransitionReason,
+};
+use macaca_host_composition::framework::formatter::OpenAiFormatter;
+use macaca_host_composition::framework::model::ToolChoice;
+use macaca_host_composition::framework::react_agent::ReActAgent;
+use macaca_host_composition::framework::tool::Toolkit;
+use macaca_host_composition::persist::EventLog;
 use macaca_proto::config::ContextConfig;
-use macaca_proto::AgentId;
-use macaca_proto::AgentState;
-use macaca_sdk::agent::{AgentServices, AgentTransitionReason};
-use macaca_sdk::framework::agent::{HookRegistry, HookedAgent};
-use macaca_sdk::framework::construction::{AgentBuildRequest, AgentLifecycleConfig};
-use macaca_sdk::framework::formatter::OpenAiFormatter;
-use macaca_sdk::framework::model::ToolChoice;
-use macaca_sdk::framework::react_agent::ReActAgent;
-use macaca_sdk::framework::tool::{ToolMiddleware, Toolkit};
-use macaca_sdk::runtime_host::persist::EventLog;
+use macaca_proto::{AgentId, AgentState, LlmServiceScope};
 use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::sync::mpsc;
@@ -32,7 +32,7 @@ pub(crate) struct WebTracedAgentFactory {
 }
 
 pub(crate) struct PreparedAgentParts {
-    pub(crate) selection: macaca_sdk::llm::ModelSelection,
+    pub(crate) selection: macaca_host_composition::llm::ModelSelection,
     pub(crate) toolkit: Toolkit,
 }
 
@@ -111,9 +111,9 @@ impl WebTracedAgentFactory {
         toolkit: &Toolkit,
         context_config: &ContextConfig,
     ) -> (
-        Arc<macaca_sdk::context::SkillCapabilityCatalog>,
-        Arc<macaca_sdk::context::McpCapabilityCatalog>,
-        Arc<macaca_sdk::context::RuntimeToolCapabilityCatalog>,
+        Arc<macaca_host_composition::context::SkillCapabilityCatalog>,
+        Arc<macaca_host_composition::context::McpCapabilityCatalog>,
+        Arc<macaca_host_composition::context::RuntimeToolCapabilityCatalog>,
         Arc<Vec<String>>,
     ) {
         let app_dir = {
@@ -178,7 +178,7 @@ impl WebTracedAgentFactory {
                         error = %error,
                         "skill snapshot failed for capability catalogs; composing empty skill index"
                     );
-                    macaca_sdk::context::SkillCapabilityCatalog::default()
+                    macaca_host_composition::context::SkillCapabilityCatalog::default()
                 }
             },
         );
@@ -202,27 +202,31 @@ impl WebTracedAgentFactory {
     /// composer capability providers (skills/MCP/runtime tools), and vector recall when enabled.
     pub(crate) fn build_react_agent(
         llm_client: Arc<dyn macaca_sdk::SystemLlmClient>,
-        context_client: Arc<dyn macaca_sdk::SystemContextClient>,
+        context_client: Arc<dyn macaca_host_composition::SystemContextClient>,
         memory_client: Arc<dyn macaca_sdk::SystemMemoryClient>,
         event_log: Arc<EventLog>,
-        persist_backend: Arc<dyn macaca_sdk::runtime_host::persist::PersistBackend>,
-        workspace_memory_tombstones: Option<Arc<macaca_sdk::memory::SharedTombstoneRegistry>>,
+        persist_backend: Arc<dyn macaca_host_composition::persist::PersistBackend>,
+        workspace_memory_tombstones: Option<
+            Arc<macaca_host_composition::memory::SharedTombstoneRegistry>,
+        >,
         merged_context_config: ContextConfig,
         agent_profile_root: Option<std::path::PathBuf>,
         request: &AgentBuildRequest,
-        selection: &macaca_sdk::llm::ModelSelection,
+        selection: &macaca_host_composition::llm::ModelSelection,
         toolkit: Toolkit,
         max_iters: usize,
         tool_choice: Option<ToolChoice>,
         routing_agent_id: Option<AgentId>,
-        skill_capability_catalog: Arc<macaca_sdk::context::SkillCapabilityCatalog>,
-        mcp_capability_catalog: Arc<macaca_sdk::context::McpCapabilityCatalog>,
-        runtime_tool_capability_catalog: Arc<macaca_sdk::context::RuntimeToolCapabilityCatalog>,
+        skill_capability_catalog: Arc<macaca_host_composition::context::SkillCapabilityCatalog>,
+        mcp_capability_catalog: Arc<macaca_host_composition::context::McpCapabilityCatalog>,
+        runtime_tool_capability_catalog: Arc<
+            macaca_host_composition::context::RuntimeToolCapabilityCatalog,
+        >,
         ready_mcp_server_ids: Arc<Vec<String>>,
-        provider_health_ledger: Option<Arc<macaca_sdk::context::ProviderHealthLedger>>,
-        context_engine_registry: Arc<macaca_sdk::context::ContextEngineRegistry>,
+        provider_health_ledger: Option<Arc<macaca_host_composition::context::ProviderHealthLedger>>,
+        context_engine_registry: Arc<macaca_host_composition::context::ContextEngineRegistry>,
     ) -> ReActAgent {
-        let llm_scope = macaca_sdk::llm::LlmServiceScope::new(
+        let llm_scope = LlmServiceScope::new(
             request.identity.app_id,
             request
                 .identity
@@ -450,13 +454,15 @@ impl WebTracedAgentFactory {
     pub(crate) async fn build_executor_agent(
         &self,
         request: AgentBuildRequest,
-        executor: Arc<macaca_sdk::runtime_host::executor::ApplicationExecutor>,
+        executor: Arc<macaca_host_composition::executor::ApplicationExecutor>,
     ) -> Result<HookedAgent<ReActAgent>, String> {
         self.build_standard_agent(request, StandardAgentMode::Executor { executor }, 25, None)
             .await
     }
 
-    pub(crate) async fn build_runtime_agent(
+    /// Materialize the framework-native runtime agent selected by the
+    /// runtime-host construction service.
+    pub(crate) async fn materialize_runtime_agent(
         &self,
         request: AgentBuildRequest,
         event_tx: Option<mpsc::Sender<macaca_proto::AgentExecutionEvent>>,

@@ -162,8 +162,7 @@ async fn agent_delegate_without_backend_returns_structured_unavailable() {
         ))
         .await
         .unwrap();
-    let decoded: ApplicationAgentDelegateResult =
-        serde_json::from_value(result.output).unwrap();
+    let decoded: ApplicationAgentDelegateResult = serde_json::from_value(result.output).unwrap();
 
     assert!(!decoded.success);
     assert_eq!(decoded.status, "unavailable");
@@ -175,7 +174,8 @@ async fn agent_delegate_without_backend_returns_structured_unavailable() {
 
 #[tokio::test]
 async fn agent_delegate_uses_injected_backend() {
-    let provider = Provider::unavailable().with_orchestration_backend(Arc::new(FakeOrchestrationBackend));
+    let provider =
+        Provider::unavailable().with_orchestration_backend(Arc::new(FakeOrchestrationBackend));
     let app_id = ApplicationId::new();
     let command = ApplicationAgentDelegateCommand {
         trace: TraceContext::new("test-agent-delegate-backend"),
@@ -199,8 +199,7 @@ async fn agent_delegate_uses_injected_backend() {
         ))
         .await
         .unwrap();
-    let decoded: ApplicationAgentDelegateResult =
-        serde_json::from_value(result.output).unwrap();
+    let decoded: ApplicationAgentDelegateResult = serde_json::from_value(result.output).unwrap();
 
     assert!(decoded.success);
     assert_eq!(decoded.task_id.as_deref(), Some("task-from-fake-backend"));

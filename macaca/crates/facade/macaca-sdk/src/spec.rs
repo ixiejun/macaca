@@ -5,7 +5,6 @@ use macaca_proto::{
     AgentId, AgentManifest, AgentState, Capability, LlmOptions, MacacaResult, Permission,
 };
 
-use crate::builder::DeclarativeAgent;
 use crate::config::AgentConfig;
 
 /// Trace behavior required for SDK-built agents.
@@ -88,31 +87,13 @@ impl AgentSpec {
         }
     }
 
-    /// Convert this declaration into the current runtime agent.
-    pub fn into_agent(self) -> DeclarativeAgent {
-        DeclarativeAgent::from_spec(self)
-    }
-
-    pub(crate) fn into_parts(
-        self,
-    ) -> (
-        AgentId,
-        String,
-        Vec<Capability>,
-        Permission,
-        String,
-        LlmOptions,
-        AgentState,
-    ) {
-        (
-            self.id,
-            self.name,
-            self.capabilities,
-            self.permission,
-            self.prompt_template,
-            self.llm_options,
-            self.state,
-        )
+    /// Consume the declaration into protocol-owned parts for service adapters.
+    ///
+    /// The SDK deliberately stops at data contracts. Runtime agent construction belongs
+    /// to application/runtime-host providers so callers cannot bypass service policy,
+    /// trace, and audit decorators by asking the facade to build an executable agent.
+    pub fn into_manifest(self) -> AgentManifest {
+        self.manifest()
     }
 }
 

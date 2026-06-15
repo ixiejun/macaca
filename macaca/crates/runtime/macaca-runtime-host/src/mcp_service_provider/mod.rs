@@ -1,10 +1,9 @@
-//! Runtime-host adapter for the Route C MCP Service (Facade module tree).
+//! Runtime-host adapter for the MCP Service (Facade module tree).
 //!
 //! The adapter owns protocol lifecycle dispatch for MCP service calls while
 //! delegating actual runtime operations to `McpRuntimeFacade`.  It exposes
-//! structured status and snapshots now, and keeps direct toolkit attachment
-//! paths available as deprecated compatibility anchors until Web adapters are
-//! migrated slice by slice.
+//! structured status, snapshots, operator lifecycle commands, and guarded tool
+//! invocation through provider-neutral service contracts.
 //!
 //! **Pattern:** Facade + Command Router — `system_service` owns lifecycle hooks,
 //! `command_dispatch` routes typed commands, and focused handler modules keep
@@ -89,7 +88,10 @@ impl McpSystemServiceProvider {
             .ok_or(ServiceError::MissingTraceContext)
     }
 
-    pub(crate) fn service_result(output: serde_json::Value, trace: TraceContext) -> ServiceCallResult {
+    pub(crate) fn service_result(
+        output: serde_json::Value,
+        trace: TraceContext,
+    ) -> ServiceCallResult {
         ServiceCallResult {
             output,
             trace,

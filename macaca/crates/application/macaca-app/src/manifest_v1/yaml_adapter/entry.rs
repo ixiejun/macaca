@@ -1,15 +1,15 @@
 //! Entry-point and permission extraction helpers for YAML manifest projection.
 //!
-//! These pure functions interpret legacy YAML entry declarations and aggregate
+//! These pure functions interpret YAML entry declarations and aggregate
 //! application-level permissions from resolved agents without embedding
 //! application-specific routing logic.
 
-use macaca_proto::ApplicationPermissionDeclaration;
 use macaca_proto::AgentConfig;
+use macaca_proto::ApplicationPermissionDeclaration;
 
 use crate::model::{AppManifest, EntrypointType};
 
-/// Resolve the effective entry identifier from legacy YAML entry fields.
+/// Resolve the effective entry identifier from YAML entry fields.
 ///
 /// `entry_agent` takes precedence over `entrypoint.name` when both are present.
 pub(super) fn entry_value(manifest: &AppManifest) -> Option<String> {

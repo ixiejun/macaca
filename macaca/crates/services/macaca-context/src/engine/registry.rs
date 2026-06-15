@@ -1,7 +1,7 @@
 //! Context engine registry (**Registry** pattern).
 //!
 //! Lightweight id→engine map used by runtime facades. Resolution always guarantees
-//! a usable legacy engine when the requested id is missing (safe default).
+//! a usable passthrough engine when the requested id is missing (safe default).
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -10,7 +10,7 @@ use tracing::debug;
 
 use crate::source::DefaultSourceRenderer;
 
-use super::legacy::LegacyContextEngine;
+use super::passthrough::PassthroughContextEngine;
 use super::pruning::PruningContextEngine;
 use super::summary::SummaryContextEngine;
 use super::types::{ContextEngine, ContextEngineInfo};
@@ -19,7 +19,7 @@ use super::windowed::WindowedContextEngine;
 /// Registry of available context-engine implementations.
 ///
 /// The registry is intentionally lightweight: callers resolve by id and fall
-/// back to `legacy` when the requested engine is missing.
+/// back to passthrough behavior when the requested engine is missing.
 #[derive(Default, Clone)]
 pub struct ContextEngineRegistry {
     engines: HashMap<String, Arc<dyn ContextEngine>>,
@@ -31,14 +31,14 @@ impl ContextEngineRegistry {
         Self::default()
     }
 
-    /// Create a registry containing only the legacy compatibility engine.
-    pub fn with_legacy() -> Self {
-        Self::new().register(Arc::new(LegacyContextEngine))
+    /// Create a registry containing only the passthrough engine.
+    pub fn with_passthrough() -> Self {
+        Self::new().register(Arc::new(PassthroughContextEngine))
     }
 
     /// Create a registry with all builtin engines shipped by this crate.
     pub fn with_builtins() -> Self {
-        Self::with_legacy()
+        Self::with_passthrough()
             .register(Arc::new(WindowedContextEngine::default()))
             .register(Arc::new(
                 PruningContextEngine::<DefaultSourceRenderer>::default(),
@@ -81,10 +81,10 @@ impl ContextEngineRegistry {
         rows
     }
 
-    /// Resolve the requested engine or guarantee a usable legacy engine.
-    pub fn resolve_or_legacy(&self, id: Option<&str>) -> Arc<dyn ContextEngine> {
+    /// Resolve the requested engine or guarantee a usable passthrough engine.
+    pub fn resolve_or_passthrough(&self, id: Option<&str>) -> Arc<dyn ContextEngine> {
         id.and_then(|id| self.get(id))
-            .or_else(|| self.get(LegacyContextEngine::ID))
-            .unwrap_or_else(|| Arc::new(LegacyContextEngine))
+            .or_else(|| self.get(PassthroughContextEngine::ID))
+            .unwrap_or_else(|| Arc::new(PassthroughContextEngine))
     }
 }

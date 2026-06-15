@@ -6,8 +6,7 @@
 
 use macaca_proto::{
     AvailabilityExpression, CapabilityToolDescriptor, CapabilityToolOriginKind,
-    IndustrialToolDescriptor, MacacaResult, ToolExecutorRouteKind, ToolLifecycleScope,
-    ToolsetRef,
+    IndustrialToolDescriptor, MacacaResult, ToolExecutorRouteKind, ToolLifecycleScope, ToolsetRef,
 };
 
 use super::family_catalog::FamilySpec;
@@ -85,14 +84,14 @@ pub(crate) fn spec_to_descriptor(spec: FamilySpec) -> MacacaResult<IndustrialToo
     Ok(descriptor)
 }
 
-/// Map executor route kind to legacy capability origin for serialization compatibility.
+/// Map executor route kind to the bounded descriptor origin required by shared DTOs.
 fn origin_kind_for_route(route_kind: &ToolExecutorRouteKind) -> CapabilityToolOriginKind {
     match route_kind {
         ToolExecutorRouteKind::Driver => CapabilityToolOriginKind::Driver,
         ToolExecutorRouteKind::Skill => CapabilityToolOriginKind::Skill,
         ToolExecutorRouteKind::Mcp => CapabilityToolOriginKind::Mcp,
-        // Route kinds outside the historical Driver/Skill/MCP origin surface use MCP-compatible
-        // descriptor origin only for legacy serialization. The typed executor route is
+        // Route kinds outside the Driver/Skill/MCP descriptor-origin surface use the MCP
+        // origin as a neutral catalog bucket. The typed executor route is
         // authoritative for dispatch.
         ToolExecutorRouteKind::OwningServiceCommand
         | ToolExecutorRouteKind::RuntimeEnvironment
@@ -105,9 +104,7 @@ fn origin_kind_for_route(route_kind: &ToolExecutorRouteKind) -> CapabilityToolOr
 /// Resolve the service.command name used when routing OwningServiceCommand families.
 fn command_name_for(spec: &FamilySpec) -> Option<String> {
     match spec.route_kind {
-        ToolExecutorRouteKind::RuntimeEnvironment => {
-            Some("tool.runtime_environment.invoke".into())
-        }
+        ToolExecutorRouteKind::RuntimeEnvironment => Some("tool.runtime_environment.invoke".into()),
         ToolExecutorRouteKind::ManagedGateway => Some("tool.managed_gateway.invoke".into()),
         ToolExecutorRouteKind::Plugin => Some("tool.plugin.invoke".into()),
         ToolExecutorRouteKind::OwningServiceCommand => match spec.family {

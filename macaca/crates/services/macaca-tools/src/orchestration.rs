@@ -9,30 +9,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::instrument;
 
-use crate::tool::Tool;
-
-/// Shared state for orchestration between agents.
-pub struct OrchestrationState {
-    /// Pending delegated tasks (task_id -> (target_agent, prompt)).
-    pub pending_tasks: std::collections::HashMap<String, (String, String)>,
-    /// Completed task results.
-    pub completed_results: std::collections::HashMap<String, String>,
-}
-
-impl Default for OrchestrationState {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl OrchestrationState {
-    pub fn new() -> Self {
-        Self {
-            pending_tasks: std::collections::HashMap::new(),
-            completed_results: std::collections::HashMap::new(),
-        }
-    }
-}
+use crate::tool::{Tool, ToolCommand};
 
 /// Type alias for the delegate callback function.
 /// Arguments: (app_id, to_agent, prompt, priority, parallel, session_id) -> Result<task_id, error>
@@ -50,14 +27,8 @@ pub type DelegateCallback = Box<
 >;
 
 /// Tool for delegating a task to another agent.
-///
-/// This tool supports two modes:
-/// 1. Legacy mode with OrchestrationState (just stores tasks)
-/// 2. Real execution mode with callback (actually executes the delegated task)
 pub struct DelegateTaskTool {
-    /// Legacy state storage (optional).
-    state: Option<Arc<RwLock<OrchestrationState>>>,
-    /// Callback for real task execution.
+    /// Callback for service-backed task execution.
     /// Arguments: (app_id, to_agent, prompt, priority, parallel, session_id) -> Result<task_id, error>
     delegate_callback: Option<DelegateCallback>,
     /// Current session ID, shared with AppState so routes can set it before execution.
@@ -65,16 +36,7 @@ pub struct DelegateTaskTool {
 }
 
 impl DelegateTaskTool {
-    /// Create a legacy tool that just stores tasks in memory.
-    pub fn new(state: Arc<RwLock<OrchestrationState>>) -> Self {
-        Self {
-            state: Some(state),
-            delegate_callback: None,
-            session_id: Arc::new(RwLock::new(None)),
-        }
-    }
-
-    /// Create a tool with a real execution callback.
+    /// Create a tool with a service-backed execution callback.
     /// The callback receives (app_id, to_agent, prompt, priority, parallel, session_id) and returns task_id.
     pub fn with_callback<F>(mut self, callback: F) -> Self
     where
@@ -97,7 +59,6 @@ impl DelegateTaskTool {
     /// Create an empty tool (use with_callback to configure).
     pub fn empty() -> Self {
         Self {
-            state: None,
             delegate_callback: None,
             session_id: Arc::new(RwLock::new(None)),
         }
@@ -106,7 +67,6 @@ impl DelegateTaskTool {
     /// Create an empty tool with a pre-shared session_id Arc.
     pub fn empty_with_session_id(session_id: Arc<RwLock<Option<String>>>) -> Self {
         Self {
-            state: None,
             delegate_callback: None,
             session_id,
         }
@@ -123,7 +83,7 @@ impl Tool for DelegateTaskTool {
         "Delegate a task to another agent. Use this to distribute work to specialized agents."
     }
 
-    fn parameters_schema(&self) -> serde_json::Value {
+    fn tool_schema(&self) -> serde_json::Value {
         serde_json::json!({
             "type": "object",
             "properties": {
@@ -150,8 +110,9 @@ impl Tool for DelegateTaskTool {
         })
     }
 
-    #[instrument(name = "delegate_task", skip(self))]
-    async fn execute(&self, input: Value) -> MacacaResult<Value> {
+    #[instrument(name = "delegate_task", skip(self, command))]
+    async fn invoke(&self, command: ToolCommand) -> MacacaResult<Value> {
+        let input = command.input;
         let agent = input["agent"]
             .as_str()
             .ok_or_else(|| MacacaError::Agent("delegate_task requires 'agent' field".into()))?;
@@ -162,7 +123,6 @@ impl Tool for DelegateTaskTool {
         let parallel = input["parallel"].as_bool().unwrap_or(false);
         let app_id = input["app_id"].as_str().unwrap_or("").to_string();
 
-        // If we have a real callback, use it for actual execution
         if let Some(ref callback) = self.delegate_callback {
             let session_id = self.session_id.read().await.clone();
             match callback(
@@ -190,23 +150,9 @@ impl Tool for DelegateTaskTool {
             }
         }
 
-        // Fall back to legacy mode (just store in memory)
-        let task_id = uuid::Uuid::new_v4().to_string();
-
-        if let Some(ref state) = self.state {
-            let mut state = state.write().await;
-            state
-                .pending_tasks
-                .insert(task_id.clone(), (agent.to_string(), prompt.to_string()));
-        }
-
-        Ok(serde_json::json!({
-            "task_id": task_id,
-            "agent": agent,
-            "status": "delegated",
-            "priority": priority,
-            "parallel": parallel
-        }))
+        Err(MacacaError::Agent(
+            "delegate_task requires a service-backed delegation callback".into(),
+        ))
     }
 }
 
@@ -226,28 +172,14 @@ pub struct TaskResultData {
 }
 
 /// Tool for getting the result of a delegated task.
-///
-/// This tool supports two modes:
-/// 1. Legacy mode with OrchestrationState (checks in-memory storage)
-/// 2. Real execution mode with callback (checks ApplicationExecutor)
 pub struct GetTaskResultTool {
-    /// Legacy state storage (optional).
-    state: Option<Arc<RwLock<OrchestrationState>>>,
-    /// Callback for real result retrieval.
+    /// Callback for service-backed result retrieval.
     /// Arguments: (app_id, task_id) -> Result<TaskResultData, error>
     result_callback: Option<GetTaskResultCallback>,
 }
 
 impl GetTaskResultTool {
-    /// Create a legacy tool that checks in-memory storage.
-    pub fn new(state: Arc<RwLock<OrchestrationState>>) -> Self {
-        Self {
-            state: Some(state),
-            result_callback: None,
-        }
-    }
-
-    /// Create a tool with a real result retrieval callback.
+    /// Create a tool with a service-backed result retrieval callback.
     pub fn with_callback<F>(mut self, callback: F) -> Self
     where
         F: Fn(
@@ -265,7 +197,6 @@ impl GetTaskResultTool {
     /// Create an empty tool (use with_callback to configure).
     pub fn empty() -> Self {
         Self {
-            state: None,
             result_callback: None,
         }
     }
@@ -281,7 +212,7 @@ impl Tool for GetTaskResultTool {
         "Get the result of a previously delegated task. WARNING: Do NOT poll this! The system uses Hook-based notification. Only call this ONCE after receiving a task completion notification from the system."
     }
 
-    fn parameters_schema(&self) -> serde_json::Value {
+    fn tool_schema(&self) -> serde_json::Value {
         serde_json::json!({
             "type": "object",
             "properties": {
@@ -294,14 +225,14 @@ impl Tool for GetTaskResultTool {
         })
     }
 
-    #[instrument(name = "get_task_result", skip(self))]
-    async fn execute(&self, input: Value) -> MacacaResult<Value> {
+    #[instrument(name = "get_task_result", skip(self, command))]
+    async fn invoke(&self, command: ToolCommand) -> MacacaResult<Value> {
+        let input = command.input;
         let task_id = input["task_id"]
             .as_str()
             .ok_or_else(|| MacacaError::Agent("get_task_result requires 'task_id' field".into()))?;
         let app_id = input["app_id"].as_str().unwrap_or("").to_string();
 
-        // If we have a real callback, use it
         if let Some(ref callback) = self.result_callback {
             match callback(app_id, task_id.to_string()).await {
                 Ok(result) => {
@@ -321,82 +252,9 @@ impl Tool for GetTaskResultTool {
             }
         }
 
-        // Fall back to legacy mode
-        if let Some(ref state) = self.state {
-            let state = state.read().await;
-
-            if let Some(result) = state.completed_results.get(task_id) {
-                return Ok(serde_json::json!({
-                    "task_id": task_id,
-                    "status": "completed",
-                    "output": result
-                }));
-            }
-
-            if state.pending_tasks.contains_key(task_id) {
-                return Ok(serde_json::json!({
-                    "task_id": task_id,
-                    "status": "pending"
-                }));
-            }
-        }
-
-        Err(MacacaError::Agent(format!("Task {} not found", task_id)))
-    }
-}
-
-/// Tool for an agent to report its task result.
-pub struct ReportResultTool {
-    state: Arc<RwLock<OrchestrationState>>,
-}
-
-impl ReportResultTool {
-    pub fn new(state: Arc<RwLock<OrchestrationState>>) -> Self {
-        Self { state }
-    }
-}
-
-#[async_trait]
-impl Tool for ReportResultTool {
-    fn name(&self) -> &str {
-        "report_result"
-    }
-
-    fn description(&self) -> &str {
-        "Report task completion result back to the coordinator."
-    }
-
-    fn parameters_schema(&self) -> serde_json::Value {
-        serde_json::json!({
-            "type": "object",
-            "properties": {
-                "task_id": {"type": "string"},
-                "success": {"type": "boolean"},
-                "output": {"type": "string"}
-            },
-            "required": ["task_id", "success", "output"]
-        })
-    }
-
-    #[instrument(name = "report_result", skip(self))]
-    async fn execute(&self, input: Value) -> MacacaResult<Value> {
-        let task_id = input["task_id"]
-            .as_str()
-            .ok_or_else(|| MacacaError::Agent("report_result requires 'task_id' field".into()))?;
-        let output = input["output"]
-            .as_str()
-            .ok_or_else(|| MacacaError::Agent("report_result requires 'output' field".into()))?;
-
-        let mut state = self.state.write().await;
-        state.pending_tasks.remove(task_id);
-        state
-            .completed_results
-            .insert(task_id.to_string(), output.to_string());
-
-        Ok(serde_json::json!({
-            "task_id": task_id,
-            "status": "recorded"
-        }))
+        Err(MacacaError::Agent(
+            "get_task_result requires a service-backed result callback".into(),
+        ))
     }
 }
 
@@ -438,11 +296,11 @@ impl Tool for ListAgentsTool {
         "List all available agents and their capabilities."
     }
 
-    fn parameters_schema(&self) -> serde_json::Value {
+    fn tool_schema(&self) -> serde_json::Value {
         serde_json::json!({"type": "object", "properties": {}})
     }
 
-    async fn execute(&self, _input: Value) -> MacacaResult<Value> {
+    async fn invoke(&self, _command: ToolCommand) -> MacacaResult<Value> {
         let agents = if let Some(ref callback) = self.agents_callback {
             callback().await
         } else {

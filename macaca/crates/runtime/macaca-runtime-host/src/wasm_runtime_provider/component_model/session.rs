@@ -7,10 +7,10 @@ use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use macaca_proto::{
-    ApplicationAbiError, ApplicationHostCommand, ApplicationHostCommandResult,
-    PackageRuntimeKind, TraceContext, WasmLifecycleCommand, WasmLifecycleState,
+    ApplicationAbiError, ApplicationHostCommand, ApplicationHostCommandResult, PackageRuntimeKind,
+    TraceContext, WasmLifecycleCommand, WasmLifecycleState, WasmLifecycleStateMachine,
     WasmLifecycleTransitionResult, WasmRuntimeDiagnostics, WasmRuntimeProviderDescriptor,
-    WasmRuntimeSessionRequest, WasmLifecycleStateMachine,
+    WasmRuntimeSessionRequest,
 };
 use serde_json::json;
 use tracing::{info, warn};
@@ -19,16 +19,16 @@ use crate::wasm_runtime_provider::component_model::provider::ComponentModelWasmR
 use crate::wasm_runtime_provider::component_model::session_host::ComponentModelWasmExecutionSessionHost;
 use crate::wasm_runtime_provider::component_model::session_lifecycle::ComponentModelWasmExecutionSessionLifecycle;
 use crate::wasm_runtime_provider::component_model::support::is_component_export_invoke;
-use crate::wasm_runtime_provider::component_model_adapter::{WasmComponentInstance, WasmComponentModule};
+use crate::wasm_runtime_provider::component_model_adapter::{
+    WasmComponentInstance, WasmComponentModule,
+};
 use crate::wasm_runtime_provider::diagnostics::non_empty_trace;
 use crate::wasm_runtime_provider::host_import_bridge::WasmHostImportBridge;
 use crate::wasm_runtime_provider::sandbox_guard::{WasmSandboxGuard, WasmSessionPermit};
 use crate::wasm_runtime_provider::telemetry::{
     emit_wasm_telemetry, WasmTelemetryEvent, WasmTelemetrySinkRef, WasmTelemetryStage,
 };
-use crate::wasm_runtime_provider::traits::{
-    WasmApplicationRuntimeProvider, WasmExecutionSession,
-};
+use crate::wasm_runtime_provider::traits::{WasmApplicationRuntimeProvider, WasmExecutionSession};
 
 /// Execution session created by the Component Model provider.
 #[derive(Debug)]

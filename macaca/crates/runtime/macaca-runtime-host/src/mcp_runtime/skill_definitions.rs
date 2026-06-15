@@ -1,25 +1,18 @@
 //! Skill snapshot → MCP server definition resolution.
 //!
-//! Walks visible skill install specs and applies the declarative compatibility registry.
+//! Walks visible skill install specs and applies the declarative mapping registry.
 
 use std::collections::{BTreeMap, HashSet};
 
 use macaca_framework::mcp::{McpSessionMode, McpTransportConfig};
 use macaca_skill::{SkillMcpServerConfig, SkillSnapshot, SkillSnapshotEntry};
 
-use crate::skill_mcp_mapping_registry::{default_skill_mcp_mapping_registry, SkillMcpMappingRegistry};
+use crate::skill_mcp_mapping_registry::SkillMcpMappingRegistry;
 
 use super::policy::apply_concurrency_isolation;
 use super::types::{McpDefinitionSource, McpLifecycleScope, McpServerDefinition};
 
-/// Resolve MCP definitions declared by a visible skill snapshot, consulting
-/// the process-default compatibility registry.
-#[deprecated(note = "Use `McpServerFactory::from_skill_snapshot` instead.")]
-pub fn definitions_from_skill_snapshot(snapshot: &SkillSnapshot) -> Vec<McpServerDefinition> {
-    definitions_from_skill_snapshot_with_registry(snapshot, default_skill_mcp_mapping_registry())
-}
-
-/// Resolve MCP definitions with an explicit compatibility registry (for
+/// Resolve MCP definitions with an explicit mapping registry (for
 /// tests and hosts that supply their own override layer).
 pub fn definitions_from_skill_snapshot_with_registry(
     snapshot: &SkillSnapshot,
@@ -35,9 +28,9 @@ pub fn definitions_from_skill_snapshot_with_registry(
                 }
             }
         }
-        if let Some(compat_entry) = registry.resolve_for_skill(skill) {
-            let id = format!("skill:{}:{}", skill.name, compat_entry.id);
-            if let Some(definition) = compat_entry.to_definition(id) {
+        if let Some(mapped_entry) = registry.resolve_for_skill(skill) {
+            let id = format!("skill:{}:{}", skill.name, mapped_entry.id);
+            if let Some(definition) = mapped_entry.to_definition(id) {
                 if seen.insert(definition.id.clone()) {
                     definitions.push(definition);
                 }
@@ -77,14 +70,4 @@ pub(crate) fn definition_from_skill_server(
         source: McpDefinitionSource::Skill,
         concurrency_isolation: policy,
     })
-}
-
-fn flatten_timeout_result<T>(
-    result: Result<Result<T, macaca_framework::mcp::McpError>, tokio::time::error::Elapsed>,
-) -> Result<T, String> {
-    match result {
-        Ok(Ok(value)) => Ok(value),
-        Ok(Err(error)) => Err(error.to_string()),
-        Err(_) => Err("connect_timeout".to_string()),
-    }
 }

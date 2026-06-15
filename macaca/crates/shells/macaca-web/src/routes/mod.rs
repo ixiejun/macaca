@@ -24,7 +24,6 @@ mod session_inspect;
 mod shared;
 mod skills_mcp;
 mod status;
-mod task_schedules;
 mod todos;
 
 #[cfg(test)]
@@ -33,8 +32,8 @@ pub(crate) mod contract_source;
 mod tests;
 
 // Shared utilities and error helpers
-pub use shared::{AgentStatusQuery, ErrorResponse, root_not_found};
 pub(crate) use shared::{app_entry_agent_name, default_model, err, proto_err};
+pub use shared::{root_not_found, AgentStatusQuery, ErrorResponse};
 
 // System status
 pub use status::{get_status, StatusResponse};
@@ -48,19 +47,14 @@ pub use apps_reload::{reload_apps, ReloadResponse};
 
 // Skills / MCP
 pub use skills_mcp::{
-    get_app_skills, get_mcp_status, get_skills, AppFilteredSkillInfo, AppSkillInfo,
-    AppSkillStatus, SkillInfo, SkillStatusQuery,
+    get_app_skills, get_mcp_status, get_skills, AppFilteredSkillInfo, AppSkillInfo, AppSkillStatus,
+    SkillInfo, SkillStatusQuery,
 };
 
 // Todo / goal board
 pub use todos::{
     get_todo_claim_diagnostics, get_todo_progress, list_agent_todos, list_goals, list_todos,
     SessionQuery,
-};
-
-// Legacy task schedules
-pub use task_schedules::{
-    create_schedule, delete_schedule, get_schedule, list_schedules, toggle_schedule,
 };
 
 // Serviceized autonomy + scheduled agent tasks
@@ -76,9 +70,9 @@ pub use autonomy_schedules::{
 
 // Session inspection
 pub use session_inspect::{
-    get_session_context_reports, get_session_events, get_session_lineage,
-    get_session_run_trace, get_session_source_artifact, manual_compact_session, EventsQuery,
-    EventsResponse, ManualCompactRequest, ManualCompactResponse, SessionLineageResponse,
+    get_session_context_reports, get_session_events, get_session_lineage, get_session_run_trace,
+    get_session_source_artifact, manual_compact_session, EventsQuery, EventsResponse,
+    ManualCompactRequest, ManualCompactResponse, SessionLineageResponse,
 };
 
 // Drivers

@@ -1,6 +1,6 @@
 //! Public projection entry points (Facade API over Adapter + Projection pipeline).
 //!
-//! Each function adapts legacy YAML via `YamlApplicationManifestAdapter`, then
+//! Each function adapts YAML via `YamlApplicationManifestAdapter`, then
 //! delegates to specialized sub-projectors.  `tracing::info` records audit nodes at
 //! metadata assembly boundaries without logging sensitive manifest payloads.
 
@@ -21,9 +21,11 @@ use macaca_proto::{
 use tracing::info;
 
 use crate::consumption::app_entry_agent_name;
-use crate::manifest_v1::{LegacyAppManifestProjection, YamlApplicationManifestAdapter};
+use crate::manifest_v1::{YamlApplicationManifestAdapter, YamlApplicationManifestProjection};
 use crate::model::{AgentSource, AppManifest, AppStatus};
-use crate::service_capability::{expand_service_capabilities, DomainPackCatalog, InMemoryDomainPackCatalog};
+use crate::service_capability::{
+    expand_service_capabilities, DomainPackCatalog, InMemoryDomainPackCatalog,
+};
 use crate::ApplicationRuntimeKindSpec;
 
 use super::app_view::manifest_v1_to_service_app_view;
@@ -33,7 +35,7 @@ use super::policy::{
 };
 use super::support::{digest_view, entry_view};
 
-/// Project an application manifest into the legacy app summary view.
+/// Project an application manifest into the application summary view.
 ///
 /// This function is intentionally metadata-only.  It does not resolve file
 /// agents, instantiate runtimes, read prompts, inspect providers, or execute
@@ -63,8 +65,8 @@ pub fn app_manifest_to_service_app_view_with_catalog(
     status: AppStatus,
     catalog: &dyn DomainPackCatalog,
 ) -> ApplicationServiceAppView {
-    let projection = YamlApplicationManifestAdapter::new(manifest.clone())
-        .project_with_catalog(catalog);
+    let projection =
+        YamlApplicationManifestAdapter::new(manifest.clone()).project_with_catalog(catalog);
     manifest_v1_to_service_app_view(&projection.manifest, manifest, app_dir, status, catalog)
 }
 
@@ -106,8 +108,8 @@ pub fn app_manifest_to_metadata_view_with_catalog(
     include_digest: bool,
     catalog: &dyn DomainPackCatalog,
 ) -> ApplicationMetadataView {
-    let projection = YamlApplicationManifestAdapter::new(manifest.clone())
-        .project_with_catalog(catalog);
+    let projection =
+        YamlApplicationManifestAdapter::new(manifest.clone()).project_with_catalog(catalog);
     let application =
         manifest_v1_to_service_app_view(&projection.manifest, manifest, app_dir, status, catalog);
     let entry = entry_view(&projection.manifest, manifest);
@@ -145,8 +147,8 @@ pub fn app_manifest_to_metadata_view_with_catalog(
         .report
         .inferred_defaults
         .iter()
-        .chain(projection.report.compatibility_warnings.iter())
-        .chain(projection.report.legacy_only_fields.iter())
+        .chain(projection.report.projection_warnings.iter())
+        .chain(projection.report.source_only_fields.iter())
         .map(|diagnostic| format!("{}:{}", diagnostic.code, diagnostic.subject))
         .collect();
 
@@ -171,4 +173,3 @@ pub fn app_manifest_to_metadata_view_with_catalog(
         diagnostics,
     }
 }
-

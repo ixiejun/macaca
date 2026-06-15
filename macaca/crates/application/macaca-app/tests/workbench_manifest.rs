@@ -4,9 +4,9 @@ use macaca_app::{
 };
 use macaca_proto::{
     AbilityImplementationKind, ApplicationAbilityDescriptor, ApplicationAbilityKind,
-    ApplicationCompatibilityDeclaration, ApplicationExecutionControlKind,
-    ApplicationExecutionHeartbeatPolicy, ApplicationExecutionProfileDeclaration,
-    ApplicationExecutionProviderKind, ApplicationExecutionProviderPreference,
+    ApplicationExecutionControlKind, ApplicationExecutionHeartbeatPolicy,
+    ApplicationExecutionProfileDeclaration, ApplicationExecutionProviderKind,
+    ApplicationExecutionProviderPreference, ApplicationHostRequirementDeclaration,
     ApplicationManifestV1, ApplicationRuntimeProfile, ApplicationWorkbenchCapabilityDeclaration,
     ApplicationWorkbenchEventSubscription, ApplicationWorkbenchManifestDeclaration,
     ApplicationWorkbenchMcpDependency, ApplicationWorkbenchOptionalProviderRequirement,
@@ -102,7 +102,7 @@ fn manifest_for(
         format!("Workbench {kind}"),
         "1.0.0",
         ApplicationRuntimeProfile::new(kind, "1"),
-        ApplicationCompatibilityDeclaration::new("0.1.0"),
+        ApplicationHostRequirementDeclaration::new("0.1.0"),
     )
     .ability(ApplicationAbilityDescriptor::new(
         "ability.workbench.generic",
@@ -192,8 +192,8 @@ workbench:
       required_bridge_capabilities: [service.call]
       event_subscriptions: [thread.item]
 "#;
-    let legacy: macaca_app::AppManifest = serde_yaml::from_str(yaml).unwrap();
-    let projection = YamlApplicationManifestAdapter::new(legacy.clone()).project();
+    let manifest: macaca_app::AppManifest = serde_yaml::from_str(yaml).unwrap();
+    let projection = YamlApplicationManifestAdapter::new(manifest.clone()).project();
 
     assert_admitted(ApplicationManifestV1Spec.validate(&projection.manifest));
     assert_eq!(
@@ -207,7 +207,7 @@ workbench:
     );
 
     let metadata = app_manifest_to_metadata_view(
-        &legacy,
+        &manifest,
         None,
         macaca_app::AppStatus::Loaded,
         true,
@@ -308,8 +308,8 @@ execution_profile:
     capability_declarations:
       - capability.application_execution
 "#;
-    let legacy: macaca_app::AppManifest = serde_yaml::from_str(yaml).unwrap();
-    let projection = YamlApplicationManifestAdapter::new(legacy).project();
+    let manifest: macaca_app::AppManifest = serde_yaml::from_str(yaml).unwrap();
+    let projection = YamlApplicationManifestAdapter::new(manifest).project();
 
     assert_admitted(ApplicationManifestV1Spec.validate(&projection.manifest));
     assert_eq!(

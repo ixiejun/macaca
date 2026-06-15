@@ -23,7 +23,7 @@ pub struct ApplicationHeartbeatAgentView {
     pub application_id: ApplicationId,
     pub agent_name: String,
     pub enabled: bool,
-    /// Manifest-level profile selector kept for compatibility and traceability.
+    /// Manifest-level profile selector kept for admission and traceability.
     pub profile_id: String,
     /// Concrete native Heartbeat profile id registered for this declaration.
     #[serde(default, skip_serializing_if = "String::is_empty")]
@@ -53,7 +53,7 @@ pub struct ApplicationServiceAgentView {
 pub struct ApplicationServiceRuntimeView {
     pub runtime_kind: Option<PackageRuntimeKind>,
     pub lifecycle_state: ApplicationLifecycleState,
-    pub compatibility_status: String,
+    pub runtime_status: String,
     pub app_dir: Option<String>,
     pub skills_dir: Option<String>,
 }

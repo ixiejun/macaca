@@ -55,7 +55,7 @@ pub struct ContextFallbackPolicy {
 impl Default for ContextFallbackPolicy {
     fn default() -> Self {
         Self {
-            fallback_engine_id: "legacy".into(),
+            fallback_engine_id: "passthrough".into(),
             empty_external_contribution: true,
         }
     }
@@ -264,14 +264,17 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn conformance_checks_legacy_result_shape() {
-        let input = ContextAssembleInput::legacy(
+    async fn conformance_checks_passthrough_result_shape() {
+        let input = ContextAssembleInput::unscoped(
             "agent",
             "model",
             vec![LlmMessage::user("hello")],
             LlmOptions::default(),
         );
-        let result = crate::LegacyContextEngine.assemble(input).await.unwrap();
+        let result = crate::PassthroughContextEngine
+            .assemble(input)
+            .await
+            .unwrap();
         ContextEngineConformance::assert_preserves_required_report_fields(&result);
     }
 
@@ -328,7 +331,7 @@ mod tests {
             ContextFallbackPolicy::default(),
         );
         let result = engine
-            .assemble(ContextAssembleInput::legacy(
+            .assemble(ContextAssembleInput::unscoped(
                 "agent",
                 "model",
                 vec![LlmMessage::user("hello")],
@@ -336,7 +339,7 @@ mod tests {
             ))
             .await
             .unwrap();
-        assert_eq!(result.report.engine_id, "legacy");
+        assert_eq!(result.report.engine_id, "passthrough");
         assert!(result
             .report
             .decisions
@@ -346,7 +349,7 @@ mod tests {
 
     #[tokio::test]
     async fn external_adapter_engine_degrades_to_fallback_on_validation_failure() {
-        let input = ContextAssembleInput::legacy(
+        let input = ContextAssembleInput::unscoped(
             "agent",
             "model",
             vec![LlmMessage::user("hello")],
@@ -378,7 +381,7 @@ mod tests {
             ContextFallbackPolicy::default(),
         );
         let result = engine.assemble(input).await.unwrap();
-        assert_eq!(result.report.engine_id, "legacy");
+        assert_eq!(result.report.engine_id, "passthrough");
         assert!(result
             .report
             .decisions

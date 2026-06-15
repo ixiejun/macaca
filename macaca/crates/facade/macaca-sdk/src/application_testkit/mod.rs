@@ -175,7 +175,7 @@ impl ApplicationContractTestKit {
     /// This SDK-side Specification mirrors the Application Framework
     /// admission contract without depending on `macaca-app` or a runtime-host
     /// provider.  It checks only metadata DTOs: artifact id/reference, digest,
-    /// ABI version compatibility, required import permissions, and runtime
+    /// ABI version match, required import permissions, and runtime
     /// capability flags.  Diagnostics are intentionally bounded to reason
     /// codes and identifiers so SDK tooling never exposes raw WASM bytes, raw
     /// manifests, host payloads, secrets, environment values, API keys, prompts,
@@ -269,7 +269,7 @@ impl ApplicationContractTestKit {
     ///
     /// Application host commands can be assembled by package tests before any
     /// runtime exists.  This check implements the Specification pattern for the
-    /// Route C trace invariant: every host operation that crosses the
+    /// Protocol trace invariant: every host operation that crosses the
     /// application boundary must either include a trace context or fail closed
     /// before execution.  The diagnostic intentionally reports only the import
     /// label and safe reason code; it never includes raw payloads, prompt

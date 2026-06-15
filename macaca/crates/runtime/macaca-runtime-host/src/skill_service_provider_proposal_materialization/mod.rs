@@ -2,7 +2,7 @@
 //!
 //! The Strategy is deliberately narrow: it accepts only proposals that the
 //! proposal-processing lane has already marked `ReadyForMaterialization`, builds
-//! bounded AgentSkills-compatible markdown, delegates the file write to the
+//! bounded AgentSkills markdown, delegates the file write to the
 //! existing content-mutation Strategy, and promotes governance metadata only
 //! after the write succeeds.  It never branches on application or workflow
 //! names, and it never logs or returns the generated `SKILL.md` body.

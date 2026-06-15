@@ -3,7 +3,7 @@ use crate::{
 };
 
 #[test]
-fn merge_eligibility_allows_compatible_skill_facts() {
+fn merge_eligibility_allows_aligned_skill_facts() {
     let policy = SkillMergeEligibilityPolicy::default();
     let facts = vec![
         SkillMergeEligibilityFacts::new("skill://agent/source", "agent", "agent-private"),

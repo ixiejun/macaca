@@ -1,7 +1,7 @@
 //! Contract tests for `SKILL.md` parsing and tier-1/tier-2 skill loading.
 
 use super::parser::parse_frontmatter;
-use super::{parse_skill_md, parse_skill_md_full, AgentSkill, extract_body};
+use super::{extract_body, parse_skill_md, parse_skill_md_full, AgentSkill};
 
 #[test]
 fn parse_frontmatter_basic() {

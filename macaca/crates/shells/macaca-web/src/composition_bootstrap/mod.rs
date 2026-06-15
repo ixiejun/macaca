@@ -7,11 +7,11 @@
 mod app_state_assembly;
 mod application_discovery;
 mod bootstrap_ctx;
-mod domain_pack_wiring;
 pub(crate) mod bootstrap_path_helpers;
 mod config_and_kernel;
 #[cfg(test)]
 pub(crate) mod contract_source;
+mod domain_pack_wiring;
 mod post_bootstrap_hooks;
 mod service_client_facades;
 mod service_runtime_wiring;

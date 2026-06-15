@@ -1,13 +1,12 @@
 //! Agent build request composition from persona, capabilities, and application semantics.
 
-use std::sync::Arc;
-use macaca_sdk::agent::{AgentCapabilitySet, AgentServices};
-use macaca_sdk::app::{app_agent_manifest_view, app_agent_prompt_semantics};
-use macaca_sdk::framework::construction::*;
-use macaca_proto::{ApplicationId, Capability};
-use crate::state::AppState;
 use super::context_prompt_builder;
 use super::FrameworkRunner;
+use crate::state::AppState;
+use macaca_host_composition::app::app_agent_prompt_semantics;
+use macaca_host_composition::framework::construction::*;
+use macaca_proto::ApplicationId;
+use std::sync::Arc;
 
 pub(crate) async fn build_request(
     state: &Arc<AppState>,
@@ -19,7 +18,8 @@ pub(crate) async fn build_request(
     intent: AgentBuildIntent,
     tools: AgentToolConfig,
 ) -> Result<AgentBuildRequest, String> {
-    let capabilities = FrameworkRunner::resolve_agent_capability_set(state, app_id, agent_name).await;
+    let capabilities =
+        FrameworkRunner::resolve_agent_capability_set(state, app_id, agent_name).await;
     let system_prompt = context_prompt_builder::build_context_system_prompt(
         state,
         app_id,

@@ -2,7 +2,7 @@
 //!
 //! This module is intentionally thin: application code should not duplicate
 //! entitlement policy. The guard delegates paid install/start/call decisions
-//! to `macaca-runtime-host` while preserving free/open package compatibility.
+//! to `macaca-runtime-host` while preserving free/open package admission.
 
 use macaca_proto::{
     CommerceError, EntitlementAuthorizeCallCommand, EntitlementAuthorizeInstallCommand,
@@ -142,9 +142,9 @@ impl<'a> CommercialPackageGuard<'a> {
 
 /// Service-backed application entitlement authorizer.
 ///
-/// This Adapter lets application package guards call the Route C Entitlement
+/// This Adapter lets application package guards call the Entitlement
 /// Service through the SDK focused client instead of depending on
-/// `macaca-runtime-host::EntitlementRuntimeFacade`.  The application crate
+/// a service-backed entitlement client.  The application crate
 /// still owns package semantics through [`ApplicationEntitlementAuthorizer`],
 /// while service dispatch, lifecycle, trace, and audit stay behind
 /// [`PackageEntitlementAuthorizeClient`].
@@ -375,7 +375,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn paid_package_install_uses_entitlement_facade() {
+    async fn paid_package_install_uses_entitlement_client() {
         let facade = MockEntitlementAuthorizer {
             record: Some(record()),
         };
@@ -432,13 +432,13 @@ mod tests {
                 EntitlementState::valid(),
             )))
         }
-
     }
 
     #[tokio::test]
     async fn service_backed_authorizer_uses_entitlement_client() {
-        let authorizer =
-            ServiceBackedApplicationEntitlementAuthorizer::new(MockPackageEntitlementAuthorizeClient);
+        let authorizer = ServiceBackedApplicationEntitlementAuthorizer::new(
+            MockPackageEntitlementAuthorizeClient,
+        );
         let guard = CommercialPackageGuard::new(&authorizer);
 
         let decision = guard

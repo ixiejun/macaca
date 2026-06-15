@@ -1,10 +1,9 @@
 //! Runtime execution-control handle wiring pause/resume channels to policy.
 
+use macaca_proto::{ExecutionControlPolicy, RuntimeResumeSignal};
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
-use macaca_proto::ExecutionControlPolicy;
-use crate::runtime_resume::RuntimeResumeSignal;
 /// Runtime-agent pause/resume wiring selected by execution-control policy.
 ///
 /// The web host owns the local session channel, but the pause trigger comes from

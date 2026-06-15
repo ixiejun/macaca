@@ -6,11 +6,11 @@ Constitutional microkernel surface and dependency invariants for Macaca Agent OS
 ## Requirements
 ### Requirement: Kernel Holds Only System Invariants
 
-The microkernel (`macaca-kernel`) SHALL contain only system invariants: identity, service registry, capability registry, IPC/service-call facade, policy facade, trace/audit bus, scheduler primitive, resource manager facade, session/task state contracts, package runtime guard, and the provider-neutral `AgentExecutionPort` abstraction. The kernel SHALL NOT contain Web3, EVM, payment/A2A, planner/worker-loop execution, or provider compatibility implementations.
+The microkernel (`macaca-kernel`) SHALL contain only system invariants: identity, service registry, capability registry, IPC/service-call facade, policy facade, trace/audit bus, scheduler primitive, resource manager facade, session/task state contracts, package runtime guard, and the provider-neutral `AgentExecutionPort` abstraction. The kernel SHALL NOT contain Web3, EVM, payment/A2A, planner/worker-loop execution, or provider bridge implementations.
 
 #### Scenario: Kernel module surface excludes non-kernel capabilities
 - **WHEN** `macaca-kernel/src/lib.rs` is inspected
-- **THEN** it SHALL NOT declare or export `web3`, `evm`, `a2a`, `payment_policy`, `provider_compat`, or an `executor` worker-loop module
+- **THEN** it SHALL NOT declare or export Web3, EVM, A2A, payment-policy, provider-bridge, or executor worker-loop modules
 - **AND** it SHALL only expose system-invariant primitives and the agent execution port
 
 #### Scenario: Kernel constructs no concrete providers
@@ -34,7 +34,7 @@ Web3, EVM, payment/A2A, and agent-execution orchestration SHALL live as system s
 #### Scenario: Kernel dependency tree is minimal
 - **WHEN** `cargo tree -e normal -p macaca-kernel --depth 1` is evaluated
 - **THEN** the only internal workspace dependencies SHALL be `macaca-proto` and `macaca-ipc`
-- **AND** the dependency gate SHALL contain zero kernel allowlist rows
+- **AND** the dependency gate SHALL contain zero kernel exception rows
 
 ### Requirement: Foundation Persistence Independence
 

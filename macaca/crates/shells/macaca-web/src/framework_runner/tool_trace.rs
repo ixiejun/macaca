@@ -1,8 +1,6 @@
 //! Tool response text extraction and trace output truncation.
 
-use macaca_sdk::framework::message::ContentBlock;
-use macaca_sdk::framework::tool::ToolResponse;
-use macaca_proto::AgentExecutionEvent;
+use macaca_host_composition::framework::tool::ToolResponse;
 
 pub(crate) const TOOL_TRACE_OUTPUT_MAX_BYTES: usize = 2000;
 
@@ -24,7 +22,9 @@ pub(crate) fn tool_response_text(response: &ToolResponse) -> String {
         .content
         .iter()
         .filter_map(|block| match block {
-            macaca_sdk::framework::message::ContentBlock::Text(text) => Some(text.text.as_str()),
+            macaca_host_composition::framework::message::ContentBlock::Text(text) => {
+                Some(text.text.as_str())
+            }
             _ => None,
         })
         .collect::<Vec<_>>()
@@ -35,7 +35,10 @@ pub(crate) fn tool_trace_output(response: &ToolResponse) -> String {
     truncate_tool_output(&tool_response_text(response), TOOL_TRACE_OUTPUT_MAX_BYTES)
 }
 
-pub(crate) fn tool_call_event(name: &str, args: &serde_json::Value) -> macaca_proto::AgentExecutionEvent {
+pub(crate) fn tool_call_event(
+    name: &str,
+    args: &serde_json::Value,
+) -> macaca_proto::AgentExecutionEvent {
     macaca_proto::AgentExecutionEvent::ToolCall {
         tool_name: name.to_string(),
         tool_input: args.clone(),

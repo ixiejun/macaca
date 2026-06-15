@@ -128,25 +128,23 @@ Macaca SHALL expose deterministic `ServiceRuntimeSnapshot` data for diagnostics 
 - **THEN** the runtime SHALL return service snapshots sorted by service id
 - **AND** each service snapshot SHALL include descriptor, runtime lifecycle state, health, and failure reason when present
 
-### Requirement: Macaca SHALL keep S1 additive and non-migrating
+### Requirement: Macaca SHALL keep ServiceRuntime as the terminal service owner
 
-S1 SHALL add runtime infrastructure without migrating concrete providers, removing existing direct dependencies, or changing user-visible flows.
+ServiceRuntime SHALL own terminal service registration, lifecycle, decorated call dispatch, cleanup, health, and snapshots for concrete service providers. User-visible flows SHALL keep stable contracts while routing through canonical service paths.
 
-#### Scenario: Existing flows remain unchanged
+#### Scenario: Existing flows use canonical service paths
 
-- **WHEN** S1 is implemented
-- **THEN** YAML application loading, `/api/chat/v2`, trace, task board, resume, driver, skill/MCP, Web UI, and CLI behavior SHALL continue through existing paths
-- **AND** S1 SHALL NOT remove any S0 allowlist row unless the implementation genuinely removes that dependency debt
-- **AND** S1 SHALL NOT introduce new kernel-to-provider, presentation-to-provider, or provider-to-presentation dependency violations
+- **WHEN** the runtime is inspected at terminal state
+- **THEN** YAML application loading, `/api/chat/v2`, trace, task board, resume, driver, skill/MCP, Web UI, and CLI behavior SHALL continue through canonical protocol/service/facade paths
+- **AND** the runtime SHALL contain no kernel-to-provider, presentation-to-provider, or provider-to-presentation dependency violations
 
 ### Requirement: Macaca SHALL document ServiceRuntime governance
 
-Macaca SHALL update Route C architecture governance documentation to describe the host-owned ServiceRuntime and its trace/policy/decorator requirements.
+Macaca SHALL update architecture governance documentation to describe the host-owned ServiceRuntime and its trace/policy/decorator requirements.
 
 #### Scenario: Governance doc explains ServiceRuntime ownership
 
-- **WHEN** maintainers read `macaca/docs/route-c-architecture-governance.md`
+- **WHEN** maintainers read the Macaca OS architecture governance documents
 - **THEN** it SHALL state that `ServiceRuntime` is host-owned orchestration rather than kernel provider ownership
 - **AND** it SHALL state that runtime service calls must pass trace and policy decorators
-- **AND** it SHALL state that concrete provider migrations occur in later S phases
-
+- **AND** it SHALL state that concrete providers are runtime-host/service-owned, not kernel or shell owned

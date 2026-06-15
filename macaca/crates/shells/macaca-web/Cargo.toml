@@ -2,10 +2,10 @@
 name = "macaca-web"
 version.workspace = true
 edition.workspace = true
+autobins = false
 
 [features]
-default = ["domain-pack-finance"]
-domain-pack-finance = ["macaca-sdk/domain-pack-finance"]
+default = []
 
 [dependencies]
 macaca-proto = { workspace = true }

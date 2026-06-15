@@ -15,7 +15,6 @@ pub(crate) fn routes_module_sources() -> String {
         include_str!("apps_reload.rs"),
         include_str!("skills_mcp.rs"),
         include_str!("todos.rs"),
-        include_str!("task_schedules.rs"),
         include_str!("autonomy_schedules.rs"),
         include_str!("autonomy_sanitizers.rs"),
         include_str!("session_inspect.rs"),

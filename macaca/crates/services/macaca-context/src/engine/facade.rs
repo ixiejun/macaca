@@ -8,7 +8,7 @@ use std::sync::Arc;
 use macaca_proto::MacacaResult;
 use tracing::{info, warn};
 
-use super::legacy::LegacyContextEngine;
+use super::passthrough::PassthroughContextEngine;
 use super::registry::ContextEngineRegistry;
 use super::types::{
     ContextAfterTurnInput, ContextAssembleInput, ContextAssembleResult, ContextEngine,
@@ -53,9 +53,9 @@ impl ContextRuntimeFacade {
         )
     }
 
-    /// Convenience constructor for pure legacy behavior.
-    pub fn legacy() -> Self {
-        Self::builtins(ContextEngineSelection::legacy())
+    /// Convenience constructor for pure passthrough behavior.
+    pub fn passthrough() -> Self {
+        Self::builtins(ContextEngineSelection::passthrough_default())
     }
 
     /// Assemble context using the selected engine and fallback if the primary fails.
@@ -65,7 +65,7 @@ impl ContextRuntimeFacade {
     ) -> MacacaResult<ContextAssembleResult> {
         let engine = self
             .registry
-            .resolve_or_legacy(Some(&self.selection.engine_id));
+            .resolve_or_passthrough(Some(&self.selection.engine_id));
         let requested_primary = self.selection.engine_id.clone();
         match engine.assemble(input.clone()).await {
             Ok(mut result) => {
@@ -81,7 +81,7 @@ impl ContextRuntimeFacade {
             }
             Err(error) => {
                 let fallback_id = self.selection.fallback_engine_id.as_str();
-                let fallback = self.registry.resolve_or_legacy(Some(fallback_id));
+                let fallback = self.registry.resolve_or_passthrough(Some(fallback_id));
                 warn!(
                     requested_engine_id = %requested_primary,
                     fallback_engine_id = %fallback_id,
@@ -91,14 +91,17 @@ impl ContextRuntimeFacade {
                 let mut result = fallback.assemble(input).await?;
                 result.report.requested_engine_id = requested_primary;
                 result.report.engine_fallback_applied = true;
-                result.report.decisions.push(crate::report::ContextDecisionReport {
-                    code: "context_engine_fallback".into(),
-                    severity: crate::report::ContextDecisionSeverity::Warning,
-                    message: format!(
-                        "Context engine '{}' failed and fallback '{}' was used: {}",
-                        self.selection.engine_id, fallback_id, error
-                    ),
-                });
+                result
+                    .report
+                    .decisions
+                    .push(crate::report::ContextDecisionReport {
+                        code: "context_engine_fallback".into(),
+                        severity: crate::report::ContextDecisionSeverity::Warning,
+                        message: format!(
+                            "Context engine '{}' failed and fallback '{}' was used: {}",
+                            self.selection.engine_id, fallback_id, error
+                        ),
+                    });
                 info!(
                     resolved_engine_id = %result.report.engine_id,
                     fallback_applied = true,
@@ -127,9 +130,9 @@ impl ContextManagerFacade {
         Self { engine }
     }
 
-    /// Convenience constructor for the legacy engine.
-    pub fn legacy() -> Self {
-        Self::new(Arc::new(LegacyContextEngine))
+    /// Convenience constructor for the passthrough engine.
+    pub fn passthrough() -> Self {
+        Self::new(Arc::new(PassthroughContextEngine))
     }
 
     /// Return metadata for the wrapped engine.

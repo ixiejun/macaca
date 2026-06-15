@@ -10,9 +10,9 @@ use macaca_proto::{
     ApplicationId, AutonomyScope, CreateScheduledAgentTaskCommand, MacacaResult,
     RecordScheduledAgentTaskResultCommand, ResolveScheduledAgentTaskPayloadCommand,
     ScheduledAgentTaskQueryCommand, ScheduledAgentTaskSchedule, SchedulerCommandResult,
-    SchedulerDeleteJobCommand, SchedulerJobDefinition, SchedulerJobId,
-    SchedulerJobLifecycleState, SchedulerRegisterJobCommand, SchedulerRunId, SchedulerRunState,
-    SchedulerTargetCommand, ServiceDescriptor, TraceContext,
+    SchedulerDeleteJobCommand, SchedulerJobDefinition, SchedulerJobId, SchedulerJobLifecycleState,
+    SchedulerRegisterJobCommand, SchedulerRunId, SchedulerRunState, SchedulerTargetCommand,
+    ServiceDescriptor, TraceContext,
 };
 use macaca_scheduler::{SchedulerService, UnavailableSchedulerProvider};
 use tokio::sync::Mutex;
@@ -181,7 +181,7 @@ fn create_command_with_skill_alias(raw_prompt: &str) -> CreateScheduledAgentTask
     let mut command = create_command(raw_prompt);
     command.metadata.insert(
         "skill.alias.requested_id".into(),
-        "skill://agent/legacy-task-skill".into(),
+        "skill://agent/stable-task-skill".into(),
     );
     command.metadata.insert(
         "prompt.secret".into(),
@@ -216,10 +216,7 @@ async fn create_stores_prompt_in_payload_store_and_registers_agent_execution_tar
     assert_eq!(jobs.len(), 1);
     match &jobs[0].target {
         SchedulerTargetCommand::AgentExecution(target) => {
-                assert_eq!(
-                    target.target_agent.as_deref(),
-                    Some(FIXTURE_TARGET_AGENT)
-                );
+            assert_eq!(target.target_agent.as_deref(), Some(FIXTURE_TARGET_AGENT));
             assert!(target.payload_ref.content_digest.is_some());
             let encoded = serde_json::to_string(target).unwrap();
             assert!(!encoded.contains(raw_prompt));
@@ -246,7 +243,7 @@ async fn create_preserves_sanitized_skill_alias_refs_for_scheduler_dispatch() {
         SchedulerTargetCommand::AgentExecution(target) => {
             assert_eq!(
                 target.metadata["skill.alias.requested_id"],
-                "skill://agent/legacy-task-skill"
+                "skill://agent/stable-task-skill"
             );
             assert!(!target.metadata.contains_key("prompt.secret"));
         }

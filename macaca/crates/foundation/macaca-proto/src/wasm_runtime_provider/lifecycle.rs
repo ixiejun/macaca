@@ -46,7 +46,7 @@ pub enum WasmLifecycleState {
 ///
 /// Operations are Command identifiers.  The runtime-host can map supported
 /// operations to guest exports, structured unsupported results, checkpoint
-/// mementos, or compatibility reports without changing this public vocabulary.
+/// mementos, or ABI decision reports without changing this public vocabulary.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum WasmLifecycleOperation {
@@ -303,7 +303,7 @@ pub struct WasmRestoreRequest {
     pub metadata: BTreeMap<String, String>,
 }
 
-/// Report returned after a restore compatibility decision.
+/// Report returned after a restore ABI decision.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct WasmRestoreReport {
     pub status: WasmLifecycleOperationStatus,
@@ -314,7 +314,7 @@ pub struct WasmRestoreReport {
     pub metadata: BTreeMap<String, String>,
 }
 
-/// Request to upgrade a session to a compatible artifact.
+/// Request to upgrade a session to an ABI-matching artifact.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct WasmUpgradeRequest {
     pub target_artifact: WasmRuntimeArtifactRef,
@@ -324,7 +324,7 @@ pub struct WasmUpgradeRequest {
     pub metadata: BTreeMap<String, String>,
 }
 
-/// Compatibility report for an upgrade decision.
+/// ABI decision report for an upgrade operation.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct WasmUpgradeReport {
     pub status: WasmLifecycleOperationStatus,
@@ -333,7 +333,7 @@ pub struct WasmUpgradeReport {
     pub source_artifact_digest_prefix: String,
     pub target_artifact: WasmRuntimeArtifactRef,
     pub target_artifact_digest_prefix: String,
-    pub abi_compatible: bool,
+    pub abi_matches: bool,
     pub trace: Option<TraceContext>,
     pub metadata: BTreeMap<String, String>,
 }
@@ -346,7 +346,7 @@ pub struct WasmRollbackRequest {
     pub metadata: BTreeMap<String, String>,
 }
 
-/// Report returned after a rollback compatibility decision.
+/// Report returned after a rollback ABI decision.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct WasmRollbackReport {
     pub status: WasmLifecycleOperationStatus,

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use macaca_sdk::context::{
+use macaca_host_composition::context::{
     ContextAdapterSafetyPolicy, ContextAssembleInput, ContextAssembleResult, ContextEngine,
     ContextEngineRegistry, ContextFallbackPolicy, ExternalAdapterContextEngine,
     ExternalContextAdapter, ExternalContextAdapterInfo,
@@ -12,7 +12,7 @@ use macaca_proto::config::{
 };
 use macaca_proto::{MacacaError, MacacaResult};
 
-use crate::state::ExternalAdapterRuntimeInstallation;
+use crate::context_runtime_facade::ExternalAdapterRuntimeInstallation;
 
 /// Startup product of config-driven external adapter installation.
 ///
@@ -230,7 +230,9 @@ mod tests {
     use super::*;
 
     use axum::{routing::post, Json, Router};
-    use macaca_sdk::context::{ContextEngineSelection, ContextReportBuilder, ContextRuntimeFacade};
+    use macaca_host_composition::context::{
+        ContextEngineSelection, ContextReportBuilder, ContextRuntimeFacade,
+    };
     use macaca_proto::config::{
         ContextExternalAdapterFallbackConfig, ContextExternalAdapterSafetyConfig,
     };
@@ -306,11 +308,11 @@ mod tests {
             installed.registry,
             ContextEngineSelection {
                 engine_id: "custom-http".into(),
-                fallback_engine_id: "legacy".into(),
+                fallback_engine_id: "passthrough".into(),
             },
         );
         let result = facade
-            .assemble(ContextAssembleInput::legacy(
+            .assemble(ContextAssembleInput::unscoped(
                 "agent",
                 "model",
                 vec![LlmMessage::user("hello")],

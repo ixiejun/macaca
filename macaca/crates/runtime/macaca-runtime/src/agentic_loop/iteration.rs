@@ -55,7 +55,7 @@ impl AgenticLoop {
         // 1. `ContextWindowManager` performs a coarse trim on the in-memory
         //    transcript to avoid obviously oversized requests.
         // 2. `ContextFacade` runs the composer (provider candidates) then the selected
-        //    context engine (`legacy`, `windowed`, `pruning`, `summary`, …) for
+        //    context engine (`passthrough`, `windowed`, `pruning`, `summary`, …) for
         //    provider-neutral prompt assembly and a structured report.
         //
         // The original `messages` vector is intentionally left intact so the
@@ -217,7 +217,6 @@ impl AgenticLoop {
         Ok(RuntimeIterationOutcome::ToolsExecuted)
     }
 
-
     async fn execute_tool_command(
         &self,
         agent_id: &AgentId,
@@ -238,5 +237,4 @@ impl AgenticLoop {
         )
         .await
     }
-
 }

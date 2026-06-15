@@ -46,11 +46,9 @@ pub async fn reload_apps(
         Err(error) => {
             tracing::warn!(
                 error = %error,
-                "Application Service reload failed; falling back to legacy registry"
+                "Application Service reload failed"
             );
-            crate::application_shell_adapter::reload_legacy_registry(&state)
-                .await
-                .map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e))?
+            return Err(err(StatusCode::BAD_GATEWAY, error.to_string()));
         }
     };
 
@@ -62,40 +60,8 @@ pub async fn reload_apps(
         }));
     }
 
-    let apps = crate::application_shell_adapter::list_runtime_apps(&state).await;
-    let agent_count = state.kernel.agent_count().await;
-
-    let registry = crate::application_shell_adapter::registry_read_guard(&state).await;
-    let app_infos: Vec<AppInfo> = apps
-        .into_iter()
-        .map(|(id, name, status)| {
-            let (description, icon) = registry
-                .get_app_by_name(&name)
-                .map(|app| {
-                    let desc = app
-                        .manifest
-                        .description
-                        .as_deref()
-                        .unwrap_or("An Agent OS application.");
-                    (desc.to_string(), "cube".to_string())
-                })
-                .unwrap_or_else(|| ("An Agent OS application.".to_string(), "cube".to_string()));
-            AppInfo {
-                id: id.0.to_string(),
-                name,
-                status: format!("{:?}", status),
-                agent_count,
-                entry_agent: None,
-                description,
-                icon,
-                ui: None,
-            }
-        })
-        .collect();
-    drop(registry);
-
     Ok(Json(ReloadResponse {
         discovered_count,
-        apps: app_infos,
+        apps: Vec::new(),
     }))
 }

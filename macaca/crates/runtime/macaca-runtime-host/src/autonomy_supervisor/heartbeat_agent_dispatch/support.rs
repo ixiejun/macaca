@@ -7,8 +7,8 @@
 use std::collections::BTreeMap;
 
 use macaca_proto::{
-    ApplicationHeartbeatAgentView, ApplicationId, HeartbeatCommandResult, HEARTBEAT_SERVICE_ID,
-    MacacaError,
+    ApplicationHeartbeatAgentView, ApplicationId, HeartbeatCommandResult, MacacaError,
+    HEARTBEAT_SERVICE_ID,
 };
 use uuid::Uuid;
 

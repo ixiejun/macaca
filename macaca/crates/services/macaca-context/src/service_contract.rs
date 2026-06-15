@@ -1,4 +1,4 @@
-//! Provider-neutral Context service contract for Route C S5.
+//! Provider-neutral Context service contract.
 //!
 //! Context composition is an orchestration capability: it selects providers,
 //! applies budget/governance, optionally triggers active recall, and returns a

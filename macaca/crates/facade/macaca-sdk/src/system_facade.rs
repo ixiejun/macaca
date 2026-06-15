@@ -3,7 +3,7 @@
 //! `SystemFacade` is the SDK-owned Facade that upper presentation shells call
 //! instead of reaching into provider crates or Web internals. The facade is
 //! deliberately composed from small Strategy clients so each capability can be
-//! migrated to `ServiceRuntime` independently in later Route C phases.
+//! connected to `ServiceRuntime` independently as capability clients mature.
 //!
 //! # Module tree (P5 iteration 96)
 //! - `types` — generic aggregate struct over Strategy client type parameters
@@ -24,7 +24,6 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 pub use crate::application_client::{SystemApplicationClient, UnavailableSystemApplicationClient};
-pub use crate::context_client::{SystemContextClient, UnavailableSystemContextClient};
 pub use crate::driver_client::{SystemDriverClient, UnavailableSystemDriverClient};
 pub use crate::entitlement_client::{SystemEntitlementClient, UnavailableSystemEntitlementClient};
 pub use crate::evm_client::{SystemEvmClient, UnavailableSystemEvmClient};
@@ -42,16 +41,13 @@ pub use crate::service_client::{
     ServiceCallCommand, ServiceCallResult, ServiceInspectionCommand, ServiceInspectionResult,
     SystemServiceClient, UnavailableSystemServiceClient,
 };
-pub use crate::skill_client::{SystemSkillClient, UnavailableSystemSkillClient};
-pub use crate::skill_operator_client::SystemSkillOperatorClient;
 pub use crate::status_client::{
-    kernel_status_snapshot, StaticSystemStatusDataSource, SystemStatusClient,
-    SystemStatusDataSource, SystemStatusSnapshot,
+    StaticSystemStatusClient, SystemStatusClient, SystemStatusSnapshot,
 };
 pub use crate::store_client::{SystemStoreClient, UnavailableSystemStoreClient};
 pub use crate::task_client::{
-    SystemTaskClient, TaskBoardDataSource, TaskBoardQueryCommand, TaskBoardQueryResult,
-    TodoStoreTaskBoardDataSource,
+    ServiceBackedTaskBoardDataSource, SystemTaskClient, TaskBoardDataSource, TaskBoardQueryCommand,
+    TaskBoardQueryResult,
 };
 pub use crate::tool_client::{
     ServiceBackedToolClient, SystemToolClient, UnavailableSystemToolClient,

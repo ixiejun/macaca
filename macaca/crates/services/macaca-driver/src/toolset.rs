@@ -1,24 +1,25 @@
-//! `DriverToolSet` — compatibility wrapper over `macaca_tools::CompositeToolSet`.
+//! `DriverToolSet` — driver-owned catalog wrapper over `macaca_tools::CompositeToolSet`.
 
-use macaca_tools::{CompositeToolSet, Tool, ToolSet};
+use macaca_tools::{CompositeToolSet, Tool, ToolCatalog};
 
-/// A `ToolSet` that combines tools from all registered drivers
-/// with any standalone tools.
+/// Driver-owned tool catalog that combines registered driver tools with any
+/// standalone tools.
 pub struct DriverToolSet {
     inner: CompositeToolSet,
 }
 
 impl DriverToolSet {
     /// Create from a list of driver tools and standalone tools.
-    #[deprecated(note = "use macaca_tools::CompositeToolSet::from_groups()")]
-    pub fn new(driver_tools: Vec<Box<dyn Tool>>, standalone_tools: Vec<Box<dyn Tool>>) -> Self {
+    pub fn from_groups(
+        driver_tools: Vec<Box<dyn Tool>>,
+        standalone_tools: Vec<Box<dyn Tool>>,
+    ) -> Self {
         Self {
             inner: CompositeToolSet::from_groups(vec![driver_tools, standalone_tools]),
         }
     }
 
     /// Create an empty toolset.
-    #[deprecated(note = "use macaca_tools::CompositeToolSet::empty()")]
     pub fn empty() -> Self {
         Self {
             inner: CompositeToolSet::empty(),
@@ -30,9 +31,8 @@ impl DriverToolSet {
     }
 }
 
-impl ToolSet for DriverToolSet {
-    #[allow(deprecated)]
-    fn tools(&self) -> &[Box<dyn Tool>] {
+impl ToolCatalog for DriverToolSet {
+    fn all_tools(&self) -> &[Box<dyn Tool>] {
         macaca_tools::ToolCatalog::all_tools(&self.inner)
     }
 }

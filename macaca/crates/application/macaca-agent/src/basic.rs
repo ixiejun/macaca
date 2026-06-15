@@ -27,18 +27,6 @@ pub struct BasicAgent {
 }
 
 impl BasicAgent {
-    /// Create a new BasicAgent with the given task description.
-    #[deprecated(note = "use BasicAgentBuilder::new(...).build() for new code")]
-    pub fn new(task_description: impl Into<String>) -> Self {
-        BasicAgentBuilder::new(task_description).build()
-    }
-
-    /// Create with an explicit id (useful for testing).
-    #[deprecated(note = "use BasicAgentBuilder::new(...).with_id(...).build() for new code")]
-    pub fn with_id(id: AgentId, task_description: impl Into<String>) -> Self {
-        BasicAgentBuilder::new(task_description).with_id(id).build()
-    }
-
     fn default_capabilities() -> Vec<Capability> {
         vec![Capability {
             name: "text_generation".into(),
@@ -52,7 +40,7 @@ impl BasicAgent {
         state: AgentState,
         capability_set: AgentCapabilitySet,
     ) -> Self {
-        let capabilities = capability_set.flatten_for_legacy_api();
+        let capabilities = capability_set.flatten();
         Self {
             id,
             task_description,
@@ -73,7 +61,9 @@ impl BasicAgentBuilder {
             id: AgentId::new(),
             task_description: task_description.into(),
             state: AgentState::Created,
-            capability_set: AgentCapabilitySet::from_legacy(BasicAgent::default_capabilities()),
+            capability_set: AgentCapabilitySet::from_flat_capabilities(
+                BasicAgent::default_capabilities(),
+            ),
         }
     }
 
@@ -88,7 +78,7 @@ impl BasicAgentBuilder {
     }
 
     pub fn with_capabilities(mut self, capabilities: Vec<Capability>) -> Self {
-        self.capability_set = AgentCapabilitySet::from_legacy(capabilities);
+        self.capability_set = AgentCapabilitySet::from_flat_capabilities(capabilities);
         self
     }
 
@@ -217,7 +207,7 @@ mod tests {
     }
 
     #[test]
-    fn capability_set_flattens_legacy_output() {
+    fn capability_set_flattens_grouped_output() {
         let mut capability_set = AgentCapabilitySet::default();
         capability_set.push_group(
             CapabilitySource::Skill,
@@ -230,7 +220,7 @@ mod tests {
             .with_capability_set(capability_set)
             .build();
 
-        assert_eq!(agent.capability_set().flatten_for_legacy_api().len(), 1);
+        assert_eq!(agent.capability_set().flatten().len(), 1);
         assert_eq!(agent.capabilities()[0].name, "browser");
     }
 }

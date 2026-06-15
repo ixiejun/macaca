@@ -2,19 +2,15 @@
 //!
 //! Dual-path execution:
 //! 1. Live path — GET the public Web facade when `SkillCliRuntimeTarget` carries an app id.
-//! 2. Diagnostic path — aggregate governance + proposal snapshots via SDK Null Object.
+//! 2. Diagnostic path — report structured unavailable without importing host contracts.
 
 use macaca_proto::{MacacaResult, TraceContext};
-use macaca_sdk::{
-    SkillExperienceProposalSnapshotCommand, SkillGovernanceSnapshotCommand,
-    SkillServiceScope, SystemSkillClient, UnavailableSystemSkillClient,
-};
 use tracing::info;
 
-use super::output::print_json;
+use super::output::{print_json, print_unavailable};
 use super::types::SkillCliRuntimeTarget;
 
-/// Print a sanitized Skill operations snapshot through the SDK Skill facade.
+/// Print a sanitized Skill operations snapshot through the live Web facade.
 pub async fn execute_skill_operations_snapshot(target: SkillCliRuntimeTarget) -> MacacaResult<()> {
     if let Some(client) = target.live_client()? {
         let response = client.get("").await?;
@@ -25,40 +21,11 @@ pub async fn execute_skill_operations_snapshot(target: SkillCliRuntimeTarget) ->
         return print_json(response);
     }
 
-    let client = UnavailableSystemSkillClient;
     let trace = TraceContext::new("cli-skill-operations-snapshot");
-    let scope = SkillServiceScope::default();
     info!(
         trace_id = %trace.trace_id,
         command = "skill.operations.snapshot",
-        "CLI forwarding Skill operations snapshot through SDK Skill facade"
+        "CLI Skill operations snapshot has no live Skill runtime target"
     );
-    let governance = client
-        .governance_snapshot(SkillGovernanceSnapshotCommand {
-            trace: trace.clone(),
-            scope: scope.clone(),
-            include_archived: true,
-            lifecycle_filters: Vec::new(),
-        })
-        .await?;
-    let proposals = client
-        .skill_experience_snapshot(SkillExperienceProposalSnapshotCommand {
-            trace: trace.clone(),
-            scope,
-            include_discarded: false,
-        })
-        .await?;
-    info!(
-        trace_id = %trace.trace_id,
-        governance_records = governance.records.len(),
-        proposal_count = proposals.proposals.len(),
-        "CLI emitted bounded Skill operations snapshot"
-    );
-    print_json(serde_json::json!({
-        "trace_id": trace.trace_id,
-        "governance_records": governance.records.len(),
-        "proposal_count": proposals.proposals.len(),
-        "governance": governance,
-        "proposals": proposals,
-    }))
+    print_unavailable(trace, "skill.operations.snapshot")
 }

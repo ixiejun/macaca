@@ -8,13 +8,11 @@ use std::sync::Arc;
 
 use tracing::info;
 
-use macaca_proto::{ApplicationId, KernelServiceId, MacacaResult, TraceContext};
-use macaca_sdk::runtime_host::AgentInfo;
 use crate::agent_context_backend::WebAgentContextBackend;
 use crate::hook_consumer;
-use crate::loop_manager;
 use crate::skill_self_evolution_execution_observer::SkillSelfEvolutionObservedAgentExecutionBackend;
 use crate::web_agent_execution_adapters::build_composed_web_agent_execution_backend;
+use macaca_proto::{AgentInfo, ApplicationId, KernelServiceId, MacacaResult, TraceContext};
 
 use super::bootstrap_ctx::BootstrapCtx;
 
@@ -22,10 +20,22 @@ use super::bootstrap_ctx::BootstrapCtx;
 pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
     let config = ctx.config.clone().expect("bootstrap: config");
     let kernel = Arc::clone(ctx.kernel.as_ref().expect("bootstrap: kernel"));
-    let service_runtime = Arc::clone(ctx.service_runtime.as_ref().expect("bootstrap: service_runtime"));
+    let service_runtime = Arc::clone(
+        ctx.service_runtime
+            .as_ref()
+            .expect("bootstrap: service_runtime"),
+    );
     let state = Arc::clone(ctx.app_state.as_ref().expect("bootstrap: app_state"));
-    let executor_registry_ref = Arc::clone(ctx.executor_registry_ref.as_ref().expect("bootstrap: executor_registry_ref"));
-    let application_orchestration_registry_ref = Arc::clone(ctx.application_orchestration_registry_ref.as_ref().expect("bootstrap: application_orchestration_registry_ref"));
+    let executor_registry_ref = Arc::clone(
+        ctx.executor_registry_ref
+            .as_ref()
+            .expect("bootstrap: executor_registry_ref"),
+    );
+    let application_orchestration_registry_ref = Arc::clone(
+        ctx.application_orchestration_registry_ref
+            .as_ref()
+            .expect("bootstrap: application_orchestration_registry_ref"),
+    );
     let started_apps = ctx.started_apps.clone().expect("bootstrap: started_apps");
 
     // 10a. Set the executor registry reference for the delegate tool
@@ -45,15 +55,17 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
     // into Web executor internals directly.
     service_runtime
         .register_provider(
-            &macaca_sdk::runtime_host::StaticServiceProviderFactory::new(
-                macaca_sdk::runtime_host::ServiceProviderInstance::new(
-                    macaca_sdk::runtime_host::agent_context_service_descriptor(),
-                    Arc::new(macaca_sdk::runtime_host::AgentContextSystemServiceProvider::new(
-                        Arc::new(WebAgentContextBackend::new(Arc::clone(&state))),
-                    )),
+            &macaca_host_composition::service_runtime::StaticServiceProviderFactory::new(
+                macaca_host_composition::service_runtime::ServiceProviderInstance::new(
+                    macaca_host_composition::agent_execution::agent_context_service_descriptor(),
+                    Arc::new(
+                        macaca_host_composition::agent_execution::AgentContextSystemServiceProvider::new(
+                            Arc::new(WebAgentContextBackend::new(Arc::clone(&state))),
+                        ),
+                    ),
                 ),
             ),
-            macaca_sdk::runtime_host::ServiceProviderFactoryContext::new(),
+            macaca_host_composition::service_runtime::ServiceProviderFactoryContext::new(),
         )
         .await
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
@@ -66,17 +78,19 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
     service_runtime
         .register_provider(
-            &macaca_sdk::runtime_host::StaticServiceProviderFactory::new(
-                macaca_sdk::runtime_host::ServiceProviderInstance::new(
-                    macaca_sdk::runtime_host::execution_control_service_descriptor(),
+            &macaca_host_composition::service_runtime::StaticServiceProviderFactory::new(
+                macaca_host_composition::service_runtime::ServiceProviderInstance::new(
+                    macaca_host_composition::execution_control::execution_control_service_descriptor(),
                     Arc::new(
-                        macaca_sdk::runtime_host::ExecutionControlSystemServiceProvider::new(Arc::new(
-                            macaca_sdk::runtime_host::ExecutionControlRuntimeCapability::new(),
-                        )),
+                        macaca_host_composition::execution_control::ExecutionControlSystemServiceProvider::new(
+                            Arc::new(
+                                macaca_host_composition::execution_control::ExecutionControlRuntimeCapability::new(),
+                            ),
+                        ),
                     ),
                 ),
             ),
-            macaca_sdk::runtime_host::ServiceProviderFactoryContext::new(),
+            macaca_host_composition::service_runtime::ServiceProviderFactoryContext::new(),
         )
         .await
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
@@ -89,23 +103,23 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
     service_runtime
         .register_provider(
-            &macaca_sdk::runtime_host::StaticServiceProviderFactory::new(
-                macaca_sdk::runtime_host::ServiceProviderInstance::new(
-                    macaca_sdk::runtime_host::agent_execution_service_descriptor(),
+            &macaca_host_composition::service_runtime::StaticServiceProviderFactory::new(
+                macaca_host_composition::service_runtime::ServiceProviderInstance::new(
+                    macaca_host_composition::agent_execution::agent_execution_service_descriptor(),
                     Arc::new(
-                        macaca_sdk::runtime_host::AgentExecutionSystemServiceProvider::new(Arc::new(
-                            SkillSelfEvolutionObservedAgentExecutionBackend::new(
+                        macaca_host_composition::agent_execution::AgentExecutionSystemServiceProvider::new(
+                            Arc::new(SkillSelfEvolutionObservedAgentExecutionBackend::new(
                                 Arc::new(build_composed_web_agent_execution_backend(
                                     Arc::clone(&state),
                                     Arc::clone(&service_runtime),
                                 )),
                                 Arc::clone(&state),
-                            ),
-                        )),
+                            )),
+                        ),
                     ),
                 ),
             ),
-            macaca_sdk::runtime_host::ServiceProviderFactoryContext::new(),
+            macaca_host_composition::service_runtime::ServiceProviderFactoryContext::new(),
         )
         .await
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
@@ -119,7 +133,7 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
 
     // Hot-swap kernel execution onto the unified service path now that
     // `service.agent_execution` is registered and backed by ComposedAgentExecutionBackend.
-    macaca_sdk::runtime_host::wire_kernel_to_agent_execution_service(
+    macaca_host_composition::agent_execution::wire_kernel_to_agent_execution_service(
         kernel.as_ref(),
         Arc::clone(&service_runtime),
         ApplicationId::from_name("host-kernel-execution"),
@@ -129,7 +143,6 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
         service_id = macaca_proto::AGENT_EXECUTION_SERVICE_ID,
         "Kernel execution port wired to service.agent_execution"
     );
-
 
     // 10b. Register all started apps to the executor registry and create workspaces
     {
@@ -227,7 +240,6 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
         });
     }
 
-
     // 10c. Note: executor_registry is available in state for task delegation
     // The executor_registry allows agents to delegate tasks to other agents
     // using capability-based routing or direct agent targeting.
@@ -236,7 +248,6 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
         let _registry = state.executor_registry.clone();
         info!("ApplicationExecutorRegistry initialized and apps registered");
     }
-
 
     // 10d. Start hook event consumer for coordinator auto-continue
     {

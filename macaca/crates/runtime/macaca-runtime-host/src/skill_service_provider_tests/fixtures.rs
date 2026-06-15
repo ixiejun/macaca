@@ -26,7 +26,10 @@ pub(super) fn traced_command<T: serde::Serialize>(
     )
 }
 
-pub(super) fn observation(event: SkillUsageEventKind, pinned: Option<bool>) -> SkillUsageObservation {
+pub(super) fn observation(
+    event: SkillUsageEventKind,
+    pinned: Option<bool>,
+) -> SkillUsageObservation {
     SkillUsageObservation {
         skill_id: "skill://agent/example".into(),
         name: "agent-example".into(),

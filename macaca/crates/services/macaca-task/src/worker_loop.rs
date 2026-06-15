@@ -7,6 +7,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
+pub use macaca_proto::WorkerEvent;
 use tracing::info;
 
 use crate::todo_board::TaskBoard;
@@ -26,34 +27,6 @@ impl Default for WorkerLoopConfig {
             max_execution_time: Duration::from_secs(30 * 60),
         }
     }
-}
-
-/// Events emitted by the Worker loop for the agent runtime to act on.
-#[derive(Debug, Clone)]
-pub enum WorkerEvent {
-    /// A task was claimed and needs execution.
-    TaskClaimed {
-        task_id: macaca_proto::TaskId,
-        title: String,
-        description: String,
-        acceptance_criteria: Vec<String>,
-        context: Option<String>,
-        optimization_suggestions: Option<String>,
-        attempt: u32,
-        /// Session scope for tracing / UI (mirrors `TodoItem.session_id`).
-        session_id: Option<String>,
-    },
-    /// A task needing optimization was found.
-    RetryTask {
-        task_id: macaca_proto::TaskId,
-        title: String,
-        description: String,
-        optimization_suggestions: String,
-        attempt: u32,
-        session_id: Option<String>,
-    },
-    /// No tasks available — agent is idle.
-    Idle,
 }
 
 /// The Worker Agent's autonomous execution loop.
@@ -86,11 +59,6 @@ impl WorkerLoopWaker {
 }
 
 impl WorkerLoop {
-    #[deprecated(note = "Use WorkerLoop::with_components instead")]
-    pub fn new(board: Arc<TaskBoard>, config: WorkerLoopConfig) -> Self {
-        Self::with_components(board, config)
-    }
-
     pub fn with_components(board: Arc<TaskBoard>, config: WorkerLoopConfig) -> Self {
         Self {
             board,
@@ -104,18 +72,6 @@ impl WorkerLoop {
         WorkerLoopWaker {
             notify: Arc::clone(&self.notify),
         }
-    }
-
-    /// Run the worker loop until shutdown is signaled.
-    ///
-    /// Emits `WorkerEvent`s for the agent runtime to process.
-    #[deprecated(note = "Use WorkerLoop::run_with_default_template instead")]
-    pub async fn run(
-        &self,
-        shutdown: Arc<AtomicBool>,
-        event_tx: tokio::sync::mpsc::Sender<WorkerEvent>,
-    ) {
-        self.run_with_default_template(shutdown, event_tx).await;
     }
 
     pub async fn run_with_default_template(

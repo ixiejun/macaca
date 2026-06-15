@@ -1,4 +1,4 @@
-//! Runtime-host adapter for the Route C Memory Service.
+//! Runtime-host adapter for the Memory Service.
 //!
 //! The adapter owns service lifecycle and command translation.  Memory storage,
 //! routing, governance, and topology decisions remain behind the injected

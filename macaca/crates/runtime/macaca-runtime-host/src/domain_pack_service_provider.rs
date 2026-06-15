@@ -10,16 +10,12 @@
 //! - [`DomainPackProviderRegistration`] lives in `macaca-kernel` so package crates
 //!   avoid depending on this runtime-host crate (breaks `pack → runtime-host → app` cycles).
 //! - Trace/result helpers live in `macaca-proto::domain_pack_contract` for the same reason.
-//! - This module keeps bootstrap wiring and re-exports for backward-compatible imports.
+//! - This module keeps bootstrap wiring and package-facing helper re-exports centralized.
 
 use std::sync::Arc;
 
-use macaca_llm::LlmProvider;
-use macaca_proto::{
-    domain_pack_command_trace, domain_pack_service_adapter_error, domain_pack_service_result,
-    KernelServiceId, MacacaError, MacacaResult, TraceContext,
-};
-use tracing::{info, warn};
+use macaca_proto::{KernelServiceId, MacacaError, MacacaResult, TraceContext};
+use tracing::info;
 
 use crate::{
     ServiceProviderFactoryContext, ServiceProviderInstance, ServiceRuntime,
@@ -31,7 +27,8 @@ pub use macaca_kernel::DomainPackProviderRegistration;
 
 /// Re-export proto-owned trace/result helpers for package adapters.
 pub use macaca_proto::{
-    domain_pack_command_trace as command_trace, domain_pack_service_adapter_error as service_adapter_error,
+    domain_pack_command_trace as command_trace,
+    domain_pack_service_adapter_error as service_adapter_error,
     domain_pack_service_result as service_result,
 };
 
@@ -58,10 +55,7 @@ pub async fn bootstrap_domain_pack_services(
     for registration in registrations {
         let descriptor = registration.descriptor().clone();
         let service_id = descriptor.id.clone();
-        let trace = TraceContext::new(format!(
-            "{trace_prefix}-{}",
-            registration.trace_suffix()
-        ));
+        let trace = TraceContext::new(format!("{trace_prefix}-{}", registration.trace_suffix()));
         info!(
             service_id = %service_id,
             trace_id = %trace.trace_id,
@@ -99,28 +93,6 @@ pub async fn bootstrap_domain_pack_services(
     Ok(bundle)
 }
 
-/// Deprecated compatibility entrypoint for the old built-in domain-pack path.
-///
-/// Base runtime-host no longer owns finance or crypto providers. Returning an empty
-/// bundle is explicit Null Object behavior: callers receive structured unavailable
-/// results from the service runtime instead of synthetic business output from the OS.
-#[deprecated(
-    since = "0.1.0",
-    note = "register package-owned providers with bootstrap_domain_pack_services"
-)]
-pub async fn bootstrap_builtin_domain_pack_services(
-    _runtime: Arc<ServiceRuntime>,
-    _llm: Arc<dyn LlmProvider>,
-    trace_prefix: impl Into<String>,
-) -> MacacaResult<DomainPackRuntimeBundle> {
-    let trace_prefix = trace_prefix.into();
-    warn!(
-        trace_prefix = %trace_prefix,
-        "built-in domain-pack providers are disabled; package provider registration is required"
-    );
-    Ok(DomainPackRuntimeBundle::default())
-}
-
 fn runtime_error(error: crate::ServiceRuntimeError) -> MacacaError {
     MacacaError::Config(error.to_string())
 }
@@ -130,7 +102,7 @@ mod tests {
     use super::DomainPackRuntimeBundle;
 
     #[test]
-    fn builtin_domain_pack_bootstrap_returns_empty_bundle() {
+    fn empty_domain_pack_bootstrap_returns_empty_bundle() {
         let bundle = DomainPackRuntimeBundle::default();
         assert!(bundle.started_services.is_empty());
     }

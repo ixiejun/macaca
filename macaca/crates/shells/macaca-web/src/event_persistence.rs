@@ -8,9 +8,10 @@ use std::sync::Arc;
 
 use tokio::task::JoinHandle;
 
-use macaca_sdk::runtime_host::executor::app_executor::ApplicationExecutor;
-use macaca_sdk::runtime_host::executor::ExecutorEvent;
-use macaca_sdk::runtime_host::persist::{AppendEventCommand, EventLog};
+use macaca_host_composition::executor::app_executor::ApplicationExecutor;
+use macaca_host_composition::executor::ExecutorEvent;
+use macaca_host_composition::persist::EventLog;
+use macaca_proto::AppendEventCommand;
 
 use crate::proto_event_visitors::delegated_persisted_event_name;
 use crate::run_trace::{phase, status, RunTracer};
@@ -21,7 +22,7 @@ use crate::run_trace::{phase, status, RunTracer};
 /// This is a single subscriber — no race conditions between registration
 /// and writing because session_id is known upfront.
 ///
-/// Also feeds the `AgentTraceCollector` for backward-compatible session save.
+/// Also feeds the `AgentTraceCollector` so session save receives the same event stream.
 pub(crate) fn spawn_session_event_collector(
     executor: Arc<ApplicationExecutor>,
     event_log: Arc<EventLog>,
@@ -34,7 +35,7 @@ pub(crate) fn spawn_session_event_collector(
         loop {
             match evt_rx.recv().await {
                 Ok(event) => {
-                    // 1. Feed the AgentTraceCollector (for session save compatibility).
+                    // 1. Feed the AgentTraceCollector for browser-visible session save.
                     match &event {
                         ExecutorEvent::TaskStarted { task_id, agent } => {
                             collector.on_task_started(&task_id.to_string(), agent).await;

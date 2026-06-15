@@ -40,7 +40,7 @@ pub(crate) fn app_info_from_service_view(view: &ApplicationServiceAppView) -> Ap
     AppInfo {
         id: view.id.0.to_string(),
         name: view.name.clone(),
-        status: view.runtime.compatibility_status.clone(),
+        status: view.runtime.runtime_status.clone(),
         agent_count: view.agents.len(),
         entry_agent: view.entry_agent.clone(),
         description: view
@@ -67,7 +67,7 @@ pub(crate) async fn service_status_views(
     match state.application_client.status(command).await {
         Ok(views) => Some(views),
         Err(error) => {
-            tracing::warn!(error = %error, trace_id, "Application Service status failed; falling back to legacy runtime");
+            tracing::warn!(error = %error, trace_id, "Application Service status failed");
             None
         }
     }
@@ -92,7 +92,7 @@ pub(crate) async fn service_metadata_view(
             tracing::warn!(
                 error = %error,
                 trace_id,
-                "Application metadata query failed; preserving deprecated fallback"
+                "Application metadata query failed"
             );
             None
         }
@@ -108,39 +108,8 @@ pub async fn get_apps(State(state): State<Arc<AppState>>) -> Json<Vec<AppInfo>> 
         return Json(views.iter().map(app_info_from_service_view).collect());
     }
 
-    let apps = crate::application_shell_adapter::list_runtime_apps(&state).await;
-    let agent_count = state.kernel.agent_count().await;
-    let registry = crate::application_shell_adapter::registry_read_guard(&state).await;
-
-    let infos = apps
-        .into_iter()
-        .map(|(id, name, status)| {
-            // Try to get description from registry (app.yaml)
-            let (description, icon) = registry
-                .get_app_by_name(&name)
-                .map(|app| {
-                    let desc = app
-                        .manifest
-                        .description
-                        .as_deref()
-                        .unwrap_or("An Agent OS application.");
-                    (desc.to_string(), "cube".to_string())
-                })
-                .unwrap_or_else(|| ("An Agent OS application.".to_string(), "cube".to_string()));
-
-            AppInfo {
-                id: id.0.to_string(),
-                name,
-                status: format!("{:?}", status),
-                agent_count,
-                entry_agent: None,
-                description,
-                icon,
-                ui: None,
-            }
-        })
-        .collect();
-    Json(infos)
+    tracing::warn!("Application list unavailable because Application Service returned no status");
+    Json(Vec::new())
 }
 
 // ---------------------------------------------------------------------------
@@ -174,38 +143,6 @@ pub async fn get_app(
         if let Some(view) = views.iter().find(|view| view.id == app_id) {
             tracing::info!(app_id = %app_id, "Application detail served from Application Service status");
             return Ok(Json(app_info_from_service_view(view)));
-        }
-    }
-
-    // Get description from registry
-    let description = {
-        #[allow(deprecated)]
-        let registry = crate::application_shell_adapter::registry_read_guard(&state).await;
-        registry
-            .get_app(&app_id)
-            .map(|a| {
-                a.manifest
-                    .description
-                    .clone()
-                    .unwrap_or_else(|| "An Agent OS application.".to_string())
-            })
-            .unwrap_or_else(|| "An Agent OS application.".to_string())
-    };
-    let icon = "cube".to_string();
-
-    let apps = crate::application_shell_adapter::list_runtime_apps(&state).await;
-    for (id, name, status) in apps {
-        if id == app_id {
-            return Ok(Json(AppInfo {
-                id: id.0.to_string(),
-                name,
-                status: format!("{:?}", status),
-                agent_count: state.kernel.agent_count().await,
-                entry_agent: None,
-                description,
-                icon,
-                ui: None,
-            }));
         }
     }
 

@@ -19,7 +19,12 @@ pub struct ApplicationPlanningAgentProfile {
 }
 
 impl ApplicationPlanningAgentProfile {
-    pub fn legacy(name: impl Into<String>) -> Self {
+    /// Build a neutral profile when the caller only knows the agent name.
+    ///
+    /// The profile is intentionally conservative: it marks the agent as
+    /// available but does not grant tools, capacity, or rich capability claims
+    /// that were not supplied by an application manifest or service snapshot.
+    pub fn default_profile(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
             capabilities: vec!["no capability metadata".into()],

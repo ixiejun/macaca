@@ -1,16 +1,13 @@
 //! Workflow **engine** — coordinator resolution and prompt assembly.
 //!
-//! [`WorkflowEngine`] is the façade for manifest workflow execution helpers.
+//! [`WorkflowEngine`] is the stateless façade for manifest workflow execution helpers.
 //! Coordinator resolution uses Chain of Responsibility over workflow steps and
 //! `entry_agent`, failing closed when neither is declared.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::Arc;
 
-use macaca_kernel::Kernel;
-use macaca_llm::LlmProvider;
-use macaca_proto::{AgentId, MacacaError, MacacaResult};
+use macaca_proto::{MacacaError, MacacaResult};
 use tracing::info;
 
 use crate::consumption::app_entry_agent_name;
@@ -21,44 +18,15 @@ use super::prompt_strategy::{
 };
 use super::types::{skeleton_prompt_context, WorkflowPromptContext, DEFAULT_WORKFLOW};
 
-/// Result of a workflow execution (output metadata for callers).
-#[derive(Debug, Clone)]
-pub struct WorkflowResult {
-    /// Final textual output from the workflow run.
-    pub output: String,
-    /// Agent that produced the final output.
-    pub agent_id: AgentId,
-    /// Number of workflow steps executed.
-    pub steps_executed: usize,
-}
-
-/// Runtime context bundle for workflow execution requests.
-pub struct WorkflowContext {
-    /// Application manifest driving the workflow graph.
-    pub manifest: AppManifest,
-    /// On-disk application root (persona / resource resolution).
-    pub app_dir: PathBuf,
-    /// Kernel handle for agent lifecycle operations.
-    pub kernel: Arc<Kernel>,
-    /// LLM provider used when steps require model calls.
-    pub llm: Arc<dyn LlmProvider>,
-    /// End-user input that triggered the workflow.
-    pub input: String,
-}
-
 /// Engine for executing workflows declared in application manifests.
-pub struct WorkflowEngine {
-    /// Kernel reference (retained for future step execution wiring).
-    kernel: Arc<Kernel>,
-    /// LLM provider reference (retained for future step execution wiring).
-    llm: Arc<dyn LlmProvider>,
-}
+#[derive(Debug, Clone, Copy, Default)]
+pub struct WorkflowEngine;
 
 impl WorkflowEngine {
-    /// Construct an engine bound to the shared kernel and LLM provider.
-    pub fn new(kernel: Arc<Kernel>, llm: Arc<dyn LlmProvider>) -> Self {
-        tracing::info!("workflow engine constructed");
-        Self { kernel, llm }
+    /// Construct a provider-neutral workflow helper.
+    pub fn new() -> Self {
+        tracing::info!("workflow engine constructed without provider-owned state");
+        Self
     }
 
     /// Resolve the workflow coordinator agent from manifest declarations.
@@ -159,7 +127,7 @@ impl WorkflowEngine {
         }
     }
 
-    /// Default SDD workflow prompt (skeleton manifest, compatibility helper).
+    /// Default SDD workflow prompt for skeleton manifest helpers.
     pub fn default_workflow_prompt() -> String {
         DefaultWorkflowPromptStrategy.render(&skeleton_prompt_context())
     }
@@ -215,11 +183,5 @@ impl WorkflowEngine {
             .filter(|e| e.type_ == EntrypointType::Workflow)
             .map(|e| e.name.clone())
             .unwrap_or_else(|| DEFAULT_WORKFLOW.into())
-    }
-}
-
-impl Default for WorkflowEngine {
-    fn default() -> Self {
-        panic!("WorkflowEngine requires kernel and llm - use WorkflowEngine::new()");
     }
 }

@@ -50,11 +50,6 @@ impl PlanLoopWaker {
 }
 
 impl PlanLoop {
-    #[deprecated(note = "Use PlanLoop::with_components instead")]
-    pub fn new(space: Arc<TaskSpace>, config: PlanLoopConfig) -> Self {
-        Self::with_components(space, config)
-    }
-
     pub fn with_components(space: Arc<TaskSpace>, config: PlanLoopConfig) -> Self {
         Self {
             space,
@@ -68,19 +63,6 @@ impl PlanLoop {
         PlanLoopWaker {
             notify: Arc::clone(&self.notify),
         }
-    }
-
-    /// Run the plan loop until shutdown is signaled.
-    ///
-    /// Returns a `PlanEvent` each cycle describing what needs attention.
-    /// The caller (or an LLM-driven agent) acts on these events.
-    #[deprecated(note = "Use PlanLoop::run_with_default_template instead")]
-    pub async fn run(
-        &self,
-        shutdown: Arc<AtomicBool>,
-        event_tx: tokio::sync::mpsc::Sender<PlanEvent>,
-    ) {
-        self.run_with_default_template(shutdown, event_tx).await;
     }
 
     pub async fn run_with_default_template(

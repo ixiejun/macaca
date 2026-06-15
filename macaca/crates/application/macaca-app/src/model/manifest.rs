@@ -10,8 +10,8 @@ use serde::{Deserialize, Serialize};
 use crate::service_capability::AppServiceContractConfig;
 use crate::ui_runtime::AppUiRuntimeConfig;
 use macaca_proto::{
-    ApplicationExecutionProfileDeclaration, ApplicationId,
-    ApplicationWorkbenchManifestDeclaration, ExecutionControlPolicy,
+    ApplicationExecutionProfileDeclaration, ApplicationId, ApplicationWorkbenchManifestDeclaration,
+    ExecutionControlPolicy,
 };
 
 use super::agent_config::{AgentSource, AppContextConfig, AppLlmConfig};

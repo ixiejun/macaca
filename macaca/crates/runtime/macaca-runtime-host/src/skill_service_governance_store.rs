@@ -32,7 +32,7 @@ impl SkillGovernanceStoreStrategy for SkillProviderGovernanceState {
             application_id = ?event.scope.application_id,
             session_id = ?event.scope.session_id,
             agent_name = ?event.scope.agent_name,
-            "skill governance event appended through local compatibility adapter"
+            "skill governance event appended through local governance store adapter"
         );
         self.event_log.lock().await.push(event.clone());
         if let Err(error) = self.persist_governance_event_journal(&event).await {
@@ -59,7 +59,7 @@ impl SkillGovernanceStoreStrategy for SkillProviderGovernanceState {
             proposals = read_model.proposals.len(),
             curation_runs = read_model.curation_runs.len(),
             rollback_refs = read_model.rollback_refs.len(),
-            "skill governance read model replayed through local compatibility adapter"
+            "skill governance read model replayed through local governance store adapter"
         );
         Ok(read_model)
     }

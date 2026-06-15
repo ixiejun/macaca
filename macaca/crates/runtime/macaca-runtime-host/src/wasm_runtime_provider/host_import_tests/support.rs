@@ -9,8 +9,8 @@ use macaca_kernel::MockSystemService;
 use macaca_persist::RedbStore;
 use macaca_proto::{
     ApplicationHostCommand, ApplicationImport, KernelServiceId, ServiceCommandName,
-    ServiceDescriptor, ServiceHealth, ServiceLifecycleState, TraceContext, TraceSchemaRef,
-    ServiceType, WasmExecutionProfile, WasmRuntimeArtifactRef, WasmRuntimeSessionRequest,
+    ServiceDescriptor, ServiceHealth, ServiceLifecycleState, ServiceType, TraceContext,
+    TraceSchemaRef, WasmExecutionProfile, WasmRuntimeArtifactRef, WasmRuntimeSessionRequest,
 };
 use tempfile::tempdir;
 
@@ -21,11 +21,17 @@ use crate::{
 };
 use macaca_task::TodoStore;
 
-pub(super) async fn register_mock_service(runtime: &ServiceRuntime, service_id: &str) -> KernelServiceId {
+pub(super) async fn register_mock_service(
+    runtime: &ServiceRuntime,
+    service_id: &str,
+) -> KernelServiceId {
     register_mock_service_with_failure(runtime, service_id, false).await
 }
 
-pub(super) async fn register_task_service(runtime: &ServiceRuntime, store: Arc<TodoStore>) -> KernelServiceId {
+pub(super) async fn register_task_service(
+    runtime: &ServiceRuntime,
+    store: Arc<TodoStore>,
+) -> KernelServiceId {
     let service: Arc<dyn macaca_kernel::SystemService> =
         Arc::new(TaskSystemServiceProvider::local(store));
     let descriptor = service.descriptor();

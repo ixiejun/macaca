@@ -8,12 +8,12 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use macaca_proto::{
-    ApplicationExecutionCommandStatus, ApplicationExecutionControlKind,
-    ApplicationExecutionError, ApplicationExecutionEventType, ApplicationExecutionHeartbeatPolicy,
-    ApplicationExecutionPayload,
-    ApplicationExecutionProviderDescriptor, ApplicationExecutionProviderHealth,
-    ApplicationExecutionProviderKind, ApplicationExecutionScope, CapabilityId, ServiceError,
-    StartApplicationExecutionCommand, StartApplicationExecutionResult,
+    ApplicationExecutionCommandStatus, ApplicationExecutionControlKind, ApplicationExecutionError,
+    ApplicationExecutionEventType, ApplicationExecutionHeartbeatPolicy,
+    ApplicationExecutionPayload, ApplicationExecutionProviderDescriptor,
+    ApplicationExecutionProviderHealth, ApplicationExecutionProviderKind,
+    ApplicationExecutionScope, CapabilityId, ServiceError, StartApplicationExecutionCommand,
+    StartApplicationExecutionResult,
 };
 use tokio::sync::RwLock;
 use tracing::info;

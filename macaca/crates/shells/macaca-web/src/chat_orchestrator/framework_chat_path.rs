@@ -10,10 +10,10 @@ use std::sync::Arc;
 
 use axum::response::sse::Event;
 use chrono::Utc;
+use macaca_host_composition::framework::execution::ExecutionContext;
 use macaca_proto::{
     AgentExecutionEvent, ApplicationId, McpCleanupCommand, McpServiceScope, TraceContext,
 };
-use macaca_sdk::framework::execution::ExecutionContext;
 use tokio::sync::RwLock;
 
 use crate::event_persistence::spawn_session_event_collector;
@@ -263,7 +263,7 @@ pub(crate) async fn run_framework_chat_path(
             status,
         )
         .await;
-        // Route C: session teardown must flow through `service.mcp` so the shell
+        // Session teardown must flow through `service.mcp` so the shell
         // does not retain a second owner of MCP subprocess leases.
         let cleanup_command = McpCleanupCommand {
             trace: TraceContext::new(format!("chat-session-mcp-cleanup:{session_key_for_task}")),
@@ -286,6 +286,11 @@ pub(crate) async fn run_framework_chat_path(
             let mut sessions = state_for_task.sessions.active_sessions.write().await;
             sessions.remove(&session_key_for_task);
         }
+        state_for_task
+            .sessions
+            .execution_control_local_notifications
+            .remove(&session_key_for_task)
+            .await;
         {
             let mut flags = state_for_task.sessions.cancel_flags.write().await;
             flags.remove(&app_id.0.to_string());

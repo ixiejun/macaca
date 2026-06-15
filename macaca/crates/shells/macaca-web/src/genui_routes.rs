@@ -11,13 +11,11 @@ use std::sync::Arc;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::Json;
-use macaca_sdk::runtime_host::persist::{AppendEventCommand, EventLog};
 use macaca_proto::{
     ApplicationGenUiSurfaceCommand, ApplicationServiceScope, TraceContext, UiAction, UiEvent,
     UiEventCommand, UiIntent, UiRenderError, UiRenderSurface,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use tracing::{info, warn};
 use uuid::Uuid;
 
@@ -112,13 +110,9 @@ pub async fn post_genui_event(
     );
     let event_id = Uuid::new_v4().to_string();
     let command = build_event_command(&app_id, &session_id, event_id.clone(), request, trace);
-    let seq = persist_event_command(
-        state.persist.event_log.as_ref(),
-        &app_id,
-        &session_id,
-        &command,
-    )
-    .await;
+    let seq = state
+        .persist_genui_event_command(&app_id, &session_id, &command)
+        .await;
 
     info!(
         app_id = %app_id,
@@ -158,30 +152,6 @@ fn build_event_command(
         trace: Some(trace),
         metadata: Default::default(),
     })
-}
-
-/// Persist a GenUI event command into the shared session EventLog.
-///
-/// This helper is the audit boundary for UI interactions.  The event is durable
-/// before the route returns, and subscribers receive the normal EventLog
-/// notification path used by session trace replay.
-async fn persist_event_command(
-    event_log: &EventLog,
-    app_id: &str,
-    session_id: &str,
-    command: &UiEventCommand,
-) -> u64 {
-    event_log
-        .append_command(
-            AppendEventCommand::new(
-                session_id,
-                "genui_event",
-                "genui_web_shell",
-                serde_json::to_value(command).unwrap_or_else(|_| json!({})),
-            )
-            .with_app_id(app_id.to_string()),
-        )
-        .await
 }
 
 /// Validate app/session route scope.
@@ -227,9 +197,7 @@ fn trace_for_genui(session_id: &str, trace_id: &str) -> TraceContext {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Arc;
-
-    use macaca_sdk::runtime_host::persist::{EventLogQuery, RedbStore};
+    use serde_json::json;
 
     #[test]
     fn genui_required_scope_rejects_missing_session() {
@@ -246,12 +214,8 @@ mod tests {
         assert_eq!(session, "session-a");
     }
 
-    #[tokio::test]
-    async fn genui_event_command_is_persisted_to_event_log() {
-        let dir = tempfile::tempdir().expect("temporary directory");
-        let store =
-            Arc::new(RedbStore::open(dir.path().join("genui-events.redb")).expect("redb store"));
-        let event_log = EventLog::new(Arc::clone(&store));
+    #[test]
+    fn genui_event_command_preserves_trace_and_payload() {
         let session_id = "session-ui-event";
         let request = GenUiEventRequest {
             session_id: session_id.to_string(),
@@ -270,17 +234,18 @@ mod tests {
         let command =
             build_event_command("app-ui", session_id, "event-1".to_string(), request, trace);
 
-        let seq = persist_event_command(&event_log, "app-ui", session_id, &command).await;
-        let events = event_log
-            .query_indexed(
-                EventLogQuery::new(session_id).event_type(Some("genui_event".to_string())),
-            )
-            .await;
-
-        assert_eq!(seq, 1);
-        assert_eq!(events.len(), 1);
-        assert_eq!(events[0].event_type, "genui_event");
-        assert_eq!(events[0].source, "genui_web_shell");
-        assert_eq!(events[0].payload["event"]["component_id"], "submit");
+        assert_eq!(command.event.app_id, "app-ui");
+        assert_eq!(command.event.session_id, session_id);
+        assert_eq!(command.event.event_id, "event-1");
+        assert_eq!(command.event.component_id, "submit");
+        assert_eq!(
+            command
+                .event
+                .trace
+                .as_ref()
+                .map(|trace| trace.trace_id.as_str()),
+            Some("trace-ui-event")
+        );
+        assert_eq!(command.event.payload["value"], "ok");
     }
 }

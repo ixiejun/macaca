@@ -50,7 +50,7 @@ fn workspace_root() -> PathBuf {
 /// targets production ownership boundaries only. The 12.4 proposal task is
 /// specifically about the application execution protocol platform, so the
 /// scanner is deliberately scoped to files whose names contain
-/// `application_execution`; broader legacy branch cleanup belongs to separate
+/// `application_execution`; broader retired branch cleanup belongs to separate
 /// governance gates and must not make this slice noisy.
 fn collect_production_rust_files(dir: &Path, files: &mut Vec<PathBuf>) {
     let entries = std::fs::read_dir(dir)
@@ -83,7 +83,7 @@ fn collect_production_rust_files(dir: &Path, files: &mut Vec<PathBuf>) {
 ///
 /// The application and foundation crates own protocol DTOs, manifest metadata,
 /// and typed identity fields. They may validate or serialize those identities as
-/// data. The LLM service allowance mirrors the existing migration surface for
+/// data. The LLM service allowance mirrors the existing terminal exception surface for
 /// provider/model strategy ownership; it is not an endorsement for new generic
 /// application execution branches.
 fn is_approved_scope_owner(relative: &str, identity: &str) -> bool {

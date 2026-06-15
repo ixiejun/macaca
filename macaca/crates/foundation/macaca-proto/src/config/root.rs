@@ -8,15 +8,20 @@ use serde::{Deserialize, Serialize};
 use crate::error::{MacacaError, MacacaResult};
 
 use super::{
-    autonomy::AutonomyConfig, context::ContextConfig, drivers::DriversConfig,
+    autonomy::AutonomyConfig,
+    context::ContextConfig,
+    drivers::DriversConfig,
     infrastructure::{
         DiscordConfig, GatewayConfig, IpcConfig, LogFileConfig, ObservabilityConfig, PersistConfig,
         TelegramConfig,
     },
-    kernel::KernelConfig, llm::LlmConfig, memory::{
+    kernel::KernelConfig,
+    llm::LlmConfig,
+    mcp::McpConfigSection,
+    memory::{
         CompressionConfig, EmbeddingConfig, MemoryConfig, MemoryProviderRuntimeConfig, VectorConfig,
     },
-    mcp::McpConfigSection, workspace::WorkspaceConfig,
+    workspace::WorkspaceConfig,
 };
 
 /// Top-level Macaca OS configuration deserialized from TOML and environment overrides.

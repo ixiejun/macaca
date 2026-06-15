@@ -83,7 +83,7 @@ impl ApplicationAbiInstance for MetadataOnlyApplicationAbiInstance {
     }
 }
 
-/// YAML compatibility adapter.
+/// YAML Application ABI adapter.
 pub struct YamlApplicationAbiAdapter {
     manifest: AppManifest,
     package: Option<PackageDescriptor>,
@@ -250,19 +250,6 @@ impl ApplicationAbiAdapter for WasmApplicationAbiAdapter {
     }
 }
 
-/// Build an ABI descriptor from an app manifest without executing the app.
-#[deprecated(
-    since = "0.1.0",
-    note = "use YamlApplicationManifestAdapter and YamlApplicationAbiAdapter for Manifest v1-backed descriptors"
-)]
-pub fn app_manifest_to_abi_descriptor(
-    manifest: &AppManifest,
-) -> Result<ApplicationAbiDescriptor, ApplicationAbiError> {
-    Ok(YamlApplicationAbiAdapter::new(manifest.clone())
-        .load()?
-        .descriptor)
-}
-
 /// Report whether a host result is the expected Phase 05 WASM unavailable result.
 pub fn is_runtime_unavailable(result: &ApplicationHostCommandResult) -> bool {
     matches!(
@@ -297,7 +284,10 @@ mod tests {
     #[test]
     fn application_abi_yaml_adapter_preserves_manifest_metadata() {
         let manifest = AppLoader::load_manifest(first_example_app()).unwrap();
-        let descriptor = app_manifest_to_abi_descriptor(&manifest).unwrap();
+        let descriptor = YamlApplicationAbiAdapter::new(manifest.clone())
+            .load()
+            .unwrap()
+            .descriptor;
 
         assert_eq!(descriptor.runtime_kind, Some(PackageRuntimeKind::Yaml));
         assert_eq!(

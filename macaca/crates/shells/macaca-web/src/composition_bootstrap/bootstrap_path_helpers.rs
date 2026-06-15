@@ -5,6 +5,7 @@
 
 use std::path::PathBuf;
 
+use macaca_host_composition::autonomy_runtime::{AutonomyProviderMode, AutonomyRuntimeConfig};
 use macaca_proto::config::AutonomyConfig;
 
 /// Build provider-neutral Skill package roots for governance restart recovery.
@@ -76,12 +77,12 @@ pub(crate) fn configured_memory_base_path(data_dir: &std::path::Path, configured
 /// that fail-closed behavior is part of the serviceization constitution.
 pub(crate) fn autonomy_runtime_config_from_web_config(
     config: &AutonomyConfig,
-) -> macaca_sdk::runtime_host::AutonomyRuntimeConfig {
+) -> AutonomyRuntimeConfig {
     let provider_mode = match config.provider_mode.trim().to_ascii_lowercase().as_str() {
-        "local" => macaca_sdk::runtime_host::AutonomyProviderMode::Local,
-        _ => macaca_sdk::runtime_host::AutonomyProviderMode::Unavailable,
+        "local" => AutonomyProviderMode::Local,
+        _ => AutonomyProviderMode::Unavailable,
     };
-    macaca_sdk::runtime_host::AutonomyRuntimeConfig {
+    AutonomyRuntimeConfig {
         provider_mode,
         supervisor_enabled: config.supervisor_enabled,
         scheduler_tick_interval_ms: config.scheduler_tick_interval_ms,

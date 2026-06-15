@@ -10,18 +10,24 @@ mod tests {
     #[test]
     fn delegate_task_path_uses_service_agent_execution_dispatcher() {
         let orchestration = include_str!("orchestration_tools.rs");
-        let dispatcher = include_str!("delegated_task_dispatcher.rs");
+        let dispatcher =
+            include_str!("../../../runtime/macaca-runtime-host/src/delegated_task_dispatcher.rs");
+        let tool_bootstrap =
+            include_str!("../../../runtime/macaca-runtime-host/src/tool_bootstrap.rs");
 
-        assert!(orchestration.contains("ServiceDelegatedTaskDispatcher"));
-        assert!(orchestration.contains("ExecutionControlForkJoinCoordinator"));
-        assert!(orchestration.contains(".dispatch("));
+        assert!(orchestration.contains("bootstrap_delegate_task_tool"));
+        assert!(!orchestration.contains("DelegateTaskTool::"));
+        assert!(dispatcher.contains("ServiceDelegatedTaskDispatcher"));
+        assert!(tool_bootstrap.contains("DelegateTaskTool::"));
+        assert!(tool_bootstrap.contains("ExecutionControlForkJoinCoordinator"));
+        assert!(tool_bootstrap.contains(".dispatch("));
         assert!(dispatcher.contains("AGENT_EXECUTION_SERVICE_ID"));
         assert!(dispatcher.contains("service.agent_execution"));
         assert!(dispatcher.contains("begin_service_backed_delegation"));
     }
 
     #[test]
-    fn fork_join_resume_uses_execution_control_before_legacy_channel() {
+    fn fork_join_resume_uses_execution_control_before_local_channel() {
         let hook_consumer = include_str!("hook_consumer.rs");
         let fork_adapter = include_str!("fork_join_shell_adapter.rs");
 
@@ -62,14 +68,24 @@ mod tests {
         );
 
         assert!(
-            !web_adapters.contains("impl FrameworkRuntimeAgentPort for WebFrameworkRuntimeAgentPort"),
+            !web_adapters
+                .contains("impl FrameworkRuntimeAgentPort for WebFrameworkRuntimeAgentPort"),
             "web shell must not implement FrameworkRuntimeAgentPort directly"
         );
         assert!(web_adapters.contains("ServiceBackedFrameworkRuntimeAgentPort"));
-        assert!(web_adapters.contains("WebFrameworkAgentConstructionPort"));
-        assert!(construction_adapter.contains("impl FrameworkAgentConstructionPort"));
-        assert!(construction_adapter.contains("build_runtime_agent_from_context_snapshot_with_execution_policy"));
-        assert!(runtime_host_service.contains("impl FrameworkRuntimeAgentPort for ServiceBackedFrameworkRuntimeAgentPort"));
+        assert!(web_adapters.contains("RuntimeHostFrameworkAgentConstructionService"));
+        assert!(web_adapters.contains("WebFrameworkAgentMaterializationPort"));
+        assert!(construction_adapter.contains("impl FrameworkAgentMaterializationPort"));
+        assert!(!construction_adapter.contains("impl FrameworkAgentConstructionPort"));
+        assert!(construction_adapter.contains(
+            "materialize_runtime_react_agent_from_context_snapshot_with_execution_policy"
+        ));
+        assert!(!construction_adapter.contains("build_runtime_agent_from_context_snapshot"));
+        assert!(runtime_host_service.contains(
+            "impl FrameworkAgentConstructionPort for RuntimeHostFrameworkAgentConstructionService"
+        ));
+        assert!(runtime_host_service
+            .contains("impl FrameworkRuntimeAgentPort for ServiceBackedFrameworkRuntimeAgentPort"));
     }
 
     #[test]
@@ -100,7 +116,7 @@ mod tests {
     fn unified_paths_do_not_hardcode_application_role_names() {
         let sources = [
             include_str!("orchestration_tools.rs"),
-            include_str!("delegated_task_dispatcher.rs"),
+            include_str!("../../../runtime/macaca-runtime-host/src/delegated_task_dispatcher.rs"),
             include_str!("goal_lifecycle_shell_adapter.rs"),
             include_str!("fork_join_shell_adapter.rs"),
             include_str!("session_loop_shell_adapter.rs"),

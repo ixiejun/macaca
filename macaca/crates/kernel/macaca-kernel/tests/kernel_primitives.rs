@@ -47,7 +47,7 @@ fn service_registry_stores_provider_neutral_scope() {
 }
 
 #[test]
-fn default_policy_allows_for_additive_compatibility() {
+fn default_policy_allows_for_additive_startup() {
     let policy = DefaultAllowPolicyEngine::new();
     let request = PolicyRequest::new("app:test", "capability.call");
 

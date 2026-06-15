@@ -79,20 +79,20 @@ Runtime and framework code SHALL call a narrow `ContextFacade` or equivalent con
 - **THEN** it SHALL call the context facade
 - **AND** it SHALL receive a compiled context and report through stable abstractions
 
-### Requirement: Legacy context entry points SHALL remain deprecated and searchable
+### Requirement: Replaced context entry points SHALL be removed
 
-Macaca SHALL keep legacy prompt/context construction entry points during migration, mark replaced entry points as deprecated, and prohibit new production calls to them.
+Macaca SHALL remove replaced prompt/context construction entry points after the context facade is available. Production code SHALL use the canonical context facade, composer, engine strategy, or provider-neutral DTOs directly; no retired marker or revert path SHALL remain in production source.
 
-#### Scenario: Replaced legacy entry remains discoverable
+#### Scenario: Replaced direct entry is absent
 
 - **GIVEN** a direct prompt construction function has been replaced by context facade usage
-- **WHEN** migration finishes
-- **THEN** the old function SHALL remain in the codebase with a deprecated marker and replacement guidance
-- **AND** new production code SHALL NOT call it
+- **WHEN** terminal boundary gates scan production sources
+- **THEN** the replaced function SHALL be absent from production code
+- **AND** no retired-marker attribute or revert-only wrapper SHALL remain
 
-#### Scenario: Legacy behavior remains available for rollback
+#### Scenario: Default behavior is canonical
 
 - **GIVEN** context provider composition is disabled
 - **WHEN** a model request is assembled
-- **THEN** Macaca SHALL preserve legacy-compatible request behavior
-- **AND** the compatibility path SHALL still emit a minimal context report
+- **THEN** Macaca SHALL use the canonical default composer or engine strategy
+- **AND** the result SHALL still emit a bounded context report

@@ -43,9 +43,10 @@ impl Kernel {
 
     /// Replace the active execution port after `service.agent_execution` is wired.
     ///
-    /// Bootstrap hosts may seed the kernel with a legacy adapter for agent
-    /// registration, then hot-swap to `ServiceClientAgentExecutionAdapter` once
-    /// the runtime-host service provider is registered and started.
+    /// Bootstrap hosts may seed the kernel with an unavailable or in-process
+    /// adapter for agent registration, then hot-swap to
+    /// `ServiceClientAgentExecutionAdapter` once the runtime-host service
+    /// provider is registered and started.
     pub async fn replace_execution_port(&self, port: Arc<dyn AgentExecutionPort>) {
         tracing::info!(
             service_id = "service.agent_execution",
@@ -78,7 +79,7 @@ impl Kernel {
     ///
     /// The kernel owns lookup, status transitions, and audit-friendly logs. The
     /// replaceable execution mechanics are delegated to `AgentExecutionPort`,
-    /// which allows service-client execution, legacy adapters, or test doubles
+    /// which allows service-client execution, in-process adapters, or test doubles
     /// to be swapped without moving provider logic into the kernel.
     pub async fn execute_agent(&self, agent_id: &AgentId) -> MacacaResult<AgentOutput> {
         tracing::info!(agent_id = %agent_id.0, "kernel agent execution started");
@@ -95,14 +96,10 @@ impl Kernel {
                 agent_id.0
             )));
         }
-        let output = self
-            .execution_port
-            .execute_registered_agent(agent_id)
-            .await;
+        let output = self.execution_port.execute_registered_agent(agent_id).await;
 
-        // The current compatibility behavior marks agents idle after the
-        // delegate returns, even when the delegate reports an error. Preserve
-        // that observable transition while the execution service is introduced.
+        // The kernel marks agents idle after the delegate returns, even when the
+        // delegate reports an error. This keeps lifecycle observations stable.
         self.status_tracker.set_idle(agent_id).await;
         match &output {
             Ok(result) => tracing::info!(

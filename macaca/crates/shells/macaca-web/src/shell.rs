@@ -1,4 +1,4 @@
-//! Web Shell command adapter boundary for Route C Phase 12.
+//! Web Shell command adapter boundary.
 //!
 //! The Web layer owns HTTP parsing, response mapping, and presentation logging.
 //! It must not own task/session/trace/service/package semantics. This adapter
@@ -15,12 +15,11 @@ use macaca_proto::{
     TraceContext, Web3Availability, Web3AvailabilityCommand,
 };
 use macaca_sdk::{
-    StaticSystemStatusDataSource, SystemApplicationExecutionClient, SystemEvmClient, SystemFacade,
-    SystemPluginCapabilityClient, SystemPluginControlClient, SystemPluginHookClient,
-    SystemServiceClient, SystemStatusSnapshot, SystemWeb3Client, TaskBoardQueryCommand,
-    TodoStoreTaskBoardDataSource,
+    ServiceBackedTaskBoardDataSource, StaticSystemStatusClient, SystemApplicationExecutionClient,
+    SystemEvmClient, SystemFacade, SystemPluginCapabilityClient, SystemPluginControlClient,
+    SystemPluginHookClient, SystemServiceClient, SystemStatusSnapshot, SystemWeb3Client,
+    TaskBoardQueryCommand,
 };
-use macaca_sdk::task::TodoStore;
 
 /// Route-safe facade bundle for Web system surfaces.
 ///
@@ -136,7 +135,7 @@ impl WebSystemFacadeBundle {
 
 /// Thin Web Shell facade specialized for current Web runtime dependencies.
 pub struct WebShellFacade {
-    system: SystemFacade<TodoStoreTaskBoardDataSource, StaticSystemStatusDataSource>,
+    system: SystemFacade<ServiceBackedTaskBoardDataSource, StaticSystemStatusClient>,
 }
 
 impl WebShellFacade {
@@ -144,11 +143,11 @@ impl WebShellFacade {
     ///
     /// The status adapter is intentionally inert for the task-board route. It
     /// keeps the facade type complete without making Web own status semantics.
-    pub fn for_task_board(todo_store: Arc<TodoStore>) -> Self {
+    pub fn for_task_board(service: Arc<dyn SystemServiceClient>) -> Self {
         Self {
             system: SystemFacade::new(
-                TodoStoreTaskBoardDataSource::new(todo_store),
-                StaticSystemStatusDataSource::new(SystemStatusSnapshot {
+                ServiceBackedTaskBoardDataSource::new(service),
+                StaticSystemStatusClient::new(SystemStatusSnapshot {
                     version: env!("CARGO_PKG_VERSION").into(),
                     agent_count: 0,
                     loaded_apps: 0,
@@ -161,7 +160,7 @@ impl WebShellFacade {
         }
     }
 
-    /// Query the task board through the SDK facade and preserve legacy JSON shape.
+    /// Query the task board through the SDK facade and preserve the stable JSON shape.
     pub async fn list_todos_json(
         &self,
         app_id: ApplicationId,
@@ -187,7 +186,6 @@ impl WebShellFacade {
 mod tests {
     use super::*;
     use async_trait::async_trait;
-    use macaca_sdk::runtime_host::persist::RedbStore;
     use macaca_proto::{
         EvmAvailability, EvmAvailabilityCommand, EvmCallAdmission, EvmContractCallCommand,
         EvmContractDeployCommand, EvmContractReadCommand, EvmDeployAdmission,
@@ -227,6 +225,32 @@ mod tests {
                 "test service client has no dispatcher for {}",
                 command.service_id
             )))
+        }
+    }
+
+    #[derive(Debug, Default)]
+    struct EmptyTaskBoardServiceClient;
+
+    #[async_trait]
+    impl SystemServiceClient for EmptyTaskBoardServiceClient {
+        async fn inspect_services(
+            &self,
+            command: &ServiceInspectionCommand,
+        ) -> MacacaResult<ServiceInspectionResult> {
+            Ok(ServiceInspectionResult {
+                scope: command.scope.clone(),
+                services: vec![macaca_proto::TASK_SERVICE_ID.into()],
+            })
+        }
+
+        async fn call_service(
+            &self,
+            _command: &ServiceCallCommand,
+        ) -> MacacaResult<ServiceCallResult> {
+            Ok(ServiceCallResult {
+                service_id: macaca_proto::TASK_SERVICE_ID.into(),
+                output: serde_json::json!({ "todos": [], "count": 0 }),
+            })
         }
     }
 
@@ -332,11 +356,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn web_shell_task_board_preserves_legacy_json_shape() {
-        let tempdir = tempfile::tempdir().unwrap();
-        let store = Arc::new(RedbStore::open(tempdir.path().join("shell.redb")).unwrap());
-        let todo_store = Arc::new(TodoStore::new(store));
-        let shell = WebShellFacade::for_task_board(todo_store);
+    async fn web_shell_task_board_preserves_stable_json_shape() {
+        let shell = WebShellFacade::for_task_board(Arc::new(EmptyTaskBoardServiceClient));
         let response = shell
             .list_todos_json(ApplicationId(uuid::Uuid::new_v4()), "session-a")
             .await

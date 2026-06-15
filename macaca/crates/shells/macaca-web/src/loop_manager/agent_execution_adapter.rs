@@ -5,14 +5,16 @@
 
 use std::sync::Arc;
 
-use macaca_sdk::runtime_host::executor::ApplicationExecutor;
 use macaca_proto::{
     AgentExecutionCommand, AgentExecutionIntent, AgentExecutionResult, AgentExecutionStatus,
     ApplicationId, KernelServiceId, ServiceBusSource, TaskId, TraceContext,
     AGENT_EXECUTION_SERVICE_ID,
 };
 
-use super::planner_helpers::{executor_task_completed, executor_task_failed, executor_task_started, update_agent_activity_by_name};
+use super::planner_helpers::{
+    executor_task_completed, executor_task_failed, executor_task_started,
+    update_agent_activity_by_name,
+};
 use crate::state::AppState;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -32,7 +34,10 @@ impl PlannerFrameworkCallKind {
         }
     }
 
-    pub(crate) fn goal_context(self, task_id: macaca_proto::TaskId) -> Option<macaca_proto::TaskId> {
+    pub(crate) fn goal_context(
+        self,
+        task_id: macaca_proto::TaskId,
+    ) -> Option<macaca_proto::TaskId> {
         match self {
             Self::DecomposeGoal | Self::FollowUp | Self::GoalEvaluation => Some(task_id),
             Self::Review => None,

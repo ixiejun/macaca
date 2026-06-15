@@ -17,6 +17,6 @@ mod types;
 #[cfg(test)]
 mod tests;
 
-pub use engine::{WorkflowContext, WorkflowEngine, WorkflowResult};
+pub use engine::WorkflowEngine;
 pub use prompt_strategy::{DefaultWorkflowPromptStrategy, WorkflowPromptStrategy};
 pub use types::{WorkflowPromptContext, WorkflowPromptParts, DEFAULT_WORKFLOW};

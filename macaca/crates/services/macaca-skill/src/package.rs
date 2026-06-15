@@ -1,6 +1,6 @@
 //! Package descriptor hooks for Agent Skills.
 //!
-//! This module is additive: it maps existing skill metadata into Route C
+//! This module maps existing skill metadata into
 //! Package Manifest v0 without changing skill discovery, parsing, activation,
 //! or provisioning behavior.  The hook lets future Store/package flows reason
 //! about skills through the same descriptor contract used by applications.

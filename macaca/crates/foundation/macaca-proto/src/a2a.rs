@@ -1,4 +1,4 @@
-//! Provider-neutral Agent-to-Agent payment contracts for Route C Phase 09.
+//! Provider-neutral Agent-to-Agent payment contracts.
 //!
 //! This module is intentionally data-only. It models identities, quote
 //! negotiation, payment intents, budget/approval policy inputs, receipts, and

@@ -7,12 +7,12 @@ use macaca_proto::{ApplicationId, TraceContext};
 
 use crate::{ServiceRuntime, ServiceRuntimeConfig};
 
+use super::super::HeartbeatLane;
 use super::fixtures::{
     agent_application_profile, heartbeat_declaration, register_lane_services,
     wait_for_recorded_commands,
 };
 use super::test_doubles::RecordingExecutionBackend;
-use super::super::HeartbeatLane;
 
 #[tokio::test]
 async fn per_agent_profiles_with_distinct_cadences_dispatch_at_separate_ticks() {

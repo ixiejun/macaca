@@ -11,10 +11,11 @@ use async_trait::async_trait;
 use macaca_app::application_service_descriptor;
 use macaca_kernel::SystemService;
 use macaca_proto::{
-    AgentExecutionCommand, AgentExecutionIntent, AgentExecutionResult, ApplicationHeartbeatAgentsResult,
-    ApplicationId, CleanupPolicy, HeartbeatCommandResult, HeartbeatRunId, HeartbeatWakeDisposition,
-    ServiceCallResult, ServiceCommand, ServiceDescriptor, ServiceError, ServiceHealth, ServiceResult,
-    TraceContext, APPLICATION_HEARTBEAT_AGENTS_QUERY_COMMAND,
+    AgentExecutionCommand, AgentExecutionIntent, AgentExecutionResult,
+    ApplicationHeartbeatAgentsResult, ApplicationId, CleanupPolicy, HeartbeatCommandResult,
+    HeartbeatRunId, HeartbeatWakeDisposition, ServiceCallResult, ServiceCommand, ServiceDescriptor,
+    ServiceError, ServiceHealth, ServiceResult, TraceContext,
+    APPLICATION_HEARTBEAT_AGENTS_QUERY_COMMAND,
 };
 use macaca_skill::{
     SkillAliasKind, SkillAliasRecord, SkillAliasResolutionPolicy, SkillAliasUpsertCommand,
@@ -104,10 +105,7 @@ pub(super) struct RecordingExecutionBackend {
 
 #[async_trait]
 impl AgentExecutionBackend for RecordingExecutionBackend {
-    async fn execute(
-        &self,
-        command: AgentExecutionCommand,
-    ) -> ServiceResult<AgentExecutionResult> {
+    async fn execute(&self, command: AgentExecutionCommand) -> ServiceResult<AgentExecutionResult> {
         self.commands.lock().unwrap().push(command.clone());
         let mut result =
             AgentExecutionResult::completed(&command, serde_json::json!({"accepted": true}));
@@ -198,4 +196,3 @@ pub(super) fn accepted_app_wake_with_metadata(
         metadata,
     }
 }
-

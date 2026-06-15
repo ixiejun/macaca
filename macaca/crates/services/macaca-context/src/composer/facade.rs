@@ -163,9 +163,9 @@ impl ContextFacade {
         }
     }
 
-    /// Shortcut when both engines are legacy.
-    pub fn legacy() -> Self {
-        Self::builtins(ContextEngineSelection::legacy())
+    /// Shortcut when both engines use passthrough behavior.
+    pub fn passthrough() -> Self {
+        Self::builtins(ContextEngineSelection::passthrough_default())
     }
 
     pub fn with_composer_fraction(mut self, pct: u32) -> Self {
@@ -177,8 +177,8 @@ impl ContextFacade {
     ///
     /// When [`ContextGovernanceRuntimeConfig::enabled`] is `true`, each `ContextProvider::contribute`
     /// call is bounded by `per_provider_timeout_ms` and outputs pass through redaction/deny/validation
-    /// strategies before [`ContextComposer::compose`]. When disabled, the legacy ungoverned fan-in is
-    /// used to preserve deterministic unit-test baselines.
+    /// strategies before [`ContextComposer::compose`]. When disabled, the ungoverned fan-in is
+    /// used to preserve deterministic local-test baselines.
     ///
     /// Trust promotions run **after** the governed/ungoverned collection finishes but **before**
     /// composer budgeting so prompt trust metadata reflects operator policy.
@@ -400,7 +400,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn empty_providers_matches_runtime_facade_legacy() {
+    async fn empty_providers_matches_runtime_facade_passthrough() {
         use macaca_proto::LlmOptions;
 
         let input = ContextAssembleInput {
@@ -413,13 +413,13 @@ mod tests {
             budget: crate::budget::ContextBudget::default(),
         };
 
-        let f = ContextFacade::legacy();
+        let f = ContextFacade::passthrough();
         let via_facade = f
             .assemble_model_context(input.clone(), &[], ContextFacadeAssemblyPolicy::default())
             .await
             .unwrap();
 
-        let via_engine = ContextRuntimeFacade::legacy()
+        let via_engine = ContextRuntimeFacade::passthrough()
             .assemble(input)
             .await
             .unwrap();

@@ -5,9 +5,9 @@
 //! `macaca-sdk` focused clients and `macaca-proto` DTO contracts.
 //!
 //! Design pattern: **Specification by Example** — `cargo metadata` is the executable
-//! contract, mirroring `kernel_purity_gate` and `route_c_dependency_boundaries`.
+//! contract, mirroring `kernel_purity_gate` and `protocol_service_dependency_boundaries`.
 //! Both CLI and Web shells are at **terminal purity** (proto + sdk only); the web
-//! migration allowlist must remain empty so CI cannot regress into tolerated debt.
+//! exception inventory must remain empty so CI cannot regress into tolerated debt.
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -15,9 +15,7 @@ use std::process::Command;
 
 use serde_json::Value;
 
-use super::allowlist::{
-    PERMITTED_SHELL_WORKSPACE_DEPS, WEB_SHELL_WORKSPACE_DEPENDENCY_DEBT,
-};
+use super::allowlist::{PERMITTED_SHELL_WORKSPACE_DEPS, WEB_SHELL_WORKSPACE_DEPENDENCY_DEBT};
 
 fn workspace_root() -> PathBuf {
     for ancestor in Path::new(env!("CARGO_MANIFEST_DIR")).ancestors() {
@@ -71,10 +69,12 @@ fn shell_workspace_dependency_names(metadata: &Value, package_name: &str) -> BTr
 
     let workspace_names: BTreeSet<&str> = packages
         .iter()
-        .filter(|package| {
-            workspace_members.contains(package["id"].as_str().unwrap_or_default())
+        .filter(|package| workspace_members.contains(package["id"].as_str().unwrap_or_default()))
+        .map(|package| {
+            package["name"]
+                .as_str()
+                .expect("package name should be a string")
         })
-        .map(|package| package["name"].as_str().expect("package name should be a string"))
         .collect();
 
     let shell_package = packages
@@ -123,9 +123,9 @@ fn assert_shell_terminal_purity(shell_crate: &str, observed: &BTreeSet<String>) 
     );
 }
 
-/// P5 §6.1.7 / §9.4 — explicit terminal assertion that web-shell migration allowlist is empty.
+/// P5 §6.1.7 / §9.4 — explicit terminal assertion that web-shell exception inventory is empty.
 ///
-/// Mirrors `assert_route_c_allowlist_terminal_state` and
+/// Mirrors `assert_protocol_service_allowlist_terminal_state` and
 /// `assert_os_layer_file_size_allowlist_terminal_state`: CI must not regress into
 /// tolerated workspace-dependency debt while the boundary scan reports zero violations.
 /// Design pattern: **Specification by Example** with a dedicated terminal assertion
@@ -143,7 +143,7 @@ pub fn assert_web_shell_workspace_dependency_allowlist_terminal_state() {
     }
 
     let mut diagnostics = String::from(
-        "Shell dependency purity gate failed: web migration allowlist must be empty at terminal state.\n\
+        "Shell dependency purity gate failed: web exception inventory must be empty at terminal state.\n\
          Remove each forbidden workspace edge from macaca-web/Cargo.toml instead of tolerating it.\n",
     );
     for row in WEB_SHELL_WORKSPACE_DEPENDENCY_DEBT {
@@ -159,9 +159,7 @@ pub fn assert_web_shell_workspace_dependency_allowlist_terminal_state() {
 pub fn assert_cli_shell_workspace_dependency_purity() {
     let metadata = run_cargo_metadata();
     let observed = shell_workspace_dependency_names(&metadata, "macaca-cli");
-    eprintln!(
-        "shell_dependency_purity_gate event=cli_workspace_deps observed={observed:?}"
-    );
+    eprintln!("shell_dependency_purity_gate event=cli_workspace_deps observed={observed:?}");
     assert_shell_terminal_purity("macaca-cli", &observed);
 }
 
@@ -175,8 +173,6 @@ pub fn assert_web_shell_workspace_dependency_purity() {
 
     let metadata = run_cargo_metadata();
     let observed = shell_workspace_dependency_names(&metadata, "macaca-web");
-    eprintln!(
-        "shell_dependency_purity_gate event=web_workspace_deps observed={observed:?}"
-    );
+    eprintln!("shell_dependency_purity_gate event=web_workspace_deps observed={observed:?}");
     assert_shell_terminal_purity("macaca-web", &observed);
 }

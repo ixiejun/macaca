@@ -180,28 +180,6 @@ impl<V: VectorStore, E: EmbeddingProvider> MemoryManager<V, E> {
         }
         Ok(())
     }
-
-    /// Store an entry through the legacy direct manager API.
-    #[deprecated(note = "use MemoryManager::remember_text for new text memories")]
-    pub async fn store(&self, entry: MemoryEntry) -> MacacaResult<MemoryId> {
-        self.store_entry(entry).await
-    }
-
-    /// Retrieve entries through the legacy direct manager API.
-    #[deprecated(note = "use MemoryManager::recall with RecallQuery")]
-    pub async fn retrieve(&self, query: &str, limit: usize) -> MacacaResult<Vec<MemoryEntry>> {
-        self.retrieve_entries(query, limit).await
-    }
-
-    /// List persistent entries through the legacy direct manager API.
-    #[deprecated(note = "use MemoryManager::list_memories")]
-    pub async fn list(
-        &self,
-        agent_id: Option<&AgentId>,
-        limit: usize,
-    ) -> MacacaResult<Vec<MemoryEntry>> {
-        self.list_entries(agent_id, limit).await
-    }
 }
 
 #[async_trait]

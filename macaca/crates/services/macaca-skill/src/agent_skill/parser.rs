@@ -1,6 +1,6 @@
 //! `SKILL.md` frontmatter parser (Builder for `ParsedSkillMd`).
 //!
-//! Parses agentskills.io-compatible YAML frontmatter, optional macaca/openclaw
+//! Parses agentskills.io YAML frontmatter, optional macaca/openclaw
 //! metadata blocks, and invocation policy flags. All functions are pure string
 //! transforms suitable for unit testing without filesystem I/O.
 

@@ -7,16 +7,18 @@ use std::collections::BTreeSet;
 
 use macaca_proto::{
     ApplicationAbilityDescriptor, ApplicationAbilityMetadataView,
-    ApplicationContextPolicyMetadataView, ApplicationManifestV1,
-    ApplicationMcpOverlayMetadataView, ApplicationSkillPolicyMetadataView,
-    ApplicationToolPolicyMetadataView, ApplicationWorkbenchMetadataView,
+    ApplicationContextPolicyMetadataView, ApplicationManifestV1, ApplicationMcpOverlayMetadataView,
+    ApplicationSkillPolicyMetadataView, ApplicationToolPolicyMetadataView,
+    ApplicationWorkbenchMetadataView,
 };
 
 use crate::model::{AgentSource, AppManifest};
 
 use super::support::{ability_agent_name, agent_name};
 
-pub(super) fn ability_view(ability: &ApplicationAbilityDescriptor) -> ApplicationAbilityMetadataView {
+pub(super) fn ability_view(
+    ability: &ApplicationAbilityDescriptor,
+) -> ApplicationAbilityMetadataView {
     ApplicationAbilityMetadataView {
         id: ability.id.clone(),
         name: ability_agent_name(ability).unwrap_or_else(|| ability.id.clone()),
@@ -51,7 +53,9 @@ pub(super) fn ability_view(ability: &ApplicationAbilityDescriptor) -> Applicatio
     }
 }
 
-pub(super) fn tool_policy_view(manifest_v1: &ApplicationManifestV1) -> ApplicationToolPolicyMetadataView {
+pub(super) fn tool_policy_view(
+    manifest_v1: &ApplicationManifestV1,
+) -> ApplicationToolPolicyMetadataView {
     let mut names = BTreeSet::new();
     for ability in &manifest_v1.abilities {
         for capability in &ability.capabilities {
@@ -71,11 +75,11 @@ pub(super) fn tool_policy_view(manifest_v1: &ApplicationManifestV1) -> Applicati
 }
 
 pub(super) fn context_policy_view(
-    legacy: &AppManifest,
+    source_manifest: &AppManifest,
     manifest_v1: &ApplicationManifestV1,
 ) -> ApplicationContextPolicyMetadataView {
     ApplicationContextPolicyMetadataView {
-        context_config_present: legacy.context.is_some(),
+        context_config_present: source_manifest.context.is_some(),
         context_engine_declared: manifest_v1.abilities.iter().any(|ability| {
             ability
                 .metadata
@@ -85,8 +89,10 @@ pub(super) fn context_policy_view(
     }
 }
 
-pub(super) fn skill_policy_view(legacy: &AppManifest) -> ApplicationSkillPolicyMetadataView {
-    let mut names: Vec<_> = legacy
+pub(super) fn skill_policy_view(
+    source_manifest: &AppManifest,
+) -> ApplicationSkillPolicyMetadataView {
+    let mut names: Vec<_> = source_manifest
         .agents
         .iter()
         .filter_map(|source| match source {
@@ -101,8 +107,8 @@ pub(super) fn skill_policy_view(legacy: &AppManifest) -> ApplicationSkillPolicyM
     }
 }
 
-pub(super) fn mcp_overlay_view(legacy: &AppManifest) -> ApplicationMcpOverlayMetadataView {
-    let agents = skill_policy_view(legacy).agents_with_skill_policy;
+pub(super) fn mcp_overlay_view(source_manifest: &AppManifest) -> ApplicationMcpOverlayMetadataView {
+    let agents = skill_policy_view(source_manifest).agents_with_skill_policy;
     ApplicationMcpOverlayMetadataView {
         overlay_declared: !agents.is_empty(),
         agents_with_overlay: agents,

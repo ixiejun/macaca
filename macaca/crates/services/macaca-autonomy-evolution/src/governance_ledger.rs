@@ -214,7 +214,7 @@ impl EvolutionGovernanceLedger for LocalJsonlEvolutionGovernanceLedger {
                         .after_sequence
                         .map(|sequence| record.sequence > sequence)
                         .unwrap_or(true)
-                    && record.scope.matches_filter(&command.scope)
+                    && crate::scope_matches_filter(&record.scope, &command.scope)
             })
             .collect::<Vec<_>>();
         records.sort_by_key(|record| record.sequence);

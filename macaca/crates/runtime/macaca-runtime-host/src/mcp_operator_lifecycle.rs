@@ -1,8 +1,8 @@
 //! Runtime-host implementation of operator-grade MCP lifecycle commands.
 //!
-//! The module is intentionally separate from the legacy MCP runtime manager so
-//! reload, OAuth, resources, diagnostics, and exposure refresh do not make that
-//! already-large protocol module larger.  It is a thin service-owned Facade over
+//! The module is intentionally separate from the core MCP runtime so reload,
+//! OAuth, resources, diagnostics, and exposure refresh do not make that
+//! protocol module larger.  It is a thin service-owned Facade over
 //! `McpRuntimeFacade` plus a small in-memory memento for auth and exposure
 //! generation.  Persistent backing can replace this state later without
 //! changing the provider-neutral command DTOs.

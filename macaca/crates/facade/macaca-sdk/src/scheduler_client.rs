@@ -82,19 +82,6 @@ pub trait SystemSchedulerClient: Send + Sync {
     ) -> MacacaResult<SchedulerServiceSnapshot>;
 }
 
-/// Legacy-compatible Scheduler client methods retained for older callers.
-///
-/// The schedule-management UI uses `transition_job` and the scoped CRUD
-/// commands above. These helpers remain as compatibility shims for previously
-/// landed runtime-host code paths.
-#[async_trait]
-pub trait LegacySystemSchedulerClient: Send + Sync {
-    async fn update_job_legacy(
-        &self,
-        command: SchedulerJobCommand,
-    ) -> MacacaResult<SchedulerCommandResult>;
-}
-
 /// Null-object Scheduler client used when `service.scheduler` is absent.
 #[derive(Debug, Clone, Default)]
 pub struct UnavailableSystemSchedulerClient;

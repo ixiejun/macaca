@@ -31,11 +31,11 @@ pub(crate) mod contract_source;
 #[cfg(test)]
 mod tests;
 
+pub(crate) use build_mode::{is_framework_tool_wrapper_trace, should_forward_driver_trace};
 pub use channel_emitter_adapter::{ChannelEmitterHook, ChannelToolMiddleware};
 pub use execution_control_middleware::ExecutionControlMiddleware;
 pub use executor_emitter_adapter::{ExecutorEmitterHook, ExecutorToolMiddleware};
 pub use runtime_execution_control::RuntimeExecutionControl;
-pub(crate) use build_mode::{is_framework_tool_wrapper_trace, should_forward_driver_trace};
 pub(crate) use tool_trace::{tool_response_text, truncate_tool_output};
 
 pub use sse_emitter_adapter::{SseEmitterHook, SseToolMiddleware};

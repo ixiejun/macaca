@@ -6,13 +6,13 @@
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 
-use macaca_sdk::app::AppLoader;
-use macaca_proto::{ApplicationId, TraceContext};
-use macaca_sdk::skill::{
+use macaca_host_composition::app::AppLoader;
+use macaca_host_composition::runtime_host::{
     SkillGovernanceRecord, SkillGovernanceRecordUsageCommand, SkillGovernanceSnapshotCommand,
     SkillLifecycleState, SkillPolicy, SkillServiceScope, SkillSnapshot, SkillUsageEventKind,
     SkillUsageObservation,
 };
+use macaca_proto::{ApplicationId, TraceContext};
 
 use crate::state::AppState;
 
@@ -22,7 +22,6 @@ pub(super) async fn resolve_agent_skill_policy(
     app_id: &ApplicationId,
     agent_name: &str,
 ) -> SkillPolicy {
-
     let registry = crate::application_shell_adapter::registry_read_guard(&state).await;
     let Some(app) = registry.get_app(app_id) else {
         return SkillPolicy::default();
@@ -39,7 +38,6 @@ pub(super) async fn resolve_agent_skill_policy(
             deny: skills.deny,
         })
         .unwrap_or_default()
-
 }
 
 /// Build usage commands for governed skills that appear in the current snapshot.
@@ -51,7 +49,6 @@ pub(crate) fn build_governed_skill_activation_usage_commands(
     agent_name: &str,
     trace_id: &str,
 ) -> Vec<SkillGovernanceRecordUsageCommand> {
-
     let visible_skill_names = snapshot
         .skills
         .iter()
@@ -91,7 +88,6 @@ pub(crate) fn build_governed_skill_activation_usage_commands(
             }
         })
         .collect()
-
 }
 
 /// Record governed activation telemetry after a snapshot is loaded or built.
@@ -103,7 +99,6 @@ pub(super) async fn record_governed_skill_snapshot_activation(
     snapshot: &SkillSnapshot,
     trace_id: &str,
 ) {
-
     let scope = match SkillServiceScope::agent(*app_id, session_id, agent_name) {
         Ok(scope) => scope,
         Err(error) => {
@@ -160,5 +155,4 @@ pub(super) async fn record_governed_skill_snapshot_activation(
             );
         }
     }
-
 }

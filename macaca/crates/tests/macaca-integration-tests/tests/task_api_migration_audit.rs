@@ -209,7 +209,7 @@ fn strip_strings_and_comments(source: &str) -> String {
 }
 
 #[test]
-fn upper_layer_task_consumers_do_not_call_deprecated_task_apis() {
+fn upper_layer_task_consumers_do_not_call_retired_task_apis() {
     let root = macaca_root();
     let mut failures = Vec::new();
 
@@ -222,7 +222,7 @@ fn upper_layer_task_consumers_do_not_call_deprecated_task_apis() {
         for forbidden in FORBIDDEN_PATTERNS {
             if sanitized.contains(forbidden.pattern) {
                 failures.push(format!(
-                    "{} contains deprecated task API pattern `{}`; use `{}` instead",
+                    "{} contains retired task API pattern `{}`; use `{}` instead",
                     target.relative_path, forbidden.pattern, forbidden.replacement
                 ));
             }
@@ -231,7 +231,7 @@ fn upper_layer_task_consumers_do_not_call_deprecated_task_apis() {
 
     assert!(
         failures.is_empty(),
-        "deprecated macaca-task API usage detected in upper-layer consumers:\n{}",
+        "retired macaca-task API usage detected in upper-layer consumers:\n{}",
         failures.join("\n")
     );
 }

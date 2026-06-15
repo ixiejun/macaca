@@ -1,6 +1,6 @@
 //! ServiceRuntime adapter for Plugin Capability Registry v1.
 //!
-//! The adapter translates generic Route C `ServiceCommand` envelopes into the
+//! The adapter translates generic protocol `ServiceCommand` envelopes into the
 //! typed Plugin Capability Service facade.  It owns transport decoding only;
 //! registry policy, conflict detection, and descriptor-safe call semantics stay
 //! behind `PluginCapabilityService`.

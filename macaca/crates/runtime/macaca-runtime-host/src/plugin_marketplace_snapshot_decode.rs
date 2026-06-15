@@ -14,9 +14,13 @@ use tracing::debug;
 use crate::plugin_marketplace_service_support::decode;
 
 /// Decode a marketplace snapshot command from either a typed DTO or a workbench envelope.
-pub(crate) fn decode_snapshot_payload(value: Value) -> ServiceResult<PluginMarketplaceSnapshotCommand> {
+pub(crate) fn decode_snapshot_payload(
+    value: Value,
+) -> ServiceResult<PluginMarketplaceSnapshotCommand> {
     if value.is_null() {
-        debug!("plugin marketplace snapshot decode: null payload defaults to empty snapshot command");
+        debug!(
+            "plugin marketplace snapshot decode: null payload defaults to empty snapshot command"
+        );
         return Ok(PluginMarketplaceSnapshotCommand {
             include_audit_tail: false,
         });

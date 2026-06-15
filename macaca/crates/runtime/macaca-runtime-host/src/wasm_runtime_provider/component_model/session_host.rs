@@ -37,11 +37,7 @@ pub(super) trait ComponentModelWasmExecutionSessionHost {
         trace: Option<TraceContext>,
     ) -> ApplicationHostCommandResult;
 
-    fn attach_common_metadata(
-        &self,
-        result: &mut ApplicationHostCommandResult,
-        export_name: &str,
-    );
+    fn attach_common_metadata(&self, result: &mut ApplicationHostCommandResult, export_name: &str);
 }
 
 impl ComponentModelWasmExecutionSessionHost for ComponentModelWasmExecutionSession {
@@ -173,11 +169,7 @@ impl ComponentModelWasmExecutionSessionHost for ComponentModelWasmExecutionSessi
         result
     }
 
-    fn attach_common_metadata(
-        &self,
-        result: &mut ApplicationHostCommandResult,
-        export_name: &str,
-    ) {
+    fn attach_common_metadata(&self, result: &mut ApplicationHostCommandResult, export_name: &str) {
         result
             .metadata
             .insert("provider_class".into(), "component_model".into());

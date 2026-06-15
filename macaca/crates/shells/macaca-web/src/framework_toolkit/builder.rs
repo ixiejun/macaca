@@ -8,16 +8,18 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
+use macaca_host_composition::framework::tool::Toolkit;
+use macaca_host_composition::mcp_runtime::{
+    probe_definition_statuses, McpServerFactory, McpToolPolicy,
+};
+use macaca_host_composition::runtime_host::{SkillServiceScope, SkillToolCatalogCommand};
+use macaca_host_composition::tool_bootstrap::{
+    bootstrap_workspace_toolkit_tools, WorkspaceToolkitBootstrapRequest,
+};
 use macaca_proto::{
     ApplicationId, McpServicePolicyHints, McpServiceScope, McpToolCatalogCommand, TraceContext,
 };
-use macaca_sdk::driver::{DriverServiceScope, DriverToolCatalogCommand};
-use macaca_sdk::framework::tool::Toolkit;
-use macaca_sdk::skill::{SkillServiceScope, SkillToolCatalogCommand};
-
-use crate::framework_adapter::{SingleToolAdapter, ToolSetBridge};
-use crate::state::AppState;
-use macaca_sdk::runtime_host::{McpServerDefinition, McpToolPolicy};
+use macaca_sdk::{DriverServiceScope, DriverToolCatalogCommand};
 
 use super::agent_tools::register_agent_tools;
 use super::mcp_bridge::{
@@ -26,7 +28,8 @@ use super::mcp_bridge::{
     load_service_mcp_snapshot_definitions, register_mcp_definitions_with_service,
 };
 use super::policy::{app_agent_names, enforce_base_tool_allowlist, resolve_tool_policy};
-use super::workspace_tools::{WorkspaceFileReadTool, WorkspaceFileWriteTool, WorkspaceShellTool};
+use crate::framework_adapter::{SingleToolAdapter, ToolSetBridge};
+use crate::state::AppState;
 
 /// Build a `Toolkit` with base tools + per-agent todo tools.
 pub(crate) async fn build_toolkit(
@@ -133,30 +136,18 @@ pub(crate) async fn build_toolkit(
         .get(app_id)
         .cloned()
     {
-        if policy.allows_base_tool("file_read") {
-            toolkit.register(
-                Box::new(SingleToolAdapter::new(Box::new(WorkspaceFileReadTool {
-                    workspace_root: ws.root.clone(),
-                }))),
-                None,
-            );
-        }
-        if policy.allows_base_tool("file_write") {
-            toolkit.register(
-                Box::new(SingleToolAdapter::new(Box::new(WorkspaceFileWriteTool {
-                    workspace_root: ws.root.clone(),
-                }))),
-                None,
-            );
-        }
-        if policy.allows_base_tool("shell") {
-            toolkit.register(
-                Box::new(SingleToolAdapter::new(Box::new(WorkspaceShellTool {
-                    workspace_root: ws.root,
-                    default_timeout: Duration::from_secs(30),
-                }))),
-                None,
-            );
+        let workspace_tools = bootstrap_workspace_toolkit_tools(
+            WorkspaceToolkitBootstrapRequest {
+                workspace_root: ws.root,
+                allow_file_read: policy.allows_base_tool("file_read"),
+                allow_file_write: policy.allows_base_tool("file_write"),
+                allow_shell: policy.allows_base_tool("shell"),
+                default_shell_timeout: Duration::from_secs(30),
+            },
+            format!("web-framework-toolkit-workspace:{app_id}:{agent_name}"),
+        );
+        for tool in workspace_tools {
+            toolkit.register(Box::new(SingleToolAdapter::new(tool)), None);
         }
     }
 
@@ -286,9 +277,7 @@ pub(crate) async fn build_toolkit(
         &mcp_definitions,
     )
     .await;
-    let mcp_statuses =
-        macaca_sdk::runtime_host::probe_definition_statuses(mcp_definitions.clone(), &mcp_policy)
-            .await;
+    let mcp_statuses = probe_definition_statuses(mcp_definitions.clone(), &mcp_policy).await;
     emit_mcp_runtime_events(state, session_id.as_deref(), agent_name, &mcp_statuses).await;
 
     if let Some(snapshot) = crate::skill_mcp::load_or_build_skill_snapshot(
@@ -300,8 +289,7 @@ pub(crate) async fn build_toolkit(
     .await
     {
         let skill_definitions =
-            macaca_sdk::runtime_host::McpServerFactory::with_bundled_mapping_registry()
-                .from_skill_snapshot(&snapshot);
+            McpServerFactory::with_bundled_mapping_registry().from_skill_snapshot(&snapshot);
         emit_mcp_starting_events(state, session_id.as_deref(), agent_name, &skill_definitions)
             .await;
         register_mcp_definitions_with_service(
@@ -312,9 +300,7 @@ pub(crate) async fn build_toolkit(
             &skill_definitions,
         )
         .await;
-        let skill_statuses =
-            macaca_sdk::runtime_host::probe_definition_statuses(skill_definitions, &mcp_policy)
-                .await;
+        let skill_statuses = probe_definition_statuses(skill_definitions, &mcp_policy).await;
         emit_skill_mcp_alias_events(state, session_id.as_deref(), agent_name, &skill_statuses)
             .await;
         emit_mcp_runtime_events(state, session_id.as_deref(), agent_name, &skill_statuses).await;

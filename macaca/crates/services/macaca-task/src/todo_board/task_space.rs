@@ -41,11 +41,6 @@ pub struct TaskSpace {
 }
 
 impl TaskSpace {
-    #[deprecated(note = "Use TaskSpace::for_session instead")]
-    pub fn new(app_id: ApplicationId, session_id: Option<String>, store: Arc<TodoStore>) -> Self {
-        Self::for_session(app_id, session_id, store)
-    }
-
     pub fn for_session(
         app_id: ApplicationId,
         session_id: Option<String>,
@@ -81,32 +76,6 @@ impl TaskSpace {
         &self.store
     }
 
-    /// Create a new task and assign it to an agent's board.
-    #[deprecated(note = "Use TaskSpace::create_task_assignment instead")]
-    pub async fn create_and_assign(
-        &self,
-        agent: &str,
-        created_by: &str,
-        title: impl Into<String>,
-        description: impl Into<String>,
-        acceptance_criteria: Vec<String>,
-        priority: u8,
-        depends_on: Vec<TaskId>,
-        parent_task: Option<TaskId>,
-    ) -> TodoItem {
-        self.create_task_assignment(
-            agent,
-            created_by,
-            title,
-            description,
-            acceptance_criteria,
-            priority,
-            depends_on,
-            parent_task,
-        )
-        .await
-    }
-
     pub async fn create_task_assignment(
         &self,
         agent: &str,
@@ -137,7 +106,7 @@ impl TaskSpace {
     /// The graph owner is not part of application product behavior.  It is a
     /// Macaca service boundary marker used by task snapshots, audit records,
     /// and application-execution terminal projection to separate
-    /// authoritative execution tasks from compatibility or diagnostic board
+    /// authoritative execution tasks from auxiliary or diagnostic board
     /// entries.  Callers must pass service categories only; application names,
     /// workflow names, provider names, and business-domain identifiers do not
     /// belong here.
@@ -233,18 +202,6 @@ impl TaskSpace {
         item
     }
 
-    /// Review a task submitted by an agent.
-    /// Searches across sessions (reviewer may not know the originating session).
-    #[deprecated(note = "Use TaskSpace::apply_review_result instead")]
-    pub async fn review_task(
-        &self,
-        task_id: &TaskId,
-        agent: &str,
-        result: TodoReviewResult,
-    ) -> bool {
-        self.apply_review_result(task_id, agent, result).await
-    }
-
     pub async fn apply_review_result(
         &self,
         task_id: &TaskId,
@@ -294,12 +251,6 @@ impl TaskSpace {
             return true;
         }
         false
-    }
-
-    /// Skip a task (Pending/Blocked → Cancelled). Triggers dependency re-evaluation.
-    #[deprecated(note = "Use TaskSpace::cancel_task instead")]
-    pub async fn skip_task(&self, task_id: &TaskId) -> bool {
-        self.cancel_task(task_id).await
     }
 
     pub async fn cancel_task(&self, task_id: &TaskId) -> bool {

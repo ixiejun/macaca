@@ -123,14 +123,17 @@ impl WasmPackageAdmissionReport {
             .unwrap_or(false)
     }
 
-    /// Build the report emitted by the legacy metadata-only WASM descriptor.
+    /// Build the report emitted by the metadata-only WASM descriptor.
     ///
     /// This Adapter path intentionally reports `Unavailable` instead of
     /// `Accepted`: the package metadata can be inspected, but Macaca still has
     /// no approved real WASM runtime in this slice.  The report captures only
-    /// identifiers and reason codes so legacy callers become traceable without
+    /// identifiers and reason codes so metadata-only callers become traceable without
     /// exposing raw package manifests or component bytes.
-    pub fn legacy_metadata_only(package: &PackageDescriptor, trace_id: Option<String>) -> Self {
+    pub fn metadata_only_unavailable(
+        package: &PackageDescriptor,
+        trace_id: Option<String>,
+    ) -> Self {
         let mut report = Self {
             package_id: package.manifest.id.to_string(),
             runtime_kind: package
@@ -288,7 +291,7 @@ impl WasmPackageAdmissionSpec {
                 report.reject(
                     code,
                     artifact.artifact_id.clone(),
-                    "WASM ABI requirement is incompatible with this host",
+                    "WASM ABI requirement is rejected by this host",
                 );
             }
         }

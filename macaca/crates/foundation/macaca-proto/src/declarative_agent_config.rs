@@ -123,7 +123,8 @@ impl AgentConfig {
     /// (`.yaml`/`.yml` for YAML, `.toml` for TOML).
     pub fn from_file(path: impl AsRef<Path>) -> MacacaResult<Self> {
         let path = path.as_ref();
-        let content = std::fs::read_to_string(path).map_err(|e| MacacaError::Config(e.to_string()))?;
+        let content =
+            std::fs::read_to_string(path).map_err(|e| MacacaError::Config(e.to_string()))?;
 
         let ext = path
             .extension()
@@ -181,7 +182,10 @@ impl DeclarativeAgentConfigValidation {
     }
 
     /// Add a validator to the chain.
-    pub fn with_validator(mut self, validator: impl DeclarativeAgentConfigValidator + 'static) -> Self {
+    pub fn with_validator(
+        mut self,
+        validator: impl DeclarativeAgentConfigValidator + 'static,
+    ) -> Self {
         self.validators.push(Box::new(validator));
         self
     }

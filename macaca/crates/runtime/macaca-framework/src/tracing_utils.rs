@@ -9,8 +9,8 @@ macro_rules! trace_agent_reply {
     ($agent_name:expr, $agent_id:expr) => {
         tracing::info_span!(
             "agent.reply",
-            agent.name = %$agent_name,
             agent.id = %$agent_id,
+            agent_name_present = !$agent_name.is_empty(),
             otel.kind = "internal",
         )
     };
@@ -22,7 +22,9 @@ macro_rules! trace_model_chat {
     ($model_name:expr) => {
         tracing::info_span!(
             "model.chat",
-            model.name = %$model_name,
+            service_id = "llm",
+            command = "chat",
+            model_hint_present = !$model_name.is_empty(),
             otel.kind = "client",
         )
     };

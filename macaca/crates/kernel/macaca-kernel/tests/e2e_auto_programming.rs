@@ -11,14 +11,16 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use macaca_agent::LlmProvider;
-use macaca_agent::{AgentExecutionPort, InProcessAgentExecutionPort, InProcessAgentSideRegistry, ToolCatalog};
+use macaca_agent::{
+    AgentExecutionPort, BasicAgent, BasicAgentBuilder, InProcessAgentExecutionPort,
+    InProcessAgentSideRegistry, LlmProvider, ToolCatalog,
+};
 use macaca_kernel::{Kernel, KernelBuilder};
 use macaca_proto::config::KernelConfig;
 use macaca_proto::{
-    AgentManifest, LlmMessage, LlmOptions, LlmResponse, LlmRole, MacacaResult, TokenUsage,
+    AgentId, AgentManifest, LlmMessage, LlmOptions, LlmResponse, LlmRole, MacacaResult, TokenUsage,
 };
-use macaca_sdk::{register_in_process_kernel_agent, AgentBuilder, AgentConfig, DeclarativeAgent};
+use macaca_sdk::{AgentBuilder, AgentConfig};
 use macaca_tools::DefaultToolSet;
 
 // ── Mock LLM for AC1 Auto-Programming ────────────────────────────────────────
@@ -132,12 +134,18 @@ fn make_kernel() -> (Kernel, Arc<InProcessAgentSideRegistry>) {
 async fn register_declarative_agent(
     kernel: &Kernel,
     side_registry: &InProcessAgentSideRegistry,
-    agent: DeclarativeAgent,
+    agent: BasicAgent,
     manifest: AgentManifest,
-) -> macaca_proto::AgentId {
-    register_in_process_kernel_agent(kernel, side_registry, Box::new(agent), manifest)
+) -> AgentId {
+    let id = manifest.id;
+    side_registry
+        .register_runtime_agent(Arc::from(Box::new(agent) as Box<dyn macaca_agent::Agent>))
+        .expect("register runtime agent in side registry");
+    kernel
+        .register_agent(manifest)
         .await
-        .expect("register declarative agent")
+        .expect("register agent manifest");
+    id
 }
 
 fn code_gen_config() -> AgentConfig {
@@ -172,10 +180,13 @@ model: mock-auto-programming
     .unwrap()
 }
 
-fn build_agent_from_config(config: AgentConfig) -> (DeclarativeAgent, AgentManifest) {
+fn build_agent_from_config(config: AgentConfig) -> (BasicAgent, AgentManifest) {
     let spec = AgentBuilder::from_config(config).build_spec().unwrap();
     let manifest = spec.manifest();
-    let agent = spec.into_agent();
+    let agent = BasicAgentBuilder::new(spec.prompt_template())
+        .with_id(spec.id())
+        .with_capabilities(spec.capabilities().to_vec())
+        .build();
     (agent, manifest)
 }
 
@@ -187,7 +198,7 @@ fn build_agent_from_config(config: AgentConfig) -> (DeclarativeAgent, AgentManif
 async fn test_ac1_auto_programming_flow() {
     let (kernel, side_registry) = make_kernel();
 
-    // Build a code-gen DeclarativeAgent via AgentBuilder
+    // Build a code-gen declaration via AgentBuilder, then materialize a test agent locally.
     let config = code_gen_config();
     let (agent, manifest) = build_agent_from_config(config);
     let agent_id = manifest.id;
@@ -227,7 +238,7 @@ async fn test_ac1_auto_programming_flow() {
     assert_eq!(output.tokens_used.total_tokens, 250);
 }
 
-/// Verify the DeclarativeAgent correctly sends system prompt + user content
+/// Verify the locally materialized agent sends declaration prompt content
 /// to the LLM, and that the mock responds based on prompt content.
 #[tokio::test]
 async fn test_ac1_agent_receives_prompt() {
@@ -258,13 +269,7 @@ async fn test_ac1_agent_receives_prompt() {
     let (planner, planner_manifest) = build_agent_from_config(planner_cfg);
     let planner_id = planner_manifest.id;
 
-    register_declarative_agent(
-        &kernel,
-        side_registry.as_ref(),
-        planner,
-        planner_manifest,
-    )
-    .await;
+    register_declarative_agent(&kernel, side_registry.as_ref(), planner, planner_manifest).await;
 
     let planner_output = kernel.execute_agent(&planner_id).await.unwrap();
 
@@ -291,13 +296,7 @@ async fn test_ac1_multi_agent_scenario() {
     let (planner, planner_manifest) = build_agent_from_config(planner_cfg);
     let planner_id = planner_manifest.id;
 
-    register_declarative_agent(
-        &kernel,
-        side_registry.as_ref(),
-        planner,
-        planner_manifest,
-    )
-    .await;
+    register_declarative_agent(&kernel, side_registry.as_ref(), planner, planner_manifest).await;
 
     // Register code-gen agent
     let coder_cfg = code_gen_config();

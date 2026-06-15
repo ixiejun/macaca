@@ -7,7 +7,7 @@
 //!
 //! Design pattern: **Facade + Command** — this integration gate orchestrates downstream
 //! crate test suites via `cargo test` subprocesses so CI has a single named VC entry
-//! point (`unified_audit_replay_terminal_gate`) aligned with Route C / file-size gates.
+//! point (`unified_audit_replay_terminal_gate`) aligned with protocol / file-size gates.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -72,14 +72,7 @@ fn run_crate_test(workspace: &Path, package: &str, filter: &str) {
         "unified_audit_replay_terminal_gate event=subprocess_start package={package} filter={filter}"
     );
     let output = Command::new("cargo")
-        .args([
-            "test",
-            "-p",
-            package,
-            filter,
-            "--",
-            "--nocapture",
-        ])
+        .args(["test", "-p", package, filter, "--", "--nocapture"])
         .current_dir(workspace)
         .output()
         .unwrap_or_else(|error| {

@@ -14,9 +14,9 @@ mod event_log_tests;
 
 pub use checkpoint::{CheckpointBuilder, CheckpointManager, CheckpointRecord, SessionSnapshot};
 pub use entitlement_store::{EntitlementStore, InMemoryEntitlementStore};
-pub use event_index::EventLogQuery;
-pub use event_log::{AppendEventCommand, EventLog, EventReplayIterator};
+pub use event_log::{EventLog, EventReplayIterator};
 pub use lineage::SessionLineageStore;
+pub use macaca_proto::{AppendEventCommand, EventLogQuery};
 pub use payment_store::{InMemoryPaymentStore, PaymentStateTransition, PaymentStore};
 pub use redb_store::RedbStore;
 pub use store::{PersistBackend, PersistStore};

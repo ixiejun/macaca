@@ -12,7 +12,7 @@
 //! - **Observer** — reacts to `AgentExecutionResult` without mutating execution outcome.
 //! - **Adapter** — `projection` maps service DTOs to kernel `TaskResult` view.
 //! - **Builder** — `proposal_builder` assembles bounded `SkillExperienceProposalCommand`.
-//! - **Value Object** — `semantic_signal` derives Skill Creator-compatible trigger phrases.
+//! - **Value Object** — `semantic_signal` derives Skill Creator aligned trigger phrases.
 
 mod forwarder;
 mod observer;

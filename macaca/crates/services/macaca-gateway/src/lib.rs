@@ -2,20 +2,19 @@
 //!
 //! Provides a pluggable architecture for connecting instant-messaging
 //! platforms (Telegram, Discord, etc.) to the Agent OS kernel. Each
-//! platform implements the [`ImAdapter`] trait, and the [`Gateway`]
-//! manages the lifecycle of all registered adapters.
+//! platform implements adapter and transport boundaries. [`GatewayBuilder`]
+//! owns lifecycle assembly, while [`GatewayMediator`] owns inbound dispatch.
 //!
 //! # Architecture
 //!
 //! ```text
-//! ┌───────────┐     ┌───────────┐     ┌──────────────┐
-//! │ Telegram  │────▶│  Gateway  │────▶│ EventHandler │
-//! └───────────┘     │           │     └──────────────┘
-//! ┌───────────┐     │           │
-//! │  Discord  │────▶│           │
-//! └───────────┘     └───────────┘
+//! ┌───────────┐     ┌────────────────┐     ┌──────────────────┐
+//! │ Telegram  │────▶│ GatewayBuilder │────▶│ GatewayMediator  │
+//! └───────────┘     └────────────────┘     └──────────────────┘
+//! ┌───────────┐              │                       │
+//! │  Discord  │──────────────┘                       ▼
+//! └───────────┘                              GatewayEventSink
 //! ```
-#![allow(deprecated)]
 
 pub mod adapter;
 pub mod builder;

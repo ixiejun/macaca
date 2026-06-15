@@ -2,7 +2,7 @@
 //!
 //! This module is intentionally protocol-only.  It describes application
 //! packages, runtime profiles, abilities, permissions, services, UI surfaces,
-//! commerce metadata, plugin dependencies, and compatibility constraints as
+//! commerce metadata, plugin dependencies, and host requirements as
 //! serializable data.  Application execution, provider construction, policy
 //! enforcement, and shell rendering live in higher layers.
 
@@ -125,15 +125,15 @@ impl ApplicationCommerceDeclaration {
     }
 }
 
-/// Compatibility constraints used by package guards and certification checks.
+/// Host requirements used by package guards and certification checks.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ApplicationCompatibilityDeclaration {
+pub struct ApplicationHostRequirementDeclaration {
     pub min_os_version: String,
     pub sdk_version: Option<String>,
     pub features: Vec<String>,
 }
 
-impl ApplicationCompatibilityDeclaration {
+impl ApplicationHostRequirementDeclaration {
     pub fn new(min_os_version: impl Into<String>) -> Self {
         Self {
             min_os_version: min_os_version.into(),
@@ -179,7 +179,7 @@ pub struct ApplicationManifestV1 {
     pub ui: Option<ApplicationUiDeclaration>,
     pub commerce: Option<ApplicationCommerceDeclaration>,
     pub plugin_dependencies: Vec<ApplicationPluginDependency>,
-    pub compatibility: ApplicationCompatibilityDeclaration,
+    pub host_requirements: ApplicationHostRequirementDeclaration,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub execution_control: Option<ExecutionControlPolicy>,
     /// Provider-neutral application execution profile.
@@ -205,7 +205,7 @@ pub struct ApplicationManifestV1 {
     /// Declarative toolsets requested by the application.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub toolsets: Vec<String>,
-    /// Backward-compatible exact tool allowlist.
+    /// Exact tool allowlist requested by the application.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub allowed_tools: Vec<String>,
     /// Permission profiles requested by the application for workbench calls.
@@ -234,7 +234,7 @@ impl ApplicationManifestV1 {
         name: impl Into<String>,
         version: impl Into<String>,
         runtime: ApplicationRuntimeProfile,
-        compatibility: ApplicationCompatibilityDeclaration,
+        host_requirements: ApplicationHostRequirementDeclaration,
     ) -> Self {
         Self {
             manifest_version: ApplicationManifestVersion::v1(),
@@ -249,7 +249,7 @@ impl ApplicationManifestV1 {
             ui: None,
             commerce: None,
             plugin_dependencies: Vec::new(),
-            compatibility,
+            host_requirements,
             execution_control: None,
             execution_profile: None,
             workbench: None,

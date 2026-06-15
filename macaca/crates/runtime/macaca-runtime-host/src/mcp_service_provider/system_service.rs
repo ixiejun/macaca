@@ -5,7 +5,9 @@
 
 use async_trait::async_trait;
 use macaca_kernel::SystemService;
-use macaca_proto::{ServiceCallResult, ServiceCommand, ServiceDescriptor, ServiceHealth, ServiceResult};
+use macaca_proto::{
+    ServiceCallResult, ServiceCommand, ServiceDescriptor, ServiceHealth, ServiceResult,
+};
 
 use super::McpSystemServiceProvider;
 

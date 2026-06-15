@@ -4,9 +4,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use crate::agent_skill::{
-    SkillEntry, SkillInstallSpec, SkillMcpServerConfig, SkillSourceScope,
-};
+use crate::agent_skill::{SkillEntry, SkillInstallSpec, SkillMcpServerConfig, SkillSourceScope};
 
 /// Skill entry visible in a frozen snapshot (model + audit facing).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

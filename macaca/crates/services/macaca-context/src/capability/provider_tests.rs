@@ -41,7 +41,7 @@ async fn mcp_capability_provider_fence_untrusted_and_collision_diagnostics() {
     let provider = mcp_capability_provider_arc(Arc::clone(&catalog));
     assert_eq!(provider.stage(), ContextProviderStage::CapabilityIndex);
 
-    let assemble = ContextAssembleInput::legacy("agent", "model", vec![], Default::default());
+    let assemble = ContextAssembleInput::unscoped("agent", "model", vec![], Default::default());
     let ctx = compose_ctx(&assemble);
     let out = provider.contribute(&ctx).await.unwrap();
     assert_eq!(out.candidates.len(), 1);
@@ -79,7 +79,7 @@ async fn skill_capability_provider_dependency_gap_becomes_diagnostics() {
     let ready = Arc::new(vec!["other".into()]);
     let provider = skill_capability_provider_arc(catalog, ready);
 
-    let assemble = ContextAssembleInput::legacy("agent", "model", vec![], Default::default());
+    let assemble = ContextAssembleInput::unscoped("agent", "model", vec![], Default::default());
     let out = provider.contribute(&compose_ctx(&assemble)).await.unwrap();
     assert_eq!(out.candidates.len(), 1);
     assert!(out.diagnostics.iter().any(|d| d.message.contains("figma")));
@@ -112,7 +112,7 @@ async fn skill_capability_provider_reports_governance_counts() {
     });
 
     let provider = skill_capability_provider_arc(catalog, Arc::new(Vec::new()));
-    let assemble = ContextAssembleInput::legacy("agent", "model", vec![], Default::default());
+    let assemble = ContextAssembleInput::unscoped("agent", "model", vec![], Default::default());
     let out = provider.contribute(&compose_ctx(&assemble)).await.unwrap();
 
     assert!(out
@@ -133,7 +133,7 @@ async fn runtime_tool_capability_provider_emits_sorted_names() {
 
     let provider = runtime_tool_capability_provider_arc(catalog);
 
-    let assemble = ContextAssembleInput::legacy("agent", "model", vec![], Default::default());
+    let assemble = ContextAssembleInput::unscoped("agent", "model", vec![], Default::default());
     let out = provider.contribute(&compose_ctx(&assemble)).await.unwrap();
     assert_eq!(out.candidates.len(), 1);
     let body = &out.candidates[0].content;

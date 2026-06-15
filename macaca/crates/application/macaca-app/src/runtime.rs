@@ -59,8 +59,8 @@ impl AppRuntimeBuilder {
     }
 }
 
-/// Factory for runtime builder creation. The default implementation is a thin
-/// compatibility layer around current `macaca-app` startup assembly.
+/// Factory for runtime builder creation. The default implementation adapts the
+/// current `macaca-app` startup assembly into a replaceable construction seam.
 pub trait ApplicationRuntimeFactory: Send + Sync {
     fn build_runtime_builder(
         &self,

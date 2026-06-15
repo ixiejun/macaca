@@ -4,24 +4,24 @@
 //! serialized through `service.execution_control`.  This module bridges those
 //! hooks into:
 //! 1. Auditable `service.execution_control` resume commands (authoritative).
-//! 2. Legacy in-memory resume channels owned by the waiting parent loop (compat).
+//! 2. Runtime-host local wake channels owned by the waiting parent loop.
 //!
 //! The adapter is intentionally application-neutral: it never branches on agent
 //! role names or workflow labels.
 
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
-use macaca_proto::{
-    ApplicationId, ForkId, LlmRole, TaskId, TraceContext, EXECUTION_CONTROL_SERVICE_ID,
+use macaca_host_composition::execution_control::{
+    ExecutionControlForkJoinCoordinator, ExecutionControlLocalNotificationRuntime,
+    ForkJoinParentResumeRequest,
 };
-use macaca_sdk::runtime_host::{
-    ExecutionControlForkJoinCoordinator, ForkJoinParentResumeRequest,
+use macaca_proto::{
+    ApplicationId, ForkId, LlmRole, RuntimeResumeSignal, TaskId, TraceContext,
+    EXECUTION_CONTROL_SERVICE_ID,
 };
 use tracing::{info, warn};
 
-use crate::runtime_resume::RuntimeResumeSignal;
-use crate::state::{ActiveSession, ForkSessionMapping};
+use crate::state::ForkSessionMapping;
 
 /// Provider-neutral reason codes recorded in execution-control audit replay.
 pub const REASON_FORK_JOIN_PARENT_RESUME_SUCCESS: &str =
@@ -35,12 +35,13 @@ pub const REASON_FORK_JOIN_PARENT_RESUME_FAILURE: &str =
 /// # Execution order
 ///
 /// 1. Emit `ExecutionControlResumeCommand` via the runtime-host coordinator so
-///    service-call audit evidence exists before any shell-local side effect.
-/// 2. Clear the deprecated `pause_signal` and push a `RuntimeResumeSignal` into
-///    the session channel so framework middleware can continue the loop.
+///    service-call audit evidence exists before any runtime-host local side effect.
+/// 2. Ask runtime-host to clear the local `pause_signal` and push a
+///    `RuntimeResumeSignal` into the local notification channel so framework
+///    middleware can continue.
 ///
-/// Failures in step 1 are logged but do not block step 2: the shell must keep
-/// functioning while execution-control migration is in progress.
+/// Failures in step 1 are logged but do not block step 2: the local wake signal
+/// is non-authoritative but still required to release the waiting loop.
 pub async fn deliver_fork_join_resume_and_notify_parent(
     coordinator: &ExecutionControlForkJoinCoordinator,
     mapping: &ForkSessionMapping,
@@ -48,7 +49,7 @@ pub async fn deliver_fork_join_resume_and_notify_parent(
     delegate_task_id: Option<TaskId>,
     reason_code: &str,
     resume_signal: RuntimeResumeSignal,
-    active_session: Option<&ActiveSession>,
+    notification_runtime: &Arc<ExecutionControlLocalNotificationRuntime>,
 ) {
     let trace = TraceContext::new(format!(
         "fork-join-resume:{}:{}",
@@ -83,35 +84,27 @@ pub async fn deliver_fork_join_resume_and_notify_parent(
                 service_id = EXECUTION_CONTROL_SERVICE_ID,
                 reason_code = %reason_code,
                 error = %error,
-                "Fork-join execution-control resume failed; continuing legacy shell adapter"
+                "Fork-join execution-control resume failed; continuing runtime-host local wake"
             );
         }
     }
 
-    if let Some(session) = active_session {
-        // Deprecated compatibility boundary: local channels remain until loop_manager
-        // fully consumes execution-control events (tasks 2.3.4 / 4.2).
-        session.pause_signal.store(false, Ordering::SeqCst);
-        if let Err(error) = session.resume_tx.send(resume_signal).await {
-            warn!(
-                session_id = %mapping.session_id,
-                error = %error,
-                "Failed to send legacy runtime resume signal after execution-control delivery"
-            );
-        }
-    } else {
+    // Local channels are wake handles only; execution-control remains the
+    // authoritative service boundary for replayable resume evidence.
+    if !notification_runtime
+        .notify_resume(&mapping.session_id, resume_signal)
+        .await
+    {
         warn!(
             session_id = %mapping.session_id,
             fork_id = %fork_id.0,
-            "Active session not found for legacy runtime resume adapter"
+            "Execution-control runtime-host local notification was unavailable for fork-join resume"
         );
     }
 }
 
 /// Extract assistant output from a fork snapshot for delegate completion signals.
-pub fn extract_fork_assistant_output(
-    messages: &[macaca_proto::LlmMessage],
-) -> String {
+pub fn extract_fork_assistant_output(messages: &[macaca_proto::LlmMessage]) -> String {
     messages
         .iter()
         .filter_map(|message| {

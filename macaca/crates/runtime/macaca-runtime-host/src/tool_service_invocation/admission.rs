@@ -16,7 +16,7 @@ use crate::tool_service_result::command_result;
 ///
 /// Keeping this as an enum prevents policy, entitlement, approval, and
 /// unavailable-provider outcomes from being inferred from free-form strings in
-/// the dispatch code. Metadata remains an input compatibility surface, but the
+/// the dispatch code. Metadata remains an input envelope surface, but the
 /// router consumes typed decisions before any side effect.
 pub(crate) enum ToolAdmissionDecision {
     Admit,

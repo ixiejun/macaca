@@ -1,4 +1,4 @@
-//! SDK Driver client facade for Route C S6.
+//! SDK Driver client facade.
 //!
 //! The SDK owns a caller-friendly Facade over Driver Service commands.  It does
 //! not construct driver runtimes; it only translates typed commands into the
@@ -7,16 +7,15 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use macaca_driver::{
+use macaca_proto::{
     DriverCleanupCommand, DriverInventoryCommand, DriverInventoryResult, DriverLoadServiceCommand,
     DriverLoadServiceResult, DriverServiceSnapshot, DriverServiceSnapshotCommand,
     DriverStatusCommand, DriverStatusResult, DriverToolCatalogCommand, DriverToolCatalogResult,
-    DriverToolInvokeCommand, DriverToolInvokeResult, DRIVER_CLEANUP_COMMAND,
-    DRIVER_INVENTORY_COMMAND, DRIVER_LOAD_COMMAND, DRIVER_RELOAD_COMMAND, DRIVER_SERVICE_ID,
-    DRIVER_SNAPSHOT_COMMAND, DRIVER_STATUS_COMMAND, DRIVER_TOOL_CATALOG_COMMAND,
+    DriverToolInvokeCommand, DriverToolInvokeResult, MacacaError, MacacaResult,
+    DRIVER_CLEANUP_COMMAND, DRIVER_INVENTORY_COMMAND, DRIVER_LOAD_COMMAND, DRIVER_RELOAD_COMMAND,
+    DRIVER_SERVICE_ID, DRIVER_SNAPSHOT_COMMAND, DRIVER_STATUS_COMMAND, DRIVER_TOOL_CATALOG_COMMAND,
     DRIVER_TOOL_INVOKE_COMMAND,
 };
-use macaca_proto::{MacacaError, MacacaResult};
 use tracing::{info, warn};
 
 use crate::service_client::{ServiceCallCommand, SystemServiceClient};

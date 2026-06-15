@@ -1,6 +1,9 @@
 mod tests {
     use super::super::*;
     use async_trait::async_trait;
+    use serde_json::Value;
+
+    use crate::message::{ContentBlock, TextBlock};
 
     // -----------------------------------------------------------------------
     // Mock tools

@@ -18,11 +18,9 @@ use super::client::ClientBox;
 use super::helpers::{missing_required_bin, status_for_definition};
 use super::manager::McpRuntimeManager;
 use super::types::{
-    McpRuntimeContext, McpRuntimeStatus, McpRuntimeStatusState, McpServerDefinition,
-    McpToolPolicy,
+    McpRuntimeContext, McpRuntimeStatus, McpRuntimeStatusState, McpServerDefinition, McpToolPolicy,
 };
 
-#[allow(deprecated)]
 impl McpRuntimeManager {
     pub(crate) async fn register_definition_tools(
         self: &Arc<Self>,
@@ -89,8 +87,7 @@ impl McpRuntimeManager {
             }) as Arc<dyn Fn() + Send + Sync>
         });
 
-        let client: Arc<RwLock<dyn McpClient>> =
-            Arc::new(RwLock::new(ClientBox::new(client)));
+        let client: Arc<RwLock<dyn McpClient>> = Arc::new(RwLock::new(ClientBox::new(client)));
         let options = McpToolRegistrationOptions {
             group_name: format!("mcp:{}", definition.id),
             conflict_policy: definition

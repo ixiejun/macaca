@@ -361,7 +361,7 @@ impl WebServerProcessLauncher {
         command.current_dir(workspace).args([
             "run",
             "-p",
-            "macaca-web",
+            "macaca-host-composition",
             "--bin",
             "macaca-web-server",
             "--",

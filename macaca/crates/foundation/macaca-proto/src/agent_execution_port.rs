@@ -1,7 +1,7 @@
 //! Provider-neutral kernel execution port contract.
 //!
 //! The microkernel dispatches registered agents through this Port abstraction.
-//! Concrete execution (service-client adapter, legacy test adapter, unavailable
+//! Concrete execution (service-client adapter, in-process test adapter, unavailable
 //! placeholder) lives in upper layers; the trait itself stays in foundation proto
 //! so `macaca-kernel` does not depend on application-agent crates.
 
@@ -24,8 +24,5 @@ pub trait AgentExecutionPort: Send + Sync {
     /// return structured errors when execution is unavailable. The port must not
     /// branch on application names, provider names, model names, or business-domain
     /// identifiers.
-    async fn execute_registered_agent(
-        &self,
-        agent_id: &AgentId,
-    ) -> MacacaResult<AgentOutput>;
+    async fn execute_registered_agent(&self, agent_id: &AgentId) -> MacacaResult<AgentOutput>;
 }

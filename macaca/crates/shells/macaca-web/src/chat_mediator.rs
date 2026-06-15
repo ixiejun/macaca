@@ -16,7 +16,7 @@ impl ChatSessionMediator {
         Self { state }
     }
 
-    /// Return the underlying state for compatibility adapters.
+    /// Return the underlying state for shell adapters that still need shared web state.
     pub fn state(&self) -> Arc<AppState> {
         Arc::clone(&self.state)
     }

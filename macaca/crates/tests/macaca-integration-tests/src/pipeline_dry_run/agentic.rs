@@ -4,9 +4,7 @@
 //! `AgenticLoop::execute_with_events` and forwards formatted lines to stderr when verbose.
 
 use macaca_proto::error::MacacaResult;
-use macaca_proto::types::{
-    AgentExecutionEvent, AgentId, LlmMessage, LlmOptions, Permission,
-};
+use macaca_proto::types::{AgentExecutionEvent, AgentId, LlmMessage, LlmOptions, Permission};
 use macaca_runtime::{AgenticLoop, LoopResult};
 use tracing::debug;
 

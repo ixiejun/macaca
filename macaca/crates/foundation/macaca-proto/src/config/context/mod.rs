@@ -68,11 +68,11 @@ pub struct ContextConfig {
 }
 
 fn default_context_engine() -> String {
-    "legacy".into()
+    "passthrough".into()
 }
 
 fn default_context_fallback_engine() -> String {
-    "legacy".into()
+    "passthrough".into()
 }
 
 fn default_context_emit_reports() -> bool {

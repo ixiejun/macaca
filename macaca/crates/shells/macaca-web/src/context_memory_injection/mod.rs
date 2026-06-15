@@ -13,7 +13,7 @@
 //!
 //! ## Composer migration
 //!
-//! Prefer [`macaca_sdk::context::MemoryActiveRecallContextProvider`] when
+//! Prefer [`macaca_host_composition::context::MemoryActiveRecallContextProvider`] when
 //! `active_vector_memory` is enabled. Pass `composer_recall_active = true` from
 //! [`crate::context_reporting_model::ContextReportingChatModel::composer_handles_active_vector_recall`]
 //! so active recall here is skipped (avoids duplicate retrieval).

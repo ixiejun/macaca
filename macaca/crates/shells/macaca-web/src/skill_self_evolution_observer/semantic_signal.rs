@@ -2,11 +2,11 @@
 
 use std::collections::BTreeSet;
 
-use macaca_sdk::runtime_host::executor::TaskResult;
+use macaca_proto::TaskResult;
 
 use super::types::MAX_SEMANTIC_TRIGGER_PHRASES;
 
-/// Bounded semantic signal used to create Skill Creator-compatible proposals.
+/// Bounded semantic signal used to create Skill Creator aligned proposals.
 ///
 /// The observer cannot author application-specific Skills and must not copy raw
 /// task output into generated packages.  This value object applies a small

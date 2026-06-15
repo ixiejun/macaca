@@ -18,7 +18,9 @@ use macaca_proto::{
     ServiceError, ServiceResult, APPLICATION_LOAD_COMMAND,
 };
 
-use super::support::{decode, discovered_view, manifest_view, running_status_for, service_adapter_error, to_value};
+use super::support::{
+    decode, discovered_view, manifest_view, running_status_for, service_adapter_error, to_value,
+};
 use super::ApplicationSystemServiceProvider;
 
 impl ApplicationSystemServiceProvider {
@@ -82,12 +84,9 @@ impl ApplicationSystemServiceProvider {
     ) -> ServiceResult<macaca_proto::ServiceCallResult> {
         let typed: ApplicationStatusCommand = decode(command.payload)?;
         let runtime = self.runtime()?;
-        let result: ApplicationStatusResult = Self::running_views(
-            &runtime,
-            self.registry.as_ref(),
-            &self.domain_pack_catalog,
-        )
-        .await?;
+        let result: ApplicationStatusResult =
+            Self::running_views(&runtime, self.registry.as_ref(), &self.domain_pack_catalog)
+                .await?;
         Ok(Self::service_result(to_value(result)?, typed.trace))
     }
 

@@ -62,8 +62,12 @@ pub async fn run(
         }
         trace(config, "  (t2 correctly Blocked until t1 completes)");
 
-        let board =
-            TaskBoard::for_agent(app_id, ASSIGNEE_AGENT, Some("sess-dep".into()), store.clone());
+        let board = TaskBoard::for_agent(
+            app_id,
+            ASSIGNEE_AGENT,
+            Some("sess-dep".into()),
+            store.clone(),
+        );
         let c = board
             .claim_next_task()
             .await

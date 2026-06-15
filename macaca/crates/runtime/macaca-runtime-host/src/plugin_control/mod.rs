@@ -12,8 +12,8 @@ mod repository;
 mod service;
 
 pub use admission::{
-    AdmissionCheck, AdmissionContext, AdmissionDecision, CompatibilityAdmissionCheck,
-    ManifestShapeAdmissionCheck, PluginAdmissionChain, SourcePolicyAdmissionCheck,
+    AdmissionCheck, AdmissionContext, AdmissionDecision, ManifestShapeAdmissionCheck,
+    PluginAdmissionChain, RuntimeVersionAdmissionCheck, SourcePolicyAdmissionCheck,
 };
 pub use repository::{
     InMemoryPluginRepository, PluginRepository, PluginRepositoryMutation, PluginRepositorySnapshot,

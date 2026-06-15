@@ -166,12 +166,12 @@ impl AppRegistry {
         self.discovered.values().collect()
     }
 
-    /// Get the default app (for backwards compatibility).
+    /// Get the default app by conventional application name.
     pub fn get_default_app(&self) -> Option<&DiscoveredApp> {
         self.get_app_by_name(DEFAULT_APP)
     }
 
-    /// Find a specific app directory by name (legacy compatibility).
+    /// Find a specific app directory by name.
     /// This is a static method that doesn't require a registry instance.
     pub fn find_app_dir(name: &str) -> Option<PathBuf> {
         // Check environment variable first

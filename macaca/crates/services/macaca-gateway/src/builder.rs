@@ -1,5 +1,4 @@
 //! Config-driven gateway construction.
-#![allow(deprecated)]
 
 use std::sync::Arc;
 
@@ -16,8 +15,8 @@ pub struct GatewayBuilder {
 
 /// Started gateway lifecycle handle returned by [`GatewayBuilder`].
 ///
-/// This keeps legacy gateway lifecycle calls inside `macaca-gateway` while
-/// giving upper crates a non-deprecated shutdown path.
+/// This keeps gateway lifecycle ownership inside `macaca-gateway` while giving
+/// upper crates a narrow shutdown path.
 pub struct RunningGateway {
     gateway: Gateway,
 }
@@ -29,7 +28,6 @@ impl RunningGateway {
     }
 
     /// Stop all adapters owned by this running gateway.
-    #[allow(deprecated)]
     pub async fn stop(&self) -> MacacaResult<()> {
         self.gateway.stop_all().await
     }
@@ -37,7 +35,6 @@ impl RunningGateway {
 
 impl GatewayBuilder {
     /// Create a builder with the default event handler.
-    #[allow(deprecated)]
     pub fn new(config: GatewayConfig) -> Self {
         Self {
             config,
@@ -52,7 +49,6 @@ impl GatewayBuilder {
     }
 
     /// Build a gateway using configured adapters.
-    #[allow(deprecated)]
     pub fn build(self) -> Gateway {
         let mut gateway = Gateway::new(self.handler);
 
@@ -74,7 +70,6 @@ impl GatewayBuilder {
     }
 
     /// Build and start the configured gateway.
-    #[allow(deprecated)]
     pub async fn start(self) -> MacacaResult<RunningGateway> {
         let gateway = self.build();
         gateway.start_all().await?;

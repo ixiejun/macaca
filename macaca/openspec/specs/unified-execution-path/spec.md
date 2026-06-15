@@ -41,14 +41,14 @@ Macaca OS SHALL execute YAML, WASM, GenUI, and headless applications through the
 - **THEN** service-call audit replay by session id SHALL show exactly one execution chain per run through the canonical path
 - **AND** both SHALL reuse the same trace/audit correlation and replay path
 
-### Requirement: Removal Of Multi-Path Reconciliation Markers
+### Requirement: Removal Of Multi-Path Path-Selection Markers
 
-Once execution paths are unified, Macaca OS SHALL remove the multi-path reconciliation markers (`graph_owner`/`execution.graph_owner` discrimination, `authoritative`/`non_authoritative`/`legacy_unmarked` classification, `suppress_executor_lifecycle`, `legacy_chat_main_thread_goal_pause`). Terminal-state determination SHALL treat all host commands as equally authoritative.
+Once execution paths are unified, Macaca OS SHALL remove the multi-path path-selection markers (`graph_owner`/`execution.graph_owner` discrimination, `authoritative`/`non_authoritative`/old-unmarked classification, `suppress_executor_lifecycle`, retired chat pause switches). Terminal-state determination SHALL treat all host commands as equally authoritative.
 
 #### Scenario: No reconciliation markers remain in production
 - **WHEN** the codebase is scanned after path convergence
-- **THEN** production code SHALL contain zero occurrences of `legacy_unmarked`, `non_authoritative`, `suppress_executor_lifecycle`, and `legacy_chat_main_thread_goal_pause`
-- **AND** terminal completion/failure SHALL be computed without authoritative-vs-compat branching
+- **THEN** production code SHALL contain zero occurrences of old unmarked-path, non-authoritative-path, executor-lifecycle-suppression, and retired chat-pause switch tokens
+- **AND** terminal completion/failure SHALL be computed without multi-path branching
 
 #### Scenario: Markers are removed only after replay proves a single chain
 - **WHEN** a reconciliation marker is proposed for removal

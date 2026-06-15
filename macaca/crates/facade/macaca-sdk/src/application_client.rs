@@ -1,4 +1,4 @@
-//! SDK Application client facade for Route C S7.
+//! SDK Application client facade.
 //!
 //! The SDK exposes a focused Application Service client for Web, CLI, Gateway,
 //! and future shells.  It never constructs `AppRuntime`, `AppRegistry`,

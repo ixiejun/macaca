@@ -195,7 +195,7 @@ mod tests {
             tool_prefix: None,
             required_bins: Vec::new(),
             enabled: true,
-            source: McpDefinitionSource::Compatibility,
+            source: McpDefinitionSource::Mapping,
             concurrency_isolation: None,
         }
     }

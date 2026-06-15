@@ -222,6 +222,11 @@ pub(crate) async fn run_wasm_chat_fast_path(
             let mut sessions = state_for_task.sessions.active_sessions.write().await;
             sessions.remove(&session_key_for_task);
         }
+        state_for_task
+            .sessions
+            .execution_control_local_notifications
+            .remove(&session_key_for_task)
+            .await;
         {
             let mut flags = state_for_task.sessions.cancel_flags.write().await;
             flags.remove(&app_id_for_task.0.to_string());

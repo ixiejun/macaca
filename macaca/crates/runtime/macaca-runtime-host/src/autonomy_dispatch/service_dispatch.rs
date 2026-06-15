@@ -56,9 +56,13 @@ pub(crate) async fn dispatch_service(
                 error = %error,
                 "autonomy supervisor service dispatch failed"
             );
-            Ok(AutonomyDispatchOutcome::retryable("service_dispatch_failed"))
+            Ok(AutonomyDispatchOutcome::retryable(
+                "service_dispatch_failed",
+            ))
         }
-        Err(_) => Ok(AutonomyDispatchOutcome::retryable("service_dispatch_timeout")),
+        Err(_) => Ok(AutonomyDispatchOutcome::retryable(
+            "service_dispatch_timeout",
+        )),
     }
 }
 
@@ -96,8 +100,12 @@ pub(crate) async fn dispatch_heartbeat(
                 error = %error,
                 "autonomy supervisor heartbeat dispatch failed"
             );
-            Ok(AutonomyDispatchOutcome::retryable("heartbeat_dispatch_failed"))
+            Ok(AutonomyDispatchOutcome::retryable(
+                "heartbeat_dispatch_failed",
+            ))
         }
-        Err(_) => Ok(AutonomyDispatchOutcome::retryable("heartbeat_dispatch_timeout")),
+        Err(_) => Ok(AutonomyDispatchOutcome::retryable(
+            "heartbeat_dispatch_timeout",
+        )),
     }
 }

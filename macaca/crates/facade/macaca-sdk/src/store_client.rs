@@ -1,4 +1,4 @@
-//! SDK Store Service client for Route C S9.
+//! SDK Store Service client.
 //!
 //! The client is a shell-facing Facade.  Web, CLI, and future Gateway adapters
 //! use this trait instead of constructing Store providers or reading package

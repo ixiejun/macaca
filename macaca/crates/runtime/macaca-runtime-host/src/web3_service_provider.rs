@@ -1,4 +1,4 @@
-//! Runtime-host Web3 optional service provider for Route C S11.
+//! Runtime-host Web3 optional service provider.
 //!
 //! This provider is the production service boundary for optional Web3
 //! capability.  It uses the Facade pattern at the `SystemService` boundary,

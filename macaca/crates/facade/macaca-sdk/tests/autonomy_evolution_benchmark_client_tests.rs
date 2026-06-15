@@ -1,8 +1,8 @@
-use macaca_autonomy_evolution::{
+use macaca_proto::TraceContext;
+use macaca_proto::{
     BenchmarkDecision, EvolutionBenchmarkCommand, EvolutionBenchmarkMeasurement,
     EvolutionBenchmarkMetrics, EvolutionScope, EvolutionTargetType,
 };
-use macaca_proto::TraceContext;
 use macaca_sdk::{SystemAutonomyEvolutionClient, UnavailableSystemAutonomyEvolutionClient};
 
 fn measurement(label: &str) -> EvolutionBenchmarkMeasurement {

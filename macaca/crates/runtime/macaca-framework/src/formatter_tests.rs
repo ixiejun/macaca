@@ -198,7 +198,7 @@ mod tests {
     }
 
     #[test]
-    fn test_dashscope_parse_openai_compatible() {
+    fn test_dashscope_parse_openai_wire_shape() {
         let raw = json!({
             "id": "ds-1",
             "created": 1700000002,

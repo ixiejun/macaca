@@ -11,7 +11,7 @@ use macaca_proto::workbench::{
     review, sandbox,
 };
 use macaca_proto::{
-    ApplicationCompatibilityDeclaration, ApplicationManifestV1, ApplicationRuntimeProfile,
+    ApplicationHostRequirementDeclaration, ApplicationManifestV1, ApplicationRuntimeProfile,
     ApplicationWorkbenchCapabilityDeclaration, ApplicationWorkbenchEventSubscription,
     ApplicationWorkbenchManifestDeclaration, ApplicationWorkbenchMcpDependency,
     ApplicationWorkbenchServiceDependency, ApplicationWorkbenchSkillBundleDependency,
@@ -110,7 +110,7 @@ pub fn proof_manifest() -> ApplicationManifestV1 {
         "Generic Workbench Proof",
         "1.0.0",
         ApplicationRuntimeProfile::new(PackageRuntimeKind::Yaml, "1"),
-        ApplicationCompatibilityDeclaration::new("0.1.0"),
+        ApplicationHostRequirementDeclaration::new("0.1.0"),
     )
     .workbench(declaration)
     .toolset("industrial.workbench")

@@ -1,13 +1,13 @@
-//! Approved migration surfaces for P5 terminal audit gates.
+//! Approved terminal surfaces for P5 terminal audit gates.
 //!
-//! Mirrors `serviceization_escape_hatches::is_approved_migration_surface` for the
-//! token families exercised by P5 gates. File-level exemptions are intentional
-//! migration debt markers — new modules cannot inherit directory-wide tolerance.
+//! Mirrors the terminal serviceization gate for the token families exercised by
+//! P5 gates. File-level exemptions are narrow test-only surfaces; new modules
+//! cannot inherit directory-wide tolerance.
 
 use super::tokens::ForbiddenToken;
 
-/// Returns true when `relative` may contain `token` during the serviceization convergence.
-pub fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> bool {
+/// Returns true when `relative` may contain `token` in a terminal exception surface.
+pub fn is_approved_terminal_exception_surface(relative: &str, token: &ForbiddenToken) -> bool {
     if relative.contains("/tests/")
         || relative.ends_with("_tests.rs")
         || relative.ends_with("tests.rs")
@@ -16,13 +16,10 @@ pub fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> 
     }
 
     match token.family {
-        // `application-runtime-direct-start` family retired in iteration 43 — no migration surfaces remain.
-        // `web-direct-runtime-field` family retired in iteration 45 — no migration surfaces remain.
-        // `provider-compat-construction` family retired in iteration 47 — no migration surfaces remain.
-        // `direct-runtime-catalog-read` family retired in iteration 46 — no migration surfaces remain.
+        // These retired families have no production surfaces remaining.
         "shell-semantic-execution-owner" => {
-            // Approved construction adapter — sole shell entry for FrameworkRunner builds
-            // until runtime-host fully owns `FrameworkAgentConstructionPort` (task 4.3.2).
+            // Approved test surfaces may mention shell execution-owner tokens while
+            // exercising terminal assertions.
             relative == "crates/shells/macaca-web/src/framework_agent_construction_shell_adapter.rs"
                 || relative.contains("/agent_execution_backend/tests/")
                 || relative == "crates/shells/macaca-web/src/unified_agent_execution_provider_tests.rs"

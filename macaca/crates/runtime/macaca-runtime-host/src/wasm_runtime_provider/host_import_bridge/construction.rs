@@ -65,10 +65,7 @@ impl WasmHostImportBridge {
     /// This applies the Repository pattern at the host-import boundary. The
     /// bridge still owns import validation and audit metadata, while the shared
     /// store owns app/session/surface lookup for Application Service queries.
-    pub fn with_genui_surface_store(
-        mut self,
-        store: crate::ApplicationGenUiSurfaceStore,
-    ) -> Self {
+    pub fn with_genui_surface_store(mut self, store: crate::ApplicationGenUiSurfaceStore) -> Self {
         self.genui_surface_store = Some(store);
         self
     }
@@ -126,13 +123,10 @@ impl WasmHostImportBridge {
         import_name: Option<&str>,
         service_id: Option<&str>,
     ) {
-        let mut event = WasmTelemetryEvent::new(
-            WasmTelemetryStage::HostImport,
-            status,
-            "host_import_bridge",
-        )
-        .trace_id(trace_id)
-        .reason_code(reason_code.to_string());
+        let mut event =
+            WasmTelemetryEvent::new(WasmTelemetryStage::HostImport, status, "host_import_bridge")
+                .trace_id(trace_id)
+                .reason_code(reason_code.to_string());
         if let Some(name) = import_name {
             event = event.metadata("import_name", name.to_string());
         }

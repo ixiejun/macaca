@@ -1,15 +1,16 @@
 //! SSE Adapter: bridges ReActAgent lifecycle and tool events to HTTP SSE + EventLog.
 
-use std::convert::Infallible;
-use std::sync::Arc;
+use super::tool_trace::tool_trace_output;
 use async_trait::async_trait;
 use axum::response::sse::Event;
-use macaca_sdk::framework::agent::Hook;
-use macaca_sdk::framework::message::Msg;
-use macaca_sdk::framework::tool::{ToolError, ToolMiddleware, ToolResponse};
-use macaca_sdk::runtime_host::persist::{AppendEventCommand, EventLog};
+use macaca_host_composition::framework::agent::Hook;
+use macaca_host_composition::framework::message::Msg;
+use macaca_host_composition::framework::tool::{ToolError, ToolMiddleware, ToolResponse};
+use macaca_host_composition::persist::EventLog;
+use macaca_proto::AppendEventCommand;
+use std::convert::Infallible;
+use std::sync::Arc;
 use tokio::sync::mpsc;
-use super::tool_trace::tool_trace_output;
 pub struct SseEmitterHook {
     pub(crate) tx: mpsc::Sender<Result<Event, Infallible>>,
     pub(crate) agent_name: String,
@@ -19,7 +20,10 @@ pub struct SseEmitterHook {
 
 #[async_trait]
 impl Hook for SseEmitterHook {
-    async fn pre_reply(&self, msg: Msg) -> macaca_sdk::framework::agent::AgentResult<Msg> {
+    async fn pre_reply(
+        &self,
+        msg: Msg,
+    ) -> macaca_host_composition::framework::agent::AgentResult<Msg> {
         if let (Some(event_log), Some(session_id)) = (&self.event_log, &self.session_id) {
             // Event log agent attribution follows the manifest-resolved entry agent
             // carried by the hook adapter (Strategy: inject runtime agent identity).
@@ -44,7 +48,10 @@ impl Hook for SseEmitterHook {
         Ok(msg)
     }
 
-    async fn post_reply(&self, msg: Msg) -> macaca_sdk::framework::agent::AgentResult<Msg> {
+    async fn post_reply(
+        &self,
+        msg: Msg,
+    ) -> macaca_host_composition::framework::agent::AgentResult<Msg> {
         let text = msg.get_text();
         if let (Some(event_log), Some(session_id)) = (&self.event_log, &self.session_id) {
             event_log

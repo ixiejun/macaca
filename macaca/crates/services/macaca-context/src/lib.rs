@@ -62,7 +62,7 @@ pub use composer::{
 pub use engine::{
     list_builtin_engine_infos, ContextAfterTurnInput, ContextAssembleInput, ContextAssembleResult,
     ContextEngine, ContextEngineInfo, ContextEngineRegistry, ContextEngineSelection,
-    ContextManagerFacade, ContextOptionsPatch, ContextRuntimeFacade, LegacyContextEngine,
+    ContextManagerFacade, ContextOptionsPatch, ContextRuntimeFacade, PassthroughContextEngine,
     PruningContextEngine, SummaryContextEngine, WindowedContextEngine,
 };
 pub use estimate::estimate_text_tokens;

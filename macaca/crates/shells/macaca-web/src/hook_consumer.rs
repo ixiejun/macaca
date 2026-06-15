@@ -5,15 +5,15 @@
 //! (`DelegateFailed`), the consumer:
 //! 1. Looks up the `fork_to_session` mapping to find the waiting parent session.
 //! 2. Delivers a fork-lifecycle resume through `service.execution_control` (audit).
-//! 3. Adapts the result into the legacy in-memory resume channel for the parent loop.
+//! 3. Adapts the result into the runtime-host local resume channel for the parent loop.
 
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
-use macaca_sdk::runtime_host::executor::fork_manager::HookEvent;
-use macaca_proto::{TaskId, EXECUTION_CONTROL_SERVICE_ID};
-use macaca_sdk::runtime_host::ExecutionControlForkJoinCoordinator;
+use macaca_host_composition::execution_control::ExecutionControlForkJoinCoordinator;
+use macaca_host_composition::executor::fork_manager::HookEvent;
+use macaca_proto::{RuntimeResumeSignal, TaskId, EXECUTION_CONTROL_SERVICE_ID};
 use tokio::sync::broadcast::Receiver;
 use tracing::{info, warn};
 
@@ -21,14 +21,13 @@ use crate::fork_join_shell_adapter::{
     deliver_fork_join_resume_and_notify_parent, extract_fork_assistant_output,
     REASON_FORK_JOIN_PARENT_RESUME_FAILURE, REASON_FORK_JOIN_PARENT_RESUME_SUCCESS,
 };
-use crate::runtime_resume::RuntimeResumeSignal;
 use crate::state::AppState;
 
 /// Start the hook event consumer background task.
 ///
 /// The consumer polls kernel hook broadcast channels (one per registered application)
 /// and translates terminal fork lifecycle events into execution-control resume
-/// commands plus shell-local wakeups.
+/// commands plus runtime-host local wakeups.
 pub async fn start_hook_event_consumer(state: Arc<AppState>) {
     info!("Hook event consumer started");
 
@@ -88,19 +87,13 @@ pub async fn start_hook_event_consumer(state: Arc<AppState>) {
                             {
                                 let fork_manager = executor.fork_manager();
                                 if let Some(fork) = fork_manager.get_fork(fork_id).await {
-                                    let output =
-                                        extract_fork_assistant_output(&fork.own_messages);
+                                    let output = extract_fork_assistant_output(&fork.own_messages);
                                     let task_id = fork
                                         .waiting_on_task
                                         .map(|task| task.0.to_string())
                                         .unwrap_or_else(|| fork_id.0.to_string());
                                     let delegate_task_id =
                                         fork.waiting_on_task.map(|task| TaskId(task.0));
-
-                                    let sessions =
-                                        state.sessions.active_sessions.read().await;
-                                    let active_session =
-                                        sessions.get(&mapping.session_id);
 
                                     info!(
                                         session_id = %mapping.session_id,
@@ -120,7 +113,7 @@ pub async fn start_hook_event_consumer(state: Arc<AppState>) {
                                             success: true,
                                             output,
                                         },
-                                        active_session,
+                                        &state.sessions.execution_control_local_notifications,
                                     )
                                     .await;
                                 } else {
@@ -148,9 +141,6 @@ pub async fn start_hook_event_consumer(state: Arc<AppState>) {
                             .cloned();
 
                         if let Some(mapping) = mapping {
-                            let sessions = state.sessions.active_sessions.read().await;
-                            let active_session = sessions.get(&mapping.session_id);
-
                             info!(
                                 session_id = %mapping.session_id,
                                 task_id = %task_id.0,
@@ -168,7 +158,7 @@ pub async fn start_hook_event_consumer(state: Arc<AppState>) {
                                     task_id: task_id.0.to_string(),
                                     error,
                                 },
-                                active_session,
+                                &state.sessions.execution_control_local_notifications,
                             )
                             .await;
                         }

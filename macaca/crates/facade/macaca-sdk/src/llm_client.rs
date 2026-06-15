@@ -1,4 +1,4 @@
-//! SDK LLM client facade for Route C S5.
+//! SDK LLM client facade.
 //!
 //! The SDK owns a caller-friendly Facade, not provider construction.  Clients
 //! either translate typed LLM commands into generic service calls or return a
@@ -7,18 +7,17 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use macaca_llm::{
+use macaca_proto::{
     LlmBudgetStatusCommand, LlmBudgetStatusResult, LlmCatalogReadCommand, LlmChatCommand,
     LlmChatResult, LlmContinuationValidateCommand, LlmContinuationValidateResult,
     LlmDegradationExplainCommand, LlmDegradationExplainResult, LlmModelCatalogResult,
     LlmModelSelectionCommand, LlmModelSelectionResult, LlmProviderCapabilitiesResult,
     LlmRouteResolveCommand, LlmRouteResolveResult, LlmServiceChatClient, LlmServiceSnapshot,
-    LlmServiceSnapshotCommand, LLM_BUDGET_STATUS_COMMAND, LLM_CHAT_COMMAND,
-    LLM_CONTINUATION_VALIDATE_COMMAND, LLM_DEGRADATION_EXPLAIN_COMMAND, LLM_MODEL_LIST_COMMAND,
-    LLM_MODEL_SELECTION_COMMAND, LLM_PROVIDER_CAPABILITIES_READ_COMMAND, LLM_ROUTE_RESOLVE_COMMAND,
-    LLM_SERVICE_ID, LLM_SNAPSHOT_COMMAND,
+    LlmServiceSnapshotCommand, MacacaError, MacacaResult, LLM_BUDGET_STATUS_COMMAND,
+    LLM_CHAT_COMMAND, LLM_CONTINUATION_VALIDATE_COMMAND, LLM_DEGRADATION_EXPLAIN_COMMAND,
+    LLM_MODEL_LIST_COMMAND, LLM_MODEL_SELECTION_COMMAND, LLM_PROVIDER_CAPABILITIES_READ_COMMAND,
+    LLM_ROUTE_RESOLVE_COMMAND, LLM_SERVICE_ID, LLM_SNAPSHOT_COMMAND,
 };
-use macaca_proto::{MacacaError, MacacaResult};
 use tracing::{info, warn};
 
 use crate::service_client::{ServiceCallCommand, SystemServiceClient};
@@ -291,7 +290,9 @@ impl LlmServiceChatClientBridge {
     /// Returns a trait object so `ServiceChatModelAdapter` can accept the handle
     /// without knowing which concrete SDK client implementation is installed.
     pub fn wrap(inner: Arc<dyn SystemLlmClient>) -> Arc<dyn LlmServiceChatClient> {
-        tracing::info!("sdk llm service chat bridge wrapping SystemLlmClient for framework dispatch");
+        tracing::info!(
+            "sdk llm service chat bridge wrapping SystemLlmClient for framework dispatch"
+        );
         Arc::new(Self { inner })
     }
 }

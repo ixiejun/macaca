@@ -116,33 +116,6 @@ impl AgenticLoop {
         }
     }
 
-    /// Run the agentic loop.
-    ///
-    /// Deprecated compatibility wrapper. Use [`AgenticLoop::execute`] for new code.
-    #[deprecated(note = "use AgenticLoop::execute")]
-    #[instrument(name = "agentic_loop_legacy", skip_all, fields(agent_id = %agent_id, max_iter = self.config.max_iterations))]
-    pub async fn run(
-        &self,
-        agent_id: &AgentId,
-        llm: &dyn LlmProvider,
-        tools: &dyn ToolCatalog,
-        initial_messages: Vec<LlmMessage>,
-        options: &LlmOptions,
-        permission: &Permission,
-        permission_checker: Option<&dyn PermissionChecker>,
-    ) -> MacacaResult<LoopResult> {
-        self.execute(
-            agent_id,
-            llm,
-            tools,
-            initial_messages,
-            options,
-            permission,
-            permission_checker,
-        )
-        .await
-    }
-
     /// Run the agentic loop with event callbacks for progress tracking.
     ///
     /// This is similar to `run` but sends events to the provided channel during execution.
@@ -232,37 +205,6 @@ impl AgenticLoop {
             messages,
         })
     }
-
-    /// Run the agentic loop with event callbacks for progress tracking.
-    ///
-    /// Deprecated compatibility wrapper. Use [`AgenticLoop::execute_with_events`] for new code.
-    #[deprecated(note = "use AgenticLoop::execute_with_events")]
-    #[instrument(name = "agentic_loop_with_events_legacy", skip_all, fields(agent_id = %agent_id, max_iter = self.config.max_iterations))]
-    pub async fn run_with_events(
-        &self,
-        agent_id: &AgentId,
-        llm: &dyn LlmProvider,
-        tools: &dyn ToolCatalog,
-        initial_messages: Vec<LlmMessage>,
-        options: &LlmOptions,
-        permission: &Permission,
-        permission_checker: Option<&dyn PermissionChecker>,
-        event_tx: Option<mpsc::Sender<AgentExecutionEvent>>,
-    ) -> MacacaResult<LoopResult> {
-        self.execute_with_events(
-            agent_id,
-            llm,
-            tools,
-            initial_messages,
-            options,
-            permission,
-            permission_checker,
-            event_tx,
-        )
-        .await
-    }
-
-
 }
 
 impl Default for AgenticLoop {
@@ -270,4 +212,3 @@ impl Default for AgenticLoop {
         Self::new(RuntimeConfig::default())
     }
 }
-

@@ -9,15 +9,15 @@ use std::sync::Arc;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
-use macaca_proto::TraceContext;
-use macaca_sdk::skill::{
+use macaca_host_composition::runtime_host::{
     SkillAutonomousMaterializationRunCommand, SkillPackageOwnershipClass,
 };
+use macaca_proto::TraceContext;
 
 use crate::routes::{err, proto_err, ErrorResponse};
 use crate::skill_operations_routes::adapter::{
-    application_skill_scope, materialization_collection_root, parse_application_id,
-    policy_hints, refs_or_approval_refs,
+    application_skill_scope, materialization_collection_root, parse_application_id, policy_hints,
+    refs_or_approval_refs,
 };
 use crate::skill_operations_routes::types::SkillOperatorCommandRequest;
 use crate::state::AppState;

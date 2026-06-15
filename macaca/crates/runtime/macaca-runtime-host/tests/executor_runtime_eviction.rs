@@ -115,8 +115,7 @@ async fn fork_manager_accepts_kernel_persistence_port() {
     // ForkManager depends only on kernel persistence/logging ports — not on kernel executor.
     let app_id = ApplicationId::new();
     let persistence = Arc::new(UnavailableKernelPersistencePort);
-    let fork_manager =
-        ForkManager::new_with_store(Some(persistence), app_id.clone());
+    let fork_manager = ForkManager::new_with_store(Some(persistence), app_id.clone());
 
     let forks = fork_manager.list_forks(&app_id).await;
     assert!(forks.is_empty());

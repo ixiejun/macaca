@@ -110,9 +110,10 @@ fn yaml_projection_synthesizes_wasm_runtime_ability_from_service_contract() {
         .iter()
         .any(|service| service.service.as_str() == "service.custom.required"));
     assert!(
-        !ability.services.iter().any(|service| {
-            service.service.as_str() == "service.market_data"
-        }),
+        !ability
+            .services
+            .iter()
+            .any(|service| { service.service.as_str() == "service.market_data" }),
         "finance pack services must not expand without an installed catalog entry"
     );
 }

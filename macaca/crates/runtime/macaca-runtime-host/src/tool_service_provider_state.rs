@@ -86,8 +86,8 @@ impl ToolServiceProviderState {
 
     /// Resolve a planned descriptor by stable id from the last bounded plan.
     ///
-    /// This is a compatibility fallback for callers that send only a stable
-    /// `tool_id`.  New framework adapters pass the descriptor selected from the
+    /// This is a descriptor lookup for callers that send only a stable
+    /// `tool_id`.  Framework adapters should pass the descriptor selected from the
     /// model-visible plan so invocation routing does not depend on a stale
     /// cache.  The cache stores only sanitized descriptors, never raw tool
     /// input/output or provider payloads.

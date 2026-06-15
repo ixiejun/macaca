@@ -9,12 +9,11 @@ use axum::Json;
 use serde::Deserialize;
 
 use macaca_proto::{
-    ApplicationId, AutonomyScope, CancelScheduledAgentTaskCommand,
-    CreateScheduledAgentTaskCommand, ScheduledAgentTaskId, ScheduledAgentTaskQueryCommand,
-    ScheduledAgentTaskSchedule, SchedulerDeleteJobCommand, SchedulerGetJobCommand,
-    SchedulerJobId, SchedulerJobLifecycleCommand, SchedulerLifecycleJobCommand,
-    SchedulerListJobsCommand, SchedulerQueryCommand, SchedulerRegisterJobCommand,
-    SchedulerUpdateJobCommand, TraceContext,
+    AutonomyScope, CancelScheduledAgentTaskCommand, CreateScheduledAgentTaskCommand,
+    ScheduledAgentTaskId, ScheduledAgentTaskQueryCommand, ScheduledAgentTaskSchedule,
+    SchedulerDeleteJobCommand, SchedulerGetJobCommand, SchedulerJobId,
+    SchedulerJobLifecycleCommand, SchedulerLifecycleJobCommand, SchedulerListJobsCommand,
+    SchedulerQueryCommand, SchedulerRegisterJobCommand, SchedulerUpdateJobCommand, TraceContext,
 };
 
 use crate::state::AppState;
@@ -25,7 +24,7 @@ use super::autonomy_sanitizers::{
     sanitized_scheduler_job, sanitized_scheduler_jobs, sanitized_scheduler_mutation,
     sanitized_scheduler_runs, AutonomyScheduleTargetRequest,
 };
-use super::shared::{err, proto_err, ErrorResponse};
+use super::shared::{proto_err, ErrorResponse};
 
 // ---------------------------------------------------------------------------
 // Serviceized application autonomy schedule routes

@@ -8,16 +8,13 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use macaca_proto::{
-    audit_redaction,
-    ApplicationImport, KernelServiceId, ServiceCommandName, TraceContext,
-    APPLICATION_AGENT_DELEGATE_COMMAND, APPLICATION_SERVICE_ID, WASM_HOST_IMPORT_CAPABILITY,
-    WASM_HOST_IMPORT_OPERATION, WASM_HOST_IMPORT_SERVICE_ID, WasmHostImportCommand,
+    audit_redaction, ApplicationImport, KernelServiceId, ServiceCommandName, TraceContext,
+    WasmHostImportCommand, APPLICATION_AGENT_DELEGATE_COMMAND, APPLICATION_SERVICE_ID,
+    WASM_HOST_IMPORT_CAPABILITY, WASM_HOST_IMPORT_OPERATION, WASM_HOST_IMPORT_SERVICE_ID,
 };
 use serde_json::{Map, Value};
 
-use super::constants::{
-    TASK_CREATE_GOAL_OPERATION, TASK_QUERY_OPERATION, TASK_SERVICE_ID,
-};
+use super::constants::{TASK_CREATE_GOAL_OPERATION, TASK_QUERY_OPERATION, TASK_SERVICE_ID};
 
 /// Hydrate host-owned scope fields on a declarative UI intent.
 ///

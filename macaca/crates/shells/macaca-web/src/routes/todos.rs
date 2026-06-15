@@ -2,12 +2,16 @@
 
 use std::sync::Arc;
 
-use axum::extract::{Query, State};
+use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
 
-use macaca_proto::ApplicationId;
+use macaca_proto::{
+    ApplicationId, QueryAgentTodosCommand, QueryTaskClaimDiagnosticsCommand, QueryTaskGoalsCommand,
+    QueryTaskProgressCommand, TraceContext,
+};
+use macaca_sdk::ServiceBackedTaskBoardDataSource;
 
 use crate::shell::WebShellFacade;
 use crate::state::AppState;
@@ -58,9 +62,8 @@ pub async fn list_todos(
         uuid::Uuid::parse_str(&app_id)
             .map_err(|_| err(StatusCode::BAD_REQUEST, "Invalid app_id".into()))?,
     );
-    let store = Arc::clone(&state.persist.todo_store);
     let session_id = required_session_id(&query, "list_todos")?;
-    let shell = WebShellFacade::for_task_board(store);
+    let shell = WebShellFacade::for_task_board(state.system_facade.service_client());
     let response = shell
         .list_todos_json(app_id, session_id)
         .await
@@ -70,7 +73,7 @@ pub async fn list_todos(
 
 /// GET /api/apps/{app_id}/todos/claim-diagnostics — why workers may not claim `Pending` tasks (session-scoped).
 ///
-/// Requires `session_id`: claim order is evaluated on [`TodoStore::list_all_todos_for_session`].
+/// Requires `session_id`: claim order is evaluated by the Task Service.
 pub async fn get_todo_claim_diagnostics(
     State(state): State<Arc<AppState>>,
     axum::extract::Path(app_id): axum::extract::Path<String>,
@@ -80,15 +83,16 @@ pub async fn get_todo_claim_diagnostics(
         uuid::Uuid::parse_str(&app_id)
             .map_err(|_| err(StatusCode::BAD_REQUEST, "Invalid app_id".into()))?,
     );
-    let Some(ref sid) = query.session_id else {
-        return Err(err(
-            StatusCode::BAD_REQUEST,
-            "session_id is required for claim diagnostics".into(),
-        ));
-    };
-    let store = Arc::clone(&state.persist.todo_store);
-    let todos = store.list_all_todos_for_session(&app_id, sid).await;
-    let diag = macaca_sdk::task::diagnose_session_claims(&todos);
+    let sid = required_session_id(&query, "claim diagnostics")?;
+    let client = ServiceBackedTaskBoardDataSource::new(state.system_facade.service_client());
+    let diag = client
+        .query_claim_diagnostics(QueryTaskClaimDiagnosticsCommand::new(
+            app_id,
+            sid,
+            Some(TraceContext::new("web-task-claim-diagnostics")),
+        ))
+        .await
+        .map_err(|error| err(StatusCode::BAD_REQUEST, error.to_string()))?;
     Ok(Json(
         serde_json::to_value(&diag).unwrap_or(serde_json::json!({})),
     ))
@@ -104,15 +108,21 @@ pub async fn get_todo_progress(
         uuid::Uuid::parse_str(&app_id)
             .map_err(|_| err(StatusCode::BAD_REQUEST, "Invalid app_id".into()))?,
     );
-    let store = Arc::clone(&state.persist.todo_store);
-    let space = macaca_sdk::task::TaskSpace::for_session(app_id, query.session_id, store);
-    let p = space.overall_progress().await;
+    let client = ServiceBackedTaskBoardDataSource::new(state.system_facade.service_client());
+    let p = client
+        .query_progress(QueryTaskProgressCommand::new(
+            app_id,
+            query.session_id,
+            Some(TraceContext::new("web-task-progress")),
+        ))
+        .await
+        .map_err(|error| err(StatusCode::BAD_REQUEST, error.to_string()))?;
     Ok(Json(serde_json::json!({
         "total": p.total, "pending": p.pending, "assigned": p.assigned,
         "in_progress": p.in_progress, "pending_review": p.pending_review,
         "needs_optimization": p.needs_optimization, "completed": p.completed,
         "blocked": p.blocked, "failed": p.failed, "cancelled": p.cancelled,
-        "all_done": space.all_tasks_done().await,
+        "all_done": p.all_done,
     })))
 }
 
@@ -125,11 +135,18 @@ pub async fn list_agent_todos(
         uuid::Uuid::parse_str(&app_id)
             .map_err(|_| err(StatusCode::BAD_REQUEST, "Invalid app_id".into()))?,
     );
-    let store = Arc::clone(&state.persist.todo_store);
-    let mut todos = store.list_agent_todos(&app_id, &None, &agent_name).await;
-    todos.sort_by_key(|t| t.sequence_number);
+    let client = ServiceBackedTaskBoardDataSource::new(state.system_facade.service_client());
+    let board = client
+        .query_agent_todos(QueryAgentTodosCommand::new(
+            app_id,
+            None,
+            agent_name,
+            Some(TraceContext::new("web-task-agent-board")),
+        ))
+        .await
+        .map_err(|error| err(StatusCode::BAD_REQUEST, error.to_string()))?;
     Ok(Json(
-        serde_json::json!({ "agent": agent_name, "todos": todos, "count": todos.len() }),
+        serde_json::json!({ "agent": board.agent, "todos": board.todos, "count": board.count }),
     ))
 }
 
@@ -143,13 +160,16 @@ pub async fn list_goals(
         uuid::Uuid::parse_str(&app_id)
             .map_err(|_| err(StatusCode::BAD_REQUEST, "Invalid app_id".into()))?,
     );
-    let store = Arc::clone(&state.persist.todo_store);
-    let goals = if let Some(ref sid) = query.session_id {
-        store.list_goals_for_session(&app_id, sid).await
-    } else {
-        store.list_goals(&app_id).await
-    };
+    let client = ServiceBackedTaskBoardDataSource::new(state.system_facade.service_client());
+    let goals = client
+        .query_goals(QueryTaskGoalsCommand::new(
+            app_id,
+            query.session_id,
+            Some(TraceContext::new("web-task-goals")),
+        ))
+        .await
+        .map_err(|error| err(StatusCode::BAD_REQUEST, error.to_string()))?;
     Ok(Json(
-        serde_json::json!({ "goals": goals, "count": goals.len() }),
+        serde_json::json!({ "goals": goals.goals, "count": goals.count }),
     ))
 }

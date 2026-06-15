@@ -1,4 +1,4 @@
-//! Provider-neutral Store/Entitlement contracts for Route C Phase 08.
+//! Provider-neutral Store/Entitlement contracts.
 //!
 //! This module defines data-only commerce primitives used by package guards,
 //! entitlement services, encrypted package hooks, and metering/audit flows.
@@ -81,7 +81,7 @@ impl fmt::Display for MeteringEventId {
 
 /// String-backed license classification.
 ///
-/// A string-backed value keeps compatibility with future third-party store
+/// A string-backed value keeps room for future third-party store
 /// vocabularies while exposing canonical helper constructors and predicates.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct LicenseType(String);
@@ -143,7 +143,7 @@ impl fmt::Display for LicenseType {
 /// String-backed entitlement state.
 ///
 /// Phase 08 requires well-known states while preserving unknown values for
-/// forward-compatible transport and storage.
+/// future-ready transport and storage.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct EntitlementState(String);
 

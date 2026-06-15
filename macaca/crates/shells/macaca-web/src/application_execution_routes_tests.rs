@@ -197,9 +197,11 @@ fn event_websocket_adapter_is_observer_over_durable_eventlog() {
 
     assert!(source.contains("websocket_execution_events"));
     assert!(source.contains("run_websocket_event_observer"));
-    assert!(source.contains("query_application_events(&event_log"));
+    assert!(source.contains("ApplicationExecutionEventLog"));
+    assert!(source.contains("query_application_events(event_log.as_ref()"));
     assert!(source.contains("event_entry_to_stream_payload(entry)"));
     assert!(source.contains("event_log.subscribe()"));
+    assert!(!source.contains("macaca_host_composition::persist::EventLog"));
     assert!(!source.contains("append_command("));
     assert!(!source.contains("append_idempotent("));
 }

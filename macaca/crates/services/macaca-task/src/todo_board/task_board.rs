@@ -25,16 +25,6 @@ pub struct TaskBoard {
 }
 
 impl TaskBoard {
-    #[deprecated(note = "Use TaskBoard::for_agent instead")]
-    pub fn new(
-        app_id: ApplicationId,
-        agent_name: impl Into<String>,
-        session_id: Option<String>,
-        store: Arc<TodoStore>,
-    ) -> Self {
-        Self::for_agent(app_id, agent_name, session_id, store)
-    }
-
     pub fn for_agent(
         app_id: ApplicationId,
         agent_name: impl Into<String>,
@@ -71,15 +61,6 @@ impl TaskBoard {
 
     pub fn agent_name(&self) -> &str {
         &self.agent_name
-    }
-
-    /// Claim the next task in sequence order. Returns None if no tasks available
-    /// or if the lowest-sequence task is not yet claimable (Blocked/InProgress/Assigned).
-    /// Sequential ordering is enforced PER SESSION — different sessions are independent.
-    /// Atomically transitions Pending → Assigned.
-    #[deprecated(note = "Use TaskBoard::claim_next_task instead")]
-    pub async fn claim_next(&self) -> Option<TodoItem> {
-        self.claim_next_task().await
     }
 
     pub async fn claim_next_task(&self) -> Option<TodoItem> {
@@ -211,12 +192,6 @@ impl TaskBoard {
         Some(claimed)
     }
 
-    /// Mark a task as in-progress. Called by the agent after claiming.
-    #[deprecated(note = "Use TaskBoard::mark_task_in_progress instead")]
-    pub async fn start_task(&self, task_id: &TaskId) -> bool {
-        self.mark_task_in_progress(task_id).await
-    }
-
     pub async fn mark_task_in_progress(&self, task_id: &TaskId) -> bool {
         if let Some(mut task) = self
             .store
@@ -240,12 +215,6 @@ impl TaskBoard {
             }
         }
         false
-    }
-
-    /// Submit a completed task for Plan Agent review.
-    #[deprecated(note = "Use TaskBoard::submit_task_for_review instead")]
-    pub async fn submit_for_review(&self, task_id: &TaskId, summary: String) -> bool {
-        self.submit_task_for_review(task_id, summary).await
     }
 
     pub async fn submit_task_for_review(&self, task_id: &TaskId, summary: String) -> bool {
@@ -287,12 +256,6 @@ impl TaskBoard {
             }
         }
         false
-    }
-
-    /// Mark a task as failed (exceeded max attempts).
-    #[deprecated(note = "Use TaskBoard::fail_task instead")]
-    pub async fn mark_failed(&self, task_id: &TaskId, error: String) -> bool {
-        self.fail_task(task_id, error).await
     }
 
     pub async fn fail_task(&self, task_id: &TaskId, error: String) -> bool {

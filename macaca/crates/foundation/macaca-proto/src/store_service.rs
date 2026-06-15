@@ -1,4 +1,4 @@
-//! Provider-neutral Store Service DTOs for Route C S9.
+//! Provider-neutral Store Service DTOs.
 //!
 //! The Store Service owns package distribution metadata, install/status
 //! orchestration, and sanitized snapshots.  It deliberately does not own

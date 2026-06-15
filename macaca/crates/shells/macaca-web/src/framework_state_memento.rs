@@ -5,9 +5,9 @@
 //! those snapshots in the AgentScope 2.0-style `AgentState` memento contract so
 //! shell routes never depend on framework-internal serialization traits.
 
-use macaca_sdk::framework::execution::ExecutionContext;
-use macaca_sdk::framework::plan::PlanNotebook;
-use macaca_sdk::framework::runtime_context::{
+use macaca_host_composition::framework::execution::ExecutionContext;
+use macaca_host_composition::framework::plan::PlanNotebook;
+use macaca_host_composition::framework::runtime_context::{
     AgentSessionError, AgentSessionStore, AgentState, SessionKey,
 };
 use tracing::{debug, warn};

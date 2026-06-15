@@ -22,9 +22,9 @@ mod tests;
 
 use chrono::{Duration, Utc};
 use macaca_proto::{
-    AutonomyScope, HeartbeatCadencePolicy, HeartbeatProfile, HeartbeatProfileId,
-    HeartbeatRunState, HeartbeatScopeIdentity, HeartbeatServiceSnapshot, MacacaResult,
-    ServiceDescriptor, ServiceHealth, ServiceLifecycleState, HEARTBEAT_SERVICE_ID,
+    AutonomyScope, HeartbeatCadencePolicy, HeartbeatProfile, HeartbeatProfileId, HeartbeatRunState,
+    HeartbeatScopeIdentity, HeartbeatServiceSnapshot, MacacaResult, ServiceDescriptor,
+    ServiceHealth, ServiceLifecycleState, HEARTBEAT_SERVICE_ID,
 };
 use tracing::info;
 
@@ -162,7 +162,6 @@ impl InProcessHeartbeatProvider {
         );
         Ok(())
     }
-
 }
 
 impl Default for InProcessHeartbeatProvider {

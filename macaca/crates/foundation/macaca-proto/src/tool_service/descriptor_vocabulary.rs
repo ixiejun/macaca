@@ -158,7 +158,7 @@ impl ToolExecutorRoute {
     /// Override the route kind and optional command after descriptor creation.
     ///
     /// Family contributors use this Builder-style method to keep base
-    /// descriptor compatibility while carrying industrial route metadata for
+    /// descriptor continuity while carrying industrial route metadata for
     /// runtime environments, gateways, plugins, owning-service commands, and
     /// unavailable providers.
     pub fn with_route_kind(

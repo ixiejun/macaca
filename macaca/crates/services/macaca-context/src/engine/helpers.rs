@@ -14,14 +14,14 @@ use crate::report::{
     ContextSourceReport,
 };
 
-use super::types::{ContextAssembleInput, LEGACY_ENGINE_ID};
+use super::types::{ContextAssembleInput, PASSTHROUGH_ENGINE_ID};
 
-/// Build the compatibility report used by the passthrough engine.
-pub(crate) fn build_legacy_report(input: &ContextAssembleInput) -> ContextReport {
-    let mut report = build_report_for_messages(LEGACY_ENGINE_ID, input, &input.base_messages);
+/// Build the report used by the passthrough engine.
+pub(crate) fn build_passthrough_report(input: &ContextAssembleInput) -> ContextReport {
+    let mut report = build_report_for_messages(PASSTHROUGH_ENGINE_ID, input, &input.base_messages);
     report.decisions.push(ContextDecisionReport::info(
-        "legacy_passthrough",
-        "Legacy engine preserved incoming messages and options.",
+        "context_passthrough",
+        "Passthrough engine preserved incoming messages and options.",
     ));
     report
 }
@@ -35,7 +35,7 @@ pub(crate) fn build_report_for_messages(
     input: &ContextAssembleInput,
     messages: &[LlmMessage],
 ) -> ContextReport {
-    let mut builder = ContextReportBuilder::new(LEGACY_ENGINE_ID)
+    let mut builder = ContextReportBuilder::new(PASSTHROUGH_ENGINE_ID)
         .identity(
             input.app_id,
             input.session_id.clone(),

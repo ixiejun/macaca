@@ -158,11 +158,7 @@ pub fn crypto_market_output_from_binance(
 }
 
 /// Build the stable finance-pack crypto market snapshot from OKX ticker data.
-pub fn crypto_market_output_from_okx(
-    symbol: &str,
-    payload: &Value,
-    ticker: OkxTicker,
-) -> Value {
+pub fn crypto_market_output_from_okx(symbol: &str, payload: &Value, ticker: OkxTicker) -> Value {
     let price = parse_exchange_f64(&ticker.last_price);
     let open_24h = parse_exchange_f64(&ticker.open_24h);
     let day_change_percent = match (price, open_24h) {

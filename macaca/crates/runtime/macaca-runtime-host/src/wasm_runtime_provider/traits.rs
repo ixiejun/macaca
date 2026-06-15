@@ -76,19 +76,19 @@ pub trait WasmExecutionSession: Send + Sync + std::fmt::Debug {
         command: WasmLifecycleCommand,
     ) -> Result<WasmCheckpointMemento, ApplicationAbiError>;
 
-    /// Restore session lifecycle metadata from a compatible checkpoint memento.
+    /// Restore session lifecycle metadata from an ABI-matching checkpoint memento.
     async fn restore(
         &self,
         request: WasmRestoreRequest,
     ) -> Result<WasmRestoreReport, ApplicationAbiError>;
 
-    /// Evaluate an upgrade request against artifact and ABI compatibility metadata.
+    /// Evaluate an upgrade request against artifact and ABI match metadata.
     async fn upgrade(
         &self,
         request: WasmUpgradeRequest,
     ) -> Result<WasmUpgradeReport, ApplicationAbiError>;
 
-    /// Evaluate a rollback request against checkpoint and ABI compatibility metadata.
+    /// Evaluate a rollback request against checkpoint and ABI match metadata.
     async fn rollback(
         &self,
         request: WasmRollbackRequest,

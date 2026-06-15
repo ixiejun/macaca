@@ -6,9 +6,9 @@ use tracing::{info, warn};
 use macaca_proto::config::MacacaConfig;
 use macaca_proto::error::MacacaResult;
 use macaca_sdk::{
-    ServiceInspectionCommand, StaticSystemStatusDataSource, SystemFacade,
-    SystemPluginControlClient, SystemStatusSnapshot, SystemTaskClient, TaskBoardQueryCommand,
-    TaskBoardQueryResult, UnavailableSystemPluginControlClient,
+    ServiceInspectionCommand, StaticSystemStatusClient, SystemFacade, SystemPluginControlClient,
+    SystemStatusSnapshot, SystemTaskClient, TaskBoardQueryCommand, TaskBoardQueryResult,
+    UnavailableSystemPluginControlClient,
 };
 
 /// Initialize and run the kernel with optional gateway adapters.
@@ -43,12 +43,6 @@ pub async fn execute_run_kernel() -> MacacaResult<()> {
     Ok(())
 }
 
-/// Initialize and run the kernel with optional gateway adapters.
-#[deprecated(note = "Use RunCommandHandler through CliCommandHandler dispatch instead")]
-pub async fn run_kernel() -> MacacaResult<()> {
-    execute_run_kernel().await
-}
-
 /// List all agents currently registered with the kernel.
 pub async fn execute_list_agents() -> MacacaResult<()> {
     let config = MacacaConfig::load_default();
@@ -57,12 +51,6 @@ pub async fn execute_list_agents() -> MacacaResult<()> {
     println!("No agents reported by CLI service inspection boundary.");
     println!("\nTotal: {} agent(s)", snapshot.agent_count);
     Ok(())
-}
-
-/// List all agents currently registered with the kernel.
-#[deprecated(note = "Use AgentsCommandHandler through CliCommandHandler dispatch instead")]
-pub async fn list_agents() -> MacacaResult<()> {
-    execute_list_agents().await
 }
 
 /// Display system status information.
@@ -166,18 +154,12 @@ impl SystemTaskClient for EmptyCliTaskBoardDataSource {
     }
 }
 
-/// Display system status information.
-#[deprecated(note = "Use StatusCommandHandler through CliCommandHandler dispatch instead")]
-pub async fn show_status() -> MacacaResult<()> {
-    execute_show_status().await
-}
-
 fn cli_system_facade(
     config: &MacacaConfig,
-) -> SystemFacade<EmptyCliTaskBoardDataSource, StaticSystemStatusDataSource> {
+) -> SystemFacade<EmptyCliTaskBoardDataSource, StaticSystemStatusClient> {
     SystemFacade::new(
         EmptyCliTaskBoardDataSource,
-        StaticSystemStatusDataSource::new(SystemStatusSnapshot {
+        StaticSystemStatusClient::new(SystemStatusSnapshot {
             version: env!("CARGO_PKG_VERSION").into(),
             agent_count: 0,
             loaded_apps: 0,

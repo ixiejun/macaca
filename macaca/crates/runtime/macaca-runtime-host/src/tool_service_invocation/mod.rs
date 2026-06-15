@@ -27,7 +27,7 @@ use crate::tool_service_provider_state::ToolServiceProviderState;
 use crate::tool_service_result::{command_result, normalize_invocation_result};
 use crate::{
     industrial_tool_managed_gateway_service, industrial_tool_runtime_environment_service,
-    ToolManagedGatewayService, ToolRuntimeEnvironmentService, ServiceRuntime,
+    ServiceRuntime, ToolManagedGatewayService, ToolRuntimeEnvironmentService,
 };
 
 use admission::{ToolAdmissionDecision, ToolInvocationAdmissionChain};
@@ -208,7 +208,7 @@ impl ToolInvocationService {
         result
     }
 
-    /// Alias for status lookup used by `tool.result_get` compatibility commands.
+    /// Alias for status lookup used by `tool.result_get` commands.
     pub fn result_get(
         &self,
         trace: TraceContext,

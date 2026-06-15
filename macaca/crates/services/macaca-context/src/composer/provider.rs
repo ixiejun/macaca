@@ -1,7 +1,7 @@
 //! [`ContextProvider`] trait: one link in a Chain-of-Responsibility pipeline.
 //!
 //! Behavior:
-//! **Legacy engine path:** [`crate::LegacyContextEngine`] is the historical “pass-through” assembler
+//! **Passthrough engine path:** [`crate::PassthroughContextEngine`] is the provider-neutral pass-through assembler
 //! (no composer fan-in). Prefer [`super::facade::ContextFacade::assemble_model_context`] for OS features
 //! requiring provider candidates.
 //!

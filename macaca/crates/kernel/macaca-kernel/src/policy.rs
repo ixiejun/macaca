@@ -1,9 +1,9 @@
 //! Policy strategy primitives for the microkernel facade.
 //!
-//! Policy evaluation is modeled as a replaceable strategy.  Phase 01 keeps a
-//! permissive default for compatibility, but the API already returns explicit
-//! decisions so later phases can enforce permissions, budgets, regional rules,
-//! approvals, and entitlement checks without changing callers.
+//! Policy evaluation is modeled as a replaceable strategy. The default strategy
+//! is intentionally permissive, but the API always returns explicit decisions so
+//! stricter permission, budget, regional, approval, and entitlement policies can
+//! be installed by the runtime composition root without changing callers.
 
 use macaca_proto::{KernelPrimitiveResult, PolicyDecision, PolicyRequest};
 
@@ -13,16 +13,16 @@ pub trait PolicyEngine: Send + Sync {
     fn evaluate(&self, request: &PolicyRequest) -> KernelPrimitiveResult<PolicyDecision>;
 }
 
-/// Compatibility policy used while existing call paths migrate to policy.
+/// Permissive default policy used when no stricter policy provider is installed.
 ///
-/// This strategy deliberately allows every request so Phase 01 remains
-/// additive and does not break current applications.  Production policy must
-/// replace this strategy in later Route C phases.
+/// This strategy deliberately allows every request and returns a structured
+/// reason. Production deployments can replace it with a stricter Strategy
+/// without moving policy semantics into presentation shells.
 #[derive(Debug, Default)]
 pub struct DefaultAllowPolicyEngine;
 
 impl DefaultAllowPolicyEngine {
-    /// Create a default compatibility policy engine.
+    /// Create a default allow policy engine.
     pub fn new() -> Self {
         Self
     }
@@ -32,7 +32,7 @@ impl PolicyEngine for DefaultAllowPolicyEngine {
     fn evaluate(&self, request: &PolicyRequest) -> KernelPrimitiveResult<PolicyDecision> {
         Ok(PolicyDecision::Allow {
             reason: format!(
-                "compatibility allow for subject '{}' action '{}'",
+                "default allow for subject '{}' action '{}'",
                 request.subject, request.action
             ),
         })

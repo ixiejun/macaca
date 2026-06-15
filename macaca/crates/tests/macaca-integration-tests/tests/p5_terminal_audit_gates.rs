@@ -13,14 +13,14 @@ mod surfaces;
 #[path = "p5_terminal_audit_gates/tokens.rs"]
 mod tokens;
 
+#[path = "p5_terminal_audit_gates/coordination_patch_retirement.rs"]
+mod coordination_patch_retirement;
 #[path = "p5_terminal_audit_gates/no_direct_provider_call.rs"]
 mod no_direct_provider_call;
 #[path = "p5_terminal_audit_gates/no_hardcoded_name.rs"]
 mod no_hardcoded_name;
 #[path = "p5_terminal_audit_gates/shell_not_semantic_owner.rs"]
 mod shell_not_semantic_owner;
-#[path = "p5_terminal_audit_gates/coordination_patch_retirement.rs"]
-mod coordination_patch_retirement;
 
 #[test]
 fn p5_no_direct_provider_call_gate_rejects_bypasses() {

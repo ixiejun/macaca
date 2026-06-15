@@ -2,8 +2,8 @@
 
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use axum::response::sse::Event;
-use macaca_sdk::runtime_host::persist::EventLog;
 use serde_json::Value;
 use tokio::sync::mpsc;
 
@@ -18,17 +18,34 @@ impl TraceEventNormalizer {
     }
 }
 
+/// Provider-neutral port for durable trace-event writes.
+///
+/// The Web shell owns normalization and SSE fanout, but durable persistence is
+/// supplied by the host composition root. This Command-style port keeps the
+/// trace forwarding facade independent from concrete persistence backends.
+#[async_trait]
+pub trait TraceEventSink: Send + Sync {
+    /// Append a normalized JSON trace event and return the durable sequence id.
+    async fn append_json(
+        &self,
+        session_id: &str,
+        event_type: &str,
+        source: &str,
+        payload: Value,
+    ) -> u64;
+}
+
 /// Facade for durable trace writes and best-effort SSE fanout.
 pub struct TraceEventForwarder {
-    event_log: Arc<EventLog>,
+    sink: Arc<dyn TraceEventSink>,
     normalizer: TraceEventNormalizer,
 }
 
 impl TraceEventForwarder {
-    /// Create a forwarder around the existing append-only event log.
-    pub fn new(event_log: Arc<EventLog>) -> Self {
+    /// Create a forwarder around a host-installed trace sink.
+    pub fn new(sink: Arc<dyn TraceEventSink>) -> Self {
         Self {
-            event_log,
+            sink,
             normalizer: TraceEventNormalizer,
         }
     }
@@ -47,8 +64,8 @@ impl TraceEventForwarder {
         payload: Value,
     ) -> u64 {
         let payload = self.normalize(payload);
-        self.event_log
-            .append(session_id, event_type, source, payload)
+        self.sink
+            .append_json(session_id, event_type, source, payload)
             .await
     }
 

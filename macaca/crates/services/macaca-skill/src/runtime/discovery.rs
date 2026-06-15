@@ -9,9 +9,7 @@ use std::path::Path;
 use macaca_proto::MacacaResult;
 use tracing::{debug, warn};
 
-use crate::agent_skill::{
-    AgentSkill, SkillEntry, SkillExposure, SkillSourceScope,
-};
+use crate::agent_skill::{AgentSkill, SkillEntry, SkillExposure, SkillSourceScope};
 use crate::source::SkillSourceSet;
 
 use super::config::SkillRuntimeLimits;

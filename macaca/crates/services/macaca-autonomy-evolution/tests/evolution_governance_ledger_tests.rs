@@ -95,26 +95,26 @@ fn replay_skips_malformed_records_with_diagnostics() {
 }
 
 #[test]
-fn replay_migrates_supported_legacy_schema_version() {
+fn replay_migrates_supported_previous_schema_version() {
     let path = ledger_path("migration");
-    let legacy = serde_json::json!({
+    let previous_record = serde_json::json!({
         "schema_version": 0,
         "sequence": 7,
-        "record_id": "legacy-record",
+        "record_id": "previous-record",
         "run_id": "run-migration",
-        "node_id": "node.legacy",
+        "node_id": "node.previous",
         "kind": "transition",
         "target_type": "SkillPackage",
-        "trace_id": "trace-legacy",
+        "trace_id": "trace-previous",
         "scope": scope(),
-        "record_ref": "legacy://record",
-        "evidence_refs": ["eventlog://legacy"],
-        "policy_decision_refs": ["policy://legacy"],
-        "audit_refs": ["audit://legacy"],
+        "record_ref": "previous://record",
+        "evidence_refs": ["eventlog://previous"],
+        "policy_decision_refs": ["policy://previous"],
+        "audit_refs": ["audit://previous"],
         "rollback_refs": [],
         "captured_at": chrono::Utc::now(),
     });
-    std::fs::write(&path, format!("{legacy}\n")).unwrap();
+    std::fs::write(&path, format!("{previous_record}\n")).unwrap();
 
     let ledger = LocalJsonlEvolutionGovernanceLedger::open(path.clone()).unwrap();
     let replay = ledger

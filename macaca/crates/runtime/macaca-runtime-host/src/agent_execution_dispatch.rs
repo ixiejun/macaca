@@ -136,7 +136,7 @@ pub fn service_client_execution_port(
 
 /// Hot-swap an already-bootstrapped kernel onto `service.agent_execution`.
 ///
-/// Web seeds the kernel with a legacy bootstrap port for agent registration, then
+/// Web seeds the kernel with a temporary bootstrap port for agent registration, then
 /// calls this helper immediately after the Agent Execution service provider is
 /// started so `Kernel::execute_agent` converges on the single service path.
 pub async fn wire_kernel_to_agent_execution_service(

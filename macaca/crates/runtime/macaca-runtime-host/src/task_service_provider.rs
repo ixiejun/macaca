@@ -13,7 +13,10 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use macaca_kernel::SystemService;
 use macaca_proto::{
-    CleanupPolicy, KernelServiceId, MacacaError, MacacaResult, ServiceCallResult, ServiceCommand,
+    BuildDecompositionPromptCommand, BuildGoalEvaluationPromptCommand, CleanupPolicy,
+    CompleteGoalCommand, FailTaskCommand, KernelServiceId, MacacaError, MacacaResult,
+    ParseGoalEvaluationCommand, QueryAgentTodosCommand, QueryTaskClaimDiagnosticsCommand,
+    QueryTaskGoalsCommand, QueryTaskProgressCommand, ServiceCallResult, ServiceCommand,
     ServiceDescriptor, ServiceError, ServiceHealth, ServiceResult, TraceContext,
 };
 use macaca_task::{
@@ -30,21 +33,14 @@ use crate::{
     StaticServiceProviderFactory,
 };
 
-/// Stable command names exposed by `service.task`.
-///
-/// The names match the Application ABI host import operations for create/query
-/// and use explicit task lifecycle verbs for the remaining runtime methods.
-/// Keeping these constants in the provider avoids stringly-typed branches being
-/// duplicated across WASM, Web bridge, and future CLI adapters.
-pub const TASK_CREATE_GOAL_COMMAND: &str = "task.create_goal";
-pub const TASK_CREATE_ASSIGNMENT_COMMAND: &str = "task.create_assignment";
-pub const TASK_QUERY_COMMAND: &str = "task.query";
-pub const TASK_CLAIM_COMMAND: &str = "task.claim";
-pub const TASK_START_COMMAND: &str = "task.start";
-pub const TASK_SUBMIT_REVIEW_COMMAND: &str = "task.submit_review";
-pub const TASK_REVIEW_COMMAND: &str = "task.review";
-pub const TASK_RESUME_COORDINATOR_COMMAND: &str = "task.resume_coordinator";
-pub const TASK_SNAPSHOT_COMMAND: &str = "service.snapshot";
+pub use macaca_proto::{
+    TASK_AGENT_TODOS_COMMAND, TASK_BUILD_DECOMPOSITION_PROMPT_COMMAND,
+    TASK_BUILD_GOAL_EVALUATION_PROMPT_COMMAND, TASK_CLAIM_COMMAND, TASK_CLAIM_DIAGNOSTICS_COMMAND,
+    TASK_COMPLETE_GOAL_COMMAND, TASK_CREATE_ASSIGNMENT_COMMAND, TASK_CREATE_GOAL_COMMAND,
+    TASK_FAIL_COMMAND, TASK_GOALS_COMMAND, TASK_PARSE_GOAL_EVALUATION_COMMAND,
+    TASK_PROGRESS_COMMAND, TASK_QUERY_COMMAND, TASK_RESUME_COORDINATOR_COMMAND,
+    TASK_REVIEW_COMMAND, TASK_SNAPSHOT_COMMAND, TASK_START_COMMAND, TASK_SUBMIT_REVIEW_COMMAND,
+};
 
 type LocalTaskRuntime = TaskServiceRuntime<NoopTaskServiceExecutionStrategy>;
 
@@ -118,6 +114,15 @@ impl SystemService for TaskSystemServiceProvider {
                 let goal = self.runtime.create_goal(typed).await.map_err(task_error)?;
                 Self::result(goal, trace)
             }
+            TASK_COMPLETE_GOAL_COMMAND => {
+                let typed: CompleteGoalCommand = Self::decode(command)?;
+                let completed = self
+                    .runtime
+                    .complete_goal(typed)
+                    .await
+                    .map_err(task_error)?;
+                Self::result(serde_json::json!({ "completed": completed }), trace)
+            }
             TASK_CREATE_ASSIGNMENT_COMMAND => {
                 let typed: CreateTaskAssignmentCommand = Self::decode(command)?;
                 let task = self
@@ -129,15 +134,71 @@ impl SystemService for TaskSystemServiceProvider {
             }
             TASK_QUERY_COMMAND => {
                 let typed: QueryTaskBoardCommand = Self::decode(command)?;
-                let todos = self
+                let board = self
                     .runtime
                     .query_task_board(typed)
                     .await
                     .map_err(task_error)?;
-                Self::result(
-                    serde_json::json!({ "todos": todos, "count": todos.len() }),
-                    trace,
-                )
+                Self::result(board, trace)
+            }
+            TASK_PROGRESS_COMMAND => {
+                let typed: QueryTaskProgressCommand = Self::decode(command)?;
+                let progress = self
+                    .runtime
+                    .query_progress(typed)
+                    .await
+                    .map_err(task_error)?;
+                Self::result(progress, trace)
+            }
+            TASK_AGENT_TODOS_COMMAND => {
+                let typed: QueryAgentTodosCommand = Self::decode(command)?;
+                let board = self
+                    .runtime
+                    .query_agent_todos(typed)
+                    .await
+                    .map_err(task_error)?;
+                Self::result(board, trace)
+            }
+            TASK_GOALS_COMMAND => {
+                let typed: QueryTaskGoalsCommand = Self::decode(command)?;
+                let goals = self.runtime.query_goals(typed).await.map_err(task_error)?;
+                Self::result(goals, trace)
+            }
+            TASK_CLAIM_DIAGNOSTICS_COMMAND => {
+                let typed: QueryTaskClaimDiagnosticsCommand = Self::decode(command)?;
+                let diagnostics = self
+                    .runtime
+                    .query_claim_diagnostics(typed)
+                    .await
+                    .map_err(task_error)?;
+                Self::result(diagnostics, trace)
+            }
+            TASK_BUILD_DECOMPOSITION_PROMPT_COMMAND => {
+                let typed: BuildDecompositionPromptCommand = Self::decode(command)?;
+                let prompt = self
+                    .runtime
+                    .build_decomposition_prompt(typed)
+                    .await
+                    .map_err(task_error)?;
+                Self::result(prompt, trace)
+            }
+            TASK_BUILD_GOAL_EVALUATION_PROMPT_COMMAND => {
+                let typed: BuildGoalEvaluationPromptCommand = Self::decode(command)?;
+                let prompt = self
+                    .runtime
+                    .build_goal_evaluation_prompt(typed)
+                    .await
+                    .map_err(task_error)?;
+                Self::result(prompt, trace)
+            }
+            TASK_PARSE_GOAL_EVALUATION_COMMAND => {
+                let typed: ParseGoalEvaluationCommand = Self::decode(command)?;
+                let evaluation = self
+                    .runtime
+                    .parse_goal_evaluation(typed)
+                    .await
+                    .map_err(task_error)?;
+                Self::result(evaluation, trace)
             }
             TASK_CLAIM_COMMAND => {
                 let typed: ClaimTaskCommand = Self::decode(command)?;
@@ -157,6 +218,11 @@ impl SystemService for TaskSystemServiceProvider {
                     .await
                     .map_err(task_error)?;
                 Self::result(serde_json::json!({ "submitted": submitted }), trace)
+            }
+            TASK_FAIL_COMMAND => {
+                let typed: FailTaskCommand = Self::decode(command)?;
+                let failed = self.runtime.fail_task(typed).await.map_err(task_error)?;
+                Self::result(serde_json::json!({ "failed": failed }), trace)
             }
             TASK_REVIEW_COMMAND => {
                 let typed: ReviewTaskCommand = Self::decode(command)?;
@@ -240,12 +306,42 @@ fn task_service_descriptor() -> ServiceDescriptor {
         TASK_CREATE_GOAL_COMMAND.into(),
     );
     descriptor.metadata.insert(
+        "command.task.complete_goal".into(),
+        TASK_COMPLETE_GOAL_COMMAND.into(),
+    );
+    descriptor.metadata.insert(
         "command.task.create_assignment".into(),
         TASK_CREATE_ASSIGNMENT_COMMAND.into(),
     );
     descriptor
         .metadata
         .insert("command.task.query".into(), TASK_QUERY_COMMAND.into());
+    descriptor
+        .metadata
+        .insert("command.task.progress".into(), TASK_PROGRESS_COMMAND.into());
+    descriptor.metadata.insert(
+        "command.task.agent_todos".into(),
+        TASK_AGENT_TODOS_COMMAND.into(),
+    );
+    descriptor
+        .metadata
+        .insert("command.task.goals".into(), TASK_GOALS_COMMAND.into());
+    descriptor.metadata.insert(
+        "command.task.claim_diagnostics".into(),
+        TASK_CLAIM_DIAGNOSTICS_COMMAND.into(),
+    );
+    descriptor.metadata.insert(
+        "command.task.build_decomposition_prompt".into(),
+        TASK_BUILD_DECOMPOSITION_PROMPT_COMMAND.into(),
+    );
+    descriptor.metadata.insert(
+        "command.task.build_goal_evaluation_prompt".into(),
+        TASK_BUILD_GOAL_EVALUATION_PROMPT_COMMAND.into(),
+    );
+    descriptor.metadata.insert(
+        "command.task.parse_goal_evaluation".into(),
+        TASK_PARSE_GOAL_EVALUATION_COMMAND.into(),
+    );
     descriptor
         .metadata
         .insert("command.task.claim".into(), TASK_CLAIM_COMMAND.into());
@@ -256,6 +352,9 @@ fn task_service_descriptor() -> ServiceDescriptor {
         "command.task.submit_review".into(),
         TASK_SUBMIT_REVIEW_COMMAND.into(),
     );
+    descriptor
+        .metadata
+        .insert("command.task.fail".into(), TASK_FAIL_COMMAND.into());
     descriptor
         .metadata
         .insert("command.task.review".into(), TASK_REVIEW_COMMAND.into());
@@ -279,86 +378,4 @@ fn runtime_error(error: crate::ServiceRuntimeError) -> MacacaError {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use macaca_persist::RedbStore;
-    use macaca_proto::{ApplicationId, ServiceCommandName, TaskId};
-    use uuid::Uuid;
-
-    #[tokio::test]
-    async fn provider_creates_and_queries_session_scoped_goal() {
-        let store = Arc::new(TodoStore::new(test_store()));
-        let provider = TaskSystemServiceProvider::local(Arc::clone(&store));
-        let app_id = ApplicationId(Uuid::new_v4());
-        let session_id = "session-task-provider";
-        let trace = TraceContext::new("trace-task-provider-create");
-        let create = CreateGoalCommand::new(
-            app_id.clone(),
-            Some(session_id.into()),
-            "Coordinate agents through task service",
-            Some(trace.clone()),
-        );
-
-        let result = provider
-            .call(ServiceCommand {
-                name: ServiceCommandName::new(TASK_CREATE_GOAL_COMMAND),
-                payload: serde_json::to_value(create).unwrap(),
-                trace: Some(trace),
-                metadata: BTreeMap::new(),
-            })
-            .await
-            .unwrap();
-        let goal: macaca_proto::TodoGoal = serde_json::from_value(result.output).unwrap();
-        assert_eq!(goal.description, "Coordinate agents through task service");
-
-        let query = QueryTaskBoardCommand::new(
-            app_id,
-            session_id,
-            Some(TraceContext::new("trace-task-provider-query")),
-        );
-        let queried = provider
-            .call(ServiceCommand {
-                name: ServiceCommandName::new(TASK_QUERY_COMMAND),
-                payload: serde_json::to_value(query).unwrap(),
-                trace: Some(TraceContext::new("trace-task-provider-query")),
-                metadata: BTreeMap::new(),
-            })
-            .await
-            .unwrap();
-        assert_eq!(queried.output["count"], serde_json::json!(0));
-    }
-
-    #[tokio::test]
-    async fn provider_rejects_missing_trace_before_task_runtime() {
-        let store = Arc::new(TodoStore::new(test_store()));
-        let provider = TaskSystemServiceProvider::local(store);
-
-        let error = provider
-            .call(ServiceCommand {
-                name: ServiceCommandName::new(TASK_START_COMMAND),
-                payload: serde_json::json!({
-                    "app_id": ApplicationId(Uuid::new_v4()),
-                    "session_id": "session-a",
-                    "agent_name": "worker",
-                    "task_id": TaskId::new(),
-                    "trace": null,
-                }),
-                trace: None,
-                metadata: BTreeMap::new(),
-            })
-            .await
-            .unwrap_err();
-
-        assert!(matches!(error, ServiceError::MissingTraceContext));
-    }
-
-    fn test_store() -> Arc<dyn macaca_persist::PersistBackend> {
-        let dir = tempfile::tempdir().expect("tempdir should be available for task provider test");
-        let path = dir.path().join("task-provider.redb");
-        // Persist the tempdir for the life of the test process.  RedbStore keeps
-        // the database file open, so dropping the directory immediately can
-        // remove the file on some platforms before async assertions complete.
-        let _leaked_dir = Box::leak(Box::new(dir));
-        Arc::new(RedbStore::open(path).expect("redb task provider test store should open"))
-    }
-}
+mod tests;

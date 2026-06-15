@@ -1,4 +1,4 @@
-//! Protocol-level IPC service bus contracts for Route C Phase 03.
+//! Protocol-level IPC service bus contracts.
 //!
 //! The service bus is the typed call plane between the microkernel facade and
 //! replaceable system services.  These structs are data-only contracts: they do
@@ -207,7 +207,7 @@ impl ServiceEnvelope {
 /// Structured reply returned from any service bus transport.
 ///
 /// The reply records transport and duration metadata at the bus boundary while
-/// keeping service output as JSON-compatible data from the Phase 02 result.
+/// keeping service output as JSON value data from the protocol result.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ServiceReply {
     pub envelope_id: ServiceEnvelopeId,

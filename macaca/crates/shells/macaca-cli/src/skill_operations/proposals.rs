@@ -4,14 +4,10 @@
 //! HTTP route without embedding proposal classification logic in the CLI.
 
 use macaca_proto::{MacacaResult, TraceContext};
-use macaca_sdk::{
-    SkillEvolutionPromoteDraftCommand, SkillEvolutionRejectDraftCommand, SkillServiceScope,
-    SystemSkillClient, UnavailableSystemSkillClient,
-};
 use tracing::info;
 
-use super::output::{print_json, print_sdk_result};
-use super::support::{live_operator_payload, optional_vec, policy_hints, url_segment};
+use super::output::{print_json, print_unavailable};
+use super::support::{live_operator_payload, url_segment};
 use super::types::{SkillCliEvidenceRefs, SkillCliRuntimeTarget};
 
 /// Promote or reject a draft proposal through the SDK Skill facade.
@@ -34,50 +30,23 @@ pub async fn execute_skill_proposal_decision(
         return print_json(response);
     }
 
-    let client = UnavailableSystemSkillClient;
     if promote {
         let trace = TraceContext::new("cli-skill-proposal-promote");
-        let command = SkillEvolutionPromoteDraftCommand {
-            trace: trace.clone(),
-            scope: SkillServiceScope::default(),
-            proposal_id,
-            reason: refs
-                .reason
-                .unwrap_or_else(|| "cli_skill_proposal_promote".into()),
-            evidence_ids: optional_vec(refs.evidence_ref),
-            policy_decision_refs: optional_vec(refs.policy_ref),
-            policy: policy_hints(),
-        };
         info!(
             trace_id = %trace.trace_id,
             command = "skill.evolution.promote_draft",
-            proposal_id = %command.proposal_id,
-            evidence_count = command.evidence_ids.len(),
-            policy_decision_count = command.policy_decision_refs.len(),
-            "CLI forwarding Skill proposal promotion through SDK Skill facade"
+            proposal_id = %proposal_id,
+            "CLI Skill proposal promotion has no live Skill runtime target"
         );
-        return print_sdk_result(trace, client.promote_skill_draft(command).await);
+        return print_unavailable(trace, "skill.evolution.promote_draft");
     }
 
     let trace = TraceContext::new("cli-skill-proposal-reject");
-    let command = SkillEvolutionRejectDraftCommand {
-        trace: trace.clone(),
-        scope: SkillServiceScope::default(),
-        proposal_id,
-        rationale: refs
-            .reason
-            .unwrap_or_else(|| "cli_skill_proposal_reject".into()),
-        evidence_ids: optional_vec(refs.evidence_ref),
-        policy_decision_refs: optional_vec(refs.policy_ref),
-        policy: policy_hints(),
-    };
     info!(
         trace_id = %trace.trace_id,
         command = "skill.evolution.reject_draft",
-        proposal_id = %command.proposal_id,
-        evidence_count = command.evidence_ids.len(),
-        policy_decision_count = command.policy_decision_refs.len(),
-        "CLI forwarding Skill proposal rejection through SDK Skill facade"
+        proposal_id = %proposal_id,
+        "CLI Skill proposal rejection has no live Skill runtime target"
     );
-    print_sdk_result(trace, client.reject_skill_draft(command).await)
+    print_unavailable(trace, "skill.evolution.reject_draft")
 }

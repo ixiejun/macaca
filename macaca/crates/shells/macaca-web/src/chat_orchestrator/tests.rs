@@ -70,12 +70,12 @@ fn chat_main_thread_enters_agent_execution_service_boundary() {
     let source = chat_orchestrator_module_sources();
     // Split forbidden role suffix so the contract test stays negative without
     // embedding a hardcoded agent-role literal in this source file.
-    let legacy_builder = ["FrameworkRunner::build_", "coord", "inator"].concat();
+    let retired_builder = ["FrameworkRunner::build_", "coord", "inator"].concat();
 
     assert!(source.contains("run_chat_main_thread_via_agent_service"));
     assert!(source.contains("AgentExecutionIntent::ChatMainThread"));
     assert!(source.contains("AGENT_EXECUTION_SERVICE_ID"));
-    assert!(!source.contains(&legacy_builder));
+    assert!(!source.contains(&retired_builder));
 }
 
 #[test]

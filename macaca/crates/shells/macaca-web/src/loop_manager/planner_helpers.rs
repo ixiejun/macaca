@@ -5,10 +5,9 @@
 
 use std::sync::Arc;
 
-use macaca_proto::ApplicationId;
-use macaca_sdk::framework::plan::PlanNotebook;
-use macaca_sdk::runtime_host::executor::{ExecutorEvent, ExecutorEventFactory};
-use macaca_sdk::runtime_host::AgentInfo;
+use macaca_host_composition::executor::{ExecutorEvent, ExecutorEventFactory};
+use macaca_host_composition::framework::plan::PlanNotebook;
+use macaca_proto::{AgentInfo, ApplicationId};
 
 use crate::state::AppState;
 

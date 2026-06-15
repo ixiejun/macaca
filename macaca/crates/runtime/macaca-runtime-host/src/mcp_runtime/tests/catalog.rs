@@ -1,27 +1,28 @@
 //! Catalog, config adapter, policy, and descriptor contract tests.
 
-#[allow(deprecated)]
 use std::collections::{BTreeMap, HashSet};
 use std::path::PathBuf;
 
 use macaca_framework::mcp::McpTransportConfig;
-use macaca_proto::{MCP_DESCRIPTOR_BACKEND_TOOL_NAME, MCP_DESCRIPTOR_LIFECYCLE_SCOPE, MCP_SERVICE_ID};
+use macaca_proto::{
+    MCP_DESCRIPTOR_BACKEND_TOOL_NAME, MCP_DESCRIPTOR_LIFECYCLE_SCOPE, MCP_SERVICE_ID,
+};
 use macaca_skill::{
     SkillInstallSpec, SkillMcpServerConfig, SkillSnapshot, SkillSnapshotEntry, SkillSourceScope,
 };
 
 use crate::mcp_runtime::{
-    apply_concurrency_isolation, definitions_from_skill_snapshot, ConcurrencyIsolationPolicy,
-    McpDefinitionSource, McpLifecycleScope, McpRegistryConfig, McpRuntimeFacade, McpToolPolicy,
+    apply_concurrency_isolation, ConcurrencyIsolationPolicy, McpDefinitionSource,
+    McpLifecycleScope, McpRegistryConfig, McpRuntimeFacade, McpToolPolicy,
 };
+use crate::McpServerFactory;
 
-use super::fixtures::{manager_with_fixture_client, stdio_definition, TestMcpClientBehavior};
 use super::super::descriptors::descriptor_from_tool;
+use super::fixtures::{manager_with_fixture_client, stdio_definition, TestMcpClientBehavior};
 
 #[tokio::test]
 async fn managed_resource_listing_and_read_use_mcp_protocol_client() {
-    let manager =
-        manager_with_fixture_client(TestMcpClientBehavior::Success, Default::default());
+    let manager = manager_with_fixture_client(TestMcpClientBehavior::Success, Default::default());
     let facade = McpRuntimeFacade::from_manager(manager);
     let mut definition = stdio_definition("server-a", "fixture-mcp");
     definition.transport = McpTransportConfig::StreamableHttp {
@@ -142,7 +143,9 @@ mcpServers:
 "#,
     )
     .unwrap();
-    let definitions = config.into_definitions(McpDefinitionSource::App).unwrap();
+    let definitions = McpServerFactory::with_bundled_mapping_registry()
+        .from_registry_config(config, McpDefinitionSource::App)
+        .unwrap();
     assert_eq!(definitions.len(), 1);
     assert_eq!(definitions[0].source, McpDefinitionSource::App);
     assert!(matches!(
@@ -152,7 +155,7 @@ mcpServers:
 }
 
 #[test]
-fn skill_snapshot_imports_explicit_and_compat_mcp_definitions() {
+fn skill_snapshot_imports_explicit_and_mapped_mcp_definitions() {
     let snapshot = SkillSnapshot {
         agent: "researcher".into(),
         prompt: String::new(),
@@ -187,7 +190,8 @@ fn skill_snapshot_imports_explicit_and_compat_mcp_definitions() {
         version: 1,
     };
 
-    let definitions = definitions_from_skill_snapshot(&snapshot);
+    let definitions =
+        McpServerFactory::with_bundled_mapping_registry().from_skill_snapshot(&snapshot);
     assert_eq!(definitions.len(), 2);
     assert!(definitions
         .iter()

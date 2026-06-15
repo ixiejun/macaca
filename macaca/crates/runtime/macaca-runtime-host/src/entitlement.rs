@@ -1,10 +1,9 @@
-//! Runtime Store/Entitlement facade for Route C Phase 08.
+//! Runtime Store/Entitlement guard for service-owned authorization.
 //!
-//! The runtime host owns this facade because entitlement policy is replaceable
-//! service behavior, not a kernel invariant. The facade deliberately exposes a
-//! small set of operations (`install`, `start`, and capability `call`) so app,
-//! skill, plugin, MCP, and future store adapters can share one auditable
-//! decision pipeline.
+//! Runtime-host owns this guard because entitlement policy is replaceable
+//! service behavior, not a kernel invariant. Public callers reach it through
+//! Entitlement and Store system service commands; the guard stays crate-local
+//! so SDKs, shells, and applications cannot depend on provider internals.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -18,19 +17,19 @@ use macaca_proto::{
 use tracing::{info, warn};
 
 #[async_trait::async_trait]
-impl macaca_app::ApplicationEntitlementAuthorizer for EntitlementRuntimeFacade {
+impl macaca_app::ApplicationEntitlementAuthorizer for RuntimeEntitlementGuard {
     async fn authorize_install(
         &self,
         manifest: &PackageManifest,
     ) -> Result<EntitlementDecision, CommerceError> {
-        EntitlementRuntimeFacade::authorize_install(self, manifest).await
+        RuntimeEntitlementGuard::authorize_install(self, manifest).await
     }
 
     async fn authorize_start(
         &self,
         manifest: &PackageManifest,
     ) -> Result<EntitlementDecision, CommerceError> {
-        EntitlementRuntimeFacade::authorize_start(self, manifest).await
+        RuntimeEntitlementGuard::authorize_start(self, manifest).await
     }
 
     async fn authorize_capability_call(
@@ -48,14 +47,14 @@ impl macaca_app::ApplicationEntitlementAuthorizer for EntitlementRuntimeFacade {
         if runtime_context.quantity == 0 {
             runtime_context.quantity = 1;
         }
-        EntitlementRuntimeFacade::authorize_capability_call(self, manifest, runtime_context).await
+        RuntimeEntitlementGuard::authorize_capability_call(self, manifest, runtime_context).await
     }
 }
 
 /// Runtime operation protected by the entitlement facade.
 ///
 /// A closed operation enum keeps the public facade readable while the emitted
-/// audit payload remains string-based and forward-compatible.
+/// audit payload remains string-based and ready for new operation labels.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EntitlementOperation {
     Install,
@@ -114,23 +113,20 @@ impl CapabilityCallContext {
     }
 }
 
-/// Facade for runtime entitlement decisions and metering emission.
+/// Internal guard for runtime entitlement decisions and metering emission.
 ///
-/// The facade composes Repository + Specification + Observer patterns:
+/// The guard composes Repository + Specification + Observer patterns:
 /// entitlement state is read through a repository trait, decision rules are
 /// isolated in small predicate methods, and every decision is persisted as an
 /// audit record. When an EventLog is supplied, paid capability calls also emit
-/// a session-scoped metering event compatible with existing trace replay.
-#[deprecated(
-    note = "Use EntitlementSystemServiceProvider plus SystemEntitlementClient for new Store/Entitlement call paths"
-)]
-pub struct EntitlementRuntimeFacade {
+/// a session-scoped metering event readable by trace replay.
+pub(crate) struct RuntimeEntitlementGuard {
     store: Arc<dyn EntitlementStore>,
     event_log: Option<Arc<EventLog>>,
 }
 
-impl EntitlementRuntimeFacade {
-    /// Create a facade with an entitlement store and no EventLog bridge.
+impl RuntimeEntitlementGuard {
+    /// Create a guard with an entitlement store and no EventLog bridge.
     pub fn new(store: Arc<dyn EntitlementStore>) -> Self {
         Self {
             store,
@@ -138,7 +134,7 @@ impl EntitlementRuntimeFacade {
         }
     }
 
-    /// Create a facade that also writes metering events into EventLog.
+    /// Create a guard that also writes metering events into EventLog.
     pub fn with_event_log(store: Arc<dyn EntitlementStore>, event_log: Arc<EventLog>) -> Self {
         Self {
             store,

@@ -165,7 +165,8 @@ impl WasmApplicationRuntimeProvider for DefaultInProcessWasmRuntimeProvider {
             .admit_session(&request)
             .map_err(|error| error.abi_error())?;
         let trace = request.trace.clone();
-        let bytes = artifact_loader::load_artifact_bytes(&request).map_err(|error| error.abi_error())?;
+        let bytes =
+            artifact_loader::load_artifact_bytes(&request).map_err(|error| error.abi_error())?;
         let (module, cache_report) = self
             .cache
             .get_or_compile(&request, &bytes, &self.adapter)
@@ -240,7 +241,9 @@ impl WasmApplicationRuntimeProvider for DefaultInProcessWasmRuntimeProvider {
             sandbox_guard: self.sandbox_guard.clone(),
             host_import_bridge: self.host_import_bridge.clone(),
             telemetry: self.telemetry.clone(),
-            lifecycle: std::sync::Mutex::new(macaca_proto::WasmLifecycleStateMachine::instantiated()),
+            lifecycle: std::sync::Mutex::new(
+                macaca_proto::WasmLifecycleStateMachine::instantiated(),
+            ),
             audit_events: std::sync::Mutex::new(Vec::new()),
             _permit: permit,
             cache_state: format!("{:?}", cache_report.state).to_ascii_lowercase(),

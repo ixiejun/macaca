@@ -1,7 +1,7 @@
-use macaca_autonomy_evolution::{
+use macaca_proto::TraceContext;
+use macaca_proto::{
     EvolutionRunTransition, EvolutionScope, EvolutionTargetType, EvolutionTransitionCommand,
 };
-use macaca_proto::TraceContext;
 use macaca_sdk::{SystemAutonomyEvolutionClient, UnavailableSystemAutonomyEvolutionClient};
 
 #[tokio::test]

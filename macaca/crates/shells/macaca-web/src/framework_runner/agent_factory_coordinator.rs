@@ -1,15 +1,15 @@
 //! Coordinator-specific factory build path with SSE and execution-control middleware.
 
-use std::sync::Arc;
-use macaca_sdk::framework::agent::{HookRegistry, HookedAgent};
-use macaca_sdk::framework::construction::AgentBuildRequest;
-use macaca_sdk::framework::react_agent::ReActAgent;
 use super::agent_factory_build::{PreparedAgentParts, WebTracedAgentFactory};
 use super::build_mode::{DriverTraceRoute, FrameworkRunnerBuildMode};
 use super::driver_trace_adapter::attach_driver_trace_route;
 use super::execution_control_middleware::ExecutionControlMiddleware;
 use super::sse_emitter_adapter::{SseEmitterHook, SseToolMiddleware};
 use super::FrameworkRunner;
+use macaca_host_composition::framework::agent::{HookRegistry, HookedAgent};
+use macaca_host_composition::framework::construction::AgentBuildRequest;
+use macaca_host_composition::framework::react_agent::ReActAgent;
+use std::sync::Arc;
 
 pub(crate) async fn build_coordinator_agent(
     factory: WebTracedAgentFactory,

@@ -4,11 +4,11 @@
 //! No application-specific agent names are hardcoded; capabilities such as
 //! `todo_goal_management` drive which todo tools an agent receives.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::sync::Arc;
 
-use macaca_sdk::app::{app_agent_manifest_view, discovered_app_agent_names};
-use macaca_sdk::framework::tool::Toolkit;
+use macaca_host_composition::app::{app_agent_manifest_view, discovered_app_agent_names};
+use macaca_host_composition::framework::tool::Toolkit;
 use macaca_proto::ApplicationId;
 
 use crate::state::AppState;
@@ -41,7 +41,10 @@ impl AgentToolPolicy {
 }
 
 /// Remove toolkit entries not present in the manifest allowlist (final enforcement pass).
-pub(crate) fn enforce_base_tool_allowlist(toolkit: &mut Toolkit, allowlist: Option<&HashSet<String>>) {
+pub(crate) fn enforce_base_tool_allowlist(
+    toolkit: &mut Toolkit,
+    allowlist: Option<&HashSet<String>>,
+) {
     let Some(allowlist) = allowlist else {
         return;
     };
@@ -114,7 +117,7 @@ pub(super) async fn resolve_tool_policy(
     // - task_planning / todo_planning: can create/review/reassign todos
     // - todo_execution: worker task-board operations
     //
-    // Backward compatibility:
+    // Capability-neutral defaults:
     // - entry agent defaults to GoalManager
     // - non-planner/non-entry agents default to Worker
     let todo_policy = if capabilities.contains("todo_goal_management") {
@@ -130,7 +133,8 @@ pub(super) async fn resolve_tool_policy(
     };
 
     // Any supervisor-like agent should not receive executable TaskBoard todos.
-    // Keep this capability-driven first, with entry-agent compatibility fallback.
+    // Keep this capability-driven first, with entry-agent defaulting only when
+    // the manifest does not expose a more precise capability.
     let app_agent_names = app_agent_names(state, app_id).await;
     let mut disallowed_task_assignees: HashSet<String> = state
         .kernel

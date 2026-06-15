@@ -9,8 +9,6 @@ use axum::response::sse::{Event, Sse};
 use axum::Json;
 use serde::Serialize;
 
-use macaca_proto::ApplicationId;
-
 use crate::state::AppState;
 
 use super::apps::{service_metadata_view, service_status_views};
@@ -105,28 +103,15 @@ pub async fn get_app_agents(
             .collect::<Vec<_>>()
     });
 
-    // Get agent IDs for this app.  The service view is the preferred source
-    // for app-scoped agent names; the legacy runtime id lookup remains the
-    // compatibility fallback needed by existing kernel status APIs.
-    let agent_ids = match crate::application_shell_adapter::app_agent_ids(&state, &app_id).await {
-        Ok(ids) => ids,
-        Err(error) if service_agent_names.is_some() => {
-            tracing::warn!(
-                app_id = %app_id,
-                error = %error,
-                "legacy app agent id lookup failed; using Application Service agent names"
-            );
-            Vec::new()
-        }
-        Err(e) => {
-            return Err((
-                StatusCode::NOT_FOUND,
-                Json(ErrorResponse {
-                    error: e.to_string(),
-                }),
-            ));
-        }
+    let Some(service_agent_names) = service_agent_names else {
+        return Err((
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponse {
+                error: "application agents are unavailable".into(),
+            }),
+        ));
     };
+    let agent_ids = Vec::new();
 
     // Get manifests from kernel
     let manifests = state.kernel.list_agents().await;
@@ -142,7 +127,7 @@ pub async fn get_app_agents(
     let entry_agent_name = app_entry_agent_name(&state, &app_id).await;
 
     let agents: Vec<AgentInfo> =
-        select_app_scoped_agent_manifests(manifests, &agent_ids, service_agent_names.as_deref())
+        select_app_scoped_agent_manifests(manifests, &agent_ids, Some(&service_agent_names))
             .into_iter()
             .map(|m| {
                 let id_str = m.id.0.to_string();
@@ -217,17 +202,13 @@ pub async fn stream_agent_status(
                     .map(|agent| agent.name.clone())
                     .collect::<Vec<_>>()
             });
-            let agent_ids =
-                match crate::application_shell_adapter::app_agent_ids(&state_clone, &app_id).await {
-                Ok(ids) => ids,
-                Err(_) if service_agent_names.is_some() => Vec::new(),
-                Err(_) => {
+            let Some(service_agent_names) = service_agent_names else {
                     yield Ok(Event::default()
                         .event("error")
-                        .data(r#"{"error":"App not found"}"#));
+                        .data(r#"{"error":"application agents are unavailable"}"#));
                     return;
-                }
             };
+            let agent_ids = Vec::new();
 
             // Get manifests
             let manifests = state_clone.kernel.list_agents().await;
@@ -244,7 +225,7 @@ pub async fn stream_agent_status(
             let agents: Vec<SimpleAgentStatus> = select_app_scoped_agent_manifests(
                 manifests,
                 &agent_ids,
-                service_agent_names.as_deref(),
+                Some(&service_agent_names),
             )
             .into_iter()
                 .map(|m| {

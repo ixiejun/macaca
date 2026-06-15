@@ -27,7 +27,7 @@ pub trait ServiceCallMiddleware: Send + Sync {
     async fn before_call(&self, context: &ServiceCallContext<'_>) -> ServiceResult<()>;
 }
 
-/// Middleware that enforces the Route C "no trace, no call" rule.
+/// Middleware that enforces the protocol invariant: no trace, no call.
 pub struct TraceRequiredMiddleware;
 
 #[async_trait]

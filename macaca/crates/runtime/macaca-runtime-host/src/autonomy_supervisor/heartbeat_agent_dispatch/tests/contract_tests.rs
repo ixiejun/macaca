@@ -17,11 +17,11 @@ use crate::{
     ServiceRuntimeConfig,
 };
 
+use super::super::HeartbeatAgentDispatchStrategy;
 use super::fixtures::{
     accepted_app_wake, accepted_app_wake_with_metadata, register_skill_alias,
     register_static_service, FakeApplicationHeartbeatService, RecordingExecutionBackend,
 };
-use super::super::HeartbeatAgentDispatchStrategy;
 
 #[tokio::test]
 async fn declaration_driven_dispatch_calls_agent_execution() {
@@ -129,7 +129,7 @@ async fn declaration_driven_dispatch_resolves_skill_alias_before_execution() {
         cooldown_secs: None,
         metadata: BTreeMap::from([(
             "skill.alias.requested_id".into(),
-            "skill://agent/legacy-heartbeat".into(),
+            "skill://agent/superseded-heartbeat".into(),
         )]),
         diagnostics: Vec::new(),
     };
@@ -142,7 +142,7 @@ async fn declaration_driven_dispatch_resolves_skill_alias_before_execution() {
     .await;
     register_skill_alias(
         &runtime,
-        "skill://agent/legacy-heartbeat",
+        "skill://agent/superseded-heartbeat",
         "skill://agent/current-heartbeat",
     )
     .await;
@@ -163,7 +163,7 @@ async fn declaration_driven_dispatch_resolves_skill_alias_before_execution() {
     let metadata = &commands[0].metadata;
     assert_eq!(
         metadata["skill.alias.requested_id"],
-        "skill://agent/legacy-heartbeat"
+        "skill://agent/superseded-heartbeat"
     );
     assert_eq!(metadata["skill.alias.resolved"], "true");
     assert_eq!(metadata["skill.alias.status"], "redirected");

@@ -51,15 +51,20 @@ impl AgentExecutionBackend for RecordingAgentExecutionBackend {
 #[tokio::test]
 async fn yaml_wasm_and_chat_intents_execute_through_same_service_provider() {
     let recorded = Arc::new(Mutex::new(Vec::new()));
-    let backend: Arc<dyn AgentExecutionBackend> = Arc::new(RecordingAgentExecutionBackend::new(
-        Arc::clone(&recorded),
-    ));
+    let backend: Arc<dyn AgentExecutionBackend> =
+        Arc::new(RecordingAgentExecutionBackend::new(Arc::clone(&recorded)));
     let provider = AgentExecutionSystemServiceProvider::new(backend);
 
     let scenarios: [(AgentExecutionIntent, &str); 3] = [
-        (AgentExecutionIntent::YamlWorkflowStep, "trace-yaml-workflow"),
+        (
+            AgentExecutionIntent::YamlWorkflowStep,
+            "trace-yaml-workflow",
+        ),
         (AgentExecutionIntent::WasmDelegate, "trace-wasm-delegate"),
-        (AgentExecutionIntent::ChatMainThread, "trace-chat-main-thread"),
+        (
+            AgentExecutionIntent::ChatMainThread,
+            "trace-chat-main-thread",
+        ),
     ];
 
     for (intent, trace_id) in scenarios {
@@ -104,7 +109,10 @@ async fn agent_execution_service_descriptor_advertises_unified_trace_schema() {
         "trace.system_service.agent_execution.v1"
     );
     assert_eq!(
-        descriptor.metadata.get("command.agent.execute").map(String::as_str),
+        descriptor
+            .metadata
+            .get("command.agent.execute")
+            .map(String::as_str),
         Some(AGENT_EXECUTE_COMMAND)
     );
 }

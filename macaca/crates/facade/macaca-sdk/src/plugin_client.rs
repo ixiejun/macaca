@@ -1,9 +1,9 @@
-//! SDK Plugin Control client for Route C Plugin Fabric.
+//! SDK Plugin Control client for the Plugin Fabric.
 //!
 //! This client is the shell-facing Facade for plugin management.  Web, CLI, and
 //! future gateways call this trait instead of reading plugin repositories,
 //! loading manifests, or invoking runtime-host internals.  The service-backed
-//! implementation uses generic Route C service calls, so the actual Plugin
+//! implementation uses generic protocol service calls, so the actual Plugin
 //! Control Service can be local, remote, or replaced by another host strategy.
 
 use std::sync::Arc;

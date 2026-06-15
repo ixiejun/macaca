@@ -5,8 +5,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use macaca_proto::{MacacaResult, TodoStatus};
 use macaca_persist::RedbStore;
+use macaca_proto::{MacacaResult, TodoStatus};
 use macaca_task::{TaskSpace, TodoStore};
 use serde_json::{json, Value};
 use tempfile::tempdir;
@@ -24,11 +24,8 @@ const FIXTURE_API_AGENT: &str = "fixture-api";
 const FIXTURE_UI_AGENT: &str = "fixture-ui";
 
 async fn exec_tool(tool: &dyn Tool, input: Value) -> MacacaResult<Value> {
-    crate::tool::ToolCommandExecutor::execute_command(
-        tool,
-        crate::tool::ToolCommand::new(input),
-    )
-    .await
+    crate::tool::ToolCommandExecutor::execute_command(tool, crate::tool::ToolCommand::new(input))
+        .await
 }
 
 #[tokio::test]
@@ -44,10 +41,7 @@ async fn create_todo_rejects_supervisor_agents() {
     let tool = CreateTodoTool {
         space,
         coordinator_name: FIXTURE_PLAN_AGENT.into(),
-        disallowed_assignees: vec![
-            FIXTURE_ENTRY_SUPERVISOR.into(),
-            FIXTURE_PLAN_AGENT.into(),
-        ],
+        disallowed_assignees: vec![FIXTURE_ENTRY_SUPERVISOR.into(), FIXTURE_PLAN_AGENT.into()],
         assignee_capabilities: HashMap::new(),
         active_goal_id: None,
     };
@@ -73,8 +67,7 @@ async fn create_todo_rejects_supervisor_agents() {
 #[tokio::test]
 async fn create_todo_requires_agent_field() {
     let dir = tempdir().expect("tempdir");
-    let db =
-        RedbStore::open(dir.path().join("todo-tests-missing-agent.redb")).expect("open redb");
+    let db = RedbStore::open(dir.path().join("todo-tests-missing-agent.redb")).expect("open redb");
     let store = Arc::new(TodoStore::new(Arc::new(db)));
     let space = Arc::new(TaskSpace::for_session(
         macaca_proto::ApplicationId(uuid::Uuid::new_v4()),
@@ -108,8 +101,7 @@ async fn create_todo_requires_agent_field() {
 #[tokio::test]
 async fn create_todo_preserves_requested_agent_even_when_profile_differs() {
     let dir = tempdir().expect("tempdir");
-    let db =
-        RedbStore::open(dir.path().join("todo-tests-preserve-agent.redb")).expect("open redb");
+    let db = RedbStore::open(dir.path().join("todo-tests-preserve-agent.redb")).expect("open redb");
     let store = Arc::new(TodoStore::new(Arc::new(db)));
     let space = Arc::new(TaskSpace::for_session(
         macaca_proto::ApplicationId(uuid::Uuid::new_v4()),
@@ -168,8 +160,8 @@ async fn create_todo_preserves_requested_agent_even_when_profile_differs() {
 #[tokio::test]
 async fn create_todo_preserves_requested_agent_for_foundation_tasks() {
     let dir = tempdir().expect("tempdir");
-    let db = RedbStore::open(dir.path().join("todo-tests-foundation-preserve.redb"))
-        .expect("open redb");
+    let db =
+        RedbStore::open(dir.path().join("todo-tests-foundation-preserve.redb")).expect("open redb");
     let store = Arc::new(TodoStore::new(Arc::new(db)));
     let space = Arc::new(TaskSpace::for_session(
         macaca_proto::ApplicationId(uuid::Uuid::new_v4()),
@@ -196,13 +188,16 @@ async fn create_todo_preserves_requested_agent_for_foundation_tasks() {
         active_goal_id: None,
     };
 
-    let out = exec_tool(&tool, json!({
+    let out = exec_tool(
+        &tool,
+        json!({
             "agent": FIXTURE_API_AGENT,
             "title": "设计项目架构和API规范",
             "description": "设计整体项目架构、接口规范、数据模型和契约。输出架构设计文档。"
-        }))
-        .await
-        .expect("create_todo should succeed");
+        }),
+    )
+    .await
+    .expect("create_todo should succeed");
 
     assert_eq!(
         out["agent"].as_str().unwrap_or_default(),

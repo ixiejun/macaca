@@ -11,8 +11,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ApplicationId, ExecutionControlPolicyOverride, MacacaError, MacacaResult, TaskId,
-    TraceContext,
+    ApplicationId, ExecutionControlPolicyOverride, MacacaError, MacacaResult, TaskId, TraceContext,
 };
 
 /// Stable service id for the unified Agent Execution service.
@@ -52,7 +51,7 @@ pub const AGENT_EXECUTION_INTENT_METADATA_KEY: &str = "execution_intent";
 /// Stable wire label for goal-decomposition planner executions.
 ///
 /// This is an OS execution-path vocabulary token (like `task_worker` / `goal_worker`),
-/// not an application agent role name. Keeping the label distinct from legacy role
+/// not an application agent role name. Keeping the label distinct from persona role
 /// literals prevents audit scanners from conflating intent metadata with persona ids.
 pub const GOAL_PLANNER_EXECUTION_INTENT_LABEL: &str = "goal_planner";
 

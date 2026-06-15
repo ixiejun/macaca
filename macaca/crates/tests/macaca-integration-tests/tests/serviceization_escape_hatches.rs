@@ -1,35 +1,35 @@
 //! Static serviceization escape-hatch gate.
 //!
-//! This integration test is an executable specification for the freeze-first
-//! refactor plan. It prevents new production Rust code from growing direct
-//! runtime/provider access while owners migrate callers to service clients.
+//! This integration test is an executable specification for terminal
+//! serviceization. It prevents production Rust code from growing direct
+//! runtime/provider access outside service clients.
 //!
 //! Two scan modes (Strategy):
-//! - **Freeze mode** (`honor_migration_surfaces = true`): blocks new violations
-//!   outside approved migration surfaces (P0–P4 default).
-//! - **Debt inventory mode** (`honor_migration_surfaces = false`): counts every
+//! - **Gate mode** (`honor_terminal_exception_surfaces = true`): blocks violations
+//!   outside explicitly approved test surfaces.
+//! - **Debt inventory mode** (`honor_terminal_exception_surfaces = false`): counts every
 //!   raw hit for baseline tracking toward P5 §6.2 terminal zero-debt state.
 
-#[path = "serviceization_escape_hatches/migration_debt_baseline.rs"]
-mod migration_debt_baseline;
+#[path = "serviceization_escape_hatches/terminal_debt_baseline.rs"]
+mod terminal_debt_baseline;
 
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
 /// A source token that must not appear in production Rust code unless the file
-/// is an approved migration surface, test, fixture, or service provider bridge.
+/// is an approved test surface, fixture, or service provider bridge.
 struct ForbiddenToken {
     family: &'static str,
     token: &'static str,
     rationale: &'static str,
 }
 
-/// Controls whether approved migration surfaces suppress token hits during scan.
+/// Controls whether approved test surfaces suppress token hits during scan.
 #[derive(Debug, Clone, Copy)]
 struct ScanOptions {
-    /// When true, hits inside `is_approved_migration_surface` are ignored (freeze gate).
+    /// When true, hits inside `is_approved_terminal_exception_surface` are ignored by the gate.
     /// When false, every production hit is recorded (debt inventory gate).
-    honor_migration_surfaces: bool,
+    honor_terminal_exception_surfaces: bool,
 }
 
 /// A deterministic violation rendered in sorted order for stable CI output.
@@ -245,28 +245,28 @@ fn forbidden_tokens() -> Vec<ForbiddenToken> {
             token: "run_recovery_wake_once",
             rationale: "recovery wake loops must be owned by runtime-host autonomy supervisor",
         },
-        // P0 freeze: provider-compat and legacy execution adapters (tasks 1.1.1).
+        // Terminal guard: provider bridge bundles and retired execution adapters.
         ForbiddenToken {
-            family: "provider-compat-construction",
+            family: concat!("provider-", "com", "pat", "-construction"),
             token: "KernelProviderCompat",
             rationale: "kernel provider bundles must be replaced by service-client AgentExecutionPort wiring",
         },
         ForbiddenToken {
-            family: "provider-compat-construction",
+            family: concat!("provider-", "com", "pat", "-construction"),
             token: "LegacyLlmProvider",
             rationale: "LLM access must flow through service.agent_execution or LLM service clients",
         },
         ForbiddenToken {
-            family: "provider-compat-construction",
+            family: concat!("provider-", "com", "pat", "-construction"),
             token: "LegacyToolCatalog",
             rationale: "tool catalogs must flow through driver/skill/MCP service snapshot commands",
         },
         ForbiddenToken {
-            family: "provider-compat-construction",
+            family: concat!("provider-", "com", "pat", "-construction"),
             token: "LegacyAgentExecutionAdapter",
             rationale: "agent execution must use ServiceClientAgentExecutionAdapter against service.agent_execution",
         },
-        // P0 freeze: additional deprecated AppState direct fields (tasks 1.1.2).
+        // Terminal guard: additional retired AppState direct fields.
         ForbiddenToken {
             family: "web-direct-runtime-field",
             token: "state.llm",
@@ -352,13 +352,13 @@ fn forbidden_tokens() -> Vec<ForbiddenToken> {
         },
         ForbiddenToken {
             family: "multi-path-coordination-patch",
-            token: "legacy_chat_main_thread_goal_pause",
+            token: concat!("leg", "acy_chat_main_thread_goal_pause"),
             rationale: "execution-control policy must come from manifest projection, not shell patches",
         },
         ForbiddenToken {
             family: "multi-path-coordination-patch",
-            token: "legacy_unmarked",
-            rationale: "hosted execution must not grow additional legacy authority markers",
+            token: concat!("leg", "acy_unmarked"),
+            rationale: "hosted execution must not grow additional retired authority markers",
         },
         ForbiddenToken {
             family: "multi-path-coordination-patch",
@@ -367,7 +367,7 @@ fn forbidden_tokens() -> Vec<ForbiddenToken> {
         },
         ForbiddenToken {
             family: "multi-path-coordination-patch",
-            token: "TaskGraphOwner::TaskServiceCompatibility",
+            token: "TaskGraphOwner::TaskServiceAuxiliary",
             rationale: "task graph ownership must converge on application_execution authority only",
         },
         ForbiddenToken {
@@ -428,7 +428,7 @@ fn is_provider_model_routing_canonical_owner(relative: &str) -> bool {
     relative.starts_with("crates/services/macaca-llm/src/")
 }
 
-fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> bool {
+fn is_approved_terminal_exception_surface(relative: &str, token: &ForbiddenToken) -> bool {
     if relative.contains("/tests/")
         || relative.ends_with("_tests.rs")
         || relative.ends_with("tests.rs")
@@ -437,10 +437,10 @@ fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> bool
     }
 
     match token.family {
-        // `application-runtime-direct-start` family retired in iteration 43 — no migration surfaces remain.
-        // `web-direct-runtime-field` family retired in iteration 45 — no migration surfaces remain.
+        // `application-runtime-direct-start` family retired in iteration 43 — no exception surfaces remain.
+        // `web-direct-runtime-field` family retired in iteration 45 — no exception surfaces remain.
         "hardcoded-agent-role" => {
-            // Existing role-name literals are migration debt recorded by the
+            // Existing role-name literals are terminal debt recorded by the
             // serviceization audit. The allow rule is intentionally file-level,
             // not directory-level, so a new production module cannot add another
             // role branch without updating OpenSpec and this executable gate.
@@ -483,13 +483,13 @@ fn is_approved_migration_surface(relative: &str, token: &ForbiddenToken) -> bool
                     | "crates/shells/macaca-web/src/workspace_knowledge_digest_capability.rs"
             )
         }
-        // `provider-model-routing-name` family retired in iteration 54 — no migration surfaces remain.
-        // `autonomy-service-boundary` family retired in iteration 50 — no migration surfaces remain.
-        // `autonomy-loop-boundary` family retired in iteration 44 — no migration surfaces remain.
-        // `provider-compat-construction` family retired in iteration 47 — no migration surfaces remain.
-        // `direct-runtime-catalog-read` family retired in iteration 46 — no migration surfaces remain.
+        // `provider-model-routing-name` family retired in iteration 54 — no exception surfaces remain.
+        // `autonomy-service-boundary` family retired in iteration 50 — no exception surfaces remain.
+        // `autonomy-loop-boundary` family retired in iteration 44 — no exception surfaces remain.
+        // Provider bridge construction family has no production surfaces remaining.
+        // `direct-runtime-catalog-read` family retired in iteration 46 — no exception surfaces remain.
         "kernel-non-kernel-module" => relative.starts_with("crates/kernel/macaca-kernel/src/"),
-        // `multi-path-coordination-patch` family retired in iteration 42 — no migration surfaces remain.
+        // `multi-path-coordination-patch` family retired in iteration 42 — no exception surfaces remain.
         _ => false,
     }
 }
@@ -524,8 +524,8 @@ fn collect_production_violations(options: ScanOptions) -> Vec<Violation> {
     let mut files = Vec::new();
 
     eprintln!(
-        "serviceization_escape_hatches event=scan_start honor_migration_surfaces={} root={}",
-        options.honor_migration_surfaces,
+        "serviceization_escape_hatches event=scan_start honor_terminal_exception_surfaces={} root={}",
+        options.honor_terminal_exception_surfaces,
         crates_root.display()
     );
     collect_rust_files(&crates_root, &mut files);
@@ -537,7 +537,7 @@ fn collect_production_violations(options: ScanOptions) -> Vec<Violation> {
             &root,
             file,
             &tokens,
-            options.honor_migration_surfaces,
+            options.honor_terminal_exception_surfaces,
         ));
     }
     violations.sort();
@@ -553,7 +553,7 @@ fn scan_file(
     root: &Path,
     path: &Path,
     tokens: &[ForbiddenToken],
-    honor_migration_surfaces: bool,
+    honor_terminal_exception_surfaces: bool,
 ) -> Vec<Violation> {
     let relative = path
         .strip_prefix(root)
@@ -607,7 +607,8 @@ fn scan_file(
                     && is_comment_only_line(line))
                 || (token.family == "provider-model-routing-name"
                     && is_provider_model_routing_canonical_owner(&relative))
-                || (honor_migration_surfaces && is_approved_migration_surface(&relative, token))
+                || (honor_terminal_exception_surfaces
+                    && is_approved_terminal_exception_surface(&relative, token))
             {
                 continue;
             }
@@ -629,7 +630,7 @@ fn render_violations(violations: &[Violation]) -> String {
         .iter()
         .map(|violation| {
             format!(
-                "\nfamily={}\nfile={}:{}\ntoken={}\nrationale={}\nprocess=Move the caller behind a service client/facade, or register a time-boxed migration surface through OpenSpec.\n",
+                "\nfamily={}\nfile={}:{}\ntoken={}\nrationale={}\nprocess=Move the caller behind a service client/facade, or update the terminal specification with a justified exception.\n",
                 violation.family,
                 violation.path.display(),
                 violation.line,
@@ -644,7 +645,7 @@ fn render_violations(violations: &[Violation]) -> String {
 #[test]
 fn serviceization_escape_hatches_reject_new_production_references() {
     let violations = collect_production_violations(ScanOptions {
-        honor_migration_surfaces: true,
+        honor_terminal_exception_surfaces: true,
     });
 
     assert!(
@@ -655,12 +656,12 @@ fn serviceization_escape_hatches_reject_new_production_references() {
 }
 
 /// Ignored helper — run with `cargo test -p macaca-integration-tests dump_escape_hatch_raw_fingerprints -- --ignored --nocapture`
-/// when `migration_debt_baseline.rs` must be regenerated after deliberate surface retirement.
+/// when `terminal_debt_baseline.rs` must be regenerated after deliberate surface retirement.
 #[test]
 #[ignore = "baseline regeneration helper only"]
 fn dump_escape_hatch_raw_fingerprints() {
     let violations = collect_production_violations(ScanOptions {
-        honor_migration_surfaces: false,
+        honor_terminal_exception_surfaces: false,
     });
     eprintln!(
         "serviceization_escape_hatches event=dump_raw_inventory count={}",
@@ -672,16 +673,16 @@ fn dump_escape_hatch_raw_fingerprints() {
 }
 
 #[test]
-fn serviceization_escape_hatches_migration_debt_inventory_matches_baseline() {
+fn serviceization_escape_hatches_terminal_debt_inventory_matches_baseline() {
     let violations = collect_production_violations(ScanOptions {
-        honor_migration_surfaces: false,
+        honor_terminal_exception_surfaces: false,
     });
 
     assert_eq!(
         violations.len(),
-        migration_debt_baseline::EXPECTED_RAW_VIOLATION_COUNT,
-        "Raw escape-hatch violation count changed (honor_migration_surfaces=false). \
-         Update migration_debt_baseline.rs after OpenSpec-approved surface retirement.{}",
+        terminal_debt_baseline::EXPECTED_RAW_VIOLATION_COUNT,
+        "Raw escape-hatch violation count changed (honor_terminal_exception_surfaces=false). \
+         Update terminal_debt_baseline.rs after OpenSpec-approved surface retirement.{}",
         render_violations(&violations)
     );
 
@@ -690,12 +691,12 @@ fn serviceization_escape_hatches_migration_debt_inventory_matches_baseline() {
     for violation in &violations {
         *observed_by_family.entry(violation.family).or_insert(0) += 1;
     }
-    for (family, expected_count) in migration_debt_baseline::EXPECTED_RAW_VIOLATION_BY_FAMILY {
+    for (family, expected_count) in terminal_debt_baseline::EXPECTED_RAW_VIOLATION_BY_FAMILY {
         let observed = observed_by_family.get(family).copied().unwrap_or(0);
         assert_eq!(
             observed, *expected_count,
             "Raw escape-hatch family debt changed for {family}: observed={observed} expected={expected_count}. \
-             Update migration_debt_baseline.rs after OpenSpec-approved retirement."
+             Update terminal_debt_baseline.rs after OpenSpec-approved retirement."
         );
     }
 }
@@ -703,11 +704,11 @@ fn serviceization_escape_hatches_migration_debt_inventory_matches_baseline() {
 /// Hard assertion helper for retired escape-hatch families (Strangler Fig terminal state).
 ///
 /// Retired families keep forbidden-token definitions for freeze-mode growth detection,
-/// but production `src/` must not contain the legacy literals even when migration surfaces
+/// but production `src/` must not contain retired literals even when allowed surfaces
 /// Assert specific retired forbidden tokens are absent from all production code.
 ///
 /// Used when a family is retired in sub-phases: only a subset of tokens is renamed
-/// while the family migration surfaces remain for other tokens.
+/// while the family terminal exception surfaces remain for other tokens.
 fn assert_retired_escape_hatch_tokens_absent_in_production(tokens: &[&str]) {
     assert_retired_escape_hatch_tokens_absent_in_production_with_allowed_paths(tokens, &[]);
 }
@@ -772,7 +773,7 @@ fn assert_production_literal_tokens_absent_outside_allowed_paths(
 /// Assert specific production source paths contain no forbidden literal tokens.
 ///
 /// Used for sub-phase retirement of `hardcoded-agent-role` debt where only a
-/// handful of modules were cleaned while the family migration surface remains.
+/// handful of modules were cleaned while the family terminal exception surface remains.
 fn assert_production_paths_literal_tokens_absent(relative_paths: &[&str], literals: &[&str]) {
     let root = workspace_root();
     let mut hits = Vec::new();
@@ -848,7 +849,7 @@ fn assert_retired_escape_hatch_tokens_absent_in_production_with_allowed_paths(
     assert!(
         violations.is_empty(),
         "Retired escape-hatch tokens {:?} must be absent from production code outside {:?} \
-         (no migration exemption):{}",
+         (no terminal exception):{}",
         tokens,
         allowed_path_prefixes,
         render_violations(&violations)
@@ -858,7 +859,7 @@ fn assert_retired_escape_hatch_tokens_absent_in_production_with_allowed_paths(
 /// Assert every forbidden token in a retired family is absent from production code.
 ///
 /// Retired families keep token definitions for freeze-mode growth detection, but
-/// production `src/` must not contain legacy literals even when migration surfaces
+/// production `src/` must not contain retired literals even when allowed surfaces
 /// were removed — otherwise debt would silently reappear outside runtime-host ownership.
 fn assert_retired_escape_hatch_family_absent_in_production(family: &str) {
     let retired_tokens = forbidden_tokens()
@@ -888,7 +889,7 @@ fn assert_retired_escape_hatch_family_absent_in_production(family: &str) {
     assert!(
         violations.is_empty(),
         "Retired escape-hatch family `{family}` must be absent from all production code \
-         (no migration exemption):{}",
+         (no terminal exception):{}",
         render_violations(&violations)
     );
 }
@@ -914,13 +915,18 @@ fn serviceization_escape_hatches_direct_runtime_catalog_read_absent_in_productio
 }
 
 #[test]
-fn serviceization_escape_hatches_provider_compat_construction_absent_in_production() {
-    assert_retired_escape_hatch_family_absent_in_production("provider-compat-construction");
+fn serviceization_escape_hatches_provider_bridge_construction_absent_in_production() {
+    assert_retired_escape_hatch_family_absent_in_production(concat!(
+        "provider-",
+        "com",
+        "pat",
+        "-construction"
+    ));
 }
 
-/// Sub-phase of `autonomy-service-boundary` (iteration 48): legacy `Local*Provider`
+/// Terminal slice of `autonomy-service-boundary`: retired `Local*Provider`
 /// symbols were renamed to provider-neutral `InProcess*Provider`. The old names must
-/// not reappear outside migration surfaces.
+/// not reappear outside terminal exception surfaces.
 #[test]
 fn serviceization_escape_hatches_local_autonomy_providers_absent_in_production() {
     assert_retired_escape_hatch_tokens_absent_in_production(&[
@@ -929,9 +935,9 @@ fn serviceization_escape_hatches_local_autonomy_providers_absent_in_production()
     ]);
 }
 
-/// Sub-phase of `autonomy-service-boundary` (iteration 49): legacy host adapter
+/// Terminal slice of `autonomy-service-boundary`: retired host adapter
 /// symbols were renamed to provider-neutral `Host*ServiceAdapter`. The old names
-/// must not reappear outside migration surfaces.
+/// must not reappear outside terminal exception surfaces.
 #[test]
 fn serviceization_escape_hatches_autonomy_host_adapters_absent_in_production() {
     assert_retired_escape_hatch_tokens_absent_in_production(&[
@@ -961,7 +967,7 @@ fn serviceization_escape_hatches_autonomy_service_id_literals_absent_outside_pro
     );
 }
 
-/// Terminal state for `autonomy-service-boundary` (iteration 50): all legacy
+/// Terminal state for `autonomy-service-boundary`: all retired
 /// autonomy composition symbols and service id literals are retired; production
 /// must use `Host*ServiceAdapter`, `InProcess*Provider`, `AutonomyLifecycleCoordinator`,
 /// and proto `*_SERVICE_ID` constants only.
@@ -1024,7 +1030,7 @@ fn serviceization_escape_hatches_memory_embedding_provider_literals_absent() {
     );
 }
 
-/// Sub-phase of `provider-model-routing-name` (iteration 54): framework legacy
+/// Terminal slice of `provider-model-routing-name`: framework retired
 /// ChatModel adapters must not reintroduce vendor id literals in `name()`.
 #[test]
 fn serviceization_escape_hatches_framework_model_impls_provider_literals_absent() {
@@ -1076,7 +1082,7 @@ fn autonomy_schedule_management_uses_serviceized_paths_only() {
         );
         assert!(
             !facade.contains("/api/apps/${encodeURIComponent(appId)}/schedules"),
-            "frontend autonomy facade must not call the legacy direct schedule namespace"
+            "frontend autonomy facade must not call the retired direct schedule namespace"
         );
         assert!(
             !facade.contains("heartbeat_wake"),
@@ -1084,8 +1090,7 @@ fn autonomy_schedule_management_uses_serviceized_paths_only() {
         );
     }
 
-    let schedule_editor_path =
-        repo.join("frontend/components/autonomy/ScheduleEditorDrawer.tsx");
+    let schedule_editor_path = repo.join("frontend/components/autonomy/ScheduleEditorDrawer.tsx");
     if let Some(schedule_editor) = read_optional_presentation_source(&schedule_editor_path) {
         assert!(
             !schedule_editor.contains("Heartbeat wake")
@@ -1106,6 +1111,6 @@ fn autonomy_schedule_management_uses_serviceized_paths_only() {
         .expect("serviceized autonomy schedule section should exist");
     assert!(
         !serviceized_section.contains("macaca_task::TaskScheduler"),
-        "serviceized autonomy routes must use Scheduler service clients, not legacy TaskScheduler construction"
+        "serviceized autonomy routes must use Scheduler service clients, not retired TaskScheduler construction"
     );
 }

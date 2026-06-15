@@ -74,7 +74,7 @@ fn figma_mcp_stdio_env(api_key: &str) -> BTreeMap<String, String> {
 }
 
 fn figma_stdio_config(api_key: &str) -> McpTransportConfig {
-    // Matches bundled `compat_mappings.toml` for `figma-developer-mcp`.
+    // Matches bundled skill-MCP mapping data for `figma-developer-mcp`.
     McpTransportConfig::Stdio {
         command: "npx".into(),
         args: vec!["-y".into(), "figma-developer-mcp".into(), "--stdio".into()],
@@ -92,7 +92,7 @@ fn fig_os_server_definition(api_key: &str) -> McpServerDefinition {
         tool_prefix: None,
         required_bins: vec!["npx".into()],
         enabled: true,
-        source: McpDefinitionSource::Compatibility,
+        source: McpDefinitionSource::Mapping,
         concurrency_isolation: None,
     }
 }

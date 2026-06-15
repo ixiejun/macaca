@@ -105,17 +105,14 @@ fn template_value_to_display_text(value: &Value) -> String {
 /// app/coordinator already supplied a typed `symbol` field in the export
 /// payload; the runtime must never parse `${chat.input}` or infer domain data
 /// from free-form prose.
-pub(super) fn resolve_chat_payload_template(
-    text: &str,
-    export_payload: &Value,
-) -> Option<Value> {
+pub(super) fn resolve_chat_payload_template(text: &str, export_payload: &Value) -> Option<Value> {
     let path = text.strip_prefix("${chat.")?.strip_suffix('}')?;
     // Newer hosted-application execution envelopes place user input under a
     // typed `chat` object so runtime metadata can carry session/run/workspace
-    // fields without colliding with application-owned payload keys.  Older
+    // fields without colliding with application-owned payload keys.  Earlier
     // declarative WASM tests and packages used top-level fields such as
     // `${chat.input}` -> `payload.input`.  Prefer the explicit `chat` object and
-    // fall back to the legacy top-level shape to preserve existing packages.
+    // fall back to the top-level shape for already-authored packages.
     let mut current = export_payload
         .get("chat")
         .cloned()
@@ -142,10 +139,7 @@ pub(super) fn resolve_chat_payload_template(
 /// The runtime resolves only exact full-value placeholders; it deliberately
 /// avoids string interpolation so payload types remain JSON-native and audit
 /// output stays predictable.
-pub(super) fn resolve_host_result_template(
-    text: &str,
-    host_results: &[Value],
-) -> Option<Value> {
+pub(super) fn resolve_host_result_template(text: &str, host_results: &[Value]) -> Option<Value> {
     let path = text.strip_prefix("${host.results.")?.strip_suffix('}')?;
     let mut parts = path.split('.');
     let index = parts.next()?.parse::<usize>().ok()?;

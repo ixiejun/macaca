@@ -1,16 +1,16 @@
-//! Package loader factory for Route C Package Manifest v0.
+//! Package loader factory for Package Manifest v0.
 //!
 //! Loader selection uses the Factory Method pattern.  The first production
 //! loader is the YAML application metadata loader, which delegates to the
-//! existing `AppLoader` compatibility path.  WASM packages are metadata-only
-//! in Phase 04 and return a structured runtime-unavailable error for execution.
+//! canonical `AppLoader` manifest path.  WASM packages are metadata-only and
+//! return a structured runtime-unavailable error for execution.
 
 use std::path::Path;
 
 use macaca_proto::{
     MacacaResult, PackageDescriptor, PackageGuardError, PackageRuntimeKind, PackageType,
 };
-use tracing::{info, warn};
+use tracing::info;
 
 use crate::abi::{ApplicationAbiAdapter, ApplicationAbiLoadResult, WasmApplicationAbiAdapter};
 use crate::package::load_yaml_app_package_descriptor;
@@ -33,7 +33,7 @@ impl PackageLoaderFactory {
     pub fn load_yaml_application(path: impl AsRef<Path>) -> MacacaResult<PackageDescriptor> {
         info!(
             path = %path.as_ref().display(),
-            "package loader selected YAML application compatibility path"
+            "package loader selected YAML application manifest path"
         );
         load_yaml_app_package_descriptor(path)
     }
@@ -59,23 +59,6 @@ impl PackageLoaderFactory {
         context: &PackageGuardContext,
     ) -> PackageDescriptor {
         PackageRuntimeGuard::new().evaluate(descriptor, context)
-    }
-
-    /// Phase 04 execution entry intentionally rejects WASM execution.
-    #[deprecated(
-        note = "use WasmApplicationAbiAdapter::execute_unavailable() so WASM execution failures are reported through Application ABI v0"
-    )]
-    pub fn execute_if_available(descriptor: &PackageDescriptor) -> Result<(), PackageGuardError> {
-        if package_requires_wasm_runtime(descriptor) {
-            warn!(
-                package_id = %descriptor.manifest.id,
-                "WASM execution requested before runtime is installed"
-            );
-            return Err(PackageGuardError::RuntimeUnavailable(
-                "WASM component execution belongs to the Application ABI runtime phase".into(),
-            ));
-        }
-        Ok(())
     }
 
     /// Load Application ABI metadata for a WASM component package without executing it.
@@ -125,22 +108,6 @@ mod tests {
             PackageLoaderFactory::select(&descriptor).unwrap(),
             PackageLoaderKind::YamlApplication
         );
-    }
-
-    #[test]
-    fn wasm_execution_returns_runtime_unavailable() {
-        let descriptor = PackageDescriptor::new(PackageManifest::new(
-            PackageId::new("pkg.wasm"),
-            PackageType::Application,
-            "1.0.0",
-            DeveloperId::new("dev.wasm"),
-            PackageRuntime::new(PackageRuntimeKind::WasmComponent, "1"),
-        ));
-
-        #[allow(deprecated)]
-        let err = PackageLoaderFactory::execute_if_available(&descriptor).unwrap_err();
-
-        assert!(matches!(err, PackageGuardError::RuntimeUnavailable(_)));
     }
 
     #[test]

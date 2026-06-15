@@ -7,11 +7,17 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use macaca_agent::{AgentCapabilitySet, AgentLifecyclePolicy, AgentServices};
+use macaca_agent::AgentLifecyclePolicy;
 use macaca_proto::{AgentState, ApplicationId, TaskId};
 
 use crate::agent::Agent;
 use crate::tool::Toolkit;
+
+// Re-export the agent value objects embedded in framework construction DTOs.
+// The construction module acts as the Facade for runtime-agent materialization
+// contracts, so upper layers do not need unrelated top-level SDK aliases to name
+// capability, service, or lifecycle policy fields.
+pub use macaca_agent::{AgentCapabilitySet, AgentServices, AgentTransitionReason};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AgentBuildIntent {

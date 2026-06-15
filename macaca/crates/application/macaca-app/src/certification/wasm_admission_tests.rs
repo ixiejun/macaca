@@ -17,7 +17,7 @@ fn wasm_fixture() -> ApplicationCertificationFixture {
         "WASM Admission Fixture",
         "1.0.0",
         ApplicationRuntimeProfile::new(PackageRuntimeKind::WasmComponent, "0"),
-        macaca_proto::ApplicationCompatibilityDeclaration::new("0.1.0"),
+        macaca_proto::ApplicationHostRequirementDeclaration::new("0.1.0"),
     )
     .ability(ApplicationAbilityDescriptor::new(
         "ability.fixture.wasm",

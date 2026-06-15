@@ -16,8 +16,7 @@ use macaca_proto::{
 pub(super) fn decode<T: serde::de::DeserializeOwned>(
     payload: serde_json::Value,
 ) -> ServiceResult<T> {
-    serde_json::from_value(payload)
-        .map_err(|error| ServiceError::AdapterFailure(error.to_string()))
+    serde_json::from_value(payload).map_err(|error| ServiceError::AdapterFailure(error.to_string()))
 }
 
 /// Serialize a typed handler result back into the generic service envelope.
@@ -74,7 +73,7 @@ pub(super) fn minimal_running_view(
         runtime: ApplicationServiceRuntimeView {
             runtime_kind: Some(PackageRuntimeKind::Yaml),
             lifecycle_state: macaca_app::lifecycle_from_app_status(status),
-            compatibility_status: format!("{status:?}"),
+            runtime_status: format!("{status:?}"),
             app_dir: None,
             skills_dir: None,
         },

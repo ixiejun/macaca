@@ -45,7 +45,9 @@ impl SkillSystemServiceProvider {
             SKILL_TOOL_INVOKE_COMMAND => self.handle_tool_invoke(command).await,
             SKILL_STATUS_COMMAND => self.handle_status(command).await,
             SKILL_OPERATOR_CATALOG_LIST_COMMAND => self.handle_operator_catalog_list(command).await,
-            SKILL_OPERATOR_MARKDOWN_READ_COMMAND => self.handle_operator_markdown_read(command).await,
+            SKILL_OPERATOR_MARKDOWN_READ_COMMAND => {
+                self.handle_operator_markdown_read(command).await
+            }
             SKILL_OPERATOR_CONFIG_WRITE_COMMAND => self.handle_operator_config_write(command).await,
             SKILL_OPERATOR_WATCH_COMMAND => self.handle_operator_watch(command).await,
             SKILL_OPERATOR_UNWATCH_COMMAND => self.handle_operator_unwatch(command).await,
@@ -56,9 +58,7 @@ impl SkillSystemServiceProvider {
                 self.handle_governance_record_usage(command, trace).await
             }
             SKILL_GOVERNANCE_SNAPSHOT_COMMAND => self.handle_governance_snapshot(command).await,
-            SKILL_CURATION_DRY_RUN_COMMAND => {
-                self.handle_curation_dry_run(command, trace).await
-            }
+            SKILL_CURATION_DRY_RUN_COMMAND => self.handle_curation_dry_run(command, trace).await,
             SKILL_CURATION_STATUS_COMMAND => self.handle_curation_status(command, trace).await,
             SKILL_CURATION_RUN_COMMAND => self.handle_curation_run(command, trace).await,
             SKILL_CURATION_SNAPSHOT_COMMAND => self.handle_curation_snapshot(command, trace).await,
@@ -74,7 +74,8 @@ impl SkillSystemServiceProvider {
                 self.handle_curation_quarantine(command, trace).await
             }
             SKILL_CURATION_RELEASE_QUARANTINE_COMMAND => {
-                self.handle_curation_release_quarantine(command, trace).await
+                self.handle_curation_release_quarantine(command, trace)
+                    .await
             }
             SKILL_CURATION_REJECT_COMMAND => self.handle_curation_reject(command, trace).await,
             SKILL_CURATION_SUPERSEDE_COMMAND => self.handle_curation_supersede(command).await,
@@ -98,16 +99,20 @@ impl SkillSystemServiceProvider {
                 self.handle_evolution_processing_run(command, trace).await
             }
             SKILL_EVOLUTION_PROCESSING_SNAPSHOT_COMMAND => {
-                self.handle_evolution_processing_snapshot(command, trace).await
+                self.handle_evolution_processing_snapshot(command, trace)
+                    .await
             }
             SKILL_EVOLUTION_MATERIALIZATION_APPLY_COMMAND => {
-                self.handle_evolution_materialization_apply(command, trace).await
+                self.handle_evolution_materialization_apply(command, trace)
+                    .await
             }
             SKILL_EVOLUTION_MATERIALIZATION_OPERATOR_RUN_COMMAND => {
-                self.handle_evolution_materialization_operator_run(command, trace).await
+                self.handle_evolution_materialization_operator_run(command, trace)
+                    .await
             }
             SKILL_EVOLUTION_MATERIALIZATION_OPERATOR_SNAPSHOT_COMMAND => {
-                self.handle_evolution_materialization_operator_snapshot(command, trace).await
+                self.handle_evolution_materialization_operator_snapshot(command, trace)
+                    .await
             }
             SKILL_EVALUATION_CHECKPOINT_APPEND_COMMAND => {
                 self.handle_evaluation_checkpoint_append(command).await

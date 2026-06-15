@@ -5,10 +5,9 @@ use serde_json::Value;
 use std::time::Duration;
 
 use macaca_proto::{MacacaError, MacacaResult};
-use macaca_tools::Tool;
+use macaca_tools::{Tool, ToolCommand};
 
 use crate::adapter::SkillToolAdapter;
-use crate::definition::SkillDefinition;
 
 /// A Tool backed by a skill definition.
 ///
@@ -19,14 +18,6 @@ pub struct SkillTool {
 }
 
 impl SkillTool {
-    /// Create a new SkillTool from a definition.
-    #[deprecated(note = "Use SkillToolAdapter::local and SkillTool::from_adapter for new code.")]
-    pub fn new(definition: SkillDefinition) -> Self {
-        Self {
-            adapter: SkillToolAdapter::local(definition),
-        }
-    }
-
     /// Create a new SkillTool from an adapter.
     pub fn from_adapter(adapter: SkillToolAdapter) -> Self {
         Self { adapter }
@@ -43,12 +34,12 @@ impl Tool for SkillTool {
         &self.adapter.definition().description
     }
 
-    fn parameters_schema(&self) -> Value {
+    fn tool_schema(&self) -> Value {
         self.adapter.definition().parameters.clone()
     }
 
-    async fn execute(&self, input: Value) -> MacacaResult<Value> {
-        self.adapter.execute(input).await
+    async fn invoke(&self, command: ToolCommand) -> MacacaResult<Value> {
+        self.adapter.execute(command.input).await
     }
 }
 
@@ -124,7 +115,7 @@ pub(crate) async fn execute_shell_entry(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::definition::SkillEntryPoint;
+    use crate::definition::{SkillDefinition, SkillEntryPoint};
 
     fn echo_skill() -> SkillDefinition {
         SkillDefinition {

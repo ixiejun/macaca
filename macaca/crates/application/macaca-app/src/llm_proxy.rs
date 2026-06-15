@@ -27,10 +27,8 @@ pub struct UserLlmOverride {
 /// the provider and/or model. The proxy delegates to the kernel's real
 /// `LlmProvider` (which holds the actual API keys).
 pub struct LlmProxy {
-    /// The kernel's real LLM provider (holds credentials).
-    inner: Arc<dyn LlmProvider>,
-    /// Optional router for provider/model selection and fallback execution.
-    router: Option<Arc<LlmRouter>>,
+    /// Router-owned LLM service boundary used for provider/model selection.
+    router: Arc<LlmRouter>,
     /// App-declared defaults.
     app_defaults: Option<AppLlmConfig>,
     /// User overrides (take priority over app defaults).
@@ -45,45 +43,10 @@ impl LlmProxy {
         user_overrides: Option<UserLlmOverride>,
     ) -> Self {
         Self {
-            inner: router.clone(),
-            router: Some(router),
+            router,
             app_defaults,
             user_overrides,
         }
-    }
-
-    /// Create a legacy direct-provider LLM proxy.
-    #[deprecated(note = "use LlmProxy::new_routed with macaca_llm::LlmRouter")]
-    pub fn new(
-        inner: Arc<dyn LlmProvider>,
-        app_defaults: Option<AppLlmConfig>,
-        user_overrides: Option<UserLlmOverride>,
-    ) -> Self {
-        Self {
-            inner,
-            router: None,
-            app_defaults,
-            user_overrides,
-        }
-    }
-
-    /// Resolve the effective model name based on priority:
-    /// user override > app default > options.model (from agent).
-    fn resolve_model(&self, agent_model: &str) -> String {
-        // User override takes highest priority.
-        if let Some(ref overrides) = self.user_overrides {
-            if let Some(ref model) = overrides.model {
-                return model.clone();
-            }
-        }
-
-        // App default takes second priority.
-        if let Some(ref defaults) = self.app_defaults {
-            return defaults.model.clone();
-        }
-
-        // Fall back to whatever the agent requested.
-        agent_model.to_string()
     }
 
     fn selection_request(&self, requested_model: &str) -> ModelSelectionRequest {
@@ -125,7 +88,7 @@ impl LlmProxy {
 #[async_trait]
 impl LlmProvider for LlmProxy {
     fn name(&self) -> &str {
-        self.inner.name()
+        self.router.name()
     }
 
     async fn chat(
@@ -133,21 +96,17 @@ impl LlmProvider for LlmProxy {
         messages: Vec<LlmMessage>,
         options: &LlmOptions,
     ) -> MacacaResult<LlmResponse> {
-        if let Some(router) = &self.router {
-            let selection = router.resolve_selection(&self.selection_request(&options.model))?;
-            let mut resolved_options = options.clone();
-            resolved_options.model = selection.primary.model.clone();
-            return router
-                .chat_with_selection(messages, &resolved_options, &selection)
-                .await;
-        }
-
-        // Apply model resolution.
+        // All application LLM calls use the router so provider selection,
+        // fallback, and policy evidence stay in the serviceized LLM boundary.
+        let selection = self
+            .router
+            .resolve_selection(&self.selection_request(&options.model))?;
         let mut resolved_options = options.clone();
-        resolved_options.model = self.resolve_model(&options.model);
+        resolved_options.model = selection.primary.model.clone();
 
-        // Delegate to the real provider (which has the API keys).
-        self.inner.chat(messages, &resolved_options).await
+        self.router
+            .chat_with_selection(messages, &resolved_options, &selection)
+            .await
     }
 }
 
@@ -276,19 +235,5 @@ mod tests {
         let resp = proxy.chat(vec![], &LlmOptions::default()).await.unwrap();
 
         assert_eq!(resp.model, "claude-sonnet-4");
-    }
-
-    #[tokio::test]
-    #[allow(deprecated)]
-    async fn deprecated_direct_provider_constructor_remains_callable() {
-        let proxy = LlmProxy::new(Arc::new(MockInnerLlm), None, None);
-        let opts = LlmOptions {
-            model: "legacy-model".into(),
-            ..Default::default()
-        };
-
-        let resp = proxy.chat(vec![], &opts).await.unwrap();
-
-        assert_eq!(resp.model, "legacy-model");
     }
 }

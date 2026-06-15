@@ -10,7 +10,7 @@ use crate::model::{AgentSource, AppManifest};
 pub const DEFAULT_WORKFLOW: &str = "default";
 
 /// Provider-neutral placeholder for skeleton prompts that intentionally lack a
-/// real manifest coordinator (documentation / compatibility helpers only).
+/// real manifest coordinator (documentation helpers only).
 pub(crate) const SKELETON_PROMPT_AGENT_LABEL: &str = "entry-agent";
 
 /// Structured sections of a workflow system prompt.

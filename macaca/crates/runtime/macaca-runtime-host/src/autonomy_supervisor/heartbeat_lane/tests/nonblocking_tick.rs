@@ -13,8 +13,10 @@ use crate::{
     ServiceRuntimeConfig,
 };
 
-use super::fixtures::{due_application_profile, register_heartbeat_service, register_static_service};
 use super::super::HeartbeatLane;
+use super::fixtures::{
+    due_application_profile, register_heartbeat_service, register_static_service,
+};
 use super::test_doubles::{FakeApplicationHeartbeatService, SlowExecutionBackend};
 
 #[tokio::test]

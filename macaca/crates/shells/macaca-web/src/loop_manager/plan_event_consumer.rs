@@ -3,7 +3,7 @@
 //! Spawns alongside macaca-task PlanLoop and routes each event to a dedicated
 //! handler module. Keeps `plan_loop_orchestrator` focused on startup only.
 
-use macaca_sdk::task::PlanEvent;
+use macaca_proto::PlanEvent;
 
 use super::plan_event_context::PlanEventConsumerCtx;
 use super::plan_event_goal_lifecycle::{
@@ -11,17 +11,27 @@ use super::plan_event_goal_lifecycle::{
 };
 use super::plan_event_goal_ready::handle_plan_event_goal_ready;
 use super::plan_event_handlers::{
-    handle_plan_event_all_tasks_done, handle_plan_event_anomaly,
-    handle_plan_event_review_needed,
+    handle_plan_event_all_tasks_done, handle_plan_event_anomaly, handle_plan_event_review_needed,
 };
 
 /// Dispatch one `PlanEvent` to the appropriate Strategy handler.
 pub(crate) async fn dispatch_plan_event(ctx: &PlanEventConsumerCtx, event: PlanEvent) {
     match event {
-        PlanEvent::GoalReady { goal_id, description, session_id } => {
+        PlanEvent::GoalReady {
+            goal_id,
+            description,
+            session_id,
+        } => {
             handle_plan_event_goal_ready(ctx, goal_id, description, session_id).await;
         }
-        PlanEvent::ReviewNeeded { task_id, agent, title, summary, criteria, session_id } => {
+        PlanEvent::ReviewNeeded {
+            task_id,
+            agent,
+            title,
+            summary,
+            criteria,
+            session_id,
+        } => {
             handle_plan_event_review_needed(
                 ctx, task_id, agent, title, summary, criteria, session_id,
             )
@@ -52,7 +62,10 @@ pub(crate) async fn dispatch_plan_event(ctx: &PlanEventConsumerCtx, event: PlanE
             )
             .await;
         }
-        PlanEvent::GoalCompleted { goal_id, description } => {
+        PlanEvent::GoalCompleted {
+            goal_id,
+            description,
+        } => {
             handle_plan_event_goal_completed(ctx, goal_id, description).await;
         }
     }

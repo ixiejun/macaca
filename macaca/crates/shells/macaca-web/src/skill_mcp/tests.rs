@@ -1,9 +1,11 @@
 //! Unit and optional integration probes for skill-backed MCP bridging.
 
-use macaca_proto::ApplicationId;
-use macaca_sdk::skill::{
-    SkillInstallSpec, SkillMcpServerConfig, SkillSnapshot, SkillSnapshotEntry,
+use macaca_host_composition::runtime_host::{
+    SkillAuthorKind, SkillGovernanceProvenance, SkillGovernanceRecord, SkillInstallSpec,
+    SkillLifecycleState, SkillMcpServerConfig, SkillSnapshot, SkillSnapshotEntry, SkillSourceScope,
+    SkillUsageEventKind,
 };
+use macaca_proto::ApplicationId;
 
 use super::governance_telemetry::build_governed_skill_activation_usage_commands;
 use super::probe::probe_skill_mcp_servers;
@@ -33,7 +35,7 @@ fn playwright_entry() -> SkillSnapshotEntry {
         location: std::path::PathBuf::from("/tmp/SKILL.md"),
         base_dir: std::path::PathBuf::from("/tmp"),
         source: "test".into(),
-        source_scope: macaca_sdk::skill::SkillSourceScope::MacacaCentral,
+        source_scope: SkillSourceScope::MacacaCentral,
         primary_env: None,
         required_env: Vec::new(),
         install: vec![SkillInstallSpec {
@@ -76,7 +78,7 @@ fn activation_usage_commands_only_cover_active_governed_snapshot_skills() {
                 location: std::path::PathBuf::from("/tmp/available/active/SKILL.md"),
                 base_dir: std::path::PathBuf::from("/tmp/available/active"),
                 source: "application".into(),
-                source_scope: macaca_sdk::skill::SkillSourceScope::Application,
+                source_scope: SkillSourceScope::Application,
                 primary_env: None,
                 required_env: Vec::new(),
                 install: Vec::new(),
@@ -90,7 +92,7 @@ fn activation_usage_commands_only_cover_active_governed_snapshot_skills() {
                 location: std::path::PathBuf::from("/tmp/available/plain/SKILL.md"),
                 base_dir: std::path::PathBuf::from("/tmp/available/plain"),
                 source: "application".into(),
-                source_scope: macaca_sdk::skill::SkillSourceScope::Application,
+                source_scope: SkillSourceScope::Application,
                 primary_env: None,
                 required_env: Vec::new(),
                 install: Vec::new(),
@@ -102,30 +104,30 @@ fn activation_usage_commands_only_cover_active_governed_snapshot_skills() {
         compact: false,
         version: 1,
     };
-    let active_record = macaca_sdk::skill::SkillGovernanceRecord {
-        provenance: macaca_sdk::skill::SkillGovernanceProvenance::new(
+    let active_record = SkillGovernanceRecord {
+        provenance: SkillGovernanceProvenance::new(
             "skill://agent/skill-exp-active",
             active_name,
             "skill.evolution",
             "proposal",
-            macaca_sdk::skill::SkillAuthorKind::Agent,
+            SkillAuthorKind::Agent,
         ),
-        lifecycle: macaca_sdk::skill::SkillLifecycleState::Active,
+        lifecycle: SkillLifecycleState::Active,
         pinned: false,
         telemetry: Default::default(),
         diagnostics: Default::default(),
         updated_at: chrono::Utc::now(),
         evidence_ids: vec!["eventlog://run-42".into()],
     };
-    let archived_record = macaca_sdk::skill::SkillGovernanceRecord {
-        provenance: macaca_sdk::skill::SkillGovernanceProvenance::new(
+    let archived_record = SkillGovernanceRecord {
+        provenance: SkillGovernanceProvenance::new(
             "skill://agent/archived",
             "archived",
             "skill.evolution",
             "proposal",
-            macaca_sdk::skill::SkillAuthorKind::Agent,
+            SkillAuthorKind::Agent,
         ),
-        lifecycle: macaca_sdk::skill::SkillLifecycleState::Archived,
+        lifecycle: SkillLifecycleState::Archived,
         pinned: false,
         telemetry: Default::default(),
         diagnostics: Default::default(),
@@ -149,7 +151,7 @@ fn activation_usage_commands_only_cover_active_governed_snapshot_skills() {
     );
     assert_eq!(
         commands[0].observation.event,
-        macaca_sdk::skill::SkillUsageEventKind::Activated
+        SkillUsageEventKind::Activated
     );
     assert_eq!(
         commands[0]
@@ -162,7 +164,7 @@ fn activation_usage_commands_only_cover_active_governed_snapshot_skills() {
 }
 
 #[test]
-fn compat_registry_resolves_playwright_mcp_package() {
+fn mapping_registry_resolves_playwright_mcp_package() {
     let snapshot = snapshot_with_entry(playwright_entry());
     let launches = resolve_skill_mcp_servers(&snapshot);
     assert_eq!(launches.len(), 1);

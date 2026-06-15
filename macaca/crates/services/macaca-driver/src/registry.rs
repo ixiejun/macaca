@@ -88,12 +88,6 @@ impl DriverRegistry {
         }
         all_tools
     }
-
-    /// Collect all tools from all registered drivers.
-    #[deprecated(note = "use DriverRegistry::snapshot_tool_catalog()")]
-    pub async fn aggregate_tools(&self) -> Vec<Box<dyn Tool>> {
-        self.snapshot_tool_catalog().await
-    }
 }
 
 impl Default for DriverRegistry {
@@ -190,7 +184,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn aggregate_tools_empty() {
+    async fn snapshot_tool_catalog_empty() {
         let registry = DriverRegistry::new();
         registry.register(Box::new(DummyDriver::new("a"))).await;
         let tools = registry.snapshot_tool_catalog().await;

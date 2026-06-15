@@ -26,7 +26,7 @@ pub const PLUGIN_CONTROL_SERVICE_ID: &str = "macaca.plugin.control";
 /// Command names accepted by Plugin Control Service.
 ///
 /// These constants keep SDK, Web, CLI, and runtime-host dispatch aligned while
-/// still using the generic Route C service-call transport.
+/// still using the generic protocol service-call transport.
 pub const PLUGIN_CONTROL_LIST_COMMAND: &str = "plugin.list";
 pub const PLUGIN_CONTROL_INSPECT_COMMAND: &str = "plugin.inspect";
 pub const PLUGIN_CONTROL_INSTALL_COMMAND: &str = "plugin.install";

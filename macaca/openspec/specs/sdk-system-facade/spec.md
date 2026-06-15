@@ -13,11 +13,11 @@ Macaca SHALL expose an SDK `SystemFacade` that upper layers use for service, tas
 - **THEN** they SHALL construct a typed SDK command or call a typed SDK facade method
 - **AND** they SHALL NOT introduce a new direct provider construction path for that operation
 
-#### Scenario: S3 remains additive
+#### Scenario: Stable contracts remain intact
 
-- **WHEN** S3 is implemented
-- **THEN** existing YAML application loading, `/api/chat/v2`, trace viewer, task board, resume, driver, skill/MCP, Web UI, and CLI behavior SHALL remain compatible
-- **AND** S3 SHALL NOT absorb provider migrations assigned to S4-S12
+- **WHEN** SDK facade convergence is implemented
+- **THEN** existing YAML application loading, `/api/chat/v2`, trace viewer, task board, resume, driver, skill/MCP, Web UI, and CLI behavior SHALL keep stable external contracts
+- **AND** the SDK SHALL route through focused clients, service facades, or proto DTOs without constructing providers
 
 ### Requirement: SDK clients SHALL be split by capability family
 
@@ -37,7 +37,7 @@ Macaca SHALL split SDK system clients into focused capability-family modules for
 
 ### Requirement: SDK commands SHALL be typed, scoped, and validated
 
-SDK system operations SHALL be represented as typed command objects with explicit scope, bounded cursor or limit fields where applicable, and trace/policy-ready metadata when required by Route C.
+SDK system operations SHALL be represented as typed command objects with explicit scope, bounded cursor or limit fields where applicable, and trace/policy-ready metadata.
 
 #### Scenario: Invalid command scope is rejected
 
@@ -50,18 +50,18 @@ SDK system operations SHALL be represented as typed command objects with explici
 - **WHEN** a command is used by Web, CLI, gateway, or application code
 - **THEN** it SHALL NOT require concrete provider, driver, gateway, model, workflow, chain, or business-specific identifiers beyond provider-neutral system scope
 
-### Requirement: SystemFacade SHALL delegate to clients and preserve compatibility
+### Requirement: SystemFacade SHALL delegate to clients and preserve stable response contracts
 
 `SystemFacade` SHALL validate/log facade calls, delegate to focused clients, and preserve existing response shapes for current task-board and status operations.
 
-#### Scenario: Task board query remains compatible
+#### Scenario: Task board query keeps stable contract
 
 - **WHEN** a session-scoped task board query is executed through `SystemFacade`
 - **THEN** it SHALL return todos sorted by sequence number
 - **AND** it SHALL preserve the existing task board result shape
 - **AND** it SHALL log start and completion with application id, session id, and count
 
-#### Scenario: Status snapshot remains compatible
+#### Scenario: Status snapshot keeps stable contract
 
 - **WHEN** a status snapshot is requested through `SystemFacade`
 - **THEN** it SHALL return the existing status snapshot fields
@@ -97,14 +97,13 @@ SDK system clients SHALL adapt existing local state, kernel/service facades, or 
 - **THEN** the clients SHALL be traits/adapters over existing boundaries
 - **AND** they SHALL NOT instantiate concrete LLM, memory, task planner, driver, skill, MCP, gateway, payment, Web3, EVM, or package provider implementations
 
-### Requirement: S3 SHALL document SDK/SystemFacade governance
+### Requirement: SDK/SystemFacade Governance SHALL Be Documented
 
-Macaca SHALL document that SDK/SystemFacade is the upper-layer system API boundary and that concrete provider migrations remain assigned to later Route C phases.
+Macaca SHALL document that SDK/SystemFacade is the upper-layer system API boundary and that concrete providers are owned by service/runtime-host boundaries.
 
-#### Scenario: Governance explains S3 ownership
+#### Scenario: Governance explains SDK ownership
 
-- **WHEN** maintainers read Route C architecture governance
+- **WHEN** maintainers read Macaca OS architecture governance
 - **THEN** it SHALL state that SDK/SystemFacade is command-driven and client-composed
 - **AND** it SHALL state that SDK clients are adapters, not provider factories
-- **AND** it SHALL state that S4-S12 remain responsible for concrete service/provider migrations
-
+- **AND** it SHALL state that service/runtime-host owners are responsible for concrete service/provider lifecycle

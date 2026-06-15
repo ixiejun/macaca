@@ -1,5 +1,3 @@
-#![allow(deprecated)]
-
 use std::collections::BTreeMap;
 
 use macaca_framework::mcp::{McpSessionMode, McpTransportConfig};

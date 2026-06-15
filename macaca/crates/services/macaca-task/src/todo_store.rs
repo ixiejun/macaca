@@ -227,7 +227,7 @@ impl TodoStore {
             .unwrap_or(0)
     }
 
-    /// Migrate legacy TodoItems that have sequence_number == 0.
+    /// Assign sequence numbers to persisted TodoItems that still use zero.
     /// Assigns sequence numbers based on created_at order within each agent+session.
     /// Runs once per app_id; uses a meta key to avoid re-running.
     pub async fn migrate_sequence_numbers(&self, app_id: &ApplicationId) {
@@ -266,7 +266,7 @@ impl TodoStore {
         }
 
         let _ = self.store.set(&meta_key, b"1").await;
-        tracing::info!(app_id = %app_id, "Migrated legacy tasks with sequence_number = 0");
+        tracing::info!(app_id = %app_id, "Assigned sequence numbers to persisted tasks with sequence_number = 0");
     }
 
     // ── TodoGoal CRUD ───────────────────────────────────────────────────

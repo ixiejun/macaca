@@ -34,7 +34,5 @@ mod validation_merge;
 #[cfg(test)]
 mod tests;
 
-pub use types::{
-    DelegateResult, ForkContext, HookCallback, HookEvent, MergeResult,
-};
 pub use manager::ForkManager;
+pub use types::{DelegateResult, ForkContext, HookCallback, HookEvent, MergeResult};

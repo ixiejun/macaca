@@ -1,7 +1,7 @@
 //! Constructor surface for `YamlApplicationManifestAdapter`.
 //!
 //! Factory methods follow the **Builder** pattern: callers construct an adapter
-//! from a parsed legacy manifest and optionally attach resolved agents before
+//! from a parsed YAML manifest and optionally attach resolved agents before
 //! invoking projection.
 
 use macaca_proto::AgentConfig;
@@ -11,7 +11,7 @@ use crate::model::AppManifest;
 use super::types::YamlApplicationManifestAdapter;
 
 impl YamlApplicationManifestAdapter {
-    /// Create an adapter from the parsed legacy YAML manifest.
+    /// Create an adapter from the parsed YAML manifest.
     ///
     /// Resolved agents are empty until the caller invokes
     /// [`with_resolved_agents`](Self::with_resolved_agents).
@@ -23,7 +23,7 @@ impl YamlApplicationManifestAdapter {
     }
 
     /// Attach resolved file-based agents when the caller has already performed
-    /// legacy file resolution.
+    /// file-agent resolution.
     ///
     /// The adapter uses resolved facts for capabilities and permissions but
     /// never stores raw agent configuration bodies in Manifest v1 metadata.

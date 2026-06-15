@@ -68,7 +68,8 @@ impl SkillCliRuntimeTarget {
 /// Lifecycle actions exposed by the CLI transport.
 ///
 /// The enum is a **Strategy** mapping layer: CLI verbs are translated once into
-/// SDK `SkillCurationLifecycleAction` values and HTTP route segments.
+/// public Web API route segments. Service-side policy owns the actual lifecycle
+/// transition semantics.
 #[derive(Debug, Clone, Copy)]
 pub enum SkillCliLifecycleAction {
     Pin,
@@ -81,20 +82,6 @@ pub enum SkillCliLifecycleAction {
 }
 
 impl SkillCliLifecycleAction {
-    /// Map the CLI verb to the SDK lifecycle action enum consumed by `service.skill`.
-    pub(crate) fn into_service_action(self) -> macaca_sdk::SkillCurationLifecycleAction {
-        use macaca_sdk::SkillCurationLifecycleAction;
-        match self {
-            Self::Pin => SkillCurationLifecycleAction::Pin,
-            Self::Unpin => SkillCurationLifecycleAction::Unpin,
-            Self::Archive => SkillCurationLifecycleAction::Archive,
-            Self::Restore => SkillCurationLifecycleAction::Restore,
-            Self::Quarantine => SkillCurationLifecycleAction::Quarantine,
-            Self::ReleaseQuarantine => SkillCurationLifecycleAction::ReleaseQuarantine,
-            Self::Reject => SkillCurationLifecycleAction::Reject,
-        }
-    }
-
     /// Stable snake_case label used in trace ids and structured logs.
     pub(crate) fn as_str(self) -> &'static str {
         match self {

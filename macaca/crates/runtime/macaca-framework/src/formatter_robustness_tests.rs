@@ -149,14 +149,14 @@ mod tests {
     }
 
     #[test]
-    fn test_dashscope_openai_compat_format() {
+    fn test_dashscope_openai_wire_format() {
         let raw = json!({
-            "id": "ds-compat-test",
+            "id": "ds-wire-test",
             "created": 1700000000,
             "choices": [{
                 "message": {
                     "role": "assistant",
-                    "content": "compat ok"
+                    "content": "wire ok"
                 }
             }],
             "usage": {
@@ -167,8 +167,8 @@ mod tests {
         });
         let fmt = DashScopeFormatter;
         let resp = fmt.parse_response(raw).unwrap();
-        assert_eq!(resp.id, "ds-compat-test");
-        assert_eq!(resp.get_text(), "compat ok");
+        assert_eq!(resp.id, "ds-wire-test");
+        assert_eq!(resp.get_text(), "wire ok");
         assert_eq!(resp.usage.input_tokens, 12);
         assert_eq!(resp.usage.output_tokens, 6);
     }

@@ -1,18 +1,17 @@
 //! Contract tests for Application Manifest v1 serde round-trips.
 //!
 //! Extracted from `application_manifest.rs` so production DTO definitions stay under
-//! the OS 500-line constitution while serde compatibility remains guarded.
+//! the OS 500-line constitution while serde shape remains guarded.
 
 use super::*;
 use crate::{
     workbench::sandbox::{SandboxRuntimeKind, WORKSPACE_WRITE_PROFILE},
-    AbilityImplementationKind, ApplicationAbilityKind,
-    ApplicationWorkbenchCapabilityDeclaration, ApplicationWorkbenchEventSubscription,
-    ApplicationWorkbenchManifestDeclaration, ApplicationWorkbenchMcpDependency,
-    ApplicationWorkbenchServiceDependency, ApplicationWorkbenchSkillBundleDependency,
-    ApplicationWorkbenchUiSurfaceDeclaration, ExecutionControlCheckpointMode,
-    ExecutionControlMode, ExecutionControlPolicy, ExecutionControlResumeSource,
-    ExecutionControlTrigger,
+    AbilityImplementationKind, ApplicationAbilityKind, ApplicationWorkbenchCapabilityDeclaration,
+    ApplicationWorkbenchEventSubscription, ApplicationWorkbenchManifestDeclaration,
+    ApplicationWorkbenchMcpDependency, ApplicationWorkbenchServiceDependency,
+    ApplicationWorkbenchSkillBundleDependency, ApplicationWorkbenchUiSurfaceDeclaration,
+    ExecutionControlCheckpointMode, ExecutionControlMode, ExecutionControlPolicy,
+    ExecutionControlResumeSource, ExecutionControlTrigger,
 };
 
 #[test]
@@ -23,7 +22,7 @@ fn application_manifest_v1_roundtrips() {
         "Fixture Application",
         "1.0.0",
         ApplicationRuntimeProfile::new(PackageRuntimeKind::Yaml, "1"),
-        ApplicationCompatibilityDeclaration::new("0.1.0"),
+        ApplicationHostRequirementDeclaration::new("0.1.0"),
     )
     .ability(ApplicationAbilityDescriptor::new(
         "ability.fixture.agent",
@@ -55,7 +54,7 @@ fn application_manifest_v1_roundtrips_execution_control_policy() {
         "Execution Control Application",
         "1.0.0",
         ApplicationRuntimeProfile::new(PackageRuntimeKind::Yaml, "1"),
-        ApplicationCompatibilityDeclaration::new("0.1.0"),
+        ApplicationHostRequirementDeclaration::new("0.1.0"),
     )
     .execution_control(policy);
 
@@ -77,7 +76,7 @@ fn application_manifest_v1_roundtrips_tool_planning_policy() {
         "Tool Policy Fixture",
         "1.0.0",
         ApplicationRuntimeProfile::new(PackageRuntimeKind::Yaml, "1"),
-        ApplicationCompatibilityDeclaration::new("0.1.0"),
+        ApplicationHostRequirementDeclaration::new("0.1.0"),
     )
     .tool_family("web")
     .tool_family("memory")
@@ -100,7 +99,7 @@ fn application_manifest_v1_declares_code_git_and_review_tool_families() {
         "Workbench Policy Fixture",
         "1.0.0",
         ApplicationRuntimeProfile::new(PackageRuntimeKind::Yaml, "1"),
-        ApplicationCompatibilityDeclaration::new("0.1.0"),
+        ApplicationHostRequirementDeclaration::new("0.1.0"),
     )
     .tool_family("code_intelligence")
     .tool_family("git")
@@ -125,7 +124,7 @@ fn application_manifest_v1_roundtrips_sandbox_policy_declarations() {
         "Sandbox Policy Fixture",
         "1.0.0",
         ApplicationRuntimeProfile::new(PackageRuntimeKind::Yaml, "1"),
-        ApplicationCompatibilityDeclaration::new("0.1.0"),
+        ApplicationHostRequirementDeclaration::new("0.1.0"),
     )
     .permission_profile(WORKSPACE_WRITE_PROFILE)
     .sandbox_runtime_kind(SandboxRuntimeKind::LocalSandbox);
@@ -186,7 +185,7 @@ fn application_manifest_v1_roundtrips_workbench_declaration() {
         "Workbench Manifest Fixture",
         "1.0.0",
         ApplicationRuntimeProfile::new(PackageRuntimeKind::Yaml, "1"),
-        ApplicationCompatibilityDeclaration::new("0.1.0"),
+        ApplicationHostRequirementDeclaration::new("0.1.0"),
     )
     .ability(ApplicationAbilityDescriptor::new(
         "ability.fixture.agent",

@@ -13,8 +13,7 @@ use tokio::time::timeout;
 use crate::transport::{bridge_for_config, McpTransport};
 
 use super::helpers::{
-    lifecycle_scope_name, missing_required_bin, prefixed_tool_name,
-    resource_scope_for_lifecycle,
+    lifecycle_scope_name, missing_required_bin, prefixed_tool_name, resource_scope_for_lifecycle,
 };
 use super::types::{McpServerDefinition, McpToolPolicy};
 

@@ -1,8 +1,8 @@
-//! Runtime-host provider for the Route C Entitlement Service.
+//! Runtime-host provider for the Entitlement Service.
 //!
 //! The provider uses Adapter/Bridge: the service bus speaks provider-neutral
 //! `macaca-proto` commands while this adapter delegates policy decisions and
-//! persistence to the Phase 08 `EntitlementRuntimeFacade` and `EntitlementStore`.
+//! persistence to the crate-local entitlement guard and `EntitlementStore`.
 //! Runtime-host owns service lifecycle, trace-required dispatch, and logging;
 //! it does not own Store vendor logic or application-specific commerce rules.
 
@@ -12,7 +12,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use chrono::Utc;
 use macaca_kernel::SystemService;
-use macaca_persist::EntitlementStore;
+use macaca_persist::{EntitlementStore, EventLog};
 use macaca_proto::{
     CleanupPolicy, CommerceMetadata, EntitlementAuditPage, EntitlementAuditQueryCommand,
     EntitlementAuthorizeCallCommand, EntitlementAuthorizeInstallCommand,
@@ -31,7 +31,7 @@ use macaca_proto::{
 use tokio::sync::RwLock;
 use tracing::info;
 
-use crate::entitlement::{CapabilityCallContext, EntitlementRuntimeFacade};
+use crate::entitlement::{CapabilityCallContext, RuntimeEntitlementGuard};
 use crate::store_entitlement_admission::{
     EntitlementOperationSpec, MeteringScopeSpec, PackageScopeSpec, StoreTraceSpec,
 };
@@ -40,17 +40,42 @@ use crate::store_entitlement_admission::{
 pub struct EntitlementSystemServiceProvider {
     descriptor: ServiceDescriptor,
     store: Option<Arc<dyn EntitlementStore>>,
-    facade: Option<Arc<EntitlementRuntimeFacade>>,
+    guard: Option<Arc<RuntimeEntitlementGuard>>,
     metering_count: RwLock<usize>,
 }
 
 impl EntitlementSystemServiceProvider {
-    /// Create a provider backed by real entitlement repository and facade.
-    pub fn new(store: Arc<dyn EntitlementStore>, facade: Arc<EntitlementRuntimeFacade>) -> Self {
+    /// Create a provider backed by a real entitlement repository.
+    ///
+    /// The provider constructs the guard internally so host composition roots do
+    /// not receive a second public entitlement facade. This keeps authorization
+    /// behavior behind the service boundary while preserving repository
+    /// injection for tests and local runtimes.
+    pub fn new(store: Arc<dyn EntitlementStore>, event_log: Option<Arc<EventLog>>) -> Self {
+        let guard = match event_log {
+            Some(event_log) => Arc::new(RuntimeEntitlementGuard::with_event_log(
+                Arc::clone(&store),
+                event_log,
+            )),
+            None => Arc::new(RuntimeEntitlementGuard::new(Arc::clone(&store))),
+        };
         Self {
             descriptor: entitlement_service_descriptor(),
             store: Some(store),
-            facade: Some(facade),
+            guard: Some(guard),
+            metering_count: RwLock::new(0),
+        }
+    }
+
+    /// Create a provider from an already-built guard for crate-local wiring.
+    pub(crate) fn with_guard(
+        store: Arc<dyn EntitlementStore>,
+        guard: Arc<RuntimeEntitlementGuard>,
+    ) -> Self {
+        Self {
+            descriptor: entitlement_service_descriptor(),
+            store: Some(store),
+            guard: Some(guard),
             metering_count: RwLock::new(0),
         }
     }
@@ -60,7 +85,7 @@ impl EntitlementSystemServiceProvider {
         Self {
             descriptor: entitlement_service_descriptor(),
             store: None,
-            facade: None,
+            guard: None,
             metering_count: RwLock::new(0),
         }
     }
@@ -71,9 +96,9 @@ impl EntitlementSystemServiceProvider {
         })
     }
 
-    fn facade(&self) -> ServiceResult<Arc<EntitlementRuntimeFacade>> {
-        self.facade.clone().ok_or_else(|| {
-            ServiceError::ServiceUnavailable("entitlement facade is not configured".into())
+    fn guard(&self) -> ServiceResult<Arc<RuntimeEntitlementGuard>> {
+        self.guard.clone().ok_or_else(|| {
+            ServiceError::ServiceUnavailable("entitlement guard is not configured".into())
         })
     }
 
@@ -132,7 +157,7 @@ impl SystemService for EntitlementSystemServiceProvider {
         info!(
             service_id = %self.descriptor.id,
             store_configured = self.store.is_some(),
-            facade_configured = self.facade.is_some(),
+            guard_configured = self.guard.is_some(),
             "entitlement service provider started"
         );
         Ok(())
@@ -210,7 +235,7 @@ impl SystemService for EntitlementSystemServiceProvider {
                 )?;
                 let manifest = Self::manifest(&typed.scope, typed.commerce)?;
                 let decision = self
-                    .facade()?
+                    .guard()?
                     .authorize_install(&manifest)
                     .await
                     .map_err(commerce_error)?;
@@ -226,7 +251,7 @@ impl SystemService for EntitlementSystemServiceProvider {
                 )?;
                 let manifest = Self::manifest(&typed.scope, typed.commerce)?;
                 let decision = self
-                    .facade()?
+                    .guard()?
                     .authorize_start(&manifest)
                     .await
                     .map_err(commerce_error)?;
@@ -244,7 +269,7 @@ impl SystemService for EntitlementSystemServiceProvider {
                 context.quantity = typed.quantity;
                 context.unit = typed.unit.clone();
                 let decision = self
-                    .facade()?
+                    .guard()?
                     .authorize_capability_call(&manifest, context)
                     .await
                     .map_err(commerce_error)?;
@@ -312,7 +337,7 @@ impl SystemService for EntitlementSystemServiceProvider {
     }
 
     async fn health(&self) -> ServiceResult<ServiceHealth> {
-        if self.store.is_some() && self.facade.is_some() {
+        if self.store.is_some() && self.guard.is_some() {
             Ok(ServiceHealth::Healthy)
         } else {
             Ok(ServiceHealth::Unavailable {

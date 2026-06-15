@@ -8,14 +8,16 @@
 
 use std::sync::Arc;
 
+use macaca_agent::{
+    BasicAgentBuilder, InProcessAgentExecutionPort, InProcessAgentSideRegistry, ToolCatalog,
+};
 use macaca_app::loader::AppLoader;
-use macaca_agent::{InProcessAgentExecutionPort, InProcessAgentSideRegistry, ToolCatalog};
 use macaca_kernel::{Kernel, KernelBuilder};
-use macaca_proto::AgentExecutionPort;
 use macaca_llm::{DashScopeProvider, LlmProvider};
 use macaca_proto::config::KernelConfig;
+use macaca_proto::AgentExecutionPort;
 use macaca_proto::LlmOptions;
-use macaca_sdk::{register_in_process_kernel_agent, AgentBuilder, AgentPersona};
+use macaca_sdk::{AgentBuilder, AgentPersona};
 use macaca_skill::SkillCatalog;
 use macaca_tools::DefaultToolSet;
 
@@ -34,7 +36,7 @@ fn dashscope_api_key() -> String {
         .unwrap_or_else(|_| "sk-7720115f25214ebaa4f83d5857224f9a".into())
 }
 
-/// Kernel + legacy side registry for live LLM execution through in-process adapters.
+/// Kernel plus side registry for live LLM execution through in-process adapters.
 fn make_kernel_with_dashscope() -> (Kernel, Arc<InProcessAgentSideRegistry>) {
     let config = KernelConfig {
         max_agents: 64,
@@ -124,7 +126,12 @@ async fn live_fullstack_autodev_architect_qwen3() {
     let skills_dir = app_dir().join("skills");
     let mut catalog = SkillCatalog::new();
     catalog.load_from_directory(&skills_dir).await.unwrap();
-    let catalog_prompt = catalog.catalog_prompt();
+    let catalog_prompt = catalog
+        .catalog()
+        .into_iter()
+        .map(|entry| format!("- {}: {}", entry.name, entry.description))
+        .collect::<Vec<_>>()
+        .join("\n");
     println!("\n=== Skill Catalog ===\n{catalog_prompt}");
 
     // 4. Build messages and call DashScope.
@@ -213,12 +220,16 @@ permission_level: system
         .build_spec()
         .unwrap();
     let manifest = spec.manifest();
-    let agent = spec.into_agent();
+    let agent = BasicAgentBuilder::new(spec.prompt_template())
+        .with_id(spec.id())
+        .with_capabilities(spec.capabilities().to_vec())
+        .build();
 
     let agent_id = manifest.id;
-    register_in_process_kernel_agent(&kernel, side_registry.as_ref(), Box::new(agent), manifest)
-        .await
+    side_registry
+        .register_runtime_agent(Arc::from(Box::new(agent) as Box<dyn macaca_agent::Agent>))
         .unwrap();
+    kernel.register_agent(manifest).await.unwrap();
 
     println!("\n=== Executing architect agent via kernel (qwen3-max) ===");
     let output = kernel.execute_agent(&agent_id).await.unwrap();

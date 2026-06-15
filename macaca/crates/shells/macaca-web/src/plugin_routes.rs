@@ -81,7 +81,7 @@ mod tests {
         assert!(!source.contains(&format!("{}{}", "PluginControl", "Service::")));
         assert!(!source.contains(&format!(
             "{}{}",
-            "macaca_sdk::runtime_host::PluginControl", "Service"
+            "macaca_sdk::", "runtime_host::PluginControlService"
         )));
     }
 }

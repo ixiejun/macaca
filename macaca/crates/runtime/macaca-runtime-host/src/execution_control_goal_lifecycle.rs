@@ -14,7 +14,7 @@
 //! - **Observer**: PlanLoop `GoalCompleted` consumers and shell adapters call
 //!   `deliver_parent_goal_resume` when task service signals goal completion.
 //!
-//! Shell adapters retain legacy in-memory resume channels until loop_manager fully
+//! Shell adapters retain local in-memory resume channels until loop_manager fully
 //! subscribes to execution-control events (tasks 2.3.4 / 4.2).
 
 use std::sync::Arc;
@@ -24,8 +24,8 @@ use macaca_proto::{
     ExecutionControlCommandResult, ExecutionControlPauseCommand, ExecutionControlPolicy,
     ExecutionControlRegisterExecutionCommand, ExecutionControlResolutionStatus,
     ExecutionControlResumeCommand, ExecutionControlResumeSource, ExecutionControlScope,
-    ExecutionControlTrigger, KernelServiceId, MacacaResult, ServiceBusSource, TaskId,
-    TraceContext, EXECUTION_CONTROL_SERVICE_ID,
+    ExecutionControlTrigger, KernelServiceId, MacacaResult, ServiceBusSource, TaskId, TraceContext,
+    EXECUTION_CONTROL_SERVICE_ID,
 };
 use tracing::{info, warn};
 
@@ -129,10 +129,8 @@ impl ExecutionControlGoalLifecycleCoordinator {
         request: GoalLifecycleParentWaitRequest,
     ) -> Result<ExecutionControlCommandResult, String> {
         let scope = Self::parent_wait_scope(&request).map_err(|error| error.to_string())?;
-        let resolved = ExecutionControlPolicyResolver::resolve(
-            Some(&Self::goal_lifecycle_policy()),
-            None,
-        );
+        let resolved =
+            ExecutionControlPolicyResolver::resolve(Some(&Self::goal_lifecycle_policy()), None);
         if resolved.status != ExecutionControlResolutionStatus::Enabled {
             return Err(format!(
                 "goal-lifecycle execution control denied: {}",
@@ -208,9 +206,10 @@ impl ExecutionControlGoalLifecycleCoordinator {
             .metadata
             .insert("goal_id".into(), request.goal_id.0.to_string());
         if let Some(summary) = request.completion_summary {
-            scope
-                .metadata
-                .insert("completion_summary".into(), summary.chars().take(200).collect());
+            scope.metadata.insert(
+                "completion_summary".into(),
+                summary.chars().take(200).collect(),
+            );
         }
 
         let result = self
@@ -284,7 +283,8 @@ mod tests {
     #[test]
     fn parent_execution_id_is_deterministic() {
         let goal_id = TaskId::new();
-        let id = ExecutionControlGoalLifecycleCoordinator::parent_execution_id("session-a", goal_id);
+        let id =
+            ExecutionControlGoalLifecycleCoordinator::parent_execution_id("session-a", goal_id);
         assert_eq!(id, format!("goal-lifecycle:session-a:{}", goal_id.0));
     }
 
@@ -326,8 +326,7 @@ mod tests {
 
         let runtime = ExecutionControlRuntimeCapability::new();
         let request = sample_parent_wait();
-        let scope =
-            ExecutionControlGoalLifecycleCoordinator::parent_wait_scope(&request).unwrap();
+        let scope = ExecutionControlGoalLifecycleCoordinator::parent_wait_scope(&request).unwrap();
         let policy = macaca_proto::ExecutionControlResolvedPolicy {
             status: ExecutionControlResolutionStatus::Enabled,
             policy: Some(ExecutionControlGoalLifecycleCoordinator::goal_lifecycle_policy()),

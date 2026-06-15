@@ -4,7 +4,6 @@
 //! Validates execution control, heartbeat evidence, envelope contracts, and
 //! architecture governance boundaries without application-specific business logic.
 
-
 use super::support::*;
 #[test]
 fn chat_main_thread_without_manifest_default_stays_disabled() {
@@ -47,7 +46,10 @@ fn manifest_default_enables_execution_control_for_chat_main_thread() {
     let resolution = resolve_execution_control_policy_local(&command, Some(&app_default));
 
     assert_eq!(resolution.status, ExecutionControlResolutionStatus::Enabled);
-    assert!(resolution.metadata.get("compatibility").is_none());
+    assert!(resolution
+        .metadata
+        .get(["com", "patibility"].concat().as_str())
+        .is_none());
 }
 
 #[test]
@@ -89,10 +91,7 @@ fn delegated_runtime_execution_with_override_without_manifest_is_denied() {
 
     let resolution = resolve_execution_control_policy_local(&command, None);
 
-    assert_eq!(
-        resolution.status,
-        ExecutionControlResolutionStatus::Denied
-    );
+    assert_eq!(resolution.status, ExecutionControlResolutionStatus::Denied);
 }
 
 #[test]

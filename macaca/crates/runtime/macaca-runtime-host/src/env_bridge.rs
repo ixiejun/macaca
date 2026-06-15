@@ -56,7 +56,7 @@ fn looks_like_env_var_name(value: &str) -> bool {
 
 /// Decide what should happen for a single `(key, value)` pair **without**
 /// touching the process environment. Exposed for unit tests; the real work is
-/// done by [`apply_mcp_env`].
+/// done by the runtime-host environment builder.
 pub fn classify_entry(value: &str) -> McpEnvApplyOutcome {
     let trimmed = value.trim();
     if trimmed.is_empty() {
@@ -83,8 +83,9 @@ pub fn classify_entry(value: &str) -> McpEnvApplyOutcome {
 /// conventionally uppercase, so we explicitly uppercase each key here before
 /// calling `set_var`. The returned `HashMap`'s keys use the same uppercased
 /// form so callers can log a stable identifier.
-#[deprecated(note = "Use `RuntimeEnvBuilder::apply_process_env` instead.")]
-pub fn apply_mcp_env(env: &HashMap<String, String>) -> HashMap<String, McpEnvApplyOutcome> {
+pub(crate) fn apply_process_env_entries(
+    env: &HashMap<String, String>,
+) -> HashMap<String, McpEnvApplyOutcome> {
     let mut outcomes = HashMap::with_capacity(env.len());
     for (raw_key, value) in env {
         let key = raw_key.to_ascii_uppercase();
@@ -128,7 +129,6 @@ pub fn apply_mcp_env(env: &HashMap<String, String>) -> HashMap<String, McpEnvApp
 }
 
 #[cfg(test)]
-#[allow(deprecated)]
 mod tests {
     use super::*;
 
@@ -175,7 +175,7 @@ mod tests {
         );
         env.insert("MCP_TEST_PLACEHOLDER_SKIP".into(), "YOUR_TOKEN_HERE".into());
 
-        let outcomes = apply_mcp_env(&env);
+        let outcomes = apply_process_env_entries(&env);
 
         assert_eq!(
             outcomes.get("MCP_TEST_LITERAL_EXPORT"),
@@ -202,7 +202,7 @@ mod tests {
         let mut env = HashMap::new();
         env.insert("MCP_TEST_DST_PRESENT".into(), "MCP_TEST_SRC_PRESENT".into());
 
-        let outcomes = apply_mcp_env(&env);
+        let outcomes = apply_process_env_entries(&env);
         assert_eq!(
             outcomes.get("MCP_TEST_DST_PRESENT"),
             Some(&McpEnvApplyOutcome::ForwardedFromEnv)
@@ -224,7 +224,7 @@ mod tests {
         let mut env = HashMap::new();
         env.insert("MCP_TEST_DST_MISSING".into(), "MCP_TEST_SRC_MISSING".into());
 
-        let outcomes = apply_mcp_env(&env);
+        let outcomes = apply_process_env_entries(&env);
         assert_eq!(
             outcomes.get("MCP_TEST_DST_MISSING"),
             Some(&McpEnvApplyOutcome::SkippedMissingEnvVar)
@@ -240,7 +240,7 @@ mod tests {
         let mut env = HashMap::new();
         env.insert("mcp_test_lowercase_input".into(), "literal-value-99".into());
 
-        let outcomes = apply_mcp_env(&env);
+        let outcomes = apply_process_env_entries(&env);
         assert_eq!(
             outcomes.get("MCP_TEST_LOWERCASE_INPUT"),
             Some(&McpEnvApplyOutcome::SetLiteral),

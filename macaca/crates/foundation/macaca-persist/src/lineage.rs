@@ -3,7 +3,7 @@
 //! `SessionLineageStore` is the **Repository** adapter for lineage DTOs defined
 //! in `macaca-proto::context_lineage`. It serializes value objects to the shared
 //! `PersistBackend` without importing `macaca-context` service logic, preserving
-//! foundation-layer dependency direction mandated by Route C governance.
+//! foundation-layer dependency direction mandated by protocol governance.
 
 use std::sync::Arc;
 

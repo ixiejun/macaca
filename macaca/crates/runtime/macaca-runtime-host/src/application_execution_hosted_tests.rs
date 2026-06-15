@@ -272,7 +272,7 @@ async fn abi_hosted_declared_host_command_results_become_durable_execution_event
 
 /// Contract test: under the unified call-path model every host-command row is
 /// equally authoritative — a single failed delegated output must emit
-/// `ExecutionFailed` without compatibility/diagnostic graph-owner branches.
+/// `ExecutionFailed` without runtime-version or diagnostic graph-owner branches.
 #[tokio::test]
 async fn abi_hosted_terminal_state_fails_when_any_host_command_fails() {
     let (_dir, event_log) = event_log();

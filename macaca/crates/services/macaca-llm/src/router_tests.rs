@@ -36,12 +36,6 @@ impl LlmProvider for EchoProvider {
     }
 }
 
-#[test]
-#[allow(deprecated)]
-fn deprecated_resolve_provider_name_remains_callable() {
-    assert_eq!(LlmRouter::resolve_provider_name("gpt-4o"), "openai");
-}
-
 #[tokio::test]
 async fn router_dispatches_to_registered_provider() {
     let mut router = LlmRouter::new();

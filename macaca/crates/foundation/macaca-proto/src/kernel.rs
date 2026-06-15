@@ -293,7 +293,7 @@ mod tests {
     #[test]
     fn policy_decision_exposes_allow_state() {
         let allow = PolicyDecision::Allow {
-            reason: "compatibility".into(),
+            reason: "default_allow".into(),
         };
         let deny = PolicyDecision::Deny {
             reason: "budget exceeded".into(),

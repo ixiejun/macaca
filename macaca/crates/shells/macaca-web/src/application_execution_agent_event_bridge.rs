@@ -54,7 +54,7 @@ impl ApplicationExecutionAgentEventMirror {
     /// application-execution run id.
     ///
     /// The run id is the protocol join key.  If it is absent, the agent run may
-    /// be a normal chat, YAML workflow, task worker, or legacy executor flow; in
+    /// be a normal chat, YAML workflow, task worker, or local executor flow; in
     /// those cases mirroring would invent state, so the method returns `None`.
     pub(crate) fn from_command(
         client: Arc<dyn SystemApplicationExecutionClient>,

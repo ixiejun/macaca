@@ -174,9 +174,7 @@ impl ExecutionControlForkJoinCoordinator {
         fork_id: ForkId,
         delegate_task_id: TaskId,
     ) -> Result<(), String> {
-        fork_manager
-            .suspend_fork(fork_id, delegate_task_id)
-            .await?;
+        fork_manager.suspend_fork(fork_id, delegate_task_id).await?;
         info!(
             fork_id = %fork_id.0,
             task_id = %delegate_task_id.0,
@@ -196,10 +194,8 @@ impl ExecutionControlForkJoinCoordinator {
         request: ForkJoinParentWaitRequest,
     ) -> Result<ExecutionControlCommandResult, String> {
         let scope = Self::parent_wait_scope(&request).map_err(|error| error.to_string())?;
-        let resolved = ExecutionControlPolicyResolver::resolve(
-            Some(&Self::fork_lifecycle_policy()),
-            None,
-        );
+        let resolved =
+            ExecutionControlPolicyResolver::resolve(Some(&Self::fork_lifecycle_policy()), None);
         if resolved.status != ExecutionControlResolutionStatus::Enabled {
             return Err(format!(
                 "fork-join execution control denied: {}",

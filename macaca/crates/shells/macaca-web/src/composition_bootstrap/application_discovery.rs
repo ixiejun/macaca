@@ -9,10 +9,11 @@ use std::sync::Arc;
 
 use tracing::{error, info, warn};
 
-use macaca_sdk::app::{AppLoader, AppRegistry, AppRuntime, SharedDomainPackCatalog};
-use macaca_proto::{ApplicationStartCommand, KernelServiceId, MacacaResult, TraceContext};
 use super::bootstrap_path_helpers::autonomy_runtime_config_from_web_config;
 use crate::wasm_orchestration_backend::WebApplicationOrchestrationBackend;
+use macaca_host_composition::app::{AppLoader, AppRegistry, AppRuntime};
+use macaca_proto::{ApplicationStartCommand, KernelServiceId, MacacaResult, TraceContext};
+use macaca_sdk::SharedDomainPackCatalog;
 
 use super::bootstrap_ctx::BootstrapCtx;
 
@@ -35,7 +36,6 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
         "Apps discovered from workspace application directory"
     );
 
-
     // 5. Compose the installed domain-pack catalog before constructing runtime
     // and Application Service so pack expansion uses the same host-owned view.
     let domain_pack_catalog: SharedDomainPackCatalog =
@@ -46,10 +46,12 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
         &domain_pack_catalog,
     )));
     let registry = Arc::new(tokio::sync::RwLock::new(registry));
-    let service_runtime = Arc::new(macaca_sdk::runtime_host::ServiceRuntime::new(
-        macaca_sdk::runtime_host::ServiceRuntimeConfig::default(),
-    ));
-    let autonomy_runtime = macaca_sdk::runtime_host::bootstrap_autonomy_services(
+    let service_runtime = Arc::new(
+        macaca_host_composition::service_runtime::ServiceRuntime::new(
+            macaca_host_composition::service_runtime::ServiceRuntimeConfig::default(),
+        ),
+    );
+    let autonomy_runtime = macaca_host_composition::autonomy_runtime::bootstrap_autonomy_services(
         Arc::clone(&service_runtime),
         "web-startup-autonomy",
         autonomy_runtime_config_from_web_config(&config.autonomy),
@@ -73,34 +75,37 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
     let mut started_apps: Vec<(macaca_proto::ApplicationId, String, Vec<String>)> = Vec::new();
     // Compose one shared audit bundle so replay commands and WASM host-import
     // routing can observe the same service-call evidence chain.
-    let service_audit_bundle = macaca_sdk::runtime_host::ServiceAuditRuntimeBundle::in_memory();
+    let service_audit_bundle =
+        macaca_host_composition::service_runtime::ServiceAuditRuntimeBundle::in_memory();
     // Host runtime wiring point for future production WASM runtime enablement.
     // Keeping this bridge bound to the shared sink guarantees audit continuity
     // once L2 WASM execution path is enabled in this host.
     let wasm_host_import_bridge = service_audit_bundle.wasm_host_import_bridge(
         Arc::clone(&service_runtime),
-        macaca_sdk::runtime_host::wasm_runtime_provider::WasmHostImportBridgeConfig::default(),
+        macaca_host_composition::application_bootstrap::wasm_runtime_provider::WasmHostImportBridgeConfig::default(),
     );
     service_runtime
         .register_provider(
-            &macaca_sdk::runtime_host::StaticServiceProviderFactory::new(
-                macaca_sdk::runtime_host::ServiceProviderInstance::new(
-                    macaca_sdk::app::application_service_descriptor(),
-                    Arc::new(macaca_sdk::runtime_host::ApplicationSystemServiceProvider::new(
-                        Arc::clone(&registry),
-                        Arc::clone(&runtime),
-                        Arc::clone(&domain_pack_catalog),
-                        Arc::clone(&kernel),
-                        wasm_host_import_bridge.policy_engine(),
-                        wasm_host_import_bridge.clone(),
-                        Some(
-                            Arc::clone(&orchestration_backend)
-                                as Arc<dyn macaca_sdk::runtime_host::ApplicationOrchestrationBackend>,
+            &macaca_host_composition::service_runtime::StaticServiceProviderFactory::new(
+                macaca_host_composition::service_runtime::ServiceProviderInstance::new(
+                    macaca_host_composition::app::application_service_descriptor(),
+                    Arc::new(
+                        macaca_host_composition::application_bootstrap::ApplicationSystemServiceProvider::new(
+                            Arc::clone(&registry),
+                            Arc::clone(&runtime),
+                            Arc::clone(&domain_pack_catalog),
+                            Arc::clone(&kernel),
+                            wasm_host_import_bridge.policy_engine(),
+                            wasm_host_import_bridge.clone(),
+                            Some(Arc::clone(&orchestration_backend)
+                                as Arc<
+                                    dyn macaca_host_composition::application_bootstrap::ApplicationOrchestrationBackend,
+                                >),
                         ),
-                    )),
+                    ),
                 ),
             ),
-            macaca_sdk::runtime_host::ServiceProviderFactoryContext::new(),
+            macaca_host_composition::service_runtime::ServiceProviderFactoryContext::new(),
         )
         .await
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
@@ -113,29 +118,33 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
     service_runtime
         .register_provider(
-            &macaca_sdk::runtime_host::StaticServiceProviderFactory::new(
+            &macaca_host_composition::service_runtime::StaticServiceProviderFactory::new(
                 service_audit_bundle.audit_service_provider_instance(),
             ),
-            macaca_sdk::runtime_host::ServiceProviderFactoryContext::new(),
+            macaca_host_composition::service_runtime::ServiceProviderFactoryContext::new(),
         )
         .await
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
     service_runtime
         .start(
-            &KernelServiceId::new(macaca_sdk::runtime_host::SERVICE_CALL_AUDIT_SERVICE_ID),
+            &KernelServiceId::new(
+                macaca_host_composition::service_runtime::SERVICE_CALL_AUDIT_SERVICE_ID,
+            ),
             TraceContext::new("web-startup-service-call-audit-service"),
         )
         .await
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
     service_runtime
         .register_provider(
-            &macaca_sdk::runtime_host::StaticServiceProviderFactory::new(
-                macaca_sdk::runtime_host::ServiceProviderInstance::new(
-                    macaca_sdk::runtime_host::plugin_control_service_descriptor(),
-                    Arc::new(macaca_sdk::runtime_host::PluginControlSystemServiceProvider::in_memory()),
+            &macaca_host_composition::service_runtime::StaticServiceProviderFactory::new(
+                macaca_host_composition::service_runtime::ServiceProviderInstance::new(
+                    macaca_host_composition::application_bootstrap::plugin_control_service_descriptor(),
+                    Arc::new(
+                        macaca_host_composition::application_bootstrap::PluginControlSystemServiceProvider::in_memory(),
+                    ),
                 ),
             ),
-            macaca_sdk::runtime_host::ServiceProviderFactoryContext::new(),
+            macaca_host_composition::service_runtime::ServiceProviderFactoryContext::new(),
         )
         .await
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
@@ -148,15 +157,16 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
     service_runtime
         .register_provider(
-            &macaca_sdk::runtime_host::StaticServiceProviderFactory::new(
-                macaca_sdk::runtime_host::ServiceProviderInstance::new(
-                    macaca_sdk::runtime_host::plugin_capability_service_descriptor(),
+            &macaca_host_composition::service_runtime::StaticServiceProviderFactory::new(
+                macaca_host_composition::service_runtime::ServiceProviderInstance::new(
+                    macaca_host_composition::application_bootstrap::plugin_capability_service_descriptor(),
                     Arc::new(
-                        macaca_sdk::runtime_host::PluginCapabilitySystemServiceProvider::in_memory(),
+                        macaca_host_composition::application_bootstrap::PluginCapabilitySystemServiceProvider::in_memory(
+                        ),
                     ),
                 ),
             ),
-            macaca_sdk::runtime_host::ServiceProviderFactoryContext::new(),
+            macaca_host_composition::service_runtime::ServiceProviderFactoryContext::new(),
         )
         .await
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
@@ -169,13 +179,15 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
     service_runtime
         .register_provider(
-            &macaca_sdk::runtime_host::StaticServiceProviderFactory::new(
-                macaca_sdk::runtime_host::ServiceProviderInstance::new(
-                    macaca_sdk::runtime_host::plugin_hook_service_descriptor(),
-                    Arc::new(macaca_sdk::runtime_host::PluginHookSystemServiceProvider::in_memory()),
+            &macaca_host_composition::service_runtime::StaticServiceProviderFactory::new(
+                macaca_host_composition::service_runtime::ServiceProviderInstance::new(
+                    macaca_host_composition::application_bootstrap::plugin_hook_service_descriptor(),
+                    Arc::new(
+                        macaca_host_composition::application_bootstrap::PluginHookSystemServiceProvider::in_memory(),
+                    ),
                 ),
             ),
-            macaca_sdk::runtime_host::ServiceProviderFactoryContext::new(),
+            macaca_host_composition::service_runtime::ServiceProviderFactoryContext::new(),
         )
         .await
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
@@ -187,7 +199,7 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
         .await
         .map_err(|err| macaca_proto::MacacaError::Config(err.to_string()))?;
     let generic_service_client: Arc<dyn macaca_sdk::SystemServiceClient> = Arc::new(
-        crate::service_runtime_client::WebRuntimeSystemServiceClient::new(
+        macaca_host_composition::HostRuntimeSystemServiceClient::new(
             Arc::clone(&service_runtime),
             "macaca.web",
         ),
@@ -197,10 +209,10 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
     );
 
     // Auto-start all discovered apps through the service boundary.  The
-    // Application Service provider still delegates to the legacy runtime
-    // implementation internally, but Web now observes startup through typed,
-    // traceable service commands and sanitized result views before loading
-    // app-local skills from the returned runtime metadata.
+    // Application Service provider owns the runtime implementation internally,
+    // while Web observes startup through typed, traceable service commands and
+    // sanitized result views before loading app-local skills from the returned
+    // runtime metadata.
     for app in &discovered {
         let manifest_path = app.manifest_path.clone();
         if manifest_path.exists() {

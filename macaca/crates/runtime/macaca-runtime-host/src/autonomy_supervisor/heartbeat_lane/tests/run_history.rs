@@ -7,11 +7,11 @@ use macaca_proto::{ApplicationId, HeartbeatRunState, TraceContext};
 
 use crate::{ServiceRuntime, ServiceRuntimeConfig};
 
+use super::super::HeartbeatLane;
 use super::fixtures::{
     agent_application_profile, heartbeat_declaration, register_lane_services, wait_for_run_state,
 };
 use super::test_doubles::{NoEvidenceExecutionBackend, RecordingExecutionBackend};
-use super::super::HeartbeatLane;
 
 #[tokio::test]
 async fn heartbeat_run_history_records_successful_agent_dispatch_completion() {

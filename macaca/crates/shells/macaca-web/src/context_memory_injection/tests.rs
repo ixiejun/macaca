@@ -2,13 +2,17 @@
 
 use async_trait::async_trait;
 use chrono::Utc;
-use macaca_sdk::context::{ContextOptionsPatch, ContextPreflightRecallConfig, ContextReportBuilder};
-use macaca_proto::{ApplicationId, LlmOptions, LlmRole, MemoryEntry, MemoryId, MemoryLayer, TraceContext};
-use macaca_sdk::memory::{
+use macaca_host_composition::context::{
+    ContextOptionsPatch, ContextPreflightRecallConfig, ContextReportBuilder,
+};
+use macaca_host_composition::memory::{
     MemoryForgetCommand, MemoryGetCommand, MemoryGetResult, MemoryPrefetchCommand,
     MemoryRecallCommand, MemoryRecallResult, MemoryRememberCommand, MemoryRememberResult,
     MemoryScope, MemoryServiceSnapshot, MemoryServiceSnapshotCommand, MemoryStatusCommand,
     MemoryStatusReport,
+};
+use macaca_proto::{
+    ApplicationId, LlmOptions, LlmRole, MemoryEntry, MemoryId, MemoryLayer, TraceContext,
 };
 use std::sync::Arc;
 
@@ -51,15 +55,12 @@ impl macaca_sdk::SystemMemoryClient for StaticMemoryClient {
             trace: TraceContext::new("test"),
             query: "test".into(),
             limit: self.entries.len().max(1),
-            policy: macaca_sdk::memory::MemoryPolicyHints::default(),
+            policy: macaca_host_composition::memory::MemoryPolicyHints::default(),
         })
         .await
     }
 
-    async fn get(
-        &self,
-        command: MemoryGetCommand,
-    ) -> macaca_proto::MacacaResult<MemoryGetResult> {
+    async fn get(&self, command: MemoryGetCommand) -> macaca_proto::MacacaResult<MemoryGetResult> {
         Ok(MemoryGetResult::new(
             self.entries
                 .iter()
@@ -78,7 +79,7 @@ impl macaca_sdk::SystemMemoryClient for StaticMemoryClient {
     ) -> macaca_proto::MacacaResult<MemoryStatusReport> {
         Ok(MemoryStatusReport::healthy(
             "test-memory-client",
-            macaca_sdk::memory::MemoryCapabilitySet::basic_store_search(),
+            macaca_host_composition::memory::MemoryCapabilitySet::basic_store_search(),
         ))
     }
 
@@ -89,7 +90,7 @@ impl macaca_sdk::SystemMemoryClient for StaticMemoryClient {
         Ok(MemoryServiceSnapshot::new(
             "test-memory-client",
             true,
-            macaca_sdk::memory::MemoryCapabilitySet::basic_store_search(),
+            macaca_host_composition::memory::MemoryCapabilitySet::basic_store_search(),
             None,
         ))
     }
@@ -107,8 +108,8 @@ fn entry(content: &str) -> MemoryEntry {
     }
 }
 
-fn assembled() -> macaca_sdk::context::ContextAssembleResult {
-    macaca_sdk::context::ContextAssembleResult {
+fn assembled() -> macaca_host_composition::context::ContextAssembleResult {
+    macaca_host_composition::context::ContextAssembleResult {
         messages: vec![
             macaca_proto::LlmMessage::system("sys"),
             macaca_proto::LlmMessage::user("find memory"),
@@ -188,7 +189,7 @@ async fn preflight_memory_fails_open_with_warning() {
 }
 
 #[tokio::test]
-async fn legacy_active_recall_reports_request_only_metadata() {
+async fn active_recall_reports_request_only_metadata() {
     let memory_client: Arc<dyn macaca_sdk::SystemMemoryClient> = Arc::new(StaticMemoryClient {
         entries: vec![entry("remembered fact")],
         fail_search: false,

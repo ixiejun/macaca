@@ -10,12 +10,12 @@ use std::collections::BTreeMap;
 use std::sync::{Arc, Weak};
 
 use async_trait::async_trait;
-use macaca_sdk::runtime_host::{AgentInfo, AgentRunner, TaskContext, TaskResult};
+use macaca_host_composition::executor::AgentRunner;
 use macaca_proto::{
-    AgentExecutionEvent, AgentExecutionIntent, ApplicationAgentDelegateCommand,
+    AgentExecutionEvent, AgentExecutionIntent, AgentInfo, ApplicationAgentDelegateCommand,
     ApplicationAgentDelegateResult, ApplicationId, ApplicationServiceScope, KernelServiceId,
-    ServiceBusSource, TaskId, TraceContext, APPLICATION_SERVICE_ID,
-    AGENT_EXECUTION_INTENT_METADATA_KEY,
+    ServiceBusSource, TaskContext, TaskId, TaskResult, TraceContext,
+    AGENT_EXECUTION_INTENT_METADATA_KEY, APPLICATION_SERVICE_ID,
 };
 use tracing::info;
 
@@ -108,10 +108,7 @@ impl WebAgentRunner {
             .map_err(|error| error.to_string())?;
 
         let mut metadata = BTreeMap::from([
-            (
-                "entrypoint".into(),
-                "kernel.agent_runner".into(),
-            ),
+            ("entrypoint".into(), "kernel.agent_runner".into()),
             (
                 AGENT_EXECUTION_INTENT_METADATA_KEY.into(),
                 AgentExecutionIntent::YamlWorkflowStep
@@ -187,7 +184,9 @@ impl WebAgentRunner {
                 .get("error")
                 .and_then(|value| value.as_str())
                 .map(ToOwned::to_owned)
-                .unwrap_or_else(|| format!("application agent delegation returned {}", result.status));
+                .unwrap_or_else(|| {
+                    format!("application agent delegation returned {}", result.status)
+                });
             if let Some(agent_manifest) = state.kernel.get_agent_by_name(agent_name).await {
                 state
                     .kernel
@@ -221,14 +220,8 @@ impl AgentRunner for WebAgentRunner {
         context: Option<TaskContext>,
         event_tx: Option<tokio::sync::mpsc::Sender<AgentExecutionEvent>>,
     ) -> Result<TaskResult, String> {
-        self.execute_via_application_delegate(
-            application_id,
-            agent_name,
-            prompt,
-            context,
-            event_tx,
-        )
-        .await
+        self.execute_via_application_delegate(application_id, agent_name, prompt, context, event_tx)
+            .await
     }
 
     async fn list_agents(&self) -> Vec<AgentInfo> {
@@ -261,4 +254,3 @@ impl AgentRunner for WebAgentRunner {
         manifests.iter().any(|m| m.name == agent_name)
     }
 }
-

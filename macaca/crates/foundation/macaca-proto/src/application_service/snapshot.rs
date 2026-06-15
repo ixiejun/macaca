@@ -9,7 +9,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{ApplicationHostCommandResult, TraceContext};
 
-use super::app_views::{ApplicationHeartbeatAgentView, ApplicationServiceAppView, ApplicationServiceSessionView};
+use super::app_views::{
+    ApplicationHeartbeatAgentView, ApplicationServiceAppView, ApplicationServiceSessionView,
+};
 use super::constants::APPLICATION_SERVICE_ID;
 use super::metadata_views::ApplicationMetadataView;
 

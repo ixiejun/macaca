@@ -5,14 +5,10 @@
 //! operator evidence and trace metadata.
 
 use macaca_proto::{MacacaResult, TraceContext};
-use macaca_sdk::{
-    SkillAuthorKind, SkillCurationLifecycleCommand, SkillServiceScope, SystemSkillClient,
-    UnavailableSystemSkillClient,
-};
 use tracing::info;
 
-use super::output::{print_json, print_sdk_result};
-use super::support::{live_operator_payload, optional_vec, policy_hints, url_segment};
+use super::output::{print_json, print_unavailable};
+use super::support::{live_operator_payload, url_segment};
 use super::types::{SkillCliEvidenceRefs, SkillCliLifecycleAction, SkillCliRuntimeTarget};
 
 /// Forward one lifecycle mutation request through the SDK Skill facade.
@@ -38,37 +34,13 @@ pub async fn execute_skill_lifecycle(
         return print_json(response);
     }
 
-    let client = UnavailableSystemSkillClient;
     let trace = TraceContext::new(format!("cli-skill-lifecycle-{}", action.as_str()));
-    let command = SkillCurationLifecycleCommand {
-        trace: trace.clone(),
-        scope: SkillServiceScope::default(),
-        skill_id: skill_id.clone(),
-        name: skill_id,
-        source: "cli-skill-operations".into(),
-        source_scope: "operator".into(),
-        author_kind: SkillAuthorKind::Unknown,
-        reason: refs
-            .reason
-            .unwrap_or_else(|| "cli_skill_lifecycle_request".into()),
-        evidence_ids: optional_vec(refs.evidence_ref),
-        task_id: None,
-        policy_decision_refs: optional_vec(refs.policy_ref),
-        policy: policy_hints(),
-    };
     info!(
         trace_id = %trace.trace_id,
         command = "skill.curation.lifecycle",
         action = action.as_str(),
-        skill_id = %command.skill_id,
-        evidence_count = command.evidence_ids.len(),
-        policy_decision_count = command.policy_decision_refs.len(),
-        "CLI forwarding Skill lifecycle command through SDK Skill facade"
+        skill_id = %skill_id,
+        "CLI Skill lifecycle command has no live Skill runtime target"
     );
-    print_sdk_result(
-        trace,
-        client
-            .curation_lifecycle(action.into_service_action(), command)
-            .await,
-    )
+    print_unavailable(trace, "skill.curation.lifecycle")
 }

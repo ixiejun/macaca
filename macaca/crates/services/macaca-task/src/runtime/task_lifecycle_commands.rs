@@ -5,7 +5,9 @@ use std::sync::Arc;
 use macaca_proto::TodoItem;
 use tracing::{info, warn};
 
-use crate::commands::{ClaimTaskCommand, ReviewTaskCommand, StartTaskCommand, SubmitReviewCommand};
+use crate::commands::{
+    ClaimTaskCommand, FailTaskCommand, ReviewTaskCommand, StartTaskCommand, SubmitReviewCommand,
+};
 use crate::events::{TaskServiceEvent, TaskServiceEventType};
 use crate::todo_board::{TaskBoard, TaskSpace};
 
@@ -152,6 +154,51 @@ where
         self.refresh_snapshot(&command.app_id, Some(&command.session_id))
             .await;
         Ok(submitted)
+    }
+
+    /// Mark a task as failed through the Task Service lifecycle boundary.
+    pub async fn fail_task(&self, command: FailTaskCommand) -> Result<bool, String> {
+        let board = TaskBoard::for_agent(
+            command.app_id.clone(),
+            command.agent_name.clone(),
+            Some(command.session_id.clone()),
+            Arc::clone(&self.store),
+        );
+        let failed = board
+            .fail_task(&command.task_id, command.error.clone())
+            .await;
+        if failed {
+            warn!(
+                app_id = %command.app_id.0,
+                session_id = %command.session_id,
+                agent = %command.agent_name,
+                task_id = %command.task_id,
+                error_len = command.error.len(),
+                trace_id = command
+                    .trace
+                    .as_ref()
+                    .map(|trace| trace.trace_id.as_str())
+                    .unwrap_or("none"),
+                "task service task failed"
+            );
+            self.emit(TaskServiceEvent::new(
+                command.app_id.clone(),
+                Some(command.session_id.clone()),
+                Some(command.task_id),
+                None,
+                TaskServiceEventType::TaskFailed,
+                command.trace.clone(),
+                serde_json::json!({
+                    "task_id": command.task_id.to_string(),
+                    "agent": command.agent_name,
+                    "error": command.error,
+                }),
+            ))
+            .await;
+        }
+        self.refresh_snapshot(&command.app_id, Some(&command.session_id))
+            .await;
+        Ok(failed)
     }
 
     /// Apply a review result to a task and emit the outcome event.

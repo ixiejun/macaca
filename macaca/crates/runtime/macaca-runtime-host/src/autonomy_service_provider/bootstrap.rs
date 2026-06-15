@@ -21,8 +21,8 @@ use crate::{
 };
 
 use super::heartbeat_adapter::HostHeartbeatServiceAdapter;
-use super::scheduler_adapter::HostSchedulerServiceAdapter;
 use super::scheduled_agent_task_adapter::ScheduledAgentTaskSystemServiceProvider;
+use super::scheduler_adapter::HostSchedulerServiceAdapter;
 use super::support::runtime_error;
 
 /// Started autonomy service ids returned by runtime-host bootstrap.
@@ -149,8 +149,12 @@ pub async fn bootstrap_autonomy_local_services(
     )
     .await?;
 
-    let supervisor =
-        AutonomyLifecycleCoordinator::new(Arc::clone(&runtime), scheduler, heartbeat, config.clone());
+    let supervisor = AutonomyLifecycleCoordinator::new(
+        Arc::clone(&runtime),
+        scheduler,
+        heartbeat,
+        config.clone(),
+    );
     supervisor
         .start(TraceContext::new(format!(
             "{trace_prefix}-supervisor-start"
@@ -158,9 +162,7 @@ pub async fn bootstrap_autonomy_local_services(
         .await?;
     if config.recovery_wake_enabled {
         supervisor
-            .dispatch_recovery_wake(TraceContext::new(format!(
-                "{trace_prefix}-recovery-wake"
-            )))
+            .dispatch_recovery_wake(TraceContext::new(format!("{trace_prefix}-recovery-wake")))
             .await?;
     }
     bundle.supervisor = Some(supervisor);

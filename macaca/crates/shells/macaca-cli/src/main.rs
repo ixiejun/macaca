@@ -1,7 +1,5 @@
 //! Agent OS CLI entry point.
 
-#![deny(deprecated)]
-
 use clap::{Args, Parser, Subcommand};
 use macaca_cli::command_handlers::{
     AgentsCommandHandler, CliCommandHandler, PluginListCommandHandler, RunCommandHandler,

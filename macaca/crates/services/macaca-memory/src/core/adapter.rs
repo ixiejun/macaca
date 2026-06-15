@@ -20,7 +20,7 @@ use super::status::{MemoryCapabilitySet, MemoryStatusReport};
 /// Runtime principle:
 /// - validate that the caller really asked for `AgentPrivate`
 /// - enrich metadata with explicit scope information
-/// - delegate storage/recall to the legacy isolated manager
+/// - delegate storage/recall to the isolated manager
 ///
 /// This keeps the new fabric API additive: callers can move to `MemoryFacade`
 /// without rewriting the proven private-memory backend immediately.
@@ -29,7 +29,7 @@ pub struct BuiltinAgentPrivateMemory<'a, V: VectorStore, E: EmbeddingProvider> {
 }
 
 impl<'a, V: VectorStore, E: EmbeddingProvider> BuiltinAgentPrivateMemory<'a, V, E> {
-    /// Wrap an existing isolated manager as a fabric-compatible private provider.
+    /// Wrap an existing isolated manager as a fabric provider.
     pub fn new(manager: &'a IsolatedMemoryManager<V, E>) -> Self {
         Self { manager }
     }
@@ -91,7 +91,7 @@ where
     }
 }
 
-/// Builtin adapter that exposes the legacy shared/session memory manager.
+/// Builtin adapter that exposes the shared/session memory manager.
 ///
 /// Unlike the private adapter, this wrapper allows collaborative memory scoped
 /// by session or project. It still depends on the caller-supplied `MemoryScope`
@@ -101,7 +101,7 @@ pub struct BuiltinSessionSharedMemory<'a, V: VectorStore, E: EmbeddingProvider> 
 }
 
 impl<'a, V: VectorStore, E: EmbeddingProvider> BuiltinSessionSharedMemory<'a, V, E> {
-    /// Wrap an existing shared memory manager as a fabric-compatible provider.
+    /// Wrap an existing shared memory manager as a fabric provider.
     pub fn new(manager: &'a MemoryManager<V, E>) -> Self {
         Self { manager }
     }
@@ -165,10 +165,10 @@ where
 /// `MemoryFabricFacade` is the core orchestrator added by the proposal:
 /// - callers speak only `MemoryFacade`
 /// - the router decides which visibility lane should handle the request
-/// - builtin adapters translate the request back into legacy managers
+/// - builtin adapters translate the request back into concrete managers
 ///
-/// This design provides a migration seam: the public API becomes generic and
-/// scope-aware today, while concrete storage backends can evolve independently.
+/// This design keeps the public API generic and scope-aware while concrete
+/// storage backends evolve independently.
 pub struct MemoryFabricFacade<P, S, R = DefaultMemoryRouter> {
     private_memory: P,
     shared_memory: S,

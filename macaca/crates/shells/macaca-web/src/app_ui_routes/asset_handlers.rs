@@ -50,10 +50,9 @@ pub async fn get_app_ui_asset(
     );
 
     let mut response = Response::new(Body::from(body));
-    response.headers_mut().insert(
-        header::CONTENT_TYPE,
-        HeaderValue::from_static(content_type),
-    );
+    response
+        .headers_mut()
+        .insert(header::CONTENT_TYPE, HeaderValue::from_static(content_type));
     if asset_path.extension().and_then(|value| value.to_str()) == Some("html") {
         response.headers_mut().insert(
             header::CONTENT_SECURITY_POLICY,

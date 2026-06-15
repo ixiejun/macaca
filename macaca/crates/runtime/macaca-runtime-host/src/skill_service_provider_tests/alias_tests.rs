@@ -5,9 +5,8 @@ use macaca_proto::TraceContext;
 use macaca_skill::{
     SkillAliasKind, SkillAliasRecord, SkillAliasResolutionPolicy, SkillAliasResolutionStatus,
     SkillAliasResolveCommand, SkillAliasResolveResult, SkillAliasSnapshotCommand,
-    SkillAliasSnapshotResult,
-    SkillAliasUpsertCommand, SkillAliasUpsertResult, SkillServiceScope, SKILL_ALIAS_RESOLVE_COMMAND,
-    SKILL_ALIAS_SNAPSHOT_COMMAND, SKILL_ALIAS_UPSERT_COMMAND,
+    SkillAliasSnapshotResult, SkillAliasUpsertCommand, SkillAliasUpsertResult, SkillServiceScope,
+    SKILL_ALIAS_RESOLVE_COMMAND, SKILL_ALIAS_SNAPSHOT_COMMAND, SKILL_ALIAS_UPSERT_COMMAND,
 };
 
 use crate::SkillSystemServiceProvider;

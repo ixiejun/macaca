@@ -47,7 +47,7 @@ impl WasmArtifactDigest {
 /// ABI requirement declared by a WASM package before negotiation.
 ///
 /// The version is string-backed so Macaca can start with simple semantic
-/// equality while preserving room for later ranges, aliases, or compatibility
+/// equality while preserving room for later ranges, aliases, or host profiles.
 /// profiles. Capability flags are generic strings instead of provider names.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WasmAbiRequirement {
@@ -144,7 +144,7 @@ impl WasmExportDeclaration {
 
 /// Metadata-only descriptor for one WASM component artifact.
 ///
-/// The descriptor is an Adapter target for legacy package metadata and future
+/// The descriptor is an Adapter target for package metadata and future
 /// Store metadata. It carries artifact id, artifact reference, digest,
 /// signature reference, ABI requirement, imports, exports, and safe metadata.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -228,11 +228,11 @@ impl WasmComponentArtifactDescriptor {
 /// Result of provider-neutral WASM ABI negotiation.
 ///
 /// Negotiation is fail-closed. It records the requested version, selected
-/// supported version when compatible, runtime capability snapshot, stable
+/// supported version when admitted, runtime capability snapshot, stable
 /// reason codes, and safe metadata.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WasmAbiNegotiationResult {
-    pub compatible: bool,
+    pub admitted: bool,
     pub requested_version: String,
     pub selected_version: Option<String>,
     pub capabilities: WasmEngineCapabilities,
@@ -266,7 +266,7 @@ impl WasmAbiNegotiationResult {
         reason_codes.sort();
         reason_codes.dedup();
         Self {
-            compatible: selected_version.is_some() && reason_codes.is_empty(),
+            admitted: selected_version.is_some() && reason_codes.is_empty(),
             requested_version: requirement.version,
             selected_version,
             capabilities,
@@ -322,7 +322,7 @@ mod tests {
             WasmEngineCapabilities::unavailable(),
         );
 
-        assert!(!result.compatible);
+        assert!(!result.admitted);
         assert!(result
             .reason_codes
             .iter()
@@ -341,7 +341,7 @@ mod tests {
             capabilities,
         );
 
-        assert!(result.compatible);
+        assert!(result.admitted);
         assert_eq!(result.selected_version.as_deref(), Some("0"));
     }
 }

@@ -21,7 +21,9 @@ use crate::service_call_audit::{
 /// every successful `service.agent_execution` call must report the same composed
 /// backend as the terminal provider, regardless of which shell entry surface initiated
 /// the run.
-fn distinct_terminal_agent_execution_providers(events: &[ServiceCallAuditEvent]) -> HashSet<String> {
+fn distinct_terminal_agent_execution_providers(
+    events: &[ServiceCallAuditEvent],
+) -> HashSet<String> {
     events
         .iter()
         .filter(|event| {
@@ -50,16 +52,15 @@ fn record_canonical_agent_execution_chain(
     );
     requested.session_id = Some(session_id.into());
     requested.provider_id = Some(entry_source.into());
-    sink.emit(requested).expect("audit sink should accept requested event");
+    sink.emit(requested)
+        .expect("audit sink should accept requested event");
 
-    let mut routed = ServiceCallAuditEvent::new(
-        "service_call_routed",
-        trace_id,
-        AGENT_EXECUTION_SERVICE_ID,
-    );
+    let mut routed =
+        ServiceCallAuditEvent::new("service_call_routed", trace_id, AGENT_EXECUTION_SERVICE_ID);
     routed.session_id = Some(session_id.into());
     routed.provider_id = Some("ComposedAgentExecutionBackend".into());
-    sink.emit(routed).expect("audit sink should accept routed event");
+    sink.emit(routed)
+        .expect("audit sink should accept routed event");
 
     let mut succeeded = ServiceCallAuditEvent::new(
         "service_call_succeeded",

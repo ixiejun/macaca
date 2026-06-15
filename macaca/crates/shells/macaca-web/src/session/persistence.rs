@@ -6,12 +6,13 @@
 use std::sync::Arc;
 
 use chrono::Utc;
+use macaca_host_composition::persist::PersistStore;
 use macaca_proto::ApplicationId;
-use macaca_sdk::runtime_host::executor::ExecutorEvent;
-use macaca_sdk::runtime_host::persist::PersistStore;
 
-use super::turn_model::{ensure_running_assistant_turn, session_status_from_executor_event, stored_turns_or_messages};
-use super::types::{AgentTrace, AssistantExecutionMeta, SessionMeta, StoredSession, StoredTraceStep, StoredTurn};
+use super::turn_model::{ensure_running_assistant_turn, stored_turns_or_messages};
+use super::types::{
+    AgentTrace, AssistantExecutionMeta, SessionMeta, StoredSession, StoredTraceStep,
+};
 
 // Key prefixes for redb storage
 pub(crate) const SESSION_PREFIX: &str = "session/";
@@ -95,69 +96,4 @@ pub(crate) async fn persist_session_snapshot<S>(
     if let Ok(data) = serde_json::to_vec(&stored) {
         let _ = store.set(&session_key_db, &data).await;
     }
-}
-/// Save agent traces to a dedicated key (simple overwrite, no read-modify-write).
-pub(crate) async fn save_agent_traces<S>(
-    store: &Arc<S>,
-    session_id: &str,
-    traces: std::collections::HashMap<String, Vec<AgentTrace>>,
-) where
-    S: PersistStore + ?Sized,
-{
-    if traces.is_empty() {
-        return;
-    }
-    let key = format!("{}{}", AGENT_TRACES_PREFIX, session_id);
-    if let Ok(data) = serde_json::to_vec(&traces) {
-        let _ = store.set(&key, &data).await;
-    }
-}
-
-/// Load agent traces from the dedicated key.
-pub(crate) async fn load_agent_traces<S>(
-    store: &Arc<S>,
-    session_id: &str,
-) -> std::collections::HashMap<String, Vec<AgentTrace>>
-where
-    S: PersistStore + ?Sized,
-{
-    let key = format!("{}{}", AGENT_TRACES_PREFIX, session_id);
-    match store.get(&key).await {
-        Ok(Some(data)) => serde_json::from_slice(&data).unwrap_or_default(),
-        _ => std::collections::HashMap::new(),
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Real-time Session Update Helper
-// ---------------------------------------------------------------------------
-
-/// Update session status in real-time based on ExecutorEvent.
-/// This is called during SSE streaming to keep session status up-to-date.
-pub(crate) async fn update_session_realtime<S>(
-    store: &Arc<S>,
-    session_id: &str,
-    app_id: &ApplicationId,
-    event: &ExecutorEvent,
-) where
-    S: PersistStore + ?Sized,
-{
-    let Some(status) = session_status_from_executor_event(event) else {
-        return;
-    };
-
-    // Note: agent_traces are NOT written here to avoid overwriting
-    // the periodic saver's data. The collector + periodic saver is
-    // the single source of truth for agent traces.
-    persist_session_snapshot(
-        store,
-        session_id,
-        app_id,
-        Some(status),
-        None,
-        None,
-        None, // agent_traces: None — let periodic saver handle it
-        None,
-    )
-    .await;
 }

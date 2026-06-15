@@ -17,12 +17,14 @@ use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::Response;
 use axum::Json;
 use futures::Stream;
-use macaca_sdk::runtime_host::persist::EventLogQuery;
-use macaca_proto::{ApplicationExecutionEventType, ApplicationId, EventEntry, TraceContext};
+use macaca_proto::{
+    ApplicationExecutionEventType, ApplicationId, EventEntry, EventLogQuery, TraceContext,
+};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use tracing::{debug, info, warn};
 
+use crate::application_execution_event_log::ApplicationExecutionEventLog;
 use crate::application_execution_routes::{parse_application_id, required_text, required_trace};
 use crate::routes::ErrorResponse;
 use crate::state::AppState;
@@ -61,7 +63,7 @@ pub async fn stream_execution_events(
     Query(query): Query<ExecutionEventStreamQuery>,
 ) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, (StatusCode, Json<ErrorResponse>)> {
     let (application_id, trace, event_query) = build_stream_query(&app_id, query)?;
-    let event_log = state.persist.event_log.clone();
+    let event_log = state.application_execution_event_log();
     let session_id = event_query.session_id.clone();
     let limit = event_query.limit;
 
@@ -78,7 +80,8 @@ pub async fn stream_execution_events(
         let mut cursor = event_query.since_seq;
         let mut receiver = event_log.subscribe();
 
-        let initial_batch = query_application_events(&event_log, application_id, event_query.clone()).await;
+        let initial_batch =
+            query_application_events(event_log.as_ref(), application_id, event_query.clone()).await;
         cursor = cursor.max(initial_batch.scanned_cursor);
         for entry in initial_batch.entries {
             cursor = cursor.max(entry.seq);
@@ -94,7 +97,7 @@ pub async fn stream_execution_events(
 
                     let follow_up_query = event_query.clone().since(cursor).limit(limit);
                     let batch = query_application_events(
-                        &event_log,
+                        event_log.as_ref(),
                         application_id,
                         follow_up_query,
                     )
@@ -151,7 +154,7 @@ pub async fn websocket_execution_events(
     Query(query): Query<ExecutionEventStreamQuery>,
 ) -> Result<Response, (StatusCode, Json<ErrorResponse>)> {
     let (application_id, trace, event_query) = build_stream_query(&app_id, query)?;
-    let event_log = state.persist.event_log.clone();
+    let event_log = state.application_execution_event_log();
     let session_id = event_query.session_id.clone();
     let limit = event_query.limit;
 
@@ -213,7 +216,7 @@ pub(crate) fn build_stream_query(
 /// projection.
 async fn run_websocket_event_observer(
     mut socket: WebSocket,
-    event_log: Arc<macaca_sdk::runtime_host::persist::EventLog>,
+    event_log: Arc<dyn ApplicationExecutionEventLog>,
     application_id: ApplicationId,
     trace: TraceContext,
     event_query: EventLogQuery,
@@ -224,7 +227,7 @@ async fn run_websocket_event_observer(
     let mut receiver = event_log.subscribe();
 
     let initial_batch =
-        query_application_events(&event_log, application_id, event_query.clone()).await;
+        query_application_events(event_log.as_ref(), application_id, event_query.clone()).await;
     cursor = cursor.max(initial_batch.scanned_cursor);
     if send_websocket_batch(&mut socket, &initial_batch.entries)
         .await
@@ -289,7 +292,7 @@ async fn run_websocket_event_observer(
                         }
                         let follow_up_query = event_query.clone().since(cursor).limit(limit);
                         let batch = query_application_events(
-                            &event_log,
+                            event_log.as_ref(),
                             application_id,
                             follow_up_query,
                         )
@@ -362,7 +365,7 @@ struct ApplicationEventBatch {
 }
 
 async fn query_application_events(
-    event_log: &macaca_sdk::runtime_host::persist::EventLog,
+    event_log: &dyn ApplicationExecutionEventLog,
     application_id: ApplicationId,
     query: EventLogQuery,
 ) -> ApplicationEventBatch {

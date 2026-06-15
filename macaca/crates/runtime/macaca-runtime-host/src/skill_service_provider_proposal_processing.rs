@@ -299,7 +299,7 @@ fn proposal_has_artifact_evidence(proposal: &SkillExperienceProposalRecord) -> b
     // Older proposal records may carry a bounded artifact count, while newer
     // service-owned capture stores durable artifact references as sanitized
     // metadata keys.  Treat either form as artifact evidence so the processing
-    // Strategy remains backward-compatible and avoids raw application paths.
+    // Strategy remains stable for existing proposal records and avoids raw application paths.
     if proposal
         .metadata
         .get("artifact_count")

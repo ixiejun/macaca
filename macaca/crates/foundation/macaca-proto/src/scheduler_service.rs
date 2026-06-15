@@ -230,12 +230,12 @@ pub struct AgentExecutionTargetCommand {
     pub metadata: BTreeMap<String, String>,
 }
 
-/// Compatibility heartbeat wake target emitted by internal Scheduler jobs.
+/// Heartbeat wake target emitted by internal Scheduler jobs.
 ///
 /// Native Heartbeat cadence is owned by `service.heartbeat`, not Scheduler.
-/// This target is retained only so migration/runtime compatibility paths can
-/// request a typed wake through Heartbeat. Application-facing schedule
-/// management surfaces must not present it as normal recurring work.
+/// This target lets scheduler-owned jobs request a typed wake through Heartbeat.
+/// Application-facing schedule management surfaces must not present it as
+/// normal recurring work.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HeartbeatWakeTargetCommand {
     pub wake_scope_key: String,

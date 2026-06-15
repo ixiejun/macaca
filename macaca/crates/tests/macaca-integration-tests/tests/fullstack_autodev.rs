@@ -7,9 +7,9 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
+use macaca_agent::{AgentExecutionPort, InProcessAgentExecutionPort, ToolCatalog};
 use macaca_app::loader::AppLoader;
 use macaca_app::{AppLayer, AppRuntime, AppStatus};
-use macaca_agent::{AgentExecutionPort, InProcessAgentExecutionPort, ToolCatalog};
 use macaca_kernel::{Kernel, KernelBuilder};
 use macaca_llm::LlmProvider;
 use macaca_proto::config::KernelConfig;
@@ -56,7 +56,10 @@ fn make_kernel() -> Kernel {
         agent_timeout_ms: 30000,
     };
     let llm: Arc<dyn LlmProvider> = Arc::new(MockLlm);
-    let execution_port: Arc<dyn AgentExecutionPort> = Arc::new(InProcessAgentExecutionPort::new(llm, Arc::from(Box::new(DefaultToolSet::new()) as Box<dyn ToolCatalog>)));
+    let execution_port: Arc<dyn AgentExecutionPort> = Arc::new(InProcessAgentExecutionPort::new(
+        llm,
+        Arc::from(Box::new(DefaultToolSet::new()) as Box<dyn ToolCatalog>),
+    ));
     KernelBuilder::from_execution_port(config, execution_port).build()
 }
 
@@ -260,20 +263,20 @@ async fn agent_skills_activate() {
     assert_eq!(catalog.activated_count(), 2);
 }
 
-/// Verify the catalog generates a prompt suitable for injection.
+/// Verify the catalog exposes structured tier-1 metadata for context providers.
 #[tokio::test]
-#[allow(deprecated)] // `catalog_prompt` is deprecated with migration to composer capability providers.
-async fn agent_skills_catalog_prompt() {
+async fn agent_skills_catalog_metadata() {
     let skills_dir = app_dir().join("skills");
 
     let mut catalog = SkillCatalog::new();
     catalog.load_from_directory(&skills_dir).await.unwrap();
 
-    let prompt = catalog.catalog_prompt();
-    assert!(prompt.contains("<available_skills>"));
-    assert!(prompt.contains("golang"));
-    assert!(prompt.contains("shadcn-ui"));
-    assert!(prompt.contains("</available_skills>"));
+    let entries = catalog.catalog();
+    assert!(entries.iter().any(|entry| entry.name == "golang"));
+    assert!(entries.iter().any(|entry| entry.name == "shadcn-ui"));
+    assert!(entries
+        .iter()
+        .all(|entry| !entry.description.trim().is_empty()));
 }
 
 // ---------------------------------------------------------------------------

@@ -3,7 +3,7 @@
 //! The provider implements the same [`WasmApplicationRuntimeProvider`] Strategy
 //! used by the default and unavailable providers.  It keeps Component Model
 //! validation and invocation behind a private Adapter so public Macaca layers
-//! remain provider-neutral and Route C dependency boundaries stay intact.
+//! remain provider-neutral and service dependency boundaries stay intact.
 //!
 //! **Pattern:** Facade — this module re-exports the public provider type while
 //! delegating implementation to focused submodules:

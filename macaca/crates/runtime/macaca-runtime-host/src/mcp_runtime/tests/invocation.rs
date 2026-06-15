@@ -5,14 +5,11 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use macaca_framework::mcp::McpTimeouts;
-use macaca_proto::{
-    ApplicationId, CapabilityToolOriginKind, MCP_SERVICE_ID, TraceContext,
-};
+use macaca_proto::{ApplicationId, CapabilityToolOriginKind, TraceContext, MCP_SERVICE_ID};
 
-use crate::mcp_runtime::{
-    McpRuntimeContext, McpRuntimeFacade, McpRuntimeManager, McpToolPolicy,
-};
+use crate::mcp_runtime::{McpRuntimeContext, McpRuntimeFacade, McpToolPolicy};
 
+use super::super::manager::McpRuntimeManager;
 use super::fixtures::{
     manager_with_fixture_client, seed_descriptor_route, stdio_definition, TestMcpClientBehavior,
 };

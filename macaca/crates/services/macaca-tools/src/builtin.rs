@@ -7,7 +7,7 @@ use std::time::Duration;
 use tokio::{fs, process::Command, time::timeout};
 use tracing::instrument;
 
-use crate::tool::{Tool, ToolSet};
+use crate::tool::{Tool, ToolCatalog, ToolCommand};
 
 /// Resolve file path from tool args. LLMs often use `file_path` / `filepath` instead of `path`.
 /// Also handles the case where arguments is a JSON string that needs re-parsing.
@@ -62,7 +62,7 @@ impl Tool for FileReadTool {
         "Read the contents of a file. Use JSON key \"path\", or alias \"file_path\" / \"filepath\"."
     }
 
-    fn parameters_schema(&self) -> serde_json::Value {
+    fn tool_schema(&self) -> serde_json::Value {
         serde_json::json!({
             "type": "object",
             "properties": {
@@ -74,8 +74,9 @@ impl Tool for FileReadTool {
         })
     }
 
-    #[instrument(name = "file_read", skip(self), fields(path))]
-    async fn execute(&self, input: Value) -> MacacaResult<Value> {
+    #[instrument(name = "file_read", skip(self, command), fields(path))]
+    async fn invoke(&self, command: ToolCommand) -> MacacaResult<Value> {
+        let input = command.input;
         let input = normalize_tool_input(&input);
         let path = pick_path_str(&input).ok_or_else(|| {
             MacacaError::Agent(
@@ -111,7 +112,7 @@ impl Tool for FileWriteTool {
         "Write content to a file. Keys: path (or file_path/filepath), content (or text/body)."
     }
 
-    fn parameters_schema(&self) -> serde_json::Value {
+    fn tool_schema(&self) -> serde_json::Value {
         serde_json::json!({
             "type": "object",
             "properties": {
@@ -126,8 +127,9 @@ impl Tool for FileWriteTool {
         })
     }
 
-    #[instrument(name = "file_write", skip(self), fields(path))]
-    async fn execute(&self, input: Value) -> MacacaResult<Value> {
+    #[instrument(name = "file_write", skip(self, command), fields(path))]
+    async fn invoke(&self, command: ToolCommand) -> MacacaResult<Value> {
+        let input = command.input;
         let input = normalize_tool_input(&input);
         let path = pick_path_str(&input).ok_or_else(|| {
             tracing::error!(raw_input = %input, "file_write: path not found in input");
@@ -194,7 +196,7 @@ impl Tool for ShellTool {
         "Execute a shell command. Input: { \"command\": \"<cmd>\", \"timeout_secs\": <optional> }"
     }
 
-    fn parameters_schema(&self) -> serde_json::Value {
+    fn tool_schema(&self) -> serde_json::Value {
         serde_json::json!({
             "type": "object",
             "properties": {
@@ -205,8 +207,9 @@ impl Tool for ShellTool {
         })
     }
 
-    #[instrument(name = "shell", skip(self), fields(command))]
-    async fn execute(&self, input: Value) -> MacacaResult<Value> {
+    #[instrument(name = "shell", skip(self, command), fields(command))]
+    async fn invoke(&self, command: ToolCommand) -> MacacaResult<Value> {
+        let input = command.input;
         let input = normalize_tool_input(&input);
         let command = input["command"]
             .as_str()
@@ -269,8 +272,8 @@ impl Default for DefaultToolSet {
     }
 }
 
-impl ToolSet for DefaultToolSet {
-    fn tools(&self) -> &[Box<dyn Tool>] {
+impl ToolCatalog for DefaultToolSet {
+    fn all_tools(&self) -> &[Box<dyn Tool>] {
         &self.tools
     }
 }

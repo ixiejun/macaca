@@ -1,24 +1,22 @@
 //! Shell adapter for session-loop wake/register/shutdown handoff (Adapter pattern).
 //!
 //! PlanLoop and WorkerLoop still run as in-process `macaca-task` controllers with
-//! local `PlanLoopWaker` / `WorkerLoopWaker` handles stored on `AppState`.  This
-//! module bridges task-service lifecycle signals into:
+//! local wake handles owned by `macaca-runtime-host`. This module bridges
+//! task-service lifecycle signals into:
 //! 1. Auditable `service.execution_control` checkpoint/register commands (authoritative).
-//! 2. Legacy in-process waker maps owned by the web shell (compat seam).
+//! 2. Runtime-host local notifications that wake in-process controllers.
 //!
 //! The adapter is intentionally application-neutral: it never branches on agent
 //! role names or workflow labels.
 
 use std::sync::Arc;
 
-use macaca_proto::{ApplicationId, EXECUTION_CONTROL_SERVICE_ID, TraceContext};
-use macaca_sdk::runtime_host::{
+use macaca_host_composition::execution_control::{
     ExecutionControlSessionLoopCoordinator, SessionLoopKind, SessionLoopRegisterRequest,
-    SessionLoopShutdownRequest, SessionLoopWakeRequest,
-    SESSION_LOOP_PLAN_WAKE_EVENT, SESSION_LOOP_TASK_CAPABILITY_ID,
-    SESSION_LOOP_WORKER_WAKE_EVENT,
+    SessionLoopShutdownRequest, SessionLoopWakeRequest, SESSION_LOOP_PLAN_WAKE_EVENT,
+    SESSION_LOOP_TASK_CAPABILITY_ID, SESSION_LOOP_WORKER_WAKE_EVENT,
 };
-use macaca_sdk::task::{PlanLoopWaker, WorkerLoopWaker};
+use macaca_proto::{ApplicationId, TraceContext, EXECUTION_CONTROL_SERVICE_ID};
 use tracing::{info, warn};
 
 use crate::state::AppState;
@@ -42,10 +40,7 @@ pub async fn register_plan_loop_via_execution_control(
     application_id: ApplicationId,
     session_id: Option<String>,
 ) {
-    let trace = TraceContext::new(format!(
-        "session-loop-register-plan:{}",
-        application_id.0
-    ));
+    let trace = TraceContext::new(format!("session-loop-register-plan:{}", application_id.0));
     let request = SessionLoopRegisterRequest {
         application_id,
         session_id,
@@ -82,10 +77,7 @@ pub async fn register_worker_loops_via_execution_control(
     session_id: Option<String>,
     worker_count: usize,
 ) {
-    let trace = TraceContext::new(format!(
-        "session-loop-register-worker:{}",
-        application_id.0
-    ));
+    let trace = TraceContext::new(format!("session-loop-register-worker:{}", application_id.0));
     let request = SessionLoopRegisterRequest {
         application_id,
         session_id,
@@ -126,10 +118,7 @@ pub async fn wake_plan_loop_and_notify_local(
     reason_code: &str,
     detail: Option<String>,
 ) {
-    let trace = TraceContext::new(format!(
-        "session-loop-wake-plan:{}",
-        application_id.0
-    ));
+    let trace = TraceContext::new(format!("session-loop-wake-plan:{}", application_id.0));
     let wake_request = SessionLoopWakeRequest {
         application_id: *application_id,
         session_id: session_id.map(str::to_string),
@@ -146,13 +135,15 @@ pub async fn wake_plan_loop_and_notify_local(
             event_kind = SESSION_LOOP_PLAN_WAKE_EVENT,
             reason_code = %reason_code,
             error = %error,
-            "Plan loop execution-control wake failed; continuing legacy shell adapter"
+            "Plan loop execution-control wake failed; continuing local shell notification"
         );
     }
 
-    if let Some(waker) = state.loops.plan_loop_wakers.read().await.get(application_id) {
-        waker.wake();
-    }
+    state
+        .loops
+        .local_runtime
+        .wake_plan_loop(application_id)
+        .await;
 }
 
 /// Record worker-loop wake(s) through execution control, then wake local controllers.
@@ -164,10 +155,7 @@ pub async fn wake_worker_loops_and_notify_local(
     reason_code: &str,
     detail: Option<String>,
 ) {
-    let trace = TraceContext::new(format!(
-        "session-loop-wake-worker:{}",
-        application_id.0
-    ));
+    let trace = TraceContext::new(format!("session-loop-wake-worker:{}", application_id.0));
     let wake_request = SessionLoopWakeRequest {
         application_id: *application_id,
         session_id: session_id.map(str::to_string),
@@ -184,15 +172,15 @@ pub async fn wake_worker_loops_and_notify_local(
             event_kind = SESSION_LOOP_WORKER_WAKE_EVENT,
             reason_code = %reason_code,
             error = %error,
-            "Worker loop execution-control wake failed; continuing legacy shell adapter"
+            "Worker loop execution-control wake failed; continuing local shell notification"
         );
     }
 
-    if let Some(wakers) = state.loops.worker_loop_wakers.read().await.get(application_id) {
-        for waker in wakers {
-            waker.wake();
-        }
-    }
+    state
+        .loops
+        .local_runtime
+        .wake_worker_loops(application_id)
+        .await;
 }
 
 /// Record session-loop shutdown through execution control during application cleanup.
@@ -201,10 +189,7 @@ pub async fn shutdown_session_loops_via_execution_control(
     application_id: &ApplicationId,
     reason_code: &str,
 ) {
-    let trace = TraceContext::new(format!(
-        "session-loop-shutdown:{}",
-        application_id.0
-    ));
+    let trace = TraceContext::new(format!("session-loop-shutdown:{}", application_id.0));
     let request = SessionLoopShutdownRequest {
         application_id: *application_id,
         session_id: None,
@@ -222,9 +207,3 @@ pub async fn shutdown_session_loops_via_execution_control(
         );
     }
 }
-
-/// Type alias documenting the legacy local waker seam retained by the shell.
-pub type LegacyPlanLoopWaker = PlanLoopWaker;
-
-/// Type alias documenting the legacy local waker seam retained by the shell.
-pub type LegacyWorkerLoopWaker = WorkerLoopWaker;

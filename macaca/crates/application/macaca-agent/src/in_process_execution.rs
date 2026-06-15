@@ -16,9 +16,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use async_trait::async_trait;
-use macaca_proto::{
-    AgentExecutionPort, AgentId, AgentOutput, MacacaError, MacacaResult,
-};
+use macaca_proto::{AgentExecutionPort, AgentId, AgentOutput, MacacaError, MacacaResult};
 
 use crate::{Agent, AgentServices, LlmProvider, ToolCatalog};
 

@@ -372,7 +372,7 @@ mod tests {
             "Certification Fixture",
             "1.0.0",
             ApplicationRuntimeProfile::new(PackageRuntimeKind::Yaml, "1"),
-            macaca_proto::ApplicationCompatibilityDeclaration::new("0.1.0"),
+            macaca_proto::ApplicationHostRequirementDeclaration::new("0.1.0"),
         )
         .ability(ApplicationAbilityDescriptor::new(
             "ability.fixture.agent",

@@ -6,7 +6,9 @@
 
 use std::sync::Arc;
 
-use macaca_app::{app_manifest_to_service_app_view_with_catalog, AppRegistry, AppRuntime, SharedDomainPackCatalog};
+use macaca_app::{
+    app_manifest_to_service_app_view_with_catalog, AppRegistry, AppRuntime, SharedDomainPackCatalog,
+};
 use macaca_proto::{ApplicationServiceAppView, ServiceResult};
 use tokio::sync::RwLock;
 

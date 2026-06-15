@@ -1,8 +1,8 @@
 //! OS-layer file-size boundary gate (VC-filesize).
 //!
 //! Enforces the Agent OS constitution: production sources under `crates/**/src`
-//! must not exceed 500 lines unless explicitly recorded as migration debt in
-//! `os_layer_file_size_gate/allowlist.rs`.
+//! must not exceed 500 lines unless explicitly recorded in the terminal exception
+//! inventory at `os_layer_file_size_gate/allowlist.rs`.
 
 #[path = "os_layer_file_size_gate/allowlist.rs"]
 mod allowlist;

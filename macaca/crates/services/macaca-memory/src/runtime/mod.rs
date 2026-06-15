@@ -1,7 +1,7 @@
 //! Production memory runtime boundary.
 //!
 //! This module deliberately stays small: it composes already-built memory
-//! capabilities behind one facade so upper crates can stop depending on legacy
+//! capabilities behind one facade so upper crates stop depending on concrete
 //! managers directly. The runtime itself does not choose providers, build
 //! embeddings, or talk to vendor SDKs; those responsibilities stay behind the
 //! lower-layer provider/runtime abstractions.

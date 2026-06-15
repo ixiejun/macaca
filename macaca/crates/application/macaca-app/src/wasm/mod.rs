@@ -45,7 +45,8 @@ impl WasmComponentApplicationDescriptor {
             return Err("package runtime is not wasm_component".into());
         }
         let package_id = package.manifest.id.clone();
-        let admission_report = WasmPackageAdmissionReport::legacy_metadata_only(&package, None);
+        let admission_report =
+            WasmPackageAdmissionReport::metadata_only_unavailable(&package, None);
         let load = WasmApplicationAbiAdapter::new(package)
             .load()
             .map_err(|error| error.to_string())?;

@@ -65,9 +65,9 @@ impl SkillSystemServiceProvider {
         let result = SkillEvaluationReportResult {
             score: typed.score.clone(),
             json_report: SelfEvolutionReportBuilder::json_summary(&typed.record, &typed.score),
-            markdown_report: typed.include_markdown.then(|| {
-                SelfEvolutionReportBuilder::markdown_summary(&typed.record, &typed.score)
-            }),
+            markdown_report: typed
+                .include_markdown
+                .then(|| SelfEvolutionReportBuilder::markdown_summary(&typed.record, &typed.score)),
         };
         tracing::info!(
             trace_id = %typed.trace.trace_id,

@@ -1,14 +1,14 @@
 //! MCP shell adapter — service-first MCP toolkit registration.
 //!
-//! Skill MCP registration still requires the in-process `McpRuntimeFacade` during P3.
-//! This adapter isolates that legacy seam so route and toolkit code does not read
+//! Skill MCP registration currently uses the in-process `McpRuntimeFacade`.
+//! This adapter isolates that runtime-host boundary so route and toolkit code does not read
 //! `AppState::mcp_runtime` directly.
 
 use std::sync::Arc;
 
-use macaca_sdk::framework::tool::Toolkit;
+use macaca_host_composition::framework::tool::Toolkit;
+use macaca_host_composition::mcp_runtime::{McpRuntimeContext, McpServerDefinition, McpToolPolicy};
 use macaca_proto::ApplicationId;
-use macaca_sdk::runtime_host::{McpRuntimeContext, McpServerDefinition, McpToolPolicy};
 use tracing::info;
 
 use crate::state::AppState;
@@ -35,7 +35,7 @@ pub async fn register_skill_mcp_definitions(
         agent = agent_name,
         session_id = session_id.unwrap_or("skill-mcp-sessionless"),
         definition_count = definitions.len(),
-        "mcp shell adapter registering skill MCP definitions via legacy runtime facade"
+        "mcp shell adapter registering skill MCP definitions via runtime-host facade"
     );
 
     let _ = state

@@ -11,8 +11,8 @@ mod drivers;
 mod infrastructure;
 mod kernel;
 mod llm;
-mod memory;
 mod mcp;
+mod memory;
 mod root;
 mod workspace;
 
@@ -26,7 +26,7 @@ pub use drivers::*;
 pub use infrastructure::*;
 pub use kernel::*;
 pub use llm::*;
-pub use memory::*;
 pub use mcp::*;
+pub use memory::*;
 pub use root::*;
 pub use workspace::*;

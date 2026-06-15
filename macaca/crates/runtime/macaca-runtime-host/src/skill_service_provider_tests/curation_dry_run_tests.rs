@@ -3,13 +3,13 @@
 use macaca_kernel::SystemService;
 use macaca_proto::TraceContext;
 use macaca_skill::{
-    SkillAliasSnapshotCommand, SkillAliasSnapshotResult, SkillAliasUpsertCommand,
-    SkillCurationAction, SkillCurationDryRunCommand, SkillCurationDryRunResult,
-    SkillCurationPhase, SkillCurationRunCommand, SkillCurationRunResult, SkillCurationSnapshotCommand,
+    SkillAliasSnapshotCommand, SkillAliasSnapshotResult, SkillAliasUpsertCommand, SkillAuthorKind,
+    SkillCurationAction, SkillCurationDryRunCommand, SkillCurationDryRunResult, SkillCurationPhase,
+    SkillCurationRunCommand, SkillCurationRunResult, SkillCurationSnapshotCommand,
     SkillCurationSnapshotResult, SkillCurationStatusCommand, SkillCurationStatusResult,
     SkillGovernanceRecordUsageCommand, SkillGovernanceSnapshotCommand,
     SkillGovernanceSnapshotResult, SkillSemanticReviewStatus, SkillServiceScope,
-    SkillUsageEventKind, SkillAuthorKind, SKILL_ALIAS_SNAPSHOT_COMMAND, SKILL_ALIAS_UPSERT_COMMAND,
+    SkillUsageEventKind, SKILL_ALIAS_SNAPSHOT_COMMAND, SKILL_ALIAS_UPSERT_COMMAND,
     SKILL_CURATION_DRY_RUN_COMMAND, SKILL_CURATION_RUN_COMMAND, SKILL_CURATION_SNAPSHOT_COMMAND,
     SKILL_CURATION_STATUS_COMMAND, SKILL_GOVERNANCE_RECORD_USAGE_COMMAND,
     SKILL_GOVERNANCE_SNAPSHOT_COMMAND,

@@ -24,10 +24,7 @@ mod tests;
 pub use callbacks::{OnGoalCreated, OnGoalRecorded, OnTodoReviewed};
 pub use create_todo::CreateTodoTool;
 pub use create_todos::CreateTodosTool;
-pub use plan_space::{
-    CheckTodoProgressTool, CreateGoalTool, ReassignTaskTool, ReviewTodoTool,
-};
+pub use plan_space::{CheckTodoProgressTool, CreateGoalTool, ReassignTaskTool, ReviewTodoTool};
 pub use worker_board::{
-    ClaimTaskTool, ListMyTasksTool, StartTaskTool, SubmitTaskForReviewTool,
-    UpdateTaskProgressTool,
+    ClaimTaskTool, ListMyTasksTool, StartTaskTool, SubmitTaskForReviewTool, UpdateTaskProgressTool,
 };

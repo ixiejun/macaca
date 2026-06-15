@@ -1,15 +1,15 @@
 //! [`WorkspaceKnowledgeDigestCapability`] — Adapter implementing
-//! [`macaca_sdk::context::KnowledgeDigestCapability`] on top of the Memory Service client.
+//! [`macaca_host_composition::context::KnowledgeDigestCapability`] on top of the Memory Service client.
 //!
 //! ## Flow
 //! 1. Derive the same **retrieval query** string the active-recall provider would use
-//!    (latest user turn text via [`macaca_sdk::context::ContextAssembleInput::last_user_message_text`]).
+//!    (latest user turn text via [`macaca_host_composition::context::ContextAssembleInput::last_user_message_text`]).
 //! 2. Pull a bounded set of [`macaca_proto::MemoryEntry`] rows through the Memory Service facade.
-//! 3. Map rows into redacted [`macaca_sdk::context::KnowledgeDigestItem`] entries, copying
+//! 3. Map rows into redacted [`macaca_host_composition::context::KnowledgeDigestItem`] entries, copying
 //!    only **opaque** evidence ids (`ClaimEvidence::source_id`) so digest-vs-raw suppression can align with
 //!    fenced recall rows without leaking full memory payloads into structured reports.
-//! 4. Apply [`macaca_sdk::context::filter_digest_items_by_tombstones`] when an optional [`macaca_sdk::memory::TombstoneIndex`] is wired
-//!    (shared registry updated by [`crate::context_memory_tools::WorkspaceMemoryForgetTool`] or a governance facade snapshot).
+//! 4. Apply [`macaca_host_composition::context::filter_digest_items_by_tombstones`] when an optional [`macaca_host_composition::memory::TombstoneIndex`] is wired
+//!    (shared registry updated by the service-backed memory forget tool or a governance facade snapshot).
 //!
 //! ## Failure semantics
 //! Any fatal error returns `Ok(vec![])` — the composer treats “no digest” as a benign outcome (fail-open).
@@ -19,11 +19,13 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use macaca_sdk::context::{
+use macaca_host_composition::context::{
     filter_digest_items_by_tombstones, ContextAssembleInput, ContextSourceProvenance,
     KnowledgeDigestCapability, KnowledgeDigestItem, PrivacyTier,
 };
-use macaca_sdk::memory::{MemoryPolicyHints, MemoryPrefetchCommand, MemoryScope, TombstoneIndex};
+use macaca_host_composition::memory::{
+    MemoryPolicyHints, MemoryPrefetchCommand, MemoryScope, TombstoneIndex,
+};
 use macaca_proto::{MacacaResult, TraceContext};
 
 /// Workspace memory → knowledge digest port adapter.
@@ -39,7 +41,7 @@ impl WorkspaceKnowledgeDigestCapability {
     /// `search_limit` should track [`macaca_proto::config::KnowledgeDigestContextConfig::max_compiler_rows`].
     ///
     /// `tombstones` integrates [`SharedTombstoneRegistry`] / [`GovernanceFacadeTombstones`] implementations from
-    /// [`macaca_sdk::memory`] without coupling this crate to a single storage backend.
+    /// [`macaca_host_composition::memory`] without coupling this crate to a single storage backend.
     #[must_use]
     pub fn new(
         memory_client: Arc<dyn macaca_sdk::SystemMemoryClient>,
@@ -135,7 +137,7 @@ mod tests {
     use std::path::PathBuf;
     use std::time::Duration;
 
-    use macaca_sdk::memory::{
+    use macaca_host_composition::memory::{
         FileMemory, InMemoryVectorStore, MemoryForgetCommand, MemoryPrefetchCommand,
         MemoryRecallCommand, MemoryRecallResult, MemoryRememberCommand, MemoryRememberResult,
         MemoryServiceSnapshot, MemoryServiceSnapshotCommand, MemoryStatusCommand,
@@ -167,7 +169,7 @@ mod tests {
     }
 
     fn assemble_input(query: &str) -> ContextAssembleInput {
-        ContextAssembleInput::legacy(
+        ContextAssembleInput::unscoped(
             "coordinator",
             "test-model",
             vec![LlmMessage::user(query)],
@@ -204,9 +206,9 @@ mod tests {
 
         async fn get(
             &self,
-            command: macaca_sdk::memory::MemoryGetCommand,
-        ) -> MacacaResult<macaca_sdk::memory::MemoryGetResult> {
-            Ok(macaca_sdk::memory::MemoryGetResult::new(
+            command: macaca_host_composition::memory::MemoryGetCommand,
+        ) -> MacacaResult<macaca_host_composition::memory::MemoryGetResult> {
+            Ok(macaca_host_composition::memory::MemoryGetResult::new(
                 self.entries
                     .iter()
                     .find(|entry| entry.id == command.id)
@@ -221,7 +223,7 @@ mod tests {
         async fn status(&self, _command: MemoryStatusCommand) -> MacacaResult<MemoryStatusReport> {
             Ok(MemoryStatusReport::healthy(
                 "test-memory-client",
-                macaca_sdk::memory::MemoryCapabilitySet::basic_store_search(),
+                macaca_host_composition::memory::MemoryCapabilitySet::basic_store_search(),
             ))
         }
 
@@ -232,7 +234,7 @@ mod tests {
             Ok(MemoryServiceSnapshot::new(
                 "test-memory-client",
                 true,
-                macaca_sdk::memory::MemoryCapabilitySet::basic_store_search(),
+                macaca_host_composition::memory::MemoryCapabilitySet::basic_store_search(),
                 None,
             ))
         }
@@ -243,7 +245,7 @@ mod tests {
         query: &str,
     ) -> Arc<dyn macaca_sdk::SystemMemoryClient> {
         let entries = manager
-            .recall(macaca_sdk::memory::RecallQuery::new(query, 8))
+            .recall(macaca_host_composition::memory::RecallQuery::new(query, 8))
             .await
             .unwrap()
             .entries;
@@ -262,7 +264,10 @@ mod tests {
             .unwrap();
 
         let memory_client = client_from_manager(&manager, "deployment knowledge").await;
-        let scope = macaca_sdk::memory::MemoryScope::project_shared(ApplicationId::new(), "workspace");
+        let scope = macaca_host_composition::memory::MemoryScope::project_shared(
+            ApplicationId::new(),
+            "workspace",
+        );
         let capability = WorkspaceKnowledgeDigestCapability::new(memory_client, scope, 8, None);
 
         let rows = capability
@@ -296,7 +301,10 @@ mod tests {
         tombstones.record(deleted_id).await;
 
         let memory_client = client_from_manager(&manager, "credential note").await;
-        let scope = macaca_sdk::memory::MemoryScope::project_shared(ApplicationId::new(), "workspace");
+        let scope = macaca_host_composition::memory::MemoryScope::project_shared(
+            ApplicationId::new(),
+            "workspace",
+        );
         let capability =
             WorkspaceKnowledgeDigestCapability::new(memory_client, scope, 8, Some(tombstones));
 

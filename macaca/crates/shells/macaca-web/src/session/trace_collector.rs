@@ -1,15 +1,14 @@
 //! In-memory agent trace collector used during SSE streaming (Observer pattern).
 //!
-//! `AgentTraceCollector` accumulates delegated-agent traces keyed by agent id until the
-//! periodic session saver persists them via `persistence::save_agent_traces`.
+//! `AgentTraceCollector` accumulates delegated-agent traces keyed by agent id until a
+//! terminal session snapshot persists the aggregated trace map with the assistant turn.
 
 use std::sync::Arc;
 
-use macaca_proto::AgentExecutionEvent;
 use tokio::sync::RwLock;
 
 use super::trace_mapping::trace_step_from_agent_event;
-use super::types::{AgentTrace, AgentTraceStep};
+use super::types::AgentTrace;
 
 /// Collects agent traces during SSE stream processing.
 /// Shared between SSE stream and session saving.

@@ -18,12 +18,12 @@ pub use basic::{BasicAgent, BasicAgentBuilder};
 pub use capability::{AgentCapabilityNode, AgentCapabilitySet, CapabilitySource};
 pub use execution::{AgentExecutionDispatch, ServiceClientAgentExecutionAdapter};
 pub use in_process_execution::{InProcessAgentExecutionPort, InProcessAgentSideRegistry};
-pub use macaca_proto::AgentExecutionPort;
 pub use lifecycle::{
     AgentLifecyclePolicy, AgentLifecycleTransition, AgentTransitionReason,
     DefaultAgentLifecyclePolicy,
 };
 pub use macaca_llm::LlmProvider;
+pub use macaca_proto::AgentExecutionPort;
 pub use macaca_tools::ToolCatalog;
 pub use services::{
     AgentServices, AgentServicesBuilder, IpcService, MemoryService, NoopIpcService,

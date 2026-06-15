@@ -6,15 +6,12 @@
 use std::sync::Arc;
 
 use macaca_persist::RedbStore;
-use macaca_proto::{
-    ApplicationId, TodoGoalStatus, TodoReviewResult, TodoStatus,
-};
+use macaca_proto::{ApplicationId, TodoGoalStatus, TodoReviewResult, TodoStatus};
 use tempfile::tempdir;
 
 use crate::todo_store::TodoStore;
 
 use super::{TaskBoard, TaskSpace};
-
 
 async fn setup() -> (ApplicationId, Arc<TodoStore>) {
     let dir = tempdir().unwrap();
@@ -115,7 +112,9 @@ async fn board_submit_and_review() {
         feedback: "Looks good".into(),
         verified_criteria: vec![("returns 200".into(), true)],
     };
-    space.apply_review_result(&task.id, "agent-alpha", result).await;
+    space
+        .apply_review_result(&task.id, "agent-alpha", result)
+        .await;
 
     let updated = store
         .get_todo(&app_id, &None, "agent-alpha", &task.id)
@@ -153,7 +152,9 @@ async fn review_fail_triggers_optimization() {
         feedback: "Missing edge case handling".into(),
         verified_criteria: vec![],
     };
-    space.apply_review_result(&task.id, "agent-alpha", result).await;
+    space
+        .apply_review_result(&task.id, "agent-alpha", result)
+        .await;
 
     let updated = store
         .get_todo(&app_id, &None, "agent-alpha", &task.id)
@@ -235,13 +236,40 @@ async fn progress_summary() {
     let space = TaskSpace::for_session(app_id.clone(), None, Arc::clone(&store));
 
     space
-        .create_task_assignment("agent-alpha", "agent-gamma", "T1", "d", vec![], 5, vec![], None)
+        .create_task_assignment(
+            "agent-alpha",
+            "agent-gamma",
+            "T1",
+            "d",
+            vec![],
+            5,
+            vec![],
+            None,
+        )
         .await;
     space
-        .create_task_assignment("agent-alpha", "agent-gamma", "T2", "d", vec![], 5, vec![], None)
+        .create_task_assignment(
+            "agent-alpha",
+            "agent-gamma",
+            "T2",
+            "d",
+            vec![],
+            5,
+            vec![],
+            None,
+        )
         .await;
     space
-        .create_task_assignment("agent-beta", "agent-gamma", "T3", "d", vec![], 5, vec![], None)
+        .create_task_assignment(
+            "agent-beta",
+            "agent-gamma",
+            "T3",
+            "d",
+            vec![],
+            5,
+            vec![],
+            None,
+        )
         .await;
 
     let progress = space.overall_progress().await;

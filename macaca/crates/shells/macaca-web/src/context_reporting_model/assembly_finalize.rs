@@ -1,10 +1,10 @@
 //! Shared post-assembly **Template Method** step for context reporting.
 //!
-//! Both the Context Service path and the legacy local assembler converge here:
-//! scoped memory recall injection, framework message conversion, and report
-//! persistence to the session event log.
+//! Context Service assemblies converge here for scoped memory recall injection,
+//! framework message conversion, and report persistence to the session event
+//! log.
 
-use macaca_sdk::framework::model::ChatOptions;
+use macaca_host_composition::framework::model::ChatOptions;
 
 use crate::context_memory_injection::{apply_active_recall, apply_preflight_memory};
 use crate::context_message_codec::{llm_messages_to_framework, llm_options_to_framework};
@@ -22,7 +22,7 @@ impl ContextReportingChatModel {
         model: &str,
         incoming_messages: &[serde_json::Value],
         options: &ChatOptions,
-        assembled: &mut macaca_sdk::context::ContextAssembleResult,
+        assembled: &mut macaca_host_composition::context::ContextAssembleResult,
         lineage_count: u32,
     ) -> (Vec<serde_json::Value>, ChatOptions) {
         assembled.report.lineage_compaction_count = lineage_count;
@@ -56,7 +56,7 @@ impl ContextReportingChatModel {
         .await;
         let recall_injected_messages = assembled.messages.len() != message_count_before_recall;
         let output_messages =
-            if assembled.report.engine_id == "legacy" && !recall_injected_messages {
+            if assembled.report.engine_id == "passthrough" && !recall_injected_messages {
                 incoming_messages.to_vec()
             } else {
                 llm_messages_to_framework(&assembled.messages)

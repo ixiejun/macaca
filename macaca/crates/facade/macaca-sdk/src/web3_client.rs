@@ -1,4 +1,4 @@
-//! SDK Web3 Service client for Route C S11.
+//! SDK Web3 Service client.
 //!
 //! This focused client is the upper-consumer Facade for optional Web3
 //! capability.  Web, CLI, Gateway, Application Framework, and agent-facing code

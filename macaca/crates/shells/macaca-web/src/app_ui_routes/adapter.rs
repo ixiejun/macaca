@@ -6,11 +6,10 @@
 use std::path::{Component, Path, PathBuf};
 
 use axum::http::StatusCode;
-use macaca_sdk::app::ui_runtime::AppUiRuntimeConfig;
 use macaca_proto::ApplicationId;
 use uuid::Uuid;
 
-use crate::app_ui_routes::types::RouteError;
+use crate::app_ui_routes::types::{AppUiRouteRuntime, RouteError};
 use crate::routes::err;
 
 /// Parse a UUID application id from the URL path segment.
@@ -47,7 +46,10 @@ pub(crate) fn normalize_package_path(value: &str) -> Result<PathBuf, RouteError>
 }
 
 /// Verify the requested asset is declared by the application UI manifest.
-pub(crate) fn ensure_declared_asset(ui: &AppUiRuntimeConfig, asset_path: &Path) -> Result<(), RouteError> {
+pub(crate) fn ensure_declared_asset(
+    ui: &AppUiRouteRuntime,
+    asset_path: &Path,
+) -> Result<(), RouteError> {
     let requested = path_to_slash(asset_path);
     if ui.entry.as_deref() == Some(requested.as_str()) {
         return Ok(());
@@ -67,7 +69,10 @@ pub(crate) fn ensure_declared_asset(ui: &AppUiRuntimeConfig, asset_path: &Path) 
 }
 
 /// Read a declared asset after canonical containment checks under `app_dir`.
-pub(crate) async fn read_declared_asset(app_dir: &Path, asset_path: &Path) -> Result<Vec<u8>, RouteError> {
+pub(crate) async fn read_declared_asset(
+    app_dir: &Path,
+    asset_path: &Path,
+) -> Result<Vec<u8>, RouteError> {
     let canonical_root = app_dir.canonicalize().map_err(|error| {
         err(
             StatusCode::NOT_FOUND,

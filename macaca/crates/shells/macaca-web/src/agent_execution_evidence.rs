@@ -14,7 +14,7 @@ use std::hash::{Hash, Hasher};
 use std::sync::{Arc, Mutex};
 use std::time::UNIX_EPOCH;
 
-use macaca_sdk::runtime_host::executor::{ApplicationExecutor, ExecutorEvent};
+use macaca_host_composition::executor::{ApplicationExecutor, ExecutorEvent};
 use macaca_proto::{AgentExecutionEvent, TaskId};
 use tokio::sync::mpsc;
 use tracing::{info, warn};

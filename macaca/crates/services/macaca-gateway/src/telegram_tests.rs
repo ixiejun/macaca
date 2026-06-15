@@ -1,5 +1,3 @@
-#![allow(deprecated)]
-
 use std::sync::Arc;
 
 use macaca_proto::config::TelegramConfig;

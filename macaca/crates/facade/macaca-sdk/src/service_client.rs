@@ -1,7 +1,7 @@
-//! SDK service client boundary for Route C system service inspection and calls.
+//! SDK service client boundary for system service inspection and calls.
 //!
 //! S3 defines the command/client shape before all concrete services are
-//! migrated. Local compatibility implementations may report unavailable rather
+//! available. Local Null Object implementations may report unavailable rather
 //! than constructing providers. Later phases can bridge these commands to
 //! `ServiceRuntime` or `ServiceBus` without changing Web/CLI contracts.
 
@@ -62,7 +62,7 @@ impl ServiceCallCommand {
         })
     }
 
-    /// Attach trace context required by Route C service-runtime dispatch.
+    /// Attach trace context required by service-runtime dispatch.
     pub fn with_trace(mut self, trace: TraceContext) -> Self {
         self.trace = Some(trace);
         self
@@ -123,7 +123,7 @@ impl SystemServiceClient for UnavailableSystemServiceClient {
             "sdk service client has no runtime-backed service dispatcher"
         );
         Err(MacacaError::Config(format!(
-            "service '{}' is unavailable through the S3 SDK compatibility client",
+            "service '{}' is unavailable through the local SDK service client",
             command.service_id
         )))
     }

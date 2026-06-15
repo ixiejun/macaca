@@ -47,7 +47,7 @@ pub struct A2ATaskTraceContext {
 ///
 /// Existing task execution can store or forward this structure as metadata.
 /// It does not call adapters, enforce payment, or alter worker scheduling by
-/// itself, which keeps Phase 09 additive and no-network compatible.
+/// itself, which keeps the A2A task path additive and no-network.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct A2ATaskRequestContext {
     pub requester: AgentIdentity,

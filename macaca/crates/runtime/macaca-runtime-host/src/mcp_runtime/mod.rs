@@ -55,10 +55,7 @@ mod tests;
 pub use facade::McpRuntimeFacade;
 pub use policy::apply_concurrency_isolation;
 pub use probe::probe_definition_statuses;
-pub use skill_definitions::{
-    definitions_from_skill_snapshot, definitions_from_skill_snapshot_with_registry,
-};
-pub use manager::McpRuntimeManager;
+pub use skill_definitions::definitions_from_skill_snapshot_with_registry;
 pub use types::{
     ConcurrencyIsolationPolicy, McpDefinitionSource, McpLifecycleScope, McpRegistryConfig,
     McpRuntimeContext, McpRuntimeKey, McpRuntimeStatus, McpRuntimeStatusState,

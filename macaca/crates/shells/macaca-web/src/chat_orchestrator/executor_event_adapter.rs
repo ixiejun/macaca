@@ -6,7 +6,7 @@
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
-use macaca_sdk::runtime_host::executor::ExecutorEvent;
+use macaca_host_composition::executor::ExecutorEvent;
 use tokio::sync::RwLock;
 
 use axum::response::sse::Event;
@@ -30,7 +30,10 @@ pub(crate) fn spawn_executor_event_forwarder(
             match exec_rx.recv().await {
                 Ok(exec_event) => {
                     if forwarder_stop_flag.load(std::sync::atomic::Ordering::Relaxed) {
-                        tracing::debug!(label = log_label, "Executor event forwarder stopped (superseded)");
+                        tracing::debug!(
+                            label = log_label,
+                            "Executor event forwarder stopped (superseded)"
+                        );
                         break;
                     }
                     sync_delegated_agent_activity_from_executor_event(&state, &exec_event).await;

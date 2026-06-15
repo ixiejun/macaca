@@ -15,15 +15,11 @@ use macaca_proto::{
     ApplicationId, ProtoErrorAdapter, TraceContext, WorkbenchCommand, WorkbenchCommandScope,
     WorkbenchCommandStatus, WorkbenchServiceDescriptor,
 };
-use macaca_sdk::{
-    ServiceBackedWorkbenchClient, SystemServiceClient, SystemWorkbenchClient,
-    WorkbenchClientCatalog,
-};
+use macaca_sdk::{ServiceBackedWorkbenchClient, SystemWorkbenchClient, WorkbenchClientCatalog};
 use serde::Serialize;
 use serde_json::Value;
 
 use crate::routes::{err, proto_err, ErrorResponse};
-use crate::service_runtime_client::WebRuntimeSystemServiceClient;
 use crate::state::AppState;
 
 #[derive(Debug, Serialize)]
@@ -75,12 +71,7 @@ pub async fn get_workbench_operations(
     let trace = TraceContext::new(format!("web-workbench-operations-{}", app_id.0));
     let scope = WorkbenchCommandScope::new(app_id, "web-workbench-operations")
         .map_err(|error| proto_err(StatusCode::BAD_REQUEST, &error))?;
-    let runtime_client: Arc<dyn SystemServiceClient> =
-        Arc::new(WebRuntimeSystemServiceClient::new(
-            Arc::clone(&state.service_runtime),
-            "web.workbench.operations",
-        ));
-    let clients = WorkbenchClientCatalog::service_backed(runtime_client);
+    let clients = WorkbenchClientCatalog::service_backed(state.system_facade.service_client());
 
     tracing::info!(
         app_id = %app_id.0,
@@ -273,7 +264,8 @@ mod tests {
     fn workbench_routes_remain_thin_sdk_adapters() {
         let source = include_str!("workbench_routes.rs");
         assert!(source.contains("SystemWorkbenchClient"));
-        assert!(source.contains("WebRuntimeSystemServiceClient"));
+        assert!(source.contains("system_facade.service_client()"));
+        assert!(!source.contains(&format!("{}{}", "macaca_host", "_composition")));
         assert!(source.contains("service.snapshot"));
         assert!(!source.contains(&format!("{}{}", "Local", "FileProvider")));
         assert!(!source.contains(&format!("{}{}", "Local", "ProcessProvider")));

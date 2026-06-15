@@ -283,11 +283,11 @@ pub struct SkillGovernanceRecordUsageResult {
 pub struct SkillGovernanceSnapshotCommand {
     pub trace: TraceContext,
     pub scope: SkillServiceScope,
-    /// Backward-compatible archived visibility switch for older shell callers.
+    /// Archived visibility switch for shell callers.
     ///
     /// New callers should prefer `lifecycle_filters` because the governance
     /// lifecycle set is now larger than active/archived.  Keeping this field
-    /// preserves existing SDK and Web route behavior while the richer filter is
+    /// preserves SDK and Web route behavior while the richer filter is
     /// rolled out across consumers.
     pub include_archived: bool,
     #[serde(default)]

@@ -11,12 +11,12 @@ use std::sync::Arc;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::Json;
-use macaca_sdk::app::AppLoader;
-use macaca_proto::{ApplicationId, TraceContext};
-use macaca_sdk::skill::{
+use macaca_host_composition::app::AppLoader;
+use macaca_host_composition::runtime_host::{
     SkillGovernanceRecord, SkillGovernanceSnapshotCommand, SkillLifecycleState, SkillPolicy,
-    SkillRuntimeFacade, SkillServiceScope, SkillSnapshotRequest,
+    SkillServiceScope, SkillSnapshotServiceCommand,
 };
+use macaca_proto::{ApplicationId, TraceContext};
 use serde::{Deserialize, Serialize};
 
 use crate::routes::{err, proto_err, ErrorResponse};
@@ -102,7 +102,7 @@ pub async fn get_skill_self_evolution_audit(
         .skill_client
         .governance_snapshot(SkillGovernanceSnapshotCommand {
             trace: trace.clone(),
-            scope,
+            scope: scope.clone(),
             include_archived: false,
             lifecycle_filters: vec![SkillLifecycleState::Active],
         })
@@ -189,14 +189,19 @@ async fn registry_load_path_check(
             deny: skills.deny.clone(),
         })
         .unwrap_or_default();
-    let snapshot = SkillRuntimeFacade::new()
-        .build_snapshot(
-            SkillSnapshotRequest::builder(agent_config.name)
-                .workspace_dir(workspace_root)
-                .app_dir(Some(app.path))
-                .policy(policy)
-                .build(),
-        )
+    let snapshot = state
+        .skill_client
+        .snapshot(SkillSnapshotServiceCommand {
+            trace: TraceContext::new("web-skill-self-evolution-registry-load-path"),
+            scope: SkillServiceScope::agent(app_id, "audit", agent_config.name.clone())
+                .map_err(|error| err(StatusCode::BAD_REQUEST, error.to_string()))?,
+            agent_name: agent_config.name,
+            workspace_dir: workspace_root,
+            app_dir: Some(app.path),
+            include_instructions: true,
+            exposure_policy: policy,
+            policy: Default::default(),
+        })
         .await
         .map_err(|error| proto_err(StatusCode::INTERNAL_SERVER_ERROR, &error))?;
     let refs = snapshot

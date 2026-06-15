@@ -51,7 +51,7 @@ fn sdk_test_plugins_satisfy_contract_first_registration() {
             .validate_boundary_compliance(&plugin.registration().manifest);
         assert!(
             boundary_report.is_success(),
-            "fixture {} should preserve Route C plugin boundary: {boundary_report:?}",
+            "fixture {} should preserve protocol microkernel plugin boundary: {boundary_report:?}",
             plugin.plugin_id()
         );
     }

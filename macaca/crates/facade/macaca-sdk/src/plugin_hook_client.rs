@@ -1,7 +1,7 @@
 //! SDK Plugin Hook Bus client.
 //!
 //! Shells and future plugin SDK helpers use this Facade instead of importing
-//! runtime-host internals.  The client only speaks generic Route C service
+//! runtime-host internals.  The client only speaks generic protocol service
 //! calls, keeping Hook Bus implementations replaceable by local, remote, or
 //! test service runtimes.
 

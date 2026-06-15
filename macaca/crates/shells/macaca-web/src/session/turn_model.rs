@@ -1,11 +1,10 @@
 //! Turn-level session model helpers (mutable turn list operations).
 //!
-//! Converts between legacy `messages` arrays and richer `turns` with execution metadata.
+//! Converts between raw `messages` arrays and richer `turns` with execution metadata.
 
 use macaca_proto::LlmMessage;
-use macaca_sdk::runtime_host::executor::ExecutorEvent;
 
-use super::types::{AssistantExecutionMeta, StoredSession, StoredTraceStep, StoredTurn, AgentTrace};
+use super::types::{StoredSession, StoredTurn};
 
 pub(crate) fn ensure_running_assistant_turn(turns: &mut Vec<StoredTurn>) -> &mut StoredTurn {
     let has_running_idx = turns.iter().rposition(|turn| {
@@ -31,26 +30,6 @@ pub(crate) fn ensure_running_assistant_turn(turns: &mut Vec<StoredTurn>) -> &mut
     &mut turns[idx]
 }
 
-pub(crate) fn session_status_from_executor_event(event: &ExecutorEvent) -> Option<&'static str> {
-    match event {
-        ExecutorEvent::TaskStarted { .. } => Some("running"),
-        ExecutorEvent::TaskCompleted { .. } => Some("completed"),
-        ExecutorEvent::TaskFailed { .. } => Some("failed"),
-        ExecutorEvent::TaskCancelled { .. } => Some("cancelled"),
-        ExecutorEvent::HookEvent { event: hook_event } => {
-            use macaca_sdk::runtime_host::executor::fork_manager::HookEvent;
-            match hook_event {
-                HookEvent::ForkMerged { .. } => Some("completed"),
-                HookEvent::DelegateFailed { .. } => Some("failed"),
-                HookEvent::DelegateCompleted { .. } => Some("running"),
-                HookEvent::ForkCreated { .. } => Some("running"),
-                HookEvent::ForkValidated { .. } => Some("running"),
-                _ => None,
-            }
-        }
-        _ => None,
-    }
-}
 pub(crate) fn build_turns_from_messages(messages: &[LlmMessage]) -> Vec<StoredTurn> {
     messages
         .iter()

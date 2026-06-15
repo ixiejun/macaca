@@ -1,7 +1,7 @@
 //! Lifecycle support helpers for the default in-process WASM provider.
 //!
 //! This module keeps lifecycle policy, checkpoint memento construction,
-//! compatibility checks, and audit logging out of `default_provider.rs`.  The
+//! ABI decision checks, and audit logging out of `default_provider.rs`.  The
 //! split is deliberate: the provider remains a small composition root, while
 //! this module owns the State, Specification, Memento, and Observer mechanics
 //! for long-running WASM sessions.
@@ -161,7 +161,7 @@ pub(super) fn checkpoint(
     Ok(checkpoint)
 }
 
-/// Restore lifecycle metadata from a compatible checkpoint memento.
+/// Restore lifecycle metadata from an ABI-matching checkpoint memento.
 pub(super) fn restore(
     session: &DefaultInProcessWasmExecutionSession,
     request: WasmRestoreRequest,
@@ -169,9 +169,9 @@ pub(super) fn restore(
     let trace = request
         .trace
         .ok_or(ApplicationAbiError::MissingTraceContext)?;
-    let compatible = request.checkpoint.abi_version == session.request.profile.abi_version
+    let abi_matches = request.checkpoint.abi_version == session.request.profile.abi_version
         && request.checkpoint.artifact_digest_prefix == artifact_digest_prefix(session);
-    let status = if compatible {
+    let status = if abi_matches {
         *session
             .lifecycle
             .lock()
@@ -181,14 +181,14 @@ pub(super) fn restore(
     } else {
         WasmLifecycleOperationStatus::Rejected
     };
-    let reason = if compatible {
+    let reason = if abi_matches {
         WasmLifecycleReasonCode::Completed
     } else {
         WasmLifecycleReasonCode::AbiMismatch
     };
     let mut metadata = request.metadata;
     attach_static_metadata(session, &mut metadata);
-    metadata.insert("abi_compatible".into(), compatible.to_string());
+    metadata.insert("abi_matches".into(), abi_matches.to_string());
     let report = WasmRestoreReport {
         status,
         reason_code: reason.as_code().into(),
@@ -209,7 +209,7 @@ pub(super) fn restore(
     Ok(report)
 }
 
-/// Evaluate a metadata-only upgrade request against ABI compatibility.
+/// Evaluate a metadata-only upgrade request against ABI match metadata.
 pub(super) fn upgrade(
     session: &DefaultInProcessWasmExecutionSession,
     request: WasmUpgradeRequest,
@@ -217,20 +217,20 @@ pub(super) fn upgrade(
     let trace = request
         .trace
         .ok_or(ApplicationAbiError::MissingTraceContext)?;
-    let compatible = request.target_abi_version == session.request.profile.abi_version;
-    let status = if compatible {
+    let abi_matches = request.target_abi_version == session.request.profile.abi_version;
+    let status = if abi_matches {
         WasmLifecycleOperationStatus::Completed
     } else {
         WasmLifecycleOperationStatus::Rejected
     };
-    let reason = if compatible {
+    let reason = if abi_matches {
         WasmLifecycleReasonCode::Completed
     } else {
         WasmLifecycleReasonCode::AbiMismatch
     };
     let mut metadata = request.metadata;
     attach_static_metadata(session, &mut metadata);
-    metadata.insert("abi_compatible".into(), compatible.to_string());
+    metadata.insert("abi_matches".into(), abi_matches.to_string());
     let report = WasmUpgradeReport {
         status,
         reason_code: reason.as_code().into(),
@@ -238,7 +238,7 @@ pub(super) fn upgrade(
         source_artifact_digest_prefix: artifact_digest_prefix(session),
         target_artifact: request.target_artifact,
         target_artifact_digest_prefix: request.target_artifact_digest.chars().take(12).collect(),
-        abi_compatible: compatible,
+        abi_matches,
         trace: Some(trace.clone()),
         metadata: sanitize_wasm_lifecycle_metadata(metadata),
     };
@@ -258,7 +258,7 @@ pub(super) fn upgrade(
     Ok(report)
 }
 
-/// Roll back lifecycle metadata to a compatible checkpoint memento.
+/// Roll back lifecycle metadata to an ABI-matching checkpoint memento.
 pub(super) fn rollback(
     session: &DefaultInProcessWasmExecutionSession,
     request: WasmRollbackRequest,

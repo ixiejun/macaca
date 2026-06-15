@@ -1,8 +1,8 @@
-//! Runtime-host package compatibility hooks.
+//! Runtime-host package metadata hooks.
 //!
-//! Runtime-host owns MCP lifecycle and compatibility glue.  This module
+//! Runtime-host owns MCP lifecycle and package requirement projection.  This module
 //! exposes package-shaped requirement metadata without forcing MCP/plugin
-//! runtime migration in Phase 04.
+//! runtime callers to depend on provider implementation details.
 
 use macaca_proto::{
     CapabilityId, DeveloperId, KernelServiceId, PackageCapability, PackageDescriptor, PackageId,

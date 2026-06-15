@@ -12,7 +12,7 @@ use macaca_proto::MacacaResult;
 use macaca_task::TaskBoard;
 use serde_json::{json, Value};
 
-use crate::tool::Tool;
+use crate::tool::{Tool, ToolCommand};
 
 /// Claim the highest-priority pending task from the agent's board.
 pub struct ClaimTaskTool {
@@ -27,10 +27,10 @@ impl Tool for ClaimTaskTool {
     fn description(&self) -> &str {
         "Claim the highest-priority pending task from your task board. Returns the task details or null if no tasks available."
     }
-    fn parameters_schema(&self) -> Value {
+    fn tool_schema(&self) -> Value {
         json!({ "type": "object", "properties": {}, "required": [] })
     }
-    async fn execute(&self, _input: Value) -> MacacaResult<Value> {
+    async fn invoke(&self, _command: ToolCommand) -> MacacaResult<Value> {
         match self.board.claim_next_task().await {
             Some(task) => Ok(json!({
                 "task_id": task.id.to_string(),
@@ -62,14 +62,15 @@ impl Tool for StartTaskTool {
     fn description(&self) -> &str {
         "Mark a claimed task as in-progress. Call this after claim_task before starting work."
     }
-    fn parameters_schema(&self) -> Value {
+    fn tool_schema(&self) -> Value {
         json!({
             "type": "object",
             "properties": { "task_id": { "type": "string", "description": "Task ID to start" } },
             "required": ["task_id"]
         })
     }
-    async fn execute(&self, input: Value) -> MacacaResult<Value> {
+    async fn invoke(&self, command: ToolCommand) -> MacacaResult<Value> {
+        let input = command.input;
         let task_id_str = input["task_id"].as_str().unwrap_or_default();
         let task_id = macaca_proto::TaskId(
             uuid::Uuid::parse_str(task_id_str)
@@ -93,7 +94,7 @@ impl Tool for UpdateTaskProgressTool {
     fn description(&self) -> &str {
         "Update progress on the current in-progress task."
     }
-    fn parameters_schema(&self) -> Value {
+    fn tool_schema(&self) -> Value {
         json!({
             "type": "object",
             "properties": {
@@ -103,7 +104,8 @@ impl Tool for UpdateTaskProgressTool {
             "required": ["task_id", "message"]
         })
     }
-    async fn execute(&self, input: Value) -> MacacaResult<Value> {
+    async fn invoke(&self, command: ToolCommand) -> MacacaResult<Value> {
+        let input = command.input;
         let task_id_str = input["task_id"].as_str().unwrap_or_default();
         let task_id = macaca_proto::TaskId(
             uuid::Uuid::parse_str(task_id_str)
@@ -128,7 +130,7 @@ impl Tool for SubmitTaskForReviewTool {
     fn description(&self) -> &str {
         "Submit a completed task for review by the Plan Agent. Include a summary of what was done."
     }
-    fn parameters_schema(&self) -> Value {
+    fn tool_schema(&self) -> Value {
         json!({
             "type": "object",
             "properties": {
@@ -138,7 +140,8 @@ impl Tool for SubmitTaskForReviewTool {
             "required": ["task_id", "summary"]
         })
     }
-    async fn execute(&self, input: Value) -> MacacaResult<Value> {
+    async fn invoke(&self, command: ToolCommand) -> MacacaResult<Value> {
+        let input = command.input;
         let task_id_str = input["task_id"].as_str().unwrap_or_default();
         let task_id = macaca_proto::TaskId(
             uuid::Uuid::parse_str(task_id_str)
@@ -163,10 +166,10 @@ impl Tool for ListMyTasksTool {
     fn description(&self) -> &str {
         "List all tasks on your task board with their statuses."
     }
-    fn parameters_schema(&self) -> Value {
+    fn tool_schema(&self) -> Value {
         json!({ "type": "object", "properties": {}, "required": [] })
     }
-    async fn execute(&self, _input: Value) -> MacacaResult<Value> {
+    async fn invoke(&self, _command: ToolCommand) -> MacacaResult<Value> {
         let tasks = self.board.list_all().await;
         let items: Vec<Value> = tasks
             .iter()

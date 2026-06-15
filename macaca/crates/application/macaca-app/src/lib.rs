@@ -6,10 +6,10 @@
 pub mod abi;
 pub mod certification;
 pub mod commercial_package;
-pub mod compatibility_checker;
+pub mod conformance_checker;
 pub mod consumption;
-pub mod domain_pack_catalog;
 pub mod dapp_capability;
+pub mod domain_pack_catalog;
 pub mod genui;
 pub mod host;
 pub mod lifecycle;
@@ -32,11 +32,10 @@ pub mod wasm;
 pub mod web3_capability;
 pub mod workflow;
 
-#[allow(deprecated)]
 pub use abi::{
-    app_manifest_to_abi_descriptor, is_runtime_unavailable, ApplicationAbiAdapter,
-    ApplicationAbiDescriptor, ApplicationAbiInstance, ApplicationAbiLoadResult,
-    MetadataOnlyApplicationAbiInstance, WasmApplicationAbiAdapter, YamlApplicationAbiAdapter,
+    is_runtime_unavailable, ApplicationAbiAdapter, ApplicationAbiDescriptor,
+    ApplicationAbiInstance, ApplicationAbiLoadResult, MetadataOnlyApplicationAbiInstance,
+    WasmApplicationAbiAdapter, YamlApplicationAbiAdapter,
 };
 pub use certification::{
     ApplicationCertificationContext, ApplicationCertificationDiagnostic,
@@ -47,22 +46,20 @@ pub use commercial_package::{
     is_commercial_package, AppCapabilityCallContext, ApplicationEntitlementAuthorizer,
     CommercialPackageGuard,
 };
-pub use compatibility_checker::{
-    CompatibilityDiagnostic, CompatibilityHostContext, CompatibilityReport, CompatibilitySeverity,
-    CompatibilityStatus, CompatibilityTraceEvent, PackageCompatibilityChecker,
-};
-#[allow(deprecated)]
-pub use domain_pack_catalog::{
-    compose_installed_domain_pack_catalog, empty_domain_pack_catalog, SharedDomainPackCatalog,
+pub use conformance_checker::{
+    ConformanceDiagnostic, ConformanceHostContext, ConformanceReport, ConformanceSeverity,
+    ConformanceStatus, ConformanceTraceEvent, PackageConformanceChecker,
 };
 pub use consumption::{
-    app_agent_base_prompt, app_agent_manifest_view, app_agent_prompt_semantics,
-    app_entry_agent_name, app_entry_agent_name_or, app_entry_workflow_name,
-    app_task_planning_contract, discovered_app_agent_names, discovered_app_runtime_builder,
-    legacy_app_task_planning_contract, AppAgentManifestView, AppAgentPromptSemantics,
+    app_agent_manifest_view, app_agent_prompt_semantics, app_entry_agent_name,
+    app_entry_workflow_name, app_task_planning_contract, discovered_app_agent_names,
+    discovered_app_runtime_builder, AppAgentManifestView, AppAgentPromptSemantics,
     AppPlanningAgentProfile, AppTaskPlanningContract, AppToolPolicyView,
 };
 pub use dapp_capability::AppDappCapabilityRequest;
+pub use domain_pack_catalog::{
+    compose_installed_domain_pack_catalog, empty_domain_pack_catalog, SharedDomainPackCatalog,
+};
 pub use genui::{text_component, GenUiResult, GenUiRuntime, UiIntentValidator};
 pub use host::{
     is_unavailable as is_application_host_unavailable, ApplicationHost, ApplicationHostBackend,
@@ -72,17 +69,16 @@ pub use lifecycle::ApplicationLifecycle;
 pub use llm_proxy::{LlmProxy, UserLlmOverride};
 pub use loader::AppLoader;
 pub use manifest_v1::{
-    LegacyAppManifestProjection, YamlApplicationManifestAdapter, YamlProjectionDiagnostic,
+    YamlApplicationManifestAdapter, YamlApplicationManifestProjection, YamlProjectionDiagnostic,
     YamlToApplicationManifestV1Report,
 };
 pub use model::{
     AppCapabilityNode, AppCapabilitySet, AppCapabilitySource, AppLayer, AppLlmConfig, AppManifest,
     AppStatus,
 };
-#[allow(deprecated)]
 pub use package::{
-    app_manifest_to_package_descriptor, application_manifest_v1_to_package_descriptor,
-    load_yaml_app_package_descriptor, AppPackageDescriptorBuilder,
+    application_manifest_v1_to_package_descriptor, load_yaml_app_package_descriptor,
+    AppPackageDescriptorBuilder,
 };
 pub use package_loader::{PackageLoaderFactory, PackageLoaderKind};
 pub use registry::{AppRegistry, DiscoveredApp, DEFAULT_APP, STANDARD_APP_DIRS};
@@ -114,6 +110,6 @@ pub use ui_runtime::*;
 pub use wasm::WasmComponentApplicationDescriptor;
 pub use web3_capability::AppWeb3CapabilityRequest;
 pub use workflow::{
-    DefaultWorkflowPromptStrategy, WorkflowContext, WorkflowEngine, WorkflowPromptContext,
-    WorkflowPromptParts, WorkflowPromptStrategy, WorkflowResult, DEFAULT_WORKFLOW,
+    DefaultWorkflowPromptStrategy, WorkflowEngine, WorkflowPromptContext, WorkflowPromptParts,
+    WorkflowPromptStrategy, DEFAULT_WORKFLOW,
 };

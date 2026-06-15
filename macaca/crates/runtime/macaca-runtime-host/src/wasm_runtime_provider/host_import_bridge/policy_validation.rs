@@ -38,8 +38,7 @@ impl WasmHostImportBridge {
         let payload_bytes = serde_json::to_vec(&command.payload)
             .map(|payload| payload.len() as u64)
             .unwrap_or(u64::MAX);
-        let guest_command =
-            command_shell(command, trace, category, import_name, payload_bytes);
+        let guest_command = command_shell(command, trace, category, import_name, payload_bytes);
         if payload_bytes > self.config.max_payload_bytes {
             return Err(self.denied_result(
                 &guest_command,

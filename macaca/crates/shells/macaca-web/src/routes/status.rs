@@ -8,8 +8,6 @@ use serde::Serialize;
 
 use crate::state::AppState;
 
-use super::apps::service_status_views;
-
 // ---------------------------------------------------------------------------
 // GET /api/status
 // ---------------------------------------------------------------------------
@@ -23,38 +21,30 @@ pub struct StatusResponse {
 }
 
 pub async fn get_status(State(state): State<Arc<AppState>>) -> Json<StatusResponse> {
-    tracing::info!("web status route entering thin system facade boundary");
-    match state
-        .system_facade
-        .service_client()
-        .inspect_services(
-            &macaca_sdk::ServiceInspectionCommand::new("web-route-status-services")
-                .expect("static service inspection scope is non-empty"),
-        )
-        .await
-    {
-        Ok(snapshot) => tracing::info!(
-            services = snapshot.services.len(),
-            "web status route inspected service runtime through facade bundle"
-        ),
-        Err(error) => tracing::warn!(
-            error = %error,
-            "web status route service inspection failed; preserving legacy response"
-        ),
+    tracing::info!(
+        operation = "status_snapshot",
+        "web status route entering SDK status facade"
+    );
+    match state.status_client.status_snapshot().await {
+        Ok(snapshot) => Json(StatusResponse {
+            version: snapshot.version,
+            agent_count: snapshot.agent_count,
+            app_count: snapshot.loaded_apps,
+            llm_provider: snapshot.llm_provider,
+        }),
+        Err(error) => {
+            tracing::warn!(
+                operation = "status_snapshot",
+                reason_code = "status_client_failed",
+                error = %error,
+                "web status route preserving bounded unavailable response"
+            );
+            Json(StatusResponse {
+                version: env!("CARGO_PKG_VERSION").into(),
+                agent_count: 0,
+                app_count: 0,
+                llm_provider: "service.llm.unavailable".into(),
+            })
+        }
     }
-    let agent_count = state.kernel.agent_count().await;
-    let app_count = if let Some(views) = service_status_views(&state, "web-route-status-apps").await
-    {
-        views.len()
-    } else {
-        crate::application_shell_adapter::running_app_count(&state).await
-    };
-    let llm_provider = crate::llm_route_shell_adapter::status_provider_label(&state).await;
-
-    Json(StatusResponse {
-        version: env!("CARGO_PKG_VERSION").into(),
-        agent_count,
-        app_count,
-        llm_provider,
-    })
 }

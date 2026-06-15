@@ -5,12 +5,14 @@
 
 use std::sync::Arc;
 
-use macaca_framework::mcp::{McpClient, McpError, McpResourceDef, McpResourceRead,
-    McpResourceTemplateDef, McpTimeouts, McpTransportConfig};
+use macaca_framework::mcp::{
+    McpClient, McpError, McpResourceDef, McpResourceRead, McpResourceTemplateDef, McpTimeouts,
+    McpTransportConfig,
+};
 
 use crate::transport::{bridge_for_config, McpTransport};
 
-use super::types::{McpServerDefinition};
+use super::types::McpServerDefinition;
 
 /// Strategy used by runtime-host to create low-level MCP protocol clients.
 ///

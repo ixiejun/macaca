@@ -1,0 +1,34 @@
+[package]
+name = "macaca-host-composition"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+async-trait = { workspace = true }
+macaca-proto = { workspace = true }
+macaca-runtime-host = { workspace = true }
+macaca-sdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+chrono = { workspace = true }
+tokio = { workspace = true }
+axum = { version = "0.8", features = ["ws"] }
+serde_yaml = "0.9"
+futures = { workspace = true }
+tower-http = { version = "0.6", features = ["cors"] }
+tracing-subscriber = { workspace = true }
+uuid = { workspace = true }
+dirs = "5"
+async-stream = "0.3"
+tokio-util = { version = "0.7", features = ["rt"] }
+once_cell = "1"
+prometheus = "0.13"
+reqwest = { version = "0.12", features = ["json"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[[bin]]
+name = "macaca-web-server"
+path = "../../shells/macaca-web/src/bin/macaca-web-server.rs"

@@ -132,7 +132,8 @@ impl ReActAgent {
                         info!(
                             agent = %self.name,
                             trace_id = %runtime.trace_id,
-                            fallback_model = %fallback.name(),
+                            route_source = "fallback",
+                            fallback_model_configured = true,
                             "react_agent fallback model attempt started"
                         );
                         return fallback.chat(messages, options).await;

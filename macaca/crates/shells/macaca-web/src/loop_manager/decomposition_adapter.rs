@@ -5,7 +5,8 @@
 
 use std::sync::Arc;
 
-use macaca_proto::ApplicationId;
+use macaca_proto::{ApplicationId, CreateTaskAssignmentCommand, TraceContext};
+use macaca_sdk::ServiceBackedTaskBoardDataSource;
 
 use super::agent_execution_adapter::list_goal_todos_for_scope;
 use super::execution_control_adapter::session_loop_coordinator;
@@ -13,7 +14,6 @@ use crate::session_loop_shell_adapter::{
     wake_worker_loops_and_notify_local, REASON_SESSION_LOOP_GOAL_DECOMPOSITION_READY,
 };
 use crate::state::AppState;
-
 
 /// Wake worker loops after recording an auditable execution-control checkpoint.
 pub(crate) async fn wake_worker_loops(
@@ -266,11 +266,7 @@ pub(crate) async fn create_fallback_decomposition_tasks(
         "Planner produced no todos; creating capability-based fallback task chain"
     );
 
-    let space = macaca_sdk::task::TaskSpace::for_session(
-        app_id.clone(),
-        session_id.map(str::to_string),
-        Arc::clone(&state.persist.todo_store),
-    );
+    let task_client = ServiceBackedTaskBoardDataSource::new(state.system_facade.service_client());
     let mut created = Vec::new();
     let mut previous: Option<macaca_proto::TaskId> = initial_dependency;
 
@@ -279,20 +275,43 @@ pub(crate) async fn create_fallback_decomposition_tasks(
         let (title, description, acceptance_criteria) =
             fallback_task_template(phase, &worker.name, goal_description);
         let depends_on = previous.into_iter().collect::<Vec<_>>();
-        let item = space
-            .create_task_assignment_with_graph_owner(
-                &worker.name,
-                plan_agent_name,
+        let mut trace = TraceContext::new(format!(
+            "task-fallback-assignment-{}-{}",
+            goal_id,
+            uuid::Uuid::new_v4()
+        ));
+        trace.session_id = session_id.map(str::to_string);
+        trace.task_id = Some(goal_id.to_string());
+        let item = match task_client
+            .create_task_assignment(CreateTaskAssignmentCommand {
+                app_id: app_id.clone(),
+                session_id: session_id.map(str::to_string),
+                agent_name: worker.name.clone(),
+                created_by: plan_agent_name.to_string(),
                 title,
                 description,
                 acceptance_criteria,
-                8u8.saturating_sub(index.min(3) as u8),
+                priority: 8u8.saturating_sub(index.min(3) as u8),
                 depends_on,
-                Some(goal_id),
-                // Goal fallback tasks participate in application-execution authority (P1.1.7 freeze).
-                macaca_proto::TaskGraphOwner::ApplicationExecution,
-            )
-            .await;
+                parent_task: Some(goal_id),
+                // Fallback tasks are generic application-execution records owned by Task Service.
+                graph_owner: macaca_proto::TaskGraphOwner::ApplicationExecution,
+                graph_id: None,
+                trace: Some(trace),
+            })
+            .await
+        {
+            Ok(item) => item,
+            Err(error) => {
+                tracing::error!(
+                    goal_id = %goal_id,
+                    agent = %worker.name,
+                    error = %error,
+                    "task service failed to create fallback decomposition task"
+                );
+                break;
+            }
+        };
         previous = Some(item.id);
         created.push(item);
     }

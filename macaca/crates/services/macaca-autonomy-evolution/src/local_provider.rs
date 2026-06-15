@@ -15,18 +15,18 @@ use macaca_proto::{MacacaResult, ServiceHealth, TraceContext};
 use tracing::{info, warn};
 
 use crate::{
-    autonomy_evolution_service_descriptor, validate_transition, AutonomyEvolutionService,
-    DefaultEvolutionAdmissionSpecification, DefaultEvolutionBenchmarkScoringStrategy,
-    DefaultEvolutionLiveOrchestrator, DefaultEvolutionReleaseSafetyStrategy,
-    EvolutionAdmissionCommand, EvolutionAdmissionResult, EvolutionAdmissionSpecification,
-    EvolutionBenchmarkCommand, EvolutionBenchmarkResult, EvolutionBenchmarkScoringStrategy,
-    EvolutionGovernanceLedgerRecord, EvolutionGovernanceLedgerRecordKind,
-    EvolutionLiveAuditCommand, EvolutionLiveAuditResult, EvolutionLiveOrchestrator,
-    EvolutionLiveTickCommand, EvolutionLiveTickResult, EvolutionReleaseCommand,
-    EvolutionReleaseResult, EvolutionReleaseSafetyStrategy, EvolutionRunRecord,
-    EvolutionServiceSnapshot, EvolutionSnapshotCommand, EvolutionTransitionCommand,
-    EvolutionTransitionResult, OsCodeEvolutionProposalAdapter, OsCodeEvolutionProposalCommand,
-    OsCodeEvolutionProposalResult, AUTONOMY_EVOLUTION_SERVICE_ID,
+    autonomy_evolution_service_descriptor, scope_matches_filter, validate_transition,
+    AutonomyEvolutionService, DefaultEvolutionAdmissionSpecification,
+    DefaultEvolutionBenchmarkScoringStrategy, DefaultEvolutionLiveOrchestrator,
+    DefaultEvolutionReleaseSafetyStrategy, EvolutionAdmissionCommand, EvolutionAdmissionResult,
+    EvolutionAdmissionSpecification, EvolutionBenchmarkCommand, EvolutionBenchmarkResult,
+    EvolutionBenchmarkScoringStrategy, EvolutionGovernanceLedgerRecord,
+    EvolutionGovernanceLedgerRecordKind, EvolutionLiveAuditCommand, EvolutionLiveAuditResult,
+    EvolutionLiveOrchestrator, EvolutionLiveTickCommand, EvolutionLiveTickResult,
+    EvolutionReleaseCommand, EvolutionReleaseResult, EvolutionReleaseSafetyStrategy,
+    EvolutionRunRecord, EvolutionServiceSnapshot, EvolutionSnapshotCommand,
+    EvolutionTransitionCommand, EvolutionTransitionResult, OsCodeEvolutionProposalAdapter,
+    OsCodeEvolutionProposalCommand, OsCodeEvolutionProposalResult, AUTONOMY_EVOLUTION_SERVICE_ID,
 };
 
 #[derive(Debug, Default, Clone)]
@@ -73,7 +73,7 @@ impl AutonomyEvolutionService for InMemoryAutonomyEvolutionProvider {
                     .as_ref()
                     .map(|run_id| &record.run_id == run_id)
                     .unwrap_or(true)
-                    && record.scope.matches_filter(&command.scope)
+                    && scope_matches_filter(&record.scope, &command.scope)
             })
             .cloned()
             .collect();

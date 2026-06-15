@@ -15,7 +15,7 @@ use super::sanitize_diagnostic_text;
 /// The key is a provider-neutral Memento for compile-cache lookup.  It combines
 /// the artifact digest, ABI version, provider capability fingerprint, and
 /// execution-profile fingerprint so cached modules are never reused across
-/// incompatible ABI or runtime capability boundaries.
+/// mismatched ABI or runtime capability boundaries.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct WasmCompiledArtifactCacheKey {
     pub digest_algorithm: String,

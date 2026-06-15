@@ -4,6 +4,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use super::identity::{AgentId, TaskId};
+use super::llm::TokenUsage;
 
 // ── Task Types ──
 
@@ -59,6 +60,29 @@ pub struct TaskResult {
     pub task_id: TaskId,
     pub success: bool,
     pub output: String,
+    /// Structured failure message when `success` is false.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
     pub artifacts: Vec<String>,
     pub completed_at: DateTime<Utc>,
+    /// Optional LLM token accounting captured by the execution service.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tokens_used: Option<TokenUsage>,
+}
+
+/// Provider-neutral description of an execution-capable application agent.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentInfo {
+    /// Unique agent identifier.
+    pub id: String,
+    /// Stable agent name exposed by application metadata.
+    pub name: String,
+    /// Provider-neutral capability labels used by routing policies.
+    pub capabilities: Vec<String>,
+    /// Current running-task count reported by the execution service.
+    pub current_load: u32,
+    /// Maximum concurrent work accepted by this agent.
+    pub max_load: u32,
+    /// Whether the agent can currently accept work.
+    pub available: bool,
 }

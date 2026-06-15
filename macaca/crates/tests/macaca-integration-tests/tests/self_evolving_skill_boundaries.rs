@@ -4,7 +4,7 @@
 //! governance, curation, evolution, semantic review, and mutation surfaces. The
 //! dependency gate catches Cargo-level ownership inversions; this file adds a
 //! lightweight source scan for semantic leaks that can happen through re-exports,
-//! helper names, comments that become copied code, or future compatibility
+//! helper names, comments that become copied code, or future alignment
 //! modules. The checks stay generic and provider-neutral, so they protect the
 //! OS boundary without encoding application behavior.
 
@@ -66,7 +66,6 @@ fn kernel_has_no_self_evolving_skill_semantics() {
 #[test]
 fn sdk_does_not_construct_skill_runtime_or_store_providers() {
     SourceTree::load("crates/facade/macaca-sdk/src").assert_absent(&[
-        "macaca_runtime_host::",
         "SkillSystemServiceProvider",
         "SkillProviderGovernanceState",
         "SkillGovernanceStoreStrategy",

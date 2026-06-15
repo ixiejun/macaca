@@ -44,7 +44,7 @@ async fn tool_capability_context_provider_emits_compact_index_only() {
 
     assert_eq!(provider.stage(), ContextProviderStage::CapabilityIndex);
 
-    let input = ContextAssembleInput::legacy("agent", "model", vec![], Default::default());
+    let input = ContextAssembleInput::unscoped("agent", "model", vec![], Default::default());
     let ctx = ContextComposeContext {
         assemble_input: &input,
     };

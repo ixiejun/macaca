@@ -19,7 +19,7 @@ impl WasmSupplyChainAdmissionSpec {
     ///
     /// This method is deliberately deterministic.  It compares descriptor
     /// digest, detached signature shape, signer allowlist, source-origin
-    /// allowlist, provenance freshness, and certification compatibility from
+    /// allowlist, provenance freshness, and certification conformance from
     /// data already present in the fixture.  A later production cryptographic
     /// verifier can be injected behind this Specification without changing the
     /// report shape or admission orchestration.
@@ -72,7 +72,7 @@ impl WasmSupplyChainAdmissionSpec {
             }
         }
         if policy.require_certification && attestation.certification_report_id.is_none() {
-            report.reject("incompatible_certification");
+            report.reject("certification_missing");
         }
 
         self.log(&report);

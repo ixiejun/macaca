@@ -114,7 +114,7 @@ async fn replay_iterator_preserves_order_and_cursor() {
 }
 
 #[tokio::test]
-async fn append_command_matches_legacy_append_behavior() {
+async fn append_command_matches_stable_append_behavior() {
     let log = test_log().await;
     let seq = log
         .append_command(AppendEventCommand::new(

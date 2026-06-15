@@ -8,20 +8,20 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use macaca_autonomy_evolution::{
+use macaca_proto::{
     EvolutionAdmissionCommand, EvolutionAdmissionResult, EvolutionBenchmarkCommand,
     EvolutionBenchmarkResult, EvolutionLiveAuditCommand, EvolutionLiveAuditResult,
     EvolutionLiveTickCommand, EvolutionLiveTickResult, EvolutionReleaseCommand,
     EvolutionReleaseResult, EvolutionRunState, EvolutionServiceSnapshot, EvolutionSnapshotCommand,
-    EvolutionTransitionCommand, EvolutionTransitionResult, OsCodeEvolutionProposalCommand,
-    OsCodeEvolutionProposalResult, AUTONOMY_EVOLUTION_ADMISSION_COMMAND,
+    EvolutionTransitionCommand, EvolutionTransitionResult, MacacaError, MacacaResult,
+    OsCodeEvolutionProposalBundle, OsCodeEvolutionProposalCommand, OsCodeEvolutionProposalDecision,
+    OsCodeEvolutionProposalResult, TraceContext, AUTONOMY_EVOLUTION_ADMISSION_COMMAND,
     AUTONOMY_EVOLUTION_BENCHMARK_COMMAND, AUTONOMY_EVOLUTION_HEALTH_COMMAND,
     AUTONOMY_EVOLUTION_LIVE_AUDIT_COMMAND, AUTONOMY_EVOLUTION_LIVE_TICK_COMMAND,
     AUTONOMY_EVOLUTION_OS_CODE_PROPOSAL_COMMAND, AUTONOMY_EVOLUTION_RELEASE_COMMAND,
     AUTONOMY_EVOLUTION_SERVICE_ID, AUTONOMY_EVOLUTION_SNAPSHOT_COMMAND,
     AUTONOMY_EVOLUTION_TRANSITION_COMMAND,
 };
-use macaca_proto::{MacacaError, MacacaResult, TraceContext};
 use tracing::{info, warn};
 
 use crate::service_client::{ServiceCallCommand, SystemServiceClient};
@@ -179,9 +179,9 @@ impl SystemAutonomyEvolutionClient for UnavailableSystemAutonomyEvolutionClient 
         Ok(OsCodeEvolutionProposalResult {
             proposal_id: command.proposal_id,
             run_id: command.run_id,
-            decision: macaca_autonomy_evolution::OsCodeEvolutionProposalDecision::Denied,
+            decision: OsCodeEvolutionProposalDecision::Denied,
             trace: command.trace,
-            bundle: macaca_autonomy_evolution::OsCodeEvolutionProposalBundle {
+            bundle: OsCodeEvolutionProposalBundle {
                 proposal_ref: None,
                 title: String::new(),
                 summary: String::new(),

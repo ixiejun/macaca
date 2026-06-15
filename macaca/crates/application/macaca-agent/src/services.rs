@@ -2,7 +2,7 @@
 
 use async_trait::async_trait;
 use macaca_memory::{RecallQuery, RecallResult, RememberText};
-use macaca_proto::{IpcMessage, MacacaResult, MemoryEntry, MemoryId};
+use macaca_proto::{IpcMessage, MacacaResult, MemoryId};
 
 static NOOP_MEMORY_SERVICE: NoopMemoryService = NoopMemoryService;
 static NOOP_IPC_SERVICE: NoopIpcService = NoopIpcService;
@@ -18,24 +18,6 @@ pub trait MemoryService: Send + Sync {
 
     /// Recall memories through the canonical memory facade.
     async fn recall(&self, query: RecallQuery) -> MacacaResult<RecallResult>;
-
-    /// Store a memory entry through the legacy service API.
-    #[deprecated(note = "use MemoryService::remember_text with macaca_memory::RememberText")]
-    async fn store(&self, entry: MemoryEntry) -> MacacaResult<MemoryId> {
-        let mut input = RememberText::new(entry.content)
-            .layer(entry.layer)
-            .metadata(entry.metadata);
-        if let Some(agent_id) = entry.agent_id {
-            input = input.agent_id(agent_id);
-        }
-        self.remember_text(input).await
-    }
-
-    /// Retrieve memories through the legacy service API.
-    #[deprecated(note = "use MemoryService::recall with macaca_memory::RecallQuery")]
-    async fn retrieve(&self, query: &str, limit: usize) -> MacacaResult<Vec<MemoryEntry>> {
-        Ok(self.recall(RecallQuery::new(query, limit)).await?.entries)
-    }
 }
 
 /// Sends IPC messages to other agents or topics.
@@ -105,12 +87,6 @@ impl AgentServices {
     /// Create the canonical builder for service bundles.
     pub fn builder() -> AgentServicesBuilder {
         AgentServicesBuilder::new()
-    }
-
-    /// Create an empty services bundle (no services attached).
-    #[deprecated(note = "use AgentServices::builder().build() for new code")]
-    pub fn empty() -> Self {
-        Self::builder().build()
     }
 
     /// Return the configured memory service or a no-op fallback.
@@ -184,7 +160,7 @@ impl Default for AgentServicesBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use macaca_proto::{AgentId, MemoryLayer, MessageId};
+    use macaca_proto::{AgentId, MemoryEntry, MemoryLayer, MessageId};
     use std::sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -270,33 +246,6 @@ mod tests {
         assert!(called.load(Ordering::SeqCst));
         assert_eq!(memories.entries.len(), 1);
         assert_eq!(memories.entries[0].content, "recorded");
-    }
-
-    #[tokio::test]
-    #[allow(deprecated)]
-    async fn deprecated_memory_service_methods_remain_callable() {
-        let called = Arc::new(AtomicBool::new(false));
-        let services = AgentServices::builder()
-            .memory(Box::new(RecordingMemoryService {
-                called: Arc::clone(&called),
-            }))
-            .build();
-
-        let memory_id = services
-            .memory_service()
-            .store(memory_entry("legacy"))
-            .await
-            .unwrap();
-        let memories = services
-            .memory_service()
-            .retrieve("legacy", 5)
-            .await
-            .unwrap();
-
-        assert_ne!(memory_id, MemoryId::default());
-        assert!(called.load(Ordering::SeqCst));
-        assert_eq!(memories.len(), 1);
-        assert_eq!(memories[0].content, "recorded");
     }
 
     struct RecordingIpcService {

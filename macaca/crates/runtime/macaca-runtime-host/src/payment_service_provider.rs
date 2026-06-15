@@ -1,4 +1,4 @@
-//! Runtime-host provider for the Route C Payment Service.
+//! Runtime-host provider for the Payment Service.
 //!
 //! The provider is a Mediator over provider-neutral A2A contracts, a payment
 //! adapter Strategy, a provider-neutral payment policy Strategy, payment-store

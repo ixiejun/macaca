@@ -1,10 +1,11 @@
 //! `aos-sdk` — declarative agent SDK for Agent OS.
 //!
 //! Provides YAML/TOML configuration parsing, a fluent builder API,
-//! and registration helpers to construct and register agents with
-//! the kernel from declarative config files.
+//! and facade clients that register declarative agents through stable
+//! service-oriented boundaries.
 
 pub mod ability_kit;
+pub mod alert_client;
 pub mod app_protocol_client;
 pub mod application;
 pub mod application_client;
@@ -15,14 +16,12 @@ pub mod application_testkit;
 pub mod autonomy_evolution_client;
 pub mod builder;
 pub mod config;
-pub mod context_client;
 pub mod domain_pack_bridge;
 pub mod driver_client;
 pub mod entitlement_client;
 pub mod evm_client;
 pub mod facade;
 pub mod heartbeat_client;
-pub mod in_process_kernel_registration;
 pub mod interaction_client;
 pub mod llm_client;
 pub mod mcp_client;
@@ -36,13 +35,9 @@ pub mod plugin_capability_client;
 pub mod plugin_client;
 pub mod plugin_hook_client;
 pub mod plugin_sdk;
-pub mod registry_api;
 pub mod scheduled_agent_task_client;
 pub mod scheduler_client;
 pub mod service_client;
-pub mod shell_provider_bridge;
-pub mod skill_client;
-pub mod skill_operator_client;
 pub mod spec;
 pub mod status_client;
 pub mod store_client;
@@ -58,6 +53,11 @@ pub mod workbench_client;
 mod application_execution_client_tests;
 
 pub use ability_kit::{AbilityDescriptorBuilder, AbilityKit};
+pub use alert_client::{
+    ServiceBackedAlertClient, SystemAlertClient, UnavailableSystemAlertClient,
+    ALERT_HEALTH_COMMAND, ALERT_RAISE_COMMAND, ALERT_RESOLVE_COMMAND, ALERT_SERVICE_ID,
+    ALERT_SNAPSHOT_COMMAND,
+};
 pub use app_protocol_client::{
     ServiceBackedAppProtocolClient, SystemAppProtocolClient, UnavailableSystemAppProtocolClient,
 };
@@ -85,10 +85,12 @@ pub use autonomy_evolution_client::{
     ServiceBackedAutonomyEvolutionClient, SystemAutonomyEvolutionClient,
     UnavailableSystemAutonomyEvolutionClient,
 };
-pub use builder::{AgentBuilder, DeclarativeAgent};
+pub use builder::AgentBuilder;
 pub use config::AgentConfig;
-pub use context_client::{
-    ServiceBackedContextClient, SystemContextClient, UnavailableSystemContextClient,
+pub use domain_pack_bridge::{
+    compose_installed_domain_pack_catalog, empty_domain_pack_catalog, expand_service_capabilities,
+    AppServiceContractConfig, DomainPackCatalog, DomainPackDefinition,
+    EffectiveServiceCapabilities, InMemoryDomainPackCatalog, SharedDomainPackCatalog,
 };
 pub use driver_client::{
     ServiceBackedDriverClient, SystemDriverClient, UnavailableSystemDriverClient,
@@ -97,8 +99,7 @@ pub use entitlement_client::{
     ServiceBackedEntitlementClient, SystemEntitlementClient, UnavailableSystemEntitlementClient,
 };
 pub use evm_client::{ServiceBackedEvmClient, SystemEvmClient, UnavailableSystemEvmClient};
-pub use facade::{AgentRegistryApi, KernelAgentRegistry, KernelPrimitiveSdk, MacacaSdk};
-pub use in_process_kernel_registration::register_in_process_kernel_agent;
+pub use facade::{AgentRegistryApi, MacacaSdk};
 pub use heartbeat_client::{
     ServiceBackedHeartbeatClient, SystemHeartbeatClient, UnavailableSystemHeartbeatClient,
 };
@@ -109,17 +110,22 @@ pub use llm_client::{
     llm_service_chat_client_from_system, ServiceBackedLlmClient, SystemLlmClient,
     UnavailableSystemLlmClient,
 };
-pub use macaca_skill::{
-    SkillAuthorKind, SkillCurationLifecycleAction, SkillCurationLifecycleCommand,
-    SkillCurationRollbackCommand, SkillCurationRunCommand, SkillEvolutionPromoteDraftCommand,
-    SkillEvolutionRejectDraftCommand, SkillExperienceProposalSnapshotCommand,
-    SkillGovernanceSnapshotCommand, SkillServicePolicyHints, SkillServiceScope,
+pub use macaca_proto::{
+    driver_service_descriptor, DriverInventoryCommand, DriverLoadServiceCommand, DriverLoadStatus,
+    DriverServiceScope, DriverToolCatalogCommand, DRIVER_SERVICE_ID,
 };
-pub use macaca_task::{TaskServiceSnapshot, TaskServiceSnapshotCommand};
+pub use macaca_proto::{
+    Alert, AlertSeverity, SkillCatalogEntryView, TaskServiceSnapshot, TaskServiceSnapshotCommand,
+};
+pub use macaca_proto::{
+    MemoryCapabilitySet, MemoryForgetCommand, MemoryGetCommand, MemoryGetResult, MemoryPolicyHints,
+    MemoryPrefetchCommand, MemoryRecallCommand, MemoryRecallResult, MemoryRememberCommand,
+    MemoryRememberResult, MemoryScope, MemoryServiceSnapshot, MemoryServiceSnapshotCommand,
+    MemoryStatusCommand, MemoryStatusReport, MemoryVisibility,
+};
 pub use mcp_client::{ServiceBackedMcpClient, SystemMcpClient, UnavailableSystemMcpClient};
 pub use memory_client::{
-    DirectFacadeMemoryClient, ServiceBackedMemoryClient, SystemMemoryClient,
-    UnavailableSystemMemoryClient,
+    ServiceBackedMemoryClient, SystemMemoryClient, UnavailableSystemMemoryClient,
 };
 pub use package_fixtures::{
     application_platform_agent_fixture, application_platform_genui_fixture,
@@ -151,8 +157,6 @@ pub use plugin_sdk::{
     PluginContractReport, PluginContractTestKit, PluginHookBuilder, PluginManifestBuilder,
     PluginRegistration, PluginRegistrationBuilder, PluginSdk, PluginSecretRequirementBuilder,
 };
-#[allow(deprecated)]
-pub use registry_api::{register_from_config, register_from_file};
 pub use scheduled_agent_task_client::{
     ServiceBackedScheduledAgentTaskClient, SystemScheduledAgentTaskClient,
     UnavailableSystemScheduledAgentTaskClient,
@@ -161,18 +165,15 @@ pub use scheduler_client::{
     ServiceBackedSchedulerClient, SystemSchedulerClient, UnavailableSystemSchedulerClient,
 };
 pub use service_client::{ServiceCallCommand, ServiceCallResult, ServiceInspectionResult};
-pub use skill_client::{ServiceBackedSkillClient, SystemSkillClient, UnavailableSystemSkillClient};
-pub use skill_operator_client::SystemSkillOperatorClient;
 pub use spec::{AgentSpec, AgentSpecBuilder, TracePolicy};
 pub use store_client::{ServiceBackedStoreClient, SystemStoreClient, UnavailableSystemStoreClient};
 pub use system_facade::{
-    kernel_status_snapshot, ApprovalDecisionCommand, EmptySystemPackageClient,
-    EmptySystemTraceClient, PackageInspectionCommand, PackageInspectionResult,
-    ServiceInspectionCommand, SessionEventQueryCommand, StaticSystemStatusDataSource, SystemFacade,
-    SystemPackageClient, SystemServiceClient, SystemStatusClient, SystemStatusDataSource,
-    SystemStatusSnapshot, SystemTaskClient, SystemTraceClient, TaskBoardDataSource,
-    TaskBoardQueryCommand, TaskBoardQueryResult, TodoStoreTaskBoardDataSource, TraceQueryResult,
-    TraceTailCommand, UnavailableSystemServiceClient,
+    ApprovalDecisionCommand, EmptySystemPackageClient, EmptySystemTraceClient,
+    PackageInspectionCommand, PackageInspectionResult, ServiceBackedTaskBoardDataSource,
+    ServiceInspectionCommand, SessionEventQueryCommand, StaticSystemStatusClient, SystemFacade,
+    SystemPackageClient, SystemServiceClient, SystemStatusClient, SystemStatusSnapshot,
+    SystemTaskClient, SystemTraceClient, TaskBoardDataSource, TaskBoardQueryCommand,
+    TaskBoardQueryResult, TraceQueryResult, TraceTailCommand, UnavailableSystemServiceClient,
 };
 pub use task_client::{TaskServiceClient, UnavailableTaskServiceClient};
 pub use tool_client::{ServiceBackedToolClient, SystemToolClient, UnavailableSystemToolClient};
@@ -181,15 +182,4 @@ pub use web3_client::{ServiceBackedWeb3Client, SystemWeb3Client, UnavailableSyst
 pub use workbench_client::{
     is_structured_unavailable, ServiceBackedWorkbenchClient, SystemWorkbenchClient,
     SystemWorkbenchFacadeExt, UnavailableWorkbenchServiceClient, WorkbenchClientCatalog,
-};
-pub use domain_pack_bridge::{
-    compose_installed_domain_pack_catalog, empty_domain_pack_catalog, expand_service_capabilities,
-    AppServiceContractConfig, DomainPackCatalog, DomainPackDefinition, EffectiveServiceCapabilities,
-    InMemoryDomainPackCatalog, SharedDomainPackCatalog,
-};
-#[cfg(feature = "domain-pack-finance")]
-pub use domain_pack_bridge::{finance_domain_pack_registrations, finance_pack_catalog_definition};
-pub use shell_provider_bridge::{
-    agent, app, context, driver, framework, kernel, llm, memory, runtime_host, skill, task,
-    tools,
 };

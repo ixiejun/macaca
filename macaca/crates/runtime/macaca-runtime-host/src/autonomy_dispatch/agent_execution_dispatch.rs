@@ -196,9 +196,11 @@ pub(crate) async fn dispatch_agent_execution(
                                 "agent_execution_result_evidence_missing",
                             ))
                         }
-                        AgentExecutionEvidenceDecision::NotCompleted => Ok(
-                            AutonomyDispatchOutcome::retryable("agent_execution_result_not_completed"),
-                        ),
+                        AgentExecutionEvidenceDecision::NotCompleted => {
+                            Ok(AutonomyDispatchOutcome::retryable(
+                                "agent_execution_result_not_completed",
+                            ))
+                        }
                     }
                 }
                 AgentExecutionStatus::Skipped | AgentExecutionStatus::Denied => {
@@ -241,10 +243,8 @@ async fn resolve_scheduled_agent_payload(
     trace: TraceContext,
     target: &AgentExecutionTargetCommand,
 ) -> MacacaResult<Option<ScheduledAgentTaskResolvedPayload>> {
-    let mut resolve = ResolveScheduledAgentTaskPayloadCommand::new(
-        trace.clone(),
-        target.payload_ref.clone(),
-    )?;
+    let mut resolve =
+        ResolveScheduledAgentTaskPayloadCommand::new(trace.clone(), target.payload_ref.clone())?;
     resolve.metadata = target.metadata.clone();
     let command = ServiceCommand::with_trace(
         ServiceCommandName::new(SCHEDULED_AGENT_TASK_RESOLVE_PAYLOAD_COMMAND),

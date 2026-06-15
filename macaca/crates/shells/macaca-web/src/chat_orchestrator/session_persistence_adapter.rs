@@ -8,8 +8,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use chrono::Utc;
+use macaca_host_composition::framework::execution::ExecutionContext;
 use macaca_proto::ApplicationId;
-use macaca_sdk::framework::execution::ExecutionContext;
 
 use crate::session::{SessionMeta, StoredSession, StoredTurn, APP_SESSIONS_PREFIX, SESSION_PREFIX};
 use crate::state::AppState;

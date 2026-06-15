@@ -24,11 +24,7 @@ impl LlmProvider for MockLlm {
     fn name(&self) -> &str {
         "mock"
     }
-    async fn chat(
-        &self,
-        _messages: Vec<LlmMessage>,
-        _options: &LlmOptions,
-    ) -> Res<LlmResponse> {
+    async fn chat(&self, _messages: Vec<LlmMessage>, _options: &LlmOptions) -> Res<LlmResponse> {
         Ok(LlmResponse {
             content: "ok".into(),
             reasoning_content: None,
@@ -52,11 +48,10 @@ fn make_kernel() -> Kernel {
         agent_timeout_ms: 30000,
     };
     let llm: Arc<dyn LlmProvider> = Arc::new(MockLlm);
-    let execution_port: Arc<dyn AgentExecutionPort> =
-        Arc::new(InProcessAgentExecutionPort::new(
-            llm,
-            Arc::from(Box::new(DefaultToolSet::new()) as Box<dyn ToolCatalog>),
-        ));
+    let execution_port: Arc<dyn AgentExecutionPort> = Arc::new(InProcessAgentExecutionPort::new(
+        llm,
+        Arc::from(Box::new(DefaultToolSet::new()) as Box<dyn ToolCatalog>),
+    ));
     KernelBuilder::from_execution_port(config, execution_port).build()
 }
 

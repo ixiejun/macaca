@@ -14,20 +14,20 @@ use macaca_proto::{
 };
 
 use crate::consumption::app_entry_agent_name;
-use crate::manifest_v1::LegacyAppManifestProjection;
+use crate::manifest_v1::YamlApplicationManifestProjection;
 use crate::model::{AgentSource, AppManifest};
 use crate::service_capability::EffectiveServiceCapabilities;
 use crate::ApplicationRuntimeKindSpec;
 
 pub(super) fn digest_view(
-    legacy: &AppManifest,
-    projection: &LegacyAppManifestProjection,
+    source_manifest: &AppManifest,
+    projection: &YamlApplicationManifestProjection,
 ) -> ApplicationManifestDigestView {
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    legacy.id.hash(&mut hasher);
-    legacy.name.hash(&mut hasher);
-    legacy.version.hash(&mut hasher);
-    legacy.agents.len().hash(&mut hasher);
+    source_manifest.id.hash(&mut hasher);
+    source_manifest.name.hash(&mut hasher);
+    source_manifest.version.hash(&mut hasher);
+    source_manifest.agents.len().hash(&mut hasher);
     projection.manifest.abilities.len().hash(&mut hasher);
     for ability in &projection.manifest.abilities {
         ability.id.hash(&mut hasher);
@@ -42,12 +42,12 @@ pub(super) fn digest_view(
             .cloned()
             .unwrap_or_else(|| "unknown".into()),
         ability_count: projection.manifest.abilities.len(),
-        agent_count: legacy.agents.len(),
+        agent_count: source_manifest.agents.len(),
     }
 }
 
 pub(super) fn runtime_diagnostics(
-    legacy: &AppManifest,
+    source_manifest: &AppManifest,
     runtime_kind: &PackageRuntimeKind,
     capabilities: &crate::service_capability::EffectiveServiceCapabilities,
 ) -> Vec<String> {
@@ -71,13 +71,16 @@ pub(super) fn runtime_diagnostics(
     if spec.execution_available_for_runtime(Some(runtime_kind)) {
         diagnostics
     } else {
-        diagnostics.push(format!("runtime unavailable for {:?}", legacy.layer));
+        diagnostics.push(format!(
+            "runtime unavailable for {:?}",
+            source_manifest.layer
+        ));
         diagnostics
     }
 }
 
-pub(super) fn skills_dir(app_dir: Option<&Path>, legacy: &AppManifest) -> Option<String> {
-    if let Some(resources) = &legacy.resources {
+pub(super) fn skills_dir(app_dir: Option<&Path>, source_manifest: &AppManifest) -> Option<String> {
+    if let Some(resources) = &source_manifest.resources {
         if let Some(skills) = &resources.skills {
             return Some(
                 app_dir
@@ -124,12 +127,12 @@ pub(super) fn ability_agent_name(ability: &ApplicationAbilityDescriptor) -> Opti
         .and_then(|activation| activation.entry.clone())
 }
 
-/// Merge legacy inline/file agents with Manifest v1 ability capability names.
+/// Merge YAML inline/file agents with Manifest v1 ability capability names.
 pub(super) fn agent_views(
     manifest_v1: &ApplicationManifestV1,
-    legacy: &AppManifest,
+    source_manifest: &AppManifest,
 ) -> Vec<ApplicationServiceAgentView> {
-    let mut views: Vec<_> = legacy
+    let mut views: Vec<_> = source_manifest
         .agents
         .iter()
         .map(|agent| ApplicationServiceAgentView {
@@ -162,10 +165,10 @@ pub(super) fn agent_views(
 /// Project runtime entry metadata without copying prompt or secret payloads.
 pub(super) fn entry_view(
     manifest_v1: &ApplicationManifestV1,
-    legacy: &AppManifest,
+    source_manifest: &AppManifest,
 ) -> ApplicationEntryMetadataView {
     ApplicationEntryMetadataView {
-        agent_name: app_entry_agent_name(legacy)
+        agent_name: app_entry_agent_name(source_manifest)
             .map(str::to_string)
             .or_else(|| manifest_v1.runtime.entry.clone()),
         entry_kind: manifest_v1.runtime.metadata.get("entry.kind").cloned(),

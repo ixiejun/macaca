@@ -243,7 +243,7 @@ pub async fn run_governed_provider_chain(
     })
 }
 
-/// Legacy collection path: no timeouts; preserves pre-governance semantics for compatibility tests.
+/// Ungoverned collection path: no timeouts; preserves local collection semantics for conformance tests.
 pub async fn run_ungoverned_provider_chain(
     providers: &[Arc<dyn ContextProvider>],
     ctx: &ContextComposeContext<'_>,

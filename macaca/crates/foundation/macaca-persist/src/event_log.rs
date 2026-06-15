@@ -12,51 +12,13 @@ use tokio::sync::RwLock;
 
 use crate::event_index::{
     agent_from_payload, event_matches, index_key, index_prefix_for_query, select_index,
-    seq_from_key, EventLogQuery, SelectedIndex,
+    seq_from_key, SelectedIndex,
 };
 use crate::store::PersistBackend;
 use macaca_proto::types::EventEntry;
+use macaca_proto::{AppendEventCommand, EventLogQuery};
 
 const EVENTS_PREFIX: &str = "events/";
-
-/// Command object for appending a single persisted event.
-#[derive(Debug, Clone)]
-pub struct AppendEventCommand {
-    pub session_id: String,
-    pub event_type: String,
-    pub source: String,
-    pub payload: serde_json::Value,
-    pub app_id: Option<String>,
-    pub agent_name: Option<String>,
-}
-
-impl AppendEventCommand {
-    pub fn new(
-        session_id: impl Into<String>,
-        event_type: impl Into<String>,
-        source: impl Into<String>,
-        payload: serde_json::Value,
-    ) -> Self {
-        Self {
-            session_id: session_id.into(),
-            event_type: event_type.into(),
-            source: source.into(),
-            payload,
-            app_id: None,
-            agent_name: None,
-        }
-    }
-
-    pub fn with_app_id(mut self, app_id: impl Into<String>) -> Self {
-        self.app_id = Some(app_id.into());
-        self
-    }
-
-    pub fn with_agent_name(mut self, agent_name: impl Into<String>) -> Self {
-        self.agent_name = Some(agent_name.into());
-        self
-    }
-}
 
 /// Stable replay primitive for ordered session event restoration.
 pub struct EventReplayIterator {
@@ -243,7 +205,7 @@ impl EventLog {
 
     /// Append an event to the log. Returns the assigned sequence number.
     ///
-    /// Kept for compatibility; internally delegates to `AppendEventCommand`.
+    /// Convenience append API that delegates to `AppendEventCommand`.
     pub async fn append(
         &self,
         session_id: &str,

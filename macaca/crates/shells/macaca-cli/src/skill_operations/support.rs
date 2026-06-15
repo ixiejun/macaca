@@ -3,10 +3,7 @@
 //! Pure functions only: no I/O, no service calls.  Keeps handler modules thin
 //! and testable.
 
-use std::collections::BTreeMap;
-
 use macaca_proto::{MacacaError, MacacaResult};
-use macaca_sdk::SkillServicePolicyHints;
 
 use super::live_client::LiveSkillOperatorPayload;
 use super::types::SkillCliEvidenceRefs;
@@ -18,19 +15,6 @@ pub(crate) fn optional_vec(value: Option<String>) -> Vec<String> {
         .filter(|value| !value.is_empty())
         .into_iter()
         .collect()
-}
-
-/// Build empty policy hints for CLI-forwarded commands.
-///
-/// Entitlement and package readiness are evaluated server-side; the shell only
-/// forwards operator refs and trace metadata.
-pub(crate) fn policy_hints() -> SkillServicePolicyHints {
-    SkillServicePolicyHints {
-        required_permissions: Vec::new(),
-        entitlement_ready: None,
-        package_ready: None,
-        metadata: BTreeMap::new(),
-    }
 }
 
 /// Normalize and validate an HTTP API base URL for live Skill operations.

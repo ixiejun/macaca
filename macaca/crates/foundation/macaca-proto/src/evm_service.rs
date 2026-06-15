@@ -1,4 +1,4 @@
-//! ServiceRuntime-facing EVM Service contracts for Route C S11.
+//! ServiceRuntime-facing EVM Service contracts.
 //!
 //! `evm.rs` defines provider-neutral EVM value objects.  This module defines
 //! the service command layer that SDK clients and runtime-host providers share.

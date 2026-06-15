@@ -26,8 +26,8 @@ pub use application_platform_wasm::application_platform_wasm_skeleton_fixture;
 ///
 /// This type is separate from `PackageDescriptor` fixtures because Application
 /// Platform certification targets Manifest v1 and ability descriptors, while
-/// package compatibility tests target the lower-level Package Manifest v0
-/// contract.  Keeping the shapes separate prevents YAML/package compatibility
+/// package host_requirements tests target the lower-level Package Manifest v0
+/// contract.  Keeping the shapes separate prevents YAML/package host_requirements
 /// fixtures from becoming privileged application-platform examples.
 #[derive(Debug, Clone)]
 pub struct ApplicationPlatformFixture {
@@ -93,8 +93,8 @@ impl EcosystemPackageFixtureBuilder {
             DeveloperId::new("developer.fixture"),
             PackageRuntime::new(runtime_kind, "1"),
         );
-        manifest.compatibility.min_os_version = Some("1".into());
-        manifest.compatibility.supported_abi_versions = vec!["1".into()];
+        manifest.host_requirements.min_os_version = Some("1".into());
+        manifest.host_requirements.supported_abi_versions = vec!["1".into()];
         manifest
             .metadata
             .insert("package.manifest.version".into(), "1".into());

@@ -1,7 +1,7 @@
 //! Proposal lifecycle state transitions for the built-in Skill provider.
 //!
 //! Keeping these helpers outside `skill_service_provider_state` prevents the
-//! local compatibility adapter from becoming a large mixed curation engine.
+//! local governance adapter from becoming a large mixed curation engine.
 //! The module still operates only on provider-neutral governance DTOs and
 //! append-only events; package file mutation is deliberately left to a later
 //! safe-mutation service slice.

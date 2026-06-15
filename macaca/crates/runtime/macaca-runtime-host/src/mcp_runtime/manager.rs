@@ -9,15 +9,10 @@ use std::sync::Arc;
 
 use macaca_framework::mcp::{
     McpClient, McpResourceDef, McpResourceRead, McpResourceTemplateDef, McpTimeouts,
-    McpTransportConfig,
 };
-use macaca_proto::{CapabilityToolDescriptor, TraceContext};
+use macaca_proto::CapabilityToolDescriptor;
 use tokio::sync::RwLock;
 use tokio::time::timeout;
-
-use crate::mcp_descriptor_index::McpToolDescriptorIndex;
-use crate::mcp_invocation_registry::McpInvocationSessionRegistry;
-use crate::transport::bridge_for_config;
 
 use super::client::{default_mcp_client_factory, McpClientFactory};
 use super::config_entry::default_mcp_config_path;
@@ -25,13 +20,17 @@ use super::descriptors::descriptors_for_definition;
 use super::helpers::resource_access_error;
 use super::probe::probe_definition_statuses;
 use super::types::{
-    McpDefinitionSource, McpRegistryConfig, McpRuntimeContext, McpRuntimeStatus,
-    McpServerDefinition, McpToolPolicy,
+    McpDefinitionSource, McpRegistryConfig, McpRuntimeStatus, McpServerDefinition, McpToolPolicy,
 };
+use crate::mcp_descriptor_index::McpToolDescriptorIndex;
+use crate::mcp_invocation_registry::McpInvocationSessionRegistry;
 
-/// Agent OS MCP runtime manager.
-#[deprecated(note = "Use `McpRuntimeFacade` as the primary host-facing entry point.")]
-pub struct McpRuntimeManager {
+/// Internal Agent OS MCP runtime state owner.
+///
+/// `McpRuntimeFacade` is the only public host-facing entry point. The manager is
+/// crate-private so service providers can share one runtime state object without
+/// exposing implementation ownership to SDKs, shells, or applications.
+pub(crate) struct McpRuntimeManager {
     pub(crate) definitions: RwLock<BTreeMap<String, McpServerDefinition>>,
     pub(crate) invocation_registry: McpInvocationSessionRegistry,
     pub(crate) descriptor_index: McpToolDescriptorIndex,
@@ -39,7 +38,6 @@ pub struct McpRuntimeManager {
     pub(crate) timeouts: McpTimeouts,
 }
 
-#[allow(deprecated)]
 impl std::fmt::Debug for McpRuntimeManager {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("McpRuntimeManager")
@@ -51,7 +49,6 @@ impl std::fmt::Debug for McpRuntimeManager {
     }
 }
 
-#[allow(deprecated)]
 impl Default for McpRuntimeManager {
     fn default() -> Self {
         Self::new()
@@ -59,7 +56,6 @@ impl Default for McpRuntimeManager {
 }
 
 impl McpRuntimeManager {
-    #[deprecated(note = "Use `McpRuntimeFacade::new` instead.")]
     pub fn new() -> Self {
         Self {
             definitions: RwLock::new(BTreeMap::new()),
@@ -90,7 +86,6 @@ impl McpRuntimeManager {
         }
     }
 
-    #[deprecated(note = "Use `McpRuntimeFacade::load_default` instead.")]
     pub async fn load_default() -> Self {
         let manager = Self::new();
         if let Some(path) = default_mcp_config_path() {
@@ -99,7 +94,6 @@ impl McpRuntimeManager {
         manager
     }
 
-    #[deprecated(note = "Use `McpServerFactory`-backed facade loading instead.")]
     pub async fn load_config_file(&self, path: PathBuf) -> Result<(), String> {
         let content = tokio::fs::read_to_string(&path)
             .await
@@ -115,7 +109,6 @@ impl McpRuntimeManager {
         Ok(())
     }
 
-    #[deprecated(note = "Use `McpRuntimeFacade::upsert_definition` instead.")]
     pub async fn upsert_definition(&self, definition: McpServerDefinition) {
         self.definitions
             .write()
@@ -137,7 +130,6 @@ impl McpRuntimeManager {
         definitions.values().cloned().collect()
     }
 
-    #[deprecated(note = "Use `McpRuntimeFacade::probe` instead.")]
     pub async fn probe_statuses(&self, policy: &McpToolPolicy) -> Vec<McpRuntimeStatus> {
         let definitions = self.snapshot_server_definitions().await;
         probe_definition_statuses(definitions, policy).await

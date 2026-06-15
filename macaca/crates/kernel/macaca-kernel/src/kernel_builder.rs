@@ -15,7 +15,7 @@ use crate::{Kernel, SchedulerFactory, SchedulerKind};
 /// Builder for constructing a [`Kernel`] from explicit runtime dependencies.
 ///
 /// This type is the sole supported construction entry for new kernel wiring. Callers
-/// inject an [`AgentExecutionPort`] produced by runtime-host service clients, legacy
+/// inject an [`AgentExecutionPort`] produced by runtime-host service clients,
 /// test adapters, or bootstrap placeholders that are hot-swapped after services start.
 pub struct KernelBuilder {
     config: KernelConfig,
@@ -26,7 +26,7 @@ pub struct KernelBuilder {
 impl KernelBuilder {
     /// Create a builder bound to one swappable execution port.
     ///
-    /// The port may be a service-client adapter in production hosts, a legacy adapter in
+    /// The port may be a service-client adapter in production hosts, a test adapter in
     /// integration fixtures, or an unavailable placeholder that is replaced once
     /// `service.agent_execution` is registered.
     pub fn from_execution_port(
@@ -46,7 +46,10 @@ impl KernelBuilder {
 
     /// Override the scheduler strategy before materializing the kernel.
     pub fn scheduler_kind(mut self, scheduler_kind: SchedulerKind) -> Self {
-        tracing::debug!(?scheduler_kind, "kernel builder scheduler strategy overridden");
+        tracing::debug!(
+            ?scheduler_kind,
+            "kernel builder scheduler strategy overridden"
+        );
         self.scheduler_kind = scheduler_kind;
         self
     }
@@ -115,10 +118,11 @@ mod tests {
             agent_timeout_ms: 30000,
         };
         let llm: Arc<dyn LlmProvider> = Arc::new(MockLlm);
-        let execution_port: Arc<dyn AgentExecutionPort> = Arc::new(InProcessAgentExecutionPort::new(
-            llm,
-            Arc::from(Box::new(DefaultToolSet::new()) as Box<dyn ToolCatalog>),
-        ));
+        let execution_port: Arc<dyn AgentExecutionPort> =
+            Arc::new(InProcessAgentExecutionPort::new(
+                llm,
+                Arc::from(Box::new(DefaultToolSet::new()) as Box<dyn ToolCatalog>),
+            ));
         let kernel = KernelBuilder::from_execution_port(config, execution_port).build();
         assert_eq!(kernel.agent_count().await, 0);
     }

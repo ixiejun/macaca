@@ -10,12 +10,12 @@
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 
-use macaca_proto::{AgentExecutionResult, ApplicationId, TraceContext};
-use macaca_sdk::skill::{
+use macaca_host_composition::runtime_host::{
     SkillGovernanceRecord, SkillGovernanceRecordUsageCommand, SkillGovernanceSnapshotCommand,
     SkillLifecycleState, SkillServiceScope, SkillSnapshot, SkillUsageEventKind,
     SkillUsageObservation,
 };
+use macaca_proto::{AgentExecutionResult, ApplicationId, TraceContext};
 
 use crate::state::AppState;
 
@@ -183,7 +183,7 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
-    use macaca_sdk::skill::{
+    use macaca_host_composition::runtime_host::{
         SkillAuthorKind, SkillGovernanceProvenance, SkillSnapshotEntry, SkillSourceScope,
     };
 

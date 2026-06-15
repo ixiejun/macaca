@@ -40,7 +40,7 @@ impl PluginContext {
         }
     }
 
-    /// Override the ABI version for contract tests or future compatibility probes.
+    /// Override the ABI version for contract tests or future conformance probes.
     pub fn with_abi_version(mut self, abi_version: PluginAbiVersion) -> Self {
         self.abi_version = abi_version;
         self

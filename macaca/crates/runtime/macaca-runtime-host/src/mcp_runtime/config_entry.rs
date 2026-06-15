@@ -7,7 +7,9 @@ use std::path::PathBuf;
 
 use macaca_framework::mcp::{McpSessionMode, McpTransportConfig};
 
-use crate::skill_mcp_mapping_registry::{default_skill_mcp_mapping_registry, SkillMcpMappingRegistry};
+use crate::skill_mcp_mapping_registry::{
+    default_skill_mcp_mapping_registry, SkillMcpMappingRegistry,
+};
 
 use super::policy::apply_concurrency_isolation;
 use super::types::{McpDefinitionSource, McpServerConfigEntry, McpServerDefinition};

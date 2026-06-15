@@ -8,8 +8,8 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use macaca_proto::{
     ApplicationId, CapabilityToolInvocation, CapabilityToolInvocationResult,
-    CapabilityToolInvocationScope, CapabilityToolOriginKind, MacacaResult, MCP_SERVICE_ID,
-    MCP_TOOL_INVOKE_COMMAND, TraceContext,
+    CapabilityToolInvocationScope, CapabilityToolOriginKind, MacacaResult, TraceContext,
+    MCP_SERVICE_ID, MCP_TOOL_INVOKE_COMMAND,
 };
 
 use crate::service_client::{ServiceCallCommand, SystemServiceClient};

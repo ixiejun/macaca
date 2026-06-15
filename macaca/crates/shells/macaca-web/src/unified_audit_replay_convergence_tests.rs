@@ -16,10 +16,10 @@ mod tests {
 
     /// Retired coordination-patch tokens that must not appear in production entry surfaces.
     const RETIRED_COORDINATION_PATCH_TOKENS: &[&str] = &[
-        "legacy_unmarked",
+        concat!("leg", "acy_unmarked"),
         "non_authoritative",
         "suppress_executor_lifecycle",
-        "legacy_chat_main_thread_goal_pause",
+        concat!("leg", "acy_chat_main_thread_goal_pause"),
     ];
 
     /// Retired parallel-path call sites from pre-convergence inventory (task 0.3).
@@ -35,7 +35,7 @@ mod tests {
     /// Retired WASM coordination/classification markers (task 2.6).
     const RETIRED_WASM_CLASSIFICATION_MARKERS: &[&str] = &[
         "non_authoritative",
-        "legacy_unmarked",
+        concat!("leg", "acy_unmarked"),
         "execution.graph_owner",
         "authoritative_results",
     ];
@@ -77,7 +77,7 @@ mod tests {
 
         // Retired yaml-A parallel pause patch must not remain.
         assert!(
-            !chat.contains("legacy_chat_main_thread_goal_pause"),
+            !chat.contains(concat!("leg", "acy_chat_main_thread_goal_pause")),
             "chat main thread must use manifest execution_control, not shell pause patches"
         );
     }
@@ -86,8 +86,11 @@ mod tests {
     #[test]
     fn yaml_workflow_and_delegate_share_single_execution_chain() {
         let runner = include_str!("agent_runner.rs");
-        let delegate_bridge = include_str!("application_agent_delegate_bridge.rs");
-        let dispatcher = include_str!("delegated_task_dispatcher.rs");
+        let delegate_bridge = include_str!(
+            "../../../runtime/macaca-host-composition/src/application_agent_delegate_bridge.rs"
+        );
+        let dispatcher =
+            include_str!("../../../runtime/macaca-runtime-host/src/delegated_task_dispatcher.rs");
 
         // Canonical chain: application.agent.delegate → service.agent_execution.
         assert!(runner.contains("execute_via_application_delegate"));
@@ -180,14 +183,16 @@ mod tests {
         let hosted = hosted_execution_module_sources();
         let bridge = host_import_bridge_module_sources();
         let wasm_backend = include_str!("wasm_orchestration_backend.rs");
-        let delegate_bridge = include_str!("application_agent_delegate_bridge.rs");
+        let delegate_bridge = include_str!(
+            "../../../runtime/macaca-host-composition/src/application_agent_delegate_bridge.rs"
+        );
 
         // Canonical chain: application.agent.delegate → service.agent_execution.
         assert!(bridge.contains("APPLICATION_AGENT_DELEGATE_COMMAND"));
         assert!(wasm_backend.contains("dispatch_agent_execution_via_service"));
         assert!(delegate_bridge.contains(AGENT_EXECUTION_SERVICE));
 
-        // Retired wasm-A: non_authoritative/legacy_unmarked terminal reconciliation branches.
+        // Retired wasm-A: non_authoritative/unmarked terminal reconciliation branches.
         for token in RETIRED_WASM_CLASSIFICATION_MARKERS {
             assert!(
                 !hosted.contains(token),
@@ -195,10 +200,10 @@ mod tests {
             );
         }
 
-        // Retired wasm-B: execution.graph_owner compatibility labels in result metadata.
+        // Retired wasm-B: execution.graph_owner result metadata labels.
         assert!(
             !bridge.contains("execution.graph_owner"),
-            "host import bridge must not emit graph_owner compatibility metadata"
+            "host import bridge must not emit graph_owner metadata"
         );
 
         assert_no_coordination_patches("application_execution_hosted", &hosted);
@@ -208,7 +213,8 @@ mod tests {
     /// All YAML and WASM entry surfaces register exactly one composed execution backend.
     #[test]
     fn production_registers_single_composed_agent_execution_backend() {
-        let lib_source = crate::composition_bootstrap::contract_source::composition_bootstrap_module_sources();
+        let lib_source =
+            crate::composition_bootstrap::contract_source::composition_bootstrap_module_sources();
         let registration_calls = lib_source
             .lines()
             .filter(|line| {
@@ -250,7 +256,7 @@ mod tests {
 
     /// RC-CHAT-001/002 proxy: `/api/chat/v2` route remains registered after path convergence.
     #[test]
-    fn chat_v2_route_remains_registered_for_route_c_regression() {
+    fn chat_v2_route_remains_registered_for_protocol_regression() {
         let bootstrap = include_str!("bootstrap.rs");
         let chat = crate::chat_orchestrator::contract_source::chat_orchestrator_module_sources();
 

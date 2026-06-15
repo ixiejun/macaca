@@ -11,7 +11,6 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use libloading::Library;
 use serde_json::Value;
-use tokio::sync::mpsc::UnboundedSender;
 use tracing::debug;
 
 use crate::command::DriverCommand;
@@ -19,7 +18,7 @@ use crate::driver::{DriverManifest, DriverType, SoftwareDriver};
 use crate::dynamic_proxy::{DynamicDriverProxy, DynamicDriverSymbols};
 use crate::plugin_abi::*;
 use macaca_proto::{DriverId, MacacaError, MacacaResult};
-use macaca_tools::{Tool, TraceEvent};
+use macaca_tools::{Tool, ToolCommand};
 
 /// A driver loaded from a shared library at runtime.
 ///
@@ -48,22 +47,6 @@ unsafe impl Sync for DynamicDriver {}
 impl DynamicDriver {
     /// Load a driver from a shared library through the canonical dynamic path.
     pub fn load_dynamic(library_path: &Path, config_json: &str) -> MacacaResult<Self> {
-        Self::load_internal(library_path, config_json)
-    }
-
-    /// Load a driver from a shared library.
-    ///
-    /// # Arguments
-    /// * `library_path` — Path to the `.dylib` / `.so` file.
-    /// * `config_json`  — JSON configuration forwarded to the driver's
-    ///   `macaca_driver_create` entry point.
-    ///
-    /// # Errors
-    /// Returns `MacacaError::Driver` if the library cannot be loaded,
-    /// required symbols are missing, the ABI version is incompatible,
-    /// or the driver fails to initialize.
-    #[deprecated(note = "use DynamicDriverFactory or DynamicDriver::load_dynamic()")]
-    pub fn load(library_path: &Path, config_json: &str) -> MacacaResult<Self> {
         Self::load_internal(library_path, config_json)
     }
 
@@ -134,7 +117,7 @@ impl DynamicDriver {
                 .ok()
                 .map(|sym| *sym);
 
-            // 3. Verify ABI version compatibility
+            // 3. Verify ABI version match
             let abi_version = fn_abi_version();
             if abi_version < DRIVER_ABI_VERSION {
                 return Err(MacacaError::Driver(format!(
@@ -312,25 +295,26 @@ impl Tool for DynamicTool {
         &self.description
     }
 
-    fn parameters_schema(&self) -> Value {
+    fn tool_schema(&self) -> Value {
         self.parameters_schema.clone()
     }
 
-    async fn execute(&self, input: Value) -> MacacaResult<Value> {
-        self.execute_via_ffi(input).await
-    }
-
-    async fn execute_streaming(
-        &self,
-        input: Value,
-        event_tx: Option<UnboundedSender<TraceEvent>>,
-    ) -> MacacaResult<Value> {
-        Arc::clone(&self.ctx.proxy)
-            .execute_command(
-                DriverCommand::execute_streaming(self.name.clone(), input, event_tx),
-                self.ctx.driver_name.clone(),
-            )
-            .await
+    async fn invoke(&self, command: ToolCommand) -> MacacaResult<Value> {
+        match command.context.event_tx {
+            Some(event_tx) => {
+                Arc::clone(&self.ctx.proxy)
+                    .execute_command(
+                        DriverCommand::execute_streaming(
+                            self.name.clone(),
+                            command.input,
+                            Some(event_tx),
+                        ),
+                        self.ctx.driver_name.clone(),
+                    )
+                    .await
+            }
+            None => self.execute_via_ffi(command.input).await,
+        }
     }
 }
 

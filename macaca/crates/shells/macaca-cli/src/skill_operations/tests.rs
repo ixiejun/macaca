@@ -1,12 +1,12 @@
 //! Contract and unit tests for CLI Skill operations adapters.
 
 use super::contract_source::skill_operations_module_sources;
+use super::execute_skill_operations_snapshot;
 use super::support::{live_operator_payload, normalize_api_base};
 use super::types::{SkillCliEvidenceRefs, SkillCliLifecycleAction, SkillCliRuntimeTarget};
-use super::execute_skill_operations_snapshot;
 
 #[tokio::test]
-async fn cli_skill_snapshot_uses_sdk_null_object() {
+async fn cli_skill_snapshot_reports_structured_unavailable() {
     execute_skill_operations_snapshot(SkillCliRuntimeTarget::default())
         .await
         .unwrap();
@@ -67,7 +67,7 @@ fn cli_skill_operations_do_not_import_runtime_or_web() {
     let runtime_host_import = ["macaca", "_runtime_host::"].concat();
     let web_import = ["macaca", "_web::"].concat();
     let provider_state_symbol = ["SkillProvider", "GovernanceState"].concat();
-    assert!(source.contains("UnavailableSystemSkillClient"));
+    assert!(source.contains("print_unavailable"));
     assert!(!source.contains(&runtime_host_import));
     assert!(!source.contains(&web_import));
     assert!(!source.contains(&provider_state_symbol));

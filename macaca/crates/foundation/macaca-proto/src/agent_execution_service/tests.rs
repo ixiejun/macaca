@@ -2,13 +2,13 @@
 
 use super::*;
 use crate::{
-    ExecutionControlCheckpointMode, ExecutionControlPolicyOverride,
-    ExecutionControlResumeSource, ExecutionControlTrigger,
+    ExecutionControlCheckpointMode, ExecutionControlPolicyOverride, ExecutionControlResumeSource,
+    ExecutionControlTrigger,
 };
 
 /// Provider-neutral fixture agent id for round-trip contract tests (Object Mother).
 ///
-/// Intentionally avoids legacy application role literals (`worker`, `planner`, etc.)
+/// Intentionally avoids application role literals (`worker`, `planner`, etc.)
 /// so terminal `hardcoded-agent-role` guards can scan this module without false
 /// positives while still exercising `target_agent` serialization boundaries.
 const FIXTURE_TARGET_AGENT: &str = "fixture-target-agent";
@@ -17,8 +17,7 @@ const FIXTURE_TARGET_AGENT: &str = "fixture-target-agent";
 ///
 /// Envelope compiler tests only assert path round-trip semantics; the directory
 /// segment must not embed application role vocabulary.
-const FIXTURE_HEARTBEAT_ARTIFACT_PATH: &str =
-    "/workspace/agents/fixture-target-agent/heartbeat.md";
+const FIXTURE_HEARTBEAT_ARTIFACT_PATH: &str = "/workspace/agents/fixture-target-agent/heartbeat.md";
 
 #[test]
 fn planner_intent_uses_provider_neutral_wire_label() {
@@ -51,8 +50,7 @@ fn execution_command_round_trips_through_service_command() {
     assert_eq!(service_command.name.as_str(), AGENT_EXECUTE_COMMAND);
     assert!(service_command.trace.is_some());
 
-    let decoded: AgentExecutionCommand =
-        serde_json::from_value(service_command.payload).unwrap();
+    let decoded: AgentExecutionCommand = serde_json::from_value(service_command.payload).unwrap();
     assert_eq!(decoded.user_prompt, "Analyze BTC");
     assert_eq!(decoded.delegated_context["symbol"], "BTC");
     assert_eq!(decoded.target_agent, FIXTURE_TARGET_AGENT);

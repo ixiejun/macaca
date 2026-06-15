@@ -9,11 +9,11 @@ use std::sync::Arc;
 
 use axum::http::StatusCode;
 use axum::Json;
-use macaca_proto::{ApplicationId, TraceContext};
-use macaca_sdk::skill::{
+use macaca_host_composition::runtime_host::{
     SkillCurationLifecycleAction, SkillCurationRunCommand, SkillServicePolicyHints,
     SkillServiceScope,
 };
+use macaca_proto::{ApplicationId, TraceContext};
 
 use crate::routes::{err, ErrorResponse};
 use crate::skill_operations_routes::types::SkillOperatorCommandRequest;

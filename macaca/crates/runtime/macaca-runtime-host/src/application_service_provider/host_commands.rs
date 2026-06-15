@@ -23,9 +23,7 @@ impl ApplicationSystemServiceProvider {
     ) -> ServiceResult<macaca_proto::ServiceCallResult> {
         let typed: ApplicationHostDispatchServiceCommand = decode(command.payload)?;
         let app_id = typed.scope.application_id.ok_or_else(|| {
-            ServiceError::AdapterFailure(
-                "application.host.dispatch requires application_id".into(),
-            )
+            ServiceError::AdapterFailure("application.host.dispatch requires application_id".into())
         })?;
         let result: ApplicationHostDispatchResult = if let Some(session) = self
             .ensure_wasm_session(app_id, typed.trace.clone())

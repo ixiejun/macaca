@@ -1,7 +1,7 @@
 //! Admission chain for Plugin Control Plane installs.
 //!
 //! The chain uses the Chain of Responsibility pattern: each check validates one
-//! security or compatibility concern and returns a structured decision.  This
+//! security or runtime-version concern and returns a structured decision.  This
 //! keeps policy growth auditable and avoids a single install function becoming
 //! a long sequence of unrelated conditionals.
 
@@ -72,18 +72,18 @@ impl AdmissionCheck for ManifestShapeAdmissionCheck {
     }
 }
 
-/// Validates runtime compatibility before runtime registration is attempted.
+/// Validates runtime version support before runtime registration is attempted.
 #[derive(Debug, Default)]
-pub struct CompatibilityAdmissionCheck;
+pub struct RuntimeVersionAdmissionCheck;
 
 #[async_trait]
-impl AdmissionCheck for CompatibilityAdmissionCheck {
+impl AdmissionCheck for RuntimeVersionAdmissionCheck {
     async fn evaluate(&self, context: &AdmissionContext<'_>) -> AdmissionDecision {
         if context.manifest.runtime.kind.is_supported_v0() {
-            AdmissionDecision::accepted("compatibility")
+            AdmissionDecision::accepted("runtime_version")
         } else {
             AdmissionDecision::rejected(
-                "compatibility",
+                "runtime_version",
                 format!("unsupported runtime {}", context.manifest.runtime.kind),
             )
         }
@@ -127,7 +127,7 @@ impl Default for PluginAdmissionChain {
         Self {
             checks: vec![
                 Box::<ManifestShapeAdmissionCheck>::default(),
-                Box::<CompatibilityAdmissionCheck>::default(),
+                Box::<RuntimeVersionAdmissionCheck>::default(),
                 Box::<SourcePolicyAdmissionCheck>::default(),
             ],
         }

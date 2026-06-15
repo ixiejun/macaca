@@ -1,4 +1,4 @@
-//! Admission specifications for the Route C Application Service.
+//! Admission specifications for the Application Service.
 //!
 //! The module applies the Specification pattern to service inputs.  Keeping
 //! trace, scope, manifest, and runtime-kind checks in small reusable specs
@@ -13,7 +13,7 @@ use macaca_proto::{
 use crate::model::{AppLayer, AppManifest, AppStatus};
 use crate::ui_runtime::validate_ui_runtime_config;
 
-/// Specification that enforces Route C trace requirements.
+/// Specification that enforces application-service trace requirements.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct ApplicationTraceSpec;
 
@@ -348,19 +348,19 @@ fn require_text(value: &str, field: &str, subject: &str) -> MacacaResult<()> {
     Ok(())
 }
 
-/// Project the legacy `AppStatus` view into the ABI lifecycle vocabulary.
+/// Project the runtime `AppStatus` view into the ABI lifecycle vocabulary.
 pub fn lifecycle_from_app_status(status: AppStatus) -> ApplicationLifecycleState {
     match status {
         AppStatus::Loaded => ApplicationLifecycleState::Initialized,
         AppStatus::Running => ApplicationLifecycleState::Started,
         AppStatus::Stopped => ApplicationLifecycleState::Stopped,
         AppStatus::Failed => ApplicationLifecycleState::Failed {
-            reason: "legacy app status error".into(),
+            reason: "application runtime status error".into(),
         },
     }
 }
 
-/// Project the ABI lifecycle state back to the legacy route status view.
+/// Project the ABI lifecycle state back to the runtime status view.
 pub fn app_status_from_lifecycle(state: &ApplicationLifecycleState) -> AppStatus {
     match state {
         ApplicationLifecycleState::Declared | ApplicationLifecycleState::Initialized => {
@@ -407,7 +407,7 @@ mod tests {
                 macaca_proto::PackageRuntimeKind::Yaml,
                 "1",
             ),
-            macaca_proto::ApplicationCompatibilityDeclaration::new("0.1.0"),
+            macaca_proto::ApplicationHostRequirementDeclaration::new("0.1.0"),
         );
 
         let report = ApplicationManifestV1Spec.validate(&manifest);

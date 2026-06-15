@@ -1,4 +1,4 @@
-//! Provider-neutral Skill service contract for Route C S6.
+//! Provider-neutral Skill service contract.
 //!
 //! The Skill service separates skill discovery, executable loading, tool
 //! catalog, invocation, status, and snapshots from Web/CLI presentation code.

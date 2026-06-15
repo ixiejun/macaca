@@ -20,9 +20,10 @@ pub mod worker_loop;
 pub use a2a_task::{A2APaymentReferences, A2ATaskRequestContext, A2ATaskTraceContext};
 pub use claim_diagnostics::{diagnose_session_claims, SessionClaimDiagnostics};
 pub use commands::{
-    ClaimTaskCommand, CreateGoalCommand, CreateTaskAssignmentCommand, QueryTaskBoardCommand,
-    ResumeCoordinatorCommand, ReviewTaskCommand, StartTaskCommand, SubmitReviewCommand,
-    TaskServiceSnapshotCommand,
+    BuildDecompositionPromptCommand, BuildGoalEvaluationPromptCommand, ClaimTaskCommand,
+    CompleteGoalCommand, CreateGoalCommand, CreateTaskAssignmentCommand, FailTaskCommand,
+    ParseGoalEvaluationCommand, QueryTaskBoardCommand, ResumeCoordinatorCommand, ReviewTaskCommand,
+    StartTaskCommand, SubmitReviewCommand, TaskServiceSnapshotCommand,
 };
 pub use decompose::{
     build_decomposition_prompt, DecomposedTask, LlmDecomposer, SimpleDecomposer, TaskDecomposer,

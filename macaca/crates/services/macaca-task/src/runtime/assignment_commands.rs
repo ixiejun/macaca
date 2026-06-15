@@ -33,7 +33,7 @@ where
             .await?;
         let space = TaskSpace::for_session(
             command.app_id.clone(),
-            Some(command.session_id.clone()),
+            command.session_id.clone(),
             Arc::clone(&self.store),
         );
         let task = space
@@ -52,7 +52,7 @@ where
             .await;
         info!(
             app_id = %command.app_id.0,
-            session_id = %command.session_id,
+            session_id = ?command.session_id,
             agent = %agent_name,
             task_id = %task.id,
             graph_owner = %command.graph_owner.as_str(),
@@ -66,7 +66,7 @@ where
         );
         self.emit(TaskServiceEvent::new(
             command.app_id.clone(),
-            Some(command.session_id.clone()),
+            command.session_id.clone(),
             Some(task.id),
             task.parent_task,
             TaskServiceEventType::TaskCreated,
@@ -81,7 +81,7 @@ where
             }),
         ))
         .await;
-        self.refresh_snapshot(&command.app_id, Some(&command.session_id))
+        self.refresh_snapshot(&command.app_id, command.session_id.as_deref())
             .await;
         Ok(task)
     }

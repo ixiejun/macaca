@@ -7,7 +7,9 @@
 
 use std::path::PathBuf;
 
-use macaca_sdk::skill::{SelfEvolutionEvaluationRecord, SelfEvolutionScore, SkillAuthorKind};
+use macaca_host_composition::runtime_host::{
+    SelfEvolutionEvaluationRecord, SelfEvolutionScore, SkillAuthorKind, SkillPackageOwnershipClass,
+};
 use serde::{Deserialize, Serialize};
 
 /// Request body shared by approval-gated Skill operation routes.
@@ -44,7 +46,7 @@ pub struct SkillOperatorCommandRequest {
     pub dry_run: Option<bool>,
     pub batch_limit: Option<u16>,
     pub min_ready_score: Option<u8>,
-    pub ownership: Option<macaca_sdk::skill::SkillPackageOwnershipClass>,
+    pub ownership: Option<SkillPackageOwnershipClass>,
 }
 
 /// Request body for building a self-evolution evaluation report.

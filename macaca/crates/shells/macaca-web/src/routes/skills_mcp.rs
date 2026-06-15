@@ -7,12 +7,9 @@ use axum::http::StatusCode;
 use axum::Json;
 use serde::{Deserialize, Serialize};
 
-use macaca_sdk::app::AppLoader;
 use macaca_proto::{
-    ApplicationId, McpProbeCommand, McpRuntimeStatusView, McpToolPolicySnapshot, ProtoErrorAdapter,
-    TraceContext,
+    MacacaError, McpProbeCommand, McpRuntimeStatusView, McpToolPolicySnapshot, TraceContext,
 };
-use macaca_sdk::skill::{SkillPolicy, SkillRuntimeFacade, SkillSnapshotRequest};
 
 use crate::skill_mcp::SkillMcpStatus;
 use crate::state::AppState;
@@ -30,13 +27,14 @@ pub struct SkillInfo {
 }
 
 pub async fn get_skills(State(state): State<Arc<AppState>>) -> Json<Vec<SkillInfo>> {
-    let catalog = state.config.catalog.read().await;
-    let skills = catalog
-        .catalog()
+    let skills = state
+        .config
+        .catalog_entries
+        .iter()
         .into_iter()
         .map(|e| SkillInfo {
-            name: e.name,
-            description: e.description,
+            name: e.name.clone(),
+            description: e.description.clone(),
         })
         .collect();
     Json(skills)
@@ -103,58 +101,28 @@ pub async fn get_app_skills(
     let app_uuid: uuid::Uuid = app_id
         .parse()
         .map_err(|_| err(StatusCode::BAD_REQUEST, "Invalid app_id".into()))?;
-    let app_id = ApplicationId(app_uuid);
-
-    let app = {
-        let registry = crate::application_shell_adapter::registry_read_guard(&state).await;
-        registry
-            .get_app(&app_id)
-            .cloned()
-            .ok_or_else(|| err(StatusCode::NOT_FOUND, "App not found".into()))?
-    };
-    let agent_configs = AppLoader::resolve_agent_configs(&app.manifest, &app.path)
-        .map_err(|e| proto_err(StatusCode::INTERNAL_SERVER_ERROR, &e))?;
-    let workspace_root = {
-        let workspaces = state.config.app_workspaces.read().await;
-        workspaces.get(&app_id).map(|ws| ws.root.clone())
-    };
-
-    let mut statuses = Vec::new();
-    for agent in agent_configs {
-        if query
-            .agent
-            .as_deref()
-            .is_some_and(|name| name != agent.name.as_str())
-        {
-            continue;
-        }
-        let policy = agent
-            .skills
-            .as_ref()
-            .map(|skills| SkillPolicy {
-                allow: skills.allow.clone(),
-                deny: skills.deny.clone(),
-            })
-            .unwrap_or_default();
-        let request = SkillSnapshotRequest::builder(agent.name.clone())
-            .workspace_dir(workspace_root.clone())
-            .app_dir(Some(app.path.clone()))
-            .policy(policy)
-            .build();
-        let snapshot = SkillRuntimeFacade::new()
-            .build_snapshot(request)
-            .await
-            .map_err(|e| proto_err(StatusCode::INTERNAL_SERVER_ERROR, &e))?;
-        let mcp = crate::skill_mcp::probe_skill_mcp_servers(&snapshot).await;
-        statuses.push(AppSkillStatus {
+    let app_id = macaca_proto::ApplicationId(app_uuid);
+    let snapshots = state
+        .app_skill_status_snapshots(app_id, query.agent)
+        .await
+        .map_err(|error| {
+            let status = match error {
+                MacacaError::NotFound(_) => StatusCode::NOT_FOUND,
+                _ => StatusCode::INTERNAL_SERVER_ERROR,
+            };
+            proto_err(status, &error)
+        })?;
+    let statuses = snapshots
+        .into_iter()
+        .map(|snapshot| AppSkillStatus {
             agent: snapshot.agent,
             visible: snapshot
-                .skills
+                .visible
                 .into_iter()
                 .map(|skill| AppSkillInfo {
                     name: skill.name,
                     description: skill.description,
-                    location: skill.location.display().to_string(),
+                    location: skill.location,
                     source: skill.source,
                 })
                 .collect(),
@@ -167,11 +135,11 @@ pub async fn get_app_skills(
                     source: skill.source,
                 })
                 .collect(),
-            mcp,
+            mcp: snapshot.mcp,
             truncated: snapshot.truncated,
             compact: snapshot.compact,
-        });
-    }
+        })
+        .collect();
 
     Ok(Json(statuses))
 }

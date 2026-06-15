@@ -1,7 +1,7 @@
 //! Provider-neutral proposal materialization contracts for Skill self-evolution.
 //!
 //! Materialization is the first lane that can turn a processed proposal into a
-//! concrete AgentSkills-compatible package file.  The DTOs are intentionally
+//! concrete AgentSkills-format package file. The DTOs are intentionally
 //! body-free on outputs: callers can audit refs, digests, byte counts, and
 //! rollback mementos without receiving raw generated `SKILL.md` content.
 

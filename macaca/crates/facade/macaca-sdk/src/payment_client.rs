@@ -1,4 +1,4 @@
-//! SDK Payment Service client for Route C S10.
+//! SDK Payment Service client.
 //!
 //! The client is the upper-consumer Facade for Payment / A2A operations. Web,
 //! CLI, Gateway, Application Framework, and future agent-facing code call this

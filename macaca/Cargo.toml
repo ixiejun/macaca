@@ -19,6 +19,7 @@ members = [
     "crates/services/macaca-tools",
     "crates/runtime/macaca-runtime",
     "crates/runtime/macaca-runtime-host",
+    "crates/runtime/macaca-host-composition",
     "crates/runtime/macaca-framework",
     "crates/application/macaca-agent",
     "crates/application/macaca-app",
@@ -100,4 +101,5 @@ macaca-skill = { path = "crates/services/macaca-skill" }
 macaca-web = { path = "crates/shells/macaca-web" }
 macaca-framework = { path = "crates/runtime/macaca-framework" }
 macaca-runtime-host = { path = "crates/runtime/macaca-runtime-host" }
+macaca-host-composition = { path = "crates/runtime/macaca-host-composition" }
 macaca-domain-pack-finance = { path = "crates/packages/macaca-domain-pack-finance" }

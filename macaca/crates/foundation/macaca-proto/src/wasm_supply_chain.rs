@@ -186,7 +186,7 @@ impl WasmSupplyChainTrustPolicy {
         self
     }
 
-    /// Allow development fixtures to skip certification-report compatibility.
+    /// Allow development fixtures to skip certification-report conformance.
     pub fn allow_without_certification(mut self) -> Self {
         self.require_certification = false;
         self

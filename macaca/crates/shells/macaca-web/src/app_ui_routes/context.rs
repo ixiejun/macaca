@@ -7,12 +7,10 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::http::StatusCode;
-use macaca_sdk::app::expand_service_capabilities;
-use macaca_proto::{
-    ApplicationId, ApplicationMetadataQueryCommand, TraceContext,
-};
+use macaca_proto::{ApplicationId, ApplicationMetadataQueryCommand, TraceContext};
+use macaca_sdk::expand_service_capabilities;
 
-use crate::app_ui_routes::types::{AppUiRouteContext, RouteError};
+use crate::app_ui_routes::types::{AppUiRouteContext, AppUiRouteRuntime, RouteError};
 use crate::routes::{err, proto_err};
 use crate::state::AppState;
 
@@ -38,7 +36,6 @@ pub(crate) async fn app_ui_context(
         )
     })?;
 
-    #[allow(deprecated)]
     let (ui, declared_services) = {
         let registry = crate::application_shell_adapter::registry_read_guard(state).await;
         let app = registry.get_app(&app_id).ok_or_else(|| {
@@ -47,12 +44,18 @@ pub(crate) async fn app_ui_context(
                 "application is not registered".into(),
             )
         })?;
-        let ui = app.manifest.ui.clone().ok_or_else(|| {
+        let ui = app.manifest.ui.as_ref().ok_or_else(|| {
             err(
                 StatusCode::NOT_FOUND,
                 "application UI runtime is not declared".into(),
             )
         })?;
+        let ui = AppUiRouteRuntime {
+            entry: ui.entry.clone(),
+            assets: ui.assets.clone(),
+            bridge_required: ui.bridge.required.clone(),
+            bridge_optional: ui.bridge.optional.clone(),
+        };
         let declared_services = expand_service_capabilities(
             app.manifest.service_contract.as_ref(),
             state.domain_pack_catalog.as_ref(),

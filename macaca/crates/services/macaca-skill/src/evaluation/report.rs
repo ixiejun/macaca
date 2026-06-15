@@ -8,7 +8,7 @@ const MAX_RENDERED_FIELD_LEN: usize = 160;
 /// Report builder for self-evolution evaluation results.
 ///
 /// The builder is a thin presentation boundary over already-scored records. It
-/// emits JSON-compatible and Markdown summaries made only from bounded refs,
+/// emits JSON value and Markdown summaries made only from bounded refs,
 /// counts, states, and reason codes. It intentionally does not render raw
 /// prompts, raw provider payloads, package bytes, manifests, credentials, or
 /// full skill bodies, which keeps shell adapters simple and audit-friendly.

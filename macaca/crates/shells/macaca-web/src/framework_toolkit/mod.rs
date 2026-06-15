@@ -4,7 +4,7 @@
 //! [`crate::loop_manager`]. `builder` orchestrates service-backed tool registration;
 //! `policy` resolves capability-driven allowlists; `mcp_bridge` adapts MCP service
 //! snapshots into auditable runtime events; `agent_tools` registers todo/task tools;
-//! `workspace_tools` scopes file/shell primitives to the application workspace root.
+//! workspace file/shell tools are requested from runtime-host bootstrap.
 //!
 //! `FrameworkRunner` consumes only [`build_toolkit`] from this facade, keeping agent
 //! construction decoupled from contributor implementation details.
@@ -13,7 +13,6 @@ mod agent_tools;
 mod builder;
 mod mcp_bridge;
 mod policy;
-mod workspace_tools;
 
 #[cfg(test)]
 pub(crate) mod contract_source;

@@ -19,8 +19,6 @@ use macaca_proto::{
 };
 use tracing::{info, warn};
 
-use super::response_mapper::{fail_closed_result, map_daemon_response};
-use super::HardenedOutOfProcessWasmRuntimeProvider;
 use super::super::diagnostics::non_empty_trace;
 use super::super::hardened_transport::WasmHardenedTransport;
 use super::super::telemetry::{
@@ -28,6 +26,8 @@ use super::super::telemetry::{
 };
 use super::super::traits::WasmExecutionSession;
 use super::super::WasmHardenedProviderEnvelope;
+use super::response_mapper::{fail_closed_result, map_daemon_response};
+use super::HardenedOutOfProcessWasmRuntimeProvider;
 
 /// Execution session that maps commands to daemon envelopes.
 #[derive(Debug, Clone)]
@@ -238,7 +238,7 @@ impl WasmExecutionSession for HardenedOutOfProcessWasmExecutionSession {
                 .chars()
                 .take(12)
                 .collect(),
-            abi_compatible: true,
+            abi_matches: true,
             trace: Some(trace),
             metadata: sanitize_wasm_lifecycle_metadata(request.metadata),
         })

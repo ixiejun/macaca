@@ -1,49 +1,19 @@
 //! Public traced agent builders for executor-backed planner/worker execution.
 
-use std::sync::Arc;
-use macaca_sdk::framework::agent::HookedAgent;
-use macaca_sdk::framework::construction::{AgentBuildIntent, AgentToolConfig, TracedAgentFactory};
-use macaca_sdk::framework::react_agent::ReActAgent;
-use macaca_proto::ApplicationId;
-use crate::state::AppState;
 use super::agent_factory_build::WebTracedAgentFactory;
 use super::build_mode::FrameworkRunnerBuildMode;
 use super::request_composition;
 use super::FrameworkRunner;
+use crate::state::AppState;
+use macaca_host_composition::framework::agent::HookedAgent;
+use macaca_host_composition::framework::construction::{
+    AgentBuildIntent, AgentToolConfig, TracedAgentFactory,
+};
+use macaca_host_composition::framework::react_agent::ReActAgent;
+use macaca_proto::ApplicationId;
+use std::sync::Arc;
 
 impl FrameworkRunner {
-    /// Deprecated: do not use. All agents must be constructed through traced
-    /// builders so execution is visible in EventLog and SSE.
-    #[deprecated(
-        note = "build_agent is disabled. Use build_traced_agent/build_traced_agent_with_goal/build_worker_agent/build_coordinator instead."
-    )]
-    pub async fn build_agent(
-        _state: &Arc<AppState>,
-        _app_id: &ApplicationId,
-        _agent_name: &str,
-        _session_id: Option<String>,
-    ) -> Result<ReActAgent, String> {
-        Err("FrameworkRunner::build_agent is disabled. Use a traced builder instead.".into())
-    }
-
-    /// Deprecated: do not use. All agents must be constructed through traced
-    /// builders so execution is visible in EventLog and SSE.
-    #[deprecated(
-        note = "build_agent_with_goal is disabled. Use build_traced_agent_with_goal instead."
-    )]
-    pub async fn build_agent_with_goal(
-        _state: &Arc<AppState>,
-        _app_id: &ApplicationId,
-        _agent_name: &str,
-        _session_id: Option<String>,
-        _goal_id: Option<macaca_proto::TaskId>,
-    ) -> Result<ReActAgent, String> {
-        Err(
-            "FrameworkRunner::build_agent_with_goal is disabled. Use a traced builder instead."
-                .into(),
-        )
-    }
-
     /// Build a traced `ReActAgent` without goal context.
     pub async fn build_traced_agent(
         state: &Arc<AppState>,
@@ -51,7 +21,7 @@ impl FrameworkRunner {
         agent_name: &str,
         session_id: Option<String>,
         task_id: macaca_proto::TaskId,
-        executor: Arc<macaca_sdk::runtime_host::executor::ApplicationExecutor>,
+        executor: Arc<macaca_host_composition::executor::ApplicationExecutor>,
     ) -> Result<HookedAgent<ReActAgent>, String> {
         Self::build_for_intent(
             state,
@@ -74,7 +44,7 @@ impl FrameworkRunner {
         agent_name: &str,
         session_id: Option<String>,
         task_id: macaca_proto::TaskId,
-        executor: Arc<macaca_sdk::runtime_host::executor::ApplicationExecutor>,
+        executor: Arc<macaca_host_composition::executor::ApplicationExecutor>,
     ) -> Result<HookedAgent<ReActAgent>, String> {
         Self::build_for_intent(
             state,
@@ -97,7 +67,7 @@ impl FrameworkRunner {
         agent_name: &str,
         session_id: Option<String>,
         task_id: macaca_proto::TaskId,
-        executor: Arc<macaca_sdk::runtime_host::executor::ApplicationExecutor>,
+        executor: Arc<macaca_host_composition::executor::ApplicationExecutor>,
         goal_id: Option<macaca_proto::TaskId>,
     ) -> Result<HookedAgent<ReActAgent>, String> {
         Self::build_for_intent(
@@ -123,7 +93,7 @@ impl FrameworkRunner {
         agent_name: &str,
         session_id: Option<String>,
         task_id: macaca_proto::TaskId,
-        executor: Arc<macaca_sdk::runtime_host::executor::ApplicationExecutor>,
+        executor: Arc<macaca_host_composition::executor::ApplicationExecutor>,
         goal_id: Option<macaca_proto::TaskId>,
     ) -> Result<HookedAgent<ReActAgent>, String> {
         Self::build_for_intent(
@@ -141,14 +111,14 @@ impl FrameworkRunner {
     /// Build a traced agent from an explicit framework build intent.
     ///
     /// This is the task-facing contract used by planner/worker runtime
-    /// consumers so they do not need to know legacy web builder naming.
+    /// consumers so they do not need to know shell-local builder naming.
     pub async fn build_for_intent(
         state: &Arc<AppState>,
         app_id: &ApplicationId,
         agent_name: &str,
         session_id: Option<String>,
         task_id: macaca_proto::TaskId,
-        executor: Arc<macaca_sdk::runtime_host::executor::ApplicationExecutor>,
+        executor: Arc<macaca_host_composition::executor::ApplicationExecutor>,
         intent: AgentBuildIntent,
     ) -> Result<HookedAgent<ReActAgent>, String> {
         let tools = match &intent {

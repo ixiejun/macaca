@@ -10,8 +10,8 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use macaca_host_composition::agent_execution::AgentExecutionBackend;
 use macaca_proto::{AgentExecutionCommand, AgentExecutionResult, ServiceError, ServiceResult};
-use macaca_sdk::runtime_host::AgentExecutionBackend;
 
 use crate::runtime_event_bridge::emit_runtime_event;
 use crate::skill_self_evolution_observer::observe_agent_execution_result_for_skill_self_evolution;

@@ -7,6 +7,6 @@
 pub mod yaml_adapter;
 
 pub use yaml_adapter::{
-    LegacyAppManifestProjection, YamlApplicationManifestAdapter, YamlProjectionDiagnostic,
+    YamlApplicationManifestAdapter, YamlApplicationManifestProjection, YamlProjectionDiagnostic,
     YamlToApplicationManifestV1Report,
 };

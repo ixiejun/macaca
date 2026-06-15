@@ -8,9 +8,9 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use macaca_proto::{
-    ApplicationId, TaskGraphOwner, TaskId, TodoGoalStatus, TodoStatus, TraceContext,
-};
+use macaca_proto::{ApplicationId, TaskId, TraceContext};
+
+pub use macaca_proto::{TaskServiceGoalSnapshot, TaskServiceSnapshot, TaskServiceTaskSnapshot};
 
 /// Structured task service lifecycle event.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -66,42 +66,4 @@ pub enum TaskServiceEventType {
     TaskSnapshotEmitted,
     TaskRejected,
     TaskFailed,
-}
-
-/// Deterministic snapshot of one task service goal state.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TaskServiceGoalSnapshot {
-    pub goal_id: TaskId,
-    pub description: String,
-    pub status: TodoGoalStatus,
-    pub session_id: Option<String>,
-}
-
-/// Deterministic snapshot of one task service task state.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TaskServiceTaskSnapshot {
-    pub task_id: TaskId,
-    pub title: String,
-    pub agent_name: String,
-    pub status: TodoStatus,
-    pub session_id: Option<String>,
-    /// Service-owned graph classification used by projections and audit tools
-    /// to distinguish authoritative execution tasks from compatibility or
-    /// diagnostic task-board entries.
-    pub graph_owner: TaskGraphOwner,
-    /// Opaque service-owned graph identity shared by tasks in the same graph.
-    ///
-    /// Snapshots expose this value for replay and audit correlation only.  UI
-    /// and shell code should render it as diagnostic metadata instead of
-    /// deriving business behavior from it.
-    pub graph_id: Option<String>,
-}
-
-/// Deterministic Task Service snapshot ordered by stable identifiers.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TaskServiceSnapshot {
-    pub app_id: ApplicationId,
-    pub session_id: Option<String>,
-    pub goals: Vec<TaskServiceGoalSnapshot>,
-    pub tasks: Vec<TaskServiceTaskSnapshot>,
 }

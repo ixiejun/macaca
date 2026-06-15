@@ -2,7 +2,7 @@
 //!
 //! Validates that public HTTP/SSE/manifest/session contracts remain wired after
 //! microkernel refactor. Uses static source markers (fast) plus a no-network
-//! pipeline dry-run (route-c baseline) so CI catches regressions without LLM keys.
+//! pipeline dry-run (protocol-service baseline) so CI catches regressions without LLM keys.
 //!
 //! Design pattern: **Specification by Example** — required route markers and the
 //! autonomous pipeline dry-run are the living contract for shell-facing APIs.
@@ -62,9 +62,7 @@ fn p5_external_contract_session_module_present() {
         lib.contains("mod session") || lib.contains("pub mod session"),
         "macaca-web lib must export session module for session isolation contract"
     );
-    eprintln!(
-        "p5_external_contract_gate event=session_module_pass path={SESSION_MODULE_MARKER}"
-    );
+    eprintln!("p5_external_contract_gate event=session_module_pass path={SESSION_MODULE_MARKER}");
 }
 
 /// Static contract: SSE wiring remains in routes/composition (substring guard).
@@ -78,16 +76,18 @@ fn p5_external_contract_sse_surface_present() {
     eprintln!("p5_external_contract_gate event=sse_surface_pass");
 }
 
-/// Dynamic contract: no-network autonomous pipeline (route-c baseline) still passes.
+/// Dynamic contract: no-network autonomous pipeline (protocol-service baseline) still passes.
 #[test]
-fn p5_external_contract_route_c_no_network_pipeline_passes() {
-    eprintln!("p5_external_contract_gate event=route_c_subprocess_start");
+fn p5_external_contract_protocol_service_no_network_pipeline_passes() {
+    eprintln!("p5_external_contract_gate event=protocol_service_subprocess_start");
     let output = Command::new("cargo")
         .args([
             "test",
             "-p",
             "macaca-integration-tests",
-            "route_c_baseline_no_network_pipeline_still_passes",
+            "--test",
+            "protocol_microkernel_baseline",
+            "protocol_service_baseline_no_network_pipeline_still_passes",
             "--",
             "--nocapture",
         ])
@@ -97,9 +97,9 @@ fn p5_external_contract_route_c_no_network_pipeline_passes() {
 
     assert!(
         output.status.success(),
-        "route-c no-network pipeline regression:\nstdout:\n{}\nstderr:\n{}",
+        "protocol-service no-network pipeline regression:\nstdout:\n{}\nstderr:\n{}",
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
-    eprintln!("p5_external_contract_gate event=route_c_subprocess_pass");
+    eprintln!("p5_external_contract_gate event=protocol_service_subprocess_pass");
 }

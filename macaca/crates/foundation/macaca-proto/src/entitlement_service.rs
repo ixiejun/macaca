@@ -1,4 +1,4 @@
-//! Provider-neutral Entitlement Service DTOs for Route C S9.
+//! Provider-neutral Entitlement Service DTOs.
 //!
 //! Entitlement Service owns authorization decisions, entitlement state,
 //! metering, and audit query shapes.  The DTOs reuse Phase 08 commerce value

@@ -11,8 +11,8 @@ use tracing::info;
 
 use crate::pipeline_dry_run::config::PipelineDryRunConfig;
 use crate::pipeline_dry_run::fixtures::{ASSIGNEE_AGENT, COORDINATOR_AGENT};
-use crate::pipeline_dry_run::report::{ok, record};
 use crate::pipeline_dry_run::report::PipelineReport;
+use crate::pipeline_dry_run::report::{ok, record};
 use crate::pipeline_dry_run::trace::{trace, trace_stage, trace_stage_end};
 
 /// Run session-scoped claim isolation and record the outcome.

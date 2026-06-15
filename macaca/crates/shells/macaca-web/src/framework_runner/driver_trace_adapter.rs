@@ -2,9 +2,9 @@
 
 use super::build_mode::{should_forward_driver_trace, DriverTraceRoute};
 use axum::response::sse::Event;
-use macaca_sdk::framework::tool::{ToolTraceEvent, Toolkit};
-use macaca_sdk::runtime_host::persist::{AppendEventCommand, EventLog};
-use std::convert::Infallible;
+use macaca_host_composition::framework::tool::{ToolTraceEvent, Toolkit};
+use macaca_proto::AppendEventCommand;
+
 pub(crate) async fn attach_driver_trace_route(toolkit: &mut Toolkit, route: DriverTraceRoute) {
     let (trace_tx, mut trace_rx) = tokio::sync::mpsc::unbounded_channel::<ToolTraceEvent>();
     toolkit.set_event_tx(trace_tx);
@@ -39,7 +39,7 @@ pub(crate) async fn attach_driver_trace_route(toolkit: &mut Toolkit, route: Driv
                     // post_chat_v2 owns the SSE forwarding for that channel; sending here
                     // as well would duplicate delegated_driver_trace events in the live UI.
                     executor.broadcast_event(
-                        macaca_sdk::runtime_host::executor::ExecutorEvent::AgentEvent {
+                        macaca_host_composition::executor::ExecutorEvent::AgentEvent {
                             task_id: *task_id,
                             agent: agent_name.clone(),
                             event: macaca_proto::AgentExecutionEvent::DriverTrace {
@@ -87,8 +87,8 @@ pub(crate) async fn attach_driver_trace_route(toolkit: &mut Toolkit, route: Driv
     });
 }
 
-fn sdk_trace_from_framework(event: ToolTraceEvent) -> macaca_sdk::tools::TraceEvent {
-    macaca_sdk::tools::TraceEvent {
+fn sdk_trace_from_framework(event: ToolTraceEvent) -> macaca_host_composition::tools::TraceEvent {
+    macaca_host_composition::tools::TraceEvent {
         event_type: event.event_type,
         driver_id: event.driver_id,
         timestamp: event.timestamp,

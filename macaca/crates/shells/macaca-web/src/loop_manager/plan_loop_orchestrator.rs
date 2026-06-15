@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 
-use macaca_proto::ApplicationId;
+use macaca_proto::{ApplicationId, PlanEvent};
 
 use super::execution_control_adapter::session_loop_coordinator;
 use super::plan_event_consumer::dispatch_plan_event;
@@ -22,52 +22,41 @@ pub(crate) async fn ensure_plan_loop(
     entry_agent_name: &str,
     plan_agent_name: &str,
 ) {
-    let already = state
+    let Some(controller) = state
         .loops
-        .plan_loop_handles
-        .read()
+        .local_runtime
+        .reserve_local_plan_loop_controller(
+            app_id.clone(),
+            session_id.clone(),
+            Arc::clone(&state.persist.todo_store),
+        )
         .await
-        .contains_key(app_id);
-    if already {
+    else {
         return;
-    }
+    };
 
-    let mut handles = state.loops.plan_loop_handles.write().await;
-    if handles.contains_key(app_id) {
-        return;
-    }
-
-    let shutdown = Arc::new(std::sync::atomic::AtomicBool::new(false));
-    handles.insert(app_id.clone(), Arc::clone(&shutdown));
-
-    let store = Arc::clone(&state.persist.todo_store);
-    let plan_space = Arc::new(macaca_sdk::task::TaskSpace::for_session(
-        app_id.clone(),
-        session_id.clone(),
-        Arc::clone(&store),
-    ));
-    let plan_loop = macaca_sdk::task::PlanLoop::with_components(
-        plan_space,
-        macaca_sdk::task::PlanLoopConfig::default(),
-    );
+    let plan_loop = controller.plan_loop;
+    let shutdown = controller.shutdown;
     let plan_waker = plan_loop.waker();
     state
         .loops
-        .plan_loop_wakers
-        .write()
-        .await
-        .insert(app_id.clone(), plan_waker);
+        .local_runtime
+        .set_plan_loop_waker(app_id.clone(), plan_waker)
+        .await;
 
     // Register PlanLoop with execution_control before the consumer handles events.
     // Audit replay must observe register → wake → shutdown ordering.
     let coordinator = session_loop_coordinator(state);
-    register_plan_loop_via_execution_control(&coordinator, app_id.clone(), session_id.clone()).await;
+    register_plan_loop_via_execution_control(&coordinator, app_id.clone(), session_id.clone())
+        .await;
 
-    let (event_tx, mut event_rx) = tokio::sync::mpsc::channel::<macaca_sdk::task::PlanEvent>(64);
+    let (event_tx, mut event_rx) = tokio::sync::mpsc::channel::<PlanEvent>(64);
     let event_tx_for_plan_loop = event_tx.clone();
 
     tokio::spawn(async move {
-        plan_loop.run_with_default_template(shutdown, event_tx_for_plan_loop).await;
+        plan_loop
+            .run_with_default_template(shutdown, event_tx_for_plan_loop)
+            .await;
     });
 
     let rt_plan_start = Arc::clone(&state.persist.run_tracer);

@@ -4,9 +4,7 @@
 //! payloads fail closed with sanitized metadata rather than leaking raw daemon
 //! text into host command results or audit logs.
 
-use macaca_proto::{
-    ApplicationHostCommandResult, ApplicationHostCommandStatus, TraceContext,
-};
+use macaca_proto::{ApplicationHostCommandResult, ApplicationHostCommandStatus, TraceContext};
 
 use super::super::hardened_transport::{sanitize_hardened_text, sanitize_label};
 use super::super::telemetry::{

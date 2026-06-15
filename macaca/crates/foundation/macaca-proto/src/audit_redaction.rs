@@ -17,14 +17,7 @@ pub const REDACTED_JSON_VALUE: &str = "[redacted]";
 /// Export paths **omit** matching keys entirely so replay consumers never see
 /// even redacted placeholders for high-risk payload families (raw prompts, secrets).
 const EXPORT_OMIT_KEY_MARKERS: &[&str] = &[
-    "raw",
-    "payload",
-    "memory",
-    "secret",
-    "api_key",
-    "apikey",
-    "prompt",
-    "env",
+    "raw", "payload", "memory", "secret", "api_key", "apikey", "prompt", "env",
 ];
 
 /// Substring markers that classify a lowercase JSON object key as sensitive for

@@ -15,16 +15,15 @@ use crate::ui_runtime::{
     AppUiSurfaceChrome, AppUiSurfaceMode, AppUiThemeMode,
 };
 
-
-pub(super) fn ui_runtime_view(legacy: &AppManifest) -> Option<ApplicationUiRuntimeView> {
-    let ui = legacy.ui.as_ref()?;
+pub(super) fn ui_runtime_view(source_manifest: &AppManifest) -> Option<ApplicationUiRuntimeView> {
+    let ui = source_manifest.ui.as_ref()?;
     let entry_url = ui
         .entry
         .as_ref()
-        .map(|entry| format!("/api/apps/{}/ui/assets/{entry}", legacy.id))
+        .map(|entry| format!("/api/apps/{}/ui/assets/{entry}", source_manifest.id))
         .unwrap_or_default();
     tracing::info!(
-        app_id = %legacy.id,
+        app_id = %source_manifest.id,
         ui_runtime = %ui_runtime_kind_label(ui.runtime),
         surface_mode = %ui_surface_mode_label(ui.surface.mode),
         surface_chrome = %ui_surface_chrome_label(ui.surface.chrome),
@@ -111,4 +110,3 @@ fn ui_theme_label(mode: AppUiThemeMode) -> &'static str {
         AppUiThemeMode::HostAdaptive => "host_adaptive",
     }
 }
-

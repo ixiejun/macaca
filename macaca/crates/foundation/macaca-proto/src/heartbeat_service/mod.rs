@@ -29,7 +29,6 @@ pub const HEARTBEAT_UPDATE_PROFILE_COMMAND: &str = "heartbeat.profile.update";
 pub const HEARTBEAT_HEALTH_COMMAND: &str = "heartbeat.health";
 pub const HEARTBEAT_SNAPSHOT_COMMAND: &str = "heartbeat.snapshot";
 
-
 mod domain_vocabulary;
 mod profile_command_builders;
 
@@ -173,7 +172,6 @@ pub struct HeartbeatQueryCommand {
     pub limit: Option<usize>,
 }
 
-
 /// Trace-bearing command for editing native Heartbeat profile policy.
 ///
 /// Profile policy is Heartbeat-owned runtime state. Application manifests keep
@@ -192,7 +190,6 @@ pub struct HeartbeatUpdateProfileCommand {
     pub metadata: BTreeMap<String, String>,
     pub reason_code: String,
 }
-
 
 /// Bounded run summary returned by heartbeat history and snapshots.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

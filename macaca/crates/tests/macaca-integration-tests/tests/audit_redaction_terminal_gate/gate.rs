@@ -25,9 +25,8 @@ const REQUIRED_WIRED_SURFACES: &[&str] = &[
 
 /// Thin delegation wrappers may keep a local `fn sanitize_json` name when the body
 /// forwards to the canonical harness/export API (Adapter pattern).
-const APPROVED_DELEGATION_WRAPPERS: &[&str] = &[
-    "crates/runtime/macaca-runtime-host/src/wasm_runtime_provider/guest_harness_support.rs",
-];
+const APPROVED_DELEGATION_WRAPPERS: &[&str] =
+    &["crates/runtime/macaca-runtime-host/src/wasm_runtime_provider/guest_harness_support.rs"];
 
 /// Marker substrings that indicate a duplicate redaction implementation (not a delegate).
 const DUPLICATE_IMPL_MARKERS: &[&str] = &[
@@ -147,7 +146,8 @@ fn assert_no_duplicate_local_sanitizers(workspace: &Path) {
         let content = std::fs::read_to_string(&path)
             .unwrap_or_else(|error| panic!("read {}: {error}", path.display()));
 
-        if content.contains("fn sanitize_json(") && !is_approved_delegation_wrapper(&relative, &content)
+        if content.contains("fn sanitize_json(")
+            && !is_approved_delegation_wrapper(&relative, &content)
         {
             violations.push(format!(
                 "{relative}: local fn sanitize_json must delegate to macaca_proto::audit_redaction"
@@ -171,9 +171,7 @@ fn assert_no_duplicate_local_sanitizers(workspace: &Path) {
         );
     }
 
-    eprintln!(
-        "audit_redaction_terminal_gate event=duplicate_scan_pass files={file_count}"
-    );
+    eprintln!("audit_redaction_terminal_gate event=duplicate_scan_pass files={file_count}");
 }
 
 /// Runs proto unit tests as behavioral proof of the canonical redaction API.
@@ -190,7 +188,9 @@ fn run_proto_redaction_unit_tests(workspace: &Path) {
         ])
         .current_dir(workspace)
         .output()
-        .unwrap_or_else(|error| panic!("failed to spawn cargo test -p macaca-proto audit_redaction: {error}"));
+        .unwrap_or_else(|error| {
+            panic!("failed to spawn cargo test -p macaca-proto audit_redaction: {error}")
+        });
 
     assert!(
         output.status.success(),

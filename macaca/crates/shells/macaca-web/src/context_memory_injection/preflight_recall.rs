@@ -5,16 +5,16 @@
 
 use std::sync::Arc;
 
-use macaca_sdk::context::{
+use macaca_host_composition::context::{
     ContextDecisionReport, ContextDecisionSeverity, ContextPreflightRecallConfig,
     ContextSourceKind, ContextSourceReport,
 };
+use macaca_host_composition::memory::{MemoryPolicyHints, MemoryPrefetchCommand, MemoryScope};
 use macaca_proto::{LlmMessage, MemoryEntry};
-use macaca_sdk::memory::{MemoryPolicyHints, MemoryPrefetchCommand, MemoryScope};
 use tokio::time::timeout;
 
 use crate::context_memory_injection::adapter::{
-    insert_after_leading_system, legacy_memory_source_report, memory_trace, truncate_chars,
+    insert_after_leading_system, memory_trace, request_memory_source_report, truncate_chars,
 };
 use crate::context_message_codec::last_user_text_from_framework;
 
@@ -24,7 +24,7 @@ pub(crate) async fn apply_preflight_memory(
     memory_client: &Arc<dyn macaca_sdk::SystemMemoryClient>,
     scope: MemoryScope,
     preflight_cfg: &ContextPreflightRecallConfig,
-    assembled: &mut macaca_sdk::context::ContextAssembleResult,
+    assembled: &mut macaca_host_composition::context::ContextAssembleResult,
     incoming_framework_messages: &[serde_json::Value],
 ) {
     if !preflight_cfg.enabled || !preflight_cfg.allows_tool("memory_search") {
@@ -103,7 +103,7 @@ pub(crate) async fn apply_preflight_memory(
 /// Render and account the preflight memory-search result.
 fn inject_preflight_entries(
     preflight_cfg: &ContextPreflightRecallConfig,
-    assembled: &mut macaca_sdk::context::ContextAssembleResult,
+    assembled: &mut macaca_host_composition::context::ContextAssembleResult,
     entries: Vec<MemoryEntry>,
 ) {
     if entries.is_empty() {
@@ -115,7 +115,7 @@ fn inject_preflight_entries(
     }
     let rendered = serde_json::to_string_pretty(&entries).unwrap_or_default();
     let truncated = truncate_chars(rendered, preflight_cfg.max_chars);
-    let tok = macaca_sdk::context::estimate_text_tokens(&truncated);
+    let tok = macaca_host_composition::context::estimate_text_tokens(&truncated);
     insert_after_leading_system(
         &mut assembled.messages,
         LlmMessage::system(format!(
@@ -123,7 +123,7 @@ fn inject_preflight_entries(
         )),
     );
     if let Some(first_entry) = entries.first() {
-        assembled.report.sources.push(legacy_memory_source_report(
+        assembled.report.sources.push(request_memory_source_report(
             first_entry,
             "Preflight workspace memory recall",
             tok,

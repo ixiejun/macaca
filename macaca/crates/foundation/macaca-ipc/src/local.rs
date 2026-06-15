@@ -43,18 +43,6 @@ impl LocalBus {
         }
     }
 
-    /// Legacy compatibility entry.
-    #[deprecated(note = "use IpcTransport::create_sender or IpcTransportFactory instead")]
-    pub fn sender(&self) -> LocalSender {
-        self.make_sender()
-    }
-
-    /// Legacy compatibility entry.
-    #[deprecated(note = "use IpcTransport::create_receiver or IpcTransportFactory instead")]
-    pub fn receiver(&self) -> LocalReceiver {
-        self.make_receiver()
-    }
-
     /// Obtain or create a broadcast channel for `topic`.
     fn get_or_create(topics: &TopicMap, topic: &str) -> broadcast::Sender<IpcMessage> {
         let mut map = topics.lock().unwrap();

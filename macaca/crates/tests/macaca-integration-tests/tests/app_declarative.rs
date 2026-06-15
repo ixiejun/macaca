@@ -5,9 +5,9 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
+use macaca_agent::{AgentExecutionPort, InProcessAgentExecutionPort, ToolCatalog};
 use macaca_app::model::{AgentSource, CapabilityRef, InlineAgentConfig};
 use macaca_app::{AppLayer, AppManifest, AppRuntime, AppStatus};
-use macaca_agent::{AgentExecutionPort, InProcessAgentExecutionPort, ToolCatalog};
 use macaca_kernel::{Kernel, KernelBuilder};
 use macaca_llm::LlmProvider;
 use macaca_proto::config::KernelConfig;
@@ -56,7 +56,10 @@ fn make_kernel() -> Kernel {
         agent_timeout_ms: 30000,
     };
     let llm: Arc<dyn LlmProvider> = Arc::new(MockLlm);
-    let execution_port: Arc<dyn AgentExecutionPort> = Arc::new(InProcessAgentExecutionPort::new(llm, Arc::from(Box::new(DefaultToolSet::new()) as Box<dyn ToolCatalog>)));
+    let execution_port: Arc<dyn AgentExecutionPort> = Arc::new(InProcessAgentExecutionPort::new(
+        llm,
+        Arc::from(Box::new(DefaultToolSet::new()) as Box<dyn ToolCatalog>),
+    ));
     KernelBuilder::from_execution_port(config, execution_port).build()
 }
 
@@ -120,7 +123,10 @@ async fn start_declarative_app_registers_agents() {
     let kernel = make_kernel();
     let manifest = inline_manifest("test-app", 2);
 
-    let app_id = runtime.bootstrap_manifest(manifest, ".", &kernel).await.unwrap();
+    let app_id = runtime
+        .bootstrap_manifest(manifest, ".", &kernel)
+        .await
+        .unwrap();
 
     // Verify app status
     let status = runtime.app_status(&app_id).await.unwrap();
@@ -145,7 +151,10 @@ async fn stop_app_unregisters_agents() {
     let kernel = make_kernel();
     let manifest = inline_manifest("stop-app", 1);
 
-    let app_id = runtime.bootstrap_manifest(manifest, ".", &kernel).await.unwrap();
+    let app_id = runtime
+        .bootstrap_manifest(manifest, ".", &kernel)
+        .await
+        .unwrap();
     assert_eq!(kernel.agent_count().await, 1);
 
     runtime.stop_app(&app_id, &kernel).await.unwrap();
@@ -191,7 +200,10 @@ async fn stop_and_remove_app() {
     let kernel = make_kernel();
     let manifest = inline_manifest("removable", 1);
 
-    let app_id = runtime.bootstrap_manifest(manifest, ".", &kernel).await.unwrap();
+    let app_id = runtime
+        .bootstrap_manifest(manifest, ".", &kernel)
+        .await
+        .unwrap();
     assert_eq!(runtime.app_count().await, 1);
 
     runtime.stop_app(&app_id, &kernel).await.unwrap();
@@ -210,7 +222,10 @@ async fn duplicate_app_rejected() {
         .bootstrap_manifest(manifest.clone(), ".", &kernel)
         .await
         .unwrap();
-    let err = runtime.bootstrap_manifest(manifest, ".", &kernel).await.unwrap_err();
+    let err = runtime
+        .bootstrap_manifest(manifest, ".", &kernel)
+        .await
+        .unwrap_err();
     assert!(err.to_string().contains("already loaded"));
 }
 

@@ -1,5 +1,8 @@
-use macaca_sdk::context::{ContextDecisionSeverity, ContextReport, ContextSourceReport};
-use macaca_sdk::runtime_host::persist::{AppendEventCommand, EventLog};
+use macaca_host_composition::context::{
+    ContextDecisionSeverity, ContextReport, ContextSourceReport,
+};
+use macaca_host_composition::persist::EventLog;
+use macaca_proto::AppendEventCommand;
 use macaca_proto::ApplicationId;
 
 fn source_report_value(source: &ContextSourceReport) -> serde_json::Value {

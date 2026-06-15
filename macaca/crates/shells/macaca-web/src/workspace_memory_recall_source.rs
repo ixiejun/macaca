@@ -1,25 +1,27 @@
-//! Workspace-backed [`macaca_sdk::context::MemorySourceProvider`] used by
-//! [`macaca_sdk::context::active_recall::DefaultActiveRecallProvider`].
+//! Workspace-backed [`macaca_host_composition::context::MemorySourceProvider`] used by
+//! [`macaca_host_composition::context::active_recall::DefaultActiveRecallProvider`].
 //!
 //! ## Routing model
-//! [`macaca_sdk::context::MemoryRecallQuery`] carries **session / application / agent** hints. The
+//! [`macaca_host_composition::context::MemoryRecallQuery`] carries **session / application / agent** hints. The
 //! service-backed memory client performs recall; this adapter enforces conservative visibility
 //! rules so agent-private rows tagged with another [`AgentId`]
 //! cannot surface during recall (fail-closed for cross-agent isolation).
 //!
 //! ## Tombstones
-//! Optional [`macaca_sdk::memory::TombstoneIndex`] aligns recall with digest compilation and
+//! Optional [`macaca_host_composition::memory::TombstoneIndex`] aligns recall with digest compilation and
 //! `memory_forget` tooling so governance-deleted ids cannot reappear in fenced recall.
 
 use std::collections::HashSet;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use macaca_sdk::context::{
+use macaca_host_composition::context::{
     memory_source, ConfidenceScore, ContextSourceProvenance, MemoryRecallItem, MemoryRecallQuery,
     MemorySourceProvider, PrivacyTier,
 };
-use macaca_sdk::memory::{MemoryPolicyHints, MemoryPrefetchCommand, MemoryScope, TombstoneIndex};
+use macaca_host_composition::memory::{
+    MemoryPolicyHints, MemoryPrefetchCommand, MemoryScope, TombstoneIndex,
+};
 use macaca_proto::{MacacaResult, MemoryEntry, TraceContext};
 
 /// Pure predicate: whether a workspace [`MemoryEntry`] may be returned for active recall.
@@ -171,8 +173,8 @@ mod tests {
     use super::WorkspaceMemoryRecallSource;
     use async_trait::async_trait;
     use chrono::Utc;
-    use macaca_sdk::context::{MemoryRecallQuery, MemorySourceProvider};
-    use macaca_sdk::memory::{
+    use macaca_host_composition::context::{MemoryRecallQuery, MemorySourceProvider};
+    use macaca_host_composition::memory::{
         MemoryBackendConfig, MemoryBackendFactory, MemoryForgetCommand, MemoryPrefetchCommand,
         MemoryRecallCommand, MemoryRecallResult, MemoryRememberCommand, MemoryRememberResult,
         MemoryServiceSnapshot, MemoryServiceSnapshotCommand, MemoryStatusCommand,
@@ -265,9 +267,9 @@ mod tests {
 
         async fn get(
             &self,
-            command: macaca_sdk::memory::MemoryGetCommand,
-        ) -> MacacaResult<macaca_sdk::memory::MemoryGetResult> {
-            Ok(macaca_sdk::memory::MemoryGetResult::new(
+            command: macaca_host_composition::memory::MemoryGetCommand,
+        ) -> MacacaResult<macaca_host_composition::memory::MemoryGetResult> {
+            Ok(macaca_host_composition::memory::MemoryGetResult::new(
                 self.entries
                     .iter()
                     .find(|entry| entry.id == command.id)
@@ -282,7 +284,7 @@ mod tests {
         async fn status(&self, _command: MemoryStatusCommand) -> MacacaResult<MemoryStatusReport> {
             Ok(MemoryStatusReport::healthy(
                 "test-memory-client",
-                macaca_sdk::memory::MemoryCapabilitySet::basic_store_search(),
+                macaca_host_composition::memory::MemoryCapabilitySet::basic_store_search(),
             ))
         }
 
@@ -293,18 +295,18 @@ mod tests {
             Ok(MemoryServiceSnapshot::new(
                 "test-memory-client",
                 true,
-                macaca_sdk::memory::MemoryCapabilitySet::basic_store_search(),
+                macaca_host_composition::memory::MemoryCapabilitySet::basic_store_search(),
                 None,
             ))
         }
     }
 
     async fn client_from_manager(
-        mgr: &Arc<macaca_sdk::memory::TestMemoryManager>,
+        mgr: &Arc<macaca_host_composition::memory::TestMemoryManager>,
         query: &str,
     ) -> Arc<dyn macaca_sdk::SystemMemoryClient> {
         let entries = mgr
-            .recall(macaca_sdk::memory::RecallQuery::new(query, 8))
+            .recall(macaca_host_composition::memory::RecallQuery::new(query, 8))
             .await
             .unwrap()
             .entries;
@@ -325,7 +327,7 @@ mod tests {
         reg.record(id).await;
 
         let memory_client = client_from_manager(&mgr, "uniq-tombstone-recall-marker-xyz").await;
-        let scope = macaca_sdk::memory::MemoryScope::project_shared(
+        let scope = macaca_host_composition::memory::MemoryScope::project_shared(
             macaca_proto::ApplicationId::new(),
             "workspace",
         );
@@ -361,7 +363,7 @@ mod tests {
         });
         let source = WorkspaceMemoryRecallSource::new(
             memory_client,
-            macaca_sdk::memory::MemoryScope::agent_private(
+            macaca_host_composition::memory::MemoryScope::agent_private(
                 macaca_proto::ApplicationId::new(),
                 current_agent,
             ),

@@ -11,26 +11,27 @@ use async_trait::async_trait;
 use macaca_proto::{
     ApplicationAbiError, ApplicationHostCommand, ApplicationHostCommandResult,
     ApplicationHostCommandStatus, TraceContext, WasmCheckpointMemento, WasmLifecycleAuditEvent,
-    WasmLifecycleCommand, WasmLifecycleState, WasmLifecycleStateMachine, WasmLifecycleTransitionResult,
-    WasmRestoreReport, WasmRestoreRequest, WasmRollbackReport, WasmRollbackRequest,
-    WasmRuntimeDiagnostics, WasmRuntimeErrorKind, WasmRuntimeProviderDescriptor,
-    WasmRuntimeSessionRequest, WasmUpgradeReport, WasmUpgradeRequest,
+    WasmLifecycleCommand, WasmLifecycleState, WasmLifecycleStateMachine,
+    WasmLifecycleTransitionResult, WasmRestoreReport, WasmRestoreRequest, WasmRollbackReport,
+    WasmRollbackRequest, WasmRuntimeDiagnostics, WasmRuntimeErrorKind,
+    WasmRuntimeProviderDescriptor, WasmRuntimeSessionRequest, WasmUpgradeReport,
+    WasmUpgradeRequest,
 };
 use serde_json::json;
 use tracing::{info, warn};
 
-use super::artifact_loader::is_wasm_export_invoke;
-use super::DefaultInProcessWasmRuntimeProvider;
 use super::super::diagnostics::non_empty_trace;
 use super::super::engine_adapter::{CompiledWasmModule, InProcessWasmInstance};
 use super::super::errors::{runtime_error_result, WasmRuntimeHostError};
-use super::super::traits::WasmApplicationRuntimeProvider;
 use super::super::host_import_bridge::WasmHostImportBridge;
 use super::super::sandbox_guard::{WasmSandboxGuard, WasmSessionPermit};
 use super::super::telemetry::{
     emit_wasm_telemetry, WasmTelemetryEvent, WasmTelemetrySinkRef, WasmTelemetryStage,
 };
+use super::super::traits::WasmApplicationRuntimeProvider;
 use super::super::traits::WasmExecutionSession;
+use super::artifact_loader::is_wasm_export_invoke;
+use super::DefaultInProcessWasmRuntimeProvider;
 
 /// Execution session for the default in-process provider.
 #[derive(Debug)]

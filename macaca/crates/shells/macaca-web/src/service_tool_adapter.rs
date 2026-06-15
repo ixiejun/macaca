@@ -8,13 +8,13 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use macaca_host_composition::tools::{Tool, ToolCommand};
 use macaca_proto::{
     ApplicationId, CapabilityToolDescriptor, CapabilityToolInvocationScope,
     CapabilityToolOriginKind, IndustrialToolDescriptor, MacacaError, MacacaResult, ToolFamilyRef,
     ToolInvokeCommand, TraceContext,
 };
 use macaca_sdk::SystemToolClient;
-use macaca_sdk::tools::Tool;
 use serde_json::{json, Value};
 
 /// Framework `Tool` implementation that invokes through `service.tool`.
@@ -60,18 +60,18 @@ impl Tool for ToolServiceInvocationAdapter {
         &self.descriptor.base_descriptor.description
     }
 
-    fn parameters_schema(&self) -> Value {
+    fn tool_schema(&self) -> Value {
         self.descriptor.base_descriptor.parameters_schema.clone()
     }
 
-    async fn execute(&self, input: Value) -> MacacaResult<Value> {
+    async fn invoke(&self, command: ToolCommand) -> MacacaResult<Value> {
         let trace = TraceContext::new(format!("tool-service-{}", self.descriptor.visible_name));
         let command = ToolInvokeCommand {
             trace,
             scope: self.scope.clone(),
             tool_id: self.descriptor.stable_tool_id.clone(),
             descriptor: Some(self.descriptor.clone()),
-            input,
+            input: command.input,
             policy_ref: None,
             approval_ref: None,
             metadata: Default::default(),

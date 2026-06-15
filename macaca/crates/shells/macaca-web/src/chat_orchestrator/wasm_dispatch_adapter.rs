@@ -82,7 +82,10 @@ pub(crate) fn wasm_chat_export_payload(prompt: &str) -> serde_json::Value {
 /// WASM applications with declared agents still execute through the WASM
 /// runtime.  The agents are prepared as OS capabilities for task/delegation
 /// imports, not as a replacement coordinator path.
-pub(crate) async fn application_declares_agents(state: &Arc<AppState>, app_id: &ApplicationId) -> bool {
+pub(crate) async fn application_declares_agents(
+    state: &Arc<AppState>,
+    app_id: &ApplicationId,
+) -> bool {
     let Some(command) = ApplicationMetadataQueryCommand::application(
         TraceContext::new("web-chat-agent-scope"),
         *app_id,

@@ -16,7 +16,6 @@ pub(super) async fn emit_skill_mcp_event(
     launch: &SkillMcpServerLaunch,
     extra: serde_json::Value,
 ) {
-
     tracing::info!(
         agent = %agent_name,
         skill = %launch.skill_name,
@@ -48,5 +47,4 @@ pub(super) async fn emit_skill_mcp_event(
         payload,
     )
     .await;
-
 }

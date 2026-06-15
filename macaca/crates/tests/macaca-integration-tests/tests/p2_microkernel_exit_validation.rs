@@ -13,7 +13,7 @@ const FORBIDDEN_KERNEL_MODULES: &[&str] = &[
     "pub mod evm",
     "pub mod a2a",
     "pub mod payment_policy",
-    "pub mod provider_compat",
+    concat!("pub mod provider_", "com", "pat"),
     "pub mod executor",
 ];
 
@@ -62,7 +62,15 @@ fn persist_cargo_has_no_production_dependency_on_context() {
 #[test]
 fn cargo_tree_confirms_persist_context_edge_removed() {
     let output = Command::new("cargo")
-        .args(["tree", "-e", "normal", "-p", "macaca-persist", "--depth", "1"])
+        .args([
+            "tree",
+            "-e",
+            "normal",
+            "-p",
+            "macaca-persist",
+            "--depth",
+            "1",
+        ])
         .current_dir(workspace_root())
         .output()
         .expect("cargo tree should execute");

@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use macaca_proto::MacacaResult;
 use serde_json::{json, Value};
 
-use crate::tool::Tool;
+use crate::tool::{Tool, ToolCommand};
 
 use super::create_todo::CreateTodoTool;
 
@@ -29,7 +29,7 @@ impl Tool for CreateTodosTool {
         "Create multiple tasks and assign each to a specific agent's task board in one call. Preferred for goal decomposition."
     }
 
-    fn parameters_schema(&self) -> Value {
+    fn tool_schema(&self) -> Value {
         let item_schema = crate::tool::ToolSchemaProvider::tool_schema(&self.create_todo);
         json!({
             "type": "object",
@@ -45,7 +45,8 @@ impl Tool for CreateTodosTool {
         })
     }
 
-    async fn execute(&self, input: Value) -> MacacaResult<Value> {
+    async fn invoke(&self, command: ToolCommand) -> MacacaResult<Value> {
+        let input = command.input;
         let tasks = input["tasks"].as_array().ok_or_else(|| {
             macaca_proto::MacacaError::Task("missing required field: tasks".into())
         })?;

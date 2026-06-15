@@ -227,7 +227,7 @@ impl SkillSemanticReviewResult {
         }
     }
 
-    /// Default used for backwards-compatible serde decoding of older reports.
+    /// Default used for stable serde decoding of older reports.
     pub fn unavailable_default() -> Self {
         Self::unavailable(Utc::now())
     }

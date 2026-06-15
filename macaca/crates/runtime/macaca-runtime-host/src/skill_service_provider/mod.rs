@@ -1,8 +1,8 @@
-//! Runtime-host adapter for the Route C Skill Service (Facade module tree).
+//! Runtime-host adapter for the Skill Service (Facade module tree).
 //!
 //! The provider bridges typed Skill service commands to existing skill runtime
 //! facades.  It keeps Web and CLI from constructing skill runtimes directly
-//! while preserving the old semantics through deprecated compatibility anchors.
+//! while exposing only provider-neutral service contracts.
 //!
 //! Module layout (Facade + Command dispatch):
 //! - `system_service.rs` — `SystemService` lifecycle hooks and command admission logging

@@ -14,7 +14,7 @@ use macaca_proto::KernelServiceId;
 pub struct ServiceContractDescriptor {
     /// Stable service identifier (for example `service.market_data`).
     pub service_id: KernelServiceId,
-    /// Version label for contract compatibility checks.
+    /// Version label for contract matching checks.
     pub version: String,
     /// Structured error codes documented by this contract version.
     pub error_codes: Vec<String>,

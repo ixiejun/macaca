@@ -35,7 +35,10 @@ fn init_process_logging() {
 
 async fn run() -> MacacaResult<()> {
     let port = parse_port(std::env::args().skip(1))?;
-    macaca_web::WebServerBuilder::new().port(port).serve().await
+    macaca_host_composition::WebServerBuilder::new()
+        .port(port)
+        .serve()
+        .await
 }
 
 fn parse_port<I>(mut args: I) -> MacacaResult<u16>

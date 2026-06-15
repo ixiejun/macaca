@@ -49,7 +49,7 @@ pub async fn post_app_ui_bridge(
         "application-owned UI bridge command received"
     );
 
-    if !context.ui.bridge.declares(&request.capability) {
+    if !context.ui.declares_bridge_capability(&request.capability) {
         tracing::warn!(
             app_id = %app_id,
             trace_id = %trace.trace_id,

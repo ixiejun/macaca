@@ -1,16 +1,14 @@
-
-
 #[cfg(test)]
 mod tests {
     use crate::framework_runner::{
         contract_source, is_framework_tool_wrapper_trace, should_forward_driver_trace,
         tool_response_text, truncate_tool_output, ExecutionControlMiddleware, FrameworkRunner,
     };
-    use macaca_sdk::app::model::AppContextConfig;
-    use macaca_sdk::framework::message::{ContentBlock, TextBlock};
-    use macaca_sdk::framework::tool::ToolResponse;
+    use macaca_host_composition::app::model::AppContextConfig;
+    use macaca_host_composition::framework::message::{ContentBlock, TextBlock};
+    use macaca_host_composition::framework::tool::ToolResponse;
+    use macaca_host_composition::tools::TraceEvent;
     use macaca_proto::config::{AgentProfileContextConfig, ContextConfig};
-    use macaca_sdk::tools::TraceEvent;
 
     #[test]
     fn truncate_tool_output_respects_utf8_boundaries() {
@@ -63,7 +61,7 @@ mod tests {
     }
 
     #[test]
-    fn production_code_does_not_call_deprecated_build_system_prompt_shim() {
+    fn production_code_does_not_call_retired_build_system_prompt_shim() {
         let source = contract_source::framework_runner_module_sources();
         let forbidden = concat!("Self::", "build_system_prompt(");
         assert!(
@@ -167,7 +165,7 @@ mod tests {
     fn context_config_precedence_agent_overrides_app_and_system_engine() {
         let mut base = ContextConfig::default();
         base.default_engine = "system-windowed".into();
-        base.fallback_engine = "system-legacy".into();
+        base.fallback_engine = "system-passthrough".into();
 
         let merged = FrameworkRunner::merge_context_config_overrides(
             base,
@@ -192,7 +190,7 @@ mod tests {
     fn context_config_precedence_keeps_system_defaults_when_overrides_absent() {
         let mut base = ContextConfig::default();
         base.default_engine = "system-windowed".into();
-        base.fallback_engine = "system-legacy".into();
+        base.fallback_engine = "system-passthrough".into();
 
         let merged = FrameworkRunner::merge_context_config_overrides(base.clone(), None, None);
         assert_eq!(merged.default_engine, base.default_engine);

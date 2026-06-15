@@ -1,56 +1,9 @@
 use macaca_proto::types::EventEntry;
+use macaca_proto::EventLogQuery;
 
 const SOURCE_PREFIX: &str = "events_by_source/";
 const AGENT_PREFIX: &str = "events_by_agent/";
 const TYPE_PREFIX: &str = "events_by_type/";
-
-#[derive(Debug, Clone, Default)]
-pub struct EventLogQuery {
-    pub session_id: String,
-    pub since_seq: u64,
-    pub limit: usize,
-    pub source: Option<String>,
-    pub agent: Option<String>,
-    pub event_type: Option<String>,
-}
-
-impl EventLogQuery {
-    pub fn new(session_id: impl Into<String>) -> Self {
-        Self {
-            session_id: session_id.into(),
-            since_seq: 0,
-            limit: 500,
-            source: None,
-            agent: None,
-            event_type: None,
-        }
-    }
-
-    pub fn since(mut self, since_seq: u64) -> Self {
-        self.since_seq = since_seq;
-        self
-    }
-
-    pub fn limit(mut self, limit: usize) -> Self {
-        self.limit = limit;
-        self
-    }
-
-    pub fn source(mut self, source: Option<String>) -> Self {
-        self.source = source;
-        self
-    }
-
-    pub fn agent(mut self, agent: Option<String>) -> Self {
-        self.agent = agent;
-        self
-    }
-
-    pub fn event_type(mut self, event_type: Option<String>) -> Self {
-        self.event_type = event_type;
-        self
-    }
-}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SelectedIndex {

@@ -7,10 +7,7 @@ use axum::http::StatusCode;
 use axum::Json;
 use serde::{Deserialize, Serialize};
 
-use macaca_sdk::context::{
-    CompactionSummaryEnvelope, LineageKind, SessionLineage, TranscriptSegment,
-};
-use macaca_sdk::runtime_host::persist::{AppendEventCommand, EventLogQuery, SessionLineageStore};
+use macaca_proto::{EventLogQuery, SessionLineage};
 
 use crate::source_artifact::{
     ContextSourceArtifactRepository, SourceArtifactQuery, SourceArtifactResponse,
@@ -147,101 +144,18 @@ pub async fn manual_compact_session(
     Path(session_id): Path<String>,
     Json(request): Json<ManualCompactRequest>,
 ) -> Result<Json<ManualCompactResponse>, (StatusCode, Json<ErrorResponse>)> {
-    let lineage_store = SessionLineageStore::new(Arc::clone(&state.persist.session_store));
-    let existing = lineage_store
-        .load_lineage(&session_id)
+    let snapshot = state
+        .manual_session_compaction_snapshot(session_id, request.focus_topic)
         .await
         .map_err(|error| err(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
-    let root_session_id = existing
-        .as_ref()
-        .map(|lineage| lineage.root_session_id.clone())
-        .unwrap_or_else(|| session_id.clone());
-    if existing.is_none() {
-        lineage_store
-            .save_lineage(&SessionLineage::root(&session_id))
-            .await
-            .map_err(|error| err(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
-    }
-
-    let successor_session_id = uuid::Uuid::new_v4().to_string();
-    let source_segment_id = format!("segment-{session_id}");
-    let successor_segment_id = format!("segment-{successor_session_id}");
-    let active_task = request
-        .focus_topic
-        .clone()
-        .unwrap_or_else(|| "Continue from latest session state.".to_string());
-    let envelope = CompactionSummaryEnvelope {
-        root_session_id: root_session_id.clone(),
-        source_segment_id: source_segment_id.clone(),
-        successor_segment_id: successor_segment_id.clone(),
-        resolved: vec!["Manual compaction requested.".into()],
-        decisions: vec!["Created successor lineage without deleting source session.".into()],
-        current_state: "Original session history remains available for audit.".into(),
-        open_questions: Vec::new(),
-        active_task,
-        important_ids_and_paths: vec![session_id.clone(), successor_session_id.clone()],
-    };
-    let successor = SessionLineage::successor(
-        root_session_id.clone(),
-        session_id.clone(),
-        successor_session_id.clone(),
-    );
-    lineage_store
-        .save_lineage(&successor)
-        .await
-        .map_err(|error| err(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
-    lineage_store
-        .save_segment(&TranscriptSegment {
-            segment_id: successor_segment_id.clone(),
-            session_id: successor_session_id.clone(),
-            predecessor_segment_id: Some(source_segment_id.clone()),
-            lineage: successor,
-        })
-        .await
-        .map_err(|error| err(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
-
-    let summary = envelope.render_reference_only();
-    state
-        .persist
-        .event_log
-        .append_command(AppendEventCommand::new(
-            &session_id,
-            "context_compaction",
-            "context",
-            serde_json::json!({
-                "root_session_id": root_session_id,
-                "source_session_id": session_id,
-                "successor_session_id": successor_session_id,
-                "source_segment_id": source_segment_id,
-                "successor_segment_id": successor_segment_id,
-                "focus_topic": request.focus_topic,
-                "summary": summary.clone(),
-            }),
-        ))
-        .await;
-    state
-        .persist
-        .event_log
-        .append_command(AppendEventCommand::new(
-            &successor_session_id,
-            "context_lineage_updated",
-            "context",
-            serde_json::json!({
-                "root_session_id": envelope.root_session_id,
-                "parent_session_id": session_id,
-                "successor_session_id": successor_session_id,
-                "lineage_kind": LineageKind::CompactionSuccessor,
-            }),
-        ))
-        .await;
 
     Ok(Json(ManualCompactResponse {
-        root_session_id: envelope.root_session_id,
-        source_session_id: session_id,
-        successor_session_id,
-        source_segment_id,
-        successor_segment_id,
-        summary,
+        root_session_id: snapshot.root_session_id,
+        source_session_id: snapshot.source_session_id,
+        successor_session_id: snapshot.successor_session_id,
+        source_segment_id: snapshot.source_segment_id,
+        successor_segment_id: snapshot.successor_segment_id,
+        summary: snapshot.summary,
     }))
 }
 
@@ -256,26 +170,13 @@ pub async fn get_session_lineage(
     State(state): State<Arc<AppState>>,
     Path(session_id): Path<String>,
 ) -> Result<Json<SessionLineageResponse>, (StatusCode, Json<ErrorResponse>)> {
-    let lineage_store = SessionLineageStore::new(Arc::clone(&state.persist.session_store));
-    let lineage = lineage_store
-        .load_lineage(&session_id)
-        .await
-        .map_err(|error| err(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
-    let root = lineage
-        .as_ref()
-        .map(|lineage| lineage.root_session_id.clone())
-        .unwrap_or_else(|| session_id.clone());
-    let tip = lineage_store
-        .resolve_tip(&session_id)
-        .await
-        .map_err(|error| err(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
-    let lineage = lineage_store
-        .list_root_lineage(&root)
+    let snapshot = state
+        .session_lineage_snapshot(session_id)
         .await
         .map_err(|error| err(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
     Ok(Json(SessionLineageResponse {
-        requested_session_id: session_id,
-        lineage_tip_session_id: tip,
-        lineage,
+        requested_session_id: snapshot.requested_session_id,
+        lineage_tip_session_id: snapshot.lineage_tip_session_id,
+        lineage: snapshot.lineage,
     }))
 }

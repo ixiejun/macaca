@@ -2,10 +2,10 @@
 //!
 //! YAML applications are still first-class inputs, but new Application Platform
 //! features should reason over Manifest v1 and ability descriptors.  This module
-//! applies the Adapter pattern: it projects the legacy YAML model into
-//! provider-neutral Manifest v1 data while preserving existing runtime
-//! behavior in the legacy loader.  It also returns a Memento-style report so
-//! inferred defaults and compatibility facts are auditable without logging raw
+//! applies the Adapter pattern: it projects the YAML source model into
+//! provider-neutral Manifest v1 data while preserving runtime behavior through
+//! the canonical YAML adapter.  It also returns a Memento-style report so
+//! inferred defaults and source-only facts are auditable without logging raw
 //! manifest bodies, prompt templates, secrets, environment values, or host
 //! payloads.
 //!
@@ -29,13 +29,13 @@ mod tests;
 use crate::model::AppManifest;
 
 pub use types::{
-    LegacyAppManifestProjection, YamlApplicationManifestAdapter, YamlProjectionDiagnostic,
+    YamlApplicationManifestAdapter, YamlApplicationManifestProjection, YamlProjectionDiagnostic,
     YamlToApplicationManifestV1Report,
 };
 
-/// Convenience projection for callers that already hold a parsed legacy manifest.
+/// Convenience projection for callers that already hold a parsed YAML manifest.
 ///
 /// Equivalent to `YamlApplicationManifestAdapter::new(manifest.clone()).project()`.
-pub fn app_manifest_projection(manifest: &AppManifest) -> LegacyAppManifestProjection {
+pub fn app_manifest_projection(manifest: &AppManifest) -> YamlApplicationManifestProjection {
     YamlApplicationManifestAdapter::new(manifest.clone()).project()
 }

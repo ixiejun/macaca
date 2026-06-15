@@ -197,8 +197,8 @@ impl ApplicationCertificationContext {
     }
 
     /// Attach the provider-neutral supply-chain trust policy used by WASM
-    /// package admission.  The policy is optional so development and legacy
-    /// fixtures remain evaluable; industrial profiles provide a policy to make
+    /// package admission.  The policy is optional so development fixtures remain
+    /// evaluable; industrial profiles provide a policy to make
     /// signature, provenance, origin, and certification checks fail closed.
     pub fn wasm_supply_chain_policy(mut self, policy: WasmSupplyChainTrustPolicy) -> Self {
         self.wasm_supply_chain_policy = Some(policy);

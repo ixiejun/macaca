@@ -4,9 +4,7 @@
 //! providers can extend rules without modifying discovery or prompt code.
 
 use crate::agent_skill::SkillEntry;
-use crate::policy::{
-    normalize_policy_set, PolicyDecision, SkillExposureContext, SkillPolicyChain,
-};
+use crate::policy::{normalize_policy_set, PolicyDecision, SkillExposureContext, SkillPolicyChain};
 
 use super::config::SkillRuntimeOptions;
 use super::types::FilteredSkill;

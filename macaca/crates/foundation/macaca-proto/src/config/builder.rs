@@ -1,8 +1,6 @@
 //! Fluent builder for assembling [`super::MacacaConfig`] in tests and SDK helpers.
 
-use super::{
-    DriversConfig, KernelConfig, LlmConfig, MacacaConfig, WorkspaceConfig,
-};
+use super::{DriversConfig, KernelConfig, LlmConfig, MacacaConfig, WorkspaceConfig};
 
 /// Builder that starts from [`MacacaConfig::default`] and overrides selected sections.
 pub struct MacacaConfigBuilder {

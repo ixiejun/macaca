@@ -1,11 +1,11 @@
 //! Core YAML → Manifest v1 projection orchestration.
 //!
-//! `project_with_catalog` applies the **Adapter** pattern: it walks legacy YAML
+//! `project_with_catalog` applies the **Adapter** pattern: it walks YAML
 //! fields, emits sanitized Manifest v1 metadata, and records a Memento-style
 //! report.  Critical execution nodes are logged via `tracing::info` for audit.
 
 use macaca_proto::{
-    ApplicationCompatibilityDeclaration, ApplicationManifestV1, DeveloperId, PackageId,
+    ApplicationHostRequirementDeclaration, ApplicationManifestV1, DeveloperId, PackageId,
     PackageRuntimeKind,
 };
 use tracing::info;
@@ -14,7 +14,7 @@ use crate::service_capability::{DomainPackCatalog, InMemoryDomainPackCatalog};
 
 use super::entry::{application_permissions, entry_kind, entry_value};
 use super::types::{
-    LegacyAppManifestProjection, YamlApplicationManifestAdapter,
+    YamlApplicationManifestAdapter, YamlApplicationManifestProjection,
     YamlToApplicationManifestV1Report,
 };
 
@@ -23,7 +23,7 @@ impl YamlApplicationManifestAdapter {
     ///
     /// Convenience wrapper that injects builtin-default domain packs so unit
     /// tests and simple callers do not need to construct a catalog explicitly.
-    pub fn project(self) -> LegacyAppManifestProjection {
+    pub fn project(self) -> YamlApplicationManifestProjection {
         self.project_with_catalog(&InMemoryDomainPackCatalog::with_builtin_defaults())
     }
 
@@ -35,7 +35,7 @@ impl YamlApplicationManifestAdapter {
     pub fn project_with_catalog(
         self,
         catalog: &dyn DomainPackCatalog,
-    ) -> LegacyAppManifestProjection {
+    ) -> YamlApplicationManifestProjection {
         let application_id = self.manifest.id.to_string();
         let package_id = format!("application.{application_id}");
         let entry = entry_value(&self.manifest);
@@ -48,14 +48,12 @@ impl YamlApplicationManifestAdapter {
         if entry.is_none() {
             report.push_default(
                 application_id.as_str(),
-                "No explicit YAML entry was declared; legacy runtime will infer entry agent.",
+                "No explicit YAML entry was declared; the YAML runtime adapter will infer entry agent.",
             );
         }
 
-        let mut runtime = macaca_proto::ApplicationRuntimeProfile::new(
-            PackageRuntimeKind::Yaml,
-            "1",
-        );
+        let mut runtime =
+            macaca_proto::ApplicationRuntimeProfile::new(PackageRuntimeKind::Yaml, "1");
         if let Some(entry) = &entry {
             runtime.entry = Some(entry.clone());
         }
@@ -66,7 +64,7 @@ impl YamlApplicationManifestAdapter {
             .metadata
             .insert("source.format".into(), "yaml".into());
         runtime.metadata.insert(
-            "legacy.layer".into(),
+            "source.yaml.layer".into(),
             format!("{:?}", self.manifest.layer).to_lowercase(),
         );
 
@@ -76,7 +74,7 @@ impl YamlApplicationManifestAdapter {
             self.manifest.name.clone(),
             self.manifest.version.clone(),
             runtime,
-            ApplicationCompatibilityDeclaration::new("0.1.0"),
+            ApplicationHostRequirementDeclaration::new("0.1.0"),
         );
         projected
             .metadata
@@ -93,36 +91,36 @@ impl YamlApplicationManifestAdapter {
         );
         if let Some(ui_type) = self.manifest.ui_type {
             projected.metadata.insert(
-                "legacy.ui_type".into(),
+                "source.yaml.ui_type".into(),
                 format!("{ui_type:?}").to_lowercase(),
             );
-            report.push_legacy_only(
+            report.push_source_only(
                 application_id.as_str(),
-                "YAML ui_type is preserved as sanitized compatibility metadata.",
+                "YAML ui_type is preserved as sanitized source metadata.",
             );
         }
         if self.manifest.context.is_some() {
             projected
                 .metadata
-                .insert("legacy.context.present".into(), "true".into());
-            report.push_legacy_only(
+                .insert("source.yaml.context.present".into(), "true".into());
+            report.push_source_only(
                 application_id.as_str(),
-                "YAML context configuration remains owned by legacy runtime compatibility.",
+                "YAML context configuration remains source-owned adapter metadata.",
             );
         }
         if self.manifest.resources.is_some() {
             projected
                 .metadata
-                .insert("legacy.resources.present".into(), "true".into());
-            report.push_legacy_only(
+                .insert("source.yaml.resources.present".into(), "true".into());
+            report.push_source_only(
                 application_id.as_str(),
-                "YAML resource paths remain owned by legacy runtime compatibility.",
+                "YAML resource paths remain source-owned adapter metadata.",
             );
         }
         if self.manifest.workflows.is_some() {
             projected
                 .metadata
-                .insert("legacy.workflows.present".into(), "true".into());
+                .insert("source.yaml.workflows.present".into(), "true".into());
         }
         if let Some(workbench) = &self.manifest.workbench {
             if !workbench.is_empty() {
@@ -133,7 +131,7 @@ impl YamlApplicationManifestAdapter {
                 projected
                     .permission_profiles
                     .extend(workbench.permission_profiles.iter().cloned());
-                report.push_legacy_only(
+                report.push_source_only(
                     application_id.as_str(),
                     "YAML workbench declaration was projected into Manifest v1 policy metadata.",
                 );
@@ -141,7 +139,7 @@ impl YamlApplicationManifestAdapter {
         }
         if let Some(execution_profile) = &self.manifest.execution_profile {
             projected.execution_profile = Some(execution_profile.clone());
-            report.push_legacy_only(
+            report.push_source_only(
                 application_id.as_str(),
                 "YAML application execution profile was projected into Manifest v1 policy metadata.",
             );
@@ -170,11 +168,11 @@ impl YamlApplicationManifestAdapter {
             package_id = %package_id,
             ability_count = report.ability_count,
             default_count = report.inferred_defaults.len(),
-            legacy_only_count = report.legacy_only_fields.len(),
+            source_only_count = report.source_only_fields.len(),
             "YAML application projected to Manifest v1"
         );
 
-        LegacyAppManifestProjection {
+        YamlApplicationManifestProjection {
             manifest: projected,
             report,
         }

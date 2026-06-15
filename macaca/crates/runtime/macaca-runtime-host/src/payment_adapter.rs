@@ -1,4 +1,4 @@
-//! Payment adapter strategies for the Route C Payment Service.
+//! Payment adapter strategies for the Payment Service.
 //!
 //! This module contains only provider-facing settlement behavior.  The runtime
 //! service provider owns command dispatch, admission control, policy checks and

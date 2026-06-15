@@ -18,7 +18,7 @@ fn wasm_fixture() -> ApplicationCertificationFixture {
         "WASM Supply Chain Fixture",
         "1.0.0",
         ApplicationRuntimeProfile::new(PackageRuntimeKind::WasmComponent, "0"),
-        macaca_proto::ApplicationCompatibilityDeclaration::new("0.1.0"),
+        macaca_proto::ApplicationHostRequirementDeclaration::new("0.1.0"),
     )
     .ability(ApplicationAbilityDescriptor::new(
         "ability.fixture.wasm",
@@ -178,7 +178,7 @@ fn wasm_supply_chain_rejects_origin_mismatch() {
 }
 
 #[test]
-fn wasm_supply_chain_rejects_incompatible_certification() {
+fn wasm_supply_chain_rejects_certification_missing() {
     let artifact = WasmComponentArtifactDescriptor::new(
         "artifact.fixture",
         WasmRuntimeArtifactRef::new("pkg://fixture/component.wasm"),
@@ -196,5 +196,5 @@ fn wasm_supply_chain_rejects_incompatible_certification() {
     assert!(report
         .reason_codes
         .iter()
-        .any(|code| code == "incompatible_certification"));
+        .any(|code| code == "certification_missing"));
 }

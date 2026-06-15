@@ -5,9 +5,7 @@
 
 use std::collections::BTreeMap;
 
-use macaca_proto::{
-    ScheduledAgentTaskId, SCHEDULED_AGENT_TASK_SERVICE_ID, SCHEDULER_SERVICE_ID,
-};
+use macaca_proto::{ScheduledAgentTaskId, SCHEDULED_AGENT_TASK_SERVICE_ID, SCHEDULER_SERVICE_ID};
 
 pub(super) fn scheduler_target_metadata(
     task_id: &ScheduledAgentTaskId,

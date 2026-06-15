@@ -86,7 +86,7 @@ impl Default for ContextExternalAdapterSafetyConfig {
 }
 
 fn default_external_adapter_fallback_engine_id() -> String {
-    "legacy".into()
+    "passthrough".into()
 }
 
 fn default_external_adapter_empty_contribution_fallback() -> bool {

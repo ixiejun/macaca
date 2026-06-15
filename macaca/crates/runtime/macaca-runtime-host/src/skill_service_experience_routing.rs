@@ -21,7 +21,7 @@ use macaca_skill::{
 ///
 /// Absence is explicit: hosts that do not wire a Memory runtime receive
 /// structured `Unavailable` route results instead of fake success.  This keeps
-/// optional-module behavior compatible with Macaca's serviceization rules.
+/// optional-module behavior aligned with Macaca's serviceization rules.
 #[derive(Default)]
 pub(crate) struct SkillExperienceDestinationRouter {
     memory_runtime: Option<Arc<dyn MemoryRuntimeFacade>>,

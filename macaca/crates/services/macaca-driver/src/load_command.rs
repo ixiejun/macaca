@@ -1,36 +1,7 @@
-//! Driver runtime load command and report types.
+//! Driver runtime load protocol re-export.
+//!
+//! Load reports are serialized across the Driver service boundary, so their
+//! canonical definitions live in `macaca-proto`.  This module keeps the
+//! provider crate's internal path stable while avoiding duplicate DTOs.
 
-use std::path::PathBuf;
-
-/// Driver runtime load intent.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub enum DriverLoadCommand {
-    LoadAll,
-    Reload,
-}
-
-/// Aggregate report for a driver load command.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct DriverLoadReport {
-    pub command: DriverLoadCommand,
-    pub loaded: usize,
-    pub failed: usize,
-    pub entries: Vec<DriverLoadEntry>,
-}
-
-/// Per-driver load report entry.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct DriverLoadEntry {
-    pub name: String,
-    pub path: PathBuf,
-    pub status: DriverLoadStatus,
-    pub tool_count: Option<usize>,
-    pub error: Option<String>,
-}
-
-/// Per-driver load status.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub enum DriverLoadStatus {
-    Loaded,
-    Failed,
-}
+pub use macaca_proto::{DriverLoadCommand, DriverLoadEntry, DriverLoadReport, DriverLoadStatus};

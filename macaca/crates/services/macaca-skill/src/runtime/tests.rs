@@ -5,9 +5,7 @@ use std::path::Path;
 
 use crate::policy::os_matches_current;
 
-use super::{
-    path_belongs_to_snapshot_skill, SkillPolicy, SkillRuntime, SkillRuntimeOptions,
-};
+use super::{path_belongs_to_snapshot_skill, SkillPolicy, SkillRuntime, SkillRuntimeOptions};
 
 async fn write_skill(root: &Path, dir: &str, body: &str) {
     let skill_dir = root.join(dir);

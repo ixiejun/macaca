@@ -1,7 +1,7 @@
 //! SDK Plugin Capability Registry client.
 //!
 //! Shells and external SDK users use this Facade instead of depending on
-//! runtime-host registry internals.  The client speaks generic Route C service
+//! runtime-host registry internals.  The client speaks generic protocol service
 //! calls, which keeps the capability registry replaceable by local, remote, or
 //! test implementations.
 

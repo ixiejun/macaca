@@ -1,8 +1,8 @@
 //! Application consumption helpers for downstream crates.
 //!
 //! These helpers keep application-level interpretation inside `macaca-app`
-//! so consumers do not re-implement manifest reading, entry-agent fallback,
-//! or runtime assembly details in parallel.
+//! so consumers do not re-implement manifest reading, entry-agent defaults, or
+//! runtime assembly details in parallel.
 
 use crate::model::{AgentSource, AppManifest, CapabilityRef, InlineAgentConfig};
 use crate::registry::DiscoveredApp;
@@ -11,7 +11,6 @@ use crate::runtime::{
 };
 use crate::workflow::{
     DefaultWorkflowPromptStrategy, WorkflowEngine, WorkflowPromptContext, WorkflowPromptStrategy,
-    DEFAULT_WORKFLOW,
 };
 use macaca_proto::{
     ApplicationPlanningAgentProfile, ApplicationTaskPlanningContract, MacacaResult,
@@ -86,30 +85,10 @@ pub fn app_entry_agent_name(manifest: &AppManifest) -> Option<&str> {
     manifest.entry_agent.as_deref()
 }
 
-/// Resolve the effective entry agent name with a caller-provided fallback.
-#[deprecated(note = "Use `app_entry_agent_name(manifest).unwrap_or(fallback)` instead.")]
-pub fn app_entry_agent_name_or(manifest: &AppManifest, fallback: &str) -> String {
-    app_entry_agent_name(manifest)
-        .unwrap_or(fallback)
-        .to_string()
-}
-
-/// Resolve the effective entry workflow name using `WorkflowEngine`'s current
-/// compatibility logic.
+/// Resolve the effective entry workflow name using `WorkflowEngine`'s canonical
+/// manifest interpretation logic.
 pub fn app_entry_workflow_name(manifest: &AppManifest) -> String {
     WorkflowEngine::get_entrypoint_workflow(manifest)
-}
-
-/// Build a compatibility base prompt for an agent from application-level
-/// workflow semantics.
-///
-/// This keeps downstream consumers from re-implementing entry-agent fallback
-/// prompt rules. Non-entry agents retain the legacy generic fallback. Entry
-/// agents continue to identify as the concrete agent name, while workflow
-/// constraints and tool policy come from `WorkflowPromptStrategy`.
-#[deprecated(note = "Use `app_agent_prompt_semantics(manifest, agent_name).base_prompt` instead.")]
-pub fn app_agent_base_prompt(manifest: &AppManifest, agent_name: &str) -> String {
-    app_agent_prompt_semantics(manifest, agent_name).base_prompt
 }
 
 /// Resolve application prompt semantics for an agent from manifest-level
@@ -190,27 +169,6 @@ pub fn app_task_planning_contract(
             .unwrap_or("entry_agent")
             .to_string(),
         worker_agents,
-    }
-}
-
-/// Build the legacy default planning contract for older task callers that
-/// only know the list of available worker agent names.
-///
-/// This keeps compatibility behavior centralized in `macaca-app` while newer
-/// runtime paths pass a real application manifest into
-/// [`app_task_planning_contract`].
-#[deprecated(
-    note = "Use `app_task_planning_contract` or construct `AppTaskPlanningContract` explicitly."
-)]
-pub fn legacy_app_task_planning_contract(available_agents: &[String]) -> AppTaskPlanningContract {
-    AppTaskPlanningContract {
-        workflow_name: DEFAULT_WORKFLOW.into(),
-        entry_agent: "entry_agent".into(),
-        worker_agents: available_agents
-            .iter()
-            .cloned()
-            .map(AppPlanningAgentProfile::legacy)
-            .collect(),
     }
 }
 
@@ -295,36 +253,36 @@ mod tests {
     }
 
     #[test]
-    #[allow(deprecated)]
-    fn entry_agent_helpers_preserve_fallback_behavior() {
+    fn entry_agent_name_supports_caller_owned_fallback() {
         let manifest = manifest();
         assert_eq!(app_entry_agent_name(&manifest), Some("coordinator"));
         assert_eq!(
-            app_entry_agent_name_or(&manifest, "fallback"),
+            app_entry_agent_name(&manifest).unwrap_or("fallback"),
             "coordinator"
         );
 
         let mut no_entry = manifest;
         no_entry.entry_agent = None;
         assert_eq!(app_entry_agent_name(&no_entry), None);
-        assert_eq!(app_entry_agent_name_or(&no_entry, "fallback"), "fallback");
+        assert_eq!(
+            app_entry_agent_name(&no_entry).unwrap_or("fallback"),
+            "fallback"
+        );
     }
 
     #[test]
-    #[allow(deprecated)]
-    fn entry_agent_base_prompt_uses_workflow_sections() {
+    fn entry_agent_prompt_semantics_uses_workflow_sections() {
         let manifest = manifest();
-        let prompt = app_agent_base_prompt(&manifest, "coordinator");
+        let prompt = app_agent_prompt_semantics(&manifest, "coordinator").base_prompt;
         assert!(prompt.contains("You are the coordinator agent in Macaca OS."));
         assert!(prompt.contains("SDD"));
         assert!(prompt.contains("claude_code_execute"));
     }
 
     #[test]
-    #[allow(deprecated)]
-    fn worker_base_prompt_preserves_legacy_generic_fallback() {
+    fn worker_prompt_semantics_uses_generic_agent_identity() {
         let manifest = manifest();
-        let prompt = app_agent_base_prompt(&manifest, "backend");
+        let prompt = app_agent_prompt_semantics(&manifest, "backend").base_prompt;
         assert_eq!(prompt, "You are the backend agent in Macaca OS.");
     }
 
@@ -366,11 +324,15 @@ mod tests {
     }
 
     #[test]
-    #[allow(deprecated)]
-    fn legacy_task_planning_contract_preserves_legacy_defaults() {
-        let contract = legacy_app_task_planning_contract(&["backend".into(), "frontend".into()]);
-        assert_eq!(contract.workflow_name, "default");
-        assert_eq!(contract.entry_agent, "entry_agent");
+    fn explicit_task_planning_contract_supports_named_workers() {
+        let contract = AppTaskPlanningContract {
+            workflow_name: "default".into(),
+            entry_agent: "entry_agent".into(),
+            worker_agents: ["backend", "frontend"]
+                .into_iter()
+                .map(AppPlanningAgentProfile::default_profile)
+                .collect(),
+        };
         assert_eq!(
             contract.available_agent_names(),
             vec!["backend".to_string(), "frontend".to_string()]

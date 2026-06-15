@@ -4,7 +4,7 @@
 //! input. This file deliberately does not instantiate providers, wallets,
 //! browser bridges, Substrate/Frontier nodes, RPC transports, or contract
 //! runtimes. That separation keeps application framework code generic across
-//! all applications and preserves the Route C microkernel boundary.
+//! all applications and preserves the microkernel/service boundary.
 
 use std::collections::BTreeMap;
 

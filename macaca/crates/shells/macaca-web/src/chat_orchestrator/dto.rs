@@ -13,7 +13,7 @@ pub(crate) struct ChatRequest {
     /// Optional session_id for continuing a conversation, or null for new session
     #[serde(default)]
     pub session_id: Option<String>,
-    /// Execution engine: "legacy" (default) or "framework" (ReActAgent-based).
+    /// Optional execution engine hint for callers that need a specific protocol path.
     #[serde(default)]
     pub engine: Option<String>,
 }

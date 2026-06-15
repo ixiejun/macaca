@@ -82,7 +82,7 @@ pub enum AppUiRuntimeKind {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AppUiPresentationConfig {
     /// Schema label expected by the application output.  The current renderer
-    /// understands GenUI-compatible component trees; future schemas can be
+    /// understands GenUI component trees; future schemas can be
     /// added as data-driven strategies rather than application-specific code.
     #[serde(default = "default_presentation_schema")]
     pub schema: String,
@@ -163,8 +163,8 @@ pub enum AppUiSurfaceChrome {
     /// The application bundle owns workspace-local navigation, headers, and
     /// action chrome.
     AppOwned,
-    /// The host shell owns workspace chrome, which is the compatibility default
-    /// for chat-first applications.
+    /// The host shell owns workspace chrome, which is the neutral default for
+    /// chat-first applications.
     Host,
 }
 
@@ -405,7 +405,7 @@ mod tests {
     }
 
     #[test]
-    fn ui_runtime_defaults_to_session_surface_for_compatibility() {
+    fn ui_runtime_defaults_to_session_surface_for_host_chrome() {
         let yaml = r#"
 runtime: web_bundle
 entry: dist/ui/index.html

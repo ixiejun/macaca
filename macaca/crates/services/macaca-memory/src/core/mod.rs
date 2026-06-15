@@ -5,10 +5,10 @@
 //! - `scope` models ownership and visibility
 //! - `facade` defines the stable request/response contract
 //! - `router` maps scope to logical memory lanes
-//! - `adapter` bridges the new contract to existing builtin managers
+//! - `adapter` bridges the contract to existing builtin managers
 //!
 //! The goal is to let the rest of Macaca depend on one generic memory boundary
-//! without deleting the legacy storage implementations in the same change.
+//! while concrete storage implementations remain replaceable behind adapters.
 
 pub mod active_recall;
 pub mod adapter;

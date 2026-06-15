@@ -50,7 +50,9 @@ mod tests {
     #[test]
     fn orchestration_backend_forwards_both_intents_through_shared_bridge() {
         let backend = include_str!("wasm_orchestration_backend.rs");
-        let delegate_bridge = include_str!("application_agent_delegate_bridge.rs");
+        let delegate_bridge = include_str!(
+            "../../../runtime/macaca-host-composition/src/application_agent_delegate_bridge.rs"
+        );
 
         assert!(backend.contains("build_execution_command_from_delegate"));
         assert!(backend.contains("dispatch_agent_execution_via_service"));
@@ -62,7 +64,9 @@ mod tests {
     fn yaml_and_wasm_share_application_abi_then_agent_execution_provider() {
         let yaml = include_str!("agent_runner.rs");
         let wasm = host_import_bridge_module_sources();
-        let bridge = include_str!("application_agent_delegate_bridge.rs");
+        let bridge = include_str!(
+            "../../../runtime/macaca-host-composition/src/application_agent_delegate_bridge.rs"
+        );
         let application_provider = include_str!(
             "../../../runtime/macaca-runtime-host/src/application_service_provider/command_dispatch.rs"
         );
@@ -79,9 +83,8 @@ mod tests {
 
     #[test]
     fn application_delegate_command_exposes_into_service_command_helper() {
-        let proto = include_str!(
-            "../../../foundation/macaca-proto/src/application_service/delegate.rs"
-        );
+        let proto =
+            include_str!("../../../foundation/macaca-proto/src/application_service/delegate.rs");
 
         assert!(proto.contains("impl ApplicationAgentDelegateCommand"));
         assert!(proto.contains("into_service_command"));
@@ -92,7 +95,9 @@ mod tests {
     fn unified_workflow_path_does_not_hardcode_application_role_names() {
         let sources = [
             include_str!("agent_runner.rs"),
-            include_str!("application_agent_delegate_bridge.rs"),
+            include_str!(
+                "../../../runtime/macaca-host-composition/src/application_agent_delegate_bridge.rs"
+            ),
             include_str!("wasm_orchestration_backend.rs"),
         ];
 

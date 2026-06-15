@@ -311,7 +311,7 @@ impl WasmExecutionSession for UnavailableWasmExecutionSession {
                 .chars()
                 .take(12)
                 .collect(),
-            abi_compatible: false,
+            abi_matches: false,
             trace: Some(trace),
             metadata: sanitize_wasm_lifecycle_metadata(request.metadata),
         })

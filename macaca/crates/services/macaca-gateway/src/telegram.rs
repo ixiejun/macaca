@@ -5,8 +5,6 @@
 //! Sending uses `sendMessage` with HTML parse mode for plain text and
 //! Markdown for code blocks.  Messages exceeding Telegram's 4 096-character
 //! limit are automatically split at newline boundaries.
-#![allow(deprecated)]
-
 use std::sync::Arc;
 
 use async_trait::async_trait;

@@ -1,6 +1,6 @@
 //! Provider-neutral Skill operator lifecycle contracts.
 //!
-//! These DTOs model the operator surface for AgentSkills-compatible knowledge
+//! These DTOs model the operator surface for AgentSkills-format knowledge
 //! skills.  The service owns catalog visibility, bounded markdown reads,
 //! config persistence, watch notifications, enablement, and audit references;
 //! shells and applications only submit commands and render results.

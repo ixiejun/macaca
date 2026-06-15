@@ -1,8 +1,8 @@
-//! SDK EVM Service client for Route C S11.
+//! SDK EVM Service client.
 //!
 //! This focused client keeps EVM optional module access behind SDK and
 //! ServiceRuntime contracts.  Upper consumers never construct concrete EVM
-//! providers, RPC clients, wallet clients, or kernel compatibility facades.
+//! providers, RPC clients, wallet clients, or kernel transport facades.
 
 use std::sync::Arc;
 
@@ -272,7 +272,10 @@ mod tests {
             .await
             .expect_err("unavailable client must reject deploy");
         assert!(
-            error.to_string().to_ascii_lowercase().contains("unavailable"),
+            error
+                .to_string()
+                .to_ascii_lowercase()
+                .contains("unavailable"),
             "expected unavailable diagnostic, got: {error}"
         );
     }

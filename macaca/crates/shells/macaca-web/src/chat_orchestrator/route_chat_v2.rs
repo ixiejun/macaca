@@ -81,10 +81,9 @@ pub(crate) async fn post_chat_v2(
             "registered request-level LLM route hint for application execution"
         );
     }
-    let app_defaults =
-        crate::application_shell_adapter::manifest_llm_config(&state, &app_id).await;
-    let system_model = (!state.config.default_model.is_empty())
-        .then(|| state.config.default_model.clone());
+    let app_defaults = crate::application_shell_adapter::manifest_llm_config(&state, &app_id).await;
+    let system_model =
+        (!state.config.default_model.is_empty()).then(|| state.config.default_model.clone());
     let request_route_metadata = crate::llm_route_shell_adapter::resolve_request_route_metadata(
         &state,
         &app_id,
@@ -194,12 +193,13 @@ pub(crate) async fn post_chat_v2(
         flags.insert(req.app_id.clone(), Arc::clone(&cancel_flag));
     }
 
-    // Session-local execution-control resume channel. The selected policy is
-    // registered later by `service.agent_execution`, which swaps this sender for
-    // the concrete run while preserving the browser-visible session handle.
+    // Runtime-host local execution-control notification handle. The
+    // authoritative policy is registered later by `service.agent_execution`;
+    // this initial handle preserves early parent-wait paths until the
+    // run-specific channel replaces it through the runtime-host owner.
     let pause_signal = Arc::new(AtomicBool::new(false));
     let (resume_tx, _resume_rx) =
-        tokio::sync::mpsc::channel::<crate::runtime_resume::RuntimeResumeSignal>(4);
+        tokio::sync::mpsc::channel::<macaca_proto::RuntimeResumeSignal>(4);
 
     // Stop old forwarder if re-entering the same session
     let forwarder_stop = Arc::new(AtomicBool::new(false));
@@ -214,13 +214,22 @@ pub(crate) async fn post_chat_v2(
             crate::state::ActiveSession {
                 session_id: session_key.clone(),
                 app_id: app_id.clone(),
-                pause_signal: Arc::clone(&pause_signal),
-                resume_tx,
                 sse_tx: Arc::clone(&sse_tx),
                 forwarder_stop: Arc::clone(&forwarder_stop),
             },
         );
     }
+    state
+        .sessions
+        .execution_control_local_notifications
+        .install(
+            session_key.clone(),
+            macaca_host_composition::execution_control::ExecutionControlLocalNotification {
+                pause_signal,
+                resume_tx,
+            },
+        )
+        .await;
 
     persist_initial_chat_session(&state, &app_id, &session_key, &req.prompt).await;
 

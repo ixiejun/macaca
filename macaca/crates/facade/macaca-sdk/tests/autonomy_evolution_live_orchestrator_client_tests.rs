@@ -1,4 +1,5 @@
-use macaca_autonomy_evolution::{
+use macaca_proto::TraceContext;
+use macaca_proto::{
     BenchmarkDecision, EvolutionAdmissionCandidate, EvolutionBenchmarkMeasurement,
     EvolutionBenchmarkMetrics, EvolutionLiveAdapterDispatch, EvolutionLiveAuditCommand,
     EvolutionLivePhaseStatus, EvolutionLiveTickCommand, EvolutionReleaseAction,
@@ -6,7 +7,6 @@ use macaca_autonomy_evolution::{
     OsCodeEvolutionProposalCommand, OsCodeEvolutionProposalDecision,
     OsCodeEvolutionProposalEvidence, OsCodeEvolutionProposalIntent,
 };
-use macaca_proto::TraceContext;
 use macaca_sdk::{SystemAutonomyEvolutionClient, UnavailableSystemAutonomyEvolutionClient};
 
 fn scope() -> EvolutionScope {

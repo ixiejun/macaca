@@ -5,7 +5,6 @@
 //! inner chat model.
 
 mod assembly_finalize;
-mod assembly_legacy;
 mod assembly_service;
 
 #[cfg(test)]
@@ -16,15 +15,15 @@ mod tests;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use macaca_sdk::context::{
+use macaca_host_composition::context::{
     ActiveRecallCapability, ContextBudget, ContextEngineRegistry, ContextEngineSelection,
     ContextPreflightRecallConfig, KnowledgeDigestCapability, McpCapabilityCatalog,
     ProviderHealthLedger, RuntimeToolCapabilityCatalog, SkillCapabilityCatalog,
 };
-use macaca_sdk::framework::model::{ChatModel, ChatOptions, ChatResponse, ModelError};
+use macaca_host_composition::framework::model::{ChatModel, ChatOptions, ChatResponse, ModelError};
+use macaca_host_composition::memory::SharedTombstoneRegistry;
+use macaca_host_composition::persist::EventLog;
 use macaca_proto::{config::ContextConfig, AgentId, ApplicationId};
-use macaca_sdk::runtime_host::persist::EventLog;
-use macaca_sdk::memory::SharedTombstoneRegistry;
 
 use crate::context_reporting_memory::{
     build_workspace_knowledge_digest_capability, build_workspace_recall_capability,
@@ -37,14 +36,14 @@ use crate::context_reporting_memory::{
 pub(crate) struct ContextReportingChatModel {
     pub(super) inner: Arc<dyn ChatModel>,
     pub(super) event_log: Arc<EventLog>,
-    pub(super) persist_backend: Arc<dyn macaca_sdk::runtime_host::persist::PersistBackend>,
+    pub(super) persist_backend: Arc<dyn macaca_host_composition::persist::PersistBackend>,
     pub(super) app_id: ApplicationId,
     pub(super) session_id: Option<String>,
     pub(super) agent_name: String,
     pub(super) context_selection: ContextEngineSelection,
     pub(super) context_budget: ContextBudget,
     pub(super) recall_runtime: macaca_proto::config::ContextRecallRuntimeConfig,
-    pub(super) context_client: Arc<dyn macaca_sdk::SystemContextClient>,
+    pub(super) context_client: Arc<dyn macaca_host_composition::SystemContextClient>,
     pub(super) memory_client: Arc<dyn macaca_sdk::SystemMemoryClient>,
     pub(super) agent_profile: macaca_proto::config::AgentProfileContextConfig,
     pub(super) agent_profile_root: Option<std::path::PathBuf>,
@@ -66,13 +65,13 @@ impl ContextReportingChatModel {
     pub(crate) fn new(
         inner: Arc<dyn ChatModel>,
         event_log: Arc<EventLog>,
-        persist_backend: Arc<dyn macaca_sdk::runtime_host::persist::PersistBackend>,
+        persist_backend: Arc<dyn macaca_host_composition::persist::PersistBackend>,
         app_id: ApplicationId,
         session_id: Option<String>,
         agent_name: String,
         merged_context_config: ContextConfig,
         agent_profile_root: Option<std::path::PathBuf>,
-        context_client: Arc<dyn macaca_sdk::SystemContextClient>,
+        context_client: Arc<dyn macaca_host_composition::SystemContextClient>,
         memory_client: Arc<dyn macaca_sdk::SystemMemoryClient>,
         workspace_memory_tombstones: Option<Arc<SharedTombstoneRegistry>>,
         routing_agent_id: Option<AgentId>,
@@ -169,8 +168,9 @@ impl ContextReportingChatModel {
 
     /// Count compaction successors for diagnostic lineage enrichment.
     pub(super) async fn lineage_compactions(&self, session_id: &str) -> u32 {
-        let store =
-            macaca_sdk::runtime_host::persist::SessionLineageStore::new(Arc::clone(&self.persist_backend));
+        let store = macaca_host_composition::persist::SessionLineageStore::new(Arc::clone(
+            &self.persist_backend,
+        ));
         store
             .count_compaction_successors(session_id)
             .await
@@ -184,16 +184,6 @@ impl ContextReportingChatModel {
         options: &ChatOptions,
     ) -> Option<(Vec<serde_json::Value>, ChatOptions)> {
         assembly_service::assemble_and_emit_report(self, messages, options).await
-    }
-
-    /// Deprecated local assembler fallback when Context Service is unavailable.
-    #[deprecated(note = "Use Context Service assembly via SystemContextClient for new code")]
-    pub(super) async fn assemble_and_emit_report_legacy_local(
-        &self,
-        messages: &[serde_json::Value],
-        options: &ChatOptions,
-    ) -> Option<(Vec<serde_json::Value>, ChatOptions)> {
-        assembly_legacy::assemble_and_emit_report_legacy_local(self, messages, options).await
     }
 }
 

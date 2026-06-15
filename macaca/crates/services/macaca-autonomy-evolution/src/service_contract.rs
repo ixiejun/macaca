@@ -28,6 +28,34 @@ use crate::{
     AUTONOMY_EVOLUTION_TRANSITION_COMMAND,
 };
 
+/// Return whether a run scope satisfies a bounded snapshot filter.
+///
+/// This helper stays provider-internal because filter matching belongs to the
+/// local read model, while the shared `EvolutionScope` DTO remains a pure
+/// protocol contract in `macaca-proto`.
+pub(crate) fn scope_matches_filter(scope: &EvolutionScope, filter: &EvolutionScope) -> bool {
+    filter
+        .application_id
+        .as_ref()
+        .map(|value| scope.application_id.as_ref() == Some(value))
+        .unwrap_or(true)
+        && filter
+            .tenant_id
+            .as_ref()
+            .map(|value| scope.tenant_id.as_ref() == Some(value))
+            .unwrap_or(true)
+        && filter
+            .session_id
+            .as_ref()
+            .map(|value| scope.session_id.as_ref() == Some(value))
+            .unwrap_or(true)
+        && filter
+            .task_id
+            .as_ref()
+            .map(|value| scope.task_id.as_ref() == Some(value))
+            .unwrap_or(true)
+}
+
 #[async_trait]
 pub trait AutonomyEvolutionService: Send + Sync {
     fn descriptor(&self) -> ServiceDescriptor;
@@ -337,29 +365,4 @@ pub fn autonomy_evolution_service_descriptor(health: ServiceHealth) -> ServiceDe
         ),
     ];
     descriptor
-}
-
-impl EvolutionScope {
-    pub(crate) fn matches_filter(&self, filter: &EvolutionScope) -> bool {
-        filter
-            .application_id
-            .as_ref()
-            .map(|value| self.application_id.as_ref() == Some(value))
-            .unwrap_or(true)
-            && filter
-                .tenant_id
-                .as_ref()
-                .map(|value| self.tenant_id.as_ref() == Some(value))
-                .unwrap_or(true)
-            && filter
-                .session_id
-                .as_ref()
-                .map(|value| self.session_id.as_ref() == Some(value))
-                .unwrap_or(true)
-            && filter
-                .task_id
-                .as_ref()
-                .map(|value| self.task_id.as_ref() == Some(value))
-                .unwrap_or(true)
-    }
 }

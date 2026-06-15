@@ -18,6 +18,7 @@ mod coordinator_commands;
 mod event_sink;
 mod goal_commands;
 mod graph_admission;
+mod prompt_commands;
 mod snapshot;
 mod strategy;
 mod task_lifecycle_commands;

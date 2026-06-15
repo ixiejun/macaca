@@ -2,8 +2,17 @@ use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
 
 use async_trait::async_trait;
 use chrono::Utc;
-use macaca_sdk::framework::mcp::{McpSessionMode, McpTransportConfig};
-use macaca_sdk::framework::tool::{ToolError, ToolHandler, ToolResponse, Toolkit};
+use macaca_host_composition::framework::mcp::{McpSessionMode, McpTransportConfig};
+use macaca_host_composition::framework::tool::{ToolError, ToolHandler, ToolResponse, Toolkit};
+use macaca_host_composition::mcp_runtime::{
+    McpDefinitionSource, McpLifecycleScope, McpRuntimeFacade, McpRuntimeStatus,
+    McpRuntimeStatusState, McpServerDefinition, McpToolPolicy,
+};
+use macaca_host_composition::runtime_host::{
+    SkillAuthorKind, SkillGovernanceProvenance, SkillGovernanceRecord,
+    SkillGovernanceSnapshotResult, SkillLifecycleState, SkillSnapshot, SkillSnapshotEntry,
+    SkillSourceScope, SkillUsageTelemetry,
+};
 use macaca_proto::config::{ContextConfig, ContextProviderFamilyConfig};
 use macaca_proto::{
     MacacaError, MacacaResult, McpCleanupCommand, McpDiagnosticsSnapshot,
@@ -17,16 +26,7 @@ use macaca_proto::{
     McpToolAttachResult, McpToolCatalogCommand, McpToolCatalogResult, McpToolInvokeCommand,
     McpToolInvokeResult, TraceContext,
 };
-use macaca_sdk::runtime_host::{
-    McpDefinitionSource, McpLifecycleScope, McpRuntimeFacade, McpRuntimeStatus,
-    McpRuntimeStatusState, McpServerDefinition, McpToolPolicy,
-};
 use macaca_sdk::SystemMcpClient;
-use macaca_sdk::skill::{
-    SkillAuthorKind, SkillGovernanceProvenance, SkillGovernanceRecord,
-    SkillGovernanceSnapshotResult, SkillLifecycleState, SkillSnapshot, SkillSourceScope,
-    SkillUsageTelemetry,
-};
 use serde_json::Value;
 
 use super::*;
@@ -112,7 +112,7 @@ fn runtime_tool_catalog_lists_tool_names_sorted_and_deduped() {
     assert_eq!(cat.tool_names, vec!["aaa", "zzz"]);
 }
 
-/// Fixture MCP client that returns deterministic probe statuses for Route C tests.
+/// Fixture MCP client that returns deterministic probe statuses for protocol tests.
 struct FixtureMcpProbeClient {
     statuses: Vec<McpRuntimeStatusView>,
 }
@@ -303,7 +303,7 @@ fn skill_snapshot(names: &[&str]) -> SkillSnapshot {
         prompt: "".into(),
         skills: names
             .iter()
-            .map(|name| macaca_sdk::skill::SkillSnapshotEntry {
+            .map(|name| SkillSnapshotEntry {
                 name: (*name).into(),
                 description: format!("{name} skill"),
                 source_location: PathBuf::from(format!("/skills/{name}/SKILL.md")),

@@ -4,26 +4,26 @@
 //! fully serialized as execution-control subscriptions inside the web shell.  This
 //! module bridges task-service goal lifecycle signals into:
 //! 1. Auditable `service.execution_control` resume commands (authoritative).
-//! 2. In-memory resume channels owned by the waiting parent loop.
+//! 2. Runtime-host local resume channels owned by the waiting parent loop.
 //! 3. Session-visible SSE + event-log evidence for operators.
 //!
 //! The adapter is intentionally application-neutral: it never branches on agent
 //! role names or workflow labels.
 
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use axum::response::sse::Event;
-use macaca_proto::{ApplicationId, TaskId, TraceContext, EXECUTION_CONTROL_SERVICE_ID};
-use macaca_sdk::framework::execution::ExecutionContext;
-use macaca_sdk::runtime_host::persist::AppendEventCommand;
-use macaca_sdk::runtime_host::{
-    ExecutionControlGoalLifecycleCoordinator, GoalLifecycleParentResumeRequest,
-    GoalLifecycleParentWaitRequest,
+use macaca_host_composition::execution_control::{
+    ExecutionControlGoalLifecycleCoordinator, ExecutionControlLocalNotificationRuntime,
+    GoalLifecycleParentResumeRequest, GoalLifecycleParentWaitRequest,
+};
+use macaca_host_composition::framework::execution::ExecutionContext;
+use macaca_proto::AppendEventCommand;
+use macaca_proto::{
+    ApplicationId, RuntimeResumeSignal, TaskId, TraceContext, EXECUTION_CONTROL_SERVICE_ID,
 };
 use tracing::{info, warn};
 
-use crate::runtime_resume::RuntimeResumeSignal;
 use crate::state::{ActiveSession, AppState};
 
 /// Provider-neutral reason codes recorded in execution-control audit replay.
@@ -84,6 +84,7 @@ pub async fn deliver_goal_resume_and_notify_parent(
     goal_id: TaskId,
     description: &str,
     active_session: Option<&ActiveSession>,
+    notification_runtime: &Arc<ExecutionControlLocalNotificationRuntime>,
 ) {
     let trace = TraceContext::new(format!("goal-lifecycle-resume:{session_id}:{}", goal_id.0));
     let resume_request = GoalLifecycleParentResumeRequest {
@@ -112,7 +113,7 @@ pub async fn deliver_goal_resume_and_notify_parent(
                 goal_id = %goal_id.0,
                 service_id = EXECUTION_CONTROL_SERVICE_ID,
                 error = %error,
-                "Goal-lifecycle execution-control resume failed; continuing local shell adapter"
+                "Goal-lifecycle execution-control resume failed; continuing runtime-host local adapter"
             );
         }
     }
@@ -123,18 +124,20 @@ pub async fn deliver_goal_resume_and_notify_parent(
         output: format!("Goal completed: {description}"),
     };
 
-    if let Some(session) = active_session {
-        // Local channels remain until loop_manager fully subscribes to
-        // execution-control event streams for every parent wait.
-        session.pause_signal.store(false, Ordering::SeqCst);
-        if let Err(error) = session.resume_tx.send(resume_reason).await {
-            warn!(
-                session_id = %session_id,
-                error = %error,
-                "Failed to send runtime resume signal after goal-lifecycle delivery"
-            );
-        }
+    // Runtime-host local channels remain until loop_manager fully subscribes to
+    // execution-control event streams for every parent wait.
+    if !notification_runtime
+        .notify_resume(session_id, resume_reason)
+        .await
+    {
+        warn!(
+            goal_id = %goal_id,
+            session_id = %session_id,
+            "Execution-control runtime-host local notification was unavailable for goal-lifecycle resume"
+        );
+    }
 
+    if let Some(session) = active_session {
         let resumed_payload = serde_json::json!({
             "session_id": session_id,
             "task_id": goal_id.to_string(),

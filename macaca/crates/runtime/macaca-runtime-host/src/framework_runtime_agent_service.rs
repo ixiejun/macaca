@@ -2,12 +2,12 @@
 //!
 //! `ComposedAgentExecutionBackend` injects a [`FrameworkRuntimeAgentPort`].
 //! This module provides the **default production implementation** that:
-//! 1. Delegates framework agent **construction** to a shell [`FrameworkAgentConstructionPort`].
+//! 1. Owns framework agent **construction** through a runtime-host construction service.
 //! 2. Owns the provider-neutral **execution** step (`ConstructedRuntimeAgent::reply_user_prompt`).
 //!
-//! Web/CLI shells therefore no longer implement `FrameworkRuntimeAgentPort` directly;
-//! they only supply construction wiring until `FrameworkRunner` fully migrates to
-//! runtime-host (task 4.3.2).
+//! Web/CLI shells therefore no longer implement `FrameworkRuntimeAgentPort` or
+//! `FrameworkAgentConstructionPort` directly; they only supply lower-level
+//! host materialization wiring behind `FrameworkAgentMaterializationPort`.
 
 use std::sync::Arc;
 
@@ -20,8 +20,8 @@ use tokio::sync::mpsc;
 use tracing::{info, warn};
 
 use crate::agent_execution_ports::{
-    ConstructedRuntimeAgent, FrameworkAgentConstructionPort, FrameworkRuntimeAgentPort,
-    OpaqueExecutionControlHandle,
+    ConstructedRuntimeAgent, FrameworkAgentConstructionPort, FrameworkAgentMaterializationPort,
+    FrameworkRuntimeAgentPort, OpaqueExecutionControlHandle,
 };
 
 /// Provider-neutral reason codes for framework runtime agent audit replay.
@@ -32,14 +32,93 @@ pub const REASON_FRAMEWORK_AGENT_REPLY_COMPLETED: &str =
 pub const REASON_FRAMEWORK_AGENT_REPLY_FAILED: &str =
     "agent_execution.framework_runtime_agent.reply.failed";
 
+/// Runtime-host implementation of [`FrameworkAgentConstructionPort`].
+///
+/// # Design pattern
+///
+/// - **Adapter**: host-local materialization details stay behind
+///   [`FrameworkAgentMaterializationPort`].
+/// - **Decorator**: construction logging and provider-neutral reason codes are
+///   applied before delegating to host-local materialization.
+pub struct RuntimeHostFrameworkAgentConstructionService {
+    materializer: Arc<dyn FrameworkAgentMaterializationPort>,
+    bus_source: String,
+}
+
+impl RuntimeHostFrameworkAgentConstructionService {
+    /// Create a runtime-host construction service from a host materializer.
+    pub fn new(
+        materializer: Arc<dyn FrameworkAgentMaterializationPort>,
+        bus_source: impl Into<String>,
+    ) -> Self {
+        let bus_source = bus_source.into();
+        info!(
+            bus_source = %bus_source,
+            service_id = AGENT_EXECUTION_SERVICE_ID,
+            pattern = "adapter+decorator",
+            "runtime-host framework agent construction service wired"
+        );
+        Self {
+            materializer,
+            bus_source,
+        }
+    }
+}
+
+#[async_trait]
+impl FrameworkAgentConstructionPort for RuntimeHostFrameworkAgentConstructionService {
+    async fn build_runtime_react_agent(
+        &self,
+        command: &AgentExecutionCommand,
+        context_snapshot: &AgentContextSnapshot,
+        agent_event_tx: mpsc::Sender<AgentExecutionEvent>,
+        execution_control: Option<OpaqueExecutionControlHandle>,
+        max_iters: usize,
+        tool_choice: Option<ToolChoice>,
+    ) -> Result<Box<dyn ConstructedRuntimeAgent>, String> {
+        info!(
+            trace_id = %command.trace.trace_id,
+            service_id = AGENT_EXECUTION_SERVICE_ID,
+            target_agent = %command.target_agent,
+            session_id = %command.session_id,
+            bus_source = %self.bus_source,
+            max_iters,
+            has_execution_control = execution_control.is_some(),
+            reason_code = REASON_FRAMEWORK_AGENT_CONSTRUCTED,
+            "runtime-host framework construction service materializing react agent"
+        );
+        self.materializer
+            .build_runtime_react_agent(
+                command,
+                context_snapshot,
+                agent_event_tx,
+                execution_control,
+                max_iters,
+                tool_choice,
+            )
+            .await
+            .map_err(|error| {
+                warn!(
+                    trace_id = %command.trace.trace_id,
+                    service_id = AGENT_EXECUTION_SERVICE_ID,
+                    target_agent = %command.target_agent,
+                    bus_source = %self.bus_source,
+                    error = %error,
+                    "runtime-host framework construction service materialization failed"
+                );
+                error
+            })
+    }
+}
+
 /// Runtime-host implementation of [`FrameworkRuntimeAgentPort`].
 ///
 /// # Design pattern
 ///
-/// - **Template Method**: construction is a hook (`FrameworkAgentConstructionPort`);
-///   reply orchestration is fixed in this type.
-/// - **Adapter**: shells adapt local composition (`AppState`, SSE, middleware) behind
-///   the construction port without owning service semantics.
+/// - **Template Method**: construction is a runtime-host service hook
+///   (`FrameworkAgentConstructionPort`); reply orchestration is fixed here.
+/// - **Adapter**: host-local composition remains behind the materialization port
+///   consumed by the construction service.
 pub struct ServiceBackedFrameworkRuntimeAgentPort {
     construction: Arc<dyn FrameworkAgentConstructionPort>,
     bus_source: String,
@@ -153,8 +232,8 @@ impl FrameworkRuntimeAgentPort for ServiceBackedFrameworkRuntimeAgentPort {
 mod tests {
     use super::*;
     use macaca_proto::{
-        AgentContextBuildCommand, AgentExecutionIntent, AgentExecutionPolicyContext,
-        ApplicationId, TraceContext,
+        AgentContextBuildCommand, AgentExecutionIntent, AgentExecutionPolicyContext, ApplicationId,
+        TraceContext,
     };
 
     /// Stub agent that returns a deterministic string for contract tests.
@@ -272,5 +351,4 @@ mod tests {
 
         assert!(error.contains("construction unavailable"));
     }
-
 }

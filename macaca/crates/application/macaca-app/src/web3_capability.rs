@@ -2,7 +2,7 @@
 //!
 //! Applications can declare that they may need Web3 without instantiating a
 //! provider. The runtime treats this as policy input and capability metadata,
-//! preserving Route C's rule that application framework code must not own
+//! preserving the rule that application framework code must not own
 //! concrete Web3 node, wallet, signing, or transaction implementations.
 
 use std::collections::BTreeMap;

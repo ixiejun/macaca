@@ -14,10 +14,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::{PackageId, PolicyDecision, ServiceCommand, TraceContext};
 
-/// Current Application ABI version introduced by Route C Phase 05.
+/// Current Application ABI version.
 ///
 /// The value is string-backed so future hosts can support semantic versions,
-/// integer revisions, or compatibility aliases without changing this type.
+/// integer revisions, or stable aliases without changing this type.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct ApplicationAbiVersion(String);
 

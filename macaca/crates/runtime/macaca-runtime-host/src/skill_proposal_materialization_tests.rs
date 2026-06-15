@@ -302,7 +302,7 @@ async fn materialization_preview_and_apply_write_skill_md_then_promote_governanc
     assert!(skill_body.contains("Inspect the service-owned evidence"));
     assert!(
         !skill_body.contains("README.md"),
-        "Skill Creator-compatible packages should avoid auxiliary documentation clutter"
+        "Skill Creator packages should avoid auxiliary documentation clutter"
     );
     assert!(
         !serde_json::to_string(&applied)

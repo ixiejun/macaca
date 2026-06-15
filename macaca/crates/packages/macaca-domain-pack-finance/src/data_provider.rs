@@ -24,7 +24,7 @@ use crate::contract::{
 use crate::live_data::{
     build_finance_http_client, crypto_market_output_from_binance, crypto_market_output_from_okx,
     crypto_news_items_from_rss, crypto_okx_instrument, crypto_spot_pair, BinanceTicker24h,
-    CRYPTO_NEWS_RSS_URL, OkxTickerEnvelope,
+    OkxTickerEnvelope, CRYPTO_NEWS_RSS_URL,
 };
 
 /// Deterministic and live finance data provider for the finance domain pack.

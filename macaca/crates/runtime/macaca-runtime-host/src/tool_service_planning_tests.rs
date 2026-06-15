@@ -119,7 +119,7 @@ async fn planning_separates_visible_hidden_policy_and_conflicts() {
 }
 
 #[tokio::test]
-async fn exact_allowed_tools_preserves_compatibility_filtering() {
+async fn exact_allowed_tools_preserves_stable_filtering() {
     let contributor = StaticToolDescriptorContributor::new(
         "fixture-contributor",
         ServiceHealth::Healthy,

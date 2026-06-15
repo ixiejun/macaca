@@ -4,13 +4,13 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use macaca_sdk::memory::{
-    MemoryDeleteRequest, MemoryForgetCommand, MemoryGetCommand, MemoryGetRequest, MemoryScope,
-    MemorySearchRequest, SharedTombstoneRegistry,
+use macaca_host_composition::memory::SharedTombstoneRegistry;
+use macaca_host_composition::tools::{Tool, ToolCommand};
+use macaca_proto::{
+    ApplicationId, MacacaError, MacacaResult, MemoryForgetCommand, MemoryGetCommand, MemoryId,
+    MemoryRecallCommand, MemoryScope, TraceContext,
 };
-use macaca_proto::{ApplicationId, MacacaError, MacacaResult, MemoryId, TraceContext};
 use macaca_sdk::SystemMemoryClient;
-use macaca_sdk::tools::Tool;
 use uuid::Uuid;
 
 /// Build a trace context for model-visible memory tool calls.
@@ -28,7 +28,7 @@ fn tool_trace(session_id: Option<&str>, agent_name: Option<&str>) -> TraceContex
 
 /// Service-backed read-only workspace memory search tool.
 ///
-/// This is the primary Route C S5 implementation.  It uses `SystemMemoryClient`
+/// This is the primary protocol service implementation.  It uses `SystemMemoryClient`
 /// so Web can swap memory backends through ServiceRuntime without changing the
 /// model-visible tool contract.
 pub(crate) struct ServiceWorkspaceMemorySearchTool {
@@ -49,17 +49,18 @@ impl Tool for ServiceWorkspaceMemorySearchTool {
         "Search long-term workspace memory read-only by text query (bounded)."
     }
 
-    fn parameters_schema(&self) -> serde_json::Value {
+    fn tool_schema(&self) -> serde_json::Value {
         memory_search_schema()
     }
 
-    async fn execute(&self, input: serde_json::Value) -> MacacaResult<serde_json::Value> {
+    async fn invoke(&self, command: ToolCommand) -> MacacaResult<serde_json::Value> {
+        let input = command.input;
         let query = input
             .get("query")
             .and_then(|v| v.as_str())
             .ok_or_else(|| MacacaError::Agent("memory_search requires 'query'".into()))?;
         let limit = bounded_limit(&input, self.default_limit);
-        let command = macaca_sdk::memory::MemoryRecallCommand::new(
+        let command = MemoryRecallCommand::new(
             self.scope.clone(),
             tool_trace(self.session_id.as_deref(), Some(&self.agent_name)),
             query.to_string(),
@@ -88,11 +89,12 @@ impl Tool for ServiceWorkspaceMemoryGetTool {
         "Retrieve a memory entry read-only by id (UUID)."
     }
 
-    fn parameters_schema(&self) -> serde_json::Value {
+    fn tool_schema(&self) -> serde_json::Value {
         memory_get_schema()
     }
 
-    async fn execute(&self, input: serde_json::Value) -> MacacaResult<serde_json::Value> {
+    async fn invoke(&self, command: ToolCommand) -> MacacaResult<serde_json::Value> {
+        let input = command.input;
         let mid = parse_memory_id(&input, "memory_get")?;
         let command = MemoryGetCommand {
             scope: self.scope.clone(),
@@ -127,11 +129,12 @@ impl Tool for ServiceWorkspaceMemoryForgetTool {
         "Delete a workspace memory row by UUID and mark it tombstoned for digest/evidence suppression."
     }
 
-    fn parameters_schema(&self) -> serde_json::Value {
+    fn tool_schema(&self) -> serde_json::Value {
         memory_forget_schema()
     }
 
-    async fn execute(&self, input: serde_json::Value) -> MacacaResult<serde_json::Value> {
+    async fn invoke(&self, command: ToolCommand) -> MacacaResult<serde_json::Value> {
+        let input = command.input;
         let mid = parse_memory_id(&input, "memory_forget")?;
         self.tombstones.record(mid).await;
         self.client
@@ -140,119 +143,6 @@ impl Tool for ServiceWorkspaceMemoryForgetTool {
                 trace: tool_trace(self.session_id.as_deref(), Some(&self.agent_name)),
                 id: mid,
                 policy: Default::default(),
-            })
-            .await?;
-        Ok(serde_json::json!({ "deleted": true, "id": mid.0.to_string() }))
-    }
-}
-
-#[deprecated(note = "Use ServiceWorkspaceMemorySearchTool for new memory tool registrations")]
-pub(crate) struct WorkspaceMemorySearchTool {
-    pub(crate) runtime: Arc<macaca_sdk::memory::FabricMemoryRuntime>,
-    pub(crate) scope: MemoryScope,
-    pub(crate) default_limit: u32,
-}
-
-#[allow(deprecated)]
-#[async_trait]
-impl Tool for WorkspaceMemorySearchTool {
-    fn name(&self) -> &str {
-        "memory_search"
-    }
-
-    fn description(&self) -> &str {
-        "Search long-term workspace memory read-only by text query (bounded)."
-    }
-
-    fn parameters_schema(&self) -> serde_json::Value {
-        memory_search_schema()
-    }
-
-    async fn execute(&self, input: serde_json::Value) -> MacacaResult<serde_json::Value> {
-        let query = input
-            .get("query")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| MacacaError::Agent("memory_search requires 'query'".into()))?;
-        let limit = bounded_limit(&input, self.default_limit);
-        let results = self
-            .runtime
-            .search(MemorySearchRequest::new(
-                self.scope.clone(),
-                query.to_string(),
-                limit,
-            ))
-            .await?;
-        Ok(serde_json::json!({ "entries": simplify_entries(&results) }))
-    }
-}
-
-#[deprecated(note = "Use ServiceWorkspaceMemoryGetTool for new memory tool registrations")]
-pub(crate) struct WorkspaceMemoryGetTool {
-    pub(crate) runtime: Arc<macaca_sdk::memory::FabricMemoryRuntime>,
-    pub(crate) scope: MemoryScope,
-}
-
-#[allow(deprecated)]
-#[async_trait]
-impl Tool for WorkspaceMemoryGetTool {
-    fn name(&self) -> &str {
-        "memory_get"
-    }
-
-    fn description(&self) -> &str {
-        "Retrieve a memory entry read-only by id (UUID)."
-    }
-
-    fn parameters_schema(&self) -> serde_json::Value {
-        memory_get_schema()
-    }
-
-    async fn execute(&self, input: serde_json::Value) -> MacacaResult<serde_json::Value> {
-        let mid = parse_memory_id(&input, "memory_get")?;
-        let Some(entry) = self
-            .runtime
-            .get(MemoryGetRequest {
-                scope: self.scope.clone(),
-                id: mid,
-            })
-            .await?
-        else {
-            return Ok(serde_json::json!({ "found": false }));
-        };
-        Ok(simplify_entry_with_found(&entry))
-    }
-}
-
-/// Deletes workspace memory row by id **and** records a tombstone for digest/evidence filtering.
-#[deprecated(note = "Use ServiceWorkspaceMemoryForgetTool for new memory tool registrations")]
-pub(crate) struct WorkspaceMemoryForgetTool {
-    pub(crate) runtime: Arc<macaca_sdk::memory::FabricMemoryRuntime>,
-    pub(crate) scope: MemoryScope,
-    pub(crate) tombstones: Arc<SharedTombstoneRegistry>,
-}
-
-#[allow(deprecated)]
-#[async_trait]
-impl Tool for WorkspaceMemoryForgetTool {
-    fn name(&self) -> &str {
-        "memory_forget"
-    }
-
-    fn description(&self) -> &str {
-        "Delete a workspace memory row by UUID and mark it tombstoned for digest/evidence suppression."
-    }
-
-    fn parameters_schema(&self) -> serde_json::Value {
-        memory_forget_schema()
-    }
-
-    async fn execute(&self, input: serde_json::Value) -> MacacaResult<serde_json::Value> {
-        let mid = parse_memory_id(&input, "memory_forget")?;
-        self.tombstones.record(mid).await;
-        self.runtime
-            .delete(MemoryDeleteRequest {
-                scope: self.scope.clone(),
-                id: mid,
             })
             .await?;
         Ok(serde_json::json!({ "deleted": true, "id": mid.0.to_string() }))
@@ -343,100 +233,4 @@ fn memory_forget_schema() -> serde_json::Value {
 #[must_use]
 pub(crate) fn workspace_tool_scope(application_id: ApplicationId) -> MemoryScope {
     MemoryScope::project_shared(application_id, "workspace")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use async_trait::async_trait;
-    use chrono::Utc;
-    use macaca_sdk::memory::{
-        ActiveRecallRequest, ActiveRecallResult, KnowledgeCompileCapability,
-        KnowledgeCompileRequest, KnowledgeCompileResult, MemoryRuntimeFacade, MemoryRuntimeStatus,
-    };
-    use macaca_proto::{MemoryEntry, MemoryLayer};
-
-    struct FakeRuntime {
-        entry: MemoryEntry,
-    }
-
-    #[async_trait]
-    impl MemoryRuntimeFacade for FakeRuntime {
-        async fn remember(
-            &self,
-            _request: macaca_sdk::memory::MemoryWriteRequest,
-        ) -> MacacaResult<MemoryId> {
-            Ok(self.entry.id)
-        }
-
-        async fn search(&self, _request: MemorySearchRequest) -> MacacaResult<Vec<MemoryEntry>> {
-            Ok(vec![self.entry.clone()])
-        }
-
-        async fn get(&self, request: MemoryGetRequest) -> MacacaResult<Option<MemoryEntry>> {
-            Ok((request.id == self.entry.id).then(|| self.entry.clone()))
-        }
-
-        async fn delete(&self, _request: MemoryDeleteRequest) -> MacacaResult<()> {
-            Ok(())
-        }
-
-        async fn active_recall(
-            &self,
-            _request: ActiveRecallRequest,
-        ) -> MacacaResult<ActiveRecallResult> {
-            Ok(ActiveRecallResult {
-                provider_id: "fake".into(),
-                candidates: Vec::new(),
-                selected: vec![self.entry.clone()],
-                latency_ms: 0,
-                diagnostics: Vec::new(),
-            })
-        }
-
-        async fn compile_knowledge(
-            &self,
-            request: KnowledgeCompileRequest,
-        ) -> MacacaResult<KnowledgeCompileResult> {
-            Ok(macaca_sdk::memory::KnowledgeCompiler::default().compile(request))
-        }
-
-        async fn status(&self) -> MemoryRuntimeStatus {
-            MemoryRuntimeStatus::default()
-        }
-    }
-
-    fn runtime_with_entry(content: &str) -> Arc<macaca_sdk::memory::FabricMemoryRuntime> {
-        Arc::new(macaca_sdk::memory::FabricMemoryRuntime::new(Arc::new(FakeRuntime {
-            entry: MemoryEntry {
-                id: MemoryId::new(),
-                layer: MemoryLayer::Vector,
-                content: content.into(),
-                metadata: serde_json::Value::Null,
-                agent_id: None,
-                created_at: Utc::now(),
-                expires_at: None,
-            },
-        })))
-    }
-
-    #[allow(deprecated)]
-    #[tokio::test]
-    async fn web_memory_runtime_search_tool_uses_runtime_facade() {
-        let tool = WorkspaceMemorySearchTool {
-            runtime: runtime_with_entry("runtime-backed search row"),
-            scope: workspace_tool_scope(ApplicationId::new()),
-            default_limit: 4,
-        };
-
-        let output = tool
-            .execute(serde_json::json!({ "query": "runtime-backed" }))
-            .await
-            .unwrap();
-
-        assert_eq!(
-            output["entries"][0]["content"],
-            serde_json::Value::String("runtime-backed search row".into())
-        );
-    }
 }

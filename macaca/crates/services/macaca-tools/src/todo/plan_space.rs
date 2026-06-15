@@ -11,7 +11,7 @@ use macaca_proto::MacacaResult;
 use macaca_task::TaskSpace;
 use serde_json::{json, Value};
 
-use crate::tool::Tool;
+use crate::tool::{Tool, ToolCommand};
 
 use super::callbacks::{OnGoalCreated, OnGoalRecorded, OnTodoReviewed};
 
@@ -30,7 +30,7 @@ impl Tool for ReviewTodoTool {
     fn description(&self) -> &str {
         "Review a submitted task. task_id must be a UUID from create_todo or list_agent_todos, not a title/slug."
     }
-    fn parameters_schema(&self) -> Value {
+    fn tool_schema(&self) -> Value {
         json!({
             "type": "object",
             "properties": {
@@ -45,7 +45,8 @@ impl Tool for ReviewTodoTool {
             "required": ["task_id", "agent", "passed", "feedback"]
         })
     }
-    async fn execute(&self, input: Value) -> MacacaResult<Value> {
+    async fn invoke(&self, command: ToolCommand) -> MacacaResult<Value> {
+        let input = command.input;
         let task_id_str = input["task_id"].as_str().unwrap_or_default();
         let task_id = macaca_proto::TaskId(
             uuid::Uuid::parse_str(task_id_str)
@@ -101,7 +102,7 @@ impl Tool for CreateGoalTool {
     fn description(&self) -> &str {
         "Create a high-level project goal. The Plan Agent will automatically decompose it into concrete tasks and assign them to appropriate agents. Use this for complex multi-step work."
     }
-    fn parameters_schema(&self) -> Value {
+    fn tool_schema(&self) -> Value {
         json!({
             "type": "object",
             "properties": {
@@ -113,7 +114,8 @@ impl Tool for CreateGoalTool {
             "required": ["description"]
         })
     }
-    async fn execute(&self, input: Value) -> MacacaResult<Value> {
+    async fn invoke(&self, command: ToolCommand) -> MacacaResult<Value> {
+        let input = command.input;
         let description = input["description"].as_str().ok_or_else(|| {
             macaca_proto::MacacaError::Task("Missing 'description' parameter".into())
         })?;
@@ -151,7 +153,7 @@ impl Tool for ReassignTaskTool {
     fn description(&self) -> &str {
         "Reassign a task from one agent to another. The task status is reset to Pending so the new agent can claim it. Use when an agent cannot complete a task or the task was misrouted."
     }
-    fn parameters_schema(&self) -> Value {
+    fn tool_schema(&self) -> Value {
         json!({
             "type": "object",
             "properties": {
@@ -162,7 +164,8 @@ impl Tool for ReassignTaskTool {
             "required": ["task_id", "current_agent", "new_agent"]
         })
     }
-    async fn execute(&self, input: Value) -> MacacaResult<Value> {
+    async fn invoke(&self, command: ToolCommand) -> MacacaResult<Value> {
+        let input = command.input;
         let task_id_str = input["task_id"]
             .as_str()
             .ok_or_else(|| macaca_proto::MacacaError::Task("Missing 'task_id'".into()))?;
@@ -217,10 +220,10 @@ impl Tool for CheckTodoProgressTool {
     fn description(&self) -> &str {
         "Check the overall progress of all tasks across all agents. When pending_review > 0, the response includes `pending_review_tasks` with `task_id` (UUID) for each task — use these with `review_todo`."
     }
-    fn parameters_schema(&self) -> Value {
+    fn tool_schema(&self) -> Value {
         json!({ "type": "object", "properties": {}, "required": [] })
     }
-    async fn execute(&self, _input: Value) -> MacacaResult<Value> {
+    async fn invoke(&self, _command: ToolCommand) -> MacacaResult<Value> {
         let p = self.space.overall_progress().await;
         let reviews = self.space.pending_reviews().await;
         let pending_review_tasks: Vec<Value> = reviews

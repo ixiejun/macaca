@@ -200,7 +200,7 @@ mod tests {
     }
 
     fn compose_ctx() -> ContextComposeContext<'static> {
-        let input = Box::leak(Box::new(ContextAssembleInput::legacy(
+        let input = Box::leak(Box::new(ContextAssembleInput::unscoped(
             "agent",
             "model",
             vec![LlmMessage::user("find memory")],

@@ -1,6 +1,6 @@
 //! Local typed service transport for the service bus.
 //!
-//! This module keeps Route C Phase 03 local-first and typed-first.  Local
+//! This module keeps the service bus local-first and typed-first. Local
 //! dispatch uses Rust trait objects and `ServiceEnvelope` values directly
 //! instead of forcing every hot-path service call through JSON or a wire
 //! protocol.  Real child-process, MCP, HTTP, and signed remote A2A transports

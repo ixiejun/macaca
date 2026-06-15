@@ -11,11 +11,12 @@ use macaca_proto::{
     TraceSchemaRef, WasmExecutionProfile, WasmRuntimeArtifactRef, WasmRuntimeSessionRequest,
 };
 
-use crate::{
-    ServiceProviderInstance, ServiceRuntime, StaticServiceProviderFactory,
-};
+use crate::{ServiceProviderInstance, ServiceRuntime, StaticServiceProviderFactory};
 
-pub(super) async fn register_mock_service(runtime: &ServiceRuntime, service_id: &str) -> KernelServiceId {
+pub(super) async fn register_mock_service(
+    runtime: &ServiceRuntime,
+    service_id: &str,
+) -> KernelServiceId {
     let descriptor = ServiceDescriptor::new(
         KernelServiceId::new(service_id),
         ServiceType::new("test.service"),
@@ -41,7 +42,10 @@ pub(super) async fn register_mock_service(runtime: &ServiceRuntime, service_id: 
     service_id
 }
 
-pub(super) fn traced_request(trace_id: &str, artifact_path: &std::path::Path) -> WasmRuntimeSessionRequest {
+pub(super) fn traced_request(
+    trace_id: &str,
+    artifact_path: &std::path::Path,
+) -> WasmRuntimeSessionRequest {
     WasmRuntimeSessionRequest::new(
         TraceContext::new(trace_id),
         "fixture.application",
@@ -67,7 +71,9 @@ pub(super) fn component_fixture_bytes() -> &'static [u8] {
     b"\0asm\x01\0\0\0macaca:component-model:v1\0export=app:start\0wit=macaca:application/runtime@1"
 }
 
-pub(super) fn component_fixture_bytes_with_host_command(command: &ApplicationHostCommand) -> Vec<u8> {
+pub(super) fn component_fixture_bytes_with_host_command(
+    command: &ApplicationHostCommand,
+) -> Vec<u8> {
     let encoded = serde_json::to_string(command).unwrap();
     format!(
         "\0asm\x01\0\0\0macaca:component-model:v1\0export=app:start\0wit=macaca:application/runtime@1\0host-command={encoded}\0"
@@ -85,7 +91,9 @@ pub(super) fn component_fixture_bytes_with_duplicate_host_command(
     .into_bytes()
 }
 
-pub(super) fn component_fixture_bytes_with_host_commands(commands: &[ApplicationHostCommand]) -> Vec<u8> {
+pub(super) fn component_fixture_bytes_with_host_commands(
+    commands: &[ApplicationHostCommand],
+) -> Vec<u8> {
     let encoded = commands
         .iter()
         .map(|command| format!("host-command={}", serde_json::to_string(command).unwrap()))

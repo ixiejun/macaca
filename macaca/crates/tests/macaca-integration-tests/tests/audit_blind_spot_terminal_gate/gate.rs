@@ -50,7 +50,8 @@ const REQUIRED_ROUTER_MARKERS: &[&str] = &[
 ];
 
 /// Files allowed to mention `audit_sink: None` (builder default only).
-const AUDIT_SINK_NONE_ALLOWLIST: &[&str] = &["crates/runtime/macaca-runtime-host/src/service_router.rs"];
+const AUDIT_SINK_NONE_ALLOWLIST: &[&str] =
+    &["crates/runtime/macaca-runtime-host/src/service_router.rs"];
 
 /// Marker substrings that indicate an intentional audit bypass in production code.
 const FORBIDDEN_BYPASS_MARKERS: &[&str] = &[
@@ -153,9 +154,10 @@ fn assert_replay_command_surface_present(workspace: &Path) {
         );
     }
 
-    let provider = std::fs::read_to_string(workspace.join(
-        "crates/runtime/macaca-runtime-host/src/service_call_audit_service_provider.rs",
-    ))
+    let provider = std::fs::read_to_string(
+        workspace
+            .join("crates/runtime/macaca-runtime-host/src/service_call_audit_service_provider.rs"),
+    )
     .expect("service_call_audit_service_provider.rs should be readable");
     for marker in REQUIRED_REPLAY_COMMAND_MARKERS {
         assert!(
@@ -164,10 +166,9 @@ fn assert_replay_command_surface_present(workspace: &Path) {
         );
     }
 
-    let lib = std::fs::read_to_string(
-        workspace.join("crates/runtime/macaca-runtime-host/src/lib.rs"),
-    )
-    .expect("macaca-runtime-host lib.rs should be readable");
+    let lib =
+        std::fs::read_to_string(workspace.join("crates/runtime/macaca-runtime-host/src/lib.rs"))
+            .expect("macaca-runtime-host lib.rs should be readable");
     for module in [
         "pub mod service_call_audit",
         "pub mod service_call_audit_service_provider",
@@ -236,7 +237,8 @@ fn assert_no_unaudited_service_router_construction(workspace: &Path) {
             ));
         }
 
-        if content.contains("audit_sink: None") && !AUDIT_SINK_NONE_ALLOWLIST.contains(&relative.as_str())
+        if content.contains("audit_sink: None")
+            && !AUDIT_SINK_NONE_ALLOWLIST.contains(&relative.as_str())
         {
             violations.push(format!(
                 "{relative}: audit_sink: None outside builder default — replay would be blind"
@@ -272,7 +274,9 @@ fn run_crate_test(workspace: &Path, package: &str, filter: &str) {
         .args(["test", "-p", package, filter, "--", "--nocapture"])
         .current_dir(workspace)
         .output()
-        .unwrap_or_else(|error| panic!("failed to spawn cargo test -p {package} {filter}: {error}"));
+        .unwrap_or_else(|error| {
+            panic!("failed to spawn cargo test -p {package} {filter}: {error}")
+        });
 
     if output.status.success() {
         eprintln!(
@@ -299,11 +303,7 @@ pub fn assert_audit_blind_spot_terminal_state() {
     assert_no_unaudited_service_router_construction(&workspace);
 
     for invocation in DOWNSTREAM_INVOCATIONS {
-        run_crate_test(
-            workspace.as_path(),
-            invocation.package,
-            invocation.filter,
-        );
+        run_crate_test(workspace.as_path(), invocation.package, invocation.filter);
     }
 
     eprintln!("audit_blind_spot_terminal_gate event=terminal_pass");

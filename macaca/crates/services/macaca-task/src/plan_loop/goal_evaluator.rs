@@ -1,50 +1,26 @@
 //! Goal quality evaluation helpers (Strategy + Template Method).
 //!
 //! `GoalEvaluator::build_prompt` produces provider-neutral evaluation prompts.
-//! Runtime callers should execute prompts through the traced framework agent path;
-//! the deprecated direct LLM `evaluate` path remains for legacy compatibility only.
+//! Runtime callers execute prompts through the traced framework agent path and
+//! feed the response back into `GoalEvaluator::parse_eval_response`.
 
-use std::sync::Arc;
-
-use macaca_proto::types::{LlmMessage, LlmOptions};
+use macaca_proto::GoalEvaluationResult;
 
 use super::config::TaskSummary;
 
 // ── GoalEvaluator ─────────────────────────────────────────────────────────────
 
 /// Result of evaluating whether a completed goal meets quality standards.
-#[derive(Debug, Clone)]
-pub enum GoalEvaluation {
-    /// Goal is complete and satisfactory.
-    Satisfied { summary: String },
-    /// Goal needs additional work — new tasks suggested.
-    NeedsMoreWork {
-        reason: String,
-        suggestions: Vec<String>,
-    },
-}
+pub type GoalEvaluation = GoalEvaluationResult;
 
 /// Pure goal evaluation prompt/parser helper.
 ///
-/// Runtime model execution should happen through the framework agent/model path
-/// owned by the application runtime. The deprecated direct LLM API remains only
-/// for compatibility with older callers.
-pub struct GoalEvaluator {
-    llm: Arc<dyn macaca_llm::LlmProvider>,
-    model: String,
-}
+/// This type intentionally has no provider state. Model execution belongs to the
+/// traced framework/model path so evaluation remains replayable and service-owned
+/// rather than a direct LLM side effect inside the task service.
+pub struct GoalEvaluator;
 
 impl GoalEvaluator {
-    #[deprecated(
-        note = "Use GoalEvaluator::build_prompt + framework agent/model execution + parse_eval_response"
-    )]
-    pub fn new(llm: Arc<dyn macaca_llm::LlmProvider>, model: impl Into<String>) -> Self {
-        Self {
-            llm,
-            model: model.into(),
-        }
-    }
-
     /// Build the goal evaluation prompt. The caller is responsible for running
     /// this prompt through the traced framework agent/model path.
     pub fn build_prompt(
@@ -87,41 +63,8 @@ If there are gaps or quality issues, set satisfied=false and provide suggestions
         )
     }
 
-    /// Evaluate whether a goal's tasks collectively satisfy the goal.
-    ///
-    /// Deprecated: this direct LLM path bypasses framework trace/model routing.
-    /// Runtime callers should use `build_prompt`, execute through a traced
-    /// framework agent/model, then call `parse_eval_response`.
-    #[deprecated(
-        note = "Use GoalEvaluator::build_prompt + framework agent/model execution + parse_eval_response"
-    )]
-    pub async fn evaluate(
-        &self,
-        goal_description: &str,
-        task_summaries: &[TaskSummary],
-        completed: usize,
-        failed: usize,
-    ) -> Result<GoalEvaluation, String> {
-        let prompt = Self::build_prompt(goal_description, task_summaries, completed, failed);
-
-        let messages = vec![LlmMessage::user(&prompt)];
-        let options = LlmOptions {
-            model: self.model.clone(),
-            temperature: Some(0.3),
-            ..Default::default()
-        };
-
-        let response = self
-            .llm
-            .chat(messages, &options)
-            .await
-            .map_err(|e| format!("Goal evaluation LLM call failed: {}", e))?;
-
-        Ok(Self::parse_eval_response(&response.content))
-    }
-
     /// Parse the LLM evaluation response. Returns `Satisfied` on any parse failure.
-    pub fn parse_eval_response(content: &str) -> GoalEvaluation {
+    pub fn parse_eval_response(content: &str) -> GoalEvaluationResult {
         let content = content.trim();
         let json_str = if content.starts_with("```") {
             content
@@ -146,11 +89,11 @@ If there are gaps or quality issues, set satisfied=false and provide suggestions
         match serde_json::from_str::<EvalResponse>(json_str) {
             Ok(eval) => {
                 if eval.satisfied {
-                    GoalEvaluation::Satisfied {
+                    GoalEvaluationResult::Satisfied {
                         summary: eval.summary,
                     }
                 } else {
-                    GoalEvaluation::NeedsMoreWork {
+                    GoalEvaluationResult::NeedsMoreWork {
                         reason: eval.summary,
                         suggestions: eval.suggestions,
                     }
@@ -158,7 +101,7 @@ If there are gaps or quality issues, set satisfied=false and provide suggestions
             }
             Err(_) => {
                 // Conservative fallback: assume satisfied so we don't block
-                GoalEvaluation::Satisfied {
+                GoalEvaluationResult::Satisfied {
                     summary: "Evaluation completed (parsing fallback)".into(),
                 }
             }

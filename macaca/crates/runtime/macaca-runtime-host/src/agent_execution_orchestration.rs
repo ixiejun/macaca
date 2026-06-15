@@ -256,7 +256,7 @@ pub fn extract_single_shell_fence(body: &str) -> Option<String> {
 /// Production hosts should prefer the service-backed resolver; this helper
 /// exists for unit tests and offline policy admission checks.  Application
 /// defaults must come from manifest projection (`ApplicationManifestV1`) rather
-/// than hard-coded OS compatibility branches.
+/// than hard-coded OS policy branches.
 #[must_use]
 pub fn resolve_execution_control_policy_local(
     command: &AgentExecutionCommand,
@@ -431,7 +431,7 @@ mod tests {
         let resolution = resolve_execution_control_policy_local(&command, Some(&app_default));
 
         assert_eq!(resolution.status, ExecutionControlResolutionStatus::Enabled);
-        assert!(resolution.metadata.get("compatibility").is_none());
+        assert!(resolution.metadata.get("runtime_version").is_none());
     }
 
     #[test]

@@ -1,6 +1,6 @@
 //! Provider-neutral tool metadata shared by Driver, Skill, and MCP services.
 //!
-//! Route C serviceization keeps each capability service responsible for its
+//! Protocol serviceization keeps each capability service responsible for its
 //! own lifecycle and invocation, but upper layers still need one safe shape for
 //! model-visible tool metadata.  The DTOs in this module are that common
 //! boundary: they describe a tool without exposing provider credentials,

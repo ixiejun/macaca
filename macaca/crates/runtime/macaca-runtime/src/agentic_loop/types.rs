@@ -31,8 +31,8 @@ impl Default for RuntimeConfig {
         Self {
             max_iterations: 25,
             tool_timeout: Duration::from_secs(60),
-            context_engine: "legacy".into(),
-            context_fallback_engine: "legacy".into(),
+            context_engine: "passthrough".into(),
+            context_fallback_engine: "passthrough".into(),
             context_budget: ContextBudget::default(),
             context: ContextConfig::default(),
         }

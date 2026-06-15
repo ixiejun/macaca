@@ -1,8 +1,7 @@
 //! SDK package client boundary for shell-facing package inspection.
 //!
-//! S9 upgrades the package client from an empty compatibility shell to a thin
-//! Store-service adapter.  The legacy command/result shape remains stable for
-//! existing Web/CLI callers while service-backed implementations delegate to
+//! This package client is a thin Store-service adapter.  The command/result
+//! shape remains stable for existing Web/CLI callers while service-backed implementations delegate to
 //! `SystemStoreClient` instead of reading package internals directly.
 
 use async_trait::async_trait;
@@ -78,9 +77,9 @@ impl SystemPackageClient for EmptySystemPackageClient {
 
 /// Package client backed by the focused Store Service client.
 ///
-/// This Adapter preserves the older inspection API while moving real package
+/// This Adapter preserves the stable inspection API while moving real package
 /// metadata reads behind Store Service.  It intentionally returns only package
-/// display strings because the legacy result type was minimal; callers that
+/// display strings because the shell-facing result type is intentionally minimal; callers that
 /// need full Store metadata should use `SystemStoreClient` directly.
 pub struct StoreBackedSystemPackageClient<S> {
     store: S,

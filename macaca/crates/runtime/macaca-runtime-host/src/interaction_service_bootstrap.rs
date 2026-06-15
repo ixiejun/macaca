@@ -23,8 +23,8 @@ use crate::{
 /// The persistence backend is injected so Web, CLI, tests, and future gateway
 /// hosts can choose their storage policy outside this service.  When an
 /// `EventLog` is supplied, the provider mirrors sanitized lifecycle events to
-/// the existing session replay path, preserving compatibility while the new
-/// ledger becomes the source of truth for Thread/Turn/Item records.
+/// the session replay path while the ledger remains the source of truth for
+/// Thread/Turn/Item records.
 pub async fn bootstrap_interaction_service(
     runtime: Arc<ServiceRuntime>,
     persist_backend: Arc<dyn PersistBackend>,

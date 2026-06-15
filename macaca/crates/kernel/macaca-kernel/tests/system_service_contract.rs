@@ -125,7 +125,8 @@ fn kernel_trace_service_descriptor_exports_provider_neutral_contract() {
     assert!(!descriptor.capabilities.is_empty());
     assert!(!descriptor.supported_scopes.is_empty());
     assert_eq!(descriptor.health, ServiceHealth::Healthy);
-    assert!(descriptor.capabilities.iter().any(|cap| {
-        cap.id == CapabilityId::new("capability.trace.emit")
-    }));
+    assert!(descriptor
+        .capabilities
+        .iter()
+        .any(|cap| { cap.id == CapabilityId::new("capability.trace.emit") }));
 }

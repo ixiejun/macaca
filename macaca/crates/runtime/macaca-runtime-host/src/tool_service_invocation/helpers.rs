@@ -108,7 +108,9 @@ pub(crate) fn backend_tool_name(descriptor: &IndustrialToolDescriptor) -> Macaca
 }
 
 /// Parse MCP lifecycle scope from descriptor metadata.
-pub(crate) fn lifecycle(descriptor: &IndustrialToolDescriptor) -> MacacaResult<McpServiceLifecycleScope> {
+pub(crate) fn lifecycle(
+    descriptor: &IndustrialToolDescriptor,
+) -> MacacaResult<McpServiceLifecycleScope> {
     match descriptor
         .base_descriptor
         .metadata

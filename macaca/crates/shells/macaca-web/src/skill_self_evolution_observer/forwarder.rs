@@ -2,9 +2,8 @@
 
 use std::sync::Arc;
 
-use macaca_proto::AgentExecutionResult;
-use macaca_sdk::runtime_host::executor::TaskResult;
-use macaca_sdk::skill::SkillExperienceProposalCommand;
+use macaca_host_composition::runtime_host::SkillExperienceProposalCommand;
+use macaca_proto::{AgentExecutionResult, TaskResult};
 
 use crate::state::AppState;
 

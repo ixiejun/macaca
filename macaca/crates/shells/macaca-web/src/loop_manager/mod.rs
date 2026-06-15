@@ -15,10 +15,10 @@ mod plan_event_goal_lifecycle;
 mod plan_event_goal_ready;
 mod plan_event_handlers;
 mod plan_loop_orchestrator;
-mod worker_loop_orchestrator;
 mod planner_helpers;
 mod sse_channel_adapter;
 mod worker_execution_adapter;
+mod worker_loop_orchestrator;
 
 #[cfg(test)]
 pub(crate) mod contract_source;

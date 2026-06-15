@@ -1,7 +1,7 @@
 //! Package descriptor hooks for software drivers.
 //!
 //! Driver manifests already describe driver identity and capabilities.  This
-//! adapter maps that metadata into Route C Package Manifest v0 without
+//! adapter maps that metadata into Package Manifest v0 without
 //! changing dynamic loading, built-in drivers, registry behavior, or sessions.
 
 use macaca_proto::{

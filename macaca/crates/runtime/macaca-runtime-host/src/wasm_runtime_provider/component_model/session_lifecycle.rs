@@ -63,14 +63,14 @@ impl ComponentModelWasmExecutionSessionLifecycle for ComponentModelWasmExecution
         &self,
         request: WasmRestoreRequest,
     ) -> Result<WasmRestoreReport, ApplicationAbiError> {
-        let compatible = request.checkpoint.artifact == self.request.artifact;
+        let abi_matches = request.checkpoint.artifact == self.request.artifact;
         Ok(WasmRestoreReport {
-            status: if compatible {
+            status: if abi_matches {
                 WasmLifecycleOperationStatus::Completed
             } else {
                 WasmLifecycleOperationStatus::Rejected
             },
-            reason_code: if compatible {
+            reason_code: if abi_matches {
                 "completed"
             } else {
                 "abi_mismatch"
@@ -87,14 +87,14 @@ impl ComponentModelWasmExecutionSessionLifecycle for ComponentModelWasmExecution
         &self,
         request: WasmUpgradeRequest,
     ) -> Result<WasmUpgradeReport, ApplicationAbiError> {
-        let compatible = request.target_abi_version == ApplicationAbiVersion::v0();
+        let abi_matches = request.target_abi_version == ApplicationAbiVersion::v0();
         Ok(WasmUpgradeReport {
-            status: if compatible {
+            status: if abi_matches {
                 WasmLifecycleOperationStatus::Completed
             } else {
                 WasmLifecycleOperationStatus::Rejected
             },
-            reason_code: if compatible {
+            reason_code: if abi_matches {
                 "completed"
             } else {
                 "abi_mismatch"
@@ -108,7 +108,7 @@ impl ComponentModelWasmExecutionSessionLifecycle for ComponentModelWasmExecution
                 .chars()
                 .take(12)
                 .collect(),
-            abi_compatible: compatible,
+            abi_matches,
             trace: request.trace,
             metadata: Default::default(),
         })

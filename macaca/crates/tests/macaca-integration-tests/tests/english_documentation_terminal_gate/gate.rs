@@ -194,8 +194,6 @@ pub fn assert_english_documentation_terminal_state() {
         assert_file_has_module_documentation(&workspace, path);
     }
 
-    eprintln!(
-        "english_documentation_terminal_gate event=scan_pass files={file_count}"
-    );
+    eprintln!("english_documentation_terminal_gate event=scan_pass files={file_count}");
     eprintln!("english_documentation_terminal_gate event=terminal_pass");
 }

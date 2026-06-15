@@ -1,10 +1,10 @@
-//! Baseline allowlist for `macaca-web` workspace dependency migration debt (P5 §4.4.4).
+//! Baseline exception inventory for `macaca-web` workspace dependency debt (P5 §4.4.4).
 //!
 //! Terminal state (§9.4): `macaca-web` depends only on `macaca-proto` and `macaca-sdk`
 //! among workspace members. The frozen debt list is empty — any new direct workspace
 //! edge on `macaca-web` fails CI immediately.
 
-/// One row of web-shell workspace dependency migration debt.
+/// One row of web-shell workspace dependency debt.
 pub struct WebShellDependencyDebt {
     /// Workspace crate name (`macaca-*`).
     pub crate_name: &'static str,

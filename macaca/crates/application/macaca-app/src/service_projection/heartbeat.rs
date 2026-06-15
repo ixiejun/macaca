@@ -20,7 +20,7 @@ use macaca_proto::{
 use tracing::info;
 
 use crate::consumption::app_entry_agent_name;
-use crate::manifest_v1::{LegacyAppManifestProjection, YamlApplicationManifestAdapter};
+use crate::manifest_v1::{YamlApplicationManifestAdapter, YamlApplicationManifestProjection};
 use crate::model::{AgentSource, AppManifest, AppStatus};
 
 use super::support::{agent_name, sanitize_heartbeat_agent_metadata};
@@ -133,4 +133,3 @@ fn heartbeat_agent_token(agent_name: &str) -> String {
         token.into()
     }
 }
-

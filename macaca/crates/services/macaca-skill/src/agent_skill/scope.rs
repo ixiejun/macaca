@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Source scope for an AgentSkills-compatible knowledge skill.
+/// Source scope for an AgentSkills-format knowledge skill.
 ///
 /// Lower priority value means higher precedence when duplicate names exist.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]

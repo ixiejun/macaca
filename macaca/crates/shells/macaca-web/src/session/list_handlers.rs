@@ -9,9 +9,9 @@ use axum::Json;
 use crate::routes::{err, ErrorResponse};
 use crate::state::AppState;
 
+use super::persistence::APP_SESSIONS_PREFIX;
 use super::persistence::SESSION_PREFIX;
 use super::types::{SessionListItem, SessionListQuery, StoredSession};
-use super::persistence::APP_SESSIONS_PREFIX;
 
 fn paged_sessions(
     mut sessions: Vec<SessionListItem>,
@@ -99,33 +99,10 @@ pub(crate) async fn list_app_sessions(
             )
         })?;
 
-    let mut session_ids: Vec<String> = keys
+    let session_ids: Vec<String> = keys
         .iter()
         .filter_map(|key| key.strip_prefix(&prefix).map(|s| s.to_string()))
         .collect();
-
-    // Also check legacy aggregate key: app_sessions/{app_id} → Vec<String>
-    // Older versions of post_chat_v2 wrote a JSON array instead of per-session keys.
-    let legacy_key = format!("{}{}", APP_SESSIONS_PREFIX, app_id);
-    if let Ok(Some(data)) = state.persist.session_store.get(&legacy_key).await {
-        if let Ok(ids) = serde_json::from_slice::<Vec<String>>(&data) {
-            for id in ids {
-                if !session_ids.contains(&id) {
-                    session_ids.push(id);
-                }
-            }
-            // Migrate: write per-session index keys and delete the legacy aggregate key
-            for id in &session_ids {
-                let per_session_key = format!("{}{}/{}", APP_SESSIONS_PREFIX, app_id, id);
-                let _ = state
-                    .persist
-                    .session_store
-                    .set(&per_session_key, id.as_bytes())
-                    .await;
-            }
-            let _ = state.persist.session_store.delete(&legacy_key).await;
-        }
-    }
 
     let mut sessions = Vec::new();
     for session_id in session_ids {

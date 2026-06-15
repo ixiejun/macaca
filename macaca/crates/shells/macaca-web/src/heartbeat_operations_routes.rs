@@ -21,6 +21,7 @@ use serde::Deserialize;
 use crate::routes::{err, proto_err, ErrorResponse};
 use crate::state::AppState;
 
+#[path = "heartbeat_operations_routes/view.rs"]
 mod view;
 
 /// Request body accepted by the profile policy update route.

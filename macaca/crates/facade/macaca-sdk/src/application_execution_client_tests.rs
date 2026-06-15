@@ -128,7 +128,7 @@ async fn service_backed_current_state_forwards_complete_scope() {
 fn system_facade_extension_builds_application_execution_clients() {
     let facade = SystemFacade::new(
         EmptyTaskBoardClient,
-        crate::StaticSystemStatusDataSource::new(crate::SystemStatusSnapshot {
+        crate::StaticSystemStatusClient::new(crate::SystemStatusSnapshot {
             version: "test".into(),
             agent_count: 0,
             loaded_apps: 0,

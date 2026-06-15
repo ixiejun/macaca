@@ -4,7 +4,27 @@
 //! client without reaching through the aggregate operation methods.
 
 impl<T, S, SV, TR, P, L, M, C, D, SK, MCP, A, ST, E, PMT, W3, EVM, SCH, HB>
-    super::types::SystemFacade<T, S, SV, TR, P, L, M, C, D, SK, MCP, A, ST, E, PMT, W3, EVM, SCH, HB>
+    super::types::SystemFacade<
+        T,
+        S,
+        SV,
+        TR,
+        P,
+        L,
+        M,
+        C,
+        D,
+        SK,
+        MCP,
+        A,
+        ST,
+        E,
+        PMT,
+        W3,
+        EVM,
+        SCH,
+        HB,
+    >
 {
     /// Borrow the focused Web3 Service client.
     pub fn web3_client(&self) -> &W3 {

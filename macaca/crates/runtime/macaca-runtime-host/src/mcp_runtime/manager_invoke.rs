@@ -8,8 +8,10 @@ use std::time::{Duration, Instant};
 
 use macaca_framework::mcp::{McpClient, McpError};
 use macaca_framework::tool::Toolkit;
-use macaca_proto::{ApplicationId, CapabilityToolInvocationResult, TraceContext,
-    MCP_DESCRIPTOR_BACKEND_TOOL_NAME, MCP_SERVICE_ID, CapabilityToolOriginKind};
+use macaca_proto::{
+    ApplicationId, CapabilityToolInvocationResult, CapabilityToolOriginKind, TraceContext,
+    MCP_DESCRIPTOR_BACKEND_TOOL_NAME, MCP_SERVICE_ID,
+};
 use tokio::time::timeout;
 
 use crate::lease::McpSessionLease;
@@ -21,11 +23,10 @@ use super::helpers::{
 };
 use super::manager::McpRuntimeManager;
 use super::types::{
-    McpLifecycleScope, McpRuntimeContext, McpRuntimeKey, McpRuntimeStatus,
-    McpRuntimeStatusState, McpServerDefinition, McpToolPolicy,
+    McpLifecycleScope, McpRuntimeContext, McpRuntimeStatus, McpRuntimeStatusState,
+    McpServerDefinition, McpToolPolicy,
 };
 
-#[allow(deprecated)]
 impl McpRuntimeManager {
     pub(crate) async fn invoke_tool(
         &self,
@@ -299,7 +300,6 @@ impl McpRuntimeManager {
         }
     }
 
-    #[deprecated(note = "Use `McpRuntimeFacade::register` instead.")]
     pub async fn register_tools(
         self: &Arc<Self>,
         toolkit: &mut Toolkit,
@@ -311,7 +311,6 @@ impl McpRuntimeManager {
             .await
     }
 
-    #[deprecated(note = "Use `McpRuntimeFacade::register_definitions` instead.")]
     pub async fn register_definitions(
         self: &Arc<Self>,
         toolkit: &mut Toolkit,
@@ -337,26 +336,6 @@ impl McpRuntimeManager {
             statuses.push(status);
         }
         statuses
-    }
-
-    #[deprecated(note = "Use `acquire_lease` for explicit runtime ownership.")]
-    pub async fn acquire_runtime_key(
-        &self,
-        definition: &McpServerDefinition,
-        context: &McpRuntimeContext,
-    ) -> McpRuntimeKey {
-        self.invocation_registry
-            .acquire(definition, context)
-            .await
-            .into_key()
-    }
-
-    #[deprecated(note = "Use `release_lease` for explicit runtime ownership release.")]
-    pub async fn release_runtime_key(&self, key: &McpRuntimeKey) -> Option<McpRuntimeStatus> {
-        let lease = McpSessionLease::new(key.clone());
-        self.invocation_registry
-            .release(&lease, false, "released")
-            .await
     }
 
     pub async fn acquire_lease(
@@ -396,7 +375,6 @@ impl McpRuntimeManager {
             .await
     }
 
-    #[deprecated(note = "Use `McpRuntimeFacade::cleanup_session` instead.")]
     pub async fn cleanup_session(&self, session_id: &str) -> Vec<McpRuntimeStatus> {
         self.invocation_registry
             .cleanup_matching(
@@ -406,7 +384,6 @@ impl McpRuntimeManager {
             .await
     }
 
-    #[deprecated(note = "Use `McpRuntimeFacade::cleanup_app` instead.")]
     pub async fn cleanup_app(&self, app_id: &ApplicationId) -> Vec<McpRuntimeStatus> {
         let app = app_id.0.to_string();
         self.invocation_registry
@@ -417,14 +394,12 @@ impl McpRuntimeManager {
             .await
     }
 
-    #[deprecated(note = "Use `McpRuntimeFacade::cleanup_all` instead.")]
     pub async fn cleanup_all(&self) -> Vec<McpRuntimeStatus> {
         self.invocation_registry
             .cleanup_matching(|_| true, "all_cleanup")
             .await
     }
 
-    #[deprecated(note = "Use `McpRuntimeFacade::cleanup_idle` instead.")]
     pub async fn cleanup_idle(&self, ttl: Duration) -> Vec<McpRuntimeStatus> {
         self.invocation_registry.cleanup_idle(ttl).await
     }

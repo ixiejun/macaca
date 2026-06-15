@@ -3,7 +3,7 @@
 //! These tests exercise the public session trait instead of private helper
 //! functions.  That keeps the contract focused on observable behavior:
 //! provider-neutral transition results, sanitized checkpoint mementos,
-//! compatibility failures, and fail-closed unavailable behavior.
+//! ABI mismatch failures, and fail-closed unavailable behavior.
 
 use macaca_proto::{
     ApplicationAbiVersion, TraceContext, WasmExecutionProfile, WasmLifecycleCommand,
@@ -215,7 +215,7 @@ async fn lifecycle_session(name: &str) -> Box<dyn super::WasmExecutionSession> {
     provider.create_session(request).await.unwrap()
 }
 
-/// Write a temporary WASM artifact and return a file URI-compatible path.
+/// Write a temporary WASM artifact and return a path suitable for file URI use.
 fn write_fixture_wasm(name: &str, bytes: &[u8]) -> std::path::PathBuf {
     let directory = tempfile::Builder::new()
         .prefix("macaca-wasm-lifecycle-")

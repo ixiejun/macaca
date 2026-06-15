@@ -1,4 +1,4 @@
-//! Runtime-host adapter for the Route C Context Service.
+//! Runtime-host adapter for the Context Service.
 //!
 //! The provider wraps a context engine registry and service commands while the
 //! domain crate continues to own composition and engine behavior.  This keeps
@@ -147,7 +147,7 @@ impl SystemService for ContextSystemServiceProvider {
                 } else {
                     tracing::warn!(
                         trace_id = %trace.trace_id,
-                        "context service assemble command has no assembly snapshot; using legacy empty provider chain"
+                        "context service assemble command has no assembly snapshot; using empty provider chain"
                     );
                     (
                         Vec::new(),

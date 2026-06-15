@@ -64,8 +64,7 @@ fn test_dedup_removes_snapshot_running_turn() {
 
     // Apply the dedup logic (same as in the success path)
     if let Some(pos) = turns.iter().rposition(|t| {
-        t.role == "assistant"
-            && matches!(t.status.as_deref(), Some("running") | Some("pending"))
+        t.role == "assistant" && matches!(t.status.as_deref(), Some("running") | Some("pending"))
     }) {
         turns.remove(pos);
         if pos > 0 && turns[pos - 1].role == "user" && turns[pos - 1].content == prompt {
@@ -112,8 +111,7 @@ fn test_dedup_preserves_prior_conversation_turns() {
     ];
 
     if let Some(pos) = turns.iter().rposition(|t| {
-        t.role == "assistant"
-            && matches!(t.status.as_deref(), Some("running") | Some("pending"))
+        t.role == "assistant" && matches!(t.status.as_deref(), Some("running") | Some("pending"))
     }) {
         turns.remove(pos);
         if pos > 0 && turns[pos - 1].role == "user" && turns[pos - 1].content == prompt {
@@ -142,8 +140,7 @@ fn test_dedup_noop_when_no_running_turn() {
     ];
 
     if let Some(pos) = turns.iter().rposition(|t| {
-        t.role == "assistant"
-            && matches!(t.status.as_deref(), Some("running") | Some("pending"))
+        t.role == "assistant" && matches!(t.status.as_deref(), Some("running") | Some("pending"))
     }) {
         turns.remove(pos);
         if pos > 0 && turns[pos - 1].role == "user" && turns[pos - 1].content == prompt {
@@ -165,8 +162,7 @@ fn test_dedup_handles_pending_status() {
     ];
 
     if let Some(pos) = turns.iter().rposition(|t| {
-        t.role == "assistant"
-            && matches!(t.status.as_deref(), Some("running") | Some("pending"))
+        t.role == "assistant" && matches!(t.status.as_deref(), Some("running") | Some("pending"))
     }) {
         turns.remove(pos);
         if pos > 0 && turns[pos - 1].role == "user" && turns[pos - 1].content == prompt {

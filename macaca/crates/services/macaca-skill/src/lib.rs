@@ -8,7 +8,7 @@
 //!
 //! ## Agent Skills (SKILL.md)
 //! Knowledge/instruction skills per the [agentskills.io](https://agentskills.io)
-//! specification. Stored in `~/.macaca/skills/` and provisioned to compatible
+//! specification. Stored in `~/.macaca/skills/` and provisioned to matching
 //! clients (Claude Code, Cursor, etc.). Managed by [`SkillCatalog`] with
 //! progressive disclosure (catalog → instructions → resources).
 //!

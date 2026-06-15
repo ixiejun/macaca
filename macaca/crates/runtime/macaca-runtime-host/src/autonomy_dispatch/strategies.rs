@@ -5,8 +5,8 @@
 //! modules while keeping Scheduler free of direct service-runtime calls.
 
 use macaca_proto::{
-    AutonomyScope, HeartbeatWakeCommand, HeartbeatWakeIntent, MacacaResult,
-    SchedulerTargetCommand, TraceContext,
+    AutonomyScope, HeartbeatWakeCommand, HeartbeatWakeIntent, MacacaResult, SchedulerTargetCommand,
+    TraceContext,
 };
 use tracing::warn;
 
@@ -90,7 +90,9 @@ impl<'a> AutonomyDispatchStrategies<'a> {
                     trace_id = trace.trace_id.as_str(),
                     "autonomy supervisor skipped plugin target because plugin dispatch strategy is not active yet"
                 );
-                Ok(AutonomyDispatchOutcome::skipped("plugin_strategy_unavailable"))
+                Ok(AutonomyDispatchOutcome::skipped(
+                    "plugin_strategy_unavailable",
+                ))
             }
         }
     }

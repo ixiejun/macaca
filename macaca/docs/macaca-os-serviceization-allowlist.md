@@ -114,44 +114,28 @@ The repository must have and continuously strengthen dependency-boundary tests. 
 
 A gate failure is an architecture violation, not test noise.
 
-## Active migration allowlist (Route C gate input)
+## Retired Dependency Exception Inventory
 
-Rust source of truth: `macaca/crates/tests/macaca-integration-tests/tests/route_c_dependency_boundaries/allowlist.rs`.
+Rust source of truth: terminal protocol dependency gates under `macaca/crates/tests/macaca-integration-tests/tests/protocol_service_dependency_boundaries/`.
 
-| Rule | From | To | Owner track | Current caller | Phase | Replacement | Expiry condition | Validation |
+| Rule | From | To | Owner track | Current caller | Replacement | Validation |
 |------|------|-----|-------------|----------------|-------|-------------|------------------|------------|
 
-**P3 §4.4 update (2026-06-07):** All seven `macaca-web → provider` allowlist rows cleared. Web now reaches driver/llm/memory/persist/skill/task/tools/kernel types through `macaca-sdk::shell_provider_bridge` crate aliases; direct `Cargo.toml` edges removed.
+Terminal rule: exception rows are not admission mechanisms. A forbidden dependency edge must be removed, or the boundary must be changed through OpenSpec before code lands.
 
-**Remaining web thin-shell debt:** **None** — `WEB_SHELL_WORKSPACE_DEPENDENCY_DEBT` is empty at §9.4 terminal state (iteration 125). `macaca-web` workspace members: `macaca-proto` + `macaca-sdk` only.
+**Resolved evidence (2026-06-07 through 2026-06-09):** presentation shell dependencies were reduced to `macaca-proto` + `macaca-sdk`; direct provider/runtime edges were deleted or moved behind SDK, service, application ABI, or runtime-host owner boundaries.
 
-**Retired (iteration 125):** `macaca-app` (via `macaca-sdk::app` bridge; cycle broken by sinking `AgentConfig` to `macaca-proto` and removing production `macaca-sdk` dep from `macaca-app`); `macaca-runtime-host` (via `macaca-sdk::runtime_host` bridge; ~90 shell source files migrated).
+**Retired dependency families:** application framework, runtime-host, agent, runtime, context, framework, and domain-pack dependency edges are not permitted as shell-owned semantic dependencies. Any required access must use provider-neutral proto DTOs, focused SDK clients, application ABI clients, or runtime-host bootstrap handles that do not expose provider internals.
 
-**Retired (iteration 120):** `macaca-agent` (via `macaca-sdk::agent` bridge); `macaca-runtime` (dead `Cargo.toml` edge, zero source imports).
+**Terminal target:** **0 rows**. Protocol service dependency gates and shell dependency purity gates enforce the target as hard assertions.
 
-**Retired (iteration 121):** `macaca-context` (via `macaca-sdk::context` bridge; 30 shell source files migrated).
+## Retired OS-Layer File-Size Exception Inventory
 
-**Retired (iteration 123):** `macaca-framework` (via `macaca-sdk::framework` bridge; cycle broken by `LlmServiceChatClient` Interface Segregation in `macaca-llm`; ~40 shell source files migrated).
-
-**Retired (iteration 124):** `macaca-domain-pack-finance` (via `macaca-sdk::domain_pack_bridge` + `domain-pack-finance` feature; cycle broken by sinking domain-pack contract to `macaca-proto`, `DomainPackProviderRegistration` to `macaca-kernel`, and removing `pack → runtime-host → app` edge).
-
-**Resolved prerequisite (iteration 122→123):** iter 122 blocked on `sdk→framework(service-clients)→sdk`; fixed by removing `macaca-sdk` from `framework/service-clients` and introducing `LlmServiceChatClient` + `llm_service_chat_client_from_system` bridge.
-
-**Resolved prerequisite (iteration 120→124):** iter 120 blocked on `app → sdk → domain-pack-finance → app`; fixed by `macaca_proto::domain_pack_contract` + `macaca_kernel::DomainPackProviderRegistration` so pack depends only on proto/kernel/llm.
-
-**Resolved prerequisite (iteration 124→125):** iter 124 blocked on `app → sdk` cycle preventing SDK bridge for app/runtime-host; fixed by `macaca_proto::declarative_agent_config` (Shared Kernel), direct kernel agent registration in `macaca-app`, and `PackageEntitlementAuthorizeClient` Interface Segregation removing production SDK entitlement coupling.
-
-Terminal target: **0 rows** (P5 gate). **Achieved** (iteration 40): Route C allowlist cleared; `assert_route_c_allowlist_terminal_state` enforces zero rows in CI. **Web shell workspace debt:** **0 rows** (iteration 125); `WEB_SHELL_WORKSPACE_DEPENDENCY_DEBT` empty; `PERMITTED_SHELL_WORKSPACE_DEPS` = `macaca-proto` + `macaca-sdk`. **Shell gate hardening** (iteration 126): Web uses hard terminal assertions (`assert_web_shell_workspace_dependency_purity` + zero-rows allowlist check), same as CLI.
-
-**Approved SDK Facade edges** (iteration 125–126, not shell debt): `macaca-sdk` → `macaca-app` and `macaca-sdk` → `macaca-runtime-host` for `shell_provider_bridge` type re-exports only; Route C rule `application-execution-sdk-no-runtime-provider-construction` forbids sdk→web/cli/persist.
-
-## Active migration allowlist (OS-layer file-size gate input)
-
-Rust source of truth: `macaca/crates/tests/macaca-integration-tests/tests/os_layer_file_size_gate/allowlist.rs`.
+Rust source of truth: `macaca/crates/tests/macaca-integration-tests/tests/os_layer_file_size_gate/`.
 
 | Path | Line count | Owner track | Target phase |
 |------|------------|-------------|--------------|
 
-**P4 §4.5.1 update (2026-06-08):** All oversized OS-layer production `src/**/*.rs` files split below the 500-line constitution. File-size allowlist cleared to **0 rows** (iteration 112); `assert_os_layer_file_size_allowlist_terminal_state` enforces terminal state in CI (iteration 113).
+**2026-06-08 update:** All oversized OS-layer production `src/**/*.rs` files were split below the 500-line constitution. File-size exception inventory is **0 rows** and CI enforces that terminal state.
 
 Terminal target: **0 rows** (P5 gate). **Achieved** (iteration 113).

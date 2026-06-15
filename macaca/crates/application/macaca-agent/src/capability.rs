@@ -4,7 +4,7 @@ use macaca_proto::Capability;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CapabilitySource {
-    Legacy,
+    Direct,
     Manifest,
     Persona,
     Skill,
@@ -40,13 +40,9 @@ pub struct AgentCapabilitySet {
 }
 
 impl AgentCapabilitySet {
-    pub fn from_legacy(capabilities: Vec<Capability>) -> Self {
-        Self {
-            nodes: capabilities
-                .into_iter()
-                .map(AgentCapabilityNode::Leaf)
-                .collect(),
-        }
+    /// Build a capability set from a flat provider-neutral capability list.
+    pub fn from_flat_capabilities(capabilities: Vec<Capability>) -> Self {
+        Self::from_source(CapabilitySource::Direct, capabilities)
     }
 
     pub fn from_source(source: CapabilitySource, capabilities: Vec<Capability>) -> Self {
@@ -65,7 +61,8 @@ impl AgentCapabilitySet {
         });
     }
 
-    pub fn flatten_for_legacy_api(&self) -> Vec<Capability> {
+    /// Flatten grouped capability declarations into the canonical public list.
+    pub fn flatten(&self) -> Vec<Capability> {
         let mut flattened = Vec::new();
         for node in &self.nodes {
             node.flatten_into(&mut flattened);
@@ -78,7 +75,7 @@ impl AgentCapabilitySet {
     }
 
     pub fn len(&self) -> usize {
-        self.flatten_for_legacy_api().len()
+        self.flatten().len()
     }
 
     pub fn nodes(&self) -> &[AgentCapabilityNode] {
@@ -89,7 +86,7 @@ impl AgentCapabilitySet {
         self.nodes
             .iter()
             .map(|node| match node {
-                AgentCapabilityNode::Leaf(_) => CapabilitySource::Legacy,
+                AgentCapabilityNode::Leaf(_) => CapabilitySource::Direct,
                 AgentCapabilityNode::Group { source, .. } => *source,
             })
             .collect()
@@ -109,17 +106,17 @@ mod tests {
 
     #[test]
     fn capability_set_reports_sources_without_changing_flattened_output() {
-        let mut set = AgentCapabilitySet::from_legacy(vec![capability("legacy")]);
+        let mut set = AgentCapabilitySet::from_flat_capabilities(vec![capability("direct")]);
         set.push_group(CapabilitySource::Skill, vec![capability("browser")]);
         set.push_group(CapabilitySource::Driver, vec![capability("opencode")]);
 
-        let flattened = set.flatten_for_legacy_api();
+        let flattened = set.flatten();
 
         assert_eq!(set.len(), 3);
         assert_eq!(
             set.sources(),
             vec![
-                CapabilitySource::Legacy,
+                CapabilitySource::Direct,
                 CapabilitySource::Skill,
                 CapabilitySource::Driver,
             ]
@@ -129,7 +126,7 @@ mod tests {
                 .iter()
                 .map(|capability| capability.name.as_str())
                 .collect::<Vec<_>>(),
-            vec!["legacy", "browser", "opencode"]
+            vec!["direct", "browser", "opencode"]
         );
     }
 
@@ -143,12 +140,12 @@ mod tests {
 
         assert_eq!(
             from_source
-                .flatten_for_legacy_api()
+                .flatten()
                 .iter()
                 .map(|capability| capability.name.as_str())
                 .collect::<Vec<_>>(),
             pushed
-                .flatten_for_legacy_api()
+                .flatten()
                 .iter()
                 .map(|capability| capability.name.as_str())
                 .collect::<Vec<_>>()

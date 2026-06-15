@@ -122,7 +122,7 @@ impl GenUiRuntime {
     }
 }
 
-/// Validate app/session/trace scope required by Route C.
+/// Validate app/session/trace scope required by the application service.
 fn require_scope(app_id: &str, session_id: &str, trace: Option<&TraceContext>) -> GenUiResult<()> {
     if app_id.trim().is_empty() {
         return Err(UiRenderError::MissingApplicationId);

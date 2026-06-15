@@ -1,4 +1,4 @@
-//! Runtime-host adapter for the Route C Driver Service.
+//! Runtime-host adapter for the Driver Service.
 //!
 //! This module uses the Adapter/Bridge pattern: `ServiceRuntime` dispatches
 //! provider-neutral `ServiceCommand` values, while the adapter delegates driver

@@ -1,10 +1,10 @@
-//! Host-owned ServiceRuntime facade for Route C ServiceRuntime v1.
+//! Host-owned ServiceRuntime facade for protocol ServiceRuntime v1.
 //!
 //! `ServiceRuntime` is intentionally hosted in `macaca-runtime-host`, not in the
 //! kernel.  The kernel owns stable primitives and service-call adapters; this
 //! facade owns runtime orchestration: provider-neutral registration, lifecycle,
 //! bus routing, admission decorators, audit events, and deterministic snapshots.
-//! Concrete provider migration remains a later Route C phase.
+//! Concrete providers are registered through factories owned by runtime-host.
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock};

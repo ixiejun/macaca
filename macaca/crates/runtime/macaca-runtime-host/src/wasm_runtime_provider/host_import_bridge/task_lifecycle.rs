@@ -16,9 +16,7 @@ use super::constants::{
     APPLICATION_EXECUTION_GRAPH_OWNER, TASK_CLAIM_OPERATION, TASK_CREATE_ASSIGNMENT_OPERATION,
     TASK_REVIEW_OPERATION, TASK_SERVICE_ID, TASK_START_OPERATION, TASK_SUBMIT_REVIEW_OPERATION,
 };
-use super::routing_support::{
-    extract_task_id_from_assignment, task_lifecycle_payload,
-};
+use super::routing_support::{extract_task_id_from_assignment, task_lifecycle_payload};
 use super::WasmHostImportBridge;
 
 impl WasmHostImportBridge {

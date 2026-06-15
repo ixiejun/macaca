@@ -10,3 +10,13 @@ mod gate;
 fn kernel_purity_gate_rejects_forbidden_workspace_dependencies() {
     gate::assert_kernel_workspace_dependency_purity();
 }
+
+#[test]
+fn kernel_purity_gate_rejects_network_transport_ownership() {
+    gate::assert_kernel_has_no_network_transport();
+}
+
+#[test]
+fn kernel_purity_gate_rejects_agent_orchestration_semantics() {
+    gate::assert_kernel_has_no_agent_orchestration_semantics();
+}

@@ -128,16 +128,6 @@ impl NatsBus {
             subscriber: None,
         }
     }
-
-    #[deprecated(note = "use IpcTransport::create_sender or IpcTransportFactory instead")]
-    pub fn sender(&self) -> NatsSender {
-        self.make_sender()
-    }
-
-    #[deprecated(note = "use IpcTransport::create_receiver or IpcTransportFactory instead")]
-    pub fn receiver(&self) -> NatsReceiver {
-        self.make_receiver()
-    }
 }
 
 #[async_trait]

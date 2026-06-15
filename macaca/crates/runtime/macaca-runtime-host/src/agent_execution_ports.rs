@@ -2,9 +2,9 @@
 //!
 //! Runtime-host owns the **composed** execution backend and provider-neutral
 //! orchestration.  Shell-specific wiring (SSE sessions, kernel executor
-//! lifecycle broadcasts, framework agent construction) is injected through
-//! these ports using the Adapter pattern so Web/CLI can remain thin transports
-//! while the service provider stays in runtime-host.
+//! lifecycle broadcasts, and host-local framework materialization) is injected
+//! through these ports using the Adapter pattern so Web/CLI can remain thin
+//! transports while the service provider stays in runtime-host.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -42,11 +42,31 @@ pub trait ConstructedRuntimeAgent: Send {
     async fn reply_user_prompt(&self, user_prompt: String) -> Result<String, String>;
 }
 
-/// Construction port: materialize a framework ReAct agent from a trusted snapshot.
+/// Host materialization port for runtime-host owned framework construction.
 ///
-/// Shells (Web, CLI, gateway) implement this port to supply host-local composition
-/// dependencies (toolkit assembly, SSE bridges, execution-control middleware).
-/// The Agent Execution Service provider never calls shell types directly.
+/// Shells implement this lower-level port to supply host-local composition
+/// dependencies such as toolkit assembly, SSE bridges, and execution-control
+/// middleware. Runtime-host owns the construction service that calls this port;
+/// shells no longer implement the public construction port directly.
+#[async_trait]
+pub trait FrameworkAgentMaterializationPort: Send + Sync {
+    /// Materialize one runtime ReAct agent from an already trusted snapshot.
+    async fn build_runtime_react_agent(
+        &self,
+        command: &AgentExecutionCommand,
+        context_snapshot: &AgentContextSnapshot,
+        agent_event_tx: mpsc::Sender<AgentExecutionEvent>,
+        execution_control: Option<OpaqueExecutionControlHandle>,
+        max_iters: usize,
+        tool_choice: Option<ToolChoice>,
+    ) -> Result<Box<dyn ConstructedRuntimeAgent>, String>;
+}
+
+/// Construction port: provider-neutral runtime-host service boundary.
+///
+/// Runtime-host implementations own construction tracing, failure reporting,
+/// and the stable contract between `service.agent_execution` and framework
+/// materialization. Host adapters stay behind [`FrameworkAgentMaterializationPort`].
 #[async_trait]
 pub trait FrameworkAgentConstructionPort: Send + Sync {
     /// Build one runtime ReAct agent from an Agent Context service snapshot.

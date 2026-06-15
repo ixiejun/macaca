@@ -42,7 +42,7 @@ pub trait ServiceRuntimeDecorator: Send + Sync {
     ) -> Result<(), ServiceRuntimeError>;
 }
 
-/// Enforces the Route C "no trace, no call" invariant at runtime admission.
+/// Enforces the protocol "no trace, no call" invariant at runtime admission.
 pub struct TraceRequiredRuntimeDecorator;
 
 #[async_trait]

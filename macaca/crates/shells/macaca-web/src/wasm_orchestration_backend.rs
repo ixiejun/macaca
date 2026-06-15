@@ -11,21 +11,21 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use macaca_sdk::runtime_host::ApplicationExecutorRegistry;
+use macaca_host_composition::application_bootstrap::ApplicationOrchestrationBackend;
+use macaca_host_composition::executor::ApplicationExecutorRegistry;
+use macaca_host_composition::service_runtime::ServiceRuntime;
 use macaca_proto::{
     AgentExecutionIntent, ApplicationAgentDelegateCommand, ApplicationAgentDelegateResult,
     ApplicationId, ServiceError, ServiceResult, TaskId,
 };
-use macaca_sdk::runtime_host::{ApplicationOrchestrationBackend, ServiceRuntime};
 use tokio::sync::RwLock;
 use tracing::info;
 
-use crate::application_agent_delegate_bridge::{
-    build_execution_command_from_delegate, delegate_result_from_execution_reply,
-    dispatch_agent_execution_via_service, queued_delegate_result,
-    DEFAULT_AGENT_DELEGATE_WAIT_MS,
-};
 use crate::workspace::AppWorkspace;
+use macaca_host_composition::{
+    build_execution_command_from_delegate, delegate_result_from_execution_reply,
+    dispatch_agent_execution_via_service, queued_delegate_result, DEFAULT_AGENT_DELEGATE_WAIT_MS,
+};
 
 /// Web-owned adapter from Application Service delegation commands to the
 /// app-scoped executor registry.
@@ -161,8 +161,7 @@ impl ApplicationOrchestrationBackend for WebApplicationOrchestrationBackend {
             .or_insert_with(|| "MacacaHosted".into());
 
         let execution_intent = execution_command.execution_intent.clone();
-        let require_completed =
-            matches!(execution_intent, AgentExecutionIntent::YamlWorkflowStep);
+        let require_completed = matches!(execution_intent, AgentExecutionIntent::YamlWorkflowStep);
         let wait_ms = command
             .metadata
             .get("wait_timeout_ms")
@@ -185,7 +184,9 @@ impl ApplicationOrchestrationBackend for WebApplicationOrchestrationBackend {
                     reason = %error,
                     "application agent delegation returned queued fallback after wait budget"
                 );
-                return Ok(queued_delegate_result(&command, app_id, session_id, task_id));
+                return Ok(queued_delegate_result(
+                    &command, app_id, session_id, task_id,
+                ));
             }
             Err(error) => return Err(error),
         };
@@ -232,8 +233,8 @@ mod tests {
     use std::collections::HashMap;
     use std::sync::Arc;
 
+    use macaca_host_composition::service_runtime::{ServiceRuntime, ServiceRuntimeConfig};
     use macaca_proto::ApplicationId;
-    use macaca_sdk::runtime_host::{ServiceRuntime, ServiceRuntimeConfig};
     use tokio::sync::RwLock;
 
     use crate::workspace::AppWorkspace;
@@ -241,7 +242,9 @@ mod tests {
     #[test]
     fn wasm_delegate_uses_shared_application_agent_delegate_bridge() {
         let source = include_str!("wasm_orchestration_backend.rs");
-        let bridge = include_str!("application_agent_delegate_bridge.rs");
+        let bridge = include_str!(
+            "../../../runtime/macaca-host-composition/src/application_agent_delegate_bridge.rs"
+        );
         let executor_fast_path = [".delegate", "_task("].concat();
 
         assert!(source.contains("build_execution_command_from_delegate"));

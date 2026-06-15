@@ -4,8 +4,8 @@
 //! serializing raw manifest bodies, prompt templates, secrets, or environment
 //! values into logs or Manifest v1 metadata.
 
-use macaca_proto::ApplicationManifestV1;
 use macaca_proto::AgentConfig;
+use macaca_proto::ApplicationManifestV1;
 
 use crate::model::AppManifest;
 
@@ -46,12 +46,12 @@ pub struct YamlToApplicationManifestV1Report {
     pub package_id: String,
     pub ability_count: usize,
     pub inferred_defaults: Vec<YamlProjectionDiagnostic>,
-    pub compatibility_warnings: Vec<YamlProjectionDiagnostic>,
-    pub legacy_only_fields: Vec<YamlProjectionDiagnostic>,
+    pub projection_warnings: Vec<YamlProjectionDiagnostic>,
+    pub source_only_fields: Vec<YamlProjectionDiagnostic>,
 }
 
 impl YamlToApplicationManifestV1Report {
-    /// Record an inferred default that legacy runtime will apply implicitly.
+    /// Record an inferred default that the YAML runtime adapter will apply implicitly.
     pub(super) fn push_default(&mut self, subject: impl Into<String>, message: impl Into<String>) {
         self.inferred_defaults.push(YamlProjectionDiagnostic::new(
             "inferred_default",
@@ -60,10 +60,14 @@ impl YamlToApplicationManifestV1Report {
         ));
     }
 
-    /// Record a YAML-only field that remains owned by legacy compatibility.
-    pub(super) fn push_legacy_only(&mut self, subject: impl Into<String>, message: impl Into<String>) {
-        self.legacy_only_fields.push(YamlProjectionDiagnostic::new(
-            "legacy_only_field",
+    /// Record a YAML-only field that is preserved as sanitized source metadata.
+    pub(super) fn push_source_only(
+        &mut self,
+        subject: impl Into<String>,
+        message: impl Into<String>,
+    ) {
+        self.source_only_fields.push(YamlProjectionDiagnostic::new(
+            "source_only_field",
             subject,
             message,
         ));
@@ -72,14 +76,14 @@ impl YamlToApplicationManifestV1Report {
 
 /// Projection result used by package and ABI adapters.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LegacyAppManifestProjection {
+pub struct YamlApplicationManifestProjection {
     pub manifest: ApplicationManifestV1,
     pub report: YamlToApplicationManifestV1Report,
 }
 
-/// Adapter that converts legacy YAML app manifests into Manifest v1.
+/// Adapter that converts YAML app manifests into Manifest v1.
 ///
-/// The adapter owns the parsed legacy manifest plus any pre-resolved file-based
+/// The adapter owns the parsed YAML manifest plus any pre-resolved file-based
 /// agents supplied by the caller.  Fields are `pub(super)` so sibling modules
 /// (`projection`, `abilities`) can implement the Adapter pattern without
 /// exposing internal state on the public API surface.

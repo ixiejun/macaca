@@ -1,11 +1,11 @@
 //! Agent Context service snapshot builder for replayable system-context evidence.
 
-use std::sync::Arc;
-use macaca_sdk::runtime_host::persist::AppendEventCommand;
-use crate::state::AppState;
 use super::context_prompt_builder;
 use super::skill_policy::resolve_agent_skill_policy;
 use super::FrameworkRunner;
+use crate::state::AppState;
+use macaca_proto::AppendEventCommand;
+use std::sync::Arc;
 
 impl FrameworkRunner {
     pub(crate) async fn build_agent_context_snapshot(

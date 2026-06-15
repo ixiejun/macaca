@@ -11,22 +11,24 @@ mod tests {
     #[test]
     fn yaml_chat_session_uses_unified_agent_execution_service() {
         let chat = crate::chat_orchestrator::contract_source::chat_orchestrator_module_sources();
-        let legacy_builder = ["FrameworkRunner::build_runtime", "_agent("].concat();
+        let retired_builder = ["FrameworkRunner::build_runtime", "_agent("].concat();
 
         assert!(chat.contains("run_chat_main_thread_via_agent_service"));
         assert!(chat.contains("AGENT_EXECUTION_SERVICE_ID"));
         assert!(chat.contains("AgentExecutionIntent::ChatMainThread"));
         assert!(chat.contains("into_service_command()"));
         assert!(chat.contains("ServiceBusSource::new(\"macaca.web.chat_orchestrator\")"));
-        assert!(!chat.contains(&legacy_builder));
+        assert!(!chat.contains(&retired_builder));
     }
 
     /// YAML workflow steps must enter through Application Service before agent execution.
     #[test]
     fn yaml_workflow_session_uses_application_service_delegate_path() {
         let runner = include_str!("agent_runner.rs");
-        let bridge = include_str!("application_agent_delegate_bridge.rs");
-        let legacy_builder = ["FrameworkRunner::build_runtime", "_agent("].concat();
+        let bridge = include_str!(
+            "../../../runtime/macaca-host-composition/src/application_agent_delegate_bridge.rs"
+        );
+        let retired_builder = ["FrameworkRunner::build_runtime", "_agent("].concat();
 
         assert!(runner.contains("execute_via_application_delegate"));
         assert!(runner.contains("APPLICATION_SERVICE_ID"));
@@ -34,14 +36,16 @@ mod tests {
         assert!(bridge.contains("AGENT_EXECUTION_SERVICE_ID"));
         assert!(runner.contains("ServiceBusSource::new(\"macaca.web.agent_runner\")"));
         assert!(!runner.contains("KernelServiceId::new(AGENT_EXECUTION_SERVICE_ID)"));
-        assert!(!runner.contains(&legacy_builder));
+        assert!(!runner.contains(&retired_builder));
     }
 
     /// WASM application delegation must call the shared bridge after Application Service.
     #[test]
     fn wasm_session_uses_unified_agent_execution_service() {
         let wasm = include_str!("wasm_orchestration_backend.rs");
-        let bridge = include_str!("application_agent_delegate_bridge.rs");
+        let bridge = include_str!(
+            "../../../runtime/macaca-host-composition/src/application_agent_delegate_bridge.rs"
+        );
         let executor_fast_path = [".delegate", "_task("].concat();
 
         assert!(wasm.contains("dispatch_agent_execution_via_service"));
@@ -53,7 +57,8 @@ mod tests {
     /// Web startup registers exactly one composed backend for the service provider.
     #[test]
     fn web_registers_single_composed_agent_execution_backend() {
-        let lib_source = crate::composition_bootstrap::contract_source::composition_bootstrap_module_sources();
+        let lib_source =
+            crate::composition_bootstrap::contract_source::composition_bootstrap_module_sources();
         let adapters = include_str!("web_agent_execution_adapters.rs");
         let composed = include_str!(
             "../../../runtime/macaca-runtime-host/src/composed_agent_execution_backend.rs"
@@ -69,9 +74,12 @@ mod tests {
     /// YAML and WASM entry surfaces must share the same service command + trace schema.
     #[test]
     fn yaml_and_wasm_share_agent_execute_command_and_trace_schema() {
-        let yaml_chat = crate::chat_orchestrator::contract_source::chat_orchestrator_module_sources();
+        let yaml_chat =
+            crate::chat_orchestrator::contract_source::chat_orchestrator_module_sources();
         let yaml_workflow = include_str!("agent_runner.rs");
-        let wasm_bridge = include_str!("application_agent_delegate_bridge.rs");
+        let wasm_bridge = include_str!(
+            "../../../runtime/macaca-host-composition/src/application_agent_delegate_bridge.rs"
+        );
         let provider = include_str!(
             "../../../runtime/macaca-runtime-host/src/agent_execution_service_provider.rs"
         );
@@ -95,9 +103,8 @@ mod tests {
         let orchestration = include_str!(
             "../../../runtime/macaca-runtime-host/src/agent_execution_orchestration.rs"
         );
-        let ports = include_str!(
-            "../../../runtime/macaca-runtime-host/src/agent_execution_ports.rs"
-        );
+        let ports =
+            include_str!("../../../runtime/macaca-runtime-host/src/agent_execution_ports.rs");
 
         assert!(composed.contains("build_agent_context_snapshot_via_service"));
         assert!(composed.contains("completed_execution_result"));
@@ -109,7 +116,8 @@ mod tests {
     /// Session entrypoints must not bypass service.agent_execution with parallel backends.
     #[test]
     fn session_entrypoints_do_not_register_parallel_agent_execution_backends() {
-        let lib_source = crate::composition_bootstrap::contract_source::composition_bootstrap_module_sources();
+        let lib_source =
+            crate::composition_bootstrap::contract_source::composition_bootstrap_module_sources();
         let registration_calls = lib_source
             .lines()
             .filter(|line| {
@@ -124,7 +132,7 @@ mod tests {
         );
         assert!(
             !lib_source.contains("WebAgentExecutionBackend"),
-            "legacy shell-owned backend must not be reintroduced"
+            "retired shell-owned backend must not be reintroduced"
         );
     }
 }

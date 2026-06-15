@@ -6,9 +6,9 @@ use axum::http::StatusCode;
 use axum::Json;
 
 use macaca_proto::{
-    ApplicationId, AutonomyScope, KernelServiceId, SchedulerJobDefinition, SchedulerJobSummary,
-    SchedulerRunSummary, SchedulerScheduleSpec, SchedulerTargetCommand,
-    ScheduledAgentTaskSummary, ServiceCommandName, ServiceTargetCommand,
+    ApplicationId, AutonomyScope, KernelServiceId, ScheduledAgentTaskSummary,
+    SchedulerJobDefinition, SchedulerJobSummary, SchedulerRunSummary, SchedulerScheduleSpec,
+    SchedulerTargetCommand, ServiceCommandName, ServiceTargetCommand,
 };
 use serde::Deserialize;
 
@@ -26,7 +26,9 @@ pub enum AutonomyScheduleTargetRequest {
     },
 }
 
-pub(crate) fn parse_application_id(app_id: &str) -> Result<ApplicationId, (StatusCode, Json<ErrorResponse>)> {
+pub(crate) fn parse_application_id(
+    app_id: &str,
+) -> Result<ApplicationId, (StatusCode, Json<ErrorResponse>)> {
     uuid::Uuid::parse_str(app_id)
         .map(ApplicationId)
         .map_err(|_| err(StatusCode::BAD_REQUEST, "Invalid app_id".into()))
@@ -119,7 +121,9 @@ pub(crate) fn sanitized_scheduler_job(job: SchedulerJobSummary) -> serde_json::V
     })
 }
 
-pub(crate) fn sanitized_scheduler_mutation(result: macaca_proto::SchedulerCommandResult) -> serde_json::Value {
+pub(crate) fn sanitized_scheduler_mutation(
+    result: macaca_proto::SchedulerCommandResult,
+) -> serde_json::Value {
     serde_json::json!({
         "accepted": result.accepted,
         "job_id": result.job_id.as_ref().map(|id| id.as_str()),

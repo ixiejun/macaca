@@ -19,8 +19,8 @@ use crate::core::{
     MemoryCapabilitySet, MemoryDeleteRequest, MemoryFacade, MemoryGetRequest, MemorySearchRequest,
     MemoryStatusReport, MemoryWriteRequest,
 };
-use crate::governance::KnowledgeCompileCapability;
 use crate::facade::{ForgetMemory, RecallQuery, RememberText};
+use crate::governance::KnowledgeCompileCapability;
 use crate::{
     ConfiguredMemoryManager, KnowledgeCompileRequest, KnowledgeCompileResult, KnowledgeCompiler,
     MemoryRuntimeFacade, MemoryRuntimeStatus, TestMemoryManager,
@@ -78,27 +78,27 @@ impl FabricMemoryRuntime {
         Self::new(Arc::new(ManagerBackedMemoryRuntime::new(memory, profile)))
     }
 
-    /// Convenience forwarder used by legacy tool adapters during service migration.
+    /// Convenience forwarder used by tool adapters that enter through the service boundary.
     pub async fn remember_text(&self, request: MemoryWriteRequest) -> MacacaResult<MemoryId> {
         self.inner.remember(request).await
     }
 
-    /// Convenience forwarder used by legacy tool adapters during service migration.
+    /// Convenience forwarder used by tool adapters that enter through the service boundary.
     pub async fn search(&self, request: MemorySearchRequest) -> MacacaResult<Vec<MemoryEntry>> {
         self.inner.search(request).await
     }
 
-    /// Convenience forwarder used by legacy tool adapters during service migration.
+    /// Convenience forwarder used by tool adapters that enter through the service boundary.
     pub async fn get(&self, request: MemoryGetRequest) -> MacacaResult<Option<MemoryEntry>> {
         self.inner.get(request).await
     }
 
-    /// Convenience forwarder used by legacy tool adapters during service migration.
+    /// Convenience forwarder used by tool adapters that enter through the service boundary.
     pub async fn delete(&self, request: MemoryDeleteRequest) -> MacacaResult<()> {
         self.inner.delete(request).await
     }
 
-    /// Convenience forwarder used by legacy tool adapters during service migration.
+    /// Convenience forwarder used by tool adapters that enter through the service boundary.
     pub async fn active_recall(
         &self,
         request: ActiveRecallRequest,
@@ -106,7 +106,7 @@ impl FabricMemoryRuntime {
         self.inner.active_recall(request).await
     }
 
-    /// Convenience forwarder used by legacy tool adapters during service migration.
+    /// Convenience forwarder used by tool adapters that enter through the service boundary.
     pub async fn compile_knowledge(
         &self,
         request: KnowledgeCompileRequest,
@@ -114,7 +114,7 @@ impl FabricMemoryRuntime {
         self.inner.compile_knowledge(request).await
     }
 
-    /// Convenience forwarder used by legacy tool adapters during service migration.
+    /// Convenience forwarder used by tool adapters that enter through the service boundary.
     pub async fn status(&self) -> MemoryRuntimeStatus {
         self.inner.status().await
     }
@@ -252,8 +252,7 @@ impl MemoryRuntimeFacade for ManagerBackedMemoryRuntime {
         &self,
         request: ActiveRecallRequest,
     ) -> MacacaResult<ActiveRecallResult> {
-        let strategy =
-            DefaultActiveRecallStrategy::new(self.provider_profile.as_str(), self);
+        let strategy = DefaultActiveRecallStrategy::new(self.provider_profile.as_str(), self);
         strategy.prefetch(request).await
     }
 
@@ -371,9 +370,3 @@ impl MemoryFacade for FabricMemoryRuntime {
         )
     }
 }
-
-/// Backward-compatible alias retained for migration notes and archived specs.
-#[deprecated(
-    note = "Renamed to FabricMemoryRuntime; web shell ownership removed in unified-call-path P3.1.4"
-)]
-pub type WebMemoryRuntime = FabricMemoryRuntime;

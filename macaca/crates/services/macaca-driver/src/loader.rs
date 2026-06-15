@@ -120,7 +120,7 @@ impl DriverLoader {
         driver_dir: &Path,
         manifest: &DriverManifestToml,
     ) -> MacacaResult<Box<dyn SoftwareDriver>> {
-        // Check ABI version compatibility
+        // Check ABI version match
         if manifest.driver.min_abi_version > DRIVER_ABI_VERSION {
             return Err(macaca_proto::MacacaError::Driver(format!(
                 "Driver '{}' requires ABI version {} but host supports version {}",
@@ -159,16 +159,6 @@ impl DriverLoader {
         );
 
         Ok(driver)
-    }
-
-    /// Load a single driver from its directory and manifest.
-    #[deprecated(note = "use DriverLoader::load_driver_with_factory()")]
-    pub fn load_driver(
-        &self,
-        driver_dir: &Path,
-        manifest: &DriverManifestToml,
-    ) -> MacacaResult<Box<dyn SoftwareDriver>> {
-        self.load_driver_with_factory(driver_dir, manifest)
     }
 
     /// Scan and load all drivers from the directory through the crate-internal runtime path.
@@ -215,13 +205,5 @@ impl DriverLoader {
         }
 
         results
-    }
-
-    /// Scan and load all drivers from the directory.
-    ///
-    /// Returns results for every discovered driver, including failures.
-    #[deprecated(note = "use DriverRuntime::load_all() or DriverRuntime::reload()")]
-    pub fn load_all(&self) -> Vec<DriverLoadResult> {
-        self.load_all_internal()
     }
 }

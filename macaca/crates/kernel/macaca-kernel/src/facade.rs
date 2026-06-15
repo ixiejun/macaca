@@ -1,4 +1,4 @@
-//! Additive microkernel facade for Route C primitive boundaries.
+//! Additive microkernel facade for primitive boundaries.
 //!
 //! The facade is the narrow entry point that later system services, SDKs, and
 //! application runtimes should depend on.  It groups discovery, policy,
@@ -89,7 +89,7 @@ impl<T> KernelFacade for T where
 
 /// Default additive facade backed by in-memory primitive components.
 ///
-/// This is the compatibility implementation for Phase 01.  It is safe for
+/// This is the default implementation. It is safe for
 /// tests and SDK discovery, but it should not be mistaken for a future
 /// distributed service registry, production policy engine, or durable trace
 /// store.

@@ -4,7 +4,6 @@
 //! Validates execution control, heartbeat evidence, envelope contracts, and
 //! architecture governance boundaries without application-specific business logic.
 
-
 use super::support::*;
 #[test]
 fn execution_envelope_is_rendered_as_highest_priority_contract() {
@@ -88,7 +87,7 @@ fn artifact_completion_policy_requires_authorized_tool_use() {
 
     assert_eq!(
         runtime_agent_tool_choice(&command),
-        Some(macaca_sdk::framework::model::ToolChoice::Required)
+        Some(macaca_host_composition::framework::model::ToolChoice::Required)
     );
 }
 

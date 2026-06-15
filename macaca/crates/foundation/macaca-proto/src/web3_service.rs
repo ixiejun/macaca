@@ -1,4 +1,4 @@
-//! ServiceRuntime-facing Web3 Service contracts for Route C S11.
+//! ServiceRuntime-facing Web3 Service contracts.
 //!
 //! The value objects in `web3.rs` describe provider-neutral Web3 concepts.
 //! This module wraps those concepts in command/result DTOs that can cross the

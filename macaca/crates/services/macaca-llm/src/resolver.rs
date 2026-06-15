@@ -98,7 +98,7 @@ impl PrefixProviderResolver {
         Self { descriptors }
     }
 
-    /// Build the compatibility resolver from default descriptor data.
+    /// Build the default resolver from descriptor data.
     pub fn built_in() -> Self {
         Self::from_descriptors(default_model_route_descriptors())
     }

@@ -1,6 +1,6 @@
 //! System service descriptor adapter for the Application Framework.
 //!
-//! The Application Service descriptor is the discovery contract for Route C S7.
+//! The Application Service descriptor is the discovery contract for applications.
 //! It advertises application lifecycle, session envelope, host dispatch, and
 //! GenUI surface capabilities without exposing `AppRuntime`, `AppRegistry`,
 //! `Kernel`, Web state, or package-store implementation details.

@@ -91,7 +91,7 @@ pub trait ServiceBusMiddleware: Send + Sync {
     async fn before_dispatch(&self, context: &ServiceBusContext<'_>) -> ServiceBusResult<()>;
 }
 
-/// Middleware that enforces the Route C "no trace, no call" rule.
+/// Middleware that enforces the protocol "no trace, no call" rule.
 pub struct TraceRequiredBusMiddleware;
 
 #[async_trait]
@@ -129,7 +129,7 @@ impl ServiceBusMiddleware for DeadlineBusMiddleware {
     }
 }
 
-/// Test and compatibility policy middleware that denies every call.
+/// Test policy middleware that denies every call.
 ///
 /// Production policy, budget, region, entitlement, and payment checks will use
 /// the same middleware insertion point.  This implementation proves denial is

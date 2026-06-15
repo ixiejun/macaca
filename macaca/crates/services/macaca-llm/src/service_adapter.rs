@@ -1,89 +1,15 @@
 //! System service descriptor adapter for the LLM layer.
 //!
-//! This adapter is a descriptor skeleton only.  It lets Route C service
-//! discovery see the LLM capability surface without changing how existing LLM
-//! providers are selected or called.
+//! The canonical descriptor lives in `macaca-proto`. This module re-exports it
+//! for provider-internal paths without forcing SDK callers to depend on the LLM
+//! provider crate.
 
-use crate::hardening_contract::{
-    LLM_BUDGET_STATUS_COMMAND, LLM_CONTINUATION_VALIDATE_COMMAND, LLM_DEGRADATION_EXPLAIN_COMMAND,
-    LLM_MODEL_LIST_COMMAND, LLM_PROVIDER_CAPABILITIES_READ_COMMAND, LLM_ROUTE_RESOLVE_COMMAND,
-};
-use crate::service_contract::{
-    LLM_CHAT_COMMAND, LLM_MODEL_SELECTION_COMMAND, LLM_SERVICE_ID, LLM_SNAPSHOT_COMMAND,
-};
-use macaca_proto::{
-    CapabilityId, CleanupPolicy, KernelServiceId, ServiceCapability, ServiceDescriptor,
-    ServiceHealth, ServiceScope, ServiceType, TraceSchemaRef,
-};
-
-/// Build the provider-neutral descriptor for the LLM system service.
-pub fn llm_service_descriptor() -> ServiceDescriptor {
-    let mut descriptor = ServiceDescriptor::new(
-        KernelServiceId::new(LLM_SERVICE_ID),
-        ServiceType::new("llm"),
-        TraceSchemaRef::new("trace.system_service.llm.v1"),
-    );
-    descriptor.capabilities = vec![
-        ServiceCapability::new(
-            CapabilityId::new("capability.llm.chat"),
-            "Runs model-backed conversational completion through the LLM service boundary.",
-        ),
-        ServiceCapability::new(
-            CapabilityId::new("capability.llm.model_selection"),
-            "Resolves provider-neutral model routing metadata without exposing provider secrets.",
-        ),
-        ServiceCapability::new(
-            CapabilityId::new("capability.llm.snapshot"),
-            "Emits sanitized LLM service inventory and health snapshots.",
-        ),
-        ServiceCapability::new(
-            CapabilityId::new("capability.llm.hardening"),
-            "Exposes model catalog, provider protocol, continuation validation, budget, and degradation diagnostics.",
-        ),
-    ];
-    descriptor.health = ServiceHealth::Healthy;
-    descriptor.supported_scopes = vec![ServiceScope::Global, ServiceScope::Application("*".into())];
-    descriptor.required_permissions = vec!["llm.call".into()];
-    descriptor
-        .metadata
-        .insert("command.chat".into(), LLM_CHAT_COMMAND.into());
-    descriptor.metadata.insert(
-        "command.model_selection".into(),
-        LLM_MODEL_SELECTION_COMMAND.into(),
-    );
-    descriptor
-        .metadata
-        .insert("command.snapshot".into(), LLM_SNAPSHOT_COMMAND.into());
-    descriptor
-        .metadata
-        .insert("command.model_list".into(), LLM_MODEL_LIST_COMMAND.into());
-    descriptor.metadata.insert(
-        "command.provider_capabilities_read".into(),
-        LLM_PROVIDER_CAPABILITIES_READ_COMMAND.into(),
-    );
-    descriptor.metadata.insert(
-        "command.route_resolve".into(),
-        LLM_ROUTE_RESOLVE_COMMAND.into(),
-    );
-    descriptor.metadata.insert(
-        "command.continuation_validate".into(),
-        LLM_CONTINUATION_VALIDATE_COMMAND.into(),
-    );
-    descriptor.metadata.insert(
-        "command.budget_status".into(),
-        LLM_BUDGET_STATUS_COMMAND.into(),
-    );
-    descriptor.metadata.insert(
-        "command.degradation_explain".into(),
-        LLM_DEGRADATION_EXPLAIN_COMMAND.into(),
-    );
-    descriptor.cleanup_policy = CleanupPolicy::None;
-    descriptor
-}
+pub use macaca_proto::llm_service_descriptor;
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use macaca_proto::LLM_CONTINUATION_VALIDATE_COMMAND;
 
     #[test]
     fn llm_descriptor_exports_contract_shape() {

@@ -66,16 +66,14 @@ pub struct PackageRuntimeGuard {
 
 impl Default for PackageRuntimeGuard {
     fn default() -> Self {
-        #[allow(deprecated)]
         Self {
             steps: vec![
                 Box::new(SchemaStep),
                 Box::new(SignatureMetadataStep),
-                Box::new(CompatibilityStep),
+                Box::new(AbiConformanceStep),
                 Box::new(PermissionStep),
                 Box::new(RequiredServiceStep),
                 Box::new(OptionalServiceStep),
-                Box::new(DeprecatedCommerceInertStep),
             ],
         }
     }
@@ -182,11 +180,11 @@ impl PackageGuardStep for SignatureMetadataStep {
     }
 }
 
-struct CompatibilityStep;
+struct AbiConformanceStep;
 
-impl PackageGuardStep for CompatibilityStep {
+impl PackageGuardStep for AbiConformanceStep {
     fn name(&self) -> &'static str {
-        "compatibility"
+        "abi_conformance"
     }
 
     fn evaluate(
@@ -197,7 +195,7 @@ impl PackageGuardStep for CompatibilityStep {
     ) -> PackageResult<()> {
         let runtime_abi = descriptor.manifest.runtime.abi_version.clone();
         if runtime_abi != context.supported_abi_version {
-            return Err(PackageGuardError::AbiIncompatible {
+            return Err(PackageGuardError::AbiRejected {
                 required: runtime_abi,
                 supported: context.supported_abi_version.clone(),
             });
@@ -277,37 +275,6 @@ impl PackageGuardStep for OptionalServiceStep {
                     });
             }
         }
-        Ok(())
-    }
-}
-
-/// Legacy synchronous commerce marker.
-///
-/// Runtime entitlement checks are now performed by
-/// `CommercialPackageGuard`/`EntitlementRuntimeFacade`. This step remains in
-/// the existing synchronous metadata guard so older callers can locate and
-/// migrate the previous precheck path without changing YAML package loading.
-#[deprecated(
-    note = "use CommercialPackageGuard with EntitlementRuntimeFacade for Store/Entitlement checks"
-)]
-struct DeprecatedCommerceInertStep;
-
-#[allow(deprecated)]
-impl PackageGuardStep for DeprecatedCommerceInertStep {
-    fn name(&self) -> &'static str {
-        "commerce_deprecated_marker"
-    }
-
-    fn evaluate(
-        &self,
-        descriptor: &mut PackageDescriptor,
-        _context: &PackageGuardContext,
-        _trace: &mut Vec<PackageGuardTraceEvent>,
-    ) -> PackageResult<()> {
-        descriptor
-            .manifest
-            .metadata
-            .insert("commerce.precheck".into(), "deprecated_marker".into());
         Ok(())
     }
 }
@@ -392,7 +359,7 @@ mod tests {
     }
 
     #[test]
-    fn guard_rejects_incompatible_abi() {
+    fn guard_rejects_nonconformant_abi() {
         let guard = PackageRuntimeGuard::new();
         let result = guard.evaluate(
             descriptor_with_runtime(Some(PackageRuntimeKind::Yaml), "99"),
@@ -402,7 +369,7 @@ mod tests {
         assert!(matches!(
             result.decision,
             PackageGuardDecision::Rejected {
-                error: PackageGuardError::AbiIncompatible { .. }
+                error: PackageGuardError::AbiRejected { .. }
             }
         ));
     }

@@ -105,36 +105,6 @@ impl SkillCatalog {
         entries
     }
 
-    /// Tier 1: Render the catalog as a compact string for prompt injection.
-    ///
-    /// Format: XML-like structure per agentskills.io recommendation.
-    #[deprecated(
-        note = "Prefer macaca_context capability providers (SkillContextProvider) or SkillRuntimeFacade snapshots; direct prompt concatenation bypasses context reports and budget."
-    )]
-    pub fn catalog_prompt(&self) -> String {
-        let entries = self.catalog();
-        if entries.is_empty() {
-            return String::new();
-        }
-
-        let mut out = String::from("<available_skills>\n");
-        for entry in &entries {
-            out.push_str("  <skill>\n");
-            out.push_str(&format!("    <name>{}</name>\n", entry.name));
-            out.push_str(&format!(
-                "    <description>{}</description>\n",
-                entry.description
-            ));
-            out.push_str(&format!(
-                "    <location>{}</location>\n",
-                entry.location.display()
-            ));
-            out.push_str("  </skill>\n");
-        }
-        out.push_str("</available_skills>");
-        out
-    }
-
     /// Tier 2: Activate a skill (load full instruction content).
     ///
     /// Returns the activated skill with full content. Caches the result
@@ -201,8 +171,6 @@ impl Default for SkillCatalog {
 
 #[cfg(test)]
 mod tests {
-    #![allow(deprecated)] // Exercises deprecated `catalog_prompt` until callers migrate entirely.
-
     use super::*;
 
     async fn make_skill_dir(base: &Path, name: &str, desc: &str) -> PathBuf {
@@ -236,11 +204,11 @@ mod tests {
         assert_eq!(entries[0].name, "alpha");
         assert_eq!(entries[1].name, "beta");
 
-        // Tier 1: catalog prompt.
-        let prompt = catalog.catalog_prompt();
-        assert!(prompt.contains("<available_skills>"));
-        assert!(prompt.contains("alpha"));
-        assert!(prompt.contains("beta"));
+        // Tier 1 is intentionally structured metadata. Prompt rendering belongs
+        // to context capability providers so reports can enforce token budget,
+        // provenance, and redaction consistently.
+        let names: Vec<&str> = entries.iter().map(|entry| entry.name.as_str()).collect();
+        assert_eq!(names, vec!["alpha", "beta"]);
     }
 
     #[tokio::test]
@@ -271,12 +239,6 @@ mod tests {
         let mut catalog = SkillCatalog::new();
         let err = catalog.activate("nope").await.unwrap_err();
         assert!(err.to_string().contains("not in catalog"));
-    }
-
-    #[tokio::test]
-    async fn empty_catalog_prompt() {
-        let catalog = SkillCatalog::new();
-        assert!(catalog.catalog_prompt().is_empty());
     }
 
     #[tokio::test]

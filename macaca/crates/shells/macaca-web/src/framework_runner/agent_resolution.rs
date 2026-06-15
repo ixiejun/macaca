@@ -1,13 +1,13 @@
 //! Agent capability, model, and context-config resolution helpers.
 
-use std::sync::Arc;
-use macaca_sdk::agent::AgentCapabilitySet;
-use macaca_sdk::app::model::AppContextConfig;
-use macaca_sdk::app::app_agent_manifest_view;
+use super::FrameworkRunner;
+use crate::state::AppState;
+use macaca_host_composition::app::app_agent_manifest_view;
+use macaca_host_composition::app::model::AppContextConfig;
+use macaca_host_composition::framework::construction::AgentCapabilitySet;
 use macaca_proto::config::{AgentProfileContextConfig, AgentProfileRootKind, ContextConfig};
 use macaca_proto::{ApplicationId, Capability};
-use crate::state::AppState;
-use super::FrameworkRunner;
+use std::sync::Arc;
 
 impl FrameworkRunner {
     pub(crate) async fn resolve_agent_capability_set(
@@ -19,7 +19,7 @@ impl FrameworkRunner {
             let registry = crate::application_shell_adapter::registry_read_guard(&state).await;
             if let Some(app) = registry.get_app(app_id) {
                 if let Some(agent) = app_agent_manifest_view(&app.manifest, agent_name) {
-                    return AgentCapabilitySet::from_legacy(
+                    return AgentCapabilitySet::from_flat_capabilities(
                         agent
                             .capabilities()
                             .iter()
@@ -38,7 +38,7 @@ impl FrameworkRunner {
             .find(|manifest| manifest.name == agent_name)
             .map(|manifest| manifest.capabilities)
             .unwrap_or_default();
-        AgentCapabilitySet::from_legacy(capabilities)
+        AgentCapabilitySet::from_flat_capabilities(capabilities)
     }
 
     /// Resolve the routed model selection for an agent.
@@ -48,7 +48,7 @@ impl FrameworkRunner {
         app_id: &ApplicationId,
         agent_name: &str,
         session_id: Option<&str>,
-    ) -> Result<macaca_sdk::llm::ModelSelection, String> {
+    ) -> Result<macaca_host_composition::llm::ModelSelection, String> {
         let request_model = if let Some(session_id) = session_id {
             state
                 .sessions
@@ -74,7 +74,7 @@ impl FrameworkRunner {
             app_id,
             agent_name,
             session_id,
-            macaca_sdk::llm::ModelSelectionRequest {
+            macaca_host_composition::llm::ModelSelectionRequest {
                 request_model: request_model.clone(),
                 agent_model,
                 app_model: app_defaults.as_ref().map(|cfg| cfg.model.clone()),
@@ -146,7 +146,7 @@ impl FrameworkRunner {
         config
     }
 
-    /// Resolves the on-disk directory scanned by [`macaca_sdk::context::ProfileFileContextProvider`].
+    /// Resolves the on-disk directory scanned by [`macaca_host_composition::context::ProfileFileContextProvider`].
     ///
     /// The path is never interpreted as a workflow name — only as filesystem layout dictated by
     /// [`AgentProfileRootKind`] and the active [`ApplicationId`].

@@ -14,7 +14,6 @@ mod executor_adapter;
 mod executor_event_adapter;
 mod framework_chat_path;
 mod route_chat_v2;
-mod route_legacy;
 mod route_stop;
 mod session_persistence_adapter;
 mod sse_adapter;
@@ -27,5 +26,4 @@ pub(crate) mod contract_source;
 mod tests;
 
 pub(crate) use route_chat_v2::post_chat_v2;
-pub(crate) use route_legacy::post_chat;
 pub(crate) use route_stop::post_chat_stop;

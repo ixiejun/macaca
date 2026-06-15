@@ -6,12 +6,11 @@
 //! becoming a God Object while preserving service ownership of provider/model
 //! semantics.
 
-use macaca_sdk::llm::{
-    LlmCatalogReadCommand, LlmPolicyHints, LlmRouteResolveCommand, LlmServiceScope,
-    LLM_MODEL_LIST_COMMAND, LLM_PROVIDER_CAPABILITIES_READ_COMMAND, LLM_ROUTE_RESOLVE_COMMAND,
-    LLM_SERVICE_ID,
+use macaca_proto::{
+    ApplicationId, LlmCatalogReadCommand, LlmPolicyHints, LlmRouteResolveCommand, LlmServiceScope,
+    TraceContext, LLM_MODEL_LIST_COMMAND, LLM_PROVIDER_CAPABILITIES_READ_COMMAND,
+    LLM_ROUTE_RESOLVE_COMMAND, LLM_SERVICE_ID,
 };
-use macaca_proto::{ApplicationId, TraceContext};
 use serde_json::Value;
 
 /// Hydrate an app-owned UI `service.llm` bridge call into a typed command.

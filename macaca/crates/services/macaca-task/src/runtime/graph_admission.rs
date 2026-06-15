@@ -1,7 +1,7 @@
 //! Task graph admission specification for session-scoped assignments.
 //!
 //! Enforces at most one authoritative application-execution graph per session while
-//! allowing compatibility/diagnostic graph entries for audit evidence.
+//! allowing auxiliary/diagnostic graph entries for audit evidence.
 
 use tracing::{info, warn};
 
@@ -34,7 +34,12 @@ where
             command
                 .graph_owner
                 .is_application_execution_authoritative()
-                .then(|| format!("application_execution:{}", command.session_id.trim()))
+                .then(|| {
+                    format!(
+                        "application_execution:{}",
+                        command.session_id.as_deref().unwrap_or("app_scope").trim()
+                    )
+                })
         })
     }
 
@@ -42,7 +47,7 @@ where
     ///
     /// The rule intentionally models graph admission instead of agent workflow
     /// semantics: many tasks may join the same authoritative graph, while a
-    /// second authoritative graph id in the same session is rejected.  Compatibility
+    /// second authoritative graph id in the same session is rejected. Auxiliary
     /// and diagnostic graph entries remain admissible because they are audit
     /// evidence, not application-execution terminal facts.
     pub(crate) async fn admit_assignment_graph(
@@ -50,10 +55,14 @@ where
         command: &CreateTaskAssignmentCommand,
         normalized_graph_id: Option<&str>,
     ) -> Result<(), String> {
-        let existing = self
-            .store
-            .list_all_todos_for_session(&command.app_id, &command.session_id)
-            .await;
+        let existing = match command.session_id.as_deref() {
+            Some(session_id) => {
+                self.store
+                    .list_all_todos_for_session(&command.app_id, session_id)
+                    .await
+            }
+            None => self.store.list_all_todos(&command.app_id).await,
+        };
         let authoritative_conflict = command
             .graph_owner
             .is_application_execution_authoritative()
@@ -68,7 +77,7 @@ where
 
         info!(
             app_id = %command.app_id.0,
-            session_id = %command.session_id,
+            session_id = ?command.session_id,
             graph_owner = %command.graph_owner.as_str(),
             graph_id = normalized_graph_id.unwrap_or("none"),
             trace_id = command
@@ -83,9 +92,9 @@ where
         if let Some(conflicting_task) = authoritative_conflict {
             warn!(
                 app_id = %command.app_id.0,
-                session_id = %command.session_id,
+                session_id = ?command.session_id,
                 requested_graph_id = normalized_graph_id.unwrap_or("none"),
-                existing_graph_id = conflicting_task.graph_id.as_deref().unwrap_or("legacy_application_execution"),
+                existing_graph_id = conflicting_task.graph_id.as_deref().unwrap_or("application_execution_unscoped"),
                 existing_task_id = %conflicting_task.id,
                 trace_id = command
                     .trace
@@ -95,7 +104,7 @@ where
                 "task graph admission rejected"
             );
             return Err(format!(
-                "task service rejected a second authoritative graph for session {}",
+                "task service rejected a second authoritative graph for session {:?}",
                 command.session_id
             ));
         }
@@ -103,7 +112,7 @@ where
         if command.graph_owner.is_application_execution_authoritative() {
             info!(
                 app_id = %command.app_id.0,
-                session_id = %command.session_id,
+                session_id = ?command.session_id,
                 graph_id = normalized_graph_id.unwrap_or("none"),
                 trace_id = command
                     .trace
@@ -115,7 +124,7 @@ where
         } else {
             info!(
                 app_id = %command.app_id.0,
-                session_id = %command.session_id,
+                session_id = ?command.session_id,
                 graph_owner = %command.graph_owner.as_str(),
                 graph_id = normalized_graph_id.unwrap_or("none"),
                 trace_id = command
@@ -123,7 +132,7 @@ where
                     .as_ref()
                     .map(|trace| trace.trace_id.as_str())
                     .unwrap_or("none"),
-                "compatibility task graph admitted"
+                "auxiliary task graph admitted"
             );
         }
 

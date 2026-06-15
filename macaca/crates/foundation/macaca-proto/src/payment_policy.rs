@@ -1,7 +1,7 @@
 //! Provider-neutral payment policy strategy for A2A intents.
 //!
-//! This module defines the policy boundary used by runtime adapters and legacy
-//! compatibility coordinators. Keeping this in `macaca-proto` allows both
+//! This module defines the policy boundary used by runtime adapters and
+//! coordination services. Keeping this in `macaca-proto` allows both
 //! kernel and runtime-host crates to share one implementation without creating
 //! cross-crate dependency cycles.
 

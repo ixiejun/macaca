@@ -1,4 +1,4 @@
-//! Provider-neutral Optional Web3 Node Module contracts for Route C Phase 10.
+//! Provider-neutral Optional Web3 Node Module contracts.
 //!
 //! These contracts describe Web3 availability, wallet/signing commands,
 //! transaction commands, chain queries, and audit-friendly outcomes without

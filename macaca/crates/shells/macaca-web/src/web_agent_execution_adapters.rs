@@ -1,14 +1,22 @@
 //! Web adapters for runtime-host `ComposedAgentExecutionBackend`.
 //!
-//! The Web shell injects framework construction and session-local lifecycle
+//! The Web shell injects framework materialization and session-local lifecycle
 //! wiring through these ports so `service.agent_execution` semantics remain
-//! owned by runtime-host per Route C governance.
+//! owned by runtime-host per protocol microkernel governance.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use macaca_sdk::runtime_host::executor::{ApplicationExecutor, ExecutorEventFactory};
+use macaca_host_composition::agent_execution::{
+    execution_control_execution_id, execution_control_scope, AgentExecutionEvidenceCollector,
+    AgentExecutionHostAdapter, AgentExecutionOutputHasher, ComposedAgentExecutionBackend,
+    RuntimeHostFrameworkAgentConstructionService, ServiceBackedFrameworkRuntimeAgentPort,
+};
+use macaca_host_composition::execution_control::{
+    ExecutionControlLocalNotification, OpaqueExecutionControlHandle,
+};
+use macaca_host_composition::executor::{ApplicationExecutor, ExecutorEventFactory};
 use macaca_proto::{
     AgentActivity, AgentExecutionCommand, AgentExecutionEvent, ApplicationMetadataQueryCommand,
     ExecutionControlCommandResult, ExecutionControlPolicy,
@@ -16,16 +24,11 @@ use macaca_proto::{
     ExecutionControlResolvePolicyCommand, ExecutionControlResolvedPolicy, KernelServiceId,
     ServiceBusSource, ServiceError, ServiceResult, TaskId, EXECUTION_CONTROL_SERVICE_ID,
 };
-use macaca_sdk::runtime_host::{
-    execution_control_execution_id, execution_control_scope, AgentExecutionEvidenceCollector,
-    AgentExecutionHostAdapter, AgentExecutionOutputHasher, OpaqueExecutionControlHandle,
-    ServiceBackedFrameworkRuntimeAgentPort,
-};
 use tokio::sync::mpsc;
 
 use crate::agent_execution_evidence::{observed_agent_execution_events, stable_agent_output_hash};
 use crate::application_execution_agent_event_bridge::ApplicationExecutionAgentEventMirror;
-use crate::framework_agent_construction_shell_adapter::WebFrameworkAgentConstructionPort;
+use crate::framework_agent_construction_shell_adapter::WebFrameworkAgentMaterializationPort;
 use crate::framework_runner::RuntimeExecutionControl;
 use crate::runtime_event_bridge::emit_execution_control_events;
 use crate::state::AppState;
@@ -35,13 +38,13 @@ const WEB_AGENT_EXECUTION_BUS_SOURCE: &str = "macaca.web.agent_execution";
 /// Host port that wires Web session state, kernel lifecycle, and execution-control services.
 pub(crate) struct WebAgentExecutionHostAdapter {
     state: Arc<AppState>,
-    service_runtime: Arc<macaca_sdk::runtime_host::ServiceRuntime>,
+    service_runtime: Arc<macaca_host_composition::service_runtime::ServiceRuntime>,
 }
 
 impl WebAgentExecutionHostAdapter {
     pub(crate) fn new(
         state: Arc<AppState>,
-        service_runtime: Arc<macaca_sdk::runtime_host::ServiceRuntime>,
+        service_runtime: Arc<macaca_host_composition::service_runtime::ServiceRuntime>,
     ) -> Self {
         Self {
             state,
@@ -96,7 +99,11 @@ impl AgentExecutionHostAdapter for WebAgentExecutionHostAdapter {
             command.trace.clone(),
             command.application_id,
         ) {
-            Ok(metadata_command) => match self.state.application_client.metadata(metadata_command).await
+            Ok(metadata_command) => match self
+                .state
+                .application_client
+                .metadata(metadata_command)
+                .await
             {
                 Ok(view) => view.execution_control,
                 Err(error) => {
@@ -148,8 +155,8 @@ impl AgentExecutionHostAdapter for WebAgentExecutionHostAdapter {
         let output = reply.output.ok_or_else(|| {
             ServiceError::AdapterFailure("execution control service returned no policy".into())
         })?;
-        let resolution: ExecutionControlResolvedPolicy = serde_json::from_value(output)
-            .map_err(|error| {
+        let resolution: ExecutionControlResolvedPolicy =
+            serde_json::from_value(output).map_err(|error| {
                 ServiceError::AdapterFailure(format!(
                     "execution control policy decode failed: {error}"
                 ))
@@ -229,26 +236,41 @@ impl AgentExecutionHostAdapter for WebAgentExecutionHostAdapter {
         if policy.triggers.is_empty() {
             return None;
         }
+        if !self
+            .state
+            .sessions
+            .active_sessions
+            .read()
+            .await
+            .contains_key(&command.session_id)
+        {
+            tracing::warn!(
+                session_id = %command.session_id,
+                target_agent = %command.target_agent,
+                "execution control requested without an active session"
+            );
+            return None;
+        }
+
         let (resume_tx, resume_rx) = mpsc::channel(4);
-        let mut sessions = self.state.sessions.active_sessions.write().await;
-        let session = match sessions.get_mut(&command.session_id) {
-            Some(session) => session,
-            None => {
-                tracing::warn!(
-                    session_id = %command.session_id,
-                    target_agent = %command.target_agent,
-                    "execution control requested without an active session"
-                );
-                return None;
-            }
-        };
-        session.resume_tx = resume_tx;
-        let control = RuntimeExecutionControl::new(
-            Arc::clone(&session.pause_signal),
-            resume_rx,
-            policy,
-            execution_id,
+        let pause_signal = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        self.state
+            .sessions
+            .execution_control_local_notifications
+            .install(
+                command.session_id.clone(),
+                ExecutionControlLocalNotification {
+                    pause_signal: Arc::clone(&pause_signal),
+                    resume_tx,
+                },
+            )
+            .await;
+        tracing::info!(
+            session_id = %command.session_id,
+            execution_id = %execution_id,
+            "Installed runtime-host execution-control local notification handle"
         );
+        let control = RuntimeExecutionControl::new(pause_signal, resume_rx, policy, execution_id);
         Some(OpaqueExecutionControlHandle(Arc::new(control)))
     }
 
@@ -381,9 +403,9 @@ impl AgentExecutionOutputHasher for WebAgentExecutionOutputHasher {
 /// Build the Web-wired composed agent execution backend for service registration.
 pub(crate) fn build_composed_web_agent_execution_backend(
     state: Arc<AppState>,
-    service_runtime: Arc<macaca_sdk::runtime_host::ServiceRuntime>,
-) -> macaca_sdk::runtime_host::ComposedAgentExecutionBackend {
-    macaca_sdk::runtime_host::ComposedAgentExecutionBackend::new(
+    service_runtime: Arc<macaca_host_composition::service_runtime::ServiceRuntime>,
+) -> ComposedAgentExecutionBackend {
+    ComposedAgentExecutionBackend::new(
         service_runtime,
         WEB_AGENT_EXECUTION_BUS_SOURCE,
         Arc::new(WebAgentExecutionHostAdapter::new(
@@ -391,7 +413,12 @@ pub(crate) fn build_composed_web_agent_execution_backend(
             Arc::clone(&state.service_runtime),
         )),
         Arc::new(ServiceBackedFrameworkRuntimeAgentPort::new(
-            Arc::new(WebFrameworkAgentConstructionPort::new(Arc::clone(&state))),
+            Arc::new(RuntimeHostFrameworkAgentConstructionService::new(
+                Arc::new(WebFrameworkAgentMaterializationPort::new(Arc::clone(
+                    &state,
+                ))),
+                WEB_AGENT_EXECUTION_BUS_SOURCE,
+            )),
             WEB_AGENT_EXECUTION_BUS_SOURCE,
         )),
         Arc::new(WebAgentExecutionOutputHasher),

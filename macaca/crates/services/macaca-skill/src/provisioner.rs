@@ -307,6 +307,5 @@ fn home_dir() -> Option<PathBuf> {
     std::env::var("HOME").ok().map(PathBuf::from)
 }
 
-
 #[cfg(test)]
 mod tests;

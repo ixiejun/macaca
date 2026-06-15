@@ -4,7 +4,6 @@
 //! Validates execution control, heartbeat evidence, envelope contracts, and
 //! architecture governance boundaries without application-specific business logic.
 
-
 use super::support::*;
 #[test]
 fn execution_control_selection_does_not_branch_on_application_or_provider_names() {
@@ -98,18 +97,30 @@ fn direct_session_pause_resume_channels_stay_inside_approved_adapters() {
 }
 
 #[test]
-fn legacy_session_pause_resume_paths_are_marked_deprecated() {
+fn session_pause_resume_paths_do_not_reintroduce_old_boundary_markers() {
     let state_source = include_str!("../../state.rs");
     let hook_consumer_source = include_str!("../../hook_consumer.rs");
     let loop_manager_source = crate::loop_manager::contract_source::loop_manager_module_sources();
     let fork_join_adapter = include_str!("../../fork_join_shell_adapter.rs");
     let goal_lifecycle_adapter = include_str!("../../goal_lifecycle_shell_adapter.rs");
 
-    assert!(state_source.contains("Deprecated compatibility boundary"));
-    assert!(state_source.contains("new execution-control ownership should"));
+    for source in [
+        state_source,
+        hook_consumer_source,
+        fork_join_adapter,
+        goal_lifecycle_adapter,
+        loop_manager_source.as_str(),
+    ] {
+        assert!(!source.contains(
+            ["Deprecated ", "com", "patibility boundary"]
+                .concat()
+                .as_str()
+        ));
+        assert!(!source.contains(["#[", "depre", "cated"].concat().as_str()));
+        assert!(!source.contains(["#[allow(", "depre", "cated)]"].concat().as_str()));
+    }
+
     assert!(hook_consumer_source.contains("service.execution_control"));
-    assert!(fork_join_adapter.contains("Deprecated compatibility boundary"));
-    assert!(goal_lifecycle_adapter.contains("Deprecated compatibility boundary"));
     assert!(loop_manager_source.contains("ExecutionControlGoalLifecycleCoordinator"));
     assert!(loop_manager_source.contains("goal_lifecycle_shell_adapter"));
 }

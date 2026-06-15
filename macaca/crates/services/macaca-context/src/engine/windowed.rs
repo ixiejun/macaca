@@ -10,9 +10,7 @@ use tracing::info;
 
 use crate::report::ContextDecisionReport;
 
-use super::helpers::{
-    build_report_for_messages, estimate_messages_tokens, trim_to_budget,
-};
+use super::helpers::{build_report_for_messages, estimate_messages_tokens, trim_to_budget};
 use super::types::{
     ContextAssembleInput, ContextAssembleResult, ContextEngine, ContextEngineInfo,
     ContextOptionsPatch,

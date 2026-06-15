@@ -1,4 +1,4 @@
-//! Provider-neutral Application Service DTOs for Route C S7.
+//! Provider-neutral Application Service DTOs.
 //!
 //! Split from monolithic `application_service.rs` (P5 iteration 83) using a
 //! Facade module tree.  These types live in `macaca-proto` because both the SDK

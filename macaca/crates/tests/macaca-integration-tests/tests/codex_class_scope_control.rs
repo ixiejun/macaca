@@ -64,10 +64,10 @@ fn collect_production_rust_files(dir: &Path, files: &mut Vec<PathBuf>) {
 }
 
 /// Application-framework code is the allowed owner for application metadata and
-/// workflow identifiers. The LLM service is a current migration surface for
+/// workflow identifiers. The LLM service is a current terminal exception surface for
 /// provider/model routing strategy; future hardening work moves more of that
 /// behavior into descriptor data, but this phase records it as non-blocking
-/// legacy ownership rather than failing the Codex-class workbench gate.
+/// retired ownership rather than failing the Codex-class workbench gate.
 fn is_approved_scope_owner(relative: &str, identity: &str) -> bool {
     relative.starts_with("crates/application/")
         || relative.starts_with("crates/foundation/")

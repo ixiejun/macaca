@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
-use macaca_sdk::memory::{MemoryPolicyHints, MemoryRememberCommand, MemoryScope};
-use macaca_proto::{ApplicationId, MemoryLayer, TraceContext};
+use macaca_proto::{
+    ApplicationId, MemoryLayer, MemoryPolicyHints, MemoryRememberCommand, MemoryScope, TraceContext,
+};
 use tracing::{info, warn};
 
 const MAX_CAPTURE_EXCERPT_CHARS: usize = 1200;
@@ -122,13 +123,12 @@ mod tests {
     use std::sync::Arc;
 
     use async_trait::async_trait;
-    use macaca_sdk::memory::{
-        MemoryForgetCommand, MemoryGetCommand, MemoryGetResult, MemoryPrefetchCommand,
-        MemoryRecallCommand, MemoryRecallResult, MemoryRememberCommand, MemoryRememberResult,
-        MemoryServiceSnapshot, MemoryServiceSnapshotCommand, MemoryStatusCommand,
-        MemoryStatusReport,
+    use macaca_proto::{
+        ApplicationId, MacacaResult, MemoryForgetCommand, MemoryGetCommand, MemoryGetResult,
+        MemoryId, MemoryPrefetchCommand, MemoryRecallCommand, MemoryRecallResult,
+        MemoryRememberCommand, MemoryRememberResult, MemoryServiceSnapshot,
+        MemoryServiceSnapshotCommand, MemoryStatusCommand, MemoryStatusReport, TraceContext,
     };
-    use macaca_proto::{ApplicationId, MacacaResult, MemoryId, TraceContext};
     use tokio::sync::Mutex;
 
     #[derive(Default)]

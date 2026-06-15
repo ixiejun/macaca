@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 
-use macaca_sdk::runtime_host::persist::{AppendEventCommand, EventLog};
+use async_trait::async_trait;
 use macaca_proto::{ApplicationId, RunTracePayload};
 use serde_json::json;
 
@@ -92,14 +92,21 @@ pub async fn emit_for_scope(
 }
 
 /// Emits structured `run_trace` rows into the session event log.
+#[async_trait]
+pub trait RunTraceSink: Send + Sync {
+    /// Append one bounded run-trace payload under the supplied session scope.
+    async fn append_run_trace(&self, session_id: &str, payload: serde_json::Value);
+}
+
+/// Emits structured `run_trace` rows into the configured sink.
 #[derive(Clone)]
 pub struct RunTracer {
-    log: Arc<EventLog>,
+    sink: Arc<dyn RunTraceSink>,
 }
 
 impl RunTracer {
-    pub fn new(log: Arc<EventLog>) -> Self {
-        Self { log }
+    pub fn new(sink: Arc<dyn RunTraceSink>) -> Self {
+        Self { sink }
     }
 
     /// Record a checkpoint. Safe to call from hot paths; failures are swallowed after metrics.
@@ -126,13 +133,6 @@ impl RunTracer {
             extra,
         };
         let v = serde_json::to_value(&payload).unwrap_or_else(|_| json!({}));
-        self.log
-            .append_command(AppendEventCommand::new(
-                session_id,
-                "run_trace",
-                "run_tracer",
-                v,
-            ))
-            .await;
+        self.sink.append_run_trace(session_id, v).await;
     }
 }

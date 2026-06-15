@@ -7,9 +7,9 @@
 //! from importing skill-governance DTOs while still making profile choices
 //! explicit and auditable.
 
-use macaca_sdk::context::catalog::constants::FAMILY_SKILL_CAPABILITY;
+use macaca_host_composition::context::catalog::constants::FAMILY_SKILL_CAPABILITY;
+use macaca_host_composition::runtime_host::SkillLifecycleState;
 use macaca_proto::config::ContextConfig;
-use macaca_sdk::skill::SkillLifecycleState;
 
 /// Provider-neutral profile label for non-active skill rows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

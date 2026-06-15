@@ -4,29 +4,18 @@ use std::collections::BTreeSet;
 use std::path::Path;
 
 use axum::http::StatusCode;
-use macaca_sdk::app::ui_runtime::{
-    AppUiBridgeConfig, AppUiPresentationConfig, AppUiRuntimeConfig, AppUiRuntimeKind,
-    AppUiSandboxConfig, AppUiSurfaceConfig, AppUiThemeConfig,
-};
 use macaca_proto::{ApplicationHostCommandStatus, TraceContext};
 
 use super::adapter::{ensure_declared_asset, normalize_package_path};
 use super::bridge_adapter::{rejected_bridge_result, rejected_undeclared_service_result};
+use super::types::AppUiRouteRuntime;
 
-fn ui_config() -> AppUiRuntimeConfig {
-    AppUiRuntimeConfig {
-        runtime: AppUiRuntimeKind::WebBundle,
-        surface: AppUiSurfaceConfig::default(),
-        framework: None,
+fn ui_config() -> AppUiRouteRuntime {
+    AppUiRouteRuntime {
         entry: Some("dist/ui/index.html".into()),
         assets: vec!["dist/ui/assets/**".into()],
-        sandbox: AppUiSandboxConfig::default(),
-        bridge: AppUiBridgeConfig {
-            required: vec!["service.call".into()],
-            optional: vec!["trace.emit".into()],
-        },
-        presentation: AppUiPresentationConfig::default(),
-        theme: AppUiThemeConfig::default(),
+        bridge_required: vec!["service.call".into()],
+        bridge_optional: vec!["trace.emit".into()],
     }
 }
 

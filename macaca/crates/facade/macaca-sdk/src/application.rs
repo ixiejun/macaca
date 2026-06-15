@@ -89,7 +89,7 @@ impl ApplicationHostCommandBuilder {
         self
     }
 
-    /// Attach trace context required by Route C host import governance.
+    /// Attach trace context required by host import governance.
     pub fn trace(mut self, trace: TraceContext) -> Self {
         self.trace = Some(trace);
         self

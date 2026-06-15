@@ -5,20 +5,20 @@
 
 use std::sync::Arc;
 
-use macaca_sdk::context::{
+use macaca_host_composition::context::{
     ActiveRecallDiagnostics, ContextDecisionReport, ContextDecisionSeverity,
     ContextPreflightRecallConfig,
 };
+use macaca_host_composition::memory::{MemoryPolicyHints, MemoryPrefetchCommand, MemoryScope};
 use macaca_proto::LlmMessage;
-use macaca_sdk::memory::{MemoryPolicyHints, MemoryPrefetchCommand, MemoryScope};
 use tokio::time::timeout;
 
 use crate::context_memory_injection::adapter::{
-    insert_after_leading_system, legacy_memory_source_report, memory_trace,
+    insert_after_leading_system, memory_trace, request_memory_source_report,
 };
 use crate::context_message_codec::last_user_text_from_framework;
 
-/// Run active recall as a dynamic, request-only context source (legacy injection path).
+/// Run active recall as a dynamic, request-only context source.
 ///
 /// Skips work when composer-stage recall already ran (`composer_recall_active`).
 pub(crate) async fn apply_active_recall(
@@ -27,7 +27,7 @@ pub(crate) async fn apply_active_recall(
     scope: MemoryScope,
     preflight_cfg: &ContextPreflightRecallConfig,
     composer_recall_active: bool,
-    assembled: &mut macaca_sdk::context::ContextAssembleResult,
+    assembled: &mut macaca_host_composition::context::ContextAssembleResult,
     incoming_framework_messages: &[serde_json::Value],
 ) {
     if composer_recall_active {
@@ -125,7 +125,7 @@ pub(crate) async fn apply_active_recall(
             ));
             continue;
         }
-        let candidate_tokens = macaca_sdk::context::estimate_text_tokens(&candidate);
+        let candidate_tokens = macaca_host_composition::context::estimate_text_tokens(&candidate);
         if used_tokens.saturating_add(candidate_tokens) > preflight_cfg.max_tokens {
             assembled.report.decisions.push(ContextDecisionReport::info(
                 "active_recall_skipped",
@@ -138,7 +138,7 @@ pub(crate) async fn apply_active_recall(
         used_tokens = used_tokens.saturating_add(candidate_tokens);
         rendered.push_str(&candidate);
         rendered.push('\n');
-        source_breakdown.push(legacy_memory_source_report(
+        source_breakdown.push(request_memory_source_report(
             entry,
             "active memory recall",
             candidate_tokens,

@@ -53,7 +53,7 @@ impl InteractionSystemServiceProvider {
     }
 
     /// Create a provider that also mirrors sanitized lifecycle evidence into
-    /// the existing session EventLog compatibility path.
+    /// the session EventLog replay path.
     pub fn with_event_log(
         store: Arc<dyn InteractionLedgerStore>,
         event_log: Option<Arc<EventLog>>,

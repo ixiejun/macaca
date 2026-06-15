@@ -1,10 +1,9 @@
 //! Adapter: project `AgentExecutionResult` into bounded `TaskResult` evidence.
 
 use chrono::Utc;
-use macaca_proto::{AgentExecutionResult, TaskId};
-use macaca_sdk::runtime_host::executor::TaskResult;
+use macaca_proto::{AgentExecutionResult, TaskId, TaskResult};
 
-use super::types::{MAX_ARTIFACT_REF_CHARS, MAX_ARTIFACT_REFS};
+use super::types::{MAX_ARTIFACT_REFS, MAX_ARTIFACT_REF_CHARS};
 
 /// Build the task-result projection used by the Skill proposal command.
 ///

@@ -113,7 +113,7 @@ impl ServiceCapability {
 
 /// Explicit service lifecycle state.
 ///
-/// The state model mirrors Route C's install/register/authorize/start/call/
+/// The state model mirrors the protocol install/register/authorize/start/call/
 /// trace/stop/cleanup path.  It is intentionally generic so every service
 /// category can share one lifecycle contract.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

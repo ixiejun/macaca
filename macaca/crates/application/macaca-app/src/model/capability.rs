@@ -1,8 +1,8 @@
 //! Composite capability tree for application-level capability tracking.
 //!
 //! Applies the **Composite** pattern: capability groups preserve provenance
-//! (`Manifest`, `Skill`, `Driver`, etc.) while `flatten_legacy` adapts back to
-//! the flat list consumed by legacy admission and projection code paths.
+//! (`Manifest`, `Skill`, `Driver`, etc.) while `flatten` returns the flat list
+//! consumed by admission and projection code paths.
 
 use super::agent_config::{AgentSource, CapabilityRef};
 
@@ -42,8 +42,8 @@ impl AppCapabilityNode {
 
 /// Composite capability set for applications.
 ///
-/// Callers can flatten back to the legacy capability list while preserving
-/// source information internally for structured admission diagnostics.
+/// Callers can flatten back to a capability list while preserving source
+/// information internally for structured admission diagnostics.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct AppCapabilitySet {
     root: Vec<AppCapabilityNode>,
@@ -86,8 +86,8 @@ impl AppCapabilitySet {
         });
     }
 
-    /// Flatten all capabilities back into the legacy output format.
-    pub fn flatten_legacy(&self) -> Vec<CapabilityRef> {
+    /// Flatten all capabilities into the transport output format.
+    pub fn flatten(&self) -> Vec<CapabilityRef> {
         let mut refs = Vec::new();
         for node in &self.root {
             node.flatten_into(&mut refs);

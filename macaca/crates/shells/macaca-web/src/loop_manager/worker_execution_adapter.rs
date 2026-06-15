@@ -1,16 +1,22 @@
 //! WorkerLoop task execution adapter via `service.agent_execution`.
 //!
-//! WorkerLoop retains scheduling/retry semantics; this adapter owns the service
-//! call, TaskBoard updates, and review submission side effects.
+//! WorkerLoop retains scheduling/retry semantics; this adapter owns the agent
+//! service call and reports task lifecycle transitions through `service.task`.
 
 use std::sync::Arc;
 
-use macaca_sdk::runtime_host::executor::ApplicationExecutor;
-use macaca_proto::{AgentExecutionIntent, ApplicationId};
+use macaca_host_composition::executor::ApplicationExecutor;
+use macaca_proto::{
+    AgentExecutionIntent, ApplicationId, FailTaskCommand, SubmitReviewCommand, TaskId, TraceContext,
+};
+use macaca_sdk::ServiceBackedTaskBoardDataSource;
 
 use super::agent_execution_adapter::run_loop_agent_execution_service_call;
 use super::execution_control_adapter::session_loop_coordinator;
-use super::planner_helpers::{executor_task_completed, executor_task_failed, executor_task_started, update_agent_activity_by_name};
+use super::planner_helpers::{
+    executor_task_completed, executor_task_failed, executor_task_started,
+    update_agent_activity_by_name,
+};
 use crate::session_loop_shell_adapter::{
     wake_plan_loop_and_notify_local, REASON_SESSION_LOOP_WORKER_SUBMIT_REVIEW,
 };
@@ -52,7 +58,11 @@ impl WorkerExecutionMode {
     }
 }
 
-pub(crate) fn worker_success_summary(mode: WorkerExecutionMode, title: &str, output: String) -> String {
+pub(crate) fn worker_success_summary(
+    mode: WorkerExecutionMode,
+    title: &str,
+    output: String,
+) -> String {
     if output.is_empty() {
         mode.empty_success_summary(title)
     } else {
@@ -62,20 +72,44 @@ pub(crate) fn worker_success_summary(mode: WorkerExecutionMode, title: &str, out
 
 async fn handle_worker_execution_success(
     state: &Arc<AppState>,
-    board: &macaca_sdk::task::TaskBoard,
     executor: &ApplicationExecutor,
     app_id: &ApplicationId,
     task_session: Option<&str>,
-    task_id: macaca_proto::TaskId,
+    task_id: TaskId,
     agent_name: &str,
     title: &str,
     output: String,
     mode: WorkerExecutionMode,
 ) {
     let summary = worker_success_summary(mode, title, output);
-    board
-        .submit_task_for_review(&task_id, summary.clone())
-        .await;
+    let task_client = ServiceBackedTaskBoardDataSource::new(state.system_facade.service_client());
+    let mut trace = TraceContext::new(format!(
+        "worker-submit-review-{}-{}",
+        task_id,
+        uuid::Uuid::new_v4()
+    ));
+    trace.session_id = task_session.map(str::to_string);
+    trace.task_id = Some(task_id.to_string());
+    trace.agent = Some(agent_name.to_string());
+    if let Err(error) = task_client
+        .submit_review(SubmitReviewCommand {
+            app_id: app_id.clone(),
+            session_id: task_session.unwrap_or_default().to_string(),
+            agent_name: agent_name.to_string(),
+            task_id,
+            summary: summary.clone(),
+            trace: Some(trace),
+        })
+        .await
+    {
+        tracing::error!(
+            app_id = %app_id,
+            task_id = %task_id,
+            agent = %agent_name,
+            error = %error,
+            "worker failed to submit task review through task service"
+        );
+    }
     executor.broadcast_event(executor_task_completed(
         task_id,
         agent_name,
@@ -130,15 +164,22 @@ async fn handle_worker_execution_success(
 
 async fn handle_worker_execution_failure(
     state: &Arc<AppState>,
-    board: &macaca_sdk::task::TaskBoard,
     executor: &ApplicationExecutor,
     app_id: &ApplicationId,
     task_session: Option<&str>,
-    task_id: macaca_proto::TaskId,
+    task_id: TaskId,
     agent_name: &str,
     error: String,
 ) {
-    board.fail_task(&task_id, error.clone()).await;
+    fail_task_through_service(
+        state,
+        app_id,
+        task_session,
+        task_id,
+        agent_name,
+        error.clone(),
+    )
+    .await;
     executor.broadcast_event(executor_task_failed(task_id, agent_name, error.clone()));
     crate::run_trace::emit_for_scope(
         &state.persist.run_tracer,
@@ -156,15 +197,63 @@ async fn handle_worker_execution_failure(
 }
 
 async fn handle_worker_execution_timeout(
-    board: &macaca_sdk::task::TaskBoard,
+    state: &Arc<AppState>,
     executor: &ApplicationExecutor,
-    task_id: macaca_proto::TaskId,
+    app_id: &ApplicationId,
+    task_session: Option<&str>,
+    task_id: TaskId,
     agent_name: &str,
     mode: WorkerExecutionMode,
 ) {
     let error = mode.timeout_error();
-    board.fail_task(&task_id, error.into()).await;
+    fail_task_through_service(
+        state,
+        app_id,
+        task_session,
+        task_id,
+        agent_name,
+        error.to_string(),
+    )
+    .await;
     executor.broadcast_event(executor_task_failed(task_id, agent_name, error));
+}
+
+async fn fail_task_through_service(
+    state: &Arc<AppState>,
+    app_id: &ApplicationId,
+    task_session: Option<&str>,
+    task_id: TaskId,
+    agent_name: &str,
+    error: String,
+) {
+    let task_client = ServiceBackedTaskBoardDataSource::new(state.system_facade.service_client());
+    let mut trace = TraceContext::new(format!(
+        "worker-fail-task-{}-{}",
+        task_id,
+        uuid::Uuid::new_v4()
+    ));
+    trace.session_id = task_session.map(str::to_string);
+    trace.task_id = Some(task_id.to_string());
+    trace.agent = Some(agent_name.to_string());
+    if let Err(service_error) = task_client
+        .fail_task(FailTaskCommand {
+            app_id: app_id.clone(),
+            session_id: task_session.unwrap_or_default().to_string(),
+            agent_name: agent_name.to_string(),
+            task_id,
+            error,
+            trace: Some(trace),
+        })
+        .await
+    {
+        tracing::error!(
+            app_id = %app_id,
+            task_id = %task_id,
+            agent = %agent_name,
+            error = %service_error,
+            "worker failed to record task failure through task service"
+        );
+    }
 }
 
 /// Execute one WorkerLoop-owned task through `service.agent_execution`.
@@ -174,7 +263,6 @@ async fn handle_worker_execution_timeout(
 /// worker execution aligned with WASM, YAML, and planner service traces.
 pub(crate) async fn execute_worker_task_via_agent_service(
     state: &Arc<AppState>,
-    board: &macaca_sdk::task::TaskBoard,
     executor: &ApplicationExecutor,
     app_id: &ApplicationId,
     session_id: Option<&str>,
@@ -205,17 +293,19 @@ pub(crate) async fn execute_worker_task_via_agent_service(
     match result {
         Ok(output) => {
             handle_worker_execution_success(
-                state, board, executor, app_id, session_id, task_id, agent_name, title, output,
-                mode,
+                state, executor, app_id, session_id, task_id, agent_name, title, output, mode,
             )
             .await;
         }
         Err(error) if error.contains("timed out") => {
-            handle_worker_execution_timeout(board, executor, task_id, agent_name, mode).await;
+            handle_worker_execution_timeout(
+                state, executor, app_id, session_id, task_id, agent_name, mode,
+            )
+            .await;
         }
         Err(error) => {
             handle_worker_execution_failure(
-                state, board, executor, app_id, session_id, task_id, agent_name, error,
+                state, executor, app_id, session_id, task_id, agent_name, error,
             )
             .await;
         }

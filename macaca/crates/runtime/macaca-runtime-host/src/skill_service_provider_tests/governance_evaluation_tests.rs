@@ -3,13 +3,12 @@
 use macaca_kernel::SystemService;
 use macaca_proto::TraceContext;
 use macaca_skill::{
-    SkillEvaluationReportCommand, SkillEvaluationReportResult, SkillEvaluationScoreCommand,
-    SkillEvaluationScoreResult, SkillGovernanceRecordUsageCommand, SkillGovernanceRecordUsageResult,
-    SkillGovernanceSnapshotCommand, SkillGovernanceSnapshotResult, SkillStatusCommand,
-    SkillAuthorKind, SkillServiceScope, SkillStatusResult, SkillUsageEventKind,
-    SKILL_EVALUATION_REPORT_COMMAND,
-    SKILL_EVALUATION_SCORE_COMMAND, SKILL_GOVERNANCE_RECORD_USAGE_COMMAND,
-    SKILL_GOVERNANCE_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND,
+    SkillAuthorKind, SkillEvaluationReportCommand, SkillEvaluationReportResult,
+    SkillEvaluationScoreCommand, SkillEvaluationScoreResult, SkillGovernanceRecordUsageCommand,
+    SkillGovernanceRecordUsageResult, SkillGovernanceSnapshotCommand,
+    SkillGovernanceSnapshotResult, SkillServiceScope, SkillStatusCommand, SkillStatusResult,
+    SkillUsageEventKind, SKILL_EVALUATION_REPORT_COMMAND, SKILL_EVALUATION_SCORE_COMMAND,
+    SKILL_GOVERNANCE_RECORD_USAGE_COMMAND, SKILL_GOVERNANCE_SNAPSHOT_COMMAND, SKILL_STATUS_COMMAND,
 };
 
 use crate::SkillSystemServiceProvider;

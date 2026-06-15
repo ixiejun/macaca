@@ -1,6 +1,6 @@
 //! Unit tests for active-recall fallback policy on the reporting ChatModel wrapper.
 
-use macaca_sdk::context::ContextPreflightRecallConfig;
+use macaca_host_composition::context::ContextPreflightRecallConfig;
 
 use super::ContextReportingChatModel;
 

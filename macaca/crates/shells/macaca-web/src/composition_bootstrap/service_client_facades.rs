@@ -13,20 +13,27 @@ use super::bootstrap_ctx::BootstrapCtx;
 
 /// Build `System*Client` handles and `WebSystemFacadeBundle` from the generic service bus client.
 pub(crate) fn materialize_service_clients(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
-    let generic_service_client =
-        Arc::clone(ctx.generic_service_client.as_ref().expect("bootstrap: generic_service_client"));
+    let generic_service_client = Arc::clone(
+        ctx.generic_service_client
+            .as_ref()
+            .expect("bootstrap: generic_service_client"),
+    );
 
     let llm_client: Arc<dyn macaca_sdk::SystemLlmClient> = Arc::new(
         macaca_sdk::ServiceBackedLlmClient::new(Arc::clone(&generic_service_client)),
     );
-    let context_client: Arc<dyn macaca_sdk::SystemContextClient> = Arc::new(
-        macaca_sdk::ServiceBackedContextClient::new(Arc::clone(&generic_service_client)),
+    let alert_client: Arc<dyn macaca_sdk::SystemAlertClient> = Arc::new(
+        macaca_sdk::ServiceBackedAlertClient::new(Arc::clone(&generic_service_client)),
     );
+    let context_client: Arc<dyn macaca_host_composition::SystemContextClient> =
+        Arc::new(macaca_host_composition::ServiceBackedContextClient::new(
+            Arc::clone(&generic_service_client),
+        ));
     let driver_client: Arc<dyn macaca_sdk::SystemDriverClient> = Arc::new(
         macaca_sdk::ServiceBackedDriverClient::new(Arc::clone(&generic_service_client)),
     );
-    let skill_client: Arc<dyn macaca_sdk::SystemSkillClient> = Arc::new(
-        macaca_sdk::ServiceBackedSkillClient::new(Arc::clone(&generic_service_client)),
+    let skill_client: Arc<dyn macaca_host_composition::SystemSkillClient> = Arc::new(
+        macaca_host_composition::ServiceBackedSkillClient::new(Arc::clone(&generic_service_client)),
     );
     let mcp_client: Arc<dyn macaca_sdk::SystemMcpClient> = Arc::new(
         macaca_sdk::ServiceBackedMcpClient::new(Arc::clone(&generic_service_client)),
@@ -46,10 +53,9 @@ pub(crate) fn materialize_service_clients(ctx: &mut BootstrapCtx) -> MacacaResul
     let scheduler_client: Arc<dyn macaca_sdk::SystemSchedulerClient> = Arc::new(
         macaca_sdk::ServiceBackedSchedulerClient::new(Arc::clone(&generic_service_client)),
     );
-    let scheduled_agent_task_client: Arc<dyn macaca_sdk::SystemScheduledAgentTaskClient> =
-        Arc::new(macaca_sdk::ServiceBackedScheduledAgentTaskClient::new(Arc::clone(
-            &generic_service_client,
-        )));
+    let scheduled_agent_task_client: Arc<dyn macaca_sdk::SystemScheduledAgentTaskClient> = Arc::new(
+        macaca_sdk::ServiceBackedScheduledAgentTaskClient::new(Arc::clone(&generic_service_client)),
+    );
     let heartbeat_client: Arc<dyn macaca_sdk::SystemHeartbeatClient> = Arc::new(
         macaca_sdk::ServiceBackedHeartbeatClient::new(Arc::clone(&generic_service_client)),
     );
@@ -83,6 +89,7 @@ pub(crate) fn materialize_service_clients(ctx: &mut BootstrapCtx) -> MacacaResul
     );
 
     ctx.llm_client = Some(llm_client);
+    ctx.alert_client = Some(alert_client);
     ctx.context_client = Some(context_client);
     ctx.driver_client = Some(driver_client);
     ctx.skill_client = Some(skill_client);

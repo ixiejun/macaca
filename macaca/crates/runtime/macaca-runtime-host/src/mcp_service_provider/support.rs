@@ -83,7 +83,9 @@ pub(super) fn failed_invocation_result(
     result
 }
 
-pub(super) fn runtime_policy_from_capability_hints(hints: &CapabilityToolPolicyHints) -> McpToolPolicy {
+pub(super) fn runtime_policy_from_capability_hints(
+    hints: &CapabilityToolPolicyHints,
+) -> McpToolPolicy {
     let mut policy = McpToolPolicy::default();
     if let Some(deny_tools) = hints.metadata.get("mcp.deny_tools") {
         policy.deny_tools = deny_tools
@@ -184,7 +186,9 @@ pub(super) fn service_definition_payloads(
         .collect()
 }
 
-pub(super) fn service_lifecycle(lifecycle: crate::mcp_runtime::McpLifecycleScope) -> McpServiceLifecycleScope {
+pub(super) fn service_lifecycle(
+    lifecycle: crate::mcp_runtime::McpLifecycleScope,
+) -> McpServiceLifecycleScope {
     match lifecycle {
         crate::mcp_runtime::McpLifecycleScope::Global => McpServiceLifecycleScope::Global,
         crate::mcp_runtime::McpLifecycleScope::App => McpServiceLifecycleScope::App,

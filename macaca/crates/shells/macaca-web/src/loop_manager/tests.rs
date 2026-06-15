@@ -6,11 +6,12 @@ mod tests {
         goal_has_decomposed_tasks, mark_decomposition_in_notebook, mark_review_in_notebook,
         planner_scope_session_id, select_entry_and_plan_agents,
     };
-    use crate::loop_manager::worker_execution_adapter::{worker_success_summary, WorkerExecutionMode};
-    use macaca_sdk::framework::plan::{PlanNotebook, PlanState, SubTaskState};
-    use macaca_sdk::runtime_host::executor::ExecutorEvent;
-    use macaca_sdk::runtime_host::AgentInfo;
-    use macaca_proto::AgentExecutionIntent;
+    use crate::loop_manager::worker_execution_adapter::{
+        worker_success_summary, WorkerExecutionMode,
+    };
+    use macaca_host_composition::executor::ExecutorEvent;
+    use macaca_host_composition::framework::plan::{PlanNotebook, PlanState, SubTaskState};
+    use macaca_proto::{AgentExecutionIntent, AgentInfo};
 
     fn agent(name: &str, capabilities: &[&str]) -> AgentInfo {
         AgentInfo {
@@ -224,10 +225,10 @@ mod tests {
         let goal_id = macaca_proto::TaskId::new();
 
         let source = include_str!("agent_execution_adapter.rs");
-        let legacy_builder = ["FrameworkRunner::build_", "for_intent"].concat();
+        let retired_builder = ["FrameworkRunner::build_", "for_intent"].concat();
         assert!(source.contains("AGENT_EXECUTION_SERVICE_ID"));
         assert!(source.contains("AgentExecutionCommand::new"));
-        assert!(!source.contains(&legacy_builder));
+        assert!(!source.contains(&retired_builder));
         assert_eq!(AgentExecutionIntent::Planner, AgentExecutionIntent::Planner);
         assert_eq!(
             PlannerFrameworkCallKind::DecomposeGoal.goal_context(goal_id),

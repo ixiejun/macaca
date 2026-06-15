@@ -1,4 +1,4 @@
-//! SDK Memory client facade for Route C S5.
+//! SDK Memory client facade.
 //!
 //! The client keeps upper layers scoped and service-oriented.  It forwards
 //! typed memory commands through the generic service client instead of exposing
@@ -7,16 +7,14 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use macaca_memory::{
-    MemoryDeleteRequest, MemoryFacade, MemoryForgetCommand, MemoryGetCommand, MemoryGetRequest,
-    MemoryGetResult, MemoryPrefetchCommand, MemoryPrefetchRequest, MemoryRecallCommand,
-    MemoryRecallResult, MemoryRememberCommand, MemoryRememberResult, MemorySearchRequest,
-    MemoryServiceSnapshot, MemoryServiceSnapshotCommand, MemoryStatusCommand, MemoryStatusReport,
-    MemoryWriteRequest, MEMORY_FORGET_COMMAND, MEMORY_GET_COMMAND, MEMORY_PREFETCH_COMMAND,
-    MEMORY_RECALL_COMMAND, MEMORY_REMEMBER_COMMAND, MEMORY_SERVICE_ID, MEMORY_SNAPSHOT_COMMAND,
-    MEMORY_STATUS_COMMAND,
+use macaca_proto::{
+    MacacaError, MacacaResult, MemoryForgetCommand, MemoryGetCommand, MemoryGetResult,
+    MemoryPrefetchCommand, MemoryRecallCommand, MemoryRecallResult, MemoryRememberCommand,
+    MemoryRememberResult, MemoryServiceSnapshot, MemoryServiceSnapshotCommand, MemoryStatusCommand,
+    MemoryStatusReport, TraceContext, MEMORY_FORGET_COMMAND, MEMORY_GET_COMMAND,
+    MEMORY_PREFETCH_COMMAND, MEMORY_RECALL_COMMAND, MEMORY_REMEMBER_COMMAND, MEMORY_SERVICE_ID,
+    MEMORY_SNAPSHOT_COMMAND, MEMORY_STATUS_COMMAND,
 };
-use macaca_proto::{MacacaError, MacacaResult, TraceContext};
 use tracing::{info, warn};
 
 use crate::service_client::{ServiceCallCommand, SystemServiceClient};
@@ -78,141 +76,6 @@ impl SystemMemoryClient for UnavailableSystemMemoryClient {
     ) -> MacacaResult<MemoryServiceSnapshot> {
         info!(trace_id = %command.trace.trace_id, "sdk memory client unavailable for snapshot");
         Err(MacacaError::Config("Memory service is unavailable".into()))
-    }
-}
-
-/// In-process Memory client that forwards typed SDK commands to a [`MemoryFacade`].
-///
-/// Bootstrap uses this adapter before the memory service is registered on the bus, and
-/// context recall wiring can share the same facade handle without re-implementing command
-/// translation inside each shell. Production request paths should prefer
-/// [`ServiceBackedMemoryClient`] once the memory service is online.
-#[derive(Clone)]
-pub struct DirectFacadeMemoryClient {
-    facade: Arc<dyn MemoryFacade>,
-    runtime_label: String,
-}
-
-impl DirectFacadeMemoryClient {
-    /// Wrap a memory facade with provider-neutral SDK command translation.
-    pub fn new(facade: Arc<dyn MemoryFacade>) -> Self {
-        info!(
-            service_id = "memory",
-            command = "direct_facade_client_construct",
-            "Direct facade memory client wired for in-process bootstrap"
-        );
-        Self {
-            facade,
-            runtime_label: "direct-facade-memory-client".into(),
-        }
-    }
-}
-
-#[async_trait]
-impl SystemMemoryClient for DirectFacadeMemoryClient {
-    async fn remember(&self, command: MemoryRememberCommand) -> MacacaResult<MemoryRememberResult> {
-        let id = self
-            .facade
-            .remember(
-                MemoryWriteRequest::new(command.scope, command.content)
-                    .layer(command.layer)
-                    .metadata(command.metadata),
-            )
-            .await?;
-        info!(
-            service_id = "memory",
-            command = MEMORY_REMEMBER_COMMAND,
-            trace_id = %command.trace.trace_id,
-            memory_id = ?id,
-            "Direct facade memory client remember completed"
-        );
-        Ok(MemoryRememberResult {
-            id,
-            stored_at: chrono::Utc::now(),
-        })
-    }
-
-    async fn recall(&self, command: MemoryRecallCommand) -> MacacaResult<MemoryRecallResult> {
-        let entries = self
-            .facade
-            .search(MemorySearchRequest::new(
-                command.scope,
-                command.query,
-                command.limit,
-            ))
-            .await?;
-        info!(
-            service_id = "memory",
-            command = MEMORY_RECALL_COMMAND,
-            trace_id = %command.trace.trace_id,
-            count = entries.len(),
-            "Direct facade memory client recall completed"
-        );
-        Ok(MemoryRecallResult::new(entries))
-    }
-
-    async fn prefetch(&self, command: MemoryPrefetchCommand) -> MacacaResult<MemoryRecallResult> {
-        let entries = self
-            .facade
-            .prefetch(MemoryPrefetchRequest {
-                scope: command.scope,
-                query: command.query,
-                limit: command.limit,
-            })
-            .await?;
-        info!(
-            service_id = "memory",
-            command = MEMORY_PREFETCH_COMMAND,
-            trace_id = %command.trace.trace_id,
-            count = entries.len(),
-            "Direct facade memory client prefetch completed"
-        );
-        Ok(MemoryRecallResult::new(entries))
-    }
-
-    async fn get(&self, command: MemoryGetCommand) -> MacacaResult<MemoryGetResult> {
-        let entry = self
-            .facade
-            .get(MemoryGetRequest {
-                scope: command.scope,
-                id: command.id,
-            })
-            .await?;
-        Ok(MemoryGetResult::new(entry))
-    }
-
-    async fn forget(&self, command: MemoryForgetCommand) -> MacacaResult<()> {
-        self.facade
-            .delete(MemoryDeleteRequest {
-                scope: command.scope,
-                id: command.id,
-            })
-            .await
-    }
-
-    async fn status(&self, command: MemoryStatusCommand) -> MacacaResult<MemoryStatusReport> {
-        let _ = command.trace.trace_id.as_str();
-        Ok(self.facade.status())
-    }
-
-    async fn snapshot(
-        &self,
-        command: MemoryServiceSnapshotCommand,
-    ) -> MacacaResult<MemoryServiceSnapshot> {
-        let status = self.facade.status();
-        info!(
-            service_id = "memory",
-            command = MEMORY_SNAPSHOT_COMMAND,
-            trace_id = %command.trace.trace_id,
-            runtime_label = %self.runtime_label,
-            "Direct facade memory client snapshot emitted"
-        );
-        Ok(MemoryServiceSnapshot::new(
-            self.runtime_label.clone(),
-            true,
-            status.capabilities,
-            None,
-        ))
     }
 }
 
@@ -305,12 +168,12 @@ mod tests {
     use std::sync::Mutex;
 
     use chrono::Utc;
-    use macaca_memory::MemoryScope;
     use macaca_proto::{ApplicationId, MemoryId};
 
     use crate::service_client::{
         ServiceCallResult, ServiceInspectionCommand, ServiceInspectionResult,
     };
+    use crate::MemoryScope;
 
     struct CapturingServiceClient {
         last_call: Mutex<Option<ServiceCallCommand>>,

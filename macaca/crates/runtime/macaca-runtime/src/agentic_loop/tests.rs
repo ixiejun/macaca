@@ -399,8 +399,9 @@ async fn execute_with_events_preserves_event_order() {
         let kind = match event {
             AgentExecutionEvent::Thinking { .. } => "thinking",
             AgentExecutionEvent::ToolCall { .. } => "tool_call",
-            AgentExecutionEvent::DriverTrace { driver_name, .. }
-                if driver_name == "macaca-context" =>
+            AgentExecutionEvent::DriverTrace { trace, .. }
+                if trace.get("event_type").and_then(|value| value.as_str())
+                    == Some("context_report") =>
             {
                 continue;
             }

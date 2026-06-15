@@ -32,14 +32,9 @@
 //! Dispatcher            (receives result)
 //! ```
 
-use std::cmp::Ordering;
-use std::sync::Arc;
-
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use tokio::sync::{broadcast, mpsc};
-use uuid::Uuid;
+use tokio::sync::mpsc;
 
 pub mod app_executor;
 pub mod bus;
@@ -58,7 +53,7 @@ pub use bus::{EventBus, SystemEvent};
 pub use callback::CallbackDispatcher;
 pub use event_factory::ExecutorEventFactory;
 pub use fork_manager::{DelegateResult, ForkContext, ForkManager, HookEvent, MergeResult};
-pub use macaca_proto::ApplicationId;
+pub use macaca_proto::{AgentInfo, ApplicationId, TaskResult, TokenUsage};
 pub use queue::ExecutionQueue;
 pub use router::TaskRouter;
 pub use worker::{ExecutorCommand, ExecutorEvent, TaskExecutor};
@@ -86,33 +81,6 @@ pub enum TaskStatus {
 pub use macaca_proto::orchestration::DelegatedTask;
 pub use macaca_proto::TaskContext;
 
-/// Result of a completed task execution.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TaskResult {
-    /// The task ID this result is for
-    pub task_id: TaskId,
-    /// Whether the task completed successfully
-    pub success: bool,
-    /// The output/content from the agent
-    pub output: String,
-    /// Error message if failed
-    pub error: Option<String>,
-    /// Any artifacts/files created during execution
-    pub artifacts: Vec<String>,
-    /// When the task completed
-    pub completed_at: DateTime<Utc>,
-    /// Token usage statistics
-    pub tokens_used: Option<TokenUsage>,
-}
-
-/// Token usage from LLM calls.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TokenUsage {
-    pub prompt_tokens: u32,
-    pub completion_tokens: u32,
-    pub total_tokens: u32,
-}
-
 /// Decision from the task router about which agent should handle a task.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RoutingDecision {
@@ -124,23 +92,6 @@ pub struct RoutingDecision {
     pub reasoning: String,
     /// Alternative candidates if primary fails
     pub fallback_agents: Vec<String>,
-}
-
-/// Information about an available agent.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgentInfo {
-    /// Unique agent identifier
-    pub id: String,
-    /// Agent name (e.g., "backend", "frontend", "architect")
-    pub name: String,
-    /// Agent capabilities
-    pub capabilities: Vec<String>,
-    /// Current load (number of running tasks)
-    pub current_load: u32,
-    /// Maximum concurrent tasks this agent can handle
-    pub max_load: u32,
-    /// Whether the agent is currently available
-    pub available: bool,
 }
 
 /// Trait for executing an agent with a given prompt.
@@ -239,6 +190,7 @@ impl ExecutionQueueBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::Utc;
 
     #[test]
     fn test_task_id_generation() {

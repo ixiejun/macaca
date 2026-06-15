@@ -11,11 +11,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::budget::ContextBudget;
 
-/// Stable identifier for the passthrough compatibility engine.
+/// Stable identifier for the passthrough context engine.
 ///
 /// Shared across selection policy, registry resolution, and report builders so
-/// engine ids stay consistent without coupling types to `legacy` module internals.
-pub(crate) const LEGACY_ENGINE_ID: &str = "legacy";
+/// engine ids stay consistent without coupling types to module internals.
+pub(crate) const PASSTHROUGH_ENGINE_ID: &str = "passthrough";
 
 /// Stable metadata describing a concrete context engine implementation.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -63,8 +63,8 @@ pub struct ContextAssembleInput {
 }
 
 impl ContextAssembleInput {
-    /// Compatibility constructor for legacy call sites that do not track app/session identity.
-    pub fn legacy(
+    /// Constructor for call sites that intentionally do not track app/session identity.
+    pub fn unscoped(
         agent_name: impl Into<String>,
         model: impl Into<String>,
         base_messages: Vec<LlmMessage>,
@@ -147,11 +147,11 @@ pub struct ContextEngineSelection {
 }
 
 impl ContextEngineSelection {
-    /// Default selection that pins both primary and fallback to the legacy engine.
-    pub fn legacy() -> Self {
+    /// Default selection that pins both primary and fallback to the passthrough engine.
+    pub fn passthrough_default() -> Self {
         Self {
-            engine_id: LEGACY_ENGINE_ID.into(),
-            fallback_engine_id: LEGACY_ENGINE_ID.into(),
+            engine_id: PASSTHROUGH_ENGINE_ID.into(),
+            fallback_engine_id: PASSTHROUGH_ENGINE_ID.into(),
         }
     }
 }

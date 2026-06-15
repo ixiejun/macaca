@@ -8,14 +8,14 @@ use std::time::Duration;
 use macaca_framework::mcp::McpTransportConfig;
 use macaca_proto::{
     CapabilityToolInvocationResult, CapabilityToolOriginKind, CapabilityToolResourceScope,
-    MCP_DESCRIPTOR_BACKEND_TOOL_NAME, MCP_SERVICE_ID, TraceContext,
+    TraceContext, MCP_DESCRIPTOR_BACKEND_TOOL_NAME, MCP_SERVICE_ID,
 };
 
 use crate::mcp_descriptor_index::McpToolDescriptorRoute;
 
 use super::types::{
-    McpLifecycleScope, McpRuntimeContext, McpRuntimeKey, McpRuntimeStatus,
-    McpRuntimeStatusState, McpServerDefinition, McpToolPolicy,
+    McpLifecycleScope, McpRuntimeContext, McpRuntimeKey, McpRuntimeStatus, McpRuntimeStatusState,
+    McpServerDefinition, McpToolPolicy,
 };
 
 pub(crate) fn missing_required_bin(definition: &McpServerDefinition) -> Option<String> {
@@ -71,7 +71,10 @@ impl McpRuntimeKey {
     }
 }
 
-pub(crate) fn runtime_key(definition: &McpServerDefinition, context: &McpRuntimeContext) -> McpRuntimeKey {
+pub(crate) fn runtime_key(
+    definition: &McpServerDefinition,
+    context: &McpRuntimeContext,
+) -> McpRuntimeKey {
     let app_id = context.app_id.as_ref().map(|id| id.0.to_string());
     let session_id = context.session_id.clone();
     let agent_name = context.agent_name.clone();

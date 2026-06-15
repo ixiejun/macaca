@@ -1,41 +1,43 @@
-//! Shell adapter for framework ReAct agent construction (Adapter pattern).
+//! Shell adapter for framework ReAct agent materialization (Adapter pattern).
 //!
 //! Agent Execution Service owns the reply orchestration via
-//! `ServiceBackedFrameworkRuntimeAgentPort` in runtime-host.  This module is the
-//! **only** web entry that still reaches `FrameworkRunner` for runtime-agent
-//! construction; it implements [`FrameworkAgentConstructionPort`] so the web shell
-//! does not implement [`FrameworkRuntimeAgentPort`] directly.
+//! `ServiceBackedFrameworkRuntimeAgentPort` in runtime-host. Runtime-host now
+//! owns the framework construction service; this module supplies only the
+//! host-local materialization hook required to assemble web tools, hooks, and
+//! execution-control middleware.
 //!
-//! Full construction logic migrates to runtime-host/framework in task 4.3.2; until
-//! then this adapter isolates shell composition behind the port boundary.
+//! Full materialization logic can continue migrating downward without changing
+//! the public runtime-host construction contract.
 
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use macaca_sdk::framework::agent::{Agent, HookedAgent};
-use macaca_sdk::framework::message::Msg;
-use macaca_sdk::framework::model::ToolChoice;
-use macaca_sdk::framework::react_agent::ReActAgent;
-use macaca_proto::{AgentContextSnapshot, AgentExecutionCommand, AgentExecutionEvent};
-use macaca_sdk::runtime_host::{
-    ConstructedRuntimeAgent, FrameworkAgentConstructionPort, OpaqueExecutionControlHandle,
+use macaca_host_composition::agent_execution::{
+    ConstructedRuntimeAgent, FrameworkAgentMaterializationPort,
 };
+use macaca_host_composition::execution_control::OpaqueExecutionControlHandle;
+use macaca_host_composition::framework::agent::{Agent, HookedAgent};
+use macaca_host_composition::framework::message::Msg;
+use macaca_host_composition::framework::model::ToolChoice;
+use macaca_host_composition::framework::react_agent::ReActAgent;
+use macaca_proto::{AgentContextSnapshot, AgentExecutionCommand, AgentExecutionEvent};
 use tokio::sync::mpsc;
 use tracing::info;
 
 use crate::framework_runner::{FrameworkRunner, RuntimeExecutionControl};
 use crate::state::AppState;
 
-/// Web shell adapter that builds framework ReAct agents through `FrameworkRunner`.
+/// Web shell adapter that materializes framework ReAct agents through `FrameworkRunner`.
 ///
-/// The adapter downcasts opaque execution-control handles to web-local middleware
-/// wiring.  Runtime-host never inspects `RuntimeExecutionControl`.
-pub(crate) struct WebFrameworkAgentConstructionPort {
+/// The adapter downcasts opaque execution-control handles to web-local
+/// middleware wiring. Runtime-host never inspects `RuntimeExecutionControl` and
+/// owns the higher-level construction service around this materializer.
+pub(crate) struct WebFrameworkAgentMaterializationPort {
     state: Arc<AppState>,
 }
 
-impl WebFrameworkAgentConstructionPort {
-    /// Create a construction port bound to the web composition root.
+impl WebFrameworkAgentMaterializationPort {
+    /// Create a materialization port bound to the web composition root.
     pub(crate) fn new(state: Arc<AppState>) -> Self {
         Self { state }
     }
@@ -73,7 +75,7 @@ impl ConstructedRuntimeAgent for WebConstructedRuntimeAgent {
 }
 
 #[async_trait]
-impl FrameworkAgentConstructionPort for WebFrameworkAgentConstructionPort {
+impl FrameworkAgentMaterializationPort for WebFrameworkAgentMaterializationPort {
     async fn build_runtime_react_agent(
         &self,
         command: &AgentExecutionCommand,
@@ -91,18 +93,19 @@ impl FrameworkAgentConstructionPort for WebFrameworkAgentConstructionPort {
             session_id = %command.session_id,
             max_iters,
             has_execution_control = runtime_control.is_some(),
-            "web framework construction adapter building runtime react agent"
+            "web framework materialization adapter building runtime react agent"
         );
 
-        let agent = FrameworkRunner::build_runtime_agent_from_context_snapshot_with_execution_policy(
-            &self.state,
-            context_snapshot,
-            Some(agent_event_tx),
-            runtime_control,
-            max_iters,
-            tool_choice,
-        )
-        .await?;
+        let agent =
+            FrameworkRunner::materialize_runtime_react_agent_from_context_snapshot_with_execution_policy(
+                &self.state,
+                context_snapshot,
+                Some(agent_event_tx),
+                runtime_control,
+                max_iters,
+                tool_choice,
+            )
+            .await?;
 
         Ok(Box::new(WebConstructedRuntimeAgent { agent }))
     }

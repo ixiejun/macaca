@@ -5,11 +5,10 @@
 //! This replaces product-name `if command.contains(...)` branches in runtime
 //! control flow with auditable, host-overridable configuration.
 //!
-//! Bundled mappings ship in `resources/compat_mappings.toml` (embedded via
+//! Bundled mappings ship in `resources/skill_mcp_mappings.toml` (embedded via
 //! `include_str!`). Hosts may override entries through
-//! `$MACACA_HOME/compat_mappings.toml` or an explicit override path passed to
-//! [`SkillMcpMappingRegistry::load_with_override`]. The on-disk TOML table key
-//! remains `[[compat]]` so existing operator overrides keep working.
+//! `$MACACA_HOME/skill_mcp_mappings.toml` or an explicit override path passed
+//! to [`SkillMcpMappingRegistry::load_with_override`].
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -26,17 +25,14 @@ use crate::mcp_runtime::{
 };
 
 /// Embedded bundled mapping document compiled into the runtime-host binary.
-const BUNDLED_SKILL_MCP_MAPPINGS_TOML: &str =
-    include_str!("../resources/compat_mappings.toml");
+const BUNDLED_SKILL_MCP_MAPPINGS_TOML: &str = include_str!("../resources/skill_mcp_mappings.toml");
 
 /// Root TOML document for skill MCP mapping files.
 ///
-/// The serde field name `compat` is retained for backward compatibility with
-/// existing operator override files; it is not an OS "compat layer" module name.
 #[derive(Debug, Clone, Deserialize, Default)]
 struct SkillMcpMappingFile {
     #[serde(default)]
-    compat: Vec<SkillMcpMappingEntry>,
+    mappings: Vec<SkillMcpMappingEntry>,
 }
 
 /// One declarative mapping from skill install metadata to an MCP server template.
@@ -118,13 +114,10 @@ impl SkillMcpMappingRegistry {
     pub fn bundled() -> Self {
         let file: SkillMcpMappingFile = toml::from_str(BUNDLED_SKILL_MCP_MAPPINGS_TOML)
             .expect("bundled skill MCP mapping TOML is valid");
-        let entry_count = file.compat.len();
-        info!(
-            entry_count,
-            "loaded bundled skill MCP mapping registry"
-        );
+        let entry_count = file.mappings.len();
+        info!(entry_count, "loaded bundled skill MCP mapping registry");
         Self {
-            entries: file.compat,
+            entries: file.mappings,
         }
     }
 
@@ -132,11 +125,11 @@ impl SkillMcpMappingRegistry {
     pub fn from_toml(text: &str) -> Result<Self, String> {
         let file: SkillMcpMappingFile = toml::from_str(text).map_err(|e| e.to_string())?;
         debug!(
-            entry_count = file.compat.len(),
+            entry_count = file.mappings.len(),
             "parsed skill MCP mapping registry from TOML"
         );
         Ok(Self {
-            entries: file.compat,
+            entries: file.mappings,
         })
     }
 
@@ -149,8 +142,8 @@ impl SkillMcpMappingRegistry {
             match std::fs::read_to_string(&path) {
                 Ok(text) => match toml::from_str::<SkillMcpMappingFile>(&text) {
                     Ok(file) => {
-                        let override_count = file.compat.len();
-                        for entry in file.compat {
+                        let override_count = file.mappings.len();
+                        for entry in file.mappings {
                             base.entries.retain(|existing| existing.id != entry.id);
                             debug!(mapping_id = %entry.id, "applied skill MCP mapping override");
                             base.entries.push(entry);
@@ -265,7 +258,7 @@ impl SkillMcpMappingEntry {
             tool_prefix: self.server.tool_prefix.clone(),
             required_bins: self.server.required_bins.clone(),
             enabled: self.server.enabled,
-            source: McpDefinitionSource::Compatibility,
+            source: McpDefinitionSource::Mapping,
             concurrency_isolation: policy,
         })
     }
@@ -341,18 +334,18 @@ mod tests {
     #[test]
     fn override_replaces_bundled_entry_by_id() {
         let override_toml = r#"
-[[compat]]
+[[mappings]]
 id = "playwright"
 match_packages = ["@playwright/mcp"]
 match_bins = []
 
-[compat.server]
+[mappings.server]
 transport = "stdio"
 command = "overridden"
 args = []
 required_bins = ["overridden"]
 
-[compat.concurrency_isolation]
+[mappings.concurrency_isolation]
 command_match = ["overridden"]
 required_args = ["--iso2"]
 skip_if_any_arg_prefix = []

@@ -6,8 +6,8 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::sse::Event;
 use axum::Json;
+use macaca_host_composition::framework::execution::ExecutionContext;
 use macaca_proto::ApplicationId;
-use macaca_sdk::framework::execution::ExecutionContext;
 
 use crate::routes::{err, ErrorResponse};
 use crate::state::AppState;
@@ -51,12 +51,12 @@ pub(crate) async fn post_chat_stop(
         .filter(|s| s.app_id == app_id)
         .map(|s| s.session_id.clone())
         .collect();
-    for sid in stopped_session_ids {
+    for sid in &stopped_session_ids {
         let mut ctx = ExecutionContext::new(sid.clone(), app_id.0.to_string(), "unknown");
         if let Some(restored) = crate::framework_state_memento::load_execution_context(
             state.sessions.framework_session_store.as_ref(),
             &app_id.0.to_string(),
-            &sid,
+            sid,
         )
         .await
         {
@@ -64,6 +64,18 @@ pub(crate) async fn post_chat_stop(
         }
         ctx.mark_stopped(Some("user_stop_all_processes".into()));
         persist_execution_context(&state, &ctx).await;
+    }
+    if !stopped_session_ids.is_empty() {
+        state
+            .sessions
+            .execution_control_local_notifications
+            .remove_many(&stopped_session_ids)
+            .await;
+        tracing::info!(
+            app_id = %app_id,
+            cleared_sessions = stopped_session_ids.len(),
+            "Cleared runtime-host execution-control local notification handles for stopped sessions"
+        );
     }
 
     // 3. Broadcast stop event to all sessions for this app

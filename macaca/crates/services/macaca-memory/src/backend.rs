@@ -386,7 +386,10 @@ mod tests {
         let profile = factory.configured_profile().unwrap();
 
         assert_eq!(profile.vector_backend, "milvus");
-        assert_eq!(profile.embedding_provider, REMOTE_TEXT_EMBEDDING_PROVIDER_ID);
+        assert_eq!(
+            profile.embedding_provider,
+            REMOTE_TEXT_EMBEDDING_PROVIDER_ID
+        );
         assert_eq!(profile.vector_collection, Some("agent_memory".into()));
         assert_eq!(profile.embedding_dimensions, 1024);
     }

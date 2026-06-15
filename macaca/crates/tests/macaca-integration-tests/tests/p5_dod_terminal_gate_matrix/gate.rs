@@ -1,7 +1,7 @@
 //! P5 §9.5 — Definition-of-Done terminal gate matrix implementation.
 //!
 //! Macaca's microkernel refactor closes when every architectural gate is green
-//! and migration allowlists are empty. Individual gate crates encode one concern;
+//! and terminal debt inventories are empty. Individual gate crates encode one concern;
 //! this matrix is the **composite specification** that proves the full P5 DoD
 //! without requiring operators to memorize fifteen VC commands.
 //!
@@ -34,19 +34,19 @@ struct TerminalGateCommand {
 /// Canonical registry of P5 terminal gates (order: fast static gates first, heavy
 /// behavioral / npx gates last so failures surface quickly in CI).
 const TERMINAL_GATE_COMMANDS: &[TerminalGateCommand] = &[
-    // §6.1.1 / §9.5 — Route C allowlist terminal state (must be zero rows).
+    // §6.1.1 / §9.5 — protocol dependency allowlist terminal state (must be zero rows).
     TerminalGateCommand {
-        gate_id: "route_c_allowlist_terminal",
+        gate_id: "protocol_service_allowlist_terminal",
         tasks_ref: "§6.1.1 / §9.5",
-        test_target: "route_c_dependency_boundaries",
-        filter: "route_c_dependency_allowlist_terminal_state_is_zero_rows",
+        test_target: "protocol_service_dependency_boundaries",
+        filter: "protocol_service_dependency_allowlist_terminal_state_is_zero_rows",
     },
-    // Route C forbidden-edge enforcement (allowlist == 0 implies all edges classified).
+    // Protocol forbidden-edge enforcement (allowlist == 0 implies all edges classified).
     TerminalGateCommand {
-        gate_id: "route_c_dependency_boundaries",
+        gate_id: "protocol_service_dependency_boundaries",
         tasks_ref: "§6.1.1",
-        test_target: "route_c_dependency_boundaries",
-        filter: "route_c_dependency_boundaries_reject_unallowlisted_forbidden_edges",
+        test_target: "protocol_service_dependency_boundaries",
+        filter: "protocol_service_dependency_boundaries_reject_unallowlisted_forbidden_edges",
     },
     // §6.1.6 / §9.6 — OS-layer file size allowlist terminal + boundary scan.
     TerminalGateCommand {
@@ -118,7 +118,7 @@ const TERMINAL_GATE_COMMANDS: &[TerminalGateCommand] = &[
         gate_id: "serviceization_escape_hatches_debt_terminal",
         tasks_ref: "§6.2.2",
         test_target: "serviceization_escape_hatches",
-        filter: "migration_debt_inventory_matches_baseline",
+        filter: "terminal_debt_inventory_matches_baseline",
     },
     TerminalGateCommand {
         gate_id: "serviceization_escape_hatches_reconciliation_absent",
@@ -140,7 +140,7 @@ const TERMINAL_GATE_COMMANDS: &[TerminalGateCommand] = &[
         test_target: "audit_redaction_terminal_gate",
         filter: "audit_redaction_terminal_state_is_canonical",
     },
-    // §9.7 — external HTTP/SSE/session contract (static markers + route-c pipeline).
+    // §9.7 — external HTTP/SSE/session contract (static markers + protocol-service pipeline).
     TerminalGateCommand {
         gate_id: "p5_external_contract",
         tasks_ref: "§9.7",
@@ -186,7 +186,7 @@ const TERMINAL_GATE_COMMANDS: &[TerminalGateCommand] = &[
 
 /// Integration-test source files that must exist before spawning subprocesses.
 const REQUIRED_GATE_TEST_SOURCES: &[&str] = &[
-    "crates/tests/macaca-integration-tests/tests/route_c_dependency_boundaries.rs",
+    "crates/tests/macaca-integration-tests/tests/protocol_service_dependency_boundaries.rs",
     "crates/tests/macaca-integration-tests/tests/os_layer_file_size_gate.rs",
     "crates/tests/macaca-integration-tests/tests/kernel_purity_gate.rs",
     "crates/tests/macaca-integration-tests/tests/shell_dependency_purity_gate.rs",

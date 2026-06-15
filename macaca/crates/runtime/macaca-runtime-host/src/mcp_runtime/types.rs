@@ -31,7 +31,7 @@ impl Default for McpLifecycleScope {
 ///
 /// Use this instead of hard-coded product-specific branches (e.g. "ensure
 /// `--isolated` when command contains `playwright`"). The policy is
-/// populated from [`crate::compat`] mappings or from `McpServerConfigEntry`
+/// populated from stable operator mappings or from `McpServerConfigEntry`
 /// YAML declarations.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 pub struct ConcurrencyIsolationPolicy {
@@ -75,7 +75,7 @@ pub enum McpDefinitionSource {
     Global,
     App,
     Skill,
-    Compatibility,
+    Mapping,
 }
 
 impl Default for McpDefinitionSource {
@@ -93,23 +93,6 @@ fn default_session_mode() -> McpSessionMode {
 pub struct McpRegistryConfig {
     #[serde(default, rename = "mcpServers")]
     pub mcp_servers: BTreeMap<String, McpServerConfigEntry>,
-}
-
-impl McpRegistryConfig {
-    #[deprecated(note = "Use `McpServerFactory::from_registry_config` instead.")]
-    pub fn into_definitions(
-        self,
-        source: McpDefinitionSource,
-    ) -> Result<Vec<McpServerDefinition>, String> {
-        self.mcp_servers
-            .into_iter()
-            .map(|(id, entry)| {
-                let mut definition = entry.into_definition(id)?;
-                definition.source = source.clone();
-                Ok(definition)
-            })
-            .collect()
-    }
 }
 
 /// Per-server YAML config entry.
@@ -228,4 +211,3 @@ pub struct McpRuntimeKey {
     pub session_id: Option<String>,
     pub agent_name: Option<String>,
 }
-

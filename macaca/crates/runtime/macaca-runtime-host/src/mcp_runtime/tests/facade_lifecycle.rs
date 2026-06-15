@@ -3,25 +3,26 @@
 use macaca_proto::ApplicationId;
 
 use crate::mcp_runtime::{
-    McpRuntimeContext, McpRuntimeFacade, McpRuntimeManager, McpRuntimeStatusState, McpToolPolicy,
+    McpRuntimeContext, McpRuntimeFacade, McpRuntimeStatusState, McpToolPolicy,
 };
 
+use super::super::manager::McpRuntimeManager;
 use super::fixtures::stdio_definition;
 
 #[tokio::test]
 async fn runtime_key_reference_count_releases_on_last_owner() {
-    let manager = McpRuntimeManager::new();
+    let facade = McpRuntimeFacade::new();
     let definition = stdio_definition("playwright", "playwright-mcp");
     let context = McpRuntimeContext {
         app_id: Some(ApplicationId(uuid::Uuid::nil())),
         session_id: Some("session-a".into()),
         agent_name: Some("agent-a".into()),
     };
-    let key = manager.acquire_runtime_key(&definition, &context).await;
-    let _ = manager.acquire_runtime_key(&definition, &context).await;
+    let lease_a = facade.acquire_lease(&definition, &context).await;
+    let lease_b = facade.acquire_lease(&definition, &context).await;
 
-    assert!(manager.release_runtime_key(&key).await.is_none());
-    assert!(manager.release_runtime_key(&key).await.is_some());
+    assert!(facade.release_lease(lease_a).await.is_none());
+    assert!(facade.release_lease(lease_b).await.is_some());
 }
 
 #[tokio::test]

@@ -2,8 +2,8 @@
 
 use chrono::Utc;
 
-use super::{ExecutorEvent, TaskResult};
 use super::TaskId;
+use super::{ExecutorEvent, TaskResult};
 
 /// Factory for task-scoped executor lifecycle events.
 #[derive(Debug, Clone)]

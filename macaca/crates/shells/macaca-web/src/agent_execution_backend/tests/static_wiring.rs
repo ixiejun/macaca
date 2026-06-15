@@ -4,7 +4,6 @@
 //! Validates execution control, heartbeat evidence, envelope contracts, and
 //! architecture governance boundaries without application-specific business logic.
 
-
 use super::support::*;
 #[test]
 fn execution_backend_registers_enabled_policy_before_adapter_install() {
@@ -25,12 +24,16 @@ fn execution_backend_consumes_context_snapshot_without_rebuilding_context() {
     );
     let construction_adapter = include_str!("../../framework_agent_construction_shell_adapter.rs");
     let service_context_call = "build_agent_context_snapshot_via_service";
-    let snapshot_runtime_builder = "build_runtime_agent_from_context_snapshot";
-    let legacy_runtime_builder = ["FrameworkRunner::build_runtime", "_agent("].concat();
+    let snapshot_materializer = "materialize_runtime_react_agent_from_context_snapshot";
+    let retired_snapshot_builder = "build_runtime_agent_from_context_snapshot";
+    let retired_runtime_builder = ["FrameworkRunner::build_runtime", "_agent("].concat();
 
     assert!(composed.contains(service_context_call));
-    assert!(construction_adapter.contains(snapshot_runtime_builder));
-    assert!(!composed.contains(&legacy_runtime_builder));
+    assert!(construction_adapter.contains(snapshot_materializer));
+    assert!(!construction_adapter.contains(retired_snapshot_builder));
+    assert!(construction_adapter.contains("impl FrameworkAgentMaterializationPort"));
+    assert!(!construction_adapter.contains("impl FrameworkAgentConstructionPort"));
+    assert!(!composed.contains(&retired_runtime_builder));
 }
 
 #[test]

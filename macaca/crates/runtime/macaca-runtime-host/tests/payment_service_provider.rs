@@ -1,4 +1,4 @@
-//! Integration tests for the Route C Payment Service provider.
+//! Integration tests for the Payment Service provider.
 //!
 //! The tests live outside the provider module so the production file stays
 //! below the Agent OS 500-line limit while still exercising the public service
@@ -188,7 +188,10 @@ async fn payment_service_policy_denied_returns_structured_adapter_failure() {
         .await
         .expect_err("over-budget policy evaluation must fail closed");
     assert!(
-        error.to_string().to_ascii_lowercase().contains("over budget"),
+        error
+            .to_string()
+            .to_ascii_lowercase()
+            .contains("over budget"),
         "expected over-budget reason, got: {error}"
     );
 }

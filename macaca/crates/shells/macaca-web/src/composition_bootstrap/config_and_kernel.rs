@@ -7,8 +7,8 @@ use std::sync::Arc;
 
 use tracing::info;
 
-use macaca_sdk::kernel::{KernelBuilder, UnavailableAgentExecutionPort};
-use macaca_sdk::llm::{LlmProvider, LlmRouter};
+use macaca_host_composition::kernel::{KernelBuilder, UnavailableAgentExecutionPort};
+use macaca_host_composition::llm::{LlmProvider, LlmRouter};
 use macaca_proto::config::{KernelConfig, MacacaConfig};
 use macaca_proto::MacacaResult;
 
@@ -16,8 +16,6 @@ use super::bootstrap_ctx::BootstrapCtx;
 
 /// Run the `config-and-kernel` bootstrap slice.
 pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
-
-
     // 1. Load configuration from config/default.toml
     let config = MacacaConfig::load_default();
     info!(
@@ -27,12 +25,11 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
         "Configuration loaded"
     );
 
-
     // 1b. Publish [mcp.env] entries into the current process environment so
     //     every stdio MCP child process (which inherits parent env by default)
     //     automatically receives secrets such as FIGMA_API_KEY.
     let mcp_env_outcomes =
-        macaca_sdk::runtime_host::RuntimeEnvBuilder::apply_process_env(&config.mcp.env);
+        macaca_host_composition::mcp_runtime::RuntimeEnvBuilder::apply_process_env(&config.mcp.env);
     if !mcp_env_outcomes.is_empty() {
         info!(
             entries = mcp_env_outcomes.len(),
@@ -40,13 +37,11 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
         );
     }
 
-
     // 2. Create LLM router/provider registry from configuration.
     let llm_router = Arc::new(LlmRouter::from_config(&config.llm)?);
     let llm: Arc<dyn LlmProvider> = llm_router.clone();
 
     info!(provider = llm.name(), "LLM provider initialized");
-
 
     // 3. Create kernel.
     let kernel_config = KernelConfig {

@@ -7,18 +7,18 @@
 use macaca_driver::{DriverToolInvokeCommand, DRIVER_TOOL_INVOKE_COMMAND};
 use macaca_proto::{
     CapabilityToolInvocation, CapabilityToolInvocationResult, IndustrialToolDescriptor,
-    KernelServiceId, MacacaResult, McpToolInvokeCommand, ServiceCommand,
-    ServiceCommandName, ToolExecutorRouteKind, ToolInvokeCommand, MCP_TOOL_INVOKE_COMMAND,
+    KernelServiceId, MacacaResult, McpToolInvokeCommand, ServiceCommand, ServiceCommandName,
+    ToolExecutorRouteKind, ToolInvokeCommand, MCP_TOOL_INVOKE_COMMAND,
 };
 use macaca_skill::{SkillToolInvokeCommand, SKILL_TOOL_INVOKE_COMMAND};
 use serde_json::Value;
 
 use crate::tool_service_provider_state::stable_json_hash;
+use crate::ServiceRuntime;
 use crate::{
     ToolManagedGatewayInvocation, ToolManagedGatewayService, ToolRuntimeEnvironmentInvocation,
     ToolRuntimeEnvironmentService,
 };
-use crate::ServiceRuntime;
 
 use super::helpers::{
     backend_tool_name, lifecycle, owning_service_payload, runtime_error, wrap_service_command_reply,

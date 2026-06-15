@@ -7,8 +7,8 @@
 use macaca_skill::{
     SkillExperienceDestinationRouteResult, SkillExperienceProposalCommand,
     SkillExperienceProposalRecord, SkillExperienceProposalResult,
-    SkillExperienceProposalSnapshotResult, SkillGovernanceEventPayload,
-    SkillGovernanceEventRecord, SkillGovernanceStoreStrategy,
+    SkillExperienceProposalSnapshotResult, SkillGovernanceEventPayload, SkillGovernanceEventRecord,
+    SkillGovernanceStoreStrategy,
 };
 
 use super::{event_id, SkillProviderGovernanceState};

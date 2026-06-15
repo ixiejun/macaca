@@ -268,7 +268,7 @@ pub struct McpServiceSnapshot {
     /// The MCP service keeps this field as JSON values rather than depending on
     /// runtime-host concrete structs in `macaca-proto`.  That preserves the
     /// Command/DTO boundary: callers may deserialize into their local adapter
-    /// type when they intentionally bridge compatibility behavior, while the
+    /// type when they intentionally bridge auxiliary behavior, while the
     /// shared contract remains provider-neutral and auditable.
     pub definitions: Vec<serde_json::Value>,
     pub ready: usize,

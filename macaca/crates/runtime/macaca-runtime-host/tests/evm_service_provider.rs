@@ -1,4 +1,4 @@
-//! Integration tests for the Route C EVM optional service provider.
+//! Integration tests for the EVM optional service provider.
 //!
 //! These tests live outside the provider module so the production file stays
 //! below the Agent OS 500-line limit while still exercising the public service
@@ -103,7 +103,10 @@ async fn evm_service_unavailable_deploy_fails_closed_without_panic() {
         .await
         .expect_err("unavailable provider must reject deploy");
     assert!(
-        error.to_string().to_ascii_lowercase().contains("unavailable"),
+        error
+            .to_string()
+            .to_ascii_lowercase()
+            .contains("unavailable"),
         "expected unavailable diagnostic, got: {error}"
     );
 }
@@ -156,8 +159,7 @@ async fn evm_service_mock_deploy_call_read_gas_receipt_and_subscribe_succeed() {
         ))
         .await
         .unwrap();
-    let call: macaca_proto::EvmCallAdmission =
-        serde_json::from_value(call_result.output).unwrap();
+    let call: macaca_proto::EvmCallAdmission = serde_json::from_value(call_result.output).unwrap();
     assert_eq!(call.status, "mock_called");
 
     let read_cmd = EvmContractReadCommand {
@@ -183,8 +185,7 @@ async fn evm_service_mock_deploy_call_read_gas_receipt_and_subscribe_succeed() {
         ))
         .await
         .unwrap();
-    let read: macaca_proto::EvmReadAdmission =
-        serde_json::from_value(read_result.output).unwrap();
+    let read: macaca_proto::EvmReadAdmission = serde_json::from_value(read_result.output).unwrap();
     assert_eq!(read.status, "mock_read");
 
     let gas_cmd = EvmGasEstimateCommand {

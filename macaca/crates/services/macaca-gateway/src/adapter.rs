@@ -1,5 +1,4 @@
 //! Core IM adapter and event handler traits.
-#![allow(deprecated)]
 
 use std::sync::Arc;
 
@@ -12,7 +11,6 @@ use macaca_proto::types::GatewayEvent;
 /// Each adapter represents a connection to an instant-messaging platform
 /// (Telegram, Discord, etc.). The gateway manages the lifecycle of adapters
 /// and dispatches incoming events to an [`EventHandler`].
-#[deprecated(note = "use GatewayTransport plus GatewayMediator for new gateway integrations")]
 #[async_trait]
 pub trait ImAdapter: Send + Sync {
     /// Human-readable adapter name (e.g. "telegram", "discord").
@@ -29,7 +27,6 @@ pub trait ImAdapter: Send + Sync {
 }
 
 /// Handles gateway events produced by IM adapters.
-#[deprecated(note = "use GatewayEventSink through GatewayMediator for new gateway integrations")]
 #[async_trait]
 pub trait EventHandler: Send + Sync {
     /// Process a single gateway event.

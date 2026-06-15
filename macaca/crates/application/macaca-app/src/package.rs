@@ -1,17 +1,17 @@
 //! Package descriptor adapter for Macaca applications.
 //!
-//! This module adapts existing YAML application manifests into the canonical
-//! Route C Package Manifest v0 contract.  It uses the Adapter + Builder
+//! This module adapts YAML application manifests into the canonical
+//! Package Manifest v0 contract.  It uses the Adapter + Builder
 //! patterns so current `app.yaml` files remain first-class inputs while future
 //! WASM/package loaders can consume the same descriptor shape.
 
 use std::path::Path;
 
+use macaca_proto::AgentConfig;
 use macaca_proto::{
     ApplicationManifestV1, MacacaResult, PackageCapability, PackageDescriptor, PackageEntry,
     PackageManifest, PackagePermission, PackageRuntime, PackageServiceRequirement,
 };
-use macaca_proto::AgentConfig;
 
 use crate::loader::AppLoader;
 use crate::manifest_v1::YamlApplicationManifestAdapter;
@@ -53,15 +53,6 @@ impl AppPackageDescriptorBuilder {
             .push("application_package.yaml_manifest_v1_projection.loaded".into());
         descriptor
     }
-}
-
-/// Convert a parsed YAML app manifest into a package descriptor.
-#[deprecated(
-    since = "0.1.0",
-    note = "use YamlApplicationManifestAdapter plus application_manifest_v1_to_package_descriptor"
-)]
-pub fn app_manifest_to_package_descriptor(manifest: &AppManifest) -> PackageDescriptor {
-    AppPackageDescriptorBuilder::new(manifest.clone()).build()
 }
 
 /// Convert Application Manifest v1 into the canonical Package Descriptor.

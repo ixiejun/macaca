@@ -1,4 +1,4 @@
-//! Integration tests for the Route C Web3 optional service provider.
+//! Integration tests for the Web3 optional service provider.
 //!
 //! These tests live outside the provider module so the production file stays
 //! below the Agent OS 500-line limit while still exercising the public service
@@ -10,12 +10,12 @@ use std::sync::Arc;
 use chrono::Utc;
 use macaca_kernel::SystemService;
 use macaca_proto::{
-    ChainId, ChainQueryRequest, ServiceCommand, ServiceCommandName, SigningRequest,
-    TraceContext, TransactionRequest, Web3Address, Web3AvailabilityCommand,
-    Web3ChainQueryCommand, Web3RequestId, Web3SigningRequestCommand, Web3SnapshotCommand,
-    Web3TransactionPrepareCommand, Web3WalletListCommand, WEB3_AVAILABILITY_COMMAND,
-    WEB3_CHAIN_QUERY_COMMAND, WEB3_SIGNING_REQUEST_COMMAND, WEB3_SNAPSHOT_COMMAND,
-    WEB3_TRANSACTION_PREPARE_COMMAND, WEB3_WALLET_LIST_COMMAND,
+    ChainId, ChainQueryRequest, ServiceCommand, ServiceCommandName, SigningRequest, TraceContext,
+    TransactionRequest, Web3Address, Web3AvailabilityCommand, Web3ChainQueryCommand, Web3RequestId,
+    Web3SigningRequestCommand, Web3SnapshotCommand, Web3TransactionPrepareCommand,
+    Web3WalletListCommand, WEB3_AVAILABILITY_COMMAND, WEB3_CHAIN_QUERY_COMMAND,
+    WEB3_SIGNING_REQUEST_COMMAND, WEB3_SNAPSHOT_COMMAND, WEB3_TRANSACTION_PREPARE_COMMAND,
+    WEB3_WALLET_LIST_COMMAND,
 };
 use macaca_runtime_host::Web3SystemServiceProvider;
 
@@ -101,7 +101,10 @@ async fn web3_service_unavailable_signing_fails_closed_without_panic() {
         .await
         .expect_err("unavailable provider must reject signing");
     assert!(
-        error.to_string().to_ascii_lowercase().contains("unavailable"),
+        error
+            .to_string()
+            .to_ascii_lowercase()
+            .contains("unavailable"),
         "expected unavailable diagnostic, got: {error}"
     );
 }
@@ -199,8 +202,7 @@ async fn web3_service_mock_wallet_list_returns_provider_views() {
         ))
         .await
         .unwrap();
-    let wallets: Vec<macaca_proto::Web3WalletView> =
-        serde_json::from_value(result.output).unwrap();
+    let wallets: Vec<macaca_proto::Web3WalletView> = serde_json::from_value(result.output).unwrap();
     assert_eq!(wallets.len(), 1);
     assert_eq!(wallets[0].wallet_id, "mock.wallet");
 }

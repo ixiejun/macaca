@@ -5,11 +5,11 @@
 //! `service.skill` while the Context composer receives a compact, body-free
 //! catalog that already honors the service-owned decision.
 
-use macaca_sdk::context::{
+use macaca_host_composition::context::{
     DeclaredCapabilityDependency, SkillCapabilityCatalog, SkillCapabilityGovernanceReport,
     SkillCapabilityRecord, SkillFilterDiagnostic,
 };
-use macaca_sdk::skill::{
+use macaca_host_composition::runtime_host::{
     FilteredSkill, SkillAliasKind, SkillAliasResolutionStatus, SkillAliasResolveResult,
     SkillGovernanceRecord, SkillGovernanceSnapshotResult, SkillLifecycleState, SkillSnapshot,
     SkillSnapshotEntry,
@@ -314,7 +314,7 @@ mod tests {
     use std::path::PathBuf;
 
     use chrono::Utc;
-    use macaca_sdk::skill::{
+    use macaca_host_composition::runtime_host::{
         SkillAliasKind, SkillAliasResolutionPolicy, SkillAliasResolutionStatus,
         SkillAliasResolveResult, SkillMcpServerConfig, SkillSnapshot, SkillSnapshotEntry,
         SkillSourceScope,
@@ -330,7 +330,7 @@ mod tests {
             skills: vec![
                 SkillSnapshotEntry {
                     name: "old-debugging".into(),
-                    description: "Narrow deprecated debugging skill".into(),
+                    description: "Narrow archived debugging skill".into(),
                     source_location: PathBuf::from("/app/skills/old-debugging/SKILL.md"),
                     source_base_dir: PathBuf::from("/app/skills/old-debugging"),
                     location: PathBuf::from("/app/skills/old-debugging/SKILL.md"),

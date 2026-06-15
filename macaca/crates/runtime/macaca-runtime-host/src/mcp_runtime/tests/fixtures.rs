@@ -3,7 +3,6 @@
 //! Provides a Strategy-injectable [`TestMcpClient`] and helper builders so
 //! invocation/catalog tests can simulate protocol outcomes without real MCP I/O.
 
-#[allow(deprecated)]
 use std::collections::BTreeMap;
 use std::future::pending;
 use std::sync::Arc;
@@ -14,11 +13,10 @@ use macaca_framework::mcp::{
 };
 use macaca_framework::message::{ContentBlock, TextBlock};
 
-use crate::mcp_runtime::{
-    McpDefinitionSource, McpLifecycleScope, McpRuntimeManager, McpServerDefinition,
-};
+use crate::mcp_runtime::{McpDefinitionSource, McpLifecycleScope, McpServerDefinition};
 
 use super::super::descriptors::descriptor_from_tool;
+use super::super::manager::McpRuntimeManager;
 
 /// Builds a minimal stdio [`McpServerDefinition`] for contract tests.
 ///
@@ -38,7 +36,7 @@ pub(crate) fn stdio_definition(id: &str, command: &str) -> McpServerDefinition {
         tool_prefix: None,
         required_bins: vec![command.to_string()],
         enabled: true,
-        source: McpDefinitionSource::Compatibility,
+        source: McpDefinitionSource::Mapping,
         concurrency_isolation: None,
     }
 }

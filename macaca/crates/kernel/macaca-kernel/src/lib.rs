@@ -1,4 +1,4 @@
-//! `aos-kernel` — agent runtime, scheduler, and orchestrator.
+//! `aos-kernel` — microkernel primitives, scheduler contracts, and service-call invariants.
 
 pub mod alert;
 pub mod audit;
@@ -9,7 +9,6 @@ pub mod facade;
 pub mod kernel;
 pub mod kernel_builder;
 pub mod logging;
-pub mod orchestrator;
 pub mod persistence;
 pub mod plugin_registry;
 pub mod policy;
@@ -28,21 +27,20 @@ pub mod trace_service_adapter;
 
 pub use capability_registry::{CapabilityRegistry, InMemoryCapabilityRegistry};
 pub use domain_pack_registration::DomainPackProviderRegistration;
+pub use execution_port::{SwappableAgentExecutionPort, UnavailableAgentExecutionPort};
 pub use facade::{
     DefaultKernelFacade, InMemoryTraceEventBus, KernelFacade, KernelTraceEvent, TraceEventBus,
 };
-pub use execution_port::{SwappableAgentExecutionPort, UnavailableAgentExecutionPort};
 pub use kernel::Kernel;
 pub use kernel_builder::KernelBuilder;
 pub use macaca_proto::AgentExecutionPort;
-pub use orchestrator::AgentOrchestrator;
 pub use persistence::{KernelPersistencePort, UnavailableKernelPersistencePort};
 pub use plugin_registry::{
     is_valid_transition as is_valid_plugin_lifecycle_transition, PluginRegistry,
     PluginRegistryEntry, PluginRegistrySnapshot,
 };
 pub use policy::{DefaultAllowPolicyEngine, PolicyEngine, StaticDenyPolicyEngine};
-pub use registry::{AgentEntry, AgentRegistry};
+pub use registry::AgentRegistry;
 pub use resource::{InMemoryResourceManager, ResourceManager};
 pub use scheduler::Scheduler;
 pub use scheduler_factory::{SchedulerFactory, SchedulerKind};

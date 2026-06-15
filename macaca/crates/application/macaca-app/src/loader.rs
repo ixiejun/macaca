@@ -98,13 +98,10 @@ fn inline_to_agent_config(inline: &InlineAgentConfig) -> AgentConfig {
         max_tokens: inline.max_tokens,
         temperature: inline.temperature,
         persona_dir: None,
-        skills: inline
-            .skills
-            .as_ref()
-            .map(|skills| AgentSkillsConfig {
-                allow: skills.allow.clone(),
-                deny: skills.deny.clone(),
-            }),
+        skills: inline.skills.as_ref().map(|skills| AgentSkillsConfig {
+            allow: skills.allow.clone(),
+            deny: skills.deny.clone(),
+        }),
     }
 }
 

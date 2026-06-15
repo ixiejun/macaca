@@ -1,15 +1,15 @@
 //! Ability descriptor synthesis for YAML → Manifest v1 projection.
 //!
-//! Each builder function maps a legacy agent source into a provider-neutral
+//! Each builder function maps a YAML agent source into a provider-neutral
 //! `ApplicationAbilityDescriptor`.  WASM runtime abilities are synthesized
 //! generically from service contracts via the **Strategy** catalog interface.
 
+use macaca_proto::AgentConfig;
 use macaca_proto::{
     AbilityActivation, AbilityCapabilityDeclaration, AbilityImplementationKind,
     AbilityPermissionDeclaration, AbilityServiceRequirement, ApplicationAbilityDescriptor,
     ApplicationAbilityKind, CapabilityId, KernelServiceId,
 };
-use macaca_proto::AgentConfig;
 
 use crate::model::{AgentSource, AppLayer, InlineAgentConfig};
 use crate::service_capability::{expand_service_capabilities, DomainPackCatalog};
@@ -18,7 +18,7 @@ use super::entry::sanitize_path_for_id;
 use super::types::YamlApplicationManifestAdapter;
 
 impl YamlApplicationManifestAdapter {
-    /// Build all projected abilities from a legacy YAML manifest.
+    /// Build all projected abilities from a YAML manifest.
     ///
     /// The adapter always projects declared YAML agents, and for L2 WASM
     /// applications with a declared service contract it synthesizes one generic
@@ -147,7 +147,7 @@ fn file_agent_ability(path: &str, entry: &Option<String>) -> ApplicationAbilityD
     let mut ability = base_agent_ability(stable_id.as_str(), "file", entry);
     ability
         .metadata
-        .insert("legacy.agent.path".into(), path.into());
+        .insert("source.yaml.agent.path".into(), path.into());
     ability
 }
 

@@ -15,7 +15,7 @@
 //! - **Facade**: [`ExecutionControlSessionLoopCoordinator`] owns the service-call
 //!   choreography for register/checkpoint/shutdown recording.
 //! - **Observer**: web `session_loop_shell_adapter` invokes the facade before
-//!   touching legacy in-process `PlanLoopWaker` / `WorkerLoopWaker` handles.
+//!   touching local in-process `PlanLoopWaker` / `WorkerLoopWaker` handles.
 //!
 //! Shell adapters retain local wakers until loop_manager fully subscribes to
 //! execution-control event streams (task 4.2 / 4.3 file split).
@@ -24,10 +24,10 @@ use std::sync::Arc;
 
 use macaca_proto::{
     ApplicationId, ExecutionControlCheckpointCommand, ExecutionControlCheckpointMode,
-    ExecutionControlCommandResult, ExecutionControlPolicy, ExecutionControlRegisterExecutionCommand,
-    ExecutionControlResolutionStatus, ExecutionControlResumeSource, ExecutionControlScope,
-    ExecutionControlTrigger, KernelServiceId, MacacaResult, ServiceBusSource, TraceContext,
-    EXECUTION_CONTROL_SERVICE_ID,
+    ExecutionControlCommandResult, ExecutionControlPolicy,
+    ExecutionControlRegisterExecutionCommand, ExecutionControlResolutionStatus,
+    ExecutionControlResumeSource, ExecutionControlScope, ExecutionControlTrigger, KernelServiceId,
+    MacacaResult, ServiceBusSource, TraceContext, EXECUTION_CONTROL_SERVICE_ID,
 };
 use tracing::{info, warn};
 
@@ -225,16 +225,14 @@ impl ExecutionControlSessionLoopCoordinator {
     /// Register a session loop controller and record an initial checkpoint.
     ///
     /// Registration emits durable service-call evidence when PlanLoop/WorkerLoop
-    /// tasks are spawned.  Local waker maps remain a shell compatibility seam.
+    /// tasks are spawned.  Local waker maps remain shell notification state.
     pub async fn register_session_loop(
         &self,
         request: SessionLoopRegisterRequest,
     ) -> Result<ExecutionControlCommandResult, String> {
         let scope = Self::loop_scope(&request).map_err(|error| error.to_string())?;
-        let resolved = ExecutionControlPolicyResolver::resolve(
-            Some(&Self::session_loop_policy()),
-            None,
-        );
+        let resolved =
+            ExecutionControlPolicyResolver::resolve(Some(&Self::session_loop_policy()), None);
         if resolved.status != ExecutionControlResolutionStatus::Enabled {
             return Err(format!(
                 "session-loop execution control denied: {}",
@@ -306,9 +304,10 @@ impl ExecutionControlSessionLoopCoordinator {
             "loop_kind".into(),
             request.loop_kind.execution_suffix().into(),
         );
-        scope
-            .metadata
-            .insert("wake_event_kind".into(), request.loop_kind.wake_event_kind().into());
+        scope.metadata.insert(
+            "wake_event_kind".into(),
+            request.loop_kind.wake_event_kind().into(),
+        );
         scope
             .metadata
             .insert("reason_code".into(), request.reason_code.clone());
@@ -369,13 +368,13 @@ impl ExecutionControlSessionLoopCoordinator {
                 SESSION_LOOP_EXECUTION_CONTROL_SOURCE,
             )
             .map_err(|error| error.to_string())?;
-            scope.metadata.insert(
-                "loop_kind".into(),
-                loop_kind.execution_suffix().into(),
-            );
             scope
                 .metadata
-                .insert("shutdown_event_kind".into(), SESSION_LOOP_SHUTDOWN_EVENT.into());
+                .insert("loop_kind".into(), loop_kind.execution_suffix().into());
+            scope.metadata.insert(
+                "shutdown_event_kind".into(),
+                SESSION_LOOP_SHUTDOWN_EVENT.into(),
+            );
             scope
                 .metadata
                 .insert("reason_code".into(), request.reason_code.clone());
@@ -459,23 +458,24 @@ mod tests {
             Some("session-a"),
             SessionLoopKind::Plan,
         );
-        assert_eq!(
-            id,
-            format!("session-loop:plan:session-a:{}", app_id.0)
-        );
+        assert_eq!(id, format!("session-loop:plan:session-a:{}", app_id.0));
     }
 
     #[test]
     fn session_loop_policy_uses_task_service_events() {
         let policy = ExecutionControlSessionLoopCoordinator::session_loop_policy();
-        assert!(policy.triggers.contains(&ExecutionControlTrigger::ServiceEvent {
-            capability_id: SESSION_LOOP_TASK_CAPABILITY_ID.into(),
-            event_kind: SESSION_LOOP_PLAN_WAKE_EVENT.into(),
-        }));
-        assert!(policy.triggers.contains(&ExecutionControlTrigger::ServiceEvent {
-            capability_id: SESSION_LOOP_TASK_CAPABILITY_ID.into(),
-            event_kind: SESSION_LOOP_WORKER_WAKE_EVENT.into(),
-        }));
+        assert!(policy
+            .triggers
+            .contains(&ExecutionControlTrigger::ServiceEvent {
+                capability_id: SESSION_LOOP_TASK_CAPABILITY_ID.into(),
+                event_kind: SESSION_LOOP_PLAN_WAKE_EVENT.into(),
+            }));
+        assert!(policy
+            .triggers
+            .contains(&ExecutionControlTrigger::ServiceEvent {
+                capability_id: SESSION_LOOP_TASK_CAPABILITY_ID.into(),
+                event_kind: SESSION_LOOP_WORKER_WAKE_EVENT.into(),
+            }));
     }
 
     #[test]
@@ -489,6 +489,9 @@ mod tests {
         };
         let scope = ExecutionControlSessionLoopCoordinator::loop_scope(&request).unwrap();
         assert_eq!(scope.session_id, "session-loop");
-        assert_eq!(scope.metadata.get("worker_count").map(String::as_str), Some("3"));
+        assert_eq!(
+            scope.metadata.get("worker_count").map(String::as_str),
+            Some("3")
+        );
     }
 }

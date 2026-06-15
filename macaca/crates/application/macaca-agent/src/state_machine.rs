@@ -22,20 +22,7 @@ pub struct AgentStateMachine {
 }
 
 impl AgentStateMachine {
-    /// Create a new state machine starting in [`AgentState::Created`].
-    #[deprecated(note = "use AgentStateMachine::default() for new code")]
-    pub fn new() -> Self {
-        Self {
-            state: AgentState::Created,
-            policy: Box::new(DefaultAgentLifecyclePolicy),
-        }
-    }
-
-    #[deprecated(note = "use AgentStateMachine::with_lifecycle_policy(...) for new code")]
-    pub fn with_policy(policy: Box<dyn AgentLifecyclePolicy>) -> Self {
-        Self::with_lifecycle_policy(policy)
-    }
-
+    /// Create a state machine with an injected lifecycle policy strategy.
     pub fn with_lifecycle_policy(policy: Box<dyn AgentLifecyclePolicy>) -> Self {
         Self {
             state: AgentState::Created,

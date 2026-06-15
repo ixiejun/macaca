@@ -10,7 +10,7 @@ use macaca_proto::{MacacaError, MacacaResult};
 use tracing::{info, warn};
 
 use crate::{
-    bounded_values, AdmissionDecision, BenchmarkDecision, DefaultEvolutionAdmissionSpecification,
+    AdmissionDecision, BenchmarkDecision, DefaultEvolutionAdmissionSpecification,
     DefaultEvolutionBenchmarkScoringStrategy, DefaultEvolutionReleaseSafetyStrategy,
     EvolutionAdmissionCommand, EvolutionAdmissionSpecification, EvolutionBenchmarkCommand,
     EvolutionBenchmarkScoringStrategy, EvolutionLivePhase, EvolutionLivePhaseCheckpoint,
@@ -18,6 +18,9 @@ use crate::{
     EvolutionReleaseCommand, EvolutionReleaseResult, EvolutionReleaseSafetyStrategy,
     EvolutionTargetType, AUTONOMY_EVOLUTION_SERVICE_ID,
 };
+
+const MAX_REF_LEN: usize = 160;
+const MAX_REFS: usize = 8;
 
 /// Strategy for turning observer refs into candidate descriptors.
 ///
@@ -382,5 +385,23 @@ fn final_result(
         adapter_dispatch_performed,
         source_mutation_performed: false,
         captured_at: chrono::Utc::now(),
+    }
+}
+
+fn bounded_values(values: &[String]) -> Vec<String> {
+    values
+        .iter()
+        .take(MAX_REFS)
+        .map(|value| bounded_value(value.clone()))
+        .collect()
+}
+
+fn bounded_value(value: String) -> String {
+    if value.len() > MAX_REF_LEN {
+        let mut bounded = value;
+        bounded.truncate(MAX_REF_LEN);
+        bounded
+    } else {
+        value
     }
 }

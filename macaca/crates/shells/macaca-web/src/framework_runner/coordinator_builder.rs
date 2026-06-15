@@ -1,20 +1,20 @@
 //! Coordinator agent builder with SSE bridging and execution-control barriers.
 
-use std::convert::Infallible;
-use std::sync::Arc;
-use axum::response::sse::Event;
-use macaca_sdk::framework::agent::HookedAgent;
-use macaca_sdk::framework::construction::{AgentBuildIntent, AgentToolConfig};
-use macaca_sdk::framework::react_agent::ReActAgent;
-use macaca_proto::ApplicationId;
-use tokio::sync::mpsc;
-use crate::state::AppState;
 use super::agent_factory_build::WebTracedAgentFactory;
 use super::agent_factory_coordinator::build_coordinator_agent;
 use super::build_mode::FrameworkRunnerBuildMode;
 use super::request_composition;
 use super::runtime_execution_control::RuntimeExecutionControl;
 use super::FrameworkRunner;
+use crate::state::AppState;
+use axum::response::sse::Event;
+use macaca_host_composition::framework::agent::HookedAgent;
+use macaca_host_composition::framework::construction::{AgentBuildIntent, AgentToolConfig};
+use macaca_host_composition::framework::react_agent::ReActAgent;
+use macaca_proto::ApplicationId;
+use std::convert::Infallible;
+use std::sync::Arc;
+use tokio::sync::mpsc;
 
 impl FrameworkRunner {
     /// Build a coordinator `ReActAgent` wrapped with `HookedAgent` for SSE bridging

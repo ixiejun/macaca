@@ -60,9 +60,9 @@ fn approved_merge_apply(trace: TraceContext) -> SkillUmbrellaMergeApplyCommand {
         }],
         risk: SkillMergeRiskScore {
             score: 0.25,
-            reasons: vec!["compatible generic debugging flow".into()],
+            reasons: vec!["matching generic debugging flow".into()],
         },
-        policy_decision_refs: vec!["policy://merge/proposal-compatible".into()],
+        policy_decision_refs: vec!["policy://merge/proposal-matching".into()],
         evidence_ids: vec!["evidence://merge/proposal".into()],
         rationale: "merge keeps the reusable debugging flow under the umbrella skill".into(),
     };

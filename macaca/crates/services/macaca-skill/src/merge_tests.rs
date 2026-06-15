@@ -29,9 +29,9 @@ fn umbrella_merge_proposal_carries_metadata_only_contract() {
         }],
         risk: SkillMergeRiskScore {
             score: 0.35,
-            reasons: vec!["compatible diagnostic flow".into()],
+            reasons: vec!["aligned diagnostic flow".into()],
         },
-        policy_decision_refs: vec!["policy://skill-merge/compatible".into()],
+        policy_decision_refs: vec!["policy://skill-merge/aligned".into()],
         evidence_ids: vec!["evidence://merge/proposal".into()],
         rationale: "merge keeps reusable debugging flow in the umbrella skill".into(),
     };

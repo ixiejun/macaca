@@ -10,10 +10,10 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use chrono::Utc;
 use macaca_proto::{
-    AutonomyScope, KernelServiceId, SchedulerCommandResult, SchedulerJobDefinition,
-    SchedulerJobId, SchedulerRegisterJobCommand, SchedulerRunState, SchedulerScheduleSpec,
-    SchedulerTargetCommand, ServiceCommandName, ServiceTargetCommand, TraceContext,
-    SCHEDULER_REGISTER_JOB_COMMAND, SCHEDULER_SERVICE_ID,
+    AutonomyScope, KernelServiceId, SchedulerCommandResult, SchedulerJobDefinition, SchedulerJobId,
+    SchedulerRegisterJobCommand, SchedulerRunState, SchedulerScheduleSpec, SchedulerTargetCommand,
+    ServiceCommandName, ServiceTargetCommand, TraceContext, SCHEDULER_REGISTER_JOB_COMMAND,
+    SCHEDULER_SERVICE_ID,
 };
 
 use super::{

@@ -10,16 +10,15 @@
 
 use chrono::Utc;
 use macaca_proto::{
-    HeartbeatCommandResult, HeartbeatWakeCommand, HeartbeatWakeIntent, MacacaResult,
-    TraceContext, HEARTBEAT_SERVICE_ID,
+    HeartbeatCommandResult, HeartbeatWakeCommand, HeartbeatWakeIntent, MacacaResult, TraceContext,
+    HEARTBEAT_SERVICE_ID,
 };
 use tracing::info;
 
 use crate::service_contract::HeartbeatService;
 
 use super::{
-    InProcessHeartbeatProvider, LOCAL_PROVIDER_ID, PROFILE_COOLDOWN_MS_KEY,
-    PROFILE_ID_METADATA_KEY,
+    InProcessHeartbeatProvider, LOCAL_PROVIDER_ID, PROFILE_COOLDOWN_MS_KEY, PROFILE_ID_METADATA_KEY,
 };
 
 impl InProcessHeartbeatProvider {

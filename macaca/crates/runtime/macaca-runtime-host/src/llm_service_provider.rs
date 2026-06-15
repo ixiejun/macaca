@@ -1,4 +1,4 @@
-//! Runtime-host adapter for the Route C LLM Service.
+//! Runtime-host adapter for the LLM Service.
 //!
 //! This module applies the Adapter/Bridge pattern: `ServiceRuntime` sees a
 //! provider-neutral `SystemService`, while the adapter delegates actual model

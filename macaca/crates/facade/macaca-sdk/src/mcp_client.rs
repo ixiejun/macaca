@@ -1,8 +1,7 @@
-//! SDK MCP client facade (**Facade** module root) for Route C S6.
+//! SDK MCP client facade (**Facade** module root).
 //!
-//! MCP service contracts live in `macaca-runtime-host` because host runtime owns
-//! protocol sessions and cleanup.  The SDK still remains a thin client: it does
-//! not construct MCP runtimes or toolkits.
+//! MCP protocol sessions and cleanup are host-owned runtime concerns.  The SDK
+//! remains a thin client: it does not construct MCP runtimes or toolkits.
 //!
 //! # Module tree (P5 iteration 94)
 //! - `support` — generic service-call bridge (`call`)
@@ -50,10 +49,8 @@ pub trait SystemMcpClient: Send + Sync {
         &self,
         command: McpToolAttachCommand,
     ) -> MacacaResult<McpToolAttachResult>;
-    async fn invoke_tool(
-        &self,
-        command: McpToolInvokeCommand,
-    ) -> MacacaResult<McpToolInvokeResult>;
+    async fn invoke_tool(&self, command: McpToolInvokeCommand)
+        -> MacacaResult<McpToolInvokeResult>;
     async fn status(&self, command: McpStatusCommand) -> MacacaResult<McpStatusResult>;
     async fn server_status_list(
         &self,

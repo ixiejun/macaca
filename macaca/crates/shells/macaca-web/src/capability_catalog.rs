@@ -1,5 +1,5 @@
 //! Host-side **Adapter** functions: bridge `macaca-skill`, MCP runtime probes, and the framework
-//! `Toolkit` into neutral [`macaca_sdk::context::capability`] DTOs used by composer providers.
+//! `Toolkit` into neutral [`macaca_host_composition::context::capability`] DTOs used by composer providers.
 //!
 //! The context crate intentionally avoids depending on skill/MCP crates; this module is the
 //! application-facing composition root that performs the mapping while keeping transport and
@@ -8,26 +8,28 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
+#[path = "capability_catalog/alias_resolution.rs"]
 mod alias_resolution;
+#[path = "capability_catalog/lifecycle_visibility.rs"]
 mod lifecycle_visibility;
 
+use macaca_host_composition::context::{
+    mcp_tool_collisions, McpCapabilityCatalog, McpServerCapabilitySummary,
+    RuntimeToolCapabilityCatalog, SkillCapabilityCatalog,
+};
+use macaca_host_composition::framework::tool::Toolkit;
+use macaca_host_composition::mcp_runtime::{
+    McpRuntimeFacade, McpRuntimeStatus, McpRuntimeStatusState, McpToolPolicy,
+};
+use macaca_host_composition::runtime_host::{
+    SkillAliasResolveCommand, SkillAliasResolveResult, SkillGovernanceSnapshotCommand,
+    SkillGovernanceSnapshotResult, SkillLifecycleState, SkillPolicy, SkillServiceScope,
+    SkillSnapshot, SkillSnapshotServiceCommand,
+};
 use macaca_proto::config::ContextConfig;
 use macaca_proto::{
     ApplicationId, McpProbeCommand, McpRuntimeStatusView, McpToolPolicySnapshot, TraceContext,
     MCP_PROBE_COMMAND, MCP_SERVICE_ID,
-};
-use macaca_sdk::context::{
-    mcp_tool_collisions, McpCapabilityCatalog, McpServerCapabilitySummary,
-    RuntimeToolCapabilityCatalog, SkillCapabilityCatalog,
-};
-use macaca_sdk::framework::tool::Toolkit;
-use macaca_sdk::runtime_host::{
-    McpRuntimeFacade, McpRuntimeStatus, McpRuntimeStatusState, McpToolPolicy,
-};
-use macaca_sdk::skill::{
-    SkillAliasResolveCommand, SkillAliasResolveResult, SkillGovernanceSnapshotCommand,
-    SkillGovernanceSnapshotResult, SkillLifecycleState, SkillPolicy, SkillRuntimeFacade,
-    SkillServiceScope, SkillSnapshot, SkillSnapshotRequest, SkillSnapshotServiceCommand,
 };
 use macaca_sdk::SystemMcpClient;
 
@@ -175,7 +177,7 @@ pub fn ready_mcp_server_ids_from_views(views: &[McpRuntimeStatusView]) -> Vec<St
 
 /// Probe MCP capability inputs through the serviceized MCP client.
 ///
-/// Preferred Route C path for composer assembly: decorators, policy gates, and
+/// Preferred protocol service path for composer assembly: decorators, policy gates, and
 /// audit evidence all flow through `service.mcp` instead of direct runtime
 /// facade reads on shell-owned `AppState` fields.
 pub async fn probe_mcp_capability_inputs_via_client(
@@ -268,11 +270,6 @@ pub async fn resolve_skill_snapshot_cached(
     match loaded_snapshot {
         Some(snapshot) => Ok(snapshot),
         None => {
-            let request = SkillSnapshotRequest::builder(agent_name)
-                .workspace_dir(workspace_root.clone())
-                .app_dir(app_dir.clone())
-                .policy(skill_policy.clone())
-                .build();
             let snapshot = match state
                 .skill_client
                 .snapshot(SkillSnapshotServiceCommand {
@@ -288,11 +285,9 @@ pub async fn resolve_skill_snapshot_cached(
                     app_dir: app_dir.clone(),
                     include_instructions: true,
                     // Preserve the application/agent exposure policy across
-                    // the serviceized skill boundary. The deprecated facade
-                    // fallback below already receives this policy through the
-                    // request builder; omitting it here made the primary
-                    // service path report an empty visible catalog for agents
-                    // that allowlist skills in app.yaml.
+                    // the serviceized skill boundary. Omitting it here would
+                    // make the primary service path report an empty visible
+                    // catalog for agents that allowlist skills in app.yaml.
                     exposure_policy: skill_policy,
                     policy: Default::default(),
                 })
@@ -303,10 +298,9 @@ pub async fn resolve_skill_snapshot_cached(
                     tracing::warn!(
                         error = %error,
                         agent = %agent_name,
-                        "Skill Service capability snapshot failed; using deprecated facade fallback"
+                        "Skill Service capability snapshot failed"
                     );
-                    #[allow(deprecated)]
-                    SkillRuntimeFacade::new().build_snapshot(request).await?
+                    return Err(error);
                 }
             };
             let alias_scope =
@@ -357,9 +351,9 @@ async fn resolve_aliases_for_snapshot(
                     );
                 } else if matches!(
                     result.status,
-                    macaca_sdk::skill::SkillAliasResolutionStatus::Denied
-                        | macaca_sdk::skill::SkillAliasResolutionStatus::Expired
-                        | macaca_sdk::skill::SkillAliasResolutionStatus::LoopPrevented
+                    macaca_host_composition::runtime_host::SkillAliasResolutionStatus::Denied
+                        | macaca_host_composition::runtime_host::SkillAliasResolutionStatus::Expired
+                        | macaca_host_composition::runtime_host::SkillAliasResolutionStatus::LoopPrevented
                 ) {
                     tracing::warn!(
                         requested_skill_id = %result.requested_skill_id,
@@ -391,7 +385,7 @@ async fn resolve_aliases_for_snapshot(
 
 /// Read the normal-profile governance snapshot used by capability context.
 ///
-/// This requests every lifecycle explicitly instead of relying on legacy
+/// This requests every lifecycle explicitly instead of relying on implicit
 /// `include_archived` semantics. The adapter then applies the normal-profile
 /// `Active` visibility rule with enough service evidence to explain every
 /// filtered row in the Context report.

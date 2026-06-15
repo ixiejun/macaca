@@ -12,12 +12,12 @@ use std::collections::{BTreeMap, BTreeSet};
 use chrono::{DateTime, Utc};
 use macaca_proto::{
     AbilityImplementationKind, AbilityPermissionDeclaration, AbilityServiceRequirement,
-    ApplicationAbilityDescriptor, ApplicationCompatibilityDeclaration, ApplicationExport,
-    ApplicationHostCommand, ApplicationHostCommandResult, ApplicationHostCommandStatus,
-    ApplicationImport, ApplicationManifestV1, ApplicationPermissionDeclaration,
-    ApplicationRuntimeProfile, CapabilityId, DeveloperId, KernelServiceId, PackageId,
-    PackageRuntimeKind, TraceContext, WasmComponentArtifactDescriptor, WASM_HOST_IMPORT_CAPABILITY,
-    WASM_HOST_IMPORT_OPERATION, WASM_HOST_IMPORT_SERVICE_ID,
+    ApplicationAbilityDescriptor, ApplicationExport, ApplicationHostCommand,
+    ApplicationHostCommandResult, ApplicationHostCommandStatus,
+    ApplicationHostRequirementDeclaration, ApplicationImport, ApplicationManifestV1,
+    ApplicationPermissionDeclaration, ApplicationRuntimeProfile, CapabilityId, DeveloperId,
+    KernelServiceId, PackageId, PackageRuntimeKind, TraceContext, WasmComponentArtifactDescriptor,
+    WASM_HOST_IMPORT_CAPABILITY, WASM_HOST_IMPORT_OPERATION, WASM_HOST_IMPORT_SERVICE_ID,
 };
 use serde_json::{json, Value};
 use tracing::{info, warn};
@@ -337,7 +337,7 @@ impl WasmGuestRuntimeHarness {
             "1.0.0",
             ApplicationRuntimeProfile::new(PackageRuntimeKind::WasmComponent, "0")
                 .entry("component.wasm"),
-            ApplicationCompatibilityDeclaration::new("0.1.0"),
+            ApplicationHostRequirementDeclaration::new("0.1.0"),
         )
         .ability(ability)
         .permission(ApplicationPermissionDeclaration::required(

@@ -5,18 +5,19 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use macaca_agent::{InProcessAgentExecutionPort, InProcessAgentSideRegistry, ToolCatalog};
+use macaca_agent::{
+    BasicAgent, BasicAgentBuilder, InProcessAgentExecutionPort, InProcessAgentSideRegistry,
+    ToolCatalog,
+};
 use macaca_kernel::{Kernel, KernelBuilder};
-use macaca_proto::AgentExecutionPort;
 use macaca_llm::LlmProvider;
 use macaca_proto::config::KernelConfig;
+use macaca_proto::AgentExecutionPort;
 use macaca_proto::{
     AgentId, AgentManifest, LlmMessage, LlmOptions, LlmResponse, MacacaError, MacacaResult,
     TokenUsage,
 };
-use macaca_sdk::{
-    register_in_process_kernel_agent, AgentBuilder, AgentConfig, DeclarativeAgent, MacacaSdk,
-};
+use macaca_sdk::{AgentBuilder, AgentConfig, MacacaSdk};
 use macaca_tools::DefaultToolSet;
 
 // ---------------------------------------------------------------------------
@@ -54,7 +55,7 @@ impl LlmProvider for MockLlm {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/// Builds a kernel with legacy in-process execution and returns the paired side registry.
+/// Builds a kernel with in-process execution and returns the paired side registry.
 ///
 /// Manifest-only kernel registration stores identity metadata; runtime [`Agent`] instances
 /// live in [`InProcessAgentSideRegistry`] and are resolved by [`InProcessAgentExecutionPort`].
@@ -75,6 +76,17 @@ fn make_kernel() -> (Kernel, Arc<InProcessAgentSideRegistry>) {
     (kernel, side_registry)
 }
 
+struct TestKernelRegistry<'a> {
+    kernel: &'a Kernel,
+}
+
+#[async_trait]
+impl macaca_sdk::AgentRegistryApi for TestKernelRegistry<'_> {
+    async fn register_manifest(&self, manifest: AgentManifest) -> MacacaResult<AgentId> {
+        self.kernel.register_agent(manifest).await
+    }
+}
+
 fn sample_agent_config(name: &str) -> AgentConfig {
     AgentConfig::from_yaml(&format!(
         r#"
@@ -90,11 +102,27 @@ max_tokens: 100
     .unwrap()
 }
 
-fn build_declarative_agent(config: AgentConfig) -> (DeclarativeAgent, AgentManifest) {
+fn build_declarative_agent(config: AgentConfig) -> (BasicAgent, AgentManifest) {
     let spec = AgentBuilder::from_config(config).build_spec().unwrap();
     let manifest = spec.manifest();
-    let agent = spec.into_agent();
+    let agent = BasicAgentBuilder::new(spec.prompt_template())
+        .with_id(spec.id())
+        .with_capabilities(spec.capabilities().to_vec())
+        .build();
     (agent, manifest)
+}
+
+async fn register_in_process_test_agent(
+    kernel: &Kernel,
+    side_registry: &InProcessAgentSideRegistry,
+    agent: BasicAgent,
+    manifest: AgentManifest,
+) -> MacacaResult<AgentId> {
+    let id = manifest.id;
+    side_registry
+        .register_runtime_agent(Arc::from(Box::new(agent) as Box<dyn macaca_agent::Agent>))?;
+    kernel.register_agent(manifest).await?;
+    Ok(id)
 }
 
 // ---------------------------------------------------------------------------
@@ -111,8 +139,8 @@ async fn declarative_agent_full_lifecycle() {
     let (agent, manifest) = build_declarative_agent(config);
     let agent_id = manifest.id;
 
-    // Register manifest in kernel and runtime agent in the legacy side registry.
-    register_in_process_kernel_agent(&kernel, side_registry.as_ref(), Box::new(agent), manifest)
+    // Register manifest in kernel and runtime agent in the side registry.
+    register_in_process_test_agent(&kernel, side_registry.as_ref(), agent, manifest)
         .await
         .unwrap();
     assert_eq!(kernel.agent_count().await, 1);
@@ -143,7 +171,7 @@ async fn register_multiple_agents() {
         let config = sample_agent_config(&format!("agent-{i}"));
         let (agent, manifest) = build_declarative_agent(config);
         let id = manifest.id;
-        register_in_process_kernel_agent(&kernel, side_registry.as_ref(), Box::new(agent), manifest)
+        register_in_process_test_agent(&kernel, side_registry.as_ref(), agent, manifest)
             .await
             .unwrap();
         ids.push(id);
@@ -182,20 +210,19 @@ async fn unregister_nonexistent_agent_returns_error() {
 /// SDK facade registration works end-to-end.
 #[tokio::test]
 async fn sdk_facade_register_config_end_to_end() {
-    let (kernel, side_registry) = make_kernel();
+    let (kernel, _side_registry) = make_kernel();
     let config = sample_agent_config("sdk-agent");
 
-    let id = MacacaSdk::for_kernel_with_in_process(&kernel, side_registry.as_ref())
-        .register_config(config)
-        .await
-        .unwrap();
+    let sdk = MacacaSdk::new(TestKernelRegistry { kernel: &kernel });
+    let id = sdk.register_config(config).await.unwrap();
 
     assert_eq!(kernel.agent_count().await, 1);
     let agents = kernel.list_agents().await;
     assert_eq!(agents[0].id, id);
     assert_eq!(agents[0].name, "sdk-agent");
 
-    // Execute via kernel
-    let output = kernel.execute_agent(&id).await.unwrap();
-    assert_eq!(output.result, "mock response");
+    // The SDK facade is manifest-only; execution materialization is owned by
+    // runtime providers and in-process test fixtures, not the SDK.
+    let err = kernel.execute_agent(&id).await.unwrap_err();
+    assert!(matches!(err, MacacaError::NotFound(_)));
 }

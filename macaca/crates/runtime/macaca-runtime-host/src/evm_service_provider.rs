@@ -1,8 +1,7 @@
-//! Runtime-host EVM optional service provider for Route C S11.
+//! Runtime-host EVM optional service provider.
 //!
-//! The provider turns EVM from a kernel-level compatibility facade into a
-//! ServiceRuntime-owned optional service.  It intentionally implements only
-//! unavailable and mock/dev strategies in S11; real nodes, RPC providers,
+//! The provider exposes EVM as a ServiceRuntime-owned optional service.  It
+//! intentionally implements only unavailable and mock/dev strategies here; real nodes, RPC providers,
 //! wallets, and EVM execution engines remain future adapters.
 
 use std::collections::BTreeMap;

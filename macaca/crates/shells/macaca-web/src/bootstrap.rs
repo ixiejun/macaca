@@ -232,18 +232,6 @@ impl WebRuntimeFacade {
                 post(application_execution_gateway_routes::gateway_failure),
             )
             .route(
-                "/api/apps/{app_id}/schedules",
-                get(routes::list_schedules).post(routes::create_schedule),
-            )
-            .route(
-                "/api/apps/{app_id}/schedules/{id}",
-                get(routes::get_schedule).delete(routes::delete_schedule),
-            )
-            .route(
-                "/api/apps/{app_id}/schedules/{id}/toggle",
-                axum::routing::put(routes::toggle_schedule),
-            )
-            .route(
                 "/api/apps/{app_id}/autonomy/schedules",
                 get(routes::list_autonomy_schedules).post(routes::create_autonomy_schedule),
             )

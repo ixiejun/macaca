@@ -1,5 +1,4 @@
-//! Gateway manager — registers and coordinates IM adapters.
-#![allow(deprecated)]
+//! Gateway manager — registers and coordinates message adapters.
 
 use std::sync::Arc;
 
@@ -23,7 +22,6 @@ pub struct Gateway {
 
 impl Gateway {
     /// Create a new gateway with the given event handler.
-    #[deprecated(note = "use GatewayBuilder and GatewayMediator for new gateway integrations")]
     pub fn new(handler: Arc<dyn EventHandler>) -> Self {
         Self {
             adapters: Vec::new(),
@@ -31,8 +29,7 @@ impl Gateway {
         }
     }
 
-    /// Register an IM adapter with the gateway.
-    #[deprecated(note = "use GatewayBuilder or GatewayTransport registration for new integrations")]
+    /// Register a message adapter with the gateway.
     pub fn register_adapter(&mut self, adapter: Box<dyn ImAdapter>) {
         info!(adapter = adapter.name(), "Registered gateway adapter");
         self.adapters.push(adapter);
@@ -44,9 +41,6 @@ impl Gateway {
     }
 
     /// Start all registered adapters.
-    #[deprecated(
-        note = "use GatewayTransport lifecycle through GatewayMediator for new integrations"
-    )]
     pub async fn start_all(&self) -> MacacaResult<()> {
         for adapter in &self.adapters {
             info!(adapter = adapter.name(), "Starting adapter");
@@ -57,9 +51,6 @@ impl Gateway {
     }
 
     /// Stop all registered adapters.
-    #[deprecated(
-        note = "use GatewayTransport lifecycle through GatewayMediator for new integrations"
-    )]
     pub async fn stop_all(&self) -> MacacaResult<()> {
         for adapter in &self.adapters {
             info!(adapter = adapter.name(), "Stopping adapter");

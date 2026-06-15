@@ -1,70 +1,40 @@
-//! Runtime agent builders for service-backed execution paths.
+//! Runtime agent materializers for service-backed execution paths.
+//!
+//! Runtime-host owns framework agent construction. This Web module only
+//! materializes the host-local `ReActAgent` instance behind the
+//! `FrameworkAgentMaterializationPort` adapter so web tools, hooks, and local
+//! notification handles can be attached without exposing construction ownership
+//! to shell callers.
 
-use std::sync::Arc;
-use macaca_sdk::framework::agent::HookedAgent;
-use macaca_sdk::framework::construction::{AgentBuildIntent, AgentToolConfig, TracedAgentFactory};
-use macaca_sdk::framework::model::ToolChoice;
-use macaca_sdk::framework::react_agent::ReActAgent;
-use macaca_proto::ApplicationId;
-use tokio::sync::mpsc;
-use crate::state::AppState;
 use super::agent_factory_build::WebTracedAgentFactory;
 use super::build_mode::FrameworkRunnerBuildMode;
 use super::request_composition;
 use super::runtime_execution_control::RuntimeExecutionControl;
 use super::FrameworkRunner;
+use crate::state::AppState;
+use macaca_host_composition::framework::agent::HookedAgent;
+use macaca_host_composition::framework::construction::{
+    AgentBuildIntent, AgentToolConfig, TracedAgentFactory,
+};
+use macaca_host_composition::framework::model::ToolChoice;
+use macaca_host_composition::framework::react_agent::ReActAgent;
+use std::sync::Arc;
+use tokio::sync::mpsc;
 
 impl FrameworkRunner {
-    /// Build a framework-native runtime agent for executor call sites that
-    /// still depend on `AgentRunner`. Optional event channels receive
-    /// `AgentExecutionEvent` updates directly from framework hooks.
-    pub async fn build_runtime_agent(
-        state: &Arc<AppState>,
-        app_id: &ApplicationId,
-        agent_name: &str,
-        session_id: Option<String>,
-        goal_id: Option<macaca_proto::TaskId>,
-        event_tx: Option<mpsc::Sender<macaca_proto::AgentExecutionEvent>>,
-    ) -> Result<HookedAgent<ReActAgent>, String> {
-        let request = request_composition::build_request(
-            state,
-            app_id,
-            agent_name,
-            session_id.clone(),
-            goal_id.unwrap_or_else(macaca_proto::TaskId::new),
-            goal_id,
-            AgentBuildIntent::RuntimeAgent,
-            AgentToolConfig {
-                goal_id,
-                ..Default::default()
-            },
-        )
-        .await?;
-        let factory = WebTracedAgentFactory {
-            state: Arc::clone(state),
-            build_mode: FrameworkRunnerBuildMode::Runtime {
-                event_tx,
-                execution_control: None,
-                max_iters: 25,
-                tool_choice: None,
-            },
-        };
-        factory.build(request).await
-    }
-
-    /// Build a runtime agent from an Agent Context service snapshot.
+    /// Materialize a runtime ReAct agent from an Agent Context service snapshot.
     ///
     /// This path is used by `service.agent_execution` after it has already
     /// called `service.agent_context`.  It intentionally does not call
     /// `build_context_system_prompt` again, so persona, skill snapshot, tool
     /// policy, and workspace context have exactly one service-owned source of
     /// truth for the execution.
-    pub(crate) async fn build_runtime_agent_from_context_snapshot(
+    pub(crate) async fn materialize_runtime_react_agent_from_context_snapshot(
         state: &Arc<AppState>,
         context_snapshot: &macaca_proto::AgentContextSnapshot,
         event_tx: Option<mpsc::Sender<macaca_proto::AgentExecutionEvent>>,
     ) -> Result<HookedAgent<ReActAgent>, String> {
-        Self::build_runtime_agent_from_context_snapshot_with_max_iters(
+        Self::materialize_runtime_react_agent_from_context_snapshot_with_max_iters(
             state,
             context_snapshot,
             event_tx,
@@ -73,9 +43,9 @@ impl FrameworkRunner {
         .await
     }
 
-    /// Build a runtime agent from an Agent Context snapshot with a caller-owned
-    /// ReAct iteration budget.
-    pub(crate) async fn build_runtime_agent_from_context_snapshot_with_max_iters(
+    /// Materialize a runtime ReAct agent from an Agent Context snapshot with a
+    /// service-selected iteration budget.
+    pub(crate) async fn materialize_runtime_react_agent_from_context_snapshot_with_max_iters(
         state: &Arc<AppState>,
         context_snapshot: &macaca_proto::AgentContextSnapshot,
         event_tx: Option<mpsc::Sender<macaca_proto::AgentExecutionEvent>>,
@@ -118,15 +88,15 @@ impl FrameworkRunner {
         factory.build(request).await
     }
 
-    /// Build a runtime agent from an Agent Context snapshot and attach the
-    /// execution-control middleware selected for this run.
-    pub(crate) async fn build_runtime_agent_from_context_snapshot_with_execution_control(
+    /// Materialize a runtime ReAct agent from an Agent Context snapshot and
+    /// attach the execution-control middleware selected for this run.
+    pub(crate) async fn materialize_runtime_react_agent_from_context_snapshot_with_execution_control(
         state: &Arc<AppState>,
         context_snapshot: &macaca_proto::AgentContextSnapshot,
         event_tx: Option<mpsc::Sender<macaca_proto::AgentExecutionEvent>>,
         execution_control: RuntimeExecutionControl,
     ) -> Result<HookedAgent<ReActAgent>, String> {
-        Self::build_runtime_agent_from_context_snapshot_with_execution_control_and_max_iters(
+        Self::materialize_runtime_react_agent_from_context_snapshot_with_execution_control_and_max_iters(
             state,
             context_snapshot,
             event_tx,
@@ -136,9 +106,9 @@ impl FrameworkRunner {
         .await
     }
 
-    /// Build a runtime agent with execution-control middleware and a
-    /// caller-owned ReAct iteration budget.
-    pub(crate) async fn build_runtime_agent_from_context_snapshot_with_execution_control_and_max_iters(
+    /// Materialize a runtime ReAct agent with execution-control middleware and
+    /// a service-selected ReAct iteration budget.
+    pub(crate) async fn materialize_runtime_react_agent_from_context_snapshot_with_execution_control_and_max_iters(
         state: &Arc<AppState>,
         context_snapshot: &macaca_proto::AgentContextSnapshot,
         event_tx: Option<mpsc::Sender<macaca_proto::AgentExecutionEvent>>,
@@ -182,8 +152,12 @@ impl FrameworkRunner {
         factory.build(request).await
     }
 
-    /// Build a runtime agent with a service-selected execution policy.
-    pub(crate) async fn build_runtime_agent_from_context_snapshot_with_execution_policy(
+    /// Materialize a runtime ReAct agent with a service-selected execution policy.
+    ///
+    /// This helper is intentionally named as materialization rather than
+    /// construction. Runtime-host has already accepted the typed construction
+    /// command, applied protocol decorators, and selected the execution policy.
+    pub(crate) async fn materialize_runtime_react_agent_from_context_snapshot_with_execution_policy(
         state: &Arc<AppState>,
         context_snapshot: &macaca_proto::AgentContextSnapshot,
         event_tx: Option<mpsc::Sender<macaca_proto::AgentExecutionEvent>>,

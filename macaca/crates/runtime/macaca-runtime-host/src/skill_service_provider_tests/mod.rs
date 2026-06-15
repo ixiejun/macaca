@@ -1,6 +1,6 @@
 //! Contract tests for the built-in Skill system service provider.
 //!
-//! These tests prove Route C Skill service commands stay provider-neutral,
+//! These tests prove Skill service commands stay provider-neutral,
 //! trace-friendly, and bounded while governance, curation, alias, and evolution
 //! flows remain application-agnostic.
 //!

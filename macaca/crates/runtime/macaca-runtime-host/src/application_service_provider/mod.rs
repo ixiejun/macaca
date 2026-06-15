@@ -1,4 +1,4 @@
-//! Runtime-host adapter for the Route C Application Service (Facade module tree).
+//! Runtime-host adapter for the Application Service (Facade module tree).
 //!
 //! This provider uses Adapter/Bridge: `ServiceRuntime` receives provider-neutral
 //! commands while this module delegates application semantics to `macaca-app`.
@@ -45,8 +45,8 @@ use macaca_app::{
 use macaca_kernel::Kernel;
 use macaca_proto::{
     ApplicationAgentDelegateCommand, ApplicationAgentDelegateResult, ApplicationId,
-    ApplicationServiceSessionView, CleanupPolicy, ServiceCallResult, ServiceCommand,
-    ServiceError, ServiceResult, TraceContext,
+    ApplicationServiceSessionView, CleanupPolicy, ServiceCallResult, ServiceCommand, ServiceError,
+    ServiceResult, TraceContext,
 };
 use tokio::sync::RwLock;
 
@@ -85,8 +85,7 @@ pub struct ApplicationSystemServiceProvider {
     pub(crate) wasm_runtime_provider: Option<Arc<dyn WasmApplicationRuntimeProvider>>,
     pub(crate) orchestration_backend: Option<Arc<dyn ApplicationOrchestrationBackend>>,
     pub(crate) sessions: Arc<RwLock<HashMap<String, ApplicationServiceSessionView>>>,
-    pub(crate) wasm_sessions:
-        Arc<RwLock<HashMap<ApplicationId, Arc<dyn WasmExecutionSession>>>>,
+    pub(crate) wasm_sessions: Arc<RwLock<HashMap<ApplicationId, Arc<dyn WasmExecutionSession>>>>,
     pub(crate) genui_surfaces: ApplicationGenUiSurfaceStore,
 }
 
@@ -172,9 +171,7 @@ impl ApplicationSystemServiceProvider {
 
     pub(crate) fn kernel(&self) -> ServiceResult<Arc<Kernel>> {
         self.kernel.clone().ok_or_else(|| {
-            ServiceError::ServiceUnavailable(
-                "application kernel compatibility handle is not configured".into(),
-            )
+            ServiceError::ServiceUnavailable("application kernel handle is not configured".into())
         })
     }
 
@@ -185,7 +182,10 @@ impl ApplicationSystemServiceProvider {
             .ok_or(ServiceError::MissingTraceContext)
     }
 
-    pub(crate) fn service_result(output: serde_json::Value, trace: TraceContext) -> ServiceCallResult {
+    pub(crate) fn service_result(
+        output: serde_json::Value,
+        trace: TraceContext,
+    ) -> ServiceCallResult {
         ServiceCallResult {
             output,
             trace,

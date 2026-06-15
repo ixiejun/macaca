@@ -12,7 +12,6 @@ pub(crate) fn framework_toolkit_module_sources() -> String {
         include_str!("builder.rs"),
         include_str!("mcp_bridge.rs"),
         include_str!("agent_tools.rs"),
-        include_str!("workspace_tools.rs"),
     ]
     .join("\n")
 }

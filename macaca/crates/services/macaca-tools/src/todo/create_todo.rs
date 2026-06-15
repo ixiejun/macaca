@@ -12,7 +12,7 @@ use macaca_proto::{MacacaResult, TaskId, TodoItem, TodoStatus};
 use macaca_task::TaskSpace;
 use serde_json::{json, Value};
 
-use crate::tool::Tool;
+use crate::tool::{Tool, ToolCommand};
 
 /// Create a new task and assign it to an agent's board.
 pub struct CreateTodoTool {
@@ -356,7 +356,7 @@ impl Tool for CreateTodoTool {
     fn description(&self) -> &str {
         "Create a new task and assign it to a specific agent's task board."
     }
-    fn parameters_schema(&self) -> Value {
+    fn tool_schema(&self) -> Value {
         json!({
             "type": "object",
             "properties": {
@@ -393,7 +393,7 @@ impl Tool for CreateTodoTool {
             "required": ["agent", "title", "description"]
         })
     }
-    async fn execute(&self, input: Value) -> MacacaResult<Value> {
-        self.create_one(input).await
+    async fn invoke(&self, command: ToolCommand) -> MacacaResult<Value> {
+        self.create_one(command.input).await
     }
 }

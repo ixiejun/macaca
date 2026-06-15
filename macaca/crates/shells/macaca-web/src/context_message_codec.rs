@@ -1,4 +1,4 @@
-use macaca_sdk::framework::model::ChatOptions;
+use macaca_host_composition::framework::model::ChatOptions;
 use macaca_proto::{LlmMessage, LlmOptions};
 
 /// Convert framework chat options into the LLM-neutral context-engine DTO.

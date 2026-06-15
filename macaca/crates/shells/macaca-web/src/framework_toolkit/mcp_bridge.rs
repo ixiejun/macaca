@@ -1,18 +1,18 @@
 //! MCP service bridge: registration, snapshot loading, and auditable runtime events.
 //!
-//! Web shell adapts typed MCP service commands into legacy EventLog/SSE lifecycle
+//! Web shell adapts typed MCP service commands into EventLog/SSE lifecycle
 //! events. Canonical MCP runtime ownership remains with `service.mcp`; this module
-//! is an Adapter that preserves UI-visible trace contracts during migration.
+//! is an Adapter that preserves UI-visible trace contracts.
 
 use std::sync::Arc;
 
+use macaca_host_composition::mcp_runtime::{
+    McpDefinitionSource, McpRegistryConfig, McpRuntimeStatus, McpRuntimeStatusState,
+    McpServerDefinition, McpServerFactory,
+};
 use macaca_proto::{
     ApplicationId, McpRegisterCommand, McpServicePolicyHints, McpServiceScope,
     McpServiceSnapshotCommand, TraceContext,
-};
-use macaca_sdk::runtime_host::{
-    McpDefinitionSource, McpRegistryConfig, McpRuntimeStatus, McpRuntimeStatusState,
-    McpServerDefinition,
 };
 
 use crate::runtime_event_bridge::emit_runtime_event;
@@ -176,7 +176,7 @@ pub(super) async fn load_app_mcp_overlay_definitions(
     match serde_yaml::from_str::<McpRegistryConfig>(&content)
         .map_err(|e| e.to_string())
         .and_then(|config| {
-            macaca_sdk::runtime_host::McpServerFactory::with_bundled_mapping_registry()
+            McpServerFactory::with_bundled_mapping_registry()
                 .from_registry_config(config, McpDefinitionSource::App)
         }) {
         Ok(definitions) => definitions,
@@ -269,7 +269,7 @@ pub(crate) struct McpRuntimeEventPlan {
     pub(crate) payload: serde_json::Value,
 }
 
-/// Build the legacy MCP runtime events from service-probed statuses.
+/// Build MCP runtime events from service-probed statuses.
 ///
 /// The event ordering is part of the user-visible runtime trace contract:
 /// every non-disabled status emits `mcp_server_resolved` first, then a terminal
@@ -327,7 +327,7 @@ pub(crate) fn mcp_runtime_event_plans(
 
 /// Build skill-backed MCP alias events without changing service ownership.
 ///
-/// Skill alias events are a Web/UI compatibility surface.  The service-backed
+/// Skill alias events are a Web/UI event-contract surface.  The service-backed
 /// runtime still owns registration and invocation, while this planner preserves
 /// the existing alias event stream for users who watch skill-specific MCP
 /// readiness in EventLog/SSE.

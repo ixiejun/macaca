@@ -11,7 +11,7 @@ use crate::message::{GatewayInboundMessage, GatewayReply};
 /// Event sink used by the mediator.
 #[async_trait]
 pub trait GatewayEventSink: Send + Sync {
-    /// Dispatch a compatibility gateway event.
+    /// Dispatch a shared gateway event.
     async fn dispatch(&self, event: GatewayEvent) -> MacacaResult<()>;
 }
 

@@ -7,9 +7,12 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::agent_runner::WebAgentRunner;
+use crate::app_skill_status_facade::WebAppSkillStatusClient;
+use crate::context_runtime_facade::WebContextRuntimeClient;
+use crate::session_inspection_facade::WebSessionInspectionClient;
 use crate::state::{AppConfig, AppState, LoopState, PersistenceState, SessionState};
+use macaca_host_composition::executor::ApplicationExecutorRegistry;
 use macaca_proto::MacacaResult;
-use macaca_sdk::runtime_host::ApplicationExecutorRegistry;
 
 use super::bootstrap_ctx::BootstrapCtx;
 
@@ -21,16 +24,6 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
     let llm = Arc::clone(ctx.llm.as_ref().expect("bootstrap: llm"));
     let llm_router = Arc::clone(ctx.llm_router.as_ref().expect("bootstrap: llm_router"));
     let mcp_runtime = Arc::clone(ctx.mcp_runtime.as_ref().expect("bootstrap: mcp_runtime"));
-    let driver_registry = Arc::clone(
-        ctx.driver_registry
-            .as_ref()
-            .expect("bootstrap: driver_registry"),
-    );
-    let driver_runtime = Arc::clone(
-        ctx.driver_runtime
-            .as_ref()
-            .expect("bootstrap: driver_runtime"),
-    );
     let application_client = Arc::clone(
         ctx.application_client
             .as_ref()
@@ -109,7 +102,6 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
         .clone()
         .expect("bootstrap: autonomy_runtime");
     let tools = Arc::clone(ctx.tools.as_ref().expect("bootstrap: tools"));
-    let workspace_memory = ctx.workspace_memory.clone();
     let workspace_memory_tombstones = ctx.workspace_memory_tombstones.clone();
     let drivers_dir = ctx.drivers_dir.clone().expect("bootstrap: drivers_dir");
     let session_store = Arc::clone(
@@ -119,7 +111,6 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
     );
     let todo_store = Arc::clone(ctx.todo_store.as_ref().expect("bootstrap: todo_store"));
     let event_log = Arc::clone(ctx.event_log.as_ref().expect("bootstrap: event_log"));
-    let audit_logger = Arc::clone(ctx.audit_logger.as_ref().expect("bootstrap: audit_logger"));
     let run_tracer = Arc::clone(ctx.run_tracer.as_ref().expect("bootstrap: run_tracer"));
     let fork_to_session = Arc::clone(
         ctx.fork_to_session
@@ -143,12 +134,11 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
             .expect("bootstrap: app_workspaces"),
     );
     let default_model = ctx.default_model.clone().expect("bootstrap: default_model");
-    let catalog = ctx.catalog.take().expect("bootstrap: catalog");
-    let alert_manager = Arc::clone(
-        ctx.alert_manager
-            .as_ref()
-            .expect("bootstrap: alert_manager"),
-    );
+    let catalog_entries = ctx
+        .catalog_entries
+        .take()
+        .expect("bootstrap: catalog_entries");
+    let alert_client = Arc::clone(ctx.alert_client.as_ref().expect("bootstrap: alert_client"));
     let context_engine_registry = Arc::clone(
         ctx.context_engine_registry
             .as_ref()
@@ -170,8 +160,35 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
     let state = Arc::new_cyclic(|weak_state| {
         // Create the real agent runner with the actual weak state
         let runner = Arc::new(WebAgentRunner::new(weak_state.clone()));
+        let status_client: Arc<dyn macaca_sdk::SystemStatusClient> = Arc::new(
+            crate::system_status_adapter::WebRuntimeStatusClient::new(weak_state.clone()),
+        );
+        let session_inspection_client: Arc<
+            dyn crate::session_inspection_facade::SystemSessionInspectionClient,
+        > = Arc::new(WebSessionInspectionClient::new(
+            Arc::clone(&session_store),
+            Arc::clone(&event_log),
+        ));
+        let app_skill_status_client: Arc<
+            dyn crate::app_skill_status_facade::SystemAppSkillStatusClient,
+        > = Arc::new(WebAppSkillStatusClient::new(
+            Arc::clone(&registry),
+            Arc::clone(&app_workspaces),
+            Arc::clone(&skill_client),
+        ));
+        let context_provider_registry =
+            Arc::new(macaca_host_composition::context::ContextProviderRegistry::new());
+        let provider_health_ledger =
+            Arc::new(macaca_host_composition::context::ProviderHealthLedger::new());
+        let context_runtime_client = Arc::new(WebContextRuntimeClient::new(
+            config.context.clone(),
+            Arc::clone(&context_provider_registry),
+            Arc::clone(&context_engine_registry),
+            Arc::clone(&external_adapter_runtime_registry),
+            Arc::clone(&provider_health_ledger),
+        ));
         let executor_registry = Arc::new(ApplicationExecutorRegistry::new(
-            Arc::clone(&runner) as Arc<dyn macaca_sdk::runtime_host::AgentRunner>
+            Arc::clone(&runner) as Arc<dyn macaca_host_composition::executor::AgentRunner>
         ));
 
         let composition = crate::shell_composition_bundle::WebShellCompositionBundle::new(
@@ -180,11 +197,13 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
             llm.clone(),
             llm_router.clone(),
             Arc::clone(&mcp_runtime),
-            Arc::clone(&driver_registry),
-            Arc::clone(&driver_runtime),
         );
 
         AppState {
+            status_client,
+            session_inspection_client,
+            app_skill_status_client,
+            context_runtime_client,
             kernel: kernel.clone(),
             composition,
             domain_pack_catalog: Arc::clone(&domain_pack_catalog),
@@ -212,27 +231,26 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
             autonomy_runtime: autonomy_runtime.clone(),
             tools,
             executor_registry: executor_registry.clone(),
-            workspace_memory: workspace_memory.clone(),
             workspace_memory_tombstones: workspace_memory_tombstones.clone(),
             drivers_dir: drivers_dir.clone(),
             persist: PersistenceState {
                 session_store,
                 todo_store,
                 event_log: event_log.clone(),
-                audit_logger: audit_logger.clone(),
                 run_tracer: Arc::clone(&run_tracer),
             },
             loops: LoopState {
-                plan_loop_handles: tokio::sync::RwLock::new(HashMap::new()),
-                worker_loop_handles: tokio::sync::RwLock::new(HashMap::new()),
-                plan_loop_wakers: tokio::sync::RwLock::new(HashMap::new()),
-                worker_loop_wakers: tokio::sync::RwLock::new(HashMap::new()),
-                scheduler_handles: tokio::sync::RwLock::new(HashMap::new()),
+                local_runtime: Arc::new(
+                    macaca_host_composition::execution_control::SessionLoopLocalRuntime::new(),
+                ),
             },
             sessions: SessionState {
                 conversations: tokio::sync::RwLock::new(HashMap::new()),
                 cancel_flags: tokio::sync::RwLock::new(HashMap::new()),
                 active_sessions: tokio::sync::RwLock::new(HashMap::new()),
+                execution_control_local_notifications: Arc::new(
+                    macaca_host_composition::execution_control::ExecutionControlLocalNotificationRuntime::new(),
+                ),
                 fork_to_session: Arc::clone(&fork_to_session),
                 goal_to_session: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
                 delegate_session_id: Arc::clone(&delegate_session_id),
@@ -244,13 +262,13 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
                 app_workspaces: Arc::clone(&app_workspaces),
                 default_model,
                 context: config.context.clone(),
-                catalog: tokio::sync::RwLock::new(catalog),
-                alert_manager: alert_manager.clone(),
+                catalog_entries,
+                alert_client: Arc::clone(&alert_client),
             },
-            context_provider_registry: Arc::new(macaca_sdk::context::ContextProviderRegistry::new()),
+            context_provider_registry,
             context_engine_registry: Arc::clone(&context_engine_registry),
             external_adapter_runtime_registry: Arc::clone(&external_adapter_runtime_registry),
-            provider_health_ledger: Arc::new(macaca_sdk::context::ProviderHealthLedger::new()),
+            provider_health_ledger,
         }
     });
 

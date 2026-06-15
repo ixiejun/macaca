@@ -11,9 +11,7 @@ use tracing::info;
 
 use super::config::PipelineDryRunConfig;
 use super::report::{ok, record, PipelineReport};
-use super::stages::{
-    agentic_create, agentic_worker_review, depends_on_review, session_claim,
-};
+use super::stages::{agentic_create, agentic_worker_review, depends_on_review, session_claim};
 use super::store::open_temp_store;
 use super::trace::{trace, trace_stage, trace_stage_end};
 

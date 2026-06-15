@@ -71,7 +71,7 @@ impl LlmDecomposer {
         goal: &str,
         available_agents: &[String],
     ) -> Result<Vec<DecomposedTask>, String> {
-        let contract = legacy_planning_contract(available_agents);
+        let contract = default_planning_contract(available_agents);
         self.decompose_for_contract(goal, &contract).await
     }
 
@@ -148,7 +148,7 @@ impl LlmDecomposer {
         available_agents: &[String],
         space: &crate::todo_board::TaskSpace,
     ) -> Result<Vec<macaca_proto::types::TodoItem>, String> {
-        let contract = legacy_planning_contract(available_agents);
+        let contract = default_planning_contract(available_agents);
         self.decompose_into_space_for_contract(goal, goal_id, &contract, space)
             .await
     }
@@ -244,14 +244,14 @@ impl LlmDecomposer {
     }
 }
 
-fn legacy_planning_contract(available_agents: &[String]) -> AppTaskPlanningContract {
+fn default_planning_contract(available_agents: &[String]) -> AppTaskPlanningContract {
     AppTaskPlanningContract {
         workflow_name: "default".into(),
         entry_agent: "entry_agent".into(),
         worker_agents: available_agents
             .iter()
             .cloned()
-            .map(AppPlanningAgentProfile::legacy)
+            .map(AppPlanningAgentProfile::default_profile)
             .collect(),
     }
 }

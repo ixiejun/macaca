@@ -56,7 +56,7 @@ impl<'a> SkillDraftMaterializationBuilder<'a> {
         Self { proposal }
     }
 
-    /// Render bounded AgentSkills-compatible markdown and derive stable digests.
+    /// Render bounded AgentSkills markdown and derive stable digests.
     ///
     /// Identity selection follows a deterministic precedence chain documented on
     /// `materialized_skill_identity`.  Content sections are hard-capped so

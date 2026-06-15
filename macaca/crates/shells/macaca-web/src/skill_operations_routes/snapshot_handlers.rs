@@ -9,12 +9,12 @@ use std::sync::Arc;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
-use macaca_proto::TraceContext;
-use macaca_sdk::skill::{
+use macaca_host_composition::runtime_host::{
     SkillAliasSnapshotCommand, SkillAutonomousMaterializationSnapshotCommand,
     SkillCurationDryRunCommand, SkillExperienceProposalSnapshotCommand,
     SkillGovernanceSnapshotCommand, SkillProposalProcessingSnapshotCommand,
 };
+use macaca_proto::TraceContext;
 
 use crate::routes::{proto_err, ErrorResponse};
 use crate::skill_operations_routes::adapter::{application_skill_scope, parse_application_id};

@@ -6,8 +6,8 @@
 
 use std::sync::Arc;
 
-use macaca_llm::LlmProvider;
 use macaca_kernel::DomainPackProviderRegistration;
+use macaca_llm::LlmProvider;
 use tracing::info;
 
 use crate::contract::{

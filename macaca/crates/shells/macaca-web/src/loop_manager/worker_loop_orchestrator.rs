@@ -6,14 +6,13 @@
 use std::sync::Arc;
 
 use axum::response::sse::Event;
-use macaca_proto::ApplicationId;
+use macaca_proto::{ApplicationId, WorkerEvent};
 
 use super::execution_control_adapter::session_loop_coordinator;
+use super::worker_execution_adapter::{execute_worker_task_via_agent_service, WorkerExecutionMode};
 use crate::session_loop_shell_adapter::register_worker_loops_via_execution_control;
 use crate::sse::{broadcast_to_app_sessions, save_plan_decision, PlanDecisionEvent};
 use crate::state::AppState;
-use super::worker_execution_adapter::{execute_worker_task_via_agent_service, WorkerExecutionMode};
-
 
 /// Start WorkerLoops for worker agents when not already running (idempotent).
 pub(crate) async fn ensure_worker_loops(
@@ -23,19 +22,14 @@ pub(crate) async fn ensure_worker_loops(
     entry_agent_name: &str,
     plan_agent_name: &str,
 ) {
-// ── WorkerLoops ──
+    // ── WorkerLoops ──
     {
-        let already = state
-            .loops
-            .worker_loop_handles
-            .read()
-            .await
-            .contains_key(app_id);
+        let already = state.loops.local_runtime.has_worker_loops(app_id).await;
         if !already {
             if let Some(executor) = state.executor_registry.get(app_id).await {
                 let agents = executor.list_agents().await;
-                let mut shutdowns: Vec<Arc<std::sync::atomic::AtomicBool>> = Vec::new();
-                let mut worker_wakers: Vec<macaca_sdk::task::WorkerLoopWaker> = Vec::new();
+                let mut shutdowns = Vec::new();
+                let mut worker_wakers = Vec::new();
 
                 for agent_info in &agents {
                     let agent_name = agent_info.name.clone();
@@ -46,22 +40,21 @@ pub(crate) async fn ensure_worker_loops(
                         continue;
                     }
 
-                    let board = Arc::new(macaca_sdk::task::TaskBoard::for_agent(
-                        app_id.clone(),
-                        agent_name.clone(),
-                        session_id.clone(),
-                        Arc::clone(&state.persist.todo_store),
-                    ));
-                    let worker_loop = macaca_sdk::task::WorkerLoop::with_components(
-                        Arc::clone(&board),
-                        macaca_sdk::task::WorkerLoopConfig::default(),
-                    );
-                    worker_wakers.push(worker_loop.waker());
-                    let shutdown = Arc::new(std::sync::atomic::AtomicBool::new(false));
+                    let controller = state
+                        .loops
+                        .local_runtime
+                        .build_local_worker_loop_controller(
+                            app_id.clone(),
+                            agent_name.clone(),
+                            session_id.clone(),
+                            Arc::clone(&state.persist.todo_store),
+                        );
+                    let worker_loop = controller.worker_loop;
+                    let shutdown = controller.shutdown;
+                    worker_wakers.push(controller.waker);
                     shutdowns.push(Arc::clone(&shutdown));
 
-                    let (event_tx, mut event_rx) =
-                        tokio::sync::mpsc::channel::<macaca_sdk::task::WorkerEvent>(32);
+                    let (event_tx, mut event_rx) = tokio::sync::mpsc::channel::<WorkerEvent>(32);
                     let shutdown_clone = Arc::clone(&shutdown);
                     tokio::spawn(async move {
                         worker_loop
@@ -71,14 +64,13 @@ pub(crate) async fn ensure_worker_loops(
 
                     let executor_clone = Arc::clone(&executor);
                     let agent_name_clone = agent_name.clone();
-                    let board_clone = Arc::clone(&board);
                     let state_for_worker = Arc::clone(state);
                     let app_id_for_worker = app_id.clone();
                     let session_store_for_worker = Arc::clone(&state.persist.session_store);
                     tokio::spawn(async move {
                         while let Some(event) = event_rx.recv().await {
                             match event {
-                                macaca_sdk::task::WorkerEvent::TaskClaimed {
+                                WorkerEvent::TaskClaimed {
                                     task_id,
                                     title,
                                     description,
@@ -186,7 +178,6 @@ pub(crate) async fn ensure_worker_loops(
                                     }
                                     execute_worker_task_via_agent_service(
                                         &state_for_worker,
-                                        &board_clone,
                                         &executor_clone,
                                         &app_id_for_worker,
                                         task_session.as_deref(),
@@ -198,7 +189,7 @@ pub(crate) async fn ensure_worker_loops(
                                     )
                                     .await;
                                 }
-                                macaca_sdk::task::WorkerEvent::RetryTask {
+                                WorkerEvent::RetryTask {
                                     task_id,
                                     title,
                                     description,
@@ -238,7 +229,6 @@ pub(crate) async fn ensure_worker_loops(
                                     .await;
                                     execute_worker_task_via_agent_service(
                                         &state_for_worker,
-                                        &board_clone,
                                         &executor_clone,
                                         &app_id_for_worker,
                                         task_session.as_deref(),
@@ -250,24 +240,17 @@ pub(crate) async fn ensure_worker_loops(
                                     )
                                     .await;
                                 }
-                                macaca_sdk::task::WorkerEvent::Idle => {}
+                                WorkerEvent::Idle => {}
                             }
                         }
                     });
                 }
-                state
-                    .loops
-                    .worker_loop_handles
-                    .write()
-                    .await
-                    .insert(app_id.clone(), shutdowns);
                 let worker_count = worker_wakers.len();
                 state
                     .loops
-                    .worker_loop_wakers
-                    .write()
-                    .await
-                    .insert(app_id.clone(), worker_wakers);
+                    .local_runtime
+                    .set_worker_loop_controls(app_id.clone(), shutdowns, worker_wakers)
+                    .await;
 
                 // Mirror worker-loop registration into execution control so wake/shutdown
                 // paths share the same auditable service boundary as PlanLoop lifecycle.

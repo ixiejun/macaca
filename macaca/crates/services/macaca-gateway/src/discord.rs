@@ -1,9 +1,8 @@
 //! Discord stub adapter.
 //!
-//! This adapter implements the [`ImAdapter`] trait but does not connect to
-//! the real Discord API. It serves as a structural placeholder until
-//! the `serenity` SDK is integrated.
-#![allow(deprecated)]
+//! This adapter implements the [`ImAdapter`] trait but does not connect to the
+//! real Discord API. It serves as a structural placeholder until a production
+//! transport provider is installed.
 
 use std::sync::Arc;
 

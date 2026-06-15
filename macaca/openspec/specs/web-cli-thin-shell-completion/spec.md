@@ -5,7 +5,7 @@ Terminal thin-shell presentation boundaries for Macaca Web and CLI: runtime-host
 ## Requirements
 ### Requirement: Macaca SHALL move service provider bootstrap out of presentation shell ownership
 
-Macaca SHALL provide a runtime-host-owned bootstrap boundary for Route C service provider registration and startup so Web and CLI do not own provider lifecycle semantics.
+Macaca SHALL provide a runtime-host-owned bootstrap boundary for service provider registration and startup so Web and CLI do not own provider lifecycle semantics.
 
 #### Scenario: Runtime-host bootstrap starts service families for Web shell consumption
 
@@ -32,12 +32,12 @@ Macaca Web SHALL consume runtime-backed SDK focused clients or `SystemFacade` fo
 - **AND** Web routes SHALL use those clients for migrated status, service inspection, optional module, package, entitlement, and payment surfaces
 - **AND** Web SHALL preserve existing response shapes unless a future proposal explicitly changes them
 
-#### Scenario: Web keeps high-risk compatibility state explicit
+#### Scenario: Web keeps runtime state outside presentation ownership
 
-- **WHEN** chat, framework, session, toolkit, or resume paths still need deprecated Web state
-- **THEN** the compatibility field or helper SHALL remain present as a documented deprecated anchor
-- **AND** new low-risk paths SHALL prefer service clients or `SystemFacade`
-- **AND** the remaining anchor SHALL document its future removal condition
+- **WHEN** chat, framework, session, toolkit, or resume paths need runtime state
+- **THEN** Web SHALL keep only presentation state and SDK/runtime-host owner handles
+- **AND** pause/resume, provider, toolkit, and agent execution semantics SHALL be owned by service/runtime-host boundaries
+- **AND** no retired presentation-owned anchor SHALL remain in production source
 
 ### Requirement: Macaca SHALL keep CLI as terminal shell and narrow Web dependency
 
@@ -54,45 +54,43 @@ Macaca CLI SHALL remain responsible for terminal parsing, terminal formatting, p
 - **WHEN** CLI starts the Web server
 - **THEN** the command SHALL use a narrow public server-start adapter seam
 - **AND** it SHALL NOT duplicate Web runtime/provider/service composition semantics inside CLI
-- **AND** any remaining `macaca-cli -> macaca-web` direct dependency SHALL be documented as server-start-only compatibility debt with an expiry condition
+- **AND** CLI inspection and operation commands SHALL NOT depend on `macaca-web` internals
 
-### Requirement: Macaca SHALL guard deprecated presentation-owned semantic paths
+### Requirement: Macaca SHALL delete replaced presentation-owned semantic paths
 
-Macaca SHALL prevent replaced Web/CLI direct semantic helpers from gaining new production callers while preserving deprecated compatibility anchors for migration search and rollback.
+Macaca SHALL remove replaced Web/CLI direct semantic helpers after facade-backed paths exist. Production code SHALL contain no retired presentation-owned semantic path, old-path anchor, or revert-only wrapper.
 
-#### Scenario: Deprecated Web provider/runtime fields are classified
+#### Scenario: Web provider/runtime fields are absent
 
-- **WHEN** implementation scans `AppState` deprecated provider/runtime fields
-- **THEN** each production read SHALL be migrated to a service client when low-risk or documented as a compatibility anchor when high-risk
-- **AND** new code SHALL NOT use those fields as the default path for serviceized capabilities
+- **WHEN** implementation scans `AppState`
+- **THEN** direct provider/runtime fields SHALL be absent
+- **AND** capability access SHALL go through SDK clients, `SystemFacade`, or runtime-host owner handles
 
-#### Scenario: Guard allows compatibility definitions but blocks new direct callers
+#### Scenario: Guard rejects replaced definitions and direct callers
 
-- **WHEN** migration guards or tests scan presentation code
-- **THEN** explicit deprecated compatibility definitions MAY remain
-- **AND** new upper-layer callers of replaced direct helpers SHALL fail the guard or be documented in the OpenSpec tasks before approval
+- **WHEN** terminal guards or tests scan presentation code
+- **THEN** replaced direct helper definitions SHALL fail the guard
+- **AND** upper-layer callers of replaced direct helpers SHALL fail the guard
 
-### Requirement: Macaca SHALL preserve Route C Web/CLI regression scenarios
+### Requirement: Macaca SHALL preserve Web/CLI regression scenarios
 
-Macaca SHALL complete S12 additively without regressing chat session creation, chat session resume, real-time trace, historical trace replay, session-scoped task board, service unavailable behavior, optional module unavailable behavior, Web UI, or CLI behavior.
+Macaca SHALL preserve chat session creation, chat session resume, real-time trace, historical trace replay, session-scoped task board, service unavailable behavior, optional module unavailable behavior, Web UI, or CLI behavior while enforcing the terminal thin-shell boundary.
 
 #### Scenario: Mandatory regression gates pass
 
-- **WHEN** S12 completion verification runs
+- **WHEN** terminal thin-shell verification runs
 - **THEN** `RC-CHAT-001`, `RC-CHAT-002`, `RC-TRACE-001`, `RC-TRACE-002`, and `RC-TASK-001` SHALL remain valid
-- **AND** `cargo test -p macaca-integration-tests --test route_c_baseline` SHALL pass
-- **AND** `cargo test -p macaca-integration-tests route_c_dependency_boundaries` SHALL pass
+- **AND** the protocol microkernel, shell dependency purity, and audit replay gates SHALL pass
 
-### Requirement: Macaca SHALL keep S12 dependency governance honest
+### Requirement: Macaca SHALL keep dependency governance terminal
 
-Macaca SHALL update Route C allowlist and dependency-boundary tests only when implementation changes direct dependency edges or narrows an existing exception.
+Macaca SHALL keep presentation dependency governance terminal: Web and CLI may depend only on `macaca-sdk` and `macaca-proto` among workspace crates, and dependency-boundary tests SHALL reject any exception row.
 
-#### Scenario: Allowlist row is removed only after executable proof
+#### Scenario: Dependency purity is proven by executable gate
 
-- **WHEN** implementation claims a presentation dependency edge is removed
-- **THEN** `cargo metadata` and the executable dependency boundary gate SHALL prove the direct edge is gone
-- **AND** the allowlist SHALL be updated with the removed or narrowed status
-- **AND** rows SHALL NOT be deleted merely because a route path now prefers a service client
+- **WHEN** implementation claims terminal shell purity
+- **THEN** `cargo metadata` and the executable dependency boundary gate SHALL prove Web/CLI have no extra workspace dependency
+- **AND** any non-empty shell dependency exception row SHALL fail the gate
 
 ### Requirement: Macaca SHALL log and audit S12 shell and bootstrap boundaries
 
@@ -106,12 +104,12 @@ Macaca SHALL emit structured logs at runtime-host bootstrap, Web route adapter, 
 
 ### Requirement: Macaca SHALL document new S12 Rust code with detailed English comments
 
-All new S12 Rust code SHALL include detailed English comments explaining ownership, design pattern intent, runtime behavior, trace/audit behavior, compatibility anchors, and non-goals.
+All new terminal thin-shell Rust code SHALL include detailed English comments explaining ownership, design pattern intent, runtime behavior, trace/audit behavior, and non-goals.
 
 #### Scenario: Maintainer can identify ownership from code comments
 
 - **WHEN** a maintainer reads new runtime-host bootstrap, Web shell adapter, or CLI shell adapter code
-- **THEN** comments SHALL explain which layer owns provider lifecycle, transport adaptation, command construction, facade delegation, system semantics, trace/audit emission, and compatibility fallback
+- **THEN** comments SHALL explain which layer owns provider lifecycle, transport adaptation, command construction, facade delegation, system semantics, and trace/audit emission
 - **AND** comments SHALL explain why Web/CLI must not define provider, service, session, task, trace, package, payment, Web3, EVM, plugin, entitlement, or application workflow semantics
 
 ### Requirement: Web Shell Holds No Direct Provider State
@@ -130,7 +128,7 @@ All new S12 Rust code SHALL include detailed English comments explaining ownersh
 #### Scenario: Shell dependency trees are minimal
 - **WHEN** `cargo tree -e normal -p macaca-web --depth 1` and `-p macaca-cli --depth 1` are evaluated
 - **THEN** internal workspace dependencies SHALL be limited to `macaca-sdk` and `macaca-proto` at terminal state
-- **AND** there SHALL be zero web and zero cli dependency-gate allowlist rows at terminal state
+- **AND** there SHALL be zero web and zero cli dependency-gate exception rows at terminal state
 
 ### Requirement: Session Loop Ownership Is Serviceized
 
@@ -158,4 +156,3 @@ Business-domain service packs (for example finance/crypto market/financials/news
 - **WHEN** base `macaca-runtime-host` is scanned
 - **THEN** it SHALL contain no finance/crypto/exchange domain identifiers or hardcoded business endpoints
 - **AND** absent domain packs SHALL return structured unavailable without affecting base OS semantics
-

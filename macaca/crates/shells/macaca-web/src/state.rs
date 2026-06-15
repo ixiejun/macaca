@@ -1,177 +1,49 @@
 //! Shared application state for the web server.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::convert::Infallible;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use axum::response::sse::Event;
-use serde::Serialize;
 use tokio::sync::{mpsc, RwLock};
 
-use macaca_proto::{config::ContextConfig, ApplicationId, ForkId, LlmMessage};
-use macaca_sdk::app::SharedDomainPackCatalog;
-use macaca_sdk::context::{
-    ContextAdapterSafetyPolicy, ContextEngineInfo, ContextEngineRegistry, ContextFallbackPolicy,
-    ContextProviderRegistry, ProviderHealthLedger,
+use macaca_host_composition::context::{
+    ContextEngineRegistry, ContextProviderRegistry, ProviderHealthLedger,
 };
-use macaca_sdk::framework::runtime_context::AgentSessionStore as FrameworkAgentSessionStore;
-use macaca_sdk::kernel::Kernel;
-use macaca_sdk::runtime_host::persist::{EventLog, PersistBackend};
-use macaca_sdk::runtime_host::ApplicationExecutorRegistry;
-use macaca_sdk::runtime_host::ServiceRuntime;
-use macaca_sdk::skill::SkillCatalog;
-use macaca_sdk::task::TodoStore;
-use macaca_sdk::tools::ToolCatalog;
+use macaca_host_composition::executor::ApplicationExecutorRegistry;
+use macaca_host_composition::framework::runtime_context::AgentSessionStore as FrameworkAgentSessionStore;
+use macaca_host_composition::kernel::Kernel;
+use macaca_host_composition::persist::{EventLog, PersistBackend};
+use macaca_host_composition::service_runtime::ServiceRuntime;
+use macaca_host_composition::tools::{TodoStore, ToolCatalog};
+use macaca_host_composition::{SystemContextClient, SystemSkillClient};
+use macaca_proto::{
+    config::ContextConfig, AppendEventCommand, ApplicationId, ForkId, LlmMessage, MacacaResult,
+    UiEventCommand,
+};
 use macaca_sdk::{
-    SystemApplicationClient, SystemContextClient, SystemDriverClient, SystemEntitlementClient,
-    SystemEvmClient, SystemHeartbeatClient, SystemLlmClient, SystemMcpClient, SystemMemoryClient,
-    SystemPaymentClient, SystemPluginCapabilityClient, SystemPluginControlClient,
-    SystemPluginHookClient, SystemScheduledAgentTaskClient, SystemSchedulerClient,
-    SystemSkillClient, SystemStoreClient, SystemToolClient, SystemWeb3Client,
+    SharedDomainPackCatalog, SkillCatalogEntryView, SystemApplicationClient, SystemDriverClient,
+    SystemEntitlementClient, SystemEvmClient, SystemHeartbeatClient, SystemLlmClient,
+    SystemMcpClient, SystemMemoryClient, SystemPaymentClient, SystemPluginCapabilityClient,
+    SystemPluginControlClient, SystemPluginHookClient, SystemScheduledAgentTaskClient,
+    SystemSchedulerClient, SystemStatusClient, SystemStoreClient, SystemToolClient,
+    SystemWeb3Client,
 };
 
-use crate::runtime_resume::RuntimeResumeSignal;
+use crate::app_skill_status_facade::{AppSkillStatusSnapshot, SystemAppSkillStatusClient};
+use crate::application_execution_event_log::ApplicationExecutionEventLog;
+use crate::context_runtime_facade::{
+    ContextProviderRuntimeSnapshot, ExternalAdapterRuntimeRegistry, SystemContextRuntimeClient,
+};
+use crate::run_trace::RunTraceSink;
+use crate::session_inspection_facade::{
+    ManualSessionCompactionSnapshot, SessionLineageSnapshot, SystemSessionInspectionClient,
+};
 use crate::shell::WebSystemFacadeBundle;
 use crate::shell_composition_bundle::WebShellCompositionBundle;
 use crate::workspace::AppWorkspace;
-
-/// Operator-visible installation record for one external adapter engine.
-///
-/// The web layer keeps this inventory separate from `ContextEngineRegistry` so
-/// `/api/context/provider-runtime` can report installation metadata even before
-/// an adapter participates in a request. Today the only concrete install path is
-/// a local registry overlay, but the shape is transport-neutral so future
-/// process/RPC/WASM loaders can publish into the same surface.
-#[derive(Clone, Debug, Serialize)]
-pub struct ExternalAdapterRuntimeInstallation {
-    /// Stable engine metadata reported by the installed adapter wrapper.
-    pub engine: ContextEngineInfo,
-    /// Transport family used to reach the adapter implementation.
-    pub transport: String,
-    /// Which runtime mechanism installed this adapter into the current process.
-    pub installation_source: String,
-    /// Coarse-grained lifecycle state exported to operator diagnostics.
-    pub runtime_state: String,
-    /// Default safety guardrails currently associated with this adapter.
-    pub default_safety_policy: ContextAdapterSafetyPolicy,
-    /// Default fallback policy currently associated with this adapter.
-    pub default_fallback_policy: ContextFallbackPolicy,
-    /// Current circuit-breaker state. Phase 9 still exposes this as metadata only.
-    pub circuit_breaker_runtime_state: String,
-    /// Last time the inventory row was synchronized from runtime state.
-    pub last_sync_epoch_ms: u128,
-}
-
-/// Dedicated inventory for installed external adapter engines.
-///
-/// This is intentionally a separate registry from `ContextEngineRegistry`:
-/// `ContextEngineRegistry` answers "what engines can be selected right now?",
-/// while this structure answers "which external adapters are installed, how did
-/// they get here, and what runtime defaults/status are attached to them?".
-#[derive(Default)]
-pub struct ExternalAdapterRuntimeRegistry {
-    rows: RwLock<HashMap<String, ExternalAdapterRuntimeInstallation>>,
-}
-
-impl ExternalAdapterRuntimeRegistry {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Create the runtime inventory with a precomputed installation snapshot.
-    ///
-    /// Startup wiring uses this when config-driven adapter installation succeeds before the full
-    /// `AppState` exists. The snapshot remains mutable afterwards via `sync_registry_overlay_engines`.
-    pub fn with_installations(
-        self,
-        installations: Vec<ExternalAdapterRuntimeInstallation>,
-    ) -> Self {
-        let rows = installations
-            .into_iter()
-            .map(|installation| (installation.engine.id.clone(), installation))
-            .collect();
-        Self {
-            rows: RwLock::new(rows),
-        }
-    }
-
-    fn now_ms() -> u128 {
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|duration| duration.as_millis())
-            .unwrap_or(0)
-    }
-
-    /// Synchronize the explicit inventory with the subset of engine registry rows
-    /// that currently represent non-builtin overlay engines.
-    ///
-    /// Until dedicated install APIs land, registry overlays are the only concrete
-    /// installation mechanism. This method keeps the operator surface explicit and
-    /// prunes stale rows if an overlay engine disappears from the runtime.
-    pub async fn sync_registry_overlay_engines(
-        &self,
-        builtin_engine_ids: &HashSet<String>,
-        registry_engine_rows: &[ContextEngineInfo],
-    ) {
-        let now_ms = Self::now_ms();
-        let mut rows = self.rows.write().await;
-        let active_overlay_ids: HashSet<_> = registry_engine_rows
-            .iter()
-            .filter(|engine| !builtin_engine_ids.contains(&engine.id))
-            .map(|engine| engine.id.clone())
-            .collect();
-
-        rows.retain(|engine_id, _| active_overlay_ids.contains(engine_id));
-
-        for engine in registry_engine_rows
-            .iter()
-            .filter(|engine| !builtin_engine_ids.contains(&engine.id))
-        {
-            let existing = rows.get(&engine.id).cloned();
-            rows.insert(
-                engine.id.clone(),
-                ExternalAdapterRuntimeInstallation {
-                    engine: engine.clone(),
-                    transport: existing
-                        .as_ref()
-                        .map(|row| row.transport.clone())
-                        .unwrap_or_else(|| "registry_overlay".to_string()),
-                    installation_source: existing
-                        .as_ref()
-                        .map(|row| row.installation_source.clone())
-                        .unwrap_or_else(|| "context_engine_registry_overlay".to_string()),
-                    runtime_state: existing
-                        .as_ref()
-                        .map(|row| row.runtime_state.clone())
-                        .unwrap_or_else(|| "installed".to_string()),
-                    default_safety_policy: existing
-                        .as_ref()
-                        .map(|row| row.default_safety_policy.clone())
-                        .unwrap_or_default(),
-                    default_fallback_policy: existing
-                        .as_ref()
-                        .map(|row| row.default_fallback_policy.clone())
-                        .unwrap_or_default(),
-                    circuit_breaker_runtime_state: existing
-                        .as_ref()
-                        .map(|row| row.circuit_breaker_runtime_state.clone())
-                        .unwrap_or_else(|| "not_implemented".to_string()),
-                    last_sync_epoch_ms: now_ms,
-                },
-            );
-        }
-    }
-
-    /// Return a stable, operator-facing snapshot sorted by `engine.id`.
-    pub async fn snapshot(&self) -> Vec<ExternalAdapterRuntimeInstallation> {
-        let mut rows: Vec<_> = self.rows.read().await.values().cloned().collect();
-        rows.sort_by(|left, right| left.engine.id.cmp(&right.engine.id));
-        rows
-    }
-}
 
 /// Mapping from fork_id to session context for hook notifications.
 #[derive(Clone, Debug)]
@@ -184,26 +56,17 @@ pub struct ForkSessionMapping {
     pub from_agent: String,
 }
 
-/// Active session with pausable agentic loop support.
+/// Browser-facing active session state.
 ///
-/// Deprecated compatibility boundary: new execution-control ownership should
-/// flow through `service.execution_control` and the Web host adapter should only
-/// keep the non-serializable local channel endpoint needed by framework
-/// middleware. The fields below remain public because older hook and plan-loop
-/// adapters still bridge their in-memory completion events into the waiting
-/// runtime loop, but new call paths must not add direct channel ownership.
-///
-/// The session also holds a hot-swappable SSE sender so browser refresh can
-/// reconnect to the same coordinator loop.
+/// This type intentionally excludes execution-control pause/resume channels.
+/// Runtime-host owns those local notification handles so Web session
+/// presentation state does not become the execution-control authority.
+#[derive(Clone)]
 pub struct ActiveSession {
     /// The session ID.
     pub session_id: String,
     /// The application ID.
     pub app_id: ApplicationId,
-    /// Deprecated local pause flag read by the framework middleware.
-    pub pause_signal: Arc<AtomicBool>,
-    /// Deprecated local resume channel used only by approved Web adapters.
-    pub resume_tx: mpsc::Sender<RuntimeResumeSignal>,
     /// Hot-swappable SSE event sender. When the browser refreshes,
     /// the stream endpoint replaces this with a new sender so the
     /// coordinator's subsequent events reach the new connection.
@@ -225,24 +88,78 @@ pub struct PersistenceState {
     pub todo_store: Arc<TodoStore>,
     /// Append-only event log (redb-backed, durable before SSE send).
     pub event_log: Arc<EventLog>,
-    /// Persistent audit logger (records tool executions, delegation, etc.).
-    pub audit_logger: Arc<macaca_sdk::kernel::audit::AuditLogger>,
     /// Sparse pipeline checkpoints (`run_trace` events + metrics).
     pub run_tracer: Arc<crate::run_trace::RunTracer>,
 }
 
-/// Loop lifecycle state: PlanLoop, WorkerLoop, Scheduler handles and wakers.
+/// AppState-local adapter from the host-owned EventLog to the stream Observer port.
+///
+/// The HTTP/SSE route modules depend only on [`ApplicationExecutionEventLog`].
+/// Keeping this adapter beside `PersistenceState` makes the concrete EventLog
+/// handle part of the Web state persistence boundary instead of the reusable
+/// observer contract.
+struct StateApplicationExecutionEventLog {
+    event_log: Arc<EventLog>,
+}
+
+impl StateApplicationExecutionEventLog {
+    /// Wrap the shared EventLog without transferring persistence ownership.
+    fn new(event_log: Arc<EventLog>) -> Self {
+        Self { event_log }
+    }
+}
+
+#[async_trait::async_trait]
+impl ApplicationExecutionEventLog for StateApplicationExecutionEventLog {
+    async fn query_indexed(
+        &self,
+        query: macaca_proto::EventLogQuery,
+    ) -> Vec<macaca_proto::EventEntry> {
+        self.event_log.query_indexed(query).await
+    }
+
+    fn subscribe(&self) -> tokio::sync::broadcast::Receiver<(String, u64)> {
+        self.event_log.subscribe()
+    }
+}
+
+/// AppState-local adapter from the host EventLog to the run-trace command port.
+///
+/// `RunTracer` owns checkpoint naming and metrics, while this adapter owns the
+/// concrete persistence write so run-trace emission does not import the host
+/// composition facade directly.
+pub(crate) struct StateRunTraceSink {
+    event_log: Arc<EventLog>,
+}
+
+impl StateRunTraceSink {
+    /// Wrap the shared EventLog without transferring persistence ownership.
+    pub(crate) fn new(event_log: Arc<EventLog>) -> Self {
+        Self { event_log }
+    }
+}
+
+#[async_trait::async_trait]
+impl RunTraceSink for StateRunTraceSink {
+    async fn append_run_trace(&self, session_id: &str, payload: serde_json::Value) {
+        self.event_log
+            .append_command(AppendEventCommand::new(
+                session_id,
+                "run_trace",
+                "run_tracer",
+                payload,
+            ))
+            .await;
+    }
+}
+
+/// Loop lifecycle state owned by runtime-host local controllers.
 pub struct LoopState {
-    /// Per-app PlanLoop shutdown handles (for lazy start on first goal).
-    pub plan_loop_handles: RwLock<HashMap<ApplicationId, Arc<AtomicBool>>>,
-    /// Per-app WorkerLoop shutdown handles (one per worker agent, started alongside PlanLoop).
-    pub worker_loop_handles: RwLock<HashMap<ApplicationId, Vec<Arc<AtomicBool>>>>,
-    /// Per-app PlanLoop wakers for immediate wakeup on new goals/reviews.
-    pub plan_loop_wakers: RwLock<HashMap<ApplicationId, macaca_sdk::task::PlanLoopWaker>>,
-    /// Per-app WorkerLoop wakers (one per worker agent) for immediate wakeup on new tasks.
-    pub worker_loop_wakers: RwLock<HashMap<ApplicationId, Vec<macaca_sdk::task::WorkerLoopWaker>>>,
-    /// Per-app Scheduler shutdown handles (for lazy start on first schedule).
-    pub scheduler_handles: RwLock<HashMap<ApplicationId, Arc<AtomicBool>>>,
+    /// Runtime-host owned local PlanLoop/WorkerLoop handles.
+    ///
+    /// Web keeps only this owner handle so presentation code can request local
+    /// wake/shutdown effects without storing execution-loop maps itself.
+    pub local_runtime: Arc<macaca_host_composition::execution_control::SessionLoopLocalRuntime>,
 }
 
 /// Session-related state: active sessions, conversation caches, mappings.
@@ -251,9 +168,15 @@ pub struct SessionState {
     pub conversations: RwLock<HashMap<String, Vec<LlmMessage>>>,
     /// Active task cancellation flags (app_id -> cancel flag).
     pub cancel_flags: RwLock<HashMap<String, Arc<AtomicBool>>>,
-    /// Active sessions with pausable agentic loops.
-    /// Used to resume coordinator loops when delegated tasks complete.
+    /// Browser-facing active sessions keyed by session id.
     pub active_sessions: RwLock<HashMap<String, ActiveSession>>,
+    /// Runtime-host owned local execution-control notification registry.
+    ///
+    /// Web stores only the owner handle. The map of pause flags and resume
+    /// channels lives in runtime-host so shell state remains a thin adapter
+    /// around service-authoritative execution-control decisions.
+    pub execution_control_local_notifications:
+        Arc<macaca_host_composition::execution_control::ExecutionControlLocalNotificationRuntime>,
     /// Mapping from fork_id to session context for hook notifications.
     ///
     /// Shared with orchestration tool callbacks via `Arc` so `delegate_task` can
@@ -287,39 +210,61 @@ pub struct AppConfig {
     pub default_model: String,
     /// Runtime context-engine configuration.
     pub context: ContextConfig,
-    /// Skill catalog for progressive disclosure (SKILL.md knowledge skills).
-    pub catalog: RwLock<SkillCatalog>,
-    /// Alert manager (deduplication + routing to log/webhook channels).
-    pub alert_manager: Arc<macaca_sdk::kernel::alert::AlertManager>,
+    /// Read-only Skill catalog snapshot for operator-facing route rendering.
+    pub catalog_entries: Vec<SkillCatalogEntryView>,
+    /// Service-backed alert client for provider-neutral alert delivery.
+    pub alert_client: Arc<dyn macaca_sdk::SystemAlertClient>,
 }
 
 /// Shared state passed to all route handlers via axum's State extractor.
 pub struct AppState {
+    /// Provider-neutral system status Strategy consumed by the HTTP status route.
+    ///
+    /// The concrete runtime-backed adapter is installed by the process
+    /// composition root. Route code does not inspect kernel, provider, or
+    /// application-runtime internals to construct its response.
+    pub status_client: Arc<dyn SystemStatusClient>,
+    /// Provider-neutral session inspection Facade consumed by session routes.
+    ///
+    /// The current implementation is installed by Web bootstrap, but routes see
+    /// only this port. That keeps session lineage memento semantics replaceable
+    /// by the host composition root without changing HTTP handlers.
+    pub session_inspection_client: Arc<dyn SystemSessionInspectionClient>,
+    /// Provider-neutral app Skill status Facade consumed by Skill routes.
+    ///
+    /// Route handlers use this port instead of resolving app manifests or
+    /// constructing Skill service commands directly.
+    pub app_skill_status_client: Arc<dyn SystemAppSkillStatusClient>,
+    /// Provider-neutral context runtime snapshot Facade consumed by diagnostics routes.
+    ///
+    /// AppState keeps the shared registries for remaining framework construction
+    /// paths, while route-facing snapshot behavior is delegated to this client.
+    pub context_runtime_client: Arc<dyn SystemContextRuntimeClient>,
     /// The kernel managing all agents.
     pub kernel: Arc<Kernel>,
     /// Bootstrap-owned provider anchors accessed only through shell adapters.
     ///
-    /// P3 thin-shell migration groups legacy runtime/provider handles here so
-    /// route handlers depend on SDK clients and adapters instead of direct fields.
+    /// The thin-shell boundary groups runtime/provider handles here so route
+    /// handlers depend on SDK clients and adapters instead of direct fields.
     pub composition: WebShellCompositionBundle,
     /// Host-installed catalog for manifest `use_packs` expansion in UI routes.
     ///
     /// This handle mirrors the catalog injected into `AppRuntime` and Application
     /// Service during bootstrap so shell adapters do not reconstruct pack metadata.
     pub domain_pack_catalog: SharedDomainPackCatalog,
-    /// The serviceized Application client used by new Route C call paths.
+    /// The serviceized Application client used by protocol call paths.
     pub application_client: Arc<dyn SystemApplicationClient>,
-    /// The serviceized LLM client used by new Route C call paths.
+    /// The serviceized LLM client used by protocol call paths.
     pub llm_client: Arc<dyn SystemLlmClient>,
-    /// The serviceized Memory client used by new Route C call paths.
+    /// The serviceized Memory client used by protocol call paths.
     pub memory_client: Arc<dyn SystemMemoryClient>,
-    /// The serviceized Context client used by new Route C call paths.
+    /// The serviceized Context client used by protocol call paths.
     pub context_client: Arc<dyn SystemContextClient>,
-    /// The serviceized Driver client used by new Route C call paths.
+    /// The serviceized Driver client used by protocol call paths.
     pub driver_client: Arc<dyn SystemDriverClient>,
-    /// The serviceized Skill client used by new Route C call paths.
+    /// The serviceized Skill client used by protocol call paths.
     pub skill_client: Arc<dyn SystemSkillClient>,
-    /// The serviceized MCP client used by new Route C call paths.
+    /// The serviceized MCP client used by protocol call paths.
     pub mcp_client: Arc<dyn SystemMcpClient>,
     /// The serviceized Tool Capability Plane client used for production
     /// framework tool invocation.  Web still adapts descriptors into framework
@@ -365,28 +310,28 @@ pub struct AppState {
     pub plugin_hook_client: Arc<dyn SystemPluginHookClient>,
     /// Primary Web-local facade bundle for low-risk system route adapters.
     ///
-    /// New status, optional-module, package, entitlement, and payment routes
-    /// should enter system semantics through this bundle or the focused SDK
-    /// clients above. Deprecated lower-level fields remain only for high-risk
-    /// chat/session/framework compatibility paths that are still being migrated.
+    /// Status, optional-module, package, entitlement, and payment routes should
+    /// enter system semantics through this bundle or the focused SDK clients
+    /// above. Lower-level fields are confined to the current web composition
+    /// root while follow-up thin-shell tasks move remaining ownership behind
+    /// service/provider boundaries.
     pub system_facade: WebSystemFacadeBundle,
-    /// Shared service runtime used by Web-local compatibility adapters that
-    /// must enter new system semantics through service boundaries.
+    /// Shared service runtime used by Web-local adapters that must enter system
+    /// semantics through service boundaries.
     pub service_runtime: Arc<ServiceRuntime>,
     /// Host-owned autonomy runtime bundle retained for supervisor lifecycle.
     ///
     /// Dropping this bundle would drop the only handle the web host has for
     /// deterministic shutdown and operator diagnostics. The actual background
     /// work remains inside the supervisor task and service providers.
-    pub autonomy_runtime: macaca_sdk::runtime_host::AutonomyRuntimeBundle,
+    pub autonomy_runtime: macaca_host_composition::autonomy_runtime::AutonomyRuntimeBundle,
     /// Composite toolset: built-in tools + executable skill tools + claude code tools.
     pub tools: Arc<dyn ToolCatalog>,
     /// Application executor registry for isolated multi-agent execution.
     pub executor_registry: Arc<ApplicationExecutorRegistry>,
-    /// Legacy builtin backing store retained for compatibility and default runtime construction.
-    pub workspace_memory: Option<Arc<macaca_sdk::memory::TestMemoryManager>>,
-    /// Tombstone registry paired with [`Self::workspace_memory`] for digest + `memory_forget` coordination.
-    pub workspace_memory_tombstones: Option<Arc<macaca_sdk::memory::SharedTombstoneRegistry>>,
+    /// Tombstone registry paired with the Memory service runtime for digest and forget coordination.
+    pub workspace_memory_tombstones:
+        Option<Arc<macaca_host_composition::memory::SharedTombstoneRegistry>>,
     /// Path to the drivers directory (for reload).
     pub drivers_dir: String,
     /// Persistence: session store, todo store, event log, audit logger, run tracer.
@@ -417,62 +362,102 @@ impl AppState {
     pub(crate) fn service_llm_client(&self) -> Arc<dyn SystemLlmClient> {
         Arc::clone(&self.llm_client)
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::ExternalAdapterRuntimeRegistry;
-    use std::collections::HashSet;
-
-    use macaca_sdk::context::ContextEngineInfo;
-
-    #[tokio::test]
-    async fn external_adapter_runtime_registry_syncs_only_overlay_engines() {
-        let registry = ExternalAdapterRuntimeRegistry::new();
-        registry
-            .sync_registry_overlay_engines(
-                &HashSet::from(["legacy".to_string()]),
-                &[
-                    ContextEngineInfo::new("legacy", "Legacy Context Engine"),
-                    ContextEngineInfo::new("custom-external", "Custom External Engine"),
-                ],
-            )
-            .await;
-
-        let snapshot = registry.snapshot().await;
-        assert_eq!(snapshot.len(), 1);
-        assert_eq!(snapshot[0].engine.id, "custom-external");
-        assert_eq!(
-            snapshot[0].installation_source,
-            "context_engine_registry_overlay"
-        );
-        assert_eq!(snapshot[0].runtime_state, "installed");
+    /// Build the sanitized context-provider runtime snapshot for operator routes.
+    ///
+    /// This delegates to the focused Facade so route code and AppState do not own
+    /// host-composition registry traversal or external-adapter inventory shaping.
+    pub(crate) async fn context_provider_runtime_snapshot(&self) -> ContextProviderRuntimeSnapshot {
+        self.context_runtime_client.snapshot().await
     }
 
-    #[tokio::test]
-    async fn external_adapter_runtime_registry_prunes_removed_overlay_engines() {
-        let registry = ExternalAdapterRuntimeRegistry::new();
-        registry
-            .sync_registry_overlay_engines(
-                &HashSet::new(),
-                &[ContextEngineInfo::new(
-                    "custom-external",
-                    "Custom External Engine",
-                )],
-            )
-            .await;
-        registry
-            .sync_registry_overlay_engines(
-                &HashSet::new(),
-                &[ContextEngineInfo::new(
-                    "replacement-external",
-                    "Replacement External Engine",
-                )],
-            )
-            .await;
+    /// Create a successor lineage segment for an operator-requested compaction.
+    ///
+    /// Design pattern: **Facade + Memento**. The route supplies only the session
+    /// id and optional focus topic; this method owns the persistence memento
+    /// updates, emits bounded audit events, and returns a sanitized read model.
+    /// No raw transcript content is copied into the response or event payloads.
+    pub(crate) async fn manual_session_compaction_snapshot(
+        &self,
+        session_id: String,
+        focus_topic: Option<String>,
+    ) -> MacacaResult<ManualSessionCompactionSnapshot> {
+        self.session_inspection_client
+            .manual_compaction_snapshot(session_id, focus_topic)
+            .await
+    }
 
-        let snapshot = registry.snapshot().await;
-        assert_eq!(snapshot.len(), 1);
-        assert_eq!(snapshot[0].engine.id, "replacement-external");
+    /// Load a bounded lineage snapshot for session inspection routes.
+    ///
+    /// This keeps host-owned persistence helpers out of HTTP handlers while
+    /// preserving the protocol DTO response shape expected by clients.
+    pub(crate) async fn session_lineage_snapshot(
+        &self,
+        session_id: String,
+    ) -> MacacaResult<SessionLineageSnapshot> {
+        self.session_inspection_client
+            .lineage_snapshot(session_id)
+            .await
+    }
+
+    /// Build application-scoped Skill status rows for a route request.
+    ///
+    /// Design pattern: **Facade + Adapter**. This method adapts application
+    /// manifest agent declarations into Skill service snapshot commands, then
+    /// maps the service result into route-safe rows. The HTTP handler remains
+    /// responsible only for parsing the app id and serializing the response.
+    pub(crate) async fn app_skill_status_snapshots(
+        &self,
+        app_id: ApplicationId,
+        agent_filter: Option<String>,
+    ) -> MacacaResult<Vec<AppSkillStatusSnapshot>> {
+        self.app_skill_status_client
+            .app_skill_status_snapshots(app_id, agent_filter)
+            .await
+    }
+
+    /// Persist a GenUI event command through the shared append-only EventLog.
+    ///
+    /// The route layer owns HTTP validation and protocol command construction,
+    /// while AppState keeps the concrete persistence adapter behind this narrow
+    /// Facade. This preserves durable audit/replay behavior without forcing the
+    /// route module to import host-composition persistence types.
+    pub(crate) async fn persist_genui_event_command(
+        &self,
+        app_id: &str,
+        session_id: &str,
+        command: &UiEventCommand,
+    ) -> u64 {
+        self.persist
+            .event_log
+            .append_command(
+                AppendEventCommand::new(
+                    session_id,
+                    "genui_event",
+                    "genui_web_shell",
+                    serde_json::to_value(command).unwrap_or_else(|error| {
+                        tracing::warn!(
+                            app_id,
+                            session_id,
+                            error = %error,
+                            "GenUI event command serialization failed before persistence"
+                        );
+                        serde_json::json!({})
+                    }),
+                )
+                .with_app_id(app_id.to_string()),
+            )
+            .await
+    }
+
+    /// Return the durable application execution event observer port.
+    ///
+    /// Stream routes use this port to replay and subscribe to EventLog rows
+    /// without importing host persistence types. The concrete adapter is created
+    /// per request around the shared EventLog handle and remains stateless.
+    pub(crate) fn application_execution_event_log(&self) -> Arc<dyn ApplicationExecutionEventLog> {
+        Arc::new(StateApplicationExecutionEventLog::new(Arc::clone(
+            &self.persist.event_log,
+        )))
     }
 }

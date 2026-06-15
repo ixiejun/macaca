@@ -204,7 +204,6 @@ impl CreateScheduledAgentTaskCommand {
         self.metadata = metadata;
         self
     }
-
 }
 
 /// Query command for get/list operations.
@@ -359,7 +358,6 @@ impl RecordScheduledAgentTaskResultCommand {
         self.result_audit_id = result_audit_id;
         self
     }
-
 }
 
 /// Payload material returned only to trusted runtime-host dispatch.
@@ -406,7 +404,6 @@ pub struct ScheduledAgentTaskSummary {
     pub updated_at: DateTime<Utc>,
     pub metadata: BTreeMap<String, String>,
 }
-
 
 /// Result returned by scheduled-agent-task mutation commands.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

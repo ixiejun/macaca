@@ -1,9 +1,12 @@
-//! Plan-loop configuration and task summary value objects.
+//! Plan-loop configuration.
 //!
 //! `PlanLoopConfig` tunes heartbeat cadence and review batching.
-//! `TaskSummary` is a denormalized read model passed to goal evaluation consumers.
+//! `TaskSummary` lives in `macaca-proto` because it crosses the task-service
+//! event boundary.
 
 use std::time::Duration;
+
+pub use macaca_proto::TaskSummary;
 
 /// Configuration for the Plan Agent loop.
 pub struct PlanLoopConfig {
@@ -20,13 +23,4 @@ impl Default for PlanLoopConfig {
             max_reviews_per_cycle: 10,
         }
     }
-}
-
-/// Summary of a completed task for goal evaluation.
-#[derive(Debug, Clone)]
-pub struct TaskSummary {
-    pub title: String,
-    pub agent: String,
-    pub status: String,
-    pub completion_summary: Option<String>,
 }

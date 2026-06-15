@@ -5,29 +5,34 @@
 //! Object implementations without importing provider crates.
 
 use crate::application_client::UnavailableSystemApplicationClient;
-use crate::context_client::UnavailableSystemContextClient;
 use crate::driver_client::UnavailableSystemDriverClient;
 use crate::entitlement_client::UnavailableSystemEntitlementClient;
 use crate::evm_client::UnavailableSystemEvmClient;
 use crate::heartbeat_client::UnavailableSystemHeartbeatClient;
 use crate::llm_client::UnavailableSystemLlmClient;
 use crate::mcp_client::UnavailableSystemMcpClient;
-use crate::memory_client::UnavailableSystemMemoryClient;
 use crate::package_client::EmptySystemPackageClient;
 use crate::payment_client::UnavailableSystemPaymentClient;
 use crate::scheduler_client::UnavailableSystemSchedulerClient;
 use crate::service_client::UnavailableSystemServiceClient;
-use crate::skill_client::UnavailableSystemSkillClient;
 use crate::store_client::UnavailableSystemStoreClient;
 use crate::trace_client::EmptySystemTraceClient;
 use crate::web3_client::UnavailableSystemWeb3Client;
+
+use crate::memory_client::UnavailableSystemMemoryClient;
+
+#[derive(Debug, Clone, Default)]
+pub struct UnavailableSystemContextClient;
+
+#[derive(Debug, Clone, Default)]
+pub struct UnavailableSystemSkillClient;
 
 /// SDK system facade consumed by Web/CLI thin shells.
 ///
 /// The type parameters are intentionally capability-scoped Strategy clients.
 /// Existing two-client call sites keep working through default service, trace,
 /// and package clients that return structured empty/unavailable responses until
-/// later Route C phases attach concrete runtime-backed implementations.
+/// later service providers attach concrete runtime-backed implementations.
 pub struct SystemFacade<
     T,
     S,

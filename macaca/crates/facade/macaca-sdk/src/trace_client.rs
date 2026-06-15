@@ -79,7 +79,7 @@ pub trait SystemTraceClient: Send + Sync {
     async fn tail_trace(&self, command: &TraceTailCommand) -> MacacaResult<TraceQueryResult>;
 }
 
-/// Empty local trace client for S3 compatibility.
+/// Empty local trace client for the S3 protocol slice.
 #[derive(Debug, Default, Clone)]
 pub struct EmptySystemTraceClient;
 

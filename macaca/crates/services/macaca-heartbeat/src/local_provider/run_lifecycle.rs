@@ -14,9 +14,8 @@ use std::collections::BTreeMap;
 use chrono::{DateTime, Utc};
 use macaca_proto::{
     AutonomyAuditCorrelation, AutonomyServiceErrorKind, AutonomyStructuredError,
-    HeartbeatCommandResult, HeartbeatCompleteRunCommand, HeartbeatGateDecision,
-    HeartbeatRunId, HeartbeatRunState, HeartbeatWakeDisposition, MacacaResult,
-    TraceContext, HEARTBEAT_SERVICE_ID,
+    HeartbeatCommandResult, HeartbeatCompleteRunCommand, HeartbeatGateDecision, HeartbeatRunId,
+    HeartbeatRunState, HeartbeatWakeDisposition, MacacaResult, TraceContext, HEARTBEAT_SERVICE_ID,
 };
 use tracing::info;
 

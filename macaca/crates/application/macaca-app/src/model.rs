@@ -31,8 +31,8 @@ pub use agent_config::{
     InlineAgentConfig,
 };
 pub use autonomy::{
-    AppAutonomyConfig, AppHeartbeatAgentConfig, AppHeartbeatCadenceConfig,
-    AppHeartbeatConfig, AppHeartbeatGateConfig,
+    AppAutonomyConfig, AppHeartbeatAgentConfig, AppHeartbeatCadenceConfig, AppHeartbeatConfig,
+    AppHeartbeatGateConfig,
 };
 pub use capability::{AppCapabilityNode, AppCapabilitySet, AppCapabilitySource};
 pub use core::{AppLayer, AppStatus, UiType};

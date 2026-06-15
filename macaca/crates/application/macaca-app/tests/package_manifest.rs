@@ -18,31 +18,31 @@ fn example_apps() -> Vec<std::path::PathBuf> {
 }
 
 #[test]
-fn package_manifest_v1_projection_preserves_legacy_key_fields() {
+fn package_manifest_v1_projection_preserves_source_key_fields() {
     let app_path = example_apps().into_iter().next().unwrap();
-    let legacy_descriptor = load_yaml_app_package_descriptor(&app_path).unwrap();
+    let source_descriptor = load_yaml_app_package_descriptor(&app_path).unwrap();
     let manifest = AppLoader::load_manifest(&app_path).unwrap();
     let projection = YamlApplicationManifestAdapter::new(manifest).project();
     let projected_descriptor = application_manifest_v1_to_package_descriptor(&projection.manifest);
 
     assert_eq!(
-        legacy_descriptor.manifest.id,
+        source_descriptor.manifest.id,
         projected_descriptor.manifest.id
     );
     assert_eq!(
-        legacy_descriptor.manifest.runtime.kind,
+        source_descriptor.manifest.runtime.kind,
         Some(PackageRuntimeKind::Yaml)
     );
     assert_eq!(
-        legacy_descriptor.manifest.runtime.kind,
+        source_descriptor.manifest.runtime.kind,
         projected_descriptor.manifest.runtime.kind
     );
     assert_eq!(
-        legacy_descriptor.manifest.entry,
+        source_descriptor.manifest.entry,
         projected_descriptor.manifest.entry
     );
     assert_eq!(
-        legacy_descriptor.manifest.provides.len(),
+        source_descriptor.manifest.provides.len(),
         projected_descriptor.manifest.provides.len()
     );
 }

@@ -2,11 +2,10 @@
 
 use std::sync::Arc;
 
-use macaca_proto::{ApplicationId, TraceContext};
-use macaca_sdk::skill::{
-    SkillRuntimeFacade, SkillServiceScope, SkillSnapshot, SkillSnapshotRequest,
-    SkillSnapshotServiceCommand,
+use macaca_host_composition::runtime_host::{
+    SkillServiceScope, SkillSnapshot, SkillSnapshotServiceCommand,
 };
+use macaca_proto::{ApplicationId, TraceContext};
 
 use crate::runtime_event_bridge::{emit_runtime_event, emit_skill_snapshot_event};
 use crate::state::AppState;
@@ -15,14 +14,13 @@ use super::governance_telemetry::{
     record_governed_skill_snapshot_activation, resolve_agent_skill_policy,
 };
 
-/// Load a cached per-agent snapshot or build one via Skill Service (with legacy fallback).
+/// Load a cached per-agent snapshot or build one via Skill Service.
 pub(crate) async fn load_or_build_skill_snapshot(
     state: &Arc<AppState>,
     app_id: &ApplicationId,
     agent_name: &str,
     session_id: Option<&str>,
 ) -> Option<SkillSnapshot> {
-
     const TRACE_ID: &str = "web-skill-mcp-snapshot";
     let snapshot_module = format!("skill_snapshot/{agent_name}");
     if let Some(session_id) = session_id {
@@ -62,11 +60,6 @@ pub(crate) async fn load_or_build_skill_snapshot(
     };
     let policy = resolve_agent_skill_policy(state, app_id, agent_name).await;
     let app_dir = app.path.clone();
-    let request = SkillSnapshotRequest::builder(agent_name)
-        .workspace_dir(workspace_dir.clone())
-        .app_dir(Some(app_dir.clone()))
-        .policy(policy.clone())
-        .build();
     if let Some(session_id) = session_id {
         emit_runtime_event(
             state,
@@ -106,7 +99,7 @@ pub(crate) async fn load_or_build_skill_snapshot(
             tracing::warn!(
                 error = %error,
                 agent = %agent_name,
-                "Skill Service snapshot failed; using deprecated SkillRuntimeFacade fallback"
+                "Skill Service snapshot failed; no shell-local fallback is allowed"
             );
             if let Some(session_id) = session_id {
                 emit_runtime_event(
@@ -123,11 +116,7 @@ pub(crate) async fn load_or_build_skill_snapshot(
                 )
                 .await;
             }
-            #[allow(deprecated)]
-            SkillRuntimeFacade::new()
-                .build_snapshot(request)
-                .await
-                .ok()?
+            return None;
         }
     };
     if let Some(session_id) = session_id {
@@ -165,5 +154,4 @@ pub(crate) async fn load_or_build_skill_snapshot(
         .await;
     }
     Some(snapshot)
-
 }

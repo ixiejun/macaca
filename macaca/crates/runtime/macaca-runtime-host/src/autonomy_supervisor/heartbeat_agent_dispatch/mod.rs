@@ -33,5 +33,5 @@ mod support;
 #[cfg(test)]
 mod tests;
 
-pub(crate) use summary::HeartbeatAgentDispatchSummary;
 pub(crate) use strategy::HeartbeatAgentDispatchStrategy;
+pub(crate) use summary::HeartbeatAgentDispatchSummary;

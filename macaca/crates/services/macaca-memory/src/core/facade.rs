@@ -11,7 +11,7 @@ use super::status::MemoryStatusReport;
 /// The request keeps the *what* and the *where* together:
 /// - `content` is the payload the caller wants to persist.
 /// - `scope` tells the fabric which isolation domain owns the memory.
-/// - `layer` preserves compatibility with the legacy memory layering model.
+/// - `layer` preserves the stable memory layering model.
 /// - `metadata` carries source/provenance fields that adapters may enrich.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryWriteRequest {
@@ -35,7 +35,7 @@ impl MemoryWriteRequest {
         }
     }
 
-    /// Override the legacy layer used when the underlying store persists this entry.
+    /// Override the layer used when the underlying store persists this entry.
     pub fn layer(mut self, layer: MemoryLayer) -> Self {
         self.layer = layer;
         self
@@ -102,7 +102,7 @@ pub struct MemoryPrefetchRequest {
 ///
 /// The trait is intentionally CRUD-shaped:
 /// - routers decide *which* backend should handle a scope
-/// - adapters translate requests into legacy managers/stores
+/// - adapters translate requests into concrete managers/stores
 /// - callers depend on one stable facade instead of knowing concrete managers
 ///
 /// This keeps the memory fabric extensible without forcing all consumers to

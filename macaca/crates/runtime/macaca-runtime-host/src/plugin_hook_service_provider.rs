@@ -1,6 +1,6 @@
 //! ServiceRuntime adapter for Plugin Hook Bus v1.
 //!
-//! The adapter translates generic Route C `ServiceCommand` envelopes into the
+//! The adapter translates generic protocol `ServiceCommand` envelopes into the
 //! typed Hook Bus facade.  It owns transport decoding only; hook ordering,
 //! timeout/failure policy, descriptor-only execution, and audit semantics stay
 //! behind `PluginHookBus`.

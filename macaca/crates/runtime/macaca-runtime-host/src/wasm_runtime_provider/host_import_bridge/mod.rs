@@ -28,11 +28,10 @@ mod ui_render;
 use std::fmt;
 use std::sync::Arc;
 
-use macaca_proto::{DEFAULT_WASM_MAX_PAYLOAD_BYTES, ServiceBusSource};
+use macaca_proto::{ServiceBusSource, DEFAULT_WASM_MAX_PAYLOAD_BYTES};
 
 use crate::{
-    ApplicationGenUiSurfaceStore, InMemoryServicePolicyEngine, ServiceCallAuditSink,
-    ServiceRouter,
+    ApplicationGenUiSurfaceStore, InMemoryServicePolicyEngine, ServiceCallAuditSink, ServiceRouter,
 };
 
 use super::telemetry::WasmTelemetrySinkRef;

@@ -119,7 +119,7 @@ impl Formatter for AnthropicFormatter {
                 }
                 _ => {
                     // Unknown blocks are not fatal because providers can add
-                    // forward-compatible block kinds. We log the type only,
+                    // future-ready block kinds. We log the type only,
                     // never raw provider payloads.
                     if !block_type.is_empty() {
                         warn!(block_type, "skipping unknown Anthropic content block type");

@@ -14,7 +14,7 @@ use macaca_proto::{
     SchedulerJobId, SchedulerJobLifecycleState, SchedulerLifecycleJobCommand,
     SchedulerListJobsCommand, SchedulerQueryCommand, SchedulerRegisterJobCommand,
     SchedulerRunState, SchedulerRunSummary, SchedulerServiceSnapshot, SchedulerTargetCommand,
-    SchedulerUpdateJobCommand,     ServiceBusSource, ServiceDescriptor, ServiceHealth, TraceContext,
+    SchedulerUpdateJobCommand, ServiceBusSource, ServiceDescriptor, ServiceHealth, TraceContext,
     SCHEDULED_AGENT_TASK_SERVICE_ID, SCHEDULER_SERVICE_ID,
 };
 use macaca_runtime_host::{
@@ -319,7 +319,7 @@ fn scheduler_boundaries_reject_raw_scheduled_agent_task_payload_fields() {
 }
 
 /// Assert that scheduled-agent-task UI/API creation uses the focused autonomy
-/// namespace and not the legacy schedule namespace.
+/// namespace and not the retired schedule namespace.
 #[test]
 fn scheduled_agent_task_shell_paths_use_focused_autonomy_namespace() {
     let repo = repository_root();
@@ -336,7 +336,7 @@ fn scheduled_agent_task_shell_paths_use_focused_autonomy_namespace() {
     assert!(
         !scheduled_task_section.contains("'/schedules'")
             && !scheduled_task_section.contains("`/schedules/"),
-        "frontend scheduled-agent-task helpers must not call legacy schedule endpoints"
+        "frontend scheduled-agent-task helpers must not call retired schedule endpoints"
     );
 
     let bootstrap =
@@ -358,7 +358,7 @@ fn scheduled_agent_task_shell_paths_use_focused_autonomy_namespace() {
 fn scheduled_agent_task_os_layer_has_no_business_or_provider_literals() {
     let root = workspace_root();
     let scan_roots = [
-        root.join("crates/foundation/macaca-proto/src/scheduled_agent_task_service.rs"),
+        root.join("crates/foundation/macaca-proto/src/scheduled_agent_task_service"),
         root.join("crates/facade/macaca-sdk/src/scheduled_agent_task_client.rs"),
         root.join("crates/services/macaca-scheduled-agent-task/src"),
         root.join("crates/runtime/macaca-runtime-host/src/autonomy_dispatch"),

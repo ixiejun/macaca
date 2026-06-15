@@ -1,7 +1,7 @@
-//! Admission specifications for Route C Payment Service.
+//! Admission specifications for the Payment Service.
 //!
 //! These small Specification objects keep validation rules out of Web, CLI,
-//! kernel compatibility helpers, and provider-specific adapters. The Payment
+//! kernel primitives, and provider-specific adapters. The Payment
 //! Service provider invokes them before adapter execution so every payment
 //! lifecycle command is traceable, scoped, amount-valid, transition-safe, and
 //! safe to log.

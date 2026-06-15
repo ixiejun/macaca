@@ -79,9 +79,6 @@ impl AgentRegistry {
     }
 }
 
-/// Backward-compatible alias retained for callers referencing `AgentEntry`.
-pub type AgentEntry = AgentManifest;
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -9,10 +9,7 @@ use std::collections::BTreeMap;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    autonomy_service::non_empty,
-    AutonomyScope, MacacaResult, ServiceCommandName,
-};
+use crate::{autonomy_service::non_empty, AutonomyScope, MacacaResult, ServiceCommandName};
 
 /// Stable identity for a native heartbeat profile.
 ///
@@ -142,7 +139,7 @@ pub struct HeartbeatProfile {
     /// Optional profile-specific cooldown override.
     ///
     /// `None` means the provider Strategy uses its default cooldown. This keeps
-    /// old profiles compatible while allowing per-agent profile policy to be
+    /// old profiles stable while allowing per-agent profile policy to be
     /// edited without hiding cooldown in untyped metadata.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cooldown_ms: Option<u64>,

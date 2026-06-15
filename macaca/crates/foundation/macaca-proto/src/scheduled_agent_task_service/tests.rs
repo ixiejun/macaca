@@ -85,11 +85,7 @@ fn create_command_requires_trace_prompt_and_target_agent() {
 
 #[test]
 fn safe_summary_never_contains_raw_prompt() {
-    let summary = redacted_fixture_for_tests(
-        "task-1",
-        "digest.prompt.123",
-        "Daily analysis task",
-    );
+    let summary = redacted_fixture_for_tests("task-1", "digest.prompt.123", "Daily analysis task");
     let encoded = serde_json::to_string(&summary).unwrap();
     assert!(!encoded.contains("Analyze the latest market state"));
     assert!(encoded.contains("digest.prompt.123"));

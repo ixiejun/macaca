@@ -12,9 +12,7 @@ use crate::transport::{bridge_for_config, McpTransport};
 use super::helpers::{
     flatten_timeout_result, missing_required_bin, prefixed_tool_name, status_for_definition,
 };
-use super::types::{
-    McpRuntimeStatus, McpRuntimeStatusState, McpServerDefinition, McpToolPolicy,
-};
+use super::types::{McpRuntimeStatus, McpRuntimeStatusState, McpServerDefinition, McpToolPolicy};
 
 pub async fn probe_definition_statuses(
     definitions: Vec<McpServerDefinition>,

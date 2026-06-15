@@ -241,35 +241,6 @@ impl PausableAgenticLoop {
             messages,
         })
     }
-
-    /// Run with pause support.
-    ///
-    /// Deprecated compatibility wrapper. Use [`PausableAgenticLoop::execute_with_pause`] for new code.
-    #[deprecated(note = "use PausableAgenticLoop::execute_with_pause")]
-    pub async fn run_with_pause(
-        &self,
-        agent_id: &AgentId,
-        llm: &dyn LlmProvider,
-        tools: &dyn ToolCatalog,
-        messages: Vec<LlmMessage>,
-        options: &LlmOptions,
-        permission: &Permission,
-        permission_checker: Option<&dyn PermissionChecker>,
-        event_tx: Option<mpsc::Sender<AgentExecutionEvent>>,
-    ) -> MacacaResult<LoopResult> {
-        self.execute_with_pause(
-            agent_id,
-            llm,
-            tools,
-            messages,
-            options,
-            permission,
-            permission_checker,
-            event_tx,
-        )
-        .await
-    }
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
-

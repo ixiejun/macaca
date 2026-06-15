@@ -9,7 +9,7 @@ use macaca_proto::{ApplicationId, MacacaResult, TodoItem, TodoStatus};
 
 use super::types::SystemFacade;
 use crate::service_client::ServiceCallCommand;
-use crate::status_client::{StaticSystemStatusDataSource, SystemStatusSnapshot};
+use crate::status_client::{StaticSystemStatusClient, SystemStatusSnapshot};
 use crate::task_client::{SystemTaskClient, TaskBoardQueryCommand, TaskBoardQueryResult};
 
 /// Provider-neutral fixture ids (Object Mother pattern) — avoids forbidden
@@ -58,7 +58,7 @@ async fn system_facade_returns_sorted_task_board_without_web_dependency() {
         MockTaskBoardClient {
             todos: vec![todo(2), todo(1)],
         },
-        StaticSystemStatusDataSource::new(SystemStatusSnapshot {
+        StaticSystemStatusClient::new(SystemStatusSnapshot {
             version: "test".into(),
             agent_count: 0,
             loaded_apps: 0,
@@ -70,8 +70,7 @@ async fn system_facade_returns_sorted_task_board_without_web_dependency() {
     );
     let result = facade
         .query_task_board(
-            TaskBoardQueryCommand::new(ApplicationId(uuid::Uuid::new_v4()), "session-a")
-                .unwrap(),
+            TaskBoardQueryCommand::new(ApplicationId(uuid::Uuid::new_v4()), "session-a").unwrap(),
         )
         .await
         .unwrap();
@@ -83,7 +82,7 @@ async fn system_facade_returns_sorted_task_board_without_web_dependency() {
 async fn default_service_client_returns_structured_unavailable() {
     let facade = SystemFacade::new(
         MockTaskBoardClient { todos: Vec::new() },
-        StaticSystemStatusDataSource::new(SystemStatusSnapshot {
+        StaticSystemStatusClient::new(SystemStatusSnapshot {
             version: "test".into(),
             agent_count: 0,
             loaded_apps: 0,
@@ -93,8 +92,7 @@ async fn default_service_client_returns_structured_unavailable() {
             gateway_enabled: false,
         }),
     );
-    let command =
-        ServiceCallCommand::new("service-a", "command-a", serde_json::json!({})).unwrap();
+    let command = ServiceCallCommand::new("service-a", "command-a", serde_json::json!({})).unwrap();
     let error = facade.call_service(command).await.unwrap_err();
     assert!(error.to_string().contains("unavailable"));
 }

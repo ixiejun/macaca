@@ -1,6 +1,6 @@
 //! Protocol-level package manifest contracts for Macaca Agent OS.
 //!
-//! A package is the smallest distributable software unit in Route C.  These
+//! A package is the smallest distributable software unit.  These
 //! contracts are data-only: they describe what a package is, what it needs,
 //! what it provides, and how it wants to run.  Actual loading, guard checks,
 //! Store entitlement, payment, and runtime execution remain outside this
@@ -176,14 +176,14 @@ pub struct PackageCapability {
     pub description: String,
 }
 
-/// Compatibility facts evaluated by runtime guards.
+/// Host requirement facts evaluated by runtime guards.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PackageCompatibility {
+pub struct PackageHostRequirements {
     pub min_os_version: Option<String>,
     pub supported_abi_versions: Vec<String>,
 }
 
-impl Default for PackageCompatibility {
+impl Default for PackageHostRequirements {
     fn default() -> Self {
         Self {
             min_os_version: None,
@@ -207,7 +207,7 @@ pub struct PackageManifest {
     pub optional_services: Vec<PackageServiceRequirement>,
     pub provides: Vec<PackageCapability>,
     pub commerce: CommerceMetadata,
-    pub compatibility: PackageCompatibility,
+    pub host_requirements: PackageHostRequirements,
     pub metadata: BTreeMap<String, String>,
 }
 
@@ -233,7 +233,7 @@ impl PackageManifest {
             optional_services: Vec::new(),
             provides: Vec::new(),
             commerce: CommerceMetadata::default(),
-            compatibility: PackageCompatibility::default(),
+            host_requirements: PackageHostRequirements::default(),
             metadata: BTreeMap::new(),
         }
     }
@@ -292,8 +292,8 @@ pub enum PackageGuardError {
     #[error("unsupported runtime kind: {0}")]
     UnsupportedRuntimeKind(String),
 
-    #[error("ABI incompatible: required {required}, supported {supported}")]
-    AbiIncompatible { required: String, supported: String },
+    #[error("ABI rejected: required {required}, supported {supported}")]
+    AbiRejected { required: String, supported: String },
 
     #[error("missing required service: {0}")]
     MissingRequiredService(String),
