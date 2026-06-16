@@ -27,6 +27,8 @@ Macaca 的 Plan-Verify 循环中，Worker agent 完成任务后提交 review，P
 
 **理由**: 保持 tool 层的纯粹性（只操作数据），事件广播在 web 层处理。
 
+**补充约束**: PlanEvent consumer 不能把 agent delegate 的自然语言完成结果等同于 Task Board review 完成。它必须在 delegate 返回后重新读取 Task Service 持久状态，只有目标 task 已经离开 `PendingReview` 时才广播 `task_reviewed` 并唤醒 worker loop；如果 task 仍处于 `PendingReview`，consumer 必须记录 run_trace/anomaly 并保持任务可见，避免制造“假完成”事件。
+
 ### Decision 3: 即时唤醒使用现有 Waker 机制
 
 **选择**: Worker 提交 review 后通过 PlanLoopWaker 唤醒 PlanLoop；Review 完成后通过 WorkerLoopWaker 唤醒 WorkerLoop。

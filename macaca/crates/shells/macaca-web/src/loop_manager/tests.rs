@@ -37,6 +37,20 @@ mod tests {
     }
 
     #[test]
+    fn planner_selection_accepts_todo_planning_capability() {
+        let agents = vec![
+            agent("orchestrator", &["todo_goal_management"]),
+            agent("board_planner", &["todo_planning"]),
+            agent("executor_a", &["todo_execution"]),
+        ];
+
+        let (entry, planner) = select_entry_and_plan_agents(&agents, Some("orchestrator"));
+
+        assert_eq!(entry, "orchestrator");
+        assert_eq!(planner, "board_planner");
+    }
+
+    #[test]
     fn planner_falls_back_to_entry_when_no_planning_capability() {
         let agents = vec![
             agent("entry_custom", &["todo_goal_management"]),
@@ -260,6 +274,25 @@ mod tests {
 
         assert_eq!(intent, AgentExecutionIntent::Reviewer);
         assert_eq!(PlannerFrameworkCallKind::Review.goal_context(task_id), None);
+    }
+
+    #[test]
+    fn review_completion_broadcast_requires_persisted_task_status() {
+        let source = include_str!("plan_event_handlers.rs");
+        let status_check = source
+            .find("todo_status_for_agent_task")
+            .expect("review handler must read persisted task status");
+        let completed_event = source
+            .find("\"decision_type\": \"task_reviewed\"")
+            .expect("review handler must still emit task_reviewed after verification");
+
+        assert!(
+            status_check < completed_event,
+            "task_reviewed must be emitted only after Task Board state verification"
+        );
+        assert!(source
+            .contains("review delegate finished without a persisted Task Board review decision"));
+        assert!(source.contains("crate::run_trace::phase::PLAN_ANOMALY"));
     }
 
     #[test]

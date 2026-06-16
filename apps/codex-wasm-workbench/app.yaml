@@ -128,9 +128,12 @@ agents:
       # concrete workspace root, applies policy, and records trace/audit events.
       - file_read
       - service.call
+      - review_todo
     capabilities:
       - name: code_change_planning
         description: "Consumes coordinator handoffs and plans changes using provider-neutral code intelligence and file service calls"
+      - name: todo_planning
+        description: "Uses generic Task Board planning and review tools to create, review, and audit delegated application work"
 
   - name: coder
     prompt_template: workflows/implement.md

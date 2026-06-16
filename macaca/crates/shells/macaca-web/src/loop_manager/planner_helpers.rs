@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use macaca_host_composition::executor::{ExecutorEvent, ExecutorEventFactory};
 use macaca_host_composition::framework::plan::PlanNotebook;
-use macaca_proto::{AgentInfo, ApplicationId};
+use macaca_proto::{AgentInfo, ApplicationId, TodoStatus};
 
 use crate::state::AppState;
 
@@ -52,10 +52,32 @@ pub(crate) fn select_entry_and_plan_agents(
         .unwrap_or_else(|| "entry_agent".to_string());
     let planner = agents
         .iter()
-        .find(|a| a.capabilities.iter().any(|c| c == "task_planning"))
+        .find(|a| {
+            a.capabilities
+                .iter()
+                .any(|c| c == "task_planning" || c == "todo_planning")
+        })
         .map(|a| a.name.clone())
         .unwrap_or_else(|| entry.clone());
     (entry, planner)
+}
+
+pub(crate) async fn todo_status_for_agent_task(
+    state: &Arc<AppState>,
+    app_id: &ApplicationId,
+    session_id: Option<&str>,
+    agent: &str,
+    task_id: macaca_proto::TaskId,
+) -> Option<TodoStatus> {
+    // This helper only verifies the persisted Task Board state after a delegated
+    // review. The Task Service remains the authority for lifecycle transitions.
+    let session = session_id.map(str::to_string);
+    state
+        .persist
+        .todo_store
+        .get_todo(app_id, &session, agent, &task_id)
+        .await
+        .map(|task| task.status)
 }
 
 pub(crate) fn mark_decomposition_in_notebook(

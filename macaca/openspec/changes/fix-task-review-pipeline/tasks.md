@@ -20,6 +20,8 @@
 - [x] 4.1 PlanEvent consumer 中，planner 完成 review delegate 后，广播 `task_reviewed` SSE 事件
 - [x] 4.2 同时写入 EventLog（通过 broadcast_to_app_sessions 持久化）
 - [x] 4.3 事件包含：task_id, agent, title, decision_type="task_reviewed"
+- [x] 4.4 delegate 返回后重新读取 Task Board 状态；只有 review 已落库才广播 `task_reviewed`
+- [x] 4.5 review 未落库时记录 run_trace/anomaly，不唤醒 worker loop 也不广播假完成
 
 ## 5. 验证 (P2)
 

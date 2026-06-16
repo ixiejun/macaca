@@ -9,7 +9,7 @@ use macaca_proto::TaskId;
 use super::agent_execution_adapter::{run_planner_framework_call, PlannerFrameworkCallKind};
 use super::execution_control_adapter::session_loop_coordinator;
 use super::plan_event_context::PlanEventConsumerCtx;
-use super::planner_helpers::planner_notebook_mark_review;
+use super::planner_helpers::{planner_notebook_mark_review, todo_status_for_agent_task};
 use crate::session_loop_shell_adapter::{
     wake_worker_loops_and_notify_local, REASON_SESSION_LOOP_REVIEW_DELEGATE_COMPLETE,
 };
@@ -45,6 +45,36 @@ pub(crate) async fn handle_plan_event_review_needed(
         &title,
     )
     .await;
+    // Emit the observable "review needed" event before delegation so UI and
+    // replay consumers see the same order as the Task Board state machine:
+    // PendingReview first, persisted review decision later.
+    let msg = format!("Task '{}' submitted for review by {}", title, agent);
+    let plan_payload = serde_json::json!({
+        "decision_type": "review_needed",
+        "task_id": task_id.to_string(),
+        "agent": agent.clone(),
+        "title": title.clone(),
+        "message": msg,
+    });
+    let sse_event = Event::default()
+        .event("plan_decision")
+        .data(plan_payload.to_string());
+    broadcast_to_app_sessions(&ctx.state, &ctx.app_id, sse_event, plan_payload).await;
+    save_plan_decision(
+        &ctx.session_store,
+        &ctx.app_id,
+        PlanDecisionEvent {
+            decision_type: "review_needed".into(),
+            message: msg,
+            timestamp: chrono::Utc::now(),
+            data: serde_json::json!({
+                "task_id": task_id.to_string(),
+                "agent": agent.clone(),
+                "title": title.clone()
+            }),
+        },
+    )
+    .await;
     {
         let prompt = format!(
             "Review this completed task using review_todo:\n\
@@ -53,7 +83,7 @@ pub(crate) async fn handle_plan_event_review_needed(
          Verify the work meets the criteria. Use review_todo with passed=true/false and feedback.",
             task_id, agent, title, summary, criteria
         );
-        let _ = run_planner_framework_call(
+        let delegate_result = run_planner_framework_call(
             &ctx.state,
             &ctx.app_id,
             &ctx.plan_agent_name,
@@ -77,50 +107,85 @@ pub(crate) async fn handle_plan_event_review_needed(
             None,
         )
         .await;
-        // Review delegate completed — wake worker loops via execution control.
-        let coordinator = session_loop_coordinator(&ctx.state);
-        wake_worker_loops_and_notify_local(
+        let persisted_status = todo_status_for_agent_task(
             &ctx.state,
-            &coordinator,
             &ctx.app_id,
             session_id.as_deref(),
-            REASON_SESSION_LOOP_REVIEW_DELEGATE_COMPLETE,
-            Some(task_id.to_string()),
+            &agent,
+            task_id,
         )
         .await;
-        // Broadcast review result as SSE + EventLog
-        let review_payload = serde_json::json!({
-            "decision_type": "task_reviewed",
-            "task_id": task_id.to_string(),
-            "agent": agent,
-            "title": title,
-            "message": format!("Task '{}' reviewed for agent {}", title, agent),
-        });
-        let review_event = Event::default()
-            .event("plan_decision")
-            .data(review_payload.to_string());
-        broadcast_to_app_sessions(&ctx.state, &ctx.app_id, review_event, review_payload).await;
+        if matches!(
+            persisted_status,
+            Some(macaca_proto::TodoStatus::Completed)
+                | Some(macaca_proto::TodoStatus::NeedsOptimization)
+                | Some(macaca_proto::TodoStatus::Failed)
+        ) {
+            // The Task Service accepted the review decision. Only persisted
+            // state can unlock dependents and drive durable UI events.
+            let coordinator = session_loop_coordinator(&ctx.state);
+            wake_worker_loops_and_notify_local(
+                &ctx.state,
+                &coordinator,
+                &ctx.app_id,
+                session_id.as_deref(),
+                REASON_SESSION_LOOP_REVIEW_DELEGATE_COMPLETE,
+                Some(task_id.to_string()),
+            )
+            .await;
+            let status = persisted_status
+                .as_ref()
+                .map(|status| format!("{status:?}"))
+                .unwrap_or_else(|| "Unknown".to_string());
+            let review_payload = serde_json::json!({
+                "decision_type": "task_reviewed",
+                "task_id": task_id.to_string(),
+                "agent": agent.clone(),
+                "title": title.clone(),
+                "new_status": status,
+                "message": format!("Task '{}' reviewed for agent {}", title, agent),
+            });
+            let review_event = Event::default()
+                .event("plan_decision")
+                .data(review_payload.to_string());
+            broadcast_to_app_sessions(&ctx.state, &ctx.app_id, review_event, review_payload).await;
+        } else {
+            let delegate_error = delegate_result.err();
+            let status = persisted_status
+                .as_ref()
+                .map(|status| format!("{status:?}"))
+                .unwrap_or_else(|| "Missing".to_string());
+            tracing::warn!(
+                app_id = %ctx.app_id,
+                session_id = session_id.as_deref().unwrap_or_default(),
+                task_id = %task_id,
+                agent = %agent,
+                planner = %ctx.plan_agent_name,
+                task_status = %status,
+                delegate_error = delegate_error.as_deref().unwrap_or("none"),
+                "review delegate finished without a persisted Task Board review decision"
+            );
+            crate::run_trace::emit_for_scope(
+                &ctx.state.persist.run_tracer,
+                session_id.as_deref(),
+                &ctx.app_id,
+                crate::run_trace::phase::PLAN_ANOMALY,
+                "plan_loop",
+                crate::run_trace::status::ERROR,
+                Some(format!(
+                    "review delegate did not persist review_todo result; status={status}"
+                )),
+                Some(task_id.to_string()),
+                None,
+                Some(serde_json::json!({
+                    "agent": agent.clone(),
+                    "planner": ctx.plan_agent_name.clone(),
+                    "delegate_error": delegate_error,
+                })),
+            )
+            .await;
+        }
     }
-    // Emit SSE decision event
-    let msg = format!("Task '{}' submitted for review by {}", title, agent);
-    let plan_payload = serde_json::json!({
-        "decision_type": "review_needed",
-        "task_id": task_id.to_string(),
-        "agent": agent,
-        "title": title,
-        "message": msg,
-    });
-    let sse_event = Event::default()
-        .event("plan_decision")
-        .data(plan_payload.to_string());
-    broadcast_to_app_sessions(&ctx.state, &ctx.app_id, sse_event, plan_payload).await;
-    // Persist decision
-    save_plan_decision(&ctx.session_store, &ctx.app_id, PlanDecisionEvent {
-        decision_type: "review_needed".into(),
-        message: msg,
-        timestamp: chrono::Utc::now(),
-        data: serde_json::json!({ "task_id": task_id.to_string(), "agent": agent, "title": title }),
-    }).await;
 }
 
 pub(crate) async fn handle_plan_event_all_tasks_done(
