@@ -7,7 +7,9 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use macaca_proto::{AgentExecutionCommand, AgentExecutionResult, ServiceResult, TaskId};
+use macaca_proto::{
+    AgentExecutionCommand, AgentExecutionEvent, AgentExecutionResult, ServiceResult, TaskId,
+};
 use tracing::{info, warn};
 
 use crate::agent_execution_orchestration::{
@@ -103,9 +105,10 @@ impl AgentExecutionBackend for ComposedAgentExecutionBackend {
 
         if let Some(command_text) = heartbeat_exact_shell_contract(&command, &context_snapshot) {
             let shell_result = execute_exact_heartbeat_shell(&command_text, &agent_event_tx).await;
-            drop(agent_event_tx);
             return match shell_result {
                 Ok(shell_output) => {
+                    emit_terminal_agent_event(&agent_event_tx, &command, task_id, true, None).await;
+                    drop(agent_event_tx);
                     self.host
                         .on_run_completed(
                             &command,
@@ -132,6 +135,15 @@ impl AgentExecutionBackend for ComposedAgentExecutionBackend {
                     Ok(result)
                 }
                 Err(error) => {
+                    emit_terminal_agent_event(
+                        &agent_event_tx,
+                        &command,
+                        task_id,
+                        false,
+                        Some(error.clone()),
+                    )
+                    .await;
+                    drop(agent_event_tx);
                     self.host
                         .on_run_failed(&command, task_id, EMIT_EXECUTOR_LIFECYCLE, &error)
                         .await;
@@ -169,6 +181,7 @@ impl AgentExecutionBackend for ComposedAgentExecutionBackend {
         );
 
         let user_prompt = user_prompt_with_context(&command);
+        let terminal_event_tx = agent_event_tx.clone();
         match self
             .framework
             .run_react_agent(
@@ -183,6 +196,8 @@ impl AgentExecutionBackend for ComposedAgentExecutionBackend {
             .await
         {
             Ok(output_text) => {
+                emit_terminal_agent_event(&terminal_event_tx, &command, task_id, true, None).await;
+                drop(terminal_event_tx);
                 self.host
                     .on_run_completed(&command, task_id, EMIT_EXECUTOR_LIFECYCLE, &output_text)
                     .await;
@@ -197,6 +212,15 @@ impl AgentExecutionBackend for ComposedAgentExecutionBackend {
                 ))
             }
             Err(error) => {
+                emit_terminal_agent_event(
+                    &terminal_event_tx,
+                    &command,
+                    task_id,
+                    false,
+                    Some(error.clone()),
+                )
+                .await;
+                drop(terminal_event_tx);
                 self.host
                     .on_run_failed(&command, task_id, EMIT_EXECUTOR_LIFECYCLE, &error)
                     .await;
@@ -211,12 +235,54 @@ impl AgentExecutionBackend for ComposedAgentExecutionBackend {
     }
 }
 
+/// Emit the canonical terminal agent event before the observation channel is
+/// closed.
+///
+/// `ComposedAgentExecutionBackend` owns the Template Method for a generic
+/// `service.agent_execution` run, so it is the only layer that can guarantee
+/// every framework result has a matching terminal event. Downstream observers
+/// use this event to project audit evidence, application-execution lifecycle
+/// state, and browser replay without adding application-specific completion
+/// rules in Web or UI code.
+async fn emit_terminal_agent_event(
+    agent_event_tx: &tokio::sync::mpsc::Sender<AgentExecutionEvent>,
+    command: &AgentExecutionCommand,
+    task_id: TaskId,
+    success: bool,
+    error: Option<String>,
+) {
+    let status = if success { "completed" } else { "failed" };
+    match agent_event_tx
+        .send(AgentExecutionEvent::Completed { success, error })
+        .await
+    {
+        Ok(()) => info!(
+            trace_id = %command.trace.trace_id,
+            task_id = %task_id,
+            target_agent = %command.target_agent,
+            status,
+            "composed agent execution backend emitted terminal agent event"
+        ),
+        Err(send_error) => warn!(
+            trace_id = %command.trace.trace_id,
+            task_id = %task_id,
+            target_agent = %command.target_agent,
+            status,
+            reason = %send_error,
+            "composed agent execution backend could not emit terminal agent event"
+        ),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::collections::BTreeMap;
 
-    use macaca_proto::{AgentContextSnapshot, AgentExecutionIntent, TraceContext};
+    use macaca_proto::{
+        AgentContextSnapshot, AgentExecutionEvent, AgentExecutionIntent, ApplicationId,
+        TraceContext,
+    };
 
     struct UnavailableFramework;
 
@@ -320,4 +386,67 @@ mod tests {
 
     // Composed backend unit tests require a full ServiceRuntime fixture; integration
     // coverage lives in macaca-web agent_execution_backend tests via Web adapters.
+
+    #[tokio::test]
+    async fn terminal_event_helper_emits_success_completion() {
+        let command = test_command("trace-terminal-success");
+        let task_id = TaskId::new();
+        let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+
+        emit_terminal_agent_event(&tx, &command, task_id, true, None).await;
+        drop(tx);
+
+        let event = rx
+            .recv()
+            .await
+            .expect("terminal success event should be observable");
+        match event {
+            AgentExecutionEvent::Completed {
+                success: true,
+                error: None,
+            } => {}
+            other => panic!("unexpected terminal event: {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn terminal_event_helper_emits_failure_completion() {
+        let command = test_command("trace-terminal-failure");
+        let task_id = TaskId::new();
+        let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+
+        emit_terminal_agent_event(
+            &tx,
+            &command,
+            task_id,
+            false,
+            Some("framework failed".into()),
+        )
+        .await;
+        drop(tx);
+
+        let event = rx
+            .recv()
+            .await
+            .expect("terminal failure event should be observable");
+        match event {
+            AgentExecutionEvent::Completed {
+                success: false,
+                error: Some(error),
+            } => assert_eq!(error, "framework failed"),
+            other => panic!("unexpected terminal event: {other:?}"),
+        }
+    }
+
+    fn test_command(trace_id: &str) -> AgentExecutionCommand {
+        AgentExecutionCommand::new(
+            ApplicationId::from_name("terminal-event-test"),
+            "session-terminal",
+            "coder",
+            AgentExecutionIntent::WasmDelegate,
+            "run delegated task",
+            TraceContext::new(trace_id),
+        )
+        .expect("test command should be valid")
+    }
 }
