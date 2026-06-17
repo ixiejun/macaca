@@ -34,3 +34,21 @@ Macaca 的 Plan-Verify 循环中，Worker agent 完成任务后提交 review，P
 **选择**: Worker 提交 review 后通过 PlanLoopWaker 唤醒 PlanLoop；Review 完成后通过 WorkerLoopWaker 唤醒 WorkerLoop。
 
 **理由**: 已有 Waker 基础设施（PlanLoopWaker/WorkerLoopWaker），只需在正确位置调用。
+
+### Decision 4: Fallback decomposition 使用通用交付阶段顺序
+
+**选择**: 当 planner 没有产出 todos 而系统创建 fallback task chain 时，按 capability 推导的通用阶段顺序为 `Research → Analyze → Produce → Validate → Finalize → Execute`。验证、review、QA、polish 类能力必须排在 produce/build/code/artifact 类能力之后。
+
+**理由**: Fallback chain 是保守的线性任务图。它必须先产生主要交付物，再让验证或 review 类型 agent 评审，否则会生成 “review 先运行、生产任务依赖 review” 的反向依赖链，导致 Task Board 长期停留在 PendingReview/Blocked。
+
+### Decision 5: Claim diagnostics DTO 必须支持省略空依赖列表
+
+**选择**: `ClaimGate.incomplete_dependencies` 在空列表时仍可从缺省 JSON 反序列化为 `[]`。
+
+**理由**: 诊断服务返回的 claimable/sequential gate 不一定有依赖列表。缺省字段不能导致 SDK 反序列化失败，否则 shell 无法显示为什么任务没有被 claim。
+
+### Decision 6: PendingReview 派发使用有界退避重试状态机
+
+**选择**: PlanLoop 不再把 `PendingReview` 任务记为一次性已处理，而是维护 per-task review dispatch state：`attempts`、`last_emitted_at`。当任务仍停留在 `PendingReview` 且 review delegate 没有通过 `review_todo` 落库时，PlanLoop 在退避窗口后重新 emit `ReviewNeeded`，直到达到上限；任务离开 `PendingReview` 后立即清理状态。默认退避窗口必须长于正常 planner review 执行窗口，避免健康但较慢的 review delegate 被误判成未落库并产生并发重复审核。
+
+**理由**: 单纯去重可以阻止重复 review 风暴，但会把一次未落库的 planner delegate 变成永久卡死。过短退避会在第一次 delegate 仍运行时排入额外 review 事件。通用 OS 调度层需要同时满足可审计、可恢复和无人值守运行：既不能每个 heartbeat 重复派发，也不能因为一次工具调用失败就让 Task Board 永久停在 review/blocked。

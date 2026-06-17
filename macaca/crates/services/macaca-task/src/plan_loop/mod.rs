@@ -17,6 +17,8 @@ mod goal_evaluator;
 mod loop_runner;
 
 #[cfg(test)]
+mod loop_runner_tests;
+#[cfg(test)]
 mod tests;
 
 pub use config::{PlanLoopConfig, TaskSummary};

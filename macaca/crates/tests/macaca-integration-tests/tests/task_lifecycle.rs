@@ -22,7 +22,9 @@ fn make_result(task_id: macaca_proto::TaskId) -> TaskResult {
         task_id,
         success: true,
         output: "completed".into(),
+        error: None,
         artifacts: vec!["artifact.txt".into()],
+        tokens_used: None,
         completed_at: Utc::now(),
     }
 }

@@ -30,7 +30,11 @@ pub struct ClaimGate {
     /// `claimable` | `blocked` | `sequential_wait`
     pub gate_kind: String,
     /// For `blocked`: dependencies not in `Completed` state.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    ///
+    /// Older and empty claimable gates omit this field from JSON to keep the
+    /// shell payload compact. Deserialization still defaults it to an empty
+    /// vector so service-call round trips remain forward compatible.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub incomplete_dependencies: Vec<DependencySnap>,
 }
 
@@ -300,5 +304,21 @@ mod tests {
                 .len(),
             1
         );
+    }
+
+    #[test]
+    fn claimable_gate_round_trips_when_dependency_list_is_omitted() {
+        let value = serde_json::json!({
+            "task_id": TaskId::new().to_string(),
+            "sequence_number": 1,
+            "title": "ready",
+            "status": "Pending",
+            "gate_kind": "claimable"
+        });
+
+        let gate: ClaimGate =
+            serde_json::from_value(value).expect("missing dependency list should default");
+
+        assert!(gate.incomplete_dependencies.is_empty());
     }
 }

@@ -192,7 +192,9 @@ mod tests {
             task_id,
             success: true,
             output: "done".into(),
+            error: None,
             artifacts: vec![],
+            tokens_used: None,
             completed_at: Utc::now(),
         }
     }

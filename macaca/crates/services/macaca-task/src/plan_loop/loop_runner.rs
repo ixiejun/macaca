@@ -1,12 +1,14 @@
-//! Plan Agent scheduling heartbeat (Template Method + Observer).
+//! Plan Agent scheduling heartbeat (Template Method + Observer + State).
 //!
 //! `PlanLoop` polls `TaskSpace` on an interval or immediate wakeup, then emits
 //! `PlanEvent` messages for downstream consumers. Trace logs mark wakeup, shutdown,
-//! goal discovery, review batching, anomaly detection, and goal-completion checks.
+//! goal discovery, review batching, review retry suppression, anomaly detection,
+//! and goal-completion checks.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::Instant;
 
 use tracing::{info, warn};
 
@@ -34,6 +36,19 @@ pub struct PlanLoop {
     config: PlanLoopConfig,
     /// Notify handle to wake the loop immediately when new work arrives.
     notify: Arc<tokio::sync::Notify>,
+}
+
+/// In-memory dispatch state for one task waiting on planner review.
+///
+/// This is deliberately a scheduler-side memento rather than task-board state:
+/// the Task Service remains authoritative for lifecycle transitions, while this
+/// short-lived object only prevents duplicate review delegation and enables
+/// bounded recovery when a delegated planner response did not persist a
+/// `review_todo` result.
+#[derive(Debug, Clone)]
+pub(super) struct ReviewDispatchState {
+    attempts: usize,
+    last_emitted_at: Instant,
 }
 
 /// Handle to wake PlanLoop immediately (e.g., when a goal is created or review submitted).
@@ -72,7 +87,8 @@ impl PlanLoop {
     ) {
         info!("Plan loop started");
         let mut last_failed_count: usize = 0;
-        let mut review_emitted: HashSet<macaca_proto::TaskId> = HashSet::new();
+        let mut review_dispatches: HashMap<macaca_proto::TaskId, ReviewDispatchState> =
+            HashMap::new();
         let mut goal_eval_emitted: HashSet<macaca_proto::TaskId> = HashSet::new();
 
         loop {
@@ -90,7 +106,7 @@ impl PlanLoop {
 
             self.process_new_goals(&event_tx).await;
             let progress = self
-                .emit_pending_reviews(&event_tx, &mut review_emitted)
+                .emit_pending_reviews(&event_tx, &mut review_dispatches)
                 .await;
             let progress = match progress {
                 Some(progress) => progress,
@@ -118,24 +134,81 @@ impl PlanLoop {
         }
     }
 
-    async fn emit_pending_reviews(
+    pub(super) async fn emit_pending_reviews(
         &self,
         event_tx: &tokio::sync::mpsc::Sender<PlanEvent>,
-        review_emitted: &mut HashSet<macaca_proto::TaskId>,
+        review_dispatches: &mut HashMap<macaca_proto::TaskId, ReviewDispatchState>,
     ) -> Option<crate::todo_board::ProgressSummary> {
         let reviews = self.space.pending_reviews().await;
         let current_review_ids: HashSet<macaca_proto::TaskId> =
             reviews.iter().map(|t| t.id).collect();
-        review_emitted.retain(|id| current_review_ids.contains(id));
-        let new_reviews: Vec<_> = reviews
-            .into_iter()
-            .filter(|t| !review_emitted.contains(&t.id))
-            .take(self.config.max_reviews_per_cycle)
-            .collect();
-        if !new_reviews.is_empty() {
-            info!(count = new_reviews.len(), "New tasks pending review");
-            for task in new_reviews {
-                review_emitted.insert(task.id);
+        review_dispatches.retain(|task_id, _state| current_review_ids.contains(task_id));
+
+        let now = Instant::now();
+        let mut reviews_to_emit = Vec::new();
+        for task in reviews {
+            match review_dispatches.get(&task.id) {
+                None => reviews_to_emit.push(task),
+                Some(state)
+                    if state.attempts < self.config.max_review_dispatch_attempts
+                        && now.duration_since(state.last_emitted_at)
+                            >= self.config.review_retry_backoff =>
+                {
+                    info!(
+                        task_id = %task.id,
+                        attempts = state.attempts,
+                        max_attempts = self.config.max_review_dispatch_attempts,
+                        backoff_ms = self.config.review_retry_backoff.as_millis(),
+                        "retrying pending review dispatch after backoff"
+                    );
+                    reviews_to_emit.push(task);
+                }
+                Some(state) if state.attempts >= self.config.max_review_dispatch_attempts => {
+                    warn!(
+                        task_id = %task.id,
+                        attempts = state.attempts,
+                        max_attempts = self.config.max_review_dispatch_attempts,
+                        "pending review dispatch retry limit reached; waiting for external state change"
+                    );
+                }
+                Some(state) => {
+                    tracing::debug!(
+                        task_id = %task.id,
+                        attempts = state.attempts,
+                        backoff_ms = self.config.review_retry_backoff.as_millis(),
+                        "pending review dispatch suppressed until retry backoff expires"
+                    );
+                }
+            }
+
+            if reviews_to_emit.len() >= self.config.max_reviews_per_cycle {
+                break;
+            }
+        }
+
+        if !reviews_to_emit.is_empty() {
+            info!(
+                count = reviews_to_emit.len(),
+                "Tasks pending review dispatch"
+            );
+            for task in reviews_to_emit {
+                let next_attempt = review_dispatches
+                    .get(&task.id)
+                    .map(|state| state.attempts.saturating_add(1))
+                    .unwrap_or(1);
+                review_dispatches.insert(
+                    task.id,
+                    ReviewDispatchState {
+                        attempts: next_attempt,
+                        last_emitted_at: now,
+                    },
+                );
+                info!(
+                    task_id = %task.id,
+                    attempt = next_attempt,
+                    max_attempts = self.config.max_review_dispatch_attempts,
+                    "emitting pending review dispatch"
+                );
                 let _ = event_tx
                     .send(PlanEvent::ReviewNeeded {
                         task_id: task.id,

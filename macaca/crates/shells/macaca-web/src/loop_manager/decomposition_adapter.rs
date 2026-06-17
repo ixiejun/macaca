@@ -119,16 +119,16 @@ pub(crate) struct PlannerWorkerDossier {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-enum FallbackTaskPhase {
+pub(crate) enum FallbackTaskPhase {
     Research = 0,
-    Validate = 1,
-    Analyze = 2,
-    Produce = 3,
+    Analyze = 1,
+    Produce = 2,
+    Validate = 3,
     Finalize = 4,
     Execute = 5,
 }
 
-fn fallback_phase_for(capabilities: &[String]) -> FallbackTaskPhase {
+pub(crate) fn fallback_phase_for(capabilities: &[String]) -> FallbackTaskPhase {
     let text = capabilities.join(" ").to_lowercase();
     if text.contains("research")
         || text.contains("source")
@@ -136,12 +136,6 @@ fn fallback_phase_for(capabilities: &[String]) -> FallbackTaskPhase {
         || text.contains("discovery")
     {
         FallbackTaskPhase::Research
-    } else if text.contains("fact")
-        || text.contains("verify")
-        || text.contains("validation")
-        || text.contains("quality")
-    {
-        FallbackTaskPhase::Validate
     } else if text.contains("analysis")
         || text.contains("analyze")
         || text.contains("architecture")
@@ -164,6 +158,16 @@ fn fallback_phase_for(capabilities: &[String]) -> FallbackTaskPhase {
         // Capability keywords only — never hardcode application agent role names
         // (e.g. fullstack "frontend"/"backend"); persona manifests declare specialists.
         FallbackTaskPhase::Produce
+    } else if text.contains("fact")
+        || text.contains("verify")
+        || text.contains("validation")
+        || text.contains("quality")
+    {
+        // Validation is intentionally after production in fallback mode. A
+        // planner-authored graph may express richer parallel validation, but
+        // this conservative synthetic chain must create the primary artifact
+        // before asking a validator or reviewer to judge it.
+        FallbackTaskPhase::Validate
     } else if text.contains("edit")
         || text.contains("review")
         || text.contains("package")
@@ -339,6 +343,27 @@ pub(crate) async fn create_fallback_decomposition_tasks(
     .await;
 
     created
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{fallback_phase_for, FallbackTaskPhase};
+
+    #[test]
+    fn fallback_phase_orders_primary_production_before_validation_or_review() {
+        let producer = vec![
+            "code_change_planning".to_string(),
+            "build_artifact".to_string(),
+        ];
+        let reviewer = vec!["quality_review".to_string(), "qa_validation".to_string()];
+
+        assert_eq!(fallback_phase_for(&producer), FallbackTaskPhase::Produce);
+        assert_eq!(fallback_phase_for(&reviewer), FallbackTaskPhase::Validate);
+        assert!(
+            fallback_phase_for(&producer) < fallback_phase_for(&reviewer),
+            "synthetic fallback chains must produce the primary artifact before validation/review"
+        );
+    }
 }
 
 pub(crate) fn terminal_goal_task(tasks: &[macaca_proto::TodoItem]) -> Option<macaca_proto::TaskId> {

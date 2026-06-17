@@ -9,7 +9,7 @@
 
 ## What Changes
 
-- PlanLoop 添加 `reviewed_tasks: HashSet<TaskId>` 去重，ReviewNeeded 每个 task 只 emit 一次
+- PlanLoop 添加有界 `ReviewNeeded` 去重/重试状态，避免心跳重复风暴，同时在 review delegate 未落库时按退避策略重新派发
 - ReviewTodoTool 执行后广播 SSE 事件 + 写 EventLog
 - Worker 提交 review 后调用 PlanLoopWaker 立即唤醒
 - Review 完成后调用 WorkerLoopWaker 唤醒，让被 unblock 的任务立即被 claim

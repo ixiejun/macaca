@@ -26,5 +26,8 @@
 ## 5. 验证 (P2)
 
 - [x] 5.1 cargo check + cargo test 全 workspace 通过
-- [ ] 5.2 手动测试：提交 review → planner 只审核一次 → 后续任务立即启动
-- [ ] 5.3 前端刷新后 review 事件正确加载
+- [x] 5.2 修复 claim diagnostics DTO roundtrip，确保 blocked/review 诊断接口可用
+- [x] 5.3 修复 fallback decomposition 通用阶段顺序，确保 produce/build 先于 validation/review
+- [x] 5.4 增加 PendingReview 有界退避重试，避免一次 review_todo 未落库后永久卡死
+- [x] 5.5 手动测试：旧 stuck session 经 planner review_todo 落库后，reviewer Completed 且 coder 从 Blocked 进入 InProgress
+- [ ] 5.6 前端刷新后 review 事件正确加载
