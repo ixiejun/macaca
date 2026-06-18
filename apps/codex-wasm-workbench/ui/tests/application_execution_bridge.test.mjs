@@ -140,9 +140,10 @@ test("markdown display wraps prose while keeping dense tables inspectable", () =
   assert.match(styleSource, /\.markdown-table-scroll[\s\S]*overflow-x: auto/);
   assert.match(styleSource, /\.markdown-raw-table[\s\S]*overflow: auto/);
   assert.match(styleSource, /\.markdown-body table[\s\S]*table-layout: auto/);
-  assert.match(styleSource, /\.markdown-body table[\s\S]*width: 100%/);
+  assert.match(styleSource, /\.markdown-body table[\s\S]*width: max-content/);
   assert.match(styleSource, /\.markdown-body th:first-child,[\s\S]*white-space: nowrap/);
-  assert.match(styleSource, /\.markdown-body th:nth-child\(2\),[\s\S]*min-width: 260px/);
+  assert.match(styleSource, /\.markdown-body th:first-child,[\s\S]*min-width: 168px/);
+  assert.match(styleSource, /\.markdown-body th:nth-child\(2\),[\s\S]*min-width: 320px/);
   assert.match(styleSource, /\.markdown-body td code,[\s\S]*overflow-wrap: anywhere/);
 });
 

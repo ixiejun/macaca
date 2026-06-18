@@ -694,10 +694,10 @@ pre {
   font-size: 13px;
   line-height: 1.58;
   margin-top: 0;
-  min-width: 720px;
+  min-width: max(100%, 860px);
   table-layout: auto;
   white-space: normal;
-  width: 100%;
+  width: max-content;
 }
 
 .markdown-body th,
@@ -715,14 +715,14 @@ pre {
 
 .markdown-body th:first-child,
 .markdown-body td:first-child {
-  min-width: 52px;
+  min-width: 168px;
   white-space: nowrap;
-  width: 1%;
+  width: auto;
 }
 
 .markdown-body th:nth-child(2),
 .markdown-body td:nth-child(2) {
-  min-width: 260px;
+  min-width: 320px;
 }
 
 .markdown-body td code,
