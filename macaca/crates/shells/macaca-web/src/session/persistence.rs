@@ -14,12 +14,25 @@ use super::types::{
     AgentTrace, AssistantExecutionMeta, SessionMeta, StoredSession, StoredTraceStep,
 };
 
+type SessionWriteLocks =
+    tokio::sync::Mutex<std::collections::HashMap<String, Arc<tokio::sync::Mutex<()>>>>;
+
 // Key prefixes for redb storage
 pub(crate) const SESSION_PREFIX: &str = "session/";
 pub(crate) const APP_SESSIONS_PREFIX: &str = "app_sessions/";
 /// Separate key prefix for agent traces — stored independently from session
 /// to avoid read-modify-write races with session updates.
 pub(crate) const AGENT_TRACES_PREFIX: &str = "agent_traces/";
+
+fn process_session_write_locks() -> &'static SessionWriteLocks {
+    // Lifecycle: one lock registry per Web process. It is intentionally reset
+    // only by process restart because persisted sessions are process-local
+    // Unit-of-Work writes and no state from this map is serialized. Tests that
+    // require isolation should use unique session ids rather than clearing the
+    // registry, preserving production race behavior.
+    static SESSION_LOCKS: std::sync::OnceLock<SessionWriteLocks> = std::sync::OnceLock::new();
+    SESSION_LOCKS.get_or_init(|| tokio::sync::Mutex::new(std::collections::HashMap::new()))
+}
 
 pub(crate) async fn persist_session_snapshot<S>(
     store: &Arc<S>,
@@ -33,14 +46,10 @@ pub(crate) async fn persist_session_snapshot<S>(
 ) where
     S: PersistStore + ?Sized,
 {
-    // Acquire per-session write lock to prevent concurrent read-modify-write
-    // from overwriting each other's data (e.g., periodic saver vs snapshot closure).
-    // We use a simple approach: lock the session_key_db string as a file-level mutex.
-    static SESSION_LOCKS: std::sync::OnceLock<
-        tokio::sync::Mutex<std::collections::HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
-    > = std::sync::OnceLock::new();
-    let locks =
-        SESSION_LOCKS.get_or_init(|| tokio::sync::Mutex::new(std::collections::HashMap::new()));
+    // Acquire a per-session write lock to prevent concurrent read-modify-write
+    // operations from overwriting each other's data (for example a periodic
+    // saver racing with a task-status snapshot closure).
+    let locks = process_session_write_locks();
     let lock = {
         let mut map = locks.lock().await;
         map.entry(session_id.to_string())

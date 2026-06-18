@@ -113,6 +113,12 @@ The SDK is the stable developer-facing and shell-facing facade:
 
 It must not own business workflows, raw presentation state, or hardcoded application behavior.
 
+Runtime-host provider families that approach the OS source-size advisory line
+must be split by stable ownership boundaries: descriptor, command dispatch,
+state machine, adapter strategy, support helpers, and tests. A provider family
+may remain in runtime-host while it is still a composition bridge, but extraction
+readiness must be documented before it is promoted to a dedicated service crate.
+
 ## Application Rules
 
 The application framework owns manifests, ABI, lifecycle, app-scoped metadata, and version contracts. Applications may dynamically orchestrate services, especially WASM applications, but all orchestration must pass through declared capabilities and service boundaries.
@@ -130,6 +136,12 @@ Web, frontend, CLI, and gateways may only:
 
 They must not become permanent semantic owners for planners, workers, payments, packages, drivers, skills, MCP, chains, or application lifecycles.
 
+Task decomposition, review recovery, fallback task planning, and Task Board
+state transitions are Task/Autonomy service semantics. Shell code may delegate
+through SDK/facade clients and render the result, but shell code must not own
+keyword classifiers, hardcoded role decisions, retry semantics, or review
+state-machine rules.
+
 ## Security And Audit Rules
 
 - Trace must exist.
@@ -139,6 +151,9 @@ They must not become permanent semantic owners for planners, workers, payments, 
 - Optional module absence must be explicit.
 - Logs and snapshots must be bounded and sanitized.
 - Raw secrets, prompts, manifests, WASM bytes, package bytes, private keys, credentials, raw signatures, raw provider payloads, and unbounded output must not enter observability surfaces.
+- Advisory architecture-smell diagnostics must be deterministic, sanitized, and
+  linked to rule identifiers. They may report 450-line source headroom, static
+  state counts, and provider near-limit trends without replacing hard gates.
 
 ## Change Review Questions
 

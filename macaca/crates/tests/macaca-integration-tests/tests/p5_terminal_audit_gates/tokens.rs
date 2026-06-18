@@ -121,6 +121,31 @@ pub fn forbidden_tokens() -> Vec<ForbiddenToken> {
             "FrameworkRunner::build_runtime_agent",
             "runtime agent construction belongs in runtime-host service providers"
         ),
+        token!(
+            "shell-task-planning-semantic-owner",
+            "fallback_phase_for(",
+            "fallback decomposition phase selection belongs to the Task Service, not presentation shells"
+        ),
+        token!(
+            "shell-task-planning-semantic-owner",
+            "FallbackTaskPhase",
+            "fallback decomposition phase labels must be service DTOs or service internals, not shell-owned semantics"
+        ),
+        token!(
+            "shell-task-planning-semantic-owner",
+            "text.contains(\"research\")",
+            "task planning keyword routing must be service-owned or declarative descriptor data"
+        ),
+        token!(
+            "shell-task-planning-semantic-owner",
+            "text.contains(\"analysis\")",
+            "task planning keyword routing must be service-owned or declarative descriptor data"
+        ),
+        token!(
+            "shell-task-planning-semantic-owner",
+            "text.contains(\"review\")",
+            "task planning keyword routing must be service-owned or declarative descriptor data"
+        ),
         // --- no-hardcoded-name ---
         token!(
             "hardcoded-agent-role",

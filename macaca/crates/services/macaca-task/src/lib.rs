@@ -39,8 +39,8 @@ pub use plan_loop::{
 };
 pub use queue::TaskQueue;
 pub use runtime::{
-    InMemoryTaskServiceEventSink, NoopTaskServiceExecutionStrategy, TaskServiceEventSink,
-    TaskServiceExecutionStrategy, TaskServiceRuntime,
+    fallback_phase_for, InMemoryTaskServiceEventSink, NoopTaskServiceExecutionStrategy,
+    TaskServiceEventSink, TaskServiceExecutionStrategy, TaskServiceRuntime,
 };
 pub use scheduler::{ScheduleAction, ScheduleEntry, ScheduleEvent, SchedulerConfig, TaskScheduler};
 pub use service_adapter::task_service_descriptor;

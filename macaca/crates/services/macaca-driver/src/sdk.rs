@@ -33,6 +33,11 @@ macro_rules! export_driver {
         // returned by `macaca_driver_create` is a non-null sentinel — the
         // real object lives here.
 
+        // Lifecycle: this static lives inside each generated dynamic driver
+        // library, not inside the Macaca host. It is reset when the plugin
+        // process/library is unloaded and stores only the ABI object requested
+        // by `macaca_driver_create`. Tests needing isolation should load a new
+        // plugin instance or call destroy before recreating the driver.
         static DRIVER_INSTANCE: std::sync::Mutex<Option<Box<dyn $crate::driver::SoftwareDriver>>> =
             std::sync::Mutex::new(None);
 

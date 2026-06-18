@@ -1,7 +1,6 @@
 #[cfg(test)]
 mod tests {
     use crate::loop_manager::agent_execution_adapter::PlannerFrameworkCallKind;
-    use crate::loop_manager::decomposition_adapter::{fallback_phase_for, FallbackTaskPhase};
     use crate::loop_manager::planner_helpers::{
         executor_task_completed, executor_task_failed, executor_task_started,
         goal_has_decomposed_tasks, mark_decomposition_in_notebook, mark_review_in_notebook,
@@ -73,22 +72,6 @@ mod tests {
         assert_eq!(
             planner_scope_session_id(&app_id, None),
             format!("_macaca_app_{}", app_id.0)
-        );
-    }
-
-    #[test]
-    fn fallback_decomposition_orders_production_before_review() {
-        let producer = vec![
-            "code_change_planning".to_string(),
-            "build_artifact".to_string(),
-        ];
-        let reviewer = vec!["quality_review".to_string(), "qa_validation".to_string()];
-
-        assert_eq!(fallback_phase_for(&producer), FallbackTaskPhase::Produce);
-        assert_eq!(fallback_phase_for(&reviewer), FallbackTaskPhase::Validate);
-        assert!(
-            fallback_phase_for(&producer) < fallback_phase_for(&reviewer),
-            "fallback task chains must create or change the primary artifact before validation/review"
         );
     }
 

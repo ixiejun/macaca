@@ -104,6 +104,7 @@ pub mod payment_adapter;
 pub mod payment_admission;
 pub mod payment_policy;
 pub mod payment_service_provider;
+pub use payment_service_provider::payment_service_descriptor;
 pub mod plugin;
 pub mod plugin_capability;
 pub mod plugin_capability_service_provider;

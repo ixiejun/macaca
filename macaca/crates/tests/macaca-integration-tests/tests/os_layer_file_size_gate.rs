@@ -18,3 +18,8 @@ fn os_layer_file_size_allowlist_terminal_state_is_zero_rows() {
 fn os_layer_file_size_gate_reject_unallowlisted_oversized_sources() {
     gate::assert_os_layer_file_size_boundaries();
 }
+
+#[test]
+fn os_layer_file_size_advisory_reports_near_limit_sources() {
+    gate::report_os_layer_file_size_advisory();
+}

@@ -103,6 +103,11 @@ Absence is a valid state. Crash, hang, silent fallback, and fake success are not
 
 Shells must not define system semantics for tasks, sessions, payments, packages, drivers, skills, MCP, applications, or chains.
 
+Task planning and review flow are autonomy-service responsibilities. Web/CLI
+shells may submit typed service commands, subscribe to task events, and render
+Task Board state, but decomposition strategies, fallback planning, review retry,
+and terminal state repair must live behind Task/Autonomy service boundaries.
+
 ## Prohibitions
 
 - Application-specific logic must not enter the kernel or generic services.
@@ -113,6 +118,9 @@ Shells must not define system semantics for tasks, sessions, payments, packages,
 - Web and CLI must not become long-term owners of system orchestration.
 - Providers must not be constructed outside approved composition roots.
 - Logs and snapshots must not contain raw secrets, prompts, manifests, package bytes, credentials, private keys, unbounded payloads, or unsanitized provider output.
+- Static registries and process locks must document lifecycle, restart
+  semantics, and test-isolation strategy. Low-risk static state should move to
+  explicit composition-root state when behavior can be preserved.
 
 ## Change Rules
 
@@ -125,3 +133,8 @@ Any boundary change must:
 5. Pass targeted tests, boundary tests, and audit replay checks.
 
 If a change cannot explain why it belongs in a lower layer, it must remain in a higher layer.
+
+Provider-family extraction readiness must be checked before moving runtime-host
+bridges into dedicated service crates: stable typed contracts, service
+descriptor completeness, isolated adapter Strategy, explicit state machine,
+sanitized audit trail, unavailable provider behavior, and compatibility tests.

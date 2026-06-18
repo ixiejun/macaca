@@ -179,7 +179,7 @@ pub(crate) async fn handle_plan_event_review_needed(
                 None,
                 Some(serde_json::json!({
                     "agent": agent.clone(),
-                    "planner": ctx.plan_agent_name.clone(),
+                    "planning_agent": ctx.plan_agent_name.clone(),
                     "delegate_error": delegate_error,
                 })),
             )

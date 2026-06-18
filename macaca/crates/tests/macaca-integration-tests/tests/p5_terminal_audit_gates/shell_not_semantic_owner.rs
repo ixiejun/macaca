@@ -12,6 +12,7 @@ const FAMILIES: &[&str] = &[
     "web-direct-runtime-field",
     "application-runtime-direct-start",
     "shell-semantic-execution-owner",
+    "shell-task-planning-semantic-owner",
 ];
 
 /// Shell crate prefix used to scope semantic-ownership violations to presentation layers.

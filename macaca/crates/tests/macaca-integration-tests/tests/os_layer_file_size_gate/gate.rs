@@ -18,6 +18,13 @@ use super::allowlist;
 /// Maximum permitted production source lines per OS-layer Rust file.
 pub const MAX_OS_LAYER_SOURCE_LINES: usize = 500;
 
+/// Advisory source-size threshold used for early ownership warnings.
+///
+/// This threshold is intentionally non-failing. It gives maintainers an
+/// auditable signal before files reach the constitutional hard limit, while
+/// preserving the existing hard gate as the only build-breaking size rule.
+pub const ADVISORY_OS_LAYER_SOURCE_LINES: usize = 450;
+
 /// One allowlisted oversized file with governance metadata for diagnostics.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FileSizeAllowlistEntry {
@@ -105,6 +112,32 @@ fn scan_oversized_sources(workspace: &Path) -> Vec<(String, usize)> {
     }
     violations.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
     violations
+}
+
+/// Scans production sources that are close to the hard line-count limit.
+///
+/// The report is sorted by descending line count for stable CI output. It is a
+/// diagnostic lane, not an allowlist mechanism: files reported here must still
+/// pass the hard 500-line gate.
+fn scan_advisory_sources(workspace: &Path) -> Vec<(String, usize)> {
+    let mut findings = Vec::new();
+    let crates_dir = workspace.join("crates");
+    for entry in walkdir_rs_files(&crates_dir) {
+        if !is_os_layer_production_source(&entry, workspace) {
+            continue;
+        }
+        let line_count = count_lines(&entry);
+        if (ADVISORY_OS_LAYER_SOURCE_LINES..=MAX_OS_LAYER_SOURCE_LINES).contains(&line_count) {
+            let rel = entry
+                .strip_prefix(workspace)
+                .unwrap()
+                .to_string_lossy()
+                .replace('\\', "/");
+            findings.push((rel, line_count));
+        }
+    }
+    findings.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+    findings
 }
 
 /// Minimal directory walker — avoids adding a `walkdir` dev-dependency to the gate.
@@ -214,4 +247,27 @@ pub fn assert_os_layer_file_size_boundaries() {
         "os_layer_file_size_gate event=boundary_pass oversized_files={} allowlist_rows=0",
         violation_paths.len()
     );
+}
+
+/// Non-failing advisory report for files approaching the hard size limit.
+///
+/// This function deliberately contains no assertion. The architecture-smell
+/// roadmap introduces it as an Observer-style diagnostic so CI logs show
+/// ownership pressure without blocking unrelated work.
+pub fn report_os_layer_file_size_advisory() {
+    let workspace = workspace_root();
+    let findings = scan_advisory_sources(&workspace);
+    eprintln!(
+        "os_layer_file_size_gate event=advisory_report threshold={} hard_limit={} findings={}",
+        ADVISORY_OS_LAYER_SOURCE_LINES,
+        MAX_OS_LAYER_SOURCE_LINES,
+        findings.len()
+    );
+    for (path, line_count) in findings.iter().take(50) {
+        eprintln!(
+            "os_layer_file_size_gate event=advisory_file path={} line_count={} guidance=split_by_ownership_before_new_behavior",
+            path,
+            line_count
+        );
+    }
 }

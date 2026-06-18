@@ -8,6 +8,7 @@
 mod commands;
 mod constants;
 mod events;
+mod fallback;
 mod prompts;
 mod queries;
 mod snapshots;
@@ -15,6 +16,7 @@ mod snapshots;
 pub use commands::*;
 pub use constants::*;
 pub use events::*;
+pub use fallback::*;
 pub use prompts::*;
 pub use queries::*;
 pub use snapshots::*;

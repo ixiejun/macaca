@@ -100,6 +100,9 @@ The following must be rejected:
 - A capability call runs without policy.
 - An absent optional module crashes, hangs, silently falls back, or fakes success.
 - Logs, traces, snapshots, or diagnostics contain raw secrets, prompts, manifests, WASM bytes, package bytes, private keys, credentials, raw signatures, raw provider payloads, or unbounded output.
+- Web, CLI, or frontend owns task decomposition keywords, review retry state,
+  fallback task planning, or Task Board repair rules instead of delegating to
+  Task/Autonomy service commands.
 
 ## Executable Gates
 
@@ -111,8 +114,28 @@ The repository must have and continuously strengthen dependency-boundary tests. 
 - Service providers must not depend on presentation shells.
 - Optional modules must not become required base OS dependencies.
 - Workspace crates must belong to clear layers.
+- A 450-line advisory source-size report and deterministic non-failing
+  architecture-smell trend lane should run beside hard gates so near-limit files
+  are visible before they violate the 500-line constitution.
 
 A gate failure is an architecture violation, not test noise.
+
+## Extraction Readiness Memo
+
+Before a runtime-host provider family can be extracted into a dedicated service
+crate, record a short memo proving:
+
+- The proto command/result DTOs are split by family and serde-compatible.
+- The runtime-host provider is already divided into descriptor, dispatch,
+  state-machine, adapter, support, and tests.
+- Trace, policy, health, snapshot, unavailable behavior, and sanitized audit are
+  covered by deterministic tests.
+- No application-specific or provider-name routing remains outside declarative
+  descriptor data.
+
+`PaymentSystemServiceProvider` is the current reference candidate: descriptor,
+support helpers, settlement state-machine execution, and command dispatch are
+separated while preserving the public `payment_service_descriptor` export.
 
 ## Retired Dependency Exception Inventory
 

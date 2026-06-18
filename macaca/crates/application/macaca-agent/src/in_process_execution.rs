@@ -74,6 +74,11 @@ pub struct InProcessAgentExecutionPort {
 impl InProcessAgentExecutionPort {
     /// Shared side registry used by default bootstrap and test wiring.
     pub fn runtime_registry() -> Arc<InProcessAgentSideRegistry> {
+        // Lifecycle: this is a process-wide composition-root default for local
+        // in-process execution. It resets on host restart and is bypassed by
+        // `new_with_registry` when tests or service hosts need explicit
+        // isolation. The registry stores only side bindings, not task state or
+        // application business semantics.
         static REGISTRY: std::sync::OnceLock<Arc<InProcessAgentSideRegistry>> =
             std::sync::OnceLock::new();
         REGISTRY

@@ -13,11 +13,12 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use macaca_kernel::SystemService;
 use macaca_proto::{
-    BuildDecompositionPromptCommand, BuildGoalEvaluationPromptCommand, CleanupPolicy,
-    CompleteGoalCommand, FailTaskCommand, KernelServiceId, MacacaError, MacacaResult,
-    ParseGoalEvaluationCommand, QueryAgentTodosCommand, QueryTaskClaimDiagnosticsCommand,
-    QueryTaskGoalsCommand, QueryTaskProgressCommand, ServiceCallResult, ServiceCommand,
-    ServiceDescriptor, ServiceError, ServiceHealth, ServiceResult, TraceContext,
+    BuildDecompositionPromptCommand, BuildFallbackDecompositionCommand,
+    BuildGoalEvaluationPromptCommand, CleanupPolicy, CompleteGoalCommand, FailTaskCommand,
+    KernelServiceId, MacacaError, MacacaResult, ParseGoalEvaluationCommand, QueryAgentTodosCommand,
+    QueryTaskClaimDiagnosticsCommand, QueryTaskGoalsCommand, QueryTaskProgressCommand,
+    ServiceCallResult, ServiceCommand, ServiceDescriptor, ServiceError, ServiceHealth,
+    ServiceResult, TraceContext,
 };
 use macaca_task::{
     ClaimTaskCommand, CreateGoalCommand, CreateTaskAssignmentCommand, InMemoryTaskServiceEventSink,
@@ -35,11 +36,12 @@ use crate::{
 
 pub use macaca_proto::{
     TASK_AGENT_TODOS_COMMAND, TASK_BUILD_DECOMPOSITION_PROMPT_COMMAND,
-    TASK_BUILD_GOAL_EVALUATION_PROMPT_COMMAND, TASK_CLAIM_COMMAND, TASK_CLAIM_DIAGNOSTICS_COMMAND,
-    TASK_COMPLETE_GOAL_COMMAND, TASK_CREATE_ASSIGNMENT_COMMAND, TASK_CREATE_GOAL_COMMAND,
-    TASK_FAIL_COMMAND, TASK_GOALS_COMMAND, TASK_PARSE_GOAL_EVALUATION_COMMAND,
-    TASK_PROGRESS_COMMAND, TASK_QUERY_COMMAND, TASK_RESUME_COORDINATOR_COMMAND,
-    TASK_REVIEW_COMMAND, TASK_SNAPSHOT_COMMAND, TASK_START_COMMAND, TASK_SUBMIT_REVIEW_COMMAND,
+    TASK_BUILD_FALLBACK_DECOMPOSITION_COMMAND, TASK_BUILD_GOAL_EVALUATION_PROMPT_COMMAND,
+    TASK_CLAIM_COMMAND, TASK_CLAIM_DIAGNOSTICS_COMMAND, TASK_COMPLETE_GOAL_COMMAND,
+    TASK_CREATE_ASSIGNMENT_COMMAND, TASK_CREATE_GOAL_COMMAND, TASK_FAIL_COMMAND,
+    TASK_GOALS_COMMAND, TASK_PARSE_GOAL_EVALUATION_COMMAND, TASK_PROGRESS_COMMAND,
+    TASK_QUERY_COMMAND, TASK_RESUME_COORDINATOR_COMMAND, TASK_REVIEW_COMMAND,
+    TASK_SNAPSHOT_COMMAND, TASK_START_COMMAND, TASK_SUBMIT_REVIEW_COMMAND,
 };
 
 type LocalTaskRuntime = TaskServiceRuntime<NoopTaskServiceExecutionStrategy>;
@@ -200,6 +202,15 @@ impl SystemService for TaskSystemServiceProvider {
                     .map_err(task_error)?;
                 Self::result(evaluation, trace)
             }
+            TASK_BUILD_FALLBACK_DECOMPOSITION_COMMAND => {
+                let typed: BuildFallbackDecompositionCommand = Self::decode(command)?;
+                let plan = self
+                    .runtime
+                    .build_fallback_decomposition(typed)
+                    .await
+                    .map_err(task_error)?;
+                Self::result(plan, trace)
+            }
             TASK_CLAIM_COMMAND => {
                 let typed: ClaimTaskCommand = Self::decode(command)?;
                 let task = self.runtime.claim_task(typed).await.map_err(task_error)?;
@@ -341,6 +352,10 @@ fn task_service_descriptor() -> ServiceDescriptor {
     descriptor.metadata.insert(
         "command.task.parse_goal_evaluation".into(),
         TASK_PARSE_GOAL_EVALUATION_COMMAND.into(),
+    );
+    descriptor.metadata.insert(
+        "command.task.build_fallback_decomposition".into(),
+        TASK_BUILD_FALLBACK_DECOMPOSITION_COMMAND.into(),
     );
     descriptor
         .metadata

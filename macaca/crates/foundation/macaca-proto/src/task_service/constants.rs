@@ -27,6 +27,9 @@ pub const TASK_BUILD_GOAL_EVALUATION_PROMPT_COMMAND: &str = "task.build_goal_eva
 /// Command name for parsing a goal evaluation response.
 pub const TASK_PARSE_GOAL_EVALUATION_COMMAND: &str = "task.parse_goal_evaluation";
 
+/// Command name for building a service-owned fallback decomposition plan.
+pub const TASK_BUILD_FALLBACK_DECOMPOSITION_COMMAND: &str = "task.build_fallback_decomposition";
+
 /// Command name for creating a high-level task goal.
 pub const TASK_CREATE_GOAL_COMMAND: &str = "task.create_goal";
 

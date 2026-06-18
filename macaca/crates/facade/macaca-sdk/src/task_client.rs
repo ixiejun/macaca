@@ -13,18 +13,19 @@ use tracing::info;
 
 use macaca_proto::{
     AgentTaskBoardResult, ApplicationId, BuildDecompositionPromptCommand,
-    BuildGoalEvaluationPromptCommand, ClaimTaskCommand, CompleteGoalCommand, CreateGoalCommand,
-    CreateTaskAssignmentCommand, FailTaskCommand, GoalEvaluationResult, MacacaError, MacacaResult,
+    BuildFallbackDecompositionCommand, BuildGoalEvaluationPromptCommand, ClaimTaskCommand,
+    CompleteGoalCommand, CreateGoalCommand, CreateTaskAssignmentCommand, FailTaskCommand,
+    FallbackDecompositionPlan, GoalEvaluationResult, MacacaError, MacacaResult,
     ParseGoalEvaluationCommand, QueryAgentTodosCommand, QueryTaskBoardCommand,
     QueryTaskClaimDiagnosticsCommand, QueryTaskGoalsCommand, QueryTaskProgressCommand,
     ResumeCoordinatorCommand, ReviewTaskCommand, SessionClaimDiagnostics, StartTaskCommand,
     SubmitReviewCommand, TaskGoalsResult, TaskProgressSummary, TaskPromptResult,
     TaskServiceSnapshot, TaskServiceSnapshotCommand, TodoGoal, TodoItem, TraceContext,
     TASK_AGENT_TODOS_COMMAND, TASK_BUILD_DECOMPOSITION_PROMPT_COMMAND,
-    TASK_BUILD_GOAL_EVALUATION_PROMPT_COMMAND, TASK_CLAIM_DIAGNOSTICS_COMMAND,
-    TASK_COMPLETE_GOAL_COMMAND, TASK_CREATE_ASSIGNMENT_COMMAND, TASK_CREATE_GOAL_COMMAND,
-    TASK_FAIL_COMMAND, TASK_GOALS_COMMAND, TASK_PARSE_GOAL_EVALUATION_COMMAND,
-    TASK_PROGRESS_COMMAND, TASK_QUERY_COMMAND, TASK_SERVICE_ID,
+    TASK_BUILD_FALLBACK_DECOMPOSITION_COMMAND, TASK_BUILD_GOAL_EVALUATION_PROMPT_COMMAND,
+    TASK_CLAIM_DIAGNOSTICS_COMMAND, TASK_COMPLETE_GOAL_COMMAND, TASK_CREATE_ASSIGNMENT_COMMAND,
+    TASK_CREATE_GOAL_COMMAND, TASK_FAIL_COMMAND, TASK_GOALS_COMMAND,
+    TASK_PARSE_GOAL_EVALUATION_COMMAND, TASK_PROGRESS_COMMAND, TASK_QUERY_COMMAND, TASK_SERVICE_ID,
 };
 
 pub use macaca_proto::TaskBoardQueryResult;
@@ -236,6 +237,23 @@ impl ServiceBackedTaskBoardDataSource {
             TASK_PARSE_GOAL_EVALUATION_COMMAND,
             command,
             "parse-goal-evaluation",
+        )
+        .await
+    }
+
+    /// Build a service-owned fallback decomposition plan through Task Service.
+    ///
+    /// The returned plan is pure data. Callers still create assignments through
+    /// `task.create_assignment`, keeping every task-board mutation traceable and
+    /// auditable while preventing shells from owning fallback planning rules.
+    pub async fn build_fallback_decomposition(
+        &self,
+        command: BuildFallbackDecompositionCommand,
+    ) -> MacacaResult<FallbackDecompositionPlan> {
+        self.call_task_service(
+            TASK_BUILD_FALLBACK_DECOMPOSITION_COMMAND,
+            command,
+            "build-fallback-decomposition",
         )
         .await
     }

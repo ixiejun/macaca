@@ -27,6 +27,16 @@ pub fn is_approved_terminal_exception_surface(relative: &str, token: &ForbiddenT
                 || relative.starts_with("crates/shells/macaca-web/src/framework_runner/traced_builders.rs")
                 || relative == "crates/shells/macaca-web/src/loop_manager/tests.rs"
         }
+        "shell-task-planning-semantic-owner" => {
+            // Shell adapters may reference service DTO and client method names
+            // while delegating to Task Service. They may not own local phase
+            // classifiers or keyword routing implementations.
+            relative == "crates/shells/macaca-web/src/loop_manager/decomposition_adapter.rs"
+                && token.token != "fallback_phase_for("
+                && token.token != "text.contains(\"research\")"
+                && token.token != "text.contains(\"analysis\")"
+                && token.token != "text.contains(\"review\")"
+        }
         "hardcoded-agent-role" => matches!(
             relative,
             "crates/application/macaca-app/src/consumption.rs"

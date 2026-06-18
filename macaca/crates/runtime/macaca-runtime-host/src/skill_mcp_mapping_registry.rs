@@ -10,7 +10,7 @@
 //! `$MACACA_HOME/skill_mcp_mappings.toml` or an explicit override path passed
 //! to [`SkillMcpMappingRegistry::load_with_override`].
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
@@ -205,16 +205,31 @@ impl SkillMcpMappingRegistry {
 
 impl SkillMcpMappingEntry {
     fn matches_skill(&self, skill: &SkillSnapshotEntry) -> bool {
+        // Request-local indexes keep the hot skill-install matching path O(n)
+        // for each mapping entry without introducing global cache invalidation
+        // or restart semantics. BTreeSet is deterministic for debug output and
+        // tests while still avoiding repeated linear scans of configured match
+        // package/bin vectors.
+        let package_index = self
+            .match_packages
+            .iter()
+            .map(String::as_str)
+            .collect::<BTreeSet<_>>();
+        let bin_index = self
+            .match_bins
+            .iter()
+            .map(String::as_str)
+            .collect::<BTreeSet<_>>();
         skill.install.iter().any(|install| {
             if let Some(pkg) = install.package.as_deref() {
-                if self.match_packages.iter().any(|p| p == pkg) {
+                if package_index.contains(pkg) {
                     return true;
                 }
             }
             install
                 .bins
                 .iter()
-                .any(|bin| self.match_bins.iter().any(|b| b == bin))
+                .any(|bin| bin_index.contains(bin.as_str()))
         })
     }
 
@@ -266,6 +281,11 @@ impl SkillMcpMappingEntry {
 
 /// Process-wide default registry containing bundled mappings only.
 pub fn default_skill_mcp_mapping_registry() -> &'static SkillMcpMappingRegistry {
+    // Lifecycle: bundled mapping data is immutable and process-wide. Host
+    // overrides must call `load_with_override` explicitly instead of mutating
+    // this registry, which keeps restart semantics simple and avoids hidden
+    // test coupling. The OnceLock contains declarative mapping records only,
+    // never app-specific runtime state.
     static REGISTRY: OnceLock<SkillMcpMappingRegistry> = OnceLock::new();
     REGISTRY.get_or_init(SkillMcpMappingRegistry::bundled)
 }
@@ -295,6 +315,18 @@ mod tests {
                 ..Default::default()
             }],
             mcp_servers: Vec::new(),
+        }
+    }
+
+    fn entry_with_bin(bin: &str) -> SkillSnapshotEntry {
+        SkillSnapshotEntry {
+            install: vec![SkillInstallSpec {
+                kind: "npm".into(),
+                package: None,
+                bins: vec![bin.into()],
+                ..Default::default()
+            }],
+            ..entry_with_pkg("unused")
         }
     }
 
@@ -329,6 +361,37 @@ mod tests {
         let registry = SkillMcpMappingRegistry::bundled();
         assert!(registry.policy_for_command("playwright-mcp").is_some());
         assert!(registry.policy_for_command("unrelated-bin").is_none());
+    }
+
+    #[test]
+    fn indexed_matching_preserves_mapping_order_and_bin_matches() {
+        let registry = SkillMcpMappingRegistry::from_toml(
+            r#"
+[[mappings]]
+id = "first"
+match_packages = []
+match_bins = ["shared-bin"]
+
+[mappings.server]
+transport = "stdio"
+command = "first"
+
+[[mappings]]
+id = "second"
+match_packages = []
+match_bins = ["shared-bin"]
+
+[mappings.server]
+transport = "stdio"
+command = "second"
+"#,
+        )
+        .expect("test mapping TOML should parse");
+
+        let resolved = registry
+            .resolve_for_skill(&entry_with_bin("shared-bin"))
+            .expect("bin match should resolve through the request-local index");
+        assert_eq!(resolved.id, "first");
     }
 
     #[test]

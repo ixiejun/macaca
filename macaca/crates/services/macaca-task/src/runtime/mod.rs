@@ -16,6 +16,7 @@
 mod assignment_commands;
 mod coordinator_commands;
 mod event_sink;
+mod fallback_decomposition;
 mod goal_commands;
 mod graph_admission;
 mod prompt_commands;
@@ -27,6 +28,7 @@ mod task_lifecycle_commands;
 mod tests;
 
 pub use event_sink::{InMemoryTaskServiceEventSink, TaskServiceEventSink};
+pub use fallback_decomposition::fallback_phase_for;
 pub use strategy::{NoopTaskServiceExecutionStrategy, TaskServiceExecutionStrategy};
 
 use std::collections::BTreeMap;
