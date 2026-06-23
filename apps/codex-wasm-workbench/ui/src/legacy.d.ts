@@ -14,16 +14,3 @@ declare module '../session_memento.js' {
     };
   }
 }
-
-declare module '../loop/controller.js' {
-  export class WorkbenchToolLoopController {
-    constructor(options: Record<string, unknown>);
-    run(input: Record<string, unknown>): Promise<Record<string, unknown>>;
-  }
-}
-
-declare module '../loop/llm_client.js' {
-  export class WorkbenchLlmClient {
-    constructor(options: Record<string, unknown>);
-  }
-}

@@ -15,8 +15,13 @@ pub const STANDARD_APP_DIRS: &[&str] = &[
     "../apps", // Relative to build directory
 ];
 
-/// Default application to auto-start if no app is specified.
-pub const DEFAULT_APP: &str = "fullstack-autodev";
+/// Environment key used by shells or tests that want an explicit default app.
+///
+/// The registry does not embed a concrete application name because the
+/// application framework is generic OS infrastructure. A caller that wants a
+/// default must provide one through configuration so packaged applications can
+/// remain fully replaceable without changing Macaca source code.
+pub const DEFAULT_APP_ENV: &str = "MACACA_DEFAULT_APP";
 
 /// Information about a discovered application (not yet loaded).
 #[derive(Debug, Clone)]
@@ -166,9 +171,31 @@ impl AppRegistry {
         self.discovered.values().collect()
     }
 
-    /// Get the default app by conventional application name.
+    /// Get the configured default app, if the host explicitly provided one.
+    ///
+    /// Returning `None` when the environment key is unset is intentional Null
+    /// Object behavior: OS infrastructure should not silently bind to a sample
+    /// or workspace-specific application. Callers that require a default can
+    /// set [`DEFAULT_APP_ENV`] or perform their own product-level selection.
     pub fn get_default_app(&self) -> Option<&DiscoveredApp> {
-        self.get_app_by_name(DEFAULT_APP)
+        let configured_name = std::env::var(DEFAULT_APP_ENV).ok()?;
+        let trimmed = configured_name.trim();
+        if trimmed.is_empty() {
+            tracing::debug!(
+                env_key = DEFAULT_APP_ENV,
+                "Configured default application name is empty"
+            );
+            return None;
+        }
+        let selected = self.get_app_by_name(trimmed);
+        if selected.is_none() {
+            tracing::warn!(
+                env_key = DEFAULT_APP_ENV,
+                app_name = trimmed,
+                "Configured default application was not discovered"
+            );
+        }
+        selected
     }
 
     /// Find a specific app directory by name.

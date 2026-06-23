@@ -3,12 +3,12 @@
 //! Hot-swaps kernel execution onto `service.agent_execution`, registers started applications,
 //! prepares per-app workspaces, and spawns the hook event consumer for fork-join auto-continue.
 
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use tracing::info;
 
 use crate::agent_context_backend::WebAgentContextBackend;
+use crate::application_shell_adapter::{app_runtime_agent_ids, select_app_scoped_agent_manifests};
 use crate::hook_consumer;
 use crate::skill_self_evolution_execution_observer::SkillSelfEvolutionObservedAgentExecutionBackend;
 use crate::web_agent_execution_adapters::build_composed_web_agent_execution_backend;
@@ -153,17 +153,26 @@ pub(crate) async fn run(ctx: &mut BootstrapCtx) -> MacacaResult<()> {
         let state_ref = Arc::clone(&state);
 
         tokio::spawn(async move {
-            // Get all agents from kernel, then register each executor with
-            // only the agents declared by that application.
-            let all_agents = kernel_ref.list_agents().await;
-            let agents_by_name: HashMap<_, _> =
-                all_agents.iter().map(|m| (m.name.clone(), m)).collect();
-
             // Register each app to executor registry
             for (app_id, app_name, app_agent_names) in apps_to_register {
-                let app_agents: Vec<AgentInfo> = app_agent_names
+                // Resolve the app-owned runtime ids before constructing the
+                // executor sandbox. Agent names are application-local and can
+                // repeat across installed apps; selecting by runtime ids keeps
+                // status updates, Task Board routing, and executor broadcasts
+                // aligned with the same kernel manifests.
+                let runtime_agent_ids = app_runtime_agent_ids(
+                    &state_ref,
+                    &app_id,
+                    "web-startup-executor-runtime-agent-ids",
+                )
+                .await;
+                let app_manifests = select_app_scoped_agent_manifests(
+                    kernel_ref.list_agents().await,
+                    &runtime_agent_ids,
+                    Some(&app_agent_names),
+                );
+                let app_agents: Vec<AgentInfo> = app_manifests
                     .iter()
-                    .filter_map(|name| agents_by_name.get(name.as_str()).copied())
                     .map(|m| AgentInfo {
                         id: m.id.0.to_string(),
                         name: m.name.clone(),

@@ -81,7 +81,7 @@ pub use package::{
     AppPackageDescriptorBuilder,
 };
 pub use package_loader::{PackageLoaderFactory, PackageLoaderKind};
-pub use registry::{AppRegistry, DiscoveredApp, DEFAULT_APP, STANDARD_APP_DIRS};
+pub use registry::{AppRegistry, DiscoveredApp, DEFAULT_APP_ENV, STANDARD_APP_DIRS};
 pub use runtime::{
     AppRuntime, AppRuntimeBuilder, ApplicationRuntimeFactory, DefaultApplicationRuntimeFactory,
 };

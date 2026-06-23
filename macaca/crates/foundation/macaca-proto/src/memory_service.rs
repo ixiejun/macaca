@@ -77,7 +77,7 @@ mod tests {
         });
 
         let command: MemoryRememberCommand =
-            serde_json::from_value(payload).expect("legacy memory command shape should decode");
+            serde_json::from_value(payload).expect("memory command shape should decode");
         assert_eq!(command.content, "remember this");
         assert_eq!(
             command.scope.identity.application_id,

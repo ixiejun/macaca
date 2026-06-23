@@ -28,6 +28,7 @@ use tokio::sync::mpsc;
 
 use crate::agent_execution_evidence::{observed_agent_execution_events, stable_agent_output_hash};
 use crate::application_execution_agent_event_bridge::ApplicationExecutionAgentEventMirror;
+use crate::application_shell_adapter::resolve_app_scoped_agent_manifest;
 use crate::framework_agent_construction_shell_adapter::WebFrameworkAgentMaterializationPort;
 use crate::framework_runner::RuntimeExecutionControl;
 use crate::runtime_event_bridge::emit_execution_control_events;
@@ -64,16 +65,19 @@ impl WebAgentExecutionHostAdapter {
         command: &AgentExecutionCommand,
         activity: AgentActivity,
     ) {
-        if let Some(manifest) = self
-            .state
-            .kernel
-            .get_agent_by_name(&command.target_agent)
-            .await
-        {
+        if let Some(manifest) = resolve_app_scoped_agent_manifest(&self.state, command).await {
+            let agent_id = manifest.id;
             self.state
                 .kernel
-                .update_agent_activity(&manifest.id, activity)
+                .update_agent_activity(&agent_id, activity)
                 .await;
+            tracing::info!(
+                application_id = %command.application_id,
+                session_id = %command.session_id,
+                target_agent = %command.target_agent,
+                agent_id = %agent_id.0,
+                "agent execution updated app-scoped kernel activity"
+            );
         } else {
             tracing::warn!(
                 application_id = %command.application_id,

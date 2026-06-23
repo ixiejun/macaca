@@ -53,7 +53,7 @@ export function WorkbenchApp() {
   }, []);
 
   useEffect(() => {
-    if (!state.debugToolLoop && state.sessionId) {
+    if (state.sessionId) {
       void replayEvents().then(refreshCurrentState).then(refreshCollaborationState).then(openExecutionWebSocket).catch((error) => appendEvent('bridge_error', { error: errorMessage(error) }));
     }
     // This effect should run only for the first restored session. Later session
@@ -136,10 +136,6 @@ export function WorkbenchApp() {
       appendEvent('bridge_error', { error: 'Task prompt is required.' });
       return;
     }
-    if (stateRef.current.debugToolLoop) {
-      await startDebugToolLoop(prompt);
-      return;
-    }
     const commandId = beginNewExecutionSession();
     applyPatch({ running: true, eventCursor: null, currentState: null, result: '', events: [], tokenSummary: 'Starting through service.application_execution...' });
     closeExecutionSocket(false);
@@ -178,45 +174,12 @@ export function WorkbenchApp() {
     }
   }
 
-  async function startDebugToolLoop(prompt: string) {
-    beginNewDebugSession();
-    applyPatch({ running: true, result: '', events: [], tokenSummary: 'Running debug-only browser loop...' });
-    try {
-      const [{ WorkbenchToolLoopController }, { WorkbenchLlmClient }] = await Promise.all([
-        import('../loop/controller.js'),
-        import('../loop/llm_client.js'),
-      ]);
-      const llmClient = new WorkbenchLlmClient({
-        callService: (serviceId: string, operation: string, payload: Record<string, unknown>) => callService(bridgeRef.current, serviceId, operation, payload),
-        applicationIdProvider: applicationIdFromLocation,
-        sessionIdProvider: () => stateRef.current.sessionId,
-      });
-      const toolLoop = new WorkbenchToolLoopController({
-        llmClient,
-        callService: (serviceId: string, operation: string, payload: Record<string, unknown>) => callService(bridgeRef.current, serviceId, operation, payload),
-        declaredServices,
-        eventSink: appendEvent,
-      });
-      const result = await toolLoop.run({ task: prompt, model: selectedModelReference(), route: stateRef.current.route, availableServices: new Set(declaredServices) });
-      if (result.status !== 'complete') appendEvent('loop_failed', result);
-    } catch (error) {
-      appendEvent('bridge_error', { error: errorMessage(error) });
-    }
-  }
-
   function beginNewExecutionSession() {
     const commandId = crypto.randomUUID();
     if (stateRef.current.sessionId) mementosRef.current.save(stateRef.current);
     applyPatch({ commandId, sessionId: `workbench-${commandId}`, runId: `run-${commandId}` });
     console.info('[codex-wasm-workbench] new execution session allocated', { command_id: commandId });
     return commandId;
-  }
-
-  function beginNewDebugSession() {
-    const commandId = crypto.randomUUID();
-    if (stateRef.current.sessionId) mementosRef.current.save(stateRef.current);
-    applyPatch({ commandId, sessionId: `workbench-debug-${commandId}`, runId: null });
-    console.info('[codex-wasm-workbench] new debug session allocated', { command_id: commandId });
   }
 
   function openExecutionWebSocket() {
@@ -275,20 +238,12 @@ export function WorkbenchApp() {
         currentState: (replay.current_state as WorkbenchState['currentState']) || stateRef.current.currentState,
       });
     } else {
-      await loadGenericSessionHistoryEvents();
+      // The application execution service is the only authoritative timeline
+      // source for Workbench runs.  Older generic session events are not
+      // promoted into execution history here because doing so creates a second
+      // replay path that cannot prove the same run/cursor invariants.
+      applyPatch({ events: [], currentState: (replay.current_state as WorkbenchState['currentState']) || stateRef.current.currentState });
     }
-  }
-
-  async function loadGenericSessionHistoryEvents() {
-    if (!stateRef.current.sessionId) return;
-    const eventsOutput = await callSessionRead(bridgeRef.current, 'events', { session_id: stateRef.current.sessionId, limit: 1000 });
-    const sessionEvents = Array.isArray(eventsOutput.events) ? eventsOutput.events.map((event) => ({ type: 'session_event', data: event as Record<string, unknown>, at: new Date().toISOString() })) : [];
-    // Generic session events are a fallback for sessions that exist before the
-    // application-execution replay API has materialized records.  They must be
-    // cached in the same app-owned state path as normal execution events so the
-    // Workbench can rehydrate after browser refresh without asking Macaca OS to
-    // know application UI details.
-    applyPatch({ events: sessionEvents });
   }
 
   async function refreshCurrentState() {
@@ -370,7 +325,7 @@ export function WorkbenchApp() {
       running: snapshot.running,
       tokenSummary: snapshot.tokenSummary || 'No run yet',
     });
-    if (!stateRef.current.debugToolLoop && snapshot.sessionId) {
+    if (snapshot.sessionId) {
       try {
         await replayEvents();
         await refreshCurrentState();
@@ -439,7 +394,7 @@ function Thread({ state }: { state: WorkbenchState }) {
 function Diagnostics({ state }: { state: WorkbenchState }) {
   const errors = state.events.filter((entry) => entry.type === 'error' || entry.type === 'bridge_error').length;
   const toolResults = state.events.filter((entry) => entry.type === 'tool_result').length;
-  const diagnostics = [`Bridge: ${window.parent === window ? 'unhosted' : 'hosted iframe'}`, `Tool results: ${toolResults}`, `Errors: ${errors}`, state.route ? `Route: ${state.route.provider_id}:${state.route.model}` : 'Route: unresolved', state.eventCursor ? `Replay cursor: ${state.eventCursor}` : 'Replay cursor: none', state.debugToolLoop ? 'Debug loop: enabled' : 'Debug loop: disabled'];
+  const diagnostics = [`Bridge: ${window.parent === window ? 'unhosted' : 'hosted iframe'}`, `Tool results: ${toolResults}`, `Errors: ${errors}`, state.route ? `Route: ${state.route.provider_id}:${state.route.model}` : 'Route: unresolved', state.eventCursor ? `Replay cursor: ${state.eventCursor}` : 'Replay cursor: none', 'Execution: service.application_execution'];
   return <section className="diagnostics-panel"><h2>Diagnostics</h2><ul>{diagnostics.map((item) => <li key={item}>{item}</li>)}</ul></section>;
 }
 

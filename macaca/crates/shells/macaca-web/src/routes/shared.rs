@@ -7,8 +7,7 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 
 use macaca_proto::{
-    AgentId, AgentManifest, ApplicationId, ApplicationMetadataQueryCommand, MacacaError,
-    ProtoErrorAdapter, TraceContext,
+    ApplicationId, ApplicationMetadataQueryCommand, MacacaError, ProtoErrorAdapter, TraceContext,
 };
 
 use crate::state::AppState;
@@ -105,56 +104,6 @@ pub(crate) fn entry_agent_activity_override(
     }
 }
 
-/// Select the application-scoped agent manifests that should be rendered by Web.
-///
-/// Application Service metadata is the authoritative app boundary for declared
-/// agent names, but the kernel registry can contain multiple manifests with
-/// the same name while applications are reloaded.  A pure name filter
-/// would leak those global or stale agents into one application's UI.  This
-/// helper implements a small Adapter over the registry: it preserves the
-/// Application Service order, returns at most one manifest per declared name,
-/// and prefers manifests whose id is also bound to the application runtime.
-pub(crate) fn select_app_scoped_agent_manifests(
-    manifests: Vec<AgentManifest>,
-    runtime_agent_ids: &[AgentId],
-    service_agent_names: Option<&[String]>,
-) -> Vec<AgentManifest> {
-    let runtime_agent_ids: std::collections::HashSet<AgentId> =
-        runtime_agent_ids.iter().copied().collect();
-
-    if let Some(service_agent_names) = service_agent_names {
-        let mut selected = Vec::with_capacity(service_agent_names.len());
-        let mut consumed_names = std::collections::HashSet::new();
-
-        for declared_name in service_agent_names {
-            if !consumed_names.insert(declared_name.as_str()) {
-                continue;
-            }
-
-            let preferred = manifests
-                .iter()
-                .find(|manifest| {
-                    manifest.name == *declared_name && runtime_agent_ids.contains(&manifest.id)
-                })
-                .or_else(|| {
-                    manifests
-                        .iter()
-                        .find(|manifest| manifest.name == *declared_name)
-                });
-
-            if let Some(manifest) = preferred {
-                selected.push(manifest.clone());
-            }
-        }
-
-        return selected;
-    }
-
-    manifests
-        .into_iter()
-        .filter(|manifest| runtime_agent_ids.contains(&manifest.id))
-        .collect()
-}
 // ---------------------------------------------------------------------------
 // Catch-all
 // ---------------------------------------------------------------------------

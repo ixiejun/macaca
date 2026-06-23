@@ -40,6 +40,15 @@ test("production UI still uses service.application_execution operations", () => 
   assert.match(appSource, /callAppExecution\(bridgeRef\.current, 'control'/);
   assert.match(appSource, /new WebSocket/);
   assert.doesNotMatch(appSource, /new EventSource/);
+  assert.doesNotMatch(appSource, /import\('\.\.\/loop\/controller\.js'\)/);
+  assert.doesNotMatch(appSource, /startDebugToolLoop/);
+});
+
+test("execution replay uses application execution projection as the only timeline source", () => {
+  assert.match(appSource, /callAppExecution\(bridgeRef\.current, 'replay'/);
+  assert.doesNotMatch(appSource, /callSessionRead\(bridgeRef\.current, 'events'/);
+  assert.doesNotMatch(appSource, /loadGenericSessionHistoryEvents/);
+  assert.doesNotMatch(appSource, /type: 'session_event'/);
 });
 
 test("each submitted task receives a fresh execution session", () => {

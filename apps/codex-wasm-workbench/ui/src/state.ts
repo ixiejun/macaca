@@ -21,7 +21,6 @@ export function createInitialState(): WorkbenchState {
     models: [],
     route: null,
     tokenSummary: 'No run yet',
-    debugToolLoop: params.get('debug_tool_loop') === '1',
     taskBoard: [],
     agents: [],
   };
@@ -60,7 +59,7 @@ export function workbenchReducer(state: WorkbenchState, action: WorkbenchAction)
     const data = event.data as Record<string, unknown>;
     next.result = String(data?.content || '');
     next.running = false;
-    next.tokenSummary = 'Completed through debug LLM/tool loop';
+    next.tokenSummary = 'Completed through application execution';
   }
   if (event.type === 'loop_failed' || event.type === 'bridge_error') next.running = false;
   return next;

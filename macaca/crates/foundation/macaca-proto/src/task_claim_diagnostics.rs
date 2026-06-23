@@ -31,9 +31,9 @@ pub struct ClaimGate {
     pub gate_kind: String,
     /// For `blocked`: dependencies not in `Completed` state.
     ///
-    /// Older and empty claimable gates omit this field from JSON to keep the
-    /// shell payload compact. Deserialization still defaults it to an empty
-    /// vector so service-call round trips remain forward compatible.
+    /// Empty claimable gates omit this field from JSON to keep the shell
+    /// payload compact. Deserialization still defaults it to an empty vector so
+    /// service-call round trips remain stable as the DTO evolves.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub incomplete_dependencies: Vec<DependencySnap>,
 }

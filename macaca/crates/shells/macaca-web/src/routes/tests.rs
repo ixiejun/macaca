@@ -2,8 +2,8 @@ use crate::source_artifact::resolve_source_artifact_ref;
 use chrono::Utc;
 use macaca_proto::{AgentId, AgentManifest, AgentState, Capability, Permission, PermissionLevel};
 
-use super::shared::select_app_scoped_agent_manifests;
 use super::todos::{required_session_id, SessionQuery};
+use crate::application_shell_adapter::select_app_scoped_agent_manifests;
 
 /// Provider-neutral fixture agent names for manifest dedup tests (Object Mother).
 const FIXTURE_ENTRY_AGENT: &str = "entry-agent";

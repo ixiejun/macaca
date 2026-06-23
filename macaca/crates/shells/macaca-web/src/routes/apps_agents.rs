@@ -1,5 +1,6 @@
 //! Per-application agent listing and SSE status stream routes.
 
+use std::collections::HashMap;
 use std::convert::Infallible;
 use std::sync::Arc;
 
@@ -9,12 +10,13 @@ use axum::response::sse::{Event, Sse};
 use axum::Json;
 use serde::Serialize;
 
+use crate::application_shell_adapter::{app_runtime_agent_ids, select_app_scoped_agent_manifests};
 use crate::state::AppState;
 
 use super::apps::{service_metadata_view, service_status_views};
 use super::shared::{
-    app_entry_agent_name, app_has_active_session, entry_agent_activity_override,
-    select_app_scoped_agent_manifests, AgentStatusQuery, ErrorResponse,
+    app_entry_agent_name, app_has_active_session, entry_agent_activity_override, AgentStatusQuery,
+    ErrorResponse,
 };
 
 // ---------------------------------------------------------------------------
@@ -43,6 +45,77 @@ pub struct AgentActivityInfo {
     pub context: Option<String>,
     /// Secondary context (tool purpose, wait reason, etc.).
     pub detail: Option<String>,
+}
+
+/// Application-scoped runtime projection used by both polling and SSE routes.
+///
+/// The Application Service owns the sanitized list of agent names declared by
+/// the application, while the kernel owns live runtime status keyed by
+/// `AgentId`.  This helper is the route-layer Adapter between those two
+/// provider-neutral views: it first selects the manifests that belong to the
+/// application boundary and then uses the selected ids to fetch runtime
+/// activity.  Keeping the join in one place prevents the HTTP route and the SSE
+/// route from drifting back to an empty-id status query, which would make every
+/// working agent render as idle.
+struct AppAgentRuntimeProjection {
+    manifests: Vec<macaca_proto::AgentManifest>,
+    statuses_by_id: HashMap<String, macaca_proto::AgentRuntimeStatus>,
+}
+
+impl AppAgentRuntimeProjection {
+    async fn load(
+        state: &Arc<AppState>,
+        app_id: &macaca_proto::ApplicationId,
+        service_agent_names: &[String],
+        trace_id: &'static str,
+    ) -> Self {
+        let runtime_agent_ids = app_runtime_agent_ids(state, app_id, trace_id).await;
+        let manifests = select_app_scoped_agent_manifests(
+            state.kernel.list_agents().await,
+            &runtime_agent_ids,
+            Some(service_agent_names),
+        );
+        let agent_ids = manifests
+            .iter()
+            .map(|manifest| manifest.id)
+            .collect::<Vec<_>>();
+        let statuses = state.kernel.list_agent_statuses_for(&agent_ids).await;
+        let statuses_by_id: HashMap<String, macaca_proto::AgentRuntimeStatus> = statuses
+            .into_iter()
+            .map(|status| (status.agent_id.0.to_string(), status))
+            .collect();
+
+        tracing::info!(
+            trace_id,
+            declared_agent_count = service_agent_names.len(),
+            runtime_agent_id_count = runtime_agent_ids.len(),
+            selected_agent_count = manifests.len(),
+            status_count = statuses_by_id.len(),
+            "projected application-scoped agent runtime statuses"
+        );
+
+        Self {
+            manifests,
+            statuses_by_id,
+        }
+    }
+
+    fn activity_for(
+        &self,
+        manifest: &macaca_proto::AgentManifest,
+    ) -> (macaca_proto::AgentActivity, Option<String>) {
+        self.statuses_by_id
+            .get(&manifest.id.0.to_string())
+            .map(|status| (status.activity.clone(), status.current_task.clone()))
+            .unwrap_or_else(|| (macaca_proto::AgentActivity::Idle, None))
+    }
+
+    fn state_for(&self, manifest: &macaca_proto::AgentManifest) -> macaca_proto::AgentState {
+        self.statuses_by_id
+            .get(&manifest.id.0.to_string())
+            .map(|status| status.state)
+            .unwrap_or(manifest.state)
+    }
 }
 
 impl From<macaca_proto::AgentActivity> for AgentActivityInfo {
@@ -111,49 +184,46 @@ pub async fn get_app_agents(
             }),
         ));
     };
-    let agent_ids = Vec::new();
-
-    // Get manifests from kernel
-    let manifests = state.kernel.list_agents().await;
-
-    // Get runtime statuses
-    let statuses = state.kernel.list_agent_statuses_for(&agent_ids).await;
-    let status_map: std::collections::HashMap<String, _> = statuses
-        .into_iter()
-        .map(|s| (s.agent_id.0.to_string(), s))
-        .collect();
+    let projection = AppAgentRuntimeProjection::load(
+        &state,
+        &app_id,
+        &service_agent_names,
+        "web-route-app-agents-runtime-status",
+    )
+    .await;
     let has_active_session =
         app_has_active_session(&state, &app_id, query.session_id.as_deref()).await;
     let entry_agent_name = app_entry_agent_name(&state, &app_id).await;
 
-    let agents: Vec<AgentInfo> =
-        select_app_scoped_agent_manifests(manifests, &agent_ids, Some(&service_agent_names))
-            .into_iter()
-            .map(|m| {
-                let id_str = m.id.0.to_string();
-                let (raw_activity, current_task) = status_map
-                    .get(&id_str)
-                    .map(|s| (s.activity.clone(), s.current_task.clone()))
-                    .unwrap_or_else(|| (macaca_proto::AgentActivity::Idle, None));
-                let activity = entry_agent_activity_override(
-                    entry_agent_name.as_deref(),
-                    &m.name,
-                    has_active_session,
-                    raw_activity,
-                )
-                .into();
+    let agents: Vec<AgentInfo> = projection
+        .manifests
+        .iter()
+        .map(|m| {
+            let id_str = m.id.0.to_string();
+            let (raw_activity, current_task) = projection.activity_for(m);
+            let activity = entry_agent_activity_override(
+                entry_agent_name.as_deref(),
+                &m.name,
+                has_active_session,
+                raw_activity,
+            )
+            .into();
 
-                AgentInfo {
-                    id: id_str,
-                    name: m.name.clone(),
-                    state: format!("{:?}", m.state),
-                    activity,
-                    capabilities: m.capabilities.into_iter().map(|c| c.name).collect(),
-                    is_active: m.state == macaca_proto::AgentState::Running,
-                    current_task,
-                }
-            })
-            .collect();
+            AgentInfo {
+                id: id_str,
+                name: m.name.clone(),
+                state: format!("{:?}", projection.state_for(m)),
+                activity,
+                capabilities: m
+                    .capabilities
+                    .iter()
+                    .map(|capability| capability.name.clone())
+                    .collect(),
+                is_active: projection.state_for(m) == macaca_proto::AgentState::Running,
+                current_task,
+            }
+        })
+        .collect();
 
     Ok(Json(agents))
 }
@@ -208,31 +278,23 @@ pub async fn stream_agent_status(
                         .data(r#"{"error":"application agents are unavailable"}"#));
                     return;
             };
-            let agent_ids = Vec::new();
-
-            // Get manifests
-            let manifests = state_clone.kernel.list_agents().await;
-            let statuses = state_clone.kernel.list_agent_statuses_for(&agent_ids).await;
-            let status_map: std::collections::HashMap<String, _> = statuses
-                .into_iter()
-                .map(|s| (s.agent_id.0.to_string(), s))
-                .collect();
+            let projection = AppAgentRuntimeProjection::load(
+                &state_clone,
+                &app_id,
+                &service_agent_names,
+                "web-route-app-agent-stream-runtime-status",
+            ).await;
             let has_active_session =
                 app_has_active_session(&state_clone, &app_id, scoped_session_id.as_deref()).await;
             let entry_agent_name = app_entry_agent_name(&state_clone, &app_id).await;
 
             // Build simplified status
-            let agents: Vec<SimpleAgentStatus> = select_app_scoped_agent_manifests(
-                manifests,
-                &agent_ids,
-                Some(&service_agent_names),
-            )
-            .into_iter()
+            let agents: Vec<SimpleAgentStatus> = projection
+                .manifests
+                .iter()
                 .map(|m| {
                     let id_str = m.id.0.to_string();
-                    let raw_activity = status_map.get(&id_str)
-                        .map(|s| s.activity.clone())
-                        .unwrap_or(macaca_proto::AgentActivity::Idle);
+                    let (raw_activity, current_task) = projection.activity_for(m);
                     let activity = entry_agent_activity_override(
                         entry_agent_name.as_deref(),
                         &m.name,
@@ -248,9 +310,9 @@ pub async fn stream_agent_status(
 
                     SimpleAgentStatus {
                         id: id_str,
-                        name: m.name,
+                        name: m.name.clone(),
                         status,
-                        detail,
+                        detail: detail.or(current_task),
                     }
                 })
                 .collect();

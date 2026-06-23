@@ -10,6 +10,7 @@ use macaca_proto::{
     ApplicationStatusCommand, TraceContext,
 };
 
+use crate::application_shell_adapter::{app_runtime_agent_ids, select_app_scoped_agent_manifests};
 use crate::session_loop_shell_adapter::{
     shutdown_session_loops_via_execution_control, REASON_SESSION_LOOP_APPLICATION_CLEANUP,
 };
@@ -145,10 +146,15 @@ pub(crate) async fn ensure_app_executor(
         }
     };
 
-    let all_agents = state.kernel.list_agents().await;
-    let app_agents: Vec<AgentInfo> = all_agents
+    let runtime_agent_ids =
+        app_runtime_agent_ids(state, app_id, "web-chat-executor-runtime-agent-ids").await;
+    let app_manifests = select_app_scoped_agent_manifests(
+        state.kernel.list_agents().await,
+        &runtime_agent_ids,
+        Some(&app_agent_names),
+    );
+    let app_agents: Vec<AgentInfo> = app_manifests
         .into_iter()
-        .filter(|agent| app_agent_names.is_empty() || app_agent_names.contains(&agent.name))
         .map(|agent| AgentInfo {
             id: agent.id.0.to_string(),
             name: agent.name,

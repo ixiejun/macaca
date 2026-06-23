@@ -6,10 +6,11 @@
 
 use std::sync::Arc;
 
-use macaca_app::{expand_service_capabilities, AppServiceContractConfig, DomainPackCatalog};
+use macaca_app::{expand_service_capabilities, AppServiceContractConfig};
 use macaca_domain_pack_finance::{
     finance_domain_pack_registrations, finance_pack_catalog_definition, FINANCE_PACK_ID,
 };
+use macaca_llm::LlmProvider;
 use macaca_runtime_host::{bootstrap_domain_pack_services, ServiceRuntime, ServiceRuntimeConfig};
 
 /// Mirror the web composition-root catalog assembly for integration coverage.
@@ -43,7 +44,7 @@ async fn web_provider_registrations_start_all_finance_services() {
     struct FixtureLlm;
 
     #[async_trait::async_trait]
-    impl macaca_sdk::llm::LlmProvider for FixtureLlm {
+    impl LlmProvider for FixtureLlm {
         fn name(&self) -> &str {
             "fixture-llm"
         }
@@ -69,7 +70,7 @@ async fn web_provider_registrations_start_all_finance_services() {
     }
 
     let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
-    let llm: Arc<dyn macaca_sdk::llm::LlmProvider> = Arc::new(FixtureLlm);
+    let llm: Arc<dyn LlmProvider> = Arc::new(FixtureLlm);
     let registrations = finance_domain_pack_registrations(llm);
     assert_eq!(registrations.len(), 4);
 

@@ -79,7 +79,6 @@ export type WorkbenchState = {
   models: ModelInfo[];
   route: ModelRoute | null;
   tokenSummary: string;
-  debugToolLoop: boolean;
   taskBoard: TaskBoardItem[];
   agents: AgentStatusItem[];
 };

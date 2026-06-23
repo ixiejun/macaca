@@ -2,7 +2,7 @@
 //!
 //! These types define the isolation envelope for every memory command. Keeping
 //! validation beside the scope DTO makes boundary rules auditable and prevents
-//! individual providers from inventing incompatible visibility semantics.
+//! individual providers from inventing divergent visibility semantics.
 
 use std::collections::BTreeMap;
 
