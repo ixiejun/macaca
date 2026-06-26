@@ -87,6 +87,7 @@ fn service_app_view_contains_effective_service_diagnostics() {
         required_services: vec!["service.custom.required".into()],
         optional_services: vec![],
         service_policy_overrides: Default::default(),
+        ..Default::default()
     });
     let view = app_manifest_to_service_app_view(&manifest, None, AppStatus::Loaded);
     assert!(view

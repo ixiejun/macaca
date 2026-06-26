@@ -86,6 +86,7 @@ fn yaml_projection_synthesizes_wasm_runtime_ability_from_service_contract() {
             required_services: vec!["service.custom.required".into()],
             optional_services: Vec::new(),
             service_policy_overrides: Default::default(),
+            ..Default::default()
         }),
         execution_profile: None,
         workbench: None,

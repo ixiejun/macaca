@@ -6,7 +6,10 @@
 
 use std::collections::BTreeSet;
 
-use macaca_proto::DomainPackDefinition;
+use macaca_proto::{
+    DomainPackDataGovernance, DomainPackDefinition, DomainPackDiagnostics, DomainPackMetadata,
+    DomainPackSdkMetadata, DomainPackStability,
+};
 
 use crate::contract::{
     FINANCE_FINANCIALS_SERVICE_ID, FINANCE_LLM_ANALYSIS_SERVICE_ID, FINANCE_MARKET_DATA_SERVICE_ID,
@@ -18,13 +21,34 @@ use crate::contract::{
 /// Composition roots merge this into their `DomainPackCatalog` when the finance
 /// optional package is installed.  Base OS catalogs remain empty by default.
 pub fn finance_pack_catalog_definition() -> DomainPackDefinition {
-    DomainPackDefinition {
-        pack_id: FINANCE_PACK_ID.into(),
-        services: BTreeSet::from([
+    DomainPackDefinition::with_metadata(
+        FINANCE_PACK_ID,
+        DomainPackMetadata {
+            family_id: "finance".into(),
+            version: "v1".into(),
+            stability: DomainPackStability::Preview,
+            data_governance: DomainPackDataGovernance {
+                classification: "market_reference".into(),
+                retention_policy: "bounded_audit_metadata_only".into(),
+                redaction_policy: "no_raw_provider_payloads".into(),
+            },
+            sdk: DomainPackSdkMetadata {
+                client_namespace: "finance".into(),
+                docs_url: "https://macaca.local/docs/packs/finance".into(),
+                examples: vec!["Declare `pack.finance.v1` and call typed finance services.".into()],
+            },
+            diagnostics: DomainPackDiagnostics {
+                health_probe: "service.health".into(),
+                unavailable_reason: "finance domain pack provider is not installed".into(),
+                replay_schema: "trace.domain_pack.finance.v1".into(),
+            },
+            ..Default::default()
+        },
+        BTreeSet::from([
             FINANCE_MARKET_DATA_SERVICE_ID.into(),
             FINANCE_FINANCIALS_SERVICE_ID.into(),
             FINANCE_NEWS_DIGEST_SERVICE_ID.into(),
             FINANCE_LLM_ANALYSIS_SERVICE_ID.into(),
         ]),
-    }
+    )
 }

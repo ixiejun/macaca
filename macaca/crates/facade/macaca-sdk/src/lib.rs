@@ -89,8 +89,12 @@ pub use builder::AgentBuilder;
 pub use config::AgentConfig;
 pub use domain_pack_bridge::{
     compose_installed_domain_pack_catalog, empty_domain_pack_catalog, expand_service_capabilities,
-    AppServiceContractConfig, DomainPackCatalog, DomainPackDefinition,
-    EffectiveServiceCapabilities, InMemoryDomainPackCatalog, SharedDomainPackCatalog,
+    AppPackPolicyOverride, AppServiceContractConfig, AppServiceContractSpec,
+    AppServicePolicyOverride, DomainPackCatalog, DomainPackCompatibility, DomainPackDataGovernance,
+    DomainPackDefinition, DomainPackDefinitionSpec, DomainPackDiagnostics, DomainPackHierarchySpec,
+    DomainPackIdentitySpec, DomainPackMetadata, DomainPackPolicyTemplate, DomainPackSdkMetadata,
+    DomainPackStability, EffectiveServiceCapabilities, InMemoryDomainPackCatalog,
+    SharedDomainPackCatalog,
 };
 pub use driver_client::{
     ServiceBackedDriverClient, SystemDriverClient, UnavailableSystemDriverClient,

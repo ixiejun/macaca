@@ -24,6 +24,8 @@ pub mod runtime;
 pub mod runtime_guard;
 pub mod service_adapter;
 pub mod service_admission;
+#[cfg(test)]
+mod service_admission_tests;
 pub mod service_capability;
 pub mod service_projection;
 pub mod skills;
@@ -96,9 +98,12 @@ pub use service_admission::{
     ApplicationTraceSpec,
 };
 pub use service_capability::{
-    expand_service_capabilities, AppServiceContractConfig, AppServicePolicyOverride,
-    DomainPackCatalog, DomainPackDefinition, EffectiveServiceCapabilities,
-    InMemoryDomainPackCatalog,
+    expand_service_capabilities, AppPackPolicyOverride, AppServiceContractConfig,
+    AppServiceContractSpec, AppServicePolicyOverride, DomainPackCatalog, DomainPackCompatibility,
+    DomainPackDataGovernance, DomainPackDefinition, DomainPackDefinitionSpec,
+    DomainPackDiagnostics, DomainPackHierarchySpec, DomainPackIdentitySpec, DomainPackMetadata,
+    DomainPackPolicyTemplate, DomainPackSdkMetadata, DomainPackStability,
+    EffectiveServiceCapabilities, InMemoryDomainPackCatalog,
 };
 pub use service_projection::{
     app_manifest_to_heartbeat_agent_views, app_manifest_to_metadata_view,

@@ -15,6 +15,10 @@
 /// Canonical domain-pack contract types and expansion helpers (proto-owned).
 pub use macaca_proto::{
     compose_installed_domain_pack_catalog, empty_domain_pack_catalog, expand_service_capabilities,
-    AppServiceContractConfig, AppServicePolicyOverride, DomainPackCatalog, DomainPackDefinition,
-    EffectiveServiceCapabilities, InMemoryDomainPackCatalog, SharedDomainPackCatalog,
+    AppPackPolicyOverride, AppServiceContractConfig, AppServiceContractSpec,
+    AppServicePolicyOverride, DomainPackCatalog, DomainPackCompatibility, DomainPackDataGovernance,
+    DomainPackDefinition, DomainPackDefinitionSpec, DomainPackDiagnostics, DomainPackHierarchySpec,
+    DomainPackIdentitySpec, DomainPackMetadata, DomainPackPolicyTemplate, DomainPackSdkMetadata,
+    DomainPackStability, EffectiveServiceCapabilities, InMemoryDomainPackCatalog,
+    SharedDomainPackCatalog,
 };

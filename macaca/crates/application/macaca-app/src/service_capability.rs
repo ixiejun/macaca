@@ -5,7 +5,10 @@
 //! package crates can share the same types without depending on `macaca-app`.
 
 pub use macaca_proto::{
-    expand_service_capabilities, AppServiceContractConfig, AppServicePolicyOverride,
-    DomainPackCatalog, DomainPackDefinition, EffectiveServiceCapabilities,
-    InMemoryDomainPackCatalog,
+    expand_service_capabilities, AppPackPolicyOverride, AppServiceContractConfig,
+    AppServiceContractSpec, AppServicePolicyOverride, DomainPackCatalog, DomainPackCompatibility,
+    DomainPackDataGovernance, DomainPackDefinition, DomainPackDefinitionSpec,
+    DomainPackDiagnostics, DomainPackHierarchySpec, DomainPackIdentitySpec, DomainPackMetadata,
+    DomainPackPolicyTemplate, DomainPackSdkMetadata, DomainPackStability,
+    EffectiveServiceCapabilities, InMemoryDomainPackCatalog,
 };
