@@ -98,12 +98,14 @@ pub use service_admission::{
     ApplicationTraceSpec,
 };
 pub use service_capability::{
-    expand_service_capabilities, AppPackPolicyOverride, AppServiceContractConfig,
-    AppServiceContractSpec, AppServicePolicyOverride, DomainPackCatalog, DomainPackCompatibility,
-    DomainPackDataGovernance, DomainPackDefinition, DomainPackDefinitionSpec,
-    DomainPackDiagnostics, DomainPackHierarchySpec, DomainPackIdentitySpec, DomainPackMetadata,
-    DomainPackPolicyTemplate, DomainPackSdkMetadata, DomainPackStability,
-    EffectiveServiceCapabilities, InMemoryDomainPackCatalog,
+    developer_pack_definition, expand_service_capabilities, foundation_pack_definition,
+    knowledge_pack_definition, reference_domain_pack_definitions, AppPackPolicyOverride,
+    AppServiceContractConfig, AppServiceContractSpec, AppServicePolicyOverride, DomainPackCatalog,
+    DomainPackCompatibility, DomainPackDataGovernance, DomainPackDefinition,
+    DomainPackDefinitionSpec, DomainPackDiagnostics, DomainPackHierarchySpec,
+    DomainPackIdentitySpec, DomainPackMetadata, DomainPackPolicyTemplate,
+    DomainPackProviderSnapshot, DomainPackSdkMetadata, DomainPackStability,
+    DomainPackUnavailableDiagnostic, EffectiveServiceCapabilities, InMemoryDomainPackCatalog,
 };
 pub use service_projection::{
     app_manifest_to_heartbeat_agent_views, app_manifest_to_metadata_view,

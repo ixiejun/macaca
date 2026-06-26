@@ -24,6 +24,7 @@ pub struct DomainPackProviderRegistration {
     descriptor: ServiceDescriptor,
     service: Arc<dyn SystemService>,
     trace_suffix: String,
+    pack_id: Option<String>,
 }
 
 impl DomainPackProviderRegistration {
@@ -37,7 +38,17 @@ impl DomainPackProviderRegistration {
             descriptor,
             service,
             trace_suffix: trace_suffix.into(),
+            pack_id: None,
         }
+    }
+
+    /// Attach the descriptor pack id without making runtime-host parse service names.
+    ///
+    /// Package crates own this metadata because they understand which pack published the
+    /// provider. Runtime-host only records the bounded value for trace/audit projection.
+    pub fn with_pack_id(mut self, pack_id: impl Into<String>) -> Self {
+        self.pack_id = Some(pack_id.into());
+        self
     }
 
     /// Expose the registered descriptor for runtime-host registration wiring.
@@ -53,5 +64,10 @@ impl DomainPackProviderRegistration {
     /// Expose the boot-trace suffix for runtime-host lifecycle evidence.
     pub fn trace_suffix(&self) -> &str {
         &self.trace_suffix
+    }
+
+    /// Return the optional descriptor pack id supplied by the package factory.
+    pub fn pack_id(&self) -> Option<&str> {
+        self.pack_id.as_deref()
     }
 }

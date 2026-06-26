@@ -129,3 +129,62 @@ fn parent_child_version_mismatch_is_rejected() {
     );
     assert!(DomainPackDefinitionSpec.validate(&definition).is_err());
 }
+
+#[test]
+fn catalog_lists_registered_packs_in_stable_order() {
+    let mut catalog = InMemoryDomainPackCatalog::new();
+    catalog.register(DomainPackDefinition::new(
+        "pack.zeta.v1",
+        [String::from("service.zeta")],
+    ));
+    catalog.register(DomainPackDefinition::new(
+        "pack.alpha.v1",
+        [String::from("service.alpha")],
+    ));
+
+    let ids = catalog
+        .list()
+        .into_iter()
+        .map(|definition| definition.pack_id)
+        .collect::<Vec<_>>();
+
+    assert_eq!(ids, vec!["pack.alpha.v1", "pack.zeta.v1"]);
+}
+
+#[test]
+fn reference_catalogs_are_descriptor_only_and_valid() {
+    let definitions = reference_domain_pack_definitions();
+    assert_eq!(definitions.len(), 3);
+    for definition in definitions {
+        assert!(DomainPackDefinitionSpec.validate(&definition).is_ok());
+        assert!(
+            !definition.metadata.sdk.client_namespace.is_empty(),
+            "reference packs must expose SDK discovery metadata"
+        );
+        assert!(
+            !definition.metadata.permission_scopes.is_empty(),
+            "reference packs must describe policy scopes"
+        );
+    }
+}
+
+#[test]
+fn provider_snapshots_and_unavailable_diagnostics_are_structured() {
+    let snapshot = DomainPackProviderSnapshot::registered(
+        "pack.foundation.v1",
+        "service.file",
+        "trace-pack-foundation",
+    );
+    assert_eq!(snapshot.provider_class, "package");
+    assert_eq!(snapshot.health, "registered");
+    assert_eq!(snapshot.unavailable_reason, None);
+
+    let unavailable = DomainPackUnavailableDiagnostic::new(
+        "pack.absent.v1",
+        true,
+        "required_pack_unresolved",
+        "required pack is absent or unavailable",
+    );
+    assert!(unavailable.required);
+    assert_eq!(unavailable.reason_code, "required_pack_unresolved");
+}

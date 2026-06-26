@@ -154,7 +154,7 @@ pub struct DomainPackMetadata {
 }
 
 /// Data-only catalog entry for one domain pack.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DomainPackDefinition {
     pub pack_id: String,
     pub metadata: DomainPackMetadata,
@@ -205,5 +205,85 @@ fn minimal_metadata_from_pack_id(pack_id: &str) -> DomainPackMetadata {
         family_id,
         version: format!("v{version_suffix}"),
         ..Default::default()
+    }
+}
+
+/// Sanitized provider snapshot projected by package registration and discovery code.
+///
+/// This Memento intentionally carries only bounded descriptor fields.  It gives SDKs and shells
+/// enough information to explain health and availability without exposing provider payloads,
+/// secrets, raw manifests, package bytes, prompts, or business-domain responses.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DomainPackProviderSnapshot {
+    pub pack_id: String,
+    pub service_id: String,
+    pub provider_class: String,
+    pub health: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unavailable_reason: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trace_id: Option<String>,
+}
+
+impl DomainPackProviderSnapshot {
+    /// Build a healthy descriptor-only snapshot after a package provider registers.
+    pub fn registered(
+        pack_id: impl Into<String>,
+        service_id: impl Into<String>,
+        trace_id: impl Into<String>,
+    ) -> Self {
+        Self {
+            pack_id: pack_id.into(),
+            service_id: service_id.into(),
+            provider_class: "package".into(),
+            health: "registered".into(),
+            unavailable_reason: None,
+            trace_id: Some(trace_id.into()),
+        }
+    }
+
+    /// Build a fail-closed unavailable snapshot for absent or incompatible packs.
+    pub fn unavailable(
+        pack_id: impl Into<String>,
+        service_id: impl Into<String>,
+        reason: impl Into<String>,
+    ) -> Self {
+        Self {
+            pack_id: pack_id.into(),
+            service_id: service_id.into(),
+            provider_class: "unavailable".into(),
+            health: "unavailable".into(),
+            unavailable_reason: Some(reason.into()),
+            trace_id: None,
+        }
+    }
+}
+
+/// SDK-facing unavailable explanation for one pack declaration.
+///
+/// Required and optional declarations share this DTO so admission, SDK tooling, and shells can
+/// render the same bounded diagnostic while keeping required-pack blocking semantics explicit.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DomainPackUnavailableDiagnostic {
+    pub pack_id: String,
+    pub required: bool,
+    pub reason_code: String,
+    pub message: String,
+}
+
+impl DomainPackUnavailableDiagnostic {
+    /// Create a diagnostic from already-sanitized pack resolution state.
+    pub fn new(
+        pack_id: impl Into<String>,
+        required: bool,
+        reason_code: impl Into<String>,
+        message: impl Into<String>,
+    ) -> Self {
+        Self {
+            pack_id: pack_id.into(),
+            required,
+            reason_code: reason_code.into(),
+            message: message.into(),
+        }
     }
 }

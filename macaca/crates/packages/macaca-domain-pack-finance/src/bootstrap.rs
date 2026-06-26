@@ -36,21 +36,25 @@ pub fn finance_domain_pack_registrations(
             finance_descriptor(FINANCE_MARKET_DATA_SERVICE_ID, "finance.market_data"),
             Arc::new(FinanceDataSystemServiceProvider::market_data()),
             "finance-market-data",
-        ),
+        )
+        .with_pack_id(FINANCE_PACK_ID),
         DomainPackProviderRegistration::new(
             finance_descriptor(FINANCE_FINANCIALS_SERVICE_ID, "finance.financials"),
             Arc::new(FinanceDataSystemServiceProvider::financials()),
             "finance-financials",
-        ),
+        )
+        .with_pack_id(FINANCE_PACK_ID),
         DomainPackProviderRegistration::new(
             finance_descriptor(FINANCE_NEWS_DIGEST_SERVICE_ID, "finance.news_digest"),
             Arc::new(FinanceDataSystemServiceProvider::news_digest()),
             "finance-news-digest",
-        ),
+        )
+        .with_pack_id(FINANCE_PACK_ID),
         DomainPackProviderRegistration::new(
             finance_descriptor(FINANCE_LLM_ANALYSIS_SERVICE_ID, "finance.llm_analysis"),
             Arc::new(FinanceLlmAnalysisSystemServiceProvider::new(llm)),
             "finance-llm-analysis",
-        ),
+        )
+        .with_pack_id(FINANCE_PACK_ID),
     ]
 }

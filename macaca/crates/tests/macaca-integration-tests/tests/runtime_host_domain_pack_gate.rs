@@ -40,6 +40,20 @@ fn runtime_host_sources(root: &Path) -> Vec<PathBuf> {
     files
 }
 
+fn boundary_sources(root: &Path) -> Vec<PathBuf> {
+    let mut files = Vec::new();
+    for relative in [
+        "crates/kernel",
+        "crates/facade/macaca-sdk/src",
+        "crates/shells",
+        "crates/runtime/macaca-runtime-host/src",
+    ] {
+        collect_rust_files(&root.join(relative), &mut files);
+    }
+    files.sort();
+    files
+}
+
 fn collect_rust_files(dir: &Path, out: &mut Vec<PathBuf>) {
     let entries = fs::read_dir(dir).unwrap_or_else(|error| {
         panic!("failed to read {}: {error}", dir.display());
@@ -87,6 +101,43 @@ fn runtime_host_production_sources_contain_no_finance_domain_tokens() {
     assert!(
         violations.is_empty(),
         "base runtime-host must not embed finance domain strings:\n{}",
+        violations.join("\n")
+    );
+}
+
+#[test]
+fn os_boundaries_do_not_import_optional_domain_pack_packages() {
+    let root = workspace_root();
+    let forbidden_import_tokens = [
+        "macaca_domain_pack_finance",
+        "macaca-domain-pack-finance",
+        "finance_domain_pack_registrations",
+        "finance_pack_catalog_definition",
+    ];
+    let mut violations = Vec::new();
+
+    for path in boundary_sources(&root) {
+        let content = fs::read_to_string(&path).expect("boundary source readable");
+        for (line_no, line) in content.lines().enumerate() {
+            if is_comment_only_line(line) {
+                continue;
+            }
+            for token in forbidden_import_tokens {
+                if line.contains(token) {
+                    let relative = path
+                        .strip_prefix(&root)
+                        .unwrap_or(&path)
+                        .display()
+                        .to_string();
+                    violations.push(format!("{relative}:{}: contains `{token}`", line_no + 1));
+                }
+            }
+        }
+    }
+
+    assert!(
+        violations.is_empty(),
+        "kernel, SDK, shells, and base runtime-host must use SDK/catalog descriptors instead of optional package imports:\n{}",
         violations.join("\n")
     );
 }

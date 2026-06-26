@@ -1,12 +1,14 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::hash::{Hash, Hasher};
 
+use serde::{Deserialize, Serialize};
+
 use super::catalog::DomainPackCatalog;
 use super::model::AppServiceContractConfig;
 use super::spec::DomainPackDefinitionSpec;
 
 /// Result of deterministic capability expansion from manifest declarations plus catalog data.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EffectiveServiceCapabilities {
     pub services: BTreeSet<String>,
     pub service_sources: BTreeMap<String, String>,
@@ -70,7 +72,7 @@ pub fn expand_service_capabilities(
 
     unresolved_packs.extend(unresolved_required_packs.iter().cloned());
     unresolved_packs.extend(unresolved_optional_packs.iter().cloned());
-    EffectiveServiceCapabilities {
+    let result = EffectiveServiceCapabilities {
         capabilities_hash: hash_services(&services),
         services,
         service_sources,
@@ -81,7 +83,17 @@ pub fn expand_service_capabilities(
         unresolved_optional_packs,
         incompatible_packs,
         unresolved_packs,
-    }
+    };
+    tracing::info!(
+        resolved_pack_count = result.resolved_packs.len(),
+        unresolved_required_pack_count = result.unresolved_required_packs.len(),
+        unresolved_optional_pack_count = result.unresolved_optional_packs.len(),
+        incompatible_pack_count = result.incompatible_packs.len(),
+        service_count = result.services.len(),
+        capabilities_hash = %result.capabilities_hash,
+        "pack_resolved"
+    );
+    result
 }
 
 fn resolve_pack_set(
@@ -100,11 +112,16 @@ fn resolve_pack_set(
                     tracing::warn!(
                         pack_id = %pack_id,
                         error = %error,
-                        "Ignoring incompatible domain-pack definition during expansion"
+                        "pack_resolution_failed"
                     );
                     incompatible_packs.push(pack_id.clone());
                     continue;
                 }
+                tracing::info!(
+                    pack_id = %pack_id,
+                    service_count = pack.services.len(),
+                    "pack_resolved"
+                );
                 resolved_packs.push(pack_id.clone());
                 for service in pack.services {
                     service_sources
@@ -113,7 +130,13 @@ fn resolve_pack_set(
                     services.insert(service);
                 }
             }
-            None => unresolved.push(pack_id.clone()),
+            None => {
+                tracing::warn!(
+                    pack_id = %pack_id,
+                    "pack_unavailable"
+                );
+                unresolved.push(pack_id.clone());
+            }
         }
     }
 }

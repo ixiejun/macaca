@@ -5,6 +5,7 @@
 //! Object implementations without importing provider crates.
 
 use crate::application_client::UnavailableSystemApplicationClient;
+use crate::domain_pack_client::EmptySystemDomainPackClient;
 use crate::driver_client::UnavailableSystemDriverClient;
 use crate::entitlement_client::UnavailableSystemEntitlementClient;
 use crate::evm_client::UnavailableSystemEvmClient;
@@ -53,6 +54,7 @@ pub struct SystemFacade<
     EVM = UnavailableSystemEvmClient,
     SCH = UnavailableSystemSchedulerClient,
     HB = UnavailableSystemHeartbeatClient,
+    DP = EmptySystemDomainPackClient,
 > {
     pub(super) task_board: T,
     pub(super) status: S,
@@ -73,4 +75,5 @@ pub struct SystemFacade<
     pub(super) evm: EVM,
     pub(super) scheduler: SCH,
     pub(super) heartbeat: HB,
+    pub(super) domain_pack: DP,
 }

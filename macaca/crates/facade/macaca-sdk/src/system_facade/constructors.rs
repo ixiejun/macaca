@@ -5,6 +5,7 @@
 //! entry point so dependency injection remains visible and auditable.
 
 use crate::application_client::UnavailableSystemApplicationClient;
+use crate::domain_pack_client::{EmptySystemDomainPackClient, SystemDomainPackClient};
 use crate::driver_client::UnavailableSystemDriverClient;
 use crate::entitlement_client::UnavailableSystemEntitlementClient;
 use crate::evm_client::UnavailableSystemEvmClient;
@@ -67,6 +68,7 @@ where
             evm: UnavailableSystemEvmClient,
             scheduler: UnavailableSystemSchedulerClient,
             heartbeat: UnavailableSystemHeartbeatClient,
+            domain_pack: EmptySystemDomainPackClient,
         }
     }
 }
@@ -125,6 +127,7 @@ where
             evm: UnavailableSystemEvmClient,
             scheduler: UnavailableSystemSchedulerClient,
             heartbeat: UnavailableSystemHeartbeatClient,
+            domain_pack: EmptySystemDomainPackClient,
         }
     }
 }
@@ -256,6 +259,7 @@ where
             evm,
             scheduler: UnavailableSystemSchedulerClient,
             heartbeat: UnavailableSystemHeartbeatClient,
+            domain_pack: EmptySystemDomainPackClient,
         }
     }
 
@@ -305,6 +309,89 @@ where
             evm,
             scheduler,
             heartbeat,
+            domain_pack: EmptySystemDomainPackClient,
+        }
+    }
+}
+
+impl<T, S, SV, TR, P, L, M, C, D, SK, MCP, A, ST, E, PMT, W3, EVM, SCH, HB, DP>
+    super::types::SystemFacade<
+        T,
+        S,
+        SV,
+        TR,
+        P,
+        L,
+        M,
+        C,
+        D,
+        SK,
+        MCP,
+        A,
+        ST,
+        E,
+        PMT,
+        W3,
+        EVM,
+        SCH,
+        HB,
+        DP,
+    >
+{
+    /// Replace the current domain-pack discovery client.
+    ///
+    /// This Builder-style method preserves existing facade construction sites while allowing a
+    /// host composition root to inject a catalog-backed discovery Strategy.  The facade only
+    /// stores the client; it never constructs package providers or reads runtime-host internals.
+    pub fn with_domain_pack_client<DP2>(
+        self,
+        domain_pack: DP2,
+    ) -> super::types::SystemFacade<
+        T,
+        S,
+        SV,
+        TR,
+        P,
+        L,
+        M,
+        C,
+        D,
+        SK,
+        MCP,
+        A,
+        ST,
+        E,
+        PMT,
+        W3,
+        EVM,
+        SCH,
+        HB,
+        DP2,
+    >
+    where
+        DP2: SystemDomainPackClient,
+    {
+        super::types::SystemFacade {
+            task_board: self.task_board,
+            status: self.status,
+            service: self.service,
+            trace: self.trace,
+            package: self.package,
+            llm: self.llm,
+            memory: self.memory,
+            context: self.context,
+            driver: self.driver,
+            skill: self.skill,
+            mcp: self.mcp,
+            application: self.application,
+            store: self.store,
+            entitlement: self.entitlement,
+            payment: self.payment,
+            web3: self.web3,
+            evm: self.evm,
+            scheduler: self.scheduler,
+            heartbeat: self.heartbeat,
+            domain_pack,
         }
     }
 }

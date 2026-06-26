@@ -14,7 +14,9 @@
 
 use std::sync::Arc;
 
-use macaca_proto::{KernelServiceId, MacacaError, MacacaResult, TraceContext};
+use macaca_proto::{
+    DomainPackProviderSnapshot, KernelServiceId, MacacaError, MacacaResult, TraceContext,
+};
 use tracing::info;
 
 use crate::{
@@ -37,6 +39,8 @@ pub use macaca_proto::{
 pub struct DomainPackRuntimeBundle {
     /// Kernel service ids that were registered and started during bootstrap.
     pub started_services: Vec<KernelServiceId>,
+    /// Sanitized provider snapshots safe for diagnostics, trace, and shell rendering.
+    pub provider_snapshots: Vec<DomainPackProviderSnapshot>,
 }
 
 /// Register and start package-owned domain-pack service providers.
@@ -58,8 +62,9 @@ pub async fn bootstrap_domain_pack_services(
         let trace = TraceContext::new(format!("{trace_prefix}-{}", registration.trace_suffix()));
         info!(
             service_id = %service_id,
+            pack_id = registration.pack_id().unwrap_or("unknown"),
             trace_id = %trace.trace_id,
-            "domain-pack service registering package provider"
+            "pack_provider_registered"
         );
         runtime
             .register_provider(
@@ -77,9 +82,17 @@ pub async fn bootstrap_domain_pack_services(
             .map_err(runtime_error)?;
         info!(
             service_id = %service_id,
+            pack_id = registration.pack_id().unwrap_or("unknown"),
             trace_id = %trace.trace_id,
-            "domain-pack package provider started"
+            "pack_provider_started"
         );
+        bundle
+            .provider_snapshots
+            .push(DomainPackProviderSnapshot::registered(
+                registration.pack_id().unwrap_or("unknown"),
+                service_id.to_string(),
+                trace.trace_id.clone(),
+            ));
         bundle.started_services.push(service_id);
     }
 
@@ -105,5 +118,6 @@ mod tests {
     fn empty_domain_pack_bootstrap_returns_empty_bundle() {
         let bundle = DomainPackRuntimeBundle::default();
         assert!(bundle.started_services.is_empty());
+        assert!(bundle.provider_snapshots.is_empty());
     }
 }

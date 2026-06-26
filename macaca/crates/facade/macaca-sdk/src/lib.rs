@@ -17,6 +17,7 @@ pub mod autonomy_evolution_client;
 pub mod builder;
 pub mod config;
 pub mod domain_pack_bridge;
+pub mod domain_pack_client;
 pub mod driver_client;
 pub mod entitlement_client;
 pub mod evm_client;
@@ -88,13 +89,20 @@ pub use autonomy_evolution_client::{
 pub use builder::AgentBuilder;
 pub use config::AgentConfig;
 pub use domain_pack_bridge::{
-    compose_installed_domain_pack_catalog, empty_domain_pack_catalog, expand_service_capabilities,
-    AppPackPolicyOverride, AppServiceContractConfig, AppServiceContractSpec,
-    AppServicePolicyOverride, DomainPackCatalog, DomainPackCompatibility, DomainPackDataGovernance,
-    DomainPackDefinition, DomainPackDefinitionSpec, DomainPackDiagnostics, DomainPackHierarchySpec,
-    DomainPackIdentitySpec, DomainPackMetadata, DomainPackPolicyTemplate, DomainPackSdkMetadata,
-    DomainPackStability, EffectiveServiceCapabilities, InMemoryDomainPackCatalog,
-    SharedDomainPackCatalog,
+    compose_installed_domain_pack_catalog, developer_pack_definition, empty_domain_pack_catalog,
+    expand_service_capabilities, foundation_pack_definition, knowledge_pack_definition,
+    reference_domain_pack_definitions, AppPackPolicyOverride, AppServiceContractConfig,
+    AppServiceContractSpec, AppServicePolicyOverride, DomainPackCatalog, DomainPackCompatibility,
+    DomainPackDataGovernance, DomainPackDefinition, DomainPackDefinitionSpec,
+    DomainPackDiagnostics, DomainPackHierarchySpec, DomainPackIdentitySpec, DomainPackMetadata,
+    DomainPackPolicyTemplate, DomainPackProviderSnapshot, DomainPackSdkMetadata,
+    DomainPackStability, DomainPackUnavailableDiagnostic, EffectiveServiceCapabilities,
+    InMemoryDomainPackCatalog, SharedDomainPackCatalog,
+};
+pub use domain_pack_client::{
+    CatalogBackedDomainPackClient, DomainPackInspectCommand, DomainPackInspectResult,
+    DomainPackListCommand, DomainPackListResult, DomainPackResolveCommand, DomainPackResolveResult,
+    EmptySystemDomainPackClient, SystemDomainPackClient,
 };
 pub use driver_client::{
     ServiceBackedDriverClient, SystemDriverClient, UnavailableSystemDriverClient,

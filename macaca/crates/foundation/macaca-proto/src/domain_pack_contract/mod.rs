@@ -15,6 +15,7 @@
 mod catalog;
 mod expansion;
 mod model;
+mod reference_catalogs;
 mod service_helpers;
 mod spec;
 
@@ -29,7 +30,12 @@ pub use expansion::{expand_service_capabilities, EffectiveServiceCapabilities};
 pub use model::{
     AppPackPolicyOverride, AppServiceContractConfig, AppServicePolicyOverride,
     DomainPackCompatibility, DomainPackDataGovernance, DomainPackDefinition, DomainPackDiagnostics,
-    DomainPackMetadata, DomainPackPolicyTemplate, DomainPackSdkMetadata, DomainPackStability,
+    DomainPackMetadata, DomainPackPolicyTemplate, DomainPackProviderSnapshot,
+    DomainPackSdkMetadata, DomainPackStability, DomainPackUnavailableDiagnostic,
+};
+pub use reference_catalogs::{
+    developer_pack_definition, foundation_pack_definition, knowledge_pack_definition,
+    reference_domain_pack_definitions,
 };
 pub use service_helpers::{
     domain_pack_command_trace, domain_pack_service_adapter_error, domain_pack_service_result,

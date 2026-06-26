@@ -83,4 +83,13 @@ async fn web_provider_registrations_start_all_finance_services() {
     .expect("finance domain-pack bootstrap should succeed");
 
     assert_eq!(bundle.started_services.len(), 4);
+    assert_eq!(bundle.provider_snapshots.len(), 4);
+    assert!(bundle
+        .provider_snapshots
+        .iter()
+        .all(|snapshot| snapshot.pack_id == FINANCE_PACK_ID));
+    assert!(bundle
+        .provider_snapshots
+        .iter()
+        .all(|snapshot| snapshot.health == "registered"));
 }

@@ -3,7 +3,7 @@
 //! Shells that need capability-specific command surfaces can borrow the focused
 //! client without reaching through the aggregate operation methods.
 
-impl<T, S, SV, TR, P, L, M, C, D, SK, MCP, A, ST, E, PMT, W3, EVM, SCH, HB>
+impl<T, S, SV, TR, P, L, M, C, D, SK, MCP, A, ST, E, PMT, W3, EVM, SCH, HB, DP>
     super::types::SystemFacade<
         T,
         S,
@@ -24,6 +24,7 @@ impl<T, S, SV, TR, P, L, M, C, D, SK, MCP, A, ST, E, PMT, W3, EVM, SCH, HB>
         EVM,
         SCH,
         HB,
+        DP,
     >
 {
     /// Borrow the focused Web3 Service client.
@@ -44,6 +45,11 @@ impl<T, S, SV, TR, P, L, M, C, D, SK, MCP, A, ST, E, PMT, W3, EVM, SCH, HB>
     /// Borrow the focused Heartbeat Service client.
     pub fn heartbeat_client(&self) -> &HB {
         &self.heartbeat
+    }
+
+    /// Borrow the focused domain-pack discovery client.
+    pub fn domain_pack_client(&self) -> &DP {
+        &self.domain_pack
     }
 
     /// Borrow the focused Payment Service client.
