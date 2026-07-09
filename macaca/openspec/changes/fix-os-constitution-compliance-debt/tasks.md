@@ -77,9 +77,12 @@
   per-adapter failures (one unavailable adapter no longer aborts the rest);
   telegram `send_message` without a token and discord stub `send_message` now
   return a structured `MacacaError::Gateway` instead of fake `Ok(())` (tests
-  updated to assert the structured error). REMAINING: tools ListAgents
-  (`orchestration.rs:303-310`), driver loader (`loader.rs:141-144`), skill facade
-  (`facade.rs:139-148`)
+  updated to assert the structured error). tools ListAgents now returns a
+  structured Agent error when no agents provider is wired (distinct from a real
+  empty list); driver loader returns a structured Driver error on config-
+  serialization failure instead of silently loading an empty config. REMAINING:
+  skill facade (`facade.rs:139-148`) needs a return-type change to surface
+  loaded/failed (deferred — signature change)
 - [ ] 2.5 Scheduled-agent-task rollback on registration failure
   (`local_provider.rs:161-199`); goal-evaluator no fake `Satisfied` on parse
   failure (`goal_evaluator.rs:66-108`)

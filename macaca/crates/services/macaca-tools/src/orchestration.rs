@@ -301,11 +301,17 @@ impl Tool for ListAgentsTool {
     }
 
     async fn invoke(&self, _command: ToolCommand) -> MacacaResult<Value> {
-        let agents = if let Some(ref callback) = self.agents_callback {
-            callback().await
-        } else {
-            vec![]
+        // Structured unavailable (2026-07-08 audit S14): when no agents provider
+        // is wired, the previous code returned `{"agents": []}`, which is
+        // indistinguishable from a real, legitimately empty agent registry. That
+        // hides a wiring gap as a normal empty result. We now return a structured
+        // error so "no provider" is explicit and distinct from "zero agents".
+        let Some(ref callback) = self.agents_callback else {
+            return Err(MacacaError::Agent(
+                "agent listing unavailable: no agents provider is wired to this tool".into(),
+            ));
         };
+        let agents = callback().await;
         Ok(serde_json::json!({"agents": agents}))
     }
 }

@@ -137,9 +137,20 @@ impl DriverLoader {
             )));
         }
 
-        // Convert config to JSON string
+        // Convert config to JSON string.
+        //
+        // Structured failure (2026-07-08 audit S17): the previous
+        // `unwrap_or_else(|_| "{}")` silently discarded a real serialization error
+        // and loaded the driver with an EMPTY config as if it had succeeded — a
+        // fake success that could start a driver in a wrong, unconfigured state.
+        // A serialization failure now returns a structured `Driver` error.
         let config_json = match &manifest.config {
-            Some(config) => serde_json::to_string(config).unwrap_or_else(|_| "{}".to_string()),
+            Some(config) => serde_json::to_string(config).map_err(|error| {
+                macaca_proto::MacacaError::Driver(format!(
+                    "failed to serialize driver '{}' config: {error}",
+                    manifest.driver.name
+                ))
+            })?,
             None => "{}".to_string(),
         };
 
