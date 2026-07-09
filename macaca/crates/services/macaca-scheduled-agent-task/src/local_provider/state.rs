@@ -155,6 +155,31 @@ impl LocalScheduledAgentTaskState {
         Some(audit_id)
     }
 
+    /// Roll back a prepared task whose downstream scheduler registration failed.
+    ///
+    /// Compensating action (2026-07-08 audit S15): `prepare_task` eagerly inserts
+    /// the task (lifecycle "active") and its payload before the scheduler job is
+    /// registered. If registration is rejected or errors, leaving those in place
+    /// produces a permanently "active" zombie task that health/list surfaces
+    /// count and whose prompt payload lingers. This removes both so preparation
+    /// and registration are effectively atomic from the caller's perspective.
+    pub(super) fn rollback_prepared_task(
+        &mut self,
+        task_id: &ScheduledAgentTaskId,
+        payload_reference: &str,
+    ) {
+        let removed_task = self.tasks.remove(task_id).is_some();
+        let removed_payload = self.payloads.remove(payload_reference).is_some();
+        tracing::warn!(
+            target = "macaca_scheduled_agent_task::state",
+            event = "prepared_task_rolled_back",
+            task_id = task_id.as_str(),
+            removed_task,
+            removed_payload,
+            "rolled back prepared scheduled-agent-task after registration failure"
+        );
+    }
+
     pub(super) fn cancel_task(
         &mut self,
         task_id: &ScheduledAgentTaskId,

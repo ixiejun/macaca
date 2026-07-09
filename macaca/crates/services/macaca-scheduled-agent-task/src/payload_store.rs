@@ -67,6 +67,15 @@ impl InMemoryPayloadStore {
         self.payloads.get(reference)
     }
 
+    /// Remove a payload, returning it if present.
+    ///
+    /// Used to roll back a payload that was inserted while preparing a task whose
+    /// downstream scheduler registration then failed (2026-07-08 audit S15), so a
+    /// sensitive prompt does not linger for a task that was never registered.
+    pub(crate) fn remove(&mut self, reference: &str) -> Option<StoredScheduledAgentPayload> {
+        self.payloads.remove(reference)
+    }
+
     /// Return current payload count for health/snapshot diagnostics.
     pub(crate) fn len(&self) -> usize {
         self.payloads.len()

@@ -63,7 +63,8 @@ If there are gaps or quality issues, set satisfied=false and provide suggestions
         )
     }
 
-    /// Parse the LLM evaluation response. Returns `Satisfied` on any parse failure.
+    /// Parse the LLM evaluation response. Returns `NeedsMoreWork` on any parse
+    /// failure so an indeterminate evaluation never falsely closes a goal.
     pub fn parse_eval_response(content: &str) -> GoalEvaluationResult {
         let content = content.trim();
         let json_str = if content.starts_with("```") {
@@ -99,10 +100,23 @@ If there are gaps or quality issues, set satisfied=false and provide suggestions
                     }
                 }
             }
-            Err(_) => {
-                // Conservative fallback: assume satisfied so we don't block
-                GoalEvaluationResult::Satisfied {
-                    summary: "Evaluation completed (parsing fallback)".into(),
+            Err(error) => {
+                // Fail-safe fallback (2026-07-08 audit S16): a parse failure means
+                // we could NOT determine whether the goal is met. The previous
+                // code returned `Satisfied`, silently marking the goal complete on
+                // an unparseable/truncated model response — a fake success that
+                // could end a goal prematurely. We now return `NeedsMoreWork` so an
+                // indeterminate evaluation keeps the goal open rather than closing
+                // it, and record the reason for audit.
+                tracing::warn!(
+                    target = "macaca_task::goal_evaluator",
+                    event = "goal_evaluation_parse_failed",
+                    error = %error,
+                    "goal evaluation response could not be parsed; treating as needs-more-work"
+                );
+                GoalEvaluationResult::NeedsMoreWork {
+                    reason: "goal evaluation response could not be parsed".into(),
+                    suggestions: Vec::new(),
                 }
             }
         }

@@ -168,21 +168,44 @@ impl ScheduledAgentTaskService for LocalScheduledAgentTaskProvider {
             "scheduled agent task payload persisted"
         );
 
-        let scheduler_result = self
-            .scheduler
-            .register_job(SchedulerRegisterJobCommand::new(
-                trace.clone(),
-                prepared.definition,
-            )?)
-            .await?;
+        // Build the scheduler registration command. On any failure below
+        // (command construction, transport error, or a non-accepted result) we
+        // roll back the prepared task + payload (2026-07-08 audit S15) so a
+        // failed registration never leaves a permanently "active" zombie task.
+        let register_command =
+            match SchedulerRegisterJobCommand::new(trace.clone(), prepared.definition) {
+                Ok(command) => command,
+                Err(error) => {
+                    self.write(|state| {
+                        state.rollback_prepared_task(
+                            &prepared.task_id,
+                            &prepared.payload_ref.reference,
+                        )
+                    });
+                    return Err(error);
+                }
+            };
+        let scheduler_result = match self.scheduler.register_job(register_command).await {
+            Ok(result) => result,
+            Err(error) => {
+                self.write(|state| {
+                    state
+                        .rollback_prepared_task(&prepared.task_id, &prepared.payload_ref.reference)
+                });
+                return Err(error);
+            }
+        };
         if !scheduler_result.accepted {
             warn!(
                 service_id = SCHEDULED_AGENT_TASK_SERVICE_ID,
                 provider_id = LOCAL_PROVIDER_ID,
                 task_id = prepared.task_id.as_str(),
                 trace_id = trace.trace_id.as_str(),
-                "scheduled agent task scheduler registration failed"
+                "scheduled agent task scheduler registration rejected; rolling back prepared task"
             );
+            self.write(|state| {
+                state.rollback_prepared_task(&prepared.task_id, &prepared.payload_ref.reference)
+            });
             return Ok(ScheduledAgentTaskCommandResult {
                 accepted: false,
                 task_id: Some(prepared.task_id),

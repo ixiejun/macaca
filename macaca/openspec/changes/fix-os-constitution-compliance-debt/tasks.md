@@ -83,9 +83,11 @@
   serialization failure instead of silently loading an empty config. REMAINING:
   skill facade (`facade.rs:139-148`) needs a return-type change to surface
   loaded/failed (deferred — signature change)
-- [ ] 2.5 Scheduled-agent-task rollback on registration failure
-  (`local_provider.rs:161-199`); goal-evaluator no fake `Satisfied` on parse
-  failure (`goal_evaluator.rs:66-108`)
+- [x] 2.5 Scheduled-agent-task `create_task` now rolls back the prepared task and
+  payload (new `rollback_prepared_task` + payload `remove`) on all three
+  registration failure paths (command build, transport error, not-accepted), so
+  no zombie active task/prompt lingers; goal-evaluator parse failure now returns
+  `NeedsMoreWork` instead of fake `Satisfied` (tests updated)
 - [x] 2.6 (partial) Event-log truthful durability: `event_log.rs` append/serialize
   and `write_index` failures now record a structured `error` event instead of
   silently swallowing (`let _ = set(...)`), removing the false-durability claim;

@@ -99,12 +99,16 @@ fn test_goal_evaluation_needs_work_no_suggestions() {
 
 #[test]
 fn test_goal_evaluation_fallback_on_bad_json() {
+    // Audit S16: an unparseable evaluation must NOT be treated as goal-satisfied
+    // (that would falsely close the goal). It must fall back to NeedsMoreWork.
     let result = GoalEvaluator::parse_eval_response("not valid json at all");
     match result {
-        GoalEvaluation::Satisfied { summary } => {
-            assert!(summary.contains("fallback"));
+        GoalEvaluation::NeedsMoreWork { reason, .. } => {
+            assert!(reason.contains("could not be parsed"));
         }
-        GoalEvaluation::NeedsMoreWork { .. } => panic!("expected Satisfied fallback"),
+        GoalEvaluation::Satisfied { .. } => {
+            panic!("expected NeedsMoreWork on unparseable evaluation")
+        }
     }
 }
 
@@ -112,8 +116,10 @@ fn test_goal_evaluation_fallback_on_bad_json() {
 fn test_goal_evaluation_fallback_on_empty_string() {
     let result = GoalEvaluator::parse_eval_response("");
     match result {
-        GoalEvaluation::Satisfied { .. } => {}
-        GoalEvaluation::NeedsMoreWork { .. } => panic!("expected Satisfied fallback"),
+        GoalEvaluation::NeedsMoreWork { .. } => {}
+        GoalEvaluation::Satisfied { .. } => {
+            panic!("expected NeedsMoreWork on empty evaluation")
+        }
     }
 }
 
