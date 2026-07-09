@@ -313,23 +313,27 @@ fn bounded_refs(values: &[String]) -> Vec<String> {
 }
 
 fn sanitize_text(value: &str) -> String {
-    let mut sanitized = sanitize_ref(value);
-    if sanitized.len() > MAX_TEXT_LEN {
-        sanitized.truncate(MAX_TEXT_LEN);
-    }
-    sanitized
+    // Character-boundary-safe truncation of the already-sanitized ref; the old
+    // `String::truncate(MAX_TEXT_LEN)` could panic on multi-byte content.
+    let sanitized = sanitize_ref(value);
+    macaca_proto::text_sanitize::safe_char_prefix(&sanitized, MAX_TEXT_LEN).to_string()
 }
 
+/// Sanitize a single reference before it enters an audit snapshot.
+///
+/// Hardened per the 2026-07-08 audit (P0-5); see the twin implementation in
+/// `governance_ledger.rs`. Applies structural, value-shape secret masking so a
+/// credential-shaped reference is fully redacted even without a keyword, keeps
+/// the keyword replacements as defense-in-depth, and truncates on a UTF-8
+/// character boundary instead of a panic-prone byte boundary.
 fn sanitize_ref(value: &str) -> String {
-    let mut sanitized = value
+    let masked = macaca_proto::text_sanitize::mask_secret(value);
+    let keyword_scrubbed = masked
         .replace("raw_prompt", "sanitized")
         .replace("raw_provider_payload", "sanitized")
         .replace("credential", "redacted")
         .replace("secret", "redacted")
         .replace("private_key", "redacted")
         .replace("raw_signature", "redacted");
-    if sanitized.len() > MAX_REF_LEN {
-        sanitized.truncate(MAX_REF_LEN);
-    }
-    sanitized
+    macaca_proto::text_sanitize::safe_char_prefix(&keyword_scrubbed, MAX_REF_LEN).to_string()
 }

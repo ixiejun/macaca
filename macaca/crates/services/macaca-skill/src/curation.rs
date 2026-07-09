@@ -99,6 +99,22 @@ impl SkillCurationRunCommand {
                 "skill curation apply run requires approval refs and policy decision refs".into(),
             );
         }
+        // Fail-closed readiness (2026-07-08 audit P0-3): a non-dry-run curation
+        // mutates skill state, so it proceeds only when both entitlement and
+        // package readiness are explicitly confirmed. This aligns curation apply
+        // with the canonical `mutation.rs` / `proposal_materialization.rs` gate
+        // and with proposal_lifecycle/processing, which previously diverged.
+        if !self.dry_run
+            && (self.policy.entitlement_ready != Some(true)
+                || self.policy.package_ready != Some(true))
+        {
+            tracing::warn!(
+                target = "macaca_skill::curation",
+                event = "curation_apply_denied",
+                reason_code = "readiness_not_confirmed"
+            );
+            return Err("skill curation apply run requires confirmed entitlement and package readiness".into());
+        }
         Ok(())
     }
 }

@@ -33,13 +33,20 @@
 - [x] 1.4 `macaca-skill/runtime/path_policy.rs` now resolves `..` via canonicalize
   then lexical normalization, rejecting unresolvable/escaping paths (fail-closed)
   with a key-node warn log; added 4 traversal regression tests
-- [x] 1.5 (partial) Skill readiness fail-closed:
+- [x] 1.5 Skill readiness fail-closed:
   `evolution.rs` `SkillExperienceEvidenceGateStatus::default()` → `Missing` and
-  `default_verified_terminal_success()` → `false`; `proposal_lifecycle.rs` and
-  `proposal_processing.rs` now require both readiness signals `== Some(true)`
-  (was the leniency `== Some(false)`), with denial warn logs. REMAINING:
-  `curation.rs:82-104` entitlement/package check, and
-  `autonomy live_orchestrator.rs:305-337` real lease validation
+  `default_verified_terminal_success()` → `false`; `proposal_lifecycle.rs`,
+  `proposal_processing.rs`, and `curation.rs` now require both readiness signals
+  `== Some(true)` (was the leniency `== Some(false)` / missing), with denial warn
+  logs. REMAINING (moved to 1.5b): `autonomy live_orchestrator.rs:305-337` real
+  lease validation
+- [ ] 1.5b Autonomy `live_orchestrator.rs:305-337`: replace `trim().is_empty()`
+  lease/idempotency check with real lease validity/ownership/expiry validation
+- [x] 1.7 Autonomy `sanitize_ref` (both `governance_ledger.rs` and
+  `os_code_proposal_adapter.rs`): structural secret masking via
+  `text_sanitize::mask_secret` (closes the sk-/Bearer value leak) + UTF-8-safe
+  truncation replacing panic-prone `String::truncate`. (Full structural
+  allow-list rewrite + dedup remains a Stage 2 item.)
 - [ ] 1.6 P0 execution stop-gap: add path allow-list, output byte cap, timeout
   `child.kill()`, and command-line sanitization to `macaca-tools/builtin.rs`
   ShellTool/FileRead/FileWrite and `macaca-skill/tool.rs` execute paths; require

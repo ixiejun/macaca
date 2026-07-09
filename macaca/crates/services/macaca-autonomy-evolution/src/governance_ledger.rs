@@ -413,18 +413,31 @@ fn sanitize_refs(values: &[String]) -> Vec<String> {
         .collect()
 }
 
+/// Sanitize a single ledger reference before it enters an audit snapshot.
+///
+/// Hardened per the 2026-07-08 audit (P0-5). The previous implementation relied
+/// solely on a keyword deny-list, which let a real secret *value* (e.g. an
+/// `sk-…` key or a bearer token) pass unchanged whenever it did not literally
+/// contain the words "secret"/"credential". It also used `String::truncate`,
+/// which panics when the byte length lands inside a multi-byte character.
+///
+/// This now (1) applies the structural, value-shape secret masking from the
+/// foundation `text_sanitize` module so credential-shaped refs are fully
+/// redacted, (2) keeps the keyword replacements as defense-in-depth for embedded
+/// markers, and (3) truncates on a UTF-8 character boundary.
 fn sanitize_ref(value: &str) -> String {
-    let mut sanitized = value
+    // Structural masking first: a ref that *is* a credential is redacted whole,
+    // regardless of surrounding keywords.
+    let masked = macaca_proto::text_sanitize::mask_secret(value);
+    let keyword_scrubbed = masked
         .replace("raw_prompt", "sanitized")
         .replace("raw_provider_payload", "sanitized")
         .replace("credential", "redacted")
         .replace("secret", "redacted")
         .replace("private_key", "redacted")
         .replace("raw_signature", "redacted");
-    if sanitized.len() > MAX_REF_LEN {
-        sanitized.truncate(MAX_REF_LEN);
-    }
-    sanitized
+    // Character-boundary-safe truncation (never panics on multi-byte input).
+    macaca_proto::text_sanitize::safe_char_prefix(&keyword_scrubbed, MAX_REF_LEN).to_string()
 }
 
 fn io_error(error: std::io::Error) -> MacacaError {
