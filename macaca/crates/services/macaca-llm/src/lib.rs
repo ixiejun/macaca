@@ -31,6 +31,7 @@ pub mod anthropic;
 pub mod coding_plans;
 pub mod cost;
 pub mod dashscope;
+pub mod error_sanitize;
 pub mod hardening_contract;
 pub mod openai;
 pub mod openai_compatible;

@@ -62,9 +62,11 @@
   lexicographic ordering past ten items
 
 ## 2. Observability Sanitization & Gate Hardening & Structured Absence
-- [ ] 2.1 Adopt `redact_text` + bounding in `macaca-llm` provider adapters
-  (anthropic/dashscope/openai/openai_compatible) and `macaca-memory`
-  embedding.rs/vector.rs error paths
+- [x] 2.1 (partial) `macaca-llm`: added shared `error_sanitize` module that
+  token-wise masks secret-shaped content and UTF-8-safely bounds provider error
+  bodies; wired into all four adapters (anthropic/dashscope/openai/
+  openai_compatible) replacing raw `raw.text().await` interpolation. REMAINING:
+  `macaca-memory` embedding.rs/vector.rs error paths
 - [ ] 2.2 Bound/sanitize gateway logs (`telegram.rs:114`, `gateway.rs:79-124`) and
   tools trace input/output (`macaca-tools/tool.rs:184-225`, `builtin.rs:135`)
 - [ ] 2.3 Harden `sdk_no_provider_construction_gate` to naming-pattern + mandatory

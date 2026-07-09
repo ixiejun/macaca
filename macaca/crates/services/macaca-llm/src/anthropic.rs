@@ -230,7 +230,9 @@ impl LlmProvider for AnthropicProvider {
 
         if !raw.status().is_success() {
             let status = raw.status();
-            let text = raw.text().await.unwrap_or_default();
+            let text = crate::error_sanitize::sanitize_provider_error_body(
+                &raw.text().await.unwrap_or_default(),
+            );
             return Err(MacacaError::Llm(format!(
                 "Anthropic API error {status}: {text}"
             )));
