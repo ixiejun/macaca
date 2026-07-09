@@ -105,10 +105,12 @@ impl EventHandler for DefaultEventHandler {
                 channel_id,
                 content,
             } => {
+                // Log a bounded preview, not the full message (2026-07-08 audit
+                // S9): user content can be large and sensitive.
                 info!(
                     user_id = %user_id,
                     channel_id = %channel_id,
-                    content = %content,
+                    content_preview = %macaca_proto::text_sanitize::truncate_with_marker(content, 128),
                     "Received task request"
                 );
             }
@@ -130,10 +132,11 @@ impl EventHandler for DefaultEventHandler {
                 content,
                 context_id,
             } => {
+                // Bounded preview only (2026-07-08 audit S9).
                 info!(
                     user_id = %user_id,
                     channel_id = %channel_id,
-                    content = %content,
+                    content_preview = %macaca_proto::text_sanitize::truncate_with_marker(content, 128),
                     context_id = %context_id,
                     "Received user reply"
                 );

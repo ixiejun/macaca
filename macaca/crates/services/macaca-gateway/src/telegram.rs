@@ -111,7 +111,15 @@ impl ImAdapter for TelegramAdapter {
                 let results = match body.get("result").and_then(|r| r.as_array()) {
                     Some(arr) => arr.clone(),
                     None => {
-                        warn!(body = %body, "Unexpected getUpdates response");
+                        // Log only structural status fields, never the whole raw
+                        // API body (2026-07-08 audit S9): the body can be large and
+                        // carry user/chat data. `ok`/`error_code` identify the
+                        // failure class without leaking payload content.
+                        warn!(
+                            ok = ?body.get("ok"),
+                            error_code = ?body.get("error_code"),
+                            "Unexpected getUpdates response (no result array)"
+                        );
                         continue;
                     }
                 };

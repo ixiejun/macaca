@@ -71,8 +71,9 @@
 - [x] 2.2 (partial) tools trace: `TraceToolCommandMiddleware` now redacts tool
   input JSON via `audit_redaction::sanitize_json` and bounds serialized output/
   error strings via `text_sanitize::truncate_with_marker`; `builtin.rs` file_write
-  logs only input keys instead of `raw_input`. REMAINING: gateway log bounding
-  (`telegram.rs:114`, `gateway.rs` DefaultEventHandler content)
+  logs only input keys instead of `raw_input`. gateway: telegram unexpected-body
+  warn now logs only `ok`/`error_code` (not the raw body); DefaultEventHandler
+  logs a 128-char bounded `content_preview` instead of full user content.
 - [ ] 2.3 Harden `sdk_no_provider_construction_gate` to naming-pattern + mandatory
   registration; add anti-`concat!`-splitting rule to the no-hardcoded-names gate;
   add a `use`-level boundary scan
