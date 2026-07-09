@@ -187,7 +187,12 @@ impl ToolCommandMiddleware for TraceToolCommandMiddleware {
                 event_type: "tool_call".into(),
                 correlation_id: command.context.correlation_id.clone(),
                 tool_name: Some(tool_name.to_string()),
-                tool_input: Some(command.input.clone()),
+                // Redact sensitive JSON keys/strings before the raw input enters
+                // the trace (2026-07-08 audit S10): tool inputs can carry prompts,
+                // file contents, or credentials that must not be recorded verbatim.
+                tool_input: Some(macaca_proto::audit_redaction::sanitize_json(
+                    command.input.clone(),
+                )),
                 metadata: command.context.metadata.clone(),
                 ..Default::default()
             });
@@ -204,7 +209,15 @@ impl ToolCommandMiddleware for TraceToolCommandMiddleware {
         if let Some(event_tx) = &command.context.event_tx {
             let (tool_output, is_error) = match result {
                 Ok(value) => (Some(serialize_tool_output(value)), Some(false)),
-                Err(error) => (Some(error.to_string()), Some(true)),
+                // Bound the error string so an error carrying a large/echoed
+                // payload cannot flood the trace (2026-07-08 audit S10).
+                Err(error) => (
+                    Some(macaca_proto::text_sanitize::truncate_with_marker(
+                        &error.to_string(),
+                        MAX_TRACE_OUTPUT_CHARS,
+                    )),
+                    Some(true),
+                ),
             };
             let _ = event_tx.send(TraceEvent {
                 event_type: "tool_result".into(),
@@ -220,8 +233,21 @@ impl ToolCommandMiddleware for TraceToolCommandMiddleware {
     }
 }
 
+/// Maximum characters retained from a tool output/error placed into a trace.
+const MAX_TRACE_OUTPUT_CHARS: usize = 2048;
+
+/// Serialize a tool output for trace recording, redacted and length-bounded.
+///
+/// Sanitization (2026-07-08 audit S10): the previous implementation serialized
+/// the entire raw output with no redaction or bound, so a large or
+/// secret-bearing result entered the trace verbatim. We first redact sensitive
+/// JSON keys/strings via the foundation `audit_redaction` Strategy, then bound
+/// the serialized string on a UTF-8 character boundary.
 fn serialize_tool_output(output: &Value) -> String {
-    serde_json::to_string(output).unwrap_or_else(|_| output.to_string())
+    let sanitized = macaca_proto::audit_redaction::sanitize_json(output.clone());
+    let serialized =
+        serde_json::to_string(&sanitized).unwrap_or_else(|_| sanitized.to_string());
+    macaca_proto::text_sanitize::truncate_with_marker(&serialized, MAX_TRACE_OUTPUT_CHARS)
 }
 
 /// A single callable tool.

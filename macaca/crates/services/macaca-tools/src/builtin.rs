@@ -132,7 +132,14 @@ impl Tool for FileWriteTool {
         let input = command.input;
         let input = normalize_tool_input(&input);
         let path = pick_path_str(&input).ok_or_else(|| {
-            tracing::error!(raw_input = %input, "file_write: path not found in input");
+            // Do not log the raw input (2026-07-08 audit): file_write input can
+            // contain the full file body or secrets. Log only the object's keys,
+            // which is enough to diagnose a missing `path` field.
+            let input_keys = input
+                .as_object()
+                .map(|o| o.keys().cloned().collect::<Vec<_>>())
+                .unwrap_or_default();
+            tracing::error!(input_keys = ?input_keys, "file_write: path not found in input");
             MacacaError::Agent(format!(
                 "file_write requires non-empty 'path'. Received keys: {:?}",
                 input

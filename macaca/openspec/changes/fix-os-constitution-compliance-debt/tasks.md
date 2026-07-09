@@ -68,8 +68,11 @@
   `macaca-memory`: added `sanitize_provider_error_body` alongside `redact_text`
   (structural, catches unknown embedded secrets) and wired into all 6 DashScope
   embedding + Milvus vector error paths.
-- [ ] 2.2 Bound/sanitize gateway logs (`telegram.rs:114`, `gateway.rs:79-124`) and
-  tools trace input/output (`macaca-tools/tool.rs:184-225`, `builtin.rs:135`)
+- [x] 2.2 (partial) tools trace: `TraceToolCommandMiddleware` now redacts tool
+  input JSON via `audit_redaction::sanitize_json` and bounds serialized output/
+  error strings via `text_sanitize::truncate_with_marker`; `builtin.rs` file_write
+  logs only input keys instead of `raw_input`. REMAINING: gateway log bounding
+  (`telegram.rs:114`, `gateway.rs` DefaultEventHandler content)
 - [ ] 2.3 Harden `sdk_no_provider_construction_gate` to naming-pattern + mandatory
   registration; add anti-`concat!`-splitting rule to the no-hardcoded-names gate;
   add a `use`-level boundary scan
