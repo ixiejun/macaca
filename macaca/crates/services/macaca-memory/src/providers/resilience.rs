@@ -180,3 +180,24 @@ pub fn redact_text(input: &str, secret_markers: &[String]) -> String {
     }
     output
 }
+
+/// Maximum characters retained from a provider (embedding/vector) error body.
+const MAX_PROVIDER_ERROR_BODY_CHARS: usize = 512;
+
+/// Sanitize a raw provider error body before it enters an error/log string.
+///
+/// Added for the 2026-07-08 audit (S8): the DashScope embedding and Milvus vector
+/// backends interpolated `response.text().await` — an unbounded, unredacted
+/// upstream body — directly into `MacacaError::Memory`. Unlike [`redact_text`],
+/// which requires the caller to already know the secret markers, this sanitizer
+/// masks any *secret-shaped* token structurally (so it catches unknown embedded
+/// credentials) and bounds the output on a UTF-8 character boundary. It reuses
+/// the foundation `text_sanitize` primitives so the rule matches the LLM crate.
+pub fn sanitize_provider_error_body(body: &str) -> String {
+    let masked = body
+        .split_whitespace()
+        .map(macaca_proto::text_sanitize::mask_secret)
+        .collect::<Vec<_>>()
+        .join(" ");
+    macaca_proto::text_sanitize::truncate_with_marker(&masked, MAX_PROVIDER_ERROR_BODY_CHARS)
+}
