@@ -172,7 +172,19 @@ fn validate_proposal_lifecycle_envelope(
             "skill proposal {operation} requires policy decision references"
         ));
     }
-    if policy.entitlement_ready == Some(false) || policy.package_ready == Some(false) {
+    // Fail-closed readiness (2026-07-08 audit P0-3): a mutating proposal
+    // operation proceeds only when BOTH readiness signals are explicitly
+    // `Some(true)`. The previous `== Some(false)` test let an `Unknown` (`None`)
+    // readiness through, authorizing side effects without confirmed entitlement
+    // or package readiness. This now matches the canonical pattern in
+    // `mutation.rs` and `proposal_materialization.rs`.
+    if policy.entitlement_ready != Some(true) || policy.package_ready != Some(true) {
+        tracing::warn!(
+            target = "macaca_skill::proposal_lifecycle",
+            event = "proposal_denied",
+            reason_code = "readiness_not_confirmed",
+            operation = %operation
+        );
         return Err(format!("skill proposal {operation} policy denied"));
     }
     Ok(())

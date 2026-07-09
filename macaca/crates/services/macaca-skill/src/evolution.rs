@@ -46,8 +46,16 @@ pub enum SkillExperienceEvidenceGateStatus {
 }
 
 impl Default for SkillExperienceEvidenceGateStatus {
+    /// Fail-closed default (2026-07-08 audit P0-3).
+    ///
+    /// The evidence gate authorizes a skill experience becoming a governed
+    /// proposal. Defaulting to `Accepted` meant a deserialized candidate missing
+    /// the `evidence_gate` field was silently treated as *already approved*,
+    /// letting unverified experience bypass the Task/Autonomy evidence gate. The
+    /// default is therefore the non-authorizing `Missing`: absence of evidence is
+    /// never acceptance.
     fn default() -> Self {
-        Self::Accepted
+        Self::Missing
     }
 }
 
@@ -134,8 +142,14 @@ impl SkillExperienceCandidate {
     }
 }
 
+/// Fail-closed default for `verified_terminal_success` (2026-07-08 audit P0-3).
+///
+/// A candidate missing this field on deserialization must NOT be presumed to
+/// have verified terminal success; presuming `true` allowed unverified work to
+/// pass `validate()`. The default is `false`, so verification must be explicitly
+/// asserted by the producer.
 fn default_verified_terminal_success() -> bool {
-    true
+    false
 }
 
 /// Stored draft proposal metadata.

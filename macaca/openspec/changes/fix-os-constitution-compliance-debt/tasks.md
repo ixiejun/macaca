@@ -30,13 +30,16 @@
   `macaca-gateway/telegram_format.rs` (split_message); added Chinese/emoji tests
 - [x] 1.3 `macaca-kernel/logging.rs` secret masking now fully redacts secret-shaped
   values (no sk-/Bearer prefix retained) via structural `mask_secret`
-- [ ] 1.4 Fix `macaca-skill/runtime/path_policy.rs:11-26`: canonicalize failure →
-  reject; add `..` traversal tests
-- [ ] 1.5 Make skill/proposal readiness fail-closed:
-  `evolution.rs:48-52,83-86,137-139` defaults → Missing/false;
-  `proposal_lifecycle.rs:175-177`, `proposal_processing.rs:183-187`,
-  `curation.rs:82-104` require `Some(true)`; `autonomy live_orchestrator.rs:305-337`
-  add real lease validation
+- [x] 1.4 `macaca-skill/runtime/path_policy.rs` now resolves `..` via canonicalize
+  then lexical normalization, rejecting unresolvable/escaping paths (fail-closed)
+  with a key-node warn log; added 4 traversal regression tests
+- [x] 1.5 (partial) Skill readiness fail-closed:
+  `evolution.rs` `SkillExperienceEvidenceGateStatus::default()` → `Missing` and
+  `default_verified_terminal_success()` → `false`; `proposal_lifecycle.rs` and
+  `proposal_processing.rs` now require both readiness signals `== Some(true)`
+  (was the leniency `== Some(false)`), with denial warn logs. REMAINING:
+  `curation.rs:82-104` entitlement/package check, and
+  `autonomy live_orchestrator.rs:305-337` real lease validation
 - [ ] 1.6 P0 execution stop-gap: add path allow-list, output byte cap, timeout
   `child.kill()`, and command-line sanitization to `macaca-tools/builtin.rs`
   ShellTool/FileRead/FileWrite and `macaca-skill/tool.rs` execute paths; require

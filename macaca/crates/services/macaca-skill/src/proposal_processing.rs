@@ -180,9 +180,18 @@ impl SkillProposalProcessingRunCommand {
             {
                 return Err("skill proposal processing apply requires policy decision refs".into());
             }
-            if self.policy.entitlement_ready == Some(false)
-                || self.policy.package_ready == Some(false)
+            // Fail-closed readiness (2026-07-08 audit P0-3): the apply path
+            // mutates state, so it proceeds only when both readiness signals are
+            // explicitly `Some(true)`. `Unknown` (`None`) is treated as denied,
+            // matching `mutation.rs`/`proposal_materialization.rs`.
+            if self.policy.entitlement_ready != Some(true)
+                || self.policy.package_ready != Some(true)
             {
+                tracing::warn!(
+                    target = "macaca_skill::proposal_processing",
+                    event = "proposal_apply_denied",
+                    reason_code = "readiness_not_confirmed"
+                );
                 return Err("skill proposal processing policy denied".into());
             }
         }
