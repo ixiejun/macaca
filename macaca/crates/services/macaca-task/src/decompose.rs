@@ -132,10 +132,14 @@ impl LlmDecomposer {
         };
 
         serde_json::from_str(json_str).map_err(|e| {
+            // Use the foundation UTF-8-safe truncation primitive. The previous
+            // `&json_str[..json_str.len().min(500)]` byte slice panicked when the
+            // 500th byte fell inside a multi-byte character (common for Chinese
+            // LLM output), turning a recoverable parse error into a crash.
             format!(
                 "Failed to parse LLM output as JSON: {}. Output: {}",
                 e,
-                &json_str[..json_str.len().min(500)]
+                macaca_proto::text_sanitize::safe_char_prefix(json_str, 500)
             )
         })
     }

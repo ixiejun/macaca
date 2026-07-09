@@ -79,40 +79,40 @@ impl LogContext {
 }
 
 /// 敏感信息脱敏处理
+///
+/// Delegates to the foundation-level [`macaca_proto::text_sanitize`] primitives
+/// so masking rules stay provider-neutral and consistent across the OS. Secret-
+/// shaped values (API keys, bearer tokens, long opaque tokens) are **fully**
+/// redacted — the previous implementation retained a usable prefix (e.g. the
+/// first 12 characters of an `sk-` key), which the 2026-07-08 audit flagged as a
+/// credential-prefix leak. Non-secret values longer than 40 characters are
+/// truncated on a UTF-8 character boundary (the old byte-slice `&text[..40]`
+/// panicked on multi-byte input such as Chinese text or emoji).
 pub fn mask_sensitive(text: &str) -> String {
     if text.is_empty() {
         return String::new();
     }
 
-    // API密钥/Token脱敏 - 保留前8位
-    if text.starts_with("sk-") && text.len() > 12 {
-        return format!("{}...****", &text[..12]);
+    // Structural, allow-list-style masking: anything that looks like a credential
+    // is redacted in full with no prefix retained.
+    if macaca_proto::text_sanitize::is_secret_shaped(text) {
+        return macaca_proto::text_sanitize::mask_secret(text);
     }
 
-    // Bearer token脱敏
-    if text.starts_with("Bearer ") && text.len() > 20 {
-        return format!("Bearer {}...****", &text[7..15]);
-    }
-
-    // 其他长字符串 - 保留前20位
-    if text.len() > 40 {
-        return format!("{}... [truncated {} chars]", &text[..40], text.len() - 40);
+    // Non-secret long strings are truncated safely on a character boundary.
+    if text.chars().count() > 40 {
+        return macaca_proto::text_sanitize::truncate_with_marker(text, 40);
     }
 
     text.to_string()
 }
 
 /// 截断长文本
+///
+/// UTF-8-safe truncation via the foundation primitive; never slices inside a
+/// multi-byte character. `max_len` is interpreted as a maximum character count.
 pub fn truncate(text: &str, max_len: usize) -> String {
-    if text.len() > max_len {
-        format!(
-            "{}... [truncated {} chars]",
-            &text[..max_len],
-            text.len() - max_len
-        )
-    } else {
-        text.to_string()
-    }
+    macaca_proto::text_sanitize::truncate_with_marker(text, max_len)
 }
 
 /// 格式化JSON参数，脱敏敏感字段
@@ -130,9 +130,13 @@ pub fn mask_json_params(params: &str) -> String {
                 let actual_start = search_start + value_start + 1;
                 if let Some(value_end) = result[actual_start..].find('"') {
                     let end = actual_start + value_end;
-                    if end > actual_start + 8 {
-                        let masked = format!("{}...****", &result[actual_start..actual_start + 8]);
-                        result.replace_range(actual_start..end, &masked);
+                    // Fully redact the sensitive value. The previous code retained
+                    // the first 8 characters (a credential-prefix leak) and sliced
+                    // by byte offset (`actual_start + 8`), which could panic when
+                    // the value contained multi-byte characters. `find` returns
+                    // valid boundaries, so `actual_start..end` is always safe.
+                    if end > actual_start {
+                        result.replace_range(actual_start..end, "[redacted]");
                     }
                 }
             }
@@ -421,9 +425,19 @@ mod tests {
 
     #[test]
     fn test_mask_sensitive() {
-        assert_eq!(mask_sensitive("sk-abc1234567890"), "sk-abc123456...****");
+        // Secret-shaped values are now fully redacted with no prefix retained.
+        assert_eq!(mask_sensitive("sk-abc1234567890"), "[redacted-secret]");
         assert_eq!(mask_sensitive("normal text"), "normal text");
         assert_eq!(mask_sensitive(""), "");
+    }
+
+    #[test]
+    fn test_mask_sensitive_multibyte_does_not_panic() {
+        // A long multi-byte string previously panicked on the `&text[..40]`
+        // byte slice; it must now truncate safely on a character boundary.
+        let long_chinese = "任务".repeat(50);
+        let masked = mask_sensitive(&long_chinese);
+        assert!(masked.contains("truncated"));
     }
 
     #[test]
@@ -431,7 +445,7 @@ mod tests {
         assert_eq!(truncate("short", 10), "short");
         assert_eq!(
             truncate("this is a long text", 10),
-            "this is a ... [truncated 9 chars]"
+            "this is a … [truncated 9 chars]"
         );
     }
 

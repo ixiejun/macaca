@@ -49,6 +49,7 @@ pub mod skill_service;
 pub mod store_service;
 pub mod task_claim_diagnostics;
 pub mod task_service;
+pub mod text_sanitize;
 pub mod tool_runtime_environment;
 pub mod tool_service;
 pub mod types;

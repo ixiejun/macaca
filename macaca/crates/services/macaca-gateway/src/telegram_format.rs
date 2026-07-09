@@ -5,29 +5,12 @@ pub(crate) const TELEGRAM_MAX_LEN: usize = 4096;
 
 /// Split `text` into chunks of at most `max_len` characters.
 ///
-/// Prefers splitting at newline boundaries to preserve formatting. Falls
-/// back to a hard split at `max_len` when no newline is found within the
-/// current window.
+/// Prefers splitting at newline boundaries to preserve formatting. Delegates to
+/// the foundation UTF-8-safe [`macaca_proto::text_sanitize::split_by_chars`]
+/// primitive: the previous implementation windowed with a raw byte slice
+/// (`&remaining[..max_len]`), which panicked whenever `max_len` landed inside a
+/// multi-byte character — i.e. on essentially any Chinese or emoji message that
+/// exceeded the Telegram length limit.
 pub(crate) fn split_message(text: &str, max_len: usize) -> Vec<String> {
-    if text.len() <= max_len {
-        return vec![text.to_string()];
-    }
-
-    let mut chunks = Vec::new();
-    let mut remaining = text;
-
-    while !remaining.is_empty() {
-        if remaining.len() <= max_len {
-            chunks.push(remaining.to_string());
-            break;
-        }
-
-        let window = &remaining[..max_len];
-        let split_at = window.rfind('\n').map(|i| i + 1).unwrap_or(max_len);
-
-        chunks.push(remaining[..split_at].to_string());
-        remaining = &remaining[split_at..];
-    }
-
-    chunks
+    macaca_proto::text_sanitize::split_by_chars(text, max_len)
 }
