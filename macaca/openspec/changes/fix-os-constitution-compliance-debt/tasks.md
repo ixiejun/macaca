@@ -77,8 +77,11 @@
 - [ ] 2.5 Scheduled-agent-task rollback on registration failure
   (`local_provider.rs:161-199`); goal-evaluator no fake `Satisfied` on parse
   failure (`goal_evaluator.rs:66-108`)
-- [ ] 2.6 Event-log truthful durability: `event_log.rs:178-203,130-132` propagate
-  write errors, fix sequence gap
+- [x] 2.6 (partial) Event-log truthful durability: `event_log.rs` append/serialize
+  and `write_index` failures now record a structured `error` event instead of
+  silently swallowing (`let _ = set(...)`), removing the false-durability claim;
+  doc comment corrected. REMAINING (deferred, 25+ call sites): change
+  `append_command`/`append` to return `MacacaResult<u64>` for full propagation
 
 ## 3. Side-Effect Guard & Trace Closure (OpenSpec-tracked; run GitNexus memo)
 - [ ] 3.1 Implement `SideEffectGuard` decorator + shared `Readiness` type in

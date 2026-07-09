@@ -128,7 +128,20 @@ impl EventLog {
         canonical_key: &str,
     ) {
         let key = index_key(index, session_id, value, seq);
-        let _ = self.store.set(&key, canonical_key.as_bytes()).await;
+        // Record index-write failures instead of swallowing them (2026-07-08
+        // audit K1). A dropped index leaves the main event durable but
+        // unfindable by that index; surfacing it lets operators detect and
+        // rebuild rather than silently miss events on indexed queries.
+        if let Err(error) = self.store.set(&key, canonical_key.as_bytes()).await {
+            tracing::error!(
+                target = "macaca_persist::event_log",
+                event = "event_index_write_failed",
+                session_id = %session_id,
+                seq,
+                error = %error,
+                "failed to persist event index entry"
+            );
+        }
     }
 
     async fn get_entry(&self, key: &str) -> Option<EventEntry> {
@@ -174,7 +187,17 @@ impl EventLog {
 
     /// Append an event command to the log. Returns the assigned sequence number.
     ///
-    /// This persists IMMEDIATELY — the event is durable before this function returns.
+    /// Durability contract (clarified after the 2026-07-08 audit K1): this method
+    /// attempts an immediate persist and **records** any serialization or write
+    /// failure at `error` level with the session and sequence, rather than
+    /// silently swallowing it as the previous implementation did (`let _ =
+    /// store.set(...)` + `if let Ok(data)`), which made the log falsely claim
+    /// durability. The returned sequence is monotonic; a failed write leaves an
+    /// unused sequence number (harmless — recovery scans for the max existing
+    /// key) but never a *silent* data loss. NOTE: full `Result` propagation to
+    /// callers is tracked as a follow-up (25+ call sites) and intentionally not
+    /// changed here to keep this fix contained; the loud error record is the
+    /// durability-truthfulness guarantee in the interim.
     pub async fn append_command(&self, command: AppendEventCommand) -> u64 {
         let seq = self.next_seq(&command.session_id).await;
         let agent_name = command
@@ -191,10 +214,34 @@ impl EventLog {
         };
 
         let key = Self::event_key(&command.session_id, seq);
-        if let Ok(data) = serde_json::to_vec(&entry) {
-            let _ = self.store.set(&key, &data).await;
-            self.write_event_indexes(&entry, &key, agent_name.as_deref())
-                .await;
+        match serde_json::to_vec(&entry) {
+            Ok(data) => {
+                if let Err(error) = self.store.set(&key, &data).await {
+                    // The event could not be persisted. Record it loudly so the
+                    // false-durability gap is observable in traces/logs.
+                    tracing::error!(
+                        target = "macaca_persist::event_log",
+                        event = "event_append_write_failed",
+                        session_id = %command.session_id,
+                        seq,
+                        error = %error,
+                        "failed to persist event entry; event was NOT durably stored"
+                    );
+                } else {
+                    self.write_event_indexes(&entry, &key, agent_name.as_deref())
+                        .await;
+                }
+            }
+            Err(error) => {
+                tracing::error!(
+                    target = "macaca_persist::event_log",
+                    event = "event_append_serialize_failed",
+                    session_id = %command.session_id,
+                    seq,
+                    error = %error,
+                    "failed to serialize event entry; event was NOT durably stored"
+                );
+            }
         }
 
         // Notify subscribers (non-blocking, ok if no subscribers)
