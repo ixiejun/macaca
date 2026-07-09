@@ -51,12 +51,18 @@ impl ImAdapter for DiscordAdapter {
     }
 
     async fn send_message(&self, channel_id: &str, content: &str) -> MacacaResult<()> {
+        // Structured unsupported (2026-07-08 audit S13): this stub has no real
+        // transport. Reporting `Ok(())` made it silently discard every reply
+        // while appearing to succeed. Return a typed Gateway error so callers can
+        // distinguish "delivered" from "no Discord transport installed".
         info!(
             channel_id = %channel_id,
             content_len = content.len(),
-            "Discord send_message (stub)"
+            "Discord send_message rejected — stub adapter has no transport"
         );
-        Ok(())
+        Err(macaca_proto::error::MacacaError::Gateway(
+            "discord gateway unsupported: stub adapter has no transport installed".to_string(),
+        ))
     }
 
     async fn stop(&self) -> MacacaResult<()> {
@@ -117,11 +123,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn discord_adapter_send_message() {
+    async fn discord_adapter_send_message_is_structured_unsupported() {
+        // Audit S13: the stub must not silently report success. Sending returns a
+        // structured Gateway error so a missing transport is observable.
         let adapter = DiscordAdapter::new(test_config());
-        adapter
+        let result = adapter
             .send_message("channel_456", "Hello from Discord test")
-            .await
-            .unwrap();
+            .await;
+        assert!(
+            matches!(result, Err(macaca_proto::error::MacacaError::Gateway(_))),
+            "stub send must be a structured Gateway error, got {result:?}"
+        );
     }
 }

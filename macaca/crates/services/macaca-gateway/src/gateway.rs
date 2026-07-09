@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use tracing::info;
+use tracing::{error, info};
 
 use macaca_proto::error::MacacaResult;
 use macaca_proto::types::GatewayEvent;
@@ -40,23 +40,52 @@ impl Gateway {
         self.adapters.len()
     }
 
-    /// Start all registered adapters.
+    /// Start all registered adapters, isolating per-adapter failures.
+    ///
+    /// Fault isolation (2026-07-08 audit): the previous implementation used `?`,
+    /// so a single adapter that failed to start (e.g. an unavailable provider
+    /// returning a structured error) aborted startup of every remaining adapter.
+    /// We now start each adapter independently, record failures at `error`
+    /// level, and continue, so one unavailable transport cannot take the whole
+    /// gateway down. The count of failures is logged for observability.
     pub async fn start_all(&self) -> MacacaResult<()> {
+        let mut failures = 0usize;
         for adapter in &self.adapters {
             info!(adapter = adapter.name(), "Starting adapter");
-            adapter.start(Arc::clone(&self.handler)).await?;
+            if let Err(error) = adapter.start(Arc::clone(&self.handler)).await {
+                failures += 1;
+                error!(
+                    adapter = adapter.name(),
+                    error = %error,
+                    "gateway adapter failed to start; continuing with remaining adapters"
+                );
+            }
         }
-        info!(count = self.adapters.len(), "All gateway adapters started");
+        info!(
+            count = self.adapters.len(),
+            failures, "gateway adapter startup complete"
+        );
         Ok(())
     }
 
-    /// Stop all registered adapters.
+    /// Stop all registered adapters, isolating per-adapter failures.
+    ///
+    /// Mirrors [`Self::start_all`]: a failure stopping one adapter must not
+    /// prevent the others from being stopped.
     pub async fn stop_all(&self) -> MacacaResult<()> {
+        let mut failures = 0usize;
         for adapter in &self.adapters {
             info!(adapter = adapter.name(), "Stopping adapter");
-            adapter.stop().await?;
+            if let Err(error) = adapter.stop().await {
+                failures += 1;
+                error!(
+                    adapter = adapter.name(),
+                    error = %error,
+                    "gateway adapter failed to stop; continuing with remaining adapters"
+                );
+            }
         }
-        info!("All gateway adapters stopped");
+        info!(failures, "gateway adapters stopped");
         Ok(())
     }
 }

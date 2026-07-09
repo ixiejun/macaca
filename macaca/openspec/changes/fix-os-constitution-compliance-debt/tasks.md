@@ -70,8 +70,11 @@
 - [ ] 2.3 Harden `sdk_no_provider_construction_gate` to naming-pattern + mandatory
   registration; add anti-`concat!`-splitting rule to the no-hardcoded-names gate;
   add a `use`-level boundary scan
-- [ ] 2.4 Structured absence (`provider-absence-contract`): gateway telegram/discord
-  (`telegram.rs:67-77,169-179`, `discord.rs:44-65`), tools ListAgents
+- [x] 2.4 (partial) Structured absence: gateway `start_all`/`stop_all` isolate
+  per-adapter failures (one unavailable adapter no longer aborts the rest);
+  telegram `send_message` without a token and discord stub `send_message` now
+  return a structured `MacacaError::Gateway` instead of fake `Ok(())` (tests
+  updated to assert the structured error). REMAINING: tools ListAgents
   (`orchestration.rs:303-310`), driver loader (`loader.rs:141-144`), skill facade
   (`facade.rs:139-148`)
 - [ ] 2.5 Scheduled-agent-task rollback on registration failure

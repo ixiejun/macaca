@@ -170,11 +170,18 @@ impl ImAdapter for TelegramAdapter {
         let token = match std::env::var(&self.config.bot_token_env) {
             Ok(t) => t,
             Err(_) => {
+                // Structured unavailable (2026-07-08 audit S12): the previous
+                // `Ok(())` reported success while silently discarding the reply,
+                // so callers believed the message was delivered. Return a typed
+                // Gateway error so the absence is explicit and observable.
                 warn!(
                     env = %self.config.bot_token_env,
-                    "Telegram bot token env var not set — message not sent"
+                    "Telegram bot token env var not set — returning structured unavailable"
                 );
-                return Ok(());
+                return Err(macaca_proto::error::MacacaError::Gateway(format!(
+                    "telegram gateway unavailable: bot token env '{}' is not configured",
+                    self.config.bot_token_env
+                )));
             }
         };
 

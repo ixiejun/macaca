@@ -192,11 +192,14 @@ async fn telegram_adapter_stop_is_ok() {
 }
 
 #[tokio::test]
-async fn telegram_adapter_send_without_token_is_ok() {
+async fn telegram_adapter_send_without_token_is_structured_unavailable() {
+    // Audit S12: sending without a configured token must return a structured
+    // Gateway error, NOT a fake `Ok(())` that silently drops the message.
     std::env::remove_var("TEST_TELEGRAM_TOKEN");
     let adapter = TelegramAdapter::new(test_config());
-    adapter
-        .send_message("chat_123", "Hello from test")
-        .await
-        .unwrap();
+    let result = adapter.send_message("chat_123", "Hello from test").await;
+    assert!(
+        matches!(result, Err(macaca_proto::error::MacacaError::Gateway(_))),
+        "send without token must be a structured Gateway error, got {result:?}"
+    );
 }
