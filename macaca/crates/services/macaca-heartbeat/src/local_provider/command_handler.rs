@@ -51,39 +51,88 @@ impl HeartbeatService for InProcessHeartbeatProvider {
     async fn wake(&self, command: HeartbeatWakeCommand) -> MacacaResult<HeartbeatCommandResult> {
         let trace = command.trace.clone();
         Ok(self.store.write(|state| {
+            // Wake coalescing with a state-machine guard (2026-07-08 audit B1).
+            //
+            // A scope may already have a pending run. The previous implementation
+            // unconditionally overwrote that run to `Coalesced` — even when it was
+            // `Running` — which destroyed in-flight state yet reported acceptance,
+            // because `mark_run_running` does not clear `pending_by_scope`. We now
+            // classify the existing run before deciding:
+            //   * in-flight (Running)      -> refuse to coalesce; return Conflict
+            //                                 so the caller sees the run is busy.
+            //   * terminal (stale pending) -> clear the stale pointer and fall
+            //                                 through to create a fresh run.
+            //   * waiting (Requested/Gated) -> coalesce as before.
             if let Some(existing) = state.pending_by_scope.get(&command.wake_scope_key).cloned() {
-                let Some(run) = state.runs.get_mut(&existing) else {
-                    state.pending_by_scope.remove(&command.wake_scope_key);
-                    return self.error_result(
-                        trace,
-                        AutonomyServiceErrorKind::Conflict,
-                        "pending_run_missing",
-                        "heartbeat pending run was missing",
-                    );
-                };
-                run.summary.state = HeartbeatRunState::Coalesced;
-                run.summary.disposition = HeartbeatWakeDisposition::Coalesced;
-                run.summary.safe_status = "wake coalesced by local heartbeat provider".into();
-                run.summary
-                    .metadata
-                    .insert("coalesced_trace_id".into(), trace.trace_id.clone());
-                info!(
-                    service_id = HEARTBEAT_SERVICE_ID,
-                    provider_id = LOCAL_PROVIDER_ID,
-                    run_id = existing.as_str(),
-                    wake_scope_key = command.wake_scope_key.as_str(),
-                    trace_id = trace.trace_id.as_str(),
-                    "local heartbeat coalesced duplicate wake"
-                );
-                return self.result(
-                    trace,
-                    Some(existing),
-                    Some(HeartbeatRunState::Coalesced),
-                    HeartbeatWakeDisposition::Coalesced,
-                    run.summary.gates.clone(),
-                    true,
-                    run.summary.audit_id.clone(),
-                );
+                let existing_state = state.runs.get(&existing).map(|run| run.summary.state.clone());
+                match existing_state {
+                    // The pending pointer references a run that no longer exists;
+                    // treat as a conflict and drop the dangling pointer.
+                    None => {
+                        state.pending_by_scope.remove(&command.wake_scope_key);
+                        return self.error_result(
+                            trace,
+                            AutonomyServiceErrorKind::Conflict,
+                            "pending_run_missing",
+                            "heartbeat pending run was missing",
+                        );
+                    }
+                    // In-flight run: refuse to overwrite it. Returning a structured
+                    // Conflict preserves the running run and its audit trail.
+                    Some(ref s) if s.is_in_flight() => {
+                        warn!(
+                            service_id = HEARTBEAT_SERVICE_ID,
+                            provider_id = LOCAL_PROVIDER_ID,
+                            run_id = existing.as_str(),
+                            wake_scope_key = command.wake_scope_key.as_str(),
+                            trace_id = trace.trace_id.as_str(),
+                            "local heartbeat refused to coalesce onto an in-flight run"
+                        );
+                        return self.error_result(
+                            trace,
+                            AutonomyServiceErrorKind::Conflict,
+                            "wake_run_in_flight",
+                            "heartbeat run already in flight for this scope",
+                        );
+                    }
+                    // Stale terminal run still pointed at by pending: clear the
+                    // pointer and fall through to create a new run below.
+                    Some(ref s) if s.is_terminal() => {
+                        state.pending_by_scope.remove(&command.wake_scope_key);
+                    }
+                    // Waiting run (Requested/Gated): coalesce the duplicate wake.
+                    Some(_) => {
+                        // Safe to unwrap: existence was just confirmed above.
+                        let run = state
+                            .runs
+                            .get_mut(&existing)
+                            .expect("existing heartbeat run vanished between reads");
+                        run.summary.state = HeartbeatRunState::Coalesced;
+                        run.summary.disposition = HeartbeatWakeDisposition::Coalesced;
+                        run.summary.safe_status =
+                            "wake coalesced by local heartbeat provider".into();
+                        run.summary
+                            .metadata
+                            .insert("coalesced_trace_id".into(), trace.trace_id.clone());
+                        info!(
+                            service_id = HEARTBEAT_SERVICE_ID,
+                            provider_id = LOCAL_PROVIDER_ID,
+                            run_id = existing.as_str(),
+                            wake_scope_key = command.wake_scope_key.as_str(),
+                            trace_id = trace.trace_id.as_str(),
+                            "local heartbeat coalesced duplicate wake"
+                        );
+                        return self.result(
+                            trace,
+                            Some(existing),
+                            Some(HeartbeatRunState::Coalesced),
+                            HeartbeatWakeDisposition::Coalesced,
+                            run.summary.gates.clone(),
+                            true,
+                            run.summary.audit_id.clone(),
+                        );
+                    }
+                }
             }
 
             let gates = self.gates.evaluate(state, &command);

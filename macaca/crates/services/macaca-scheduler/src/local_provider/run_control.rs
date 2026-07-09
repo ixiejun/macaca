@@ -57,7 +57,7 @@ impl InProcessSchedulerProvider {
         Ok(self.store.write(|state| {
             expire_locked(state, Utc::now(), &trace);
             let now = Utc::now();
-            let Some((run_id, lease_timeout_ms)) = next_lease_candidate(state) else {
+            let Some((run_id, lease_timeout_ms)) = next_lease_candidate(state, now) else {
                 info!(
                     service_id = SCHEDULER_SERVICE_ID,
                     provider_id = LOCAL_PROVIDER_ID,
@@ -350,9 +350,19 @@ impl InProcessSchedulerProvider {
     }
 }
 
-fn next_lease_candidate(state: &LocalSchedulerState) -> Option<(SchedulerRunId, u64)> {
+fn next_lease_candidate(
+    state: &LocalSchedulerState,
+    now: DateTime<Utc>,
+) -> Option<(SchedulerRunId, u64)> {
     state.runs.iter().find_map(|(run_id, run)| {
         if run.summary.state != SchedulerRunState::Queued {
+            return None;
+        }
+        // Honor backoff (2026-07-08 audit B2): a queued run whose `scheduled_for`
+        // is in the future (e.g. a retry with a retry delay) must NOT be leased
+        // yet. The previous implementation ignored `scheduled_for`, so retries
+        // were dispatched immediately and the backoff was effectively disabled.
+        if run.summary.scheduled_for > now {
             return None;
         }
         let job = state.jobs.get(&run.summary.job_id)?;

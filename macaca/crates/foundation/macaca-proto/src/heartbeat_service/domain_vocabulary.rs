@@ -221,6 +221,31 @@ pub enum HeartbeatRunState {
     Skipped,
 }
 
+impl HeartbeatRunState {
+    /// Return whether this state is terminal (no further transition expected).
+    ///
+    /// Provider-neutral classification used by wake coalescing and lifecycle
+    /// guards so state-machine rules are declared once here (Specification
+    /// pattern) instead of being re-derived at each call site. `Coalesced` is
+    /// terminal because a coalesced run has been folded into another and will not
+    /// run on its own.
+    pub fn is_terminal(&self) -> bool {
+        matches!(
+            self,
+            HeartbeatRunState::Succeeded
+                | HeartbeatRunState::Failed
+                | HeartbeatRunState::Skipped
+                | HeartbeatRunState::Coalesced
+        )
+    }
+
+    /// Return whether this state represents an in-flight run that must not be
+    /// overwritten (e.g. by coalescing a later wake onto it).
+    pub fn is_in_flight(&self) -> bool {
+        matches!(self, HeartbeatRunState::Running)
+    }
+}
+
 /// Result of accepting, coalescing, gating, or skipping a wake request.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum HeartbeatWakeDisposition {

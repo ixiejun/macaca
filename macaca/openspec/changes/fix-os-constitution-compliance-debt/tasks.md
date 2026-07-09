@@ -54,9 +54,12 @@
 - [ ] 1.7 Rewrite `macaca-autonomy-evolution` `sanitize_ref` to structural
   allow-list; unify sanitization at the contract boundary for both JSONL and
   in-memory ledger paths
-- [ ] 1.8 State fixes: heartbeat coalesce guard against Running
-  (`command_handler.rs:53-87`); scheduler `scheduled_for <= now` filter
-  (`run_control.rs:353-376`); zero-pad run/job ids (`store.rs:65-69`)
+- [x] 1.8 State fixes: heartbeat coalesce now guards against overwriting an
+  in-flight run (added `HeartbeatRunState::is_terminal`/`is_in_flight` to proto,
+  in-flight → structured Conflict, stale-terminal → new run; regression test
+  added); scheduler `next_lease_candidate` now filters `scheduled_for <= now`
+  (honors retry backoff); run/job ids zero-padded (`{:020}`) for correct
+  lexicographic ordering past ten items
 
 ## 2. Observability Sanitization & Gate Hardening & Structured Absence
 - [ ] 2.1 Adopt `redact_text` + bounding in `macaca-llm` provider adapters

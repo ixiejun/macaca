@@ -55,16 +55,24 @@ pub(super) struct LocalSchedulerState {
 
 impl LocalSchedulerState {
     /// Allocate the next monotonic job identifier for provider-owned registrations.
+    ///
+    /// The sequence is zero-padded to a fixed width (2026-07-08 audit B3). These
+    /// ids are keys in a `BTreeMap`, which orders lexicographically; without
+    /// padding, `job-10` sorts before `job-2`, corrupting FIFO/recent-N ordering
+    /// once the sequence reaches two digits. Twenty digits accommodate the full
+    /// `u64` range so ordering matches creation order for the provider's lifetime.
     pub(super) fn next_job_id(&mut self) -> SchedulerJobId {
         self.next_job_sequence += 1;
-        SchedulerJobId::new(format!("job-{}", self.next_job_sequence))
+        SchedulerJobId::new(format!("job-{:020}", self.next_job_sequence))
             .expect("generated scheduler job id is always non-empty")
     }
 
     /// Allocate the next monotonic run identifier for materialized or manual runs.
+    ///
+    /// Zero-padded for the same lexicographic-ordering reason as [`Self::next_job_id`].
     pub(super) fn next_run_id(&mut self) -> SchedulerRunId {
         self.next_run_sequence += 1;
-        SchedulerRunId::new(format!("run-{}", self.next_run_sequence))
+        SchedulerRunId::new(format!("run-{:020}", self.next_run_sequence))
             .expect("generated scheduler run id is always non-empty")
     }
 

@@ -7,7 +7,7 @@ use chrono::{Duration, Utc};
 use macaca_proto::{
     AutonomyScope, HeartbeatCadencePolicy, HeartbeatCompleteRunCommand, HeartbeatGateKind,
     HeartbeatProfile, HeartbeatProfileId, HeartbeatRunState, HeartbeatScopeIdentity,
-    HeartbeatUpdateProfileCommand, HeartbeatWakeIntent, TraceContext,
+    HeartbeatUpdateProfileCommand, HeartbeatWakeCommand, HeartbeatWakeIntent, TraceContext,
 };
 
 use crate::service_contract::HeartbeatService;
@@ -218,4 +218,66 @@ async fn native_heartbeat_profile_update_changes_policy_and_records_audit() {
         .as_deref()
         .unwrap_or_default()
         .starts_with("audit.heartbeat.profile.updated."));
+}
+
+#[tokio::test]
+async fn wake_refuses_to_coalesce_onto_running_run() {
+    // Regression for the 2026-07-08 audit B1 finding: a second wake for a scope
+    // whose run is already in flight must NOT overwrite that run to `Coalesced`;
+    // it must return a structured conflict and leave the running run intact.
+    let provider = InProcessHeartbeatProvider::new();
+    let scope = AutonomyScope::global();
+    let scope_key = "scope.coalesce.guard";
+
+    // First wake creates a pending, accepted run for the scope.
+    let first = provider
+        .wake(
+            HeartbeatWakeCommand::new(
+                trace(),
+                scope.clone(),
+                scope_key,
+                HeartbeatWakeIntent::Immediate,
+            )
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert!(first.accepted);
+    let run_id = first.run_id.clone().expect("first wake should create a run");
+
+    // Move the run in-flight.
+    provider.mark_run_running(trace(), run_id).unwrap();
+
+    // Second wake on the same scope must be refused, not coalesced.
+    let second = provider
+        .wake(
+            HeartbeatWakeCommand::new(
+                trace(),
+                scope,
+                scope_key,
+                HeartbeatWakeIntent::Immediate,
+            )
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert!(
+        !second.accepted,
+        "wake onto an in-flight run must not be accepted"
+    );
+    assert!(
+        second.error.is_some(),
+        "wake onto an in-flight run must return a structured error"
+    );
+
+    // The original run remains Running and was never overwritten to Coalesced.
+    let snapshot = provider.snapshot_inner();
+    assert!(snapshot
+        .recent_runs
+        .iter()
+        .any(|run| matches!(run.state, HeartbeatRunState::Running)));
+    assert!(!snapshot
+        .recent_runs
+        .iter()
+        .any(|run| matches!(run.state, HeartbeatRunState::Coalesced)));
 }
