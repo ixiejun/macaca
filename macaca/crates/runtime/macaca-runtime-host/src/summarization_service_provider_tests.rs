@@ -86,8 +86,12 @@ async fn summarization_commands_are_traceable_replayable_and_redacted_through_ru
     }
 
     let observable = format!("{:?}", events.events().unwrap());
+    // The provider snapshot is a Memento for recovery, so it must retain only
+    // bounded handles and counters rather than replaying request source data.
+    let snapshot = format!("{:?}", provider.snapshot().await);
     for marker in ["secret-marker", "private-marker", "raw-marker"] {
         assert!(!observable.contains(marker));
+        assert!(!snapshot.contains(marker));
     }
 }
 

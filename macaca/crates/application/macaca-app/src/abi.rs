@@ -6,11 +6,13 @@
 //! or framework state to application code.
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use macaca_proto::{
-    ApplicationAbiDeclaration, ApplicationAbiError, ApplicationCheckpoint, ApplicationExport,
-    ApplicationHostCommandResult, ApplicationHostCommandStatus, ApplicationLifecycleState,
-    PackageDescriptor, PackageRuntimeKind,
+    expand_service_capabilities, ApplicationAbiDeclaration, ApplicationAbiError,
+    ApplicationCheckpoint, ApplicationExport, ApplicationHostCommandResult,
+    ApplicationHostCommandStatus, ApplicationLifecycleState, DomainPackCatalog,
+    EffectiveServiceCapabilities, InMemoryDomainPackCatalog, PackageDescriptor, PackageRuntimeKind,
 };
 use tracing::{info, warn};
 
@@ -21,6 +23,12 @@ use crate::package::application_manifest_v1_to_package_descriptor;
 #[derive(Debug, Clone, PartialEq)]
 pub struct ApplicationAbiDescriptor {
     pub declaration: ApplicationAbiDeclaration,
+    /// Sanitized, descriptor-owned service capabilities visible to the application.
+    ///
+    /// This Memento is expanded from the application declaration and catalog only.
+    /// It intentionally contains command schemas, granted scopes, unavailable
+    /// diagnostics, and replay references, never provider instances or raw data.
+    pub service_capabilities: EffectiveServiceCapabilities,
     pub package: Option<PackageDescriptor>,
     pub runtime_kind: Option<PackageRuntimeKind>,
     pub entry: Option<String>,
@@ -87,6 +95,7 @@ impl ApplicationAbiInstance for MetadataOnlyApplicationAbiInstance {
 pub struct YamlApplicationAbiAdapter {
     manifest: AppManifest,
     package: Option<PackageDescriptor>,
+    catalog: Option<Arc<dyn DomainPackCatalog>>,
 }
 
 impl YamlApplicationAbiAdapter {
@@ -95,6 +104,7 @@ impl YamlApplicationAbiAdapter {
         Self {
             manifest,
             package: None,
+            catalog: None,
         }
     }
 
@@ -103,13 +113,25 @@ impl YamlApplicationAbiAdapter {
         self.package = Some(package);
         self
     }
+
+    /// Inject the host-installed catalog used for descriptor-only discovery.
+    ///
+    /// The catalog remains an abstract Strategy boundary, allowing hosts to
+    /// expose installed, remote, mock, or unavailable pack descriptors without
+    /// making the ABI adapter aware of any concrete provider implementation.
+    pub fn with_catalog(mut self, catalog: Arc<dyn DomainPackCatalog>) -> Self {
+        self.catalog = Some(catalog);
+        self
+    }
 }
 
 impl ApplicationAbiAdapter for YamlApplicationAbiAdapter {
     fn load(&self) -> Result<ApplicationAbiLoadResult, ApplicationAbiError> {
+        let default_catalog = InMemoryDomainPackCatalog::with_builtin_defaults();
+        let catalog = self.catalog.as_deref().unwrap_or(&default_catalog);
         let projection =
             crate::manifest_v1::YamlApplicationManifestAdapter::new(self.manifest.clone())
-                .project();
+                .project_with_catalog(catalog);
         let projected_package = self
             .package
             .clone()
@@ -120,6 +142,11 @@ impl ApplicationAbiAdapter for YamlApplicationAbiAdapter {
             .get("application.id")
             .cloned()
             .unwrap_or_else(|| self.manifest.id.to_string());
+        // Keep service discovery at the ABI boundary data-only. The catalog owns
+        // pack resolution, so this adapter neither constructs providers nor embeds
+        // pack-specific routing rules in application-framework code.
+        let service_capabilities =
+            expand_service_capabilities(self.manifest.service_contract.as_ref(), catalog);
         let mut declaration = ApplicationAbiDeclaration::v0(application_id.clone());
         declaration.package_id = Some(projected_package.manifest.id.clone());
         declaration.permissions = projected_package
@@ -128,6 +155,15 @@ impl ApplicationAbiAdapter for YamlApplicationAbiAdapter {
             .iter()
             .map(|permission| permission.name.clone())
             .collect();
+        declaration.permissions.extend(
+            service_capabilities
+                .granted_pack_permission_scopes
+                .values()
+                .flatten()
+                .cloned(),
+        );
+        declaration.permissions.sort();
+        declaration.permissions.dedup();
         declaration
             .metadata
             .insert("application.name".into(), projection.manifest.name.clone());
@@ -144,6 +180,21 @@ impl ApplicationAbiAdapter for YamlApplicationAbiAdapter {
         declaration.metadata.insert(
             "ability.count".into(),
             projection.manifest.abilities.len().to_string(),
+        );
+        declaration.metadata.insert(
+            "service.capabilities.hash".into(),
+            service_capabilities.capabilities_hash.clone(),
+        );
+        declaration.metadata.insert(
+            "service.capabilities.count".into(),
+            service_capabilities.services.len().to_string(),
+        );
+        declaration.metadata.insert(
+            "service.unavailable_pack_count".into(),
+            service_capabilities
+                .unavailable_pack_reasons
+                .len()
+                .to_string(),
         );
 
         let entry = projection.manifest.runtime.entry.clone();
@@ -179,6 +230,7 @@ impl ApplicationAbiAdapter for YamlApplicationAbiAdapter {
         Ok(ApplicationAbiLoadResult {
             descriptor: ApplicationAbiDescriptor {
                 declaration,
+                service_capabilities,
                 package: Some(projected_package),
                 runtime_kind: Some(PackageRuntimeKind::Yaml),
                 entry,
@@ -235,6 +287,7 @@ impl ApplicationAbiAdapter for WasmApplicationAbiAdapter {
         Ok(ApplicationAbiLoadResult {
             descriptor: ApplicationAbiDescriptor {
                 declaration,
+                service_capabilities: EffectiveServiceCapabilities::default(),
                 package: Some(self.package.clone()),
                 runtime_kind: Some(PackageRuntimeKind::WasmComponent),
                 entry: self
@@ -259,98 +312,5 @@ pub fn is_runtime_unavailable(result: &ApplicationHostCommandResult) -> bool {
 }
 
 #[cfg(test)]
-mod tests {
-    use macaca_proto::{
-        ApplicationImport, DeveloperId, PackageDescriptor, PackageId, PackageManifest,
-        PackageRuntime, PackageRuntimeKind, PackageType,
-    };
-
-    use super::*;
-    use crate::loader::AppLoader;
-
-    fn first_example_app() -> std::path::PathBuf {
-        let examples_dir =
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/apps");
-        let mut paths = std::fs::read_dir(examples_dir)
-            .unwrap()
-            .filter_map(Result::ok)
-            .map(|entry| entry.path().join("app.yaml"))
-            .filter(|path| path.exists())
-            .collect::<Vec<_>>();
-        paths.sort();
-        paths.into_iter().next().unwrap()
-    }
-
-    #[test]
-    fn application_abi_yaml_adapter_preserves_manifest_metadata() {
-        let manifest = AppLoader::load_manifest(first_example_app()).unwrap();
-        let descriptor = YamlApplicationAbiAdapter::new(manifest.clone())
-            .load()
-            .unwrap()
-            .descriptor;
-
-        assert_eq!(descriptor.runtime_kind, Some(PackageRuntimeKind::Yaml));
-        assert_eq!(
-            descriptor
-                .declaration
-                .metadata
-                .get("application.name")
-                .unwrap(),
-            &manifest.name
-        );
-        descriptor.declaration.validate_required_exports().unwrap();
-        assert!(descriptor
-            .declaration
-            .imports
-            .contains(&ApplicationImport::TaskCreateGoal));
-    }
-
-    #[test]
-    fn application_abi_yaml_projection_preserves_key_fields() {
-        let manifest = AppLoader::load_manifest(first_example_app()).unwrap();
-        let load = YamlApplicationAbiAdapter::new(manifest.clone())
-            .load()
-            .unwrap();
-        let descriptor = load.descriptor;
-
-        assert_eq!(
-            descriptor.declaration.application_id,
-            manifest.id.to_string()
-        );
-        assert_eq!(descriptor.runtime_kind, Some(PackageRuntimeKind::Yaml));
-        assert!(descriptor.declaration.package_id.is_some());
-        assert_eq!(
-            descriptor
-                .declaration
-                .metadata
-                .get("manifest.version")
-                .map(String::as_str),
-            Some("1")
-        );
-        let expected_ability_count = manifest.agents.len().to_string();
-        assert_eq!(
-            descriptor.metadata.get("ability.count").map(String::as_str),
-            Some(expected_ability_count.as_str())
-        );
-    }
-
-    #[test]
-    fn application_abi_wasm_adapter_loads_metadata_but_not_execution() {
-        let package = PackageDescriptor::new(PackageManifest::new(
-            PackageId::new("pkg.wasm"),
-            PackageType::Application,
-            "1.0.0",
-            DeveloperId::new("dev.wasm"),
-            PackageRuntime::new(PackageRuntimeKind::WasmComponent, "0"),
-        ));
-        let adapter = WasmApplicationAbiAdapter::new(package);
-        let load = adapter.load().unwrap();
-        let result = adapter.execute_unavailable();
-
-        assert_eq!(
-            load.descriptor.runtime_kind,
-            Some(PackageRuntimeKind::WasmComponent)
-        );
-        assert!(is_runtime_unavailable(&result));
-    }
-}
+#[path = "abi_tests.rs"]
+mod tests;

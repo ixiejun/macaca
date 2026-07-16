@@ -46,14 +46,14 @@
 - [x] 5.1 Extend SDK discovery for `pack.knowledge.summarization.v1` with command schemas, summary modes, source kinds, languages, output formats, citation support, context-compression support, evaluation support, examples, availability, diagnostics, documentation link, provider class, capability hash, compatibility, and redaction profile.
 - [x] 5.2 Extend application admission so required declarations block readiness when unavailable and optional declarations degrade explicitly with effective capability mementos.
 - [x] 5.3 Add SDK command helper builders for all `summarization.*` commands; helpers must only build canonical traced service calls and must never construct providers, prompts, or model clients.
-- [ ] 5.4 Extend WASM/app ABI descriptors so applications can discover summarization commands, declare permissions, receive unavailable diagnostics, and submit typed service calls through the canonical execution path.
+- [x] 5.4 Extend WASM/app ABI descriptors so applications can discover summarization commands, declare permissions, receive unavailable diagnostics, and submit typed service calls through the canonical execution path.
 - [x] 5.5 Add generic app-facing examples for planning a summary, producing an extractive summary, producing an abstractive summary, summarizing many sources, summarizing a conversation, compressing context, comparing summaries, evaluating summary quality, and inspecting evidence.
 - [x] 5.6 Add unavailable-provider, missing-source-permission, missing-citation-support, and quota-denied examples that demonstrate diagnostics without provider names, credentials, application-specific workflows, private documents, or domain-specific summary templates.
 
 ## 6. Trace, Audit, Replay, Security, And Gates
 
 - [x] 6.1 Emit sanitized declaration, admission, planning, validation, policy, entitlement, resource, approval, service-call, summary-generation, conversation-summary, context-compression, refinement, comparison, evaluation, evidence-inspection, health, snapshot, unavailable, and failure events.
-- [ ] 6.2 Ensure traces, audits, snapshots, SDK diagnostics, and examples exclude raw credentials, raw source documents, raw prompts, raw model outputs, raw provider payloads, raw private spans, private conversation text, unbounded summaries, package bytes, manifests, private keys, and signatures.
+- [x] 6.2 Ensure traces, audits, snapshots, SDK diagnostics, and examples exclude raw credentials, raw source documents, raw prompts, raw model outputs, raw provider payloads, raw private spans, private conversation text, unbounded summaries, package bytes, manifests, private keys, and signatures.
 - [x] 6.3 Add replay tests proving every `summarization.*` command is trace-addressable through the canonical service path and that snapshots contain enough bounded metadata for recovery diagnostics.
 - [x] 6.4 Add dependency gates proving kernel, SDK, shells, and generic application framework do not import concrete summarization providers, model clients, prompt templates, cloud SDKs, or provider-specific adapters.
 - [x] 6.5 Add no-direct-provider-call gates proving SDK helpers, WASM ABI handlers, app admission, web, CLI, and frontend paths route through descriptor-owned service commands.

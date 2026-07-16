@@ -70,3 +70,28 @@ fn summarization_boundaries_do_not_import_or_construct_concrete_providers() {
         violations.join("\n")
     );
 }
+
+#[test]
+fn summarization_developer_examples_do_not_embed_sensitive_payloads() {
+    let guide = fs::read_to_string(root().join("docs/developer-packs/knowledge/summarization.md"))
+        .expect("summarization developer guide must exist");
+
+    // Documentation examples are part of the developer-facing contract. Keep
+    // them handle-oriented so copying an example cannot disclose credentials,
+    // private keys, provider responses, or source/conversation content.
+    for forbidden in [
+        "sk-",
+        "BEGIN PRIVATE KEY",
+        "credential=",
+        "raw-provider-response",
+        "private-source-content",
+        "private-conversation-turn",
+    ] {
+        assert!(
+            !guide.contains(forbidden),
+            "summarization guide contains forbidden example payload marker: {forbidden}"
+        );
+    }
+    assert!(guide.contains("source handles"));
+    assert!(guide.contains("Raw source documents"));
+}

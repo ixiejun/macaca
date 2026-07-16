@@ -91,3 +91,34 @@ async fn catalog_client_discovers_knowledge_contract_metadata() {
             .contains("developer-packs/knowledge"));
     }
 }
+
+#[tokio::test]
+async fn summarization_sdk_discovery_serializes_only_descriptor_metadata() {
+    let catalog = compose_installed_domain_pack_catalog(reference_domain_pack_definitions());
+    let client = CatalogBackedDomainPackClient::new(catalog);
+    let inspect = client
+        .inspect_pack(
+            &DomainPackInspectCommand::new(KNOWLEDGE_SUMMARIZATION_PACK_ID)
+                .expect("summary pack id must be valid"),
+        )
+        .await
+        .unwrap();
+
+    // SDK discovery receives catalog descriptors, not service-call payloads.
+    // These markers model values that must remain confined to runtime-host
+    // request handling and therefore must never enter developer diagnostics.
+    let diagnostic = serde_json::to_string(&inspect).unwrap();
+    for marker in [
+        "credential=summary-secret",
+        "private-source-content",
+        "raw-provider-response",
+        "private-conversation-turn",
+    ] {
+        assert!(
+            !diagnostic.contains(marker),
+            "SDK diagnostic leaked {marker}"
+        );
+    }
+    assert!(diagnostic.contains("knowledge_summarization_provider_not_installed"));
+    assert!(diagnostic.contains("redaction_policy"));
+}
