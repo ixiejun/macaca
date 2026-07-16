@@ -62,7 +62,7 @@
   approved runtime-host composition roots.
 - [ ] 4.2 Add unavailable and mock providers with deterministic corpus, schema,
   query, facet, suggest, explain, refresh, stats, and capability behavior.
-- [ ] 4.3 Add lifecycle, health, snapshot, shutdown, timeout, cancellation,
+- [x] 4.3 Add lifecycle, health, snapshot, shutdown, timeout, cancellation,
   bounded pagination, cursor resume, query diagnostics, refresh async handles,
   and index health support.
 - [ ] 4.4 Add provider capability reporting for query AST features, filters,

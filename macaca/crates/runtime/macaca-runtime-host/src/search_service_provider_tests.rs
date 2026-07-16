@@ -100,6 +100,26 @@ async fn search_provider_fails_closed_and_cleans_bounded_snapshot_state() {
     assert_eq!(provider.snapshot().await["active_reference_count"], "0");
 }
 
+#[tokio::test]
+async fn search_provider_projects_bounded_cursor_and_refresh_handles() {
+    let provider = SearchSystemServiceProvider::mock();
+    for (command, state, field) in [
+        ("search.search", "paged", "next_cursor_ref"),
+        ("search.refresh_index", "async", "async_handle_ref"),
+    ] {
+        let reply = provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new(command),
+                serde_json::json!({"result_state":state}),
+                TraceContext::new(format!("search-{state}")),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(reply.status, state);
+        assert!(!reply.output[field].is_null());
+    }
+}
+
 fn command(name: &str, trace_id: &str) -> ServiceCommand {
     ServiceCommand::with_trace(
         ServiceCommandName::new(name),

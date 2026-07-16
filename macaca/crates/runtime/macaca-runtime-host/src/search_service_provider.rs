@@ -10,8 +10,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use async_trait::async_trait;
 use macaca_kernel::SystemService;
 use macaca_proto::{
-    domain_pack_command_trace, domain_pack_service_result, DomainPackProviderCapabilityState,
-    KernelServiceId, SearchProviderCapability, ServiceCommand, ServiceDescriptor, ServiceError,
+    domain_pack_command_trace, CleanupPolicy, DomainPackProviderCapabilityState, KernelServiceId,
+    SearchProviderCapability, ServiceCallResult, ServiceCommand, ServiceDescriptor, ServiceError,
     ServiceHealth, ServiceResult, ServiceType, TraceSchemaRef, KNOWLEDGE_SEARCH_COMMANDS,
     KNOWLEDGE_SEARCH_PACK_ID, KNOWLEDGE_SEARCH_SERVICE_ID,
 };
@@ -158,6 +158,7 @@ impl SystemService for SearchSystemServiceProvider {
         }
 
         let reference = format!("search:reference:{}", trace.trace_id);
+        let result_state = bounded_result_state(&command);
         self.references
             .write()
             .await
@@ -171,10 +172,10 @@ impl SystemService for SearchSystemServiceProvider {
                 .send(event(&command.name.to_string(), &trace.trace_id, *kind));
         }
         info!(service_id = %self.descriptor.id, command = %command.name, trace_id = %trace.trace_id, "search provider call completed");
-        Ok(domain_pack_service_result(
-            serde_json::json!({"status":"ok", "search_handle_ref":reference, "provider_class":"mock", "result_metadata":"bounded:provider-owned"}),
+        Ok(result(
+            serde_json::json!({"status":result_state, "search_handle_ref":reference, "next_cursor_ref":(result_state == "paged").then(|| format!("search:cursor:{}", trace.trace_id)), "async_handle_ref":(result_state == "async").then(|| format!("search:async:{}", trace.trace_id)), "provider_class":"mock", "result_metadata":"bounded:provider-owned"}),
             trace,
-            "mock",
+            result_state,
         ))
     }
 
@@ -202,6 +203,34 @@ impl SystemService for SearchSystemServiceProvider {
             SearchRuntimeEventKind::HealthReported,
         ));
         Ok(health)
+    }
+}
+
+/// Read only bounded mock controls; arbitrary provider output is never retained.
+fn bounded_result_state(command: &ServiceCommand) -> &'static str {
+    match command
+        .payload
+        .get("result_state")
+        .and_then(serde_json::Value::as_str)
+    {
+        Some("paged") => "paged",
+        Some("async") => "async",
+        _ => "ok",
+    }
+}
+
+/// Build a provider-neutral result envelope with opaque references only.
+fn result(
+    output: serde_json::Value,
+    trace: macaca_proto::TraceContext,
+    status: &str,
+) -> ServiceCallResult {
+    ServiceCallResult {
+        output,
+        trace,
+        status: status.into(),
+        metadata: BTreeMap::from([("provider_class".into(), "mock".into())]),
+        cleanup_hint: Some(CleanupPolicy::None),
     }
 }
 
