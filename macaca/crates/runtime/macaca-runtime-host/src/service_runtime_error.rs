@@ -4,7 +4,7 @@
 //! small and makes structured runtime failures easy to audit from tests and
 //! future shell tools.
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use macaca_ipc::InMemoryServiceBusTraceSink;
 use macaca_proto::{ServiceBusError, ServiceBusSource};
@@ -34,6 +34,24 @@ pub enum ServiceRuntimeError {
     #[error("service bus error: {0}")]
     Bus(String),
 
+    #[error("service call timed out after {timeout_ms} ms")]
+    CallTimedOut { timeout_ms: u64 },
+
+    #[error("service call cancelled by runtime token: {cancellation_token}")]
+    CallCancelled { cancellation_token: String },
+
+    #[error("service reply too large: {actual_bytes} bytes exceeds {max_bytes} bytes")]
+    ReplyTooLarge {
+        actual_bytes: usize,
+        max_bytes: usize,
+    },
+
+    #[error("service stream frame limit exceeded: {actual_frames} frames exceeds {max_frames}")]
+    StreamFrameLimitExceeded {
+        actual_frames: usize,
+        max_frames: usize,
+    },
+
     #[error("service operation failed: {0}")]
     Service(String),
 
@@ -47,8 +65,18 @@ impl From<ServiceBusError> for ServiceRuntimeError {
             ServiceBusError::MissingTraceContext => Self::MissingTraceContext,
             ServiceBusError::PolicyDenied(reason) => Self::PolicyDenied(reason),
             ServiceBusError::InvalidArgument(reason) => Self::InvalidArgument(reason),
+            ServiceBusError::DeadlineExceeded => Self::CallTimedOut { timeout_ms: 0 },
             other => Self::Bus(other.to_string()),
         }
+    }
+}
+
+impl ServiceRuntimeError {
+    /// Return whether the error came from runtime-owned call controls rather
+    /// than provider logic.  The caller uses this to preserve service health
+    /// while still emitting terminal audit evidence for the call.
+    pub(crate) fn is_runtime_control_failure(&self) -> bool {
+        matches!(self, Self::CallTimedOut { .. } | Self::CallCancelled { .. })
     }
 }
 
@@ -59,6 +87,9 @@ pub struct ServiceRuntimeConfig {
     pub policy: Arc<dyn ServiceRuntimePolicy>,
     pub event_sink: Option<Arc<dyn ServiceRuntimeEventSink>>,
     pub bus_trace_sink: Option<Arc<InMemoryServiceBusTraceSink>>,
+    pub call_timeout: Option<Duration>,
+    pub max_reply_output_bytes: usize,
+    pub max_stream_frames: usize,
 }
 
 impl Default for ServiceRuntimeConfig {
@@ -68,6 +99,9 @@ impl Default for ServiceRuntimeConfig {
             policy: Arc::new(AllowAllServiceRuntimePolicy),
             event_sink: None,
             bus_trace_sink: None,
+            call_timeout: Some(Duration::from_secs(120)),
+            max_reply_output_bytes: 4 * 1024 * 1024,
+            max_stream_frames: 2048,
         }
     }
 }

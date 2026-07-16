@@ -243,7 +243,10 @@ async fn wake_refuses_to_coalesce_onto_running_run() {
         .await
         .unwrap();
     assert!(first.accepted);
-    let run_id = first.run_id.clone().expect("first wake should create a run");
+    let run_id = first
+        .run_id
+        .clone()
+        .expect("first wake should create a run");
 
     // Move the run in-flight.
     provider.mark_run_running(trace(), run_id).unwrap();
@@ -251,13 +254,8 @@ async fn wake_refuses_to_coalesce_onto_running_run() {
     // Second wake on the same scope must be refused, not coalesced.
     let second = provider
         .wake(
-            HeartbeatWakeCommand::new(
-                trace(),
-                scope,
-                scope_key,
-                HeartbeatWakeIntent::Immediate,
-            )
-            .unwrap(),
+            HeartbeatWakeCommand::new(trace(), scope, scope_key, HeartbeatWakeIntent::Immediate)
+                .unwrap(),
         )
         .await
         .unwrap();

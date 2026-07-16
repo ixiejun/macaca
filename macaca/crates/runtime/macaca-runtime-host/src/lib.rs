@@ -46,6 +46,8 @@ pub(crate) mod autonomy_result_evidence;
 pub mod autonomy_runtime_config;
 pub mod autonomy_service_provider;
 pub mod autonomy_supervisor;
+pub mod calendar_service_provider;
+pub mod citation_service_provider;
 pub mod code_intelligence_service_provider;
 pub mod composed_agent_execution_backend;
 pub(crate) mod config_service_commands;
@@ -53,9 +55,12 @@ pub mod config_service_provider;
 pub mod context_service_provider;
 pub mod delegated_task_dispatcher;
 pub mod diagnostics_service_provider;
+pub mod document_parsing_service_provider;
+mod domain_pack_provider_replacement;
 pub mod domain_pack_service_provider;
 pub mod driver_service_bootstrap;
 pub mod driver_service_provider;
+pub mod email_service_provider;
 pub mod entitlement;
 pub mod entitlement_service_provider;
 pub mod env_bridge;
@@ -80,8 +85,15 @@ mod framework_public_api;
 pub mod framework_runtime_agent_service;
 pub mod genui_surface_store;
 pub mod git_service_provider;
+pub mod graph_service_provider;
 pub(crate) mod hook_service_commands;
 pub mod hook_service_provider;
+pub mod identity_account_service_provider;
+pub mod identity_auth_handoff_service_provider;
+pub mod identity_organization_service_provider;
+pub mod identity_profile_service_provider;
+pub mod identity_tenant_service_provider;
+pub mod inbox_service_provider;
 pub mod interaction_ledger_store;
 pub mod interaction_service_bootstrap;
 pub(crate) mod interaction_service_items;
@@ -98,6 +110,8 @@ pub(crate) mod mcp_operator_lifecycle;
 pub mod mcp_runtime;
 pub mod mcp_service_provider;
 pub mod memory_service_provider;
+pub mod messaging_service_provider;
+pub mod notification_service_provider;
 pub mod optional_service_bootstrap;
 pub mod package;
 pub mod payment_adapter;
@@ -122,9 +136,11 @@ pub mod process_service_provider;
 pub(crate) mod process_service_records;
 pub mod realtime_service_provider;
 pub mod remote_environment_service_provider;
+pub mod retrieval_service_provider;
 pub mod review_service_provider;
 pub(crate) mod sandbox_service_local;
 pub mod sandbox_service_provider;
+pub mod search_service_provider;
 pub mod service_audit_runtime_bundle;
 pub mod service_call_audit;
 pub mod service_call_audit_service_provider;
@@ -162,6 +178,8 @@ pub(crate) mod skill_service_provider_semantic_review;
 pub(crate) mod skill_service_provider_state;
 pub mod store_entitlement_admission;
 pub mod store_service_provider;
+pub mod summarization_service_provider;
+pub mod summarization_strategy;
 pub mod task_service_provider;
 pub mod task_toolkit_bootstrap;
 pub mod tool_bootstrap;
@@ -177,6 +195,7 @@ pub mod tool_service_result;
 pub mod transport;
 pub mod wasm_runtime_provider;
 pub mod web3_service_provider;
+pub mod workflow_task_service_provider;
 pub mod workspace_toolkit_bootstrap;
 
 #[cfg(test)]
@@ -200,17 +219,37 @@ mod application_execution_service_provider_tests;
 #[cfg(test)]
 mod approval_service_provider_tests;
 #[cfg(test)]
+mod calendar_service_provider_tests;
+#[cfg(test)]
+mod citation_service_provider_tests;
+#[cfg(test)]
 mod code_intelligence_service_provider_tests;
 #[cfg(test)]
 mod config_service_provider_tests;
 #[cfg(test)]
 mod diagnostics_realtime_remote_service_provider_tests;
 #[cfg(test)]
+mod document_parsing_service_provider_tests;
+#[cfg(test)]
+mod email_service_provider_tests;
+#[cfg(test)]
 mod file_service_provider_tests;
 #[cfg(test)]
 mod git_service_provider_tests;
 #[cfg(test)]
+mod graph_service_provider_tests;
+#[cfg(test)]
 mod hook_service_provider_tests;
+#[cfg(test)]
+mod identity_account_service_provider_tests;
+#[cfg(test)]
+mod identity_auth_handoff_service_provider_tests;
+#[cfg(test)]
+mod identity_governance_service_provider_tests;
+#[cfg(test)]
+mod identity_profile_service_provider_tests;
+#[cfg(test)]
+mod inbox_service_provider_tests;
 #[cfg(test)]
 mod interaction_service_provider_tests;
 #[cfg(test)]
@@ -218,13 +257,21 @@ mod interaction_service_state_tests;
 #[cfg(test)]
 mod llm_service_provider_hardening_tests;
 #[cfg(test)]
+mod messaging_service_provider_tests;
+#[cfg(test)]
+mod notification_service_provider_tests;
+#[cfg(test)]
 mod plugin_marketplace_service_provider_tests;
 #[cfg(test)]
 mod process_service_provider_tests;
 #[cfg(test)]
+mod retrieval_service_provider_tests;
+#[cfg(test)]
 mod review_service_provider_tests;
 #[cfg(test)]
 mod sandbox_service_provider_tests;
+#[cfg(test)]
+mod search_service_provider_tests;
 #[cfg(test)]
 mod service_router_tests;
 #[cfg(test)]
@@ -258,6 +305,10 @@ mod skill_service_provider_tests;
 #[cfg(test)]
 mod skill_service_usage_tests;
 #[cfg(test)]
+mod summarization_service_provider_tests;
+#[cfg(test)]
+mod summarization_strategy_tests;
+#[cfg(test)]
 mod tool_service_audit_tests;
 #[cfg(test)]
 mod tool_service_environment_tests;
@@ -273,6 +324,8 @@ mod tool_service_planning_tests;
 mod unified_agent_execution_provider_tests;
 #[cfg(test)]
 mod unified_audit_replay_convergence_tests;
+#[cfg(test)]
+mod workflow_task_service_provider_tests;
 
 mod runtime_host_public_api;
 pub use runtime_host_public_api::*;

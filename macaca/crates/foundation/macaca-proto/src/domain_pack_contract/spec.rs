@@ -1,4 +1,6 @@
-use super::model::{AppServiceContractConfig, DomainPackDefinition, DomainPackMetadata};
+use super::model::{
+    AppServiceContractConfig, DomainPackAvailability, DomainPackDefinition, DomainPackMetadata,
+};
 use crate::{ServiceError, ServiceResult};
 
 /// Specification for application-side pack declarations.
@@ -16,8 +18,14 @@ impl AppServiceContractSpec {
             .chain(contract.required_packs.iter())
             .chain(contract.optional_packs.iter())
             .chain(contract.pack_policy_overrides.keys())
+            .chain(contract.pack_permission_scopes.keys())
         {
             validate_domain_pack_id(pack_id)?;
+        }
+        for scopes in contract.pack_permission_scopes.values() {
+            for scope in scopes {
+                validate_domain_pack_permission_scope("application declaration", scope)?;
+            }
         }
         Ok(())
     }
@@ -58,6 +66,66 @@ impl DomainPackDefinitionSpec {
         DomainPackIdentitySpec.validate(definition)?;
         if let Some(parent_pack_id) = definition.metadata.parent_pack_id.as_deref() {
             DomainPackHierarchySpec.validate_parent_child(parent_pack_id, &definition.pack_id)?;
+        }
+        validate_diagnostic_fields(definition)?;
+        if definition.is_callable() {
+            DomainPackCallableSpec.validate(definition)?;
+        }
+        Ok(())
+    }
+}
+
+/// Specification for descriptors that claim callable runtime availability.
+///
+/// A catalog entry is allowed to exist without service mappings when it is only a preview or
+/// unavailable descriptor.  Once the entry becomes callable, the contract must prove that every
+/// expanded service has command and result schema references so SDK invocation helpers can stay
+/// typed, traceable, and provider-neutral.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct DomainPackCallableSpec;
+
+impl DomainPackCallableSpec {
+    pub fn validate(&self, definition: &DomainPackDefinition) -> ServiceResult<()> {
+        if !matches!(
+            definition.metadata.availability,
+            DomainPackAvailability::Available
+        ) {
+            return Err(ServiceError::InvalidArgument(format!(
+                "domain pack `{}` is not marked available",
+                definition.pack_id
+            )));
+        }
+        if definition.services.is_empty() {
+            return Err(ServiceError::InvalidArgument(format!(
+                "callable domain pack `{}` must map to at least one service",
+                definition.pack_id
+            )));
+        }
+        for service in &definition.services {
+            let Some(commands) = definition.metadata.service_command_schemas.get(service) else {
+                return Err(ServiceError::InvalidArgument(format!(
+                    "callable domain pack `{}` is missing command schemas for service `{service}`",
+                    definition.pack_id
+                )));
+            };
+            if commands.is_empty() {
+                return Err(ServiceError::InvalidArgument(format!(
+                    "callable domain pack `{}` has empty command schemas for service `{service}`",
+                    definition.pack_id
+                )));
+            }
+            let Some(results) = definition.metadata.service_result_schemas.get(service) else {
+                return Err(ServiceError::InvalidArgument(format!(
+                    "callable domain pack `{}` is missing result schemas for service `{service}`",
+                    definition.pack_id
+                )));
+            };
+            if results.is_empty() {
+                return Err(ServiceError::InvalidArgument(format!(
+                    "callable domain pack `{}` has empty result schemas for service `{service}`",
+                    definition.pack_id
+                )));
+            }
         }
         Ok(())
     }
@@ -138,6 +206,16 @@ pub fn validate_domain_pack_parent(parent_pack_id: &str, child_pack_id: &str) ->
 fn validate_pack_metadata(pack_id: &str, metadata: &DomainPackMetadata) -> ServiceResult<()> {
     validate_domain_pack_family_id(metadata.family_id.trim())?;
     validate_domain_pack_version(metadata.version.trim())?;
+    let Some((_, pack_version_suffix)) = pack_id.rsplit_once(".v") else {
+        return Err(ServiceError::InvalidArgument(format!(
+            "domain pack `{pack_id}` must expose a parseable version suffix"
+        )));
+    };
+    if metadata.version.trim() != format!("v{pack_version_suffix}") {
+        return Err(ServiceError::InvalidArgument(format!(
+            "domain pack `{pack_id}` metadata version must match the pack id version"
+        )));
+    }
     for version_range in [
         metadata.compatibility.version_range.as_str(),
         metadata.compatibility.parent_version_range.as_str(),
@@ -150,6 +228,48 @@ fn validate_pack_metadata(pack_id: &str, metadata: &DomainPackMetadata) -> Servi
     }
     if let Some(parent_pack_id) = metadata.parent_pack_id.as_deref() {
         validate_domain_pack_id(parent_pack_id)?;
+    }
+    for scope in &metadata.permission_scopes {
+        validate_domain_pack_permission_scope(pack_id, scope)?;
+    }
+    Ok(())
+}
+
+fn validate_domain_pack_permission_scope(pack_id: &str, scope: &str) -> ServiceResult<()> {
+    let scope = scope.trim();
+    if scope.is_empty() || scope.len() > 256 {
+        return Err(ServiceError::InvalidArgument(format!(
+            "domain pack `{pack_id}` permission scopes must be bounded and non-empty"
+        )));
+    }
+    let mut segments = scope.split('.').peekable();
+    if segments.peek().is_none() {
+        return Err(ServiceError::InvalidArgument(format!(
+            "domain pack `{pack_id}` permission scopes must be segmented"
+        )));
+    }
+    for segment in segments {
+        if segment.is_empty() || !segment.chars().all(is_pack_segment_char) {
+            return Err(ServiceError::InvalidArgument(format!(
+                "domain pack `{pack_id}` permission scope `{scope}` contains an invalid segment"
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn validate_diagnostic_fields(definition: &DomainPackDefinition) -> ServiceResult<()> {
+    for field in [
+        definition.metadata.diagnostics.health_probe.as_str(),
+        definition.metadata.diagnostics.unavailable_reason.as_str(),
+        definition.metadata.diagnostics.replay_schema.as_str(),
+    ] {
+        if field.contains('\n') || field.len() > 512 {
+            return Err(ServiceError::InvalidArgument(format!(
+                "domain pack `{}` diagnostic metadata must stay bounded and single-line",
+                definition.pack_id
+            )));
+        }
     }
     Ok(())
 }

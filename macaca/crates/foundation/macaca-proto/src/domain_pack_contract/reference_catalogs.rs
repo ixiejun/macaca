@@ -5,9 +5,11 @@ use crate::{
     TASK_SERVICE_ID,
 };
 
+use super::industrial_reference_catalogs::industrial_reference_domain_pack_definitions;
 use super::model::{
-    DomainPackCompatibility, DomainPackDataGovernance, DomainPackDefinition, DomainPackDiagnostics,
-    DomainPackMetadata, DomainPackPolicyTemplate, DomainPackSdkMetadata, DomainPackStability,
+    DomainPackAvailability, DomainPackCompatibility, DomainPackDataGovernance,
+    DomainPackDefinition, DomainPackDiagnostics, DomainPackMetadata, DomainPackPolicyTemplate,
+    DomainPackSdkMetadata, DomainPackStability,
 };
 
 /// Return the data-only reference packs shipped by the provider-neutral platform.
@@ -16,11 +18,13 @@ use super::model::{
 /// already exist behind service/facade boundaries so SDKs can explain the platform without the
 /// base OS importing optional package providers or branching on application behavior.
 pub fn reference_domain_pack_definitions() -> Vec<DomainPackDefinition> {
-    vec![
+    let mut definitions = vec![
         foundation_pack_definition(),
         developer_pack_definition(),
         knowledge_pack_definition(),
-    ]
+    ];
+    definitions.extend(industrial_reference_domain_pack_definitions());
+    definitions
 }
 
 /// Foundation pack metadata for generic host primitives already exposed as services.
@@ -141,12 +145,32 @@ fn pack_definition<const S: usize, const P: usize, const C: usize>(
         .into_iter()
         .flat_map(|(scope, verbs)| verbs.iter().map(move |verb| format!("{scope}.{verb}")))
         .collect::<BTreeSet<_>>();
-    let service_command_schemas = command_schemas
+    let mut service_command_schemas = command_schemas
         .into_iter()
         .map(|(service, commands)| {
             (
                 service.to_string(),
-                commands.iter().map(ToString::to_string).collect(),
+                commands
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<BTreeSet<_>>(),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    for service in &services {
+        service_command_schemas
+            .entry(service.clone())
+            .or_insert_with(|| BTreeSet::from([format!("{service}.command.v1")]));
+    }
+    let service_result_schemas = service_command_schemas
+        .iter()
+        .map(|(service, commands)| {
+            (
+                service.clone(),
+                commands
+                    .iter()
+                    .map(|command| format!("{command}.result"))
+                    .collect(),
             )
         })
         .collect::<BTreeMap<_, _>>();
@@ -155,8 +179,12 @@ fn pack_definition<const S: usize, const P: usize, const C: usize>(
         parent_pack_id: parent_pack_id.map(ToString::to_string),
         version: "v1".into(),
         stability: DomainPackStability::Preview,
+        availability: DomainPackAvailability::Available,
         service_command_schemas,
+        service_result_schemas,
         permission_scopes,
+        source_attribution: BTreeSet::from(["macaca-industrial-pack-catalog.v1".into()]),
+        migration_notes: Vec::new(),
         policy_template: DomainPackPolicyTemplate {
             timeout_ms: Some(30_000),
             max_retries: Some(1),
@@ -183,6 +211,7 @@ fn pack_definition<const S: usize, const P: usize, const C: usize>(
             parent_version_range: String::new(),
             service_version_ranges: BTreeMap::new(),
         },
+        provider_descriptors: BTreeMap::new(),
     };
     DomainPackDefinition::with_metadata(pack_id, metadata, services)
 }

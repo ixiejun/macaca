@@ -189,8 +189,7 @@ impl ScheduledAgentTaskService for LocalScheduledAgentTaskProvider {
             Ok(result) => result,
             Err(error) => {
                 self.write(|state| {
-                    state
-                        .rollback_prepared_task(&prepared.task_id, &prepared.payload_ref.reference)
+                    state.rollback_prepared_task(&prepared.task_id, &prepared.payload_ref.reference)
                 });
                 return Err(error);
             }

@@ -3,6 +3,8 @@ use std::sync::Arc;
 
 use tracing::info;
 
+use serde::{Deserialize, Serialize};
+
 use super::model::DomainPackDefinition;
 
 /// Domain pack lookup abstraction used during manifest capability expansion.
@@ -60,6 +62,18 @@ impl DomainPackCatalog for InMemoryDomainPackCatalog {
 /// Thread-safe catalog handle shared across runtime, service provider, and UI layers.
 pub type SharedDomainPackCatalog = Arc<dyn DomainPackCatalog>;
 
+/// Replay-safe memento for the active domain-pack catalog.
+///
+/// The snapshot contains descriptor metadata only.  Its stable hash lets admission reports, SDK
+/// responses, and runtime audit events refer to the exact catalog view used for a decision without
+/// storing provider payloads, package bytes, manifests, prompts, or secrets.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DomainPackCatalogSnapshot {
+    pub packs: Vec<DomainPackDefinition>,
+    pub catalog_hash: String,
+    pub replay_schema: String,
+}
+
 /// Build an empty catalog for unit tests and hosts without optional packs.
 pub fn empty_domain_pack_catalog() -> SharedDomainPackCatalog {
     Arc::new(InMemoryDomainPackCatalog::with_builtin_defaults())
@@ -83,4 +97,29 @@ pub fn compose_installed_domain_pack_catalog(
         "Composed installed domain-pack catalog for composition root"
     );
     Arc::new(catalog)
+}
+
+/// Capture a deterministic descriptor-only snapshot of a catalog.
+pub fn snapshot_domain_pack_catalog(catalog: &dyn DomainPackCatalog) -> DomainPackCatalogSnapshot {
+    let packs = catalog.list();
+    let catalog_hash = hash_catalog(&packs);
+    tracing::info!(
+        pack_count = packs.len(),
+        catalog_hash = %catalog_hash,
+        replay_schema = "pack.catalog.snapshot.v1",
+        "pack_catalog_snapshot"
+    );
+    DomainPackCatalogSnapshot {
+        packs,
+        catalog_hash,
+        replay_schema: "pack.catalog.snapshot.v1".into(),
+    }
+}
+
+fn hash_catalog(packs: &[DomainPackDefinition]) -> String {
+    let payload = serde_json::to_vec(packs).unwrap_or_default();
+    let digest = payload.iter().fold(0_u64, |state, byte| {
+        state.wrapping_mul(1099511628211).wrapping_add(*byte as u64)
+    });
+    format!("{digest:016x}")
 }

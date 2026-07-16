@@ -6,8 +6,10 @@
 
 pub use macaca_proto::{
     developer_pack_definition, expand_service_capabilities, foundation_pack_definition,
-    knowledge_pack_definition, reference_domain_pack_definitions, AppPackPolicyOverride,
-    AppServiceContractConfig, AppServiceContractSpec, AppServicePolicyOverride, DomainPackCatalog,
+    industrial_reference_domain_pack_definitions, knowledge_pack_definition,
+    reference_domain_pack_definitions, snapshot_domain_pack_catalog, AppPackPolicyOverride,
+    AppServiceContractConfig, AppServiceContractSpec, AppServicePolicyOverride,
+    DomainPackAvailability, DomainPackCallableSpec, DomainPackCatalog, DomainPackCatalogSnapshot,
     DomainPackCompatibility, DomainPackDataGovernance, DomainPackDefinition,
     DomainPackDefinitionSpec, DomainPackDiagnostics, DomainPackHierarchySpec,
     DomainPackIdentitySpec, DomainPackMetadata, DomainPackPolicyTemplate,

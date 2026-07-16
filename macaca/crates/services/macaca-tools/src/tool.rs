@@ -245,8 +245,7 @@ const MAX_TRACE_OUTPUT_CHARS: usize = 2048;
 /// the serialized string on a UTF-8 character boundary.
 fn serialize_tool_output(output: &Value) -> String {
     let sanitized = macaca_proto::audit_redaction::sanitize_json(output.clone());
-    let serialized =
-        serde_json::to_string(&sanitized).unwrap_or_else(|_| sanitized.to_string());
+    let serialized = serde_json::to_string(&sanitized).unwrap_or_else(|_| sanitized.to_string());
     macaca_proto::text_sanitize::truncate_with_marker(&serialized, MAX_TRACE_OUTPUT_CHARS)
 }
 

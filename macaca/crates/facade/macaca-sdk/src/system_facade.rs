@@ -27,7 +27,10 @@ pub use crate::application_client::{SystemApplicationClient, UnavailableSystemAp
 pub use crate::domain_pack_client::{
     CatalogBackedDomainPackClient, DomainPackInspectCommand, DomainPackInspectResult,
     DomainPackListCommand, DomainPackListResult, DomainPackResolveCommand, DomainPackResolveResult,
-    EmptySystemDomainPackClient, SystemDomainPackClient,
+    DomainPackServiceCallBuilder, EmptySystemDomainPackClient, SystemDomainPackClient,
+};
+pub use crate::domain_pack_command_builder::{
+    DomainPackCommandCatalogBuilder, DomainPackCommandSpec, DomainPackDeclaredCommandBuilder,
 };
 pub use crate::driver_client::{SystemDriverClient, UnavailableSystemDriverClient};
 pub use crate::entitlement_client::{SystemEntitlementClient, UnavailableSystemEntitlementClient};

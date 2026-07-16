@@ -64,7 +64,10 @@ impl HeartbeatService for InProcessHeartbeatProvider {
             //                                 through to create a fresh run.
             //   * waiting (Requested/Gated) -> coalesce as before.
             if let Some(existing) = state.pending_by_scope.get(&command.wake_scope_key).cloned() {
-                let existing_state = state.runs.get(&existing).map(|run| run.summary.state.clone());
+                let existing_state = state
+                    .runs
+                    .get(&existing)
+                    .map(|run| run.summary.state.clone());
                 match existing_state {
                     // The pending pointer references a run that no longer exists;
                     // treat as a conflict and drop the dangling pointer.

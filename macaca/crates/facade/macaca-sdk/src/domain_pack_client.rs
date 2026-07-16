@@ -68,6 +68,60 @@ pub struct DomainPackResolveResult {
     pub unavailable: Vec<DomainPackUnavailableDiagnostic>,
 }
 
+/// Builder for canonical domain-pack service-call commands.
+///
+/// The builder is intentionally small and provider-neutral.  It owns only the command envelope
+/// required by the SDK Facade and delegates validation to [`DomainPackResolveResult`], which has
+/// the effective capability memento produced during admission/discovery.  This keeps developer
+/// helpers ergonomic while proving that SDK code constructs traced service-runtime commands
+/// instead of constructing providers, opening credentials, or branching on pack-specific business
+/// behavior.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DomainPackServiceCallBuilder {
+    service_id: String,
+    command_name: String,
+    payload: serde_json::Value,
+    trace: TraceContext,
+}
+
+impl DomainPackServiceCallBuilder {
+    /// Create a builder from already provider-neutral command parts.
+    ///
+    /// Empty service or command names are rejected before the builder can reach runtime dispatch.
+    /// The payload is intentionally opaque JSON because the pack descriptor owns command-schema
+    /// compatibility; the SDK builder only guarantees canonical routing and trace attachment.
+    pub fn new(
+        service_id: impl Into<String>,
+        command_name: impl Into<String>,
+        payload: serde_json::Value,
+        trace: TraceContext,
+    ) -> MacacaResult<Self> {
+        let service_id = service_id.into().trim().to_string();
+        let command_name = command_name.into().trim().to_string();
+        if service_id.is_empty() || command_name.is_empty() {
+            return Err(MacacaError::Config(
+                "domain-pack service-call builder requires non-empty service_id and command_name"
+                    .into(),
+            ));
+        }
+        Ok(Self {
+            service_id,
+            command_name,
+            payload,
+            trace,
+        })
+    }
+
+    /// Build the canonical traced service command from an effective pack capability memento.
+    ///
+    /// This method is the SDK-side Command pattern boundary.  It does not import package crates,
+    /// instantiate providers, access credentials, or execute side effects.  Missing services and
+    /// undeclared command schemas fail before a `ServiceCallCommand` is returned.
+    pub fn build(self, resolved: &DomainPackResolveResult) -> MacacaResult<ServiceCallCommand> {
+        resolved.service_call_command(self.service_id, self.command_name, self.payload, self.trace)
+    }
+}
+
 impl DomainPackResolveResult {
     /// Build a canonical traced service command for a service expanded from the declaration.
     ///
@@ -92,6 +146,23 @@ impl DomainPackResolveResult {
                 "service '{service_id}' is not declared by the effective pack capability set"
             )));
         }
+        let command_name = command_name.into();
+        let command_declared = self
+            .effective
+            .service_command_schemas
+            .get(&service_id)
+            .is_some_and(|commands| commands.contains(&command_name));
+        if !command_declared {
+            warn!(
+                service_id = %service_id,
+                command = %command_name,
+                capabilities_hash = %self.effective.capabilities_hash,
+                "pack_service_call_failed"
+            );
+            return Err(MacacaError::Config(format!(
+                "command '{command_name}' is not declared by the effective pack capability set for service '{service_id}'"
+            )));
+        }
         let source = self
             .effective
             .service_sources
@@ -109,6 +180,7 @@ impl DomainPackResolveResult {
         info!(
             pack_id = source,
             service_id = %service_id,
+            command = %command_name,
             trace_id = %trace.trace_id,
             capabilities_hash = %self.effective.capabilities_hash,
             "pack_service_call_requested"
@@ -267,7 +339,11 @@ fn unavailable_diagnostics(
             pack_id.clone(),
             true,
             "required_pack_unresolved",
-            "required pack is absent or unavailable",
+            effective
+                .unavailable_pack_reasons
+                .get(pack_id)
+                .map(String::as_str)
+                .unwrap_or("required pack is absent or unavailable"),
         )
     });
     let optional = effective.unresolved_optional_packs.iter().map(|pack_id| {
@@ -275,7 +351,11 @@ fn unavailable_diagnostics(
             pack_id.clone(),
             false,
             "optional_pack_unresolved",
-            "optional pack is absent or unavailable",
+            effective
+                .unavailable_pack_reasons
+                .get(pack_id)
+                .map(String::as_str)
+                .unwrap_or("optional pack is absent or unavailable"),
         )
     });
     let incompatible = effective.incompatible_packs.iter().map(|pack_id| {
@@ -290,93 +370,41 @@ fn unavailable_diagnostics(
 }
 
 #[cfg(test)]
-mod tests {
-    use macaca_proto::{
-        compose_installed_domain_pack_catalog, foundation_pack_definition,
-        reference_domain_pack_definitions, TraceContext,
-    };
-
-    use super::*;
-
-    #[tokio::test]
-    async fn catalog_client_lists_reference_pack_metadata() {
-        let catalog = compose_installed_domain_pack_catalog(reference_domain_pack_definitions());
-        let client = CatalogBackedDomainPackClient::new(catalog);
-
-        let result = client
-            .list_packs(&DomainPackListCommand {
-                scope: "sdk-test".into(),
-            })
-            .await
-            .unwrap();
-
-        assert!(result
-            .packs
-            .iter()
-            .any(|pack| pack.pack_id == "pack.foundation.v1"));
-    }
-
-    #[tokio::test]
-    async fn catalog_client_resolves_required_and_optional_unavailable() {
-        let catalog = compose_installed_domain_pack_catalog([foundation_pack_definition()]);
-        let client = CatalogBackedDomainPackClient::new(catalog);
-        let declaration = AppServiceContractConfig {
-            required_packs: vec!["pack.foundation.v1".into(), "pack.absent.v1".into()],
-            optional_packs: vec!["pack.optional.v1".into()],
-            ..Default::default()
-        };
-
-        let result = client
-            .resolve_declaration(&DomainPackResolveCommand { declaration })
-            .await
-            .unwrap();
-
-        assert!(result
-            .effective
-            .resolved_packs
-            .contains(&"pack.foundation.v1".to_string()));
-        assert!(result
-            .unavailable
-            .iter()
-            .any(|diagnostic| { diagnostic.pack_id == "pack.absent.v1" && diagnostic.required }));
-        assert!(result.unavailable.iter().any(|diagnostic| {
-            diagnostic.pack_id == "pack.optional.v1" && !diagnostic.required
-        }));
-    }
-
-    #[tokio::test]
-    async fn resolved_pack_service_invocation_stays_trace_addressable() {
-        let catalog = compose_installed_domain_pack_catalog([foundation_pack_definition()]);
-        let client = CatalogBackedDomainPackClient::new(catalog);
-        let declaration = AppServiceContractConfig {
-            required_packs: vec!["pack.foundation.v1".into()],
-            ..Default::default()
-        };
-
-        let result = client
-            .resolve_declaration(&DomainPackResolveCommand { declaration })
-            .await
-            .unwrap();
-        let service_id = result
-            .effective
-            .services
-            .iter()
-            .next()
-            .expect("foundation pack exposes at least one service")
-            .clone();
-        let command = result
-            .service_call_command(
-                service_id.clone(),
-                "service.snapshot",
-                serde_json::json!({}),
-                TraceContext::new("trace-pack-service-call"),
-            )
-            .unwrap();
-
-        assert_eq!(command.service_id, service_id);
-        assert_eq!(
-            command.trace.as_ref().map(|trace| trace.trace_id.as_str()),
-            Some("trace-pack-service-call")
-        );
-    }
-}
+#[path = "domain_pack_client_ai_tests.rs"]
+mod ai_tests;
+#[cfg(test)]
+#[path = "domain_pack_client_commerce_tests.rs"]
+mod commerce_tests;
+#[cfg(test)]
+#[path = "domain_pack_client_communication_tests.rs"]
+mod communication_tests;
+#[cfg(test)]
+#[path = "domain_pack_client_developer_tests.rs"]
+mod developer_tests;
+#[cfg(test)]
+#[path = "domain_pack_client_device_tests.rs"]
+mod device_tests;
+#[cfg(test)]
+#[path = "domain_pack_client_finance_tests.rs"]
+mod finance_tests;
+#[cfg(test)]
+#[path = "domain_pack_client_identity_tests.rs"]
+mod identity_tests;
+#[cfg(test)]
+#[path = "domain_pack_client_knowledge_tests.rs"]
+mod knowledge_tests;
+#[cfg(test)]
+#[path = "domain_pack_client_location_tests.rs"]
+mod location_tests;
+#[cfg(test)]
+#[path = "domain_pack_client_media_tests.rs"]
+mod media_tests;
+#[cfg(test)]
+#[path = "domain_pack_client_office_tests.rs"]
+mod office_tests;
+#[cfg(test)]
+#[path = "domain_pack_client_tests.rs"]
+mod tests;
+#[cfg(test)]
+#[path = "domain_pack_client_workflow_tests.rs"]
+mod workflow_tests;

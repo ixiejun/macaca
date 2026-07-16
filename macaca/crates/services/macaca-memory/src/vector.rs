@@ -131,7 +131,9 @@ impl MilvusStore {
             return Ok(());
         }
         let status = resp.status();
-        let text = crate::providers::resilience::sanitize_provider_error_body(&resp.text().await.unwrap_or_default());
+        let text = crate::providers::resilience::sanitize_provider_error_body(
+            &resp.text().await.unwrap_or_default(),
+        );
         Err(MacacaError::Memory(format!(
             "milvus create collection {status}: {text}"
         )))
@@ -209,7 +211,9 @@ impl VectorStore for MilvusStore {
 
         if !resp.status().is_success() {
             let status = resp.status();
-            let text = crate::providers::resilience::sanitize_provider_error_body(&resp.text().await.unwrap_or_default());
+            let text = crate::providers::resilience::sanitize_provider_error_body(
+                &resp.text().await.unwrap_or_default(),
+            );
             return Err(MacacaError::Memory(format!(
                 "milvus upsert {status}: {text}"
             )));
@@ -241,7 +245,9 @@ impl VectorStore for MilvusStore {
 
         if !resp.status().is_success() {
             let status = resp.status();
-            let text = crate::providers::resilience::sanitize_provider_error_body(&resp.text().await.unwrap_or_default());
+            let text = crate::providers::resilience::sanitize_provider_error_body(
+                &resp.text().await.unwrap_or_default(),
+            );
             return Err(MacacaError::Memory(format!(
                 "milvus search {status}: {text}"
             )));
@@ -286,7 +292,9 @@ impl VectorStore for MilvusStore {
 
         if !resp.status().is_success() {
             let status = resp.status();
-            let text = crate::providers::resilience::sanitize_provider_error_body(&resp.text().await.unwrap_or_default());
+            let text = crate::providers::resilience::sanitize_provider_error_body(
+                &resp.text().await.unwrap_or_default(),
+            );
             return Err(MacacaError::Memory(format!(
                 "milvus delete {status}: {text}"
             )));

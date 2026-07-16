@@ -159,7 +159,9 @@ impl DashScopeEmbedding {
 
         if !response.status().is_success() {
             let status = response.status();
-            let text = crate::providers::resilience::sanitize_provider_error_body(&response.text().await.unwrap_or_default());
+            let text = crate::providers::resilience::sanitize_provider_error_body(
+                &response.text().await.unwrap_or_default(),
+            );
             return Err(MacacaError::Memory(format!(
                 "dashscope error {status}: {text}"
             )));
@@ -199,7 +201,9 @@ impl DashScopeEmbedding {
 
         if !response.status().is_success() {
             let status = response.status();
-            let text = crate::providers::resilience::sanitize_provider_error_body(&response.text().await.unwrap_or_default());
+            let text = crate::providers::resilience::sanitize_provider_error_body(
+                &response.text().await.unwrap_or_default(),
+            );
             return Err(MacacaError::Memory(format!(
                 "dashscope error {status}: {text}"
             )));

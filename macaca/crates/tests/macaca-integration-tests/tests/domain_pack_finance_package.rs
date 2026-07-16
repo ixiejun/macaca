@@ -7,12 +7,21 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use macaca_domain_pack_finance::finance_domain_pack_registrations;
+use macaca_kernel::SystemService;
 use macaca_llm::LlmProvider;
 use macaca_proto::{
+    domain_pack_contract::finance_accounting::{
+        FINANCE_ACCOUNTING_COMMANDS, FINANCE_ACCOUNTING_PACK_ID, FINANCE_ACCOUNTING_SERVICE_ID,
+    },
     KernelServiceId, LlmMessage, LlmOptions, LlmResponse, MacacaResult, ServiceBusSource,
-    ServiceCommand, ServiceCommandName, TokenUsage, TraceContext,
+    ServiceCommand, ServiceCommandName, ServiceDescriptor, ServiceType, TokenUsage, TraceContext,
+    TraceSchemaRef,
 };
-use macaca_runtime_host::{bootstrap_domain_pack_services, ServiceRuntime, ServiceRuntimeConfig};
+use macaca_runtime_host::{
+    bootstrap_domain_pack_services,
+    domain_pack_service_provider::DomainPackUnavailableSystemServiceProvider, ServiceRuntime,
+    ServiceRuntimeConfig,
+};
 
 /// Minimal LLM stub for finance analysis provider registration tests.
 struct FixtureLlm;
@@ -114,5 +123,42 @@ async fn finance_package_registers_all_contract_services() {
                 .any(|started| started.as_str() == service_id),
             "expected finance service `{service_id}` to start"
         );
+    }
+}
+
+#[tokio::test]
+async fn accounting_unavailable_provider_rejects_every_declared_command_without_payload_echo() {
+    let provider = DomainPackUnavailableSystemServiceProvider::new(
+        ServiceDescriptor::new(
+            KernelServiceId::new(FINANCE_ACCOUNTING_SERVICE_ID),
+            ServiceType::new("domain_pack.finance.accounting"),
+            TraceSchemaRef::new("trace.finance.accounting.v1"),
+        ),
+        FINANCE_ACCOUNTING_PACK_ID,
+        "finance_accounting_provider_not_installed",
+    );
+
+    for command in FINANCE_ACCOUNTING_COMMANDS {
+        let result = provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new(*command),
+                serde_json::json!({
+                    "raw_ledger_row": "must-not-leak",
+                    "account_number": "must-not-leak",
+                }),
+                TraceContext::new(format!("trace-accounting-unavailable-{command}")),
+            ))
+            .await
+            .unwrap();
+
+        assert_eq!(result.status, "unavailable", "{command}");
+        assert_eq!(result.output["status"], "unavailable", "{command}");
+        assert_eq!(result.output["pack_id"], FINANCE_ACCOUNTING_PACK_ID);
+        assert_eq!(result.output["command"], *command);
+        assert_eq!(
+            result.output["reason_code"],
+            "finance_accounting_provider_not_installed"
+        );
+        assert!(!result.output.to_string().contains("must-not-leak"));
     }
 }

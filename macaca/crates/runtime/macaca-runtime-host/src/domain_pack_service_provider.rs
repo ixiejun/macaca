@@ -27,6 +27,13 @@ use crate::{
 /// Re-export the kernel-owned registration product type.
 pub use macaca_kernel::DomainPackProviderRegistration;
 
+/// Re-export generic provider replacement adapters while preserving this module as the public
+/// package-facing bootstrap surface.
+pub use crate::domain_pack_provider_replacement::{
+    mock_domain_pack_provider_registration, unavailable_domain_pack_provider_registration,
+    DomainPackMockSystemServiceProvider, DomainPackUnavailableSystemServiceProvider,
+};
+
 /// Re-export proto-owned trace/result helpers for package adapters.
 pub use macaca_proto::{
     domain_pack_command_trace as command_trace,

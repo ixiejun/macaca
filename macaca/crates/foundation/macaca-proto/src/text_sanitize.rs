@@ -215,7 +215,10 @@ mod tests {
     #[test]
     fn mask_secret_fully_redacts_secret_shapes() {
         assert_eq!(mask_secret("sk-abc1234567890"), "[redacted-secret]");
-        assert_eq!(mask_secret("Bearer abcdef.token.value"), "[redacted-secret]");
+        assert_eq!(
+            mask_secret("Bearer abcdef.token.value"),
+            "[redacted-secret]"
+        );
         // A 32+ char opaque token is masked.
         assert_eq!(
             mask_secret("AKIA1234567890ABCDEF1234567890ABCD"),

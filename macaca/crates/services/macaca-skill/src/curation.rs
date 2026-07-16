@@ -113,7 +113,10 @@ impl SkillCurationRunCommand {
                 event = "curation_apply_denied",
                 reason_code = "readiness_not_confirmed"
             );
-            return Err("skill curation apply run requires confirmed entitlement and package readiness".into());
+            return Err(
+                "skill curation apply run requires confirmed entitlement and package readiness"
+                    .into(),
+            );
         }
         Ok(())
     }

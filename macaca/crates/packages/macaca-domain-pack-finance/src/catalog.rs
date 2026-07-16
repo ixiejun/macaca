@@ -4,7 +4,7 @@
 //! to during manifest capability resolution.  Provider implementations are
 //! registered separately through [`crate::bootstrap::finance_domain_pack_registrations`].
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use macaca_proto::{
     DomainPackDataGovernance, DomainPackDefinition, DomainPackDiagnostics, DomainPackMetadata,
@@ -27,6 +27,46 @@ pub fn finance_pack_catalog_definition() -> DomainPackDefinition {
             family_id: "finance".into(),
             version: "v1".into(),
             stability: DomainPackStability::Preview,
+            service_command_schemas: BTreeMap::from([
+                (
+                    FINANCE_MARKET_DATA_SERVICE_ID.into(),
+                    BTreeSet::from(["finance.market_data.quote.v1".into()]),
+                ),
+                (
+                    FINANCE_FINANCIALS_SERVICE_ID.into(),
+                    BTreeSet::from(["finance.financials.statement.v1".into()]),
+                ),
+                (
+                    FINANCE_NEWS_DIGEST_SERVICE_ID.into(),
+                    BTreeSet::from(["finance.news.digest.v1".into()]),
+                ),
+                (
+                    FINANCE_LLM_ANALYSIS_SERVICE_ID.into(),
+                    BTreeSet::from(["finance.analysis.generate.v1".into()]),
+                ),
+            ]),
+            service_result_schemas: BTreeMap::from([
+                (
+                    FINANCE_MARKET_DATA_SERVICE_ID.into(),
+                    BTreeSet::from(["finance.market_data.quote.result.v1".into()]),
+                ),
+                (
+                    FINANCE_FINANCIALS_SERVICE_ID.into(),
+                    BTreeSet::from(["finance.financials.statement.result.v1".into()]),
+                ),
+                (
+                    FINANCE_NEWS_DIGEST_SERVICE_ID.into(),
+                    BTreeSet::from(["finance.news.digest.result.v1".into()]),
+                ),
+                (
+                    FINANCE_LLM_ANALYSIS_SERVICE_ID.into(),
+                    BTreeSet::from(["finance.analysis.generate.result.v1".into()]),
+                ),
+            ]),
+            source_attribution: BTreeSet::from(["macaca-domain-pack-finance".into()]),
+            migration_notes: vec![
+                "Finance package services are optional-module providers registered through the composition root.".into(),
+            ],
             data_governance: DomainPackDataGovernance {
                 classification: "market_reference".into(),
                 retention_policy: "bounded_audit_metadata_only".into(),

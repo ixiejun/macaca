@@ -13,15 +13,14 @@ use chrono::Utc;
 use macaca_ipc::{LocalServiceTransport, ServiceBus};
 use macaca_kernel::{InMemoryTraceEventBus, SystemServiceBusHandler};
 use macaca_proto::{
-    KernelServiceId, ServiceBusSource, ServiceCommand, ServiceDescriptor, ServiceHealth,
-    ServiceLifecycleState, ServiceReply, TraceContext,
+    KernelServiceId, ServiceCommand, ServiceDescriptor, ServiceHealth, ServiceLifecycleState,
+    TraceContext,
 };
 
 use crate::service_decorator::{
     AuditPlaceholderRuntimeDecorator, EntitlementPlaceholderRuntimeDecorator,
     MeteringPlaceholderRuntimeDecorator, PolicyRuntimeDecorator,
-    ResourcePlaceholderRuntimeDecorator, ServiceRuntimeCallContext, ServiceRuntimeDecorator,
-    TraceRequiredRuntimeDecorator,
+    ResourcePlaceholderRuntimeDecorator, ServiceRuntimeDecorator, TraceRequiredRuntimeDecorator,
 };
 use crate::service_provider::{ServiceProviderFactory, ServiceProviderFactoryContext};
 use crate::service_runtime_error::{ServiceRuntimeConfig, ServiceRuntimeError};
@@ -30,19 +29,17 @@ use crate::service_runtime_event::{
     ServiceRuntimeSnapshot,
 };
 
-struct RuntimeServiceRecord {
-    descriptor: ServiceDescriptor,
-    service: Arc<dyn macaca_kernel::SystemService>,
-    lifecycle_state: ServiceLifecycleState,
-    health: ServiceHealth,
-    failure_reason: Option<String>,
-}
+mod call;
+mod control;
+mod health;
+mod support;
 
 /// Facade that hosts provider-neutral services and dispatches calls by bus.
 pub struct ServiceRuntime {
-    services: RwLock<BTreeMap<KernelServiceId, RuntimeServiceRecord>>,
+    services: RwLock<BTreeMap<KernelServiceId, support::RuntimeServiceRecord>>,
     transport: Arc<LocalServiceTransport>,
     bus: ServiceBus,
+    control: control::ServiceRuntimeControl,
     decorators: Vec<Box<dyn ServiceRuntimeDecorator>>,
     event_sink: Option<Arc<dyn ServiceRuntimeEventSink>>,
 }
@@ -61,10 +58,16 @@ impl ServiceRuntime {
         if let Some(bus_trace_sink) = config.bus_trace_sink {
             bus = bus.with_trace_sink(bus_trace_sink);
         }
+        let control = control::ServiceRuntimeControl::new(
+            config.call_timeout,
+            config.max_reply_output_bytes,
+            config.max_stream_frames,
+        );
         Self {
             services: RwLock::new(BTreeMap::new()),
             transport,
             bus,
+            control,
             decorators: vec![
                 Box::new(TraceRequiredRuntimeDecorator),
                 Box::new(PolicyRuntimeDecorator::new(config.policy)),
@@ -94,7 +97,7 @@ impl ServiceRuntime {
         tracing::info!(service_id = %service_id, "service runtime provider registration requested");
 
         {
-            let services = self.services.read().map_err(lock_error)?;
+            let services = self.services.read().map_err(support::lock_error)?;
             if services.contains_key(&service_id) {
                 self.emit(
                     &service_id,
@@ -120,14 +123,14 @@ impl ServiceRuntime {
             .register_handler(service_id.clone(), handler)
             .map_err(ServiceRuntimeError::from)?;
 
-        let record = RuntimeServiceRecord {
+        let record = support::RuntimeServiceRecord {
             descriptor: instance.descriptor,
             service: instance.service,
             lifecycle_state: ServiceLifecycleState::Registered,
             health: ServiceHealth::Unknown,
             failure_reason: None,
         };
-        let mut services = self.services.write().map_err(lock_error)?;
+        let mut services = self.services.write().map_err(support::lock_error)?;
         services.insert(service_id.clone(), record);
         drop(services);
 
@@ -151,17 +154,20 @@ impl ServiceRuntime {
         let service = self.transition(service_id, ServiceLifecycleState::Starting, Some(&trace))?;
         match service.start().await {
             Ok(()) => {
+                let health = self
+                    .observed_health_after_success(service_id, &service, ServiceHealth::Healthy)
+                    .await;
                 self.set_state(
                     service_id,
                     ServiceLifecycleState::Running,
-                    ServiceHealth::Healthy,
+                    health.clone(),
                     None,
                 )?;
                 self.emit(
                     service_id,
                     "service_runtime.start.completed",
                     ServiceLifecycleState::Running,
-                    Some(ServiceHealth::Healthy),
+                    Some(health),
                     Some(&trace),
                     serde_json::json!({"status": "running"}),
                 )
@@ -175,82 +181,29 @@ impl ServiceRuntime {
         }
     }
 
-    /// Dispatch a traced command through decorators and the service bus.
-    pub async fn call(
+    /// Request cancellation for one active runtime call by neutral token.
+    ///
+    /// The token is never emitted raw.  The service id and trace context provide
+    /// audit correlation while providers remain unaware of runtime internals
+    /// unless their future is cooperatively dropped by the timeout/cancel race.
+    pub fn cancel_call(
         &self,
         service_id: &KernelServiceId,
-        source: ServiceBusSource,
-        command: ServiceCommand,
-    ) -> Result<ServiceReply, ServiceRuntimeError> {
-        let (descriptor, trace) = self.descriptor_and_trace(service_id, &command)?;
-        let context = ServiceRuntimeCallContext {
-            service_id,
-            source: &source,
-            command: &command,
-            descriptor: &descriptor,
-        };
-        let mut admission_decorators = Vec::with_capacity(self.decorators.len());
-        for decorator in &self.decorators {
-            if let Err(err) = decorator.before_dispatch(&context).await {
-                self.emit_rejection(service_id, &command, &err)?;
-                return Err(err);
-            }
-            admission_decorators.push(decorator.name());
-        }
-
-        self.set_lifecycle(service_id, ServiceLifecycleState::Calling)?;
+        cancellation_token: impl Into<String>,
+        trace: TraceContext,
+    ) -> Result<(), ServiceRuntimeError> {
+        let audit_ref = self.control.cancel(cancellation_token)?;
         self.emit(
             service_id,
-            "service_runtime.call.dispatched",
+            "service_runtime.call.cancel_requested",
             ServiceLifecycleState::Calling,
             None,
-            trace.as_ref(),
+            Some(&trace),
             serde_json::json!({
-                "command": command.name.to_string(),
-                "admission_decorators": admission_decorators,
+                "status": "cancel_requested",
+                "cancellation_token_ref": audit_ref,
             }),
-        )?;
-        let envelope = macaca_proto::ServiceEnvelope::new(source, service_id.clone(), command);
-        match self.bus.call(envelope).await {
-            Ok(reply) => {
-                self.set_lifecycle(service_id, ServiceLifecycleState::Running)?;
-                self.emit(
-                    service_id,
-                    "service_runtime.call.completed",
-                    ServiceLifecycleState::Running,
-                    Some(ServiceHealth::Healthy),
-                    reply.trace.as_ref(),
-                    serde_json::json!({"status": reply.status}),
-                )?;
-                Ok(reply)
-            }
-            Err(err) => {
-                let runtime_error = ServiceRuntimeError::from(err);
-                if let ServiceRuntimeError::InvalidArgument(reason) = runtime_error {
-                    self.set_state(
-                        service_id,
-                        ServiceLifecycleState::Running,
-                        ServiceHealth::Healthy,
-                        None,
-                    )?;
-                    self.emit(
-                        service_id,
-                        "service_runtime.call.rejected",
-                        ServiceLifecycleState::Running,
-                        Some(ServiceHealth::Healthy),
-                        trace.as_ref(),
-                        serde_json::json!({"error": reason, "reason_code": "invalid_argument"}),
-                    )?;
-                    return Err(ServiceRuntimeError::InvalidArgument(reason));
-                }
-                self.fail_with_result(
-                    service_id,
-                    "service_runtime.call.failed",
-                    trace.as_ref(),
-                    runtime_error.to_string(),
-                )
-            }
-        }
+        )
     }
 
     /// Stop a service gracefully.
@@ -313,7 +266,7 @@ impl ServiceRuntime {
     /// Return a deterministic runtime memento sorted by service id.
     pub fn snapshot(&self) -> Result<ServiceRuntimeSnapshot, ServiceRuntimeError> {
         tracing::info!("service runtime snapshot requested");
-        let services = self.services.read().map_err(lock_error)?;
+        let services = self.services.read().map_err(support::lock_error)?;
         Ok(ServiceRuntimeSnapshot {
             services: services
                 .values()
@@ -332,7 +285,7 @@ impl ServiceRuntime {
         service_id: &KernelServiceId,
         command: &ServiceCommand,
     ) -> Result<(ServiceDescriptor, Option<TraceContext>), ServiceRuntimeError> {
-        let services = self.services.read().map_err(lock_error)?;
+        let services = self.services.read().map_err(support::lock_error)?;
         let record = services
             .get(service_id)
             .ok_or_else(|| ServiceRuntimeError::UnknownService(service_id.to_string()))?;
@@ -345,7 +298,7 @@ impl ServiceRuntime {
         next: ServiceLifecycleState,
         trace: Option<&TraceContext>,
     ) -> Result<Arc<dyn macaca_kernel::SystemService>, ServiceRuntimeError> {
-        let mut services = self.services.write().map_err(lock_error)?;
+        let mut services = self.services.write().map_err(support::lock_error)?;
         let record = services
             .get_mut(service_id)
             .ok_or_else(|| ServiceRuntimeError::UnknownService(service_id.to_string()))?;
@@ -368,7 +321,7 @@ impl ServiceRuntime {
         service_id: &KernelServiceId,
         state: ServiceLifecycleState,
     ) -> Result<(), ServiceRuntimeError> {
-        let mut services = self.services.write().map_err(lock_error)?;
+        let mut services = self.services.write().map_err(support::lock_error)?;
         let record = services
             .get_mut(service_id)
             .ok_or_else(|| ServiceRuntimeError::UnknownService(service_id.to_string()))?;
@@ -383,7 +336,7 @@ impl ServiceRuntime {
         health: ServiceHealth,
         failure_reason: Option<String>,
     ) -> Result<(), ServiceRuntimeError> {
-        let mut services = self.services.write().map_err(lock_error)?;
+        let mut services = self.services.write().map_err(support::lock_error)?;
         let record = services
             .get_mut(service_id)
             .ok_or_else(|| ServiceRuntimeError::UnknownService(service_id.to_string()))?;
@@ -452,6 +405,35 @@ impl ServiceRuntime {
         Err(ServiceRuntimeError::Service(reason))
     }
 
+    fn control_failure_with_result<T>(
+        &self,
+        service_id: &KernelServiceId,
+        operation: &str,
+        trace: Option<&TraceContext>,
+        error: ServiceRuntimeError,
+    ) -> Result<T, ServiceRuntimeError> {
+        let reason = error.to_string();
+        self.set_state(
+            service_id,
+            ServiceLifecycleState::Running,
+            ServiceHealth::Degraded {
+                reason: reason.clone(),
+            },
+            Some(reason.clone()),
+        )?;
+        self.emit(
+            service_id,
+            operation,
+            ServiceLifecycleState::Running,
+            Some(ServiceHealth::Degraded {
+                reason: reason.clone(),
+            }),
+            trace,
+            serde_json::json!({"status": "control_failed", "error": reason}),
+        )?;
+        Err(error)
+    }
+
     fn emit(
         &self,
         service_id: &KernelServiceId,
@@ -482,8 +464,4 @@ impl ServiceRuntime {
         }
         Ok(())
     }
-}
-
-fn lock_error<T>(_: T) -> ServiceRuntimeError {
-    ServiceRuntimeError::State("service runtime lock poisoned".into())
 }

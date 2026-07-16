@@ -12,36 +12,153 @@
 //! - **Specification**: validators make taxonomy rules executable and auditable.
 //! - **Composition Root**: catalog composition happens once at host bootstrap.
 
+pub mod ai_common;
+pub mod ai_embedding;
+pub mod ai_llm;
+pub mod ai_model_evaluation;
+pub mod ai_preflight;
+pub mod ai_rerank;
+pub mod ai_speech;
+pub mod ai_vision;
 mod catalog;
+pub mod commerce_cart;
+mod commerce_cart_validation;
+pub mod commerce_catalog;
+mod commerce_catalog_hashes;
+mod commerce_catalog_validation;
+pub mod commerce_common;
+pub mod commerce_entitlement;
+mod commerce_entitlement_validation;
+pub mod commerce_order;
+mod commerce_order_validation;
+pub mod commerce_payment_intent;
+mod commerce_payment_intent_validation;
+pub mod commerce_receipt;
+mod commerce_receipt_validation;
+mod communication_calendar;
+pub mod communication_calendar_preflight;
+mod communication_calendar_validation;
+mod communication_common;
+mod communication_email;
+pub mod communication_email_preflight;
+mod communication_email_validation;
+mod communication_inbox;
+pub mod communication_inbox_preflight;
+mod communication_inbox_validation;
+mod communication_messaging;
+pub mod communication_messaging_preflight;
+mod communication_messaging_validation;
+mod communication_notification;
+pub mod communication_notification_preflight;
+mod communication_notification_validation;
+pub mod developer_browser_automation;
+pub mod developer_ci;
+pub mod developer_code;
+pub mod developer_common;
+pub mod developer_design_tools;
+pub mod developer_issue_tracker;
+pub mod developer_repository;
+pub mod developer_terminal;
+pub mod device_camera;
+pub mod device_common;
+pub mod device_foreground_background_host;
+pub mod device_local_files;
+pub mod device_notifications;
+pub mod device_sensors;
+mod device_validation;
 mod expansion;
+mod exports;
+pub mod finance_accounting;
+mod finance_accounting_bounds;
+mod finance_accounting_commands;
+mod finance_accounting_hashes;
+mod finance_accounting_model;
+mod finance_accounting_preflight;
+mod finance_accounting_reports;
+pub mod finance_common;
+pub mod finance_crypto;
+pub mod finance_invoice;
+mod finance_invoice_validation;
+pub mod finance_market_data;
+pub mod finance_portfolio;
+pub mod finance_portfolio_async;
+mod finance_portfolio_validation;
+pub mod finance_stock;
+mod foundation_config;
+mod foundation_config_validation;
+mod foundation_filesystem;
+mod foundation_filesystem_validation;
+mod foundation_key_value_state;
+mod foundation_key_value_state_validation;
+mod foundation_random;
+mod foundation_random_validation;
+mod foundation_secrets_reference;
+mod foundation_secrets_reference_validation;
+mod foundation_session_state;
+mod foundation_session_state_validation;
+mod foundation_time;
+mod foundation_time_validation;
+mod foundation_validation;
+pub mod identity_account;
+mod identity_account_validation;
+pub mod identity_auth_handoff;
+mod identity_auth_handoff_validation;
+pub mod identity_common;
+pub mod identity_organization;
+pub mod identity_profile;
+mod identity_profile_validation;
+pub mod identity_tenant;
+mod identity_validation;
+mod industrial_pack_taxonomy;
+mod industrial_reference_catalogs;
+mod knowledge_citations;
+mod knowledge_common;
+mod knowledge_document_parsing;
+mod knowledge_graph;
+mod knowledge_retrieval;
+mod knowledge_search;
+mod knowledge_summarization;
+mod knowledge_summarization_preflight;
+pub mod location_common;
+pub mod location_geocode;
+pub mod location_maps;
+pub mod location_place_search;
+pub mod location_route;
+pub mod location_timezone;
+pub mod media_audio;
+pub mod media_common;
+pub mod media_image;
+pub mod media_rendering;
+pub mod media_transcription;
+pub mod media_video;
 mod model;
+pub mod office_common;
+pub mod office_document;
+pub mod office_forms;
+pub mod office_pdf;
+pub mod office_presentation;
+pub mod office_spreadsheet;
+pub mod pack_preflight;
 mod reference_catalogs;
 mod service_helpers;
 mod spec;
+pub mod workflow_approval;
+pub mod workflow_common;
+pub mod workflow_delegation;
+pub mod workflow_recovery;
+pub mod workflow_review;
+pub mod workflow_schedule;
+pub mod workflow_task;
+pub mod workflow_task_approval_spec;
+pub mod workflow_task_dispatch_gate;
+pub mod workflow_task_lifecycle_event;
+pub mod workflow_task_lifecycle_spec;
+pub mod workflow_task_resource_spec;
+pub mod workflow_task_transition;
 
+#[cfg(test)]
+mod knowledge_summarization_preflight_tests;
 #[cfg(test)]
 mod tests;
 
-pub use catalog::{
-    compose_installed_domain_pack_catalog, empty_domain_pack_catalog, DomainPackCatalog,
-    InMemoryDomainPackCatalog, SharedDomainPackCatalog,
-};
-pub use expansion::{expand_service_capabilities, EffectiveServiceCapabilities};
-pub use model::{
-    AppPackPolicyOverride, AppServiceContractConfig, AppServicePolicyOverride,
-    DomainPackCompatibility, DomainPackDataGovernance, DomainPackDefinition, DomainPackDiagnostics,
-    DomainPackMetadata, DomainPackPolicyTemplate, DomainPackProviderSnapshot,
-    DomainPackSdkMetadata, DomainPackStability, DomainPackUnavailableDiagnostic,
-};
-pub use reference_catalogs::{
-    developer_pack_definition, foundation_pack_definition, knowledge_pack_definition,
-    reference_domain_pack_definitions,
-};
-pub use service_helpers::{
-    domain_pack_command_trace, domain_pack_service_adapter_error, domain_pack_service_result,
-};
-pub use spec::{
-    validate_domain_pack_family_id, validate_domain_pack_id, validate_domain_pack_parent,
-    validate_domain_pack_version, AppServiceContractSpec, DomainPackDefinitionSpec,
-    DomainPackHierarchySpec, DomainPackIdentitySpec,
-};
+pub use exports::*;
