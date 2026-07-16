@@ -8,10 +8,11 @@ use std::collections::{BTreeMap, BTreeSet};
 use async_trait::async_trait;
 use macaca_kernel::SystemService;
 use macaca_proto::{
-    domain_pack_command_trace, domain_pack_service_result, DomainPackProviderCapabilityState,
-    KernelServiceId, ServiceCommand, ServiceDescriptor, ServiceError, ServiceHealth, ServiceResult,
-    ServiceType, SummaryProviderCapability, TraceSchemaRef, KNOWLEDGE_SUMMARIZATION_COMMANDS,
-    KNOWLEDGE_SUMMARIZATION_PACK_ID, KNOWLEDGE_SUMMARIZATION_SERVICE_ID,
+    domain_pack_command_trace, CleanupPolicy, DomainPackProviderCapabilityState, KernelServiceId,
+    ServiceCallResult, ServiceCommand, ServiceDescriptor, ServiceError, ServiceHealth,
+    ServiceResult, ServiceType, SummaryProviderCapability, TraceSchemaRef,
+    KNOWLEDGE_SUMMARIZATION_COMMANDS, KNOWLEDGE_SUMMARIZATION_PACK_ID,
+    KNOWLEDGE_SUMMARIZATION_SERVICE_ID,
 };
 use tokio::sync::{broadcast, RwLock};
 use tracing::{info, warn};
@@ -226,6 +227,7 @@ impl SystemService for SummarizationSystemServiceProvider {
             .expect("descriptor command must have a summarization strategy");
         let long_document_plan = (strategy == SummarizationStrategyKind::LongDocumentSynthesis)
             .then(|| LongDocumentExecutionPlan::for_trace(&trace.trace_id, 1));
+        let result_state = bounded_result_state(&command);
         let reference = format!("summarization:reference:{}", trace.trace_id);
         self.references
             .write()
@@ -240,10 +242,10 @@ impl SystemService for SummarizationSystemServiceProvider {
                 .send(event(command.name.as_str(), &trace.trace_id, *kind));
         }
         info!(service_id = %self.descriptor.id, command = %command.name, trace_id = %trace.trace_id, "summarization provider call completed");
-        Ok(domain_pack_service_result(
-            serde_json::json!({"status":"ok", "summary_handle_ref":reference, "strategy":strategy.label(), "checkpoint_ref":checkpoint_ref(strategy, &trace.trace_id), "long_document_plan":long_document_plan, "provider_class":"mock", "result_metadata":"bounded:provider-owned"}),
+        Ok(result(
+            serde_json::json!({"status":result_state, "summary_handle_ref":reference, "strategy":strategy.label(), "checkpoint_ref":checkpoint_ref(strategy, &trace.trace_id), "long_document_plan":long_document_plan, "next_cursor_ref":(result_state == "paged").then(|| format!("summarization:cursor:{}", trace.trace_id)), "partial_result_ref":(result_state == "partial").then(|| format!("summarization:partial:{}", trace.trace_id)), "stream_frames":if result_state == "streaming" { serde_json::json!([{"frame_ref":format!("summarization:stream:{}:0", trace.trace_id)}]) } else { serde_json::json!([]) }, "provider_class":"mock", "result_metadata":"bounded:provider-owned"}),
             trace,
-            "mock",
+            result_state,
         ))
     }
     async fn stop(&self) -> ServiceResult<()> {
@@ -320,6 +322,35 @@ fn event_kind(command: &str) -> SummarizationRuntimeEventKind {
         "summarization.inspect_summary_evidence" => EvidenceInspected,
         "summarization.inspect_provider" => ProviderInspected,
         _ => ServiceCall,
+    }
+}
+
+/// Read a bounded mock-result control without preserving arbitrary provider data.
+fn bounded_result_state(command: &ServiceCommand) -> &'static str {
+    match command
+        .payload
+        .get("result_state")
+        .and_then(serde_json::Value::as_str)
+    {
+        Some("partial") => "partial",
+        Some("paged") => "paged",
+        Some("streaming") => "streaming",
+        _ => "ok",
+    }
+}
+
+/// Create a sanitized reply while preserving the provider-neutral result state.
+fn result(
+    output: serde_json::Value,
+    trace: macaca_proto::TraceContext,
+    status: &str,
+) -> ServiceCallResult {
+    ServiceCallResult {
+        output,
+        trace,
+        status: status.into(),
+        metadata: BTreeMap::from([("provider_class".into(), "mock".into())]),
+        cleanup_hint: Some(CleanupPolicy::None),
     }
 }
 

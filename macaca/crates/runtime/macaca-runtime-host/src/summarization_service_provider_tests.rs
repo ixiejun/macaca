@@ -218,6 +218,27 @@ async fn summarization_plan_returns_resumable_bounded_map_reduce_memento() {
 }
 
 #[tokio::test]
+async fn summarization_provider_projects_bounded_partial_page_and_stream_results() {
+    let provider = SummarizationSystemServiceProvider::mock();
+    for (state, required_field) in [
+        ("partial", "partial_result_ref"),
+        ("paged", "next_cursor_ref"),
+        ("streaming", "stream_frames"),
+    ] {
+        let reply = provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new("summarization.summarize"),
+                serde_json::json!({"result_state":state}),
+                TraceContext::new(format!("result-{state}")),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(reply.status, state);
+        assert!(!reply.output[required_field].is_null());
+    }
+}
+
+#[tokio::test]
 async fn cited_summary_fails_closed_when_declared_evidence_service_is_unavailable() {
     let provider = SummarizationSystemServiceProvider::mock();
     let command = ServiceCommand::with_trace(

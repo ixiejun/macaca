@@ -35,7 +35,7 @@
 - [x] 4.1 Implement or bind the summarization service provider behind the service runtime; do not construct summarization providers from SDK, shell, kernel, or application code.
 - [x] 4.2 Add a deterministic unavailable provider that returns typed unavailable/unsupported diagnostics and complete discovery metadata.
 - [x] 4.3 Add mock provider support for extractive, abstractive, hybrid, multi-document, conversation, context-compression, refinement, comparison, evaluation, evidence inspection, and provider capability inspection commands.
-- [ ] 4.4 Add lifecycle, health, snapshot, shutdown, timeout, cancellation, bounded streaming, and paginated/partial result behavior.
+- [x] 4.4 Add lifecycle, health, snapshot, shutdown, timeout, cancellation, bounded streaming, and paginated/partial result behavior.
 - [x] 4.5 Add Strategy implementations for extractive summarization, abstractive summarization, hybrid summarization, long-document synthesis, rolling summaries, context compression, summary evaluation, and unavailable behavior.
 - [x] 4.6 Add long-document execution support for chunk plans, map summaries, reduce/synthesis summaries, overlap policies, partial failures, and resumable checkpoints.
 - [x] 4.7 Add evidence and citation integration hooks through declared pack/service handles, returning structured unavailable diagnostics when evidence/citation capability is absent.
@@ -58,7 +58,7 @@
 - [x] 6.4 Add dependency gates proving kernel, SDK, shells, and generic application framework do not import concrete summarization providers, model clients, prompt templates, cloud SDKs, or provider-specific adapters.
 - [x] 6.5 Add no-direct-provider-call gates proving SDK helpers, WASM ABI handlers, app admission, web, CLI, and frontend paths route through descriptor-owned service commands.
 - [x] 6.6 Add boundary tests proving optional provider absence returns structured unavailable diagnostics and never crashes, hangs, silently falls back, or fakes success.
-- [ ] 6.7 Run `openspec validate add-pack-knowledge-summarization --strict`, targeted cargo tests, boundary gates, file-size gates, and audit replay checks before marking implementation complete.
+- [x] 6.7 Run `openspec validate add-pack-knowledge-summarization --strict`, targeted cargo tests, boundary gates, file-size gates, and audit replay checks before marking implementation complete.
 
 ## 7. Developer Documentation
 
