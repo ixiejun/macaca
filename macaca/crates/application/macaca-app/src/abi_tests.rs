@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use macaca_proto::{
-    knowledge_summarization_pack_definition, ApplicationImport, DeveloperId,
-    DomainPackAvailability, InMemoryDomainPackCatalog, PackageDescriptor, PackageId,
-    PackageManifest, PackageRuntime, PackageRuntimeKind, PackageType,
+    knowledge_retrieval_pack_definition, knowledge_summarization_pack_definition,
+    ApplicationImport, DeveloperId, DomainPackAvailability, InMemoryDomainPackCatalog,
+    PackageDescriptor, PackageId, PackageManifest, PackageRuntime, PackageRuntimeKind, PackageType,
 };
 
 use super::*;
@@ -146,6 +146,63 @@ fn application_abi_surfaces_unavailable_summary_commands_from_injected_catalog()
             .map(String::as_str),
         Some("summarization_runtime_not_installed")
     );
+}
+
+#[test]
+fn application_abi_projects_declared_retrieval_scopes_and_command_schemas() {
+    let manifest = AppLoader::parse_manifest_yaml(
+        r#"
+name: retrieval-abi-fixture
+layer: L2Wasm
+service_contract:
+  optional_packs:
+    - pack.knowledge.retrieval.v1
+  pack_permission_scopes:
+    pack.knowledge.retrieval.v1:
+      - retrieval.collection.manage
+      - retrieval.record.write
+      - retrieval.query
+      - retrieval.rerank
+      - retrieval.read
+      - retrieval.evidence
+"#,
+    )
+    .unwrap();
+    let mut retrieval = knowledge_retrieval_pack_definition();
+    retrieval.metadata.availability = DomainPackAvailability::Available;
+    let mut catalog = InMemoryDomainPackCatalog::new();
+    catalog.register(retrieval);
+
+    let descriptor = YamlApplicationAbiAdapter::new(manifest)
+        .with_catalog(Arc::new(catalog))
+        .load()
+        .unwrap()
+        .descriptor;
+    let projection = descriptor
+        .service_capabilities
+        .capability_projections
+        .iter()
+        .find(|projection| projection.pack_id == "pack.knowledge.retrieval.v1")
+        .expect("declared retrieval pack must produce an ABI projection");
+
+    for command in [
+        "retrieval.register_collection",
+        "retrieval.upsert_records",
+        "retrieval.retrieve",
+        "retrieval.rerank_context",
+        "retrieval.expand_context",
+        "retrieval.package_evidence",
+    ] {
+        assert!(projection.callable_commands.contains(command));
+    }
+    assert!(descriptor
+        .declaration
+        .permissions
+        .contains(&"retrieval.record.write".into()));
+    assert!(descriptor
+        .declaration
+        .imports
+        .contains(&ApplicationImport::ServiceCall));
 }
 
 fn summary_manifest(name: &str, includes_scopes: bool) -> crate::model::AppManifest {

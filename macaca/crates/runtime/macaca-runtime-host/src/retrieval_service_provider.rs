@@ -10,10 +10,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use async_trait::async_trait;
 use macaca_kernel::SystemService;
 use macaca_proto::{
-    domain_pack_command_trace, domain_pack_service_result, DomainPackProviderCapabilityState,
-    KernelServiceId, RetrievalProviderCapability, ServiceCommand, ServiceDescriptor, ServiceError,
-    ServiceHealth, ServiceResult, ServiceType, TraceSchemaRef, KNOWLEDGE_RETRIEVAL_COMMANDS,
-    KNOWLEDGE_RETRIEVAL_PACK_ID, KNOWLEDGE_RETRIEVAL_SERVICE_ID,
+    domain_pack_command_trace, CleanupPolicy, DomainPackProviderCapabilityState, KernelServiceId,
+    RetrievalProviderCapability, ServiceCallResult, ServiceCommand, ServiceDescriptor,
+    ServiceError, ServiceHealth, ServiceResult, ServiceType, TraceSchemaRef,
+    KNOWLEDGE_RETRIEVAL_COMMANDS, KNOWLEDGE_RETRIEVAL_PACK_ID, KNOWLEDGE_RETRIEVAL_SERVICE_ID,
 };
 use tokio::sync::{broadcast, RwLock};
 use tracing::{info, warn};
@@ -167,6 +167,7 @@ impl SystemService for RetrievalSystemServiceProvider {
             return Err(ServiceError::UnsupportedCommand(command.name.to_string()));
         }
         let reference = format!("retrieval:reference:{}", trace.trace_id);
+        let result_state = bounded_result_state(&command);
         self.references
             .write()
             .await
@@ -180,10 +181,10 @@ impl SystemService for RetrievalSystemServiceProvider {
                 .send(event(&command.name.to_string(), &trace.trace_id, *kind));
         }
         info!(service_id = %self.descriptor.id, command = %command.name, trace_id = %trace.trace_id, "retrieval provider call completed");
-        Ok(domain_pack_service_result(
-            serde_json::json!({"status":"ok", "retrieval_handle_ref":reference, "provider_class":"mock", "evidence_metadata":"bounded:provider-owned"}),
+        Ok(result(
+            serde_json::json!({"status":result_state, "retrieval_handle_ref":reference, "next_cursor_ref":(result_state == "paged").then(|| format!("retrieval:cursor:{}", trace.trace_id)), "partial_result_ref":(result_state == "partial").then(|| format!("retrieval:partial:{}", trace.trace_id)), "async_handle_ref":(result_state == "async").then(|| format!("retrieval:async:{}", trace.trace_id)), "provider_class":"mock", "evidence_metadata":"bounded:provider-owned"}),
             trace,
-            "mock",
+            result_state,
         ))
     }
     async fn stop(&self) -> ServiceResult<()> {
@@ -208,6 +209,34 @@ impl SystemService for RetrievalSystemServiceProvider {
             RetrievalRuntimeEventKind::HealthReported,
         ));
         Ok(health)
+    }
+}
+/// Select only supported mock result states without preserving provider data.
+fn bounded_result_state(command: &ServiceCommand) -> &'static str {
+    match command
+        .payload
+        .get("result_state")
+        .and_then(serde_json::Value::as_str)
+    {
+        Some("paged") => "paged",
+        Some("partial") => "partial",
+        Some("async") => "async",
+        _ => "ok",
+    }
+}
+
+/// Build a sanitized service result while preserving a bounded lifecycle state.
+fn result(
+    output: serde_json::Value,
+    trace: macaca_proto::TraceContext,
+    status: &str,
+) -> ServiceCallResult {
+    ServiceCallResult {
+        output,
+        trace,
+        status: status.into(),
+        metadata: BTreeMap::from([("provider_class".into(), "mock".into())]),
+        cleanup_hint: Some(CleanupPolicy::None),
     }
 }
 

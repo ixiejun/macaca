@@ -84,6 +84,27 @@ async fn retrieval_provider_fails_closed_and_cleans_bounded_snapshot_state() {
 }
 
 #[tokio::test]
+async fn retrieval_provider_projects_bounded_page_partial_and_refresh_handles() {
+    let provider = RetrievalSystemServiceProvider::mock();
+    for (command, state, field) in [
+        ("retrieval.retrieve", "paged", "next_cursor_ref"),
+        ("retrieval.bulk_retrieve", "partial", "partial_result_ref"),
+        ("retrieval.refresh_collection", "async", "async_handle_ref"),
+    ] {
+        let reply = provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new(command),
+                serde_json::json!({"result_state":state}),
+                TraceContext::new(format!("retrieval-{state}")),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(reply.status, state);
+        assert!(!reply.output[field].is_null());
+    }
+}
+
+#[tokio::test]
 async fn retrieval_provider_emits_bounded_lifecycle_and_failure_events() {
     let provider = RetrievalSystemServiceProvider::mock();
     let mut events = provider.subscribe();

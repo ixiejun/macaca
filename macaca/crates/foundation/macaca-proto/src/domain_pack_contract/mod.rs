@@ -116,6 +116,7 @@ mod knowledge_common;
 mod knowledge_document_parsing;
 mod knowledge_graph;
 mod knowledge_retrieval;
+mod knowledge_retrieval_preflight;
 mod knowledge_search;
 mod knowledge_summarization;
 mod knowledge_summarization_preflight;
@@ -156,6 +157,8 @@ pub mod workflow_task_lifecycle_spec;
 pub mod workflow_task_resource_spec;
 pub mod workflow_task_transition;
 
+#[cfg(test)]
+mod knowledge_retrieval_preflight_tests;
 #[cfg(test)]
 mod knowledge_summarization_preflight_tests;
 #[cfg(test)]

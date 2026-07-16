@@ -51,17 +51,17 @@
   `retrieval.collection.manage`, `retrieval.record.write`,
   `retrieval.query`, `retrieval.read`, `retrieval.evidence`,
   `retrieval.rerank`, `retrieval.metadata.inspect`, and `retrieval.refresh`.
-- [ ] 3.2 Enforce collection ownership, secret references, namespace isolation,
+- [x] 3.2 Enforce collection ownership, secret references, namespace isolation,
   vector-space compatibility, embedding model compatibility, ACL filtering,
   metadata filter validation, top-k budgets, threshold/range limits, context
   window limits, query complexity, timeout, provider capability, rate limit,
   refresh quota, and resource budget checks before provider calls.
-- [ ] 3.3 Reject raw credentials, raw provider payloads, raw vectors, raw
+- [x] 3.3 Reject raw credentials, raw provider payloads, raw vectors, raw
   documents, raw chunks beyond redaction policy, raw prompt text, private corpus
   content, and unbounded output at admission and observability boundaries.
 - [x] 3.4 Model required declarations as readiness blockers and optional
   declarations as explicit degraded effective capabilities.
-- [ ] 3.5 Add tests proving denied, validation, quota, unsupported, and
+- [x] 3.5 Add tests proving denied, validation, quota, unsupported, and
   unavailable paths do not call concrete retrieval providers.
 
 ## 4. Service Provider And Runtime Integration
@@ -71,7 +71,7 @@
 - [x] 4.2 Add unavailable and mock providers with deterministic collection,
   record, vector, filter, hybrid, rerank, context expansion, evidence, refresh,
   diagnostics, and capability behavior.
-- [ ] 4.3 Add lifecycle, health, snapshot, shutdown, timeout, cancellation,
+- [x] 4.3 Add lifecycle, health, snapshot, shutdown, timeout, cancellation,
   bounded pagination/cursors, idempotent record upsert, delete, bulk retrieval,
   range retrieval, refresh async handles, and collection health support.
 - [x] 4.4 Add provider capability reporting for dense/sparse/multivector support,
@@ -91,7 +91,7 @@
 - [x] 5.2 Add focused SDK helper builders that only produce canonical traced
   service calls and return Null Object unavailable diagnostics when the pack is
   absent.
-- [ ] 5.3 Extend WASM/application ABI metadata so applications can declare
+- [x] 5.3 Extend WASM/application ABI metadata so applications can declare
   retrieval collection access, write records, query, rerank, expand context, and
   package evidence only through declared permissions.
 - [x] 5.4 Add generic examples for register collection, upsert records, retrieve,

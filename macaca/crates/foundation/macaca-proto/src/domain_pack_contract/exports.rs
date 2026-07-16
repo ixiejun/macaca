@@ -343,6 +343,9 @@ pub use super::knowledge_retrieval::{
     RetrievalUpsertRecordsCommand, RetrievalVectorSpace, KNOWLEDGE_RETRIEVAL_COMMANDS,
     KNOWLEDGE_RETRIEVAL_PACK_ID, KNOWLEDGE_RETRIEVAL_SERVICE_ID,
 };
+pub use super::knowledge_retrieval_preflight::{
+    RetrievalAdmissionEvidence, RetrievalDispatchPreflight,
+};
 pub use super::knowledge_search::{
     knowledge_search_descriptor_hashes, knowledge_search_pack_definition, search_stable_hash,
     SearchAnalyzerProfile, SearchAutocompleteCommand, SearchCorpus, SearchCursor,
