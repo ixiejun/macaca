@@ -18,7 +18,7 @@
 - [x] 3.1 Implement declaration validation for scopes: `workflow.recovery.read`, `workflow.recovery.repair`, `workflow.recovery.resume`.
 - [x] 3.2 Add policy checks before side effects and resource reservation before provider calls.
 - [x] 3.3 Add entitlement checks and explicit unavailable/denied diagnostics for missing provider, missing permission, missing entitlement, disabled host capability, and unsupported command.
-- [ ] 3.4 Add approval behavior for sensitive, external, host, identity, financial, irreversible, or long-running side effects.
+- [x] 3.4 Add approval behavior for sensitive, external, host, identity, financial, irreversible, or long-running side effects.
 - [x] 3.5 Add tests proving denied/unavailable paths do not call concrete providers.
 
 ## 4. Service Provider Or Unavailable Provider
@@ -37,11 +37,11 @@
 
 ## 6. Trace, Audit, Replay, And Gates
 
-- [ ] 6.1 Emit sanitized declaration, admission, policy, entitlement, resource, service-call, health, snapshot, and unavailable events.
+- [x] 6.1 Emit sanitized declaration, admission, policy, entitlement, resource, service-call, health, snapshot, and unavailable events.
 - [x] 6.2 Add replay tests proving `pack.workflow.recovery.v1` calls are trace-addressable through the canonical service path.
-- [ ] 6.3 Add dependency gates proving kernel, SDK, shells, and generic application framework do not import concrete providers.
+- [x] 6.3 Add dependency gates proving kernel, SDK, shells, and generic application framework do not import concrete providers.
 - [x] 6.4 Add no-direct-provider-call gates and canonical execution-path tests for all commands.
-- [ ] 6.5 Run `openspec validate add-pack-workflow-recovery --strict`, targeted cargo tests, boundary gates, file-size gates, and audit replay checks before marking complete.
+- [x] 6.5 Run `openspec validate add-pack-workflow-recovery --strict`, targeted cargo tests, boundary gates, file-size gates, and audit replay checks before marking complete.
 
 ## 7. Developer Documentation
 
@@ -51,15 +51,15 @@
 
 ## 8. Industrial Recovery Semantics
 
-- [ ] 8.1 Model `FailureRecord`, `RecoveryPoint`, `RetryPolicy`, `RecoveryPlan`, `RepairAction`, `CompensationRef`, `ResumePlan`, and `ReplayExport` with schema-versioned DTOs and redaction profiles.
-- [ ] 8.2 Implement the failed/classified/planned/retrying/repairing/compensating/resumed/terminal state machine as provider-neutral contract tests.
-- [ ] 8.3 Add failure classification rules for transient, permanent, policy-denied, quota-exhausted, provider-unavailable, corrupted-checkpoint, and unknown failures.
-- [ ] 8.4 Add checkpoint integrity and compatibility checks before retry, repair, resume, or replay export.
-- [ ] 8.5 Add retry budget, backoff, terminalization, and compensation-reference behavior with deterministic time control.
+- [x] 8.1 Model `FailureRecord`, `RecoveryPoint`, `RetryPolicy`, `RecoveryPlan`, `RepairAction`, `CompensationRef`, `ResumePlan`, and `ReplayExport` with schema-versioned DTOs and redaction profiles.
+- [x] 8.2 Implement the failed/classified/planned/retrying/repairing/compensating/resumed/terminal state machine as provider-neutral contract tests.
+- [x] 8.3 Add failure classification rules for transient, permanent, policy-denied, quota-exhausted, provider-unavailable, corrupted-checkpoint, and unknown failures.
+- [x] 8.4 Add checkpoint integrity and compatibility checks before retry, repair, resume, or replay export.
+- [x] 8.5 Add retry budget, backoff, terminalization, and compensation-reference behavior with deterministic time control.
 
 ## 9. Supplier-Grade Edge Cases
 
-- [ ] 9.1 Test retry budget exhaustion and ensure recovery stops with a typed terminal or escalation result instead of infinite loops.
-- [ ] 9.2 Test corrupted checkpoint rejection and preserve diagnostic evidence without exposing raw checkpoint bytes.
-- [ ] 9.3 Test resume after service restart using only recovery points, trace lineage, and provider-neutral service state.
-- [ ] 9.4 Test replay export redaction for prompts, manifests, credentials, provider payloads, package bytes, and unbounded output.
+- [x] 9.1 Test retry budget exhaustion and ensure recovery stops with a typed terminal or escalation result instead of infinite loops.
+- [x] 9.2 Test corrupted checkpoint rejection and preserve diagnostic evidence without exposing raw checkpoint bytes.
+- [x] 9.3 Test resume after service restart using only recovery points, trace lineage, and provider-neutral service state.
+- [x] 9.4 Test replay export redaction for prompts, manifests, credentials, provider payloads, package bytes, and unbounded output.

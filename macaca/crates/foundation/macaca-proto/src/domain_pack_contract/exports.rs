@@ -417,3 +417,8 @@ pub use super::workflow_delegation_semantics::{
     DelegationHandoffV1, DelegationLeaseV1, DelegationLifecycleSpec, DelegationLifecycleState,
     DelegationRequestV1, DelegationResultOutcome, DelegationResultV1,
 };
+pub use super::workflow_recovery_semantics::{
+    CompensationRefV1, FailureClass, FailureClassificationSpec, FailureRecordV1,
+    RecoveryLifecycleSpec, RecoveryLifecycleState, RecoveryPlanV1, RecoveryPointSpec,
+    RecoveryPointV1, RepairActionV1, ReplayExportV1, ResumePlanV1, RetryPolicyV1,
+};
