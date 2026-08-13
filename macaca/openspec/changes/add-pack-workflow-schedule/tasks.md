@@ -16,37 +16,37 @@
 ## 3. Permission, Policy, Resource, Entitlement, And Approval
 
 - [x] 3.1 Implement declaration validation for `workflow.schedule.read`, `workflow.schedule.write`, `workflow.schedule.control`, `workflow.schedule.fire`, `workflow.schedule.backfill`, and `workflow.schedule.admin`.
-- [ ] 3.2 Enforce recurrence, timezone, DST strategy, action target, idempotency key derivation, misfire, catch-up, overlap, preview range, backfill range, and redaction policies before dispatch.
-- [ ] 3.3 Require every generated trigger to carry idempotency key, scheduled time, logical time, action reference, and policy evidence.
-- [ ] 3.4 Add resource reservation and quota checks for active schedules, pending triggers, backfill triggers, preview ranges, history size, retained snapshots, and replay metadata.
-- [ ] 3.5 Add approval behavior for large backfill, high-frequency schedules, critical action targets, catch-up floods, and administrative repair.
-- [ ] 3.6 Add tests proving denied, unavailable, invalid-recurrence, DST-unresolved, misfire-blocked, overlap-blocked, backfill-too-large, paused, trigger-conflict, and quota paths do not create tasks or service commands incorrectly.
+- [x] 3.2 Enforce recurrence, timezone, DST strategy, action target, idempotency key derivation, misfire, catch-up, overlap, preview range, backfill range, and redaction policies before dispatch.
+- [x] 3.3 Require every generated trigger to carry idempotency key, scheduled time, logical time, action reference, and policy evidence.
+- [x] 3.4 Add resource reservation and quota checks for active schedules, pending triggers, backfill triggers, preview ranges, history size, retained snapshots, and replay metadata.
+- [x] 3.5 Add approval behavior for large backfill, high-frequency schedules, critical action targets, catch-up floods, and administrative repair.
+- [x] 3.6 Add tests proving denied, unavailable, invalid-recurrence, DST-unresolved, misfire-blocked, overlap-blocked, backfill-too-large, paused, trigger-conflict, and quota paths do not create tasks or service commands incorrectly.
 
 ## 4. Service Provider And Recurrence Strategy
 
-- [ ] 4.1 Implement the workflow schedule service provider contract behind the service runtime; do not construct providers from kernel, SDK, shells, or generic application-framework code.
+- [x] 4.1 Implement the workflow schedule service provider contract behind the service runtime; do not construct providers from kernel, SDK, shells, or generic application-framework code.
 - [x] 4.2 Add provider descriptor support for built-in durable, remote workflow-engine, plugin, mock, and unavailable provider classes.
-- [ ] 4.3 Add schedule, trigger, pause/resume, backfill, misfire, catch-up, overlap, and deletion state machines.
+- [x] 4.3 Add schedule, trigger, pause/resume, backfill, misfire, catch-up, overlap, and deletion state machines.
 - [x] 4.4 Add mock and unavailable providers for deterministic tests; external schedule adapters must remain optional providers or plugin/remote modules.
-- [ ] 4.5 Add provider conformance tests for one-shot, interval, cron, RRULE, inclusions/exclusions, timezone/DST, preview, fire due, misfire, catch-up, backfill, overlap, history, snapshot, redaction, and unsupported-command reporting.
-- [ ] 4.6 Add lifecycle, health, snapshot, shutdown, timeout, cancellation, trigger idempotency, resource cleanup, and bounded output behavior.
+- [x] 4.5 Add provider conformance tests for one-shot, interval, cron, RRULE, inclusions/exclusions, timezone/DST, preview, fire due, misfire, catch-up, backfill, overlap, history, snapshot, redaction, and unsupported-command reporting.
+- [x] 4.6 Add lifecycle, health, snapshot, shutdown, timeout, cancellation, trigger idempotency, resource cleanup, and bounded output behavior.
 
 ## 5. SDK, Admission, Examples, And ABI
 
 - [x] 5.1 Extend SDK discovery for `pack.workflow.schedule.v1` with command schemas, DTO schemas, permission scopes, examples, availability, recurrence support, timezone/DST support, misfire/catch-up/overlap policies, diagnostics, compatibility, and documentation URL.
 - [x] 5.2 Extend application admission so required declarations block when unavailable and optional declarations degrade explicitly with effective capability mementos.
 - [x] 5.3 Add SDK command helper builders that only produce canonical traced service calls and never construct providers or branch on schedule/task/application names.
-- [ ] 5.4 Add WASM/application ABI exposure for schedule commands using provider-neutral DTO schemas and canonical service-call dispatch.
+- [x] 5.4 Add WASM/application ABI exposure for schedule commands using provider-neutral DTO schemas and canonical service-call dispatch.
 - [x] 5.5 Add generic examples for one-shot, interval, cron, RRULE, preview, pause/resume, fire due, backfill, misfire, overlap, task integration, history, and unavailable-provider diagnostics.
 
 ## 6. Trace, Audit, Replay, And Boundary Gates
 
-- [ ] 6.1 Emit sanitized schedule lifecycle events for declaration, admission, creation, update, pause, resume, preview, trigger computation, trigger fire, trigger cancellation, backfill start/completion, misfire handling, deletion, and snapshot recording.
-- [ ] 6.2 Add replay tests proving every computed/fired trigger is trace-addressable through the canonical service path after refresh/restart.
-- [ ] 6.3 Add dependency-boundary gates proving microkernel, SDK, shells, and generic application framework do not import concrete schedule providers or recurrence engines directly.
-- [ ] 6.4 Add no-direct-provider-call gates proving all schedule commands enter through descriptor-owned service registrations and typed service runtime dispatch.
-- [ ] 6.5 Add redaction tests for action payloads, prompts, provider payloads, schedule metadata, trigger history, snapshots, and logs.
-- [ ] 6.6 Run `openspec validate add-pack-workflow-schedule --strict`, DTO compatibility tests, recurrence tests, DST tests, misfire/catch-up tests, backfill tests, boundary gates, file-size gates, and audit replay checks before marking implementation tasks complete.
+- [x] 6.1 Emit sanitized schedule lifecycle events for declaration, admission, creation, update, pause, resume, preview, trigger computation, trigger fire, trigger cancellation, backfill start/completion, misfire handling, deletion, and snapshot recording.
+- [x] 6.2 Add replay tests proving every computed/fired trigger is trace-addressable through the canonical service path after refresh/restart.
+- [x] 6.3 Add dependency-boundary gates proving microkernel, SDK, shells, and generic application framework do not import concrete schedule providers or recurrence engines directly.
+- [x] 6.4 Add no-direct-provider-call gates proving all schedule commands enter through descriptor-owned service registrations and typed service runtime dispatch.
+- [x] 6.5 Add redaction tests for action payloads, prompts, provider payloads, schedule metadata, trigger history, snapshots, and logs.
+- [x] 6.6 Run `openspec validate add-pack-workflow-schedule --strict`, DTO compatibility tests, recurrence tests, DST tests, misfire/catch-up tests, backfill tests, boundary gates, file-size gates, and audit replay checks before marking implementation tasks complete.
 
 ## 7. Developer Documentation
 

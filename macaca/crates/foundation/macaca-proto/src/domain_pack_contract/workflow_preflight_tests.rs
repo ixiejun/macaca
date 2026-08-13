@@ -8,6 +8,7 @@ use super::super::workflow_approval::workflow_approval_pack_definition;
 use super::super::workflow_delegation::workflow_delegation_pack_definition;
 use super::super::workflow_recovery::workflow_recovery_pack_definition;
 use super::super::workflow_review::workflow_review_pack_definition;
+use super::super::workflow_schedule::workflow_schedule_pack_definition;
 use super::*;
 
 #[test]
@@ -92,6 +93,11 @@ fn workflow_preflight_cases() -> Vec<(DomainPackDefinition, &'static str, &'stat
             workflow_review_pack_definition(),
             "review.request_review",
             "workflow.review.request",
+        ),
+        (
+            workflow_schedule_pack_definition(),
+            "workflow_schedule.create",
+            "workflow.schedule.write",
         ),
     ]
 }

@@ -158,6 +158,7 @@ pub mod workflow_recovery_semantics;
 pub mod workflow_review;
 pub mod workflow_review_semantics;
 pub mod workflow_schedule;
+pub mod workflow_schedule_semantics;
 pub mod workflow_task;
 pub mod workflow_task_approval_spec;
 pub mod workflow_task_dispatch_gate;
@@ -192,5 +193,7 @@ mod workflow_recovery_semantics_tests;
 mod workflow_review_preflight_tests;
 #[cfg(test)]
 mod workflow_review_semantics_tests;
+#[cfg(test)]
+mod workflow_schedule_semantics_tests;
 
 pub use exports::*;

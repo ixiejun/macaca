@@ -439,3 +439,10 @@ pub use super::workflow_review_semantics::{
     ReviewFindingV1, ReviewGateRaceResult, ReviewLifecycleSpec, ReviewLifecycleState,
     ReviewOutcomeV1, ReviewRequestV1, ReviewRevisionPolicy, ReviewRevisionSpec, ReviewRoundV1,
 };
+pub use super::workflow_schedule_semantics::{
+    approval_required, derive_idempotency_key, filtered_schedule_page, preflight_schedule,
+    redacted_schedule_metadata, reserve_resources, transition_schedule, trigger_evidence,
+    trigger_record, validate_misfire, validate_overlap, validate_recurrence, validate_spec,
+    validate_timezone, ScheduleAdmissionFailure, ScheduleApprovalEvidence, SchedulePolicyContext,
+    ScheduleResourceLimits, ScheduleResourceReservation, ScheduleTriggerEvidence,
+};
