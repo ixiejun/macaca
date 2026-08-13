@@ -422,3 +422,9 @@ pub use super::workflow_recovery_semantics::{
     RecoveryLifecycleSpec, RecoveryLifecycleState, RecoveryPlanV1, RecoveryPointSpec,
     RecoveryPointV1, RepairActionV1, ReplayExportV1, ResumePlanV1, RetryPolicyV1,
 };
+pub use super::workflow_review_semantics::{
+    filtered_finding_page, resolve_gate_race, FixRequestV1, ReviewClosureGateSpec,
+    ReviewClosureGateV1, ReviewDismissalSpec, ReviewFindingLifecycleSpec, ReviewFindingState,
+    ReviewFindingV1, ReviewGateRaceResult, ReviewLifecycleSpec, ReviewLifecycleState,
+    ReviewOutcomeV1, ReviewRequestV1, ReviewRevisionPolicy, ReviewRevisionSpec, ReviewRoundV1,
+};

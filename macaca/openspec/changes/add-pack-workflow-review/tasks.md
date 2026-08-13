@@ -18,7 +18,7 @@
 - [x] 3.1 Implement declaration validation for scopes: `workflow.review.request`, `workflow.review.write`, `workflow.review.approve`.
 - [x] 3.2 Add policy checks before side effects and resource reservation before provider calls.
 - [x] 3.3 Add entitlement checks and explicit unavailable/denied diagnostics for missing provider, missing permission, missing entitlement, disabled host capability, and unsupported command.
-- [ ] 3.4 Add approval behavior for sensitive, external, host, identity, financial, irreversible, or long-running side effects.
+- [x] 3.4 Add approval behavior for sensitive, external, host, identity, financial, irreversible, or long-running side effects.
 - [x] 3.5 Add tests proving denied/unavailable paths do not call concrete providers.
 
 ## 4. Service Provider Or Unavailable Provider
@@ -37,11 +37,11 @@
 
 ## 6. Trace, Audit, Replay, And Gates
 
-- [ ] 6.1 Emit sanitized declaration, admission, policy, entitlement, resource, service-call, health, snapshot, and unavailable events.
+- [x] 6.1 Emit sanitized declaration, admission, policy, entitlement, resource, service-call, health, snapshot, and unavailable events.
 - [x] 6.2 Add replay tests proving `pack.workflow.review.v1` calls are trace-addressable through the canonical service path.
-- [ ] 6.3 Add dependency gates proving kernel, SDK, shells, and generic application framework do not import concrete providers.
+- [x] 6.3 Add dependency gates proving kernel, SDK, shells, and generic application framework do not import concrete providers.
 - [x] 6.4 Add no-direct-provider-call gates and canonical execution-path tests for all commands.
-- [ ] 6.5 Run `openspec validate add-pack-workflow-review --strict`, targeted cargo tests, boundary gates, file-size gates, and audit replay checks before marking complete.
+- [x] 6.5 Run `openspec validate add-pack-workflow-review --strict`, targeted cargo tests, boundary gates, file-size gates, and audit replay checks before marking complete.
 
 ## 7. Developer Documentation
 
@@ -51,15 +51,15 @@
 
 ## 8. Industrial Review Semantics
 
-- [ ] 8.1 Model `ReviewRequest`, `ReviewRound`, `ReviewFinding`, `FixRequest`, `ReviewOutcome`, and `ReviewClosureGate` with schema-versioned DTOs and redaction profiles.
-- [ ] 8.2 Implement the requested/in_review/changes_requested/fix_submitted/approved/dismissed/stale/closed/cancelled state machine as provider-neutral contract tests.
-- [ ] 8.3 Add finding lifecycle behavior for open, acknowledged, fixed, verified, dismissed, and stale findings.
-- [ ] 8.4 Add subject revision hash checks so approvals and findings become stale or carry forward only under explicit policy.
-- [ ] 8.5 Add review closure gate checks proving unresolved blocking findings prevent terminal reviewed state.
+- [x] 8.1 Model `ReviewRequest`, `ReviewRound`, `ReviewFinding`, `FixRequest`, `ReviewOutcome`, and `ReviewClosureGate` with schema-versioned DTOs and redaction profiles.
+- [x] 8.2 Implement the requested/in_review/changes_requested/fix_submitted/approved/dismissed/stale/closed/cancelled state machine as provider-neutral contract tests.
+- [x] 8.3 Add finding lifecycle behavior for open, acknowledged, fixed, verified, dismissed, and stale findings.
+- [x] 8.4 Add subject revision hash checks so approvals and findings become stale or carry forward only under explicit policy.
+- [x] 8.5 Add review closure gate checks proving unresolved blocking findings prevent terminal reviewed state.
 
 ## 9. Supplier-Grade Edge Cases
 
-- [ ] 9.1 Test re-review after fix evidence and ensure prior findings are preserved with status transitions rather than overwritten.
-- [ ] 9.2 Test dismissal authority and dismissal reason requirements for findings and whole review outcomes.
-- [ ] 9.3 Test policy-filtered finding listing so hidden findings do not leak through counts, cursors, or severity aggregates.
-- [ ] 9.4 Test concurrent approval and new blocking finding submission, guaranteeing deterministic gate outcome and replayable losing-command diagnostics.
+- [x] 9.1 Test re-review after fix evidence and ensure prior findings are preserved with status transitions rather than overwritten.
+- [x] 9.2 Test dismissal authority and dismissal reason requirements for findings and whole review outcomes.
+- [x] 9.3 Test policy-filtered finding listing so hidden findings do not leak through counts, cursors, or severity aggregates.
+- [x] 9.4 Test concurrent approval and new blocking finding submission, guaranteeing deterministic gate outcome and replayable losing-command diagnostics.
