@@ -4,8 +4,8 @@ use async_trait::async_trait;
 use macaca_proto::{
     CapabilityId, CleanupPolicy, KernelServiceId, ServiceCallResult, ServiceCapability,
     ServiceCommand, ServiceDescriptor, ServiceError, ServiceHealth, ServiceLifecycleState,
-    ServiceResult, ServiceScope, ServiceType, TraceSchemaRef, FOUNDATION_TIME_COMMANDS,
-    FOUNDATION_TIME_SERVICE_ID,
+    ServiceResult, ServiceScope, ServiceType, TimeClockHealth, TimeProviderSnapshot,
+    TraceSchemaRef, FOUNDATION_TIME_COMMANDS, FOUNDATION_TIME_SERVICE_ID,
 };
 
 /// Time capability boundary implemented by host, remote, plugin, and replay providers.
@@ -17,6 +17,8 @@ pub trait TimeService: Send + Sync {
     async fn call(&self, command: ServiceCommand) -> ServiceResult<ServiceCallResult>;
     /// Return bounded provider health without raw host state.
     fn health(&self) -> ServiceHealth;
+    /// Return a replay-safe Memento without timer ids, payloads, or host handles.
+    fn snapshot(&self) -> TimeProviderSnapshot;
     /// Release active timer state during service shutdown.
     async fn shutdown(&self) -> ServiceResult<()>;
 }
@@ -78,6 +80,22 @@ impl TimeService for UnavailableTimeProvider {
     fn health(&self) -> ServiceHealth {
         ServiceHealth::Unavailable {
             reason: self.reason.clone(),
+        }
+    }
+    fn snapshot(&self) -> TimeProviderSnapshot {
+        TimeProviderSnapshot {
+            descriptor_hash: "foundation-time-unavailable-v1".into(),
+            provider_class: "unavailable".into(),
+            health: TimeClockHealth {
+                provider_class: "unavailable".into(),
+                wall_clock_available: false,
+                monotonic_available: false,
+                timezone_data_version: None,
+                locale_data_available: false,
+                max_timer_duration_ms: 0,
+                unavailable_reason: Some(self.reason.clone()),
+            },
+            timer_state_hashes: Default::default(),
         }
     }
     async fn shutdown(&self) -> ServiceResult<()> {

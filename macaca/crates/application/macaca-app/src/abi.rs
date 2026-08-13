@@ -330,3 +330,7 @@ mod messaging_tests;
 #[cfg(test)]
 #[path = "abi_random_tests.rs"]
 mod random_tests;
+
+#[cfg(test)]
+#[path = "abi_time_tests.rs"]
+mod time_tests;

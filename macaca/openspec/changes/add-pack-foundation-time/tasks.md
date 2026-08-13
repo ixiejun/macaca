@@ -56,16 +56,16 @@
 
 ## 4. Service Provider And Runtime Integration
 
-- [ ] 4.1 Define the time service trait/provider interface behind the service
+- [x] 4.1 Define the time service trait/provider interface behind the service
   runtime.
 - [x] 4.2 Implement unavailable provider behavior for absent time service,
   unsupported monotonic clock, unsupported exact timers, missing timezone data,
   missing locale data, and disabled mock clock.
-- [ ] 4.3 Implement deterministic mock/frozen clock provider for contract,
+- [x] 4.3 Implement deterministic mock/frozen clock provider for contract,
   replay, and SDK examples.
-- [ ] 4.4 Implement or bind host wall-clock, monotonic clock, formatting/parsing,
+- [x] 4.4 Implement or bind host wall-clock, monotonic clock, formatting/parsing,
   timezone, and timer providers with bounded health diagnostics.
-- [ ] 4.5 Add lifecycle, health, snapshot, shutdown, timeout, cancellation, timer
+- [x] 4.5 Add lifecycle, health, snapshot, shutdown, timeout, cancellation, timer
   cleanup, and provider capability reports.
 
 ## 5. SDK, WASM ABI, And Application Framework
@@ -78,12 +78,12 @@
 - [ ] 5.3 Add SDK helpers for monotonic timeout, timezone conversion, localized
   formatting, strict parsing, timer create/cancel, deadline evaluation, and mock
   clock setup in test contexts.
-- [ ] 5.4 Extend effective capability projection so applications can inspect
+- [x] 5.4 Extend effective capability projection so applications can inspect
   callable commands, denied commands, unavailable timezone/calendar/timer
   features, provider capability flags, and replay references.
-- [ ] 5.5 Expose WASM host imports only for declared callable time commands and
+- [x] 5.5 Expose WASM host imports only for declared callable time commands and
   route every import through the service runtime path.
-- [ ] 5.6 Add app-framework tests proving YAML, WASM, GenUI, and headless apps all
+- [x] 5.6 Add app-framework tests proving YAML, WASM, GenUI, and headless apps all
   use the same time execution path.
 
 ## 6. Trace, Audit, Replay, And Gates
@@ -97,9 +97,9 @@
 - [ ] 6.3 Add replay tests proving every time command is trace-addressable and can
   reconstruct wall-clock/monotonic decisions with clock source and timezone data
   version.
-- [ ] 6.4 Add dependency-boundary tests proving kernel, SDK, shells, and
+- [x] 6.4 Add dependency-boundary tests proving kernel, SDK, shells, and
   application framework do not import concrete time providers.
-- [ ] 6.5 Add no-direct-provider-call gates proving SDK helpers and WASM host
+- [x] 6.5 Add no-direct-provider-call gates proving SDK helpers and WASM host
   imports cannot bypass service runtime.
 - [ ] 6.6 Run `openspec validate add-pack-foundation-time --strict`, targeted
   cargo tests, dependency-boundary gates, file-size gates, and audit replay

@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use macaca_kernel::SystemService;
 use macaca_proto::{
     ServiceCallResult, ServiceCommand, ServiceDescriptor, ServiceHealth, ServiceResult,
-    FOUNDATION_TIME_SERVICE_ID,
+    TimeProviderSnapshot, FOUNDATION_TIME_SERVICE_ID,
 };
 use macaca_time::{TimeService, UnavailableTimeProvider};
 use tracing::info;
@@ -28,6 +28,10 @@ impl TimeSystemServiceProvider {
     /// Construct the fail-closed optional-module state.
     pub fn unavailable() -> Self {
         Self::new(Arc::new(UnavailableTimeProvider::default()))
+    }
+    /// Return the provider's bounded replay Memento without native handles or payloads.
+    pub fn snapshot(&self) -> TimeProviderSnapshot {
+        self.provider.snapshot()
     }
 }
 
@@ -103,5 +107,13 @@ mod tests {
             .unwrap();
         assert_eq!(result.status, "unavailable");
         assert_eq!(result.trace.trace_id.as_str(), "trace-time-unavailable");
+    }
+
+    #[test]
+    fn adapter_exposes_replay_safe_provider_snapshot() {
+        let provider = TimeSystemServiceProvider::new(Arc::new(FrozenTimeProvider::new(42)));
+        let snapshot = provider.snapshot();
+        assert_eq!(snapshot.provider_class, "frozen-test-clock");
+        assert!(snapshot.timer_state_hashes.is_empty());
     }
 }
