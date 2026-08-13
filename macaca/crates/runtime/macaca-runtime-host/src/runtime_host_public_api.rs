@@ -381,6 +381,7 @@ pub use crate::task_toolkit_bootstrap::{
     bootstrap_task_toolkit_tools, GoalRecordedObserver, TaskToolkitBootstrapRequest,
     TaskToolkitPolicy,
 };
+pub use crate::time_service_provider::TimeSystemServiceProvider;
 pub use crate::tool_bootstrap::{
     bootstrap_delegate_task_tool, bootstrap_get_task_result_tool, bootstrap_list_agents_tool,
     bootstrap_local_base_tools, DelegateTaskToolBootstrapPorts, ForkSessionMappingRecorder,

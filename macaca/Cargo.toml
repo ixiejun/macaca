@@ -11,6 +11,7 @@ members = [
     "crates/services/macaca-scheduled-agent-task",
     "crates/services/macaca-heartbeat",
     "crates/services/macaca-random",
+    "crates/services/macaca-time",
     "crates/services/macaca-llm",
     "crates/services/macaca-memory",
     "crates/services/macaca-context",
@@ -93,6 +94,7 @@ macaca-scheduler = { path = "crates/services/macaca-scheduler" }
 macaca-scheduled-agent-task = { path = "crates/services/macaca-scheduled-agent-task" }
 macaca-heartbeat = { path = "crates/services/macaca-heartbeat" }
 macaca-random = { path = "crates/services/macaca-random" }
+macaca-time = { path = "crates/services/macaca-time" }
 macaca-app = { path = "crates/application/macaca-app" }
 macaca-kernel = { path = "crates/kernel/macaca-kernel" }
 macaca-sdk = { path = "crates/facade/macaca-sdk" }

@@ -25,6 +25,7 @@ pub mod entitlement_client;
 pub mod evm_client;
 pub mod facade;
 pub mod foundation_random_client;
+pub mod foundation_time_client;
 pub mod heartbeat_client;
 pub mod interaction_client;
 pub mod llm_client;
@@ -334,6 +335,11 @@ pub use entitlement_client::{
 };
 pub use evm_client::{ServiceBackedEvmClient, SystemEvmClient, UnavailableSystemEvmClient};
 pub use facade::{AgentRegistryApi, MacacaSdk};
+pub use foundation_time_client::{
+    clock_health_command, localized_format_command, monotonic_timeout_command,
+    strict_parse_command, timer_cancel_command, timer_create_command, timezone_conversion_command,
+    TimeDomainPackCommandBuildOutcome, TimeDomainPackCommandBuilder,
+};
 pub use heartbeat_client::{
     ServiceBackedHeartbeatClient, SystemHeartbeatClient, UnavailableSystemHeartbeatClient,
 };

@@ -1818,6 +1818,7 @@ dependencies = [
  "macaca-scheduler",
  "macaca-skill",
  "macaca-task",
+ "macaca-time",
  "macaca-tools",
  "reqwest",
  "serde",
@@ -1902,6 +1903,18 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "macaca-time"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "macaca-proto",
+ "serde_json",
  "tokio",
  "tracing",
 ]

@@ -292,6 +292,10 @@ pub use super::foundation_time::{
     TimeResultEnvelope, TimeResultStatus, TimeTimerReference, TimeZoneReference,
     FOUNDATION_TIME_COMMANDS, FOUNDATION_TIME_PACK_ID, FOUNDATION_TIME_SERVICE_ID,
 };
+pub use super::foundation_time_semantics::{
+    preflight_timer, release_timer, reserve_timer, TimeAdmissionContext, TimeAdmissionFailure,
+    TimeResourceLimits, TimeResourceReservation,
+};
 pub use super::identity_organization_semantics::{
     filtered_organization_page, preserved_role_history, OrganizationInvitationLifecycle,
     OrganizationLifecycle, OrganizationLifecycleSpec, OrganizationMembershipLifecycle,
