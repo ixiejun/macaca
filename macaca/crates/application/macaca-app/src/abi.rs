@@ -322,3 +322,7 @@ mod calendar_tests;
 #[cfg(test)]
 #[path = "abi_email_tests.rs"]
 mod email_tests;
+
+#[cfg(test)]
+#[path = "abi_messaging_tests.rs"]
+mod messaging_tests;

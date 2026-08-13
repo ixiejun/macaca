@@ -24,6 +24,54 @@ pub struct MessagingAdmissionEvidence {
     pub provider_capability_available: bool,
 }
 
+/// Declarative messaging-pack configuration used during application admission.
+///
+/// The declaration contains only bounded references. Provider credentials,
+/// conversation content, attachment bytes, and webhook payloads remain owned
+/// by optional service adapters.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MessagingPackDeclaration {
+    pub required: bool,
+    pub sender_identity_refs: Vec<String>,
+    pub conversation_class_refs: Vec<String>,
+    pub event_ingestion_endpoint_refs: Vec<String>,
+    pub attachment_support_refs: Vec<String>,
+}
+
+/// Specification validating provider-neutral messaging declaration shape.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct MessagingPackDeclarationSpec;
+
+impl MessagingPackDeclarationSpec {
+    /// Reject incomplete required declarations and unsafe reference values.
+    pub fn validate(&self, declaration: &MessagingPackDeclaration) -> Result<(), String> {
+        if declaration.required && declaration.sender_identity_refs.is_empty() {
+            return Err("required messaging pack needs a sender identity reference".into());
+        }
+        for reference in declaration
+            .sender_identity_refs
+            .iter()
+            .chain(declaration.conversation_class_refs.iter())
+            .chain(declaration.event_ingestion_endpoint_refs.iter())
+            .chain(declaration.attachment_support_refs.iter())
+        {
+            if !is_safe_declaration_reference(reference) {
+                return Err("messaging declaration contains an invalid reference".into());
+            }
+        }
+        Ok(())
+    }
+}
+
+fn is_safe_declaration_reference(value: &str) -> bool {
+    let value = value.trim();
+    !value.is_empty()
+        && value.len() <= 256
+        && value.chars().all(|character| {
+            character.is_ascii_alphanumeric() || matches!(character, ':' | '-' | '_' | '.' | '/')
+        })
+}
+
 /// A provider-neutral Specification for messaging side effects.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MessagingDispatchPreflight {

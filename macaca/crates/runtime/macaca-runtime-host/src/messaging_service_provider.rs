@@ -50,9 +50,30 @@ pub enum MessagingRuntimeEventKind {
     ServiceCall,
     ProviderCallStarted,
     ProviderCallSucceeded,
+    ProviderCallFailed,
+    SendRequested,
+    SendAccepted,
+    SendFailed,
     HealthReported,
     SnapshotRecorded,
     Unavailable,
+}
+
+/// Provider adapter Bridge for messaging transports and remote APIs.
+///
+/// Concrete adapters are installed outside the OS layer. They receive canonical
+/// commands and exchange opaque references, so native payloads and credentials
+/// cannot leak into SDK callers or application framework surfaces.
+#[async_trait]
+pub trait MessagingProviderAdapter: Send + Sync {
+    /// Return a descriptor-only capability report for the adapter Strategy.
+    fn capability(&self) -> MessagingProviderCapability;
+
+    /// Dispatch a normalized command and return an opaque provider-owned reference.
+    async fn dispatch(&self, command: &ServiceCommand) -> ServiceResult<String>;
+
+    /// Ingest a verified provider event by reference with idempotency protection.
+    async fn ingest_event(&self, event_ref: &str, idempotency_key: &str) -> ServiceResult<()>;
 }
 
 /// Deterministic mock or explicit unavailable messaging `SystemService` adapter.
@@ -93,6 +114,15 @@ impl MessagingSystemServiceProvider {
             supports_reactions: true,
             supports_typing: true,
             supports_event_ingest: true,
+            supports_attachment_handles: true,
+            supports_cursors: true,
+            supports_health: true,
+            supported_formats: BTreeSet::from([
+                "text".into(),
+                "markdown".into(),
+                "reference".into(),
+            ]),
+            rate_limit_bucket: "runtime_host_default".into(),
             max_attachment_bytes: 65_536,
             max_message_bytes: 65_536,
             availability: DomainPackProviderCapabilityState::Preview,
@@ -146,6 +176,16 @@ impl SystemService for MessagingSystemServiceProvider {
     ) -> ServiceResult<macaca_proto::ServiceCallResult> {
         let trace = domain_pack_command_trace(&command)?;
         if let Some(reason) = &self.unavailable_reason {
+            if matches!(
+                command.name.as_str(),
+                "messaging.send_message" | "messaging.reply_message"
+            ) {
+                let _ = self.events.send(event(
+                    &command.name.to_string(),
+                    &trace.trace_id,
+                    MessagingRuntimeEventKind::SendFailed,
+                ));
+            }
             let _ = self.events.send(event(
                 &command.name.to_string(),
                 &trace.trace_id,
@@ -155,6 +195,12 @@ impl SystemService for MessagingSystemServiceProvider {
             return Err(ServiceError::ServiceUnavailable(reason.clone()));
         }
         if !COMMUNICATION_MESSAGING_COMMANDS.contains(&command.name.as_str()) {
+            let _ = self.events.send(event(
+                &command.name.to_string(),
+                &trace.trace_id,
+                MessagingRuntimeEventKind::ProviderCallFailed,
+            ));
+            warn!(service_id = %self.descriptor.id, command = %command.name, trace_id = %trace.trace_id, "messaging provider rejected unsupported command");
             return Err(ServiceError::UnsupportedCommand(command.name.to_string()));
         }
         let reference = format!("messaging:reference:{}", trace.trace_id);
@@ -164,7 +210,7 @@ impl SystemService for MessagingSystemServiceProvider {
             .insert(trace.trace_id.clone(), reference.clone());
         for kind in common_event_kinds()
             .iter()
-            .chain([event_kind(command.name.as_str())].iter())
+            .chain(command_event_kinds(command.name.as_str()).iter())
         {
             let _ = self
                 .events
@@ -234,23 +280,23 @@ fn common_event_kinds() -> &'static [MessagingRuntimeEventKind] {
         ProviderCallSucceeded,
     ]
 }
-fn event_kind(command: &str) -> MessagingRuntimeEventKind {
+fn command_event_kinds(command: &str) -> &'static [MessagingRuntimeEventKind] {
     use MessagingRuntimeEventKind::*;
     match command {
-        "messaging.find_conversation" | "messaging.create_conversation" => ConversationChanged,
-        "messaging.inspect_participants" => ParticipantsInspected,
-        "messaging.list_messages" | "messaging.fetch_message" => MessageRequested,
-        "messaging.send_message"
-        | "messaging.reply_message"
-        | "messaging.edit_message"
-        | "messaging.delete_message" => MessageChanged,
-        "messaging.add_reaction" | "messaging.remove_reaction" => ReactionChanged,
-        "messaging.mark_read" => ReadReceiptChanged,
-        "messaging.attach_handle" => AttachmentReferenced,
-        "messaging.delivery_status" => DeliveryInspected,
-        "messaging.send_typing" => TypingSent,
-        "messaging.ingest_event" => EventIngested,
-        _ => ServiceCall,
+        "messaging.find_conversation" | "messaging.create_conversation" => &[ConversationChanged],
+        "messaging.inspect_participants" => &[ParticipantsInspected],
+        "messaging.list_messages" | "messaging.fetch_message" => &[MessageRequested],
+        "messaging.send_message" | "messaging.reply_message" => {
+            &[SendRequested, MessageChanged, SendAccepted]
+        }
+        "messaging.edit_message" | "messaging.delete_message" => &[MessageChanged],
+        "messaging.add_reaction" | "messaging.remove_reaction" => &[ReactionChanged],
+        "messaging.mark_read" => &[ReadReceiptChanged],
+        "messaging.attach_handle" => &[AttachmentReferenced],
+        "messaging.delivery_status" => &[DeliveryInspected],
+        "messaging.send_typing" => &[TypingSent],
+        "messaging.ingest_event" => &[EventIngested],
+        _ => &[ServiceCall],
     }
 }
 fn event(command: &str, trace_id: &str, kind: MessagingRuntimeEventKind) -> MessagingRuntimeEvent {

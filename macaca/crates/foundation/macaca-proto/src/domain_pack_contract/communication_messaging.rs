@@ -241,6 +241,21 @@ pub struct MessagingProviderCapability {
     pub supports_reactions: bool,
     pub supports_typing: bool,
     pub supports_event_ingest: bool,
+    /// Whether the adapter supports opaque attachment handles rather than bytes.
+    #[serde(default)]
+    pub supports_attachment_handles: bool,
+    /// Whether the adapter can resume conversation reads using cursor hashes.
+    #[serde(default)]
+    pub supports_cursors: bool,
+    /// Whether service lifecycle health is reported by this adapter.
+    #[serde(default)]
+    pub supports_health: bool,
+    /// Bounded formatting classes supported by the adapter's normalized renderer.
+    #[serde(default)]
+    pub supported_formats: BTreeSet<String>,
+    /// Descriptor-owned rate-limit bucket with no provider account identity.
+    #[serde(default)]
+    pub rate_limit_bucket: String,
     pub max_attachment_bytes: u64,
     pub max_message_bytes: u64,
     pub availability: DomainPackProviderCapabilityState,
@@ -413,6 +428,11 @@ pub fn communication_messaging_descriptor_hashes() -> MessagingDescriptorHashes 
             supports_reactions: false,
             supports_typing: false,
             supports_event_ingest: false,
+            supports_attachment_handles: false,
+            supports_cursors: false,
+            supports_health: false,
+            supported_formats: BTreeSet::new(),
+            rate_limit_bucket: "unavailable".into(),
             max_attachment_bytes: 0,
             max_message_bytes: 0,
             availability: DomainPackProviderCapabilityState::Unavailable,

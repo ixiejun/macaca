@@ -115,6 +115,37 @@ async fn email_sdk_discovery_serializes_only_descriptor_metadata() {
 }
 
 #[tokio::test]
+async fn messaging_sdk_discovery_serializes_only_descriptor_metadata() {
+    let catalog = compose_installed_domain_pack_catalog(reference_domain_pack_definitions());
+    let client = CatalogBackedDomainPackClient::new(catalog);
+    let inspect = client
+        .inspect_pack(
+            &DomainPackInspectCommand::new(COMMUNICATION_MESSAGING_PACK_ID)
+                .expect("messaging pack id must be valid"),
+        )
+        .await
+        .unwrap();
+
+    // Discovery exposes normalized capability metadata, never chat transport data.
+    let diagnostic = serde_json::to_string(&inspect).unwrap();
+    for marker in [
+        "access-token",
+        "bot-token",
+        "webhook-secret",
+        "raw-provider-payload",
+        "raw-message-body",
+        "raw-attachment-bytes",
+    ] {
+        assert!(
+            !diagnostic.contains(marker),
+            "SDK diagnostic leaked {marker}"
+        );
+    }
+    assert!(diagnostic.contains("messaging_provider_not_installed"));
+    assert!(diagnostic.contains("redaction_policy"));
+}
+
+#[tokio::test]
 async fn inbox_sdk_discovery_serializes_only_descriptor_metadata() {
     let catalog = compose_installed_domain_pack_catalog(reference_domain_pack_definitions());
     let client = CatalogBackedDomainPackClient::new(catalog);

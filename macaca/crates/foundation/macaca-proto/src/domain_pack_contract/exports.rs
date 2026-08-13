@@ -172,6 +172,9 @@ pub use super::communication_messaging::{
     COMMUNICATION_MESSAGING_COMMANDS, COMMUNICATION_MESSAGING_PACK_ID,
     COMMUNICATION_MESSAGING_SERVICE_ID,
 };
+pub use super::communication_messaging_preflight::{
+    MessagingPackDeclaration, MessagingPackDeclarationSpec,
+};
 pub use super::communication_notification::{
     communication_notification_descriptor_hashes, communication_notification_pack_definition,
     notification_stable_hash, NotificationAcknowledgeCommand, NotificationActionDefinition,

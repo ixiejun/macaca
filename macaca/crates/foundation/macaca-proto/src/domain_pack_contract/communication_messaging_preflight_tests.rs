@@ -5,8 +5,33 @@ use super::super::communication_messaging::{
     MessagingSendMessageCommand, MessagingSenderRef,
 };
 use super::super::communication_messaging_preflight::{
-    MessagingAdmissionEvidence, MessagingDispatchPreflight,
+    MessagingAdmissionEvidence, MessagingDispatchPreflight, MessagingPackDeclaration,
+    MessagingPackDeclarationSpec,
 };
+
+#[test]
+fn messaging_declaration_requires_safe_identity_conversation_event_and_attachment_refs() {
+    let declaration = MessagingPackDeclaration {
+        required: true,
+        sender_identity_refs: vec!["sender:primary".into()],
+        conversation_class_refs: vec!["conversation:channel".into()],
+        event_ingestion_endpoint_refs: vec!["endpoint:events".into()],
+        attachment_support_refs: vec!["artifact:handles".into()],
+    };
+    assert!(MessagingPackDeclarationSpec.validate(&declaration).is_ok());
+    assert!(MessagingPackDeclarationSpec
+        .validate(&MessagingPackDeclaration {
+            required: true,
+            ..Default::default()
+        })
+        .is_err());
+    assert!(MessagingPackDeclarationSpec
+        .validate(&MessagingPackDeclaration {
+            event_ingestion_endpoint_refs: vec!["https://endpoint.example/?token=raw".into()],
+            ..Default::default()
+        })
+        .is_err());
+}
 use super::super::pack_preflight::{
     DomainPackApprovalEvidence, DomainPackCommandPreflight, DomainPackEntitlementEvidence,
     DomainPackPolicyEvidence, DomainPackResourceReservation,
