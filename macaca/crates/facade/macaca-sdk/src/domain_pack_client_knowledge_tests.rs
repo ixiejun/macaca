@@ -122,3 +122,33 @@ async fn summarization_sdk_discovery_serializes_only_descriptor_metadata() {
     assert!(diagnostic.contains("knowledge_summarization_provider_not_installed"));
     assert!(diagnostic.contains("redaction_policy"));
 }
+
+#[tokio::test]
+async fn search_sdk_discovery_serializes_only_descriptor_metadata() {
+    let catalog = compose_installed_domain_pack_catalog(reference_domain_pack_definitions());
+    let client = CatalogBackedDomainPackClient::new(catalog);
+    let inspect = client
+        .inspect_pack(
+            &DomainPackInspectCommand::new(KNOWLEDGE_SEARCH_PACK_ID)
+                .expect("search pack id must be valid"),
+        )
+        .await
+        .unwrap();
+
+    // Discovery serializes an immutable descriptor, never request or provider data.
+    let diagnostic = serde_json::to_string(&inspect).unwrap();
+    for marker in [
+        "credential=search-secret",
+        "raw-provider-response",
+        "private-corpus-content",
+        "raw-query-token",
+        "unbounded-snippet",
+    ] {
+        assert!(
+            !diagnostic.contains(marker),
+            "SDK diagnostic leaked {marker}"
+        );
+    }
+    assert!(diagnostic.contains("knowledge_search_provider_not_installed"));
+    assert!(diagnostic.contains("redaction_policy"));
+}

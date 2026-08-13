@@ -118,6 +118,7 @@ mod knowledge_graph;
 mod knowledge_retrieval;
 mod knowledge_retrieval_preflight;
 mod knowledge_search;
+mod knowledge_search_preflight;
 mod knowledge_summarization;
 mod knowledge_summarization_preflight;
 pub mod location_common;
@@ -159,6 +160,8 @@ pub mod workflow_task_transition;
 
 #[cfg(test)]
 mod knowledge_retrieval_preflight_tests;
+#[cfg(test)]
+mod knowledge_search_preflight_tests;
 #[cfg(test)]
 mod knowledge_summarization_preflight_tests;
 #[cfg(test)]

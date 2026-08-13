@@ -49,6 +49,7 @@ pub enum SearchRuntimeEventKind {
     ServiceCall,
     ProviderCallStarted,
     ProviderCallSucceeded,
+    ProviderCallFailed,
     HealthReported,
     SnapshotRecorded,
     Unavailable,
@@ -94,10 +95,16 @@ impl SearchSystemServiceProvider {
                 "sort".into(),
                 "suggest".into(),
                 "autocomplete".into(),
+                "explain".into(),
+                "refresh".into(),
             ]),
             max_page_size: 100,
             supports_semantic: true,
             supports_hybrid: true,
+            max_explain_depth: 3,
+            supports_refresh: true,
+            rate_limit_bucket: "runtime_host_default".into(),
+            supports_health: true,
             state: DomainPackProviderCapabilityState::Preview,
         }
     }
@@ -118,6 +125,7 @@ impl SearchSystemServiceProvider {
         BTreeMap::from([
             ("descriptor_hash".into(), "search:descriptor".into()),
             ("provider_class".into(), "mock".into()),
+            ("redaction_profile".into(), "references_only".into()),
             ("active_reference_count".into(), count.to_string()),
         ])
     }
@@ -154,6 +162,12 @@ impl SystemService for SearchSystemServiceProvider {
             return Err(ServiceError::ServiceUnavailable(reason.clone()));
         }
         if !KNOWLEDGE_SEARCH_COMMANDS.contains(&command.name.as_str()) {
+            let _ = self.events.send(event(
+                &command.name.to_string(),
+                &trace.trace_id,
+                SearchRuntimeEventKind::ProviderCallFailed,
+            ));
+            warn!(service_id = %self.descriptor.id, command = %command.name, trace_id = %trace.trace_id, "search provider rejected unsupported command");
             return Err(ServiceError::UnsupportedCommand(command.name.to_string()));
         }
 

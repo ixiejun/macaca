@@ -95,7 +95,17 @@ async fn search_provider_fails_closed_and_cleans_bounded_snapshot_state() {
         .call(command("search.search", "one"))
         .await
         .unwrap();
-    assert_eq!(provider.snapshot().await["active_reference_count"], "1");
+    let snapshot = provider.snapshot().await;
+    assert_eq!(snapshot["active_reference_count"], "1");
+    let observable = format!("{snapshot:?}");
+    for marker in [
+        "secret-marker",
+        "raw-marker",
+        "private-marker",
+        "raw-query-token",
+    ] {
+        assert!(!observable.contains(marker));
+    }
     provider.cleanup().await.unwrap();
     assert_eq!(provider.snapshot().await["active_reference_count"], "0");
 }
@@ -118,6 +128,28 @@ async fn search_provider_projects_bounded_cursor_and_refresh_handles() {
         assert_eq!(reply.status, state);
         assert!(!reply.output[field].is_null());
     }
+}
+
+#[test]
+fn search_mock_capability_reports_only_provider_neutral_bounded_features() {
+    let capability = SearchSystemServiceProvider::mock().capability();
+    for feature in [
+        "query_ast",
+        "filters",
+        "facets",
+        "sort",
+        "suggest",
+        "autocomplete",
+        "explain",
+        "refresh",
+    ] {
+        assert!(capability.query_features.contains(feature));
+    }
+    assert_eq!(capability.max_page_size, 100);
+    assert_eq!(capability.max_explain_depth, 3);
+    assert!(capability.supports_refresh);
+    assert!(capability.supports_health);
+    assert!(!capability.rate_limit_bucket.contains("credential"));
 }
 
 fn command(name: &str, trace_id: &str) -> ServiceCommand {

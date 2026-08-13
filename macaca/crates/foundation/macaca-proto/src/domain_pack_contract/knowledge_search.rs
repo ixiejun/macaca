@@ -241,6 +241,18 @@ pub struct SearchProviderCapability {
     pub max_page_size: u32,
     pub supports_semantic: bool,
     pub supports_hybrid: bool,
+    /// Maximum provider-neutral explanation depth that callers may request.
+    #[serde(default)]
+    pub max_explain_depth: u32,
+    /// Whether the provider accepts an asynchronous index refresh request.
+    #[serde(default)]
+    pub supports_refresh: bool,
+    /// Opaque rate-limit bucket identifier, never a provider-native quota value.
+    #[serde(default)]
+    pub rate_limit_bucket: String,
+    /// Bounded health capability reported through the canonical service runtime.
+    #[serde(default)]
+    pub supports_health: bool,
     pub state: DomainPackProviderCapabilityState,
 }
 
@@ -301,6 +313,10 @@ pub fn knowledge_search_descriptor_hashes() -> SearchDescriptorHashes {
             max_page_size: 100,
             supports_semantic: true,
             supports_hybrid: true,
+            max_explain_depth: 3,
+            supports_refresh: true,
+            rate_limit_bucket: "default".into(),
+            supports_health: true,
             state: DomainPackProviderCapabilityState::Preview,
         }),
         unavailable_schema_hash: search_stable_hash(&KnowledgeError {

@@ -44,28 +44,28 @@
   `knowledge.search.facets`, `knowledge.search.explain`,
   `knowledge.search.index.read`, `knowledge.search.index.refresh`,
   `knowledge.search.corpus.manage`, and `knowledge.search.stats`.
-- [ ] 3.2 Enforce corpus ownership, ACL trimming, source attribution, query
+- [x] 3.2 Enforce corpus ownership, ACL trimming, source attribution, query
   complexity, page size, cursor expiry, timeout, facet cardinality, snippet
   redaction, provider capability, rate limit, refresh quota, and resource budget
   checks before provider calls.
-- [ ] 3.3 Reject raw credentials, raw provider payloads, raw documents,
+- [x] 3.3 Reject raw credentials, raw provider payloads, raw documents,
   unbounded snippets, raw query tokens, private corpus content, and unbounded
   output at admission and observability boundaries.
 - [x] 3.4 Model required declarations as readiness blockers and optional
   declarations as explicit degraded effective capabilities.
-- [ ] 3.5 Add tests proving denied, validation, quota, unsupported, and
+- [x] 3.5 Add tests proving denied, validation, quota, unsupported, and
   unavailable paths do not call concrete search providers.
 
 ## 4. Service Provider And Runtime Integration
 
 - [x] 4.1 Implement or bind search providers only through the service runtime and
   approved runtime-host composition roots.
-- [ ] 4.2 Add unavailable and mock providers with deterministic corpus, schema,
+- [x] 4.2 Add unavailable and mock providers with deterministic corpus, schema,
   query, facet, suggest, explain, refresh, stats, and capability behavior.
 - [x] 4.3 Add lifecycle, health, snapshot, shutdown, timeout, cancellation,
   bounded pagination, cursor resume, query diagnostics, refresh async handles,
   and index health support.
-- [ ] 4.4 Add provider capability reporting for query AST features, filters,
+- [x] 4.4 Add provider capability reporting for query AST features, filters,
   facets, sort, suggest, autocomplete, semantic/hybrid support, explain depth,
   refresh support, page limits, rate limits, and health.
 - [x] 4.5 Add canonical execution-path tests proving every search command
@@ -81,7 +81,7 @@
 - [x] 5.2 Add focused SDK helper builders that only produce canonical traced
   service calls and return Null Object unavailable diagnostics when the pack is
   absent.
-- [ ] 5.3 Extend WASM/application ABI metadata so applications can declare corpus
+- [x] 5.3 Extend WASM/application ABI metadata so applications can declare corpus
   search access, inspect indexes, run queries, request facets, and explain
   ranking only through declared permissions.
 - [x] 5.4 Add generic examples for register corpus, inspect index, keyword
@@ -91,14 +91,14 @@
 
 ## 6. Trace, Audit, Replay, Security, And Gates
 
-- [ ] 6.1 Emit sanitized declaration, admission, corpus registration, index
+- [x] 6.1 Emit sanitized declaration, admission, corpus registration, index
   inspection, query, suggestion, facet, ranking explanation, refresh, stats,
   policy, resource, entitlement, approval, service-call, provider-call, health,
   snapshot, and unavailable events.
 - [x] 6.2 Add replay tests proving corpus registration, index inspection, search,
   cursor pagination, facets, suggestions, explain ranking, refresh, and query
   diagnostics are trace-addressable through the canonical service path.
-- [ ] 6.3 Add sanitization tests proving traces, audits, snapshots, SDK
+- [x] 6.3 Add sanitization tests proving traces, audits, snapshots, SDK
   diagnostics, and examples do not leak raw credentials, raw provider payloads,
   raw documents, private corpus content, raw query tokens, or unbounded snippets.
 - [x] 6.4 Add dependency gates proving kernel, SDK, shells, and generic

@@ -357,6 +357,7 @@ pub use super::knowledge_search::{
     SearchResultStatus, SearchSearchCommand, SearchSort, SearchSuggestCommand, SearchSynonymSet,
     KNOWLEDGE_SEARCH_COMMANDS, KNOWLEDGE_SEARCH_PACK_ID, KNOWLEDGE_SEARCH_SERVICE_ID,
 };
+pub use super::knowledge_search_preflight::{SearchAdmissionEvidence, SearchDispatchPreflight};
 pub use super::knowledge_summarization::{
     knowledge_summarization_descriptor_hashes, knowledge_summarization_pack_definition,
     summarization_stable_hash, CompressionMap, SummarizationCompareSummariesCommand,

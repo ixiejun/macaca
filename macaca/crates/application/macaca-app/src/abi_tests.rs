@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
 use macaca_proto::{
-    knowledge_retrieval_pack_definition, knowledge_summarization_pack_definition,
-    ApplicationImport, DeveloperId, DomainPackAvailability, InMemoryDomainPackCatalog,
-    PackageDescriptor, PackageId, PackageManifest, PackageRuntime, PackageRuntimeKind, PackageType,
+    knowledge_retrieval_pack_definition, knowledge_search_pack_definition,
+    knowledge_summarization_pack_definition, ApplicationImport, DeveloperId,
+    DomainPackAvailability, InMemoryDomainPackCatalog, PackageDescriptor, PackageId,
+    PackageManifest, PackageRuntime, PackageRuntimeKind, PackageType,
 };
 
 use super::*;
@@ -199,6 +200,61 @@ service_contract:
         .declaration
         .permissions
         .contains(&"retrieval.record.write".into()));
+    assert!(descriptor
+        .declaration
+        .imports
+        .contains(&ApplicationImport::ServiceCall));
+}
+
+#[test]
+fn application_abi_projects_declared_search_scopes_and_command_schemas() {
+    let manifest = AppLoader::parse_manifest_yaml(
+        r#"
+name: search-abi-fixture
+layer: L2Wasm
+service_contract:
+  optional_packs:
+    - pack.knowledge.search.v1
+  pack_permission_scopes:
+    pack.knowledge.search.v1:
+      - knowledge.search.corpus.manage
+      - knowledge.search.index.read
+      - knowledge.search.query
+      - knowledge.search.facets
+      - knowledge.search.explain
+"#,
+    )
+    .unwrap();
+    let mut search = knowledge_search_pack_definition();
+    search.metadata.availability = DomainPackAvailability::Available;
+    let mut catalog = InMemoryDomainPackCatalog::new();
+    catalog.register(search);
+
+    let descriptor = YamlApplicationAbiAdapter::new(manifest)
+        .with_catalog(Arc::new(catalog))
+        .load()
+        .unwrap()
+        .descriptor;
+    let projection = descriptor
+        .service_capabilities
+        .capability_projections
+        .iter()
+        .find(|projection| projection.pack_id == "pack.knowledge.search.v1")
+        .expect("declared search pack must produce an ABI projection");
+
+    for command in [
+        "search.register_corpus",
+        "search.inspect_index",
+        "search.search",
+        "search.facets",
+        "search.explain_ranking",
+    ] {
+        assert!(projection.callable_commands.contains(command));
+    }
+    assert!(descriptor
+        .declaration
+        .permissions
+        .contains(&"knowledge.search.query".into()));
     assert!(descriptor
         .declaration
         .imports
