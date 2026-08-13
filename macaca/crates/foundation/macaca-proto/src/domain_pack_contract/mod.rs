@@ -115,6 +115,7 @@ mod knowledge_citations;
 mod knowledge_citations_preflight;
 mod knowledge_common;
 mod knowledge_document_parsing;
+mod knowledge_document_parsing_preflight;
 mod knowledge_graph;
 mod knowledge_retrieval;
 mod knowledge_retrieval_preflight;
@@ -161,6 +162,8 @@ pub mod workflow_task_transition;
 
 #[cfg(test)]
 mod knowledge_citations_preflight_tests;
+#[cfg(test)]
+mod knowledge_document_parsing_preflight_tests;
 #[cfg(test)]
 mod knowledge_retrieval_preflight_tests;
 #[cfg(test)]

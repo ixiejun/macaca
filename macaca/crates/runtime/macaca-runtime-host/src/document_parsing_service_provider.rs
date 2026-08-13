@@ -53,6 +53,7 @@ pub enum DocumentParsingRuntimeEventKind {
     ServiceCall,
     ProviderCallStarted,
     ProviderCallSucceeded,
+    ProviderCallFailed,
     HealthReported,
     SnapshotRecorded,
     Unavailable,
@@ -98,6 +99,9 @@ impl DocumentParsingSystemServiceProvider {
             ]),
             max_bytes: 65_536,
             max_pages: 100,
+            max_output_bytes: 65_536,
+            rate_limit_bucket: "runtime_host_default".into(),
+            supports_health: true,
             state: DomainPackProviderCapabilityState::Preview,
         }
     }
@@ -119,6 +123,7 @@ impl DocumentParsingSystemServiceProvider {
                 "document-parsing:descriptor".into(),
             ),
             ("provider_class".into(), "mock".into()),
+            ("redaction_profile".into(), "references_only".into()),
             ("active_job_count".into(), count.to_string()),
         ])
     }
@@ -153,6 +158,12 @@ impl SystemService for DocumentParsingSystemServiceProvider {
             return Err(ServiceError::ServiceUnavailable(reason.clone()));
         }
         if !KNOWLEDGE_DOCUMENT_PARSING_COMMANDS.contains(&command.name.as_str()) {
+            let _ = self.events.send(event(
+                &command.name.to_string(),
+                &trace.trace_id,
+                DocumentParsingRuntimeEventKind::ProviderCallFailed,
+            ));
+            warn!(service_id = %self.descriptor.id, command = %command.name, trace_id = %trace.trace_id, "document parsing provider rejected unsupported command");
             return Err(ServiceError::UnsupportedCommand(command.name.to_string()));
         }
         let job_ref = format!("document-parse:reference:{}", trace.trace_id);

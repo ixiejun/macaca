@@ -54,16 +54,16 @@
   `document.extract.table`, `document.extract.form`,
   `document.extract.metadata`, `document.extract.embedded`,
   `document.convert`, `document.chunk`, and `document.parser.inspect`.
-- [ ] 3.2 Enforce document ownership, document handle validity, type allowlist,
+- [x] 3.2 Enforce document ownership, document handle validity, type allowlist,
   malware scan state, encryption policy, size/page/output budgets, OCR policy,
   embedded-resource policy, provider capability, timeout, rate limit, approval,
   and resource budget checks before provider calls.
-- [ ] 3.3 Reject raw credentials, raw provider payloads, raw documents, raw OCR
+- [x] 3.3 Reject raw credentials, raw provider payloads, raw documents, raw OCR
   images, raw embedded files, private signatures, unbounded full text, and
   private corpus content at admission and observability boundaries.
 - [x] 3.4 Model required declarations as readiness blockers and optional
   declarations as explicit degraded effective capabilities.
-- [ ] 3.5 Add tests proving denied, validation, quota, unsupported, and
+- [x] 3.5 Add tests proving denied, validation, quota, unsupported, and
   unavailable paths do not call concrete parsing providers.
 
 ## 4. Service Provider And Runtime Integration
@@ -73,10 +73,10 @@
 - [x] 4.2 Add unavailable and mock providers with deterministic format detection,
   validation, sync parse, async job, OCR, layout, table, form, metadata,
   canonical conversion, chunking, and capability behavior.
-- [ ] 4.3 Add lifecycle, health, snapshot, shutdown, timeout, cancellation,
+- [x] 4.3 Add lifecycle, health, snapshot, shutdown, timeout, cancellation,
   bounded output pagination, async job state, progress events, partial results,
   and parse result handles.
-- [ ] 4.4 Add provider capability reporting for supported formats, OCR languages,
+- [x] 4.4 Add provider capability reporting for supported formats, OCR languages,
   handwriting support, layout/table/form/entity support, embedded resources,
   async jobs, max bytes, max pages, output limits, confidence model, rate limits,
   and health.
@@ -93,7 +93,7 @@
 - [x] 5.2 Add focused SDK helper builders that only produce canonical traced
   service calls and return Null Object unavailable diagnostics when the pack is
   absent.
-- [ ] 5.3 Extend WASM/application ABI metadata so applications can declare
+- [x] 5.3 Extend WASM/application ABI metadata so applications can declare
   document parsing access, start/inspect parse jobs, and consume parse results
   only through declared permissions.
 - [x] 5.4 Add generic examples for detect format, validate document, sync parse,
@@ -103,7 +103,7 @@
 
 ## 6. Trace, Audit, Replay, Security, And Gates
 
-- [ ] 6.1 Emit sanitized declaration, admission, format detection, validation,
+- [x] 6.1 Emit sanitized declaration, admission, format detection, validation,
   parse job start/progress/complete/fail/cancel, text extraction, layout
   extraction, table extraction, form extraction, canonical conversion, chunking,
   policy, resource, entitlement, approval, service-call, provider-call, health,

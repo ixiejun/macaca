@@ -319,6 +319,9 @@ pub use super::knowledge_document_parsing::{
     KNOWLEDGE_DOCUMENT_PARSING_COMMANDS, KNOWLEDGE_DOCUMENT_PARSING_PACK_ID,
     KNOWLEDGE_DOCUMENT_PARSING_SERVICE_ID,
 };
+pub use super::knowledge_document_parsing_preflight::{
+    DocumentParsingAdmissionEvidence, DocumentParsingDispatchPreflight,
+};
 pub use super::knowledge_graph::{
     graph_stable_hash, knowledge_graph_descriptor_hashes, knowledge_graph_pack_definition,
     GraphDeleteGraphItemsCommand, GraphDeleteTriplesCommand, GraphDescriptorHashes, GraphEdge,

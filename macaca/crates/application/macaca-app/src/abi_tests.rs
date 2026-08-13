@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
 use macaca_proto::{
-    knowledge_citations_pack_definition, knowledge_retrieval_pack_definition,
-    knowledge_search_pack_definition, knowledge_summarization_pack_definition, ApplicationImport,
-    DeveloperId, DomainPackAvailability, InMemoryDomainPackCatalog, PackageDescriptor, PackageId,
+    knowledge_citations_pack_definition, knowledge_document_parsing_pack_definition,
+    knowledge_retrieval_pack_definition, knowledge_search_pack_definition,
+    knowledge_summarization_pack_definition, ApplicationImport, DeveloperId,
+    DomainPackAvailability, InMemoryDomainPackCatalog, PackageDescriptor, PackageId,
     PackageManifest, PackageRuntime, PackageRuntimeKind, PackageType,
 };
 
@@ -310,6 +311,65 @@ service_contract:
         .declaration
         .permissions
         .contains(&"citation.format".into()));
+    assert!(descriptor
+        .declaration
+        .imports
+        .contains(&ApplicationImport::ServiceCall));
+}
+
+#[test]
+fn application_abi_projects_declared_document_parsing_scopes_and_commands() {
+    let manifest = AppLoader::parse_manifest_yaml(
+        r#"
+name: document-parsing-abi-fixture
+layer: L2Wasm
+service_contract:
+  optional_packs:
+    - pack.knowledge.document.parsing.v1
+  pack_permission_scopes:
+    pack.knowledge.document.parsing.v1:
+      - document.parse
+      - document.extract.text
+      - document.extract.layout
+      - document.extract.table
+      - document.extract.form
+      - document.extract.metadata
+      - document.convert
+      - document.chunk
+"#,
+    )
+    .unwrap();
+    let mut parsing = knowledge_document_parsing_pack_definition();
+    parsing.metadata.availability = DomainPackAvailability::Available;
+    let mut catalog = InMemoryDomainPackCatalog::new();
+    catalog.register(parsing);
+
+    let descriptor = YamlApplicationAbiAdapter::new(manifest)
+        .with_catalog(Arc::new(catalog))
+        .load()
+        .unwrap()
+        .descriptor;
+    let projection = descriptor
+        .service_capabilities
+        .capability_projections
+        .iter()
+        .find(|projection| projection.pack_id == "pack.knowledge.document.parsing.v1")
+        .expect("declared parsing pack must produce an ABI projection");
+
+    for command in [
+        "document_parsing.parse_document",
+        "document_parsing.start_parse_job",
+        "document_parsing.extract_text",
+        "document_parsing.extract_tables",
+        "document_parsing.convert_to_canonical",
+        "document_parsing.chunk_document",
+    ] {
+        assert!(projection.callable_commands.contains(command));
+    }
+    assert!(descriptor
+        .declaration
+        .permissions
+        .contains(&"document.parse".into()));
     assert!(descriptor
         .declaration
         .imports

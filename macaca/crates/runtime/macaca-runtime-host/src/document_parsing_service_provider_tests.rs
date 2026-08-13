@@ -78,9 +78,32 @@ async fn document_parsing_provider_fails_closed_and_cleans_bounded_snapshot_stat
         .call(command("document_parsing.start_parse_job", "one"))
         .await
         .unwrap();
-    assert_eq!(provider.snapshot().await["active_job_count"], "1");
+    let snapshot = provider.snapshot().await;
+    assert_eq!(snapshot["active_job_count"], "1");
+    let observable = format!("{snapshot:?}");
+    for marker in [
+        "secret-marker",
+        "raw-marker",
+        "private-marker",
+        "raw-ocr-image",
+    ] {
+        assert!(!observable.contains(marker));
+    }
     provider.cleanup().await.unwrap();
     assert_eq!(provider.snapshot().await["active_job_count"], "0");
+}
+
+#[test]
+fn document_parsing_mock_capability_reports_only_bounded_generic_facts() {
+    let capability = DocumentParsingSystemServiceProvider::mock().capability();
+    for feature in ["ocr", "layout", "tables", "forms", "async_jobs"] {
+        assert!(capability.supported_features.contains(feature));
+    }
+    assert_eq!(capability.max_bytes, 65_536);
+    assert_eq!(capability.max_pages, 100);
+    assert_eq!(capability.max_output_bytes, 65_536);
+    assert!(capability.supports_health);
+    assert!(!capability.rate_limit_bucket.contains("credential"));
 }
 
 fn command(name: &str, trace_id: &str) -> ServiceCommand {

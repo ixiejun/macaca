@@ -272,6 +272,15 @@ pub struct DocumentParserCapability {
     pub supported_features: BTreeSet<String>,
     pub max_bytes: u64,
     pub max_pages: u32,
+    /// Maximum reference-only output represented by a parse result envelope.
+    #[serde(default)]
+    pub max_output_bytes: u64,
+    /// Opaque rate-limit bucket, never a parser-native quota payload.
+    #[serde(default)]
+    pub rate_limit_bucket: String,
+    /// Whether this capability exposes health through the service runtime.
+    #[serde(default)]
+    pub supports_health: bool,
     pub state: DomainPackProviderCapabilityState,
 }
 
@@ -340,6 +349,9 @@ pub fn knowledge_document_parsing_descriptor_hashes() -> DocumentParsingDescript
             supported_features: BTreeSet::from(["ocr".into(), "layout".into(), "tables".into()]),
             max_bytes: 10_000_000,
             max_pages: 100,
+            max_output_bytes: 1_000_000,
+            rate_limit_bucket: "default".into(),
+            supports_health: true,
             state: DomainPackProviderCapabilityState::Preview,
         }),
         unavailable_schema_hash: document_parsing_stable_hash(&KnowledgeError {

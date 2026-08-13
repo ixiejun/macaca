@@ -183,3 +183,35 @@ async fn citations_sdk_discovery_serializes_only_descriptor_metadata() {
     assert!(diagnostic.contains("knowledge_citations_provider_not_installed"));
     assert!(diagnostic.contains("redaction_policy"));
 }
+
+#[tokio::test]
+async fn document_parsing_sdk_discovery_serializes_only_descriptor_metadata() {
+    let catalog = compose_installed_domain_pack_catalog(reference_domain_pack_definitions());
+    let client = CatalogBackedDomainPackClient::new(catalog);
+    let inspect = client
+        .inspect_pack(
+            &DomainPackInspectCommand::new(KNOWLEDGE_DOCUMENT_PARSING_PACK_ID)
+                .expect("document parsing pack id must be valid"),
+        )
+        .await
+        .unwrap();
+
+    // Discovery uses descriptors and must never retain parsing inputs or outputs.
+    let diagnostic = serde_json::to_string(&inspect).unwrap();
+    for marker in [
+        "credential=parser-secret",
+        "raw-provider-response",
+        "raw-document-bytes",
+        "raw-ocr-image",
+        "raw-embedded-file",
+        "private-signature",
+        "private-corpus-content",
+    ] {
+        assert!(
+            !diagnostic.contains(marker),
+            "SDK diagnostic leaked {marker}"
+        );
+    }
+    assert!(diagnostic.contains("knowledge_document_parsing_provider_not_installed"));
+    assert!(diagnostic.contains("redaction_policy"));
+}
