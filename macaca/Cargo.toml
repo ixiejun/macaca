@@ -10,6 +10,7 @@ members = [
     "crates/services/macaca-scheduler",
     "crates/services/macaca-scheduled-agent-task",
     "crates/services/macaca-heartbeat",
+    "crates/services/macaca-random",
     "crates/services/macaca-llm",
     "crates/services/macaca-memory",
     "crates/services/macaca-context",
@@ -72,6 +73,8 @@ clap = { version = "4", features = ["derive"] }
 
 # UUID
 uuid = { version = "1", features = ["v4", "v5", "serde"] }
+getrandom = "0.2"
+base64 = "0.22"
 
 # Time
 chrono = { version = "0.4", features = ["serde"] }
@@ -89,6 +92,7 @@ macaca-autonomy-evolution = { path = "crates/services/macaca-autonomy-evolution"
 macaca-scheduler = { path = "crates/services/macaca-scheduler" }
 macaca-scheduled-agent-task = { path = "crates/services/macaca-scheduled-agent-task" }
 macaca-heartbeat = { path = "crates/services/macaca-heartbeat" }
+macaca-random = { path = "crates/services/macaca-random" }
 macaca-app = { path = "crates/application/macaca-app" }
 macaca-kernel = { path = "crates/kernel/macaca-kernel" }
 macaca-sdk = { path = "crates/facade/macaca-sdk" }

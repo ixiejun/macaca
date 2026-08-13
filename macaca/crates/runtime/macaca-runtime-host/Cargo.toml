@@ -18,6 +18,7 @@ macaca-autonomy-evolution = { workspace = true }
 macaca-scheduler = { workspace = true }
 macaca-scheduled-agent-task = { workspace = true }
 macaca-heartbeat = { workspace = true }
+macaca-random = { workspace = true }
 macaca-skill = { workspace = true }
 macaca-app = { workspace = true }
 macaca-tools = { workspace = true }

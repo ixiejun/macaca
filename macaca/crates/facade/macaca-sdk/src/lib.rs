@@ -24,6 +24,7 @@ pub mod driver_client;
 pub mod entitlement_client;
 pub mod evm_client;
 pub mod facade;
+pub mod foundation_random_client;
 pub mod heartbeat_client;
 pub mod interaction_client;
 pub mod llm_client;

@@ -134,6 +134,7 @@ pub(crate) mod plugin_marketplace_snapshot_decode;
 pub(crate) mod process_service_local;
 pub mod process_service_provider;
 pub(crate) mod process_service_records;
+pub mod random_service_provider;
 pub mod realtime_service_provider;
 pub mod remote_environment_service_provider;
 pub mod retrieval_service_provider;

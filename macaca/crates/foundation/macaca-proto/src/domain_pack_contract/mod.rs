@@ -91,6 +91,7 @@ mod foundation_filesystem_validation;
 mod foundation_key_value_state;
 mod foundation_key_value_state_validation;
 mod foundation_random;
+pub mod foundation_random_semantics;
 mod foundation_random_validation;
 mod foundation_secrets_reference;
 mod foundation_secrets_reference_validation;
@@ -167,6 +168,8 @@ pub mod workflow_task_lifecycle_spec;
 pub mod workflow_task_resource_spec;
 pub mod workflow_task_transition;
 
+#[cfg(test)]
+mod foundation_random_semantics_tests;
 #[cfg(test)]
 mod identity_organization_semantics_tests;
 #[cfg(test)]

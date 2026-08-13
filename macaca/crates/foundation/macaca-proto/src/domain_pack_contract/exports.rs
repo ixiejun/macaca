@@ -246,6 +246,12 @@ pub use super::foundation_random::{
     RandomTokenCommand, RandomUuidV4Command, FOUNDATION_RANDOM_COMMANDS, FOUNDATION_RANDOM_PACK_ID,
     FOUNDATION_RANDOM_SERVICE_ID,
 };
+pub use super::foundation_random_semantics::{
+    dispatch_after_preflight as dispatch_random_after_preflight, preflight_bytes,
+    preflight_identifier, preflight_integer, preflight_test_stream, preflight_token,
+    redacted_random_audit_fields, reserve as reserve_random_resources, RandomAdmissionFailure,
+    RandomAuditFields, RandomPolicyContext, RandomResourceLimits, RandomResourceReservation,
+};
 pub use super::foundation_secrets_reference::{
     foundation_secrets_reference_descriptor_hashes, foundation_secrets_reference_pack_definition,
     secrets_reference_stable_hash, SecretAccessPolicy, SecretAuditRecord, SecretExternalLocator,

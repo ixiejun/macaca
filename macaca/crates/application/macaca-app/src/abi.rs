@@ -326,3 +326,7 @@ mod email_tests;
 #[cfg(test)]
 #[path = "abi_messaging_tests.rs"]
 mod messaging_tests;
+
+#[cfg(test)]
+#[path = "abi_random_tests.rs"]
+mod random_tests;
