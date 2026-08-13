@@ -82,3 +82,35 @@ async fn catalog_client_discovers_communication_contract_metadata() {
             .contains("developer-packs/communication"));
     }
 }
+
+#[tokio::test]
+async fn inbox_sdk_discovery_serializes_only_descriptor_metadata() {
+    let catalog = compose_installed_domain_pack_catalog(reference_domain_pack_definitions());
+    let client = CatalogBackedDomainPackClient::new(catalog);
+    let inspect = client
+        .inspect_pack(
+            &DomainPackInspectCommand::new(COMMUNICATION_INBOX_PACK_ID)
+                .expect("inbox pack id must be valid"),
+        )
+        .await
+        .unwrap();
+
+    // Discovery serializes immutable metadata, never connector request content.
+    let diagnostic = serde_json::to_string(&inspect).unwrap();
+    for marker in [
+        "credential=inbox-secret",
+        "oauth-access-token",
+        "webhook-secret",
+        "raw-provider-payload",
+        "raw-full-body",
+        "raw-attachment-bytes",
+        "unbounded-content",
+    ] {
+        assert!(
+            !diagnostic.contains(marker),
+            "SDK diagnostic leaked {marker}"
+        );
+    }
+    assert!(diagnostic.contains("inbox_provider_not_installed"));
+    assert!(diagnostic.contains("redaction_policy"));
+}

@@ -219,7 +219,25 @@ pub struct InboxProviderCapability {
     pub supports_query: bool,
     pub supports_mutation: bool,
     pub supports_claims: bool,
+    /// Whether source change notifications are supported through opaque events.
+    #[serde(default)]
+    pub supports_watch_events: bool,
+    /// Whether content is exposed only as bounded body references.
+    #[serde(default)]
+    pub supports_body_handles: bool,
+    /// Whether attachments are exposed only as bounded attachment handles.
+    #[serde(default)]
+    pub supports_attachment_handles: bool,
+    /// Maximum cursor lifetime expressed as a bounded provider-neutral duration.
+    #[serde(default)]
+    pub cursor_ttl_seconds: u64,
     pub page_limit: u32,
+    /// Opaque rate-limit bucket, never a connector-native quota payload.
+    #[serde(default)]
+    pub rate_limit_bucket: String,
+    /// Whether health is available through the canonical service runtime.
+    #[serde(default)]
+    pub supports_health: bool,
     pub availability: DomainPackProviderCapabilityState,
 }
 
@@ -410,7 +428,13 @@ pub fn communication_inbox_descriptor_hashes() -> InboxDescriptorHashes {
             supports_query: false,
             supports_mutation: false,
             supports_claims: false,
+            supports_watch_events: false,
+            supports_body_handles: false,
+            supports_attachment_handles: false,
+            cursor_ttl_seconds: 0,
             page_limit: 0,
+            rate_limit_bucket: "default".into(),
+            supports_health: true,
             availability: DomainPackProviderCapabilityState::Unavailable,
         }),
         unavailable_schema_hash: inbox_stable_hash(&InboxError {

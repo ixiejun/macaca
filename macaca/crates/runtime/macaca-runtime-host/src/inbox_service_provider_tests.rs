@@ -78,13 +78,38 @@ async fn inbox_provider_fails_closed_and_cleans_bounded_snapshot_state() {
         .call(command("inbox.sync_sources", "sync-one"))
         .await
         .unwrap();
-    assert_eq!(provider.snapshot().await.item_count, 1);
+    let snapshot = provider.snapshot().await;
+    assert_eq!(snapshot.item_count, 1);
+    let observable = format!("{snapshot:?}");
+    for marker in [
+        "secret-marker",
+        "raw-marker",
+        "private-marker",
+        "webhook-token",
+    ] {
+        assert!(!observable.contains(marker));
+    }
     provider.cleanup().await.unwrap();
     assert_eq!(provider.snapshot().await.item_count, 0);
     assert_eq!(
         provider.capability().supported_commands.len(),
         COMMUNICATION_INBOX_COMMANDS.len()
     );
+}
+
+#[test]
+fn inbox_mock_capability_reports_only_bounded_generic_facts() {
+    let capability = InboxSystemServiceProvider::mock().capability();
+    assert!(capability.supports_query);
+    assert!(capability.supports_mutation);
+    assert!(capability.supports_claims);
+    assert!(capability.supports_watch_events);
+    assert!(capability.supports_body_handles);
+    assert!(capability.supports_attachment_handles);
+    assert_eq!(capability.cursor_ttl_seconds, 3_600);
+    assert_eq!(capability.page_limit, 100);
+    assert!(capability.supports_health);
+    assert!(!capability.rate_limit_bucket.contains("credential"));
 }
 
 fn command(name: &str, trace_id: &str) -> ServiceCommand {

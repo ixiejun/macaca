@@ -61,10 +61,10 @@
   runtime and approved runtime-host composition roots.
 - [x] 4.2 Add unavailable and mock providers with deterministic source, cursor,
   event, item, mutation, claim, and reset behavior.
-- [ ] 4.3 Add lifecycle, health, snapshot, shutdown, timeout, cancellation,
+- [x] 4.3 Add lifecycle, health, snapshot, shutdown, timeout, cancellation,
   bounded pagination, sync checkpoint, cursor resume, cursor reset, idempotent
   event ingestion, and claim lease support.
-- [ ] 4.4 Add provider capability reporting for source kinds, query support,
+- [x] 4.4 Add provider capability reporting for source kinds, query support,
   label/folder support, read-state support, body/attachment support, watch/event
   support, mutation support, cursor expiry, page limits, and rate limits.
 - [x] 4.5 Add canonical execution-path tests proving every inbox command
@@ -79,7 +79,7 @@
 - [x] 5.2 Add focused SDK helper builders that only produce canonical traced
   service calls and return Null Object unavailable diagnostics when the pack is
   absent.
-- [ ] 5.3 Extend WASM/application ABI metadata so applications can declare inbox
+- [x] 5.3 Extend WASM/application ABI metadata so applications can declare inbox
   source access, receive item events, claim items, and fetch content only through
   declared permissions.
 - [x] 5.4 Add generic examples for source registration, sync, list/search/get,
@@ -88,14 +88,14 @@
 
 ## 6. Trace, Audit, Replay, Security, And Gates
 
-- [ ] 6.1 Emit sanitized declaration, admission, source registration, source
+- [x] 6.1 Emit sanitized declaration, admission, source registration, source
   health, sync, checkpoint, event ingestion, item upsert, mutation, claim, policy,
   resource, entitlement, approval, service-call, provider-call, health,
   snapshot, and unavailable events.
 - [x] 6.2 Add replay tests proving source registration, sync cursors, event
   ingestion, item mutations, claim leases, and reset-required flows are
   trace-addressable through the canonical service path.
-- [ ] 6.3 Add sanitization tests proving traces, audits, snapshots, SDK
+- [x] 6.3 Add sanitization tests proving traces, audits, snapshots, SDK
   diagnostics, and examples do not leak raw credentials, OAuth tokens, webhook
   secrets, raw provider payloads, raw full bodies, raw attachments, or unbounded
   content.

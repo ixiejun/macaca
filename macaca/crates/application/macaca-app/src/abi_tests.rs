@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use macaca_proto::{
-    knowledge_citations_pack_definition, knowledge_document_parsing_pack_definition,
-    knowledge_retrieval_pack_definition, knowledge_search_pack_definition,
-    knowledge_summarization_pack_definition, ApplicationImport, DeveloperId,
-    DomainPackAvailability, InMemoryDomainPackCatalog, PackageDescriptor, PackageId,
+    communication_inbox_pack_definition, knowledge_citations_pack_definition,
+    knowledge_document_parsing_pack_definition, knowledge_retrieval_pack_definition,
+    knowledge_search_pack_definition, knowledge_summarization_pack_definition, ApplicationImport,
+    DeveloperId, DomainPackAvailability, InMemoryDomainPackCatalog, PackageDescriptor, PackageId,
     PackageManifest, PackageRuntime, PackageRuntimeKind, PackageType,
 };
 
@@ -370,6 +370,62 @@ service_contract:
         .declaration
         .permissions
         .contains(&"document.parse".into()));
+    assert!(descriptor
+        .declaration
+        .imports
+        .contains(&ApplicationImport::ServiceCall));
+}
+
+#[test]
+fn application_abi_projects_declared_inbox_scopes_and_command_schemas() {
+    let manifest = AppLoader::parse_manifest_yaml(
+        r#"
+name: inbox-abi-fixture
+layer: L2Wasm
+service_contract:
+  optional_packs:
+    - pack.communication.inbox.v1
+  pack_permission_scopes:
+    pack.communication.inbox.v1:
+      - inbox.source.manage
+      - inbox.sync
+      - inbox.event.ingest
+      - inbox.read.metadata
+      - inbox.read.body
+      - inbox.claim
+"#,
+    )
+    .unwrap();
+    let mut inbox = communication_inbox_pack_definition();
+    inbox.metadata.availability = DomainPackAvailability::Available;
+    let mut catalog = InMemoryDomainPackCatalog::new();
+    catalog.register(inbox);
+
+    let descriptor = YamlApplicationAbiAdapter::new(manifest)
+        .with_catalog(Arc::new(catalog))
+        .load()
+        .unwrap()
+        .descriptor;
+    let projection = descriptor
+        .service_capabilities
+        .capability_projections
+        .iter()
+        .find(|projection| projection.pack_id == "pack.communication.inbox.v1")
+        .expect("declared inbox pack must produce an ABI projection");
+
+    for command in [
+        "inbox.register_source",
+        "inbox.sync_sources",
+        "inbox.ingest_event",
+        "inbox.fetch_body",
+        "inbox.claim_item",
+    ] {
+        assert!(projection.callable_commands.contains(command));
+    }
+    assert!(descriptor
+        .declaration
+        .permissions
+        .contains(&"inbox.sync".into()));
     assert!(descriptor
         .declaration
         .imports

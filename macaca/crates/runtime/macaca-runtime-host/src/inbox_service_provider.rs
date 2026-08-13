@@ -47,6 +47,7 @@ pub enum InboxRuntimeEventKind {
     ServiceCall,
     ProviderCallStarted,
     ProviderCallSucceeded,
+    ProviderCallFailed,
     HealthReported,
     SnapshotRecorded,
     Unavailable,
@@ -90,7 +91,13 @@ impl InboxSystemServiceProvider {
             supports_query: true,
             supports_mutation: true,
             supports_claims: true,
+            supports_watch_events: true,
+            supports_body_handles: true,
+            supports_attachment_handles: true,
+            cursor_ttl_seconds: 3_600,
             page_limit: 100,
+            rate_limit_bucket: "runtime_host_default".into(),
+            supports_health: true,
             availability: DomainPackProviderCapabilityState::Preview,
         }
     }
@@ -148,6 +155,12 @@ impl SystemService for InboxSystemServiceProvider {
             return Err(ServiceError::ServiceUnavailable(reason.clone()));
         }
         if !COMMUNICATION_INBOX_COMMANDS.contains(&command.name.as_str()) {
+            let _ = self.events.send(event(
+                &command.name.to_string(),
+                &trace.trace_id,
+                InboxRuntimeEventKind::ProviderCallFailed,
+            ));
+            warn!(service_id = %self.descriptor.id, command = %command.name, trace_id = %trace.trace_id, "inbox provider rejected unsupported command");
             return Err(ServiceError::UnsupportedCommand(command.name.to_string()));
         }
         let reference = format!("inbox:reference:{}", trace.trace_id);
