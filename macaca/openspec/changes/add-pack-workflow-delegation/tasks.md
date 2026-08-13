@@ -18,7 +18,7 @@
 - [x] 3.1 Implement declaration validation for scopes: `workflow.delegation.create`, `workflow.delegation.accept`, `workflow.delegation.cancel`.
 - [x] 3.2 Add policy checks before side effects and resource reservation before provider calls.
 - [x] 3.3 Add entitlement checks and explicit unavailable/denied diagnostics for missing provider, missing permission, missing entitlement, disabled host capability, and unsupported command.
-- [ ] 3.4 Add approval behavior for sensitive, external, host, identity, financial, irreversible, or long-running side effects.
+- [x] 3.4 Add approval behavior for sensitive, external, host, identity, financial, irreversible, or long-running side effects.
 - [x] 3.5 Add tests proving denied/unavailable paths do not call concrete providers.
 
 ## 4. Service Provider Or Unavailable Provider
@@ -37,11 +37,11 @@
 
 ## 6. Trace, Audit, Replay, And Gates
 
-- [ ] 6.1 Emit sanitized declaration, admission, policy, entitlement, resource, service-call, health, snapshot, and unavailable events.
+- [x] 6.1 Emit sanitized declaration, admission, policy, entitlement, resource, service-call, health, snapshot, and unavailable events.
 - [x] 6.2 Add replay tests proving `pack.workflow.delegation.v1` calls are trace-addressable through the canonical service path.
-- [ ] 6.3 Add dependency gates proving kernel, SDK, shells, and generic application framework do not import concrete providers.
+- [x] 6.3 Add dependency gates proving kernel, SDK, shells, and generic application framework do not import concrete providers.
 - [x] 6.4 Add no-direct-provider-call gates and canonical execution-path tests for all commands.
-- [ ] 6.5 Run `openspec validate add-pack-workflow-delegation --strict`, targeted cargo tests, boundary gates, file-size gates, and audit replay checks before marking complete.
+- [x] 6.5 Run `openspec validate add-pack-workflow-delegation --strict`, targeted cargo tests, boundary gates, file-size gates, and audit replay checks before marking complete.
 
 ## 7. Developer Documentation
 
@@ -51,15 +51,15 @@
 
 ## 8. Industrial Delegation Semantics
 
-- [ ] 8.1 Model `DelegationRequest`, `DelegationClaim`, `DelegationLease`, `DelegationHandoff`, `CapacitySnapshot`, and `DelegationResult` with schema-versioned DTOs and redaction profiles.
-- [ ] 8.2 Implement the requested/queued/claimed/in_progress/handoff_requested/lease_expired/completed/failed/cancelled state machine as provider-neutral contract tests.
-- [ ] 8.3 Add atomic claim semantics proving only one active owner can exist for delegated work.
-- [ ] 8.4 Add lease renewal and expiry semantics with deterministic clocks and replayable expiry evidence.
-- [ ] 8.5 Add result collection semantics for success, partial success, failed, cancelled, and expired work with bounded artifact references.
+- [x] 8.1 Model `DelegationRequest`, `DelegationClaim`, `DelegationLease`, `DelegationHandoff`, `CapacitySnapshot`, and `DelegationResult` with schema-versioned DTOs and redaction profiles.
+- [x] 8.2 Implement the requested/queued/claimed/in_progress/handoff_requested/lease_expired/completed/failed/cancelled state machine as provider-neutral contract tests.
+- [x] 8.3 Add atomic claim semantics proving only one active owner can exist for delegated work.
+- [x] 8.4 Add lease renewal and expiry semantics with deterministic clocks and replayable expiry evidence.
+- [x] 8.5 Add result collection semantics for success, partial success, failed, cancelled, and expired work with bounded artifact references.
 
 ## 9. Supplier-Grade Edge Cases
 
-- [ ] 9.1 Test duplicate accept attempts from different assignees and return typed conflict to losing calls.
-- [ ] 9.2 Test capacity exhaustion, capacity recovery, and queue re-placement without provider-name routing.
-- [ ] 9.3 Test handoff preserving partial checkpoints and rejecting handoff to ineligible assignees.
-- [ ] 9.4 Test cancellation racing with lease renewal and completion, guaranteeing one terminal state and replayable losing-command diagnostics.
+- [x] 9.1 Test duplicate accept attempts from different assignees and return typed conflict to losing calls.
+- [x] 9.2 Test capacity exhaustion, capacity recovery, and queue re-placement without provider-name routing.
+- [x] 9.3 Test handoff preserving partial checkpoints and rejecting handoff to ineligible assignees.
+- [x] 9.4 Test cancellation racing with lease renewal and completion, guaranteeing one terminal state and replayable losing-command diagnostics.

@@ -150,6 +150,7 @@ pub mod workflow_approval;
 pub mod workflow_approval_semantics;
 pub mod workflow_common;
 pub mod workflow_delegation;
+pub mod workflow_delegation_semantics;
 pub mod workflow_recovery;
 pub mod workflow_review;
 pub mod workflow_schedule;
@@ -175,5 +176,7 @@ mod knowledge_summarization_preflight_tests;
 mod tests;
 #[cfg(test)]
 mod workflow_approval_semantics_tests;
+#[cfg(test)]
+mod workflow_delegation_semantics_tests;
 
 pub use exports::*;

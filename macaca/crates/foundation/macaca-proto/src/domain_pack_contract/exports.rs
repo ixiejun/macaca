@@ -412,3 +412,8 @@ pub use super::workflow_approval_semantics::{
     ApprovalEligibilitySpec, ApprovalEvidenceBundleV1, ApprovalIdempotencyResult,
     ApprovalLifecycleSpec, ApprovalLifecycleState, ApprovalPendingProjection, ApprovalRequestV1,
 };
+pub use super::workflow_delegation_semantics::{
+    CapacitySnapshotV1, DelegationClaimSpec, DelegationClaimV1, DelegationHandoffSpec,
+    DelegationHandoffV1, DelegationLeaseV1, DelegationLifecycleSpec, DelegationLifecycleState,
+    DelegationRequestV1, DelegationResultOutcome, DelegationResultV1,
+};
