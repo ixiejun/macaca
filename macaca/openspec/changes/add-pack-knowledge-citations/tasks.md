@@ -48,16 +48,16 @@
   `citation.read`, `citation.update`, `citation.source.link`,
   `citation.resolve`, `citation.verify`, `citation.format`,
   `citation.import_export`, and `citation.evidence.read`.
-- [ ] 3.2 Enforce source access, source-anchor validation, identifier scheme
+- [x] 3.2 Enforce source access, source-anchor validation, identifier scheme
   support, network/provider resolver policy, style support, import/export limits,
   quote/snippet redaction, output bounds, rate limit, timeout, approval, and
   resource budget checks before provider calls.
-- [ ] 3.3 Reject raw credentials, raw provider payloads, raw source documents,
+- [x] 3.3 Reject raw credentials, raw provider payloads, raw source documents,
   raw private quotes, raw bibliography style files, unbounded formatted output,
   and private corpus content at admission and observability boundaries.
 - [x] 3.4 Model required declarations as readiness blockers and optional
   declarations as explicit degraded effective capabilities.
-- [ ] 3.5 Add tests proving denied, validation, quota, unsupported, and
+- [x] 3.5 Add tests proving denied, validation, quota, unsupported, and
   unavailable paths do not call concrete citation providers.
 
 ## 4. Service Provider And Runtime Integration

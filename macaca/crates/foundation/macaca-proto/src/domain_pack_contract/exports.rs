@@ -297,6 +297,9 @@ pub use super::knowledge_citations::{
     CitationsUpdateCitationCommand, CitationsVerifyCitationCommand, FormattedCitation,
     KNOWLEDGE_CITATIONS_COMMANDS, KNOWLEDGE_CITATIONS_PACK_ID, KNOWLEDGE_CITATIONS_SERVICE_ID,
 };
+pub use super::knowledge_citations_preflight::{
+    CitationAdmissionEvidence, CitationDispatchPreflight,
+};
 pub use super::knowledge_common::{KnowledgeCommandEnvelope, KnowledgeError, KnowledgePage};
 pub use super::knowledge_document_parsing::{
     document_parsing_stable_hash, knowledge_document_parsing_descriptor_hashes,

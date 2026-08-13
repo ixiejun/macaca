@@ -112,6 +112,7 @@ mod identity_validation;
 mod industrial_pack_taxonomy;
 mod industrial_reference_catalogs;
 mod knowledge_citations;
+mod knowledge_citations_preflight;
 mod knowledge_common;
 mod knowledge_document_parsing;
 mod knowledge_graph;
@@ -158,6 +159,8 @@ pub mod workflow_task_lifecycle_spec;
 pub mod workflow_task_resource_spec;
 pub mod workflow_task_transition;
 
+#[cfg(test)]
+mod knowledge_citations_preflight_tests;
 #[cfg(test)]
 mod knowledge_retrieval_preflight_tests;
 #[cfg(test)]
