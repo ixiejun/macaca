@@ -147,6 +147,7 @@ mod reference_catalogs;
 mod service_helpers;
 mod spec;
 pub mod workflow_approval;
+pub mod workflow_approval_semantics;
 pub mod workflow_common;
 pub mod workflow_delegation;
 pub mod workflow_recovery;
@@ -172,5 +173,7 @@ mod knowledge_search_preflight_tests;
 mod knowledge_summarization_preflight_tests;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod workflow_approval_semantics_tests;
 
 pub use exports::*;

@@ -18,7 +18,7 @@
 - [x] 3.1 Implement declaration validation for scopes: `workflow.approval.request`, `workflow.approval.decide`, `workflow.approval.escalate`.
 - [x] 3.2 Add policy checks before side effects and resource reservation before provider calls.
 - [x] 3.3 Add entitlement checks and explicit unavailable/denied diagnostics for missing provider, missing permission, missing entitlement, disabled host capability, and unsupported command.
-- [ ] 3.4 Add approval behavior for sensitive, external, host, identity, financial, irreversible, or long-running side effects.
+- [x] 3.4 Add approval behavior for sensitive, external, host, identity, financial, irreversible, or long-running side effects.
 - [x] 3.5 Add tests proving denied/unavailable paths do not call concrete providers.
 
 ## 4. Service Provider Or Unavailable Provider
@@ -37,11 +37,11 @@
 
 ## 6. Trace, Audit, Replay, And Gates
 
-- [ ] 6.1 Emit sanitized declaration, admission, policy, entitlement, resource, service-call, health, snapshot, and unavailable events.
+- [x] 6.1 Emit sanitized declaration, admission, policy, entitlement, resource, service-call, health, snapshot, and unavailable events.
 - [x] 6.2 Add replay tests proving `pack.workflow.approval.v1` calls are trace-addressable through the canonical service path.
-- [ ] 6.3 Add dependency gates proving kernel, SDK, shells, and generic application framework do not import concrete providers.
+- [x] 6.3 Add dependency gates proving kernel, SDK, shells, and generic application framework do not import concrete providers.
 - [x] 6.4 Add no-direct-provider-call gates and canonical execution-path tests for all commands.
-- [ ] 6.5 Run `openspec validate add-pack-workflow-approval --strict`, targeted cargo tests, boundary gates, file-size gates, and audit replay checks before marking complete.
+- [x] 6.5 Run `openspec validate add-pack-workflow-approval --strict`, targeted cargo tests, boundary gates, file-size gates, and audit replay checks before marking complete.
 
 ## 7. Developer Documentation
 
@@ -51,15 +51,15 @@
 
 ## 8. Industrial Approval Semantics
 
-- [ ] 8.1 Model `ApprovalRequest`, `ApprovalAssignment`, `ApprovalDecision`, `ApprovalEvidenceBundle`, and `ApprovalDecisionGate` with schema-versioned DTOs and redaction profiles.
-- [ ] 8.2 Implement the requested/pending/claimed/escalated/decided/expired/cancelled/consumed state machine as provider-neutral contract tests before provider-specific adapters.
-- [ ] 8.3 Add idempotency behavior for duplicate requests and duplicate decisions, including conflict results for mismatched duplicate payloads.
-- [ ] 8.4 Add approver eligibility re-checks at decision time, including revoked identity, revoked group membership, expired delegation, and tenant mismatch.
-- [ ] 8.5 Add approval-decision consumption checks so protected side-effect services can verify subject, policy hash, trace lineage, expiry, and consumption mode.
+- [x] 8.1 Model `ApprovalRequest`, `ApprovalAssignment`, `ApprovalDecision`, `ApprovalEvidenceBundle`, and `ApprovalDecisionGate` with schema-versioned DTOs and redaction profiles.
+- [x] 8.2 Implement the requested/pending/claimed/escalated/decided/expired/cancelled/consumed state machine as provider-neutral contract tests before provider-specific adapters.
+- [x] 8.3 Add idempotency behavior for duplicate requests and duplicate decisions, including conflict results for mismatched duplicate payloads.
+- [x] 8.4 Add approver eligibility re-checks at decision time, including revoked identity, revoked group membership, expired delegation, and tenant mismatch.
+- [x] 8.5 Add approval-decision consumption checks so protected side-effect services can verify subject, policy hash, trace lineage, expiry, and consumption mode.
 
 ## 9. Supplier-Grade Edge Cases
 
-- [ ] 9.1 Test wait timer and deadline expiry behavior without relying on wall-clock sleeps.
-- [ ] 9.2 Test escalation from an unclaimed request to a new eligible approver set while preserving previous assignment audit evidence.
-- [ ] 9.3 Test cancellation racing with decision submission and guarantee exactly one terminal state.
-- [ ] 9.4 Test policy-filtered `approval.list_pending` pagination so callers cannot infer hidden approvals through counts, cursors, or timing-sensitive diagnostics.
+- [x] 9.1 Test wait timer and deadline expiry behavior without relying on wall-clock sleeps.
+- [x] 9.2 Test escalation from an unclaimed request to a new eligible approver set while preserving previous assignment audit evidence.
+- [x] 9.3 Test cancellation racing with decision submission and guarantee exactly one terminal state.
+- [x] 9.4 Test policy-filtered `approval.list_pending` pagination so callers cannot infer hidden approvals through counts, cursors, or timing-sensitive diagnostics.

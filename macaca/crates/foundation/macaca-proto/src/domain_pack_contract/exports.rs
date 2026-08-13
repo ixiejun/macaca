@@ -406,3 +406,9 @@ pub use super::spec::{
     validate_domain_pack_version, AppServiceContractSpec, DomainPackCallableSpec,
     DomainPackDefinitionSpec, DomainPackHierarchySpec, DomainPackIdentitySpec,
 };
+pub use super::workflow_approval_semantics::{
+    check_idempotency, filtered_pending_page, ApprovalAssignmentV1, ApprovalConsumptionMode,
+    ApprovalDeadlineSpec, ApprovalDecisionGateV1, ApprovalDecisionV1, ApprovalEligibilityEvidence,
+    ApprovalEligibilitySpec, ApprovalEvidenceBundleV1, ApprovalIdempotencyResult,
+    ApprovalLifecycleSpec, ApprovalLifecycleState, ApprovalPendingProjection, ApprovalRequestV1,
+};
