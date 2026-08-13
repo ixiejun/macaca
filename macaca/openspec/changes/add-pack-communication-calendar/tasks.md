@@ -70,10 +70,10 @@
 - [x] 4.2 Add unavailable and mock providers with deterministic source, event,
   recurrence, availability, reminder, invite, conference, sync, watch, and
   conflict behavior.
-- [ ] 4.3 Add lifecycle, health, snapshot, shutdown, timeout, cancellation,
+- [x] 4.3 Add lifecycle, health, snapshot, shutdown, timeout, cancellation,
   bounded pagination, recurrence expansion, sync checkpoint, cursor resume,
   cursor reset, idempotency, optimistic concurrency, and watch support.
-- [ ] 4.4 Add provider capability reporting for event CRUD, recurrence,
+- [x] 4.4 Add provider capability reporting for event CRUD, recurrence,
   attendees, RSVP, reminders, conference metadata, availability, scheduling
   suggestions, sync/watch, iCalendar import/export, timezone support, page
   limits, and rate limits.
@@ -90,7 +90,7 @@
 - [x] 5.2 Add focused SDK helper builders that only produce canonical traced
   service calls and return Null Object unavailable diagnostics when the pack is
   absent.
-- [ ] 5.3 Extend WASM/application ABI metadata so applications can declare
+- [x] 5.3 Extend WASM/application ABI metadata so applications can declare
   calendar access, receive calendar change events, inspect availability, mutate
   events, and respond to invites only through declared permissions.
 - [x] 5.4 Add generic examples for list calendars, query events, create recurring
@@ -100,7 +100,7 @@
 
 ## 6. Trace, Audit, Replay, Security, And Gates
 
-- [ ] 6.1 Emit sanitized declaration, admission, source listing, event query,
+- [x] 6.1 Emit sanitized declaration, admission, source listing, event query,
   event mutation, invite action, availability, reminder, conference, sync,
   watch, conflict, policy, resource, entitlement, approval, service-call,
   provider-call, health, snapshot, and unavailable events.
@@ -108,14 +108,14 @@
   responses, availability checks, reminders, conference handles, sync cursors,
   watch events, and conflict handling are trace-addressable through the canonical
   service path.
-- [ ] 6.3 Add sanitization tests proving traces, audits, snapshots, SDK
+- [x] 6.3 Add sanitization tests proving traces, audits, snapshots, SDK
   diagnostics, and examples do not leak raw credentials, OAuth tokens, webhook
   secrets, raw provider payloads, raw calendar exports, conference secrets, raw
   invite payloads, private notes, or unbounded descriptions.
 - [x] 6.4 Add dependency gates proving kernel, SDK, shells, and generic
   application framework do not import concrete calendar providers or connector
   adapters.
-- [ ] 6.5 Run `openspec validate add-pack-communication-calendar --strict`,
+- [x] 6.5 Run `openspec validate add-pack-communication-calendar --strict`,
   targeted cargo tests, boundary gates, file-size gates, canonical execution-path
   tests, and audit replay checks before marking complete.
 

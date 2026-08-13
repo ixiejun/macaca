@@ -50,6 +50,7 @@ pub enum CalendarRuntimeEventKind {
     ServiceCall,
     ProviderCallStarted,
     ProviderCallSucceeded,
+    ProviderCallFailed,
     HealthReported,
     SnapshotRecorded,
     Unavailable,
@@ -100,6 +101,11 @@ impl CalendarSystemServiceProvider {
             supports_sync_watch: true,
             supports_icalendar: true,
             max_recurrence_expansion: 128,
+            supports_attendees: true,
+            supports_reminders_and_conference: true,
+            page_limit: 100,
+            rate_limit_bucket: "runtime_host_default".into(),
+            supports_health: true,
             availability: DomainPackProviderCapabilityState::Preview,
         }
     }
@@ -160,6 +166,12 @@ impl SystemService for CalendarSystemServiceProvider {
             return Err(ServiceError::ServiceUnavailable(reason.clone()));
         }
         if !COMMUNICATION_CALENDAR_COMMANDS.contains(&command.name.as_str()) {
+            let _ = self.events.send(event(
+                &command.name.to_string(),
+                &trace.trace_id,
+                CalendarRuntimeEventKind::ProviderCallFailed,
+            ));
+            warn!(service_id = %self.descriptor.id, command = %command.name, trace_id = %trace.trace_id, "calendar provider rejected unsupported command");
             return Err(ServiceError::UnsupportedCommand(command.name.to_string()));
         }
         let reference = format!("calendar:reference:{}", trace.trace_id);

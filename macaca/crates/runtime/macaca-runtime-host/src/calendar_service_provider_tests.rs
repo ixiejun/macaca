@@ -91,6 +91,19 @@ async fn calendar_provider_fails_closed_and_cleans_bounded_snapshot_state() {
     );
 }
 
+#[test]
+fn calendar_mock_capability_reports_only_bounded_generic_facts() {
+    let capability = CalendarSystemServiceProvider::mock().capability();
+    assert!(capability.supports_event_crud);
+    assert!(capability.supports_recurrence);
+    assert!(capability.supports_attendees);
+    assert!(capability.supports_reminders_and_conference);
+    assert_eq!(capability.max_recurrence_expansion, 128);
+    assert_eq!(capability.page_limit, 100);
+    assert!(capability.supports_health);
+    assert!(!capability.rate_limit_bucket.contains("credential"));
+}
+
 fn command(name: &str, trace_id: &str) -> ServiceCommand {
     ServiceCommand::with_trace(
         ServiceCommandName::new(name),

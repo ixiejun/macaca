@@ -114,3 +114,36 @@ async fn inbox_sdk_discovery_serializes_only_descriptor_metadata() {
     assert!(diagnostic.contains("inbox_provider_not_installed"));
     assert!(diagnostic.contains("redaction_policy"));
 }
+
+#[tokio::test]
+async fn calendar_sdk_discovery_serializes_only_descriptor_metadata() {
+    let catalog = compose_installed_domain_pack_catalog(reference_domain_pack_definitions());
+    let client = CatalogBackedDomainPackClient::new(catalog);
+    let inspect = client
+        .inspect_pack(
+            &DomainPackInspectCommand::new(COMMUNICATION_CALENDAR_PACK_ID)
+                .expect("calendar pack id must be valid"),
+        )
+        .await
+        .unwrap();
+
+    // Discovery carries descriptors only, never calendar event or connector payloads.
+    let diagnostic = serde_json::to_string(&inspect).unwrap();
+    for marker in [
+        "credential=calendar-secret",
+        "oauth-access-token",
+        "webhook-secret",
+        "raw-provider-payload",
+        "raw-calendar-export",
+        "conference-secret",
+        "private-note",
+        "unbounded-description",
+    ] {
+        assert!(
+            !diagnostic.contains(marker),
+            "SDK diagnostic leaked {marker}"
+        );
+    }
+    assert!(diagnostic.contains("calendar_provider_not_installed"));
+    assert!(diagnostic.contains("redaction_policy"));
+}

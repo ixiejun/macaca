@@ -236,6 +236,16 @@ pub struct CalendarProviderCapability {
     pub supports_sync_watch: bool,
     pub supports_icalendar: bool,
     pub max_recurrence_expansion: u32,
+    #[serde(default)]
+    pub supports_attendees: bool,
+    #[serde(default)]
+    pub supports_reminders_and_conference: bool,
+    #[serde(default)]
+    pub page_limit: u32,
+    #[serde(default)]
+    pub rate_limit_bucket: String,
+    #[serde(default)]
+    pub supports_health: bool,
     pub availability: DomainPackProviderCapabilityState,
 }
 
@@ -413,6 +423,11 @@ pub fn communication_calendar_descriptor_hashes() -> CalendarDescriptorHashes {
             supports_sync_watch: false,
             supports_icalendar: false,
             max_recurrence_expansion: 0,
+            supports_attendees: false,
+            supports_reminders_and_conference: false,
+            page_limit: 0,
+            rate_limit_bucket: "default".into(),
+            supports_health: true,
             availability: DomainPackProviderCapabilityState::Unavailable,
         }),
         unavailable_schema_hash: calendar_stable_hash(&CalendarError {

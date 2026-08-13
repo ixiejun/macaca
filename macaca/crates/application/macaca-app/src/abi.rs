@@ -314,3 +314,7 @@ pub fn is_runtime_unavailable(result: &ApplicationHostCommandResult) -> bool {
 #[cfg(test)]
 #[path = "abi_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "abi_calendar_tests.rs"]
+mod calendar_tests;
