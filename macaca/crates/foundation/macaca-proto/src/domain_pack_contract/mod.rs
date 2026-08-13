@@ -105,6 +105,7 @@ pub mod identity_auth_handoff;
 mod identity_auth_handoff_validation;
 pub mod identity_common;
 pub mod identity_organization;
+pub mod identity_organization_semantics;
 pub mod identity_profile;
 mod identity_profile_validation;
 pub mod identity_tenant;
@@ -164,6 +165,8 @@ pub mod workflow_task_lifecycle_spec;
 pub mod workflow_task_resource_spec;
 pub mod workflow_task_transition;
 
+#[cfg(test)]
+mod identity_organization_semantics_tests;
 #[cfg(test)]
 mod knowledge_citations_preflight_tests;
 #[cfg(test)]
