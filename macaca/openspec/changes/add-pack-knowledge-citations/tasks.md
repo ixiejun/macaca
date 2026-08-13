@@ -67,10 +67,10 @@
 - [x] 4.2 Add unavailable and mock providers with deterministic identifier
   resolution, source anchor validation, verification, formatting, import/export,
   and capability behavior.
-- [ ] 4.3 Add lifecycle, health, snapshot, shutdown, timeout, cancellation,
+- [x] 4.3 Add lifecycle, health, snapshot, shutdown, timeout, cancellation,
   bounded pagination, optimistic concurrency, source-anchor inspection,
   metadata freshness checks, and formatted-output handles.
-- [ ] 4.4 Add provider capability reporting for identifier schemes, metadata
+- [x] 4.4 Add provider capability reporting for identifier schemes, metadata
   enrichment, verification depth, style rendering, import/export formats,
   selector support, max items, rate limits, and health.
 - [x] 4.5 Add canonical execution-path tests proving every citation command
@@ -86,7 +86,7 @@
 - [x] 5.2 Add focused SDK helper builders that only produce canonical traced
   service calls and return Null Object unavailable diagnostics when the pack is
   absent.
-- [ ] 5.3 Extend WASM/application ABI metadata so applications can declare
+- [x] 5.3 Extend WASM/application ABI metadata so applications can declare
   citation access, link source spans, resolve identifiers, verify citations, and
   format bibliographies only through declared permissions.
 - [x] 5.4 Add generic examples for create citation, resolve DOI-like identifier,
@@ -96,7 +96,7 @@
 
 ## 6. Trace, Audit, Replay, Security, And Gates
 
-- [ ] 6.1 Emit sanitized declaration, admission, citation creation, identifier
+- [x] 6.1 Emit sanitized declaration, admission, citation creation, identifier
   resolution, source span linking, verification, formatting, bibliography
   formatting, import/export, anchor inspection, policy, resource, entitlement,
   approval, service-call, provider-call, health, snapshot, and unavailable

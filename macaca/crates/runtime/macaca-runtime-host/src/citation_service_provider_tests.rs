@@ -78,9 +78,30 @@ async fn citation_provider_fails_closed_and_cleans_bounded_snapshot_state() {
         .call(command("citations.create_citation", "one"))
         .await
         .unwrap();
-    assert_eq!(provider.snapshot().await["active_reference_count"], "1");
+    let snapshot = provider.snapshot().await;
+    assert_eq!(snapshot["active_reference_count"], "1");
+    let observable = format!("{snapshot:?}");
+    for marker in [
+        "secret-marker",
+        "raw-marker",
+        "private-marker",
+        "raw-style-file",
+    ] {
+        assert!(!observable.contains(marker));
+    }
     provider.cleanup().await.unwrap();
     assert_eq!(provider.snapshot().await["active_reference_count"], "0");
+}
+
+#[test]
+fn citation_mock_capability_reports_only_bounded_generic_facts() {
+    let capability = CitationSystemServiceProvider::mock().capability();
+    assert!(capability.identifier_schemes.contains("reference"));
+    assert!(capability.style_formats.contains("reference"));
+    assert!(capability.selector_support.contains("reference"));
+    assert_eq!(capability.max_items, 100);
+    assert!(capability.supports_health);
+    assert!(!capability.rate_limit_bucket.contains("credential"));
 }
 
 fn command(name: &str, trace_id: &str) -> ServiceCommand {

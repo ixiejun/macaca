@@ -230,6 +230,15 @@ pub struct CitationProviderCapability {
     pub style_formats: BTreeSet<String>,
     pub selector_support: BTreeSet<String>,
     pub verification_depth: String,
+    /// Bounded maximum number of citation items accepted by import or export.
+    #[serde(default)]
+    pub max_items: u32,
+    /// Opaque rate-limit bucket, never a provider-native quota payload.
+    #[serde(default)]
+    pub rate_limit_bucket: String,
+    /// Whether this capability can report health through the service runtime.
+    #[serde(default)]
+    pub supports_health: bool,
     pub state: DomainPackProviderCapabilityState,
 }
 
@@ -294,6 +303,9 @@ pub fn knowledge_citations_descriptor_hashes() -> CitationDescriptorHashes {
             style_formats: BTreeSet::from(["csl".into(), "bibtex".into()]),
             selector_support: BTreeSet::from(["text_position".into(), "text_quote".into()]),
             verification_depth: "metadata_and_anchor".into(),
+            max_items: 100,
+            rate_limit_bucket: "default".into(),
+            supports_health: true,
             state: DomainPackProviderCapabilityState::Preview,
         }),
         unavailable_schema_hash: citations_stable_hash(&KnowledgeError {

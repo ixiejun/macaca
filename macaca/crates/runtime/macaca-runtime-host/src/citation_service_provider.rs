@@ -48,6 +48,7 @@ pub enum CitationRuntimeEventKind {
     ServiceCall,
     ProviderCallStarted,
     ProviderCallSucceeded,
+    ProviderCallFailed,
     HealthReported,
     SnapshotRecorded,
     Unavailable,
@@ -87,6 +88,9 @@ impl CitationSystemServiceProvider {
             style_formats: BTreeSet::from(["reference".into()]),
             selector_support: BTreeSet::from(["reference".into()]),
             verification_depth: "bounded".into(),
+            max_items: 100,
+            rate_limit_bucket: "runtime_host_default".into(),
+            supports_health: true,
             state: DomainPackProviderCapabilityState::Preview,
         }
     }
@@ -105,6 +109,7 @@ impl CitationSystemServiceProvider {
         BTreeMap::from([
             ("descriptor_hash".into(), "citations:descriptor".into()),
             ("provider_class".into(), "mock".into()),
+            ("redaction_profile".into(), "references_only".into()),
             ("active_reference_count".into(), count.to_string()),
         ])
     }
@@ -139,6 +144,12 @@ impl SystemService for CitationSystemServiceProvider {
             return Err(ServiceError::ServiceUnavailable(reason.clone()));
         }
         if !KNOWLEDGE_CITATIONS_COMMANDS.contains(&command.name.as_str()) {
+            let _ = self.events.send(event(
+                &command.name.to_string(),
+                &trace.trace_id,
+                CitationRuntimeEventKind::ProviderCallFailed,
+            ));
+            warn!(service_id = %self.descriptor.id, command = %command.name, trace_id = %trace.trace_id, "citation provider rejected unsupported command");
             return Err(ServiceError::UnsupportedCommand(command.name.to_string()));
         }
         let reference = format!("citation:reference:{}", trace.trace_id);
