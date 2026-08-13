@@ -292,6 +292,11 @@ pub use super::identity_organization_semantics::{
     OrganizationMutationDecision, OrganizationMutationDiagnosticV1, OrganizationMutationEvidenceV1,
     OrganizationMutationSpec, OrganizationRoleBindingLifecycle,
 };
+pub use super::identity_tenant_semantics::{
+    filtered_tenant_page, TenantLifecycle, TenantLifecycleSpec, TenantMutationDecision,
+    TenantMutationDiagnosticV1, TenantMutationEvidenceV1, TenantMutationSpec,
+    TenantPolicyAttachmentState, TenantQuotaReservationState,
+};
 pub use super::industrial_reference_catalogs::industrial_reference_domain_pack_definitions;
 pub use super::knowledge_citations::{
     citations_stable_hash, knowledge_citations_descriptor_hashes,

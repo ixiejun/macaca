@@ -109,6 +109,7 @@ pub mod identity_organization_semantics;
 pub mod identity_profile;
 mod identity_profile_validation;
 pub mod identity_tenant;
+pub mod identity_tenant_semantics;
 mod identity_validation;
 mod industrial_pack_taxonomy;
 mod industrial_reference_catalogs;
@@ -167,6 +168,8 @@ pub mod workflow_task_transition;
 
 #[cfg(test)]
 mod identity_organization_semantics_tests;
+#[cfg(test)]
+mod identity_tenant_semantics_tests;
 #[cfg(test)]
 mod knowledge_citations_preflight_tests;
 #[cfg(test)]
