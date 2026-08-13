@@ -222,6 +222,64 @@ async fn wasm_host_import_carries_calendar_dto_through_canonical_service_call() 
 }
 
 #[tokio::test]
+async fn wasm_host_import_carries_email_dto_through_canonical_service_call() {
+    let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
+    let provider = Arc::new(EmailSystemServiceProvider::mock());
+    let service_id = runtime
+        .register_provider(
+            &StaticServiceProviderFactory::new(ServiceProviderInstance::new(
+                provider.descriptor(),
+                provider,
+            )),
+            Default::default(),
+        )
+        .await
+        .unwrap();
+    runtime
+        .start(
+            &service_id,
+            macaca_proto::TraceContext::new("trace-email-start"),
+        )
+        .await
+        .unwrap();
+    let bridge = Arc::new(WasmHostImportBridge::new(
+        Arc::clone(&runtime),
+        WasmHostImportBridgeConfig::default(),
+    ));
+    let provider = DefaultInProcessWasmRuntimeProvider::default().with_host_import_bridge(bridge);
+    let session = provider
+        .create_session(traced_request("trace-email-abi-provider"))
+        .await
+        .unwrap();
+    let command = host_import_command(
+        "trace-email-abi-command",
+        &service_id,
+        "email.send",
+        serde_json::to_value(EmailSendCommand {
+            message: None,
+            draft: Some(EmailDraftRef {
+                draft_id: "draft:reference".into(),
+                revision: "v1".into(),
+            }),
+            approval_ref: Some("approval:reference".into()),
+            idempotency_key: "request:reference".into(),
+        })
+        .unwrap(),
+        "service.call",
+    );
+    let result = session.dispatch(command).await.unwrap();
+    assert!(matches!(result.status, ApplicationHostCommandStatus::Ok));
+    assert_eq!(
+        result.metadata.get("service_id").map(String::as_str),
+        Some(COMMUNICATION_EMAIL_SERVICE_ID)
+    );
+    assert_eq!(
+        result.metadata.get("service.operation").map(String::as_str),
+        Some("email.send")
+    );
+}
+
+#[tokio::test]
 async fn wasm_host_import_carries_inbox_dto_through_canonical_service_call() {
     let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
     let provider = Arc::new(InboxSystemServiceProvider::mock());

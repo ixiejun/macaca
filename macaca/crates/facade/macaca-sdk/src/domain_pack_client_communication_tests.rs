@@ -84,6 +84,37 @@ async fn catalog_client_discovers_communication_contract_metadata() {
 }
 
 #[tokio::test]
+async fn email_sdk_discovery_serializes_only_descriptor_metadata() {
+    let catalog = compose_installed_domain_pack_catalog(reference_domain_pack_definitions());
+    let client = CatalogBackedDomainPackClient::new(catalog);
+    let inspect = client
+        .inspect_pack(
+            &DomainPackInspectCommand::new(COMMUNICATION_EMAIL_PACK_ID)
+                .expect("email pack id must be valid"),
+        )
+        .await
+        .unwrap();
+
+    // Discovery exposes only the declarative contract, never mail transport data.
+    let diagnostic = serde_json::to_string(&inspect).unwrap();
+    for marker in [
+        "oauth-access-token",
+        "smtp-password",
+        "webhook-secret",
+        "raw-provider-payload",
+        "raw-message-body",
+        "raw-attachment-bytes",
+    ] {
+        assert!(
+            !diagnostic.contains(marker),
+            "SDK diagnostic leaked {marker}"
+        );
+    }
+    assert!(diagnostic.contains("email_provider_not_installed"));
+    assert!(diagnostic.contains("redaction_policy"));
+}
+
+#[tokio::test]
 async fn inbox_sdk_discovery_serializes_only_descriptor_metadata() {
     let catalog = compose_installed_domain_pack_catalog(reference_domain_pack_definitions());
     let client = CatalogBackedDomainPackClient::new(catalog);

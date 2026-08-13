@@ -318,3 +318,7 @@ mod tests;
 #[cfg(test)]
 #[path = "abi_calendar_tests.rs"]
 mod calendar_tests;
+
+#[cfg(test)]
+#[path = "abi_email_tests.rs"]
+mod email_tests;

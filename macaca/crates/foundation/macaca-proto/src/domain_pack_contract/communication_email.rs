@@ -253,6 +253,18 @@ pub struct EmailProviderCapability {
     pub supports_scheduled_send: bool,
     pub supports_mailbox_sync: bool,
     pub supports_event_ingest: bool,
+    /// Whether the adapter can retain opaque attachment handles without copying bytes.
+    #[serde(default)]
+    pub supports_attachment_handles: bool,
+    /// Whether the adapter can resume a mailbox scan from a sanitized cursor hash.
+    #[serde(default)]
+    pub supports_sync_cursors: bool,
+    /// Whether health is available through the service lifecycle contract.
+    #[serde(default)]
+    pub supports_health: bool,
+    /// Descriptor-owned rate-limit bucket; it never identifies a concrete provider account.
+    #[serde(default)]
+    pub rate_limit_bucket: String,
     pub max_attachment_bytes: u64,
     pub max_recipients: u32,
     pub availability: DomainPackProviderCapabilityState,
@@ -427,6 +439,10 @@ pub fn communication_email_descriptor_hashes() -> EmailDescriptorHashes {
             supports_scheduled_send: false,
             supports_mailbox_sync: false,
             supports_event_ingest: false,
+            supports_attachment_handles: false,
+            supports_sync_cursors: false,
+            supports_health: false,
+            rate_limit_bucket: "unavailable".into(),
             max_attachment_bytes: 0,
             max_recipients: 0,
             availability: DomainPackProviderCapabilityState::Unavailable,

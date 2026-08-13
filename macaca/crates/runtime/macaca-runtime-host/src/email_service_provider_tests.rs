@@ -8,7 +8,7 @@ use macaca_proto::{
     TraceContext, COMMUNICATION_EMAIL_COMMANDS,
 };
 
-use super::email_service_provider::EmailSystemServiceProvider;
+use super::email_service_provider::{EmailRuntimeEventKind, EmailSystemServiceProvider};
 use crate::{
     InMemoryServiceRuntimeEventSink, ServiceProviderInstance, ServiceRuntime, ServiceRuntimeConfig,
     StaticServiceProviderFactory,
@@ -66,11 +66,16 @@ async fn email_provider_fails_closed_and_cleans_bounded_snapshot_state() {
         Err(ServiceError::ServiceUnavailable(_))
     ));
     let provider = EmailSystemServiceProvider::mock();
+    let mut events = provider.subscribe();
     assert!(matches!(
         provider
             .call(command("email.unsupported", "unsupported"))
             .await,
         Err(ServiceError::UnsupportedCommand(_))
+    ));
+    assert!(matches!(
+        events.recv().await.unwrap().kind,
+        EmailRuntimeEventKind::ProviderCallFailed
     ));
     provider.call(command("email.send", "one")).await.unwrap();
     assert_eq!(provider.snapshot().await.sender_identity_count, 1);
@@ -80,6 +85,11 @@ async fn email_provider_fails_closed_and_cleans_bounded_snapshot_state() {
         provider.capability().supported_commands.len(),
         COMMUNICATION_EMAIL_COMMANDS.len()
     );
+    let capability = provider.capability();
+    assert!(capability.supports_attachment_handles);
+    assert!(capability.supports_sync_cursors);
+    assert!(capability.supports_health);
+    assert_eq!(capability.rate_limit_bucket, "runtime_host_default");
 }
 
 fn command(name: &str, trace_id: &str) -> ServiceCommand {

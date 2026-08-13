@@ -41,15 +41,34 @@ pub enum EmailRuntimeEventKind {
     DraftChanged,
     SendRequested,
     SendAccepted,
+    SendFailed,
     MailboxSynced,
     AttachmentFetched,
     DeliveryEventIngested,
     ServiceCall,
     ProviderCallStarted,
     ProviderCallSucceeded,
+    ProviderCallFailed,
     HealthReported,
     SnapshotRecorded,
     Unavailable,
+}
+
+/// Provider adapter Bridge for email transports and remote APIs.
+///
+/// Concrete implementations live in optional provider crates. The runtime only
+/// exchanges canonical service commands and redacted reference results, keeping
+/// provider credentials and native payloads outside the OS contract.
+#[async_trait]
+pub trait EmailProviderAdapter: Send + Sync {
+    /// Return the descriptor-only capability report for this adapter Strategy.
+    fn capability(&self) -> EmailProviderCapability;
+
+    /// Dispatch a canonical command and return an opaque provider-owned reference.
+    async fn dispatch(&self, command: &ServiceCommand) -> ServiceResult<String>;
+
+    /// Record an externally received event using only a verified reference.
+    async fn ingest_event(&self, event_ref: &str, idempotency_key: &str) -> ServiceResult<()>;
 }
 
 /// Deterministic mock or fail-closed Null Object email provider.
@@ -90,6 +109,10 @@ impl EmailSystemServiceProvider {
             supports_scheduled_send: true,
             supports_mailbox_sync: true,
             supports_event_ingest: true,
+            supports_attachment_handles: true,
+            supports_sync_cursors: true,
+            supports_health: true,
+            rate_limit_bucket: "runtime_host_default".into(),
             max_attachment_bytes: 65_536,
             max_recipients: 100,
             availability: DomainPackProviderCapabilityState::Preview,
@@ -143,6 +166,13 @@ impl SystemService for EmailSystemServiceProvider {
     ) -> ServiceResult<macaca_proto::ServiceCallResult> {
         let trace = domain_pack_command_trace(&command)?;
         if let Some(reason) = &self.unavailable_reason {
+            if command.name.as_str() == "email.send" {
+                let _ = self.events.send(event(
+                    &command.name.to_string(),
+                    &trace.trace_id,
+                    EmailRuntimeEventKind::SendFailed,
+                ));
+            }
             let _ = self.events.send(event(
                 &command.name.to_string(),
                 &trace.trace_id,
@@ -152,6 +182,12 @@ impl SystemService for EmailSystemServiceProvider {
             return Err(ServiceError::ServiceUnavailable(reason.clone()));
         }
         if !COMMUNICATION_EMAIL_COMMANDS.contains(&command.name.as_str()) {
+            let _ = self.events.send(event(
+                &command.name.to_string(),
+                &trace.trace_id,
+                EmailRuntimeEventKind::ProviderCallFailed,
+            ));
+            warn!(service_id = %self.descriptor.id, command = %command.name, trace_id = %trace.trace_id, "email provider rejected unsupported command");
             return Err(ServiceError::UnsupportedCommand(command.name.to_string()));
         }
         let reference = format!("email:reference:{}", trace.trace_id);
@@ -161,7 +197,7 @@ impl SystemService for EmailSystemServiceProvider {
             .insert(trace.trace_id.clone(), reference.clone());
         for kind in common_event_kinds()
             .iter()
-            .chain([event_kind(command.name.as_str())].iter())
+            .chain(command_event_kinds(command.name.as_str()).iter())
         {
             let _ = self
                 .events
@@ -231,20 +267,21 @@ fn common_event_kinds() -> &'static [EmailRuntimeEventKind] {
         ProviderCallSucceeded,
     ]
 }
-fn event_kind(command: &str) -> EmailRuntimeEventKind {
+fn command_event_kinds(command: &str) -> &'static [EmailRuntimeEventKind] {
     use EmailRuntimeEventKind::*;
     match command {
-        "email.compose" | "email.validate_recipients" => Composed,
-        "email.save_draft" | "email.update_draft" => DraftChanged,
-        "email.send" | "email.schedule_send" | "email.cancel_scheduled_send" => SendRequested,
+        "email.compose" | "email.validate_recipients" => &[Composed],
+        "email.save_draft" | "email.update_draft" => &[DraftChanged],
+        "email.send" => &[SendRequested, SendAccepted],
+        "email.schedule_send" | "email.cancel_scheduled_send" => &[SendRequested],
         "email.sync_mailbox"
         | "email.list_threads"
         | "email.fetch_message"
         | "email.apply_labels"
-        | "email.mark_read" => MailboxSynced,
-        "email.fetch_attachment" => AttachmentFetched,
-        "email.delivery_status" | "email.ingest_event" => DeliveryEventIngested,
-        _ => ServiceCall,
+        | "email.mark_read" => &[MailboxSynced],
+        "email.fetch_attachment" => &[AttachmentFetched],
+        "email.delivery_status" | "email.ingest_event" => &[DeliveryEventIngested],
+        _ => &[ServiceCall],
     }
 }
 fn event(command: &str, trace_id: &str, kind: EmailRuntimeEventKind) -> EmailRuntimeEvent {

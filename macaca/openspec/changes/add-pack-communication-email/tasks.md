@@ -41,7 +41,7 @@
 
 ## 3. Admission, Permission, Policy, Resource, And Approval
 
-- [ ] 3.1 Implement manifest declaration validation for required/optional
+- [x] 3.1 Implement manifest declaration validation for required/optional
   `pack.communication.email.v1`, sender identities, mailbox access, and event
   ingestion endpoints.
 - [x] 3.2 Validate scopes: `email.send`, `email.read`, `email.draft`,
@@ -66,11 +66,11 @@
   missing entitlement, and provider health failure.
 - [x] 4.3 Implement deterministic mock provider for contract, replay, and delivery
   event tests.
-- [ ] 4.4 Implement adapter bridge points for SMTP/IMAP, Gmail, Microsoft Graph,
+- [x] 4.4 Implement adapter bridge points for SMTP/IMAP, Gmail, Microsoft Graph,
   SendGrid, and Mailgun without leaking provider-native APIs to SDK callers.
-- [ ] 4.5 Add webhook/event ingestion bridge with signature status, idempotency,
+- [x] 4.5 Add webhook/event ingestion bridge with signature status, idempotency,
   provider event refs, and normalized delivery states.
-- [ ] 4.6 Add lifecycle, health, snapshot, shutdown, sync cursor management,
+- [x] 4.6 Add lifecycle, health, snapshot, shutdown, sync cursor management,
   attachment handling, rate-limit reporting, redaction, and provider capability
   reports.
 
@@ -81,20 +81,20 @@
   limits, permissions, policy templates, health, diagnostics, and docs link.
 - [x] 5.2 Add SDK command builders for every `email.*` command; builders must only
   produce canonical traced service calls.
-- [ ] 5.3 Add SDK helpers for compose, draft, send with approval, attachment ref
+- [x] 5.3 Add SDK helpers for compose, draft, send with approval, attachment ref
   binding, mailbox sync, message fetch, delivery status, event ingestion, and
   unavailable diagnostics.
-- [ ] 5.4 Extend effective capability projection so applications can inspect
+- [x] 5.4 Extend effective capability projection so applications can inspect
   callable commands, denied commands, unavailable providers, sender identities,
   provider capability flags, rate limits, and replay references.
-- [ ] 5.5 Expose WASM host imports only for declared callable email commands and
+- [x] 5.5 Expose WASM host imports only for declared callable email commands and
   route every import through the service runtime path.
-- [ ] 5.6 Add app-framework tests proving YAML, WASM, GenUI, and headless apps all
+- [x] 5.6 Add app-framework tests proving YAML, WASM, GenUI, and headless apps all
   use the same email execution path.
 
 ## 6. Trace, Audit, Replay, And Gates
 
-- [ ] 6.1 Emit sanitized events for declaration, admission, policy, compose, draft,
+- [x] 6.1 Emit sanitized events for declaration, admission, policy, compose, draft,
   send request, send accepted/failed, mailbox sync, attachment fetch, delivery
   event ingestion, success, failure, denied, and unavailable states.
 - [x] 6.2 Add audit redaction tests proving raw OAuth tokens, SMTP credentials,

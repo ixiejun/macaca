@@ -1,7 +1,32 @@
 use std::collections::BTreeMap;
 
 use super::super::communication_email::{EmailDraftRef, EmailSendCommand};
-use super::super::communication_email_preflight::{EmailAdmissionEvidence, EmailDispatchPreflight};
+use super::super::communication_email_preflight::{
+    EmailAdmissionEvidence, EmailDispatchPreflight, EmailPackDeclaration, EmailPackDeclarationSpec,
+};
+
+#[test]
+fn email_declaration_requires_safe_identity_mailbox_and_event_references() {
+    let declaration = EmailPackDeclaration {
+        required: true,
+        sender_identity_refs: vec!["sender:primary".into()],
+        mailbox_access_refs: vec!["mailbox:team/inbox".into()],
+        event_ingestion_endpoint_refs: vec!["endpoint:delivery-events".into()],
+    };
+    assert!(EmailPackDeclarationSpec.validate(&declaration).is_ok());
+    assert!(EmailPackDeclarationSpec
+        .validate(&EmailPackDeclaration {
+            required: true,
+            ..Default::default()
+        })
+        .is_err());
+    assert!(EmailPackDeclarationSpec
+        .validate(&EmailPackDeclaration {
+            event_ingestion_endpoint_refs: vec!["https://endpoint.example/?secret=raw".into()],
+            ..Default::default()
+        })
+        .is_err());
+}
 use super::super::pack_preflight::{
     DomainPackApprovalEvidence, DomainPackCommandPreflight, DomainPackEntitlementEvidence,
     DomainPackPolicyEvidence, DomainPackResourceReservation,

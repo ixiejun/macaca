@@ -142,6 +142,7 @@ pub use super::communication_email::{
     EmailSyncMailboxCommand, EmailUpdateDraftCommand, EmailValidateRecipientsCommand,
     COMMUNICATION_EMAIL_COMMANDS, COMMUNICATION_EMAIL_PACK_ID, COMMUNICATION_EMAIL_SERVICE_ID,
 };
+pub use super::communication_email_preflight::{EmailPackDeclaration, EmailPackDeclarationSpec};
 pub use super::communication_inbox::{
     communication_inbox_descriptor_hashes, communication_inbox_pack_definition, inbox_stable_hash,
     InboxArchiveItemCommand, InboxAttachmentHandle, InboxClaim, InboxClaimItemCommand, InboxCursor,

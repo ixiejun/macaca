@@ -21,6 +21,51 @@ pub struct EmailAdmissionEvidence {
     pub provider_capability_available: bool,
 }
 
+/// Declarative email-pack configuration owned by the application manifest layer.
+///
+/// Values are references and bounded identifiers only. Provider credentials,
+/// mailbox contents, and inbound event payloads stay behind service adapters.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EmailPackDeclaration {
+    pub required: bool,
+    pub sender_identity_refs: Vec<String>,
+    pub mailbox_access_refs: Vec<String>,
+    pub event_ingestion_endpoint_refs: Vec<String>,
+}
+
+/// Specification validating email declaration shape before provider admission.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct EmailPackDeclarationSpec;
+
+impl EmailPackDeclarationSpec {
+    /// Reject undeclared required capabilities and unbounded identity references.
+    pub fn validate(&self, declaration: &EmailPackDeclaration) -> Result<(), String> {
+        if declaration.required && declaration.sender_identity_refs.is_empty() {
+            return Err("required email pack needs a sender identity reference".into());
+        }
+        for reference in declaration
+            .sender_identity_refs
+            .iter()
+            .chain(declaration.mailbox_access_refs.iter())
+            .chain(declaration.event_ingestion_endpoint_refs.iter())
+        {
+            if !is_safe_declaration_reference(reference) {
+                return Err("email declaration contains an invalid reference".into());
+            }
+        }
+        Ok(())
+    }
+}
+
+fn is_safe_declaration_reference(value: &str) -> bool {
+    let value = value.trim();
+    !value.is_empty()
+        && value.len() <= 256
+        && value.chars().all(|character| {
+            character.is_ascii_alphanumeric() || matches!(character, ':' | '-' | '_' | '.' | '/')
+        })
+}
+
 /// Provider-neutral mail dispatch Specification.
 ///
 /// The host supplies policy outcomes and this contract protects the provider
