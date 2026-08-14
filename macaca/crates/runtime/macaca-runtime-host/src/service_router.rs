@@ -390,6 +390,8 @@ fn sanitized_replay_metadata(metadata: &BTreeMap<String, String>) -> BTreeMap<St
         "replay.provider_class",
         "replay.timezone_data_version",
         "replay.monotonic_unit",
+        "replay.random_command",
+        "replay.random_length",
     ];
     metadata
         .iter()
