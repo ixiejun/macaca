@@ -4,6 +4,7 @@
 //! provider-neutral, application-agnostic format that can be replayed by
 //! `trace_id` and `session_id`.
 
+use std::collections::BTreeMap;
 use std::sync::RwLock;
 
 use chrono::{DateTime, Utc};
@@ -18,12 +19,16 @@ pub struct ServiceCallAuditEvent {
     pub session_id: Option<String>,
     pub app_id: Option<String>,
     pub service_id: String,
+    /// Canonical operation identifier required to interpret a replay entry.
+    pub operation: Option<String>,
     pub provider_id: Option<String>,
     pub decision: Option<String>,
     pub retry_count: Option<u32>,
     pub latency_ms: Option<u64>,
     pub input_hash: Option<String>,
     pub output_hash: Option<String>,
+    /// Explicitly allowlisted provider facts, never provider output or input.
+    pub replay_metadata: BTreeMap<String, String>,
     pub emitted_at: DateTime<Utc>,
 }
 
@@ -40,12 +45,14 @@ impl ServiceCallAuditEvent {
             session_id: None,
             app_id: None,
             service_id: service_id.into(),
+            operation: None,
             provider_id: None,
             decision: None,
             retry_count: None,
             latency_ms: None,
             input_hash: None,
             output_hash: None,
+            replay_metadata: BTreeMap::new(),
             emitted_at: Utc::now(),
         }
     }

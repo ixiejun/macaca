@@ -50,7 +50,7 @@
   data availability, and provider capability.
 - [x] 3.4 Add resource reservations before timer creation and release resources
   on fire, cancel, timeout, provider failure, and session shutdown.
-- [ ] 3.5 Add tests proving denied, unavailable, quota, unsupported, and invalid
+- [x] 3.5 Add tests proving denied, unavailable, quota, unsupported, and invalid
   timezone/calendar paths do not invoke a concrete provider where they should be
   rejected before side effects.
 
@@ -88,20 +88,20 @@
 
 ## 6. Trace, Audit, Replay, And Gates
 
-- [ ] 6.1 Emit sanitized events for declaration, admission, policy, resource,
+- [x] 6.1 Emit sanitized events for declaration, admission, policy, resource,
   service calls, timer lifecycle, clock health, success, failure, denied, and
   unavailable states.
-- [ ] 6.2 Add audit redaction tests proving raw user content, prompts, manifests,
+- [x] 6.2 Add audit redaction tests proving raw user content, prompts, manifests,
   package bytes, credentials, private keys, provider payloads, and unbounded
   output do not enter observability surfaces.
-- [ ] 6.3 Add replay tests proving every time command is trace-addressable and can
+- [x] 6.3 Add replay tests proving every time command is trace-addressable and can
   reconstruct wall-clock/monotonic decisions with clock source and timezone data
   version.
 - [x] 6.4 Add dependency-boundary tests proving kernel, SDK, shells, and
   application framework do not import concrete time providers.
 - [x] 6.5 Add no-direct-provider-call gates proving SDK helpers and WASM host
   imports cannot bypass service runtime.
-- [ ] 6.6 Run `openspec validate add-pack-foundation-time --strict`, targeted
+- [x] 6.6 Run `openspec validate add-pack-foundation-time --strict`, targeted
   cargo tests, dependency-boundary gates, file-size gates, and audit replay
   checks before marking complete.
 

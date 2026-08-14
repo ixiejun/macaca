@@ -94,6 +94,7 @@ impl ServiceRouter {
             )
             .app_id(request.app_id.clone())
             .session_id(request.session_id.clone())
+            .operation(Some(request.operation.to_string()))
             .input_hash(hash_json(&request.payload)),
         );
         let strategy = ProviderSelectionStrategy::from_metadata(
@@ -128,6 +129,7 @@ impl ServiceRouter {
             )
             .app_id(request.app_id.clone())
             .session_id(request.session_id.clone())
+            .operation(Some(request.operation.to_string()))
             .provider_id(Some(selected_provider.clone())),
         );
         let contract = self
@@ -161,6 +163,7 @@ impl ServiceRouter {
                 )
                 .app_id(request.app_id.clone())
                 .session_id(request.session_id.clone())
+                .operation(Some(request.operation.to_string()))
                 .decision(Some(decision.reason_code.clone())),
             );
             return Err(ServiceRuntimeError::PolicyDenied(decision.reason_code));
@@ -211,6 +214,7 @@ impl ServiceRouter {
                         )
                         .app_id(request.app_id.clone())
                         .session_id(request.session_id.clone())
+                        .operation(Some(request.operation.to_string()))
                         .provider_id(Some(selected_provider.clone()))
                         .retry_count(Some(attempt.saturating_sub(1))),
                     );
@@ -241,6 +245,7 @@ impl ServiceRouter {
                         )
                         .app_id(request.app_id.clone())
                         .session_id(request.session_id.clone())
+                        .operation(Some(request.operation.to_string()))
                         .provider_id(Some(selected_provider.clone()))
                         .decision(Some("policy_timeout_budget_exceeded".into()))
                         .retry_count(Some(attempt.saturating_sub(1))),
@@ -261,6 +266,7 @@ impl ServiceRouter {
                 "service_call_succeeded"
             );
             let latency_ms = start.elapsed().as_millis() as u64;
+            let replay_metadata = sanitized_replay_metadata(&reply.metadata);
             self.emit_audit_event(
                 ServiceCallAuditEvent::new(
                     "service_call_succeeded",
@@ -269,10 +275,12 @@ impl ServiceRouter {
                 )
                 .app_id(request.app_id.clone())
                 .session_id(request.session_id.clone())
+                .operation(Some(request.operation.to_string()))
                 .provider_id(Some(selected_provider.clone()))
                 .decision(Some(decision.reason_code.clone()))
                 .retry_count(Some(attempt.saturating_sub(1)))
                 .latency_ms(Some(latency_ms))
+                .replay_metadata(replay_metadata)
                 .output_hash(hash_json(&reply.output.clone().unwrap_or(Value::Null))),
             );
             let mut metadata = reply.metadata;
@@ -337,6 +345,11 @@ impl ServiceCallAuditEvent {
         self
     }
 
+    fn operation(mut self, operation: Option<String>) -> Self {
+        self.operation = operation;
+        self
+    }
+
     fn decision(mut self, decision: Option<String>) -> Self {
         self.decision = decision;
         self
@@ -361,6 +374,30 @@ impl ServiceCallAuditEvent {
         self.output_hash = output_hash;
         self
     }
+
+    fn replay_metadata(mut self, replay_metadata: BTreeMap<String, String>) -> Self {
+        self.replay_metadata = replay_metadata;
+        self
+    }
+}
+
+/// Copy only service-declared facts that are useful to replay and bounded by
+/// their key/value limits. The router never reflects arbitrary metadata into
+/// the audit chain because metadata may have originated from a provider.
+fn sanitized_replay_metadata(metadata: &BTreeMap<String, String>) -> BTreeMap<String, String> {
+    const ALLOWED_KEYS: &[&str] = &[
+        "replay.clock_source",
+        "replay.provider_class",
+        "replay.timezone_data_version",
+        "replay.monotonic_unit",
+    ];
+    metadata
+        .iter()
+        .filter(|(key, value)| {
+            ALLOWED_KEYS.contains(&key.as_str()) && value.len() <= 96 && value.is_ascii()
+        })
+        .map(|(key, value)| (key.clone(), value.clone()))
+        .collect()
 }
 
 fn hash_json(value: &Value) -> Option<String> {

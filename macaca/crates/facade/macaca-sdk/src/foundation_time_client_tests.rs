@@ -8,7 +8,7 @@ use macaca_proto::{TimeAdmissionFailure, TimeResourceReservation};
 
 use super::{
     mock_clock_setup_command, now_command, timer_create_command, timezone_conversion_command,
-    TimeDomainPackCommandBuildOutcome,
+    TimeDomainPackCommandBuildOutcome, TimeDomainPackCommandBuilder,
 };
 use crate::domain_pack_client::{DomainPackResolveResult, SystemDomainPackClient};
 use crate::{CatalogBackedDomainPackClient, DomainPackResolveCommand};
@@ -83,6 +83,32 @@ async fn timer_rejection_does_not_create_a_service_call() {
         outcome,
         TimeDomainPackCommandBuildOutcome::Rejected(TimeAdmissionFailure::QuotaExceeded)
     );
+}
+
+#[tokio::test]
+async fn preflight_rejections_never_construct_provider_calls() {
+    let failures = [
+        TimeAdmissionFailure::MissingScope("time.timer".into()),
+        TimeAdmissionFailure::ProviderUnavailable,
+        TimeAdmissionFailure::QuotaExceeded,
+        TimeAdmissionFailure::ExactTimerUnsupported,
+        TimeAdmissionFailure::InvalidRequest("invalid_timezone".into()),
+        TimeAdmissionFailure::InvalidRequest("invalid_calendar".into()),
+    ];
+    for failure in failures {
+        let outcome = TimeDomainPackCommandBuilder::new(
+            "time.create_timer",
+            serde_json::json!({"untrusted":"provider-payload-marker"}),
+            Err(failure.clone()),
+            TraceContext::new("trace-sdk-time-preflight"),
+        )
+        .build(&resolved().await)
+        .unwrap();
+        assert_eq!(
+            outcome,
+            TimeDomainPackCommandBuildOutcome::Rejected(failure)
+        );
+    }
 }
 
 #[tokio::test]

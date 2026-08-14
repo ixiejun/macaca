@@ -98,6 +98,7 @@ impl TimeService for HostTimeProvider {
             self.origin.elapsed().as_nanos(),
             &self.timers,
             true,
+            "host-clock",
         )
     }
     fn health(&self) -> ServiceHealth {
@@ -121,7 +122,14 @@ impl TimeService for FrozenTimeProvider {
             .epoch_millis
             .lock()
             .map_err(|_| ServiceError::AdapterFailure("frozen clock lock poisoned".into()))?;
-        dispatch(command, epoch_millis, 0, &self.timers, false)
+        dispatch(
+            command,
+            epoch_millis,
+            0,
+            &self.timers,
+            false,
+            "frozen-test-clock",
+        )
     }
     fn health(&self) -> ServiceHealth {
         ServiceHealth::Healthy
@@ -140,6 +148,7 @@ fn dispatch(
     monotonic: u128,
     timers: &TimerStore,
     exact: bool,
+    provider_class: &str,
 ) -> ServiceResult<ServiceCallResult> {
     let trace = command
         .trace
@@ -175,9 +184,41 @@ fn dispatch(
         output,
         trace,
         status: "ok".into(),
-        metadata: Default::default(),
+        metadata: replay_metadata(command.name.as_str(), provider_class, exact),
         cleanup_hint: Some(CleanupPolicy::OnStop),
     })
+}
+
+/// Provide bounded decision facts for generic router replay without exposing
+/// payloads, timer handles, or provider-internal state. The runtime host owns
+/// the allowlist that decides which of these facts reaches the audit sink.
+fn replay_metadata(command: &str, provider_class: &str, exact: bool) -> BTreeMap<String, String> {
+    let mut metadata =
+        BTreeMap::from([("replay.provider_class".into(), provider_class.to_string())]);
+    match command {
+        "time.now" | "time.evaluate_deadline" => {
+            metadata.insert("replay.clock_source".into(), "wall_clock".into());
+            metadata.insert(
+                "replay.timezone_data_version".into(),
+                "fixed-offset-v1".into(),
+            );
+        }
+        "time.monotonic_now" => {
+            metadata.insert("replay.clock_source".into(), "monotonic".into());
+            metadata.insert("replay.monotonic_unit".into(), "nanos".into());
+        }
+        "time.resolve_timezone" | "time.convert_timezone" | "time.parse" => {
+            metadata.insert(
+                "replay.timezone_data_version".into(),
+                "fixed-offset-v1".into(),
+            );
+        }
+        "time.clock_health" if !exact => {
+            metadata.insert("replay.clock_source".into(), "frozen".into());
+        }
+        _ => {}
+    }
+    metadata
 }
 
 fn duration_between(payload: &serde_json::Value) -> ServiceResult<serde_json::Value> {
