@@ -10,7 +10,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use macaca_kernel::SystemService;
 use macaca_proto::{
-    ServiceCallResult, ServiceCommand, ServiceDescriptor, ServiceHealth, ServiceResult,
+    RandomProviderSnapshot, ServiceCallResult, ServiceCommand, ServiceDescriptor, ServiceHealth,
+    ServiceResult,
 };
 use macaca_random::{RandomService, UnavailableRandomProvider};
 use tracing::info;
@@ -29,6 +30,11 @@ impl RandomSystemServiceProvider {
     /// Build the fail-closed optional-module provider.
     pub fn unavailable() -> Self {
         Self::new(Arc::new(UnavailableRandomProvider::default()))
+    }
+
+    /// Return the provider's sanitized replay Memento without generated values.
+    pub fn snapshot(&self) -> RandomProviderSnapshot {
+        self.provider.snapshot()
     }
 }
 
@@ -112,5 +118,13 @@ mod tests {
             .unwrap();
         assert_eq!(result.status, "unavailable");
         assert_eq!(result.trace.trace_id.as_str(), "trace-random-unavailable");
+    }
+
+    #[test]
+    fn provider_snapshot_excludes_random_material() {
+        let provider = RandomSystemServiceProvider::new(Arc::new(HostRandomProvider));
+        let snapshot = provider.snapshot();
+        assert_eq!(snapshot.provider_class, "host-csprng");
+        assert!(snapshot.stream_position_hashes.is_empty());
     }
 }
