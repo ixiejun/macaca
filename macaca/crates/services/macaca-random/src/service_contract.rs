@@ -2,10 +2,10 @@
 
 use async_trait::async_trait;
 use macaca_proto::{
-    CapabilityId, CleanupPolicy, KernelServiceId, ServiceCallResult, ServiceCapability,
-    ServiceCommand, ServiceDescriptor, ServiceError, ServiceHealth, ServiceLifecycleState,
-    ServiceResult, ServiceScope, ServiceType, TraceSchemaRef, FOUNDATION_RANDOM_COMMANDS,
-    FOUNDATION_RANDOM_SERVICE_ID,
+    CapabilityId, CleanupPolicy, KernelServiceId, RandomEntropyHealth, RandomProviderSnapshot,
+    ServiceCallResult, ServiceCapability, ServiceCommand, ServiceDescriptor, ServiceError,
+    ServiceHealth, ServiceLifecycleState, ServiceResult, ServiceScope, ServiceType, TraceSchemaRef,
+    FOUNDATION_RANDOM_COMMANDS, FOUNDATION_RANDOM_SERVICE_ID,
 };
 
 /// Provider-neutral random service boundary.
@@ -17,6 +17,8 @@ pub trait RandomService: Send + Sync {
     async fn call(&self, command: ServiceCommand) -> ServiceResult<ServiceCallResult>;
     /// Return a bounded health projection without generated values.
     fn health(&self) -> ServiceHealth;
+    /// Return a bounded replay Memento that excludes generated values and seeds.
+    fn snapshot(&self) -> RandomProviderSnapshot;
     /// Stop provider-owned state and release resources.
     async fn shutdown(&self) -> ServiceResult<()>;
 }
@@ -79,6 +81,21 @@ impl RandomService for UnavailableRandomProvider {
     fn health(&self) -> ServiceHealth {
         ServiceHealth::Unavailable {
             reason: self.reason.clone(),
+        }
+    }
+
+    fn snapshot(&self) -> RandomProviderSnapshot {
+        RandomProviderSnapshot {
+            descriptor_hash: "foundation-random-unavailable-v1".into(),
+            provider_class: "unavailable".into(),
+            health: RandomEntropyHealth {
+                provider_class: "unavailable".into(),
+                entropy_available: false,
+                blocking_risk: false,
+                max_bytes_per_request: 0,
+                unavailable_reason: Some(self.reason.clone()),
+            },
+            stream_position_hashes: Default::default(),
         }
     }
 

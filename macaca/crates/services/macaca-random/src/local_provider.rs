@@ -11,8 +11,9 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use base64::Engine;
 use macaca_proto::{
-    CapabilityId, CleanupPolicy, ServiceCallResult, ServiceCommand, ServiceError, ServiceHealth,
-    ServiceResult, TraceContext, FOUNDATION_RANDOM_COMMANDS, FOUNDATION_RANDOM_SERVICE_ID,
+    CapabilityId, CleanupPolicy, RandomEntropyHealth, RandomProviderSnapshot, ServiceCallResult,
+    ServiceCommand, ServiceError, ServiceHealth, ServiceResult, TraceContext,
+    FOUNDATION_RANDOM_COMMANDS, FOUNDATION_RANDOM_SERVICE_ID,
 };
 use serde_json::Value;
 use tracing::info;
@@ -46,6 +47,9 @@ impl RandomService for HostRandomProvider {
     fn health(&self) -> ServiceHealth {
         ServiceHealth::Healthy
     }
+    fn snapshot(&self) -> RandomProviderSnapshot {
+        snapshot("host-csprng", true, BTreeMap::new())
+    }
     async fn shutdown(&self) -> ServiceResult<()> {
         Ok(())
     }
@@ -77,6 +81,24 @@ impl RandomService for DeterministicRandomProvider {
 
     fn health(&self) -> ServiceHealth {
         ServiceHealth::Healthy
+    }
+    fn snapshot(&self) -> RandomProviderSnapshot {
+        let hashes = self
+            .streams
+            .lock()
+            .map(|streams| {
+                streams
+                    .iter()
+                    .map(|(id, value)| {
+                        (
+                            format!("stream:{:016x}", stable_hash(id)),
+                            value.len().to_string(),
+                        )
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        snapshot("deterministic-test", true, hashes)
     }
     async fn shutdown(&self) -> ServiceResult<()> {
         self.streams
@@ -225,6 +247,33 @@ fn bounded_integer(
 
 fn encode(bytes: Vec<u8>) -> String {
     base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes)
+}
+
+/// Create a replay-safe Memento using only provider class and bounded stream facts.
+fn snapshot(
+    provider_class: &str,
+    entropy_available: bool,
+    stream_position_hashes: BTreeMap<String, String>,
+) -> RandomProviderSnapshot {
+    RandomProviderSnapshot {
+        descriptor_hash: format!("foundation-random-{provider_class}-v1"),
+        provider_class: provider_class.into(),
+        health: RandomEntropyHealth {
+            provider_class: provider_class.into(),
+            entropy_available,
+            blocking_risk: false,
+            max_bytes_per_request: MAX_BYTES,
+            unavailable_reason: None,
+        },
+        stream_position_hashes,
+    }
+}
+
+/// Hash opaque stream identifiers before snapshotting so callers never see handles.
+fn stable_hash(value: &str) -> u64 {
+    value.bytes().fold(0_u64, |state, byte| {
+        state.wrapping_mul(1099511628211).wrapping_add(byte as u64)
+    })
 }
 
 fn descriptor(provider: &str, healthy: bool) -> macaca_proto::ServiceDescriptor {
