@@ -335,6 +335,12 @@ pub use entitlement_client::{
 };
 pub use evm_client::{ServiceBackedEvmClient, SystemEvmClient, UnavailableSystemEvmClient};
 pub use facade::{AgentRegistryApi, MacacaSdk};
+pub use foundation_random_client::{
+    random_bytes_command, random_entropy_health_command, random_integer_command,
+    random_nonce_command, random_provider_capabilities_command, random_test_stream_command,
+    random_token_command, random_uuid_v4_command, RandomDomainPackCommandBuildOutcome,
+    RandomDomainPackCommandBuilder,
+};
 pub use foundation_time_client::{
     clock_health_command, deadline_evaluation_command, localized_format_command,
     mock_clock_setup_command, monotonic_now_command, monotonic_timeout_command, now_command,

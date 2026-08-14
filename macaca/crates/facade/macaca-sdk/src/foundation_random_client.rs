@@ -82,6 +82,81 @@ pub fn random_bytes_command(
     RandomDomainPackCommandBuilder::new("random.bytes", payload, decision, trace)
 }
 
+/// Build an identifier command through the canonical service boundary.
+pub fn random_uuid_v4_command(
+    payload: serde_json::Value,
+    trace: TraceContext,
+) -> RandomDomainPackCommandBuilder {
+    read_only_command("random.uuid_v4", payload, trace)
+}
+
+/// Build a nonce command through the canonical service boundary.
+pub fn random_nonce_command(
+    payload: serde_json::Value,
+    trace: TraceContext,
+) -> RandomDomainPackCommandBuilder {
+    read_only_command("random.nonce", payload, trace)
+}
+
+/// Build a token command after caller-owned policy preflight.
+pub fn random_token_command(
+    payload: serde_json::Value,
+    decision: Result<RandomResourceReservation, RandomAdmissionFailure>,
+    trace: TraceContext,
+) -> RandomDomainPackCommandBuilder {
+    RandomDomainPackCommandBuilder::new("random.token", payload, decision, trace)
+}
+
+/// Build a bias-free integer request through the canonical service boundary.
+pub fn random_integer_command(
+    payload: serde_json::Value,
+    trace: TraceContext,
+) -> RandomDomainPackCommandBuilder {
+    read_only_command("random.integer", payload, trace)
+}
+
+/// Build a deterministic stream command only after explicit test-context admission.
+pub fn random_test_stream_command(
+    payload: serde_json::Value,
+    decision: Result<RandomResourceReservation, RandomAdmissionFailure>,
+    trace: TraceContext,
+) -> RandomDomainPackCommandBuilder {
+    RandomDomainPackCommandBuilder::new("random.test_stream_create", payload, decision, trace)
+}
+
+/// Build a bounded entropy diagnostic query without exposing provider handles.
+pub fn random_entropy_health_command(
+    payload: serde_json::Value,
+    trace: TraceContext,
+) -> RandomDomainPackCommandBuilder {
+    read_only_command("random.entropy_health", payload, trace)
+}
+
+/// Build a provider capability query without exposing native RNG state.
+pub fn random_provider_capabilities_command(
+    payload: serde_json::Value,
+    trace: TraceContext,
+) -> RandomDomainPackCommandBuilder {
+    read_only_command("random.provider_capabilities", payload, trace)
+}
+
+/// Centralize the zero-cost reservation used by read-only or bounded commands.
+fn read_only_command(
+    command_name: &str,
+    payload: serde_json::Value,
+    trace: TraceContext,
+) -> RandomDomainPackCommandBuilder {
+    RandomDomainPackCommandBuilder::new(
+        command_name,
+        payload,
+        Ok(RandomResourceReservation {
+            request_units: 1,
+            ..Default::default()
+        }),
+        trace,
+    )
+}
+
 #[cfg(test)]
 #[path = "foundation_random_client_tests.rs"]
 mod tests;
