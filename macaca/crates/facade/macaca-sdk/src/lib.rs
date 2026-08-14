@@ -336,7 +336,8 @@ pub use entitlement_client::{
 pub use evm_client::{ServiceBackedEvmClient, SystemEvmClient, UnavailableSystemEvmClient};
 pub use facade::{AgentRegistryApi, MacacaSdk};
 pub use foundation_time_client::{
-    clock_health_command, localized_format_command, monotonic_timeout_command,
+    clock_health_command, deadline_evaluation_command, localized_format_command,
+    mock_clock_setup_command, monotonic_now_command, monotonic_timeout_command, now_command,
     strict_parse_command, timer_cancel_command, timer_create_command, timezone_conversion_command,
     TimeDomainPackCommandBuildOutcome, TimeDomainPackCommandBuilder,
 };

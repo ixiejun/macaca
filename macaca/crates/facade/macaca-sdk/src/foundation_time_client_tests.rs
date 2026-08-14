@@ -6,7 +6,10 @@ use macaca_proto::{
 };
 use macaca_proto::{TimeAdmissionFailure, TimeResourceReservation};
 
-use super::{timer_create_command, timezone_conversion_command, TimeDomainPackCommandBuildOutcome};
+use super::{
+    mock_clock_setup_command, now_command, timer_create_command, timezone_conversion_command,
+    TimeDomainPackCommandBuildOutcome,
+};
 use crate::domain_pack_client::{DomainPackResolveResult, SystemDomainPackClient};
 use crate::{CatalogBackedDomainPackClient, DomainPackResolveCommand};
 
@@ -37,6 +40,34 @@ async fn helpers_build_canonical_time_service_calls() {
     };
     assert_eq!(command.service_id, FOUNDATION_TIME_SERVICE_ID);
     assert_eq!(command.command_name, "time.convert_timezone");
+}
+
+#[tokio::test]
+async fn clock_read_helpers_build_traced_canonical_calls() {
+    for (trace_id, builder) in [
+        (
+            "trace-sdk-time-now",
+            now_command(
+                serde_json::json!({}),
+                TraceContext::new("trace-sdk-time-now"),
+            ),
+        ),
+        (
+            "trace-sdk-time-mock",
+            mock_clock_setup_command(
+                serde_json::json!({"source":"frozen-test-clock"}),
+                TraceContext::new("trace-sdk-time-mock"),
+            ),
+        ),
+    ] {
+        let outcome = builder.build(&resolved().await).unwrap();
+        let TimeDomainPackCommandBuildOutcome::Ready(command) = outcome else {
+            panic!("expected ready")
+        };
+        assert_eq!(command.service_id, FOUNDATION_TIME_SERVICE_ID);
+        assert_eq!(command.command_name, "time.now");
+        assert_eq!(command.trace.unwrap().trace_id.as_str(), trace_id);
+    }
 }
 
 #[tokio::test]

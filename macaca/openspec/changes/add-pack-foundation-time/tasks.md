@@ -48,7 +48,7 @@
 - [x] 3.3 Add policy checks for clock mode, timer count, maximum timer duration,
   exactness request, mock-clock context, locale/calendar availability, timezone
   data availability, and provider capability.
-- [ ] 3.4 Add resource reservations before timer creation and release resources
+- [x] 3.4 Add resource reservations before timer creation and release resources
   on fire, cancel, timeout, provider failure, and session shutdown.
 - [ ] 3.5 Add tests proving denied, unavailable, quota, unsupported, and invalid
   timezone/calendar paths do not invoke a concrete provider where they should be
@@ -75,7 +75,7 @@
   timer exactness, provider availability, health, diagnostics, and docs link.
 - [x] 5.2 Add SDK command builders for every `time.*` command; builders must only
   produce canonical traced service calls.
-- [ ] 5.3 Add SDK helpers for monotonic timeout, timezone conversion, localized
+- [x] 5.3 Add SDK helpers for monotonic timeout, timezone conversion, localized
   formatting, strict parsing, timer create/cancel, deadline evaluation, and mock
   clock setup in test contexts.
 - [x] 5.4 Extend effective capability projection so applications can inspect

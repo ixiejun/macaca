@@ -83,6 +83,35 @@ pub fn monotonic_timeout_command(
         trace,
     )
 }
+
+/// Read a provider-neutral wall-clock instant through the service runtime.
+pub fn now_command(
+    payload: serde_json::Value,
+    trace: TraceContext,
+) -> TimeDomainPackCommandBuilder {
+    TimeDomainPackCommandBuilder::new("time.now", payload, Ok(default_reservation()), trace)
+}
+
+/// Read a provider-neutral monotonic instant through the service runtime.
+pub fn monotonic_now_command(
+    payload: serde_json::Value,
+    trace: TraceContext,
+) -> TimeDomainPackCommandBuilder {
+    TimeDomainPackCommandBuilder::new(
+        "time.monotonic_now",
+        payload,
+        Ok(default_reservation()),
+        trace,
+    )
+}
+
+/// Evaluate a deadline using the explicit deadline command.
+pub fn deadline_evaluation_command(
+    payload: serde_json::Value,
+    trace: TraceContext,
+) -> TimeDomainPackCommandBuilder {
+    monotonic_timeout_command(payload, trace)
+}
 /// Create timezone conversion through the common runtime path.
 pub fn timezone_conversion_command(
     payload: serde_json::Value,
@@ -140,6 +169,15 @@ pub fn clock_health_command(
         Ok(default_reservation()),
         trace,
     )
+}
+
+/// Build a frozen-clock test-context read without exposing a native clock handle.
+/// The runtime/provider decides whether the caller is authorized to use the test source.
+pub fn mock_clock_setup_command(
+    payload: serde_json::Value,
+    trace: TraceContext,
+) -> TimeDomainPackCommandBuilder {
+    TimeDomainPackCommandBuilder::new("time.now", payload, Ok(default_reservation()), trace)
 }
 
 fn default_reservation() -> TimeResourceReservation {

@@ -102,6 +102,30 @@ async fn snapshots_hash_timer_ids_and_shutdown_releases_timer_state() {
 }
 
 #[tokio::test]
+async fn fired_timer_releases_its_reservation_from_the_ledger() {
+    let provider = FrozenTimeProvider::new(1_000);
+    let created = provider
+        .call(command(
+            "time.create_timer",
+            serde_json::json!({"duration":{"millis":10}}),
+        ))
+        .await
+        .unwrap();
+    let timer_id = created.output["timer_id"].clone();
+    assert_eq!(provider.snapshot().timer_state_hashes.len(), 1);
+    provider.advance_millis(10).unwrap();
+    let inspected = provider
+        .call(command(
+            "time.inspect_timer",
+            serde_json::json!({"timer":{"timer_id":timer_id}}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(inspected.output["state"], "fired");
+    assert!(provider.snapshot().timer_state_hashes.is_empty());
+}
+
+#[tokio::test]
 async fn every_declared_command_is_trace_addressable_and_never_echoes_parse_input() {
     let provider = FrozenTimeProvider::new(1_000);
     let cases = [

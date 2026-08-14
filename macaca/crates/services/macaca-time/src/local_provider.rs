@@ -19,6 +19,9 @@ use macaca_proto::{
 use tracing::info;
 
 use crate::service_contract::TimeService;
+use crate::time_conversion::{
+    calendar_convert, convert_timezone, format_time, parse_time, resolve_timezone,
+};
 
 const MAX_TIMER_DURATION_MS: i128 = 86_400_000;
 const MAX_ACTIVE_TIMERS: usize = 256;
@@ -33,7 +36,7 @@ pub struct HostTimeProvider {
 /// Deterministic frozen clock for test and replay compositions only.
 #[derive(Debug)]
 pub struct FrozenTimeProvider {
-    epoch_millis: i128,
+    epoch_millis: Arc<Mutex<i128>>,
     timers: TimerStore,
 }
 
@@ -41,6 +44,7 @@ type TimerStore = Arc<Mutex<BTreeMap<String, TimerRecord>>>;
 
 #[derive(Debug, Clone)]
 struct TimerRecord {
+    reservation_id: String,
     due_epoch_millis: i128,
     exactness: String,
     state: &'static str,
@@ -59,9 +63,26 @@ impl FrozenTimeProvider {
     /// Create a deterministic test clock without accessing the host clock.
     pub fn new(epoch_millis: i128) -> Self {
         Self {
-            epoch_millis,
+            epoch_millis: Arc::new(Mutex::new(epoch_millis)),
             timers: Arc::new(Mutex::new(BTreeMap::new())),
         }
+    }
+
+    /// Advance the deterministic test/replay clock without touching host time.
+    pub fn advance_millis(&self, duration_millis: i128) -> ServiceResult<()> {
+        let mut epoch = self
+            .epoch_millis
+            .lock()
+            .map_err(|_| ServiceError::AdapterFailure("frozen clock lock poisoned".into()))?;
+        *epoch = epoch
+            .checked_add(duration_millis)
+            .ok_or_else(|| ServiceError::InvalidArgument("frozen clock overflow".into()))?;
+        info!(
+            service_id = FOUNDATION_TIME_SERVICE_ID,
+            advanced_millis = duration_millis,
+            "time_pack_frozen_clock_advanced"
+        );
+        Ok(())
     }
 }
 
@@ -96,7 +117,11 @@ impl TimeService for FrozenTimeProvider {
         descriptor("frozen-test-clock", true)
     }
     async fn call(&self, command: ServiceCommand) -> ServiceResult<ServiceCallResult> {
-        dispatch(command, self.epoch_millis, 0, &self.timers, false)
+        let epoch_millis = *self
+            .epoch_millis
+            .lock()
+            .map_err(|_| ServiceError::AdapterFailure("frozen clock lock poisoned".into()))?;
+        dispatch(command, epoch_millis, 0, &self.timers, false)
     }
     fn health(&self) -> ServiceHealth {
         ServiceHealth::Healthy
@@ -181,106 +206,6 @@ fn add_duration(payload: &serde_json::Value) -> ServiceResult<serde_json::Value>
     )
 }
 
-/// Resolve only explicit UTC or fixed-offset zones without binding a platform zone database.
-fn resolve_timezone(payload: &serde_json::Value) -> ServiceResult<serde_json::Value> {
-    let zone = payload
-        .get("zone_query")
-        .and_then(|value| value.as_str())
-        .ok_or_else(|| ServiceError::InvalidArgument("timezone query is required".into()))?;
-    let offset = timezone_offset_seconds(zone).ok_or_else(|| {
-        ServiceError::InvalidArgument("timezone is unavailable in this provider".into())
-    })?;
-    Ok(
-        serde_json::json!({"status":"success","zone_id":zone,"offset_seconds":offset,"data_version":"fixed-offset-v1"}),
-    )
-}
-
-/// Convert an instant using UTC or an explicitly requested fixed offset.
-fn convert_timezone(payload: &serde_json::Value) -> ServiceResult<serde_json::Value> {
-    let epoch_millis = payload
-        .pointer("/instant/epoch_millis")
-        .and_then(|value| value.as_i64())
-        .ok_or_else(|| ServiceError::InvalidArgument("instant is required".into()))?;
-    let zone = payload
-        .pointer("/target_timezone/zone_id")
-        .and_then(|value| value.as_str())
-        .ok_or_else(|| ServiceError::InvalidArgument("target timezone is required".into()))?;
-    let offset = timezone_offset_seconds(zone).ok_or_else(|| {
-        ServiceError::InvalidArgument("timezone is unavailable in this provider".into())
-    })?;
-    Ok(
-        serde_json::json!({"status":"success","epoch_millis":epoch_millis,"zone_id":zone,"offset_seconds":offset,"timezone_data_version":"fixed-offset-v1"}),
-    )
-}
-
-/// Calendar conversion deliberately supports ISO-8601 only until a calendar adapter is installed.
-fn calendar_convert(payload: &serde_json::Value) -> ServiceResult<serde_json::Value> {
-    let calendar = payload
-        .pointer("/target_calendar/calendar_id")
-        .and_then(|value| value.as_str())
-        .ok_or_else(|| ServiceError::InvalidArgument("target calendar is required".into()))?;
-    if !matches!(calendar, "iso8601" | "gregorian") {
-        return Ok(
-            serde_json::json!({"status":"unsupported","reason":"calendar_adapter_not_installed"}),
-        );
-    }
-    Ok(serde_json::json!({"status":"success","calendar_id":calendar}))
-}
-
-/// Format only named stable formats so raw user patterns never enter provider diagnostics.
-fn format_time(payload: &serde_json::Value) -> ServiceResult<serde_json::Value> {
-    let epoch_millis = payload
-        .pointer("/instant/epoch_millis")
-        .and_then(|value| value.as_i64())
-        .ok_or_else(|| ServiceError::InvalidArgument("instant is required".into()))?;
-    let format_ref = payload
-        .pointer("/format/pattern_ref")
-        .and_then(|value| value.as_str())
-        .unwrap_or("format:rfc3339");
-    if format_ref != "format:rfc3339" {
-        return Ok(
-            serde_json::json!({"status":"unsupported","reason":"format_reference_unsupported"}),
-        );
-    }
-    let instant = chrono::DateTime::from_timestamp_millis(epoch_millis)
-        .ok_or_else(|| ServiceError::InvalidArgument("instant is out of range".into()))?;
-    Ok(
-        serde_json::json!({"status":"success","formatted":instant.to_rfc3339(),"format_ref":format_ref,"locale":"invariant"}),
-    )
-}
-
-/// Parse RFC3339 only; the returned result never echoes the supplied text.
-fn parse_time(payload: &serde_json::Value) -> ServiceResult<serde_json::Value> {
-    let input = payload
-        .get("input_ref")
-        .and_then(|value| value.as_str())
-        .ok_or_else(|| ServiceError::InvalidArgument("parse input is required".into()))?;
-    let parsed = chrono::DateTime::parse_from_rfc3339(input)
-        .map_err(|_| ServiceError::InvalidArgument("strict RFC3339 parsing failed".into()))?;
-    Ok(
-        serde_json::json!({"status":"success","epoch_millis":parsed.timestamp_millis(),"timezone_data_version":"fixed-offset-v1"}),
-    )
-}
-
-fn timezone_offset_seconds(zone: &str) -> Option<i32> {
-    if matches!(zone, "UTC" | "Etc/UTC" | "Z") {
-        return Some(0);
-    }
-    let raw = zone.strip_prefix("UTC")?;
-    let sign = match raw.as_bytes().first()? {
-        b'+' => 1_i32,
-        b'-' => -1_i32,
-        _ => return None,
-    };
-    let (hours, minutes) = raw[1..].split_once(':')?;
-    let hours = hours.parse::<i32>().ok()?;
-    let minutes = minutes.parse::<i32>().ok()?;
-    if hours > 23 || minutes > 59 {
-        return None;
-    }
-    Some(sign * (hours * 3_600 + minutes * 60))
-}
-
 fn create_timer(
     payload: &serde_json::Value,
     now: i128,
@@ -305,7 +230,10 @@ fn create_timer(
             "active timer quota exceeded".into(),
         ));
     }
+    // The timer map is the provider-local reservation ledger. Every terminal
+    // transition removes one record, releasing its reservation exactly once.
     let id = format!("timer-{}", entries.len() + 1);
+    let reservation_id = format!("reservation-{id}");
     let exactness = payload
         .get("exactness")
         .and_then(|v| v.as_str())
@@ -316,11 +244,16 @@ fn create_timer(
     entries.insert(
         id.clone(),
         TimerRecord {
+            reservation_id: reservation_id.clone(),
             due_epoch_millis: now + duration,
             exactness: exactness.into(),
             state: "active",
         },
     );
+    info!(service_id = FOUNDATION_TIME_SERVICE_ID,
+        timer_id_hash = %stable_timer_hash(&id),
+        reservation_id_hash = %stable_timer_hash(&reservation_id),
+        "time_pack_timer_created");
     Ok(
         serde_json::json!({"status":"success","timer_id":id,"exact":exact && exactness != "inexact_allowed"}),
     )
@@ -338,6 +271,12 @@ fn cancel_timer(
         .lock()
         .map_err(|_| ServiceError::AdapterFailure("timer lock poisoned".into()))?
         .remove(id);
+    if let Some(record) = &removed {
+        info!(service_id = FOUNDATION_TIME_SERVICE_ID,
+            timer_id_hash = %stable_timer_hash(id),
+            reservation_id_hash = %stable_timer_hash(&record.reservation_id),
+            "time_pack_timer_cancelled");
+    }
     Ok(if removed.is_some() {
         serde_json::json!({"status":"success","state":"cancelled"})
     } else {
@@ -354,11 +293,21 @@ fn inspect_timer(
         .pointer("/timer/timer_id")
         .and_then(|v| v.as_str())
         .ok_or_else(|| ServiceError::InvalidArgument("timer id is required".into()))?;
-    let entry = timers
+    let mut entries = timers
         .lock()
-        .map_err(|_| ServiceError::AdapterFailure("timer lock poisoned".into()))?
-        .get(id)
-        .cloned();
+        .map_err(|_| ServiceError::AdapterFailure("timer lock poisoned".into()))?;
+    let entry = entries.get(id).cloned();
+    if entry
+        .as_ref()
+        .is_some_and(|record| now >= record.due_epoch_millis)
+    {
+        if let Some(record) = entries.remove(id) {
+            info!(service_id = FOUNDATION_TIME_SERVICE_ID,
+                timer_id_hash = %stable_timer_hash(id),
+                reservation_id_hash = %stable_timer_hash(&record.reservation_id),
+                "time_pack_timer_fired");
+        }
+    }
     Ok(match entry {
         Some(record) => {
             serde_json::json!({"status":"success","state":if now >= record.due_epoch_millis {"fired"} else {record.state},"exactness":record.exactness})
@@ -379,10 +328,23 @@ fn evaluate_deadline(payload: &serde_json::Value, now: i128) -> ServiceResult<se
 }
 
 fn clear_timers(timers: &TimerStore) -> ServiceResult<()> {
-    timers
+    let mut entries = timers
         .lock()
-        .map(|mut value| value.clear())
-        .map_err(|_| ServiceError::AdapterFailure("timer lock poisoned".into()))
+        .map_err(|_| ServiceError::AdapterFailure("timer lock poisoned".into()))?;
+    let released_reservations = entries.len();
+    entries.clear();
+    info!(
+        service_id = FOUNDATION_TIME_SERVICE_ID,
+        released_reservations, "time_pack_timer_resources_released_on_shutdown"
+    );
+    Ok(())
+}
+
+fn stable_timer_hash(value: &str) -> String {
+    let digest = value.bytes().fold(0_u64, |state, byte| {
+        state.wrapping_mul(1099511628211).wrapping_add(byte as u64)
+    });
+    format!("{digest:016x}")
 }
 
 /// Build a bounded Memento from provider metadata and hashed timer state only.
@@ -398,13 +360,8 @@ fn snapshot(
             entries
                 .iter()
                 .map(|(id, record)| {
-                    let digest = id
-                        .bytes()
-                        .chain(record.state.bytes())
-                        .fold(0_u64, |value, byte| {
-                            value.wrapping_mul(1099511628211).wrapping_add(byte as u64)
-                        });
-                    (format!("timer:{digest:016x}"), record.state.to_string())
+                    let digest = stable_timer_hash(&format!("{id}:{}", record.state));
+                    (format!("timer:{digest}"), record.state.to_string())
                 })
                 .collect()
         })

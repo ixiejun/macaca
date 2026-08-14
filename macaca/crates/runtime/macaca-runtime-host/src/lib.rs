@@ -184,6 +184,9 @@ pub mod summarization_strategy;
 pub mod task_service_provider;
 pub mod task_toolkit_bootstrap;
 pub mod time_service_provider;
+
+#[cfg(test)]
+mod time_service_audit_tests;
 pub mod tool_bootstrap;
 pub mod tool_family_providers;
 pub mod tool_service_availability;
