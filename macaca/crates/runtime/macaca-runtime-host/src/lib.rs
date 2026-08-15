@@ -120,6 +120,8 @@ pub mod payment_admission;
 pub mod payment_policy;
 pub mod payment_service_provider;
 pub use payment_service_provider::payment_service_descriptor;
+#[cfg(test)]
+mod foundation_config_service_audit_tests;
 pub mod plugin;
 pub mod plugin_capability;
 pub mod plugin_capability_service_provider;
