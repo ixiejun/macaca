@@ -82,7 +82,7 @@
 - [x] 5.4 Extend effective capability projection so applications can inspect
   callable commands, denied commands, unavailable sources, provider capability
   flags, schema availability, and replay references.
-- [ ] 5.5 Expose WASM host imports only for declared callable config commands and
+- [x] 5.5 Expose WASM host imports only for declared callable config commands and
   route every import through the service runtime path.
 - [x] 5.6 Add app-framework tests proving YAML, WASM, GenUI, and headless apps all
   use the same config execution path.
