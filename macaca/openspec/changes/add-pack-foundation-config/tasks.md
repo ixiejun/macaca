@@ -92,7 +92,7 @@
 - [ ] 6.1 Emit sanitized events for declaration, admission, policy, resource,
   service calls, source reloads, watch lifecycle, snapshots, validation failures,
   success, failure, denied, and unavailable states.
-- [ ] 6.2 Add audit redaction tests proving raw secret values, unbounded config
+- [x] 6.2 Add audit redaction tests proving raw secret values, unbounded config
   values, raw environment dumps, prompts, manifests, package bytes, credentials,
   private keys, and provider payloads do not enter observability surfaces.
 - [ ] 6.3 Add replay tests proving config commands are trace-addressable and can

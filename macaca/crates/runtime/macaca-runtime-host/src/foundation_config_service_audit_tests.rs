@@ -42,12 +42,25 @@ async fn config_router_replay_redacts_payload_and_retains_only_trace_metadata() 
     )
     .with_audit_sink(Arc::new(InMemoryServiceCallAuditSink::new()));
     let trace_id = "trace-config-audit";
-    router.route(ServiceRouteRequest { app_id: Some("app:generic".into()), tenant_id: None, session_id: None, service_id: KernelServiceId::new("service.foundation.config"), operation: ServiceCommandName::new("config.get"), payload: serde_json::json!({"key":{"namespace":"app","key":"ui.theme"},"secret":"raw-secret-marker","credential":"private-key-marker"}), metadata: BTreeMap::new(), trace: TraceContext::new(trace_id) }).await.unwrap();
+    // These values model sensitive data from independent sources. The router may retain
+    // bounded command evidence, but must never serialize source payloads into audit/replay.
+    router.route(ServiceRouteRequest { app_id: Some("app:generic".into()), tenant_id: None, session_id: None, service_id: KernelServiceId::new("service.foundation.config"), operation: ServiceCommandName::new("config.get"), payload: serde_json::json!({"key":{"namespace":"app","key":"ui.theme"},"secret":"raw-secret-marker","credential":"private-key-marker","environment":{"TOKEN":"raw-environment-marker"},"prompt":"raw-prompt-marker","manifest":"raw-manifest-marker","package_bytes":"raw-package-marker","provider_payload":"raw-provider-marker","private_key":"raw-private-key-marker","unbounded_value":"raw-config-value-marker"}), metadata: BTreeMap::new(), trace: TraceContext::new(trace_id) }).await.unwrap();
     let replay = router.replay_audit_by_trace_id(trace_id).unwrap();
     let text = format!("{replay:?}");
     assert!(!text.contains("raw-secret-marker"));
     assert!(!text.contains("private-key-marker"));
     assert!(!text.contains("theme-default"));
+    for forbidden in [
+        "raw-environment-marker",
+        "raw-prompt-marker",
+        "raw-manifest-marker",
+        "raw-package-marker",
+        "raw-provider-marker",
+        "raw-private-key-marker",
+        "raw-config-value-marker",
+    ] {
+        assert!(!text.contains(forbidden), "audit exposed {forbidden}");
+    }
     let success = replay
         .iter()
         .find(|event| event.stage == "service_call_succeeded")
