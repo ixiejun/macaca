@@ -55,6 +55,31 @@ async fn unavailable_provider_fails_closed_with_trace_evidence() {
 }
 
 #[tokio::test]
+async fn every_declared_config_command_is_trace_addressable_for_replay() {
+    let provider = MockConfigProvider::default();
+    provider
+        .insert_reference("setting", "artifact:replay-reference")
+        .unwrap();
+    for operation in macaca_proto::FOUNDATION_CONFIG_COMMANDS {
+        let payload = match *operation {
+            "config.get" | "config.resolve_effective" | "config.explain_provenance" => {
+                serde_json::json!({"key":{"key":"setting"}})
+            }
+            _ => serde_json::json!({}),
+        };
+        let reply = provider.call(command(operation, payload)).await.unwrap();
+        assert_eq!(
+            reply.metadata.get("replay.config_command"),
+            Some(&operation.to_string())
+        );
+        assert_eq!(reply.trace.trace_id.as_str(), format!("trace-{operation}"));
+    }
+    let snapshot = provider.snapshot();
+    assert_eq!(snapshot.provider_class, "mock");
+    assert!(!snapshot.source_hashes.is_empty());
+}
+
+#[tokio::test]
 async fn layered_adapters_apply_declared_precedence_and_clear_on_shutdown() {
     // The source list deliberately contains no app-specific identity. Runtime composition
     // supplies generic source IDs and determines precedence without exposing native handles.
