@@ -45,7 +45,7 @@
   byte length, token length, alphabet class, integer bounds, rate limits, max
   blocking duration, and provider capability.
 - [x] 3.4 Reject deterministic seeded streams outside test/replay contexts.
-- [ ] 3.5 Add resource reservations/rate limits before large random byte or token
+- [x] 3.5 Add resource reservations/rate limits before large random byte or token
   generation requests.
 - [x] 3.6 Add tests proving denied, unavailable, quota, blocked, and unsupported
   paths do not use insecure fallback providers.
