@@ -52,7 +52,7 @@
 
 ## 4. Service Provider And Runtime Integration
 
-- [ ] 4.1 Define the random service trait/provider interface behind the service
+- [x] 4.1 Define the random service trait/provider interface behind the service
   runtime.
 - [x] 4.2 Implement unavailable provider behavior for absent random service,
   entropy unavailable, blocked provider, unsupported UUID/integer/token feature,
