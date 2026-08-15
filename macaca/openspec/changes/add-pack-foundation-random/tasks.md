@@ -76,7 +76,7 @@
 - [ ] 5.4 Extend effective capability projection so applications can inspect
   callable commands, denied commands, unavailable entropy/provider states,
   provider capability flags, and replay references.
-- [ ] 5.5 Expose WASM host imports only for declared callable random commands and
+- [x] 5.5 Expose WASM host imports only for declared callable random commands and
   route every import through the service runtime path.
 - [ ] 5.6 Add app-framework tests proving YAML, WASM, GenUI, and headless apps all
   use the same random execution path.
