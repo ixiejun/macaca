@@ -48,4 +48,12 @@ async fn config_router_replay_redacts_payload_and_retains_only_trace_metadata() 
     assert!(!text.contains("raw-secret-marker"));
     assert!(!text.contains("private-key-marker"));
     assert!(!text.contains("theme-default"));
+    let success = replay
+        .iter()
+        .find(|event| event.stage == "service_call_succeeded")
+        .unwrap();
+    assert_eq!(
+        success.replay_metadata.get("replay.config_command"),
+        Some(&"config.get".into())
+    );
 }
