@@ -84,7 +84,9 @@ mod tests {
 
     use macaca_kernel::SystemService;
     use macaca_proto::{ServiceCommand, ServiceCommandName, TraceContext};
-    use macaca_random::{HostRandomProvider, UnavailableRandomProvider};
+    use macaca_random::{
+        DeterministicRandomProvider, HostRandomProvider, UnavailableRandomProvider,
+    };
 
     use super::RandomSystemServiceProvider;
 
@@ -126,5 +128,27 @@ mod tests {
         let snapshot = provider.snapshot();
         assert_eq!(snapshot.provider_class, "host-csprng");
         assert!(snapshot.stream_position_hashes.is_empty());
+    }
+
+    #[tokio::test]
+    async fn deterministic_provider_lifecycle_clears_snapshot_state_on_stop() {
+        let provider =
+            RandomSystemServiceProvider::new(Arc::new(DeterministicRandomProvider::default()));
+        provider.start().await.unwrap();
+        provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new("random.test_stream_bytes"),
+                serde_json::json!({"stream_id":"test-stream","length":16}),
+                TraceContext::new("trace-random-lifecycle"),
+            ))
+            .await
+            .unwrap();
+        assert!(!provider.snapshot().stream_position_hashes.is_empty());
+        assert!(matches!(
+            provider.health().await.unwrap(),
+            macaca_proto::ServiceHealth::Healthy
+        ));
+        provider.stop().await.unwrap();
+        assert!(provider.snapshot().stream_position_hashes.is_empty());
     }
 }

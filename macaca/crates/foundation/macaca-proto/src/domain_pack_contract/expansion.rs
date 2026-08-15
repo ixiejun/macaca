@@ -213,12 +213,10 @@ fn resolve_pack_set(
                     );
                     unavailable_pack_reasons.insert(pack_id.clone(), REASON.into());
                     unresolved.push(pack_id.clone());
-                    capability_projections.extend(pack_projections(
-                        &pack,
-                        required,
-                        false,
-                        Some(REASON),
-                    ));
+                    // Permission admission is distinct from provider availability. Preserve that
+                    // distinction in the provider-neutral Memento so every application runtime
+                    // can explain a denied command without implying that its service is absent.
+                    capability_projections.extend(denied_pack_projections(&pack, required, REASON));
                     continue;
                 }
                 tracing::info!(
@@ -339,6 +337,33 @@ fn absent_projection(
         unavailable_features: BTreeMap::from([("pack".into(), reason.into())]),
         ..Default::default()
     }
+}
+
+/// Project commands rejected during declaration admission without exposing a provider.
+///
+/// This keeps denied and unavailable states separate for every pack. The caller receives only
+/// descriptor command names and a stable reason; policy details and provider payloads never
+/// cross the ABI boundary.
+fn denied_pack_projections(
+    pack: &DomainPackDefinition,
+    required: bool,
+    reason: &str,
+) -> Vec<DomainPackEffectiveCapabilityProjection> {
+    let mut projections = pack_projections(pack, required, false, None);
+    for projection in &mut projections {
+        let commands = pack
+            .metadata
+            .service_command_schemas
+            .get(&projection.service_id)
+            .cloned()
+            .unwrap_or_default();
+        projection.denied_commands = commands
+            .into_iter()
+            .map(|command| (command, reason.to_string()))
+            .collect();
+        projection.unavailable_commands.clear();
+    }
+    projections
 }
 
 fn provider_flags(

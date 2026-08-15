@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use macaca_kernel::SystemService;
 use macaca_proto::{KernelServiceId, ServiceBusSource, ServiceCommandName, TraceContext};
-use macaca_random::HostRandomProvider;
+use macaca_random::{DeterministicRandomProvider, HostRandomProvider};
 
 use crate::random_service_provider::RandomSystemServiceProvider;
 use crate::{
@@ -64,4 +64,122 @@ async fn random_router_replay_redacts_generated_values_and_sensitive_input() {
         success.replay_metadata.get("replay.random_length"),
         Some(&"16".into())
     );
+}
+
+#[tokio::test]
+async fn every_random_command_is_trace_addressable_without_exposing_outputs() {
+    let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
+    let provider: Arc<dyn SystemService> = Arc::new(RandomSystemServiceProvider::new(Arc::new(
+        HostRandomProvider,
+    )));
+    let descriptor = provider.descriptor();
+    let service_id = runtime
+        .register_provider(
+            &StaticServiceProviderFactory::new(ServiceProviderInstance::new(descriptor, provider)),
+            Default::default(),
+        )
+        .await
+        .unwrap();
+    runtime
+        .start(&service_id, TraceContext::new("trace-random-all-start"))
+        .await
+        .unwrap();
+    let router = ServiceRouter::new(
+        runtime,
+        ServiceBusSource::new("test.foundation.random"),
+        Arc::new(InMemoryServiceContractRegistry::new()),
+        Arc::new(InMemoryServicePolicyEngine::new()) as Arc<dyn ServicePolicyEngine>,
+    )
+    .with_audit_sink(Arc::new(InMemoryServiceCallAuditSink::new()));
+    let cases = [
+        ("random.bytes", serde_json::json!({"length":8})),
+        ("random.fill", serde_json::json!({"length":8})),
+        (
+            "random.integer",
+            serde_json::json!({"min_inclusive":0,"max_exclusive":4}),
+        ),
+        ("random.uuid_v4", serde_json::json!({"count":1})),
+        ("random.nonce", serde_json::json!({"length":8})),
+        ("random.token", serde_json::json!({"char_length":8})),
+        (
+            "random.test_stream_create",
+            serde_json::json!({"seed":"raw-seed-marker"}),
+        ),
+        (
+            "random.test_stream_bytes",
+            serde_json::json!({"stream_id":"raw-stream-marker"}),
+        ),
+        ("random.entropy_health", serde_json::json!({})),
+        ("random.provider_capabilities", serde_json::json!({})),
+    ];
+    for (index, (operation, payload)) in cases.into_iter().enumerate() {
+        let trace_id = format!("trace-random-replay-{index}");
+        let response = router
+            .route(ServiceRouteRequest {
+                app_id: Some("app:generic".into()),
+                tenant_id: None,
+                session_id: None,
+                service_id: KernelServiceId::new("service.foundation.random"),
+                operation: ServiceCommandName::new(operation),
+                payload,
+                metadata: BTreeMap::new(),
+                trace: TraceContext::new(trace_id.clone()),
+            })
+            .await
+            .unwrap();
+        let replay = router.replay_audit_by_trace_id(&trace_id).unwrap();
+        let success = replay
+            .iter()
+            .find(|event| event.stage == "service_call_succeeded")
+            .expect("all declared commands produce a trace-addressable audit event");
+        assert_eq!(success.operation.as_deref(), Some(operation));
+        assert!(success.output_hash.is_some());
+        let text = format!("{replay:?}");
+        assert!(!text.contains("raw-seed-marker"));
+        assert!(!text.contains("raw-stream-marker"));
+        // Byte-like outputs and UUIDs are secret-derived values. The Observer may retain a
+        // one-way hash for correlation, but the response material must never be replayable.
+        if let Some(generated) = response.output.get("data").and_then(|value| value.as_str()) {
+            assert!(
+                !text.contains(generated),
+                "{operation} output leaked into replay"
+            );
+        }
+        if let Some(uuid) = response
+            .output
+            .get("data")
+            .and_then(|value| value.as_array())
+            .and_then(|values| values.first())
+            .and_then(|value| value.as_str())
+        {
+            assert!(!text.contains(uuid), "{operation} UUID leaked into replay");
+        }
+    }
+}
+
+#[tokio::test]
+async fn deterministic_streams_replay_only_with_the_test_provider() {
+    let provider =
+        RandomSystemServiceProvider::new(Arc::new(DeterministicRandomProvider::default()));
+    let replay = provider
+        .call(macaca_proto::ServiceCommand::with_trace(
+            ServiceCommandName::new("random.test_stream_bytes"),
+            serde_json::json!({"stream_id":"stream:approved","length":8,"seed":"raw-seed"}),
+            TraceContext::new("trace-random-deterministic-replay"),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(replay.output["status"], "success");
+    assert!(!replay.output.to_string().contains("raw-seed"));
+
+    let production = RandomSystemServiceProvider::new(Arc::new(HostRandomProvider));
+    let rejected = production
+        .call(macaca_proto::ServiceCommand::with_trace(
+            ServiceCommandName::new("random.test_stream_bytes"),
+            serde_json::json!({"stream_id":"stream:production","length":8}),
+            TraceContext::new("trace-random-production-replay"),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(rejected.output["status"], "deterministic_not_allowed");
 }
