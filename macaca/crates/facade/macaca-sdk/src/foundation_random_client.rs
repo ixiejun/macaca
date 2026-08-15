@@ -132,6 +132,14 @@ pub fn random_entropy_health_command(
     read_only_command("random.entropy_health", payload, trace)
 }
 
+/// Build the explicit unavailable/entropy diagnostic query through the service.
+pub fn random_unavailable_diagnostics_command(
+    payload: serde_json::Value,
+    trace: TraceContext,
+) -> RandomDomainPackCommandBuilder {
+    random_entropy_health_command(payload, trace)
+}
+
 /// Build a provider capability query without exposing native RNG state.
 pub fn random_provider_capabilities_command(
     payload: serde_json::Value,

@@ -9,7 +9,12 @@ use macaca_proto::{
 };
 use macaca_proto::{FOUNDATION_RANDOM_PACK_ID, FOUNDATION_RANDOM_SERVICE_ID};
 
-use super::{random_bytes_command, RandomDomainPackCommandBuildOutcome};
+use super::{
+    random_bytes_command, random_entropy_health_command, random_integer_command,
+    random_nonce_command, random_provider_capabilities_command, random_test_stream_command,
+    random_token_command, random_unavailable_diagnostics_command, random_uuid_v4_command,
+    RandomDomainPackCommandBuildOutcome,
+};
 use crate::domain_pack_client::{DomainPackResolveResult, SystemDomainPackClient};
 use crate::{CatalogBackedDomainPackClient, DomainPackInspectCommand, DomainPackResolveCommand};
 
@@ -62,6 +67,84 @@ async fn random_helper_rejects_without_creating_a_service_call() {
         outcome,
         RandomDomainPackCommandBuildOutcome::Rejected(RandomAdmissionFailure::QuotaExceeded)
     );
+}
+
+#[tokio::test]
+async fn all_random_helpers_build_canonical_traced_service_calls() {
+    let reservation = || RandomResourceReservation {
+        request_units: 1,
+        ..Default::default()
+    };
+    let helpers = vec![
+        (
+            "random.uuid_v4",
+            random_uuid_v4_command(
+                serde_json::json!({}),
+                TraceContext::new("trace-random-uuid"),
+            ),
+        ),
+        (
+            "random.nonce",
+            random_nonce_command(
+                serde_json::json!({}),
+                TraceContext::new("trace-random-nonce"),
+            ),
+        ),
+        (
+            "random.token",
+            random_token_command(
+                serde_json::json!({}),
+                Ok(reservation()),
+                TraceContext::new("trace-random-token"),
+            ),
+        ),
+        (
+            "random.integer",
+            random_integer_command(
+                serde_json::json!({}),
+                TraceContext::new("trace-random-integer"),
+            ),
+        ),
+        (
+            "random.test_stream_create",
+            random_test_stream_command(
+                serde_json::json!({}),
+                Ok(reservation()),
+                TraceContext::new("trace-random-stream"),
+            ),
+        ),
+        (
+            "random.entropy_health",
+            random_entropy_health_command(
+                serde_json::json!({}),
+                TraceContext::new("trace-random-health"),
+            ),
+        ),
+        (
+            "random.provider_capabilities",
+            random_provider_capabilities_command(
+                serde_json::json!({}),
+                TraceContext::new("trace-random-capabilities"),
+            ),
+        ),
+        (
+            "random.entropy_health",
+            random_unavailable_diagnostics_command(
+                serde_json::json!({}),
+                TraceContext::new("trace-random-unavailable"),
+            ),
+        ),
+    ];
+    for (name, helper) in helpers {
+        let RandomDomainPackCommandBuildOutcome::Ready(command) =
+            helper.build(&resolved().await).unwrap()
+        else {
+            panic!("expected ready")
+        };
+        assert_eq!(command.service_id, FOUNDATION_RANDOM_SERVICE_ID);
+        assert_eq!(command.command_name, name);
+        assert!(command.trace.is_some());
+    }
 }
 
 #[tokio::test]

@@ -71,7 +71,7 @@
   policy templates, health, diagnostics, and docs link.
 - [x] 5.2 Add SDK command builders for every `random.*` command; builders must
   only produce canonical traced service calls.
-- [ ] 5.3 Add SDK helpers for bytes, UUID v4, nonce, token, bounded integer,
+- [x] 5.3 Add SDK helpers for bytes, UUID v4, nonce, token, bounded integer,
   deterministic test stream, entropy health, and unavailable diagnostics.
 - [ ] 5.4 Extend effective capability projection so applications can inspect
   callable commands, denied commands, unavailable entropy/provider states,
