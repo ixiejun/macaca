@@ -1,7 +1,10 @@
 //! Deterministic mock configuration provider for contract and replay tests.
 
 use std::collections::BTreeMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc, Mutex,
+};
 
 use async_trait::async_trait;
 use macaca_proto::{
@@ -17,6 +20,7 @@ use crate::service_contract::ConfigService;
 #[derive(Debug, Default)]
 pub struct MockConfigProvider {
     values: Arc<Mutex<BTreeMap<String, String>>>,
+    call_count: AtomicUsize,
 }
 
 #[async_trait]
@@ -26,6 +30,7 @@ impl ConfigService for MockConfigProvider {
     }
 
     async fn call(&self, command: ServiceCommand) -> ServiceResult<ServiceCallResult> {
+        self.call_count.fetch_add(1, Ordering::Relaxed);
         let trace = command
             .trace
             .clone()
@@ -100,6 +105,10 @@ impl ConfigService for MockConfigProvider {
 }
 
 impl MockConfigProvider {
+    /// Return invocation evidence used only by contract tests to prove admission preflight.
+    pub fn call_count(&self) -> usize {
+        self.call_count.load(Ordering::Relaxed)
+    }
     /// Seed an opaque artifact or secret reference without accepting raw configuration values.
     pub fn insert_reference(
         &self,

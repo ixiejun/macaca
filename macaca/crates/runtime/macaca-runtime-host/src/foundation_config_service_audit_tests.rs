@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use macaca_foundation_config::MockConfigProvider;
+use macaca_foundation_config::{ConfigService, MockConfigProvider};
 use macaca_kernel::SystemService;
 use macaca_proto::{KernelServiceId, ServiceBusSource, ServiceCommandName, TraceContext};
 
@@ -13,6 +13,7 @@ use crate::{
     ServiceProviderInstance, ServiceRouteRequest, ServiceRouter, ServiceRuntime,
     ServiceRuntimeConfig, StaticServiceProviderFactory,
 };
+use crate::{ServicePolicyLayer, ServiceRuntimeError};
 
 #[tokio::test]
 async fn config_router_replay_redacts_payload_and_retains_only_trace_metadata() {
@@ -69,4 +70,51 @@ async fn config_router_replay_redacts_payload_and_retains_only_trace_metadata() 
         success.replay_metadata.get("replay.config_command"),
         Some(&"config.get".into())
     );
+}
+
+#[tokio::test]
+async fn config_policy_denial_happens_before_provider_side_effects() {
+    let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
+    let mock = Arc::new(MockConfigProvider::default());
+    let config_service: Arc<dyn ConfigService> = mock.clone();
+    let provider: Arc<dyn SystemService> =
+        Arc::new(FoundationConfigSystemServiceProvider::new(config_service));
+    let descriptor = provider.descriptor();
+    let id = runtime
+        .register_provider(
+            &StaticServiceProviderFactory::new(ServiceProviderInstance::new(descriptor, provider)),
+            Default::default(),
+        )
+        .await
+        .unwrap();
+    runtime
+        .start(&id, TraceContext::new("trace-config-denied-start"))
+        .await
+        .unwrap();
+    let policy = Arc::new(InMemoryServicePolicyEngine::new());
+    policy.set_baseline(ServicePolicyLayer {
+        deny_services: ["service.foundation.config".into()].into(),
+        ..Default::default()
+    });
+    let router = ServiceRouter::new(
+        runtime,
+        ServiceBusSource::new("test.foundation.config"),
+        Arc::new(InMemoryServiceContractRegistry::new()),
+        policy,
+    );
+    let error = router
+        .route(ServiceRouteRequest {
+            app_id: None,
+            tenant_id: None,
+            session_id: None,
+            service_id: id,
+            operation: ServiceCommandName::new("config.get"),
+            payload: serde_json::json!({"key":{"key":"setting"}}),
+            metadata: BTreeMap::new(),
+            trace: TraceContext::new("trace-config-denied"),
+        })
+        .await
+        .unwrap_err();
+    assert!(matches!(error, ServiceRuntimeError::PolicyDenied(_)));
+    assert_eq!(mock.call_count(), 0);
 }
