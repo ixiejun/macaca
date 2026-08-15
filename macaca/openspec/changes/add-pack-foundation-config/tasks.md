@@ -64,7 +64,7 @@
   missing source, unsupported watch/reload, unsupported selector, missing schema,
   and missing secret-reference integration.
 - [x] 4.3 Implement deterministic mock provider for contract and replay tests.
-- [ ] 4.4 Implement or bind package descriptor, workspace config, environment
+- [x] 4.4 Implement or bind package descriptor, workspace config, environment
   adapter, tenant config, and remote config bridge providers without leaking
   provider-native APIs to SDK callers.
 - [ ] 4.5 Add lifecycle, health, snapshot, shutdown, reload, watch cancellation,

@@ -4,9 +4,11 @@
 //! for test/replay compositions, and a fail-closed Null Object. Runtime hosts
 //! choose provider composition while applications only issue traced commands.
 
+pub mod layered_provider;
 pub mod local_provider;
 pub mod service_contract;
 
+pub use layered_provider::{ConfigSourceKind, LayeredConfigProvider, ReferenceMapConfigSource};
 pub use local_provider::MockConfigProvider;
 pub use service_contract::{ConfigService, UnavailableConfigProvider};
 
