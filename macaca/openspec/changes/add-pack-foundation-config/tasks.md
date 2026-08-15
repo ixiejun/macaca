@@ -98,9 +98,9 @@
 - [ ] 6.3 Add replay tests proving config commands are trace-addressable and can
   reconstruct effective config with source hashes, layer order, schema ids,
   validation result, and redaction summary.
-- [ ] 6.4 Add dependency-boundary tests proving kernel, SDK, shells, and
+- [x] 6.4 Add dependency-boundary tests proving kernel, SDK, shells, and
   application framework do not import concrete config providers.
-- [ ] 6.5 Add no-direct-provider-call gates proving SDK helpers and WASM host
+- [x] 6.5 Add no-direct-provider-call gates proving SDK helpers and WASM host
   imports cannot bypass service runtime.
 - [ ] 6.6 Run `openspec validate add-pack-foundation-config --strict`, targeted
   cargo tests, dependency-boundary gates, file-size gates, and audit replay
