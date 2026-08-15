@@ -58,12 +58,12 @@
 
 ## 4. Service Provider And Runtime Integration
 
-- [ ] 4.1 Define the config service trait/provider interface behind the service
+- [x] 4.1 Define the config service trait/provider interface behind the service
   runtime.
 - [x] 4.2 Implement unavailable provider behavior for absent config service,
   missing source, unsupported watch/reload, unsupported selector, missing schema,
   and missing secret-reference integration.
-- [ ] 4.3 Implement deterministic mock provider for contract and replay tests.
+- [x] 4.3 Implement deterministic mock provider for contract and replay tests.
 - [ ] 4.4 Implement or bind package descriptor, workspace config, environment
   adapter, tenant config, and remote config bridge providers without leaking
   provider-native APIs to SDK callers.
