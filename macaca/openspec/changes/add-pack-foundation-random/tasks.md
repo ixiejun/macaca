@@ -47,7 +47,7 @@
 - [x] 3.4 Reject deterministic seeded streams outside test/replay contexts.
 - [ ] 3.5 Add resource reservations/rate limits before large random byte or token
   generation requests.
-- [ ] 3.6 Add tests proving denied, unavailable, quota, blocked, and unsupported
+- [x] 3.6 Add tests proving denied, unavailable, quota, blocked, and unsupported
   paths do not use insecure fallback providers.
 
 ## 4. Service Provider And Runtime Integration
@@ -57,9 +57,9 @@
 - [x] 4.2 Implement unavailable provider behavior for absent random service,
   entropy unavailable, blocked provider, unsupported UUID/integer/token feature,
   and disabled deterministic test provider.
-- [ ] 4.3 Implement deterministic test provider for replay and test contexts with
+- [x] 4.3 Implement deterministic test provider for replay and test contexts with
   opaque seed references and stream position tracking.
-- [ ] 4.4 Implement or bind host CSPRNG provider with max byte limits, health
+- [x] 4.4 Implement or bind host CSPRNG provider with max byte limits, health
   diagnostics, bias-free integer generation, and UUID/token helpers.
 - [ ] 4.5 Add lifecycle, health, snapshot, shutdown, timeout, cancellation,
   rate-limit accounting, and provider capability reports.
