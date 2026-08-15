@@ -24,6 +24,7 @@ pub mod driver_client;
 pub mod entitlement_client;
 pub mod evm_client;
 pub mod facade;
+pub mod foundation_config_client;
 pub mod foundation_random_client;
 pub mod foundation_time_client;
 pub mod heartbeat_client;
@@ -335,6 +336,11 @@ pub use entitlement_client::{
 };
 pub use evm_client::{ServiceBackedEvmClient, SystemEvmClient, UnavailableSystemEvmClient};
 pub use facade::{AgentRegistryApi, MacacaSdk};
+pub use foundation_config_client::{
+    config_effective_command, config_export_redacted_command, config_get_command,
+    config_provenance_command, config_unavailable_diagnostics_command, config_validate_command,
+    config_watch_command, ConfigDomainPackCommandBuilder,
+};
 pub use foundation_random_client::{
     random_bytes_command, random_entropy_health_command, random_integer_command,
     random_nonce_command, random_provider_capabilities_command, random_test_stream_command,
