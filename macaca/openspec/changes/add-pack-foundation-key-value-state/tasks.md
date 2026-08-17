@@ -61,7 +61,7 @@
 - [x] 4.2 Implement unavailable provider behavior for absent state service,
   disabled namespace, unsupported TTL/watch/snapshot/compaction capability, and
   missing entitlement.
-- [ ] 4.3 Implement deterministic in-memory mock provider for contract and replay
+- [x] 4.3 Implement deterministic in-memory mock provider for contract and replay
   tests.
 - [ ] 4.4 Implement or bind an embedded durable provider with namespace sandboxing,
   revision tracking, bounded scans, TTL cleanup, and snapshot references.
