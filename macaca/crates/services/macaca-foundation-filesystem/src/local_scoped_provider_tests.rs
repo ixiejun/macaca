@@ -6,9 +6,9 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use macaca_proto::{
-    FilesystemConflictMode, FilesystemContentRef, FilesystemPathRef, FilesystemRootRef,
-    FilesystemStatPathCommand, FilesystemWriteFileCommand, ServiceCommand, ServiceCommandName,
-    ServiceError, TraceContext,
+    FilesystemConflictMode, FilesystemContentRef, FilesystemListDirectoryCommand,
+    FilesystemPathRef, FilesystemRootRef, FilesystemStatPathCommand, FilesystemWriteFileCommand,
+    ServiceCommand, ServiceCommandName, ServiceError, TraceContext,
 };
 
 use crate::{FilesystemContentResolver, FilesystemService, LocalScopedWorkspaceFilesystemProvider};
@@ -161,4 +161,34 @@ async fn local_provider_rejects_symlink_escapes_before_reading() {
         ))
         .await;
     assert!(matches!(result, Err(ServiceError::DisabledByPolicy(_))));
+}
+
+#[tokio::test]
+async fn local_provider_pages_directory_metadata_without_exposing_entry_paths() {
+    let workspace = tempfile::tempdir().unwrap();
+    std::fs::create_dir(workspace.path().join("documents")).unwrap();
+    std::fs::write(workspace.path().join("documents/first.txt"), "first").unwrap();
+    std::fs::write(workspace.path().join("documents/second.txt"), "second").unwrap();
+    let provider = LocalScopedWorkspaceFilesystemProvider::with_unavailable_content_resolver([(
+        "workspace".into(),
+        PathBuf::from(workspace.path()),
+    )])
+    .unwrap();
+    let response = provider
+        .call(command(
+            "filesystem.list_directory",
+            FilesystemListDirectoryCommand {
+                path: path("documents"),
+                recursive: false,
+                page_size: 1,
+                cursor: None,
+            },
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.output["status"], "partial_stream_page");
+    assert_eq!(response.output["entry_count"], 1);
+    let observation = format!("{:?}", response);
+    assert!(!observation.contains("first.txt"));
+    assert!(!observation.contains("second.txt"));
 }

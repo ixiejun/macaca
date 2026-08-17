@@ -65,7 +65,7 @@
 - [x] 4.4 Implement or bind a local scoped workspace provider with root sandboxing,
   path normalization, symlink policy, bounded directory paging, and atomic write
   strategy.
-- [ ] 4.5 Add lifecycle, health, snapshot, shutdown, timeout, cancellation,
+- [x] 4.5 Add lifecycle, health, snapshot, shutdown, timeout, cancellation,
   bounded streaming, and watch cleanup.
 - [x] 4.6 Add provider capability reporting for root kinds, maximum sizes,
   recursive support, watch support, snapshot support, atomic write support, and
