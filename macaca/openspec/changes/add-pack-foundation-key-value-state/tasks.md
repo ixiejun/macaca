@@ -56,7 +56,7 @@
 
 ## 4. Service Provider And Runtime Integration
 
-- [ ] 4.1 Define the key-value state service trait/provider interface behind the
+- [x] 4.1 Define the key-value state service trait/provider interface behind the
   service runtime.
 - [x] 4.2 Implement unavailable provider behavior for absent state service,
   disabled namespace, unsupported TTL/watch/snapshot/compaction capability, and

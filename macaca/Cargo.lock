@@ -1568,6 +1568,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "macaca-foundation-key-value-state"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "macaca-proto",
+ "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "macaca-framework"
 version = "0.1.0"
 dependencies = [
