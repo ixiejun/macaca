@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 use super::foundation_filesystem::FilesystemRootRef;
 
 /// Optional pack declaration block in an application `service_contract` section.
-///
 /// The raw service lists remain available for low-level capability declarations, while pack
 /// lists give applications a provider-neutral way to request capability bundles.  This keeps
 /// application manifests extensible without forcing the OS to know any business domain.
@@ -86,7 +85,6 @@ impl Default for DomainPackStability {
 }
 
 /// Runtime availability lane for catalog descriptors.
-///
 /// Stability explains product maturity, while availability explains whether a descriptor is
 /// callable in the active composition root.  Keeping the two axes separate allows Macaca to ship
 /// an industrial catalog that is discoverable before every optional provider exists.  Unavailable
@@ -165,7 +163,6 @@ pub struct DomainPackCompatibility {
 }
 
 /// Provider-neutral descriptor for one replacement provider class.
-///
 /// Domain packs often support several provider classes: built-in service implementations,
 /// host-native bridges, browser-hosted bridges, remote providers, plugin providers, mock
 /// providers, and unavailable providers.  This DTO keeps those choices declarative so discovery,
@@ -260,7 +257,6 @@ pub struct DomainPackDefinition {
 
 impl DomainPackDefinition {
     /// Create a pack definition and derive minimal metadata from a valid `pack.*.vN` id.
-    ///
     /// This constructor remains useful for tests and simple optional packages.  Explicit
     /// metadata should use [`Self::with_metadata`] when governance, SDK, or diagnostics fields
     /// are available.
@@ -322,7 +318,6 @@ impl DomainPackDefinition {
     }
 
     /// Return a deterministic, provider-neutral descriptor hash for this pack definition.
-    ///
     /// The hash is intentionally computed from the serialized descriptor DTO rather than from
     /// runtime provider state.  This makes it safe to put into admission reports, SDK discovery
     /// responses, trace events, audit snapshots, and replay evidence without leaking provider

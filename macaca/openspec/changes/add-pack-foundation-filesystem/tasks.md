@@ -88,7 +88,7 @@
 
 ## 6. Trace, Audit, Replay, And Gates
 
-- [ ] 6.1 Emit sanitized events for declaration, admission, policy, resource,
+- [x] 6.1 Emit sanitized events for declaration, admission, policy, resource,
   entitlement, handle lifecycle, service calls, watch lifecycle, snapshots,
   restore, success, failure, denied, and unavailable states.
 - [x] 6.2 Add audit redaction tests proving raw host paths, file bytes, secrets,
@@ -100,7 +100,7 @@
   application framework do not import concrete filesystem providers.
 - [x] 6.5 Add no-direct-provider-call gates proving SDK helpers and WASM host
   imports cannot bypass service runtime.
-- [ ] 6.6 Run `openspec validate add-pack-foundation-filesystem --strict`,
+- [x] 6.6 Run `openspec validate add-pack-foundation-filesystem --strict`,
   targeted cargo tests, dependency-boundary gates, file-size gates, and audit
   replay checks before marking complete.
 
