@@ -80,12 +80,12 @@
 - [ ] 5.3 Add SDK helpers for CAS update loops, bounded prefix scans, watch stream
   cancellation, TTL cache entries, snapshot dry runs, and unavailable
   diagnostics.
-- [ ] 5.4 Extend effective capability projection so applications can inspect
+- [x] 5.4 Extend effective capability projection so applications can inspect
   callable commands, denied commands, unavailable namespaces, provider capability
   flags, and replay references.
 - [ ] 5.5 Expose WASM host imports only for declared callable KV commands and
   route every import through the service runtime path.
-- [ ] 5.6 Add app-framework tests proving YAML, WASM, GenUI, and headless apps all
+- [x] 5.6 Add app-framework tests proving YAML, WASM, GenUI, and headless apps all
   use the same KV execution path.
 
 ## 6. Trace, Audit, Replay, And Gates
