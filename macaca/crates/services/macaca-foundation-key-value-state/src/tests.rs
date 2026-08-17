@@ -2,7 +2,12 @@
 
 use macaca_proto::{ServiceCommand, ServiceCommandName, TraceContext};
 
-use crate::{KeyValueStateService, MockKeyValueStateProvider, UnavailableKeyValueStateProvider};
+use std::sync::Arc;
+
+use crate::{
+    KeyValueStateProviderFactory, KeyValueStateService, MockKeyValueStateProvider,
+    UnavailableKeyValueStateProvider,
+};
 
 fn command(name: &str) -> ServiceCommand {
     ServiceCommand::with_trace(
@@ -39,4 +44,25 @@ async fn unavailable_provider_returns_structured_traceable_diagnostics() {
         Some(&"key_value_state_pack_unavailable".into())
     );
     assert_eq!(provider.snapshot().provider_class, "unavailable");
+}
+
+struct MockFactory;
+
+impl KeyValueStateProviderFactory for MockFactory {
+    fn provider_class(&self) -> &str {
+        "mock"
+    }
+    fn create(&self) -> Arc<dyn KeyValueStateService> {
+        Arc::new(MockKeyValueStateProvider::default())
+    }
+}
+
+#[test]
+fn provider_factory_keeps_adapter_selection_outside_sdk_contracts() {
+    let factory = MockFactory;
+    assert_eq!(factory.provider_class(), "mock");
+    assert_eq!(
+        factory.create().descriptor().metadata.get("provider_class"),
+        Some(&"mock".into())
+    );
 }

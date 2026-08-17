@@ -10,7 +10,9 @@ pub mod service_contract;
 
 pub use mock_provider::MockKeyValueStateProvider;
 pub use resource_lease::{KeyValueResourceLease, KeyValueResourceLedger};
-pub use service_contract::{KeyValueStateService, UnavailableKeyValueStateProvider};
+pub use service_contract::{
+    KeyValueStateProviderFactory, KeyValueStateService, UnavailableKeyValueStateProvider,
+};
 
 #[cfg(test)]
 mod resource_lease_tests;

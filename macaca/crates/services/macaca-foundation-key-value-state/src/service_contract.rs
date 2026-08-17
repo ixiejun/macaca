@@ -8,6 +8,7 @@ use macaca_proto::{
     ServiceLifecycleState, ServiceResult, ServiceScope, ServiceType, TraceSchemaRef,
     FOUNDATION_KEY_VALUE_STATE_COMMANDS, FOUNDATION_KEY_VALUE_STATE_SERVICE_ID,
 };
+use std::sync::Arc;
 
 /// Provider-neutral Command boundary for all key-value state Strategies.
 #[async_trait]
@@ -24,6 +25,18 @@ pub trait KeyValueStateService: Send + Sync {
     fn provider_capabilities(&self) -> KeyValueStateProviderCapability;
     /// Stop the provider and release bounded watches, leases, and caches.
     async fn shutdown(&self) -> ServiceResult<()>;
+}
+
+/// Abstract Factory boundary for optional provider adapters.
+///
+/// A host composition can register embedded, remote, consensus, plugin, or
+/// test Strategies through this factory without exposing a provider client,
+/// protocol request, endpoint, or topology detail to SDK and application code.
+pub trait KeyValueStateProviderFactory: Send + Sync {
+    /// Return a bounded provider-class identifier for diagnostics and selection.
+    fn provider_class(&self) -> &str;
+    /// Construct the provider-owned Strategy behind the generic service contract.
+    fn create(&self) -> Arc<dyn KeyValueStateService>;
 }
 
 /// Null Object used when a host composition has no key-value state provider.

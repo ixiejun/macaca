@@ -65,7 +65,7 @@
   tests.
 - [ ] 4.4 Implement or bind an embedded durable provider with namespace sandboxing,
   revision tracking, bounded scans, TTL cleanup, and snapshot references.
-- [ ] 4.5 Add optional adapter bridge points for Redis-like and etcd-like
+- [x] 4.5 Add optional adapter bridge points for Redis-like and etcd-like
   providers without leaking provider-native APIs to SDK callers.
 - [ ] 4.6 Add lifecycle, health, snapshot, shutdown, timeout, cancellation,
   bounded watch streaming, compaction handling, and provider capability reports.
