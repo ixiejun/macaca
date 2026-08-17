@@ -82,6 +82,7 @@ pub mod factory;
 pub(crate) mod file_service_local;
 pub mod file_service_provider;
 pub mod foundation_config_service_provider;
+pub mod foundation_filesystem_service_provider;
 mod framework_public_api;
 pub mod framework_runtime_agent_service;
 pub mod genui_surface_store;
@@ -122,6 +123,8 @@ pub mod payment_service_provider;
 pub use payment_service_provider::payment_service_descriptor;
 #[cfg(test)]
 mod foundation_config_service_audit_tests;
+#[cfg(test)]
+mod foundation_filesystem_service_audit_tests;
 pub mod plugin;
 pub mod plugin_capability;
 pub mod plugin_capability_service_provider;

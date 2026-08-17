@@ -56,12 +56,12 @@
 
 ## 4. Service Provider And Runtime Integration
 
-- [ ] 4.1 Define the filesystem service trait/provider interface behind the
+- [x] 4.1 Define the filesystem service trait/provider interface behind the
   service runtime.
 - [x] 4.2 Implement unavailable provider behavior for absent filesystem service,
   disabled roots, unsupported watch/snapshot/atomic-write capability, and missing
   entitlement.
-- [ ] 4.3 Implement deterministic mock provider for contract and replay tests.
+- [x] 4.3 Implement deterministic mock provider for contract and replay tests.
 - [ ] 4.4 Implement or bind a local scoped workspace provider with root sandboxing,
   path normalization, symlink policy, bounded directory paging, and atomic write
   strategy.
@@ -91,14 +91,14 @@
 - [ ] 6.1 Emit sanitized events for declaration, admission, policy, resource,
   entitlement, handle lifecycle, service calls, watch lifecycle, snapshots,
   restore, success, failure, denied, and unavailable states.
-- [ ] 6.2 Add audit redaction tests proving raw host paths, file bytes, secrets,
+- [x] 6.2 Add audit redaction tests proving raw host paths, file bytes, secrets,
   manifests, package bytes, credentials, private keys, provider payloads, and
   unbounded output do not enter observability surfaces.
 - [ ] 6.3 Add replay tests proving every filesystem command is trace-addressable
   and can reconstruct the decision path without replaying raw file content.
-- [ ] 6.4 Add dependency-boundary tests proving kernel, SDK, shells, and
+- [x] 6.4 Add dependency-boundary tests proving kernel, SDK, shells, and
   application framework do not import concrete filesystem providers.
-- [ ] 6.5 Add no-direct-provider-call gates proving SDK helpers and WASM host
+- [x] 6.5 Add no-direct-provider-call gates proving SDK helpers and WASM host
   imports cannot bypass service runtime.
 - [ ] 6.6 Run `openspec validate add-pack-foundation-filesystem --strict`,
   targeted cargo tests, dependency-boundary gates, file-size gates, and audit

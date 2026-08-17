@@ -1555,6 +1555,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "macaca-foundation-filesystem"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "macaca-proto",
+ "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "macaca-framework"
 version = "0.1.0"
 dependencies = [
@@ -1817,6 +1828,7 @@ dependencies = [
  "macaca-context",
  "macaca-driver",
  "macaca-foundation-config",
+ "macaca-foundation-filesystem",
  "macaca-framework",
  "macaca-heartbeat",
  "macaca-ipc",

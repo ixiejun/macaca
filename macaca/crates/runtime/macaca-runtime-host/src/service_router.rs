@@ -393,6 +393,7 @@ fn sanitized_replay_metadata(metadata: &BTreeMap<String, String>) -> BTreeMap<St
         "replay.random_command",
         "replay.random_length",
         "replay.config_command",
+        "replay.filesystem_command",
     ];
     metadata
         .iter()

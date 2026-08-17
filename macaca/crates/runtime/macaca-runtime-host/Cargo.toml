@@ -20,6 +20,7 @@ macaca-scheduled-agent-task = { workspace = true }
 macaca-heartbeat = { workspace = true }
 macaca-random = { workspace = true }
 macaca-foundation-config = { workspace = true }
+macaca-foundation-filesystem = { workspace = true }
 macaca-time = { workspace = true }
 macaca-skill = { workspace = true }
 macaca-app = { workspace = true }

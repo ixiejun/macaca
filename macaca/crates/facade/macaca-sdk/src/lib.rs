@@ -25,6 +25,7 @@ pub mod entitlement_client;
 pub mod evm_client;
 pub mod facade;
 pub mod foundation_config_client;
+pub mod foundation_filesystem_client;
 pub mod foundation_random_client;
 pub mod foundation_time_client;
 pub mod heartbeat_client;
@@ -342,6 +343,15 @@ pub use foundation_config_client::{
     config_provenance_command, config_reload_command, config_snapshot_command,
     config_unavailable_diagnostics_command, config_validate_command, config_watch_command,
     ConfigDomainPackCommandBuildOutcome, ConfigDomainPackCommandBuilder,
+};
+pub use foundation_filesystem_client::{
+    filesystem_append_file_command, filesystem_close_handle_command, filesystem_copy_path_command,
+    filesystem_create_directory_command, filesystem_create_temp_command,
+    filesystem_delete_path_command, filesystem_list_directory_command,
+    filesystem_move_path_command, filesystem_open_handle_command, filesystem_read_file_command,
+    filesystem_restore_snapshot_command, filesystem_snapshot_tree_command,
+    filesystem_stat_path_command, filesystem_watch_path_command, filesystem_write_file_command,
+    FilesystemDomainPackCommandBuildOutcome, FilesystemDomainPackCommandBuilder,
 };
 pub use foundation_random_client::{
     random_bytes_command, random_entropy_health_command, random_integer_command,
