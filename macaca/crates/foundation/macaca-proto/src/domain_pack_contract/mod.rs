@@ -91,6 +91,7 @@ mod foundation_filesystem;
 pub mod foundation_filesystem_semantics;
 mod foundation_filesystem_validation;
 mod foundation_key_value_state;
+pub mod foundation_key_value_state_semantics;
 mod foundation_key_value_state_validation;
 mod foundation_random;
 pub mod foundation_random_semantics;

@@ -249,6 +249,9 @@ pub use super::foundation_key_value_state::{
     FOUNDATION_KEY_VALUE_STATE_COMMANDS, FOUNDATION_KEY_VALUE_STATE_PACK_ID,
     FOUNDATION_KEY_VALUE_STATE_SERVICE_ID,
 };
+pub use super::foundation_key_value_state_semantics::{
+    requires_key_value_approval, KeyValueApprovalFacts,
+};
 pub use super::foundation_key_value_state_validation::validate_key_value_namespace_declarations;
 pub use super::foundation_random::{
     foundation_random_descriptor_hashes, foundation_random_pack_definition, random_stable_hash,

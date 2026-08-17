@@ -37,6 +37,42 @@ fn key_value_namespace_declarations_require_declared_pack_and_unique_safe_refere
 }
 
 #[test]
+fn key_value_broad_or_unsafe_mutations_require_approval_before_dispatch() {
+    let ordinary = KeyValueApprovalFacts {
+        namespace_wide: false,
+        overwrite_without_revision: false,
+        batch_entries: 2,
+        approval_batch_threshold: 10,
+    };
+    assert!(!requires_key_value_approval("kv.put", ordinary));
+    assert!(requires_key_value_approval(
+        "kv.restore_namespace",
+        ordinary
+    ));
+    assert!(requires_key_value_approval(
+        "kv.delete",
+        KeyValueApprovalFacts {
+            namespace_wide: true,
+            ..ordinary
+        }
+    ));
+    assert!(requires_key_value_approval(
+        "kv.put",
+        KeyValueApprovalFacts {
+            overwrite_without_revision: true,
+            ..ordinary
+        }
+    ));
+    assert!(requires_key_value_approval(
+        "kv.batch_delete",
+        KeyValueApprovalFacts {
+            batch_entries: 11,
+            ..ordinary
+        }
+    ));
+}
+
+#[test]
 fn foundation_key_value_state_descriptor_is_discoverable_and_not_callable() {
     let definition = foundation_key_value_state_pack_definition();
 

@@ -47,7 +47,7 @@
 - [x] 3.3 Add policy checks for namespace scope, key prefix bounds, max key size,
   max value size, batch size, scan page size, stream budget, TTL bounds,
   retention, consistency level, and provider capability.
-- [ ] 3.4 Add side-effect approval behavior for namespace-wide delete, restore,
+- [x] 3.4 Add side-effect approval behavior for namespace-wide delete, restore,
   migration, compaction, large batch mutation, and overwrite without revision.
 - [ ] 3.5 Add resource reservations before side-effect provider calls and release
   resources on success, failure, timeout, cancellation, and stream termination.
