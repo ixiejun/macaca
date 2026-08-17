@@ -9,8 +9,8 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use macaca_proto::{
-    expand_service_capabilities, ApplicationAbiDeclaration, ApplicationAbiError,
-    ApplicationCheckpoint, ApplicationExport, ApplicationHostCommandResult,
+    expand_service_capabilities, validate_filesystem_root_declarations, ApplicationAbiDeclaration,
+    ApplicationAbiError, ApplicationCheckpoint, ApplicationExport, ApplicationHostCommandResult,
     ApplicationHostCommandStatus, ApplicationLifecycleState, DomainPackCatalog,
     EffectiveServiceCapabilities, InMemoryDomainPackCatalog, PackageDescriptor, PackageRuntimeKind,
 };
@@ -142,6 +142,12 @@ impl ApplicationAbiAdapter for YamlApplicationAbiAdapter {
             .get("application.id")
             .cloned()
             .unwrap_or_else(|| self.manifest.id.to_string());
+        if let Some(service_contract) = self.manifest.service_contract.as_ref() {
+            validate_filesystem_root_declarations(service_contract).map_err(|reason| {
+                warn!(application_id = %application_id, reason, "application ABI filesystem root admission rejected");
+                ApplicationAbiError::InvalidDeclaration(reason.into())
+            })?;
+        }
         // Keep service discovery at the ABI boundary data-only. The catalog owns
         // pack resolution, so this adapter neither constructs providers nor embeds
         // pack-specific routing rules in application-framework code.

@@ -2,6 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
+use super::foundation_filesystem::FilesystemRootRef;
+
 /// Optional pack declaration block in an application `service_contract` section.
 ///
 /// The raw service lists remain available for low-level capability declarations, while pack
@@ -25,6 +27,13 @@ pub struct AppServiceContractConfig {
     /// cannot grant themselves provider capabilities or bypass host policy.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub pack_permission_scopes: BTreeMap<String, BTreeSet<String>>,
+    /// Logical roots declared for `pack.foundation.filesystem.v1`.
+    ///
+    /// These references contain an opaque root id and kind only. Runtime-host
+    /// composition maps an admitted id to a local, remote, temporary, or plugin
+    /// root; manifests must never include a host path or provider-native handle.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub filesystem_roots: Vec<FilesystemRootRef>,
     /// Mandatory service identifiers required by the application.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub required_services: Vec<String>,

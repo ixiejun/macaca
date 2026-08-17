@@ -108,3 +108,25 @@ fn filesystem_projection_separates_permission_denial_from_unavailability() {
         Some("filesystem_provider_not_installed")
     );
 }
+
+#[test]
+fn filesystem_root_declarations_are_admitted_before_abi_construction() {
+    let catalog = available_catalog();
+    let accepted = AppLoader::parse_manifest_yaml(
+        "name: filesystem-roots\nlayer: L3Declarative\nservice_contract:\n  optional_packs:\n    - pack.foundation.filesystem.v1\n  filesystem_roots:\n    - root_id: workspace\n      root_kind: app_workspace\n",
+    )
+    .unwrap();
+    assert!(YamlApplicationAbiAdapter::new(accepted)
+        .with_catalog(Arc::new(catalog.clone()))
+        .load()
+        .is_ok());
+
+    let invalid = AppLoader::parse_manifest_yaml(
+        "name: invalid-filesystem-root\nlayer: L3Declarative\nservice_contract:\n  filesystem_roots:\n    - root_id: /private/path\n      root_kind: app_workspace\n",
+    )
+    .unwrap();
+    assert!(YamlApplicationAbiAdapter::new(invalid)
+        .with_catalog(Arc::new(catalog))
+        .load()
+        .is_err());
+}

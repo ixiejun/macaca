@@ -233,6 +233,7 @@ pub use super::foundation_filesystem_semantics::{
     FilesystemAdmissionRequest, FilesystemAuditFields, FilesystemPolicyContext,
     FilesystemResourceLimits, FilesystemResourceReservation,
 };
+pub use super::foundation_filesystem_validation::validate_filesystem_root_declarations;
 pub use super::foundation_key_value_state::{
     foundation_key_value_state_descriptor_hashes, foundation_key_value_state_pack_definition,
     key_value_state_stable_hash, KeyValueBatchDeleteCommand, KeyValueBatchGetCommand,

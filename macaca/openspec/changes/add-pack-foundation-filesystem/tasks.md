@@ -38,7 +38,7 @@
 
 ## 3. Admission, Permission, Policy, Resource, And Approval
 
-- [ ] 3.1 Implement manifest declaration validation for required/optional
+- [x] 3.1 Implement manifest declaration validation for required/optional
   `pack.foundation.filesystem.v1` and app-scoped filesystem roots.
 - [x] 3.2 Validate scopes: `filesystem.read`, `filesystem.write`,
   `filesystem.append`, `filesystem.list`, `filesystem.metadata`,

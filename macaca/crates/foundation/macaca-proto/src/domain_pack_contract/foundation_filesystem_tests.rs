@@ -2,6 +2,37 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use super::*;
 
+#[test]
+fn filesystem_root_declarations_require_declared_pack_and_unique_safe_ids() {
+    let root = FilesystemRootRef {
+        root_id: "workspace".into(),
+        root_kind: "app_workspace".into(),
+    };
+    assert!(
+        validate_filesystem_root_declarations(&AppServiceContractConfig {
+            optional_packs: vec![FOUNDATION_FILESYSTEM_PACK_ID.into()],
+            filesystem_roots: vec![root.clone()],
+            ..Default::default()
+        })
+        .is_ok()
+    );
+    assert!(
+        validate_filesystem_root_declarations(&AppServiceContractConfig {
+            filesystem_roots: vec![root.clone()],
+            ..Default::default()
+        })
+        .is_err()
+    );
+    assert!(
+        validate_filesystem_root_declarations(&AppServiceContractConfig {
+            optional_packs: vec![FOUNDATION_FILESYSTEM_PACK_ID.into()],
+            filesystem_roots: vec![root.clone(), root],
+            ..Default::default()
+        })
+        .is_err()
+    );
+}
+
 // Filesystem tests validate provider-neutral metadata only. They do not touch
 // host paths, open files, create watchers, or construct concrete providers.
 
