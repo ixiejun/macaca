@@ -123,6 +123,7 @@ impl FilesystemService for MockFilesystemProvider {
                     "filesystem.audit_event".into(),
                     audit_event(operation).into(),
                 ),
+                ("service.audit.stage".into(), audit_event(operation).into()),
                 (
                     "filesystem.redaction".into(),
                     "paths_and_content_references_only".into(),

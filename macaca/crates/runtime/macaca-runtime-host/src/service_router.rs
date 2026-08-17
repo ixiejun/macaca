@@ -283,6 +283,22 @@ impl ServiceRouter {
                 .replay_metadata(replay_metadata)
                 .output_hash(hash_json(&reply.output.clone().unwrap_or(Value::Null))),
             );
+            if let Some(stage) = sanitized_provider_audit_stage(&reply.metadata) {
+                self.emit_audit_event(
+                    ServiceCallAuditEvent::new(
+                        stage,
+                        request.trace.trace_id.clone(),
+                        request.service_id.to_string(),
+                    )
+                    .app_id(request.app_id.clone())
+                    .session_id(request.session_id.clone())
+                    .operation(Some(request.operation.to_string()))
+                    .provider_id(Some(selected_provider.clone()))
+                    .decision(Some(decision.reason_code.clone()))
+                    .retry_count(Some(attempt.saturating_sub(1)))
+                    .latency_ms(Some(latency_ms)),
+                );
+            }
             let mut metadata = reply.metadata;
             metadata.insert("provider_id".into(), selected_provider.clone());
             metadata.insert("retry_count".into(), attempt.saturating_sub(1).to_string());
@@ -402,6 +418,18 @@ fn sanitized_replay_metadata(metadata: &BTreeMap<String, String>) -> BTreeMap<St
         })
         .map(|(key, value)| (key.clone(), value.clone()))
         .collect()
+}
+
+/// Admit one provider-declared audit stage without coupling the router to a
+/// service family. Stage values are identifiers only, never messages or data.
+fn sanitized_provider_audit_stage(metadata: &BTreeMap<String, String>) -> Option<&str> {
+    let stage = metadata.get("service.audit.stage")?;
+    (stage.len() <= 96
+        && stage.is_ascii()
+        && stage.chars().all(|character| {
+            character.is_ascii_lowercase() || character.is_ascii_digit() || character == '_'
+        }))
+    .then_some(stage.as_str())
 }
 
 fn hash_json(value: &Value) -> Option<String> {

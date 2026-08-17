@@ -91,6 +91,9 @@ async fn filesystem_router_replay_redacts_paths_and_content_references() {
         success.replay_metadata.get("replay.filesystem_command"),
         Some(&"filesystem.write_file".into())
     );
+    assert!(replay
+        .iter()
+        .any(|event| event.stage == "filesystem_pack_service_call_succeeded"));
 }
 
 #[tokio::test]

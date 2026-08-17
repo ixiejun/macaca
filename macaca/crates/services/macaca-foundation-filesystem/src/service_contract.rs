@@ -82,10 +82,16 @@ impl FilesystemService for UnavailableFilesystemProvider {
             output: serde_json::json!({"status":"unavailable","reason":self.reason}),
             trace,
             status: "unavailable".into(),
-            metadata: [(
-                "filesystem.audit_event".into(),
-                "filesystem_pack_unavailable".into(),
-            )]
+            metadata: [
+                (
+                    "filesystem.audit_event".into(),
+                    "filesystem_pack_unavailable".into(),
+                ),
+                (
+                    "service.audit.stage".into(),
+                    "filesystem_pack_unavailable".into(),
+                ),
+            ]
             .into_iter()
             .collect(),
             cleanup_hint: Some(CleanupPolicy::None),
