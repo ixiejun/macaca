@@ -17,6 +17,7 @@ mod audit_genui_tests;
 mod domain_import_tests;
 mod domain_pack_service_call_tests;
 mod foundation_config_service_call_tests;
+mod foundation_filesystem_service_call_tests;
 mod foundation_random_service_call_tests;
 mod foundation_time_service_call_tests;
 mod knowledge_domain_pack_service_call_tests;
