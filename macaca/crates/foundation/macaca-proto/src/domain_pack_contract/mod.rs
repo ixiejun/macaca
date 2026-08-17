@@ -88,6 +88,7 @@ mod foundation_config;
 pub mod foundation_config_semantics;
 mod foundation_config_validation;
 mod foundation_filesystem;
+pub mod foundation_filesystem_semantics;
 mod foundation_filesystem_validation;
 mod foundation_key_value_state;
 mod foundation_key_value_state_validation;
@@ -172,6 +173,8 @@ pub mod workflow_task_transition;
 
 #[cfg(test)]
 mod foundation_config_semantics_tests;
+#[cfg(test)]
+mod foundation_filesystem_semantics_tests;
 #[cfg(test)]
 mod foundation_random_semantics_tests;
 #[cfg(test)]

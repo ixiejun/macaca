@@ -226,6 +226,13 @@ pub use super::foundation_filesystem::{
     FilesystemWatchPathCommand, FilesystemWriteFileCommand, FOUNDATION_FILESYSTEM_COMMANDS,
     FOUNDATION_FILESYSTEM_PACK_ID, FOUNDATION_FILESYSTEM_SERVICE_ID,
 };
+pub use super::foundation_filesystem_semantics::{
+    dispatch_after_preflight as dispatch_filesystem_after_preflight,
+    preflight_command as preflight_filesystem_command, redacted_filesystem_audit_fields,
+    reserve as reserve_filesystem_resources, FilesystemAdmissionFailure,
+    FilesystemAdmissionRequest, FilesystemAuditFields, FilesystemPolicyContext,
+    FilesystemResourceLimits, FilesystemResourceReservation,
+};
 pub use super::foundation_key_value_state::{
     foundation_key_value_state_descriptor_hashes, foundation_key_value_state_pack_definition,
     key_value_state_stable_hash, KeyValueBatchDeleteCommand, KeyValueBatchGetCommand,

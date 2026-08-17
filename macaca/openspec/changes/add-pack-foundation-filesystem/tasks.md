@@ -47,11 +47,11 @@
   `filesystem.restore`.
 - [x] 3.3 Add policy checks for root scope, max bytes, max entries, recursive
   bounds, stream budget, retention, conflict mode, and provider capability.
-- [ ] 3.4 Add side-effect approval behavior for delete, overwrite, restore,
+- [x] 3.4 Add side-effect approval behavior for delete, overwrite, restore,
   recursive copy/move/delete, and non-temporary root mutation.
 - [ ] 3.5 Add resource reservations before side-effect provider calls and release
   resources on success, failure, timeout, and cancellation.
-- [ ] 3.6 Add tests proving denied, unavailable, and quota paths do not invoke a
+- [x] 3.6 Add tests proving denied, unavailable, and quota paths do not invoke a
   concrete provider.
 
 ## 4. Service Provider And Runtime Integration
