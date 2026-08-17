@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
 use super::foundation_filesystem::FilesystemRootRef;
+use super::foundation_key_value_state::KeyValueNamespaceRef;
 
 /// Optional pack declaration block in an application `service_contract` section.
 /// The raw service lists remain available for low-level capability declarations, while pack
@@ -33,6 +34,13 @@ pub struct AppServiceContractConfig {
     /// root; manifests must never include a host path or provider-native handle.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub filesystem_roots: Vec<FilesystemRootRef>,
+    /// Logical namespaces declared for `pack.foundation.key.value.state.v1`.
+    ///
+    /// Namespace references contain only bounded logical identifiers. Runtime-host
+    /// composition selects the durable, remote, browser, or mock provider; app
+    /// manifests cannot embed database handles or provider-native configuration.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub key_value_namespaces: Vec<KeyValueNamespaceRef>,
     /// Mandatory service identifiers required by the application.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub required_services: Vec<String>,

@@ -39,7 +39,7 @@
 
 ## 3. Admission, Permission, Policy, Resource, And Approval
 
-- [ ] 3.1 Implement manifest declaration validation for required/optional
+- [x] 3.1 Implement manifest declaration validation for required/optional
   `pack.foundation.key.value.state.v1` and app-scoped namespaces.
 - [x] 3.2 Validate scopes: `state.read`, `state.write`, `state.delete`,
   `state.list`, `state.watch`, `state.ttl`, `state.counter`,

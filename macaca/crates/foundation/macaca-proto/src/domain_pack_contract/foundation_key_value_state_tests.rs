@@ -6,6 +6,37 @@ use super::*;
 // not construct stores, remote clients, watchers, snapshots, or migrations.
 
 #[test]
+fn key_value_namespace_declarations_require_declared_pack_and_unique_safe_references() {
+    let namespace = KeyValueNamespaceRef {
+        namespace: "preferences".into(),
+        tenant_ref: Some("tenant:example".into()),
+    };
+    assert!(
+        validate_key_value_namespace_declarations(&AppServiceContractConfig {
+            optional_packs: vec![FOUNDATION_KEY_VALUE_STATE_PACK_ID.into()],
+            key_value_namespaces: vec![namespace.clone()],
+            ..Default::default()
+        })
+        .is_ok()
+    );
+    assert!(
+        validate_key_value_namespace_declarations(&AppServiceContractConfig {
+            key_value_namespaces: vec![namespace.clone()],
+            ..Default::default()
+        })
+        .is_err()
+    );
+    assert!(
+        validate_key_value_namespace_declarations(&AppServiceContractConfig {
+            optional_packs: vec![FOUNDATION_KEY_VALUE_STATE_PACK_ID.into()],
+            key_value_namespaces: vec![namespace.clone(), namespace],
+            ..Default::default()
+        })
+        .is_err()
+    );
+}
+
+#[test]
 fn foundation_key_value_state_descriptor_is_discoverable_and_not_callable() {
     let definition = foundation_key_value_state_pack_definition();
 

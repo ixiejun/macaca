@@ -1,15 +1,49 @@
 use super::foundation_key_value_state::{
     KeyValueBatchPutCommand, KeyValueKeyRef, KeyValueNamespaceRef, KeyValuePutCommand,
-    KeyValueTtlPolicy, KeyValueTypedValueRef,
+    KeyValueTtlPolicy, KeyValueTypedValueRef, FOUNDATION_KEY_VALUE_STATE_PACK_ID,
 };
 use super::foundation_validation::{
     bounded_reference, opaque_artifact_reference, secret_store_reference,
 };
+use super::model::AppServiceContractConfig;
+
+/// Validate pack-scoped namespaces before ABI or provider admission.
+///
+/// The Specification admits only opaque, bounded namespace identifiers. The
+/// runtime-host composition root remains solely responsible for selecting and
+/// configuring a concrete provider for an admitted namespace.
+pub fn validate_key_value_namespace_declarations(
+    declaration: &AppServiceContractConfig,
+) -> Result<(), &'static str> {
+    let key_value_declared = declaration
+        .use_packs
+        .iter()
+        .chain(declaration.required_packs.iter())
+        .chain(declaration.optional_packs.iter())
+        .any(|pack_id| pack_id == FOUNDATION_KEY_VALUE_STATE_PACK_ID);
+    if !declaration.key_value_namespaces.is_empty() && !key_value_declared {
+        return Err("key-value namespaces require the foundation key-value state pack");
+    }
+    let mut namespaces = std::collections::BTreeSet::new();
+    for namespace in &declaration.key_value_namespaces {
+        if !namespace.is_bounded_reference() {
+            return Err("key-value namespace must be a bounded logical reference");
+        }
+        if !namespaces.insert((&namespace.namespace, namespace.tenant_ref.as_deref())) {
+            return Err("key-value namespaces must be unique per tenant scope");
+        }
+    }
+    Ok(())
+}
 
 impl KeyValueNamespaceRef {
     /// Keep namespaces tenant-scoped logical identifiers rather than provider handles.
     pub fn is_bounded_reference(&self) -> bool {
         bounded_reference(&self.namespace, 160)
+            && self.namespace.is_ascii()
+            && !self.namespace.contains(['/', '\\'])
+            && self.namespace != "."
+            && self.namespace != ".."
             && self
                 .tenant_ref
                 .as_deref()
