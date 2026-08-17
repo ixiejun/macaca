@@ -250,7 +250,8 @@ pub use super::foundation_key_value_state::{
     FOUNDATION_KEY_VALUE_STATE_SERVICE_ID,
 };
 pub use super::foundation_key_value_state_semantics::{
-    requires_key_value_approval, KeyValueApprovalFacts,
+    requires_key_value_approval, reserve_key_value_resources, KeyValueApprovalFacts,
+    KeyValueResourceFailure, KeyValueResourceLimits, KeyValueResourceReservation,
 };
 pub use super::foundation_key_value_state_validation::validate_key_value_namespace_declarations;
 pub use super::foundation_random::{

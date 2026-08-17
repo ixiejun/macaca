@@ -73,6 +73,41 @@ fn key_value_broad_or_unsafe_mutations_require_approval_before_dispatch() {
 }
 
 #[test]
+fn key_value_resource_reservations_reject_quota_before_provider_dispatch() {
+    let limits = KeyValueResourceLimits {
+        max_byte_units: 10,
+        max_entry_units: 4,
+        max_batch_operations: 1,
+        max_watch_slots: 1,
+        max_snapshot_units: 10,
+        max_mutation_operations: 1,
+        max_request_units: 1,
+    };
+    let admitted = reserve_key_value_resources(
+        KeyValueResourceReservation::default(),
+        KeyValueResourceReservation {
+            byte_units: 4,
+            request_units: 1,
+            ..Default::default()
+        },
+        limits,
+    )
+    .unwrap();
+    assert_eq!(admitted.byte_units, 4);
+    assert_eq!(
+        reserve_key_value_resources(
+            admitted,
+            KeyValueResourceReservation {
+                request_units: 1,
+                ..Default::default()
+            },
+            limits,
+        ),
+        Err(KeyValueResourceFailure::QuotaExceeded)
+    );
+}
+
+#[test]
 fn foundation_key_value_state_descriptor_is_discoverable_and_not_callable() {
     let definition = foundation_key_value_state_pack_definition();
 
