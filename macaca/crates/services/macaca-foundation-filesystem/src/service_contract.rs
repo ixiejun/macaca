@@ -112,12 +112,15 @@ impl FilesystemService for UnavailableFilesystemProvider {
         FilesystemProviderCapability {
             provider_class: "unavailable".into(),
             supported_commands: Default::default(),
+            supported_root_kinds: Default::default(),
+            supports_recursive_operations: false,
             supports_watch: false,
             supports_snapshot: false,
             supports_atomic_write: false,
             max_file_bytes: 0,
             max_directory_entries: 0,
             availability: DomainPackProviderCapabilityState::Unavailable,
+            unavailable_reason: Some("filesystem provider is not installed".into()),
         }
     }
 

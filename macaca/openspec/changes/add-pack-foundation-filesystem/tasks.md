@@ -67,7 +67,7 @@
   strategy.
 - [ ] 4.5 Add lifecycle, health, snapshot, shutdown, timeout, cancellation,
   bounded streaming, and watch cleanup.
-- [ ] 4.6 Add provider capability reporting for root kinds, maximum sizes,
+- [x] 4.6 Add provider capability reporting for root kinds, maximum sizes,
   recursive support, watch support, snapshot support, atomic write support, and
   unavailable reasons.
 

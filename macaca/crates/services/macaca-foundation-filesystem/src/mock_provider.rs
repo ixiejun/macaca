@@ -170,12 +170,18 @@ impl FilesystemService for MockFilesystemProvider {
                 .iter()
                 .map(|item| (*item).into())
                 .collect(),
+            supported_root_kinds: ["app_workspace", "session_workspace", "temporary"]
+                .into_iter()
+                .map(String::from)
+                .collect(),
+            supports_recursive_operations: true,
             supports_watch: true,
             supports_snapshot: true,
             supports_atomic_write: true,
             max_file_bytes: 16_777_216,
             max_directory_entries: 10_000,
             availability: DomainPackProviderCapabilityState::Available,
+            unavailable_reason: None,
         }
     }
 

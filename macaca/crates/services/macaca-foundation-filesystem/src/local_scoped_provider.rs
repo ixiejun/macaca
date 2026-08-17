@@ -312,12 +312,18 @@ impl FilesystemService for LocalScopedWorkspaceFilesystemProvider {
         FilesystemProviderCapability {
             provider_class: "local_scoped_workspace".into(),
             supported_commands: LOCAL_COMMANDS.iter().map(|item| (*item).into()).collect(),
+            supported_root_kinds: ["app_workspace", "session_workspace", "temporary"]
+                .into_iter()
+                .map(String::from)
+                .collect(),
+            supports_recursive_operations: false,
             supports_watch: false,
             supports_snapshot: false,
             supports_atomic_write: true,
             max_file_bytes: MAX_FILE_BYTES,
             max_directory_entries: MAX_DIRECTORY_ENTRIES,
             availability: DomainPackProviderCapabilityState::Available,
+            unavailable_reason: None,
         }
     }
     async fn shutdown(&self) -> ServiceResult<()> {

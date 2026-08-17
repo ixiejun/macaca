@@ -155,12 +155,16 @@ fn provider_descriptor(
     let capability = FilesystemProviderCapability {
         provider_class: provider_class.into(),
         supported_commands: schema_set(FOUNDATION_FILESYSTEM_COMMANDS),
+        supported_root_kinds: schema_set(&["app_workspace", "session_workspace", "temporary"]),
+        supports_recursive_operations: provider_class != "unavailable",
         supports_watch: provider_class != "unavailable",
         supports_snapshot: provider_class != "unavailable",
         supports_atomic_write: matches!(provider_class, "local-scoped-workspace" | "mock"),
         max_file_bytes: 16_777_216,
         max_directory_entries: 10_000,
         availability,
+        unavailable_reason: (provider_class == "unavailable")
+            .then(|| "filesystem_provider_not_installed".into()),
     };
     DomainPackProviderDescriptor {
         provider_class: provider_class.into(),
@@ -278,12 +282,18 @@ pub struct FilesystemSnapshotRef {
 pub struct FilesystemProviderCapability {
     pub provider_class: String,
     pub supported_commands: BTreeSet<String>,
+    /// Declared logical root kinds accepted by this provider Strategy.
+    pub supported_root_kinds: BTreeSet<String>,
+    /// Whether bounded recursive copy/list/delete semantics are available.
+    pub supports_recursive_operations: bool,
     pub supports_watch: bool,
     pub supports_snapshot: bool,
     pub supports_atomic_write: bool,
     pub max_file_bytes: u64,
     pub max_directory_entries: u32,
     pub availability: DomainPackProviderCapabilityState,
+    /// Bounded diagnostic for unavailable providers; never a host/provider payload.
+    pub unavailable_reason: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -461,12 +471,15 @@ pub fn foundation_filesystem_descriptor_hashes() -> FilesystemDescriptorHashes {
         provider_capability_schema_hash: filesystem_stable_hash(&FilesystemProviderCapability {
             provider_class: "unavailable".into(),
             supported_commands: schema_set(FOUNDATION_FILESYSTEM_COMMANDS),
+            supported_root_kinds: BTreeSet::new(),
+            supports_recursive_operations: false,
             supports_watch: false,
             supports_snapshot: false,
             supports_atomic_write: false,
             max_file_bytes: 0,
             max_directory_entries: 0,
             availability: DomainPackProviderCapabilityState::Unavailable,
+            unavailable_reason: Some("filesystem_provider_not_installed".into()),
         }),
         unavailable_schema_hash: filesystem_stable_hash(&FilesystemError {
             code: FilesystemResultStatus::Unavailable,
