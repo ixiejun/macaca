@@ -351,5 +351,9 @@ mod random_tests;
 mod foundation_config_tests;
 
 #[cfg(test)]
+#[path = "abi_foundation_filesystem_tests.rs"]
+mod foundation_filesystem_tests;
+
+#[cfg(test)]
 #[path = "abi_time_tests.rs"]
 mod time_tests;
