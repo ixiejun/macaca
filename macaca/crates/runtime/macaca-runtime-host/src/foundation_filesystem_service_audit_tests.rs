@@ -200,6 +200,31 @@ async fn every_filesystem_command_has_trace_addressable_sanitized_replay_evidenc
     }
 }
 
+#[tokio::test]
+async fn filesystem_bridge_cancels_watches_and_shutdown_clears_lifecycle_state() {
+    let mock = Arc::new(MockFilesystemProvider::default());
+    let provider = FoundationFilesystemSystemServiceProvider::new(mock.clone());
+    provider.start().await.unwrap();
+    let watch = provider
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new("filesystem.watch_path"),
+            serde_json::json!({"path":{"relative_path":"document.txt"}}),
+            TraceContext::new("trace-filesystem-watch-lifecycle"),
+        ))
+        .await
+        .unwrap();
+    let checkpoint = watch.output["watch_checkpoint"].as_str().unwrap();
+    assert_eq!(provider.snapshot().active_watch_count, 1);
+    provider.cancel_watch(checkpoint).await.unwrap();
+    assert_eq!(provider.snapshot().active_watch_count, 0);
+    provider.stop().await.unwrap();
+    assert_eq!(provider.snapshot().open_handle_count, 0);
+    assert!(matches!(
+        provider.health().await.unwrap(),
+        macaca_proto::ServiceHealth::Healthy
+    ));
+}
+
 fn replay_payload(operation: &str) -> serde_json::Value {
     match operation {
         "filesystem.open_handle"

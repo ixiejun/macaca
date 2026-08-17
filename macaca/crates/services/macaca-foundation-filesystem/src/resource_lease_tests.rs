@@ -57,3 +57,24 @@ fn exceeded_reservations_do_not_mutate_current_capacity() {
         FilesystemResourceReservation::default()
     );
 }
+
+#[tokio::test]
+async fn timeout_drops_lease_and_releases_capacity() {
+    let ledger = FilesystemResourceLedger::new(limits());
+    let lease = ledger
+        .reserve(FilesystemResourceReservation {
+            request_units: 1,
+            ..Default::default()
+        })
+        .unwrap();
+    let timed = tokio::time::timeout(std::time::Duration::from_millis(1), async move {
+        let _lease = lease;
+        std::future::pending::<()>().await;
+    })
+    .await;
+    assert!(timed.is_err());
+    assert_eq!(
+        ledger.current().unwrap(),
+        FilesystemResourceReservation::default()
+    );
+}
