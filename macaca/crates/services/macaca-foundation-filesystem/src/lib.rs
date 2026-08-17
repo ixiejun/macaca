@@ -6,6 +6,7 @@
 
 pub mod local_scoped_provider;
 pub mod mock_provider;
+pub mod resource_lease;
 pub mod service_contract;
 
 pub use local_scoped_provider::{
@@ -13,6 +14,7 @@ pub use local_scoped_provider::{
     UnavailableFilesystemContentResolver,
 };
 pub use mock_provider::MockFilesystemProvider;
+pub use resource_lease::{FilesystemResourceLease, FilesystemResourceLedger};
 pub use service_contract::{FilesystemService, UnavailableFilesystemProvider};
 
 #[cfg(test)]
@@ -20,3 +22,6 @@ mod tests;
 
 #[cfg(test)]
 mod local_scoped_provider_tests;
+
+#[cfg(test)]
+mod resource_lease_tests;
