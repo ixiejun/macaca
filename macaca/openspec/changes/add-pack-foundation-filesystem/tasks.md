@@ -49,7 +49,7 @@
   bounds, stream budget, retention, conflict mode, and provider capability.
 - [x] 3.4 Add side-effect approval behavior for delete, overwrite, restore,
   recursive copy/move/delete, and non-temporary root mutation.
-- [ ] 3.5 Add resource reservations before side-effect provider calls and release
+- [x] 3.5 Add resource reservations before side-effect provider calls and release
   resources on success, failure, timeout, and cancellation.
 - [x] 3.6 Add tests proving denied, unavailable, and quota paths do not invoke a
   concrete provider.

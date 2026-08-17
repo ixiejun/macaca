@@ -3,9 +3,14 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use macaca_foundation_filesystem::{FilesystemService, MockFilesystemProvider};
+use macaca_foundation_filesystem::{
+    FilesystemResourceLedger, FilesystemService, MockFilesystemProvider,
+};
 use macaca_kernel::SystemService;
-use macaca_proto::{KernelServiceId, ServiceBusSource, ServiceCommandName, TraceContext};
+use macaca_proto::{
+    FilesystemResourceLimits, KernelServiceId, ServiceBusSource, ServiceCommand,
+    ServiceCommandName, TraceContext,
+};
 
 use crate::foundation_filesystem_service_provider::FoundationFilesystemSystemServiceProvider;
 use crate::{
@@ -123,4 +128,30 @@ async fn filesystem_policy_denial_happens_before_mock_invocation() {
     assert!(matches!(error, ServiceRuntimeError::PolicyDenied(_)));
     assert_eq!(mock.snapshot().open_handle_count, 0);
     assert_eq!(mock.snapshot().root_hashes.len(), 0);
+}
+
+#[tokio::test]
+async fn filesystem_resource_quota_rejects_before_mock_side_effect_and_releases_capacity() {
+    let mock = Arc::new(MockFilesystemProvider::default());
+    let provider = FoundationFilesystemSystemServiceProvider::with_resource_ledger(
+        mock.clone(),
+        FilesystemResourceLedger::new(FilesystemResourceLimits {
+            max_byte_units: 0,
+            max_entry_units: 0,
+            max_recursive_operations: 0,
+            max_watch_slots: 0,
+            max_snapshot_units: 0,
+            max_mutation_operations: 0,
+            max_request_units: 0,
+        }),
+    );
+    let result = provider
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new("filesystem.write_file"),
+            serde_json::json!({"path":{"relative_path":"document.txt"},"content":{"content_ref":"artifact:test"}}),
+            TraceContext::new("trace-filesystem-resource-denied"),
+        ))
+        .await;
+    assert!(result.is_err());
+    assert!(mock.snapshot().root_hashes.is_empty());
 }

@@ -8,22 +8,40 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use macaca_foundation_filesystem::{FilesystemService, UnavailableFilesystemProvider};
+use macaca_foundation_filesystem::{
+    FilesystemResourceLedger, FilesystemService, UnavailableFilesystemProvider,
+};
 use macaca_kernel::SystemService;
 use macaca_proto::{
-    FilesystemProviderCapability, FilesystemProviderSnapshot, ServiceCallResult, ServiceCommand,
-    ServiceDescriptor, ServiceHealth, ServiceResult,
+    FilesystemProviderCapability, FilesystemProviderSnapshot, FilesystemResourceLimits,
+    FilesystemResourceReservation, ServiceCallResult, ServiceCommand, ServiceDescriptor,
+    ServiceHealth, ServiceResult,
 };
 
 /// Runtime composition Bridge that owns filesystem provider lifecycle delegation.
 pub struct FoundationFilesystemSystemServiceProvider {
     provider: Arc<dyn FilesystemService>,
+    resource_ledger: FilesystemResourceLedger,
 }
 
 impl FoundationFilesystemSystemServiceProvider {
     /// Inject an approved provider Strategy from the runtime-host composition root.
     pub fn new(provider: Arc<dyn FilesystemService>) -> Self {
-        Self { provider }
+        Self::with_resource_ledger(
+            provider,
+            FilesystemResourceLedger::new(default_resource_limits()),
+        )
+    }
+
+    /// Inject a bounded resource ledger from the runtime-host composition root.
+    pub fn with_resource_ledger(
+        provider: Arc<dyn FilesystemService>,
+        resource_ledger: FilesystemResourceLedger,
+    ) -> Self {
+        Self {
+            provider,
+            resource_ledger,
+        }
     }
 
     /// Build the fail-closed fallback when no filesystem provider was installed.
@@ -62,6 +80,12 @@ impl SystemService for FoundationFilesystemSystemServiceProvider {
     }
 
     async fn call(&self, command: ServiceCommand) -> ServiceResult<ServiceCallResult> {
+        // The guard remains live across the provider await. A router timeout or
+        // task cancellation drops it during future unwinding, releasing counters
+        // before a later filesystem call can observe stale reservation state.
+        let _lease = side_effect_reservation(&command)
+            .map(|reservation| self.resource_ledger.reserve(reservation))
+            .transpose()?;
         self.provider.call(command).await
     }
 
@@ -81,4 +105,69 @@ impl SystemService for FoundationFilesystemSystemServiceProvider {
     async fn health(&self) -> ServiceResult<ServiceHealth> {
         Ok(self.provider.health())
     }
+}
+
+/// Conservative default limits for a generic host composition.
+fn default_resource_limits() -> FilesystemResourceLimits {
+    FilesystemResourceLimits {
+        max_byte_units: 16 * 1024 * 1024,
+        max_entry_units: 10_000,
+        max_recursive_operations: 8,
+        max_watch_slots: 64,
+        max_snapshot_units: 16 * 1024 * 1024,
+        max_mutation_operations: 1_024,
+        max_request_units: 4_096,
+    }
+}
+
+/// Derive only bounded counters; paths, handles, and content references stay private.
+fn side_effect_reservation(command: &ServiceCommand) -> Option<FilesystemResourceReservation> {
+    let name = command.name.as_str();
+    let side_effect = matches!(
+        name,
+        "filesystem.write_file"
+            | "filesystem.append_file"
+            | "filesystem.create_directory"
+            | "filesystem.copy_path"
+            | "filesystem.move_path"
+            | "filesystem.delete_path"
+            | "filesystem.create_temp"
+            | "filesystem.watch_path"
+            | "filesystem.snapshot_tree"
+            | "filesystem.restore_snapshot"
+    );
+    side_effect.then(|| FilesystemResourceReservation {
+        byte_units: command
+            .payload
+            .get("max_bytes")
+            .and_then(serde_json::Value::as_u64)
+            .unwrap_or(0)
+            .min(16 * 1024 * 1024),
+        entry_units: command
+            .payload
+            .get("page_size")
+            .and_then(serde_json::Value::as_u64)
+            .unwrap_or(0)
+            .min(10_000) as u32,
+        recursive_operations: u32::from(
+            command
+                .payload
+                .get("recursive")
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(false),
+        ),
+        watch_slots: u32::from(name == "filesystem.watch_path"),
+        snapshot_units: if name == "filesystem.snapshot_tree" {
+            command
+                .payload
+                .get("max_bytes")
+                .and_then(serde_json::Value::as_u64)
+                .unwrap_or(0)
+                .min(16 * 1024 * 1024)
+        } else {
+            0
+        },
+        mutation_operations: u32::from(name != "filesystem.watch_path"),
+        request_units: 1,
+    })
 }
