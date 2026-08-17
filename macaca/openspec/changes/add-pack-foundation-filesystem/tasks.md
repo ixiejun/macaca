@@ -62,7 +62,7 @@
   disabled roots, unsupported watch/snapshot/atomic-write capability, and missing
   entitlement.
 - [x] 4.3 Implement deterministic mock provider for contract and replay tests.
-- [ ] 4.4 Implement or bind a local scoped workspace provider with root sandboxing,
+- [x] 4.4 Implement or bind a local scoped workspace provider with root sandboxing,
   path normalization, symlink policy, bounded directory paging, and atomic write
   strategy.
 - [ ] 4.5 Add lifecycle, health, snapshot, shutdown, timeout, cancellation,
