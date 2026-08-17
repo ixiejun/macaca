@@ -49,7 +49,7 @@
   retention, consistency level, and provider capability.
 - [x] 3.4 Add side-effect approval behavior for namespace-wide delete, restore,
   migration, compaction, large batch mutation, and overwrite without revision.
-- [ ] 3.5 Add resource reservations before side-effect provider calls and release
+- [x] 3.5 Add resource reservations before side-effect provider calls and release
   resources on success, failure, timeout, cancellation, and stream termination.
 - [ ] 3.6 Add tests proving denied, unavailable, quota, and unsupported paths do
   not invoke a concrete provider.

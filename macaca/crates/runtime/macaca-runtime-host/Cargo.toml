@@ -21,6 +21,7 @@ macaca-heartbeat = { workspace = true }
 macaca-random = { workspace = true }
 macaca-foundation-config = { workspace = true }
 macaca-foundation-filesystem = { workspace = true }
+macaca-foundation-key-value-state = { workspace = true }
 macaca-time = { workspace = true }
 macaca-skill = { workspace = true }
 macaca-app = { workspace = true }

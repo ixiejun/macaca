@@ -83,6 +83,7 @@ pub(crate) mod file_service_local;
 pub mod file_service_provider;
 pub mod foundation_config_service_provider;
 pub mod foundation_filesystem_service_provider;
+pub mod foundation_key_value_state_service_provider;
 mod framework_public_api;
 pub mod framework_runtime_agent_service;
 pub mod genui_surface_store;

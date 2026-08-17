@@ -1842,6 +1842,7 @@ dependencies = [
  "macaca-driver",
  "macaca-foundation-config",
  "macaca-foundation-filesystem",
+ "macaca-foundation-key-value-state",
  "macaca-framework",
  "macaca-heartbeat",
  "macaca-ipc",
