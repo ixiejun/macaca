@@ -74,3 +74,68 @@ async fn wasm_filesystem_read_uses_service_runtime_and_preserves_trace_metadata(
     );
     assert!(!format!("{result:?}").contains("/private/host"));
 }
+
+#[tokio::test]
+async fn wasm_routes_every_declared_filesystem_command_through_the_service_descriptor() {
+    let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
+    let provider: Arc<dyn SystemService> = Arc::new(
+        FoundationFilesystemSystemServiceProvider::new(Arc::new(MockFilesystemProvider::default())),
+    );
+    let descriptor = provider.descriptor();
+    let service_id = runtime
+        .register_provider(
+            &StaticServiceProviderFactory::new(ServiceProviderInstance::new(descriptor, provider)),
+            Default::default(),
+        )
+        .await
+        .unwrap();
+    runtime
+        .start(
+            &service_id,
+            macaca_proto::TraceContext::new("trace-filesystem-wasm-all-start"),
+        )
+        .await
+        .unwrap();
+    let bridge = Arc::new(WasmHostImportBridge::new(
+        Arc::clone(&runtime),
+        WasmHostImportBridgeConfig::default(),
+    ));
+    let provider = DefaultInProcessWasmRuntimeProvider::default().with_host_import_bridge(bridge);
+    let session = provider
+        .create_session(traced_request("trace-filesystem-wasm-all-provider"))
+        .await
+        .unwrap();
+    for operation in macaca_proto::FOUNDATION_FILESYSTEM_COMMANDS {
+        let result = session
+            .dispatch(host_import_command(
+                &format!("trace-filesystem-wasm-{operation}"),
+                &service_id,
+                operation,
+                filesystem_payload(operation),
+                "filesystem.read",
+            ))
+            .await
+            .unwrap();
+        assert!(matches!(result.status, ApplicationHostCommandStatus::Ok));
+        assert_eq!(
+            result.metadata.get("service.operation").map(String::as_str),
+            Some(*operation)
+        );
+    }
+}
+
+fn filesystem_payload(operation: &str) -> serde_json::Value {
+    match operation {
+        "filesystem.open_handle"
+        | "filesystem.read_file"
+        | "filesystem.stat_path"
+        | "filesystem.list_directory"
+        | "filesystem.create_directory"
+        | "filesystem.delete_path"
+        | "filesystem.watch_path" => serde_json::json!({"path":{"relative_path":"document.txt"}}),
+        "filesystem.write_file" | "filesystem.append_file" => {
+            serde_json::json!({"path":{"relative_path":"document.txt"},"content":{"content_ref":"artifact:test"}})
+        }
+        _ => serde_json::json!({}),
+    }
+}

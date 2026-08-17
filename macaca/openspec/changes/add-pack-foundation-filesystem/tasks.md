@@ -81,7 +81,7 @@
 - [x] 5.3 Extend effective capability projection so applications can inspect
   callable commands, denied commands, unavailable roots, provider capability
   flags, and replay references.
-- [ ] 5.4 Expose WASM host imports only for declared callable filesystem commands,
+- [x] 5.4 Expose WASM host imports only for declared callable filesystem commands,
   and route every import through the service runtime path.
 - [x] 5.5 Add app-framework tests proving YAML, WASM, GenUI, and headless apps all
   use the same filesystem execution path.
