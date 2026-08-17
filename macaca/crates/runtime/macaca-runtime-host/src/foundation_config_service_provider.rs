@@ -6,8 +6,8 @@ use async_trait::async_trait;
 use macaca_foundation_config::{ConfigService, UnavailableConfigProvider};
 use macaca_kernel::SystemService;
 use macaca_proto::{
-    ConfigProviderSnapshot, ServiceCallResult, ServiceCommand, ServiceDescriptor, ServiceHealth,
-    ServiceResult,
+    ConfigProviderCapability, ConfigProviderSnapshot, ServiceCallResult, ServiceCommand,
+    ServiceDescriptor, ServiceHealth, ServiceResult,
 };
 
 /// Runtime composition adapter; callers remain unaware of concrete config sources.
@@ -27,6 +27,14 @@ impl FoundationConfigSystemServiceProvider {
     /// Return the provider's sanitized Memento for replay diagnostics.
     pub fn snapshot(&self) -> ConfigProviderSnapshot {
         self.provider.snapshot()
+    }
+    /// Return sanitized provider capability facts for health and discovery surfaces.
+    pub fn provider_capabilities(&self) -> ConfigProviderCapability {
+        self.provider.provider_capabilities()
+    }
+    /// Forward watch cancellation through the provider lifecycle boundary.
+    pub async fn cancel_watch(&self, watch_checkpoint: &str) -> ServiceResult<()> {
+        self.provider.cancel_watch(watch_checkpoint).await
     }
 }
 

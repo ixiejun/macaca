@@ -2,10 +2,11 @@
 
 use async_trait::async_trait;
 use macaca_proto::{
-    CapabilityId, CleanupPolicy, ConfigProviderSnapshot, KernelServiceId, ServiceCallResult,
-    ServiceCapability, ServiceCommand, ServiceDescriptor, ServiceError, ServiceHealth,
-    ServiceLifecycleState, ServiceResult, ServiceScope, ServiceType, TraceSchemaRef,
-    FOUNDATION_CONFIG_COMMANDS, FOUNDATION_CONFIG_SERVICE_ID,
+    CapabilityId, CleanupPolicy, ConfigProviderCapability, ConfigProviderSnapshot,
+    DomainPackProviderCapabilityState, KernelServiceId, ServiceCallResult, ServiceCapability,
+    ServiceCommand, ServiceDescriptor, ServiceError, ServiceHealth, ServiceLifecycleState,
+    ServiceResult, ServiceScope, ServiceType, TraceSchemaRef, FOUNDATION_CONFIG_COMMANDS,
+    FOUNDATION_CONFIG_SERVICE_ID,
 };
 
 /// Provider-neutral boundary for layered configuration providers.
@@ -19,6 +20,14 @@ pub trait ConfigService: Send + Sync {
     fn health(&self) -> ServiceHealth;
     /// Return a replay-safe Memento containing hashes and redaction counts only.
     fn snapshot(&self) -> ConfigProviderSnapshot;
+    /// Report provider capabilities without exposing source identities or values.
+    fn provider_capabilities(&self) -> ConfigProviderCapability;
+    /// Cancel a bounded watch handle. Providers without watch support fail explicitly.
+    async fn cancel_watch(&self, _watch_checkpoint: &str) -> ServiceResult<()> {
+        Err(ServiceError::UnsupportedCommand(
+            "config.watch.cancel".into(),
+        ))
+    }
     /// Release watches and provider-owned caches during runtime shutdown.
     async fn shutdown(&self) -> ServiceResult<()>;
 }
@@ -73,7 +82,14 @@ impl ConfigService for UnavailableConfigProvider {
             output: serde_json::json!({"status":"unavailable","reason":self.reason}),
             trace,
             status: "unavailable".into(),
-            metadata: Default::default(),
+            // Audit consumers receive only a bounded state label and never the unavailable
+            // provider's native failure payload, source locator, or diagnostic stack.
+            metadata: [(
+                "config.audit_event".into(),
+                "config_pack_unavailable".into(),
+            )]
+            .into_iter()
+            .collect(),
             cleanup_hint: Some(CleanupPolicy::None),
         })
     }
@@ -88,11 +104,27 @@ impl ConfigService for UnavailableConfigProvider {
             provider_class: "unavailable".into(),
             source_hashes: Default::default(),
             schema_hashes: Default::default(),
+            layer_order: Default::default(),
+            validation_status: "unavailable".into(),
+            replay_ref: "replay:foundation-config:unavailable".into(),
             redaction_summary: macaca_proto::ConfigRedactionSummary {
                 redacted_value_count: 0,
                 redacted_source_count: 0,
                 contains_secret_references: false,
             },
+        }
+    }
+    fn provider_capabilities(&self) -> ConfigProviderCapability {
+        ConfigProviderCapability {
+            provider_class: "unavailable".into(),
+            supported_commands: Default::default(),
+            supported_value_kinds: Default::default(),
+            supports_watch: false,
+            supports_reload: false,
+            supports_redacted_export: false,
+            max_keys_per_page: 0,
+            max_value_bytes: 0,
+            availability: DomainPackProviderCapabilityState::Unavailable,
         }
     }
     async fn shutdown(&self) -> ServiceResult<()> {

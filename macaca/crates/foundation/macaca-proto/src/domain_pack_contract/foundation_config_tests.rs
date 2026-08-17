@@ -217,6 +217,9 @@ fn foundation_config_result_and_snapshot_dtos_are_bounded() {
         provider_class: "unavailable".into(),
         source_hashes: BTreeMap::from([("workspace".into(), "source-hash".into())]),
         schema_hashes: BTreeMap::from([("app.settings".into(), "schema-hash".into())]),
+        layer_order: vec!["package_descriptor".into(), "workspace".into()],
+        validation_status: "valid".into(),
+        replay_ref: "replay:foundation-config:test".into(),
         redaction_summary: redaction.clone(),
     };
     let unavailable: ConfigResultEnvelope<String> = ConfigResultEnvelope {

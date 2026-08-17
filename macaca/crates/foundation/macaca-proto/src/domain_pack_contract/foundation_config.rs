@@ -281,6 +281,15 @@ pub struct ConfigProviderSnapshot {
     pub provider_class: String,
     pub source_hashes: BTreeMap<String, String>,
     pub schema_hashes: BTreeMap<String, String>,
+    /// Declarative precedence names retained without source paths or values.
+    #[serde(default)]
+    pub layer_order: Vec<String>,
+    /// Bounded result of the last admitted validation pass.
+    #[serde(default)]
+    pub validation_status: String,
+    /// Opaque trace/replay reference used to locate audit evidence.
+    #[serde(default)]
+    pub replay_ref: String,
     pub redaction_summary: ConfigRedactionSummary,
 }
 
@@ -414,6 +423,9 @@ pub fn foundation_config_descriptor_hashes() -> ConfigDescriptorHashes {
             provider_class: "unavailable".into(),
             source_hashes: BTreeMap::new(),
             schema_hashes: BTreeMap::new(),
+            layer_order: Vec::new(),
+            validation_status: "not_evaluated".into(),
+            replay_ref: "replay:foundation-config:unavailable".into(),
             redaction_summary: redaction,
         }),
         provider_capability_schema_hash: config_stable_hash(&ConfigProviderCapability {

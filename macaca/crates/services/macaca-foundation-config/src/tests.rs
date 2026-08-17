@@ -33,6 +33,10 @@ async fn mock_provider_returns_only_opaque_references_and_hashed_snapshot_keys()
         .unwrap();
     assert_eq!(reply.output["value_ref"], "artifact:theme-default");
     assert!(!reply.output.to_string().contains("raw-secret"));
+    assert_eq!(
+        reply.metadata.get("config.audit_event").map(String::as_str),
+        Some("config_pack_service_call_succeeded")
+    );
     let snapshot = provider.snapshot();
     assert!(snapshot
         .source_hashes
@@ -51,6 +55,10 @@ async fn unavailable_provider_fails_closed_with_trace_evidence() {
         .unwrap();
     assert_eq!(reply.status, "unavailable");
     assert_eq!(reply.trace.trace_id.as_str(), "trace-config.get");
+    assert_eq!(
+        reply.metadata.get("config.audit_event").map(String::as_str),
+        Some("config_pack_unavailable")
+    );
     assert_eq!(provider.snapshot().provider_class, "unavailable");
 }
 
@@ -77,6 +85,9 @@ async fn every_declared_config_command_is_trace_addressable_for_replay() {
     let snapshot = provider.snapshot();
     assert_eq!(snapshot.provider_class, "mock");
     assert!(!snapshot.source_hashes.is_empty());
+    assert_eq!(snapshot.layer_order, vec!["mock"]);
+    assert_eq!(snapshot.validation_status, "valid");
+    assert!(snapshot.replay_ref.starts_with("replay:foundation-config:"));
 }
 
 #[tokio::test]
@@ -123,4 +134,17 @@ async fn layered_adapters_apply_declared_precedence_and_clear_on_shutdown() {
         .unwrap();
     assert_eq!(cleared.output["status"], "not_found");
     assert_eq!(provider.health(), macaca_proto::ServiceHealth::Healthy);
+}
+
+#[tokio::test]
+async fn providers_report_capabilities_and_release_watch_lifecycle_state() {
+    let provider = MockConfigProvider::default();
+    let watched = provider
+        .call(command("config.watch", serde_json::json!({})))
+        .await
+        .unwrap();
+    let checkpoint = watched.output["checkpoint"].as_str().unwrap();
+    assert!(provider.provider_capabilities().supports_watch);
+    provider.cancel_watch(checkpoint).await.unwrap();
+    provider.shutdown().await.unwrap();
 }

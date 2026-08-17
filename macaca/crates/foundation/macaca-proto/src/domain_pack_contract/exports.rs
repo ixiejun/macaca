@@ -206,6 +206,12 @@ pub use super::foundation_config::{
     ConfigWatchCommand, ConfigWatchEvent, FOUNDATION_CONFIG_COMMANDS, FOUNDATION_CONFIG_PACK_ID,
     FOUNDATION_CONFIG_SERVICE_ID,
 };
+pub use super::foundation_config_semantics::{
+    dispatch_after_preflight as dispatch_config_after_preflight, preflight_command,
+    redacted_config_audit_fields, reserve as reserve_config_resources, ConfigAdmissionFailure,
+    ConfigAdmissionRequest, ConfigAuditFields, ConfigPolicyContext, ConfigResourceLimits,
+    ConfigResourceReservation,
+};
 pub use super::foundation_filesystem::{
     filesystem_stable_hash, foundation_filesystem_descriptor_hashes,
     foundation_filesystem_pack_definition, FilesystemAccessMode, FilesystemAppendFileCommand,

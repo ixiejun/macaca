@@ -6,9 +6,11 @@ use macaca_proto::{
 };
 
 use super::{
-    config_effective_command, config_export_redacted_command, config_get_command,
-    config_provenance_command, config_unavailable_diagnostics_command, config_validate_command,
-    config_watch_command,
+    config_describe_schema_command, config_effective_command, config_export_redacted_command,
+    config_get_command, config_get_many_command, config_list_keys_command,
+    config_provenance_command, config_reload_command, config_snapshot_command,
+    config_unavailable_diagnostics_command, config_validate_command, config_watch_command,
+    ConfigDomainPackCommandBuildOutcome,
 };
 use crate::domain_pack_client::SystemDomainPackClient;
 use crate::{CatalogBackedDomainPackClient, DomainPackResolveCommand};
@@ -31,14 +33,49 @@ async fn resolved() -> crate::DomainPackResolveResult {
 async fn config_helpers_build_only_canonical_traced_service_calls() {
     let helpers = vec![
         (
+            "config.describe_schema",
+            config_describe_schema_command(
+                serde_json::json!({}),
+                TraceContext::new("trace-config-schema"),
+            ),
+        ),
+        (
             "config.get",
             config_get_command(serde_json::json!({}), TraceContext::new("trace-config-get")),
+        ),
+        (
+            "config.get_many",
+            config_get_many_command(
+                serde_json::json!({}),
+                TraceContext::new("trace-config-many"),
+            ),
+        ),
+        (
+            "config.list_keys",
+            config_list_keys_command(
+                serde_json::json!({}),
+                TraceContext::new("trace-config-list"),
+            ),
         ),
         (
             "config.resolve_effective",
             config_effective_command(
                 serde_json::json!({}),
                 TraceContext::new("trace-config-effective"),
+            ),
+        ),
+        (
+            "config.reload",
+            config_reload_command(
+                serde_json::json!({}),
+                TraceContext::new("trace-config-reload"),
+            ),
+        ),
+        (
+            "config.snapshot",
+            config_snapshot_command(
+                serde_json::json!({}),
+                TraceContext::new("trace-config-snapshot"),
             ),
         ),
         (
@@ -83,4 +120,23 @@ async fn config_helpers_build_only_canonical_traced_service_calls() {
         assert_eq!(command.command_name, name);
         assert!(command.trace.is_some());
     }
+}
+
+#[tokio::test]
+async fn rejected_config_preflight_cannot_create_a_service_call() {
+    let outcome = config_reload_command(
+        serde_json::json!({"source":"remote"}),
+        TraceContext::new("trace-config-preflight-rejected"),
+    )
+    .build_after_preflight(
+        &resolved().await,
+        Err(macaca_proto::ConfigAdmissionFailure::ApprovalRequired),
+    )
+    .unwrap();
+    assert_eq!(
+        outcome,
+        ConfigDomainPackCommandBuildOutcome::Rejected(
+            macaca_proto::ConfigAdmissionFailure::ApprovalRequired
+        )
+    );
 }

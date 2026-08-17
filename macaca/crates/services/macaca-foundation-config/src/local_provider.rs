@@ -1,6 +1,6 @@
 //! Deterministic mock configuration provider for contract and replay tests.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc, Mutex,
@@ -8,7 +8,8 @@ use std::sync::{
 
 use async_trait::async_trait;
 use macaca_proto::{
-    CapabilityId, CleanupPolicy, ConfigProviderSnapshot, ConfigRedactionSummary, KernelServiceId,
+    CapabilityId, CleanupPolicy, ConfigProviderCapability, ConfigProviderSnapshot,
+    ConfigRedactionSummary, ConfigValueKind, DomainPackProviderCapabilityState, KernelServiceId,
     ServiceCallResult, ServiceCapability, ServiceCommand, ServiceDescriptor, ServiceError,
     ServiceHealth, ServiceResult, ServiceType, TraceSchemaRef, FOUNDATION_CONFIG_COMMANDS,
     FOUNDATION_CONFIG_SERVICE_ID,
@@ -20,6 +21,7 @@ use crate::service_contract::ConfigService;
 #[derive(Debug, Default)]
 pub struct MockConfigProvider {
     values: Arc<Mutex<BTreeMap<String, String>>>,
+    watches: Arc<Mutex<BTreeSet<String>>>,
     call_count: AtomicUsize,
 }
 
@@ -46,11 +48,18 @@ impl ConfigService for MockConfigProvider {
             | "config.list_keys"
             | "config.describe_schema"
             | "config.validate"
-            | "config.watch"
             | "config.reload"
             | "config.snapshot"
             | "config.export_redacted" => {
                 serde_json::json!({"status":"success","provider_class":"mock","redacted":true})
+            }
+            "config.watch" => {
+                let checkpoint = hash(trace.trace_id.as_str());
+                self.watches
+                    .lock()
+                    .map_err(lock_error)?
+                    .insert(checkpoint.clone());
+                serde_json::json!({"status":"watch_checkpoint","checkpoint":checkpoint,"redacted":true})
             }
             other => return Err(ServiceError::UnsupportedCommand(other.into())),
         };
@@ -63,6 +72,8 @@ impl ConfigService for MockConfigProvider {
             metadata: BTreeMap::from([
                 ("replay.provider_class".into(), "mock".into()),
                 ("replay.config_command".into(), operation.into()),
+                ("config.audit_event".into(), audit_event(operation).into()),
+                ("config.redaction".into(), "opaque_references_only".into()),
             ]),
             cleanup_hint: Some(CleanupPolicy::OnStop),
         })
@@ -87,6 +98,9 @@ impl ConfigService for MockConfigProvider {
             provider_class: "mock".into(),
             source_hashes,
             schema_hashes: Default::default(),
+            layer_order: vec!["mock".into()],
+            validation_status: "valid".into(),
+            replay_ref: "replay:foundation-config:mock".into(),
             redaction_summary: ConfigRedactionSummary {
                 redacted_value_count: 0,
                 redacted_source_count: 0,
@@ -94,8 +108,48 @@ impl ConfigService for MockConfigProvider {
             },
         }
     }
+    fn provider_capabilities(&self) -> ConfigProviderCapability {
+        ConfigProviderCapability {
+            provider_class: "mock".into(),
+            supported_commands: FOUNDATION_CONFIG_COMMANDS
+                .iter()
+                .map(|command| (*command).into())
+                .collect(),
+            supported_value_kinds: BTreeSet::from([
+                ConfigValueKind::String,
+                ConfigValueKind::Number,
+                ConfigValueKind::Boolean,
+                ConfigValueKind::Json,
+                ConfigValueKind::SecretReference,
+            ]),
+            supports_watch: true,
+            supports_reload: true,
+            supports_redacted_export: true,
+            max_keys_per_page: 1_000,
+            max_value_bytes: 65_536,
+            availability: DomainPackProviderCapabilityState::Available,
+        }
+    }
+    async fn cancel_watch(&self, watch_checkpoint: &str) -> ServiceResult<()> {
+        if watch_checkpoint.is_empty() || watch_checkpoint.len() > 128 {
+            return Err(ServiceError::InvalidArgument(
+                "bounded watch checkpoint required".into(),
+            ));
+        }
+        self.watches
+            .lock()
+            .map_err(lock_error)?
+            .remove(watch_checkpoint);
+        tracing::info!(
+            service_id = FOUNDATION_CONFIG_SERVICE_ID,
+            watch_checkpoint_hash = hash(watch_checkpoint),
+            "foundation config mock watch cancelled"
+        );
+        Ok(())
+    }
     async fn shutdown(&self) -> ServiceResult<()> {
         self.values.lock().map_err(lock_error)?.clear();
+        self.watches.lock().map_err(lock_error)?.clear();
         tracing::info!(
             service_id = FOUNDATION_CONFIG_SERVICE_ID,
             "foundation config mock cache cleared"
@@ -144,6 +198,17 @@ fn descriptor() -> ServiceDescriptor {
         .metadata
         .insert("provider_class".into(), "mock".into());
     descriptor
+}
+
+/// Map declared commands to sanitized observer events without provider-specific data.
+fn audit_event(operation: &str) -> &'static str {
+    match operation {
+        "config.watch" => "config_pack_watch_started",
+        "config.reload" => "config_pack_source_reloaded",
+        "config.snapshot" => "config_pack_snapshot_recorded",
+        "config.validate" => "config_pack_validation_succeeded",
+        _ => "config_pack_service_call_succeeded",
+    }
 }
 
 fn key_from_payload(payload: &serde_json::Value) -> ServiceResult<String> {

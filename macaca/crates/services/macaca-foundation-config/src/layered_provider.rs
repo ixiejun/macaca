@@ -10,7 +10,8 @@ use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use macaca_proto::{
-    CapabilityId, CleanupPolicy, ConfigProviderSnapshot, ConfigRedactionSummary, KernelServiceId,
+    CapabilityId, CleanupPolicy, ConfigProviderCapability, ConfigProviderSnapshot,
+    ConfigRedactionSummary, ConfigValueKind, DomainPackProviderCapabilityState, KernelServiceId,
     ServiceCallResult, ServiceCapability, ServiceCommand, ServiceDescriptor, ServiceError,
     ServiceHealth, ServiceResult, ServiceType, TraceSchemaRef, FOUNDATION_CONFIG_COMMANDS,
     FOUNDATION_CONFIG_SERVICE_ID,
@@ -106,6 +107,7 @@ impl ReferenceMapConfigSource {
 /// Layered provider with deterministic highest-priority-last resolution.
 pub struct LayeredConfigProvider {
     sources: Vec<ReferenceMapConfigSource>,
+    watches: Arc<Mutex<BTreeSet<String>>>,
 }
 
 impl LayeredConfigProvider {
@@ -124,7 +126,10 @@ impl LayeredConfigProvider {
                 ));
             }
         }
-        Ok(Self { sources })
+        Ok(Self {
+            sources,
+            watches: Arc::new(Mutex::new(BTreeSet::new())),
+        })
     }
 
     fn effective_reference(&self, key: &str) -> ServiceResult<Option<(String, String)>> {
@@ -176,11 +181,18 @@ impl ConfigService for LayeredConfigProvider {
             | "config.list_keys"
             | "config.describe_schema"
             | "config.validate"
-            | "config.watch"
             | "config.reload"
             | "config.snapshot"
             | "config.export_redacted" => {
                 serde_json::json!({"status":"success","provider_class":"layered_adapter","source_count":self.sources.len(),"redacted":true})
+            }
+            "config.watch" => {
+                let checkpoint = hash(trace.trace_id.as_str());
+                self.watches
+                    .lock()
+                    .map_err(lock_error)?
+                    .insert(checkpoint.clone());
+                serde_json::json!({"status":"watch_checkpoint","checkpoint":checkpoint,"redacted":true})
             }
             other => return Err(ServiceError::UnsupportedCommand(other.into())),
         };
@@ -192,6 +204,8 @@ impl ConfigService for LayeredConfigProvider {
             metadata: BTreeMap::from([
                 ("replay.provider_class".into(), "layered_adapter".into()),
                 ("replay.config_command".into(), operation.into()),
+                ("config.audit_event".into(), audit_event(operation).into()),
+                ("config.redaction".into(), "opaque_references_only".into()),
             ]),
             cleanup_hint: Some(CleanupPolicy::OnStop),
         })
@@ -211,6 +225,13 @@ impl ConfigService for LayeredConfigProvider {
                 .map(|source| (source.kind.name().into(), source.source_hash()))
                 .collect(),
             schema_hashes: BTreeMap::new(),
+            layer_order: self
+                .sources
+                .iter()
+                .map(|source| source.kind.name().into())
+                .collect(),
+            validation_status: "valid".into(),
+            replay_ref: "replay:foundation-config:layered".into(),
             redaction_summary: ConfigRedactionSummary {
                 redacted_value_count: 0,
                 redacted_source_count: self.sources.len() as u32,
@@ -219,10 +240,52 @@ impl ConfigService for LayeredConfigProvider {
         }
     }
 
+    fn provider_capabilities(&self) -> ConfigProviderCapability {
+        ConfigProviderCapability {
+            provider_class: "layered_adapter".into(),
+            supported_commands: FOUNDATION_CONFIG_COMMANDS
+                .iter()
+                .map(|command| (*command).into())
+                .collect(),
+            supported_value_kinds: BTreeSet::from([
+                ConfigValueKind::String,
+                ConfigValueKind::Number,
+                ConfigValueKind::Boolean,
+                ConfigValueKind::Json,
+                ConfigValueKind::SecretReference,
+            ]),
+            supports_watch: true,
+            supports_reload: true,
+            supports_redacted_export: true,
+            max_keys_per_page: 1_000,
+            max_value_bytes: 65_536,
+            availability: DomainPackProviderCapabilityState::Available,
+        }
+    }
+
+    async fn cancel_watch(&self, watch_checkpoint: &str) -> ServiceResult<()> {
+        if watch_checkpoint.is_empty() || watch_checkpoint.len() > 128 {
+            return Err(ServiceError::InvalidArgument(
+                "bounded watch checkpoint required".into(),
+            ));
+        }
+        self.watches
+            .lock()
+            .map_err(lock_error)?
+            .remove(watch_checkpoint);
+        tracing::info!(
+            service_id = FOUNDATION_CONFIG_SERVICE_ID,
+            watch_checkpoint_hash = hash(watch_checkpoint),
+            "foundation layered config watch cancelled"
+        );
+        Ok(())
+    }
+
     async fn shutdown(&self) -> ServiceResult<()> {
         for source in &self.sources {
             source.values.lock().map_err(lock_error)?.clear();
         }
+        self.watches.lock().map_err(lock_error)?.clear();
         tracing::info!(
             service_id = FOUNDATION_CONFIG_SERVICE_ID,
             "foundation layered config sources cleared during shutdown"
@@ -248,6 +311,17 @@ fn hash(value: &str) -> String {
             .wrapping_mul(1099511628211)
             .wrapping_add(byte as u64))
     )
+}
+
+/// Map declared commands to sanitized observer events without native source facts.
+fn audit_event(operation: &str) -> &'static str {
+    match operation {
+        "config.watch" => "config_pack_watch_started",
+        "config.reload" => "config_pack_source_reloaded",
+        "config.snapshot" => "config_pack_snapshot_recorded",
+        "config.validate" => "config_pack_validation_succeeded",
+        _ => "config_pack_service_call_succeeded",
+    }
 }
 fn lock_error<T>(_: std::sync::PoisonError<T>) -> ServiceError {
     ServiceError::AdapterFailure("config source lock poisoned".into())

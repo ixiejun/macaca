@@ -108,3 +108,20 @@ fn config_projection_separates_permission_denial_from_provider_unavailability() 
         Some("config_provider_not_installed")
     );
 }
+
+#[test]
+fn required_config_declarations_fail_admission_when_no_provider_is_available() {
+    let mut catalog = InMemoryDomainPackCatalog::new();
+    catalog.register(macaca_proto::foundation_config_pack_definition());
+    let manifest = AppLoader::parse_manifest_yaml(
+        "name: required-config\nlayer: L3Declarative\nservice_contract:\n  required_packs:\n    - pack.foundation.config.v1\n",
+    )
+    .unwrap();
+    let result = YamlApplicationAbiAdapter::new(manifest)
+        .with_catalog(Arc::new(catalog))
+        .load();
+    assert!(
+        result.is_err(),
+        "required unavailable config must block admission"
+    );
+}

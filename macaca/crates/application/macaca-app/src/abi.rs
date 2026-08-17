@@ -147,6 +147,21 @@ impl ApplicationAbiAdapter for YamlApplicationAbiAdapter {
         // pack-specific routing rules in application-framework code.
         let service_capabilities =
             expand_service_capabilities(self.manifest.service_contract.as_ref(), catalog);
+        // Required packs are an admission contract, not a best-effort discovery hint.
+        // Returning before ABI construction prevents every application form from obtaining
+        // callable imports for a provider that is unavailable, incompatible, or denied.
+        // Optional packs remain projected as explicit unavailable Mementos below.
+        if !service_capabilities.unresolved_required_packs.is_empty() {
+            let pack_ids = service_capabilities.unresolved_required_packs.join(",");
+            warn!(
+                application_id = %application_id,
+                required_pack_count = service_capabilities.unresolved_required_packs.len(),
+                "application ABI admission rejected unresolved required service packs"
+            );
+            return Err(ApplicationAbiError::InvalidDeclaration(format!(
+                "required service packs are unavailable: {pack_ids}"
+            )));
+        }
         let mut declaration = ApplicationAbiDeclaration::v0(application_id.clone());
         declaration.package_id = Some(projected_package.manifest.id.clone());
         declaration.permissions = projected_package

@@ -337,9 +337,11 @@ pub use entitlement_client::{
 pub use evm_client::{ServiceBackedEvmClient, SystemEvmClient, UnavailableSystemEvmClient};
 pub use facade::{AgentRegistryApi, MacacaSdk};
 pub use foundation_config_client::{
-    config_effective_command, config_export_redacted_command, config_get_command,
-    config_provenance_command, config_unavailable_diagnostics_command, config_validate_command,
-    config_watch_command, ConfigDomainPackCommandBuilder,
+    config_describe_schema_command, config_effective_command, config_export_redacted_command,
+    config_get_command, config_get_many_command, config_list_keys_command,
+    config_provenance_command, config_reload_command, config_snapshot_command,
+    config_unavailable_diagnostics_command, config_validate_command, config_watch_command,
+    ConfigDomainPackCommandBuildOutcome, ConfigDomainPackCommandBuilder,
 };
 pub use foundation_random_client::{
     random_bytes_command, random_entropy_health_command, random_integer_command,

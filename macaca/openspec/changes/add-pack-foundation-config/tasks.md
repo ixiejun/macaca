@@ -40,7 +40,7 @@
 
 ## 3. Admission, Permission, Policy, Resource, And Approval
 
-- [ ] 3.1 Implement manifest declaration validation for required/optional
+- [x] 3.1 Implement manifest declaration validation for required/optional
   `pack.foundation.config.v1`, schema refs, and app-scoped config selectors.
 - [x] 3.2 Validate scopes: `config.read`, `config.list`, `config.validate`,
   `config.watch`, `config.reload`, `config.snapshot`, and `config.export`.
@@ -49,10 +49,10 @@
   watch budget, reload budget, and provider capability.
 - [x] 3.4 Reject raw secret values and require secret-reference interoperability
   for secret-classified config.
-- [ ] 3.5 Add approval behavior for reload from external sources, broad export,
+- [x] 3.5 Add approval behavior for reload from external sources, broad export,
   test override activation, and tenant-wide config changes when providers support
   mutation.
-- [ ] 3.6 Add tests proving denied, unavailable, validation_failed, quota, and
+- [x] 3.6 Add tests proving denied, unavailable, validation_failed, quota, and
   secret_value_forbidden paths do not invoke concrete providers where they should
   be rejected before side effects.
 
@@ -67,7 +67,7 @@
 - [x] 4.4 Implement or bind package descriptor, workspace config, environment
   adapter, tenant config, and remote config bridge providers without leaking
   provider-native APIs to SDK callers.
-- [ ] 4.5 Add lifecycle, health, snapshot, shutdown, reload, watch cancellation,
+- [x] 4.5 Add lifecycle, health, snapshot, shutdown, reload, watch cancellation,
   validation, redaction, and provider capability reports.
 
 ## 5. SDK, WASM ABI, And Application Framework
@@ -77,7 +77,7 @@
   availability, health, diagnostics, and docs link.
 - [x] 5.2 Add SDK command builders for every `config.*` command; builders must
   only produce canonical traced service calls.
-- [ ] 5.3 Add SDK helpers for effective config, typed get, validation, provenance
+- [x] 5.3 Add SDK helpers for effective config, typed get, validation, provenance
   explanation, watch cancellation, redacted export, and unavailable diagnostics.
 - [x] 5.4 Extend effective capability projection so applications can inspect
   callable commands, denied commands, unavailable sources, provider capability
@@ -89,20 +89,20 @@
 
 ## 6. Trace, Audit, Replay, And Gates
 
-- [ ] 6.1 Emit sanitized events for declaration, admission, policy, resource,
+- [x] 6.1 Emit sanitized events for declaration, admission, policy, resource,
   service calls, source reloads, watch lifecycle, snapshots, validation failures,
   success, failure, denied, and unavailable states.
 - [x] 6.2 Add audit redaction tests proving raw secret values, unbounded config
   values, raw environment dumps, prompts, manifests, package bytes, credentials,
   private keys, and provider payloads do not enter observability surfaces.
-- [ ] 6.3 Add replay tests proving config commands are trace-addressable and can
+- [x] 6.3 Add replay tests proving config commands are trace-addressable and can
   reconstruct effective config with source hashes, layer order, schema ids,
   validation result, and redaction summary.
 - [x] 6.4 Add dependency-boundary tests proving kernel, SDK, shells, and
   application framework do not import concrete config providers.
 - [x] 6.5 Add no-direct-provider-call gates proving SDK helpers and WASM host
   imports cannot bypass service runtime.
-- [ ] 6.6 Run `openspec validate add-pack-foundation-config --strict`, targeted
+- [x] 6.6 Run `openspec validate add-pack-foundation-config --strict`, targeted
   cargo tests, dependency-boundary gates, file-size gates, and audit replay
   checks before marking complete.
 

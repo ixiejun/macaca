@@ -85,6 +85,7 @@ pub mod finance_portfolio_async;
 mod finance_portfolio_validation;
 pub mod finance_stock;
 mod foundation_config;
+pub mod foundation_config_semantics;
 mod foundation_config_validation;
 mod foundation_filesystem;
 mod foundation_filesystem_validation;
@@ -169,6 +170,8 @@ pub mod workflow_task_lifecycle_spec;
 pub mod workflow_task_resource_spec;
 pub mod workflow_task_transition;
 
+#[cfg(test)]
+mod foundation_config_semantics_tests;
 #[cfg(test)]
 mod foundation_random_semantics_tests;
 #[cfg(test)]
