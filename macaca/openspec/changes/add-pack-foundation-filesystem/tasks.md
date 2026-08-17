@@ -94,7 +94,7 @@
 - [x] 6.2 Add audit redaction tests proving raw host paths, file bytes, secrets,
   manifests, package bytes, credentials, private keys, provider payloads, and
   unbounded output do not enter observability surfaces.
-- [ ] 6.3 Add replay tests proving every filesystem command is trace-addressable
+- [x] 6.3 Add replay tests proving every filesystem command is trace-addressable
   and can reconstruct the decision path without replaying raw file content.
 - [x] 6.4 Add dependency-boundary tests proving kernel, SDK, shells, and
   application framework do not import concrete filesystem providers.

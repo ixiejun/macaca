@@ -155,3 +155,65 @@ async fn filesystem_resource_quota_rejects_before_mock_side_effect_and_releases_
     assert!(result.is_err());
     assert!(mock.snapshot().root_hashes.is_empty());
 }
+
+#[tokio::test]
+async fn every_filesystem_command_has_trace_addressable_sanitized_replay_evidence() {
+    let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig::default()));
+    let provider: Arc<dyn SystemService> = Arc::new(
+        FoundationFilesystemSystemServiceProvider::new(Arc::new(MockFilesystemProvider::default())),
+    );
+    let service_id = registered_provider(&runtime, provider).await;
+    let router = ServiceRouter::new(
+        runtime,
+        ServiceBusSource::new("test.foundation.filesystem.replay"),
+        Arc::new(InMemoryServiceContractRegistry::new()),
+        Arc::new(InMemoryServicePolicyEngine::new()),
+    )
+    .with_audit_sink(Arc::new(InMemoryServiceCallAuditSink::new()));
+    for operation in macaca_proto::FOUNDATION_FILESYSTEM_COMMANDS {
+        let trace_id = format!("trace-filesystem-replay-{operation}");
+        router
+            .route(ServiceRouteRequest {
+                app_id: Some("app:generic".into()),
+                tenant_id: None,
+                session_id: None,
+                service_id: service_id.clone(),
+                operation: ServiceCommandName::new(*operation),
+                payload: replay_payload(operation),
+                metadata: BTreeMap::new(),
+                trace: TraceContext::new(&trace_id),
+            })
+            .await
+            .unwrap();
+        let replay = router.replay_audit_by_trace_id(&trace_id).unwrap();
+        let success = replay
+            .iter()
+            .find(|event| event.stage == "service_call_succeeded")
+            .unwrap();
+        assert_eq!(
+            success.replay_metadata.get("replay.filesystem_command"),
+            Some(&operation.to_string())
+        );
+        let serialized = format!("{replay:?}");
+        assert!(!serialized.contains("private-document.txt"));
+        assert!(!serialized.contains("artifact:private-content"));
+    }
+}
+
+fn replay_payload(operation: &str) -> serde_json::Value {
+    match operation {
+        "filesystem.open_handle"
+        | "filesystem.read_file"
+        | "filesystem.stat_path"
+        | "filesystem.list_directory"
+        | "filesystem.create_directory"
+        | "filesystem.delete_path"
+        | "filesystem.watch_path" => {
+            serde_json::json!({"path":{"relative_path":"private-document.txt"}})
+        }
+        "filesystem.write_file" | "filesystem.append_file" => {
+            serde_json::json!({"path":{"relative_path":"private-document.txt"},"content":{"content_ref":"artifact:private-content"}})
+        }
+        _ => serde_json::json!({}),
+    }
+}
