@@ -23,6 +23,11 @@ pub trait KeyValueStateService: Send + Sync {
     fn snapshot(&self) -> KeyValueStateProviderSnapshot;
     /// Report capabilities without exposing provider-native topology or clients.
     fn provider_capabilities(&self) -> KeyValueStateProviderCapability;
+    /// Cancel one bounded watch by its trace identity; the default is a no-op for providers
+    /// that do not expose streaming state.
+    async fn cancel_watch(&self, _trace_id: &str) -> ServiceResult<()> {
+        Ok(())
+    }
     /// Stop the provider and release bounded watches, leases, and caches.
     async fn shutdown(&self) -> ServiceResult<()>;
 }

@@ -67,7 +67,7 @@
   revision tracking, bounded scans, TTL cleanup, and snapshot references.
 - [x] 4.5 Add optional adapter bridge points for Redis-like and etcd-like
   providers without leaking provider-native APIs to SDK callers.
-- [ ] 4.6 Add lifecycle, health, snapshot, shutdown, timeout, cancellation,
+- [x] 4.6 Add lifecycle, health, snapshot, shutdown, timeout, cancellation,
   bounded watch streaming, compaction handling, and provider capability reports.
 
 ## 5. SDK, WASM ABI, And Application Framework

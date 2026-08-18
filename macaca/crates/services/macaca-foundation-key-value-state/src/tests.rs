@@ -232,4 +232,6 @@ async fn embedded_provider_snapshots_restores_and_bounds_watch_slots() {
         ))
         .await
         .is_err());
+    provider.cancel_watch("trace-watch-0").await.unwrap();
+    assert_eq!(provider.snapshot().active_watch_count, 31);
 }

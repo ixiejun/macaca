@@ -521,7 +521,11 @@ impl KeyValueStateService for EmbeddedKeyValueStateProvider {
             descriptor_hash: "foundation-key-value-state-embedded-v1".into(),
             provider_class: "embedded-durable".into(),
             namespace_hashes: BTreeMap::new(),
-            active_watch_count: 0,
+            active_watch_count: self
+                .active_watches
+                .try_lock()
+                .map(|count| *count)
+                .unwrap_or(0),
         }
     }
 
@@ -545,6 +549,20 @@ impl KeyValueStateService for EmbeddedKeyValueStateProvider {
     async fn shutdown(&self) -> ServiceResult<()> {
         *self.stopped.lock().await = true;
         *self.active_watches.lock().await = 0;
+        Ok(())
+    }
+
+    async fn cancel_watch(&self, trace_id: &str) -> ServiceResult<()> {
+        let mut watches = self.active_watches.lock().await;
+        if *watches > 0 {
+            *watches -= 1;
+        }
+        tracing::info!(
+            service_id = FOUNDATION_KEY_VALUE_STATE_SERVICE_ID,
+            trace_id,
+            active_watch_count = *watches,
+            "embedded key-value watch cancelled"
+        );
         Ok(())
     }
 }
