@@ -285,6 +285,9 @@ pub use super::foundation_secrets_reference::{
     FOUNDATION_SECRETS_REFERENCE_PACK_ID, FOUNDATION_SECRETS_REFERENCE_SERVICE_ID,
 };
 pub use super::foundation_secrets_reference_manifest_validation::validate_secret_reference_declarations;
+pub use super::foundation_secrets_reference_semantics::{
+    approve_secret_operation, SecretApprovalFacts, SecretApprovalFailure,
+};
 pub use super::foundation_session_state::{
     foundation_session_state_descriptor_hashes, foundation_session_state_pack_definition,
     session_state_stable_hash, SessionStateCheckpointRef, SessionStateClearSessionCommand,

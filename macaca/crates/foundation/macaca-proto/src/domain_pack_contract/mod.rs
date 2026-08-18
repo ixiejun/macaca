@@ -98,6 +98,7 @@ pub mod foundation_random_semantics;
 mod foundation_random_validation;
 mod foundation_secrets_reference;
 mod foundation_secrets_reference_manifest_validation;
+pub mod foundation_secrets_reference_semantics;
 mod foundation_secrets_reference_validation;
 mod foundation_session_state;
 mod foundation_session_state_validation;

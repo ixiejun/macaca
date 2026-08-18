@@ -54,7 +54,7 @@
 - [x] 3.4 Reject all app-facing raw secret value results and all trace/audit/
   snapshot/diagnostic payloads containing raw secret values or provider-private
   locators.
-- [ ] 3.5 Add approval behavior for import, purpose binding, provider resolution,
+- [x] 3.5 Add approval behavior for import, purpose binding, provider resolution,
   rotation, revoke, and audit export.
 - [ ] 3.6 Add tests proving denied, unavailable, disabled, destroyed, expired,
   raw_secret_forbidden, and invalid_purpose paths do not inject secrets into
