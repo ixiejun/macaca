@@ -51,7 +51,7 @@
   migration, compaction, large batch mutation, and overwrite without revision.
 - [x] 3.5 Add resource reservations before side-effect provider calls and release
   resources on success, failure, timeout, cancellation, and stream termination.
-- [ ] 3.6 Add tests proving denied, unavailable, quota, and unsupported paths do
+- [x] 3.6 Add tests proving denied, unavailable, quota, and unsupported paths do
   not invoke a concrete provider.
 
 ## 4. Service Provider And Runtime Integration
@@ -93,10 +93,10 @@
 - [ ] 6.1 Emit sanitized events for declaration, admission, policy, resource,
   entitlement, service calls, watch lifecycle, snapshots, restore, migration,
   compaction, success, failure, denied, and unavailable states.
-- [ ] 6.2 Add audit redaction tests proving raw values, raw secrets, prompts,
+- [x] 6.2 Add audit redaction tests proving raw values, raw secrets, prompts,
   manifests, package bytes, credentials, private keys, provider payloads, and
   unbounded key listings do not enter observability surfaces.
-- [ ] 6.3 Add replay tests proving every KV command is trace-addressable and can
+- [x] 6.3 Add replay tests proving every KV command is trace-addressable and can
   reconstruct the decision path without replaying raw state values.
 - [ ] 6.4 Add dependency-boundary tests proving kernel, SDK, shells, and
   application framework do not import concrete KV providers.

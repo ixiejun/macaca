@@ -126,6 +126,7 @@ pub use payment_service_provider::payment_service_descriptor;
 mod foundation_config_service_audit_tests;
 #[cfg(test)]
 mod foundation_filesystem_service_audit_tests;
+mod foundation_key_value_state_audit_tests;
 pub mod plugin;
 pub mod plugin_capability;
 pub mod plugin_capability_service_provider;
