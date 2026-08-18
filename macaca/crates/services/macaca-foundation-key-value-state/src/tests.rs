@@ -147,3 +147,89 @@ async fn embedded_provider_persists_opaque_references_without_leaking_them() {
         .unwrap()
         .contains("artifact:theme"));
 }
+
+#[tokio::test]
+async fn embedded_provider_snapshots_restores_and_bounds_watch_slots() {
+    let provider = EmbeddedKeyValueStateProvider::new(Arc::new(MemoryPersistStore::default()));
+    let namespace = KeyValueNamespaceRef {
+        namespace: "preferences".into(),
+        tenant_ref: Some("tenant".into()),
+    };
+    let key = KeyValueKeyRef {
+        namespace: namespace.clone(),
+        key: "theme".into(),
+    };
+    let value = KeyValueTypedValueRef {
+        value_ref: "artifact:theme".into(),
+        value_kind: "json".into(),
+        schema_id: None,
+        secret_reference_required: false,
+    };
+    let trace = |name| TraceContext::new(format!("trace-{name}"));
+    provider
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new("kv.put"),
+            serde_json::to_value(KeyValuePutCommand {
+                key: key.clone(),
+                value,
+                ttl: None,
+                conflict_mode: KeyValueConflictMode::Fail,
+            })
+            .unwrap(),
+            trace("put"),
+        ))
+        .await
+        .unwrap();
+    let snapshot = provider
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new("kv.snapshot_namespace"),
+            serde_json::json!({"namespace":namespace,"include_prefix":null}),
+            trace("snapshot"),
+        ))
+        .await
+        .unwrap();
+    provider
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new("kv.delete"),
+            serde_json::json!({"key":key,"expected_revision":null}),
+            trace("delete"),
+        ))
+        .await
+        .unwrap();
+    let snapshot_id = snapshot.output["snapshot_ref"].as_str().unwrap();
+    let restore = serde_json::json!({"snapshot":{"snapshot_id":snapshot_id,"namespace":namespace,"state_hash":"redacted"},"conflict_mode":"fail","dry_run":false});
+    assert_eq!(
+        provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new("kv.restore_namespace"),
+                restore,
+                trace("restore")
+            ))
+            .await
+            .unwrap()
+            .status,
+        "ok"
+    );
+    for index in 0..32 {
+        assert_eq!(
+            provider
+                .call(ServiceCommand::with_trace(
+                    ServiceCommandName::new("kv.watch_namespace"),
+                    serde_json::json!({"namespace":namespace,"prefix":null,"start_revision":null}),
+                    TraceContext::new(format!("trace-watch-{index}"))
+                ))
+                .await
+                .unwrap()
+                .status,
+            "ok"
+        );
+    }
+    assert!(provider
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new("kv.watch_namespace"),
+            serde_json::json!({"namespace":namespace,"prefix":null,"start_revision":null}),
+            trace("watch-overflow")
+        ))
+        .await
+        .is_err());
+}
