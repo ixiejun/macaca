@@ -6,6 +6,26 @@ use super::*;
 // They never create, import, resolve, or log a real secret value.
 
 #[test]
+fn secret_reference_manifest_declarations_require_the_pack_and_unique_safe_ids() {
+    let reference = SecretReference {
+        reference_id: "secret-ref".into(),
+        provider_class: "vault".into(),
+        version_hint: Some("current".into()),
+    };
+    let mut declaration = AppServiceContractConfig {
+        secret_reference_declarations: vec![reference.clone()],
+        ..Default::default()
+    };
+    assert!(validate_secret_reference_declarations(&declaration).is_err());
+    declaration
+        .optional_packs
+        .push(FOUNDATION_SECRETS_REFERENCE_PACK_ID.into());
+    assert!(validate_secret_reference_declarations(&declaration).is_ok());
+    declaration.secret_reference_declarations.push(reference);
+    assert!(validate_secret_reference_declarations(&declaration).is_err());
+}
+
+#[test]
 fn foundation_secrets_reference_descriptor_is_discoverable_and_not_callable() {
     let definition = foundation_secrets_reference_pack_definition();
 

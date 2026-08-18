@@ -39,7 +39,7 @@
 
 ## 3. Admission, Permission, Policy, Resource, And Approval
 
-- [ ] 3.1 Implement manifest declaration validation for required/optional
+- [x] 3.1 Implement manifest declaration validation for required/optional
   `pack.foundation.secrets.reference.v1`, reference declarations, allowed
   purposes, and allowed service ids.
 - [x] 3.2 Validate scopes: `secrets.reference.read`,

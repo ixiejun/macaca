@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use super::foundation_filesystem::FilesystemRootRef;
 use super::foundation_key_value_state::KeyValueNamespaceRef;
+use super::foundation_secrets_reference::SecretReference;
 
 /// Optional pack declaration block in an application `service_contract` section.
 /// The raw service lists remain available for low-level capability declarations, while pack
@@ -41,6 +42,9 @@ pub struct AppServiceContractConfig {
     /// manifests cannot embed database handles or provider-native configuration.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub key_value_namespaces: Vec<KeyValueNamespaceRef>,
+    /// Reference-only secret metadata admitted by the secrets-reference pack.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub secret_reference_declarations: Vec<SecretReference>,
     /// Mandatory service identifiers required by the application.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub required_services: Vec<String>,
