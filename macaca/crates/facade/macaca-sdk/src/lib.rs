@@ -26,6 +26,8 @@ pub mod evm_client;
 pub mod facade;
 pub mod foundation_config_client;
 pub mod foundation_filesystem_client;
+pub mod foundation_key_value_state_client;
+mod foundation_key_value_state_watch;
 pub mod foundation_random_client;
 pub mod foundation_time_client;
 pub mod heartbeat_client;
@@ -352,6 +354,12 @@ pub use foundation_filesystem_client::{
     filesystem_restore_snapshot_command, filesystem_snapshot_tree_command,
     filesystem_stat_path_command, filesystem_watch_path_command, filesystem_write_file_command,
     FilesystemDomainPackCommandBuildOutcome, FilesystemDomainPackCommandBuilder,
+};
+pub use foundation_key_value_state_client::{
+    key_value_bounded_prefix_scan_command, key_value_restore_snapshot_dry_run_command,
+    key_value_ttl_cache_entry_command, key_value_unavailable_diagnostics,
+    key_value_watch_subscription, KeyValueCasUpdatePlan, KeyValueDomainPackCommandBuilder,
+    KeyValueWatchCancellation, KeyValueWatchSubscription,
 };
 pub use foundation_random_client::{
     random_bytes_command, random_entropy_health_command, random_integer_command,

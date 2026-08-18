@@ -77,7 +77,7 @@
   consistency/TTL/watch support, health, diagnostics, and docs link.
 - [x] 5.2 Add SDK command builders for every `kv.*` command; builders must only
   produce canonical traced service calls.
-- [ ] 5.3 Add SDK helpers for CAS update loops, bounded prefix scans, watch stream
+- [x] 5.3 Add SDK helpers for CAS update loops, bounded prefix scans, watch stream
   cancellation, TTL cache entries, snapshot dry runs, and unavailable
   diagnostics.
 - [x] 5.4 Extend effective capability projection so applications can inspect
