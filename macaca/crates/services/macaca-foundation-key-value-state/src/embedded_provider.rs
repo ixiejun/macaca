@@ -12,6 +12,7 @@ use async_trait::async_trait;
 use macaca_persist::PersistStore;
 use macaca_proto::{
     CapabilityId, CleanupPolicy, DomainPackProviderCapabilityState, KernelServiceId,
+    KeyValueBatchDeleteCommand, KeyValueBatchGetCommand, KeyValueBatchPutCommand,
     KeyValueCompareAndSetCommand, KeyValueDeleteCommand, KeyValueExistsCommand, KeyValueGetCommand,
     KeyValueGetTtlCommand, KeyValueKeyRef, KeyValueListKeysCommand, KeyValuePutCommand,
     KeyValueRevision, KeyValueSetTtlCommand, KeyValueSnapshotNamespaceCommand, KeyValueTtlPolicy,
@@ -281,6 +282,50 @@ impl KeyValueStateService for EmbeddedKeyValueStateProvider {
                     "ok",
                 )
             }
+            "kv.batch_get" => {
+                let request = decode::<KeyValueBatchGetCommand>(&command.payload)?;
+                if request.keys.len() > 500 {
+                    return Err(ServiceError::AdapterFailure("batch limit exceeded".into()));
+                }
+                let mut found = 0_u32;
+                for key in &request.keys {
+                    found += u32::from(self.load(key).await?.is_some());
+                }
+                (
+                    serde_json::json!({"status":"success","requested":request.keys.len(),"found":found}),
+                    "ok",
+                )
+            }
+            "kv.batch_put" => {
+                let request = decode::<KeyValueBatchPutCommand>(&command.payload)?;
+                if request.entries.is_empty() || request.entries.len() > 500 {
+                    return Err(ServiceError::AdapterFailure("invalid bounded batch".into()));
+                }
+                for entry in request.entries {
+                    self.put(entry).await?;
+                }
+                (serde_json::json!({"status":"success"}), "ok")
+            }
+            "kv.batch_delete" => {
+                let request = decode::<KeyValueBatchDeleteCommand>(&command.payload)?;
+                if request.keys.is_empty() || request.keys.len() > 500 {
+                    return Err(ServiceError::AdapterFailure("invalid bounded batch".into()));
+                }
+                let mut deleted = 0_u32;
+                for key in request.keys {
+                    deleted += u32::from(
+                        self.delete(KeyValueDeleteCommand {
+                            key,
+                            expected_revision: request.expected_revision.clone(),
+                        })
+                        .await?,
+                    );
+                }
+                (
+                    serde_json::json!({"status":"success","deleted":deleted}),
+                    "ok",
+                )
+            }
             "kv.compare_and_set" => {
                 let entry = self
                     .compare_and_set(decode::<KeyValueCompareAndSetCommand>(&command.payload)?)
@@ -406,8 +451,11 @@ struct StoredSnapshot {
 fn decode<T: serde::de::DeserializeOwned>(payload: &serde_json::Value) -> ServiceResult<T> {
     serde_json::from_value(payload.clone()).map_err(json_error)
 }
-fn supported_commands() -> [&'static str; 9] {
+fn supported_commands() -> [&'static str; 12] {
     [
+        "kv.batch_get",
+        "kv.batch_put",
+        "kv.batch_delete",
         "kv.get",
         "kv.put",
         "kv.delete",
