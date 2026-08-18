@@ -12,8 +12,9 @@ use async_trait::async_trait;
 use macaca_persist::PersistStore;
 use macaca_proto::{
     CapabilityId, CleanupPolicy, DomainPackProviderCapabilityState, KernelServiceId,
-    KeyValueDeleteCommand, KeyValueGetCommand, KeyValueKeyRef, KeyValueListKeysCommand,
-    KeyValuePutCommand, KeyValueRevision, KeyValueSnapshotNamespaceCommand, KeyValueTtlPolicy,
+    KeyValueCompareAndSetCommand, KeyValueDeleteCommand, KeyValueExistsCommand, KeyValueGetCommand,
+    KeyValueGetTtlCommand, KeyValueKeyRef, KeyValueListKeysCommand, KeyValuePutCommand,
+    KeyValueRevision, KeyValueSetTtlCommand, KeyValueSnapshotNamespaceCommand, KeyValueTtlPolicy,
     KeyValueTypedValueRef, ServiceCallResult, ServiceCapability, ServiceCommand, ServiceDescriptor,
     ServiceError, ServiceHealth, ServiceResult, ServiceType, TraceSchemaRef,
     FOUNDATION_KEY_VALUE_STATE_COMMANDS, FOUNDATION_KEY_VALUE_STATE_SERVICE_ID,
@@ -149,6 +150,43 @@ impl EmbeddedKeyValueStateProvider {
         Ok(true)
     }
 
+    async fn compare_and_set(
+        &self,
+        request: KeyValueCompareAndSetCommand,
+    ) -> ServiceResult<StoredEntry> {
+        let current = self
+            .load(&request.key)
+            .await?
+            .ok_or_else(|| ServiceError::AdapterFailure("revision conflict".into()))?;
+        if current.revision != request.expected_revision {
+            return Err(ServiceError::AdapterFailure("revision conflict".into()));
+        }
+        self.put(KeyValuePutCommand {
+            key: request.key,
+            value: request.value,
+            ttl: None,
+            conflict_mode: macaca_proto::KeyValueConflictMode::CompareRevision,
+        })
+        .await
+    }
+
+    async fn set_ttl(&self, request: KeyValueSetTtlCommand) -> ServiceResult<StoredEntry> {
+        let _mutation = self.mutations.lock().await;
+        let mut entry = self
+            .load(&request.key)
+            .await?
+            .ok_or_else(|| ServiceError::AdapterFailure("key not found".into()))?;
+        entry.expire_at_epoch_millis = expiry(Some(&request.ttl))?;
+        self.store
+            .set(
+                &entry_key(&request.key),
+                &serde_json::to_vec(&entry).map_err(json_error)?,
+            )
+            .await
+            .map_err(persist_error)?;
+        Ok(entry)
+    }
+
     async fn list(&self, request: KeyValueListKeysCommand) -> ServiceResult<serde_json::Value> {
         if !request.namespace.is_bounded_reference()
             || !(1..=MAX_SCAN_PAGE_SIZE).contains(&request.page_size)
@@ -188,7 +226,7 @@ impl KeyValueStateService for EmbeddedKeyValueStateProvider {
         );
         descriptor.health = ServiceHealth::Healthy;
         descriptor.cleanup_policy = CleanupPolicy::OnStop;
-        descriptor.capabilities = FOUNDATION_KEY_VALUE_STATE_COMMANDS
+        descriptor.capabilities = supported_commands()
             .iter()
             .map(|name| ServiceCapability::new(CapabilityId::new(*name), "key-value state command"))
             .collect();
@@ -234,6 +272,43 @@ impl KeyValueStateService for EmbeddedKeyValueStateProvider {
                 (
                     serde_json::json!({"status":if deleted {"success"} else {"not_found"}}),
                     if deleted { "ok" } else { "not_found" },
+                )
+            }
+            "kv.exists" => {
+                let request = decode::<KeyValueExistsCommand>(&command.payload)?;
+                (
+                    serde_json::json!({"status":"success","exists":self.load(&request.key).await?.is_some()}),
+                    "ok",
+                )
+            }
+            "kv.compare_and_set" => {
+                let entry = self
+                    .compare_and_set(decode::<KeyValueCompareAndSetCommand>(&command.payload)?)
+                    .await?;
+                (
+                    serde_json::json!({"status":"success","revision":entry.revision}),
+                    "ok",
+                )
+            }
+            "kv.set_ttl" => {
+                let entry = self
+                    .set_ttl(decode::<KeyValueSetTtlCommand>(&command.payload)?)
+                    .await?;
+                (
+                    serde_json::json!({"status":"success","revision":entry.revision}),
+                    "ok",
+                )
+            }
+            "kv.get_ttl" => {
+                let request = decode::<KeyValueGetTtlCommand>(&command.payload)?;
+                let ttl = self.load(&request.key).await?.and_then(|entry| {
+                    entry
+                        .expire_at_epoch_millis
+                        .map(|expiry| expiry.saturating_sub(now()))
+                });
+                (
+                    serde_json::json!({"status":"success","ttl_millis":ttl}),
+                    "ok",
                 )
             }
             "kv.list_keys" => (
@@ -289,16 +364,10 @@ impl KeyValueStateService for EmbeddedKeyValueStateProvider {
     fn provider_capabilities(&self) -> macaca_proto::KeyValueStateProviderCapability {
         macaca_proto::KeyValueStateProviderCapability {
             provider_class: "embedded-durable".into(),
-            supported_commands: [
-                "kv.get",
-                "kv.put",
-                "kv.delete",
-                "kv.list_keys",
-                "kv.snapshot_namespace",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            supported_commands: supported_commands()
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
             supports_ttl: true,
             supports_watch: false,
             supports_snapshot: true,
@@ -336,6 +405,19 @@ struct StoredSnapshot {
 
 fn decode<T: serde::de::DeserializeOwned>(payload: &serde_json::Value) -> ServiceResult<T> {
     serde_json::from_value(payload.clone()).map_err(json_error)
+}
+fn supported_commands() -> [&'static str; 9] {
+    [
+        "kv.get",
+        "kv.put",
+        "kv.delete",
+        "kv.exists",
+        "kv.list_keys",
+        "kv.compare_and_set",
+        "kv.set_ttl",
+        "kv.get_ttl",
+        "kv.snapshot_namespace",
+    ]
 }
 fn validate_key(key: &KeyValueKeyRef) -> ServiceResult<()> {
     if key.is_bounded_reference() {
