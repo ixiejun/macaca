@@ -98,9 +98,9 @@
   unbounded key listings do not enter observability surfaces.
 - [x] 6.3 Add replay tests proving every KV command is trace-addressable and can
   reconstruct the decision path without replaying raw state values.
-- [ ] 6.4 Add dependency-boundary tests proving kernel, SDK, shells, and
+- [x] 6.4 Add dependency-boundary tests proving kernel, SDK, shells, and
   application framework do not import concrete KV providers.
-- [ ] 6.5 Add no-direct-provider-call gates proving SDK helpers and WASM host
+- [x] 6.5 Add no-direct-provider-call gates proving SDK helpers and WASM host
   imports cannot bypass service runtime.
 - [ ] 6.6 Run `openspec validate add-pack-foundation-key-value-state --strict`,
   targeted cargo tests, dependency-boundary gates, file-size gates, and audit
