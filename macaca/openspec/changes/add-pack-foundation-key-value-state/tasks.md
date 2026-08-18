@@ -83,7 +83,7 @@
 - [x] 5.4 Extend effective capability projection so applications can inspect
   callable commands, denied commands, unavailable namespaces, provider capability
   flags, and replay references.
-- [ ] 5.5 Expose WASM host imports only for declared callable KV commands and
+- [x] 5.5 Expose WASM host imports only for declared callable KV commands and
   route every import through the service runtime path.
 - [x] 5.6 Add app-framework tests proving YAML, WASM, GenUI, and headless apps all
   use the same KV execution path.
