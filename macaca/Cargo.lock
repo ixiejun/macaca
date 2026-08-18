@@ -1572,7 +1572,9 @@ name = "macaca-foundation-key-value-state"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "macaca-persist",
  "macaca-proto",
+ "serde",
  "serde_json",
  "tokio",
  "tracing",

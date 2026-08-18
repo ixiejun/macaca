@@ -4,10 +4,12 @@
 //! SDKs, applications, and shells issue only traced service commands and never
 //! receive database clients, raw values, or provider-native handles.
 
+pub mod embedded_provider;
 pub mod mock_provider;
 pub mod resource_lease;
 pub mod service_contract;
 
+pub use embedded_provider::EmbeddedKeyValueStateProvider;
 pub use mock_provider::MockKeyValueStateProvider;
 pub use resource_lease::{KeyValueResourceLease, KeyValueResourceLedger};
 pub use service_contract::{

@@ -1,12 +1,20 @@
 //! Contract tests for deterministic and unavailable key-value state providers.
 
-use macaca_proto::{ServiceCommand, ServiceCommandName, TraceContext};
-
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use async_trait::async_trait;
+use macaca_persist::PersistStore;
+use macaca_proto::{
+    KeyValueConflictMode, KeyValueConsistencyLevel, KeyValueGetCommand, KeyValueKeyRef,
+    KeyValueNamespaceRef, KeyValuePutCommand, KeyValueTypedValueRef, MacacaResult, ServiceCommand,
+    ServiceCommandName, TraceContext,
+};
+use tokio::sync::Mutex;
+
 use crate::{
-    KeyValueStateProviderFactory, KeyValueStateService, MockKeyValueStateProvider,
-    UnavailableKeyValueStateProvider,
+    EmbeddedKeyValueStateProvider, KeyValueStateProviderFactory, KeyValueStateService,
+    MockKeyValueStateProvider, UnavailableKeyValueStateProvider,
 };
 
 fn command(name: &str) -> ServiceCommand {
@@ -65,4 +73,77 @@ fn provider_factory_keeps_adapter_selection_outside_sdk_contracts() {
         factory.create().descriptor().metadata.get("provider_class"),
         Some(&"mock".into())
     );
+}
+
+#[derive(Default)]
+struct MemoryPersistStore(Mutex<BTreeMap<String, Vec<u8>>>);
+
+#[async_trait]
+impl PersistStore for MemoryPersistStore {
+    async fn get(&self, key: &str) -> MacacaResult<Option<Vec<u8>>> {
+        Ok(self.0.lock().await.get(key).cloned())
+    }
+    async fn set(&self, key: &str, value: &[u8]) -> MacacaResult<()> {
+        self.0.lock().await.insert(key.into(), value.into());
+        Ok(())
+    }
+    async fn delete(&self, key: &str) -> MacacaResult<()> {
+        self.0.lock().await.remove(key);
+        Ok(())
+    }
+    async fn list_keys(&self, prefix: &str) -> MacacaResult<Vec<String>> {
+        Ok(self
+            .0
+            .lock()
+            .await
+            .keys()
+            .filter(|key| key.starts_with(prefix))
+            .cloned()
+            .collect())
+    }
+}
+
+#[tokio::test]
+async fn embedded_provider_persists_opaque_references_without_leaking_them() {
+    let provider = EmbeddedKeyValueStateProvider::new(Arc::new(MemoryPersistStore::default()));
+    let key = KeyValueKeyRef {
+        namespace: KeyValueNamespaceRef {
+            namespace: "preferences".into(),
+            tenant_ref: Some("tenant".into()),
+        },
+        key: "theme".into(),
+    };
+    let value = KeyValueTypedValueRef {
+        value_ref: "artifact:theme".into(),
+        value_kind: "json".into(),
+        schema_id: None,
+        secret_reference_required: false,
+    };
+    let put = ServiceCommand::with_trace(
+        ServiceCommandName::new("kv.put"),
+        serde_json::to_value(KeyValuePutCommand {
+            key: key.clone(),
+            value,
+            ttl: None,
+            conflict_mode: KeyValueConflictMode::Fail,
+        })
+        .unwrap(),
+        TraceContext::new("trace-put"),
+    );
+    assert_eq!(provider.call(put).await.unwrap().status, "ok");
+    let get = ServiceCommand::with_trace(
+        ServiceCommandName::new("kv.get"),
+        serde_json::to_value(KeyValueGetCommand {
+            key,
+            consistency: KeyValueConsistencyLevel::Local,
+        })
+        .unwrap(),
+        TraceContext::new("trace-get"),
+    );
+    let reply = provider.call(get).await.unwrap();
+    assert_eq!(reply.status, "ok");
+    assert!(reply.output["value_present"].as_bool().unwrap());
+    assert!(!serde_json::to_string(&reply)
+        .unwrap()
+        .contains("artifact:theme"));
 }
