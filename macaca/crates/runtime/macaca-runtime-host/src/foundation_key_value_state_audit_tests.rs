@@ -79,6 +79,16 @@ async fn key_value_router_replay_redacts_values_and_records_provider_stage() {
     assert!(replay
         .iter()
         .any(|event| event.stage == "key_value_state_pack_service_call_succeeded"));
+    for stage in [
+        "service_call_requested",
+        "service_call_dispatched",
+        "service_call_succeeded",
+    ] {
+        assert!(
+            replay.iter().any(|event| event.stage == stage),
+            "missing sanitized KV audit stage {stage}"
+        );
+    }
     assert!(replay.iter().any(
         |event| event.replay_metadata.get("replay.key_value_state_command")
             == Some(&"kv.put".into())

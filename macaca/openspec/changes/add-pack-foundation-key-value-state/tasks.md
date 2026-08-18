@@ -90,7 +90,7 @@
 
 ## 6. Trace, Audit, Replay, And Gates
 
-- [ ] 6.1 Emit sanitized events for declaration, admission, policy, resource,
+- [x] 6.1 Emit sanitized events for declaration, admission, policy, resource,
   entitlement, service calls, watch lifecycle, snapshots, restore, migration,
   compaction, success, failure, denied, and unavailable states.
 - [x] 6.2 Add audit redaction tests proving raw values, raw secrets, prompts,
@@ -102,7 +102,7 @@
   application framework do not import concrete KV providers.
 - [x] 6.5 Add no-direct-provider-call gates proving SDK helpers and WASM host
   imports cannot bypass service runtime.
-- [ ] 6.6 Run `openspec validate add-pack-foundation-key-value-state --strict`,
+- [x] 6.6 Run `openspec validate add-pack-foundation-key-value-state --strict`,
   targeted cargo tests, dependency-boundary gates, file-size gates, and audit
   replay checks before marking complete.
 
