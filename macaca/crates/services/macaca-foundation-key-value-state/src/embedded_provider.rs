@@ -13,11 +13,13 @@ use macaca_persist::PersistStore;
 use macaca_proto::{
     CapabilityId, CleanupPolicy, DomainPackProviderCapabilityState, KernelServiceId,
     KeyValueBatchDeleteCommand, KeyValueBatchGetCommand, KeyValueBatchPutCommand,
-    KeyValueCompareAndSetCommand, KeyValueDeleteCommand, KeyValueExistsCommand, KeyValueGetCommand,
-    KeyValueGetTtlCommand, KeyValueKeyRef, KeyValueListKeysCommand, KeyValuePutCommand,
-    KeyValueRevision, KeyValueSetTtlCommand, KeyValueSnapshotNamespaceCommand, KeyValueTtlPolicy,
-    KeyValueTypedValueRef, ServiceCallResult, ServiceCapability, ServiceCommand, ServiceDescriptor,
-    ServiceError, ServiceHealth, ServiceResult, ServiceType, TraceSchemaRef,
+    KeyValueCompactNamespaceCommand, KeyValueCompareAndSetCommand, KeyValueDeleteCommand,
+    KeyValueExistsCommand, KeyValueGetCommand, KeyValueGetTtlCommand, KeyValueKeyRef,
+    KeyValueListKeysCommand, KeyValueMigrateNamespaceCommand, KeyValuePutCommand,
+    KeyValueRestoreNamespaceCommand, KeyValueRevision, KeyValueSetTtlCommand,
+    KeyValueSnapshotNamespaceCommand, KeyValueTtlPolicy, KeyValueTypedValueRef,
+    KeyValueWatchNamespaceCommand, ServiceCallResult, ServiceCapability, ServiceCommand,
+    ServiceDescriptor, ServiceError, ServiceHealth, ServiceResult, ServiceType, TraceSchemaRef,
     FOUNDATION_KEY_VALUE_STATE_COMMANDS, FOUNDATION_KEY_VALUE_STATE_SERVICE_ID,
 };
 use serde::{Deserialize, Serialize};
@@ -215,6 +217,91 @@ impl EmbeddedKeyValueStateProvider {
             serde_json::json!({"status": if end < keys.len() {"partial_page"} else {"success"}, "key_hashes":key_hashes, "next_cursor":(end < keys.len()).then_some(end.to_string())}),
         )
     }
+
+    async fn restore(
+        &self,
+        request: KeyValueRestoreNamespaceCommand,
+    ) -> ServiceResult<serde_json::Value> {
+        let key = format!("{SNAPSHOT_PREFIX}{}", request.snapshot.snapshot_id);
+        let bytes = self
+            .store
+            .get(&key)
+            .await
+            .map_err(persist_error)?
+            .ok_or_else(|| ServiceError::AdapterFailure("snapshot not found".into()))?;
+        let snapshot: StoredSnapshot = serde_json::from_slice(&bytes).map_err(json_error)?;
+        if request.dry_run {
+            return Ok(
+                serde_json::json!({"status":"success","dry_run":true,"entry_count":snapshot.entries.len()}),
+            );
+        }
+        let _mutation = self.mutations.lock().await;
+        for (storage_key, entry) in &snapshot.entries {
+            self.store
+                .set(storage_key, &serde_json::to_vec(entry).map_err(json_error)?)
+                .await
+                .map_err(persist_error)?;
+        }
+        Ok(serde_json::json!({"status":"success","entry_count":snapshot.entries.len()}))
+    }
+
+    async fn migrate(
+        &self,
+        request: KeyValueMigrateNamespaceCommand,
+    ) -> ServiceResult<serde_json::Value> {
+        if !request.source.is_bounded_reference() || !request.target.is_bounded_reference() {
+            return Err(ServiceError::AdapterFailure(
+                "invalid namespace reference".into(),
+            ));
+        }
+        let source = namespace_hash_ref(&request.source);
+        let target = namespace_hash_ref(&request.target);
+        let keys = self
+            .store
+            .list_keys(&format!("{ENTRY_PREFIX}{source}/"))
+            .await
+            .map_err(persist_error)?;
+        if request.dry_run {
+            return Ok(
+                serde_json::json!({"status":"success","dry_run":true,"entry_count":keys.len()}),
+            );
+        }
+        let _mutation = self.mutations.lock().await;
+        for old_key in &keys {
+            if let Some(bytes) = self.store.get(old_key).await.map_err(persist_error)? {
+                let suffix = old_key
+                    .strip_prefix(&format!("{ENTRY_PREFIX}{source}/"))
+                    .unwrap_or_default();
+                self.store
+                    .set(&format!("{ENTRY_PREFIX}{target}/{suffix}"), &bytes)
+                    .await
+                    .map_err(persist_error)?;
+            }
+        }
+        Ok(serde_json::json!({"status":"success","entry_count":keys.len()}))
+    }
+
+    async fn compact(
+        &self,
+        request: KeyValueCompactNamespaceCommand,
+    ) -> ServiceResult<serde_json::Value> {
+        if !request.namespace.is_bounded_reference() {
+            return Err(ServiceError::AdapterFailure(
+                "invalid namespace reference".into(),
+            ));
+        }
+        let keys = self
+            .store
+            .list_keys(&format!(
+                "{ENTRY_PREFIX}{}/",
+                namespace_hash_ref(&request.namespace)
+            ))
+            .await
+            .map_err(persist_error)?;
+        Ok(
+            serde_json::json!({"status":"success","dry_run":request.dry_run,"retained_entries":keys.len(),"before_revision":request.before_revision}),
+        )
+    }
 }
 
 #[async_trait]
@@ -373,6 +460,38 @@ impl KeyValueStateService for EmbeddedKeyValueStateProvider {
                     "ok",
                 )
             }
+            "kv.restore_namespace" => (
+                self.restore(decode::<KeyValueRestoreNamespaceCommand>(&command.payload)?)
+                    .await?,
+                "ok",
+            ),
+            "kv.migrate_namespace" => (
+                self.migrate(decode::<KeyValueMigrateNamespaceCommand>(&command.payload)?)
+                    .await?,
+                "ok",
+            ),
+            "kv.compact_namespace" => (
+                self.compact(decode::<KeyValueCompactNamespaceCommand>(&command.payload)?)
+                    .await?,
+                "ok",
+            ),
+            "kv.watch_namespace" => {
+                let request = decode::<KeyValueWatchNamespaceCommand>(&command.payload)?;
+                if !request.namespace.is_bounded_reference() {
+                    return Err(ServiceError::AdapterFailure(
+                        "invalid namespace reference".into(),
+                    ));
+                }
+                let mut watches = self.active_watches.lock().await;
+                if *watches >= 32 {
+                    return Err(ServiceError::AdapterFailure("watch quota exceeded".into()));
+                }
+                *watches += 1;
+                (
+                    serde_json::json!({"status":"watch_checkpoint","checkpoint":hash(&trace.trace_id),"active_watch_count":*watches}),
+                    "ok",
+                )
+            }
             _ => (serde_json::json!({"status":"unsupported"}), "unsupported"),
         };
         tracing::info!(service_id = FOUNDATION_KEY_VALUE_STATE_SERVICE_ID, command = operation,
@@ -414,9 +533,9 @@ impl KeyValueStateService for EmbeddedKeyValueStateProvider {
                 .map(str::to_string)
                 .collect(),
             supports_ttl: true,
-            supports_watch: false,
+            supports_watch: true,
             supports_snapshot: true,
-            supports_compaction: false,
+            supports_compaction: true,
             max_value_bytes: 1_048_576,
             max_batch_entries: 500,
             availability: DomainPackProviderCapabilityState::Available,
@@ -451,7 +570,7 @@ struct StoredSnapshot {
 fn decode<T: serde::de::DeserializeOwned>(payload: &serde_json::Value) -> ServiceResult<T> {
     serde_json::from_value(payload.clone()).map_err(json_error)
 }
-fn supported_commands() -> [&'static str; 12] {
+fn supported_commands() -> [&'static str; 16] {
     [
         "kv.batch_get",
         "kv.batch_put",
@@ -465,6 +584,10 @@ fn supported_commands() -> [&'static str; 12] {
         "kv.set_ttl",
         "kv.get_ttl",
         "kv.snapshot_namespace",
+        "kv.restore_namespace",
+        "kv.migrate_namespace",
+        "kv.compact_namespace",
+        "kv.watch_namespace",
     ]
 }
 fn validate_key(key: &KeyValueKeyRef) -> ServiceResult<()> {
