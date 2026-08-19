@@ -411,6 +411,7 @@ fn sanitized_replay_metadata(metadata: &BTreeMap<String, String>) -> BTreeMap<St
         "replay.config_command",
         "replay.filesystem_command",
         "replay.key_value_state_command",
+        "replay.secrets_reference_command",
     ];
     metadata
         .iter()

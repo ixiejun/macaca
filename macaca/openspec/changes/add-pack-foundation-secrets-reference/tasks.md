@@ -97,13 +97,13 @@
 
 ## 6. Trace, Audit, Replay, And Gates
 
-- [ ] 6.1 Emit sanitized events for declaration, admission, policy, reference
+- [x] 6.1 Emit sanitized events for declaration, admission, policy, reference
   create/import, purpose binding, provider resolution, provider injection, lease
   create/renew/revoke, rotation, success, failure, denied, and unavailable states.
-- [ ] 6.2 Add redaction tests proving raw secret values, external provider
+- [x] 6.2 Add redaction tests proving raw secret values, external provider
   locators, credentials, private keys, raw signatures, raw provider payloads,
   prompts, manifests, and unbounded output do not enter observability surfaces.
-- [ ] 6.3 Add replay tests proving secret-reference commands are trace-addressable
+- [x] 6.3 Add replay tests proving secret-reference commands are trace-addressable
   and can reconstruct decisions without revealing raw secret values.
 - [x] 6.4 Add dependency-boundary tests proving kernel, SDK, shells, and
   application framework do not import concrete secret providers.
