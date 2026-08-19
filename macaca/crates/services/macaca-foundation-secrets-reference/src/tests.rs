@@ -3,8 +3,10 @@
 use macaca_proto::{ServiceCommand, ServiceCommandName, TraceContext};
 
 use crate::{
-    MockSecretsReferenceProvider, SecretsReferenceService, UnavailableSecretsReferenceProvider,
+    MockSecretsReferenceProvider, SecretsReferenceAdapterBridge, SecretsReferenceProviderFactory,
+    SecretsReferenceService, UnavailableSecretsReferenceProvider,
 };
+use std::sync::Arc;
 
 fn command(name: &str) -> ServiceCommand {
     ServiceCommand::with_trace(
@@ -63,4 +65,24 @@ async fn unavailable_provider_is_traceable_and_fail_closed() {
         .unwrap()
         .contains("not installed"));
     assert_eq!(provider.snapshot().provider_class, "unavailable");
+}
+
+struct Factory;
+impl SecretsReferenceProviderFactory for Factory {
+    fn provider_class(&self) -> &str {
+        "test-adapter"
+    }
+    fn create(&self) -> Arc<dyn SecretsReferenceService> {
+        Arc::new(MockSecretsReferenceProvider::default())
+    }
+}
+
+#[test]
+fn adapter_bridge_exposes_only_abstract_factory_and_class_label() {
+    let bridge = SecretsReferenceAdapterBridge::new("test-adapter", Arc::new(Factory));
+    assert_eq!(bridge.provider_class(), "test-adapter");
+    assert_eq!(
+        bridge.create().provider_capabilities().provider_class,
+        "mock"
+    );
 }

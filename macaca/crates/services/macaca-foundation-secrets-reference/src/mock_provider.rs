@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use macaca_proto::{
     CapabilityId, CleanupPolicy, DomainPackProviderCapabilityState, KernelServiceId,
-    SecretReference, SecretVersionState, SecretsCreateReferenceCommand,
+    SecretReference, SecretResolutionHandle, SecretVersionState, SecretsCreateReferenceCommand,
     SecretsImportReferenceCommand, SecretsReferenceProviderCapability,
     SecretsReferenceProviderSnapshot, ServiceCallResult, ServiceCapability, ServiceCommand,
     ServiceDescriptor, ServiceError, ServiceHealth, ServiceResult, ServiceType, TraceSchemaRef,
@@ -180,6 +180,17 @@ impl SecretsReferenceService for MockSecretsReferenceProvider {
             max_lease_ttl_seconds: 86_400,
             availability: DomainPackProviderCapabilityState::Available,
         }
+    }
+    async fn inject_for_provider(&self, handle: &SecretResolutionHandle) -> ServiceResult<()> {
+        if handle.handle_id.is_empty() || handle.service_id.is_empty() {
+            return Err(ServiceError::InvalidArgument(
+                "invalid resolution handle".into(),
+            ));
+        }
+        tracing::info!(service_id = FOUNDATION_SECRETS_REFERENCE_SERVICE_ID,
+            handle_hash = %stable_hash(&handle.handle_id),
+            "secrets reference provider injection completed without raw value return");
+        Ok(())
     }
     async fn shutdown(&self) -> ServiceResult<()> {
         self.leases.lock().map_err(lock_error)?.clear();

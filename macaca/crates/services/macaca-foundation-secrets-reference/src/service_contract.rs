@@ -5,9 +5,9 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use macaca_proto::{
     CapabilityId, CleanupPolicy, DomainPackProviderCapabilityState, KernelServiceId,
-    SecretsReferenceProviderCapability, SecretsReferenceProviderSnapshot, ServiceCallResult,
-    ServiceCapability, ServiceCommand, ServiceDescriptor, ServiceError, ServiceHealth,
-    ServiceLifecycleState, ServiceResult, ServiceScope, ServiceType, TraceSchemaRef,
+    SecretResolutionHandle, SecretsReferenceProviderCapability, SecretsReferenceProviderSnapshot,
+    ServiceCallResult, ServiceCapability, ServiceCommand, ServiceDescriptor, ServiceError,
+    ServiceHealth, ServiceLifecycleState, ServiceResult, ServiceScope, ServiceType, TraceSchemaRef,
     FOUNDATION_SECRETS_REFERENCE_COMMANDS, FOUNDATION_SECRETS_REFERENCE_SERVICE_ID,
 };
 
@@ -24,6 +24,12 @@ pub trait SecretsReferenceService: Send + Sync {
     fn snapshot(&self) -> SecretsReferenceProviderSnapshot;
     /// Report provider capabilities and raw-value prohibition.
     fn provider_capabilities(&self) -> SecretsReferenceProviderCapability;
+    /// Inject a provider-owned resolution handle without returning a raw value to the caller.
+    async fn inject_for_provider(&self, _handle: &SecretResolutionHandle) -> ServiceResult<()> {
+        Err(ServiceError::UnsupportedCommand(
+            "secrets.provider_injection".into(),
+        ))
+    }
     /// Stop provider state and revoke bounded leases.
     async fn shutdown(&self) -> ServiceResult<()>;
 }

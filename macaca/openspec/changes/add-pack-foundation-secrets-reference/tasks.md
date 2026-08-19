@@ -69,12 +69,12 @@
   missing entitlement.
 - [x] 4.3 Implement deterministic mock provider that returns references, leases,
   and diagnostics without creating real secrets.
-- [ ] 4.4 Implement adapter bridge points for AWS Secrets Manager, Vault,
+- [x] 4.4 Implement adapter bridge points for AWS Secrets Manager, Vault,
   Kubernetes Secrets, Apple Keychain, and cloud key vault providers without
   leaking provider-native APIs to SDK callers.
-- [ ] 4.5 Add provider-side injection path for admitted service providers while
+- [x] 4.5 Add provider-side injection path for admitted service providers while
   preventing raw value exposure to applications and WASM guests.
-- [ ] 4.6 Add lifecycle, health, snapshot, shutdown, lease cleanup, rotation
+- [x] 4.6 Add lifecycle, health, snapshot, shutdown, lease cleanup, rotation
   state, redaction, and provider capability reports.
 
 ## 5. SDK, WASM ABI, And Application Framework
