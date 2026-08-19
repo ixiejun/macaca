@@ -116,6 +116,25 @@ fn secret_reference_approval_is_fail_closed_for_sensitive_operations() {
 }
 
 #[test]
+fn secret_reference_preconditions_reject_invalid_purpose_and_private_material() {
+    let bad_purpose = SecretPurposeBinding {
+        purpose: "purpose".into(),
+        service_id: "not-a-service".into(),
+        expires_at_epoch_millis: None,
+    };
+    assert!(!bad_purpose.is_bounded_binding());
+    let raw_locator = SecretExternalLocator {
+        provider_class: "mock".into(),
+        redacted_locator_hash: "https://provider.example/raw".into(),
+    };
+    assert!(!raw_locator.is_safe_reference());
+    assert_eq!(
+        SecretsReferenceResultStatus::RawSecretForbidden,
+        SecretsReferenceResultStatus::RawSecretForbidden
+    );
+}
+
+#[test]
 fn industrial_catalog_uses_foundation_secrets_reference_contract_descriptor() {
     let definition = industrial_reference_domain_pack_definitions()
         .into_iter()

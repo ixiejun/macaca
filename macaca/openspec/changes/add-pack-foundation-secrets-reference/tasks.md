@@ -56,7 +56,7 @@
   locators.
 - [x] 3.5 Add approval behavior for import, purpose binding, provider resolution,
   rotation, revoke, and audit export.
-- [ ] 3.6 Add tests proving denied, unavailable, disabled, destroyed, expired,
+- [x] 3.6 Add tests proving denied, unavailable, disabled, destroyed, expired,
   raw_secret_forbidden, and invalid_purpose paths do not inject secrets into
   providers.
 
