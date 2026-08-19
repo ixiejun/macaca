@@ -92,6 +92,30 @@ fn foundation_secrets_reference_descriptor_is_discoverable_and_not_callable() {
 }
 
 #[test]
+fn secret_reference_approval_is_fail_closed_for_sensitive_operations() {
+    let denied = SecretApprovalFacts {
+        policy_requires_approval: false,
+        approval_granted: false,
+        provider_resolution: false,
+        export_audit: false,
+        revoke_or_rotate: false,
+    };
+    assert_eq!(
+        approve_secret_operation("secrets.import_reference", denied),
+        Err(SecretApprovalFailure::ApprovalRequired)
+    );
+    assert!(approve_secret_operation("secrets.inspect_reference", denied).is_ok());
+    assert!(approve_secret_operation(
+        "secrets.resolve_for_provider",
+        SecretApprovalFacts {
+            approval_granted: true,
+            ..denied
+        }
+    )
+    .is_ok());
+}
+
+#[test]
 fn industrial_catalog_uses_foundation_secrets_reference_contract_descriptor() {
     let definition = industrial_reference_domain_pack_definitions()
         .into_iter()
