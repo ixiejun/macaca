@@ -29,6 +29,7 @@ pub mod foundation_filesystem_client;
 pub mod foundation_key_value_state_client;
 mod foundation_key_value_state_watch;
 pub mod foundation_random_client;
+pub mod foundation_secrets_reference_client;
 pub mod foundation_time_client;
 pub mod heartbeat_client;
 pub mod interaction_client;
@@ -366,6 +367,13 @@ pub use foundation_random_client::{
     random_nonce_command, random_provider_capabilities_command, random_test_stream_command,
     random_token_command, random_unavailable_diagnostics_command, random_uuid_v4_command,
     RandomDomainPackCommandBuildOutcome, RandomDomainPackCommandBuilder,
+};
+pub use foundation_secrets_reference_client::{
+    secrets_reference_audit_access_command, secrets_reference_bind_purpose_command,
+    secrets_reference_inspect_command, secrets_reference_renew_lease_command,
+    secrets_reference_resolve_for_provider_command, secrets_reference_revoke_lease_command,
+    secrets_reference_rotate_command, secrets_reference_unavailable_diagnostic,
+    SecretsReferenceDomainPackCommandBuilder,
 };
 pub use foundation_time_client::{
     clock_health_command, deadline_evaluation_command, localized_format_command,

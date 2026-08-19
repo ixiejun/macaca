@@ -84,7 +84,7 @@
   support, provider availability, health, diagnostics, and docs link.
 - [x] 5.2 Add SDK command builders for every `secrets.*` command; builders must
   only produce canonical traced service calls.
-- [ ] 5.3 Add SDK helpers for metadata inspection, purpose binding, provider
+- [x] 5.3 Add SDK helpers for metadata inspection, purpose binding, provider
   resolution request building, lease renew/revoke, rotation request, audit access,
   and unavailable diagnostics.
 - [ ] 5.4 Extend effective capability projection so applications can inspect
