@@ -436,8 +436,9 @@ pub use super::model::{
     DomainPackDefinition, DomainPackDiagnostics, DomainPackMetadata, DomainPackPolicyTemplate,
     DomainPackProviderCapabilityReport, DomainPackProviderCapabilityState,
     DomainPackProviderDescriptor, DomainPackProviderSnapshot, DomainPackSdkMetadata,
-    DomainPackStability, DomainPackUnavailableDiagnostic,
+    DomainPackStability,
 };
+pub use super::model_diagnostics::DomainPackUnavailableDiagnostic;
 pub use super::reference_catalogs::{
     developer_pack_definition, foundation_pack_definition, knowledge_pack_definition,
     reference_domain_pack_definitions,

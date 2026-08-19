@@ -145,6 +145,7 @@ pub mod media_rendering;
 pub mod media_transcription;
 pub mod media_video;
 mod model;
+mod model_diagnostics;
 pub mod office_common;
 pub mod office_document;
 pub mod office_forms;

@@ -109,7 +109,7 @@
   application framework do not import concrete secret providers.
 - [x] 6.5 Add no-direct-provider-call gates proving SDK helpers and WASM host
   imports cannot bypass service runtime.
-- [ ] 6.6 Run `openspec validate add-pack-foundation-secrets-reference --strict`,
+- [x] 6.6 Run `openspec validate add-pack-foundation-secrets-reference --strict`,
   targeted cargo tests, dependency-boundary gates, file-size gates, and audit
   replay checks before marking complete.
 
